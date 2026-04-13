@@ -3,6 +3,7 @@ import { CustomEditor } from "@mariozechner/pi-coding-agent";
 import {
   type AutocompleteItem,
   type AutocompleteProvider,
+  type AutocompleteSuggestions,
   fuzzyFilter,
   matchesKey,
 } from "@mariozechner/pi-tui";
@@ -39,7 +40,12 @@ class SkillShortcutAutocomplete implements AutocompleteProvider {
     private skillCommands: { name: string; description?: string }[]
   ) {}
 
-  getSuggestions(lines: string[], cursorLine: number, cursorCol: number, options?: any) {
+  async getSuggestions(
+    lines: string[],
+    cursorLine: number,
+    cursorCol: number,
+    options: { signal: AbortSignal; force?: boolean }
+  ): Promise<AutocompleteSuggestions | null> {
     const textBeforeCursor = (lines[cursorLine] || "").slice(0, cursorCol);
     const dollarPrefix = extractDollarPrefix(textBeforeCursor);
 
