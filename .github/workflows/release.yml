@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - name: Checkout
@@ -35,4 +36,3 @@ jobs:
         run: pnpm exec semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
