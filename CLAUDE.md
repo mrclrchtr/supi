@@ -52,7 +52,10 @@ pnpm test
 # Fast smoke test for LSP guidance/relevance changes
 pnpm exec vitest run lsp/__tests__/guidance.test.ts
 
-# Run the pre-push hook suite locally (biome, typecheck, pack:check)
+# Install repo hook scripts into .git/hooks
+mise run hooks
+
+# Run the pre-push hook suite locally (full pnpm verify)
 hk run check
 
 # Run the pre-commit autofix suite locally
@@ -63,6 +66,8 @@ pnpm test:watch
 ```
 
 Toolchain versions are managed via mise (`node = "lts"`, `pnpm = "latest"`, `hk = "1.42.0"`, `pkl = "0.31.1"`).
+
+Tooling config at repo root: `hk.pkl`, `commitlint.config.mjs`, `release.config.mjs` (no `.github` shims).
 
 ## Architecture
 
@@ -190,3 +195,6 @@ Key docs to reach for first:
 - **Probe live LSP behavior with a temporary TS error file**: writing `lsp/__tmp_guidance_probe.ts` with an intentional type error exercises both `tool_result` diagnostics and pre-turn guidance.
 - **Unit-test LSP manager summaries with fake clients**: cast `manager as unknown as { clients: Map<...> }` to seed coverage/diagnostics; keep real server behavior in `*.integration.test.ts`.
 - **Unhandled promise rejections fail vitest**: if production code rejects promises during cleanup (e.g., `dispose()`), add `promise.catch(() => {})` at creation to prevent vitest from catching them as test errors.
+- **`hk` is the local hook runner**: `commit-msg` checks Conventional Commits, `pre-commit` runs Biome + safety checks, and `pre-push` runs `pnpm verify`.
+- **Local `semantic-release` dry-runs still require git auth**: `pnpm release -- --dry-run --no-ci` can fail with `EGITNOPERMISSION` even when config is correct.
+- **TS LSP integration diagnostics can arrive late**: retry `syncFileAndGetDiagnostics()` before asserting non-empty diagnostics in integration tests.

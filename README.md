@@ -64,7 +64,7 @@ pnpm biome:ai
 pnpm test
 pnpm pack:check
 pnpm verify
-hk run check # local pre-push checks (biome, typecheck, pack:check)
+hk run check # local pre-push checks (full pnpm verify)
 hk run fix   # local pre-commit autofixes
 ```
 

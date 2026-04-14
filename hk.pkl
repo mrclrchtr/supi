@@ -38,18 +38,8 @@ local commitmsg = new Mapping<String, Step> {
 }
 
 local prepush = new Mapping<String, Step> {
-  ["biome:ci"] {
-    check = "pnpm -s biome:ci"
-    stomp = true
-  }
-
-  ["typecheck"] {
-    check = "pnpm -s typecheck"
-    stomp = true
-  }
-
-  ["pack:check"] {
-    check = "pnpm -s pack:check"
+  ["verify"] {
+    check = "pnpm -s verify"
     stomp = true
   }
 }
