@@ -22,11 +22,17 @@ pi install git:github.com/mrclrchtr/SuPi
 ## Commands
 
 ```bash
+# Install pinned local tools
+mise install
+
 # Install dependencies
 pnpm install
 
+# Install repo git hooks
+mise run hooks
+
 # Type-check all extensions (no emit)
-pnpm exec tsc --noEmit
+pnpm typecheck
 
 # Lint/format check (AI-friendly output)
 pnpm biome:ai
@@ -46,11 +52,17 @@ pnpm test
 # Fast smoke test for LSP guidance/relevance changes
 pnpm exec vitest run lsp/__tests__/guidance.test.ts
 
+# Run the pre-push hook suite locally (biome, typecheck, pack:check)
+hk run check
+
+# Run the pre-commit autofix suite locally
+hk run fix
+
 # Watch mode
 pnpm test:watch
 ```
 
-Toolchain versions are managed via mise (`node = "lts"`, `pnpm = "latest"`).
+Toolchain versions are managed via mise (`node = "lts"`, `pnpm = "latest"`, `hk = "1.42.0"`, `pkl = "0.31.1"`).
 
 ## Architecture
 

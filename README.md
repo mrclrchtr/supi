@@ -53,7 +53,9 @@ Configuration:
 ## Development
 
 ```bash
+mise install
 pnpm install
+mise run hooks
 pnpm typecheck
 pnpm biome
 pnpm biome:fix
@@ -62,6 +64,8 @@ pnpm biome:ai
 pnpm test
 pnpm pack:check
 pnpm verify
+hk run check # local pre-push checks (biome, typecheck, pack:check)
+hk run fix   # local pre-commit autofixes
 ```
 
 Biome is configured in `biome.jsonc` with formatting, import organization, recommended lint rules, and stricter project/types/test plus aggressive complexity and nursery rules.

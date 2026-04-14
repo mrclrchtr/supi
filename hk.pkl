@@ -1,0 +1,87 @@
+amends "package://github.com/jdx/hk/releases/download/v1.42.0/hk@1.42.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.42.0/hk@1.42.0#/Builtins.pkl"
+
+env {
+  ["NODE_ENV"] = "development"
+}
+
+default_branch = "main"
+fail_fast = true
+
+exclude =
+  List(
+    "node_modules",
+    ".git",
+    ".idea",
+    ".claude",
+    ".codex",
+    ".pi",
+    "dist",
+    "build",
+    "coverage"
+  )
+
+local precommit = new Mapping<String, Step> {
+  ["check-merge-conflict"] = Builtins.check_merge_conflict
+  ["detect-private-key"] = Builtins.detect_private_key
+  ["check-added-large-files"] = Builtins.check_added_large_files
+
+  ["biome"] = (Builtins.biome) {
+    prefix = "pnpm -s exec"
+  }
+
+  ["trailing-whitespace"] = Builtins.trailing_whitespace
+}
+
+local commitmsg = new Mapping<String, Step> {
+  ["check-conventional-commit"] = Builtins.check_conventional_commit
+}
+
+local prepush = new Mapping<String, Step> {
+  ["biome:ci"] {
+    check = "pnpm -s biome:ci"
+    stomp = true
+  }
+
+  ["typecheck"] {
+    check = "pnpm -s typecheck"
+    stomp = true
+  }
+
+  ["pack:check"] {
+    check = "pnpm -s pack:check"
+    stomp = true
+  }
+}
+
+// stash = "none" because "git" and "patch-file" have data-loss bugs:
+// - "git": discards fixer changes (#368), resurrects deleted files (#209), corrupts binaries (#743)
+// - "patch-file": corrupts binaries (#743), removes untracked files (#209)
+// Trade-off: unstaged changes in fixed files may get staged together.
+// See: https://github.com/jdx/hk/discussions/209
+hooks {
+  ["commit-msg"] {
+    steps = commitmsg
+  }
+
+  ["pre-commit"] {
+    fix = true
+    stash = "none"
+    steps = precommit
+  }
+
+  ["pre-push"] {
+    fix = false
+    steps = prepush
+  }
+
+  ["check"] {
+    steps = prepush
+  }
+
+  ["fix"] {
+    fix = true
+    stash = "none"
+    steps = precommit
+  }
+}
