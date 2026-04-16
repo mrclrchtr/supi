@@ -85,14 +85,13 @@ describe("normalizeQuestionnaire", () => {
     expect(out.questions[0].options.map((o) => o.value)).toEqual(["yes", "no"]);
   });
 
-  it("text questions get empty options and never allow Other/comment", () => {
+  it("text questions get empty options and never allow Other", () => {
     const out = normalizeQuestionnaire({
       questions: [{ type: "text", id: "t", header: "T", prompt: "Type" }],
     });
     const q = out.questions[0];
     expect(q.options).toEqual([]);
     expect(q.allowOther).toBe(false);
-    expect(q.allowComment).toBe(false);
   });
 
   it("rejects whitespace-only id", () => {

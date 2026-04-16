@@ -32,14 +32,13 @@ function scriptedUi(steps: Step[]): FallbackUi {
   };
 }
 
-const choiceWithComment: AskUserParams = {
+const choiceQuestion: AskUserParams = {
   questions: [
     {
       type: "choice",
       id: "scope",
       header: "Scope",
       prompt: "Pick scope",
-      allowComment: true,
       options: [
         { value: "narrow", label: "Narrow" },
         { value: "broad", label: "Broad" },
@@ -56,7 +55,7 @@ describe("runFallbackQuestionnaire — comment prompt", () => {
       { kind: "input", result: "rationale here" },
     ]);
     const outcome = await runFallbackQuestionnaire(
-      normalizeQuestionnaire(choiceWithComment).questions,
+      normalizeQuestionnaire(choiceQuestion).questions,
       { ui },
     );
     expect(outcome.terminalState).toBe("submitted");
@@ -69,7 +68,7 @@ describe("runFallbackQuestionnaire — comment prompt", () => {
       { kind: "select", result: 1 as unknown as string }, // No, skip
     ]);
     const outcome = await runFallbackQuestionnaire(
-      normalizeQuestionnaire(choiceWithComment).questions,
+      normalizeQuestionnaire(choiceQuestion).questions,
       { ui },
     );
     expect(outcome.terminalState).toBe("submitted");
@@ -82,7 +81,7 @@ describe("runFallbackQuestionnaire — comment prompt", () => {
       { kind: "select", result: undefined }, // dismissed
     ]);
     const outcome = await runFallbackQuestionnaire(
-      normalizeQuestionnaire(choiceWithComment).questions,
+      normalizeQuestionnaire(choiceQuestion).questions,
       { ui },
     );
     expect(outcome.terminalState).toBe("cancelled");
@@ -96,7 +95,7 @@ describe("runFallbackQuestionnaire — comment prompt", () => {
       { kind: "input", result: undefined }, // dismissed
     ]);
     const outcome = await runFallbackQuestionnaire(
-      normalizeQuestionnaire(choiceWithComment).questions,
+      normalizeQuestionnaire(choiceQuestion).questions,
       { ui },
     );
     expect(outcome.terminalState).toBe("cancelled");

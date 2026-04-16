@@ -23,9 +23,6 @@ const ChoiceQuestionSchema = Type.Object({
   allowOther: Type.Optional(
     Type.Boolean({ description: "Allow a freeform 'Other' answer (default false)" }),
   ),
-  allowComment: Type.Optional(
-    Type.Boolean({ description: "Allow an optional follow-up comment (default false)" }),
-  ),
   recommendation: Type.Optional(
     Type.String({ description: "Recommended option `value` (must match one of `options`)" }),
   ),
@@ -47,9 +44,6 @@ const YesNoQuestionSchema = Type.Object({
     Type.Boolean({
       description: "Allow a freeform 'Other' answer (e.g. 'depends'/'unknown'); default false",
     }),
-  ),
-  allowComment: Type.Optional(
-    Type.Boolean({ description: "Allow an optional follow-up comment (default false)" }),
   ),
   recommendation: Type.Optional(
     Type.Union([Type.Literal("yes"), Type.Literal("no")], {

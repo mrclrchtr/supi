@@ -30,7 +30,6 @@ describe("ask_user prompt guidance", () => {
     const all = askUserPromptGuidelines.join("\n");
     expect(all).toMatch(/recommendation/i);
     expect(all).toMatch(/allowOther/);
-    expect(all).toMatch(/allowComment/);
   });
 
   it("guidelines warn against running concurrent ask_user calls", () => {

@@ -102,7 +102,10 @@ describe("ask_user execute", () => {
     const { tool } = fakePi();
     const ctxOne = fallbackCtx(async () => undefined); // cancel
     await tool.execute("a", validParams, undefined, undefined, ctxOne);
-    const ctxTwo = fallbackCtx(async (_t: string, options: string[] | undefined) => options?.[0]);
+    const ctxTwo = fallbackCtx(async (_t: string, options: string[] | undefined) => {
+      // First select returns the first option; second select skips the comment.
+      return options?.at(-1);
+    });
     const result = await tool.execute("b", validParams, undefined, undefined, ctxTwo);
     expect(result.details).toMatchObject({ terminalState: "submitted" });
   });

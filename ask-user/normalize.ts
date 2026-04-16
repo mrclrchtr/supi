@@ -112,7 +112,6 @@ function normalizeChoice(q: ExternalChoiceQuestion): NormalizedQuestion {
     prompt: q.prompt,
     options,
     allowOther: q.allowOther === true,
-    allowComment: q.allowComment === true,
     recommendedIndex: resolveChoiceRecommendation(q.id, options, q.recommendation),
   };
 }
@@ -142,7 +141,6 @@ function normalizeYesNo(q: ExternalYesNoQuestion): NormalizedQuestion {
     prompt: q.prompt,
     options: YES_NO_OPTIONS.map((o) => ({ ...o })),
     allowOther: q.allowOther === true,
-    allowComment: q.allowComment === true,
     recommendedIndex,
   };
 }
@@ -155,7 +153,6 @@ function normalizeText(q: { id: string; header: string; prompt: string }): Norma
     prompt: q.prompt,
     options: [],
     allowOther: false,
-    allowComment: false,
     recommendedIndex: undefined,
   };
 }

@@ -14,10 +14,61 @@ const choice: NormalizedQuestion = {
     { value: "b", label: "B" },
   ],
   allowOther: false,
-  allowComment: false,
 };
 
 describe("runRichQuestionnaire", () => {
+  it("submits from review after a final text question", async () => {
+    const tuiStub = { requestRender: () => {} } as unknown as TUI;
+    const themeStub = {
+      fg: (_color: string, text: string) => text,
+      bold: (text: string) => text,
+    } as unknown as Theme;
+    const textLast: NormalizedQuestion[] = [
+      choice,
+      {
+        id: "note",
+        header: "Note",
+        type: "text",
+        prompt: "Why?",
+        options: [],
+        allowOther: false,
+      },
+    ];
+    type Outcome = { terminalState: string; answers: { questionId: string; value: string }[] };
+    let captured: Component | undefined;
+    let resolveOutcome: ((value: Outcome) => void) | undefined;
+    const outcomePromise = new Promise<Outcome>((resolve) => {
+      resolveOutcome = resolve;
+    });
+    const host: RichUiHost = {
+      custom: ((
+        factory: (tui: TUI, theme: Theme, kb: unknown, done: (r: Outcome) => void) => Component,
+      ) => {
+        captured = factory(tuiStub, themeStub, undefined, (outcome) => resolveOutcome?.(outcome));
+        return outcomePromise;
+      }) as unknown as RichUiHost["custom"],
+    };
+
+    const runPromise = runRichQuestionnaire(textLast, { ui: host });
+    await Promise.resolve();
+    if (!captured) throw new Error("custom() was not invoked with a factory");
+
+    captured.handleInput?.("\r"); // Q1: choose A → comment-prompt
+    captured.handleInput?.("n"); // skip comment → advance to Q2
+    captured.handleInput?.("o");
+    captured.handleInput?.("k");
+    captured.handleInput?.("\r"); // Q2: submit "ok" → review
+    captured.handleInput?.("\r"); // review: submit
+
+    const outcome = await outcomePromise;
+    await expect(runPromise).resolves.toEqual(outcome);
+    expect(outcome.terminalState).toBe("submitted");
+    expect(outcome.answers).toMatchObject([
+      { questionId: "scope", value: "a" },
+      { questionId: "note", value: "ok" },
+    ]);
+  });
+
   it("returns an aborted outcome without opening the overlay when the signal is already aborted", async () => {
     const custom = vi.fn();
     const controller = new AbortController();
@@ -35,19 +86,24 @@ describe("runRichQuestionnaire", () => {
     expect(result).toBe("unsupported");
   });
 
-  it("requests overlay mode so the questionnaire renders modally", async () => {
-    let observedOptions: RichCustomOptions | undefined;
+  it("opens via ctx.ui.custom() without options so pi replaces the editor area", async () => {
+    // pi's `{ overlay: true }` mode renders on top of existing content without
+    // clearing the screen, which produces a duplicated tab bar after every
+    // re-render. Calling custom() with no options makes pi replace the editor
+    // cleanly, matching the reference questionnaire example.
+    let optionsArg: RichCustomOptions | undefined;
+    let optionsArgPresent = false;
     const host: RichUiHost = {
-      custom: ((_factory: unknown, options?: RichCustomOptions) => {
-        observedOptions = options;
-        // Return a never-resolving promise so the questionnaire stays "open".
+      custom: ((_factory: unknown, ...rest: unknown[]) => {
+        optionsArgPresent = rest.length > 0;
+        optionsArg = rest[0] as RichCustomOptions | undefined;
         return new Promise(() => {});
       }) as unknown as RichUiHost["custom"],
     };
     void runRichQuestionnaire([choice], { ui: host });
-    // Wait a microtask for the call to settle.
     await Promise.resolve();
-    expect(observedOptions).toEqual({ overlay: true });
+    expect(optionsArgPresent).toBe(false);
+    expect(optionsArg).toBeUndefined();
   });
 
   it("aborts mid-overlay when the signal fires after the questionnaire opens", async () => {
@@ -76,6 +132,56 @@ describe("runRichQuestionnaire", () => {
     const outcome = await outcomePromise;
     expect(outcome.terminalState).toBe("aborted");
     expect(outcome.answers).toEqual([]);
+  });
+});
+
+describe("runRichQuestionnaire render state", () => {
+  it("restores the previously selected structured answer when revising from review", async () => {
+    const tuiStub = { requestRender: () => {} } as unknown as TUI;
+    const themeStub = {
+      fg: (_color: string, text: string) => text,
+      bold: (text: string) => text,
+      bg: (_color: string, text: string) => text,
+    } as unknown as Theme;
+    const questions: NormalizedQuestion[] = [
+      choice,
+      {
+        id: "confirm",
+        header: "Confirm",
+        type: "yesno",
+        prompt: "Proceed?",
+        options: [
+          { value: "yes", label: "Yes" },
+          { value: "no", label: "No" },
+        ],
+        allowOther: false,
+        recommendedIndex: 0,
+      },
+    ];
+    let captured: Component | undefined;
+    const host: RichUiHost = {
+      custom: ((
+        factory: (tui: TUI, theme: Theme, kb: unknown, done: (r: unknown) => void) => Component,
+      ) => {
+        captured = factory(tuiStub, themeStub, undefined, () => {});
+        return new Promise(() => {});
+      }) as unknown as RichUiHost["custom"],
+    };
+
+    void runRichQuestionnaire(questions, { ui: host });
+    await Promise.resolve();
+    if (!captured) throw new Error("custom() was not invoked with a factory");
+
+    captured.handleInput?.("\r"); // Q1: choose A → comment-prompt
+    captured.handleInput?.("n"); // skip comment → advance to Q2
+    captured.handleInput?.("\u001b[B"); // Q2: move from Yes to No
+    captured.handleInput?.("\r"); // Q2: answer No → comment-prompt
+    captured.handleInput?.("n"); // skip comment → enter review
+    captured.handleInput?.("\u001b[D"); // review: go back to revise Q2
+
+    const lines = captured.render(80).join("\n");
+    expect(lines).toContain("> 2. No");
+    expect(lines).not.toContain("> 1. Yes (recommended)");
   });
 
   it("invalidates cached lines when render is called with a new width", async () => {

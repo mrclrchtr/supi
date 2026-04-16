@@ -56,12 +56,14 @@ export async function runRichQuestionnaire(
     flow.abort();
     return flow.outcome();
   }
-  // Open as a modal overlay. Without `{ overlay: true }`, pi replaces the
-  // editor with the questionnaire and the user loses the surrounding
-  // transcript while the questionnaire is open.
-  const promise = opts.ui.custom<QuestionnaireOutcome>(
-    (tui, theme, _kb, done) => buildOverlay({ tui, theme, flow, signal: opts.signal, done }),
-    { overlay: true },
+  // Bare custom() (no `{ overlay: true }`) replaces the editor at the bottom
+  // of the screen, mirroring pi's reference questionnaire example. We avoid
+  // pi's overlay mode on purpose: per docs/tui.md, overlays render on top of
+  // existing content WITHOUT clearing the screen, which both anchors the UI
+  // mid-screen and leaves the previous frame's tab bar visible after each
+  // re-render.
+  const promise = opts.ui.custom<QuestionnaireOutcome>((tui, theme, _kb, done) =>
+    buildOverlay({ tui, theme, flow, signal: opts.signal, done }),
   );
   if (!promise) return "unsupported";
   return promise;
@@ -311,7 +313,9 @@ function finalizePendingAnswer(deps: OverlayDeps): void {
   const { flow, state, refresh } = deps;
   const q = flow.currentQuestion;
   if (!q || !state.pendingAnswer) return;
-  if (q.allowComment) {
+  // Structured questions always offer a comment prompt. Text questions are
+  // freeform already so the comment prompt is skipped.
+  if (q.type !== "text") {
     state.subMode = "comment-prompt";
     refresh();
     return;
@@ -335,8 +339,25 @@ function moveAfterAnswer(deps: OverlayDeps): void {
 function resetSubModeForCurrent(deps: OverlayDeps): void {
   const { flow, state, editor } = deps;
   const q = flow.currentQuestion;
-  state.subMode = initialSubMode(q);
-  state.optionIndex = q?.recommendedIndex ?? 0;
+  // Review mode must never retain an editor sub-mode from the last answered
+  // question. If the final question is `text`, carrying `text-input` into the
+  // review screen routes Enter back into the editor instead of submitting.
+  state.subMode = flow.currentMode === "reviewing" ? "select" : initialSubMode(q);
+  state.optionIndex = selectedIndexForCurrent(flow, q);
   state.pendingAnswer = null;
   editor.setText("");
+}
+
+function selectedIndexForCurrent(
+  flow: QuestionnaireFlow,
+  q: NormalizedQuestion | undefined,
+): number {
+  if (!q || q.type === "text") return 0;
+  const existing = flow.getAnswer(q.id);
+  if (!existing) return q.recommendedIndex ?? 0;
+  if (existing.source === "option" || existing.source === "yesno") {
+    return existing.optionIndex ?? q.recommendedIndex ?? 0;
+  }
+  if (existing.source === "other" && q.allowOther) return q.options.length;
+  return q.recommendedIndex ?? 0;
 }

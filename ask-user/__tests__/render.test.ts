@@ -68,7 +68,6 @@ describe("renderAskUserResult", () => {
                 { value: "full_rewrite", label: "Full rewrite" },
               ],
               allowOther: false,
-              allowComment: false,
             },
           ],
           answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],
@@ -77,7 +76,7 @@ describe("renderAskUserResult", () => {
           },
           terminalState: "submitted",
         },
-        content: [{ type: "text", text: "Scope: 1. API only" }],
+        content: [{ type: "text", text: "Scope: API only" }],
       },
       theme,
     );

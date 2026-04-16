@@ -21,7 +21,6 @@ export interface NormalizedQuestion {
   prompt: string;
   options: NormalizedOption[];
   allowOther: boolean;
-  allowComment: boolean;
   recommendedIndex?: number;
 }
 

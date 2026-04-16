@@ -12,13 +12,14 @@ export function decorateOption(label: string, recommended: boolean): string {
 }
 
 // Format used in the model-facing tool content and the in-line transcript:
-// includes the option index and uses an em-dash separator for Other.
+// uses the human label for structured selections and an em-dash separator for
+// Other.
 export function formatSummaryBody(question: NormalizedQuestion, answer: Answer): string {
   switch (answer.source) {
     case "option": {
       if (answer.optionIndex === undefined) return answer.value;
       const label = question.options[answer.optionIndex]?.label ?? answer.value;
-      return `${answer.optionIndex + 1}. ${label}`;
+      return label;
     }
     case "other":
       return `Other — ${answer.value}`;

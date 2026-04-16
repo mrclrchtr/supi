@@ -12,7 +12,6 @@ const choiceQuestion: NormalizedQuestion = {
     { value: "broad", label: "Broad" },
   ],
   allowOther: false,
-  allowComment: false,
 };
 
 const yesNoQuestion: NormalizedQuestion = {
@@ -38,7 +37,7 @@ describe("buildResult", () => {
       answers,
     });
     const text = result.content[0].text;
-    expect(text).toContain("Scope: 1. Narrow");
+    expect(text).toContain("Scope: Narrow");
     expect(text).toContain("Go?: Yes");
     expect(result.details.terminalState).toBe("submitted");
     expect(result.details.answers).toHaveLength(2);
@@ -56,7 +55,7 @@ describe("buildResult", () => {
       terminalState: "submitted",
       answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],
     });
-    expect(result.content[0].text).toBe("Scope: 1. API only");
+    expect(result.content[0].text).toBe("Scope: API only");
     // The machine-readable value is preserved in `details` for callers that need it.
     expect(result.details.answers[0].value).toBe("api_only");
     expect(result.details.answersById.scope.value).toBe("api_only");

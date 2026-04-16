@@ -46,7 +46,10 @@ export function renderOverlay(
 }
 
 function renderTabBar(add: (s: string) => void, theme: Theme, flow: QuestionnaireFlow): void {
-  const segments: string[] = [];
+  // Active segment uses the selected-bg highlight (matches pi's reference
+  // questionnaire and Claude's UI). Inactive segments stay foreground-only:
+  // success when answered, muted when pending.
+  const segments: string[] = [theme.fg("dim", "← ")];
   flow.questions.forEach((q, i) => {
     const answered = flow.hasAnswer(q.id);
     const active =
@@ -54,13 +57,21 @@ function renderTabBar(add: (s: string) => void, theme: Theme, flow: Questionnair
     const marker = answered ? "■" : "□";
     const text = ` ${marker} ${q.header} `;
     segments.push(
-      active ? theme.fg("accent", text) : theme.fg(answered ? "success" : "muted", text),
+      active
+        ? theme.bg("selectedBg", theme.fg("text", text))
+        : theme.fg(answered ? "success" : "muted", text),
     );
+    segments.push(" ");
   });
   const reviewActive = flow.currentMode === "reviewing";
   const reviewText = " ✓ Review ";
-  segments.push(reviewActive ? theme.fg("accent", reviewText) : theme.fg("dim", reviewText));
-  add(segments.join(""));
+  segments.push(
+    reviewActive
+      ? theme.bg("selectedBg", theme.fg("text", reviewText))
+      : theme.fg("dim", reviewText),
+  );
+  segments.push(theme.fg("dim", " →"));
+  add(` ${segments.join("")}`);
   add("");
 }
 
@@ -103,14 +114,10 @@ function renderOptions(
     const selected = i === optionIndex;
     const prefix = selected ? theme.fg("accent", "> ") : "  ";
     const numbered = `${i + 1}. ${item.label}`;
-    const descTail = item.description ? `  ${item.description}` : "";
-    if (selected) {
-      add(prefix + theme.fg("accent", numbered + descTail));
-      return;
+    add(prefix + (selected ? theme.fg("accent", numbered) : theme.fg("text", numbered)));
+    if (item.description) {
+      add(`     ${theme.fg("muted", item.description)}`);
     }
-    const base = theme.fg("text", numbered);
-    const tail = item.description ? theme.fg("muted", descTail) : "";
-    add(prefix + base + tail);
   });
 }
 

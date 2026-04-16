@@ -12,7 +12,6 @@ const q = (id: string, header = id): NormalizedQuestion => ({
     { value: "b", label: "B" },
   ],
   allowOther: false,
-  allowComment: false,
 });
 
 describe("QuestionnaireFlow", () => {

@@ -54,7 +54,10 @@ const choiceParams: AskUserParams = {
 
 describe("runFallbackQuestionnaire", () => {
   it("submits when the user selects a single choice option", async () => {
-    const ui = scriptedUi([{ kind: "select", result: 0 as unknown as string }]);
+    const ui = scriptedUi([
+      { kind: "select", result: 0 as unknown as string },
+      { kind: "select", result: 1 as unknown as string }, // skip comment
+    ]);
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams).questions, {
       ui,
     });
@@ -74,6 +77,7 @@ describe("runFallbackQuestionnaire", () => {
     const ui = scriptedUi([
       { kind: "select", result: 2 as unknown as string }, // Other (after narrow/broad)
       { kind: "input", result: "scope to api/" },
+      { kind: "select", result: 1 as unknown as string }, // skip comment
     ]);
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
       ui,
@@ -91,6 +95,7 @@ describe("runFallbackQuestionnaire", () => {
       { kind: "input", result: "" },
       { kind: "input", result: "   " },
       { kind: "input", result: "scope to api/" },
+      { kind: "select", result: 1 as unknown as string }, // skip comment
     ]);
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
       ui,
@@ -174,7 +179,7 @@ describe("runFallbackQuestionnaire", () => {
     };
     const controller = new AbortController();
     const params: AskUserParams = {
-      questions: [{ ...(choiceParams.questions[0] as object), allowComment: true } as never],
+      questions: [{ ...(choiceParams.questions[0] as object) } as never],
     };
     await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
       ui,
@@ -196,7 +201,9 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
     };
     const ui = scriptedUi([
       { kind: "select", result: 1 as unknown as string }, // broad
+      { kind: "select", result: 1 as unknown as string }, // skip comment
       { kind: "select", result: 0 as unknown as string }, // yes
+      { kind: "select", result: 1 as unknown as string }, // skip comment
       { kind: "select", result: "Submit answers" }, // review step picks Submit
     ]);
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
@@ -215,7 +222,9 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
     };
     const ui = scriptedUi([
       { kind: "select", result: 0 as unknown as string },
+      { kind: "select", result: 1 as unknown as string }, // skip comment
       { kind: "select", result: 0 as unknown as string },
+      { kind: "select", result: 1 as unknown as string }, // skip comment
       { kind: "select", result: "Cancel questionnaire" },
     ]);
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
@@ -305,7 +314,7 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
   it("review step shows comments alongside answers", async () => {
     const params: AskUserParams = {
       questions: [
-        { ...(choiceParams.questions[0] as object), allowComment: true } as never,
+        { ...(choiceParams.questions[0] as object) } as never,
         { type: "yesno", id: "go", header: "Go?", prompt: "Proceed?" },
       ],
     };
@@ -317,6 +326,7 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
         if (phase === 1) return options[0]; // narrow
         if (phase === 2) return options[0]; // "Yes, add a note"
         if (phase === 3) return options[0]; // yesno: Yes
+        if (phase === 4) return options[1]; // "No, skip" comment for yesno
         reviewTitle = title;
         return options[0]; // Submit answers
       },
@@ -334,6 +344,7 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
     const ui = scriptedUi([
       { kind: "select", result: 2 as unknown as string }, // Other
       { kind: "input", result: "depends on the deploy" },
+      { kind: "select", result: 1 as unknown as string }, // skip comment
     ]);
     const params: AskUserParams = {
       questions: [{ type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", allowOther: true }],

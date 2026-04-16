@@ -198,7 +198,8 @@ async function collectComment(
   question: NormalizedQuestion,
   opts: RunOptions,
 ): Promise<string | "aborted" | "cancelled"> {
-  if (!question.allowComment) return "";
+  // Text questions are freeform already — skip the comment prompt.
+  if (question.type === "text") return "";
   // Use select() instead of confirm() so a dismissed dialog returns undefined
   // and can be treated as cancellation. confirm()'s boolean return collapses
   // "no" and "dismiss" together, which would silently submit on user cancel.
