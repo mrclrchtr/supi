@@ -10,6 +10,12 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["aliases/**/*.ts", "bash-timeout/**/*.ts", "skill-shortcut/**/*.ts", "lsp/**/*.ts"],
-  "exclude": ["node_modules", "lsp/__tests__"]
+  "include": [
+    "aliases/**/*.ts",
+    "ask-user/**/*.ts",
+    "bash-timeout/**/*.ts",
+    "skill-shortcut/**/*.ts",
+    "lsp/**/*.ts"
+  ],
+  "exclude": ["node_modules", "lsp/__tests__", "ask-user/__tests__"]
 }
