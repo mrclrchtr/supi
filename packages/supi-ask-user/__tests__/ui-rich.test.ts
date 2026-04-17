@@ -1,6 +1,7 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component, TUI } from "@mariozechner/pi-tui";
 import { describe, expect, it, vi } from "vitest";
+import { decorateOption } from "../format.ts";
 import type { NormalizedQuestion } from "../types.ts";
 import { type RichCustomOptions, type RichUiHost, runRichQuestionnaire } from "../ui-rich.ts";
 
@@ -259,5 +260,119 @@ describe("runRichQuestionnaire notes", () => {
     const rendered = captured.value.render(120).join("\n");
     expect(rendered).toContain("Preview — best");
     expect(rendered).toContain("Multi-select — core");
+  });
+});
+
+const choiceWithVaryingPreviews: NormalizedQuestion = {
+  id: "commit-strategy",
+  header: "Strategy",
+  type: "choice",
+  prompt: "How to commit?",
+  options: [
+    {
+      value: "single",
+      label: "Single commit",
+      description: "All changes in one commit",
+      preview: "1. feat: everything",
+    },
+    {
+      value: "two",
+      label: "Two commits",
+      preview: "1. feat: first change\n2. feat: second change\n3. chore: cleanup\n4. docs: update",
+    },
+    { value: "three", label: "Three commits" },
+  ],
+  allowOther: false,
+  allowDiscuss: false,
+  recommendedIndexes: [1],
+};
+
+describe("render height stability", () => {
+  it("output length does not decrease when navigating from long preview to no preview", async () => {
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire([choiceWithVaryingPreviews], { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked");
+
+    // Initial render — recommended index 1 ("Two commits") has 4-line preview
+    const initialLines = captured.value.render(80);
+    const initialLength = initialLines.length;
+    expect(initialLength).toBeGreaterThan(0);
+
+    // Navigate to option 3 ("Three commits") — no preview at all
+    captured.value.handleInput?.("\u001b[B"); // down to option 3
+    const afterNav = captured.value.render(80);
+    expect(afterNav.length).toBeGreaterThanOrEqual(initialLength);
+  });
+
+  it("output length increases when navigating to an option with a longer preview", async () => {
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire([choiceWithVaryingPreviews], { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked");
+
+    // Start on recommended index 1 ("Two commits", 4-line preview)
+    // Navigate up to option 1 ("Single commit", 1-line preview)
+    captured.value.handleInput?.("\u001b[A"); // up
+    const shortPreview = captured.value.render(80);
+    const shortLength = shortPreview.length;
+
+    // Navigate back to option 2 ("Two commits", 4-line preview)
+    captured.value.handleInput?.("\u001b[B"); // down
+    const longPreview = captured.value.render(80);
+    expect(longPreview.length).toBeGreaterThan(shortLength);
+  });
+
+  it("maxHeight resets when resetStateForCurrent is called (question change)", async () => {
+    const twoQuestions: NormalizedQuestion[] = [
+      choiceWithVaryingPreviews,
+      {
+        id: "confirm",
+        header: "Confirm",
+        type: "yesno",
+        prompt: "Sure?",
+        options: [
+          { value: "yes", label: "Yes" },
+          { value: "no", label: "No" },
+        ],
+        allowOther: false,
+        allowDiscuss: false,
+        recommendedIndexes: [0],
+      },
+    ];
+
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire(twoQuestions, { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked");
+
+    // Render first question — tall due to preview
+    const q1Lines = captured.value.render(80);
+
+    // Submit option 1 to advance to question 2
+    captured.value.handleInput?.("\u001b[A"); // up to option 1
+    captured.value.handleInput?.("\r"); // submit
+
+    // Render second question — yesno, much shorter, should NOT carry q1's height
+    const q2Lines = captured.value.render(80);
+    expect(q2Lines.length).toBeLessThan(q1Lines.length);
+  });
+});
+
+describe("decorateOption", () => {
+  it("does not double-append (recommended) when label already contains it", () => {
+    expect(decorateOption("Two commits (recommended)", true)).toBe("Two commits (recommended)");
+  });
+
+  it("appends (recommended) when label does not contain it", () => {
+    expect(decorateOption("Two commits", true)).toBe("Two commits (recommended)");
+  });
+
+  it("returns label unchanged when not recommended", () => {
+    expect(decorateOption("Two commits", false)).toBe("Two commits");
+  });
+
+  it("handles case-insensitive match", () => {
+    expect(decorateOption("Option (Recommended)", true)).toBe("Option (Recommended)");
   });
 });

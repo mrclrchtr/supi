@@ -70,6 +70,7 @@ function buildOverlay(args: BuildOverlayArgs): Component {
     noteTarget: undefined,
     cachedLines: undefined,
     cachedWidth: undefined,
+    maxHeight: 0,
   };
   const editor = new Editor(tui, makeEditorTheme(theme));
   const refresh = () => {
@@ -94,8 +95,19 @@ function buildOverlay(args: BuildOverlayArgs): Component {
       if (state.cachedWidth !== width) {
         state.cachedLines = undefined;
         state.cachedWidth = width;
+        state.maxHeight = 0;
       }
-      if (!state.cachedLines) state.cachedLines = renderOverlay(width, theme, flow, state, editor);
+      if (!state.cachedLines) {
+        state.cachedLines = renderOverlay(width, theme, flow, state, editor);
+        // Stabilize height — prevent shrinkage that triggers pi-tui's
+        // viewport tracking bug with differential rendering.
+        if (state.cachedLines.length > state.maxHeight) {
+          state.maxHeight = state.cachedLines.length;
+        }
+        while (state.cachedLines.length < state.maxHeight) {
+          state.cachedLines.push("");
+        }
+      }
       return state.cachedLines;
     },
     invalidate: () => {

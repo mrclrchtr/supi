@@ -27,6 +27,7 @@ export interface OverlayState extends OverlayRenderState {
   noteTarget?: NoteTarget;
   cachedLines: string[] | undefined;
   cachedWidth: number | undefined;
+  maxHeight: number;
 }
 
 export interface OverlayDeps {
@@ -70,6 +71,7 @@ export function resetStateForCurrent(deps: OverlayDeps): void {
   deps.state.subMode = deps.flow.currentMode === "reviewing" ? "select" : initialSubMode(question);
   deps.state.selectedIndex = selectedRowIndex(deps.flow, question);
   deps.state.noteTarget = undefined;
+  deps.state.maxHeight = 0;
   deps.editor.setText("");
 }
 

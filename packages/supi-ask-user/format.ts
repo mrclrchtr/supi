@@ -11,7 +11,9 @@ export const SUBMIT_SELECTIONS_LABEL = "Submit selections";
 export const NOTE_MARKER = "✎";
 
 export function decorateOption(label: string, recommended: boolean): string {
-  return recommended ? `${label} (recommended)` : label;
+  if (!recommended) return label;
+  if (label.trimEnd().toLowerCase().endsWith("(recommended)")) return label;
+  return `${label} (recommended)`;
 }
 
 export function formatSummaryBody(question: NormalizedQuestion, answer: Answer): string {
