@@ -52,6 +52,10 @@
     "@mariozechner/pi-tui": "~0.66.0",
     "@sinclair/typebox": ">=0.34.0"
   },
+  "dependencies": {
+    "tree-sitter-bash": "^0.25.1",
+    "web-tree-sitter": "^0.26.8"
+  },
   "devDependencies": {
     "@biomejs/biome": "^2.4.11",
     "@commitlint/cli": "^20.5.0",

@@ -13,7 +13,7 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { shouldBlockSemanticBashSearch } from "./bash-guard.ts";
+import { initBashParser, shouldSuggestLsp } from "./bash-guard.ts";
 import { loadConfig } from "./config.ts";
 import {
   extractPromptPathHints,
@@ -123,6 +123,7 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     }
 
     ensureLspToolActive(pi);
+    void initBashParser();
     state.manager = new LspManager(loadConfig(process.cwd()));
     state.recentPaths = restoreRecentPaths(
       ctx.sessionManager.getEntries() as Array<{
@@ -239,13 +240,6 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
     return { messages };
   });
 
-  pi.on("tool_call", async (event) => {
-    const reason = getSemanticBashBlockReason(event.toolName, event.input, state);
-    if (reason) {
-      return { block: true, reason };
-    }
-  });
-
   pi.on("tool_result", async (event, ctx) => {
     if (!state.manager) return;
 
@@ -271,6 +265,19 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
         );
       }
       updateLspUi(ctx, state.manager, state.inlineSeverity);
+    }
+
+    // Soft nudge: when the agent runs a text-search bash command targeting
+    // LSP-supported files with a semantic prompt, inject a steer message
+    // suggesting the lsp tool. Non-blocking — the command already ran.
+    if (event.toolName === "bash" && !event.isError && typeof event.input.command === "string") {
+      const nudge = shouldSuggestLsp(event.input.command, state.currentPrompt, state.manager);
+      if (nudge) {
+        pi.sendMessage(
+          { customType: "lsp-nudge", content: nudge, display: true },
+          { deliverAs: "steer" },
+        );
+      }
     }
   });
 }
@@ -335,26 +342,6 @@ function refreshRelevantPaths(state: LspRuntimeState): void {
   state.currentRelevantPaths = mergeRelevantPaths(
     extractPromptPathHints(state.currentPrompt),
     state.recentPaths,
-  );
-}
-
-function getSemanticBashBlockReason(
-  toolName: string,
-  input: Record<string, unknown>,
-  state: LspRuntimeState,
-): string | null {
-  if (!state.manager || toolName !== "bash") return null;
-  if (typeof input.command !== "string") return null;
-
-  const hasRelevantCoverage =
-    state.currentRelevantPaths.length > 0 &&
-    state.manager.getRelevantCoverageSummaryText(state.currentRelevantPaths) !== null;
-
-  return shouldBlockSemanticBashSearch(
-    input.command,
-    state.currentPrompt,
-    state.currentRelevantPaths,
-    hasRelevantCoverage,
   );
 }
 
