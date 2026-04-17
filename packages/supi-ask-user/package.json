@@ -1,0 +1,35 @@
+{
+  "name": "@mrclrchtr/supi-ask-user",
+  "version": "0.1.0",
+  "description": "SuPi ask-user extension — rich questionnaire UI for structured agent-user decisions",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "*.ts",
+    "!__tests__"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "~0.66.0",
+    "@mariozechner/pi-tui": "~0.66.0",
+    "@sinclair/typebox": ">=0.34.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  },
+  "pi": {
+    "extensions": [
+      "./ask-user.ts"
+    ]
+  }
+}

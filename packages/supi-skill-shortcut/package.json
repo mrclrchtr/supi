@@ -1,0 +1,30 @@
+{
+  "name": "@mrclrchtr/supi-skill-shortcut",
+  "version": "0.1.0",
+  "description": "SuPi skill-shortcut extension — type $skill-name as shorthand for /skill:skill-name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "skill-shortcut.ts"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "~0.66.0",
+    "@mariozechner/pi-tui": "~0.66.0"
+  },
+  "pi": {
+    "extensions": [
+      "./skill-shortcut.ts"
+    ]
+  }
+}

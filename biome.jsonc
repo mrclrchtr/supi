@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!skills/openspec-brainstorm/scripts"]
+    "includes": ["**", "!packages/supi/skills/openspec-brainstorm/scripts"]
   },
   "formatter": {
     "enabled": true,

@@ -1,3 +1,6 @@
-allowBuilds:
-  koffi: true
-  protobufjs: true
+packages:
+  - "packages/*"
+
+onlyBuiltDependencies:
+  - koffi
+  - protobufjs

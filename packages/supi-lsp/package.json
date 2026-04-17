@@ -1,0 +1,36 @@
+{
+  "name": "@mrclrchtr/supi-lsp",
+  "version": "0.1.0",
+  "description": "SuPi LSP extension — Language Server Protocol integration for pi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "*.ts",
+    "*.json",
+    "!__tests__"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "~0.66.0",
+    "@mariozechner/pi-tui": "~0.66.0",
+    "@sinclair/typebox": ">=0.34.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  },
+  "pi": {
+    "extensions": [
+      "./lsp.ts"
+    ]
+  }
+}

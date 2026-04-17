@@ -1,37 +1,34 @@
 {
-  "name": "@mrclrchtr/supi",
+  "name": "@mrclrchtr/supi-workspace",
   "version": "0.1.0",
-  "description": "SuPi (Super Pi) — The opinionated way to extend PI",
+  "private": true,
+  "description": "SuPi (Super Pi) — The opinionated way to extend PI. Workspace root.",
   "packageManager": "pnpm@10.33.0",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/SuPi.git"
-  },
-  "homepage": "https://github.com/mrclrchtr/SuPi#readme",
-  "bugs": {
-    "url": "https://github.com/mrclrchtr/SuPi/issues"
-  },
-  "publishConfig": {
-    "access": "public"
+    "url": "git+https://github.com/mrclrchtr/supi.git"
   },
   "keywords": [
     "pi-package",
     "pi",
     "pi-coding-agent"
   ],
-  "files": [
-    "aliases/*.ts",
-    "ask-user/*.ts",
-    "bash-timeout/*.ts",
-    "lsp/*.ts",
-    "lsp/*.json",
-    "prompts/*.md",
-    "skill-shortcut/*.ts",
-    "skills",
-    "README.md",
-    "LICENSE"
-  ],
+  "pi": {
+    "extensions": [
+      "./packages/supi-aliases/aliases.ts",
+      "./packages/supi-ask-user/ask-user.ts",
+      "./packages/supi-bash-timeout/index.ts",
+      "./packages/supi-skill-shortcut/skill-shortcut.ts",
+      "./packages/supi-lsp/lsp.ts"
+    ],
+    "prompts": [
+      "./packages/supi/prompts"
+    ],
+    "skills": [
+      "./packages/supi/skills"
+    ]
+  },
   "scripts": {
     "biome": "biome check",
     "biome:fix": "biome check --write --error-on-warnings",
@@ -41,10 +38,9 @@
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "typecheck": "tsc --noEmit",
-    "typecheck:tests": "tsc --noEmit -p lsp/__tests__/tsconfig.json && tsc --noEmit -p ask-user/__tests__/tsconfig.json",
-    "pack:check": "npm pack --dry-run",
-    "release": "semantic-release",
+    "typecheck": "tsc --noEmit -p packages/supi-aliases/tsconfig.json && tsc --noEmit -p packages/supi-ask-user/tsconfig.json && tsc --noEmit -p packages/supi-bash-timeout/tsconfig.json && tsc --noEmit -p packages/supi-lsp/tsconfig.json && tsc --noEmit -p packages/supi-skill-shortcut/tsconfig.json",
+    "typecheck:tests": "tsc --noEmit -p packages/supi-ask-user/__tests__/tsconfig.json && tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json",
+    "pack:check": "pnpm --filter @mrclrchtr/supi exec pnpm pack --dry-run",
     "check": "pnpm biome",
     "check:fix": "pnpm biome:fix",
     "verify": "pnpm typecheck && pnpm typecheck:tests && pnpm biome:ai && pnpm test && pnpm pack:check",
@@ -56,30 +52,10 @@
     "@mariozechner/pi-tui": "~0.66.0",
     "@sinclair/typebox": ">=0.34.0"
   },
-  "pi": {
-    "prompts": [
-      "./prompts"
-    ],
-    "extensions": [
-      "./aliases/aliases.ts",
-      "./ask-user/ask-user.ts",
-      "./bash-timeout/index.ts",
-      "./skill-shortcut/skill-shortcut.ts",
-      "./lsp/lsp.ts"
-    ],
-    "skills": [
-      "./skills"
-    ]
-  },
   "devDependencies": {
     "@biomejs/biome": "^2.4.11",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
-    "@semantic-release/commit-analyzer": "^13.0.1",
-    "@semantic-release/github": "^12.0.6",
-    "@semantic-release/npm": "^13.1.5",
-    "@semantic-release/release-notes-generator": "^14.1.0",
-    "semantic-release": "^25.0.3",
     "typescript": "^6.0.2",
     "vitest": "^4.1.4"
   }

@@ -1,0 +1,11 @@
+{
+  "packages": {
+    "packages/supi": {},
+    "packages/supi-aliases": {},
+    "packages/supi-ask-user": {},
+    "packages/supi-bash-timeout": {},
+    "packages/supi-lsp": {},
+    "packages/supi-skill-shortcut": {}
+  },
+  "plugins": ["node-workspace"]
+}

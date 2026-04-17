@@ -14,9 +14,13 @@ Extensions sourced from [joelhooks/pi-tools](https://github.com/joelhooks/pi-too
 
 Install into pi:
 ```bash
+# Full stack
 pi install /path/to/SuPi
-# or
-pi install git:github.com/mrclrchtr/SuPi
+pi install git:github.com/mrclrchtr/supi
+
+# Individual extensions from local checkout
+pi install /path/to/SuPi/packages/supi-lsp
+pi install /path/to/SuPi/packages/supi-ask-user
 ```
 
 ## Commands
@@ -56,7 +60,10 @@ pnpm biome:ci --colors=off 2>&1 | grep '\.ts:'
 pnpm test
 
 # Fast smoke test for LSP guidance/relevance changes
-pnpm exec vitest run lsp/__tests__/guidance.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/guidance.test.ts
+
+# Fast smoke test for ask-user changes
+pnpm exec vitest run packages/supi-ask-user/__tests__/guidance.test.ts
 
 # Install repo hook scripts into .git/hooks
 mise run hooks
@@ -70,34 +77,27 @@ hk run fix
 # Watch mode
 pnpm test:watch
 
-# Dry-run npm pack
+# Dry-run npm pack (meta-package only)
 pnpm pack:check
 
-# Release (requires git auth even for --dry-run)
-pnpm release
+# Releases are automated via release-please — no local command needed
 ```
 
 Toolchain versions are managed via [mise](https://mise.jdx.dev) in `.mise.toml`
 (`node = "lts"`, `pnpm = "latest"`, `hk = "1.42.0"`, `pkl = "0.31.1"`).
 
-Tooling config at repo root: `hk.pkl`, `commitlint.config.mjs`, `release.config.mjs` (no `.github` shims).
+Tooling config at repo root: `hk.pkl`, `commitlint.config.mjs`, `release-please-config.json`, `.release-please-manifest.json`, `vitest.workspace.ts` (no `.github` shims).
 
 ## Architecture
 
-Each extension lives in its own directory with a single `.ts` entry file. Extensions are registered in `package.json` under `pi.extensions`. Prompt templates live in `prompts/*.md` and are registered under `pi.prompts`:
+This is a pnpm workspace monorepo. Each extension is an independently installable package under `packages/supi-*/`. The `packages/supi/` meta-package bundles the full stack, and the repository root also exposes a `pi` manifest so `pi install /path/to/SuPi` and `pi install git:github.com/mrclrchtr/supi` continue to work.
+
+Extension packages are registered in their own `package.json` under `pi.extensions`. The meta-package re-exports them through local wrapper `.ts` entrypoints in `packages/supi/`, while the repository root points at `packages/*` source files for git and local-path installs. Prompt templates and skills live in `packages/supi/prompts/` and `packages/supi/skills/`.
 
 ```json
+// packages/supi-aliases/package.json
 "pi": {
-  "extensions": [
-    "./aliases/aliases.ts",
-    "./ask-user/ask-user.ts",
-    "./bash-timeout/index.ts",
-    "./skill-shortcut/skill-shortcut.ts",
-    "./lsp/lsp.ts"
-  ],
-  "prompts": [
-    "./prompts"
-  ]
+  "extensions": ["./aliases.ts"]
 }
 ```
 
@@ -143,7 +143,7 @@ export default function (pi: ExtensionAPI) {
 
 Provides Language Server Protocol integration — type-aware hover, go-to-definition, find-references, diagnostics, rename, code-actions, and document-symbols via a registered `lsp` tool. Intercepts `write`/`edit` to surface blocking diagnostics inline. The tool advertises semantic-first guidance via `promptSnippet`/`promptGuidelines` as always-on discoverability. Runtime pre-turn guidance in `before_agent_start` is stateful and dormant by default: it activates only after qualifying source interactions (`read`, `edit`, `write`, `lsp` on a supported file type) and re-injects only when the activation hint is pending or tracked-file diagnostics change.
 
-Files: `lsp/lsp.ts` (entry), `lsp/client.ts` (LSP client lifecycle), `lsp/transport.ts` (JSON-RPC), `lsp/config.ts` (server config), `lsp/manager.ts` (server pool), `lsp/runtime-state.ts` (runtime guidance state), `lsp/guidance.ts` (message formatting), `lsp/tool-actions.ts` (tool dispatch), `lsp/diagnostics.ts` (formatting), `lsp/utils.ts` (URI/language/path utils), `lsp/types.ts` (LSP types), `lsp/defaults.json` (server definitions).
+Files: `packages/supi-lsp/lsp.ts` (entry), `packages/supi-lsp/client.ts` (LSP client lifecycle), `packages/supi-lsp/transport.ts` (JSON-RPC), `packages/supi-lsp/config.ts` (server config), `packages/supi-lsp/manager.ts` (server pool), `packages/supi-lsp/runtime-state.ts` (runtime guidance state), `packages/supi-lsp/guidance.ts` (message formatting), `packages/supi-lsp/tool-actions.ts` (tool dispatch), `packages/supi-lsp/diagnostics.ts` (formatting), `packages/supi-lsp/utils.ts` (URI/language/path utils), `packages/supi-lsp/types.ts` (LSP types), `packages/supi-lsp/defaults.json` (server definitions).
 
 Commands: `/lsp-status` — shows active servers, open files, and diagnostics summary.
 
@@ -153,7 +153,7 @@ Per-project config: `.pi-lsp.json` in project root to override/add/disable serve
 
 Rich questionnaire UI (`ask_user` tool) for structured agent–user decisions. Supports explicit `choice`, `multichoice`, `yesno`, and `text` question types with inline `Other`/`Discuss` editing, context-sensitive note hotkeys (`n`), split-pane option previews, and review/revise flows. Fallback path degrades gracefully when rich custom UI is unavailable.
 
-Files: `ask-user/ask-user.ts` (entry), `ask-user/schema.ts` (external contract), `ask-user/normalize.ts` (validation), `ask-user/types.ts` (internal model), `ask-user/flow.ts` (shared state machine), `ask-user/ui-rich.ts` (overlay builder), `ask-user/ui-rich-state.ts` (state types and pure helpers), `ask-user/ui-rich-handlers.ts` (input handlers), `ask-user/ui-rich-render.ts` (core rendering), `ask-user/ui-rich-render-notes.ts` (note rendering), `ask-user/ui-rich-render-editor.ts` (editor pane rendering), `ask-user/ui-rich-inline.ts` (inline Other/Discuss rows), `ask-user/ui-fallback.ts` (fallback path), `ask-user/format.ts` (summary/review formatting), `ask-user/render.ts` (transcript rendering), `ask-user/result.ts` (tool content/details).
+Files: `packages/supi-ask-user/ask-user.ts` (entry), `packages/supi-ask-user/schema.ts` (external contract), `packages/supi-ask-user/normalize.ts` (validation), `packages/supi-ask-user/types.ts` (internal model), `packages/supi-ask-user/flow.ts` (shared state machine), `packages/supi-ask-user/ui-rich.ts` (overlay builder), `packages/supi-ask-user/ui-rich-state.ts` (state types and pure helpers), `packages/supi-ask-user/ui-rich-handlers.ts` (input handlers), `packages/supi-ask-user/ui-rich-render.ts` (core rendering), `packages/supi-ask-user/ui-rich-render-notes.ts` (note rendering), `packages/supi-ask-user/ui-rich-render-editor.ts` (editor pane rendering), `packages/supi-ask-user/ui-rich-inline.ts` (inline Other/Discuss rows), `packages/supi-ask-user/ui-fallback.ts` (fallback path), `packages/supi-ask-user/format.ts` (summary/review formatting), `packages/supi-ask-user/render.ts` (transcript rendering), `packages/supi-ask-user/result.ts` (tool content/details).
 
 No `ask_user` commands — the tool is invoked by the agent via `pi.registerTool`.
 
@@ -204,15 +204,15 @@ Key docs to reach for first:
 
 - **peerDependencies install as regular deps**: pnpm installs missing peers automatically; after bumping version ranges in `package.json` run `pnpm install` to update the lockfile.
 - **`~` version range on peerDeps**: intentional — pins to the minor release train (`~0.66.0` allows `0.66.x` only) to avoid silent breakage from pi API changes across minor versions.
-- **`@sinclair/typebox` is a peerDependency**: it's a runtime import (used by `lsp/lsp.ts`) so it must be in `peerDependencies`. pnpm auto-installs it locally for type-checking. Putting it in `devDependencies` breaks `pi install npm:...`. Avoid `@mariozechner/pi-ai`'s `StringEnum` — use `Type.Union(Type.Literal(...))` instead to keep the dep tree smaller.
+- **`@sinclair/typebox` is a peerDependency**: it's a runtime import (used by `packages/supi-lsp/lsp.ts`) so it must be in `peerDependencies`. pnpm auto-installs it locally for type-checking. Putting it in `devDependencies` breaks `pi install npm:...`. Avoid `@mariozechner/pi-ai`'s `StringEnum` — use `Type.Union(Type.Literal(...))` instead to keep the dep tree smaller.
 - **JSON imports**: avoid `import X from "./file.json" with { type: "json" }` — it errors under some tsconfig modes. Use `JSON.parse(fs.readFileSync(path.join(__dirname, "file.json"), "utf-8"))` instead. pi's jiti loader always provides `__dirname`.
 
 ### Biome & code style
 
 - **Biome config is `biome.jsonc`** (not `biome.json`): all rule overrides go there. Inline `biome-ignore` comments don't work for file-level nursery rules like `noExcessiveLinesPerFile` — must split the file or raise the threshold in `biome.jsonc`.
 - **Always run `biome check --write` on new test files**: biome enforces import order and formatting that won't match hand-written code. Fix first, then verify with `biome:ai`.
-- **Biome complexity trips quickly in `lsp/manager.ts`**: prefer small helper functions for summary/aggregation logic before reaching for suppressions.
-- **`lsp/summary.ts` holds formatting/relevance helpers**: keep `lsp/manager.ts` focused on state/server management to stay under Biome file-length limits.
+- **Biome complexity trips quickly in `packages/supi-lsp/manager.ts`**: prefer small helper functions for summary/aggregation logic before reaching for suppressions.
+- **`packages/supi-lsp/summary.ts` holds formatting/relevance helpers**: keep `packages/supi-lsp/manager.ts` focused on state/server management to stay under Biome file-length limits.
 - **`skill-shortcut` needs `biome-ignore` for `noExplicitAny`**: the `as any` casts accessing private TUI internals are intentional — each needs an inline `// biome-ignore lint/suspicious/noExplicitAny: accessing private TUI internals` comment.
 
 ### pi API & runtime
@@ -231,9 +231,9 @@ Key docs to reach for first:
 
 ### Testing
 
-- **Test framework is vitest**: unit tests at `lsp/__tests__/*.test.ts`, integration tests at `*.integration.test.ts`. Integration tests use `describe.skipIf(!HAS_CMD)` to auto-skip when LSP servers aren't on PATH.
+- **Test framework is vitest**: unit tests at `packages/supi-lsp/__tests__/*.test.ts` and `packages/supi-ask-user/__tests__/*.test.ts`, integration tests at `*.integration.test.ts`. Integration tests use `describe.skipIf(!HAS_CMD)` to auto-skip when LSP servers aren't on PATH.
 - **Unhandled promise rejections fail vitest**: if production code rejects promises during cleanup (e.g., `dispose()`), add `promise.catch(() => {})` at creation to prevent vitest from catching them as test errors.
-- **Probe live LSP behavior with a temporary TS error file**: writing `lsp/__tmp_guidance_probe.ts` with an intentional type error exercises both `tool_result` diagnostics and pre-turn guidance.
+- **Probe live LSP behavior with a temporary TS error file**: writing `packages/supi-lsp/__tmp_guidance_probe.ts` with an intentional type error exercises both `tool_result` diagnostics and pre-turn guidance.
 - **Unit-test LSP manager summaries with fake clients**: cast `manager as unknown as { clients: Map<...> }` to seed coverage/diagnostics; keep real server behavior in `*.integration.test.ts`.
 - **TS LSP integration diagnostics can arrive late**: retry `syncFileAndGetDiagnostics()` before asserting non-empty diagnostics in integration tests.
 
@@ -247,7 +247,9 @@ Key docs to reach for first:
 ### Release & hooks
 
 - **`hk` is the local hook runner**: `commit-msg` checks Conventional Commits, `pre-commit` runs Biome + safety checks, and `pre-push` runs `pnpm verify`.
-- **Local `semantic-release` dry-runs still require git auth**: `pnpm release -- --dry-run --no-ci` can fail with `EGITNOPERMISSION` even when config is correct.
+- **Releases are automated via release-please**: The `Release Please` workflow opens a PR with version bumps and changelogs. Merging it triggers GitHub releases and npm publishes. No local release commands needed.
+- **Meta-package dependencies are workspace-linked**: `packages/supi/package.json` lists sub-packages as `workspace:*` dependencies. pnpm replaces these with concrete versions during publish. npm installs them when users install `@mrclrchtr/supi`.
+- **Use wrapper entrypoints in the meta-package**: `pi.extensions` entries are package-relative paths. In `packages/supi/`, keep small local `.ts` wrappers that re-export the workspace packages so published installs do not depend on nested `node_modules` layout.
 
 ### Misc
 

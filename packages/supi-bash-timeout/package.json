@@ -1,0 +1,29 @@
+{
+  "name": "@mrclrchtr/supi-bash-timeout",
+  "version": "0.1.0",
+  "description": "SuPi bash-timeout extension — injects default timeout on bash tool calls",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "index.ts"
+  ],
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "~0.66.0"
+  },
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

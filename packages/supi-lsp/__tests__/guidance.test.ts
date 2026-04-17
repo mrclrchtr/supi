@@ -128,11 +128,11 @@ describe("LSP prompt guidance", () => {
 
   it("extracts existing path hints from prompts", () => {
     const hints = extractPromptPathHints(
-      "check lsp and lsp/manager.ts plus README.md before editing",
+      "check packages/supi-lsp and packages/supi-lsp/manager.ts plus README.md before editing",
     );
 
-    expect(hints).toContain("lsp");
-    expect(hints).toContain("lsp/manager.ts");
+    expect(hints).toContain("packages/supi-lsp");
+    expect(hints).toContain("packages/supi-lsp/manager.ts");
     expect(hints).toContain("README.md");
   });
 

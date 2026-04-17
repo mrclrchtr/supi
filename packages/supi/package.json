@@ -1,0 +1,47 @@
+{
+  "name": "@mrclrchtr/supi",
+  "version": "0.1.0",
+  "description": "SuPi (Super Pi) — The opinionated way to extend PI. Meta-package bundling the full SuPi extension stack.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "*.ts",
+    "prompts",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@mrclrchtr/supi-aliases": "workspace:*",
+    "@mrclrchtr/supi-ask-user": "workspace:*",
+    "@mrclrchtr/supi-bash-timeout": "workspace:*",
+    "@mrclrchtr/supi-lsp": "workspace:*",
+    "@mrclrchtr/supi-skill-shortcut": "workspace:*"
+  },
+  "pi": {
+    "extensions": [
+      "./aliases.ts",
+      "./ask-user.ts",
+      "./bash-timeout.ts",
+      "./skill-shortcut.ts",
+      "./lsp.ts"
+    ],
+    "prompts": [
+      "./prompts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  }
+}

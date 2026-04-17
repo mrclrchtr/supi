@@ -1,108 +1,55 @@
-name: Release
+name: Release Please
 
 on:
   push:
     branches:
       - main
 
-env:
-  REQUIRED_CHECKS: verify,actionlint,commit-messages
-
 permissions:
-  contents: read
-  checks: read
+  contents: write
+  pull-requests: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-please-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  release-please:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: write
-      checks: read
-      id-token: write
-
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
     steps:
-      - name: Wait for required checks
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
+      - uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4.1.1
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
-          IFS=',' read -r -a required_checks <<< "$REQUIRED_CHECKS"
-          deadline=$((SECONDS + 600))
-
-          while (( SECONDS < deadline )); do
-            mapfile -t check_runs < <(
-              gh api \
-                -H "Accept: application/vnd.github+json" \
-                "/repos/$REPO/commits/$SHA/check-runs?per_page=100" \
-                --jq '.check_runs[] | [.name, .status, (.conclusion // "")] | @tsv'
-            )
-
-            declare -A statuses=()
-            declare -A conclusions=()
-
-            for run in "${check_runs[@]}"; do
-              IFS=$'\t' read -r name status conclusion <<< "$run"
-              statuses["$name"]="$status"
-              conclusions["$name"]="$conclusion"
-            done
-
-            pending=()
-            failed=()
-
-            for name in "${required_checks[@]}"; do
-              status="${statuses[$name]:-missing}"
-              conclusion="${conclusions[$name]:-}"
-
-              if [[ "$status" == "completed" ]]; then
-                if [[ "$conclusion" != "success" ]]; then
-                  failed+=("$name ($conclusion)")
-                fi
-                continue
-              fi
-
-              pending+=("$name ($status)")
-            done
-
-            if ((${#failed[@]} > 0)); then
-              echo "Required checks failed: ${failed[*]}"
-              exit 1
-            fi
-
-            if ((${#pending[@]} == 0)); then
-              echo "All required checks passed."
-              break
-            fi
-
-            echo "Waiting for checks: ${pending[*]}"
-            sleep 15
-          done
-
-          if (( SECONDS >= deadline )); then
-            echo "Timed out waiting for required checks: $REQUIRED_CHECKS"
-            exit 1
-          fi
-
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.releases_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
 
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
 
-      - name: Verify package
-        run: pnpm verify
-
-      - name: Release
-        run: pnpm exec semantic-release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish released packages
+        run: |
+          # Publish sub-packages first, then meta-package
+          for pkg in packages/supi-aliases packages/supi-ask-user packages/supi-bash-timeout packages/supi-lsp packages/supi-skill-shortcut packages/supi; do
+            name=$(jq -r .name "$pkg/package.json")
+            version=$(jq -r .version "$pkg/package.json")
+            if npm view "$name@$version" version &>/dev/null; then
+              echo "$name@$version already published, skipping"
+              continue
+            fi
+            echo "Publishing $name@$version"
+            (cd "$pkg" && pnpm publish --no-git-checks --access public --provenance)
+          done
