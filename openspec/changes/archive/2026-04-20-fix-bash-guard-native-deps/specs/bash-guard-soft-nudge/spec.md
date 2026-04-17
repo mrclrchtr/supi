@@ -1,9 +1,4 @@
-# Capability: bash-guard-soft-nudge
-
-## Purpose
-Soft informational nudge for semantic text-search commands targeting LSP-supported files.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Target path extraction from bash search commands
 The system SHALL provide a function `extractSearchTargets(command: string): string[]` that parses common text-search command invocations (`rg`, `grep`, `ack`, `ag`, `git grep`) using a WASM-based bash AST parser (`web-tree-sitter` loading the bundled `tree-sitter-bash.wasm` artifact from the `tree-sitter-bash` package) and returns an array of file or directory path arguments found in the command string. The parser SHALL be initialized asynchronously at session start via a fire-and-forget pattern. If the parser is not yet ready, the function SHALL return `[]`. If parser initialization fails, the system SHALL log a warning and SHALL retry initialization in a later session instead of permanently disabling parsing for the process lifetime.
@@ -24,10 +19,6 @@ The system SHALL provide a function `extractSearchTargets(command: string): stri
 - **WHEN** the command is `git grep "pattern" -- packages/supi-lsp/`
 - **THEN** `extractSearchTargets` returns `["packages/supi-lsp/"]`
 
-#### Scenario: Compound cd && rg command
-- **WHEN** the command is `cd /path && rg "pattern" src/`
-- **THEN** `extractSearchTargets` returns `["src/"]`
-
 #### Scenario: unparseable or unsupported command
 - **WHEN** the command is a search tool invocation that does not match known patterns
 - **THEN** `extractSearchTargets` returns `[]`
@@ -37,7 +28,7 @@ The system SHALL provide a function `extractSearchTargets(command: string): stri
 - **THEN** `extractSearchTargets` returns `[]`
 
 ### Requirement: Soft nudge for semantic bash searches on LSP-supported files
-The system SHALL provide a function `shouldSuggestLsp` that returns an informational nudge message when the agent runs a text-search command targeting LSP-supported files with a semantically motivated prompt. The system SHALL NOT block the bash command — the nudge is injected via `pi.sendMessage` with `deliverAs: "steer"`. When checking directory targets, the system SHALL limit traversal to a maximum depth of 5 levels and 1000 files visited to prevent event-loop stalls in large repositories. When a subtree exceeds the depth limit, the system SHALL skip that subtree, log a warning, and continue scanning remaining candidate directories. When the global file budget is exhausted, the system SHALL stop the scan, log a warning, and return `false` for that target. Directory targets SHALL pass the supportability gate when they contain LSP-supported files.
+The system SHALL provide a function `shouldSuggestLsp` that returns an informational nudge message when the agent runs a text-search command targeting LSP-supported files with a semantically motivated prompt. The system SHALL NOT block the bash command — the nudge is appended to the tool result as additional content. When checking directory targets, the system SHALL limit traversal to a maximum depth of 5 levels and 1000 files visited to prevent event-loop stalls in large repositories. When a subtree exceeds the depth limit, the system SHALL skip that subtree, log a warning, and continue scanning remaining candidate directories. When the global file budget is exhausted, the system SHALL stop the scan, log a warning, and return `false` for that target.
 
 #### Scenario: Semantic grep on TypeScript files with LSP active
 - **WHEN** the agent runs `rg "pattern" packages/supi-lsp/` targeting `.ts` files
