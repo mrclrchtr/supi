@@ -90,6 +90,10 @@ function renderQuestionBody(
   add(theme.fg("text", ` ${q.prompt}`));
   lines.push("");
   if (q.type !== "text") renderOptions(add, theme, q, state.optionIndex);
+  if (q.type !== "text" && state.subMode === "select") {
+    add("");
+    add(theme.fg("dim", " n to add notes"));
+  }
   if (state.subMode === "text-input" || state.subMode === "other-input") {
     const caption = state.subMode === "other-input" ? "Other" : "Answer";
     renderEditorBlock(add, lines, theme, editor, width, caption);
@@ -171,6 +175,6 @@ function footerHelp(flow: QuestionnaireFlow, state: OverlayRenderState): string 
   if (flow.currentMode === "reviewing")
     return "Enter to submit • ←/Shift-Tab to revise • Esc to cancel";
   if (flow.isMultiQuestion)
-    return "↑↓ select • Enter confirm • ←/Shift-Tab back • →/Tab review • Esc cancel";
-  return "↑↓ select • Enter confirm • Esc cancel";
+    return "↑↓ select • Enter confirm • n add note • ←/Shift-Tab back • →/Tab review • Esc cancel";
+  return "↑↓ select • Enter confirm • n add note • Esc cancel";
 }
