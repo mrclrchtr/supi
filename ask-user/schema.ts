@@ -20,9 +20,6 @@ const ChoiceQuestionSchema = Type.Object({
   options: Type.Array(ChoiceOptionSchema, {
     description: "Allowed answers (2-8). Use distinct, mutually exclusive options.",
   }),
-  allowOther: Type.Optional(
-    Type.Boolean({ description: "Allow a freeform 'Other' answer (default false)" }),
-  ),
   recommendation: Type.Optional(
     Type.String({ description: "Recommended option `value` (must match one of `options`)" }),
   ),
@@ -40,11 +37,6 @@ const YesNoQuestionSchema = Type.Object({
   id: Type.String({ description: "Unique question id within this questionnaire" }),
   header: Type.String({ description: "Short label (chip) describing the decision" }),
   prompt: Type.String({ description: "Full yes/no question shown to the user" }),
-  allowOther: Type.Optional(
-    Type.Boolean({
-      description: "Allow a freeform 'Other' answer (e.g. 'depends'/'unknown'); default false",
-    }),
-  ),
   recommendation: Type.Optional(
     Type.Union([Type.Literal("yes"), Type.Literal("no")], {
       description: "Recommended answer (`yes` or `no`)",

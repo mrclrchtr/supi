@@ -29,7 +29,7 @@ describe("ask_user prompt guidance", () => {
   it("guidelines describe when to enable optional flags", () => {
     const all = askUserPromptGuidelines.join("\n");
     expect(all).toMatch(/recommendation/i);
-    expect(all).toMatch(/allowOther/);
+    expect(all).toMatch(/Other is always available/);
   });
 
   it("guidelines warn against running concurrent ask_user calls", () => {

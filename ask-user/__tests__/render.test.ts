@@ -67,7 +67,6 @@ describe("renderAskUserResult", () => {
                 { value: "api_only", label: "API only" },
                 { value: "full_rewrite", label: "Full rewrite" },
               ],
-              allowOther: false,
             },
           ],
           answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],

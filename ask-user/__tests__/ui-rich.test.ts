@@ -13,8 +13,50 @@ const choice: NormalizedQuestion = {
     { value: "a", label: "A" },
     { value: "b", label: "B" },
   ],
-  allowOther: false,
 };
+
+const yesNoGo: NormalizedQuestion = {
+  id: "go",
+  header: "Go?",
+  type: "yesno",
+  prompt: "Proceed?",
+  options: [
+    { value: "yes", label: "Yes" },
+    { value: "no", label: "No" },
+  ],
+  recommendedIndex: 0,
+};
+
+interface RichFixture<Outcome> {
+  captured: { value: Component | undefined };
+  host: RichUiHost;
+  outcomePromise: Promise<Outcome>;
+}
+
+function makeRichFixture<Outcome>(): RichFixture<Outcome> {
+  const tuiStub = { requestRender: () => {} } as unknown as TUI;
+  const themeStub = {
+    fg: (_color: string, text: string) => text,
+    bold: (text: string) => text,
+    bg: (_color: string, text: string) => text,
+  } as unknown as Theme;
+  const captured: { value: Component | undefined } = { value: undefined };
+  let resolveOutcome: ((value: Outcome) => void) | undefined;
+  const outcomePromise = new Promise<Outcome>((resolve) => {
+    resolveOutcome = resolve;
+  });
+  const host: RichUiHost = {
+    custom: ((
+      factory: (tui: TUI, theme: Theme, kb: unknown, done: (r: Outcome) => void) => Component,
+    ) => {
+      captured.value = factory(tuiStub, themeStub, undefined, (outcome) =>
+        resolveOutcome?.(outcome),
+      );
+      return outcomePromise;
+    }) as unknown as RichUiHost["custom"],
+  };
+  return { captured, host, outcomePromise };
+}
 
 describe("runRichQuestionnaire", () => {
   it("submits from review after a final text question", async () => {
@@ -31,7 +73,6 @@ describe("runRichQuestionnaire", () => {
         type: "text",
         prompt: "Why?",
         options: [],
-        allowOther: false,
       },
     ];
     type Outcome = { terminalState: string; answers: { questionId: string; value: string }[] };
@@ -53,8 +94,7 @@ describe("runRichQuestionnaire", () => {
     await Promise.resolve();
     if (!captured) throw new Error("custom() was not invoked with a factory");
 
-    captured.handleInput?.("\r"); // Q1: choose A → comment-prompt
-    captured.handleInput?.("n"); // skip comment → advance to Q2
+    captured.handleInput?.("\r"); // Q1: choose A → advance to Q2
     captured.handleInput?.("o");
     captured.handleInput?.("k");
     captured.handleInput?.("\r"); // Q2: submit "ok" → review
@@ -137,51 +177,84 @@ describe("runRichQuestionnaire", () => {
 
 describe("runRichQuestionnaire render state", () => {
   it("restores the previously selected structured answer when revising from review", async () => {
-    const tuiStub = { requestRender: () => {} } as unknown as TUI;
-    const themeStub = {
-      fg: (_color: string, text: string) => text,
-      bold: (text: string) => text,
-      bg: (_color: string, text: string) => text,
-    } as unknown as Theme;
-    const questions: NormalizedQuestion[] = [
-      choice,
-      {
-        id: "confirm",
-        header: "Confirm",
-        type: "yesno",
-        prompt: "Proceed?",
-        options: [
-          { value: "yes", label: "Yes" },
-          { value: "no", label: "No" },
-        ],
-        allowOther: false,
-        recommendedIndex: 0,
-      },
-    ];
-    let captured: Component | undefined;
-    const host: RichUiHost = {
-      custom: ((
-        factory: (tui: TUI, theme: Theme, kb: unknown, done: (r: unknown) => void) => Component,
-      ) => {
-        captured = factory(tuiStub, themeStub, undefined, () => {});
-        return new Promise(() => {});
-      }) as unknown as RichUiHost["custom"],
-    };
-
-    void runRichQuestionnaire(questions, { ui: host });
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire([choice, { ...yesNoGo, id: "confirm", header: "Confirm" }], {
+      ui: host,
+    });
     await Promise.resolve();
-    if (!captured) throw new Error("custom() was not invoked with a factory");
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
-    captured.handleInput?.("\r"); // Q1: choose A → comment-prompt
-    captured.handleInput?.("n"); // skip comment → advance to Q2
-    captured.handleInput?.("\u001b[B"); // Q2: move from Yes to No
-    captured.handleInput?.("\r"); // Q2: answer No → comment-prompt
-    captured.handleInput?.("n"); // skip comment → enter review
-    captured.handleInput?.("\u001b[D"); // review: go back to revise Q2
+    captured.value.handleInput?.("\r"); // Q1: choose A → advance to Q2
+    captured.value.handleInput?.("\u001b[B"); // Q2: move from Yes to No
+    captured.value.handleInput?.("\r"); // Q2: answer No → enter review
+    captured.value.handleInput?.("\u001b[D"); // review: go back to revise Q2
 
-    const lines = captured.render(80).join("\n");
+    const lines = captured.value.render(80).join("\n");
     expect(lines).toContain("> 2. No");
     expect(lines).not.toContain("> 1. Yes (recommended)");
+  });
+
+  it("preserves a previously attached note when revising and re-confirming", async () => {
+    type Outcome = {
+      terminalState: string;
+      answers: { questionId: string; value: string; comment?: string }[];
+    };
+    const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
+    const runPromise = runRichQuestionnaire([choice, yesNoGo], { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    // Q1: stage a note via `n`, type "ctx", submit, then confirm option A.
+    for (const ch of "nctx") captured.value.handleInput?.(ch);
+    captured.value.handleInput?.("\r"); // submit note → subMode back to select
+    captured.value.handleInput?.("\r"); // confirm Q1 option A with comment attached
+    // Q2: accept default (Yes) → enter review.
+    captured.value.handleInput?.("\r");
+    // Review: ← back to Q2, then ← again back to Q1 to revise it.
+    captured.value.handleInput?.("\u001b[D");
+    captured.value.handleInput?.("\u001b[D");
+    // Q1: re-confirm the same answer without touching the note. The previous
+    // comment must be rehydrated and written back, not silently dropped.
+    captured.value.handleInput?.("\r");
+    // Q2: re-confirm → review → submit.
+    captured.value.handleInput?.("\r");
+    captured.value.handleInput?.("\r");
+
+    const outcome = await outcomePromise;
+    await expect(runPromise).resolves.toEqual(outcome);
+    expect(outcome.terminalState).toBe("submitted");
+    const q1 = outcome.answers.find((a) => a.questionId === "scope");
+    expect(q1?.comment).toBe("ctx");
+  });
+
+  it("keeps a pending note across navigation before the answer is confirmed", async () => {
+    type Outcome = {
+      terminalState: string;
+      answers: { questionId: string; value: string; comment?: string }[];
+    };
+    const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
+    const runPromise = runRichQuestionnaire([choice, yesNoGo], { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    // Q1: confirm option A with no note attached.
+    captured.value.handleInput?.("\r");
+    // Q2: stage a note ("foo") but do NOT confirm the answer.
+    for (const ch of "nfoo") captured.value.handleInput?.(ch);
+    captured.value.handleInput?.("\r"); // submit note → subMode back to select on Q2
+    // Navigate back to Q1 and then forward again by re-confirming.
+    captured.value.handleInput?.("\u001b[D"); // ← back to Q1
+    captured.value.handleInput?.("\r"); // re-confirm Q1 → back on Q2
+    // Q2: confirm the default (Yes). The staged note must still be attached.
+    captured.value.handleInput?.("\r");
+    // Review → submit.
+    captured.value.handleInput?.("\r");
+
+    const outcome = await outcomePromise;
+    await expect(runPromise).resolves.toEqual(outcome);
+    expect(outcome.terminalState).toBe("submitted");
+    const q2 = outcome.answers.find((a) => a.questionId === "go");
+    expect(q2?.comment).toBe("foo");
   });
 
   it("invalidates cached lines when render is called with a new width", async () => {

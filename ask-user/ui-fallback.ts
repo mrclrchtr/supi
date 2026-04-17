@@ -1,7 +1,7 @@
 // Dialog/input fallback for environments where ctx.ui.custom() is unavailable
-// (e.g., RPC mode). Sequentially walks the QuestionnaireFlow via select/
-// confirm/input. Honors signal.aborted between dialogs and treats user
-// dismissal (undefined return) as cancellation.
+// (e.g., RPC mode). Sequentially walks the QuestionnaireFlow via select/input.
+// Honors signal.aborted between dialogs and treats user dismissal (undefined
+// return) as cancellation.
 
 import { QuestionnaireFlow } from "./flow.ts";
 import { decorateOption, formatReviewLine, OTHER_LABEL } from "./format.ts";
@@ -17,7 +17,6 @@ export interface FallbackUi {
     options: string[],
     opts?: FallbackDialogOptions,
   ): Promise<string | undefined>;
-  confirm(title: string, message: string, opts?: FallbackDialogOptions): Promise<boolean>;
   input(
     title: string,
     placeholder?: string,
@@ -153,16 +152,14 @@ async function collectStructured(
       appendDescription(decorateOption(o.label, i === question.recommendedIndex), o.description),
     ),
   );
-  const otherIndex = question.allowOther ? question.options.length : -1;
-  const allLabels = question.allowOther
-    ? [...optionLabels, numberedLabel(otherIndex, OTHER_LABEL)]
-    : optionLabels;
+  const otherIndex = question.options.length;
+  const allLabels = [...optionLabels, numberedLabel(otherIndex, OTHER_LABEL)];
   const choice = await opts.ui.select(question.prompt, allLabels, { signal: opts.signal });
   if (opts.signal?.aborted) return "aborted";
   if (choice === undefined) return "cancelled";
   const pickedIdx = allLabels.indexOf(choice);
   if (pickedIdx < 0) return "cancelled";
-  if (question.allowOther && pickedIdx === otherIndex) return collectOther(question, opts);
+  if (pickedIdx === otherIndex) return collectOther(question, opts);
   return {
     questionId: question.id,
     source,
@@ -200,9 +197,9 @@ async function collectComment(
 ): Promise<string | "aborted" | "cancelled"> {
   // Text questions are freeform already — skip the comment prompt.
   if (question.type === "text") return "";
-  // Use select() instead of confirm() so a dismissed dialog returns undefined
-  // and can be treated as cancellation. confirm()'s boolean return collapses
-  // "no" and "dismiss" together, which would silently submit on user cancel.
+  // Use select() instead of pi's ctx.ui.confirm() so a dismissed dialog
+  // returns undefined and can be treated as cancellation. confirm()'s boolean
+  // return collapses "no" and "dismiss", which would silently submit on cancel.
   const choice = await opts.ui.select(
     `${question.header}: add a note?`,
     [COMMENT_YES_LABEL, COMMENT_NO_LABEL],

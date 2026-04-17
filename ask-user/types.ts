@@ -20,7 +20,6 @@ export interface NormalizedQuestion {
   type: QuestionType;
   prompt: string;
   options: NormalizedOption[];
-  allowOther: boolean;
   recommendedIndex?: number;
 }
 

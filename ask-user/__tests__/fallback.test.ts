@@ -5,10 +5,9 @@ import { type FallbackUi, runFallbackQuestionnaire } from "../ui-fallback.ts";
 
 interface Step {
   // For select: the label index to pick (or undefined to dismiss)
-  // For confirm: the boolean to return
   // For input: the string to return (or undefined to dismiss)
-  kind: "select" | "confirm" | "input";
-  result: string | boolean | undefined;
+  kind: "select" | "input";
+  result: string | undefined;
 }
 
 function scriptedUi(steps: Step[]): FallbackUi {
@@ -29,7 +28,6 @@ function scriptedUi(steps: Step[]): FallbackUi {
       const idx = result as unknown as number;
       return typeof idx === "number" ? options[idx] : undefined;
     },
-    confirm: async () => Boolean(next("confirm")),
     input: async () => {
       const r = next("input");
       return r === undefined ? undefined : String(r);
@@ -72,7 +70,7 @@ describe("runFallbackQuestionnaire", () => {
 
   it("captures Other freeform input as a separate source", async () => {
     const params: AskUserParams = {
-      questions: [{ ...(choiceParams.questions[0] as object), allowOther: true } as never],
+      questions: [choiceParams.questions[0] as never],
     };
     const ui = scriptedUi([
       { kind: "select", result: 2 as unknown as string }, // Other (after narrow/broad)
@@ -88,7 +86,7 @@ describe("runFallbackQuestionnaire", () => {
 
   it("reprompts the Other dialog until the user submits non-empty text", async () => {
     const params: AskUserParams = {
-      questions: [{ ...(choiceParams.questions[0] as object), allowOther: true } as never],
+      questions: [choiceParams.questions[0] as never],
     };
     const ui = scriptedUi([
       { kind: "select", result: 2 as unknown as string },
@@ -106,7 +104,7 @@ describe("runFallbackQuestionnaire", () => {
 
   it("cancels the questionnaire only when the Other dialog is dismissed", async () => {
     const params: AskUserParams = {
-      questions: [{ ...(choiceParams.questions[0] as object), allowOther: true } as never],
+      questions: [choiceParams.questions[0] as never],
     };
     const ui = scriptedUi([
       { kind: "select", result: 2 as unknown as string },
@@ -151,7 +149,6 @@ describe("runFallbackQuestionnaire", () => {
         controller.abort();
         return undefined;
       },
-      confirm: async () => false,
       input: async () => undefined,
     };
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams).questions, {
@@ -167,10 +164,6 @@ describe("runFallbackQuestionnaire", () => {
       select: async (_t, options, opts) => {
         seenSignals.push(opts?.signal);
         return options[0];
-      },
-      confirm: async (_t, _m, opts) => {
-        seenSignals.push(opts?.signal);
-        return true;
       },
       input: async (_t, _p, opts) => {
         seenSignals.push(opts?.signal);
@@ -240,7 +233,6 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
         recordedLabels.push([...options]);
         return options[0];
       },
-      confirm: async () => false,
       input: async () => undefined,
     };
     const params: AskUserParams = {
@@ -249,7 +241,11 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
       ],
     };
     await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, { ui });
-    expect(recordedLabels[0]).toEqual(["1. Yes", "2. No (recommended)"]);
+    expect(recordedLabels[0]).toEqual([
+      "1. Yes",
+      "2. No (recommended)",
+      "3. Other (type your own)",
+    ]);
   });
 
   it("surfaces option descriptions in the select dialog labels", async () => {
@@ -273,11 +269,14 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
         recorded.push([...options]);
         return options[0];
       },
-      confirm: async () => false,
       input: async () => undefined,
     };
     await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, { ui });
-    expect(recorded[0]).toEqual(["1. Narrow — limit to api/", "2. Broad — entire repo"]);
+    expect(recorded[0]).toEqual([
+      "1. Narrow — limit to api/",
+      "2. Broad — entire repo",
+      "3. Other (type your own)",
+    ]);
   });
 
   it("disambiguates duplicate option labels by index prefix", async () => {
@@ -301,13 +300,12 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
         recorded.push([...options]);
         return options[1]; // pick the second of two same-labeled options
       },
-      confirm: async () => false,
       input: async () => undefined,
     };
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
       ui,
     });
-    expect(recorded[0]).toEqual(["1. Same", "2. Same"]);
+    expect(recorded[0]).toEqual(["1. Same", "2. Same", "3. Other (type your own)"]);
     expect(outcome.answers[0]).toMatchObject({ value: "b", optionIndex: 1 });
   });
 
@@ -330,7 +328,6 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
         reviewTitle = title;
         return options[0]; // Submit answers
       },
-      confirm: async () => true,
       input: async () => "rationale here",
     };
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
@@ -340,14 +337,14 @@ describe("runFallbackQuestionnaire — multi-question + yesno extras", () => {
     expect(reviewTitle).toContain("rationale here");
   });
 
-  it("yesno supports allowOther and records source 'other'", async () => {
+  it("yesno records source 'other' when the user picks Other", async () => {
     const ui = scriptedUi([
       { kind: "select", result: 2 as unknown as string }, // Other
       { kind: "input", result: "depends on the deploy" },
       { kind: "select", result: 1 as unknown as string }, // skip comment
     ]);
     const params: AskUserParams = {
-      questions: [{ type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", allowOther: true }],
+      questions: [{ type: "yesno", id: "go", header: "Go?", prompt: "Proceed?" }],
     };
     const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
       ui,

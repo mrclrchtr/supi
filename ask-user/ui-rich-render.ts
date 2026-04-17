@@ -8,11 +8,12 @@ import type { QuestionnaireFlow } from "./flow.ts";
 import { decorateOption, formatReviewLine, OTHER_LABEL } from "./format.ts";
 import type { NormalizedQuestion } from "./types.ts";
 
-export type SubMode = "select" | "other-input" | "text-input" | "comment-prompt" | "comment-input";
+export type SubMode = "select" | "other-input" | "text-input" | "comment-input";
 
 export interface OverlayRenderState {
   optionIndex: number;
   subMode: SubMode;
+  pendingNote?: string;
 }
 
 export function isEditorMode(mode: SubMode): boolean {
@@ -20,7 +21,7 @@ export function isEditorMode(mode: SubMode): boolean {
 }
 
 export function displayOptionCount(q: NormalizedQuestion): number {
-  return q.options.length + (q.allowOther ? 1 : 0);
+  return q.options.length + 1;
 }
 
 // biome-ignore lint/complexity/useMaxParams: render entry needs full overlay context
@@ -91,20 +92,35 @@ function renderQuestionBody(
   lines.push("");
   if (q.type !== "text") renderOptions(add, theme, q, state.optionIndex);
   if (q.type !== "text" && state.subMode === "select") {
-    add("");
-    add(theme.fg("dim", " n to add notes"));
+    renderSelectModeExtras(add, lines, theme, editor, width, q, state);
   }
   if (state.subMode === "text-input" || state.subMode === "other-input") {
     const caption = state.subMode === "other-input" ? "Other" : "Answer";
     renderEditorBlock(add, lines, theme, editor, width, caption);
   }
-  if (state.subMode === "comment-prompt") {
-    add("");
-    add(theme.fg("muted", " Add a note? (y/n)"));
-  }
   if (state.subMode === "comment-input") {
     renderEditorBlock(add, lines, theme, editor, width, "Note");
   }
+}
+
+// biome-ignore lint/complexity/useMaxParams: shares the full render context with renderQuestionBody
+function renderSelectModeExtras(
+  add: (s: string) => void,
+  lines: string[],
+  theme: Theme,
+  editor: Editor,
+  width: number,
+  q: NormalizedQuestion,
+  state: OverlayRenderState,
+): void {
+  const otherIdx = displayOptionCount(q) - 1;
+  if (state.optionIndex === otherIdx) {
+    const caption = state.pendingNote ? "Other (✓ note attached)" : "Other";
+    renderEditorBlock(add, lines, theme, editor, width, caption);
+    return;
+  }
+  add("");
+  add(theme.fg("dim", state.pendingNote ? " ✓ note added  •  n to edit" : " n to add notes"));
 }
 
 function renderOptions(
@@ -135,7 +151,7 @@ function buildOptionItems(q: NormalizedQuestion): OptionItem[] {
     label: decorateOption(opt.label, i === q.recommendedIndex),
     description: opt.description,
   }));
-  if (q.allowOther) items.push({ label: OTHER_LABEL });
+  items.push({ label: OTHER_LABEL });
   return items;
 }
 
@@ -170,11 +186,15 @@ function footerHelp(flow: QuestionnaireFlow, state: OverlayRenderState): string 
   // whole questionnaire (see ui-rich.handleEditorEscape). The hint must say so.
   if (state.subMode === "text-input") return "Enter to submit • Esc to cancel";
   if (isEditorMode(state.subMode)) return "Enter to submit • Esc to go back";
-  if (state.subMode === "comment-prompt")
-    return "y to add a note • n/Enter to skip • Esc to cancel";
   if (flow.currentMode === "reviewing")
     return "Enter to submit • ←/Shift-Tab to revise • Esc to cancel";
+  // When the cursor is parked on Other, `n` types into the freeform editor
+  // instead of opening the note shortcut — drop the hint so we don't
+  // advertise a shortcut that does something else in that state.
+  const q = flow.currentQuestion;
+  const onOther = q ? state.optionIndex === displayOptionCount(q) - 1 : false;
+  const noteHint = onOther ? "" : "n add note • ";
   if (flow.isMultiQuestion)
-    return "↑↓ select • Enter confirm • n add note • ←/Shift-Tab back • →/Tab review • Esc cancel";
-  return "↑↓ select • Enter confirm • n add note • Esc cancel";
+    return `↑↓ select • Enter confirm • ${noteHint}←/Shift-Tab back • →/Tab review • Esc cancel`;
+  return `↑↓ select • Enter confirm • ${noteHint}Esc cancel`;
 }

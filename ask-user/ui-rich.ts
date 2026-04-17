@@ -13,7 +13,7 @@ import {
   type TUI,
 } from "@mariozechner/pi-tui";
 import { QuestionnaireFlow } from "./flow.ts";
-import type { Answer, NormalizedQuestion, QuestionnaireOutcome } from "./types.ts";
+import type { NormalizedQuestion, QuestionnaireOutcome } from "./types.ts";
 import {
   displayOptionCount,
   isEditorMode,
@@ -78,7 +78,11 @@ interface BuildOverlayArgs {
 }
 
 interface OverlayState extends OverlayRenderState {
-  pendingAnswer: Answer | null;
+  // Per-question staged notes survive navigation. A note goes in here when
+  // the user submits the comment-input editor, and is cleared when the
+  // question's answer is confirmed — from that point the stored answer's
+  // `comment` is the source of truth.
+  stagedNotes: Map<string, string>;
   cachedLines: string[] | undefined;
   // Track the width the cached lines were rendered for. pi's TUI does not
   // call invalidate() on terminal resize, so we self-invalidate when the
@@ -99,7 +103,8 @@ function buildOverlay(args: BuildOverlayArgs): Component {
   const state: OverlayState = {
     optionIndex: flow.currentQuestion?.recommendedIndex ?? 0,
     subMode: initialSubMode(flow.currentQuestion),
-    pendingAnswer: null,
+    pendingNote: undefined,
+    stagedNotes: new Map(),
     cachedLines: undefined,
     cachedWidth: undefined,
   };
@@ -173,15 +178,24 @@ function onEditorSubmit(value: string, deps: OverlayDeps): void {
       refresh();
       return;
     }
-    state.pendingAnswer = { questionId: q.id, source: "other", value: trimmed };
-    finalizePendingAnswer(deps);
+    deps.flow.setAnswer({
+      questionId: q.id,
+      source: "other",
+      value: trimmed,
+      comment: state.pendingNote,
+    });
+    state.pendingNote = undefined;
+    state.stagedNotes.delete(q.id);
+    moveAfterAnswer(deps);
     return;
   }
-  if (state.subMode === "comment-input" && state.pendingAnswer) {
-    state.pendingAnswer.comment = trimmed.length > 0 ? trimmed : undefined;
-    deps.flow.setAnswer(state.pendingAnswer);
-    state.pendingAnswer = null;
-    moveAfterAnswer(deps);
+  if (state.subMode === "comment-input") {
+    if (trimmed.length > 0) state.stagedNotes.set(q.id, trimmed);
+    else state.stagedNotes.delete(q.id);
+    state.pendingNote = trimmed.length > 0 ? trimmed : undefined;
+    state.subMode = "select";
+    editor.setText("");
+    refresh();
   }
 }
 
@@ -205,10 +219,6 @@ function handleOverlayInput(data: string, deps: OverlayDeps): void {
     handleReviewInput(data, deps);
     return;
   }
-  if (state.subMode === "comment-prompt") {
-    handleCommentPromptInput(data, deps);
-    return;
-  }
   handleSelectInput(data, deps);
 }
 
@@ -221,9 +231,7 @@ function handleEditorEscape(deps: OverlayDeps): void {
     deps.finish(flow.outcome());
     return;
   }
-  if (state.subMode === "comment-input" && state.pendingAnswer) {
-    state.subMode = "comment-prompt";
-  } else if (state.subMode === "other-input") {
+  if (state.subMode === "comment-input" || state.subMode === "other-input") {
     state.subMode = "select";
   }
   editor.setText("");
@@ -231,10 +239,12 @@ function handleEditorEscape(deps: OverlayDeps): void {
 }
 
 function handleSelectInput(data: string, deps: OverlayDeps): void {
-  const { flow, state, refresh } = deps;
+  const { flow, state, editor, refresh } = deps;
   const q = flow.currentQuestion;
   if (!q) return;
   const optionCount = displayOptionCount(q);
+  const otherIdx = optionCount - 1;
+  const isOnOther = state.optionIndex === otherIdx;
   if (matchesKey(data, Key.up)) {
     state.optionIndex = Math.max(0, state.optionIndex - 1);
     refresh();
@@ -245,24 +255,44 @@ function handleSelectInput(data: string, deps: OverlayDeps): void {
     refresh();
     return;
   }
+  if (handleSelectNav(data, deps)) return;
+  if (!isOnOther && matchesKey(data, "n")) {
+    state.subMode = "comment-input";
+    editor.setText(state.pendingNote ?? "");
+    refresh();
+    return;
+  }
+  if (matchesKey(data, Key.enter)) {
+    handleSelectEnter(q, deps);
+    return;
+  }
+  if (isOnOther) {
+    state.subMode = "other-input";
+    editor.handleInput(data);
+    refresh();
+  }
+}
+
+function handleSelectNav(data: string, deps: OverlayDeps): boolean {
+  const { flow, refresh } = deps;
   if (matchesKey(data, Key.shift("tab")) || matchesKey(data, Key.left)) {
     if (flow.goBack()) {
       resetSubModeForCurrent(deps);
       refresh();
     }
-    return;
+    return true;
   }
   if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
     if (flow.allAnswered() && flow.enterReview()) refresh();
-    return;
+    return true;
   }
-  if (matchesKey(data, Key.enter)) handleSelectEnter(q, deps);
+  return false;
 }
 
 function handleSelectEnter(q: NormalizedQuestion, deps: OverlayDeps): void {
   const { state, editor, refresh } = deps;
   const total = displayOptionCount(q);
-  const isOther = q.allowOther && state.optionIndex === total - 1;
+  const isOther = state.optionIndex === total - 1;
   if (isOther) {
     state.subMode = "other-input";
     editor.setText("");
@@ -271,28 +301,16 @@ function handleSelectEnter(q: NormalizedQuestion, deps: OverlayDeps): void {
   }
   const idx = state.optionIndex;
   const option = q.options[idx];
-  state.pendingAnswer = {
+  deps.flow.setAnswer({
     questionId: q.id,
     source: q.type === "yesno" ? "yesno" : "option",
     value: option.value,
     optionIndex: idx,
-  };
-  finalizePendingAnswer(deps);
-}
-
-function handleCommentPromptInput(data: string, deps: OverlayDeps): void {
-  const { state, flow, editor, refresh } = deps;
-  if (matchesKey(data, "y")) {
-    state.subMode = "comment-input";
-    editor.setText("");
-    refresh();
-    return;
-  }
-  if (matchesKey(data, "n") || matchesKey(data, Key.enter)) {
-    if (state.pendingAnswer) flow.setAnswer(state.pendingAnswer);
-    state.pendingAnswer = null;
-    moveAfterAnswer(deps);
-  }
+    comment: state.pendingNote,
+  });
+  state.pendingNote = undefined;
+  state.stagedNotes.delete(q.id);
+  moveAfterAnswer(deps);
 }
 
 function handleReviewInput(data: string, deps: OverlayDeps): void {
@@ -307,22 +325,6 @@ function handleReviewInput(data: string, deps: OverlayDeps): void {
       refresh();
     }
   }
-}
-
-function finalizePendingAnswer(deps: OverlayDeps): void {
-  const { flow, state, refresh } = deps;
-  const q = flow.currentQuestion;
-  if (!q || !state.pendingAnswer) return;
-  // Structured questions always offer a comment prompt. Text questions are
-  // freeform already so the comment prompt is skipped.
-  if (q.type !== "text") {
-    state.subMode = "comment-prompt";
-    refresh();
-    return;
-  }
-  flow.setAnswer(state.pendingAnswer);
-  state.pendingAnswer = null;
-  moveAfterAnswer(deps);
 }
 
 function moveAfterAnswer(deps: OverlayDeps): void {
@@ -344,7 +346,12 @@ function resetSubModeForCurrent(deps: OverlayDeps): void {
   // review screen routes Enter back into the editor instead of submitting.
   state.subMode = flow.currentMode === "reviewing" ? "select" : initialSubMode(q);
   state.optionIndex = selectedIndexForCurrent(flow, q);
-  state.pendingAnswer = null;
+  // Prefer a staged (unconfirmed) note so navigating away mid-edit doesn't
+  // drop it; otherwise fall back to the confirmed answer's comment so
+  // revising and re-confirming doesn't silently drop it either.
+  state.pendingNote = q
+    ? (state.stagedNotes.get(q.id) ?? flow.getAnswer(q.id)?.comment)
+    : undefined;
   editor.setText("");
 }
 
@@ -358,6 +365,6 @@ function selectedIndexForCurrent(
   if (existing.source === "option" || existing.source === "yesno") {
     return existing.optionIndex ?? q.recommendedIndex ?? 0;
   }
-  if (existing.source === "other" && q.allowOther) return q.options.length;
+  if (existing.source === "other") return q.options.length;
   return q.recommendedIndex ?? 0;
 }

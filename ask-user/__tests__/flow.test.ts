@@ -11,7 +11,6 @@ const q = (id: string, header = id): NormalizedQuestion => ({
     { value: "a", label: "A" },
     { value: "b", label: "B" },
   ],
-  allowOther: false,
 });
 
 describe("QuestionnaireFlow", () => {

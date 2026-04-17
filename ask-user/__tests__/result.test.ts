@@ -11,7 +11,6 @@ const choiceQuestion: NormalizedQuestion = {
     { value: "narrow", label: "Narrow" },
     { value: "broad", label: "Broad" },
   ],
-  allowOther: false,
 };
 
 const yesNoQuestion: NormalizedQuestion = {

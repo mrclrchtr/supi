@@ -50,7 +50,6 @@ function fallbackCtx(selectImpl: SelectImpl) {
     hasUI: true,
     ui: {
       select: vi.fn(selectImpl),
-      confirm: vi.fn(async () => false),
       input: vi.fn(async () => undefined),
     },
   };
@@ -63,7 +62,6 @@ describe("ask_user execute", () => {
       hasUI: false,
       ui: {
         select: async () => undefined,
-        confirm: async () => false,
         input: async () => undefined,
       },
     };
@@ -102,9 +100,11 @@ describe("ask_user execute", () => {
     const { tool } = fakePi();
     const ctxOne = fallbackCtx(async () => undefined); // cancel
     await tool.execute("a", validParams, undefined, undefined, ctxOne);
+    let selectCall = 0;
     const ctxTwo = fallbackCtx(async (_t: string, options: string[] | undefined) => {
-      // First select returns the first option; second select skips the comment.
-      return options?.at(-1);
+      selectCall++;
+      // First select picks the first option; second select skips the comment.
+      return selectCall === 1 ? options?.[0] : options?.at(-1);
     });
     const result = await tool.execute("b", validParams, undefined, undefined, ctxTwo);
     expect(result.details).toMatchObject({ terminalState: "submitted" });

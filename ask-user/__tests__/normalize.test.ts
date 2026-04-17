@@ -91,7 +91,6 @@ describe("normalizeQuestionnaire", () => {
     });
     const q = out.questions[0];
     expect(q.options).toEqual([]);
-    expect(q.allowOther).toBe(false);
   });
 
   it("rejects whitespace-only id", () => {

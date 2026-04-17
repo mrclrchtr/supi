@@ -28,7 +28,7 @@ const TOOL_NAME = "ask_user";
 const TOOL_LABEL = "Ask User";
 
 const TOOL_DESCRIPTION =
-  "Ask the user a focused decision question (or up to 4 grouped questions) when explicit user input is required to proceed safely. Use for clarifying intent, picking between options, or confirming a destructive action — not for surveys or open-ended discovery. Each question is `choice`, `text`, or `yesno`; structured questions can include `recommendation` and `allowOther`.";
+  "Ask the user a focused decision question (or up to 4 grouped questions) when explicit user input is required to proceed safely. Use for clarifying intent, picking between options, or confirming a destructive action — not for surveys or open-ended discovery. Each question is `choice`, `text`, or `yesno`; structured questions can include `recommendation` and always offer a freeform 'Other' answer.";
 
 const PROMPT_SNIPPET =
   "ask_user — pause and request a focused decision (1-4 typed questions) when explicit user input is required to proceed";
@@ -38,14 +38,13 @@ const PROMPT_GUIDELINES = [
   "Keep questionnaires bounded: 1-4 focused questions with short headers; prefer one decision per call when possible.",
   "Choose the narrowest type that fits: yesno for binary decisions, choice for known options, text only when freeform input is genuinely needed.",
   "Set `recommendation` when one option is clearly preferable, so the UI can surface it as guidance.",
-  "Enable `allowOther` only when the listed options may be incomplete; comments are always available so there is no need to plan for them.",
+  "Other is always available on structured questions — no need to plan for it. Comments are also always available.",
   "Do not call ask_user while another ask_user interaction is in flight — wait for the previous result before issuing another.",
 ];
 
 interface ExtensionUi {
   ui: {
     select: FallbackUi["select"];
-    confirm: FallbackUi["confirm"];
     input: FallbackUi["input"];
     custom?: RichUiHost["custom"];
   };
@@ -117,7 +116,6 @@ async function driveQuestionnaire(
   }
   const fallbackUi: FallbackUi = {
     select: ctx.ui.select.bind(ctx.ui),
-    confirm: ctx.ui.confirm.bind(ctx.ui),
     input: ctx.ui.input.bind(ctx.ui),
   };
   const outcome = await runFallbackQuestionnaire(questions, { ui: fallbackUi, signal });

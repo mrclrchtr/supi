@@ -4,8 +4,8 @@ import type { AskUserParams } from "../schema.ts";
 import { type FallbackUi, runFallbackQuestionnaire } from "../ui-fallback.ts";
 
 interface Step {
-  kind: "select" | "confirm" | "input";
-  result: string | boolean | undefined;
+  kind: "select" | "input";
+  result: string | undefined;
 }
 
 function scriptedUi(steps: Step[]): FallbackUi {
@@ -24,7 +24,6 @@ function scriptedUi(steps: Step[]): FallbackUi {
       const idx = result as unknown as number;
       return typeof idx === "number" ? options[idx] : undefined;
     },
-    confirm: async () => Boolean(next("confirm")),
     input: async () => {
       const r = next("input");
       return r === undefined ? undefined : String(r);
