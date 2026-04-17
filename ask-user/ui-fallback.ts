@@ -1,11 +1,15 @@
-// Dialog/input fallback for environments where ctx.ui.custom() is unavailable
-// (e.g., RPC mode). Sequentially walks the QuestionnaireFlow via select/input.
-// Honors signal.aborted between dialogs and treats user dismissal (undefined
-// return) as cancellation.
+// Dialog/input fallback for environments where ctx.ui.custom() is unavailable.
+// This path intentionally preserves the redesigned answer semantics while
+// flattening preview-heavy affordances into plain dialog lists.
 
 import { QuestionnaireFlow } from "./flow.ts";
-import { decorateOption, formatReviewLine, OTHER_LABEL } from "./format.ts";
-import type { Answer, NormalizedQuestion, QuestionnaireOutcome } from "./types.ts";
+import { DISCUSS_LABEL, decorateOption, formatReviewLine, OTHER_LABEL } from "./format.ts";
+import type {
+  Answer,
+  NormalizedQuestion,
+  NormalizedStructuredQuestion,
+  QuestionnaireOutcome,
+} from "./types.ts";
 
 export interface FallbackDialogOptions {
   signal?: AbortSignal;
@@ -29,12 +33,12 @@ interface RunOptions {
   signal?: AbortSignal;
 }
 
-const COMMENT_PROMPT_PLACEHOLDER = "Optional note (leave blank to skip)";
-const COMMENT_YES_LABEL = "Yes, add a note";
-const COMMENT_NO_LABEL = "No, skip";
-
 type StepOutcome = "answered" | "cancelled" | "aborted";
 type CollectOutcome = Exclude<StepOutcome, "answered">;
+
+const REVIEW_SUBMIT = "Submit answers";
+const REVIEW_CANCEL = "Cancel questionnaire";
+const MULTI_SUBMIT = "Submit selections";
 
 export async function runFallbackQuestionnaire(
   questions: NormalizedQuestion[],
@@ -46,9 +50,9 @@ export async function runFallbackQuestionnaire(
       flow.abort();
       break;
     }
-    const q = flow.currentQuestion;
-    if (!q) break;
-    const step = await askAndStore(q, flow, options);
+    const question = flow.currentQuestion;
+    if (!question) break;
+    const step = await askAndStore(question, flow, options);
     if (step === "aborted") flow.abort();
     else if (step === "cancelled") flow.cancel();
     else await applyAdvance(flow, options);
@@ -65,20 +69,22 @@ async function applyAdvance(flow: QuestionnaireFlow, opts: RunOptions): Promise<
   else flow.submit();
 }
 
-const REVIEW_SUBMIT = "Submit answers";
-const REVIEW_CANCEL = "Cancel questionnaire";
-
 async function runReviewStep(
   flow: QuestionnaireFlow,
   opts: RunOptions,
 ): Promise<"submit" | "cancelled" | "aborted"> {
   const summary = flow.questions
-    .map((q) => `${q.header}: ${formatReviewLine(q, flow.getAnswer(q.id))}`)
+    .map(
+      (question) =>
+        `${question.header}: ${formatReviewLine(question, flow.getAnswer(question.id))}`,
+    )
     .join("  |  ");
   const choice = await opts.ui.select(
     `Review answers — ${summary}`,
     [REVIEW_SUBMIT, REVIEW_CANCEL],
-    { signal: opts.signal },
+    {
+      signal: opts.signal,
+    },
   );
   if (opts.signal?.aborted) return "aborted";
   if (choice === undefined || choice === REVIEW_CANCEL) return "cancelled";
@@ -92,9 +98,6 @@ async function askAndStore(
 ): Promise<StepOutcome> {
   const answer = await collectAnswer(question, opts);
   if (answer === "aborted" || answer === "cancelled") return answer;
-  const comment = await collectComment(question, opts);
-  if (comment === "aborted" || comment === "cancelled") return comment;
-  if (comment) answer.comment = comment;
   flow.setAnswer(answer);
   return "answered";
 }
@@ -103,20 +106,13 @@ function collectAnswer(
   question: NormalizedQuestion,
   opts: RunOptions,
 ): Promise<Answer | CollectOutcome> {
-  if (question.type === "yesno") return collectYesNo(question, opts);
   if (question.type === "text") return collectText(question, opts);
-  return collectChoice(question, opts);
-}
-
-function collectYesNo(
-  question: NormalizedQuestion,
-  opts: RunOptions,
-): Promise<Answer | CollectOutcome> {
-  return collectStructured(question, opts, "yesno");
+  if (question.type === "multichoice") return collectMultichoice(question, opts);
+  return collectStructured(question, opts, question.type === "yesno" ? "yesno" : "option");
 }
 
 async function collectText(
-  question: NormalizedQuestion,
+  question: Extract<NormalizedQuestion, { type: "text" }>,
   opts: RunOptions,
 ): Promise<Answer | CollectOutcome> {
   while (true) {
@@ -124,96 +120,153 @@ async function collectText(
     if (opts.signal?.aborted) return "aborted";
     if (value === undefined) return "cancelled";
     const trimmed = value.trim();
-    if (trimmed.length > 0) {
-      return { questionId: question.id, source: "text", value: trimmed };
-    }
+    if (trimmed.length > 0) return { questionId: question.id, source: "text", value: trimmed };
   }
-}
-
-function collectChoice(
-  question: NormalizedQuestion,
-  opts: RunOptions,
-): Promise<Answer | CollectOutcome> {
-  return collectStructured(question, opts, "option");
 }
 
 async function collectStructured(
-  question: NormalizedQuestion,
+  question: NormalizedStructuredQuestion,
   opts: RunOptions,
   source: "option" | "yesno",
 ): Promise<Answer | CollectOutcome> {
-  // Prefix every label with `${i + 1}.` so duplicate or recommendation-decorated
-  // labels can never collide on indexOf() reverse-lookup. Append option
-  // description inline — the select dialog has no separate description channel,
-  // but dropping descriptions entirely makes terse/repeated labels ambiguous.
-  const optionLabels = question.options.map((o, i) =>
-    numberedLabel(
-      i,
-      appendDescription(decorateOption(o.label, i === question.recommendedIndex), o.description),
-    ),
-  );
-  const otherIndex = question.options.length;
-  const allLabels = [...optionLabels, numberedLabel(otherIndex, OTHER_LABEL)];
-  const choice = await opts.ui.select(question.prompt, allLabels, { signal: opts.signal });
+  const labels = structuredChoiceLabels(question);
+  const choice = await opts.ui.select(question.prompt, labels, { signal: opts.signal });
   if (opts.signal?.aborted) return "aborted";
   if (choice === undefined) return "cancelled";
-  const pickedIdx = allLabels.indexOf(choice);
-  if (pickedIdx < 0) return "cancelled";
-  if (pickedIdx === otherIndex) return collectOther(question, opts);
-  return {
-    questionId: question.id,
-    source,
-    value: question.options[pickedIdx].value,
-    optionIndex: pickedIdx,
-  };
+  const index = labels.indexOf(choice);
+  if (index < 0) return "cancelled";
+  if (index < question.options.length) {
+    const option = question.options[index];
+    return source === "yesno"
+      ? {
+          questionId: question.id,
+          source: "yesno",
+          value: option.value as "yes" | "no",
+          optionIndex: index as 0 | 1,
+        }
+      : { questionId: question.id, source: "option", value: option.value, optionIndex: index };
+  }
+  return collectStructuredAction(question, index - question.options.length, opts);
 }
 
-function numberedLabel(idx: number, label: string): string {
-  return `${idx + 1}. ${label}`;
+function structuredChoiceLabels(question: NormalizedStructuredQuestion): string[] {
+  const labels = question.options.map((option, index) =>
+    numberedLabel(
+      index,
+      appendDescription(
+        decorateOption(option.label, question.recommendedIndexes.includes(index)),
+        option.description,
+      ),
+    ),
+  );
+  let offset = question.options.length;
+  if (question.allowOther) {
+    labels.push(numberedLabel(offset, OTHER_LABEL));
+    offset += 1;
+  }
+  if (question.allowDiscuss) labels.push(numberedLabel(offset, DISCUSS_LABEL));
+  return labels;
+}
+
+async function collectStructuredAction(
+  question: NormalizedStructuredQuestion,
+  actionIndex: number,
+  opts: RunOptions,
+): Promise<Answer | CollectOutcome> {
+  if (question.allowOther && actionIndex === 0) return collectOther(question, opts);
+  return collectDiscuss(question, opts);
 }
 
 async function collectOther(
-  question: NormalizedQuestion,
+  question: NormalizedStructuredQuestion,
   opts: RunOptions,
 ): Promise<Answer | CollectOutcome> {
-  // Blank input reprompts (matches the text-question loop and the rich UI).
-  // Only a dismissed dialog (`undefined`) cancels the questionnaire.
   while (true) {
-    const free = await opts.ui.input(`${question.prompt} (Other)`, undefined, {
+    const value = await opts.ui.input(`${question.prompt} (${OTHER_LABEL})`, undefined, {
       signal: opts.signal,
     });
     if (opts.signal?.aborted) return "aborted";
-    if (free === undefined) return "cancelled";
-    const trimmed = free.trim();
-    if (trimmed.length > 0) {
-      return { questionId: question.id, source: "other", value: trimmed };
-    }
+    if (value === undefined) return "cancelled";
+    const trimmed = value.trim();
+    if (trimmed.length > 0) return { questionId: question.id, source: "other", value: trimmed };
   }
 }
 
-async function collectComment(
-  question: NormalizedQuestion,
+async function collectDiscuss(
+  question: NormalizedStructuredQuestion,
   opts: RunOptions,
-): Promise<string | "aborted" | "cancelled"> {
-  // Text questions are freeform already — skip the comment prompt.
-  if (question.type === "text") return "";
-  // Use select() instead of pi's ctx.ui.confirm() so a dismissed dialog
-  // returns undefined and can be treated as cancellation. confirm()'s boolean
-  // return collapses "no" and "dismiss", which would silently submit on cancel.
-  const choice = await opts.ui.select(
-    `${question.header}: add a note?`,
-    [COMMENT_YES_LABEL, COMMENT_NO_LABEL],
-    { signal: opts.signal },
-  );
-  if (opts.signal?.aborted) return "aborted";
-  if (choice === undefined) return "cancelled";
-  if (choice === COMMENT_NO_LABEL) return "";
-  const note = await opts.ui.input(`${question.header} note`, COMMENT_PROMPT_PLACEHOLDER, {
+): Promise<Answer | CollectOutcome> {
+  const value = await opts.ui.input(`${question.prompt} (${DISCUSS_LABEL})`, "Optional context", {
     signal: opts.signal,
   });
   if (opts.signal?.aborted) return "aborted";
-  if (note === undefined) return "cancelled";
-  return note.trim();
+  if (value === undefined) return "cancelled";
+  const trimmed = value.trim();
+  return trimmed.length > 0
+    ? { questionId: question.id, source: "discuss", value: trimmed }
+    : { questionId: question.id, source: "discuss" };
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: fallback multiselect loop is intentionally linear
+async function collectMultichoice(
+  question: Extract<NormalizedQuestion, { type: "multichoice" }>,
+  opts: RunOptions,
+): Promise<Answer | CollectOutcome> {
+  const selected = new Set<number>();
+  while (true) {
+    const labels = multichoiceLabels(question, selected);
+    const choice = await opts.ui.select(question.prompt, labels, { signal: opts.signal });
+    if (opts.signal?.aborted) return "aborted";
+    if (choice === undefined) return "cancelled";
+    const index = labels.indexOf(choice);
+    if (index < 0) return "cancelled";
+    if (index < question.options.length) {
+      if (selected.has(index)) selected.delete(index);
+      else selected.add(index);
+      continue;
+    }
+    const submitIndex = question.options.length;
+    if (index === submitIndex) {
+      if (selected.size === 0) continue;
+      const optionIndexes = [...selected].sort((a, b) => a - b);
+      const selections = optionIndexes.map((optionIndex) => ({
+        optionIndex,
+        value: question.options[optionIndex].value,
+      }));
+      return {
+        questionId: question.id,
+        source: "options",
+        values: selections.map((selection) => selection.value),
+        optionIndexes,
+        selections,
+      };
+    }
+    return collectDiscuss(question, opts);
+  }
+}
+
+function multichoiceLabels(
+  question: Extract<NormalizedQuestion, { type: "multichoice" }>,
+  selected: Set<number>,
+): string[] {
+  const labels = question.options.map((option, index) => {
+    const checked = selected.has(index) ? "[x]" : "[ ]";
+    const recommended = question.recommendedIndexes.includes(index);
+    return numberedLabel(
+      index,
+      appendDescription(
+        `${checked} ${decorateOption(option.label, recommended)}`,
+        option.description,
+      ),
+    );
+  });
+  labels.push(numberedLabel(question.options.length, MULTI_SUBMIT));
+  if (question.allowDiscuss) labels.push(numberedLabel(question.options.length + 1, DISCUSS_LABEL));
+  return labels;
+}
+
+function numberedLabel(index: number, label: string): string {
+  return `${index + 1}. ${label}`;
 }
 
 function appendDescription(label: string, description: string | undefined): string {

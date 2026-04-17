@@ -4,6 +4,7 @@
 // cannot drift apart on cancellation/abort semantics.
 
 import type { Answer, NormalizedQuestion, QuestionnaireOutcome, TerminalState } from "./types.ts";
+import { needsReview } from "./types.ts";
 
 export type FlowMode = "answering" | "reviewing" | "terminal";
 
@@ -48,35 +49,22 @@ export class QuestionnaireFlow {
   }
 
   setAnswer(answer: Answer): void {
-    // Centralized safety net: every stored answer has a trimmed value; a
-    // whitespace-only comment is dropped entirely. Keeps both UI paths and any
-    // future caller from smuggling untrimmed strings into the outcome.
-    const stored: Answer = {
-      questionId: answer.questionId,
-      source: answer.source,
-      value: answer.value.trim(),
-    };
-    if (answer.optionIndex !== undefined) stored.optionIndex = answer.optionIndex;
-    const comment = answer.comment?.trim();
-    if (comment && comment.length > 0) stored.comment = comment;
-    this.answers.set(stored.questionId, stored);
+    this.answers.set(answer.questionId, normalizeAnswer(answer));
   }
 
   advance(): boolean {
     if (this.mode !== "answering") return false;
     const current = this.currentQuestion;
-    // Hard invariant: advance only after the current question has an answer.
-    // Catches UI bugs that would otherwise produce an empty submission.
     if (current && !this.answers.has(current.id)) return false;
-    if (!this.isMultiQuestion) {
-      this.markSubmitted();
-      return true;
-    }
     if (this.index < this.questions.length - 1) {
       this.index += 1;
       return true;
     }
-    this.mode = "reviewing";
+    if (needsReview(this.questions)) {
+      this.mode = "reviewing";
+      return true;
+    }
+    this.markSubmitted();
     return true;
   }
 
@@ -96,7 +84,7 @@ export class QuestionnaireFlow {
 
   enterReview(): boolean {
     if (this.mode === "terminal") return false;
-    if (!this.isMultiQuestion) return false;
+    if (!needsReview(this.questions)) return false;
     if (!this.allAnswered()) return false;
     this.mode = "reviewing";
     return true;
@@ -139,13 +127,67 @@ export class QuestionnaireFlow {
   }
 
   private collectAnswers(): Answer[] {
-    // When submitted, every question must have a stored answer. We never
-    // fabricate empty answers — submit()/advance() refuse without them.
     return this.questions.flatMap((q) => {
-      const a = this.answers.get(q.id);
-      return a ? [a] : [];
+      const answer = this.answers.get(q.id);
+      return answer ? [answer] : [];
     });
   }
+}
+
+function normalizeAnswer(answer: Answer): Answer {
+  switch (answer.source) {
+    case "option":
+      return {
+        questionId: answer.questionId,
+        source: "option",
+        value: answer.value.trim(),
+        optionIndex: answer.optionIndex,
+        note: trimOptional(answer.note),
+      };
+    case "options":
+      return {
+        questionId: answer.questionId,
+        source: "options",
+        values: answer.values.map((value) => value.trim()),
+        optionIndexes: [...answer.optionIndexes],
+        selections: answer.selections.map((selection) => ({
+          value: selection.value.trim(),
+          optionIndex: selection.optionIndex,
+          note: trimOptional(selection.note),
+        })),
+      };
+    case "other":
+      return {
+        questionId: answer.questionId,
+        source: "other",
+        value: answer.value.trim(),
+      };
+    case "discuss": {
+      const value = trimOptional(answer.value);
+      return value
+        ? { questionId: answer.questionId, source: "discuss", value }
+        : { questionId: answer.questionId, source: "discuss" };
+    }
+    case "text":
+      return {
+        questionId: answer.questionId,
+        source: "text",
+        value: answer.value.trim(),
+      };
+    case "yesno":
+      return {
+        questionId: answer.questionId,
+        source: "yesno",
+        value: answer.value,
+        optionIndex: answer.optionIndex,
+        note: trimOptional(answer.note),
+      };
+  }
+}
+
+function trimOptional(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
 }
 
 // Session-scoped lock: only one in-flight `ask_user` interaction at a time.

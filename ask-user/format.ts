@@ -3,49 +3,93 @@
 // fallback, transcript renderer, and tool-content summary cannot accidentally
 // diverge.
 
-import type { Answer, NormalizedQuestion } from "./types.ts";
+import type { Answer, MultiSelection, NormalizedQuestion } from "./types.ts";
 
-export const OTHER_LABEL = "Other (type your own)";
+export const OTHER_LABEL = "Other answer";
+export const DISCUSS_LABEL = "Discuss instead";
+export const SUBMIT_SELECTIONS_LABEL = "Submit selections";
+export const NOTE_MARKER = "✎";
 
 export function decorateOption(label: string, recommended: boolean): string {
   return recommended ? `${label} (recommended)` : label;
 }
 
-// Format used in the model-facing tool content and the in-line transcript:
-// uses the human label for structured selections and an em-dash separator for
-// Other.
 export function formatSummaryBody(question: NormalizedQuestion, answer: Answer): string {
   switch (answer.source) {
     case "option": {
-      if (answer.optionIndex === undefined) return answer.value;
       const label = question.options[answer.optionIndex]?.label ?? answer.value;
-      return label;
+      return withNote(label, answer.note);
+    }
+    case "options": {
+      const selections = resolveSelections(question, answer);
+      return selections.map((selection) => withNote(selection.label, selection.note)).join("; ");
     }
     case "other":
       return `Other — ${answer.value}`;
-    case "yesno":
-      return answer.value === "yes" ? "Yes" : "No";
+    case "discuss":
+      return answer.value ? `Discuss — ${answer.value}` : "Discuss";
     case "text":
       return answer.value;
+    case "yesno":
+      return withNote(answer.value === "yes" ? "Yes" : "No", answer.note);
   }
 }
 
-// Format used in the user-facing review screen (rich overlay + fallback
-// summary): just the label, with a colon-separated `Other:` prefix.
 export function formatReviewBody(question: NormalizedQuestion, answer: Answer): string {
-  if (answer.source === "yesno") return answer.value === "yes" ? "Yes" : "No";
-  if (answer.source === "other") return `Other: ${answer.value}`;
-  if (answer.source === "option" && answer.optionIndex !== undefined) {
-    return question.options[answer.optionIndex]?.label ?? answer.value;
-  }
-  return answer.value;
+  return formatReviewLines(question, answer).join("; ");
 }
 
-// Review-line wrapper shared by both review surfaces: handles the
-// unanswered-question placeholder and appends an em-dash comment when
-// present. Call sites prepend whatever header/styling they need.
+export function formatReviewLines(question: NormalizedQuestion, answer: Answer): string[] {
+  switch (answer.source) {
+    case "option": {
+      const label = question.options[answer.optionIndex]?.label ?? answer.value;
+      return [withNote(label, answer.note)];
+    }
+    case "options": {
+      const selections = resolveSelections(question, answer);
+      return selections.length > 0
+        ? selections.map((selection) => withNote(selection.label, selection.note))
+        : ["(no selections)"];
+    }
+    case "other":
+      return [`Other: ${answer.value}`];
+    case "discuss":
+      return [answer.value ? `Discuss: ${answer.value}` : "Discuss"];
+    case "text":
+      return [answer.value];
+    case "yesno":
+      return [withNote(answer.value === "yes" ? "Yes" : "No", answer.note)];
+  }
+}
+
 export function formatReviewLine(question: NormalizedQuestion, answer: Answer | undefined): string {
   if (!answer) return "(no answer)";
-  const body = formatReviewBody(question, answer);
-  return answer.comment ? `${body} — ${answer.comment}` : body;
+  return formatReviewBody(question, answer);
+}
+
+interface ResolvedSelection {
+  label: string;
+  note?: string;
+}
+
+function resolveSelections(
+  question: NormalizedQuestion,
+  answer: Extract<Answer, { source: "options" }>,
+): ResolvedSelection[] {
+  const selections = answer.selections.length > 0 ? answer.selections : legacySelections(answer);
+  return selections.map((selection) => ({
+    label: question.options[selection.optionIndex]?.label ?? selection.value,
+    note: selection.note,
+  }));
+}
+
+function legacySelections(answer: Extract<Answer, { source: "options" }>): MultiSelection[] {
+  return answer.optionIndexes.map((optionIndex, index) => ({
+    value: answer.values[index] ?? "",
+    optionIndex,
+  }));
+}
+
+function withNote(body: string, note: string | undefined): string {
+  return note ? `${body} — ${note}` : body;
 }

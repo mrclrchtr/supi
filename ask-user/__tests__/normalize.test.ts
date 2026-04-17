@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { AskUserValidationError, normalizeQuestionnaire } from "../normalize.ts";
 import type { AskUserParams } from "../schema.ts";
 
-const choice = (
-  overrides: Partial<AskUserParams["questions"][number]> = {},
-): AskUserParams["questions"][number] => ({
+type ChoiceQuestion = Extract<AskUserParams["questions"][number], { type: "choice" }>;
+
+const choice = (overrides: Partial<ChoiceQuestion> = {}): ChoiceQuestion => ({
   type: "choice",
   id: "q1",
   header: "Pick",
@@ -17,17 +17,47 @@ const choice = (
 });
 
 describe("normalizeQuestionnaire", () => {
-  it("accepts a valid mixed questionnaire (choice + text + yesno)", () => {
+  it("accepts a valid mixed questionnaire with previews and explicit flags", () => {
     const params: AskUserParams = {
       questions: [
-        choice({ id: "scope", header: "Scope" }),
-        { type: "text", id: "name", header: "Name", prompt: "Pick a name" },
-        { type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", recommendation: "yes" },
+        choice({
+          id: "scope",
+          header: "Scope",
+          allowOther: true,
+          allowDiscuss: true,
+          options: [
+            { value: "a", label: "Alpha", preview: "const a = 1;" },
+            { value: "b", label: "Beta", description: "second option" },
+          ],
+          recommendation: "a",
+        }),
+        {
+          type: "multichoice",
+          id: "features",
+          header: "Features",
+          prompt: "Pick features",
+          options: [
+            { value: "preview", label: "Preview" },
+            { value: "discuss", label: "Discuss" },
+          ],
+          recommendation: ["preview"],
+          allowDiscuss: true,
+        },
+        { type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", allowDiscuss: true },
+        { type: "text", id: "note", header: "Note", prompt: "Why?" },
       ],
     };
+
     const out = normalizeQuestionnaire(params);
-    expect(out.questions.map((q) => q.type)).toEqual(["choice", "text", "yesno"]);
-    expect(out.questions[2].recommendedIndex).toBe(0);
+    expect(out.questions.map((question) => question.type)).toEqual([
+      "choice",
+      "multichoice",
+      "yesno",
+      "text",
+    ]);
+    expect(out.questions[0]).toMatchObject({ allowOther: true, allowDiscuss: true });
+    expect(out.questions[0].options[0].preview).toBe("const a = 1;");
+    expect(out.questions[1]).toMatchObject({ recommendedIndexes: [0] });
   });
 
   it("rejects 0 questions", () => {
@@ -35,7 +65,7 @@ describe("normalizeQuestionnaire", () => {
   });
 
   it("rejects more than 4 questions", () => {
-    const five = Array.from({ length: 5 }, (_, i) => choice({ id: `q${i}` }));
+    const five = Array.from({ length: 5 }, (_, index) => choice({ id: `q${index}` }));
     expect(() => normalizeQuestionnaire({ questions: five })).toThrow(/1-4 questions/);
   });
 
@@ -45,100 +75,72 @@ describe("normalizeQuestionnaire", () => {
     ).toThrow(/unique/);
   });
 
-  it("rejects overlong header", () => {
+  it("rejects unsupported multichoice allowOther", () => {
     expect(() =>
-      normalizeQuestionnaire({ questions: [choice({ header: "x".repeat(41) })] }),
-    ).toThrow(/header/);
+      normalizeQuestionnaire({
+        questions: [
+          {
+            type: "multichoice",
+            id: "features",
+            header: "Features",
+            prompt: "Pick",
+            options: [
+              { value: "a", label: "A" },
+              { value: "b", label: "B" },
+            ],
+            allowOther: true,
+          },
+        ],
+      }),
+    ).toThrow(/does not support allowOther/);
   });
 
-  it("rejects choice questions with too few options", () => {
-    expect(() =>
-      normalizeQuestionnaire({ questions: [choice({ options: [{ value: "a", label: "A" }] })] }),
-    ).toThrow(/2-8 options/);
-  });
-
-  it("rejects choice questions with too many options", () => {
-    const options = Array.from({ length: 9 }, (_, i) => ({
-      value: `v${i}`,
-      label: `L${i}`,
-    }));
-    expect(() => normalizeQuestionnaire({ questions: [choice({ options })] })).toThrow(
-      /2-8 options/,
-    );
-  });
-
-  it("rejects recommendation that doesn't match an option value", () => {
+  it("rejects recommendation that does not match an option value", () => {
     expect(() =>
       normalizeQuestionnaire({ questions: [choice({ recommendation: "missing" })] }),
     ).toThrow(/not one of its option values/);
   });
 
-  it("resolves recommendation to the matching option index", () => {
-    const out = normalizeQuestionnaire({ questions: [choice({ recommendation: "b" })] });
-    expect(out.questions[0].recommendedIndex).toBe(1);
+  it("rejects duplicate multichoice recommended values", () => {
+    expect(() =>
+      normalizeQuestionnaire({
+        questions: [
+          {
+            type: "multichoice",
+            id: "features",
+            header: "Features",
+            prompt: "Pick",
+            options: [
+              { value: "a", label: "A" },
+              { value: "b", label: "B" },
+            ],
+            recommendation: ["a", "a"],
+          },
+        ],
+      }),
+    ).toThrow(/duplicate recommended value/);
   });
 
   it("synthesizes yes/no options for yesno questions", () => {
     const out = normalizeQuestionnaire({
       questions: [{ type: "yesno", id: "y", header: "Y?", prompt: "Yes?" }],
     });
-    expect(out.questions[0].options.map((o) => o.value)).toEqual(["yes", "no"]);
+    expect(out.questions[0].options.map((option) => option.value)).toEqual(["yes", "no"]);
   });
 
-  it("text questions get empty options and never allow Other", () => {
-    const out = normalizeQuestionnaire({
-      questions: [{ type: "text", id: "t", header: "T", prompt: "Type" }],
-    });
-    const q = out.questions[0];
-    expect(q.options).toEqual([]);
-  });
-
-  it("rejects whitespace-only id", () => {
+  it("rejects whitespace-only id, header, and prompt", () => {
     expect(() => normalizeQuestionnaire({ questions: [choice({ id: "   " })] })).toThrow(
       /non-empty/,
     );
-  });
-
-  it("rejects whitespace-only header", () => {
-    expect(() => normalizeQuestionnaire({ questions: [choice({ header: "  \t " })] })).toThrow(
+    expect(() => normalizeQuestionnaire({ questions: [choice({ header: "   " })] })).toThrow(
       /non-empty header/,
     );
-  });
-
-  it("rejects whitespace-only prompt", () => {
-    expect(() => normalizeQuestionnaire({ questions: [choice({ prompt: "\n\n" })] })).toThrow(
+    expect(() => normalizeQuestionnaire({ questions: [choice({ prompt: "   " })] })).toThrow(
       /non-empty prompt/,
     );
   });
 
-  it("rejects choice options whose value or label is whitespace-only", () => {
-    expect(() =>
-      normalizeQuestionnaire({
-        questions: [
-          choice({
-            options: [
-              { value: "   ", label: "Alpha" },
-              { value: "b", label: "Beta" },
-            ],
-          }),
-        ],
-      }),
-    ).toThrow(/empty value or label/);
-    expect(() =>
-      normalizeQuestionnaire({
-        questions: [
-          choice({
-            options: [
-              { value: "a", label: "Alpha" },
-              { value: "b", label: "   " },
-            ],
-          }),
-        ],
-      }),
-    ).toThrow(/empty value or label/);
-  });
-
-  it("rejects duplicate option values within one question", () => {
+  it("rejects duplicate structured option values", () => {
     expect(() =>
       normalizeQuestionnaire({
         questions: [

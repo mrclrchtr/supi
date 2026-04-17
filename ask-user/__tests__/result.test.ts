@@ -8,110 +8,85 @@ const choiceQuestion: NormalizedQuestion = {
   type: "choice",
   prompt: "Scope?",
   options: [
-    { value: "narrow", label: "Narrow" },
-    { value: "broad", label: "Broad" },
+    { value: "api_only", label: "API only" },
+    { value: "full_rewrite", label: "Full rewrite" },
   ],
+  allowOther: true,
+  allowDiscuss: true,
+  recommendedIndexes: [0],
 };
 
-const yesNoQuestion: NormalizedQuestion = {
-  ...choiceQuestion,
-  id: "go",
-  header: "Go?",
-  type: "yesno",
-  prompt: "Proceed?",
+const multichoiceQuestion: NormalizedQuestion = {
+  id: "features",
+  header: "Features",
+  type: "multichoice",
+  prompt: "Features?",
   options: [
-    { value: "yes", label: "Yes" },
-    { value: "no", label: "No" },
+    { value: "preview", label: "Preview" },
+    { value: "multi", label: "Multi-select" },
+    { value: "discuss", label: "Discuss" },
   ],
+  allowOther: false,
+  allowDiscuss: true,
+  recommendedIndexes: [0],
 };
 
 describe("buildResult", () => {
   it("formats submitted answers as one line per question with header prefix", () => {
     const answers: Answer[] = [
-      { questionId: "scope", source: "option", value: "narrow", optionIndex: 0 },
-      { questionId: "go", source: "yesno", value: "yes", optionIndex: 0 },
+      { questionId: "scope", source: "option", value: "api_only", optionIndex: 0, note: "safer" },
+      {
+        questionId: "features",
+        source: "options",
+        values: ["preview", "multi"],
+        optionIndexes: [0, 1],
+        selections: [
+          { value: "preview", optionIndex: 0, note: "best demo" },
+          { value: "multi", optionIndex: 1, note: "core capability" },
+        ],
+      },
     ];
-    const result = buildResult([choiceQuestion, yesNoQuestion], {
+    const result = buildResult([choiceQuestion, multichoiceQuestion], {
       terminalState: "submitted",
       answers,
     });
     const text = result.content[0].text;
-    expect(text).toContain("Scope: Narrow");
-    expect(text).toContain("Go?: Yes");
-    expect(result.details.terminalState).toBe("submitted");
-    expect(result.details.answers).toHaveLength(2);
+    expect(text).toContain("Scope: API only — safer");
+    expect(text).toContain("Features: Preview — best demo; Multi-select — core capability");
+    expect(result.details.answersById.scope).toMatchObject({ value: "api_only" });
   });
 
-  it("renders the option label, not the stable value, when they diverge", () => {
-    const q: NormalizedQuestion = {
-      ...choiceQuestion,
-      options: [
-        { value: "api_only", label: "API only" },
-        { value: "full_rewrite", label: "Full rewrite" },
-      ],
-    };
-    const result = buildResult([q], {
-      terminalState: "submitted",
-      answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],
-    });
-    expect(result.content[0].text).toBe("Scope: API only");
-    // The machine-readable value is preserved in `details` for callers that need it.
-    expect(result.details.answers[0].value).toBe("api_only");
-    expect(result.details.answersById.scope.value).toBe("api_only");
-  });
-
-  it("includes Other source label and trailing comment", () => {
+  it("includes discuss outcomes explicitly", () => {
     const result = buildResult([choiceQuestion], {
       terminalState: "submitted",
-      answers: [
-        {
-          questionId: "scope",
-          source: "other",
-          value: "scoped to api/",
-          comment: "ui changes follow",
-        },
-      ],
+      answers: [{ questionId: "scope", source: "discuss", value: "need more context" }],
     });
-    expect(result.content[0].text).toBe("Scope: Other — scoped to api/ — ui changes follow");
+    expect(result.content[0].text).toBe("Scope: Discuss — need more context");
   });
 
-  it("emits an explicit cancellation summary", () => {
+  it("includes Other source label", () => {
     const result = buildResult([choiceQuestion], {
-      terminalState: "cancelled",
-      answers: [],
-    });
-    expect(result.content[0].text).toBe("User cancelled the questionnaire.");
-    expect(result.details.terminalState).toBe("cancelled");
-  });
-
-  it("exposes per-question answers keyed by question id alongside the array", () => {
-    const result = buildResult([choiceQuestion, yesNoQuestion], {
       terminalState: "submitted",
-      answers: [
-        { questionId: "scope", source: "option", value: "broad", optionIndex: 1 },
-        { questionId: "go", source: "yesno", value: "no", optionIndex: 1 },
-      ],
+      answers: [{ questionId: "scope", source: "other", value: "scoped to api/" }],
     });
-    expect(Object.keys(result.details.answersById).sort()).toEqual(["go", "scope"]);
-    expect(result.details.answersById.scope.value).toBe("broad");
-    expect(result.details.answersById.go.value).toBe("no");
+    expect(result.content[0].text).toBe("Scope: Other — scoped to api/");
   });
 
-  it("emits an explicit aborted summary", () => {
-    const result = buildResult([choiceQuestion], {
-      terminalState: "aborted",
-      answers: [],
-    });
-    expect(result.content[0].text).toMatch(/aborted/i);
-    expect(result.details.terminalState).toBe("aborted");
+  it("emits explicit cancellation and aborted summaries", () => {
+    expect(
+      buildResult([choiceQuestion], { terminalState: "cancelled", answers: [] }).content[0].text,
+    ).toBe("User cancelled the questionnaire.");
+    expect(
+      buildResult([choiceQuestion], { terminalState: "aborted", answers: [] }).content[0].text,
+    ).toMatch(/aborted/i);
   });
 });
 
 describe("buildErrorResult", () => {
   it("returns a single-line content with empty details and cancelled state", () => {
-    const r = buildErrorResult("nope");
-    expect(r.content[0].text).toBe("nope");
-    expect(r.details.questions).toEqual([]);
-    expect(r.details.terminalState).toBe("cancelled");
+    const result = buildErrorResult("nope");
+    expect(result.content[0].text).toBe("nope");
+    expect(result.details.questions).toEqual([]);
+    expect(result.details.terminalState).toBe("cancelled");
   });
 });

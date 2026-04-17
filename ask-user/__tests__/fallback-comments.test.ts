@@ -3,101 +3,74 @@ import { normalizeQuestionnaire } from "../normalize.ts";
 import type { AskUserParams } from "../schema.ts";
 import { type FallbackUi, runFallbackQuestionnaire } from "../ui-fallback.ts";
 
-interface Step {
-  kind: "select" | "input";
-  result: string | undefined;
-}
-
-function scriptedUi(steps: Step[]): FallbackUi {
-  const queue = [...steps];
-  const next = (kind: Step["kind"]): Step["result"] => {
-    const step = queue.shift();
-    if (!step) throw new Error(`fallback ui ran out of scripted steps when expecting ${kind}`);
-    if (step.kind !== kind) throw new Error(`expected ${kind}, scripted ${step.kind}`);
-    return step.result;
-  };
+function scriptedUi(results: Array<string | undefined>): FallbackUi {
+  const queue = [...results];
   return {
     select: async (_title, options) => {
-      const result = next("select");
+      const result = queue.shift();
       if (result === undefined) return undefined;
-      if (typeof result === "string") return result;
-      const idx = result as unknown as number;
-      return typeof idx === "number" ? options[idx] : undefined;
+      const numeric = Number(result);
+      if (!Number.isNaN(numeric) && `${numeric}` === result) return options[numeric];
+      return result;
     },
     input: async () => {
-      const r = next("input");
-      return r === undefined ? undefined : String(r);
+      const result = queue.shift();
+      return result ?? undefined;
     },
   };
 }
 
-const choiceQuestion: AskUserParams = {
-  questions: [
-    {
-      type: "choice",
-      id: "scope",
-      header: "Scope",
-      prompt: "Pick scope",
-      options: [
-        { value: "narrow", label: "Narrow" },
-        { value: "broad", label: "Broad" },
+describe("runFallbackQuestionnaire — reduced fallback semantics", () => {
+  it("allows discuss with an empty follow-up input", async () => {
+    const params: AskUserParams = {
+      questions: [
+        {
+          type: "choice",
+          id: "scope",
+          header: "Scope",
+          prompt: "Pick scope",
+          allowDiscuss: true,
+          options: [
+            { value: "narrow", label: "Narrow", preview: "ignored in fallback" },
+            { value: "broad", label: "Broad" },
+          ],
+        },
       ],
-    },
-  ],
-};
-
-describe("runFallbackQuestionnaire — comment prompt", () => {
-  it("captures an optional comment when the user opts in", async () => {
-    const ui = scriptedUi([
-      { kind: "select", result: 0 as unknown as string },
-      { kind: "select", result: 0 as unknown as string }, // Yes, add a note
-      { kind: "input", result: "rationale here" },
-    ]);
-    const outcome = await runFallbackQuestionnaire(
-      normalizeQuestionnaire(choiceQuestion).questions,
-      { ui },
-    );
-    expect(outcome.terminalState).toBe("submitted");
-    expect(outcome.answers[0].comment).toBe("rationale here");
+    };
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
+      ui: scriptedUi(["2", ""]),
+    });
+    expect(outcome).toMatchObject({
+      terminalState: "submitted",
+      answers: [{ source: "discuss" }],
+    });
   });
 
-  it("skips the comment when the user picks 'No, skip'", async () => {
-    const ui = scriptedUi([
-      { kind: "select", result: 0 as unknown as string },
-      { kind: "select", result: 1 as unknown as string }, // No, skip
-    ]);
-    const outcome = await runFallbackQuestionnaire(
-      normalizeQuestionnaire(choiceQuestion).questions,
-      { ui },
-    );
-    expect(outcome.terminalState).toBe("submitted");
-    expect(outcome.answers[0].comment).toBeUndefined();
-  });
-
-  it("cancels the questionnaire when the comment Yes/No prompt is dismissed", async () => {
-    const ui = scriptedUi([
-      { kind: "select", result: 0 as unknown as string },
-      { kind: "select", result: undefined }, // dismissed
-    ]);
-    const outcome = await runFallbackQuestionnaire(
-      normalizeQuestionnaire(choiceQuestion).questions,
-      { ui },
-    );
-    expect(outcome.terminalState).toBe("cancelled");
-    expect(outcome.answers).toEqual([]);
-  });
-
-  it("cancels the questionnaire when the note input is dismissed after opting in", async () => {
-    const ui = scriptedUi([
-      { kind: "select", result: 0 as unknown as string },
-      { kind: "select", result: 0 as unknown as string }, // Yes, add a note
-      { kind: "input", result: undefined }, // dismissed
-    ]);
-    const outcome = await runFallbackQuestionnaire(
-      normalizeQuestionnaire(choiceQuestion).questions,
-      { ui },
-    );
-    expect(outcome.terminalState).toBe("cancelled");
-    expect(outcome.answers).toEqual([]);
+  it("flattens previews by omitting them from select labels", async () => {
+    const params: AskUserParams = {
+      questions: [
+        {
+          type: "choice",
+          id: "scope",
+          header: "Scope",
+          prompt: "Pick scope",
+          options: [
+            { value: "narrow", label: "Narrow", preview: "const a = 1;" },
+            { value: "broad", label: "Broad" },
+          ],
+        },
+      ],
+    };
+    let seen: string[] = [];
+    const ui: FallbackUi = {
+      select: async (_title, options) => {
+        seen = options;
+        return options[0];
+      },
+      input: async () => undefined,
+    };
+    await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, { ui });
+    expect(seen.join(" | ")).not.toContain("const a = 1;");
+    expect(seen[0]).toContain("Narrow");
   });
 });

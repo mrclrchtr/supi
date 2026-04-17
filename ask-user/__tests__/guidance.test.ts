@@ -8,7 +8,7 @@ import { askUserPromptGuidelines, askUserPromptSnippet } from "../ask-user.ts";
 describe("ask_user prompt guidance", () => {
   it("snippet emphasizes pause-for-decision intent and bounded count", () => {
     expect(askUserPromptSnippet).toMatch(/pause/i);
-    expect(askUserPromptSnippet).toMatch(/decision/i);
+    expect(askUserPromptSnippet).toMatch(/decision|proceed/i);
     expect(askUserPromptSnippet).toMatch(/1-4/);
   });
 
@@ -22,14 +22,16 @@ describe("ask_user prompt guidance", () => {
   it("guidelines explain when to use each question type", () => {
     const all = askUserPromptGuidelines.join("\n");
     expect(all).toMatch(/yesno for binary/i);
-    expect(all).toMatch(/choice for known options/i);
+    expect(all).toMatch(/choice for one known option/i);
+    expect(all).toMatch(/multichoice/i);
     expect(all).toMatch(/text only when freeform/i);
   });
 
-  it("guidelines describe when to enable optional flags", () => {
+  it("guidelines describe previews and explicit discuss/other controls", () => {
     const all = askUserPromptGuidelines.join("\n");
-    expect(all).toMatch(/recommendation/i);
-    expect(all).toMatch(/Other is always available/);
+    expect(all).toMatch(/allowOther/i);
+    expect(all).toMatch(/allowDiscuss/i);
+    expect(all).toMatch(/preview/i);
   });
 
   it("guidelines warn against running concurrent ask_user calls", () => {

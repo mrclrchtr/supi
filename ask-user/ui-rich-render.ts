@@ -3,25 +3,57 @@
 // dispatch logic can be read without scrolling past a wall of theme strings.
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Editor, truncateToWidth } from "@mariozechner/pi-tui";
+import { type Editor, truncateToWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import type { QuestionnaireFlow } from "./flow.ts";
-import { decorateOption, formatReviewLine, OTHER_LABEL } from "./format.ts";
-import type { NormalizedQuestion } from "./types.ts";
+import { decorateOption, formatReviewLines, NOTE_MARKER } from "./format.ts";
+import type { NormalizedStructuredQuestion } from "./types.ts";
+import { inlineStructuredRowLines, structuredRowLabel } from "./ui-rich-inline.ts";
+import {
+  editorCaption,
+  padRight,
+  renderEditorBlock,
+  renderEditorPane,
+  usesSeparateEditorPane,
+} from "./ui-rich-render-editor.ts";
+import {
+  currentNote,
+  currentRowSupportsNotes,
+  renderNoteStatus,
+  visibleNoteMarker,
+} from "./ui-rich-render-notes.ts";
+import { hasPreview, type InteractiveRow, interactiveRows } from "./ui-rich-state.ts";
 
-export type SubMode = "select" | "other-input" | "text-input" | "comment-input";
+export type SubMode = "select" | "other-input" | "text-input" | "discuss-input" | "note-input";
 
 export interface OverlayRenderState {
-  optionIndex: number;
+  selectedIndex: number;
   subMode: SubMode;
-  pendingNote?: string;
+  stagedSelections: Map<string, number[]>;
+  stagedSingleNotes: Map<string, string>;
+  stagedMultiNotes: Map<string, Map<number, string>>;
 }
 
 export function isEditorMode(mode: SubMode): boolean {
-  return mode === "text-input" || mode === "other-input" || mode === "comment-input";
+  return (
+    mode === "text-input" ||
+    mode === "other-input" ||
+    mode === "discuss-input" ||
+    mode === "note-input"
+  );
 }
 
-export function displayOptionCount(q: NormalizedQuestion): number {
-  return q.options.length + 1;
+export function selectedIndexesForQuestion(
+  flow: Pick<QuestionnaireFlow, "getAnswer">,
+  state: Pick<OverlayRenderState, "stagedSelections">,
+  question: NormalizedStructuredQuestion,
+): number[] {
+  const staged = state.stagedSelections.get(question.id);
+  if (staged) return [...staged];
+  const answer = flow.getAnswer(question.id);
+  if (!answer) return [];
+  if (answer.source === "option" || answer.source === "yesno") return [answer.optionIndex];
+  if (answer.source === "options") return [...answer.optionIndexes];
+  return [];
 }
 
 // biome-ignore lint/complexity/useMaxParams: render entry needs full overlay context
@@ -33,41 +65,39 @@ export function renderOverlay(
   editor: Editor,
 ): string[] {
   const lines: string[] = [];
-  const add = (s: string) => lines.push(truncateToWidth(s, width));
+  const add = (text: string) => lines.push(truncateToWidth(text, width));
   add(theme.fg("accent", "─".repeat(width)));
   if (flow.isMultiQuestion) renderTabBar(add, theme, flow);
   if (flow.currentMode === "reviewing") {
     renderReview(add, theme, flow);
   } else {
-    renderQuestionBody(add, lines, theme, flow, state, editor, width);
+    renderQuestion(add, lines, width, theme, flow, state, editor);
   }
   add(theme.fg("dim", ` ${footerHelp(flow, state)}`));
   add(theme.fg("accent", "─".repeat(width)));
   return lines;
 }
 
-function renderTabBar(add: (s: string) => void, theme: Theme, flow: QuestionnaireFlow): void {
+function renderTabBar(add: (text: string) => void, theme: Theme, flow: QuestionnaireFlow): void {
   // Active segment uses the selected-bg highlight (matches pi's reference
   // questionnaire and Claude's UI). Inactive segments stay foreground-only:
   // success when answered, muted when pending.
   const segments: string[] = [theme.fg("dim", "← ")];
-  flow.questions.forEach((q, i) => {
-    const answered = flow.hasAnswer(q.id);
-    const active =
-      !flow.isTerminal() && flow.currentMode === "answering" && flow.currentIndex === i;
+  for (const [index, question] of flow.questions.entries()) {
+    const answered = flow.hasAnswer(question.id);
+    const active = flow.currentMode === "answering" && flow.currentIndex === index;
     const marker = answered ? "■" : "□";
-    const text = ` ${marker} ${q.header} `;
+    const text = ` ${marker} ${question.header} `;
     segments.push(
       active
         ? theme.bg("selectedBg", theme.fg("text", text))
         : theme.fg(answered ? "success" : "muted", text),
     );
     segments.push(" ");
-  });
-  const reviewActive = flow.currentMode === "reviewing";
+  }
   const reviewText = " ✓ Review ";
   segments.push(
-    reviewActive
+    flow.currentMode === "reviewing"
       ? theme.bg("selectedBg", theme.fg("text", reviewText))
       : theme.fg("dim", reviewText),
   );
@@ -76,125 +106,265 @@ function renderTabBar(add: (s: string) => void, theme: Theme, flow: Questionnair
   add("");
 }
 
-// biome-ignore lint/complexity/useMaxParams: dispatcher needs full overlay context
-function renderQuestionBody(
-  add: (s: string) => void,
+// biome-ignore lint/complexity/useMaxParams: question render needs full context
+function renderQuestion(
+  add: (text: string) => void,
   lines: string[],
+  width: number,
   theme: Theme,
   flow: QuestionnaireFlow,
   state: OverlayRenderState,
   editor: Editor,
-  width: number,
 ): void {
-  const q = flow.currentQuestion;
-  if (!q) return;
-  add(theme.fg("text", ` ${q.prompt}`));
+  const question = flow.currentQuestion;
+  if (!question) return;
+  for (const line of wrapTextWithAnsi(` ${question.prompt}`, width)) {
+    add(theme.fg("text", line));
+  }
   lines.push("");
-  if (q.type !== "text") renderOptions(add, theme, q, state.optionIndex);
-  if (q.type !== "text" && state.subMode === "select") {
-    renderSelectModeExtras(add, lines, theme, editor, width, q, state);
-  }
-  if (state.subMode === "text-input" || state.subMode === "other-input") {
-    const caption = state.subMode === "other-input" ? "Other" : "Answer";
-    renderEditorBlock(add, lines, theme, editor, width, caption);
-  }
-  if (state.subMode === "comment-input") {
-    renderEditorBlock(add, lines, theme, editor, width, "Note");
-  }
-}
-
-// biome-ignore lint/complexity/useMaxParams: shares the full render context with renderQuestionBody
-function renderSelectModeExtras(
-  add: (s: string) => void,
-  lines: string[],
-  theme: Theme,
-  editor: Editor,
-  width: number,
-  q: NormalizedQuestion,
-  state: OverlayRenderState,
-): void {
-  const otherIdx = displayOptionCount(q) - 1;
-  if (state.optionIndex === otherIdx) {
-    const caption = state.pendingNote ? "Other (✓ note attached)" : "Other";
-    renderEditorBlock(add, lines, theme, editor, width, caption);
+  if (question.type === "text") {
+    renderTextQuestion(add, lines, theme, editor, width);
     return;
   }
-  add("");
-  add(theme.fg("dim", state.pendingNote ? " ✓ note added  •  n to edit" : " n to add notes"));
+  renderStructuredQuestion(add, lines, width, theme, flow, state, editor, question);
 }
 
-function renderOptions(
-  add: (s: string) => void,
+// biome-ignore lint/complexity/useMaxParams: split view layout needs full context
+function renderSplitView(
+  lines: string[],
+  width: number,
   theme: Theme,
-  q: NormalizedQuestion,
-  optionIndex: number,
+  flow: QuestionnaireFlow,
+  state: OverlayRenderState,
+  editor: Editor,
+  question: NormalizedStructuredQuestion,
+  rows: InteractiveRow[],
 ): void {
-  const items = buildOptionItems(q);
-  items.forEach((item, i) => {
-    const selected = i === optionIndex;
-    const prefix = selected ? theme.fg("accent", "> ") : "  ";
-    const numbered = `${i + 1}. ${item.label}`;
-    add(prefix + (selected ? theme.fg("accent", numbered) : theme.fg("text", numbered)));
-    if (item.description) {
-      add(`     ${theme.fg("muted", item.description)}`);
-    }
-  });
+  const leftWidth = Math.max(34, Math.floor(width * 0.42));
+  const rightWidth = Math.max(24, width - leftWidth - 3);
+  const leftLines = renderPaneRows(leftWidth, theme, flow, state, editor, question, rows);
+  const rightLines = usesSeparateEditorPane(state)
+    ? renderEditorPane(rightWidth, theme, editor, editorCaption(state))
+    : renderPreviewPane(
+        rightWidth,
+        theme,
+        previewForSelection(question, rows[state.selectedIndex]),
+      );
+  const total = Math.max(leftLines.length, rightLines.length);
+  for (let index = 0; index < total; index += 1) {
+    const left = padRight(leftLines[index] ?? "", leftWidth);
+    const right = padRight(rightLines[index] ?? "", rightWidth);
+    lines.push(`${left} ${theme.fg("accent", "│")} ${right}`);
+  }
 }
 
-interface OptionItem {
-  label: string;
-  description?: string;
-}
-
-function buildOptionItems(q: NormalizedQuestion): OptionItem[] {
-  const items: OptionItem[] = q.options.map((opt, i) => ({
-    label: decorateOption(opt.label, i === q.recommendedIndex),
-    description: opt.description,
-  }));
-  items.push({ label: OTHER_LABEL });
-  return items;
-}
-
-// biome-ignore lint/complexity/useMaxParams: render dispatcher
-function renderEditorBlock(
-  add: (s: string) => void,
+// biome-ignore lint/complexity/useMaxParams: thin adapter for text question rendering
+function renderTextQuestion(
+  add: (text: string) => void,
   lines: string[],
   theme: Theme,
   editor: Editor,
   width: number,
-  caption: string,
 ): void {
-  add("");
-  add(theme.fg("muted", ` ${caption}:`));
-  for (const line of editor.render(width - 2)) lines.push(` ${line}`);
+  renderEditorBlock(add, lines, theme, editor, width, "Answer");
 }
 
-function renderReview(add: (s: string) => void, theme: Theme, flow: QuestionnaireFlow): void {
+// biome-ignore lint/complexity/useMaxParams: structured render needs full context
+function renderStructuredQuestion(
+  add: (text: string) => void,
+  lines: string[],
+  width: number,
+  theme: Theme,
+  flow: QuestionnaireFlow,
+  state: OverlayRenderState,
+  editor: Editor,
+  question: NormalizedStructuredQuestion,
+): void {
+  const rows = interactiveRows(question);
+  if (hasPreview(question) && width >= 100) {
+    renderSplitView(lines, width, theme, flow, state, editor, question, rows);
+  } else {
+    renderStandardStructuredQuestion(add, lines, width, theme, flow, state, editor, question, rows);
+  }
+  const note = currentNote(flow, state, question);
+  if (note) renderNoteStatus(add, theme, note);
+}
+
+// biome-ignore lint/complexity/useMaxParams: standard layout needs full context
+function renderStandardStructuredQuestion(
+  add: (text: string) => void,
+  lines: string[],
+  width: number,
+  theme: Theme,
+  flow: QuestionnaireFlow,
+  state: OverlayRenderState,
+  editor: Editor,
+  question: NormalizedStructuredQuestion,
+  rows: InteractiveRow[],
+): void {
+  renderRows(add, width, theme, flow, state, editor, question, rows);
+  if (usesSeparateEditorPane(state)) {
+    renderEditorBlock(add, lines, theme, editor, width, editorCaption(state));
+    return;
+  }
+  const preview = previewForSelection(question, rows[state.selectedIndex]);
+  if (preview) renderPreviewBlock(add, lines, theme, width, preview);
+}
+
+// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
+function renderPaneRows(
+  width: number,
+  theme: Theme,
+  flow: QuestionnaireFlow,
+  state: OverlayRenderState,
+  editor: Editor,
+  question: NormalizedStructuredQuestion,
+  rows: InteractiveRow[],
+): string[] {
+  const out: string[] = [];
+  const push = (text = "") => out.push(truncateToWidth(text, width));
+  renderRows(push, width, theme, flow, state, editor, question, rows);
+  return out;
+}
+
+// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
+function renderRows(
+  add: (text: string) => void,
+  width: number,
+  theme: Theme,
+  flow: QuestionnaireFlow,
+  state: OverlayRenderState,
+  editor: Editor,
+  question: NormalizedStructuredQuestion,
+  rows: InteractiveRow[],
+): void {
+  const selected = selectedIndexesForQuestion(flow, state, question);
+  for (const [index, row] of rows.entries()) {
+    const active = state.selectedIndex === index;
+    const prefix = active ? theme.fg("accent", "> ") : "  ";
+    const inlineEditorLines = inlineStructuredRowLines({
+      width,
+      theme,
+      state,
+      editor,
+      row,
+      prefix,
+    });
+    if (inlineEditorLines) {
+      for (const [lineIndex, line] of inlineEditorLines.entries()) {
+        add(`${lineIndex === 0 ? prefix : "   "}${line}`);
+      }
+      continue;
+    }
+    add(prefix + rowLabel(theme, flow, state, question, row, active, selected));
+    const description = rowDescription(question, row);
+    if (description) add(`     ${theme.fg("muted", description)}`);
+  }
+}
+
+// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
+function rowLabel(
+  theme: Theme,
+  flow: QuestionnaireFlow,
+  state: OverlayRenderState,
+  question: NormalizedStructuredQuestion,
+  row: InteractiveRow,
+  active: boolean,
+  selected: number[],
+): string {
+  if (row.kind === "option") {
+    const option = question.options[row.optionIndex];
+    const recommended = question.recommendedIndexes.includes(row.optionIndex);
+    const noteMarker = visibleNoteMarker({ flow, state, question, row, active });
+    const baseLabel = `${decorateOption(option.label, recommended)}${noteMarker ? ` ${NOTE_MARKER}` : ""}`;
+    if (question.type === "multichoice") {
+      const checked = selected.includes(row.optionIndex) ? "[x]" : "[ ]";
+      return theme.fg("text", `${checked} ${baseLabel}`);
+    }
+    return theme.fg("text", `${row.optionIndex + 1}. ${baseLabel}`);
+  }
+  if (row.kind === "other") return theme.fg("text", structuredRowLabel(flow, question, row));
+  return theme.fg("text", structuredRowLabel(flow, question, row));
+}
+
+function rowDescription(
+  question: NormalizedStructuredQuestion,
+  row: InteractiveRow,
+): string | undefined {
+  if (row.kind === "option") return question.options[row.optionIndex].description;
+  return undefined;
+}
+
+function renderPreviewPane(width: number, theme: Theme, preview: string | undefined): string[] {
+  const out: string[] = [];
+  const push = (text = "") => out.push(truncateToWidth(text, width));
+  push(theme.fg("accent", " Preview"));
+  push("");
+  if (!preview) {
+    push(theme.fg("muted", " No preview for the current selection."));
+    return out;
+  }
+  for (const line of preview.split("\n")) push(theme.fg("text", ` ${line}`));
+  return out;
+}
+
+// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
+function renderPreviewBlock(
+  add: (text: string) => void,
+  lines: string[],
+  theme: Theme,
+  width: number,
+  preview: string,
+): void {
+  add("");
+  add(theme.fg("accent", " Preview:"));
+  for (const line of preview.split("\n")) {
+    lines.push(truncateToWidth(` ${line}`, width));
+  }
+}
+
+function previewForSelection(
+  question: NormalizedStructuredQuestion,
+  row: InteractiveRow | undefined,
+): string | undefined {
+  return row?.kind === "option" ? question.options[row.optionIndex].preview : undefined;
+}
+
+function renderReview(add: (text: string) => void, theme: Theme, flow: QuestionnaireFlow): void {
   add(theme.fg("accent", " Review answers:"));
   add("");
-  for (const q of flow.questions) {
-    add(
-      `${theme.fg("muted", ` ${q.header}: `)}${theme.fg("text", formatReviewLine(q, flow.getAnswer(q.id)))}`,
-    );
+  for (const question of flow.questions) {
+    const answer = flow.getAnswer(question.id);
+    const lines = answer ? formatReviewLines(question, answer) : ["(no answer)"];
+    add(theme.fg("muted", ` ${question.header}:`));
+    for (const line of lines) add(`   ${theme.fg("text", line)}`);
   }
   add("");
   add(theme.fg(flow.allAnswered() ? "success" : "warning", " Press Enter to submit"));
 }
 
 function footerHelp(flow: QuestionnaireFlow, state: OverlayRenderState): string {
-  // Text questions have no select/back state to fall into, so Esc cancels the
-  // whole questionnaire (see ui-rich.handleEditorEscape). The hint must say so.
   if (state.subMode === "text-input") return "Enter to submit • Esc to cancel";
   if (isEditorMode(state.subMode)) return "Enter to submit • Esc to go back";
-  if (flow.currentMode === "reviewing")
+  if (flow.currentMode === "reviewing") {
     return "Enter to submit • ←/Shift-Tab to revise • Esc to cancel";
-  // When the cursor is parked on Other, `n` types into the freeform editor
-  // instead of opening the note shortcut — drop the hint so we don't
-  // advertise a shortcut that does something else in that state.
-  const q = flow.currentQuestion;
-  const onOther = q ? state.optionIndex === displayOptionCount(q) - 1 : false;
-  const noteHint = onOther ? "" : "n add note • ";
-  if (flow.isMultiQuestion)
-    return `↑↓ select • Enter confirm • ${noteHint}←/Shift-Tab back • →/Tab review • Esc cancel`;
-  return `↑↓ select • Enter confirm • ${noteHint}Esc cancel`;
+  }
+  const question = flow.currentQuestion;
+  if (!question || question.type === "text") return "Esc cancel";
+  const canGoBack = flow.currentIndex > 0;
+  const canReview = flow.allAnswered();
+  const parts = ["↑↓ navigate"];
+  if (question.type === "multichoice") {
+    parts.push("Space toggle");
+    if (selectedIndexesForQuestion(flow, state, question).length > 0) parts.push("Enter submit");
+  } else {
+    parts.push("Enter confirm/select");
+  }
+  if (currentRowSupportsNotes(question, state)) {
+    parts.push(currentNote(flow, state, question) ? "n edit note" : "n add note");
+  }
+  if (canGoBack) parts.push("←/Shift-Tab back");
+  if (canReview) parts.push("→/Tab review");
+  parts.push("Esc cancel");
+  return parts.join(" • ");
 }

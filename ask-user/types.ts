@@ -1,10 +1,8 @@
 // Internal data model used by both UI paths and result formatting.
 // The external (model-facing) schema lives in `schema.ts`; everything beyond
-// the parser passes through normalization into the shapes defined here.
+// parsing passes through normalization into the shapes defined here.
 
-export type QuestionType = "choice" | "text" | "yesno";
-
-export type AnswerSource = "option" | "other" | "text" | "yesno";
+export type QuestionType = "choice" | "multichoice" | "text" | "yesno";
 
 export type TerminalState = "submitted" | "cancelled" | "aborted";
 
@@ -12,28 +10,110 @@ export interface NormalizedOption {
   value: string;
   label: string;
   description?: string;
+  preview?: string;
 }
 
-export interface NormalizedQuestion {
+interface BaseQuestion {
   id: string;
   header: string;
-  type: QuestionType;
   prompt: string;
-  options: NormalizedOption[];
-  recommendedIndex?: number;
+  type: QuestionType;
 }
+
+interface StructuredQuestionBase extends BaseQuestion {
+  options: NormalizedOption[];
+  allowOther: boolean;
+  allowDiscuss: boolean;
+  recommendedIndexes: number[];
+}
+
+export interface NormalizedChoiceQuestion extends StructuredQuestionBase {
+  type: "choice";
+}
+
+export interface NormalizedMultiChoiceQuestion extends StructuredQuestionBase {
+  type: "multichoice";
+}
+
+export interface NormalizedYesNoQuestion extends StructuredQuestionBase {
+  type: "yesno";
+}
+
+export interface NormalizedTextQuestion extends BaseQuestion {
+  type: "text";
+  options: [];
+}
+
+export type NormalizedStructuredQuestion =
+  | NormalizedChoiceQuestion
+  | NormalizedMultiChoiceQuestion
+  | NormalizedYesNoQuestion;
+
+export type NormalizedQuestion =
+  | NormalizedChoiceQuestion
+  | NormalizedMultiChoiceQuestion
+  | NormalizedTextQuestion
+  | NormalizedYesNoQuestion;
 
 export interface NormalizedQuestionnaire {
   questions: NormalizedQuestion[];
 }
 
-export interface Answer {
+export interface OptionAnswer {
   questionId: string;
-  source: AnswerSource;
+  source: "option";
   value: string;
-  optionIndex?: number;
-  comment?: string;
+  optionIndex: number;
+  note?: string;
 }
+
+export interface MultiSelection {
+  value: string;
+  optionIndex: number;
+  note?: string;
+}
+
+export interface OptionsAnswer {
+  questionId: string;
+  source: "options";
+  values: string[];
+  optionIndexes: number[];
+  selections: MultiSelection[];
+}
+
+export interface OtherAnswer {
+  questionId: string;
+  source: "other";
+  value: string;
+}
+
+export interface DiscussAnswer {
+  questionId: string;
+  source: "discuss";
+  value?: string;
+}
+
+export interface TextAnswer {
+  questionId: string;
+  source: "text";
+  value: string;
+}
+
+export interface YesNoAnswer {
+  questionId: string;
+  source: "yesno";
+  value: "yes" | "no";
+  optionIndex: 0 | 1;
+  note?: string;
+}
+
+export type Answer =
+  | OptionAnswer
+  | OptionsAnswer
+  | OtherAnswer
+  | DiscussAnswer
+  | TextAnswer
+  | YesNoAnswer;
 
 export interface QuestionnaireOutcome {
   terminalState: TerminalState;
@@ -43,9 +123,6 @@ export interface QuestionnaireOutcome {
 export interface AskUserDetails {
   questions: NormalizedQuestion[];
   answers: Answer[];
-  // Per-question answers keyed by stable question id, as required by the
-  // `ask-user` capability spec. Mirrors `answers` so consumers can do either
-  // ordered iteration or keyed lookup without rebuilding a map.
   answersById: Record<string, Answer>;
   terminalState: TerminalState;
 }
@@ -54,7 +131,21 @@ export const QUESTION_LIMITS = {
   minQuestions: 1,
   maxQuestions: 4,
   maxHeaderLength: 40,
-  maxPromptLength: 240,
+  maxPromptLength: 2000,
   minChoiceOptions: 2,
   maxChoiceOptions: 8,
 } as const;
+
+export function isStructuredQuestion(
+  question: NormalizedQuestion,
+): question is NormalizedStructuredQuestion {
+  return question.type !== "text";
+}
+
+export function needsReview(questions: NormalizedQuestion[]): boolean {
+  return questions.length > 1 || questions.some((q) => q.type === "multichoice");
+}
+
+export function primaryRecommendationIndex(question: NormalizedQuestion): number | undefined {
+  return isStructuredQuestion(question) ? question.recommendedIndexes[0] : undefined;
+}

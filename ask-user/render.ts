@@ -26,8 +26,7 @@ export function renderAskUserResult(
   theme: Theme,
 ): Text {
   if (isErrorDetails(result.details)) {
-    const text = result.content[0]?.text ?? "Error";
-    return new Text(theme.fg("error", text), 0, 0);
+    return new Text(theme.fg("error", result.content[0]?.text ?? "Error"), 0, 0);
   }
   const details = coerceDetails(result.details);
   if (!details) {
@@ -56,8 +55,12 @@ function extractHeadersFromArgs(args: unknown): string[] {
   const questions = (args as { questions?: unknown }).questions;
   if (!Array.isArray(questions)) return [];
   return questions
-    .map((q) => (q && typeof q === "object" ? (q as { header?: unknown }).header : undefined))
-    .filter((h): h is string => typeof h === "string" && h.length > 0);
+    .map((question) =>
+      question && typeof question === "object"
+        ? (question as { header?: unknown }).header
+        : undefined,
+    )
+    .filter((header): header is string => typeof header === "string" && header.length > 0);
 }
 
 function coerceDetails(details: unknown): AskUserDetails | null {
@@ -65,27 +68,23 @@ function coerceDetails(details: unknown): AskUserDetails | null {
   const obj = details as { terminalState?: unknown; questions?: unknown; answers?: unknown };
   if (typeof obj.terminalState !== "string") return null;
   if (!Array.isArray(obj.questions) || !Array.isArray(obj.answers)) return null;
-  return obj as unknown as AskUserDetails;
+  return obj as AskUserDetails;
 }
 
 function formatSubmittedSummary(details: AskUserDetails, theme: Theme): string {
-  const byId = new Map(details.answers.map((a) => [a.questionId, a]));
-  const lines = details.questions.map((q) => formatLine(q, byId.get(q.id), theme));
-  return lines.join("\n");
+  const byId = new Map(details.answers.map((answer) => [answer.questionId, answer]));
+  return details.questions
+    .map((question) => formatLine(question, byId.get(question.id), theme))
+    .join("\n");
 }
 
 function formatLine(
-  q: NormalizedQuestion,
+  question: NormalizedQuestion,
   answer: AskUserDetails["answers"][number] | undefined,
   theme: Theme,
 ): string {
   if (!answer) {
-    return `${theme.fg("warning", "○ ")}${theme.fg("muted", q.header)}: (no answer)`;
+    return `${theme.fg("warning", "○ ")}${theme.fg("muted", question.header)}: (no answer)`;
   }
-  const body = formatSummaryBody(q, answer);
-  const decorated = `${theme.fg("success", "✓ ")}${theme.fg("accent", q.header)}: ${theme.fg("text", body)}`;
-  if (answer.comment) {
-    return `${decorated} ${theme.fg("dim", `— ${answer.comment}`)}`;
-  }
-  return decorated;
+  return `${theme.fg("success", "✓ ")}${theme.fg("accent", question.header)}: ${theme.fg("text", formatSummaryBody(question, answer))}`;
 }

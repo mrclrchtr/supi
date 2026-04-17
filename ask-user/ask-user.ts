@@ -28,17 +28,18 @@ const TOOL_NAME = "ask_user";
 const TOOL_LABEL = "Ask User";
 
 const TOOL_DESCRIPTION =
-  "Ask the user a focused decision question (or up to 4 grouped questions) when explicit user input is required to proceed safely. Use for clarifying intent, picking between options, or confirming a destructive action — not for surveys or open-ended discovery. Each question is `choice`, `text`, or `yesno`; structured questions can include `recommendation` and always offer a freeform 'Other' answer.";
+  "Ask the user a focused decision question (or up to 4 grouped questions) when explicit user input is required to proceed safely. Use for clarifying intent, picking between options, prioritizing a short set of features, or confirming a destructive action — not for surveys or open-ended discovery. Each question is `choice`, `multichoice`, `text`, or `yesno`; structured questions can add `recommendation`, `allowOther`, `allowDiscuss`, and option `preview` content.";
 
 const PROMPT_SNIPPET =
-  "ask_user — pause and request a focused decision (1-4 typed questions) when explicit user input is required to proceed";
+  "ask_user — pause and request a focused decision (1-4 typed questions) when explicit user input is required to proceed, including rich choice, multichoice, and discuss flows";
 
 const PROMPT_GUIDELINES = [
   "Use ask_user only for decisions that require explicit user input — never as a substitute for reading code or thinking through a problem.",
   "Keep questionnaires bounded: 1-4 focused questions with short headers; prefer one decision per call when possible.",
-  "Choose the narrowest type that fits: yesno for binary decisions, choice for known options, text only when freeform input is genuinely needed.",
-  "Set `recommendation` when one option is clearly preferable, so the UI can surface it as guidance.",
-  "Other is always available on structured questions — no need to plan for it. Comments are also always available.",
+  "Choose the narrowest type that fits: yesno for binary decisions, choice for one known option, multichoice for short pick-many lists, and text only when freeform input is genuinely needed.",
+  "Set `recommendation` when one option or a small set of options is clearly preferable, so the UI can surface that guidance.",
+  "Enable `allowOther` only when a custom answer is genuinely useful, and `allowDiscuss` only when the user may need to talk through the choice instead of deciding immediately.",
+  "Use option `preview` content when the user would understand choices better from code, config, markdown, or ASCII mockups than from one-line descriptions alone.",
   "Do not call ask_user while another ask_user interaction is in flight — wait for the previous result before issuing another.",
 ];
 

@@ -20,9 +20,8 @@ export function buildResult(
   questions: NormalizedQuestion[],
   outcome: QuestionnaireOutcome,
 ): HybridResult {
-  const summary = summarize(questions, outcome);
   return {
-    content: [{ type: "text", text: summary }],
+    content: [{ type: "text", text: summarize(questions, outcome) }],
     details: {
       questions,
       answers: outcome.answers,
@@ -34,13 +33,10 @@ export function buildResult(
 
 function indexById(answers: Answer[]): Record<string, Answer> {
   const out: Record<string, Answer> = {};
-  for (const a of answers) out[a.questionId] = a;
+  for (const answer of answers) out[answer.questionId] = answer;
   return out;
 }
 
-// Sentinel inserted into details for tool-level errors (validation, no-UI,
-// concurrency). Lets renderResult distinguish them from real user
-// cancellations without changing the public terminalState contract.
 export const ASK_USER_ERROR_MARKER = "__ask_user_error__";
 
 export function buildErrorResult(message: string): HybridResult {
@@ -57,12 +53,9 @@ export function buildErrorResult(message: string): HybridResult {
 }
 
 function summarize(questions: NormalizedQuestion[], outcome: QuestionnaireOutcome): string {
-  if (outcome.terminalState !== "submitted") {
-    return summarizeTerminal(outcome.terminalState);
-  }
-  const byId = new Map(outcome.answers.map((a) => [a.questionId, a]));
-  const lines = questions.map((q) => formatAnswerLine(q, byId.get(q.id)));
-  return lines.join("\n");
+  if (outcome.terminalState !== "submitted") return summarizeTerminal(outcome.terminalState);
+  const byId = new Map(outcome.answers.map((answer) => [answer.questionId, answer]));
+  return questions.map((question) => formatAnswerLine(question, byId.get(question.id))).join("\n");
 }
 
 function summarizeTerminal(state: TerminalState): string {
@@ -71,12 +64,6 @@ function summarizeTerminal(state: TerminalState): string {
 }
 
 function formatAnswerLine(question: NormalizedQuestion, answer: Answer | undefined): string {
-  if (!answer) {
-    return `${question.header}: (no answer)`;
-  }
-  const body = formatSummaryBody(question, answer);
-  if (answer.comment) {
-    return `${question.header}: ${body} — ${answer.comment}`;
-  }
-  return `${question.header}: ${body}`;
+  if (!answer) return `${question.header}: (no answer)`;
+  return `${question.header}: ${formatSummaryBody(question, answer)}`;
 }

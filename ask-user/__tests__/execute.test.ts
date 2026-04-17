@@ -35,6 +35,8 @@ const validParams = {
       id: "scope",
       header: "Scope",
       prompt: "Pick scope",
+      allowOther: true,
+      allowDiscuss: true,
       options: [
         { value: "a", label: "Alpha" },
         { value: "b", label: "Beta" },
@@ -45,12 +47,14 @@ const validParams = {
 
 type SelectImpl = (title: string, options: string[]) => Promise<string | undefined>;
 
-function fallbackCtx(selectImpl: SelectImpl) {
+type InputImpl = (title: string, placeholder?: string) => Promise<string | undefined>;
+
+function fallbackCtx(selectImpl: SelectImpl, inputImpl?: InputImpl) {
   return {
     hasUI: true,
     ui: {
       select: vi.fn(selectImpl),
-      input: vi.fn(async () => undefined),
+      input: vi.fn(inputImpl ?? (async () => undefined)),
     },
   };
 }
@@ -72,41 +76,55 @@ describe("ask_user execute", () => {
   it("rejects validation errors with a clear message", async () => {
     const { tool } = fakePi();
     const ctx = fallbackCtx(async () => undefined);
-    const result = await tool.execute("id", { questions: [] }, undefined, undefined, ctx);
-    expect(result.content[0].text).toMatch(/1-4 questions/);
+    const result = await tool.execute(
+      "id",
+      { questions: [{ type: "multichoice", id: "x", header: "X", prompt: "X", options: [] }] },
+      undefined,
+      undefined,
+      ctx,
+    );
+    expect(result.content[0].text).toMatch(/2-8 options|structured question/);
   });
 
   it("rejects a second concurrent ask_user call with an explicit error", async () => {
     const { tool } = fakePi();
-    let resolveFirst: ((v: string | undefined) => void) | undefined;
+    let resolveFirst: ((value: string | undefined) => void) | undefined;
     const firstCtx = fallbackCtx(
       () =>
-        new Promise<string | undefined>((res) => {
-          resolveFirst = res;
+        new Promise<string | undefined>((resolve) => {
+          resolveFirst = resolve;
         }),
     );
     const firstPromise = tool.execute("a", validParams, undefined, undefined, firstCtx);
 
-    // Second call while the first is still in flight
     const secondCtx = fallbackCtx(async () => undefined);
     const secondResult = await tool.execute("b", validParams, undefined, undefined, secondCtx);
     expect(secondResult.content[0].text).toMatch(/already in flight/);
 
-    resolveFirst?.(undefined); // let the first call resolve as cancelled
+    resolveFirst?.(undefined);
     await firstPromise;
   });
 
   it("releases the lock after the first call so a follow-up call works", async () => {
     const { tool } = fakePi();
-    const ctxOne = fallbackCtx(async () => undefined); // cancel
-    await tool.execute("a", validParams, undefined, undefined, ctxOne);
-    let selectCall = 0;
-    const ctxTwo = fallbackCtx(async (_t: string, options: string[] | undefined) => {
-      selectCall++;
-      // First select picks the first option; second select skips the comment.
-      return selectCall === 1 ? options?.[0] : options?.at(-1);
-    });
-    const result = await tool.execute("b", validParams, undefined, undefined, ctxTwo);
+    const cancelledCtx = fallbackCtx(async () => undefined);
+    await tool.execute("a", validParams, undefined, undefined, cancelledCtx);
+
+    const submitCtx = fallbackCtx(async (_title, options) => options[0]);
+    const result = await tool.execute("b", validParams, undefined, undefined, submitCtx);
     expect(result.details).toMatchObject({ terminalState: "submitted" });
+  });
+
+  it("can return a discuss answer through the fallback path", async () => {
+    const { tool } = fakePi();
+    const ctx = fallbackCtx(
+      async (_title, options) => options[3],
+      async () => "need more context",
+    );
+    const result = await tool.execute("id", validParams, undefined, undefined, ctx);
+    expect(result.details).toMatchObject({
+      terminalState: "submitted",
+      answers: [{ source: "discuss", value: "need more context" }],
+    });
   });
 });

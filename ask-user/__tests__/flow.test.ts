@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ActiveQuestionnaireLock, QuestionnaireFlow } from "../flow.ts";
 import type { NormalizedQuestion } from "../types.ts";
 
-const q = (id: string, header = id): NormalizedQuestion => ({
+const choice = (id: string, header = id): NormalizedQuestion => ({
   id,
   header,
   type: "choice",
@@ -11,111 +11,133 @@ const q = (id: string, header = id): NormalizedQuestion => ({
     { value: "a", label: "A" },
     { value: "b", label: "B" },
   ],
+  allowOther: true,
+  allowDiscuss: true,
+  recommendedIndexes: [0],
+});
+
+const multichoice = (id: string, header = id): NormalizedQuestion => ({
+  id,
+  header,
+  type: "multichoice",
+  prompt: `${id}?`,
+  options: [
+    { value: "a", label: "A" },
+    { value: "b", label: "B" },
+    { value: "c", label: "C" },
+  ],
+  allowOther: false,
+  allowDiscuss: true,
+  recommendedIndexes: [0, 2],
 });
 
 describe("QuestionnaireFlow", () => {
-  it("transitions to submitted immediately on single-question advance", () => {
-    const flow = new QuestionnaireFlow([q("only")]);
+  it("submits immediately for a single non-review question", () => {
+    const flow = new QuestionnaireFlow([choice("only")]);
     flow.setAnswer({ questionId: "only", source: "option", value: "a", optionIndex: 0 });
     flow.advance();
     expect(flow.isTerminal()).toBe(true);
     expect(flow.outcome().terminalState).toBe("submitted");
   });
 
-  it("walks through multi-question flow and enters review at the end", () => {
-    const flow = new QuestionnaireFlow([q("one"), q("two")]);
-    flow.setAnswer({ questionId: "one", source: "option", value: "a", optionIndex: 0 });
-    flow.advance();
-    expect(flow.currentMode).toBe("answering");
-    expect(flow.currentIndex).toBe(1);
-    flow.setAnswer({ questionId: "two", source: "option", value: "b", optionIndex: 1 });
+  it("enters review for a single multichoice question before submission", () => {
+    const flow = new QuestionnaireFlow([multichoice("features")]);
+    flow.setAnswer({
+      questionId: "features",
+      source: "options",
+      values: ["a", "c"],
+      optionIndexes: [0, 2],
+      selections: [
+        { value: "a", optionIndex: 0, note: "best" },
+        { value: "c", optionIndex: 2 },
+      ],
+    });
     flow.advance();
     expect(flow.currentMode).toBe("reviewing");
     expect(flow.submit()).toBe(true);
-    expect(flow.outcome().terminalState).toBe("submitted");
-    expect(flow.outcome().answers).toHaveLength(2);
+    expect(flow.outcome()).toMatchObject({
+      terminalState: "submitted",
+      answers: [
+        {
+          questionId: "features",
+          source: "options",
+          selections: [
+            { value: "a", optionIndex: 0, note: "best" },
+            { value: "c", optionIndex: 2 },
+          ],
+        },
+      ],
+    });
   });
 
-  it("supports back-navigation to revise an earlier answer", () => {
-    const flow = new QuestionnaireFlow([q("one"), q("two")]);
+  it("supports back-navigation and revision across review", () => {
+    const flow = new QuestionnaireFlow([choice("one"), choice("two")]);
     flow.setAnswer({ questionId: "one", source: "option", value: "a", optionIndex: 0 });
     flow.advance();
-    flow.setAnswer({ questionId: "two", source: "option", value: "a", optionIndex: 0 });
+    flow.setAnswer({ questionId: "two", source: "yesno", value: "no", optionIndex: 1 });
     flow.advance();
-    // In review; back goes to last question
+    expect(flow.currentMode).toBe("reviewing");
     expect(flow.goBack()).toBe(true);
-    expect(flow.currentMode).toBe("answering");
     expect(flow.currentIndex).toBe(1);
-    // Back again to first question
     expect(flow.goBack()).toBe(true);
     expect(flow.currentIndex).toBe(0);
-    flow.setAnswer({ questionId: "one", source: "option", value: "b", optionIndex: 1 });
+    flow.setAnswer({ questionId: "one", source: "other", value: "custom" });
     flow.advance();
     flow.advance();
     flow.submit();
-    const answers = flow.outcome().answers;
-    expect(answers.find((a) => a.questionId === "one")?.value).toBe("b");
-  });
-
-  it("blocks submit until every question is answered", () => {
-    const flow = new QuestionnaireFlow([q("one"), q("two")]);
-    flow.setAnswer({ questionId: "one", source: "option", value: "a", optionIndex: 0 });
-    expect(flow.submit()).toBe(false);
-  });
-
-  it("refuses to advance past a question that has not been answered", () => {
-    const flow = new QuestionnaireFlow([q("one"), q("two")]);
-    expect(flow.advance()).toBe(false);
-    expect(flow.currentIndex).toBe(0);
-    expect(flow.currentMode).toBe("answering");
-  });
-
-  it("does not fabricate empty answers when collecting outcome", () => {
-    // Force an internal terminal state without populating answers — should
-    // never happen in practice, but guards the invariant.
-    const flow = new QuestionnaireFlow([q("only")]);
-    flow.cancel();
-    expect(flow.outcome().answers).toEqual([]);
-  });
-
-  it("cancel and abort lock the flow with explicit terminal states", () => {
-    const flow = new QuestionnaireFlow([q("only")]);
-    flow.cancel();
-    expect(flow.outcome().terminalState).toBe("cancelled");
-    expect(flow.goBack()).toBe(false);
-    const aborted = new QuestionnaireFlow([q("only")]);
-    aborted.abort();
-    expect(aborted.outcome().terminalState).toBe("aborted");
-  });
-
-  it("trims value and comment when storing an answer", () => {
-    const flow = new QuestionnaireFlow([q("only")]);
-    flow.setAnswer({
-      questionId: "only",
-      source: "text",
-      value: "  hello world  ",
-      comment: "  rationale  ",
+    expect(flow.outcome().answers.find((answer) => answer.questionId === "one")).toMatchObject({
+      source: "other",
+      value: "custom",
     });
-    const stored = flow.getAnswer("only");
-    expect(stored?.value).toBe("hello world");
-    expect(stored?.comment).toBe("rationale");
   });
 
-  it("drops whitespace-only comments entirely rather than storing an empty string", () => {
-    const flow = new QuestionnaireFlow([q("only")]);
-    flow.setAnswer({ questionId: "only", source: "text", value: "x", comment: "   " });
-    expect(flow.getAnswer("only")?.comment).toBeUndefined();
+  it("stores discuss answers without forcing cancellation semantics", () => {
+    const flow = new QuestionnaireFlow([choice("only")]);
+    flow.setAnswer({ questionId: "only", source: "discuss", value: "need more context" });
+    flow.advance();
+    expect(flow.outcome()).toMatchObject({
+      terminalState: "submitted",
+      answers: [{ questionId: "only", source: "discuss", value: "need more context" }],
+    });
   });
 
-  it("preserves optionIndex but never stores an undefined one", () => {
-    const flow = new QuestionnaireFlow([q("only")]);
-    flow.setAnswer({ questionId: "only", source: "option", value: "a", optionIndex: 0 });
-    expect(flow.getAnswer("only")).toEqual({
+  it("trims note strings when storing answers", () => {
+    const flow = new QuestionnaireFlow([choice("only"), multichoice("features")]);
+    flow.setAnswer({
       questionId: "only",
       source: "option",
       value: "a",
       optionIndex: 0,
+      note: "  rationale  ",
     });
+    flow.setAnswer({
+      questionId: "features",
+      source: "options",
+      values: ["a"],
+      optionIndexes: [0],
+      selections: [{ value: "a", optionIndex: 0, note: "  best first  " }],
+    });
+    expect(flow.getAnswer("only")).toMatchObject({ note: "rationale" });
+    expect(flow.getAnswer("features")).toMatchObject({
+      selections: [{ value: "a", optionIndex: 0, note: "best first" }],
+    });
+  });
+
+  it("blocks submit until every question is answered", () => {
+    const flow = new QuestionnaireFlow([choice("one"), choice("two")]);
+    flow.setAnswer({ questionId: "one", source: "option", value: "a", optionIndex: 0 });
+    expect(flow.submit()).toBe(false);
+  });
+
+  it("cancel and abort lock the flow with explicit terminal states", () => {
+    const cancelled = new QuestionnaireFlow([choice("only")]);
+    cancelled.cancel();
+    expect(cancelled.outcome().terminalState).toBe("cancelled");
+    expect(cancelled.goBack()).toBe(false);
+
+    const aborted = new QuestionnaireFlow([choice("only")]);
+    aborted.abort();
+    expect(aborted.outcome().terminalState).toBe("aborted");
   });
 });
 

@@ -6,6 +6,7 @@ import { ASK_USER_ERROR_MARKER, buildErrorResult } from "../result.ts";
 const theme: Theme = {
   fg: (color: string, text: string) => `[${color}]${text}[/${color}]`,
   bold: (text: string) => `<b>${text}</b>`,
+  bg: (_color: string, text: string) => text,
   // biome-ignore lint/suspicious/noExplicitAny: minimal Theme stub for unit tests
 } as any;
 
@@ -15,7 +16,7 @@ describe("renderAskUserCall", () => {
       {
         questions: [
           { type: "choice", id: "scope", header: "Scope" },
-          { type: "yesno", id: "go", header: "Go?" },
+          { type: "multichoice", id: "features", header: "Features" },
         ],
       },
       theme,
@@ -23,7 +24,7 @@ describe("renderAskUserCall", () => {
     const rendered = text.render(120).join("\n");
     expect(rendered).toContain("ask_user");
     expect(rendered).toContain("2 questions");
-    expect(rendered).toContain("Scope, Go?");
+    expect(rendered).toContain("Scope, Features");
   });
 });
 
@@ -49,15 +50,30 @@ describe("renderAskUserResult", () => {
   });
 
   it("error marker is set on error results", () => {
-    const r = buildErrorResult("nope");
-    expect((r.details as unknown as Record<string, unknown>)[ASK_USER_ERROR_MARKER]).toBe(true);
+    const result = buildErrorResult("nope");
+    expect((result.details as unknown as Record<string, unknown>)[ASK_USER_ERROR_MARKER]).toBe(
+      true,
+    );
   });
 
-  it("renders the option label, not the stable value, for choice answers", () => {
+  it("renders multiselect and note summaries in submitted results", () => {
     const text = renderAskUserResult(
       {
         details: {
           questions: [
+            {
+              id: "features",
+              header: "Features",
+              type: "multichoice",
+              prompt: "Pick",
+              options: [
+                { value: "preview", label: "Preview" },
+                { value: "multi", label: "Multi-select" },
+              ],
+              allowOther: false,
+              allowDiscuss: true,
+              recommendedIndexes: [0],
+            },
             {
               id: "scope",
               header: "Scope",
@@ -67,20 +83,62 @@ describe("renderAskUserResult", () => {
                 { value: "api_only", label: "API only" },
                 { value: "full_rewrite", label: "Full rewrite" },
               ],
+              allowOther: true,
+              allowDiscuss: true,
+              recommendedIndexes: [0],
             },
           ],
-          answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],
+          answers: [
+            {
+              questionId: "features",
+              source: "options",
+              values: ["preview", "multi"],
+              optionIndexes: [0, 1],
+              selections: [
+                { value: "preview", optionIndex: 0, note: "best demo" },
+                { value: "multi", optionIndex: 1 },
+              ],
+            },
+            {
+              questionId: "scope",
+              source: "option",
+              value: "api_only",
+              optionIndex: 0,
+              note: "safer",
+            },
+          ],
           answersById: {
-            scope: { questionId: "scope", source: "option", value: "api_only", optionIndex: 0 },
+            features: {
+              questionId: "features",
+              source: "options",
+              values: ["preview", "multi"],
+              optionIndexes: [0, 1],
+              selections: [
+                { value: "preview", optionIndex: 0, note: "best demo" },
+                { value: "multi", optionIndex: 1 },
+              ],
+            },
+            scope: {
+              questionId: "scope",
+              source: "option",
+              value: "api_only",
+              optionIndex: 0,
+              note: "safer",
+            },
           },
           terminalState: "submitted",
         },
-        content: [{ type: "text", text: "Scope: API only" }],
+        content: [
+          {
+            type: "text",
+            text: "Features: Preview — best demo; Multi-select\nScope: API only — safer",
+          },
+        ],
       },
       theme,
     );
     const rendered = text.render(120).join("");
-    expect(rendered).toContain("API only");
-    expect(rendered).not.toContain("api_only");
+    expect(rendered).toContain("Preview — best demo");
+    expect(rendered).toContain("API only — safer");
   });
 });

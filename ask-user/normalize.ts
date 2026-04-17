@@ -5,6 +5,7 @@
 import type {
   AskUserParams,
   ExternalChoiceQuestion,
+  ExternalMultiChoiceQuestion,
   ExternalQuestion,
   ExternalYesNoQuestion,
 } from "./schema.ts";
@@ -29,8 +30,7 @@ export class AskUserValidationError extends Error {
 
 export function normalizeQuestionnaire(params: AskUserParams): NormalizedQuestionnaire {
   validateQuestionnaireShape(params);
-  const questions = params.questions.map((q) => normalizeQuestion(q));
-  return { questions };
+  return { questions: params.questions.map((q) => normalizeQuestion(q)) };
 }
 
 function validateQuestionnaireShape(params: AskUserParams): void {
@@ -53,9 +53,16 @@ function validateQuestionnaireShape(params: AskUserParams): void {
 
 function normalizeQuestion(q: ExternalQuestion): NormalizedQuestion {
   validateCommonFields(q);
-  if (q.type === "choice") return normalizeChoice(q);
-  if (q.type === "yesno") return normalizeYesNo(q);
-  return normalizeText(q);
+  switch (q.type) {
+    case "choice":
+      return normalizeChoice(q);
+    case "multichoice":
+      return normalizeMultiChoice(q);
+    case "yesno":
+      return normalizeYesNo(q);
+    case "text":
+      return normalizeText(q);
+  }
 }
 
 function validateCommonFields(q: ExternalQuestion): void {
@@ -81,65 +88,48 @@ function validateCommonFields(q: ExternalQuestion): void {
 }
 
 function normalizeChoice(q: ExternalChoiceQuestion): NormalizedQuestion {
-  const optionCount = q.options.length;
-  if (
-    optionCount < QUESTION_LIMITS.minChoiceOptions ||
-    optionCount > QUESTION_LIMITS.maxChoiceOptions
-  ) {
-    throw new AskUserValidationError(
-      `choice question "${q.id}" must have ${QUESTION_LIMITS.minChoiceOptions}-${QUESTION_LIMITS.maxChoiceOptions} options (got ${optionCount}).`,
-    );
-  }
-  const seenValues = new Set<string>();
-  const options: NormalizedOption[] = q.options.map((opt) => {
-    if (opt.value.trim().length === 0 || opt.label.trim().length === 0) {
-      throw new AskUserValidationError(
-        `choice question "${q.id}" has an option with empty value or label.`,
-      );
-    }
-    if (seenValues.has(opt.value)) {
-      throw new AskUserValidationError(
-        `choice question "${q.id}" has duplicate option value "${opt.value}".`,
-      );
-    }
-    seenValues.add(opt.value);
-    return { value: opt.value, label: opt.label, description: opt.description };
-  });
+  const options = normalizeStructuredOptions(q.id, q.options);
   return {
     id: q.id,
     header: q.header,
     type: "choice",
     prompt: q.prompt,
     options,
-    recommendedIndex: resolveChoiceRecommendation(q.id, options, q.recommendation),
+    allowOther: q.allowOther ?? false,
+    allowDiscuss: q.allowDiscuss ?? false,
+    recommendedIndexes: resolveSingleRecommendation(q.id, options, q.recommendation),
   };
 }
 
-function resolveChoiceRecommendation(
-  questionId: string,
-  options: NormalizedOption[],
-  recommendation: string | undefined,
-): number | undefined {
-  if (recommendation === undefined) return undefined;
-  const idx = options.findIndex((opt) => opt.value === recommendation);
-  if (idx < 0) {
+function normalizeMultiChoice(q: ExternalMultiChoiceQuestion): NormalizedQuestion {
+  if (q.allowOther) {
     throw new AskUserValidationError(
-      `choice question "${questionId}" recommends "${recommendation}", which is not one of its option values.`,
+      `multichoice question "${q.id}" does not support allowOther in this version.`,
     );
   }
-  return idx;
+  const options = normalizeStructuredOptions(q.id, q.options);
+  return {
+    id: q.id,
+    header: q.header,
+    type: "multichoice",
+    prompt: q.prompt,
+    options,
+    allowOther: false,
+    allowDiscuss: q.allowDiscuss ?? false,
+    recommendedIndexes: resolveMultiRecommendation(q.id, options, q.recommendation),
+  };
 }
 
 function normalizeYesNo(q: ExternalYesNoQuestion): NormalizedQuestion {
-  const recommendedIndex =
-    q.recommendation === undefined ? undefined : q.recommendation === "yes" ? 0 : 1;
   return {
     id: q.id,
     header: q.header,
     type: "yesno",
     prompt: q.prompt,
-    options: YES_NO_OPTIONS.map((o) => ({ ...o })),
-    recommendedIndex,
+    options: YES_NO_OPTIONS.map((option) => ({ ...option })),
+    allowOther: q.allowOther ?? false,
+    allowDiscuss: q.allowDiscuss ?? false,
+    recommendedIndexes: q.recommendation === undefined ? [] : [q.recommendation === "yes" ? 0 : 1],
   };
 }
 
@@ -150,6 +140,79 @@ function normalizeText(q: { id: string; header: string; prompt: string }): Norma
     type: "text",
     prompt: q.prompt,
     options: [],
-    recommendedIndex: undefined,
   };
+}
+
+function normalizeStructuredOptions(
+  questionId: string,
+  options: ExternalChoiceQuestion["options"] | ExternalMultiChoiceQuestion["options"],
+): NormalizedOption[] {
+  const optionCount = options.length;
+  if (
+    optionCount < QUESTION_LIMITS.minChoiceOptions ||
+    optionCount > QUESTION_LIMITS.maxChoiceOptions
+  ) {
+    throw new AskUserValidationError(
+      `structured question "${questionId}" must have ${QUESTION_LIMITS.minChoiceOptions}-${QUESTION_LIMITS.maxChoiceOptions} options (got ${optionCount}).`,
+    );
+  }
+  const seenValues = new Set<string>();
+  return options.map((opt) => {
+    if (opt.value.trim().length === 0 || opt.label.trim().length === 0) {
+      throw new AskUserValidationError(
+        `structured question "${questionId}" has an option with empty value or label.`,
+      );
+    }
+    if (seenValues.has(opt.value)) {
+      throw new AskUserValidationError(
+        `structured question "${questionId}" has duplicate option value "${opt.value}".`,
+      );
+    }
+    seenValues.add(opt.value);
+    return {
+      value: opt.value,
+      label: opt.label,
+      description: opt.description,
+      preview: opt.preview,
+    };
+  });
+}
+
+function resolveSingleRecommendation(
+  questionId: string,
+  options: NormalizedOption[],
+  recommendation: string | undefined,
+): number[] {
+  if (recommendation === undefined) return [];
+  const idx = options.findIndex((opt) => opt.value === recommendation);
+  if (idx < 0) {
+    throw new AskUserValidationError(
+      `choice question "${questionId}" recommends "${recommendation}", which is not one of its option values.`,
+    );
+  }
+  return [idx];
+}
+
+function resolveMultiRecommendation(
+  questionId: string,
+  options: NormalizedOption[],
+  recommendation: string[] | undefined,
+): number[] {
+  if (!recommendation || recommendation.length === 0) return [];
+  const seen = new Set<string>();
+  return recommendation.map((value) => {
+    if (seen.has(value)) {
+      throw new AskUserValidationError(
+        `multichoice question "${questionId}" has duplicate recommended value "${value}".`,
+      );
+    }
+    seen.add(value);
+    const idx = options.findIndex((opt) => opt.value === value);
+    if (idx < 0) {
+      throw new AskUserValidationError(
+        `multichoice question "${questionId}" recommends "${value}", which is not one of its option values.`,
+      );
+    }
+    return idx;
+  });
 }
