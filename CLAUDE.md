@@ -31,8 +31,14 @@ pnpm install
 # Install repo git hooks
 mise run hooks
 
+# Full verification suite (runs on pre-push)
+pnpm verify
+
 # Type-check all extensions (no emit)
 pnpm typecheck
+
+# Type-check test files only (faster than full typecheck)
+pnpm typecheck:tests
 
 # Lint/format check (AI-friendly output)
 pnpm biome:ai
@@ -63,9 +69,16 @@ hk run fix
 
 # Watch mode
 pnpm test:watch
+
+# Dry-run npm pack
+pnpm pack:check
+
+# Release (requires git auth even for --dry-run)
+pnpm release
 ```
 
-Toolchain versions are managed via mise (`node = "lts"`, `pnpm = "latest"`, `hk = "1.42.0"`, `pkl = "0.31.1"`).
+Toolchain versions are managed via [mise](https://mise.jdx.dev) in `.mise.toml`
+(`node = "lts"`, `pnpm = "latest"`, `hk = "1.42.0"`, `pkl = "0.31.1"`).
 
 Tooling config at repo root: `hk.pkl`, `commitlint.config.mjs`, `release.config.mjs` (no `.github` shims).
 
@@ -77,6 +90,7 @@ Each extension lives in its own directory with a single `.ts` entry file. Extens
 "pi": {
   "extensions": [
     "./aliases/aliases.ts",
+    "./ask-user/ask-user.ts",
     "./bash-timeout/index.ts",
     "./skill-shortcut/skill-shortcut.ts",
     "./lsp/lsp.ts"
@@ -90,6 +104,8 @@ Each extension lives in its own directory with a single `.ts` entry file. Extens
 ### Prompt templates
 
 Templates live in `prompts/*.md` and are invoked with `/name` in the pi editor. Only `description:` is valid frontmatter — `allowed-tools` and other Claude-specific keys are silently ignored.
+
+Current templates: `revise-claude-md.md` (invoked with `/revise-claude-md`).
 
 ### Skills
 
@@ -133,6 +149,18 @@ Commands: `/lsp-status` — shows active servers, open files, and diagnostics su
 
 Per-project config: `.pi-lsp.json` in project root to override/add/disable servers. YAML is not supported (no YAML parser dependency).
 
+### Ask-user extension
+
+Rich questionnaire UI (`ask_user` tool) for structured agent–user decisions. Supports explicit `choice`, `multichoice`, `yesno`, and `text` question types with inline `Other`/`Discuss` editing, context-sensitive note hotkeys (`n`), split-pane option previews, and review/revise flows. Fallback path degrades gracefully when rich custom UI is unavailable.
+
+Files: `ask-user/ask-user.ts` (entry), `ask-user/schema.ts` (external contract), `ask-user/normalize.ts` (validation), `ask-user/types.ts` (internal model), `ask-user/flow.ts` (shared state machine), `ask-user/ui-rich.ts` (overlay builder), `ask-user/ui-rich-state.ts` (state types and pure helpers), `ask-user/ui-rich-handlers.ts` (input handlers), `ask-user/ui-rich-render.ts` (core rendering), `ask-user/ui-rich-render-notes.ts` (note rendering), `ask-user/ui-rich-render-editor.ts` (editor pane rendering), `ask-user/ui-rich-inline.ts` (inline Other/Discuss rows), `ask-user/ui-fallback.ts` (fallback path), `ask-user/format.ts` (summary/review formatting), `ask-user/render.ts` (transcript rendering), `ask-user/result.ts` (tool content/details).
+
+No `ask_user` commands — the tool is invoked by the agent via `pi.registerTool`.
+
+### OpenSpec workflow
+
+This repo uses an experimental OpenSpec artifact workflow in `openspec/`. Changes are tracked as directories under `openspec/changes/` with `design.md`, `proposal.md`, `tasks.md`, and `specs/` artifacts. Key skills: `openspec-new-change`, `openspec-continue-change`, `openspec-apply-change`, `openspec-verify-change`, `openspec-archive-change`.
+
 ### Skill-shortcut extension
 
 The most complex extension. It wraps pi-tui's `AutocompleteProvider` and `CustomEditor` to intercept `$name` tokens and expand them to `/skill:name`. The editor subclass (`SkillShortcutEditor`) delegates autocomplete to the inner provider unless the cursor is inside a `$`-prefixed token.
@@ -172,29 +200,55 @@ Key docs to reach for first:
 
 ## Gotchas
 
+### Dependencies & packaging
+
 - **peerDependencies install as regular deps**: pnpm installs missing peers automatically; after bumping version ranges in `package.json` run `pnpm install` to update the lockfile.
 - **`~` version range on peerDeps**: intentional — pins to the minor release train (`~0.66.0` allows `0.66.x` only) to avoid silent breakage from pi API changes across minor versions.
-- **`skill-shortcut` accesses private TUI internals**: `SkillShortcutEditor` casts `this as any` to reach `autocompleteState`, `state`, and `tryTriggerAutocomplete`. These are undocumented internals and may break on `@mariozechner/pi-tui` upgrades — verify after bumping.
-- **`bash-timeout` entry point is `index.ts`**: all other extensions use `dir/dir.ts` naming; `bash-timeout` uses `bash-timeout/index.ts`. This is intentional (copied from source) but inconsistent.
-- **Prompt template frontmatter**: only `description:` is supported; Claude-specific keys like `allowed-tools` are silently ignored — strip them when porting Claude commands.
 - **`@sinclair/typebox` is a peerDependency**: it's a runtime import (used by `lsp/lsp.ts`) so it must be in `peerDependencies`. pnpm auto-installs it locally for type-checking. Putting it in `devDependencies` breaks `pi install npm:...`. Avoid `@mariozechner/pi-ai`'s `StringEnum` — use `Type.Union(Type.Literal(...))` instead to keep the dep tree smaller.
-- **`ctx.ui.notify()` level is `"warning"` not `"warn"`**: valid values are `"error" | "warning" | "info"`.
-- **`pi.on("tool_result")` modifies results; `pi.on("tool_call")` only blocks**: use `tool_result` to append diagnostics or context to tool output. Return `{ content, details, isError }` to patch.
-- **Session cleanup event is `session_shutdown`** not `session_end`: use for tearing down subprocesses, connections, etc.
-- **Local `pi install /path` uses the working tree directly**: confirm the active package path in `~/.pi/agent/settings.json`, then use `/reload` or restart pi after edits.
 - **JSON imports**: avoid `import X from "./file.json" with { type: "json" }` — it errors under some tsconfig modes. Use `JSON.parse(fs.readFileSync(path.join(__dirname, "file.json"), "utf-8"))` instead. pi's jiti loader always provides `__dirname`.
-- **openspec PostHog errors are harmless**: the CLI emits `PostHogFetchNetworkError` when offline — ignore.
+
+### Biome & code style
+
 - **Biome config is `biome.jsonc`** (not `biome.json`): all rule overrides go there. Inline `biome-ignore` comments don't work for file-level nursery rules like `noExcessiveLinesPerFile` — must split the file or raise the threshold in `biome.jsonc`.
-- **Prefer `Type.Union(Type.Literal(...))` over `StringEnum`**: avoids adding `@mariozechner/pi-ai` as a runtime/peer dep. Only `@sinclair/typebox` is needed for tool parameter schemas.
-- **`skill-shortcut` needs `biome-ignore` for `noExplicitAny`**: the `as any` casts accessing private TUI internals are intentional — each needs an inline `// biome-ignore lint/suspicious/noExplicitAny: accessing private TUI internals` comment.
-- **Test framework is vitest**: unit tests at `lsp/__tests__/*.test.ts`, integration tests at `*.integration.test.ts`. Integration tests use `describe.skipIf(!HAS_CMD)` to auto-skip when LSP servers aren't on PATH.
 - **Always run `biome check --write` on new test files**: biome enforces import order and formatting that won't match hand-written code. Fix first, then verify with `biome:ai`.
 - **Biome complexity trips quickly in `lsp/manager.ts`**: prefer small helper functions for summary/aggregation logic before reaching for suppressions.
 - **`lsp/summary.ts` holds formatting/relevance helpers**: keep `lsp/manager.ts` focused on state/server management to stay under Biome file-length limits.
+- **`skill-shortcut` needs `biome-ignore` for `noExplicitAny`**: the `as any` casts accessing private TUI internals are intentional — each needs an inline `// biome-ignore lint/suspicious/noExplicitAny: accessing private TUI internals` comment.
+
+### pi API & runtime
+
+- **`pi.on("tool_result")` modifies results; `pi.on("tool_call")` only blocks**: use `tool_result` to append diagnostics or context to tool output. Return `{ content, details, isError }` to patch.
+- **Session cleanup event is `session_shutdown`** not `session_end`: use for tearing down subprocesses, connections, etc.
+- **`ctx.ui.notify()` level is `"warning"` not `"warn"`**: valid values are `"error" | "warning" | "info"`.
+- **Local `pi install /path` uses the working tree directly**: confirm the active package path in `~/.pi/agent/settings.json`, then use `/reload` or restart pi after edits.
 - **Keep `before_agent_start` guidance stateful**: generic LSP preference belongs in `promptSnippet`/`promptGuidelines`; pre-turn messages should only add actionable diagnostics or relevant active coverage.
+
+### TUI & extensions
+
+- **`skill-shortcut` accesses private TUI internals**: `SkillShortcutEditor` casts `this as any` to reach `autocompleteState`, `state`, and `tryTriggerAutocomplete`. These are undocumented internals and may break on `@mariozechner/pi-tui` upgrades — verify after bumping.
+- **`bash-timeout` entry point is `index.ts`**: all other extensions use `dir/dir.ts` naming; `bash-timeout` uses `bash-timeout/index.ts`. This is intentional (copied from source) but inconsistent.
+- **Prompt template frontmatter**: only `description:` is supported; Claude-specific keys like `allowed-tools` are silently ignored — strip them when porting Claude commands.
+
+### Testing
+
+- **Test framework is vitest**: unit tests at `lsp/__tests__/*.test.ts`, integration tests at `*.integration.test.ts`. Integration tests use `describe.skipIf(!HAS_CMD)` to auto-skip when LSP servers aren't on PATH.
+- **Unhandled promise rejections fail vitest**: if production code rejects promises during cleanup (e.g., `dispose()`), add `promise.catch(() => {})` at creation to prevent vitest from catching them as test errors.
 - **Probe live LSP behavior with a temporary TS error file**: writing `lsp/__tmp_guidance_probe.ts` with an intentional type error exercises both `tool_result` diagnostics and pre-turn guidance.
 - **Unit-test LSP manager summaries with fake clients**: cast `manager as unknown as { clients: Map<...> }` to seed coverage/diagnostics; keep real server behavior in `*.integration.test.ts`.
-- **Unhandled promise rejections fail vitest**: if production code rejects promises during cleanup (e.g., `dispose()`), add `promise.catch(() => {})` at creation to prevent vitest from catching them as test errors.
+- **TS LSP integration diagnostics can arrive late**: retry `syncFileAndGetDiagnostics()` before asserting non-empty diagnostics in integration tests.
+
+### Ask-user extension
+
+- **`ask-user` uses a split flow**: rich overlay via `ctx.ui.custom()` when available, otherwise fallback dialog. Fallback does NOT support notes, previews, or inline editing.
+- **`ask-user` inline `Other`/`Discuss` auto-enters edit mode on keyboard focus**: navigating onto those rows immediately activates inline input. `Esc` exits back to row navigation.
+- **`ask-user` multichoice uses `Space` to toggle**: not `Enter`. `Enter` submits the current selection set. The old `Submit selections` row was removed.
+- **`ask-user` notes are per-option for multichoice**: `n` hotkey edits a note on the highlighted option. Notes survive uncheck/re-check within the same questionnaire.
+
+### Release & hooks
+
 - **`hk` is the local hook runner**: `commit-msg` checks Conventional Commits, `pre-commit` runs Biome + safety checks, and `pre-push` runs `pnpm verify`.
 - **Local `semantic-release` dry-runs still require git auth**: `pnpm release -- --dry-run --no-ci` can fail with `EGITNOPERMISSION` even when config is correct.
-- **TS LSP integration diagnostics can arrive late**: retry `syncFileAndGetDiagnostics()` before asserting non-empty diagnostics in integration tests.
+
+### Misc
+
+- **openspec PostHog errors are harmless**: the CLI emits `PostHogFetchNetworkError` when offline — ignore.
