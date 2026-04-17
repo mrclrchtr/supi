@@ -8,7 +8,7 @@ The change needs more than a thin wrapper around `ctx.ui.select()`. The approved
 
 **Goals:**
 - Register a single `ask_user` tool that the model can call for focused clarifications and decisions during an agent run
-- Support bounded questionnaires with typed questions: `choice`, `text`, and `yesno`
+- Support bounded questionnaires with typed questions: `choice`, `multichoice`, `text`, and `yesno`
 - Provide richer decision support for structured questions via recommendations, optional `Other`, and optional follow-up comments
 - Offer a rich overlay UI in interactive TUI sessions and a clean dialog/input fallback path when overlay interaction is unavailable
 - Return hybrid tool results: concise continuation-friendly `content` plus structured `details` for rendering and future state reconstruction
@@ -26,7 +26,7 @@ The change needs more than a thin wrapper around `ctx.ui.select()`. The approved
 
 ### 1. Register one `ask_user` tool with a bounded questionnaire schema
 
-**Decision**: Expose a single `ask_user` tool that accepts `questions: Question[]`, where `Question` is a discriminated union of `choice`, `text`, and `yesno`, with a hard cap of 1–4 questions. In v1, the tool does not accept a timeout parameter and waits until the user submits, dismisses, or the execution signal is aborted.
+**Decision**: Expose a single `ask_user` tool that accepts `questions: Question[]`, where `Question` is a discriminated union of `choice`, `multichoice`, `text`, and `yesno`, with a hard cap of 1–4 questions. `multichoice` supports multi-select via Space-toggle with per-option notes and always enters review before submission (even for a single multichoice question). In v1, the tool does not accept a timeout parameter and waits until the user submits, dismisses, or the execution signal is aborted.
 
 **Rationale**: One tool keeps the model surface small and easy to learn, while a typed question union preserves clarity and deterministic parsing. Omitting timeout from the contract keeps user patience out of model control and avoids introducing a second failure state that often cannot help the agent proceed safely anyway. The 1–4 question bound matches the approved decision-oriented scope and prevents the tool from drifting into survey territory.
 
@@ -87,7 +87,7 @@ The change needs more than a thin wrapper around `ctx.ui.select()`. The approved
 
 ### 7. Return hybrid tool results with structured per-question answers
 
-**Decision**: `content` will contain a short natural-language summary suitable for immediate continuation, while `details` will include normalized questions, per-question answers keyed by stable ID, answer source metadata, terminal-state metadata, and optional comments. In v1, answer sources are `option`, `other`, `text`, and `yesno`; terminal states are tracked separately as `submitted`, `cancelled`, or `aborted`.
+**Decision**: `content` will contain a short natural-language summary suitable for immediate continuation, while `details` will include normalized questions, per-question answers keyed by stable ID, answer source metadata, terminal-state metadata, and optional comments. In v1, answer sources are `option`, `options` (multichoice), `other`, `text`, `discuss`, and `yesno`; terminal states are tracked separately as `submitted`, `cancelled`, or `aborted`.
 
 **Rationale**: The model should not need to parse a raw JSON block just to continue, but the extension still needs durable, structured result data for custom rendering, debugging, and future session reconstruction. Hybrid output provides both.
 

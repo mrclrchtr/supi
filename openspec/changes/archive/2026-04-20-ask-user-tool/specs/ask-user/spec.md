@@ -13,7 +13,7 @@ The system SHALL register an `ask_user` tool that the agent can call to gather f
 - **THEN** the session transcript shows a concise summary of the pending question set rather than an unreadable raw parameter dump
 
 ### Requirement: `ask_user` questionnaires SHALL use a bounded typed schema
-The system SHALL accept questionnaires containing one to four questions, where each question has a stable `id`, a short `header`, and a supported type of `choice`, `text`, or `yesno`.
+The system SHALL accept questionnaires containing one to four questions, where each question has a stable `id`, a short `header`, and a supported type of `choice`, `multichoice`, `text`, or `yesno`.
 
 #### Scenario: Valid mixed questionnaire is accepted
 - **WHEN** the tool is called with three questions using supported types and unique IDs
@@ -35,9 +35,27 @@ The system SHALL accept questionnaires containing one to four questions, where e
 - **WHEN** the tool is called with a `choice` question whose option count falls outside the supported bounded range
 - **THEN** the tool returns an error explaining that `choice` questions must stay within the supported option-count bounds
 
+#### Scenario: Multichoice question accepts multi-select answers
+- **WHEN** the tool is called with a `multichoice` question and the user toggles one or more options and submits
+- **THEN** the result records all selected option values with per-option notes if provided
+- **AND** the answer source is `options` with a `selections` array
+
+#### Scenario: Single multichoice question enters review before submission
+- **WHEN** the tool is called with a single `multichoice` question and the user selects options
+- **THEN** the flow enters review mode before final submission even though there is only one question
+
+#### Scenario: Multichoice per-option notes are captured independently
+- **WHEN** a `multichoice` question is active and the user adds notes to individual selected options
+- **THEN** each note is stored on its corresponding selection independently
+
 #### Scenario: Invalid recommendation target is rejected clearly
 - **WHEN** the tool is called with recommendation metadata that does not point to a valid answer for the question
 - **THEN** the tool returns an error explaining that the recommendation target is invalid for that question
+
+#### Scenario: Multichoice recommendation accepts an array of option values
+- **WHEN** a `multichoice` question includes a recommendation array pointing to valid option values
+- **THEN** the UI highlights all recommended options
+- **AND** each recommended value must match an existing option and must not be duplicated
 
 #### Scenario: Text questions capture non-empty freeform answers
 - **WHEN** the tool presents a `text` question and the user submits a non-empty string
