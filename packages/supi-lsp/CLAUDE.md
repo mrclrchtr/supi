@@ -25,10 +25,10 @@ Entrypoint: `lsp.ts`
 
 - Per-project config lives in `.pi-lsp.json` at the project root. YAML is intentionally unsupported.
 - The `lsp` tool advertises semantic-first guidance via `promptSnippet` / `promptGuidelines`.
-- Runtime `before_agent_start` guidance is stateful and should stay mostly dormant:
-  - activate only after qualifying source interactions (`read`, `edit`, `write`, `lsp`) on supported files
-  - re-inject only when an activation hint is pending or tracked-file diagnostics changed
-- Use `pi.on("tool_result")` to append diagnostics/context to tool output.
+- `before_agent_start` custom messages reach the LLM as user-role content; keep stable guidance in session-start `promptGuidelines` and reserve dynamic XML-framed context for diagnostics only.
+- `/reload` reruns `session_start`; use it to refresh proactive scans, eager server startup, and rebuilt `promptGuidelines`.
+- `/lsp-status` should merge proactive scan roots with lazily started clients; do not assume UI state can rely on the session-start scan snapshot alone.
+- Use `pi.on("tool_result")` to append inline diagnostics to `write` / `edit` output.
 
 ## Environment variables
 
@@ -41,6 +41,8 @@ Entrypoint: `lsp.ts`
 - `@sinclair/typebox` is a runtime import here, so keep it in `peerDependencies`.
 - Avoid `@mariozechner/pi-ai`'s `StringEnum`; use `Type.Union(Type.Literal(...))` to keep the dep tree smaller.
 - If a cleanup promise may reject, attach `promise.catch(() => {})` at creation time so vitest does not treat it as an unhandled rejection.
+- `packages/supi-lsp/package.json` is a published install target; keep its dependency removals in sync with the workspace root.
+- Prefer splitting `manager.ts` helpers into focused `manager-*.ts` modules over relaxing the repo-wide Biome line-limit rule.
 
 ## Testing
 
@@ -53,4 +55,5 @@ pnpm exec vitest run packages/supi-lsp/__tests__/scanner.test.ts
 Testing gotchas:
 - Integration tests use `describe.skipIf(!HAS_CMD)` and will auto-skip when required language servers are missing from `PATH`.
 - Diagnostics can arrive late in TS integration tests; retry `syncFileAndGetDiagnostics()` before asserting.
+- `packages/supi-lsp/__tests__/tsconfig.json` needs `"types": ["node"]` for tests importing `node:*`.
 - A temporary file like `packages/supi-lsp/__tmp_guidance_probe.ts` with an intentional type error is a useful live probe for diagnostics + guidance behavior.

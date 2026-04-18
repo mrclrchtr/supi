@@ -115,7 +115,9 @@ Start with:
 - `pi.on("tool_result")` can modify tool output; `pi.on("tool_call")` can only block.
 - Session cleanup event is `session_shutdown`, not `session_end`.
 - `ctx.ui.notify()` uses `"warning"`, not `"warn"`.
+- `ctx.ui.theme` does not expose an `"info"` color; use existing colors like `"accent"` / `"dim"` for info-level UI.
 - Keep runtime-imported packages in `peerDependencies`; after changing version ranges run `pnpm install` to refresh the lockfile.
+- Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
 - Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
 - Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
