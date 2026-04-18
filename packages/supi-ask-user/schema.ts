@@ -2,7 +2,7 @@
 // Rich-TUI-first redesign: explicit question kinds, explicit escape hatches,
 // and first-class option previews for structured comparisons.
 
-import { type Static, Type } from "@sinclair/typebox";
+import { type Static, Type } from "typebox";
 
 const StructuredOptionSchema = Type.Object({
   value: Type.String({ description: "Stable identifier returned in the answer" }),

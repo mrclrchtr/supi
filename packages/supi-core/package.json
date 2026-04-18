@@ -20,7 +20,7 @@
     "!__tests__"
   ],
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "~0.66.0"
+    "@mariozechner/pi-coding-agent": "~0.69.0"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
