@@ -2,43 +2,32 @@
 //
 // Gives the agent type-aware hover, go-to-definition,
 // diagnostics, document-symbols, rename, and code-actions via a registered
-// `lsp` tool. It also keeps supported source files warm in their language
-// servers, surfaces inline diagnostics after edits/writes, and injects concise
-// semantic-first guidance into agent turns.
-//
-// Environment variables:
-//   PI_LSP_DISABLED=1        — disable all LSP functionality
-//   PI_LSP_SERVERS=a,b       — restrict to listed servers
-//   PI_LSP_SEVERITY=2        — inline severity threshold (1=error, 2=warn, 3=info, 4=hint)
+// `lsp` tool. It keeps supported source files warm in their language servers,
+// surfaces inline diagnostics after edits/writes, eagerly starts detected
+// servers on session start, and injects compact diagnostic context only when
+// outstanding diagnostics exist.
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { initBashParser, shouldSuggestLsp } from "./bash-guard.ts";
 import { loadConfig } from "./config.ts";
 import {
-  extractPromptPathHints,
-  filterLspGuidanceMessages,
+  buildProjectGuidelines,
+  diagnosticsContextFingerprint,
+  formatDiagnosticsContext,
   lspPromptGuidelines,
   lspPromptSnippet,
-  mergeRelevantPaths,
-  runtimeGuidanceFingerprint,
+  reorderDiagnosticContextMessages,
 } from "./guidance.ts";
 import { LspManager } from "./manager.ts";
+import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
 import {
-  persistRecentPaths,
-  restoreRecentPaths,
-  updateRecentPathsFromToolEvent,
-} from "./recent-paths.ts";
-import {
-  computePendingRuntimeGuidance,
-  createRuntimeGuidanceState,
-  type LspRuntimeGuidanceState,
-  pruneMissingTrackedPaths,
-  registerQualifyingSourceInteraction,
-  resetRuntimeGuidanceState,
-} from "./runtime-state.ts";
+  introspectCapabilities,
+  scanProjectCapabilities,
+  startDetectedServers,
+} from "./scanner.ts";
 import { executeAction, type LspAction, lspToolDescription } from "./tool-actions.ts";
+import type { DetectedProjectServer, ProjectServerInfo } from "./types.ts";
 import { type LspInspectorState, toggleLspStatusOverlay, updateLspUi } from "./ui.ts";
 
 const LspActionEnum = Type.Union([
@@ -53,15 +42,13 @@ const LspActionEnum = Type.Union([
 
 interface LspRuntimeState {
   manager: LspManager | null;
-  recentPaths: string[];
-  persistedRecentPaths: string[];
-  currentPrompt: string;
-  currentRelevantPaths: string[];
-  currentGuidanceToken: string | null;
-  guidanceCounter: number;
   inlineSeverity: number;
   inspector: LspInspectorState;
-  runtime: LspRuntimeGuidanceState;
+  detectedServers: DetectedProjectServer[];
+  projectServers: ProjectServerInfo[];
+  lastDiagnosticsFingerprint: string | null;
+  currentContextToken: string | null;
+  contextCounter: number;
 }
 
 export default function lspExtension(pi: ExtensionAPI) {
@@ -75,17 +62,11 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerLspAwareToolOverrides(pi, {
     inlineSeverity: state.inlineSeverity,
     getManager: () => state.manager,
-    getRecentPaths: () => state.recentPaths,
-    setRecentPaths: (paths) => {
-      state.recentPaths = paths;
-      refreshRelevantPaths(state);
-    },
-    onRecentPathsChange: () => refreshRelevantPaths(state),
   });
 
+  registerLspTool(pi, state, lspPromptGuidelines);
   registerSessionLifecycleHandlers(pi, state);
   registerBehaviorHandlers(pi, state);
-  registerLspTool(pi, state);
   registerLspStatusCommand(pi, state);
 }
 
@@ -101,18 +82,16 @@ function registerDisabledStatusCommand(pi: ExtensionAPI): void {
 function createRuntimeState(inlineSeverity: number): LspRuntimeState {
   return {
     manager: null,
-    recentPaths: [],
-    persistedRecentPaths: [],
-    currentPrompt: "",
-    currentRelevantPaths: [],
-    currentGuidanceToken: null,
-    guidanceCounter: 0,
     inlineSeverity,
     inspector: {
       handle: null,
       close: null,
     },
-    runtime: createRuntimeGuidanceState(),
+    detectedServers: [],
+    projectServers: [],
+    lastDiagnosticsFingerprint: null,
+    currentContextToken: null,
+    contextCounter: 0,
   };
 }
 
@@ -123,22 +102,17 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     }
 
     ensureLspToolActive(pi);
-    void initBashParser();
-    state.manager = new LspManager(loadConfig(process.cwd()));
-    state.recentPaths = restoreRecentPaths(
-      ctx.sessionManager.getEntries() as Array<{
-        type?: string;
-        customType?: string;
-        data?: unknown;
-      }>,
-    );
-    state.persistedRecentPaths = [...state.recentPaths];
-    state.currentPrompt = "";
-    state.currentGuidanceToken = null;
-    state.guidanceCounter = 0;
-    resetRuntimeGuidanceState(state.runtime);
-    refreshRelevantPaths(state);
-    updateLspUi(ctx, state.manager, state.inlineSeverity);
+    const config = loadConfig(process.cwd());
+    state.manager = new LspManager(config);
+    state.detectedServers = scanProjectCapabilities(config, process.cwd());
+    state.manager.registerDetectedServers(state.detectedServers);
+    await startDetectedServers(state.manager, state.detectedServers);
+    refreshProjectServers(state);
+    state.lastDiagnosticsFingerprint = null;
+    state.currentContextToken = null;
+    registerLspTool(pi, state, buildProjectGuidelines(state.projectServers));
+    ensureLspToolActive(pi);
+    updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
   });
 
   pi.on("session_shutdown", async () => {
@@ -148,82 +122,57 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     }
 
     state.inspector.close?.();
-    state.recentPaths = [];
-    state.persistedRecentPaths = [];
-    state.currentPrompt = "";
-    state.currentRelevantPaths = [];
-    state.currentGuidanceToken = null;
-    resetRuntimeGuidanceState(state.runtime);
-  });
-
-  pi.on("turn_end", async () => {
-    state.persistedRecentPaths = persistRecentPaths(
-      pi,
-      state.recentPaths,
-      state.persistedRecentPaths,
-    );
+    state.detectedServers = [];
+    state.projectServers = [];
+    state.lastDiagnosticsFingerprint = null;
+    state.currentContextToken = null;
   });
 
   pi.on("agent_end", async (_event, ctx) => {
-    state.currentPrompt = "";
-    state.currentRelevantPaths = [];
-    state.currentGuidanceToken = null;
+    state.currentContextToken = null;
+    refreshProjectServers(state);
 
     if (state.manager) {
-      updateLspUi(ctx, state.manager, state.inlineSeverity);
+      updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
     }
   });
 }
 
 function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
-  pi.on("before_agent_start", async (event, ctx) => {
+  pi.on("before_agent_start", async (_event, ctx) => {
     ensureLspToolActive(pi);
     if (!state.manager) return;
 
     state.manager.pruneMissingFiles();
-    pruneMissingTrackedPaths(state.runtime);
-    state.currentPrompt = event.prompt;
-    refreshRelevantPaths(state);
-    updateLspUi(ctx, state.manager, state.inlineSeverity);
+    refreshProjectServers(state);
+    updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
 
-    const guidance = computePendingRuntimeGuidance(
-      state.runtime,
-      state.manager,
-      state.inlineSeverity,
-    );
-    if (!guidance) return;
+    const diagnostics = state.manager.getOutstandingDiagnosticSummary(state.inlineSeverity);
+    const content = formatDiagnosticsContext(diagnostics);
+    const fingerprint = diagnosticsContextFingerprint(content);
 
-    const fingerprint = runtimeGuidanceFingerprint(guidance.input);
-
-    // Refresh the stored fingerprint even when there is nothing to inject.
-    // Without this, a diagnostic summary that disappears and later returns
-    // identical would still match the previously injected fingerprint and be
-    // silently skipped — the caller would never see the regression resurface.
-    if (!guidance.content) {
-      state.runtime.lastInjectedFingerprint = fingerprint;
+    if (!content) {
+      state.lastDiagnosticsFingerprint = null;
+      state.currentContextToken = null;
       return;
     }
 
-    // Pending activation always injects (one-shot ready hint) regardless of
-    // fingerprint match; otherwise dedupe against the last injected snapshot.
-    if (
-      fingerprint === state.runtime.lastInjectedFingerprint &&
-      !guidance.input.pendingActivation
-    ) {
+    if (fingerprint === state.lastDiagnosticsFingerprint) {
+      state.currentContextToken = null;
       return;
     }
 
-    state.runtime.lastInjectedFingerprint = fingerprint;
-    state.runtime.pendingActivation = false;
-    state.currentGuidanceToken = `lsp-guidance-${++state.guidanceCounter}`;
+    state.lastDiagnosticsFingerprint = fingerprint;
+    state.currentContextToken = `lsp-context-${++state.contextCounter}`;
+    ctx.ui.notify(buildDiagnosticsNotification(diagnostics), "info");
 
     return {
       message: {
-        customType: "lsp-guidance",
-        content: guidance.content,
+        customType: "lsp-context",
+        content,
         display: false,
         details: {
-          guidanceToken: state.currentGuidanceToken,
+          contextToken: state.currentContextToken,
           inlineSeverity: state.inlineSeverity,
         },
       },
@@ -231,64 +180,41 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
   });
 
   pi.on("context", (event) => {
-    const messages = filterLspGuidanceMessages(
-      event.messages as Array<{ customType?: string; details?: unknown }>,
-      state.currentGuidanceToken,
+    const messages = reorderDiagnosticContextMessages(
+      event.messages as Array<{ role?: string; customType?: string; details?: unknown }>,
+      state.currentContextToken,
     ) as typeof event.messages;
 
-    if (messages.length === event.messages.length) return;
+    if (
+      messages.length === event.messages.length &&
+      messages.every((m, i) => m === event.messages[i])
+    ) {
+      return;
+    }
     return { messages };
   });
 
   pi.on("tool_result", async (event, ctx) => {
     if (!state.manager) return;
 
-    if (event.toolName === "lsp") {
-      state.recentPaths = updateRecentPathsFromToolEvent(
-        event.toolName,
-        event.input,
-        state.recentPaths,
-      );
-      refreshRelevantPaths(state);
-    }
-
     if (isLspAwareTool(event.toolName)) {
-      // Only treat successful interactions as qualifying. Failed lsp/read/edit
-      // calls (e.g. invalid params, missing files) shouldn't arm runtime
-      // guidance — the file may not have been touched at all.
-      if (!event.isError) {
-        registerQualifyingSourceInteraction(
-          state.runtime,
-          state.manager,
-          event.toolName,
-          event.input,
-        );
-      }
-      updateLspUi(ctx, state.manager, state.inlineSeverity);
-    }
-
-    // Soft nudge: when the agent runs a text-search bash command targeting
-    // LSP-supported files with a semantic prompt, inject a steer message
-    // suggesting the lsp tool. Non-blocking — the command already ran.
-    if (event.toolName === "bash" && !event.isError && typeof event.input.command === "string") {
-      const nudge = shouldSuggestLsp(event.input.command, state.currentPrompt, state.manager);
-      if (nudge) {
-        pi.sendMessage(
-          { customType: "lsp-nudge", content: nudge, display: true },
-          { deliverAs: "steer" },
-        );
-      }
+      refreshProjectServers(state);
+      updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
     }
   });
 }
 
-function registerLspTool(pi: ExtensionAPI, state: LspRuntimeState): void {
+function registerLspTool(
+  pi: ExtensionAPI,
+  state: LspRuntimeState,
+  promptGuidelines: string[],
+): void {
   pi.registerTool({
     name: "lsp",
     label: "LSP",
     description: lspToolDescription,
     promptSnippet: lspPromptSnippet,
-    promptGuidelines: lspPromptGuidelines,
+    promptGuidelines,
     parameters: Type.Object({
       action: LspActionEnum,
       file: Type.Optional(Type.String({ description: "File path (relative or absolute)" })),
@@ -326,22 +252,70 @@ function registerLspTool(pi: ExtensionAPI, state: LspRuntimeState): void {
 
 function registerLspStatusCommand(pi: ExtensionAPI, state: LspRuntimeState): void {
   pi.registerCommand("lsp-status", {
-    description: "Show active LSP servers, open files, and diagnostics",
+    description: "Show detected LSP servers, roots, open files, and diagnostics",
     handler: async (_args, ctx) => {
       if (!state.manager) {
         ctx.ui.notify("LSP not initialized", "warning");
         return;
       }
 
-      toggleLspStatusOverlay(ctx, state.manager, state.inlineSeverity, state.inspector);
+      refreshProjectServers(state);
+      toggleLspStatusOverlay(
+        ctx,
+        state.manager,
+        state.inlineSeverity,
+        state.inspector,
+        state.projectServers,
+      );
     },
   });
 }
 
-function refreshRelevantPaths(state: LspRuntimeState): void {
-  state.currentRelevantPaths = mergeRelevantPaths(
-    extractPromptPathHints(state.currentPrompt),
-    state.recentPaths,
+function refreshProjectServers(state: LspRuntimeState): void {
+  if (!state.manager) {
+    state.projectServers = [];
+    return;
+  }
+
+  state.projectServers = introspectCapabilities(state.manager, state.detectedServers);
+}
+
+function buildDiagnosticsNotification(diagnostics: OutstandingDiagnosticSummaryEntry[]): string {
+  if (diagnostics.length === 0) return "ℹ️ LSP diagnostics injected";
+  if (diagnostics.length === 1) {
+    const [entry] = diagnostics;
+    if (!entry) return "ℹ️ LSP diagnostics injected";
+    return `ℹ️ LSP: ${entry.file} — ${formatNotificationCounts(entry, ", ")}`;
+  }
+
+  const totals = collectDiagnosticTotals(diagnostics);
+  return `ℹ️ LSP: ${diagnostics.length} files • ${formatNotificationCounts(totals, " • ")}`;
+}
+
+function formatNotificationCounts(
+  entry: Pick<OutstandingDiagnosticSummaryEntry, "errors" | "warnings" | "information" | "hints">,
+  separator: string,
+): string {
+  const parts: string[] = [];
+  if (entry.errors > 0) parts.push(`${entry.errors} error${entry.errors === 1 ? "" : "s"}`);
+  if (entry.warnings > 0) parts.push(`${entry.warnings} warning${entry.warnings === 1 ? "" : "s"}`);
+  if (entry.information > 0)
+    parts.push(`${entry.information} info${entry.information === 1 ? "" : "s"}`);
+  if (entry.hints > 0) parts.push(`${entry.hints} hint${entry.hints === 1 ? "" : "s"}`);
+  return parts.join(separator);
+}
+
+function collectDiagnosticTotals(
+  diagnostics: OutstandingDiagnosticSummaryEntry[],
+): Pick<OutstandingDiagnosticSummaryEntry, "errors" | "warnings" | "information" | "hints"> {
+  return diagnostics.reduce(
+    (totals, entry) => ({
+      errors: totals.errors + entry.errors,
+      warnings: totals.warnings + entry.warnings,
+      information: totals.information + entry.information,
+      hints: totals.hints + entry.hints,
+    }),
+    { errors: 0, warnings: 0, information: 0, hints: 0 },
   );
 }
 
@@ -357,6 +331,6 @@ function ensureLspToolActive(pi: ExtensionAPI): void {
 
 function parseSeverity(env: string | undefined): number {
   if (!env) return 1;
-  const parsed = parseInt(env, 10);
+  const parsed = Number.parseInt(env, 10);
   return parsed >= 1 && parsed <= 4 ? parsed : 1;
 }

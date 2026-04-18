@@ -1,5 +1,8 @@
 import * as path from "node:path";
-import type { ActiveCoverageSummaryEntry, OutstandingDiagnosticSummaryEntry } from "./manager.ts";
+import type {
+  ActiveCoverageSummaryEntry,
+  OutstandingDiagnosticSummaryEntry,
+} from "./manager-types.ts";
 
 /**
  * Display form for a file path used both for human-readable LSP output and as

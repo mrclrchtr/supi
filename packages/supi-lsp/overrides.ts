@@ -2,14 +2,10 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createEditTool, createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
 import { formatDiagnostics } from "./diagnostics.ts";
 import type { LspManager } from "./manager.ts";
-import { trackRecentPath } from "./recent-paths.ts";
 
 interface LspOverrideState {
   inlineSeverity: number;
   getManager(): LspManager | null;
-  getRecentPaths(): string[];
-  setRecentPaths(paths: string[]): void;
-  onRecentPathsChange?(): void;
 }
 
 export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverrideState): void {
@@ -23,7 +19,6 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(toolCallId, params, signal, onUpdate, _ctx) {
       const result = await originalRead.execute(toolCallId, params, signal, onUpdate);
-      recordRecentPath(state, params.path);
       await ensureFileOpen(state.getManager(), params.path);
       return result;
     },
@@ -34,8 +29,6 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(toolCallId, params, signal, onUpdate, _ctx) {
       const result = await originalWrite.execute(toolCallId, params, signal, onUpdate);
-
-      recordRecentPath(state, params.path);
       return appendInlineDiagnostics(state.getManager(), params.path, state.inlineSeverity, result);
     },
   });
@@ -45,8 +38,6 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(toolCallId, params, signal, onUpdate, _ctx) {
       const result = await originalEdit.execute(toolCallId, params, signal, onUpdate);
-
-      recordRecentPath(state, params.path);
       return appendInlineDiagnostics(state.getManager(), params.path, state.inlineSeverity, result);
     },
   });
@@ -87,9 +78,4 @@ async function ensureFileOpen(manager: LspManager | null, filePath: string): Pro
   } catch {
     // Never block the agent on LSP errors
   }
-}
-
-function recordRecentPath(state: LspOverrideState, filePath: string): void {
-  state.setRecentPaths(trackRecentPath(state.getRecentPaths(), filePath));
-  state.onRecentPathsChange?.();
 }

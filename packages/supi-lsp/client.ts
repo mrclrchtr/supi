@@ -74,6 +74,10 @@ export class LspClient {
     return Array.from(this.openDocs.keys()).map(uriToFile);
   }
 
+  get serverCapabilities(): ServerCapabilities | null {
+    return this.capabilities;
+  }
+
   // ── Lifecycle ───────────────────────────────────────────────────────
 
   /** Spawn the server process and perform the initialize handshake. */

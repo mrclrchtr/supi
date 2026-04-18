@@ -1,6 +1,6 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
-import type { LspManager } from "./manager.ts";
+import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
+import type { ProjectServerInfo } from "./types.ts";
 
 export const lspPromptSnippet =
   "Use semantic code intelligence for hover, definitions, references, symbols, rename planning, code actions, and diagnostics in supported languages.";
@@ -11,130 +11,108 @@ export const lspPromptGuidelines = [
   "Fall back to bash/read when LSP is unavailable, the file type is unsupported, or the task is plain-text search across docs, config files, or string literals.",
 ];
 
-type DiagnosticsManager = Pick<LspManager, "getRelevantOutstandingDiagnosticsSummaryText">;
+export function buildProjectGuidelines(servers: ProjectServerInfo[]): string[] {
+  const dynamic = servers.map((server) => {
+    const root = displayRoot(server.root);
+    const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(", ");
+    const actions = server.supportedActions.join(", ");
+    const status = server.status === "running" ? "active" : "unavailable";
+    const actionText = actions.length > 0 ? ` | actions: ${actions}` : "";
+    return `LSP ${status}: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
+  });
 
-type GuidanceMessageLike = {
+  return [...lspPromptGuidelines.slice(0, 2), ...dynamic, lspPromptGuidelines[2]].filter(Boolean);
+}
+
+export function formatDiagnosticsContext(
+  diagnostics: OutstandingDiagnosticSummaryEntry[],
+  maxFiles: number = 3,
+): string | null {
+  if (diagnostics.length === 0) return null;
+
+  const lines = diagnostics
+    .slice(0, maxFiles)
+    .map((entry) => `- ${entry.file}: ${formatCounts(entry)}`);
+  const remaining = diagnostics.length - Math.min(diagnostics.length, maxFiles);
+  if (remaining > 0) {
+    lines.push(`- +${remaining} more file${remaining === 1 ? "" : "s"}`);
+  }
+
+  return [
+    '<extension-context source="supi-lsp">',
+    "Outstanding diagnostics:",
+    ...lines,
+    "</extension-context>",
+  ].join("\n");
+}
+
+export function diagnosticsContextFingerprint(content: string | null): string | null {
+  return content;
+}
+
+type ContextMessageLike = {
+  role?: string;
   customType?: string;
   details?: unknown;
 };
 
-export interface RuntimeGuidanceInput {
-  pendingActivation: boolean;
-  diagnosticsSummary: string | null;
-  trackedFiles: string[];
-}
-
-export function computeTrackedDiagnosticsSummary(
-  manager: DiagnosticsManager,
-  inlineSeverity: number,
-  trackedPaths: string[],
-): string | null {
-  if (trackedPaths.length === 0) return null;
-  return manager.getRelevantOutstandingDiagnosticsSummaryText(trackedPaths, inlineSeverity);
-}
-
-export function buildRuntimeLspGuidance(input: RuntimeGuidanceInput): string | null {
-  const lines: string[] = [];
-  const fileHint = summarizeTrackedFiles(input.trackedFiles);
-
-  if (input.pendingActivation) {
-    lines.push(
-      fileHint
-        ? `LSP ready for semantic navigation on tracked source files (${fileHint}).`
-        : "LSP ready for semantic navigation on the tracked source files.",
-    );
-  } else if (fileHint) {
-    // After activation, surface the current tracked-file context so the agent
-    // sees newly touched supported source files reflected in runtime guidance.
-    // Dedup is the caller's job (fingerprint match → skip).
-    lines.push(`LSP tracking source files: ${fileHint}.`);
-  }
-
-  if (input.diagnosticsSummary) {
-    lines.push(input.diagnosticsSummary);
-  }
-
-  if (lines.length === 0) return null;
-
-  return ["LSP guidance:", ...lines.map((line) => `- ${line}`)].join("\n");
-}
-
-/**
- * Fingerprint captures the parts of runtime guidance that persist across turns
- * — tracked source-file set and tracked diagnostics summary. `pendingActivation`
- * is a one-shot signal cleared after injection, so it's excluded; otherwise an
- * unchanged-state turn would never match the previously stored fingerprint.
- * Tracked files are included so newly opened supported files re-trigger
- * guidance even when diagnostics are unchanged.
- */
-export function runtimeGuidanceFingerprint(input: RuntimeGuidanceInput): string {
-  // Canonicalize by sorting: registerQualifyingSourceInteraction moves the most
-  // recent file to the front of trackedSourcePaths, so an order-sensitive join
-  // would treat re-touching an already-tracked file as a state change and
-  // re-inject guidance during ordinary back-and-forth edits.
-  const canonical = [...input.trackedFiles].sort().join("|");
-  return `${canonical}\u0000${input.diagnosticsSummary ?? ""}`;
-}
-
-export function extractPromptPathHints(prompt: string, cwd: string = process.cwd()): string[] {
-  const tokens = prompt.match(/[A-Za-z0-9_./-]+/g) ?? [];
-  const matches = new Set<string>();
-
-  for (const token of tokens) {
-    const candidate = normalizePromptPathHint(token);
-    if (!candidate) continue;
-
-    const resolved = path.resolve(cwd, candidate);
-    if (!fs.existsSync(resolved)) continue;
-
-    const relative = path.relative(cwd, resolved);
-    if (relative === "") {
-      matches.add(path.basename(resolved));
-      continue;
-    }
-
-    if (!relative.startsWith(`..${path.sep}`) && relative !== "..") {
-      matches.add(relative.replaceAll(path.sep, "/"));
-    }
-  }
-
-  return Array.from(matches);
-}
-
-export function mergeRelevantPaths(
-  promptPaths: string[],
-  recentPaths: string[],
-  maxEntries: number = 8,
-): string[] {
-  return Array.from(new Set([...promptPaths, ...recentPaths])).slice(0, maxEntries);
-}
-
-export function filterLspGuidanceMessages<T extends GuidanceMessageLike>(
+export function reorderDiagnosticContextMessages<T extends ContextMessageLike>(
   messages: T[],
-  activeGuidanceToken: string | null,
+  activeToken: string | null,
 ): T[] {
-  return messages.filter((message) => {
-    if (message.customType !== "lsp-guidance") return true;
-    if (!activeGuidanceToken) return false;
-    return getGuidanceToken(message.details) === activeGuidanceToken;
+  const filtered = messages.filter((message) => {
+    if (message.customType !== "lsp-context") return true;
+    if (!activeToken) return false;
+    return getContextToken(message.details) === activeToken;
   });
+
+  if (!activeToken) return filtered;
+
+  const contextIndex = filtered.findIndex(
+    (message) =>
+      message.customType === "lsp-context" && getContextToken(message.details) === activeToken,
+  );
+  if (contextIndex === -1) return filtered;
+
+  const userIndex = findLastUserMessageIndex(filtered);
+  if (userIndex === -1 || contextIndex < userIndex) return filtered;
+
+  const next = [...filtered];
+  const [contextMessage] = next.splice(contextIndex, 1);
+  if (!contextMessage) return filtered;
+  next.splice(userIndex, 0, contextMessage);
+  return next;
 }
 
-function summarizeTrackedFiles(files: string[], maxFiles: number = 2): string {
-  if (files.length === 0) return "";
-  const shown = files.slice(0, maxFiles).join(", ");
-  const remaining = files.length - maxFiles;
-  return remaining > 0 ? `${shown}, +${remaining} more` : shown;
+function formatCounts(entry: OutstandingDiagnosticSummaryEntry): string {
+  const counts: string[] = [];
+  if (entry.errors > 0) counts.push(pluralize(entry.errors, "error"));
+  if (entry.warnings > 0) counts.push(pluralize(entry.warnings, "warning"));
+  if (entry.information > 0) counts.push(pluralize(entry.information, "info"));
+  if (entry.hints > 0) counts.push(pluralize(entry.hints, "hint"));
+  return counts.join(", ");
 }
 
-function getGuidanceToken(details: unknown): string | null {
+function displayRoot(root: string): string {
+  const relative = path.relative(process.cwd(), root);
+  if (relative === "") return ".";
+  if (relative.startsWith(`..${path.sep}`) || relative === "..") return root;
+  return relative.replaceAll(path.sep, "/");
+}
+
+function pluralize(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function getContextToken(details: unknown): string | null {
   if (!details || typeof details !== "object") return null;
-  const token = (details as { guidanceToken?: unknown }).guidanceToken;
+  const token = (details as { contextToken?: unknown }).contextToken;
   return typeof token === "string" ? token : null;
 }
 
-function normalizePromptPathHint(token: string): string | null {
-  const cleaned = token.replace(/^[`'"([]+|[`'"),.:;\]]+$/g, "");
-  if (cleaned.length < 2) return null;
-  return cleaned;
+function findLastUserMessageIndex<T extends ContextMessageLike>(messages: T[]): number {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index]?.role === "user") return index;
+  }
+  return -1;
 }

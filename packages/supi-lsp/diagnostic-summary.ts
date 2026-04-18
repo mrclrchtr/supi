@@ -1,4 +1,4 @@
-import type { OutstandingDiagnosticSummaryEntry } from "./manager.ts";
+import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
 import { displayRelativeFilePath, shouldIgnoreLspPath } from "./summary.ts";
 import { type Diagnostic, DiagnosticSeverity } from "./types.ts";
 

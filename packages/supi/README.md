@@ -67,10 +67,10 @@ The `lsp` extension is meant to make pi more semantic in supported languages:
 
 - exposes a single `lsp` tool with actions for hover, definition, references, diagnostics, symbols, rename, and code actions
 - appends LSP diagnostics after `write`/`edit`
-- adds semantic-first `promptSnippet` / `promptGuidelines` so the agent prefers `lsp` for code navigation and diagnostics
-- injects stateful pre-turn guidance in `before_agent_start` that stays dormant until the session successfully reads/edits/writes or runs `lsp` on a supported source file, then surfaces a one-shot activation hint, tracked-file context, and diagnostics for the tracked set — deduped across turns so unchanged state doesn't re-inject
-- tracks prompt-mentioned and recently touched files to scope semantic bash-search redirection and diagnostic relevance
-- provides `/lsp-status` for server and diagnostic visibility
+- performs a proactive project scan at `session_start` to detect matching roots and available language servers, then eagerly starts them
+- builds project-specific semantic-first `promptSnippet` / `promptGuidelines` from detected servers, roots, file types, and supported actions so the agent prefers `lsp` for code navigation and diagnostics
+- injects compact XML-framed diagnostic context only when outstanding diagnostics exist, deduped across turns so unchanged diagnostics do not re-inject
+- provides `/lsp-status` for server roots, capabilities, open files, and diagnostics
 
 Configuration:
 

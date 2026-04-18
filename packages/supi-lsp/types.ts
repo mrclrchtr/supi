@@ -284,3 +284,15 @@ export interface ServerConfig {
 export interface LspConfig {
   servers: Record<string, ServerConfig>;
 }
+
+export interface DetectedProjectServer {
+  name: string;
+  root: string;
+  fileTypes: string[];
+}
+
+export interface ProjectServerInfo extends DetectedProjectServer {
+  status: "running" | "error" | "unavailable";
+  supportedActions: string[];
+  openFiles: string[];
+}

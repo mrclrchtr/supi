@@ -10,6 +10,16 @@ import {
   createOutstandingDiagnosticSummary,
   relativeFilePathFromUri,
 } from "./diagnostic-summary.ts";
+import { buildProjectServerInfo } from "./manager-project-info.ts";
+import { buildKnownRootsMap, mergeKnownRoots, resolveKnownRoot } from "./manager-roots.ts";
+import type {
+  ActiveCoverageSummaryEntry,
+  CoverageSummaryEntry,
+  DiagnosticSummary,
+  ManagerStatus,
+  OutstandingDiagnosticSummaryEntry,
+  ServerStatus,
+} from "./manager-types.ts";
 import {
   displayRelativeFilePath,
   formatCoverageSummaryText,
@@ -18,51 +28,9 @@ import {
   normalizeRelevantPaths,
   shouldIgnoreLspPath,
 } from "./summary.ts";
-import type { Diagnostic, LspConfig } from "./types.ts";
+import type { DetectedProjectServer, Diagnostic, LspConfig, ProjectServerInfo } from "./types.ts";
 import { commandExists, findProjectRoot } from "./utils.ts";
-
-// ── Types ─────────────────────────────────────────────────────────────
-
-export interface ServerStatus {
-  name: string;
-  status: "running" | "error" | "unavailable";
-  root: string;
-  openFiles: string[];
-}
-
-export interface DiagnosticSummary {
-  file: string;
-  errors: number;
-  warnings: number;
-}
-
-export interface CoverageSummaryEntry {
-  name: string;
-  fileTypes: string[];
-  active: boolean;
-  openFiles: number;
-}
-
-export interface ActiveCoverageSummaryEntry {
-  name: string;
-  openFiles: string[];
-}
-
-export interface OutstandingDiagnosticSummaryEntry {
-  file: string;
-  total: number;
-  errors: number;
-  warnings: number;
-  information: number;
-  hints: number;
-}
-
-export interface ManagerStatus {
-  servers: ServerStatus[];
-}
-
 // ── LspManager ────────────────────────────────────────────────────────
-
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
   private clients = new Map<string, LspClient>();
@@ -70,11 +38,13 @@ export class LspManager {
   private unavailable = new Set<string>();
   /** Memoized per-command availability of LSP server binaries on PATH */
   private commandAvailability = new Map<string, boolean>();
-
+  /** Preferred project roots discovered by proactive scan or lazy startup */
+  private knownRoots = new Map<string, string[]>();
   constructor(private readonly config: LspConfig) {}
-
   // ── Public API ────────────────────────────────────────────────────
-
+  registerDetectedServers(detected: DetectedProjectServer[]): void {
+    this.knownRoots = buildKnownRootsMap(detected);
+  }
   /**
    * Synchronously check whether a file path maps to a configured LSP server
    * whose binary is actually installed and has not already failed to start.
@@ -93,12 +63,10 @@ export class LspManager {
     // Mirror getClientForFile's root resolution so the unavailable check stays
     // root-specific. A failed startup in one workspace must not suppress
     // activation for unrelated roots served by the same language server.
-    const fileDir = path.dirname(path.resolve(filePath));
-    const root = findProjectRoot(fileDir, serverConfig.rootMarkers, process.cwd());
+    const root = this.resolveRootForFile(filePath, serverName, serverConfig.rootMarkers);
     if (this.unavailable.has(`${serverName}:${root}`)) return false;
     return this.isServerCommandAvailable(serverConfig.command);
   }
-
   private isServerCommandAvailable(command: string): boolean {
     // Only memoize positive lookups. A negative result may become stale if the
     // user installs the binary mid-session (e.g. `mise install`), and
@@ -110,7 +78,6 @@ export class LspManager {
     if (available) this.commandAvailability.set(command, true);
     return available;
   }
-
   /**
    * Get or create an LSP client for the given file.
    * Returns null if no server is configured or available.
@@ -118,48 +85,76 @@ export class LspManager {
   async getClientForFile(filePath: string): Promise<LspClient | null> {
     const match = getServerForFile(this.config, filePath);
     if (!match) return null;
-
     const [serverName, serverConfig] = match;
-
     // Find project root
-    const fileDir = path.dirname(path.resolve(filePath));
-    const root = findProjectRoot(fileDir, serverConfig.rootMarkers, process.cwd());
-    const key = `${serverName}:${root}`;
-
-    // Check if unavailable
+    const root = this.resolveRootForFile(filePath, serverName, serverConfig.rootMarkers);
+    return this.startServerForRoot(serverName, root);
+  }
+  async startServerForRoot(serverName: string, root: string): Promise<LspClient | null> {
+    const serverConfig = this.config.servers[serverName];
+    if (!serverConfig) return null;
+    const key = this.clientKey(serverName, root);
     if (this.unavailable.has(key)) return null;
-
     // Return existing client
     const existing = this.clients.get(key);
     if (existing && existing.status === "running") return existing;
-
     // If existing client errored, remove it
     if (existing && existing.status === "error") {
       this.clients.delete(key);
       this.unavailable.add(key);
       return null;
     }
-
     // Validate command exists
     if (!commandExists(serverConfig.command)) {
       this.unavailable.add(key);
       return null;
     }
-
     // Spawn new client
     const client = new LspClient(serverName, serverConfig, root);
     this.clients.set(key, client);
-
+    this.rememberKnownRoot(serverName, root);
     try {
       await client.start();
       return client;
-    } catch (_err) {
+    } catch {
       this.unavailable.add(key);
       this.clients.delete(key);
       return null;
     }
   }
-
+  getProjectServerInfo(serverName: string, root: string, fileTypes: string[]): ProjectServerInfo {
+    const key = this.clientKey(serverName, root);
+    return buildProjectServerInfo({
+      serverName,
+      root,
+      fileTypes,
+      client: this.clients.get(key),
+      unavailable: this.unavailable.has(key),
+    });
+  }
+  getKnownProjectServers(detected: DetectedProjectServer[]): ProjectServerInfo[] {
+    const known = new Map<string, DetectedProjectServer>();
+    for (const entry of detected) {
+      known.set(this.clientKey(entry.name, entry.root), entry);
+    }
+    for (const client of this.clients.values()) {
+      const key = this.clientKey(client.name, client.root);
+      if (known.has(key)) continue;
+      known.set(key, {
+        name: client.name,
+        root: client.root,
+        fileTypes: [...(this.config.servers[client.name]?.fileTypes ?? [])],
+      });
+    }
+    return Array.from(known.values())
+      .map((entry) => this.getProjectServerInfo(entry.name, entry.root, entry.fileTypes))
+      .sort(
+        (a, b) =>
+          a.root.localeCompare(b.root) ||
+          a.name.localeCompare(b.name) ||
+          a.status.localeCompare(b.status),
+      );
+  }
   /**
    * Sync a file with its LSP server and wait for diagnostics.
    * Returns diagnostics filtered to the given severity threshold.
@@ -170,7 +165,6 @@ export class LspManager {
   ): Promise<Diagnostic[]> {
     const client = await this.getClientForFile(filePath);
     if (!client) return [];
-
     const resolvedPath = path.resolve(filePath);
     let content: string;
     try {
@@ -179,11 +173,9 @@ export class LspManager {
       this.closeFile(resolvedPath);
       return [];
     }
-
     const diagnostics = await client.syncAndWaitForDiagnostics(resolvedPath, content);
     return diagnostics.filter((d) => d.severity !== undefined && d.severity <= maxSeverity);
   }
-
   /** Close a file across any active LSP clients and clear its cached diagnostics. */
   closeFile(filePath: string): void {
     const resolvedPath = path.resolve(filePath);
@@ -191,7 +183,6 @@ export class LspManager {
       client.didClose(resolvedPath);
     }
   }
-
   /** Remove any missing files from open-document and diagnostic state. */
   pruneMissingFiles(): string[] {
     const removed: string[] = [];
@@ -203,15 +194,14 @@ export class LspManager {
     }
     return removed;
   }
-
   /** Shut down all running LSP servers. */
   async shutdownAll(): Promise<void> {
     const shutdowns = Array.from(this.clients.values()).map((c) => c.shutdown().catch(() => {}));
     await Promise.all(shutdowns);
     this.clients.clear();
     this.unavailable.clear();
+    this.knownRoots.clear();
   }
-
   /** Get status of all servers. */
   getStatus(): ManagerStatus {
     this.pruneMissingFiles();
@@ -226,19 +216,16 @@ export class LspManager {
     }
     return { servers };
   }
-
   /** Get configured and active LSP coverage for the current project. */
   getCoverageSummary(): CoverageSummaryEntry[] {
     this.pruneMissingFiles();
     const activeServers = new Map<string, { active: boolean; openFiles: number }>();
-
     for (const server of this.getStatus().servers) {
       const current = activeServers.get(server.name) ?? { active: false, openFiles: 0 };
       current.active = current.active || server.status === "running";
       current.openFiles += server.openFiles.length;
       activeServers.set(server.name, current);
     }
-
     return Object.entries(this.config.servers)
       .map(([name, server]) => {
         const activity = activeServers.get(name);
@@ -256,15 +243,12 @@ export class LspManager {
           a.name.localeCompare(b.name),
       );
   }
-
   /** Get active LSP coverage summarized by running servers with open files. */
   getActiveCoverageSummary(): ActiveCoverageSummaryEntry[] {
     this.pruneMissingFiles();
     const activeServers = new Map<string, Set<string>>();
-
     for (const server of this.getStatus().servers) {
       if (server.status !== "running" || server.openFiles.length === 0) continue;
-
       const openFiles = activeServers.get(server.name) ?? new Set<string>();
       for (const file of server.openFiles) {
         const relativeFile = displayRelativeFilePath(file);
@@ -273,7 +257,6 @@ export class LspManager {
       }
       activeServers.set(server.name, openFiles);
     }
-
     return Array.from(activeServers.entries())
       .map(([name, openFiles]) => ({
         name,
@@ -281,12 +264,10 @@ export class LspManager {
       }))
       .sort((a, b) => b.openFiles.length - a.openFiles.length || a.name.localeCompare(b.name));
   }
-
   /** Get active coverage as compact text suitable for pre-turn context. */
   getCoverageSummaryText(maxServers: number = 2, maxFiles: number = 2): string | null {
     return formatCoverageSummaryText(this.getActiveCoverageSummary(), maxServers, maxFiles);
   }
-
   /** Get active coverage filtered to files or directories relevant to the current turn. */
   getRelevantCoverageSummaryText(
     relevantPaths: string[],
@@ -295,49 +276,40 @@ export class LspManager {
   ): string | null {
     const normalizedPaths = normalizeRelevantPaths(relevantPaths);
     if (normalizedPaths.length === 0) return null;
-
     const relevantEntries = this.getActiveCoverageSummary()
       .map((entry) => ({
         ...entry,
         openFiles: entry.openFiles.filter((file) => isPathRelevant(file, normalizedPaths)),
       }))
       .filter((entry) => entry.openFiles.length > 0);
-
     return formatCoverageSummaryText(relevantEntries, maxServers, maxFiles);
   }
-
   /** Get a diagnostic summary across all servers and files. */
   getDiagnosticSummary(): DiagnosticSummary[] {
     this.pruneMissingFiles();
     const fileDiags = new Map<string, { errors: number; warnings: number }>();
-
     for (const client of this.clients.values()) {
       for (const entry of client.getAllDiagnostics()) {
         collectDiagnosticSummaryCounts(fileDiags, entry);
       }
     }
-
     return Array.from(fileDiags.entries()).map(([file, counts]) => ({ file, ...counts }));
   }
-
   /** Get outstanding diagnostics at or above the configured inline threshold. */
   getOutstandingDiagnosticSummary(maxSeverity: number = 1): OutstandingDiagnosticSummaryEntry[] {
     this.pruneMissingFiles();
     const fileDiags = new Map<string, OutstandingDiagnosticSummaryEntry>();
-
     for (const client of this.clients.values()) {
       for (const entry of client.getAllDiagnostics()) {
         const file = relativeFilePathFromUri(entry.uri);
         if (shouldIgnoreLspPath(file)) continue;
         const current = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
         const next = accumulateOutstandingDiagnostics(current, entry.diagnostics, maxSeverity);
-
         if (next.total > 0) {
           fileDiags.set(file, next);
         }
       }
     }
-
     return Array.from(fileDiags.values()).sort(
       (a, b) =>
         b.errors - a.errors ||
@@ -347,7 +319,6 @@ export class LspManager {
         a.file.localeCompare(b.file),
     );
   }
-
   /** Get outstanding diagnostics as compact text suitable for pre-turn context. */
   getOutstandingDiagnosticsSummaryText(
     maxSeverity: number = 1,
@@ -358,7 +329,6 @@ export class LspManager {
       maxFiles,
     );
   }
-
   /** Get outstanding diagnostics filtered to files or directories relevant to the current turn. */
   getRelevantOutstandingDiagnosticsSummaryText(
     relevantPaths: string[],
@@ -367,14 +337,11 @@ export class LspManager {
   ): string | null {
     const normalizedPaths = normalizeRelevantPaths(relevantPaths);
     if (normalizedPaths.length === 0) return null;
-
     const relevantEntries = this.getOutstandingDiagnosticSummary(maxSeverity).filter((entry) =>
       isPathRelevant(entry.file, normalizedPaths),
     );
-
     return formatOutstandingDiagnosticsSummaryText(relevantEntries, maxFiles);
   }
-
   /**
    * Ensure a file is open in its LSP server.
    * Used when the agent needs to read a file for the first time.
@@ -382,7 +349,6 @@ export class LspManager {
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
     const client = await this.getClientForFile(filePath);
     if (!client) return null;
-
     const resolvedPath = path.resolve(filePath);
     try {
       const content = fs.readFileSync(resolvedPath, "utf-8");
@@ -392,5 +358,19 @@ export class LspManager {
       this.closeFile(resolvedPath);
       return null;
     }
+  }
+  private clientKey(serverName: string, root: string): string {
+    return `${serverName}:${root}`;
+  }
+  private resolveRootForFile(filePath: string, serverName: string, rootMarkers: string[]): string {
+    const preferredRoots = this.knownRoots.get(serverName) ?? [];
+    const knownRoot = resolveKnownRoot(filePath, preferredRoots);
+    if (knownRoot) return knownRoot;
+    const fileDir = path.dirname(path.resolve(filePath));
+    return findProjectRoot(fileDir, rootMarkers, process.cwd());
+  }
+  private rememberKnownRoot(serverName: string, root: string): void {
+    const roots = this.knownRoots.get(serverName) ?? [];
+    this.knownRoots.set(serverName, mergeKnownRoots(roots, root));
   }
 }

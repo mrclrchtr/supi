@@ -1,15 +1,15 @@
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  buildRuntimeLspGuidance,
-  computeTrackedDiagnosticsSummary,
-  extractPromptPathHints,
-  filterLspGuidanceMessages,
+  buildProjectGuidelines,
+  diagnosticsContextFingerprint,
+  formatDiagnosticsContext,
   lspPromptGuidelines,
   lspPromptSnippet,
-  runtimeGuidanceFingerprint,
+  reorderDiagnosticContextMessages,
 } from "../guidance.ts";
 import { LspManager } from "../manager.ts";
+import type { ProjectServerInfo } from "../types.ts";
 import { DiagnosticSeverity } from "../types.ts";
 
 describe("LSP prompt guidance", () => {
@@ -19,145 +19,111 @@ describe("LSP prompt guidance", () => {
     expect(lspPromptGuidelines.join(" ")).toContain("Fall back to bash/read");
   });
 
-  it("emits a compact activation hint when runtime LSP context first activates", () => {
-    const content = buildRuntimeLspGuidance({
-      pendingActivation: true,
-      diagnosticsSummary: null,
-      trackedFiles: ["lsp/lsp.ts", "lsp/manager.ts"],
-    });
-
-    expect(content).toContain("LSP guidance:");
-    expect(content).toContain("LSP ready for semantic navigation");
-    expect(content).toContain("lsp/lsp.ts");
-    expect(content).not.toContain("Active LSP coverage");
-    expect(content).not.toContain("Prefer lsp for definitions");
-  });
-
-  it("emits changed diagnostics summary without restating generic coverage", () => {
-    const content = buildRuntimeLspGuidance({
-      pendingActivation: false,
-      diagnosticsSummary: "Outstanding LSP diagnostics: lsp/manager.ts (1 error).",
-      trackedFiles: ["lsp/manager.ts"],
-    });
-
-    expect(content).toContain("Outstanding LSP diagnostics: lsp/manager.ts (1 error).");
-    expect(content).not.toContain("Active LSP coverage");
-  });
-
-  it("emits a tracking line for tracked files when activation has been consumed", () => {
-    const content = buildRuntimeLspGuidance({
-      pendingActivation: false,
-      diagnosticsSummary: null,
-      trackedFiles: ["lsp/lsp.ts"],
-    });
-
-    expect(content).toContain("LSP guidance:");
-    expect(content).toContain("LSP tracking source files: lsp/lsp.ts.");
-    expect(content).not.toContain("LSP ready");
-  });
-
-  it("returns null when runtime LSP context is dormant (no tracked files)", () => {
-    const content = buildRuntimeLspGuidance({
-      pendingActivation: false,
-      diagnosticsSummary: null,
-      trackedFiles: [],
-    });
-
-    expect(content).toBeNull();
-  });
-
-  it("fingerprint reflects diagnostics and tracked files but not activation", () => {
-    const base = {
-      pendingActivation: false,
-      diagnosticsSummary: "Outstanding LSP diagnostics: lsp/manager.ts (1 error).",
-      trackedFiles: ["lsp/manager.ts"],
-    };
-
-    expect(runtimeGuidanceFingerprint(base)).toBe(runtimeGuidanceFingerprint(base));
-    // Activation is one-shot — excluding it keeps the fingerprint comparable.
-    expect(runtimeGuidanceFingerprint(base)).toBe(
-      runtimeGuidanceFingerprint({ ...base, pendingActivation: true }),
-    );
-    // Diagnostics changes register.
-    expect(runtimeGuidanceFingerprint(base)).not.toBe(
-      runtimeGuidanceFingerprint({
-        ...base,
-        diagnosticsSummary: "Outstanding LSP diagnostics: lsp/manager.ts (2 errors).",
-      }),
-    );
-    // Tracked-file changes register so multi-file workflows refresh guidance.
-    expect(runtimeGuidanceFingerprint(base)).not.toBe(
-      runtimeGuidanceFingerprint({ ...base, trackedFiles: ["lsp/manager.ts", "lsp/lsp.ts"] }),
-    );
-    // Reordering the same tracked-file set must not change the fingerprint —
-    // re-touching a tracked file moves it to the front but shouldn't re-inject.
-    expect(
-      runtimeGuidanceFingerprint({ ...base, trackedFiles: ["lsp/manager.ts", "lsp/lsp.ts"] }),
-    ).toBe(runtimeGuidanceFingerprint({ ...base, trackedFiles: ["lsp/lsp.ts", "lsp/manager.ts"] }));
-  });
-
-  it("tracked diagnostics summary is null when no paths are tracked", () => {
-    const summary = computeTrackedDiagnosticsSummary(
+  it("builds project-specific guidelines with roots, file types, and actions", () => {
+    const guidelines = buildProjectGuidelines([
       {
-        getRelevantOutstandingDiagnosticsSummaryText: () => {
-          throw new Error("should not be called when tracked set is empty");
-        },
-      },
-      1,
-      [],
-    );
-
-    expect(summary).toBeNull();
-  });
-
-  it("tracked diagnostics summary delegates to the manager for tracked paths", () => {
-    const summary = computeTrackedDiagnosticsSummary(
+        name: "typescript-language-server",
+        root: process.cwd(),
+        fileTypes: ["ts", "tsx"],
+        status: "running",
+        // biome-ignore lint/security/noSecrets: tool signature hints, not secrets
+        supportedActions: ["hover(file,line,char)", "diagnostics(file?)"],
+        openFiles: [],
+      } satisfies ProjectServerInfo,
       {
-        getRelevantOutstandingDiagnosticsSummaryText: (paths, severity) => {
-          expect(paths).toEqual(["lsp/manager.ts"]);
-          expect(severity).toBe(2);
-          return "Outstanding LSP diagnostics: lsp/manager.ts (1 error).";
-        },
+        name: "rust-analyzer",
+        root: `${process.cwd()}/crates/core`,
+        fileTypes: ["rs"],
+        status: "unavailable",
+        supportedActions: [],
+        openFiles: [],
+      } satisfies ProjectServerInfo,
+    ]);
+
+    expect(guidelines.join(" ")).toContain("LSP active: typescript-language-server");
+    expect(guidelines.join(" ")).toContain("root: .");
+    expect(guidelines.join(" ")).toContain(".ts, .tsx");
+    expect(guidelines.join(" ")).toContain("hover(file,line,char)");
+    expect(guidelines.join(" ")).toContain("LSP unavailable: rust-analyzer");
+  });
+
+  it("falls back to generic guidance when no servers are detected", () => {
+    expect(buildProjectGuidelines([])).toEqual(lspPromptGuidelines);
+  });
+
+  it("formats diagnostics as xml extension context", () => {
+    const content = formatDiagnosticsContext([
+      {
+        file: "packages/supi-lsp/lsp.ts",
+        total: 2,
+        errors: 1,
+        warnings: 1,
+        information: 0,
+        hints: 0,
       },
-      2,
-      ["lsp/manager.ts"],
-    );
+      {
+        file: "packages/supi-lsp/manager.ts",
+        total: 1,
+        errors: 1,
+        warnings: 0,
+        information: 0,
+        hints: 0,
+      },
+    ]);
 
-    expect(summary).toBe("Outstanding LSP diagnostics: lsp/manager.ts (1 error).");
+    expect(content).toContain('<extension-context source="supi-lsp">');
+    expect(content).toContain("Outstanding diagnostics:");
+    expect(content).toContain("packages/supi-lsp/lsp.ts: 1 error, 1 warning");
+    expect(content).toContain("packages/supi-lsp/manager.ts: 1 error");
+    expect(content).toContain("</extension-context>");
   });
 
-  it("extracts existing path hints from prompts", () => {
-    const hints = extractPromptPathHints(
-      "check packages/supi-lsp and packages/supi-lsp/manager.ts plus README.md before editing",
-    );
-
-    expect(hints).toContain("packages/supi-lsp");
-    expect(hints).toContain("packages/supi-lsp/manager.ts");
-    expect(hints).toContain("README.md");
+  it("returns null for empty diagnostics context", () => {
+    expect(formatDiagnosticsContext([])).toBeNull();
+    expect(diagnosticsContextFingerprint(null)).toBeNull();
   });
 
-  it("keeps only the active lsp guidance message in context", () => {
+  it("fingerprints diagnostics from the exact content", () => {
+    const content =
+      '<extension-context source="supi-lsp">\nOutstanding diagnostics:\n- a.ts: 1 error\n</extension-context>';
+    expect(diagnosticsContextFingerprint(content)).toBe(content);
+  });
+
+  it("reorders current lsp-context before the last user message and drops stale ones", () => {
     const messages = [
-      { customType: "lsp-guidance", details: { guidanceToken: "old" } },
-      { customType: "note", details: {} },
-      { customType: "lsp-guidance", details: { guidanceToken: "current" } },
+      { role: "user", content: "older prompt" },
+      { role: "custom", customType: "lsp-context", details: { contextToken: "old" } },
+      { role: "assistant", content: "working" },
+      { role: "user", content: "current prompt" },
+      { role: "custom", customType: "lsp-context", details: { contextToken: "current" } },
     ];
 
-    expect(filterLspGuidanceMessages(messages, "current")).toEqual([
-      { customType: "note", details: {} },
-      { customType: "lsp-guidance", details: { guidanceToken: "current" } },
+    expect(reorderDiagnosticContextMessages(messages, "current")).toEqual([
+      { role: "user", content: "older prompt" },
+      { role: "assistant", content: "working" },
+      { role: "custom", customType: "lsp-context", details: { contextToken: "current" } },
+      { role: "user", content: "current prompt" },
     ]);
   });
 
-  it("drops stale lsp guidance entirely when there is no active token", () => {
+  it("drops all lsp-context messages when there is no active token", () => {
     const messages = [
-      { customType: "lsp-guidance", details: { guidanceToken: "old" } },
-      { customType: "note", details: {} },
+      { role: "user", content: "prompt" },
+      { role: "custom", customType: "lsp-context", details: { contextToken: "old" } },
     ];
 
-    expect(filterLspGuidanceMessages(messages, null)).toEqual([
-      { customType: "note", details: {} },
+    expect(reorderDiagnosticContextMessages(messages, null)).toEqual([
+      { role: "user", content: "prompt" },
     ]);
+  });
+
+  it("leaves messages alone when there is no user message to prepend before", () => {
+    const messages = [
+      { role: "assistant", content: "working" },
+      { role: "custom", customType: "lsp-context", details: { contextToken: "current" } },
+    ];
+
+    expect(reorderDiagnosticContextMessages(messages, "current")).toEqual(messages);
   });
 });
 
@@ -224,99 +190,6 @@ describe("LspManager relevant coverage summaries", () => {
     expect(summary).toContain("lsp/lsp.ts");
     expect(summary).not.toContain("README.md");
   });
-
-  it("filters active coverage summaries to relevant files", () => {
-    const manager = new LspManager({
-      servers: {
-        "typescript-language-server": {
-          command: "typescript-language-server",
-          args: ["--stdio"],
-          fileTypes: ["ts", "tsx", "js", "jsx"],
-          rootMarkers: ["package.json"],
-        },
-      },
-    });
-
-    const clients = (
-      manager as unknown as {
-        clients: Map<
-          string,
-          {
-            name: string;
-            status: "running" | "error";
-            root: string;
-            openFiles: string[];
-            getAllDiagnostics(): Array<{ uri: string; diagnostics: unknown[] }>;
-          }
-        >;
-      }
-    ).clients;
-
-    clients.set("typescript-language-server:/tmp/project", {
-      name: "typescript-language-server",
-      status: "running",
-      root: "/tmp/project",
-      openFiles: [
-        path.join(process.cwd(), "lsp/lsp.ts"),
-        path.join(process.cwd(), "lsp/manager.ts"),
-      ],
-      getAllDiagnostics: () => [],
-    });
-
-    const summary = manager.getRelevantCoverageSummaryText(["manager.ts"]);
-    expect(summary).toContain("Active LSP coverage");
-    expect(summary).toContain("1 open file");
-    expect(summary).toContain("lsp/manager.ts");
-    expect(summary).not.toContain("lsp/lsp.ts");
-  });
-});
-
-describe("LspManager active coverage summaries", () => {
-  it("includes open files in active coverage summaries", () => {
-    const manager = new LspManager({
-      servers: {
-        "typescript-language-server": {
-          command: "typescript-language-server",
-          args: ["--stdio"],
-          fileTypes: ["ts", "tsx", "js", "jsx"],
-          rootMarkers: ["package.json"],
-        },
-      },
-    });
-
-    const clients = (
-      manager as unknown as {
-        clients: Map<
-          string,
-          {
-            name: string;
-            status: "running" | "error";
-            root: string;
-            openFiles: string[];
-            getAllDiagnostics(): Array<{ uri: string; diagnostics: unknown[] }>;
-          }
-        >;
-      }
-    ).clients;
-
-    clients.set("typescript-language-server:/tmp/project", {
-      name: "typescript-language-server",
-      status: "running",
-      root: "/tmp/project",
-      openFiles: [
-        path.join(process.cwd(), "lsp/lsp.ts"),
-        path.join(process.cwd(), "lsp/manager.ts"),
-      ],
-      getAllDiagnostics: () => [],
-    });
-
-    const summary = manager.getCoverageSummaryText();
-    expect(summary).toContain("Active LSP coverage");
-    expect(summary).toContain("2 open files");
-    expect(summary).toContain("lsp/lsp.ts");
-    expect(summary).toContain("lsp/manager.ts");
-    expect(summary).not.toContain(".tsx");
-  });
 });
 
 describe("LspManager diagnostic summaries", () => {
@@ -353,40 +226,33 @@ describe("LspManager diagnostic summaries", () => {
     expect(summary).toContain("lsp/manager.ts");
     expect(summary).not.toContain("README.md");
   });
+});
 
-  it("summarizes outstanding diagnostics at the requested severity threshold", () => {
-    const manager = new LspManager({ servers: {} });
-    const clients = (
-      manager as unknown as {
-        clients: Map<
-          string,
-          {
-            getAllDiagnostics(): Array<{
-              uri: string;
-              diagnostics: Array<{ severity?: number; message: string }>;
-            }>;
-          }
-        >;
-      }
-    ).clients;
-
-    clients.set("fake", {
-      getAllDiagnostics: () => [
-        {
-          uri: `file://${path.join(process.cwd(), "src/broken.ts")}`,
-          diagnostics: [
-            { severity: DiagnosticSeverity.Error, message: "type error" },
-            { severity: DiagnosticSeverity.Warning, message: "warning" },
-            { severity: DiagnosticSeverity.Hint, message: "hint" },
-          ],
+describe("LspManager detected root reuse", () => {
+  it("reuses the detected logical root for nested files so lazy startup does not spawn duplicate roots", () => {
+    const manager = new LspManager({
+      servers: {
+        "node-based": {
+          command: "node",
+          args: [],
+          fileTypes: ["ts"],
+          rootMarkers: ["tsconfig.json", "package.json"],
         },
-      ],
+      },
     });
 
-    const summary = manager.getOutstandingDiagnosticsSummaryText(2);
-    expect(summary).toContain("src/broken.ts");
-    expect(summary).toContain("1 error");
-    expect(summary).toContain("1 warning");
-    expect(summary).not.toContain("hint");
+    manager.registerDetectedServers([
+      {
+        name: "node-based",
+        root: process.cwd(),
+        fileTypes: ["ts"],
+      },
+    ]);
+
+    (manager as unknown as { unavailable: Set<string> }).unavailable.add(
+      `node-based:${process.cwd()}`,
+    );
+
+    expect(manager.isSupportedSourceFile("packages/supi-lsp/ui.ts")).toBe(false);
   });
 });
