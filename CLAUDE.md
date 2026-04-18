@@ -75,6 +75,8 @@ This repo has two install surfaces:
 
 Current workspace packages:
 - `packages/supi-aliases` — `/exit`, `/e`, `/clear` shortcuts
+- `packages/supi-core` — shared infrastructure: XML `<extension-context>` tag, config system
+- `packages/supi-claude-md` — subdirectory CLAUDE.md injection + root context refresh
 - `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
 - `packages/supi-bash-timeout` — default timeout injection for `bash`
 - `packages/supi-lsp` — Language Server Protocol integration + diagnostics guardrails
@@ -91,6 +93,7 @@ Keep repo-wide guidance here. Keep deep package-specific guidance in local `CLAU
 - `packages/supi/CLAUDE.md` — meta-package wrapper entrypoints, prompts, and skills
 - `packages/supi-lsp/CLAUDE.md` — LSP tool behavior, diagnostics flow, config, and tests
 - `packages/supi-ask-user/CLAUDE.md` — rich/fallback UI behavior, interaction rules, and tests
+- `packages/supi-claude-md/CLAUDE.md` — subdirectory injection, root refresh, config, and test patterns
 - `packages/supi-skill-shortcut/CLAUDE.md` — pi-tui internals and upgrade hazards
 
 ## Reading pi docs
@@ -114,7 +117,7 @@ Start with:
 - pi loads these extensions from the working tree directly; after edits, use `/reload` or restart pi.
 - `pi.on("tool_result")` can modify tool output; `pi.on("tool_call")` can only block.
 - Session cleanup event is `session_shutdown`, not `session_end`.
-- `ctx.ui.notify()` uses `"warning"`, not `"warn"`.
+- `ctx.ui.notify()` accepts `"info"` | `"warning"` | `"error"` severity — the gotcha about "info" is for `ctx.ui.theme` colors, not `notify`.
 - `ctx.ui.theme` does not expose an `"info"` color; use existing colors like `"accent"` / `"dim"` for info-level UI.
 - Keep runtime-imported packages in `peerDependencies`; after changing version ranges run `pnpm install` to refresh the lockfile.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
@@ -123,3 +126,13 @@ Start with:
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
 - Releases are automated via release-please; there is no local release command.
 - OpenSpec `PostHogFetchNetworkError` output is harmless when offline.
+
+## Testing patterns
+
+- `vi.hoisted()` callbacks execute before imports — must be inline arrow functions, cannot reference imported values
+- Each test file that mocks modules needs its own top-level `vi.hoisted` + `vi.mock` calls; can't share through helper functions
+- Biome enforces `noExcessiveLinesPerFunction` (120) and `noExcessiveLinesPerFile` (400, nursery) on test files too — split large describe blocks into separate test files
+- Test helpers can export utilities (`createPiMock`, `makeCtx`, constants) but must not call `vi.mock` or `vi.hoisted` internally
+- Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
+- `pnpm vitest run packages/supi-<pkg>/` — run tests for a single package
+- `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports and other unsafe lint issues

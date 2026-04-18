@@ -45,7 +45,9 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 
 ## Gotchas
 
+- `ctx.ui.notify("...", "info")` is valid — the `"info"` severity is supported (unlike `ctx.ui.theme` which has no `"info"` color)
 - `systemPromptOptions` may not be in pi's published types but exists at runtime on `BeforeAgentStartEvent` — cast via `as unknown`
 - `scanForContextFiles` uses `require()` for lazy fs/path loading in command handler context
 - Module-level `extensionState` variable lets command handlers access the state object
 - `os.homedir()` cannot be mocked in ESM — config functions accept optional `homeDir` parameter for testability
+- Extension integration test files: `extension-lifecycle.test.ts` (session/turn/compact), `extension-refresh.test.ts` (root refresh/context event), `extension-toolresult.test.ts` (subdir injection/dedup), `commands.test.ts` (CLI subcommands), `extension-helpers.ts` (shared utilities)
