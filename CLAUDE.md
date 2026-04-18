@@ -1,9 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
-
-## Overview
-
 SuPi (**Super Pi**) is an opinionated extension repo for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent) (`@mariozechner/pi-coding-agent`).
 
 It is a pnpm workspace monorepo of installable pi extensions. pi loads the extensions directly as TypeScript — there is no build step.
@@ -46,8 +42,7 @@ Current workspace packages:
 - `packages/supi` — meta-package, prompts, and bundled skills
 
 Other notable areas:
-- `openspec/changes/` and `openspec/specs/` — experimental OpenSpec artifacts
-- `.pi/skills/` and `.agents/skills/` — local skill material used by the repo/tooling
+- `openspec/changes/` and `openspec/specs/` — OpenSpec artifacts
 
 ## Shared gotchas
 
