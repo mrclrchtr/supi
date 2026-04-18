@@ -104,7 +104,10 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
       return;
     }
 
-    const nativeFiles = readNativeContextFiles(opts.systemPromptOptions?.contextFiles ?? []);
+    const nativeFiles = readNativeContextFiles(
+      opts.systemPromptOptions?.contextFiles ?? [],
+      _ctx.cwd,
+    );
     const content = nativeFiles.length > 0 ? formatRefreshContext(nativeFiles) : null;
     if (!content) {
       state.currentContextToken = null;

@@ -3,6 +3,7 @@
 // Handles periodic re-injection of root/ancestor context files
 // that pi loaded natively at startup.
 
+import * as path from "node:path";
 import { wrapExtensionContext } from "@mrclrchtr/supi-core";
 import type { ClaudeMdConfig } from "./config.ts";
 import type { ClaudeMdState } from "./state.ts";
@@ -49,15 +50,20 @@ export function formatRefreshContext(contextFiles: NativeContextFile[]): string 
 
 /**
  * Read native context files from pi's system prompt options.
+ * Filters out files resolved outside the project tree (cwd).
  */
 export function readNativeContextFiles(
   contextFiles: Array<{ path?: string; content?: string }>,
+  cwd: string,
 ): NativeContextFile[] {
+  const absCwd = path.resolve(cwd);
   const result: NativeContextFile[] = [];
   for (const file of contextFiles) {
-    if (file.path && file.content) {
-      result.push({ path: file.path, content: file.content });
-    }
+    if (!file.path || !file.content) continue;
+    const absPath = path.resolve(file.path);
+    const rel = path.relative(absCwd, absPath);
+    if (rel.startsWith("..") || path.isAbsolute(rel)) continue;
+    result.push({ path: file.path, content: file.content });
   }
   return result;
 }

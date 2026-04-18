@@ -1,8 +1,4 @@
-# Root Refresh Dedup
-
-Purpose: Ensure root context files are not duplicated at session start while preserving compaction-triggered refresh.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Root context is not duplicated at session start
 The extension SHALL NOT inject root context files on turn 0 when pi has already loaded them natively via `systemPromptOptions.contextFiles`. Additionally, only files within the project tree (cwd) SHALL be eligible for re-injection during periodic refresh — files resolved outside cwd SHALL be excluded even when present in `contextFiles`.
@@ -20,11 +16,3 @@ The extension SHALL NOT inject root context files on turn 0 when pi has already 
 - **WHEN** a periodic refresh triggers and `contextFiles` contains both `/Users/alice/AGENTS.md` and `/Users/alice/projects/myapp/CLAUDE.md` with `cwd` = `/Users/alice/projects/myapp`
 - **THEN** the refresh message SHALL only include the project-level `CLAUDE.md`
 - **AND** the home-directory `AGENTS.md` SHALL NOT appear in the refresh payload
-
-### Requirement: Compaction-triggered refresh still works
-The extension SHALL set `needsRefresh = true` on `session_compact` events (when `compactRefresh` is enabled), causing immediate re-injection on the next `before_agent_start`.
-
-#### Scenario: Compaction forces immediate re-injection
-- **WHEN** a `session_compact` event fires with `compactRefresh` enabled
-- **THEN** `state.needsRefresh` SHALL be `true`
-- **AND** the next `before_agent_start` SHALL emit a `supi-claude-md-refresh` message regardless of turn count
