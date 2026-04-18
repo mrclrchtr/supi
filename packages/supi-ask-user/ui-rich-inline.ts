@@ -1,6 +1,6 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Editor } from "@mariozechner/pi-tui";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import type { QuestionnaireFlow } from "./flow.ts";
 import { DISCUSS_LABEL, OTHER_LABEL } from "./format.ts";
 import type { NormalizedStructuredQuestion } from "./types.ts";
@@ -50,10 +50,23 @@ function renderInlineEditorLines(
 ): string[] {
   const lines = editor.getLines();
   const cursor = editor.getCursor();
-  return lines.map((line, index) => {
+  const out: string[] = [];
+  const lineWidth = Math.max(1, width);
+  const prefixWidth = visibleWidth(prefix);
+  const contentWidth = Math.max(1, lineWidth - prefixWidth);
+  const continuationPrefix = " ".repeat(prefixWidth);
+
+  for (const [index, line] of lines.entries()) {
     const content = index === cursor.line ? highlightCursor(theme, line, cursor.col) : line;
-    return truncateToWidth(`${prefix}${content}`, Math.max(1, width));
-  });
+    const wrapped = wrapTextWithAnsi(content, contentWidth);
+    for (const [chunkIndex, chunk] of wrapped.entries()) {
+      out.push(
+        truncateToWidth(`${chunkIndex === 0 ? prefix : continuationPrefix}${chunk}`, lineWidth),
+      );
+    }
+  }
+
+  return out.length > 0 ? out : [truncateToWidth(prefix, lineWidth)];
 }
 
 function highlightCursor(theme: Theme, line: string, col: number): string {

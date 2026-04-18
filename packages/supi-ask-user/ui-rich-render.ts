@@ -3,7 +3,7 @@
 // dispatch logic can be read without scrolling past a wall of theme strings.
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Editor, truncateToWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
+import { type Editor, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import type { QuestionnaireFlow } from "./flow.ts";
 import { decorateOption, formatReviewLines, NOTE_MARKER } from "./format.ts";
 import type { NormalizedStructuredQuestion } from "./types.ts";
@@ -69,7 +69,7 @@ export function renderOverlay(
   add(theme.fg("accent", "─".repeat(width)));
   if (flow.isMultiQuestion) renderTabBar(add, theme, flow);
   if (flow.currentMode === "reviewing") {
-    renderReview(add, theme, flow);
+    renderReview(add, width, theme, flow);
   } else {
     renderQuestion(add, lines, width, theme, flow, state, editor);
   }
@@ -251,14 +251,15 @@ function renderRows(
       prefix,
     });
     if (inlineEditorLines) {
+      const rowContinuation = " ".repeat(visibleWidth(prefix));
       for (const [lineIndex, line] of inlineEditorLines.entries()) {
-        add(`${lineIndex === 0 ? prefix : "   "}${line}`);
+        add(`${lineIndex === 0 ? prefix : rowContinuation}${line}`);
       }
       continue;
     }
-    add(prefix + rowLabel(theme, flow, state, question, row, active, selected));
+    addWrapped(add, width, prefix, rowLabel(theme, flow, state, question, row, active, selected));
     const description = rowDescription(question, row);
-    if (description) add(`     ${theme.fg("muted", description)}`);
+    if (description) addWrapped(add, width, "     ", theme.fg("muted", description));
   }
 }
 
@@ -330,17 +331,36 @@ function previewForSelection(
   return row?.kind === "option" ? question.options[row.optionIndex].preview : undefined;
 }
 
-function renderReview(add: (text: string) => void, theme: Theme, flow: QuestionnaireFlow): void {
+function renderReview(
+  add: (text: string) => void,
+  width: number,
+  theme: Theme,
+  flow: QuestionnaireFlow,
+): void {
   add(theme.fg("accent", " Review answers:"));
   add("");
   for (const question of flow.questions) {
     const answer = flow.getAnswer(question.id);
     const lines = answer ? formatReviewLines(question, answer) : ["(no answer)"];
     add(theme.fg("muted", ` ${question.header}:`));
-    for (const line of lines) add(`   ${theme.fg("text", line)}`);
+    for (const line of lines) addWrapped(add, width, "   ", theme.fg("text", line));
   }
   add("");
   add(theme.fg(flow.allAnswered() ? "success" : "warning", " Press Enter to submit"));
+}
+
+function addWrapped(
+  add: (text: string) => void,
+  width: number,
+  prefix: string,
+  text: string,
+): void {
+  const prefixWidth = visibleWidth(prefix);
+  const contentWidth = Math.max(1, width - prefixWidth);
+  const continuationPrefix = " ".repeat(prefixWidth);
+  for (const [index, line] of wrapTextWithAnsi(text, contentWidth).entries()) {
+    add(`${index === 0 ? prefix : continuationPrefix}${line}`);
+  }
 }
 
 function footerHelp(flow: QuestionnaireFlow, state: OverlayRenderState): string {

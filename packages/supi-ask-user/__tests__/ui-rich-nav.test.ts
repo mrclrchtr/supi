@@ -1,5 +1,5 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import type { Component, TUI } from "@mariozechner/pi-tui";
+import { type Component, type TUI, visibleWidth } from "@mariozechner/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { NormalizedQuestion } from "../types.ts";
 import { type RichUiHost, runRichQuestionnaire } from "../ui-rich.ts";
@@ -54,7 +54,7 @@ interface RichFixture<Outcome> {
 }
 
 function makeRichFixture<Outcome>(): RichFixture<Outcome> {
-  const tuiStub = { requestRender: () => {} } as unknown as TUI;
+  const tuiStub = { requestRender: () => {}, terminal: { rows: 40 } } as unknown as TUI;
   const themeStub = {
     fg: (_color: string, text: string) => text,
     bold: (text: string) => text,
@@ -328,5 +328,29 @@ describe("runRichQuestionnaire render state", () => {
     expect(second).toBe(first);
     const resized = captured.render(120);
     expect(resized).not.toBe(first);
+  });
+});
+
+describe("runRichQuestionnaire wrapping", () => {
+  it("wraps long inline other input to the next line", async () => {
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire([choice], { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    captured.value.handleInput?.("\u001b[B");
+    captured.value.handleInput?.("\u001b[B");
+    for (const char of "this answer should wrap onto the next line") {
+      captured.value.handleInput?.(char);
+    }
+
+    const lines = captured.value.render(32);
+    const rendered = lines.join("\n");
+    expect(rendered).toContain("Other answer: this");
+    expect(rendered).toContain("should wrap onto");
+    expect(rendered).toContain("the next line");
+    for (const line of lines) {
+      expect(visibleWidth(line)).toBeLessThanOrEqual(32);
+    }
   });
 });
