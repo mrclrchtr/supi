@@ -50,6 +50,7 @@ interface ExtensionUi {
     custom?: RichUiHost["custom"];
   };
   hasUI: boolean;
+  abort(): void;
 }
 
 export default function askUserExtension(pi: ExtensionAPI): void {
@@ -64,7 +65,7 @@ export default function askUserExtension(pi: ExtensionAPI): void {
     parameters: AskUserParamsSchema,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      return executeAskUser(params as AskUserParams, signal, ctx as ExtensionUi, lock);
+      return executeAskUser(params as AskUserParams, signal, ctx as unknown as ExtensionUi, lock);
     },
     renderCall: (args, theme) => renderAskUserCall(args, theme as Theme),
     renderResult: (result, _options, theme) =>
@@ -99,7 +100,11 @@ async function executeAskUser(
     );
   }
   try {
-    return await driveQuestionnaire(normalized, signal, ctx);
+    const result = await driveQuestionnaire(normalized, signal, ctx);
+    if (result.details.terminalState !== "submitted") {
+      ctx.abort();
+    }
+    return result;
   } finally {
     lock.release();
   }

@@ -162,3 +162,18 @@ Submitted `ask_user` results SHALL include a concise model-facing summary and st
 #### Scenario: Aborted questionnaire preserves terminal state
 - **WHEN** questionnaire execution is interrupted by abort handling before submission completes
 - **THEN** the result reports the terminal state as `aborted`
+
+### Requirement: Cancelled or aborted questionnaire SHALL stop the agent turn
+When the user cancels a questionnaire (Escape) or the questionnaire is aborted (signal), the extension SHALL abort the current agent turn via `ctx.abort()` so the LLM does not receive a follow-up turn. The tool result SHALL still be recorded in the transcript with the appropriate terminal state, but the agent SHALL return control to the user for the next prompt.
+
+#### Scenario: Cancel stops the agent turn
+- **WHEN** the user presses Escape to cancel a questionnaire
+- **THEN** the extension calls `ctx.abort()` after building the cancelled result, preventing the LLM from responding to the cancellation
+
+#### Scenario: Abort stops the agent turn
+- **WHEN** the questionnaire is aborted via signal before submission
+- **THEN** the extension calls `ctx.abort()` after building the aborted result, preventing the LLM from responding to the abort
+
+#### Scenario: Submitted questionnaire does not stop the agent turn
+- **WHEN** the user submits a questionnaire successfully
+- **THEN** the extension does NOT call `ctx.abort()`, allowing the LLM to continue with the submitted answers

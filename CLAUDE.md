@@ -219,6 +219,7 @@ Key docs to reach for first:
 
 ### Ask-user extension
 
+- **`ask-user` cancellation aborts the agent turn**: when the user cancels (Escape) or the questionnaire is aborted (signal), `ctx.abort()` is called so the LLM does not get a follow-up turn. The result is still recorded in the transcript.
 - **`ask-user` uses a split flow**: rich overlay via `ctx.ui.custom()` when available, otherwise fallback dialog. Fallback does NOT support notes, previews, or inline editing.
 - **`ask-user` inline `Other`/`Discuss` auto-enters edit mode on keyboard focus**: navigating onto those rows immediately activates inline input. `Esc` exits back to row navigation.
 - **`ask-user` multichoice uses `Space` to toggle**: not `Enter`. `Enter` submits the current selection set. The old `Submit selections` row was removed.

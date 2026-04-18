@@ -56,6 +56,7 @@ function fallbackCtx(selectImpl: SelectImpl, inputImpl?: InputImpl) {
       select: vi.fn(selectImpl),
       input: vi.fn(inputImpl ?? (async () => undefined)),
     },
+    abort: vi.fn(),
   };
 }
 
@@ -113,6 +114,22 @@ describe("ask_user execute", () => {
     const submitCtx = fallbackCtx(async (_title, options) => options[0]);
     const result = await tool.execute("b", validParams, undefined, undefined, submitCtx);
     expect(result.details).toMatchObject({ terminalState: "submitted" });
+  });
+
+  it("calls abort when the user cancels the questionnaire", async () => {
+    const { tool } = fakePi();
+    const ctx = fallbackCtx(async () => undefined);
+    const result = await tool.execute("id", validParams, undefined, undefined, ctx);
+    expect(result.details).toMatchObject({ terminalState: "cancelled" });
+    expect(ctx.abort).toHaveBeenCalledOnce();
+  });
+
+  it("does not call abort when the user submits the questionnaire", async () => {
+    const { tool } = fakePi();
+    const ctx = fallbackCtx(async (_title, options) => options[0]);
+    const result = await tool.execute("id", validParams, undefined, undefined, ctx);
+    expect(result.details).toMatchObject({ terminalState: "submitted" });
+    expect(ctx.abort).not.toHaveBeenCalled();
   });
 
   it("can return a discuss answer through the fallback path", async () => {
