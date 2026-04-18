@@ -123,43 +123,23 @@ export default function (pi: ExtensionAPI) {
 }
 ```
 
-### Key API surface
-
-- `pi.registerCommand(name, { description, handler })` — adds a `/name` slash command
-- `pi.on("session_start", (event, ctx) => …)` — fires when a session begins
-- `pi.on("tool_call", async (event) => …)` — intercepts LLM tool calls; mutate `event.input` to override parameters
-- `pi.on("input", (event) => …)` — intercepts user input before agent processing; return `{ action: "transform", text }` to rewrite it or `{ action: "continue" }` to pass through
-- `pi.on("before_agent_start", (event) => …)` — inject per-turn steering/context; use `message.display = false` for hidden guidance
-- `pi.getCommands()` — returns all registered commands; `c.source === "skill"` identifies skill commands
-- `ctx.shutdown()` — exits the session
-- `ctx.ui.setWidget(id, lines)` — shows/clears a persistent UI widget
-- `ctx.ui.notify(message, level)` — one-shot notification
-- `ctx.ui.setEditorComponent(factory)` — replaces the prompt editor component
-- `pi.registerTool({ name, label, description, parameters, execute })` — registers a custom tool; `parameters` uses `Type.Object()` from `@sinclair/typebox`; `execute(toolCallId, params, signal, onUpdate, ctx)` returns `{ content, details }`
-- `pi.on("tool_result", async (event, ctx) => …)` — runs after tool execution; return `{ content }` to patch result
-- `pi.on("session_shutdown", async () => …)` — fires before session teardown; clean up subprocesses here
+For the full API surface (`registerCommand`, `registerTool`, event hooks, `ctx.ui.*`, etc.) read pi's own docs — see [Reading pi docs](#reading-pi-docs) below.
 
 ### LSP extension
 
 Provides Language Server Protocol integration — type-aware hover, go-to-definition, find-references, diagnostics, rename, code-actions, and document-symbols via a registered `lsp` tool. Intercepts `write`/`edit` to surface blocking diagnostics inline. The tool advertises semantic-first guidance via `promptSnippet`/`promptGuidelines` as always-on discoverability. Runtime pre-turn guidance in `before_agent_start` is stateful and dormant by default: it activates only after qualifying source interactions (`read`, `edit`, `write`, `lsp` on a supported file type) and re-injects only when the activation hint is pending or tracked-file diagnostics change.
 
-Files: `packages/supi-lsp/lsp.ts` (entry), `packages/supi-lsp/client.ts` (LSP client lifecycle), `packages/supi-lsp/transport.ts` (JSON-RPC), `packages/supi-lsp/config.ts` (server config), `packages/supi-lsp/manager.ts` (server pool), `packages/supi-lsp/runtime-state.ts` (runtime guidance state), `packages/supi-lsp/guidance.ts` (message formatting), `packages/supi-lsp/tool-actions.ts` (tool dispatch), `packages/supi-lsp/diagnostics.ts` (formatting), `packages/supi-lsp/utils.ts` (URI/language/path utils), `packages/supi-lsp/types.ts` (LSP types), `packages/supi-lsp/defaults.json` (server definitions).
-
-Commands: `/lsp-status` — shows active servers, open files, and diagnostics summary.
-
-Per-project config: `.pi-lsp.json` in project root to override/add/disable servers. YAML is not supported (no YAML parser dependency).
+Entry: `packages/supi-lsp/lsp.ts`. Per-project config: `.pi-lsp.json` in project root to override/add/disable servers. YAML is not supported (no YAML parser dependency).
 
 ### Ask-user extension
 
 Rich questionnaire UI (`ask_user` tool) for structured agent–user decisions. Supports explicit `choice`, `multichoice`, `yesno`, and `text` question types with inline `Other`/`Discuss` editing, context-sensitive note hotkeys (`n`), split-pane option previews, and review/revise flows. Fallback path degrades gracefully when rich custom UI is unavailable.
 
-Files: `packages/supi-ask-user/ask-user.ts` (entry), `packages/supi-ask-user/schema.ts` (external contract), `packages/supi-ask-user/normalize.ts` (validation), `packages/supi-ask-user/types.ts` (internal model), `packages/supi-ask-user/flow.ts` (shared state machine), `packages/supi-ask-user/ui-rich.ts` (overlay builder), `packages/supi-ask-user/ui-rich-state.ts` (state types and pure helpers), `packages/supi-ask-user/ui-rich-handlers.ts` (input handlers), `packages/supi-ask-user/ui-rich-render.ts` (core rendering), `packages/supi-ask-user/ui-rich-render-notes.ts` (note rendering), `packages/supi-ask-user/ui-rich-render-editor.ts` (editor pane rendering), `packages/supi-ask-user/ui-rich-inline.ts` (inline Other/Discuss rows), `packages/supi-ask-user/ui-fallback.ts` (fallback path), `packages/supi-ask-user/format.ts` (summary/review formatting), `packages/supi-ask-user/render.ts` (transcript rendering), `packages/supi-ask-user/result.ts` (tool content/details).
-
-No `ask_user` commands — the tool is invoked by the agent via `pi.registerTool`.
+Entry: `packages/supi-ask-user/ask-user.ts`. The tool is invoked by the agent via `pi.registerTool`.
 
 ### OpenSpec workflow
 
-This repo uses an experimental OpenSpec artifact workflow in `openspec/`. Changes are tracked as directories under `openspec/changes/` with `design.md`, `proposal.md`, `tasks.md`, and `specs/` artifacts. Key skills: `openspec-new-change`, `openspec-continue-change`, `openspec-apply-change`, `openspec-verify-change`, `openspec-archive-change`.
+This repo uses an experimental OpenSpec artifact workflow in `openspec/`. Changes are tracked as directories under `openspec/changes/` with `design.md`, `proposal.md`, `tasks.md`, and `specs/` artifacts.
 
 ### Skill-shortcut extension
 
