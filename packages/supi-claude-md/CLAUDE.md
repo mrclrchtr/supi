@@ -45,7 +45,7 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 
 ## Gotchas
 
-- `systemPromptOptions` may not be in pi's published types but exists at runtime on `BeforeAgentStartEvent` — cast via `as unknown`
+- `systemPromptOptions` is accessed via a typed intersection (`BeforeAgentStartEvent & { systemPromptOptions?: ... }`) for forward-compatibility with pi >= 0.68.0
 - `scanForContextFiles` uses `require()` for lazy fs/path loading in command handler context
 - Module-level `extensionState` variable lets command handlers access the state object
 - `os.homedir()` cannot be mocked in ESM — config functions accept optional `homeDir` parameter for testability

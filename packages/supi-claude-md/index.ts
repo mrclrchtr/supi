@@ -94,18 +94,18 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
 
   pi.on("before_agent_start", async (event: BeforeAgentStartEvent, _ctx: ExtensionContext) => {
     const config = loadClaudeMdConfig(_ctx.cwd);
-    const opts = event as unknown as {
+    const eventWithOpts = event as BeforeAgentStartEvent & {
       systemPromptOptions?: { contextFiles?: Array<{ path?: string; content?: string }> };
     };
 
-    captureNativePaths(state, opts);
+    captureNativePaths(state, eventWithOpts);
     if (!shouldRefreshRoot(state, config)) {
       state.currentContextToken = null;
       return;
     }
 
     const nativeFiles = readNativeContextFiles(
-      opts.systemPromptOptions?.contextFiles ?? [],
+      eventWithOpts.systemPromptOptions?.contextFiles ?? [],
       _ctx.cwd,
     );
     const content = nativeFiles.length > 0 ? formatRefreshContext(nativeFiles) : null;
