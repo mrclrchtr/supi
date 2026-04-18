@@ -19,6 +19,7 @@
       "./packages/supi-aliases/aliases.ts",
       "./packages/supi-ask-user/ask-user.ts",
       "./packages/supi-bash-timeout/index.ts",
+      "./packages/supi-claude-md/index.ts",
       "./packages/supi-skill-shortcut/skill-shortcut.ts",
       "./packages/supi-lsp/lsp.ts"
     ],
@@ -38,7 +39,7 @@
     "lint:fix": "biome lint --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "typecheck": "tsc --noEmit -p packages/supi-aliases/tsconfig.json && tsc --noEmit -p packages/supi-ask-user/tsconfig.json && tsc --noEmit -p packages/supi-bash-timeout/tsconfig.json && tsc --noEmit -p packages/supi-lsp/tsconfig.json && tsc --noEmit -p packages/supi-skill-shortcut/tsconfig.json",
+    "typecheck": "tsc --noEmit -p packages/supi-aliases/tsconfig.json && tsc --noEmit -p packages/supi-ask-user/tsconfig.json && tsc --noEmit -p packages/supi-bash-timeout/tsconfig.json && tsc --noEmit -p packages/supi-core/tsconfig.json && tsc --noEmit -p packages/supi-claude-md/tsconfig.json && tsc --noEmit -p packages/supi-lsp/tsconfig.json && tsc --noEmit -p packages/supi-skill-shortcut/tsconfig.json",
     "typecheck:tests": "tsc --noEmit -p packages/supi-ask-user/__tests__/tsconfig.json && tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json",
     "pack:check": "pnpm --filter @mrclrchtr/supi exec pnpm pack --dry-run",
     "check": "pnpm biome",

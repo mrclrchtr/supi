@@ -48,6 +48,12 @@ importers:
       '@mrclrchtr/supi-bash-timeout':
         specifier: workspace:*
         version: link:../supi-bash-timeout
+      '@mrclrchtr/supi-claude-md':
+        specifier: workspace:*
+        version: link:../supi-claude-md
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
       '@mrclrchtr/supi-lsp':
         specifier: workspace:*
         version: link:../supi-lsp
@@ -82,6 +88,35 @@ importers:
       '@mariozechner/pi-coding-agent':
         specifier: ~0.66.0
         version: 0.66.1(ws@8.20.0)(zod@4.3.6)
+
+  packages/supi-claude-md:
+    dependencies:
+      '@mariozechner/pi-coding-agent':
+        specifier: ~0.66.0
+        version: 0.66.1(ws@8.20.0)(zod@4.3.6)
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
+    devDependencies:
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
+      vitest:
+        specifier: ^4.1.4
+        version: 4.1.4(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
+
+  packages/supi-core:
+    dependencies:
+      '@mariozechner/pi-coding-agent':
+        specifier: ~0.66.0
+        version: 0.66.1(ws@8.20.0)(zod@4.3.6)
+    devDependencies:
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
+      vitest:
+        specifier: ^4.1.4
+        version: 4.1.4(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
 
   packages/supi-lsp:
     dependencies:

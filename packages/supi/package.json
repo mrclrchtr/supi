@@ -26,6 +26,8 @@
     "@mrclrchtr/supi-aliases": "workspace:*",
     "@mrclrchtr/supi-ask-user": "workspace:*",
     "@mrclrchtr/supi-bash-timeout": "workspace:*",
+    "@mrclrchtr/supi-claude-md": "workspace:*",
+    "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-skill-shortcut": "workspace:*"
   },
@@ -34,6 +36,7 @@
       "./aliases.ts",
       "./ask-user.ts",
       "./bash-timeout.ts",
+      "./claude-md.ts",
       "./skill-shortcut.ts",
       "./lsp.ts"
     ],
