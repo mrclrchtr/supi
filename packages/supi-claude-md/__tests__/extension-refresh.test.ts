@@ -36,7 +36,7 @@ vi.mock("../state.ts", () => ({
     completedTurns: 0,
     lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    needsRefresh: true,
+    needsRefresh: false,
     currentContextToken: null,
     contextCounter: 0,
     nativeContextPaths: new Set(),
@@ -117,6 +117,58 @@ describe("claudeMdExtension: before_agent_start (root refresh)", () => {
     );
 
     expect(result).toBeUndefined();
+  });
+});
+
+describe("claudeMdExtension: before_agent_start (no duplication at session start)", () => {
+  beforeEach(resetMocks);
+
+  it("does not emit refresh on turn 0 with fresh state (needsRefresh=false)", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    // needsRefresh defaults to false, shouldRefreshRoot returns false
+    // → no refresh message on first before_agent_start
+    mockFns.shouldRefreshRoot.mockReturnValue(false);
+
+    const result = await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
+      makeCtx(),
+    );
+
+    expect(result).toBeUndefined();
+    expect(mockFns.readNativeContextFiles).not.toHaveBeenCalled();
+  });
+});
+
+describe("claudeMdExtension: compaction-triggered refresh", () => {
+  beforeEach(resetMocks);
+
+  it("sets needsRefresh=true on compact, causing re-injection on next before_agent_start", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    // Turn 0: no refresh (needsRefresh=false)
+    mockFns.shouldRefreshRoot.mockReturnValue(false);
+    await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
+      makeCtx(),
+    );
+
+    // Compaction event sets needsRefresh=true (via real state mutation)
+    await handlers.get("session_compact")?.({}, makeCtx());
+
+    // Now shouldRefreshRoot returns true because needsRefresh is true
+    mockFns.shouldRefreshRoot.mockReturnValue(true);
+    mockFns.readNativeContextFiles.mockReturnValue([{ path: "CLAUDE.md", content: "# Root" }]);
+    mockFns.formatRefreshContext.mockReturnValue("<extension-context>root</extension-context>");
+
+    const result = await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
+      makeCtx(),
+    );
+
+    expect(result).toMatchObject({ message: { customType: "supi-claude-md-refresh" } });
   });
 });
 

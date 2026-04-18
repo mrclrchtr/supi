@@ -69,7 +69,6 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
         state.completedTurns = reconstructed.completedTurns;
         state.lastRefreshTurn = reconstructed.lastRefreshTurn;
         state.injectedDirs = reconstructed.injectedDirs;
-        state.needsRefresh = reconstructed.completedTurns === 0;
       }
     } catch {
       // Reconstruction failed — start fresh
