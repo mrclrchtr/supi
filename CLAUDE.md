@@ -65,8 +65,11 @@ pnpm exec vitest run packages/supi-lsp/__tests__/guidance.test.ts
 # Fast smoke test for ask-user changes
 pnpm exec vitest run packages/supi-ask-user/__tests__/guidance.test.ts
 
-# Install repo hook scripts into .git/hooks
-mise run hooks
+# Fast smoke test for ask-user rich UI changes
+pnpm exec vitest run packages/supi-ask-user/__tests__/ui-rich.test.ts packages/supi-ask-user/__tests__/ui-rich-nav.test.ts
+
+# Fast smoke test for LSP project scanning changes
+pnpm exec vitest run packages/supi-lsp/__tests__/scanner.test.ts
 
 # Run the pre-push hook suite locally (full pnpm verify)
 hk run check
@@ -91,6 +94,13 @@ Tooling config at repo root: `hk.pkl`, `commitlint.config.mjs`, `release-please-
 ## Architecture
 
 This is a pnpm workspace monorepo. Each extension is an independently installable package under `packages/supi-*/`. The `packages/supi/` meta-package bundles the full stack, and the repository root also exposes a `pi` manifest so `pi install /path/to/SuPi` and `pi install git:github.com/mrclrchtr/supi` continue to work.
+
+Current extension packages:
+- `supi-aliases` — `/exit`, `/e`, `/clear` shortcuts
+- `supi-ask-user` — structured questionnaire UI + `ask_user` tool
+- `supi-bash-timeout` — injects a default timeout into bash tool calls
+- `supi-lsp` — LSP integration + diagnostics guardrails
+- `supi-skill-shortcut` — `$skill-name` shorthand for `/skill:skill-name`
 
 Extension packages are registered in their own `package.json` under `pi.extensions`. The meta-package re-exports them through local wrapper `.ts` entrypoints in `packages/supi/`, while the repository root points at `packages/*` source files for git and local-path installs. Prompt templates and skills live in `packages/supi/prompts/` and `packages/supi/skills/`.
 
