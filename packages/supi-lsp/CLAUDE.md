@@ -4,11 +4,7 @@ This file provides guidance to Claude Code when working in `packages/supi-lsp/`.
 
 ## Scope
 
-`@mrclrchtr/supi-lsp` provides Language Server Protocol integration for pi:
-- type-aware hover / definition / references / rename / code actions / symbols
-- a registered `lsp` tool
-- inline diagnostics surfaced around `write` and `edit`
-- agent guidance that nudges semantic tooling over raw text search
+`@mrclrchtr/supi-lsp` provides a registered `lsp` tool, inline diagnostics surfaced around `write` and `edit`, and agent guidance that nudges semantic tooling over raw text search.
 
 Entrypoint: `lsp.ts`
 
@@ -40,8 +36,6 @@ Entrypoint: `lsp.ts`
 
 - `@sinclair/typebox` is a runtime import here, so keep it in `peerDependencies`.
 - Avoid `@mariozechner/pi-ai`'s `StringEnum`; use `Type.Union(Type.Literal(...))` to keep the dep tree smaller.
-- If a cleanup promise may reject, attach `promise.catch(() => {})` at creation time so vitest does not treat it as an unhandled rejection.
-- `packages/supi-lsp/package.json` is a published install target; keep its dependency removals in sync with the workspace root.
 - Prefer splitting `manager.ts` helpers into focused `manager-*.ts` modules over relaxing the repo-wide Biome line-limit rule.
 
 ## Testing
@@ -55,5 +49,3 @@ pnpm exec vitest run packages/supi-lsp/__tests__/scanner.test.ts
 Testing gotchas:
 - Integration tests use `describe.skipIf(!HAS_CMD)` and will auto-skip when required language servers are missing from `PATH`.
 - Diagnostics can arrive late in TS integration tests; retry `syncFileAndGetDiagnostics()` before asserting.
-- `packages/supi-lsp/__tests__/tsconfig.json` needs `"types": ["node"]` for tests importing `node:*`.
-- A temporary file like `packages/supi-lsp/__tmp_guidance_probe.ts` with an intentional type error is a useful live probe for diagnostics + guidance behavior.

@@ -21,7 +21,6 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
 
 - `pi.extensions`, `pi.prompts`, and `pi.skills` entries are package-relative paths.
 - Keep small local wrapper `.ts` files in this package so published installs do not depend on nested workspace `node_modules` layout.
-- `workspace:*` dependencies are intentional; pnpm replaces them with concrete versions during publish.
 
 ## Prompt templates
 
@@ -31,16 +30,4 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
 
 ## Skills
 
-- Skills live in `skills/<name>/SKILL.md`.
-- Registration comes from `pi.skills: ["./skills"]` in `package.json`.
-- Naming rules are strict and silent on failure:
-  - lowercase + hyphens only
-  - max 64 chars
-  - directory name must match skill name
-  - no leading, trailing, or consecutive hyphens
-  - `description:` frontmatter is required
-- Progressive disclosure matters:
-  - `description` is always loaded
-  - `SKILL.md` loads on invocation
-  - `references/*.md` load on demand
-- Keep `SKILL.md` focused on guidance and pointers; put copy-paste material in `references/`.
+Skills live in `skills/<name>/SKILL.md` with registration via `pi.skills: ["./skills"]` in `package.json`. See pi's `docs/skills.md` for naming rules and progressive disclosure (`description` → `SKILL.md` → `references/*.md`). Keep `SKILL.md` focused on guidance and pointers; put copy-paste material in `references/`.
