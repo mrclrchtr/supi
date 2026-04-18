@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ClaudeMdConfig } from "../config.ts";
 import { CLAUDE_MD_DEFAULTS } from "../config.ts";
-import { pruneStaleRefreshMessages, shouldRefreshRoot } from "../refresh.ts";
+import { shouldRefreshRoot } from "../refresh.ts";
 import type { ClaudeMdState } from "../state.ts";
 import { createInitialState } from "../state.ts";
 
@@ -59,87 +59,5 @@ describe("shouldRefreshRoot", () => {
     const state = makeState({ needsRefresh: false, completedTurns: 10, lastRefreshTurn: 0 });
     const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, rereadInterval: 0 };
     expect(shouldRefreshRoot(state, config)).toBe(false);
-  });
-});
-
-describe("pruneStaleRefreshMessages", () => {
-  it("removes all refresh messages when no active token", () => {
-    const messages = [
-      { role: "user", customType: undefined, details: undefined },
-      {
-        role: "assistant",
-        customType: "supi-claude-md-refresh",
-        details: { contextToken: "old-1" },
-      },
-      { role: "assistant", customType: undefined, details: undefined },
-    ];
-
-    const result = pruneStaleRefreshMessages(messages, null);
-    expect(result).toHaveLength(2);
-    expect(result[1]?.customType).toBeUndefined();
-  });
-
-  it("keeps only active refresh message", () => {
-    const messages = [
-      { role: "user", customType: undefined, details: undefined },
-      {
-        role: "assistant",
-        customType: "supi-claude-md-refresh",
-        details: { contextToken: "old-1" },
-      },
-      { role: "user", customType: undefined, details: undefined },
-      {
-        role: "assistant",
-        customType: "supi-claude-md-refresh",
-        details: { contextToken: "active-1" },
-      },
-    ];
-
-    const result = pruneStaleRefreshMessages(messages, "active-1");
-    expect(result).toHaveLength(3);
-    expect(result.filter((m) => m.customType === "supi-claude-md-refresh")).toHaveLength(1);
-  });
-
-  it("reorders active refresh before last user message", () => {
-    const messages = [
-      { role: "user", customType: undefined, details: undefined },
-      {
-        role: "assistant",
-        customType: "supi-claude-md-refresh",
-        details: { contextToken: "active-1" },
-      },
-      { role: "user", customType: undefined, details: undefined },
-    ];
-
-    const result = pruneStaleRefreshMessages(messages, "active-1");
-    // Should be: user, refresh, user (refresh moved before last user)
-    expect(result).toHaveLength(3);
-    expect(result[1]?.customType).toBe("supi-claude-md-refresh");
-    expect(result[2]?.role).toBe("user");
-  });
-
-  it("does not reorder if already before last user message", () => {
-    const messages = [
-      {
-        role: "assistant",
-        customType: "supi-claude-md-refresh",
-        details: { contextToken: "active-1" },
-      },
-      { role: "user", customType: undefined, details: undefined },
-    ];
-
-    const result = pruneStaleRefreshMessages(messages, "active-1");
-    expect(result).toHaveLength(2);
-    expect(result[0]?.customType).toBe("supi-claude-md-refresh");
-  });
-
-  it("returns unchanged when no refresh messages exist", () => {
-    const messages = [
-      { role: "user", customType: undefined, details: undefined },
-      { role: "assistant", customType: undefined, details: undefined },
-    ];
-
-    const result = pruneStaleRefreshMessages(messages, "active-1");
-    expect(result).toEqual(messages);
   });
 });

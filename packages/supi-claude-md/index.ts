@@ -16,6 +16,7 @@ import type {
   SessionStartEvent,
   TurnEndEvent,
 } from "@mariozechner/pi-coding-agent";
+import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core";
 import { getArgumentCompletions, handleCommand } from "./commands.ts";
 import { loadClaudeMdConfig } from "./config.ts";
 import {
@@ -23,12 +24,7 @@ import {
   filterAlreadyLoaded,
   findSubdirContextFiles,
 } from "./discovery.ts";
-import {
-  formatRefreshContext,
-  pruneStaleRefreshMessages,
-  readNativeContextFiles,
-  shouldRefreshRoot,
-} from "./refresh.ts";
+import { formatRefreshContext, readNativeContextFiles, shouldRefreshRoot } from "./refresh.ts";
 import { type ClaudeMdState, createInitialState, reconstructState } from "./state.ts";
 import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
 
@@ -132,8 +128,9 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
   // ── Context pruning ────────────────────────────────────────
 
   pi.on("context", (event) => {
-    const messages = pruneStaleRefreshMessages(
+    const messages = pruneAndReorderContextMessages(
       event.messages as Array<{ role?: string; customType?: string; details?: unknown }>,
+      "supi-claude-md-refresh",
       state.currentContextToken,
     ) as typeof event.messages;
 

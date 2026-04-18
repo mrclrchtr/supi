@@ -11,8 +11,12 @@ const mockFns = vi.hoisted(() => ({
   shouldRefreshRoot: vi.fn(),
   formatRefreshContext: vi.fn(),
   readNativeContextFiles: vi.fn(),
-  pruneStaleRefreshMessages: vi.fn(),
+  pruneAndReorderContextMessages: vi.fn(),
   reconstructState: vi.fn(),
+}));
+
+vi.mock("@mrclrchner/supi-core", () => ({
+  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
 }));
 
 vi.mock("../config.ts", () => ({
@@ -34,7 +38,6 @@ vi.mock("../refresh.ts", () => ({
   shouldRefreshRoot: mockFns.shouldRefreshRoot,
   formatRefreshContext: mockFns.formatRefreshContext,
   readNativeContextFiles: mockFns.readNativeContextFiles,
-  pruneStaleRefreshMessages: mockFns.pruneStaleRefreshMessages,
 }));
 
 vi.mock("../state.ts", () => ({
@@ -57,7 +60,7 @@ function resetMocks() {
   vi.clearAllMocks();
   mockFns.loadClaudeMdConfig.mockReturnValue({ ...DEFAULT_CONFIG });
   mockFns.shouldRefreshRoot.mockReturnValue(false);
-  mockFns.pruneStaleRefreshMessages.mockImplementation((msgs) => msgs);
+  mockFns.pruneAndReorderContextMessages.mockImplementation((msgs) => msgs);
 }
 
 describe("claudeMdExtension: registration", () => {

@@ -28,27 +28,27 @@ When outstanding LSP diagnostics exist at the configured severity threshold, the
 - **THEN** the summary includes both errors and warnings but omits info and hints
 
 ### Requirement: Diagnostic context SHALL be prepended before the user prompt
-The system SHALL use the `context` event to reorder the injected `lsp-context` message so it appears before the user's actual prompt in the LLM message list. The user's prompt SHALL be the last user-role message the LLM sees.
+The system SHALL use the shared `pruneAndReorderContextMessages` function from `supi-core` (with `customType: "lsp-context"` and the active token) to filter stale `lsp-context` messages and reorder the active one before the last user message. The previous local `reorderDiagnosticContextMessages` implementation in `supi-lsp/guidance.ts` SHALL be replaced by this shared function. The behavior SHALL remain identical: stale messages are removed, the active message is moved before the last user message, and unchanged arrays produce no return value.
 
 #### Scenario: Extension message is reordered
 - **WHEN** pi appends the `lsp-context` message after the user message (hardcoded order)
-- **THEN** the `context` event moves it before the last user message
+- **THEN** the `context` event handler calls `pruneAndReorderContextMessages(messages, "lsp-context", activeToken)` which moves it before the last user message
 - **AND** the user's actual prompt is the final user-role message in the LLM context
 
 #### Scenario: No diagnostic message exists
 - **WHEN** `before_agent_start` did not inject a message (no diagnostics)
-- **THEN** the `context` event performs no reordering
+- **THEN** the `context` event handler calls `pruneAndReorderContextMessages(messages, "lsp-context", null)` which removes all stale `lsp-context` messages and performs no reordering
 
 ### Requirement: Stale diagnostic context SHALL be filtered from conversation history
-The system SHALL filter stale `lsp-context` messages from previous prompts in the `context` event, keeping only the current prompt's diagnostic message (if any). This prevents accumulation of outdated diagnostic snapshots in the LLM context.
+The system SHALL use the shared `pruneAndReorderContextMessages` function from `supi-core` to filter stale `lsp-context` messages from previous prompts, keeping only the current prompt's diagnostic message (if any). This replaces the previous local `reorderDiagnosticContextMessages` implementation with identical semantics.
 
 #### Scenario: Multiple prompts with diagnostics
 - **WHEN** the conversation contains `lsp-context` messages from 3 previous prompts and 1 from the current prompt
-- **THEN** the `context` event removes the 3 stale messages and keeps only the current one
+- **THEN** `pruneAndReorderContextMessages(messages, "lsp-context", activeToken)` returns only the current prompt's message
 
 #### Scenario: Previous diagnostics resolved
 - **WHEN** the conversation contains `lsp-context` messages from previous prompts but the current prompt has no diagnostics
-- **THEN** the `context` event removes all stale `lsp-context` messages
+- **THEN** `pruneAndReorderContextMessages(messages, "lsp-context", null)` removes all `lsp-context` messages
 
 ### Requirement: Diagnostic summary SHALL be deduplicated across turns
 The system SHALL fingerprint the diagnostic summary content and skip injection when the summary is identical to the previously injected one. This avoids re-injecting the same diagnostics on consecutive prompts where no files were edited.

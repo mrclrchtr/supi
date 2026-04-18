@@ -6,7 +6,11 @@ const mockFns = vi.hoisted(() => ({
   shouldRefreshRoot: vi.fn(),
   formatRefreshContext: vi.fn(),
   readNativeContextFiles: vi.fn(),
-  pruneStaleRefreshMessages: vi.fn(),
+  pruneAndReorderContextMessages: vi.fn(),
+}));
+
+vi.mock("@mrclrchner/supi-core", () => ({
+  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
 }));
 
 vi.mock("../config.ts", () => ({
@@ -28,7 +32,6 @@ vi.mock("../refresh.ts", () => ({
   shouldRefreshRoot: mockFns.shouldRefreshRoot,
   formatRefreshContext: mockFns.formatRefreshContext,
   readNativeContextFiles: mockFns.readNativeContextFiles,
-  pruneStaleRefreshMessages: mockFns.pruneStaleRefreshMessages,
 }));
 
 vi.mock("../state.ts", () => ({
@@ -56,7 +59,7 @@ function resetMocks() {
     fileNames: ["CLAUDE.md"],
   });
   mockFns.shouldRefreshRoot.mockReturnValue(false);
-  mockFns.pruneStaleRefreshMessages.mockImplementation((msgs: unknown) => msgs);
+  mockFns.pruneAndReorderContextMessages.mockImplementation((msgs: unknown) => msgs);
 }
 
 describe("claudeMdExtension: before_agent_start (root refresh)", () => {
@@ -175,12 +178,12 @@ describe("claudeMdExtension: compaction-triggered refresh", () => {
 describe("claudeMdExtension: context event", () => {
   beforeEach(resetMocks);
 
-  it("delegates to pruneStaleRefreshMessages and returns modified messages", () => {
+  it("delegates to pruneAndReorderContextMessages and returns modified messages", () => {
     const { handlers, pi } = createPiMock();
     claudeMdExtension(pi as never);
 
     const prunedMessages = [{ role: "user", customType: undefined, details: undefined }];
-    mockFns.pruneStaleRefreshMessages.mockReturnValue(prunedMessages);
+    mockFns.pruneAndReorderContextMessages.mockReturnValue(prunedMessages);
 
     const result = handlers.get("context")?.({
       messages: [
@@ -201,7 +204,7 @@ describe("claudeMdExtension: context event", () => {
     claudeMdExtension(pi as never);
 
     const messages = [{ role: "user", customType: undefined, details: undefined }];
-    mockFns.pruneStaleRefreshMessages.mockReturnValue(messages);
+    mockFns.pruneAndReorderContextMessages.mockReturnValue(messages);
 
     const result = handlers.get("context")?.({ messages });
 

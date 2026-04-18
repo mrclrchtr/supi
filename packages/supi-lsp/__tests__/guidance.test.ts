@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core";
 import { describe, expect, it } from "vitest";
 import {
   buildProjectGuidelines,
@@ -6,7 +7,6 @@ import {
   formatDiagnosticsContext,
   lspPromptGuidelines,
   lspPromptSnippet,
-  reorderDiagnosticContextMessages,
 } from "../guidance.ts";
 import { LspManager } from "../manager.ts";
 import type { ProjectServerInfo } from "../types.ts";
@@ -98,7 +98,7 @@ describe("LSP prompt guidance", () => {
       { role: "custom", customType: "lsp-context", details: { contextToken: "current" } },
     ];
 
-    expect(reorderDiagnosticContextMessages(messages, "current")).toEqual([
+    expect(pruneAndReorderContextMessages(messages, "lsp-context", "current")).toEqual([
       { role: "user", content: "older prompt" },
       { role: "assistant", content: "working" },
       { role: "custom", customType: "lsp-context", details: { contextToken: "current" } },
@@ -112,7 +112,7 @@ describe("LSP prompt guidance", () => {
       { role: "custom", customType: "lsp-context", details: { contextToken: "old" } },
     ];
 
-    expect(reorderDiagnosticContextMessages(messages, null)).toEqual([
+    expect(pruneAndReorderContextMessages(messages, "lsp-context", null)).toEqual([
       { role: "user", content: "prompt" },
     ]);
   });
@@ -123,7 +123,7 @@ describe("LSP prompt guidance", () => {
       { role: "custom", customType: "lsp-context", details: { contextToken: "current" } },
     ];
 
-    expect(reorderDiagnosticContextMessages(messages, "current")).toEqual(messages);
+    expect(pruneAndReorderContextMessages(messages, "lsp-context", "current")).toEqual(messages);
   });
 });
 

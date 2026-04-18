@@ -11,7 +11,11 @@ const mockFns = vi.hoisted(() => ({
   shouldRefreshRoot: vi.fn(),
   formatRefreshContext: vi.fn(),
   readNativeContextFiles: vi.fn(),
-  pruneStaleRefreshMessages: vi.fn(),
+  pruneAndReorderContextMessages: vi.fn(),
+}));
+
+vi.mock("@mrclrchner/supi-core", () => ({
+  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
 }));
 
 vi.mock("../config.ts", () => ({
@@ -33,7 +37,6 @@ vi.mock("../refresh.ts", () => ({
   shouldRefreshRoot: mockFns.shouldRefreshRoot,
   formatRefreshContext: mockFns.formatRefreshContext,
   readNativeContextFiles: mockFns.readNativeContextFiles,
-  pruneStaleRefreshMessages: mockFns.pruneStaleRefreshMessages,
 }));
 
 vi.mock("../state.ts", () => ({
@@ -59,7 +62,7 @@ function resetMocks() {
   mockFns.findSubdirContextFiles.mockReturnValue([]);
   mockFns.filterAlreadyLoaded.mockImplementation((files: unknown) => files);
   mockFns.shouldRefreshRoot.mockReturnValue(false);
-  mockFns.pruneStaleRefreshMessages.mockImplementation((msgs: unknown) => msgs);
+  mockFns.pruneAndReorderContextMessages.mockImplementation((msgs: unknown) => msgs);
 }
 
 describe("claudeMdExtension: tool_result (injection)", () => {

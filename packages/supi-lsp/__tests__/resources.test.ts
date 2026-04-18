@@ -14,7 +14,7 @@ const mockFns = vi.hoisted(() => ({
   executeAction: vi.fn(),
   diagnosticsContextFingerprint: vi.fn(),
   formatDiagnosticsContext: vi.fn(),
-  reorderDiagnosticContextMessages: vi.fn((msgs) => msgs),
+  pruneAndReorderContextMessages: vi.fn((msgs) => msgs),
   registerLspAwareToolOverrides: vi.fn(),
 }));
 
@@ -24,13 +24,15 @@ vi.mock("../scanner.ts", () => ({
   startDetectedServers: mockFns.startDetectedServers,
   introspectCapabilities: mockFns.introspectCapabilities,
 }));
+vi.mock("@mrclrchtr/supi-core", () => ({
+  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
+}));
 vi.mock("../guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
   diagnosticsContextFingerprint: mockFns.diagnosticsContextFingerprint,
   formatDiagnosticsContext: mockFns.formatDiagnosticsContext,
   lspPromptGuidelines: mockFns.lspPromptGuidelines,
   lspPromptSnippet: mockFns.lspPromptSnippet,
-  reorderDiagnosticContextMessages: mockFns.reorderDiagnosticContextMessages,
 }));
 vi.mock("../overrides.ts", () => ({
   registerLspAwareToolOverrides: mockFns.registerLspAwareToolOverrides,

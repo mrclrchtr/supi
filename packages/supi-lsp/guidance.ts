@@ -50,39 +50,9 @@ export function diagnosticsContextFingerprint(content: string | null): string | 
   return content;
 }
 
-type ContextMessageLike = {
-  role?: string;
-  customType?: string;
-  details?: unknown;
-};
-
-export function reorderDiagnosticContextMessages<T extends ContextMessageLike>(
-  messages: T[],
-  activeToken: string | null,
-): T[] {
-  const filtered = messages.filter((message) => {
-    if (message.customType !== "lsp-context") return true;
-    if (!activeToken) return false;
-    return getContextToken(message.details) === activeToken;
-  });
-
-  if (!activeToken) return filtered;
-
-  const contextIndex = filtered.findIndex(
-    (message) =>
-      message.customType === "lsp-context" && getContextToken(message.details) === activeToken,
-  );
-  if (contextIndex === -1) return filtered;
-
-  const userIndex = findLastUserMessageIndex(filtered);
-  if (userIndex === -1 || contextIndex < userIndex) return filtered;
-
-  const next = [...filtered];
-  const [contextMessage] = next.splice(contextIndex, 1);
-  if (!contextMessage) return filtered;
-  next.splice(userIndex, 0, contextMessage);
-  return next;
-}
+// reorderDiagnosticContextMessages, getContextToken, and findLastUserMessageIndex
+// have been extracted to supi-core/context-messages.ts.
+// Use pruneAndReorderContextMessages(messages, "lsp-context", activeToken) instead.
 
 function formatCounts(entry: OutstandingDiagnosticSummaryEntry): string {
   const counts: string[] = [];
@@ -102,17 +72,4 @@ function displayRoot(root: string): string {
 
 function pluralize(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
-}
-
-function getContextToken(details: unknown): string | null {
-  if (!details || typeof details !== "object") return null;
-  const token = (details as { contextToken?: unknown }).contextToken;
-  return typeof token === "string" ? token : null;
-}
-
-function findLastUserMessageIndex<T extends ContextMessageLike>(messages: T[]): number {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    if (messages[index]?.role === "user") return index;
-  }
-  return -1;
 }

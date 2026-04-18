@@ -15,13 +15,13 @@ import { loadConfig } from "./config.ts";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
 
+import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core";
 import {
   buildProjectGuidelines,
   diagnosticsContextFingerprint,
   formatDiagnosticsContext,
   lspPromptGuidelines,
   lspPromptSnippet,
-  reorderDiagnosticContextMessages,
 } from "./guidance.ts";
 import { LspManager } from "./manager.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
@@ -186,8 +186,9 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
   });
 
   pi.on("context", (event) => {
-    const messages = reorderDiagnosticContextMessages(
+    const messages = pruneAndReorderContextMessages(
       event.messages as Array<{ role?: string; customType?: string; details?: unknown }>,
+      "lsp-context",
       state.currentContextToken,
     ) as typeof event.messages;
 

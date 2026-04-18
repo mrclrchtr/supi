@@ -43,61 +43,9 @@ export function formatRefreshContext(contextFiles: NativeContextFile[]): string 
   return parts.join("\n\n");
 }
 
-type ContextMessageLike = {
-  role?: string;
-  customType?: string;
-  details?: unknown;
-};
-
-/**
- * Prune stale refresh messages from the context, keeping only the active one.
- * Reorders the active message before the last user message.
- */
-export function pruneStaleRefreshMessages<T extends ContextMessageLike>(
-  messages: T[],
-  activeToken: string | null,
-): T[] {
-  // Remove all refresh messages except the active one
-  const filtered = messages.filter((message) => {
-    if (message.customType !== "supi-claude-md-refresh") return true;
-    if (!activeToken) return false;
-    return getContextToken(message.details) === activeToken;
-  });
-
-  if (!activeToken) return filtered;
-
-  // Find the active refresh message
-  const contextIndex = filtered.findIndex(
-    (message) =>
-      message.customType === "supi-claude-md-refresh" &&
-      getContextToken(message.details) === activeToken,
-  );
-  if (contextIndex === -1) return filtered;
-
-  // Find the last user message
-  const userIndex = findLastUserMessageIndex(filtered);
-  if (userIndex === -1 || contextIndex < userIndex) return filtered;
-
-  // Move context message before last user message
-  const next = [...filtered];
-  const [contextMessage] = next.splice(contextIndex, 1);
-  if (!contextMessage) return filtered;
-  next.splice(userIndex, 0, contextMessage);
-  return next;
-}
-
-function getContextToken(details: unknown): string | null {
-  if (!details || typeof details !== "object") return null;
-  const token = (details as { contextToken?: unknown }).contextToken;
-  return typeof token === "string" ? token : null;
-}
-
-function findLastUserMessageIndex<T extends ContextMessageLike>(messages: T[]): number {
-  for (let index = messages.length - 1; index >= 0; index--) {
-    if (messages[index]?.role === "user") return index;
-  }
-  return -1;
-}
+// pruneStaleRefreshMessages, getContextToken, and findLastUserMessageIndex
+// have been extracted to supi-core/context-messages.ts.
+// Use pruneAndReorderContextMessages(messages, "supi-claude-md-refresh", activeToken) instead.
 
 /**
  * Read native context files from pi's system prompt options.
