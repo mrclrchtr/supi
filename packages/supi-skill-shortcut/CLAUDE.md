@@ -10,21 +10,17 @@ Entrypoint: `skill-shortcut.ts`
 
 ## Architecture
 
-The extension wraps pi-tui's autocomplete/editor stack:
-- `SkillShortcutEditor` subclasses the editor integration
-- it intercepts `$name` tokens under the cursor
-- outside a `$` token, autocomplete should delegate back to the inner provider unchanged
+The extension uses the stacked autocomplete provider API (`ctx.ui.addAutocompleteProvider`) introduced in pi 0.69.0:
+- registers a provider that returns skill suggestions when the cursor prefix starts with `$`
+- returns `null` outside `$` tokens so built-in completion continues normally
+- the `input` event handler transforms `$skill-name` → `/skill:skill-name` before agent processing
 
-## Critical gotchas
+## Fallback
 
-- This package intentionally reaches into private pi-tui internals using `as any` casts.
-- Known private fields/methods touched include `autocompleteState`, `state`, and `tryTriggerAutocomplete`.
-- These internals are undocumented and may break on `@mariozechner/pi-tui` upgrades; verify behavior after every pi-tui version bump.
-- Keep the inline `// biome-ignore lint/suspicious/noExplicitAny: accessing private TUI internals` comments on each intentional cast.
+`addAutocompleteProvider` is accessed via optional chaining (`?.`) with a local interface extension, so the extension gracefully degrades on pi versions < 0.69.0.
 
 ## Working rules
 
-- Prefer small, targeted changes here; regressions are easy because the package sits on private editor behavior.
 - If behavior changes, test both:
   - expansion inside `$...` tokens
   - normal autocomplete everywhere else
