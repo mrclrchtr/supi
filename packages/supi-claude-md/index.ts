@@ -6,6 +6,8 @@
 // 2. Root refresh: periodically re-inject root/ancestor context files that
 //    pi loaded natively (via before_agent_start persistent messages).
 
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type {
   BeforeAgentStartEvent,
   ExtensionAPI,
@@ -29,6 +31,8 @@ import {
 } from "./refresh.ts";
 import { type ClaudeMdState, createInitialState, reconstructState } from "./state.ts";
 import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
+
+const baseDir = dirname(fileURLToPath(import.meta.url));
 
 let extensionState: ClaudeMdState | null = null;
 
@@ -190,6 +194,10 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
       handleCommand(args, ctx, extensionState);
     },
   });
+
+  pi.on("resources_discover", () => ({
+    skillPaths: [join(baseDir, "resources")],
+  }));
 }
 
 function captureNativePaths(

@@ -17,6 +17,7 @@
   ],
   "files": [
     "*.ts",
+    "resources",
     "!__tests__"
   ],
   "peerDependencies": {
@@ -30,6 +31,9 @@
   "pi": {
     "extensions": [
       "./ask-user.ts"
+    ],
+    "skills": [
+      "./resources"
     ]
   }
 }

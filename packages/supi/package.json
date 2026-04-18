@@ -31,12 +31,19 @@
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-skill-shortcut": "workspace:*"
   },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.4"
+  },
   "pi": {
     "extensions": [
       "./aliases.ts",
       "./ask-user.ts",
       "./bash-timeout.ts",
       "./claude-md.ts",
+      "./resources.ts",
       "./skill-shortcut.ts",
       "./lsp.ts"
     ],

@@ -13,6 +13,8 @@
 //   result.ts           — hybrid (content + details) result formatting
 //   render.ts           — custom renderCall / renderResult for the transcript
 
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
 import type { Component } from "@mariozechner/pi-tui";
 import { ActiveQuestionnaireLock } from "./flow.ts";
@@ -23,6 +25,8 @@ import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import type { NormalizedQuestion } from "./types.ts";
 import { type FallbackUi, runFallbackQuestionnaire } from "./ui-fallback.ts";
 import { type RichUiHost, runRichQuestionnaire } from "./ui-rich.ts";
+
+const baseDir = dirname(fileURLToPath(import.meta.url));
 
 const TOOL_NAME = "ask_user";
 const TOOL_LABEL = "Ask User";
@@ -74,6 +78,10 @@ export default function askUserExtension(pi: ExtensionAPI): void {
         theme as Theme,
       ) as unknown as Component,
   });
+
+  pi.on("resources_discover", () => ({
+    skillPaths: [join(baseDir, "resources")],
+  }));
 }
 
 async function executeAskUser(

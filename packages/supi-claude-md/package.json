@@ -17,6 +17,7 @@
   ],
   "files": [
     "*.ts",
+    "resources",
     "!__tests__"
   ],
   "dependencies": {
@@ -32,6 +33,9 @@
   "pi": {
     "extensions": [
       "./index.ts"
+    ],
+    "skills": [
+      "./resources"
     ]
   }
 }

@@ -18,6 +18,7 @@
   "files": [
     "*.ts",
     "*.json",
+    "resources",
     "!__tests__"
   ],
   "peerDependencies": {
@@ -31,6 +32,9 @@
   "pi": {
     "extensions": [
       "./lsp.ts"
+    ],
+    "skills": [
+      "./resources"
     ]
   }
 }

@@ -21,6 +21,7 @@ function fakePi(): { tool: MockTool } {
     registerTool: (def: MockTool) => {
       captured = def;
     },
+    on() {},
   };
   // biome-ignore lint/suspicious/noExplicitAny: registering a partial ExtensionAPI is intentional in tests
   askUserExtension(api as any);

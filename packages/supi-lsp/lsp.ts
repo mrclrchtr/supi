@@ -7,9 +7,14 @@
 // servers on session start, and injects compact diagnostic context only when
 // outstanding diagnostics exist.
 
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { loadConfig } from "./config.ts";
+
+const baseDir = dirname(fileURLToPath(import.meta.url));
+
 import {
   buildProjectGuidelines,
   diagnosticsContextFingerprint,
@@ -68,6 +73,7 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerSessionLifecycleHandlers(pi, state);
   registerBehaviorHandlers(pi, state);
   registerLspStatusCommand(pi, state);
+  registerResourcesDiscover(pi);
 }
 
 function registerDisabledStatusCommand(pi: ExtensionAPI): void {
@@ -333,4 +339,10 @@ function parseSeverity(env: string | undefined): number {
   if (!env) return 1;
   const parsed = Number.parseInt(env, 10);
   return parsed >= 1 && parsed <= 4 ? parsed : 1;
+}
+
+function registerResourcesDiscover(pi: ExtensionAPI): void {
+  pi.on("resources_discover", () => ({
+    skillPaths: [join(baseDir, "resources")],
+  }));
 }
