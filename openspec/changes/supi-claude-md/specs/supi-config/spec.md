@@ -92,30 +92,11 @@ The `/supi-claude-md` command SHALL write config changes to project config (`.pi
 - **WHEN** user runs `/supi-claude-md --global interval 5`
 - **THEN** `~/.pi/agent/supi/config.json` SHALL be updated with `{ "claude-md": { "rereadInterval": 5 } }`
 
-### Requirement: Command subcommands
+### Requirement: Command opens settings UI
 
-The `/supi-claude-md` command SHALL support these subcommands:
-- (no args) or `status`: show effective config and current state
-- `refresh`: force re-inject on next prompt
-- `list`: show discovered subdirectory context files
-- `interval <N>`: set reread interval
-- `interval off`: disable periodic reread (set to 0)
-- `interval default`: remove project override for interval
-- `subdirs on|off`: toggle subdirectory discovery
-- `compact on|off`: toggle post-compaction refresh
-- `--global` flag: write to global config instead of project
+The `/supi-claude-md` command SHALL open the interactive settings UI directly. It SHALL NOT expose command-line subcommands.
 
-#### Scenario: Status shows effective config
+#### Scenario: User opens settings UI
 
-- **WHEN** user runs `/supi-claude-md status`
-- **THEN** the extension SHALL display the resolved config values, completed turns, last refresh turn, and number of injected subdirectories
-
-#### Scenario: Interval set
-
-- **WHEN** user runs `/supi-claude-md interval 5`
-- **THEN** the reread interval SHALL be updated to 5 in project config and take effect immediately
-
-#### Scenario: Interval default removes override
-
-- **WHEN** user runs `/supi-claude-md interval default`
-- **THEN** the `rereadInterval` key SHALL be removed from project config, falling back to global or hardcoded default
+- **WHEN** the user runs `/supi-claude-md`
+- **THEN** the settings UI SHALL open and show the current effective config values

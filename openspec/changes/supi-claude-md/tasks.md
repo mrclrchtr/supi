@@ -19,8 +19,8 @@
 
 ## 4. supi-claude-md: config and types
 
-- [x] 4.1 Define config interface and hardcoded defaults in `packages/supi-claude-md/config.ts` (`rereadInterval: 3`, `subdirs: true`, `compactRefresh: true`, `fileNames: ["CLAUDE.md", "AGENTS.md"]`)
-- [x] 4.2 Define internal state types in `packages/supi-claude-md/state.ts` (`ClaudeMdState` with `completedTurns`, `lastRefreshTurn`, `injectedDirs`, `needsRefresh`, `currentContextToken`, `contextCounter`, `nativeContextPaths`)
+- [x] 4.1 Define config interface and hardcoded defaults in `packages/supi-claude-md/config.ts` (`rereadInterval: 3`, `subdirs: true`, `fileNames: ["CLAUDE.md", "AGENTS.md"]`)
+- [x] 4.2 Define internal state types in `packages/supi-claude-md/state.ts` (`ClaudeMdState` with `completedTurns`, `lastRefreshTurn`, `injectedDirs`, `currentContextToken`, `contextCounter`, `nativeContextPaths`)
 - [x] 4.3 Write unit tests for config loading via `loadSupiConfig` in `packages/supi-claude-md/__tests__/config.test.ts`
 
 ## 5. supi-claude-md: context file discovery
@@ -40,14 +40,14 @@
 
 ## 7. supi-claude-md: root refresh (before_agent_start + context)
 
-- [x] 7.1 Implement `shouldRefreshRoot(state, config)` in `packages/supi-claude-md/refresh.ts` — check turn interval, post-compaction flag, manual refresh flag
+- [x] 7.1 Implement `shouldRefreshRoot(state, config)` in `packages/supi-claude-md/refresh.ts` — check turn interval only
 - [x] 7.2 Implement `formatRefreshContext(contextFiles)` — format root context files using `wrapExtensionContext`
 - [x] 7.3 Implement `pruneStaleRefreshMessages(messages, activeToken)` — filter out old refresh messages, reorder current one before last user message (same pattern as supi-lsp's `reorderDiagnosticContextMessages`)
 - [x] 7.4 Wire `before_agent_start` handler: check shouldRefreshRoot, read native context files from `event.systemPromptOptions.contextFiles`, return persistent message with `customType: "supi-claude-md-refresh"`, `display: false`, details with `contextToken` and `turn`
 - [x] 7.5 Wire `context` event handler: call `pruneStaleRefreshMessages`, return modified messages
 - [x] 7.6 Wire `turn_end` handler: increment `completedTurns` on `stopReason: "stop"`
-- [x] 7.7 Wire `session_compact` handler: set `needsRefresh = true`, clear `injectedDirs`
-- [x] 7.8 Write unit tests in `packages/supi-claude-md/__tests__/refresh.test.ts`: should-refresh logic (interval, post-compaction, manual), prune/reorder messages, format output
+- [x] 7.7 Wire `session_compact` handler: clear `injectedDirs`
+- [x] 7.8 Write unit tests in `packages/supi-claude-md/__tests__/refresh.test.ts`: should-refresh logic (interval), prune/reorder messages, format output
 
 ## 8. supi-claude-md: session state reconstruction
 
@@ -65,11 +65,11 @@
 
 - [x] 10.1 Register `/supi-claude-md` command with subcommand parsing in `packages/supi-claude-md/index.ts`
 - [x] 10.2 Implement `status` subcommand: display effective config, completed turns, last refresh turn, injected dirs count
-- [x] 10.3 Implement `refresh` subcommand: set `needsRefresh = true`, notify user
+- [x] 10.3 Open the settings UI directly from `/supi-claude-md`
 - [x] 10.4 Implement `list` subcommand: display all discovered subdirectory context files (scan cwd tree)
 - [x] 10.5 Implement `interval <N|off|default>` subcommand: write to project or global config via `writeSupiConfig`
 - [x] 10.6 Implement `subdirs on|off` subcommand: write to config
-- [x] 10.7 Implement `compact on|off` subcommand: write to config
+- [x] 10.7 No compaction toggle; root refresh follows the interval only
 - [x] 10.8 Implement `--global` flag parsing: route config writes to global scope
 - [x] 10.9 Implement argument autocompletion via `getArgumentCompletions`
 
@@ -84,5 +84,5 @@
 - [x] 12.3 Run `pnpm biome:ai` — no lint/format issues
 - [x] 12.4 Manual smoke test: install SuPi in pi, verify subdirectory CLAUDE.md injection on file read
 - [x] 12.5 Manual smoke test: verify root context refresh after 3 completed turns
-- [x] 12.6 Manual smoke test: verify post-compaction refresh
+- [x] 12.6 Manual smoke test: verify interval-based root refresh
 - [x] 12.7 Manual smoke test: verify `/supi-claude-md status`, `interval`, `refresh`, `list` commands

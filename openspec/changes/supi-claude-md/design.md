@@ -91,6 +91,6 @@ When the agent accesses `packages/supi-lsp/src/foo.ts`, walk up from `packages/s
 
 - **[Shared config file corruption]** One extension writing bad JSON breaks config for all SuPi extensions. → Config write uses read-modify-write with JSON.parse/stringify. If parse fails on read, fall back to hardcoded defaults. Clear error message via `ctx.ui.notify`.
 
-- **[Post-compaction refresh timing]** `session_compact` fires after compaction, but we can't inject there without triggering a turn. → Set `needsRefresh = true` flag; inject on next `before_agent_start` (next user prompt). Acceptable delay.
+- **[Interval-based refresh timing]** Refresh happens on the next `before_agent_start` after the configured interval elapses. The extension does not add a separate post-compaction refresh path.
 
 - **[Multiple context files per directory chain]** Walking up from a deeply nested file could discover many context files. → Capped by depth (stop at cwd). Typical monorepos have 1–2 context files in subdirectories.

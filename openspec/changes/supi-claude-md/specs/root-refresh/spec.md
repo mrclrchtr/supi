@@ -52,28 +52,18 @@ The extension SHALL register a `context` event handler that removes all refresh 
 - **WHEN** there is no active `contextToken` (e.g., refresh disabled or no refresh has occurred)
 - **THEN** all refresh messages SHALL be removed from the context
 
-### Requirement: Re-inject after compaction
+### Requirement: Interval-based root refresh only
 
-The extension SHALL re-inject root context files after compaction. When `session_compact` fires, the extension SHALL set an internal flag. On the next `before_agent_start`, if the flag is set, the extension SHALL inject a refresh regardless of the turn count.
+The extension SHALL refresh root context files only on the configured `rereadInterval`. Compaction does not trigger an additional refresh.
 
-#### Scenario: Compaction triggers refresh on next prompt
+#### Scenario: Compaction does not force refresh
 
 - **WHEN** compaction occurs and the user sends a new prompt
-- **THEN** the extension SHALL inject a root context refresh even if the turn interval has not been reached
+- **THEN** the extension SHALL continue following the normal interval-based refresh timing
 
-#### Scenario: Flag cleared after refresh
+### Requirement: No manual refresh command
 
-- **WHEN** the post-compaction refresh is injected
-- **THEN** the flag SHALL be cleared and normal interval-based refresh SHALL resume
-
-### Requirement: Manual refresh via command
-
-The extension SHALL support a `/supi-claude-md refresh` command that immediately injects a root context refresh on the next `before_agent_start`, regardless of turn count or interval.
-
-#### Scenario: User forces refresh
-
-- **WHEN** the user runs `/supi-claude-md refresh`
-- **THEN** the extension SHALL set the refresh flag and notify the user that refresh will occur on the next prompt
+The extension SHALL NOT expose a dedicated `/supi-claude-md refresh` command. Root refresh is driven by the configured interval only.
 
 ### Requirement: Reconstruct root refresh state on session start
 
