@@ -13,6 +13,8 @@ Two capabilities wired into a single extension:
 
 - `index.ts` — Extension entry point, all event handlers, `/supi-claude-md` command
 - `config.ts` — Config interface, defaults, `loadClaudeMdConfig()`
+- `settings.ts` — Interactive settings overlay (`/supi-claude-md settings`), TUI component with scope toggle, `SettingsList`, and interval `Input`
+- `commands.ts` — Subcommand routing for `/supi-claude-md` (status, refresh, list, interval, subdirs, compact, settings)
 - `state.ts` — `ClaudeMdState` type, `createInitialState()`, `reconstructState()`
 - `discovery.ts` — `findSubdirContextFiles()`, `filterAlreadyLoaded()`, `extractPathFromToolEvent()`
 - `subdirectory.ts` — `formatSubdirContext()`, `shouldInjectSubdir()`
@@ -45,6 +47,9 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 
 ## Gotchas
 
+- `/supi-claude-md settings` opens an interactive TUI overlay; other subcommands (`interval`, `subdirs`, `compact`) remain as text-based alternatives
+- `settings.ts` uses `ctx.ui.custom()` with `SettingsList` from `@mariozechner/pi-tui` for boolean toggles and a custom `Input` for interval editing
+- The overlay's `handleInput` is split into `handleEditingInput` and `handleNavigateInput` to satisfy Biome's cognitive complexity limits
 - `systemPromptOptions` is accessed via a typed intersection (`BeforeAgentStartEvent & { systemPromptOptions?: ... }`) for forward-compatibility with pi >= 0.68.0
 - `scanForContextFiles` uses `require()` for lazy fs/path loading in command handler context
 - Module-level `extensionState` variable lets command handlers access the state object

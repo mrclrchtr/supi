@@ -17,7 +17,7 @@ import type {
   TurnEndEvent,
 } from "@mariozechner/pi-coding-agent";
 import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core";
-import { getArgumentCompletions, handleCommand } from "./commands.ts";
+import { handleCommand } from "./commands.ts";
 import { loadClaudeMdConfig } from "./config.ts";
 import {
   extractPathFromToolEvent,
@@ -30,18 +30,14 @@ import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
 
-let extensionState: ClaudeMdState | null = null;
-
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: extension entry point wires all events
 export default function claudeMdExtension(pi: ExtensionAPI) {
   const state: ClaudeMdState = createInitialState();
-  extensionState = state;
 
   // ── Session lifecycle ──────────────────────────────────────
 
   pi.on("session_start", async (_event: SessionStartEvent, ctx: ExtensionContext) => {
     Object.assign(state, createInitialState());
-    extensionState = state;
 
     try {
       const branch =
@@ -188,9 +184,8 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
 
   pi.registerCommand("supi-claude-md", {
     description: "Manage supi-claude-md context injection",
-    getArgumentCompletions,
     async handler(args: string, ctx) {
-      handleCommand(args, ctx, extensionState);
+      handleCommand(args, ctx);
     },
   });
 
