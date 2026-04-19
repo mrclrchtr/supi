@@ -20,25 +20,28 @@ describe("LSP prompt guidance", () => {
   });
 
   it("builds project-specific guidelines with roots, file types, and actions", () => {
-    const guidelines = buildProjectGuidelines([
-      {
-        name: "typescript-language-server",
-        root: process.cwd(),
-        fileTypes: ["ts", "tsx"],
-        status: "running",
-        // biome-ignore lint/security/noSecrets: tool signature hints, not secrets
-        supportedActions: ["hover(file,line,char)", "diagnostics(file?)"],
-        openFiles: [],
-      } satisfies ProjectServerInfo,
-      {
-        name: "rust-analyzer",
-        root: `${process.cwd()}/crates/core`,
-        fileTypes: ["rs"],
-        status: "unavailable",
-        supportedActions: [],
-        openFiles: [],
-      } satisfies ProjectServerInfo,
-    ]);
+    const guidelines = buildProjectGuidelines(
+      [
+        {
+          name: "typescript-language-server",
+          root: process.cwd(),
+          fileTypes: ["ts", "tsx"],
+          status: "running",
+          // biome-ignore lint/security/noSecrets: tool signature hints, not secrets
+          supportedActions: ["hover(file,line,char)", "diagnostics(file?)"],
+          openFiles: [],
+        } satisfies ProjectServerInfo,
+        {
+          name: "rust-analyzer",
+          root: `${process.cwd()}/crates/core`,
+          fileTypes: ["rs"],
+          status: "unavailable",
+          supportedActions: [],
+          openFiles: [],
+        } satisfies ProjectServerInfo,
+      ],
+      process.cwd(),
+    );
 
     expect(guidelines.join(" ")).toContain("LSP active: typescript-language-server");
     expect(guidelines.join(" ")).toContain("root: .");
@@ -48,7 +51,7 @@ describe("LSP prompt guidance", () => {
   });
 
   it("falls back to generic guidance when no servers are detected", () => {
-    expect(buildProjectGuidelines([])).toEqual(lspPromptGuidelines);
+    expect(buildProjectGuidelines([], process.cwd())).toEqual(lspPromptGuidelines);
   });
 
   it("formats diagnostics as xml extension context", () => {
@@ -129,22 +132,25 @@ describe("LSP prompt guidance", () => {
 
 describe("LspManager inactive coverage summaries", () => {
   it("omits active coverage summaries before any server is active", () => {
-    const manager = new LspManager({
-      servers: {
-        "typescript-language-server": {
-          command: "typescript-language-server",
-          args: ["--stdio"],
-          fileTypes: ["ts", "tsx", "js", "jsx"],
-          rootMarkers: ["package.json"],
-        },
-        pyright: {
-          command: "pyright-langserver",
-          args: ["--stdio"],
-          fileTypes: ["py", "pyi"],
-          rootMarkers: ["pyproject.toml"],
+    const manager = new LspManager(
+      {
+        servers: {
+          "typescript-language-server": {
+            command: "typescript-language-server",
+            args: ["--stdio"],
+            fileTypes: ["ts", "tsx", "js", "jsx"],
+            rootMarkers: ["package.json"],
+          },
+          pyright: {
+            command: "pyright-langserver",
+            args: ["--stdio"],
+            fileTypes: ["py", "pyi"],
+            rootMarkers: ["pyproject.toml"],
+          },
         },
       },
-    });
+      process.cwd(),
+    );
 
     expect(manager.getCoverageSummaryText()).toBeNull();
   });
@@ -152,16 +158,19 @@ describe("LspManager inactive coverage summaries", () => {
 
 describe("LspManager relevant coverage summaries", () => {
   it("filters active coverage summaries to relevant directories", () => {
-    const manager = new LspManager({
-      servers: {
-        "typescript-language-server": {
-          command: "typescript-language-server",
-          args: ["--stdio"],
-          fileTypes: ["ts", "tsx", "js", "jsx"],
-          rootMarkers: ["package.json"],
+    const manager = new LspManager(
+      {
+        servers: {
+          "typescript-language-server": {
+            command: "typescript-language-server",
+            args: ["--stdio"],
+            fileTypes: ["ts", "tsx", "js", "jsx"],
+            rootMarkers: ["package.json"],
+          },
         },
       },
-    });
+      process.cwd(),
+    );
 
     const clients = (
       manager as unknown as {
@@ -194,7 +203,7 @@ describe("LspManager relevant coverage summaries", () => {
 
 describe("LspManager diagnostic summaries", () => {
   it("filters outstanding diagnostics to relevant files", () => {
-    const manager = new LspManager({ servers: {} });
+    const manager = new LspManager({ servers: {} }, process.cwd());
     const clients = (
       manager as unknown as {
         clients: Map<
@@ -228,18 +237,116 @@ describe("LspManager diagnostic summaries", () => {
   });
 });
 
+describe("LspManager getOutstandingDiagnostics", () => {
+  it("returns detailed diagnostics per file with messages and line numbers", () => {
+    const manager = new LspManager({ servers: {} }, process.cwd());
+    const clients = (
+      manager as unknown as {
+        clients: Map<
+          string,
+          {
+            getAllDiagnostics(): Array<{
+              uri: string;
+              diagnostics: Array<{
+                severity?: number;
+                message: string;
+                range: { start: { line: number; character: number } };
+              }>;
+            }>;
+          }
+        >;
+      }
+    ).clients;
+
+    clients.set("fake", {
+      getAllDiagnostics: () => [
+        {
+          uri: `file://${path.join(process.cwd(), "src/app.ts")}`,
+          diagnostics: [
+            {
+              severity: DiagnosticSeverity.Error,
+              message: "Cannot find module 'typebox'",
+              range: { start: { line: 4, character: 21 } },
+            },
+            {
+              severity: DiagnosticSeverity.Warning,
+              message: "Unused import",
+              range: { start: { line: 1, character: 0 } },
+            },
+          ],
+        },
+      ],
+    });
+
+    const detailed = manager.getOutstandingDiagnostics(2);
+    expect(detailed).toHaveLength(1);
+    expect(detailed[0]?.file).toBe("src/app.ts");
+    expect(detailed[0]?.diagnostics).toHaveLength(2);
+    expect(detailed[0]?.diagnostics[0]?.message).toBe("Cannot find module 'typebox'");
+    expect(detailed[0]?.diagnostics[0]?.range.start.line).toBe(4);
+  });
+
+  it("filters diagnostics by severity threshold", () => {
+    const manager = new LspManager({ servers: {} }, process.cwd());
+    const clients = (
+      manager as unknown as {
+        clients: Map<
+          string,
+          {
+            getAllDiagnostics(): Array<{
+              uri: string;
+              diagnostics: Array<{
+                severity?: number;
+                message: string;
+                range: { start: { line: number; character: number } };
+              }>;
+            }>;
+          }
+        >;
+      }
+    ).clients;
+
+    clients.set("fake", {
+      getAllDiagnostics: () => [
+        {
+          uri: `file://${path.join(process.cwd(), "src/app.ts")}`,
+          diagnostics: [
+            {
+              severity: DiagnosticSeverity.Error,
+              message: "type error",
+              range: { start: { line: 0, character: 0 } },
+            },
+            {
+              severity: DiagnosticSeverity.Hint,
+              message: "hint",
+              range: { start: { line: 0, character: 0 } },
+            },
+          ],
+        },
+      ],
+    });
+
+    const errorsOnly = manager.getOutstandingDiagnostics(1);
+    expect(errorsOnly[0]?.diagnostics).toHaveLength(1);
+    expect(errorsOnly[0]?.diagnostics[0]?.message).toBe("type error");
+  });
+});
+
 describe("LspManager detected root reuse", () => {
   it("reuses the detected logical root for nested files so lazy startup does not spawn duplicate roots", () => {
-    const manager = new LspManager({
-      servers: {
-        "node-based": {
-          command: "node",
-          args: [],
-          fileTypes: ["ts"],
-          rootMarkers: ["tsconfig.json", "package.json"],
+    const manager = new LspManager(
+      {
+        servers: {
+          "node-based": {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["tsconfig.json", "package.json"],
+          },
         },
       },
-    });
+      process.cwd(),
+    );
 
     manager.registerDetectedServers([
       {

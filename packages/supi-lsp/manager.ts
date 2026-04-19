@@ -40,7 +40,14 @@ export class LspManager {
   private commandAvailability = new Map<string, boolean>();
   /** Preferred project roots discovered by proactive scan or lazy startup */
   private knownRoots = new Map<string, string[]>();
-  constructor(private readonly config: LspConfig) {}
+  constructor(
+    private readonly config: LspConfig,
+    private readonly cwd: string,
+  ) {}
+
+  getCwd(): string {
+    return this.cwd;
+  }
   // ── Public API ────────────────────────────────────────────────────
   registerDetectedServers(detected: DetectedProjectServer[]): void {
     this.knownRoots = buildKnownRootsMap(detected);
@@ -124,13 +131,16 @@ export class LspManager {
   }
   getProjectServerInfo(serverName: string, root: string, fileTypes: string[]): ProjectServerInfo {
     const key = this.clientKey(serverName, root);
-    return buildProjectServerInfo({
-      serverName,
-      root,
-      fileTypes,
-      client: this.clients.get(key),
-      unavailable: this.unavailable.has(key),
-    });
+    return buildProjectServerInfo(
+      {
+        serverName,
+        root,
+        fileTypes,
+        client: this.clients.get(key),
+        unavailable: this.unavailable.has(key),
+      },
+      this.cwd,
+    );
   }
   getKnownProjectServers(detected: DetectedProjectServer[]): ProjectServerInfo[] {
     const known = new Map<string, DetectedProjectServer>();
@@ -251,7 +261,7 @@ export class LspManager {
       if (server.status !== "running" || server.openFiles.length === 0) continue;
       const openFiles = activeServers.get(server.name) ?? new Set<string>();
       for (const file of server.openFiles) {
-        const relativeFile = displayRelativeFilePath(file);
+        const relativeFile = displayRelativeFilePath(file, this.cwd);
         if (shouldIgnoreLspPath(relativeFile)) continue;
         openFiles.add(relativeFile);
       }
@@ -290,7 +300,7 @@ export class LspManager {
     const fileDiags = new Map<string, { errors: number; warnings: number }>();
     for (const client of this.clients.values()) {
       for (const entry of client.getAllDiagnostics()) {
-        collectDiagnosticSummaryCounts(fileDiags, entry);
+        collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd);
       }
     }
     return Array.from(fileDiags.entries()).map(([file, counts]) => ({ file, ...counts }));
@@ -301,7 +311,7 @@ export class LspManager {
     const fileDiags = new Map<string, OutstandingDiagnosticSummaryEntry>();
     for (const client of this.clients.values()) {
       for (const entry of client.getAllDiagnostics()) {
-        const file = relativeFilePathFromUri(entry.uri);
+        const file = relativeFilePathFromUri(entry.uri, this.cwd);
         if (shouldIgnoreLspPath(file)) continue;
         const current = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
         const next = accumulateOutstandingDiagnostics(current, entry.diagnostics, maxSeverity);
@@ -342,6 +352,29 @@ export class LspManager {
     );
     return formatOutstandingDiagnosticsSummaryText(relevantEntries, maxFiles);
   }
+
+  /** Get outstanding diagnostics with full detail per file. */
+  getOutstandingDiagnostics(
+    maxSeverity: number = 1,
+  ): Array<{ file: string; diagnostics: Diagnostic[] }> {
+    this.pruneMissingFiles();
+    const fileDiags = new Map<string, Diagnostic[]>();
+    for (const client of this.clients.values()) {
+      for (const entry of client.getAllDiagnostics()) {
+        const file = relativeFilePathFromUri(entry.uri, this.cwd);
+        if (shouldIgnoreLspPath(file)) continue;
+        const filtered = entry.diagnostics.filter(
+          (d) => d.severity !== undefined && d.severity <= maxSeverity,
+        );
+        if (filtered.length === 0) continue;
+        const existing = fileDiags.get(file) ?? [];
+        fileDiags.set(file, [...existing, ...filtered]);
+      }
+    }
+    return Array.from(fileDiags.entries())
+      .map(([file, diagnostics]) => ({ file, diagnostics }))
+      .sort((a, b) => a.file.localeCompare(b.file));
+  }
   /**
    * Ensure a file is open in its LSP server.
    * Used when the agent needs to read a file for the first time.
@@ -367,7 +400,7 @@ export class LspManager {
     const knownRoot = resolveKnownRoot(filePath, preferredRoots);
     if (knownRoot) return knownRoot;
     const fileDir = path.dirname(path.resolve(filePath));
-    return findProjectRoot(fileDir, rootMarkers, process.cwd());
+    return findProjectRoot(fileDir, rootMarkers, this.cwd);
   }
   private rememberKnownRoot(serverName: string, root: string): void {
     const roots = this.knownRoots.get(serverName) ?? [];

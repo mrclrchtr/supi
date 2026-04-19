@@ -74,7 +74,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
 
   beforeAll(async () => {
     const config = loadConfig(tmpDir);
-    manager = new LspManager(config);
+    manager = new LspManager(config, tmpDir);
     await warmUpToolActionManager(manager);
   }, 20_000);
 

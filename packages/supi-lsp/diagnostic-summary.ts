@@ -5,8 +5,9 @@ import { type Diagnostic, DiagnosticSeverity } from "./types.ts";
 export function collectDiagnosticSummaryCounts(
   fileDiags: Map<string, { errors: number; warnings: number }>,
   entry: { uri: string; diagnostics: Diagnostic[] },
+  cwd: string,
 ): void {
-  const file = relativeFilePathFromUri(entry.uri);
+  const file = relativeFilePathFromUri(entry.uri, cwd);
   if (shouldIgnoreLspPath(file)) return;
 
   const current = fileDiags.get(file) ?? { errors: 0, warnings: 0 };
@@ -47,8 +48,8 @@ export function accumulateOutstandingDiagnostics(
   return next;
 }
 
-export function relativeFilePathFromUri(uri: string): string {
-  return displayRelativeFilePath(uri.replace("file://", ""));
+export function relativeFilePathFromUri(uri: string, cwd: string): string {
+  return displayRelativeFilePath(uri.replace("file://", ""), cwd);
 }
 
 function isDiagnosticWithinThreshold(

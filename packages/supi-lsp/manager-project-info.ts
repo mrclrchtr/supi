@@ -10,7 +10,10 @@ interface ProjectServerInfoInput {
   unavailable: boolean;
 }
 
-export function buildProjectServerInfo(input: ProjectServerInfoInput): ProjectServerInfo {
+export function buildProjectServerInfo(
+  input: ProjectServerInfoInput,
+  cwd: string,
+): ProjectServerInfo {
   const status = input.unavailable
     ? "unavailable"
     : input.client?.status === "running"
@@ -25,7 +28,7 @@ export function buildProjectServerInfo(input: ProjectServerInfoInput): ProjectSe
     fileTypes: input.fileTypes,
     status,
     supportedActions: getSupportedActions(input.client?.serverCapabilities),
-    openFiles: input.client?.openFiles.map((file) => displayRelativeFilePath(file)) ?? [],
+    openFiles: input.client?.openFiles.map((file) => displayRelativeFilePath(file, cwd)) ?? [],
   };
 }
 

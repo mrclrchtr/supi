@@ -9,11 +9,15 @@ export const lspPromptGuidelines = [
   "Prefer the lsp tool over bash text search for supported source files when the task is semantic code navigation or diagnostics.",
   "Use lsp for hover, definitions, references, document symbols, rename planning, code actions, and diagnostics before falling back to grep-style shell search.",
   "Fall back to bash/read when LSP is unavailable, the file type is unsupported, or the task is plain-text search across docs, config files, or string literals.",
+  "Diagnostics are automatically delivered: inline after every write/edit tool result, and as context before each agent turn. You do not need to call the lsp tool to check them — they are already in your context.",
+  "When delivered diagnostics show errors, decide: (a) expected temporary state from a planned multi-step change — continue your sequence, then verify at the end; (b) unexpected 'Cannot find module', unresolved imports, or type mismatches — stop and fix the root cause before editing more files.",
+  "When the SAME error pattern appears across MULTIPLE files after you changed imports, dependencies, or shared types, it is a systemic root-cause issue (missing install, broken import path, wrong dependency version). Do not patch each file individually — find and fix the root cause first.",
+  "After changing package.json dependencies, imports, or peer dependencies, run the package manager install command (e.g., pnpm install) before concluding that module resolution errors are real code bugs.",
 ];
 
-export function buildProjectGuidelines(servers: ProjectServerInfo[]): string[] {
+export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string): string[] {
   const dynamic = servers.map((server) => {
-    const root = displayRoot(server.root);
+    const root = displayRoot(server.root, cwd);
     const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(", ");
     const actions = server.supportedActions.join(", ");
     const status = server.status === "running" ? "active" : "unavailable";
@@ -40,7 +44,7 @@ export function formatDiagnosticsContext(
 
   return [
     '<extension-context source="supi-lsp">',
-    "Outstanding diagnostics:",
+    "Outstanding diagnostics — fix these before proceeding:",
     ...lines,
     "</extension-context>",
   ].join("\n");
@@ -63,8 +67,8 @@ function formatCounts(entry: OutstandingDiagnosticSummaryEntry): string {
   return counts.join(", ");
 }
 
-function displayRoot(root: string): string {
-  const relative = path.relative(process.cwd(), root);
+function displayRoot(root: string, cwd: string): string {
+  const relative = path.relative(cwd, root);
   if (relative === "") return ".";
   if (relative.startsWith(`..${path.sep}`) || relative === "..") return root;
   return relative.replaceAll(path.sep, "/");

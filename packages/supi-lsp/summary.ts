@@ -12,9 +12,9 @@ import type {
  * unrelated files with the same name appear interchangeable in relevance
  * matching, and it broke diagnostic correlation for tracked external paths.
  */
-export function displayRelativeFilePath(filePath: string): string {
+export function displayRelativeFilePath(filePath: string, cwd: string): string {
   const absolutePath = path.resolve(filePath);
-  const relativePath = path.relative(process.cwd(), absolutePath);
+  const relativePath = path.relative(cwd, absolutePath);
   if (relativePath === "") return path.basename(absolutePath);
   if (relativePath.startsWith(`..${path.sep}`) || relativePath === "..") {
     return absolutePath;

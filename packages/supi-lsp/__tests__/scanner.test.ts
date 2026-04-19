@@ -126,7 +126,7 @@ describe("dedupeTopmostRoots", () => {
 describe("introspectCapabilities", () => {
   it("returns unavailable status for detected roots without running clients", () => {
     const root = makeTmpProject();
-    const manager = new LspManager(makeConfig());
+    const manager = new LspManager(makeConfig(), root);
 
     const info = introspectCapabilities(manager, [
       {
@@ -150,7 +150,7 @@ describe("introspectCapabilities", () => {
 
   it("includes lazily-started servers discovered after the initial scan", () => {
     const root = makeTmpProject();
-    const manager = new LspManager(makeConfig());
+    const manager = new LspManager(makeConfig(), root);
 
     (
       manager as unknown as {
@@ -193,7 +193,7 @@ describe("introspectCapabilities", () => {
         fileTypes: ["ts", "tsx"],
         status: "running",
         supportedActions: expectedActions,
-        openFiles: [path.join(root, "src", "index.ts")],
+        openFiles: ["src/index.ts"],
       },
     ]);
   });

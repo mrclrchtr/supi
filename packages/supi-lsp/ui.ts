@@ -4,7 +4,8 @@ import type { OverlayHandle } from "@mariozechner/pi-tui";
 import { Container, Spacer, Text } from "@mariozechner/pi-tui";
 import type { LspManager } from "./manager.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
-import type { ProjectServerInfo } from "./types.ts";
+import type { Diagnostic, ProjectServerInfo } from "./types.ts";
+import { DiagnosticSeverity } from "./types.ts";
 
 export interface LspInspectorState {
   handle: OverlayHandle | null;
@@ -88,6 +89,7 @@ function buildLspInspectorContainer(
   servers: ProjectServerInfo[],
 ): Container {
   const diagnostics = manager.getOutstandingDiagnosticSummary(inlineSeverity);
+  const detailedDiagnostics = manager.getOutstandingDiagnostics(inlineSeverity);
   const container = new Container();
 
   container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
@@ -117,7 +119,7 @@ function buildLspInspectorContainer(
     buildOverlaySection(
       theme,
       diagnostics.length > 0 ? "Problems" : "Diagnostics",
-      buildOverlayDiagnosticLines(theme, diagnostics),
+      buildOverlayDiagnosticLines(theme, diagnostics, detailedDiagnostics),
     ),
   );
   container.addChild(new Spacer(1));
@@ -271,29 +273,46 @@ function buildOverlayServerLines(
 function buildOverlayDiagnosticLines(
   theme: ExtensionContext["ui"]["theme"],
   diagnostics: OutstandingDiagnosticSummaryEntry[],
+  detailedDiagnostics: Array<{ file: string; diagnostics: Diagnostic[] }>,
 ): string[] {
   if (diagnostics.length === 0) {
     return [theme.fg("success", "✓ no outstanding diagnostics")];
   }
 
-  const lines = diagnostics
-    .slice(0, 5)
-    .map(
-      (entry) =>
-        `${theme.fg("error", "●")} ${entry.file} ${theme.fg("dim", `— ${formatDiagnosticCounts(entry)}`)}`,
-    );
+  const lines: string[] = [];
+  const maxFiles = 3;
+  const maxMessagesPerFile = 3;
 
-  const remainingDiagnostics = diagnostics.length - Math.min(diagnostics.length, 5);
-  if (remainingDiagnostics > 0) {
-    lines.push(
-      theme.fg(
-        "dim",
-        `↳ +${remainingDiagnostics} more diagnostic file${remainingDiagnostics === 1 ? "" : "s"}`,
-      ),
-    );
+  for (const entry of detailedDiagnostics.slice(0, maxFiles)) {
+    const summary = diagnostics.find((d) => d.file === entry.file);
+    const countLabel = summary ? formatDiagnosticCounts(summary) : "";
+    lines.push(`${theme.fg("error", "●")} ${entry.file} ${theme.fg("dim", `— ${countLabel}`)}`);
+
+    for (const diag of entry.diagnostics.slice(0, maxMessagesPerFile)) {
+      const line = diag.range.start.line + 1;
+      const col = diag.range.start.character + 1;
+      const sevColor = diag.severity === DiagnosticSeverity.Error ? "error" : "warning";
+      const message = truncate(diag.message, 48);
+      lines.push(`  ${theme.fg(sevColor, "└")} ${line}:${col} ${theme.fg("dim", message)}`);
+    }
+
+    const remainingMessages = entry.diagnostics.length - maxMessagesPerFile;
+    if (remainingMessages > 0) {
+      lines.push(`  ${theme.fg("dim", `└ +${remainingMessages} more`)}`);
+    }
+  }
+
+  const remainingFiles = diagnostics.length - Math.min(diagnostics.length, maxFiles);
+  if (remainingFiles > 0) {
+    lines.push(theme.fg("dim", `↳ +${remainingFiles} more file${remainingFiles === 1 ? "" : "s"}`));
   }
 
   return lines;
+}
+
+function truncate(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength - 1)}…`;
 }
 
 function formatDiagnosticCounts(entry: OutstandingDiagnosticSummaryEntry): string {

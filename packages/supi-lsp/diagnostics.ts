@@ -52,10 +52,14 @@ export function formatDiagnostic(diag: Diagnostic): string {
 /**
  * Format a list of diagnostics for a file.
  */
-export function formatDiagnostics(filePath: string, diagnostics: Diagnostic[]): string {
+export function formatDiagnostics(
+  filePath: string,
+  diagnostics: Diagnostic[],
+  cwd: string,
+): string {
   if (diagnostics.length === 0) return "No diagnostics.";
 
-  const relPath = path.relative(process.cwd(), filePath);
+  const relPath = path.relative(cwd, filePath);
   const lines = [`**${relPath}**:`];
 
   for (const diag of diagnostics) {
@@ -70,13 +74,14 @@ export function formatDiagnostics(filePath: string, diagnostics: Diagnostic[]): 
  */
 export function formatGroupedDiagnostics(
   entries: Array<{ file: string; diagnostics: Diagnostic[] }>,
+  cwd: string,
 ): string {
   if (entries.length === 0) return "No diagnostics across any files.";
 
   const sections: string[] = [];
   for (const entry of entries) {
     if (entry.diagnostics.length > 0) {
-      sections.push(formatDiagnostics(entry.file, entry.diagnostics));
+      sections.push(formatDiagnostics(entry.file, entry.diagnostics, cwd));
     }
   }
 

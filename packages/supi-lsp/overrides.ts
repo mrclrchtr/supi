@@ -6,13 +6,13 @@ import type { LspManager } from "./manager.ts";
 interface LspOverrideState {
   inlineSeverity: number;
   getManager(): LspManager | null;
+  cwd: string;
 }
 
 export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverrideState): void {
-  const cwd = process.cwd();
-  const originalRead = createReadTool(cwd);
-  const originalWrite = createWriteTool(cwd);
-  const originalEdit = createEditTool(cwd);
+  const originalRead = createReadTool(state.cwd);
+  const originalWrite = createWriteTool(state.cwd);
+  const originalEdit = createEditTool(state.cwd);
 
   pi.registerTool({
     ...originalRead,
@@ -29,7 +29,13 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(toolCallId, params, signal, onUpdate, _ctx) {
       const result = await originalWrite.execute(toolCallId, params, signal, onUpdate);
-      return appendInlineDiagnostics(state.getManager(), params.path, state.inlineSeverity, result);
+      return appendInlineDiagnostics({
+        manager: state.getManager(),
+        filePath: params.path,
+        inlineSeverity: state.inlineSeverity,
+        cwd: state.cwd,
+        result,
+      });
     },
   });
 
@@ -38,35 +44,49 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(toolCallId, params, signal, onUpdate, _ctx) {
       const result = await originalEdit.execute(toolCallId, params, signal, onUpdate);
-      return appendInlineDiagnostics(state.getManager(), params.path, state.inlineSeverity, result);
+      return appendInlineDiagnostics({
+        manager: state.getManager(),
+        filePath: params.path,
+        inlineSeverity: state.inlineSeverity,
+        cwd: state.cwd,
+        result,
+      });
     },
   });
 }
 
+interface AppendInlineDiagnosticsOptions<T extends { content: unknown[]; details: unknown }> {
+  manager: LspManager | null;
+  filePath: string;
+  inlineSeverity: number;
+  cwd: string;
+  result: T;
+}
+
 async function appendInlineDiagnostics<T extends { content: unknown[]; details: unknown }>(
-  manager: LspManager | null,
-  filePath: string,
-  inlineSeverity: number,
-  result: T,
+  options: AppendInlineDiagnosticsOptions<T>,
 ): Promise<T> {
-  if (!manager) return result;
+  if (!options.manager) return options.result;
 
   try {
-    const diags = await manager.syncFileAndGetDiagnostics(filePath, inlineSeverity);
-    if (diags.length === 0) return result;
+    const diags = await options.manager.syncFileAndGetDiagnostics(
+      options.filePath,
+      options.inlineSeverity,
+    );
+    if (diags.length === 0) return options.result;
 
-    const diagText = formatDiagnostics(filePath, diags);
+    const diagText = formatDiagnostics(options.filePath, diags, options.cwd);
     const diagnosticContent = {
       type: "text" as const,
-      text: `\n\n⚠️ LSP Diagnostics:\n${diagText}`,
+      text: `\n\n⚠️ LSP Diagnostics — review before continuing:\n${diagText}\nIf these errors are unexpected or appear across multiple files, fix the root cause before editing more files.`,
     } as T["content"][number];
 
     return {
-      ...result,
-      content: [...result.content, diagnosticContent],
+      ...options.result,
+      content: [...options.result.content, diagnosticContent],
     } as T;
   } catch {
-    return result;
+    return options.result;
   }
 }
 

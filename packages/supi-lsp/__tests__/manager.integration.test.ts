@@ -55,7 +55,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
 
   beforeAll(() => {
     const config = loadConfig(tmpDir);
-    manager = new LspManager(config);
+    manager = new LspManager(config, tmpDir);
   });
 
   afterAll(async () => {

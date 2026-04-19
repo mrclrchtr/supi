@@ -61,7 +61,7 @@ describe("formatDiagnostic", () => {
 
 describe("formatDiagnostics", () => {
   it("returns no-diagnostics message for empty array", () => {
-    expect(formatDiagnostics("file.ts", [])).toBe("No diagnostics.");
+    expect(formatDiagnostics("file.ts", [], "/project")).toBe("No diagnostics.");
   });
 
   it("includes file path and all diagnostics", () => {
@@ -69,8 +69,8 @@ describe("formatDiagnostics", () => {
       makeDiag({ message: "Error 1" }),
       makeDiag({ severity: 2, message: "Warning 1" }),
     ];
-    const result = formatDiagnostics("/project/src/file.ts", diags);
-    expect(result).toContain("file.ts");
+    const result = formatDiagnostics("/project/src/file.ts", diags, "/project");
+    expect(result).toContain("src/file.ts");
     expect(result).toContain("Error 1");
     expect(result).toContain("Warning 1");
   });

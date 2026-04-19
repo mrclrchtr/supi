@@ -10,7 +10,7 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { loadConfig } from "./config.ts";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -67,6 +67,7 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerLspAwareToolOverrides(pi, {
     inlineSeverity: state.inlineSeverity,
     getManager: () => state.manager,
+    cwd: process.cwd(),
   });
 
   registerLspTool(pi, state, lspPromptGuidelines);
@@ -108,15 +109,16 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     }
 
     ensureLspToolActive(pi);
-    const config = loadConfig(process.cwd());
-    state.manager = new LspManager(config);
-    state.detectedServers = scanProjectCapabilities(config, process.cwd());
+    const cwd = ctx.cwd;
+    const config = loadConfig(cwd);
+    state.manager = new LspManager(config, cwd);
+    state.detectedServers = scanProjectCapabilities(config, cwd);
     state.manager.registerDetectedServers(state.detectedServers);
     await startDetectedServers(state.manager, state.detectedServers);
     refreshProjectServers(state);
     state.lastDiagnosticsFingerprint = null;
     state.currentContextToken = null;
-    registerLspTool(pi, state, buildProjectGuidelines(state.projectServers));
+    registerLspTool(pi, state, buildProjectGuidelines(state.projectServers, cwd));
     ensureLspToolActive(pi);
     updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
   });
@@ -170,7 +172,8 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
 
     state.lastDiagnosticsFingerprint = fingerprint;
     state.currentContextToken = `lsp-context-${++state.contextCounter}`;
-    ctx.ui.notify(buildDiagnosticsNotification(diagnostics), "info");
+    const hasErrors = diagnostics.some((d) => d.errors > 0);
+    ctx.ui.notify(buildDiagnosticsNotification(diagnostics), hasErrors ? "warning" : "info");
 
     return {
       message: {

@@ -52,14 +52,14 @@ describe("formatHover", () => {
 
 describe("formatLocations", () => {
   it("formats single location", () => {
-    const result = formatLocations("Definition", [loc("file:///src/app.ts", 9, 4)]);
+    const result = formatLocations("Definition", [loc("file:///src/app.ts", 9, 4)], "/project");
     expect(result).toContain("Definition:");
     expect(result).toContain("10:5");
   });
 
   it("formats multiple locations", () => {
     const locs = [loc("file:///src/a.ts", 0, 0), loc("file:///src/b.ts", 5, 3)];
-    const result = formatLocations("References", locs);
+    const result = formatLocations("References", locs, "/project");
     expect(result).toContain("2 locations");
     expect(result).toContain("1:1");
     expect(result).toContain("6:4");
@@ -147,7 +147,7 @@ describe("formatSymbolInformation", () => {
         containerName: "AppModule",
       },
     ];
-    const result = formatSymbolInformation(symbols);
+    const result = formatSymbolInformation(symbols, "/project");
     expect(result).toContain("Function");
     expect(result).toContain("**handler**");
     expect(result).toContain("(in AppModule)");
@@ -166,7 +166,7 @@ describe("formatWorkspaceEdit", () => {
         ],
       },
     };
-    const result = formatWorkspaceEdit(edit);
+    const result = formatWorkspaceEdit(edit, "/project");
     expect(result).toContain("1 change(s)");
     expect(result).toContain("newName");
   });

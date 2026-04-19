@@ -36,10 +36,10 @@ export function formatHover(hover: Hover): string {
 
 // ── Locations ─────────────────────────────────────────────────────────
 
-export function formatLocations(label: string, locations: Location[]): string {
+export function formatLocations(label: string, locations: Location[], cwd: string): string {
   if (locations.length === 1) {
     const loc = locations[0];
-    const file = relPath(uriToFile(loc.uri));
+    const file = relPath(uriToFile(loc.uri), cwd);
     const line = loc.range.start.line + 1;
     const col = loc.range.start.character + 1;
     return `${label}: ${file}:${line}:${col}`;
@@ -47,7 +47,7 @@ export function formatLocations(label: string, locations: Location[]): string {
 
   const lines = [`${label} (${locations.length} locations):\n`];
   for (const loc of locations) {
-    const file = relPath(uriToFile(loc.uri));
+    const file = relPath(uriToFile(loc.uri), cwd);
     const line = loc.range.start.line + 1;
     const col = loc.range.start.character + 1;
     lines.push(`- ${file}:${line}:${col}`);
@@ -88,11 +88,11 @@ export function formatDocumentSymbols(symbols: DocumentSymbol[], indent: number)
   return lines.join("\n");
 }
 
-export function formatSymbolInformation(symbols: SymbolInformation[]): string {
+export function formatSymbolInformation(symbols: SymbolInformation[], cwd: string): string {
   const lines: string[] = [];
   for (const sym of symbols) {
     const kind = symbolKindName(sym.kind);
-    const file = relPath(uriToFile(sym.location.uri));
+    const file = relPath(uriToFile(sym.location.uri), cwd);
     const line = sym.location.range.start.line + 1;
     const container = sym.containerName ? ` (in ${sym.containerName})` : "";
     lines.push(`- ${kind} **${sym.name}**${container} — ${file}:${line}`);
@@ -102,12 +102,12 @@ export function formatSymbolInformation(symbols: SymbolInformation[]): string {
 
 // ── Workspace Edits ───────────────────────────────────────────────────
 
-export function formatWorkspaceEdit(edit: WorkspaceEdit): string {
+export function formatWorkspaceEdit(edit: WorkspaceEdit, cwd: string): string {
   const lines: string[] = ["Rename workspace edit:\n"];
 
   if (edit.changes) {
     for (const [uri, edits] of Object.entries(edit.changes)) {
-      const file = relPath(uriToFile(uri));
+      const file = relPath(uriToFile(uri), cwd);
       lines.push(`**${file}** (${edits.length} change(s))`);
       for (const e of edits) {
         const line = e.range.start.line + 1;
@@ -118,7 +118,7 @@ export function formatWorkspaceEdit(edit: WorkspaceEdit): string {
 
   if (edit.documentChanges) {
     for (const dc of edit.documentChanges) {
-      const file = relPath(uriToFile(dc.textDocument.uri));
+      const file = relPath(uriToFile(dc.textDocument.uri), cwd);
       lines.push(`**${file}** (${dc.edits.length} change(s))`);
       for (const e of dc.edits) {
         const line = e.range.start.line + 1;
@@ -185,6 +185,6 @@ function symbolKindName(kind: number): string {
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-function relPath(filePath: string): string {
-  return path.relative(process.cwd(), filePath);
+function relPath(filePath: string, cwd: string): string {
+  return path.relative(cwd, filePath);
 }

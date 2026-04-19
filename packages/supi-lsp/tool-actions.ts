@@ -52,19 +52,20 @@ Line and character are 1-based. File paths are relative to cwd.`;
 // ── Action Dispatcher ─────────────────────────────────────────────────
 
 export async function executeAction(manager: LspManager, params: LspToolParams): Promise<string> {
+  const cwd = manager.getCwd();
   switch (params.action) {
     case "hover":
       return handleHover(manager, params);
     case "definition":
-      return handleDefinition(manager, params);
+      return handleDefinition(manager, params, cwd);
     case "references":
-      return handleReferences(manager, params);
+      return handleReferences(manager, params, cwd);
     case "diagnostics":
-      return handleDiagnostics(manager, params);
+      return handleDiagnostics(manager, params, cwd);
     case "symbols":
-      return handleSymbols(manager, params);
+      return handleSymbols(manager, params, cwd);
     case "rename":
-      return handleRename(manager, params);
+      return handleRename(manager, params, cwd);
     case "code_actions":
       return handleCodeActions(manager, params);
     default:
@@ -84,7 +85,11 @@ async function handleHover(manager: LspManager, params: LspToolParams): Promise<
   return formatHover(hover);
 }
 
-async function handleDefinition(manager: LspManager, params: LspToolParams): Promise<string> {
+async function handleDefinition(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
   const { file, line, character } = requireFilePosition(params);
   const client = await manager.ensureFileOpen(file);
   if (!client) return noServerMessage(file);
@@ -95,10 +100,14 @@ async function handleDefinition(manager: LspManager, params: LspToolParams): Pro
   const locations = normalizeLocations(result);
   if (locations.length === 0) return "No definition found.";
 
-  return formatLocations("Definition", locations);
+  return formatLocations("Definition", locations, cwd);
 }
 
-async function handleReferences(manager: LspManager, params: LspToolParams): Promise<string> {
+async function handleReferences(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
   const { file, line, character } = requireFilePosition(params);
   const client = await manager.ensureFileOpen(file);
   if (!client) return noServerMessage(file);
@@ -106,10 +115,14 @@ async function handleReferences(manager: LspManager, params: LspToolParams): Pro
   const locations = await client.references(path.resolve(file), toZeroBased(line, character));
   if (!locations || locations.length === 0) return "No references found.";
 
-  return formatLocations("References", locations);
+  return formatLocations("References", locations, cwd);
 }
 
-async function handleDiagnostics(manager: LspManager, params: LspToolParams): Promise<string> {
+async function handleDiagnostics(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
   if (params.file) {
     const resolvedPath = path.resolve(params.file);
     const client = await manager.ensureFileOpen(params.file);
@@ -123,7 +136,7 @@ async function handleDiagnostics(manager: LspManager, params: LspToolParams): Pr
     }
 
     const diags = await client.syncAndWaitForDiagnostics(resolvedPath, content);
-    return formatDiagnostics(params.file, diags);
+    return formatDiagnostics(params.file, diags, cwd);
   }
 
   const summary = manager.getDiagnosticSummary();
@@ -136,7 +149,11 @@ async function handleDiagnostics(manager: LspManager, params: LspToolParams): Pr
   return lines.join("\n");
 }
 
-async function handleSymbols(manager: LspManager, params: LspToolParams): Promise<string> {
+async function handleSymbols(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
   if (!params.file) return "Error: 'file' parameter is required for symbols action.";
 
   const client = await manager.ensureFileOpen(params.file);
@@ -148,10 +165,14 @@ async function handleSymbols(manager: LspManager, params: LspToolParams): Promis
   if ("children" in symbols[0] || "selectionRange" in symbols[0]) {
     return formatDocumentSymbols(symbols as DocumentSymbol[], 0);
   }
-  return formatSymbolInformation(symbols as SymbolInformation[]);
+  return formatSymbolInformation(symbols as SymbolInformation[], cwd);
 }
 
-async function handleRename(manager: LspManager, params: LspToolParams): Promise<string> {
+async function handleRename(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
   const { file, line, character } = requireFilePosition(params);
   if (!params.newName) return "Error: 'newName' parameter is required for rename action.";
 
@@ -165,7 +186,7 @@ async function handleRename(manager: LspManager, params: LspToolParams): Promise
   );
   if (!edit) return "Rename not available at this position.";
 
-  return formatWorkspaceEdit(edit);
+  return formatWorkspaceEdit(edit, cwd);
 }
 
 async function handleCodeActions(manager: LspManager, params: LspToolParams): Promise<string> {
