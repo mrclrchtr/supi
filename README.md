@@ -22,14 +22,6 @@ Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent)
 | `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
 | `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. |
 
-## Skills
-
-| Skill | Description |
-|-------|-------------|
-| **supi-openspec-brainstorm** | Structured brainstorming for OpenSpec changes. It turns an idea into an approved change direction by exploring context, asking one question at a time, comparing approaches, and then recommending the best next OpenSpec skill before implementation starts. |
-
-Invoke it with `/skill:supi-openspec-brainstorm`.
-
 ## Install
 
 ### Full stack (meta-package)

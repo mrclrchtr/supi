@@ -43,4 +43,4 @@ Note: links/images are absolute by default; use `--no-abs-links` to keep them as
 
 - Slow or flaky fetch: retry with a larger `--timeout-ms` and use `--debug`.
 - Output looks like placeholders (common for SPAs/JS-rendered pages): ask the user for rendered HTML/text (or a browser capture) and then convert.
-- Output is mostly navigation/footer: try an alternate official Markdown source (docs `.md`, README) or a “printable” version if available.
+- Output is mostly navigation/footer: try an alternate official Markdown source (docs `.md`, README) or a "printable" version if available.

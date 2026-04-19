@@ -1,10 +1,15 @@
 {
   "version": 1,
   "skills": {
+    "openspec-brainstorm": {
+      "source": "/Users/mrclrchtr/Development/mrclrchtr/skills",
+      "sourceType": "local",
+      "computedHash": "f4c1ca9153d298aa0daf7135e14298743e6137615cff6e47ac4cfc32d2530d56"
+    },
     "web-fetch-to-markdown": {
       "source": "/Users/mrclrchtr/Development/mrclrchtr/skills",
       "sourceType": "local",
-      "computedHash": "f7847982d769819cda9c90baed9d7be5fa1b4ec7282f51fafd91e4fea7258249"
+      "computedHash": "ba2d207dc9a3bd4d51d564dbcc5e60ccf884126559cf968f984c00274cc20d8a"
     }
   }
 }
