@@ -1,5 +1,5 @@
 ---
-name: openspec-brainstorm
+name: supi-openspec-brainstorm
 description: "You MUST use this before creative OpenSpec work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation, then hands off to the best matching OpenSpec skill or command without managing OpenSpec artifacts."
 license: MIT
 compatibility: Requires pi plus the Fission-AI OpenSpec CLI in the project.

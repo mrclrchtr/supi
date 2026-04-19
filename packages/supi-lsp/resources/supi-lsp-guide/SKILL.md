@@ -1,5 +1,5 @@
 ---
-name: lsp-usage
+name: supi-lsp-guide
 description: Use the LSP tool effectively — when to prefer hover, diagnostics, definition, references, symbols, rename, and code_actions over plain file reads and text search.
 ---
 

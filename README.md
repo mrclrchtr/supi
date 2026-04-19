@@ -26,9 +26,9 @@ Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent)
 
 | Skill | Description |
 |-------|-------------|
-| **openspec-brainstorm** | Structured brainstorming for OpenSpec changes. It turns an idea into an approved change direction by exploring context, asking one question at a time, comparing approaches, and then recommending the best next OpenSpec skill before implementation starts. |
+| **supi-openspec-brainstorm** | Structured brainstorming for OpenSpec changes. It turns an idea into an approved change direction by exploring context, asking one question at a time, comparing approaches, and then recommending the best next OpenSpec skill before implementation starts. |
 
-Invoke it with `/skill:openspec-brainstorm`.
+Invoke it with `/skill:supi-openspec-brainstorm`.
 
 ## Install
 

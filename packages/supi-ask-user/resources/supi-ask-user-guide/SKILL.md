@@ -1,5 +1,5 @@
 ---
-name: ask-user-patterns
+name: supi-ask-user-guide
 description: When and how to use the ask_user tool for structured agent-user decisions — choosing question types, setting recommendations, and avoiding common pitfalls.
 ---
 

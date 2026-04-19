@@ -1,5 +1,5 @@
 ---
-name: context-injection
+name: supi-claude-md-guide
 description: How supi-claude-md context injection works — subdirectory discovery, root refresh, settings UI, and configuration.
 ---
 
