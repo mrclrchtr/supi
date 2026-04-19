@@ -41,6 +41,8 @@ Do not set recommendations when options are genuinely equal.
 
 Set `preview` on options when the user would understand the choice better from code, config, or ASCII mockups than from a one-line description.
 
+Rich sessions can show previews and richer inline interactions. Fallback UI is intentionally simpler and does not support the full rich experience, so only rely on previews when they are genuinely helpful rather than required to understand the question.
+
 Good uses:
 - Show the config file snippet for each option
 - Show an ASCII mockup of a layout choice
@@ -58,7 +60,7 @@ Bad uses:
 
 ## Concurrency rule
 
-Never call `ask_user` while another `ask_user` interaction is in flight. Wait for the previous result before issuing the next call. The tool enforces a single-active-questionnaire lock.
+Never call `ask_user` while another `ask_user` interaction is in flight. Wait for the previous result before issuing the next call. The tool enforces a single-active-questionnaire lock and returns an error if a second questionnaire is attempted before the first completes.
 
 ## Investigation first, questions second
 

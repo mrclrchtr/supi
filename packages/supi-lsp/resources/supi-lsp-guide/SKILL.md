@@ -60,6 +60,14 @@ Use `rename` instead of `edit` find-and-replace. The LSP handles renaming across
 
 Use `code_actions` to get available quick-fixes and refactors at a position. Useful for auto-imports, adding missing return statements, or applying suggested fixes.
 
+## Automatic behavior
+
+In addition to the `lsp` tool itself, the extension automatically surfaces inline diagnostics around edit/write workflows and injects compact diagnostic context when outstanding diagnostics change.
+
+Use `/lsp-status` to inspect detected servers, roots, open files, and diagnostics.
+
+If you install new language servers or change project setup mid-session, use `/reload` or restart pi so proactive scanning and guidance rebuild cleanly.
+
 ## Workflow patterns
 
 ### Pattern: Investigate before editing

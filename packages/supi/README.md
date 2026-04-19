@@ -1,120 +1,88 @@
-# SuPi
+# @mrclrchtr/supi
 
-**Super Pi**
+SuPi (**Super Pi**) is an opinionated bundle of extensions, prompts, and supporting packages for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
 
-*The opinionated way to extend PI.*
-
-SuPi is an opinionated extension monorepo for PI with LSP, Skills, marketplace compatibility, and personal best practices built in.
-
-- SuPi is my curated extension stack for PI.
-- SuPi makes PI extensible, interoperable, and sane by default.
-- Install the full stack or pick individual extensions.
-
-Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
-
-## Extensions
-
-| Package | Extension | Description |
-|---------|-----------|-------------|
-| `@mrclrchtr/supi-aliases` | **aliases** | Registers `/exit` to quit pi, `/e` as a shorthand alias, and `/clear` to start a new session (alias for `/new`) |
-| `@mrclrchtr/supi-bash-timeout` | **bash-timeout** | Injects a default timeout on every bash tool call when the LLM omits one. Configurable via `PI_BASH_DEFAULT_TIMEOUT` (seconds, default 120). |
-| `@mrclrchtr/supi-skill-shortcut` | **skill-shortcut** | Type `$skill-name` as a shorthand for `/skill:skill-name`. Autocomplete triggers on `$`. |
-| `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
-| `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. |
+Install the full stack or pick individual packages.
 
 ## Install
 
-### Full stack (meta-package)
+### Full stack
 
 ```bash
 pi install npm:@mrclrchtr/supi
 ```
 
-### Individual extensions
+### From git or a local checkout
 
 ```bash
-pi install npm:@mrclrchtr/supi-lsp
-pi install npm:@mrclrchtr/supi-ask-user
-pi install npm:@mrclrchtr/supi-skill-shortcut
-pi install npm:@mrclrchtr/supi-bash-timeout
-pi install npm:@mrclrchtr/supi-aliases
-```
-
-### From git or local path
-
-```bash
-# Full stack from git
+# Git install
 pi install git:github.com/mrclrchtr/supi
 
-# Individual extension from local checkout
-pi install /path/to/SuPi/packages/supi-lsp
-pi install /path/to/SuPi/packages/supi-ask-user
+# Local checkout
+pi install /path/to/supi/packages/supi
 ```
 
-When installed from a local path, pi loads the working tree directly; after edits, use `/reload` or restart pi to pick up extension changes.
+When installed from a local path, pi loads the working tree directly. After edits, use `/reload` or restart pi.
 
-## LSP extension
+## What the meta-package bundles
 
-The `lsp` extension is meant to make pi more semantic in supported languages:
+The `@mrclrchtr/supi` package exposes wrapper entrypoints for the main SuPi extensions and contributes prompt and skill resource directories.
 
-- exposes a single `lsp` tool with actions for hover, definition, references, diagnostics, symbols, rename, and code actions
-- appends LSP diagnostics after `write`/`edit`
-- performs a proactive project scan at `session_start` to detect matching roots and available language servers, then eagerly starts them
-- builds project-specific semantic-first `promptSnippet` / `promptGuidelines` from detected servers, roots, file types, and supported actions so the agent prefers `lsp` for code navigation and diagnostics
-- injects compact XML-framed diagnostic context only when outstanding diagnostics exist, deduped across turns so unchanged diagnostics do not re-inject
-- provides `/lsp-status` for server roots, capabilities, open files, and diagnostics
+Included extension entrypoints:
 
-Configuration:
+- `aliases.ts`
+- `ask-user.ts`
+- `bash-timeout.ts`
+- `claude-md.ts`
+- `lsp.ts`
+- `skill-shortcut.ts`
+- `resources.ts`
 
-- `PI_LSP_DISABLED=1` — disable the extension
-- `PI_LSP_SERVERS=rust-analyzer,pyright` — allow-list servers
-- `PI_LSP_SEVERITY=1|2|3|4` — inline diagnostic threshold
-- `.pi-lsp.json` in the project root — override/add/disable server definitions
+Current bundled prompt templates:
 
-## Development
+- `prompts/revise-claude-md.md`
+
+## Packages
+
+| Package | Type | Purpose |
+| --- | --- | --- |
+| [`@mrclrchtr/supi`](./README.md) | meta-package | Full SuPi bundle for pi installs |
+| [`@mrclrchtr/supi-aliases`](../supi-aliases/README.md) | extension | `/exit`, `/e`, and `/clear` shortcuts |
+| [`@mrclrchtr/supi-ask-user`](../supi-ask-user/README.md) | extension | Structured `ask_user` tool and rich questionnaire UI |
+| [`@mrclrchtr/supi-bash-timeout`](../supi-bash-timeout/README.md) | extension | Injects default timeouts into `bash` tool calls |
+| [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | extension | Subdirectory context injection and root context refresh |
+| [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | extension | Language Server Protocol tool, diagnostics, and semantic guidance |
+| [`@mrclrchtr/supi-skill-shortcut`](../supi-skill-shortcut/README.md) | extension | `$skill-name` shorthand and autocomplete |
+| [`@mrclrchtr/supi-core`](../supi-core/README.md) | library | Shared config and context utilities used by SuPi packages |
+
+## Install individual packages
 
 ```bash
-mise install
-pnpm install
-mise run hooks
-pnpm typecheck
-pnpm biome
-pnpm biome:fix
-pnpm biome:ci
-pnpm biome:ai
-pnpm test
-pnpm pack:check
-pnpm verify
-hk run check # local pre-push checks (full pnpm verify)
-hk run fix   # local pre-commit autofixes
+pi install npm:@mrclrchtr/supi-aliases
+pi install npm:@mrclrchtr/supi-ask-user
+pi install npm:@mrclrchtr/supi-bash-timeout
+pi install npm:@mrclrchtr/supi-claude-md
+pi install npm:@mrclrchtr/supi-lsp
+pi install npm:@mrclrchtr/supi-skill-shortcut
 ```
 
-Biome is configured in `biome.jsonc` with formatting, import organization, recommended lint rules, and stricter project/types/test plus aggressive complexity and nursery rules.
+## Notable included behavior
 
-## Publishing
+### `ask_user`
 
-This is a pnpm workspace monorepo. Each extension is a standalone package under `packages/supi-*/`. The `packages/supi/` meta-package bundles the full stack for convenience.
+Adds a structured tool for narrow agent-user decisions with typed questions, recommendations, discuss flows, and rich previews.
 
-Pi package docs require a `pi` manifest per package and recommend the `pi-package` keyword for discoverability. All packages publish TypeScript source directly — pi loads extensions without a build step.
+### `claude-md`
 
-GitHub Actions handles verification and releases:
+Keeps directory-specific `CLAUDE.md` and `AGENTS.md` guidance flowing into sessions, including periodic refresh of root context.
 
-- `CI` runs typecheck, Biome, Vitest, and `npm pack --dry-run`
-- `Conventional Commits` lints PR titles and commit messages
-- `Actionlint` validates GitHub Actions workflows
-- `Release Please` runs on pushes to `main`, parses conventional commits, opens a "Release Please" PR with version bumps and changelogs, and — once that PR is merged — creates GitHub releases and publishes all updated packages to npm
+### `lsp`
 
-### One-time setup
+Adds semantic code navigation and diagnostics through a single `lsp` tool plus inline diagnostic surfacing and `/lsp-status`.
 
-- Ensure the publishing account owns the `@mrclrchtr` npm scope
-- Configure npm trusted publishing for this GitHub repository so the release workflow can publish with OIDC
-- Use Conventional Commits on merges to `main` so release-please can compute versions (`feat:` = minor, `fix:` = patch, `!` / `BREAKING CHANGE:` = major)
+### Small UX improvements
 
-### Release flow
+- command aliases via `supi-aliases`
+- default shell timeouts via `supi-bash-timeout`
+- `$skill-name` shorthand via `supi-skill-shortcut`
 
-1. Merge PRs to `main` using Conventional Commits
-2. The `Release Please` workflow opens a "Release Please" PR with version bumps and changelogs
-3. Review and merge the "Release Please" PR
-4. The workflow creates GitHub releases and publishes updated packages to npm automatically
-
-Releases are driven by [release-please](https://github.com/googleapis/release-please) with the `node-workspace` plugin. Each package versions independently based on the commits that touched its files.

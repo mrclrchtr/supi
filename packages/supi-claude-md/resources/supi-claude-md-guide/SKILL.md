@@ -14,11 +14,11 @@ supi-claude-md gives the agent project context beyond what pi loads natively:
 
 ## Subdirectory discovery
 
-When the agent reads or edits `packages/my-lib/src/foo.ts`, supi-claude-md checks for context files in:
+When the agent touches a path-aware tool target such as `packages/my-lib/src/foo.ts`, supi-claude-md checks for context files in:
 - `packages/my-lib/`
 - `packages/`
 
-It injects any CLAUDE.md or AGENTS.md found there directly into the tool result. The agent sees this context automatically — no action needed.
+This can be triggered by reads, writes, edits, and other path-aware tooling such as LSP operations. It injects any CLAUDE.md or AGENTS.md found there directly into the tool result. The agent sees this context automatically — no action needed.
 
 Each directory is injected at most once per session (by default). After the configured `rereadInterval` turns, the content is re-read in case it changed.
 
@@ -32,7 +32,7 @@ Note: pi's system prompt already contains root context files and is re-sent on e
 
 ## Settings
 
-Run `/supi-claude-md` to open the interactive settings UI. It replaces the editor area and shows the current effective configuration with keyboard navigation:
+Run `/supi-claude-md` to open the interactive settings UI. It opens directly in the pi interface, replaces the editor area, and shows the current effective configuration with keyboard navigation:
 
 | Key | Action |
 |-----|--------|
