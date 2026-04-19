@@ -24,8 +24,14 @@ exclude =
 
 local precommit = new Mapping<String, Step> {
   ["check-merge-conflict"] = Builtins.check_merge_conflict
-  ["detect-private-key"] = Builtins.detect_private_key
+  ["gitleaks"] = (Builtins.gitleaks) {
+    prefix = "pnpm -s exec"
+  }
   ["check-added-large-files"] = Builtins.check_added_large_files
+
+  ["tsc"] = (Builtins.tsc) {
+    prefix = "pnpm -s exec"
+  }
 
   ["biome"] = (Builtins.biome) {
     prefix = "pnpm -s exec"

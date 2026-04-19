@@ -26,11 +26,6 @@ function extractDollarPrefix(textBeforeCursor: string): string | null {
   return textBeforeCursor.startsWith("$") ? textBeforeCursor : null;
 }
 
-/** Stacked autocomplete provider support (pi >= 0.69.0). */
-interface UiWithAutocomplete extends ExtensionUIContext {
-  addAutocompleteProvider?: (provider: AutocompleteProvider) => void;
-}
-
 // ── Extension entry point ─────────────────────────────────────────
 
 export default function (pi: ExtensionAPI) {
@@ -80,7 +75,8 @@ export default function (pi: ExtensionAPI) {
       },
     };
 
-    (ctx.ui as UiWithAutocomplete).addAutocompleteProvider?.(provider);
+    // biome-ignore lint/suspicious/noExplicitAny: pi >= 0.69.0 API not yet in installed types
+    (ctx.ui as any).addAutocompleteProvider?.(provider);
   });
 
   // Transform $skill-name → /skill:skill-name before agent processing

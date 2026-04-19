@@ -15,7 +15,7 @@ pnpm typecheck
 pnpm typecheck:tests
 pnpm biome:ai
 pnpm biome:fix && pnpm biome:ai
-pnpm exec biome check --write <files...>
+pnpm exec biome check --write [--unsafe] <files...>
 pnpm test
 pnpm test:watch
 hk run fix
@@ -52,6 +52,7 @@ Other notable areas:
 - `ctx.ui.notify()` accepts `"info"` | `"warning"` | `"error"` severity — the gotcha about "info" is for `ctx.ui.theme` colors, not `notify`.
 - `ctx.ui.theme` does not expose an `"info"` color; use existing colors like `"accent"` / `"dim"` for info-level UI.
 - Keep runtime-imported packages in `peerDependencies`; after changing version ranges run `pnpm install` to refresh the lockfile.
+- Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
 - Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
 - Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.

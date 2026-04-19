@@ -38,6 +38,8 @@ Entrypoint: `lsp.ts`
 - Avoid `@mariozechner/pi-ai`'s `StringEnum`; use `Type.Union(Type.Literal(...))` to keep the dep tree smaller.
 - Prefer splitting `manager.ts` helpers into focused `manager-*.ts` modules over relaxing the repo-wide Biome line-limit rule.
 - `process.cwd()` is no longer used for path resolution; `ctx.cwd` from the extension context is threaded through `LspManager` and all formatting utilities. When adding new formatting helpers that need relative paths, accept `cwd` as a parameter.
+- `LspManager` constructor: `new LspManager(config, cwd)` — `cwd` is required.
+- `manager.getOutstandingDiagnostics(maxSeverity)` returns `{ file, diagnostics: Diagnostic[] }[]` with full messages and line numbers.
 
 ## Testing
 
