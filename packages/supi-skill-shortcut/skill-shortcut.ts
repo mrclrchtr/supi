@@ -1,5 +1,5 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { type AutocompleteProvider, fuzzyFilter } from "@mariozechner/pi-tui";
+import { fuzzyFilter } from "@mariozechner/pi-tui";
 
 /**
  * Extension: `$` as a shortcut prefix for skills.
@@ -42,12 +42,16 @@ export default function (pi: ExtensionAPI) {
       }));
     skillNames = skillCommands.map((c) => c.name);
 
-    const provider: AutocompleteProvider = {
-      async getSuggestions(lines, cursorLine, cursorCol, _options) {
+    // Stack skill autocomplete on top of the built-in provider.
+    // addAutocompleteProvider takes a wrapper callback: (current) => provider.
+    ctx.ui.addAutocompleteProvider((current) => ({
+      async getSuggestions(lines, cursorLine, cursorCol, options) {
         const textBeforeCursor = (lines[cursorLine] || "").slice(0, cursorCol);
         const dollarPrefix = extractDollarPrefix(textBeforeCursor);
 
-        if (!dollarPrefix || dollarPrefix.includes(" ")) return null;
+        if (!dollarPrefix || dollarPrefix.includes(" ")) {
+          return current.getSuggestions(lines, cursorLine, cursorCol, options);
+        }
 
         const query = dollarPrefix.slice(1);
         const items = skillCommands.map((c) => ({
@@ -59,24 +63,29 @@ export default function (pi: ExtensionAPI) {
           label: i.name,
           ...(i.description && { description: i.description }),
         }));
-        return filtered.length ? { items: filtered, prefix: dollarPrefix } : null;
+        return filtered.length
+          ? { items: filtered, prefix: dollarPrefix }
+          : current.getSuggestions(lines, cursorLine, cursorCol, options);
       },
       // biome-ignore lint/complexity/useMaxParams: AutocompleteProvider interface
       applyCompletion(lines, cursorLine, cursorCol, item, prefix) {
-        const line = lines[cursorLine] || "";
-        const before = line.slice(0, cursorCol - prefix.length);
-        const after = line.slice(cursorCol);
-        const newLine = `${before}$${item.value} ${after}`;
-        return {
-          lines: [...lines.slice(0, cursorLine), newLine, ...lines.slice(cursorLine + 1)],
-          cursorLine,
-          cursorCol: before.length + 1 + item.value.length + 1,
-        };
+        if (prefix.startsWith("$")) {
+          const line = lines[cursorLine] || "";
+          const before = line.slice(0, cursorCol - prefix.length);
+          const after = line.slice(cursorCol);
+          const newLine = `${before}$${item.value} ${after}`;
+          return {
+            lines: [...lines.slice(0, cursorLine), newLine, ...lines.slice(cursorLine + 1)],
+            cursorLine,
+            cursorCol: before.length + 1 + item.value.length + 1,
+          };
+        }
+        return current.applyCompletion(lines, cursorLine, cursorCol, item, prefix);
       },
-    };
-
-    // biome-ignore lint/suspicious/noExplicitAny: pi >= 0.69.0 API not yet in installed types
-    (ctx.ui as any).addAutocompleteProvider?.(provider);
+      shouldTriggerFileCompletion(lines, cursorLine, cursorCol) {
+        return current.shouldTriggerFileCompletion?.(lines, cursorLine, cursorCol) ?? true;
+      },
+    }));
   });
 
   // Transform $skill-name → /skill:skill-name before agent processing
