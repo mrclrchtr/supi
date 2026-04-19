@@ -13,7 +13,7 @@
 ## 3. TUI Overlay Component
 
 - [x] 3.1 Build overlay container with scope toggle header (Project / Global) using `Text` and theme tokens
-- [x] 3.2 Integrate `SettingsList` for `subdirs` and `compactRefresh` booleans with `getSettingsListTheme()`
+- [x] 3.2 Integrate manual row rendering for `subdirs` boolean toggle
 - [x] 3.3 Add custom interval row with `Input` component; handle numeric entry, "off" (0), and reset-to-default
 - [x] 3.4 Add read-only `fileNames` display row beneath the editable rows
 - [x] 3.5 Implement keyboard handling: ↑↓ navigate, Enter confirm/edit, Escape close, Tab switch scope
@@ -31,7 +31,7 @@
 - [x] 5.1 Create `packages/supi-claude-md/__tests__/settings.test.ts` with unit tests for `loadSettingsForScope`, `persistSetting`, and `buildSettingsRows`
 - [x] 5.2 Test scope switching reloads correct config values
 - [x] 5.3 Test interval persistence: number, 0 (off), and default (key removal)
-- [x] 5.4 Test boolean toggle persistence writes correct true/false values
+- [x] 5.4 Test boolean toggle persistence writes correct true/false values for `subdirs`
 - [x] 5.5 Run `pnpm vitest run packages/supi-claude-md/` and ensure all tests pass
 - [x] 5.6 Run `pnpm exec biome check --write packages/supi-claude-md/` to auto-fix formatting
 

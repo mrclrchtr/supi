@@ -1,6 +1,6 @@
 ---
 name: context-injection
-description: How supi-claude-md context injection works — subdirectory discovery, root refresh, manual commands, and configuration.
+description: How supi-claude-md context injection works — subdirectory discovery, root refresh, settings UI, and configuration.
 ---
 
 # Context Injection Guide
@@ -26,17 +26,22 @@ Each directory is injected at most once per session (by default). After the conf
 
 Context files loaded natively by pi (like the root AGENTS.md) may go stale as the session progresses. supi-claude-md periodically re-reads and re-injects these files via a persistent message in `before_agent_start`.
 
-Refresh timing is controlled by the `refreshInterval` config option (default: every 3 turns).
+Refresh timing is controlled by the `rereadInterval` config option (default: every 3 turns). Set to `0` to disable.
 
-## Manual commands
+Note: pi's system prompt already contains root context files and is re-sent on every LLM call. Root refresh is for **updating** the content when files change mid-session, not for re-adding missing context after compaction.
 
-Use `/supi-claude-md` with these subcommands:
+## Settings
 
-| Subcommand | Description |
-|------------|-------------|
-| `status` | Show loaded context paths, turn count, and refresh state |
-| `refresh` | Force an immediate root context refresh |
-| `config` | Show current configuration |
+Run `/supi-claude-md` to open the interactive settings UI. It replaces the editor area and shows the current effective configuration with keyboard navigation:
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate between settings |
+| `Enter` | Edit / toggle the selected setting |
+| `Tab` | Switch between Project and Global scope |
+| `Esc` | Close the settings UI |
+
+Changes are persisted immediately to the selected scope's config file.
 
 ## Configuration
 
@@ -47,9 +52,7 @@ Config lives in `.pi/supi/config.json` under the `claude-md` section:
   "claude-md": {
     "subdirs": true,
     "fileNames": ["CLAUDE.md", "AGENTS.md"],
-    "refreshInterval": 3,
-    "rereadInterval": 3,
-    "compactRefresh": true
+    "rereadInterval": 3
   }
 }
 ```
@@ -58,12 +61,10 @@ Config lives in `.pi/supi/config.json` under the `claude-md` section:
 |--------|---------|-------------|
 | `subdirs` | `true` | Enable subdirectory context injection |
 | `fileNames` | `["CLAUDE.md", "AGENTS.md"]` | Filenames to look for in subdirectories |
-| `refreshInterval` | `3` | Re-read root context every N turns |
-| `rereadInterval` | `3` | Re-read subdirectory context every N turns |
-| `compactRefresh` | `true` | Re-inject root context after compaction |
+| `rereadInterval` | `3` | Re-read root and subdirectory context every N turns (0 = off) |
 
 ## Tips
 
 - Put project-specific guidelines in subdirectory CLAUDE.md files so the agent gets them only when working in that area.
-- Use `/supi-claude-md refresh` after editing context files mid-session to make changes visible immediately.
+- Use the settings UI (`/supi-claude-md`) to adjust `rereadInterval` mid-session — changes take effect on the next turn.
 - Context is injected as XML `<extension-context>` blocks with a `source="supi-claude-md"` attribute.

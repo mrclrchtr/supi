@@ -5,7 +5,7 @@ The system SHALL provide a `settings` subcommand for `/supi-claude-md` that open
 
 #### Scenario: Opening the settings UI
 - **WHEN** the user runs `/supi-claude-md settings`
-- **THEN** an overlay appears showing the current effective configuration for `rereadInterval`, `subdirs`, `compactRefresh`, and `fileNames`
+- **THEN** an overlay appears showing the current effective configuration for `rereadInterval`, `subdirs`, and `fileNames`
 
 #### Scenario: Dismissing the settings UI
 - **WHEN** the user presses Escape inside the settings overlay
@@ -27,15 +27,11 @@ The settings overlay SHALL allow the user to switch between Project scope and Gl
 - **THEN** the change is written to the global config file
 
 ### Requirement: Boolean toggle editing
-The overlay SHALL provide toggle controls for `subdirs` and `compactRefresh`.
+The overlay SHALL provide toggle controls for `subdirs`.
 
 #### Scenario: Toggling subdirs on
 - **WHEN** the user toggles `subdirs` from off to on in the overlay
 - **THEN** the value `true` is persisted to the selected scope's config
-
-#### Scenario: Toggling compactRefresh off
-- **WHEN** the user toggles `compactRefresh` from on to off in the overlay
-- **THEN** the value `false` is persisted to the selected scope's config
 
 ### Requirement: Numeric interval editing
 The overlay SHALL provide an editable field for `rereadInterval`.

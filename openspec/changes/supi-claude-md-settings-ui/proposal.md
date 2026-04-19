@@ -5,7 +5,7 @@ The `supi-claude-md` extension currently requires users to type command-line sty
 ## What Changes
 
 - Add an interactive **settings overlay** for `supi-claude-md`, triggered via `/supi-claude-md settings`
-- The overlay displays current config values (rereadInterval, subdirs, compactRefresh, fileNames) and allows inline editing
+- The overlay displays current config values (rereadInterval, subdirs, fileNames) and allows inline editing
 - Boolean toggles use `SettingsList` cycling (on/off)
 - Numeric `rereadInterval` uses a dedicated numeric input field (number, "off", or "default")
 - `fileNames` displayed as editable comma-separated list
