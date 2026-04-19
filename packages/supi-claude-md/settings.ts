@@ -55,8 +55,8 @@ export function buildSettingsRows(config: ClaudeMdConfig): SettingsRow[] {
   return [
     {
       id: "rereadInterval",
-      label: "Root Refresh Interval",
-      description: "Turns between re-injecting root context files (0 = off)",
+      label: "Context Refresh Interval",
+      description: "Turns between re-reading context files for fresh content (0 = off)",
       type: "interval",
       value: config.rereadInterval === 0 ? "off" : String(config.rereadInterval),
     },
