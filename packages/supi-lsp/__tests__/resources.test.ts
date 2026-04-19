@@ -26,6 +26,8 @@ vi.mock("../scanner.ts", () => ({
 }));
 vi.mock("@mrclrchtr/supi-core", () => ({
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
+  registerSettings: vi.fn(),
+  loadSupiConfig: vi.fn(() => ({ enabled: true, severity: 1, servers: [] })),
 }));
 vi.mock("../guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,

@@ -16,7 +16,6 @@ const DEFAULTS: LspConfig = JSON.parse(
  * Load LSP config: built-in defaults merged with optional `.pi-lsp.json`
  * from the project root. Project config takes precedence.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: straightforward merge logic
 export function loadConfig(cwd: string): LspConfig {
   const defaults = DEFAULTS;
   const projectOverrides = loadProjectConfig(cwd);
@@ -37,16 +36,6 @@ export function loadConfig(cwd: string): LspConfig {
         if (override.command && override.fileTypes && override.rootMarkers) {
           merged[name] = override as ServerConfig;
         }
-      }
-    }
-  }
-
-  // Apply PI_LSP_SERVERS filter (always, even without project config)
-  const allowList = getServerAllowList();
-  if (allowList) {
-    for (const name of Object.keys(merged)) {
-      if (!allowList.has(name)) {
-        delete merged[name];
       }
     }
   }
@@ -86,14 +75,4 @@ function loadProjectConfig(cwd: string): LspConfig | null {
   }
 
   return null;
-}
-
-function getServerAllowList(): Set<string> | null {
-  const env = process.env.PI_LSP_SERVERS;
-  if (!env) return null;
-  const names = env
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  return names.length > 0 ? new Set(names) : null;
 }

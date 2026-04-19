@@ -44,6 +44,31 @@ Current workspace packages:
 Other notable areas:
 - `openspec/changes/` and `openspec/specs/` — OpenSpec artifacts
 
+## Settings registry
+
+SuPi extensions can register their settings with the shared registry in `supi-core`:
+
+```ts
+import { registerSettings } from "@mrclrchtr/supi-core";
+
+registerSettings({
+  id: "my-ext",
+  label: "My Extension",
+  loadValues: (scope, cwd) => [
+    { id: "enabled", label: "Enable", currentValue: "on", values: ["on", "off"] },
+  ],
+  persistChange: (scope, cwd, settingId, value) => {
+    // Write to ~/.pi/agent/supi/config.json (global) or .pi/supi/config.json (project)
+  },
+});
+```
+
+- Call `registerSettings()` during the extension factory function (not in async handlers)
+- The registry stores `SettingItem[]` compatible with pi-tui's `SettingsList`
+- `/supi-settings` (registered by `packages/supi/settings.ts`) renders all registered sections
+- Scope toggle (Tab) switches between project/global config; values are strings — extensions handle string↔typed conversion
+- Submenus use `SettingItem.submenu` returning a pi-tui `Component`; Escape confirms, empty-string done() cancels
+
 ## Shared gotchas
 
 - pi loads these extensions from the working tree directly; after edits, use `/reload` or restart pi.

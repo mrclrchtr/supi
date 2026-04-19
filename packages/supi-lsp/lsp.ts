@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import { loadConfig } from "./config.ts";
+import { loadLspSettings, registerLspSettings } from "./settings-registration.ts";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
 
@@ -57,12 +58,15 @@ interface LspRuntimeState {
 }
 
 export default function lspExtension(pi: ExtensionAPI) {
-  if (process.env.PI_LSP_DISABLED === "1") {
+  registerLspSettings(process.cwd());
+  const lspSettings = loadLspSettings(process.cwd());
+
+  if (!lspSettings.enabled) {
     registerDisabledStatusCommand(pi);
     return;
   }
 
-  const state = createRuntimeState(parseSeverity(process.env.PI_LSP_SEVERITY));
+  const state = createRuntimeState(lspSettings.severity);
 
   registerLspAwareToolOverrides(pi, {
     inlineSeverity: state.inlineSeverity,
@@ -71,7 +75,7 @@ export default function lspExtension(pi: ExtensionAPI) {
   });
 
   registerLspTool(pi, state, lspPromptGuidelines);
-  registerSessionLifecycleHandlers(pi, state);
+  registerSessionLifecycleHandlers(pi, state, lspSettings);
   registerBehaviorHandlers(pi, state);
   registerLspStatusCommand(pi, state);
   registerResourcesDiscover(pi);
@@ -81,7 +85,7 @@ function registerDisabledStatusCommand(pi: ExtensionAPI): void {
   pi.registerCommand("lsp-status", {
     description: "Show LSP server status",
     handler: async (_args, ctx) => {
-      ctx.ui.notify("LSP is disabled (PI_LSP_DISABLED=1)", "warning");
+      ctx.ui.notify("LSP is disabled in settings", "warning");
     },
   });
 }
@@ -102,7 +106,11 @@ function createRuntimeState(inlineSeverity: number): LspRuntimeState {
   };
 }
 
-function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
+function registerSessionLifecycleHandlers(
+  pi: ExtensionAPI,
+  state: LspRuntimeState,
+  _initialSettings: { servers: string[] },
+): void {
   pi.on("session_start", async (_event, ctx) => {
     if (state.manager) {
       await state.manager.shutdownAll();
@@ -110,7 +118,19 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
 
     ensureLspToolActive(pi);
     const cwd = ctx.cwd;
+    const lspSettings = loadLspSettings(cwd);
     const config = loadConfig(cwd);
+
+    // Apply server allowlist filter from supi shared config
+    if (lspSettings.servers.length > 0) {
+      const allowList = new Set(lspSettings.servers);
+      for (const name of Object.keys(config.servers)) {
+        if (!allowList.has(name)) {
+          delete config.servers[name];
+        }
+      }
+    }
+
     state.manager = new LspManager(config, cwd);
     state.detectedServers = scanProjectCapabilities(config, cwd);
     state.manager.registerDetectedServers(state.detectedServers);
@@ -337,12 +357,6 @@ function ensureLspToolActive(pi: ExtensionAPI): void {
   const activeTools = pi.getActiveTools();
   if (activeTools.includes("lsp")) return;
   pi.setActiveTools([...activeTools, "lsp"]);
-}
-
-function parseSeverity(env: string | undefined): number {
-  if (!env) return 1;
-  const parsed = Number.parseInt(env, 10);
-  return parsed >= 1 && parsed <= 4 ? parsed : 1;
 }
 
 function registerResourcesDiscover(pi: ExtensionAPI): void {

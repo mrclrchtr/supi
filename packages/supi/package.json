@@ -44,6 +44,7 @@
       "./bash-timeout.ts",
       "./claude-md.ts",
       "./resources.ts",
+      "./settings.ts",
       "./skill-shortcut.ts",
       "./lsp.ts"
     ],

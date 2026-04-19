@@ -11,10 +11,9 @@ Two capabilities wired into a single extension:
 
 ## Key files
 
-- `index.ts` — Extension entry point, all event handlers, `/supi-claude-md` command
+- `index.ts` — Extension entry point, all event handlers
 - `config.ts` — Config interface, defaults, `loadClaudeMdConfig()`
-- `settings.ts` — Interactive settings overlay (`/supi-claude-md`), TUI component with scope toggle, manual row rendering, and `Input` for editing
-- `commands.ts` — Opens settings overlay directly (no subcommands)
+- `settings-registration.ts` — Registers claude-md settings with the supi-core settings registry
 - `state.ts` — `ClaudeMdState` type, `createInitialState()`, `reconstructState()`
 - `discovery.ts` — `findSubdirContextFiles()`, `filterAlreadyLoaded()`, `extractPathFromToolEvent()`
 - `subdirectory.ts` — `formatSubdirContext()`, `shouldInjectSubdir()`
@@ -22,7 +21,7 @@ Two capabilities wired into a single extension:
 
 ## Dependencies
 
-- `@mrclrchtr/supi-core` — `wrapExtensionContext()`, `loadSupiConfig()`, `writeSupiConfig()`, `removeSupiConfigKey()`
+- `@mrclrchtr/supi-core` — `wrapExtensionContext()`, `loadSupiConfig()`, `writeSupiConfig()`, `removeSupiConfigKey()`, `registerSettings()`
 
 ## Config
 
@@ -46,9 +45,7 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 
 ## Gotchas
 
-- `/supi-claude-md` opens an interactive settings UI (replaces editor area, not a modal overlay)
-- `settings.ts` uses `ctx.ui.custom()` without `{ overlay: true }`, manual row rendering with `matchesKey(data, Key.*)` from `@mariozechner/pi-tui` for keyboard input
-- The overlay's `handleInput` is split into `handleEditingInput` and `handleNavigateInput` to satisfy Biome's cognitive complexity limits
+- Settings are managed via `/supi-settings` (unified supi settings command) — claude-md registers its settings via `registerClaudeMdSettings()` in the supi-core registry
 - `systemPromptOptions` is accessed via a typed intersection (`BeforeAgentStartEvent & { systemPromptOptions?: ... }`) for forward-compatibility with pi >= 0.68.0
 - `os.homedir()` cannot be mocked in ESM — config functions accept optional `homeDir` parameter for testability
 - Post-compaction refresh is **not needed**: pi's system prompt (which contains root context files) survives compaction and is re-sent every turn

@@ -15,8 +15,9 @@ const mockFns = vi.hoisted(() => ({
   reconstructState: vi.fn(),
 }));
 
-vi.mock("@mrclrchner/supi-core", () => ({
+vi.mock("@mrclrchtr/supi-core", () => ({
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
+  registerSettings: vi.fn(),
 }));
 
 vi.mock("../config.ts", () => ({
@@ -64,12 +65,6 @@ function resetMocks() {
 
 describe("claudeMdExtension: registration", () => {
   beforeEach(resetMocks);
-
-  it("registers /supi-claude-md command", () => {
-    const { commands, pi } = createPiMock();
-    claudeMdExtension(pi as never);
-    expect(commands.has("supi-claude-md")).toBe(true);
-  });
 
   it("registers all event handlers", () => {
     const { handlers, pi } = createPiMock();

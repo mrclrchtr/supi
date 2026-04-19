@@ -40,21 +40,13 @@ describe("loadConfig", () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
-  it("respects PI_LSP_SERVERS allow-list", () => {
-    const original = process.env.PI_LSP_SERVERS;
-    process.env.PI_LSP_SERVERS = "rust-analyzer,pyright";
-
+  it("no longer applies env-based allowlist (moved to lsp.ts)", () => {
     const config = loadConfig(os.tmpdir());
+    // All default servers should be present regardless of env vars
     expect(config.servers["rust-analyzer"]).toBeDefined();
     expect(config.servers.pyright).toBeDefined();
-    expect(config.servers["typescript-language-server"]).toBeUndefined();
-    expect(config.servers.gopls).toBeUndefined();
-
-    if (original === undefined) {
-      delete process.env.PI_LSP_SERVERS;
-    } else {
-      process.env.PI_LSP_SERVERS = original;
-    }
+    expect(config.servers["typescript-language-server"]).toBeDefined();
+    expect(config.servers.gopls).toBeDefined();
   });
 });
 

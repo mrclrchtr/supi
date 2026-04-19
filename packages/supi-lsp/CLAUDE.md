@@ -15,7 +15,8 @@ Entrypoint: `lsp.ts`
 - `summary.ts` — formatting/relevance helpers; keep summary logic here to avoid bloating `manager.ts`
 - `scanner.ts` — project scanning/guidance coverage logic
 - `diagnostics.ts`, `diagnostic-summary.ts`, `ui.ts` — diagnostic shaping and presentation
-- `config.ts` — `.pi-lsp.json` handling
+- `config.ts` — `.pi-lsp.json` handling (server definitions only)
+- `settings-registration.ts` — supi shared config settings (`enabled`, `severity`, `servers`)
 
 ## Behavior notes
 
@@ -26,11 +27,25 @@ Entrypoint: `lsp.ts`
 - `/lsp-status` should merge proactive scan roots with lazily started clients; do not assume UI state can rely on the session-start scan snapshot alone.
 - Use `pi.on("tool_result")` to append inline diagnostics to `write` / `edit` output.
 
-## Environment variables
+## Settings
 
-- `PI_LSP_DISABLED=1` — disable all LSP functionality
-- `PI_LSP_SERVERS=rust-analyzer,pyright` — allow-list active servers
-- `PI_LSP_SEVERITY=1|2|3|4` — inline diagnostic threshold (`1` = errors only)
+LSP settings are managed via the supi shared config system and the `/supi-settings` command:
+
+```json
+{
+  "lsp": {
+    "enabled": true,
+    "severity": 1,
+    "servers": ["typescript-language-server", "pyright"]
+  }
+}
+```
+
+- `enabled` (boolean, default `true`) — enable/disable all LSP functionality
+- `severity` (number 1-4, default `1`) — inline diagnostic threshold (`1` = errors only)
+- `servers` (string array, default `[]`) — allow-list active servers; empty means all servers enabled
+
+Settings are registered with the supi-core settings registry via `registerLspSettings(cwd)` in `lsp.ts`. The server allowlist is applied in `session_start` after loading config, not inside `loadConfig()`.
 
 ## Packaging/runtime gotchas
 
