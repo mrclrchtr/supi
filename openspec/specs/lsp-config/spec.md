@@ -68,13 +68,52 @@ The system SHALL detect the project root for each server by searching upward fro
 - **WHEN** no root marker files are found searching upward to filesystem root
 - **THEN** the system falls back to the current working directory as the project root
 
-### Requirement: Environment variable controls
-The system SHALL respect `PI_LSP_DISABLED=1` to disable all LSP functionality and `PI_LSP_SERVERS` to restrict which servers are enabled.
+### Requirement: Supi shared config controls
+The system SHALL read LSP enable/disable, severity threshold, and server allowlist from the supi shared config `"lsp"` section. The `enabled` key (boolean) controls whether LSP is active. The `severity` key (number 1-4) sets the inline diagnostic threshold. The `servers` key (string array) restricts which servers are enabled. An unset or empty `servers` array means all configured servers are enabled.
 
-#### Scenario: LSP disabled globally
-- **WHEN** `PI_LSP_DISABLED=1` is set
-- **THEN** no LSP servers are started and the `lsp` tool returns "LSP is disabled"
+#### Scenario: LSP disabled via config
+- **WHEN** the supi shared config contains `{ "lsp": { "enabled": false } }` (project or global)
+- **THEN** no LSP servers are started, no LSP tool is registered, and the system shows a notification that LSP is disabled
 
-#### Scenario: Server whitelist
-- **WHEN** `PI_LSP_SERVERS=rust-analyzer,pyright` is set
-- **THEN** only `rust-analyzer` and `pyright` servers are eligible; all others are skipped
+#### Scenario: LSP enabled (default)
+- **WHEN** no `enabled` key exists in the `"lsp"` config section, or `enabled` is `true`
+- **THEN** LSP functionality proceeds normally
+
+#### Scenario: Severity threshold from config
+- **WHEN** the supi shared config contains `{ "lsp": { "severity": 2 } }`
+- **THEN** inline diagnostics are shown for errors and warnings (severity ≤ 2)
+
+#### Scenario: Severity default
+- **WHEN** no `severity` key exists in the `"lsp"` config section
+- **THEN** inline diagnostics default to severity 1 (errors only)
+
+#### Scenario: Server allowlist from config
+- **WHEN** the supi shared config contains `{ "lsp": { "servers": ["rust-analyzer", "pyright"] } }`
+- **THEN** only `rust-analyzer` and `pyright` servers are eligible; all others are filtered out during config loading
+
+#### Scenario: Server allowlist empty or unset (default)
+- **WHEN** the `servers` key is absent or an empty array in the `"lsp"` config section
+- **THEN** all configured servers (from defaults and `.pi-lsp.json`) are eligible
+
+#### Scenario: Env vars are ignored
+- **WHEN** `PI_LSP_DISABLED`, `PI_LSP_SEVERITY`, or `PI_LSP_SERVERS` environment variables are set
+- **THEN** the env vars have no effect; only supi shared config is read
+
+### Requirement: LSP settings registration
+supi-lsp SHALL register its settings with the supi-core settings registry during extension initialization, providing items for "Enable LSP" (boolean toggle), "Inline Severity" (value cycling 1-4), and "Active Servers" (submenu with per-server toggles).
+
+#### Scenario: LSP settings appear in /supi-settings
+- **WHEN** the user opens `/supi-settings`
+- **THEN** the LSP section shows three settings: Enable LSP, Inline Severity, and Active Servers
+
+#### Scenario: Toggling LSP disabled via settings UI
+- **WHEN** the user sets "Enable LSP" to "off" in the settings overlay
+- **THEN** the change is persisted to the active scope's config and takes effect on next session start
+
+#### Scenario: Server allowlist submenu
+- **WHEN** the user activates the "Active Servers" setting
+- **THEN** a submenu opens showing all servers from the merged config (defaults + `.pi-lsp.json`) as enabled/disabled toggles
+
+#### Scenario: Server toggle persistence
+- **WHEN** the user toggles a server to "disabled" in the server submenu
+- **THEN** the server name is removed from the `servers` allowlist in the active scope's config
