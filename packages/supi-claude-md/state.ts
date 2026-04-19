@@ -17,8 +17,6 @@ export interface ClaudeMdState {
   lastRefreshTurn: number;
   /** Map of directory path → injection info */
   injectedDirs: Map<string, InjectedDir>;
-  /** Set after compaction or manual refresh to force re-injection */
-  needsRefresh: boolean;
   /** Token of the current active root refresh message (for pruning) */
   currentContextToken: string | null;
   /** Counter for generating unique context tokens */
@@ -34,7 +32,6 @@ export function createInitialState(): ClaudeMdState {
     completedTurns: 0,
     lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    needsRefresh: false,
     currentContextToken: null,
     contextCounter: 0,
     nativeContextPaths: new Set(),

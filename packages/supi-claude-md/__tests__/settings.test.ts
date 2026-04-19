@@ -52,7 +52,6 @@ describe("loadSettingsForScope", () => {
     // May be affected by real global config; just check type correctness
     expect(typeof config.rereadInterval).toBe("number");
     expect(typeof config.subdirs).toBe("boolean");
-    expect(typeof config.compactRefresh).toBe("boolean");
     expect(Array.isArray(config.fileNames)).toBe(true);
   });
 
@@ -61,7 +60,6 @@ describe("loadSettingsForScope", () => {
     const config = loadSettingsForScope("project", tmpDir);
     expect(config.rereadInterval).toBe(10);
     expect(config.subdirs).toBe(false);
-    expect(config.compactRefresh).toBe(CLAUDE_MD_DEFAULTS.compactRefresh);
   });
 });
 
@@ -135,7 +133,7 @@ describe("persistSetting", () => {
 describe("buildSettingsRows", () => {
   it("builds rows from default config", () => {
     const rows = buildSettingsRows(CLAUDE_MD_DEFAULTS);
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(3);
 
     expect(rows[0]).toEqual({
       id: "rereadInterval",
@@ -152,13 +150,6 @@ describe("buildSettingsRows", () => {
       value: "on",
     });
     expect(rows[2]).toEqual({
-      id: "compactRefresh",
-      label: "Post-Compaction Refresh",
-      description: "Re-inject root context after conversation compaction",
-      type: "boolean",
-      value: "on",
-    });
-    expect(rows[3]).toEqual({
       id: "fileNames",
       label: "Context File Names",
       description: "File names to look for in each directory (comma-separated)",
@@ -185,19 +176,13 @@ describe("buildSettingsRows", () => {
     expect(rows[1].value).toBe("off");
   });
 
-  it("shows 'off' for compactRefresh=false", () => {
-    const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, compactRefresh: false };
-    const rows = buildSettingsRows(config);
-    expect(rows[2].value).toBe("off");
-  });
-
   it("joins fileNames with commas", () => {
     const config: ClaudeMdConfig = {
       ...CLAUDE_MD_DEFAULTS,
       fileNames: ["INSTRUCTIONS.md", "CONTEXT.md", "AGENTS.md"],
     };
     const rows = buildSettingsRows(config);
-    expect(rows[3].value).toBe("INSTRUCTIONS.md, CONTEXT.md, AGENTS.md");
+    expect(rows[2].value).toBe("INSTRUCTIONS.md, CONTEXT.md, AGENTS.md");
   });
 });
 
@@ -281,17 +266,5 @@ describe("boolean toggle persistence", () => {
     persistSetting("project", tmpDir, "subdirs", false);
     const config = loadSettingsForScope("project", tmpDir);
     expect(config.subdirs).toBe(false);
-  });
-
-  it("writes true for compactRefresh on", () => {
-    persistSetting("project", tmpDir, "compactRefresh", true);
-    const config = loadSettingsForScope("project", tmpDir);
-    expect(config.compactRefresh).toBe(true);
-  });
-
-  it("writes false for compactRefresh off", () => {
-    persistSetting("project", tmpDir, "compactRefresh", false);
-    const config = loadSettingsForScope("project", tmpDir);
-    expect(config.compactRefresh).toBe(false);
   });
 });

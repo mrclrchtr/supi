@@ -12,9 +12,6 @@ import type { ClaudeMdState } from "./state.ts";
  * Check if root context should be refreshed.
  */
 export function shouldRefreshRoot(state: ClaudeMdState, config: ClaudeMdConfig): boolean {
-  // Manual refresh flag (from /supi-claude-md refresh command or compaction)
-  if (state.needsRefresh) return true;
-
   // Disabled
   if (config.rereadInterval === 0) return false;
 

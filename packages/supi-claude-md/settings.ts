@@ -68,13 +68,6 @@ export function buildSettingsRows(config: ClaudeMdConfig): SettingsRow[] {
       value: config.subdirs ? "on" : "off",
     },
     {
-      id: "compactRefresh",
-      label: "Post-Compaction Refresh",
-      description: "Re-inject root context after conversation compaction",
-      type: "boolean",
-      value: config.compactRefresh ? "on" : "off",
-    },
-    {
       id: "fileNames",
       label: "Context File Names",
       description: "File names to look for in each directory (comma-separated)",

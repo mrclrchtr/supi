@@ -45,7 +45,6 @@ vi.mock("../state.ts", () => ({
     completedTurns: 0,
     lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    needsRefresh: false,
     currentContextToken: null,
     contextCounter: 0,
     nativeContextPaths: new Set(),
@@ -158,7 +157,7 @@ describe("claudeMdExtension: turn_end", () => {
 describe("claudeMdExtension: session_compact", () => {
   beforeEach(resetMocks);
 
-  it("sets needsRefresh and clears injectedDirs", async () => {
+  it("clears injectedDirs on compact", async () => {
     const { handlers, pi } = createPiMock();
     claudeMdExtension(pi as never);
 
@@ -184,40 +183,16 @@ describe("claudeMdExtension: session_compact", () => {
       makeCtx(),
     );
 
+    // Compact should clear injectedDirs but not trigger refresh (it's redundant)
     await handlers.get("session_compact")?.({}, makeCtx());
 
-    mockFns.shouldRefreshRoot.mockReturnValue(true);
-    mockFns.readNativeContextFiles.mockReturnValue([{ path: "CLAUDE.md", content: "root" }]);
-    mockFns.formatRefreshContext.mockReturnValue("<extension-context>root</extension-context>");
-
+    // After compaction, shouldRefreshRoot is still false (interval not met)
+    mockFns.shouldRefreshRoot.mockReturnValue(false);
     const result = await handlers.get("before_agent_start")?.(
       { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "root" }] } },
       makeCtx(),
     );
 
-    expect(result).toMatchObject({ message: { customType: "supi-claude-md-refresh" } });
-  });
-
-  it("does not set needsRefresh when compactRefresh is disabled", async () => {
-    mockFns.loadClaudeMdConfig.mockReturnValue({ ...DEFAULT_CONFIG, compactRefresh: false });
-
-    const { handlers, pi } = createPiMock();
-    claudeMdExtension(pi as never);
-
-    mockFns.shouldRefreshRoot.mockReturnValue(true);
-    mockFns.readNativeContextFiles.mockReturnValue([{ path: "CLAUDE.md", content: "root" }]);
-    mockFns.formatRefreshContext.mockReturnValue("<extension-context>root</extension-context>");
-
-    const ctx = makeCtx();
-    const event = {
-      systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "root context" }] },
-    };
-
-    await handlers.get("before_agent_start")?.(event, ctx);
-
-    mockFns.shouldRefreshRoot.mockReturnValue(false);
-    await handlers.get("session_compact")?.({}, ctx);
-
-    expect(await handlers.get("before_agent_start")?.(event, ctx)).toBeUndefined();
+    expect(result).toBeUndefined();
   });
 });

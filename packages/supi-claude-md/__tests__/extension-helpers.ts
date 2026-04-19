@@ -1,7 +1,6 @@
 export const DEFAULT_CONFIG = {
   rereadInterval: 3,
   subdirs: true,
-  compactRefresh: true,
   fileNames: ["CLAUDE.md", "AGENTS.md"],
 };
 

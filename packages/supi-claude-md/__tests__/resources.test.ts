@@ -48,7 +48,6 @@ vi.mock("../state.ts", () => ({
     completedTurns: 0,
     lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    needsRefresh: true,
     currentContextToken: null,
     contextCounter: 0,
     nativeContextPaths: new Set(),
@@ -67,7 +66,6 @@ import claudeMdExtension from "../index.ts";
 const DEFAULT_CONFIG = {
   rereadInterval: 3,
   subdirs: true,
-  compactRefresh: true,
   fileNames: ["CLAUDE.md", "AGENTS.md"],
 };
 

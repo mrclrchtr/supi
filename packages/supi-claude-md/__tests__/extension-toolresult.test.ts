@@ -44,7 +44,6 @@ vi.mock("../state.ts", () => ({
     completedTurns: 0,
     lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    needsRefresh: false,
     currentContextToken: null,
     contextCounter: 0,
     nativeContextPaths: new Set(),

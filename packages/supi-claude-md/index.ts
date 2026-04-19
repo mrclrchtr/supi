@@ -79,10 +79,6 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
   // ── Compaction ─────────────────────────────────────────────
 
   pi.on("session_compact", async (_event: SessionCompactEvent, _ctx: ExtensionContext) => {
-    const config = loadClaudeMdConfig(_ctx.cwd);
-    if (config.compactRefresh) {
-      state.needsRefresh = true;
-    }
     state.injectedDirs.clear();
   });
 
@@ -112,7 +108,6 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
 
     state.currentContextToken = `supi-claude-md-${++state.contextCounter}`;
     state.lastRefreshTurn = state.completedTurns;
-    state.needsRefresh = false;
 
     return {
       message: {

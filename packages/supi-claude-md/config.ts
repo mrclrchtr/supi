@@ -4,7 +4,6 @@
 // {
 //   "rereadInterval": 3,      // turns between root/subdir refresh (0 = off)
 //   "subdirs": true,           // enable subdirectory context discovery
-//   "compactRefresh": true,    // re-inject after compaction
 //   "fileNames": ["CLAUDE.md", "AGENTS.md"]  // context file names to look for
 // }
 
@@ -15,8 +14,6 @@ export interface ClaudeMdConfig {
   rereadInterval: number;
   /** Enable subdirectory context discovery. Default: true */
   subdirs: boolean;
-  /** Re-inject after compaction. Default: true */
-  compactRefresh: boolean;
   /** Context file names to look for (first match per directory). Default: ["CLAUDE.md", "AGENTS.md"] */
   fileNames: string[];
 }
@@ -24,7 +21,6 @@ export interface ClaudeMdConfig {
 export const CLAUDE_MD_DEFAULTS: ClaudeMdConfig = {
   rereadInterval: 3,
   subdirs: true,
-  compactRefresh: true,
   fileNames: ["CLAUDE.md", "AGENTS.md"],
 };
 
