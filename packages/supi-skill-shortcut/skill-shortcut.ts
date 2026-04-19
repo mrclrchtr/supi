@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionUIContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { type AutocompleteProvider, fuzzyFilter } from "@mariozechner/pi-tui";
 
 /**
