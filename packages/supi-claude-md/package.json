@@ -24,7 +24,7 @@
     "@mrclrchtr/supi-core": "workspace:*"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "~0.69.0",
+    "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*"
   },
   "devDependencies": {

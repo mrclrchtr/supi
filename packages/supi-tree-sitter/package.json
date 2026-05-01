@@ -22,10 +22,10 @@
     "!__tests__"
   ],
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "~0.69.0",
+    "@mariozechner/pi-coding-agent": "*",
     "tree-sitter-javascript": ">=0.23.0",
     "tree-sitter-typescript": ">=0.23.0",
-    "typebox": ">=1.0.0",
+    "typebox": "*",
     "web-tree-sitter": "^0.26.8"
   },
   "devDependencies": {

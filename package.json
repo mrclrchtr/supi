@@ -56,9 +56,9 @@
     "web-tree-sitter": "^0.26.8"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "~0.69.0",
-    "@mariozechner/pi-tui": "~0.69.0",
-    "typebox": ">=1.0.0"
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
+    "typebox": "*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.11",

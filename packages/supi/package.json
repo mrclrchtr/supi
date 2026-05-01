@@ -35,7 +35,7 @@
     "web-tree-sitter": "^0.26.8"
   },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "~0.69.0"
+    "@mariozechner/pi-coding-agent": "*"
   },
   "devDependencies": {
     "vitest": "^4.1.4"
