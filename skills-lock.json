@@ -6,6 +6,11 @@
       "sourceType": "local",
       "computedHash": "f4c1ca9153d298aa0daf7135e14298743e6137615cff6e47ac4cfc32d2530d56"
     },
+    "skill-creator": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+    },
     "web-fetch-to-markdown": {
       "source": "/Users/mrclrchtr/Development/mrclrchtr/skills",
       "sourceType": "local",
