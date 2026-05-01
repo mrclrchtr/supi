@@ -2,11 +2,11 @@
 description: Update CLAUDE.md with learnings from this session
 ---
 
-Review this session for learnings about working in this codebase. Update CLAUDE.md with context that would help future sessions be more effective.
+Review this session for learnings about working with PI Agent in this codebase. Update CLAUDE.md with context that would help future PI sessions be more effective.
 
 ## Step 1: Reflect
 
-What context was missing that would have helped work more effectively?
+What context was missing that would have helped PI work more effectively?
 - Bash commands that were used or discovered
 - Code style patterns followed
 - Testing approaches that worked
@@ -20,14 +20,14 @@ find . -name "CLAUDE.md" -o -name ".claude.local.md" 2>/dev/null | head -20
 ```
 
 Decide where each addition belongs:
-- `CLAUDE.md` — team-shared, checked into git
-- `.claude.local.md` — personal/local only, gitignored
+- `CLAUDE.md` - Team-shared (checked into git)
+- `.claude.local.md` - Personal/local only (gitignored)
 
 ## Step 3: Draft Additions
 
-**Keep it concise** — one line per concept. CLAUDE.md is part of the prompt, so brevity matters.
+**Keep it concise** - one line per concept. CLAUDE.md is part of the prompt, so brevity matters.
 
-Format: `<command or pattern>` — `<brief description>`
+Format: `<command or pattern>` - `<brief description>`
 
 Avoid:
 - Verbose explanations
@@ -44,10 +44,10 @@ For each addition:
 **Why:** [one-line reason]
 
 \`\`\`diff
-+ [the addition — keep it brief]
++ [the addition - keep it brief]
 \`\`\`
 ```
 
 ## Step 5: Apply with Approval
 
-Ask if changes should be applied. Only edit files that are explicitly approved.
+Ask if the user wants to apply the changes. Only edit files they approve.
