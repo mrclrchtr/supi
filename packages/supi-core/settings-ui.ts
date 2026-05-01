@@ -69,16 +69,17 @@ function findSectionAndId(
 interface SettingsOverlayDeps {
   state: OverlayState;
   container: Container;
+  settingsList: SettingsList;
   tui: Parameters<Parameters<ExtensionContext["ui"]["custom"]>[0]>[0];
   theme: Parameters<Parameters<ExtensionContext["ui"]["custom"]>[0]>[1];
   done: () => void;
 }
 
-function rebuildSettingsList(deps: SettingsOverlayDeps): SettingsList {
+function createSettingsList(deps: SettingsOverlayDeps): SettingsList {
   const sections = getRegisteredSettings();
   const items = buildFlatItems(sections, deps.state.scope, deps.state.cwd);
 
-  const settingsList = new SettingsList(
+  return new SettingsList(
     items,
     Math.min(items.length + 4, 20),
     getSettingsListTheme(),
@@ -87,18 +88,28 @@ function rebuildSettingsList(deps: SettingsOverlayDeps): SettingsList {
       if (found) {
         found.section.persistChange(deps.state.scope, deps.state.cwd, found.itemId, newValue);
       }
-      // Rebuild to reflect persisted changes
-      rebuildSettingsList(deps);
+      // Re-read all values to reflect persisted changes, but keep the list
+      // instance (and its selectedIndex) intact.
+      const updatedItems = buildFlatItems(sections, deps.state.scope, deps.state.cwd);
+      for (const updated of updatedItems) {
+        const existing = items.find((i) => i.id === updated.id);
+        if (existing && existing.currentValue !== updated.currentValue) {
+          deps.settingsList.updateValue(updated.id, updated.currentValue);
+        }
+      }
       deps.tui.requestRender();
     },
     () => deps.done(),
     { enableSearch: true },
   );
+}
 
-  // Replace old settingsList in container
+function rebuildSettingsList(deps: SettingsOverlayDeps): SettingsList {
+  const settingsList = createSettingsList(deps);
+  deps.settingsList = settingsList;
+
   deps.container.clear();
-  const header = createHeaderComponent(deps);
-  deps.container.addChild(header);
+  deps.container.addChild(createHeaderComponent(deps));
   deps.container.addChild(settingsList);
 
   return settingsList;
@@ -135,9 +146,10 @@ export function openSettingsOverlay(ctx: ExtensionContext): void {
     const state: OverlayState = { scope: "project", cwd: ctx.cwd };
     const container = new Container();
 
-    const deps: SettingsOverlayDeps = {
+    const deps = {
       state,
       container,
+      settingsList: null as unknown as SettingsList,
       tui,
       theme,
       done,
