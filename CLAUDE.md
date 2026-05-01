@@ -14,6 +14,12 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 - Before changing code or giving guidance about pi-specific behavior, read the relevant installed pi docs (`README.md`, matching files in `docs/`, and `examples/`) and follow linked `.md` cross-references.
 - Treat the pi docs as the source of truth for extensions, skills, prompt templates, TUI, SDK, providers, models, and package behavior.
 
+## Documentation expectations
+
+- Add JSDoc when introducing or changing exported APIs, extension entrypoints, config/settings surfaces, or other non-obvious TypeScript behavior when applicable.
+- Add inline JSDoc for complex internal logic when a short explanatory block will make the code easier to maintain.
+- Keep JSDoc concise and useful: explain purpose, important parameters/returns, side effects, and pi-specific constraints; skip boilerplate comments for trivial private code.
+
 ## Commands
 
 ```bash
