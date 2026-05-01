@@ -24,6 +24,7 @@ This file contains non-obvious guidance for future work in `packages/supi-lsp/`.
 ## Package-specific conventions
 
 - Keep summary/relevance formatting out of `manager.ts`; prefer focused helpers like `summary.ts` or `manager-*.ts` modules.
+- `manager.ts` + Biome `noExcessiveLinesPerFile` — extract focused `manager-*.ts` helpers before commit hooks fail on the 400-line cap.
 - `ctx.cwd` is threaded through `LspManager` and formatting utilities; do not use `process.cwd()` for path resolution.
 - `loadConfig()` handles only `.pi-lsp.json` server definitions; settings allowlists are applied in `session_start` after loading config.
 
