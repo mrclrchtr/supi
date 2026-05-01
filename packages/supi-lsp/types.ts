@@ -135,6 +135,8 @@ export interface WorkspaceSymbol {
   kind: SymbolKind;
   location: Location;
   containerName?: string;
+  /** LSP 3.17+ extra data for resolve support */
+  data?: unknown;
 }
 
 // ── Code Actions ──────────────────────────────────────────────────────

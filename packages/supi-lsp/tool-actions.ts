@@ -268,6 +268,8 @@ async function handleSymbolHover(manager: LspManager, params: LspToolParams): Pr
     return `Symbol "${params.symbol}" not found.`;
   }
 
+  // Use the first match arbitrarily; LSP servers return results in their own
+  // order. The agent can use workspace_symbol or search to disambiguate.
   const match = symbols[0];
   const filePath = uriToFile(match.location.uri);
   const client = await manager.ensureFileOpen(filePath);

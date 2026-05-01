@@ -46,6 +46,11 @@ export async function augmentDiagnostics(
   return parts.length > 0 ? parts.join("\n") : null;
 }
 
+/**
+ * Extract raw hover text for inline diagnostic augmentation.
+ * Intentionally strips markdown code-block framing (unlike formatHover)
+ * to keep augmentation concise and readable inside diagnostic output.
+ */
 function formatHoverForDiagnostics(hover: Hover): string {
   const contents = hover.contents;
   let text = "";
@@ -67,8 +72,11 @@ function formatHoverForDiagnostics(hover: Hover): string {
 }
 
 async function withTimeout<T>(promise: Promise<T | null>, ms: number): Promise<T | null> {
-  return Promise.race([
-    promise,
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
-  ]);
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timeoutPromise = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  const result = await Promise.race([promise, timeoutPromise]);
+  if (timer) clearTimeout(timer);
+  return result;
 }

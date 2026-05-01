@@ -39,16 +39,16 @@ const SOURCE_EXTENSIONS = new Set([
 ]);
 
 /** Simple recursive text search in project source files. */
-export function fallbackGrep(cwd: string, query: string): GrepMatch[] {
+export function fallbackGrep(projectRoot: string, query: string): GrepMatch[] {
   const results: GrepMatch[] = [];
-  walk(cwd, query, results);
+  walk(projectRoot, projectRoot, query, results);
   return results;
 }
 
-function walk(cwd: string, query: string, results: GrepMatch[]): void {
+function walk(dir: string, projectRoot: string, query: string, results: GrepMatch[]): void {
   let entries: fs.Dirent[];
   try {
-    entries = fs.readdirSync(cwd, { withFileTypes: true });
+    entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
     return;
   }
@@ -56,7 +56,7 @@ function walk(cwd: string, query: string, results: GrepMatch[]): void {
   for (const entry of entries) {
     if (entry.isDirectory()) {
       if (!IGNORE_DIRS.has(entry.name)) {
-        walk(path.join(cwd, entry.name), query, results);
+        walk(path.join(dir, entry.name), projectRoot, query, results);
       }
       continue;
     }
@@ -65,13 +65,18 @@ function walk(cwd: string, query: string, results: GrepMatch[]): void {
       continue;
     }
 
-    const filePath = path.join(cwd, entry.name);
-    searchFile(filePath, cwd, query, results);
+    const filePath = path.join(dir, entry.name);
+    searchFile(filePath, projectRoot, query, results);
     if (results.length >= 20) return;
   }
 }
 
-function searchFile(filePath: string, cwd: string, query: string, results: GrepMatch[]): void {
+function searchFile(
+  filePath: string,
+  projectRoot: string,
+  query: string,
+  results: GrepMatch[],
+): void {
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf-8");
@@ -83,7 +88,7 @@ function searchFile(filePath: string, cwd: string, query: string, results: GrepM
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes(query)) {
       results.push({
-        file: path.relative(cwd, filePath),
+        file: path.relative(projectRoot, filePath),
         line: i + 1,
         text: lines[i].trim(),
       });

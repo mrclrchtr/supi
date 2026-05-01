@@ -1,6 +1,7 @@
 // LSP result formatting — converts LSP response types into readable text.
 
 import * as path from "node:path";
+import type { GrepMatch } from "./search-fallback.ts";
 import type {
   CodeAction,
   DocumentSymbol,
@@ -165,12 +166,6 @@ export function formatWorkspaceSymbols(symbols: SymbolInformation[], cwd: string
 }
 
 // ── Search Results ────────────────────────────────────────────────────
-
-export interface GrepMatch {
-  file: string;
-  line: number;
-  text: string;
-}
 
 export function formatSearchResults(
   lspSymbols: SymbolInformation[] | null,
