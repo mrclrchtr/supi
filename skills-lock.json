@@ -2,18 +2,18 @@
   "version": 1,
   "skills": {
     "openspec-brainstorm": {
-      "source": "/Users/mrclrchtr/Development/mrclrchtr/skills",
-      "sourceType": "local",
-      "computedHash": "f4c1ca9153d298aa0daf7135e14298743e6137615cff6e47ac4cfc32d2530d56"
-    },
-    "skill-creator": {
-      "source": "anthropics/skills",
+      "source": "mrclrchtr/skills",
       "sourceType": "github",
-      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+      "computedHash": "c69ae2d49615cd0bd8f61debc76cadab909e5d5f3ecd6ca92f727f3715c83baa"
+    },
+    "pi-upgrade": {
+      "source": "mrclrchtr/skills",
+      "sourceType": "github",
+      "computedHash": "922dc38cd7eb697a910a1800949ed2d120e718ffe89bbbf2bdf27f7081bb7fdd"
     },
     "web-fetch-to-markdown": {
-      "source": "/Users/mrclrchtr/Development/mrclrchtr/skills",
-      "sourceType": "local",
+      "source": "mrclrchtr/skills",
+      "sourceType": "github",
       "computedHash": "ba2d207dc9a3bd4d51d564dbcc5e60ccf884126559cf968f984c00274cc20d8a"
     }
   }
