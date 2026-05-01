@@ -100,9 +100,7 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     const lspSettings = loadLspSettings(cwd);
 
     if (!lspSettings.enabled) {
-      state.manager = null;
-      state.detectedServers = [];
-      state.projectServers = [];
+      disableLspState(pi, state);
       return;
     }
 
@@ -158,8 +156,15 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
 
 function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
   pi.on("before_agent_start", async (_event, ctx) => {
+    if (!state.manager) {
+      const activeTools = pi.getActiveTools();
+      if (activeTools.includes("lsp")) {
+        pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
+      }
+      return;
+    }
+
     ensureLspToolActive(pi);
-    if (!state.manager) return;
 
     state.manager.pruneMissingFiles();
     refreshProjectServers(state);
@@ -347,6 +352,19 @@ function collectDiagnosticTotals(
 
 function isLspAwareTool(toolName: string): boolean {
   return toolName === "lsp" || toolName === "read" || toolName === "write" || toolName === "edit";
+}
+
+function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void {
+  state.manager = null;
+  state.detectedServers = [];
+  state.projectServers = [];
+  state.lastDiagnosticsFingerprint = null;
+  state.currentContextToken = null;
+
+  const activeTools = pi.getActiveTools();
+  if (activeTools.includes("lsp")) {
+    pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
+  }
 }
 
 function ensureLspToolActive(pi: ExtensionAPI): void {
