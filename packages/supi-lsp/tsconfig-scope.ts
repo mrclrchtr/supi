@@ -72,13 +72,11 @@ function findNearestTsconfig(startDir: string, rootDir: string): TsconfigInfo | 
 
     if (path.relative(rootDir, dir).startsWith("..") || dir === rootDir) {
       // Don't look above the project root
-      cache.set(dir, null);
       return null;
     }
 
     const parent = path.dirname(dir);
     if (parent === dir) {
-      cache.set(dir, null);
       return null;
     }
     dir = parent;
