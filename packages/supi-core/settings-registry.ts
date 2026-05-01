@@ -18,7 +18,23 @@ export interface SettingsSection {
   persistChange: (scope: SettingsScope, cwd: string, settingId: string, value: string) => void;
 }
 
-const registry = new Map<string, SettingsSection>();
+// Use a globalThis-backed registry so that all jiti module instances
+// (resolved through different node_modules symlinks) share the same Map.
+// Without this, each symlink path gets its own module copy and its own Map,
+// so extensions registering settings write to a different Map than the
+// /supi-settings command reads from.
+const REGISTRY_KEY = Symbol.for("@mrclrchtr/supi-core/settings-registry");
+
+function getRegistry(): Map<string, SettingsSection> {
+  let registry = (globalThis as Record<symbol, unknown>)[REGISTRY_KEY] as
+    | Map<string, SettingsSection>
+    | undefined;
+  if (!registry) {
+    registry = new Map<string, SettingsSection>();
+    (globalThis as Record<symbol, unknown>)[REGISTRY_KEY] = registry;
+  }
+  return registry;
+}
 
 /**
  * Register a settings section for an extension.
@@ -26,15 +42,15 @@ const registry = new Map<string, SettingsSection>();
  * Duplicate ids replace the previous registration.
  */
 export function registerSettings(section: SettingsSection): void {
-  registry.set(section.id, section);
+  getRegistry().set(section.id, section);
 }
 
 /** Get all registered settings sections in registration order. */
 export function getRegisteredSettings(): SettingsSection[] {
-  return Array.from(registry.values());
+  return Array.from(getRegistry().values());
 }
 
 /** Clear the registry — used by tests. */
 export function clearRegisteredSettings(): void {
-  registry.clear();
+  getRegistry().clear();
 }
