@@ -21,6 +21,7 @@ Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent)
 | `@mrclrchtr/supi-skill-shortcut` | **skill-shortcut** | Type `$skill-name` as a shorthand for `/skill:skill-name`. Autocomplete triggers on `$`. |
 | `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
 | `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. |
+| `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis for JavaScript and TypeScript files: outline, imports, exports, node-at-position lookup, and custom queries. |
 
 ## Install
 
@@ -34,6 +35,7 @@ pi install npm:@mrclrchtr/supi
 
 ```bash
 pi install npm:@mrclrchtr/supi-lsp
+pi install npm:@mrclrchtr/supi-tree-sitter
 pi install npm:@mrclrchtr/supi-ask-user
 pi install npm:@mrclrchtr/supi-skill-shortcut
 pi install npm:@mrclrchtr/supi-bash-timeout
@@ -48,10 +50,21 @@ pi install git:github.com/mrclrchtr/supi
 
 # Individual extension from local checkout
 pi install /path/to/SuPi/packages/supi-lsp
+pi install /path/to/SuPi/packages/supi-tree-sitter
 pi install /path/to/SuPi/packages/supi-ask-user
 ```
 
 When installed from a local path, pi loads the working tree directly; after edits, use `/reload` or restart pi to pick up extension changes.
+
+## Tree-sitter extension
+
+The `tree_sitter` extension provides syntax-tree-level analysis when an LSP server is unavailable or when exact AST structure is useful:
+
+- supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, and `.cjs`
+- exposes actions for `outline`, `imports`, `exports`, `node_at`, and `query`
+- uses 1-based `line`/`character` coordinates compatible with the `lsp` tool; `character` is a UTF-16 code-unit column
+- caps tool responses at 100 emitted items, including nested outline children
+- exports `createTreeSitterSession(cwd)` for other SuPi packages that need reusable parse/query/structure services
 
 ## LSP extension
 

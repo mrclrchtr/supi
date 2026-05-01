@@ -35,6 +35,7 @@ Included extension entrypoints:
 - `bash-timeout.ts`
 - `claude-md.ts`
 - `lsp.ts`
+- `tree-sitter.ts`
 - `skill-shortcut.ts`
 - `resources.ts`
 
@@ -52,6 +53,7 @@ Current bundled prompt templates:
 | [`@mrclrchtr/supi-bash-timeout`](../supi-bash-timeout/README.md) | extension | Injects default timeouts into `bash` tool calls |
 | [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | extension | Subdirectory context injection and root context refresh |
 | [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | extension | Language Server Protocol tool, diagnostics, and semantic guidance |
+| [`@mrclrchtr/supi-tree-sitter`](../supi-tree-sitter/README.md) | extension/library | Tree-sitter structural analysis tool and reusable parse/query services |
 | [`@mrclrchtr/supi-skill-shortcut`](../supi-skill-shortcut/README.md) | extension | `$skill-name` shorthand and autocomplete |
 | [`@mrclrchtr/supi-core`](../supi-core/README.md) | library | Shared config and context utilities used by SuPi packages |
 
@@ -63,6 +65,7 @@ pi install npm:@mrclrchtr/supi-ask-user
 pi install npm:@mrclrchtr/supi-bash-timeout
 pi install npm:@mrclrchtr/supi-claude-md
 pi install npm:@mrclrchtr/supi-lsp
+pi install npm:@mrclrchtr/supi-tree-sitter
 pi install npm:@mrclrchtr/supi-skill-shortcut
 ```
 
@@ -79,6 +82,10 @@ Keeps directory-specific `CLAUDE.md` and `AGENTS.md` guidance flowing into sessi
 ### `lsp`
 
 Adds semantic code navigation and diagnostics through a single `lsp` tool plus inline diagnostic surfacing and `/lsp-status`.
+
+### `tree_sitter`
+
+Adds syntax-tree-level structure for JavaScript and TypeScript files through `outline`, `imports`, `exports`, `node_at`, and custom query actions. Results use 1-based coordinates compatible with `lsp` and are capped for agent-friendly output.
 
 ### Small UX improvements
 

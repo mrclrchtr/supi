@@ -22,7 +22,8 @@
       "./packages/supi-claude-md/index.ts",
       "./packages/supi/settings.ts",
       "./packages/supi-skill-shortcut/skill-shortcut.ts",
-      "./packages/supi-lsp/lsp.ts"
+      "./packages/supi-lsp/lsp.ts",
+      "./packages/supi-tree-sitter/tree-sitter.ts"
     ],
     "prompts": [
       "./packages/supi/prompts"
@@ -42,12 +43,17 @@
     "format:check": "biome format .",
     "typecheck": "for p in packages/*/tsconfig.json; do tsc --noEmit -p \"$p\" || exit 1; done",
     "typecheck:tests": "for p in packages/*/__tests__/tsconfig.json; do [ -f \"$p\" ] && tsc --noEmit -p \"$p\" || exit 1; done",
-    "pack:check": "pnpm --filter @mrclrchtr/supi exec pnpm pack --dry-run",
+    "pack:check": "pnpm --filter \"./packages/supi*\" exec pnpm pack --dry-run",
     "check": "pnpm biome",
     "check:fix": "pnpm biome:fix",
     "verify": "pnpm typecheck && pnpm typecheck:tests && pnpm biome:ai && pnpm test && pnpm pack:check",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "dependencies": {
+    "tree-sitter-javascript": "^0.23.0",
+    "tree-sitter-typescript": "^0.23.0",
+    "web-tree-sitter": "^0.26.8"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "~0.69.0",
