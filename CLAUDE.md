@@ -4,6 +4,10 @@ SuPi (**Super Pi**) is an opinionated extension repo for the [pi coding agent](h
 
 It is a pnpm workspace monorepo of installable pi extensions. pi loads the extensions directly as TypeScript — there is no build step.
 
+## Development status
+
+SuPi is pre-release and not API-stable. Intentional breaking changes to package APIs, commands, configuration formats, and extension behavior are allowed when they improve the design. Do not treat backwards compatibility as a blocker unless a task explicitly asks for it.
+
 ## Commands
 
 ```bash
@@ -38,6 +42,7 @@ Current workspace packages:
 - `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
 - `packages/supi-bash-timeout` — default timeout injection for `bash`
 - `packages/supi-lsp` — Language Server Protocol integration + diagnostics guardrails
+- `packages/supi-tree-sitter` — Tree-sitter structural analysis tool + reusable parse/query service
 - `packages/supi-skill-shortcut` — `$skill-name` shorthand for `/skill:name`
 - `packages/supi` — meta-package, prompts, and bundled skills
 
@@ -77,6 +82,7 @@ registerSettings({
 - `ctx.ui.notify()` accepts `"info"` | `"warning"` | `"error"` severity — the gotcha about "info" is for `ctx.ui.theme` colors, not `notify`.
 - `ctx.ui.theme` does not expose an `"info"` color; use existing colors like `"accent"` / `"dim"` for info-level UI.
 - Keep runtime-imported packages in `peerDependencies`; after changing version ranges run `pnpm install` to refresh the lockfile.
+- Pi core peer deps (`@mariozechner/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
 - Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
