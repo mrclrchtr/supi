@@ -11,7 +11,6 @@ const baseDir = dirname(fileURLToPath(import.meta.url));
 
 export default function resourcesExtension(pi: ExtensionAPI) {
   pi.on("resources_discover", () => ({
-    skillPaths: [join(baseDir, "skills")],
     promptPaths: [join(baseDir, "prompts")],
   }));
 }

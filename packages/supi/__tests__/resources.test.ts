@@ -18,7 +18,6 @@ function getDiscoverHandler(handlers: Map<string, (...args: unknown[]) => unknow
   const handler = handlers.get("resources_discover");
   expect(handler).toBeDefined();
   return handler as (...args: unknown[]) => Promise<{
-    skillPaths: string[];
     promptPaths: string[];
   }>;
 }
@@ -29,18 +28,14 @@ describe("resources extension", () => {
     expect(handlers.has("resources_discover")).toBe(true);
   });
 
-  it("returns absolute skill and prompt paths", async () => {
+  it("returns absolute prompt paths", async () => {
     const handler = getDiscoverHandler(setup());
     const result = await handler({}, { cwd: "/tmp" });
 
     expect(result).toEqual({
-      skillPaths: [expect.stringContaining(join("packages", "supi", "skills"))],
       promptPaths: [expect.stringContaining(join("packages", "supi", "prompts"))],
     });
 
-    for (const p of result.skillPaths) {
-      expect(p).toMatch(/^\//);
-    }
     for (const p of result.promptPaths) {
       expect(p).toMatch(/^\//);
     }
@@ -50,9 +45,6 @@ describe("resources extension", () => {
     const handler = getDiscoverHandler(setup());
     const result = await handler({}, { cwd: "/tmp" });
 
-    for (const p of result.skillPaths) {
-      expect(existsSync(p)).toBe(true);
-    }
     for (const p of result.promptPaths) {
       expect(existsSync(p)).toBe(true);
     }

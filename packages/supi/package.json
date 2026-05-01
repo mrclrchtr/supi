@@ -18,7 +18,6 @@
   "files": [
     "*.ts",
     "prompts",
-    "skills",
     "README.md",
     "LICENSE"
   ],
@@ -50,9 +49,6 @@
     ],
     "prompts": [
       "./prompts"
-    ],
-    "skills": [
-      "./skills"
     ]
   }
 }

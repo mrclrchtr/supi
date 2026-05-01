@@ -30,6 +30,7 @@ vi.mock("../guidance.ts", () => ({
   formatDiagnosticsContext: mockFns.formatDiagnosticsContext,
   lspPromptGuidelines: mockFns.lspPromptGuidelines,
   lspPromptSnippet: mockFns.lspPromptSnippet,
+  MAX_DETAILED_DIAGNOSTICS: 5,
 }));
 
 vi.mock("@mrclrchtr/supi-core", () => ({
@@ -118,6 +119,7 @@ function createManager(diagnostics: unknown[] = []) {
     shutdownAll: vi.fn(),
     pruneMissingFiles: vi.fn(),
     getOutstandingDiagnosticSummary: vi.fn(() => diagnostics),
+    getOutstandingDiagnostics: vi.fn(() => []),
   };
 }
 

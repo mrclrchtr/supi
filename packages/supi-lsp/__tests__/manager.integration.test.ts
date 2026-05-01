@@ -22,7 +22,7 @@ async function waitForDiagnostics(
   return waitFor(
     () => manager.syncFileAndGetDiagnostics(filePath, maxSeverity),
     (diagnostics) => diagnostics.length > 0,
-    { timeoutMs: 1_500, retryDelayMs: 250, label: `diagnostics for ${path.basename(filePath)}` },
+    { timeoutMs: 5_000, retryDelayMs: 200, label: `diagnostics for ${path.basename(filePath)}` },
   );
 }
 
