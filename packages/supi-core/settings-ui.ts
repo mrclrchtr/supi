@@ -43,6 +43,7 @@ function buildFlatItems(
     for (const item of sectionItems) {
       items.push({
         ...item,
+        id: `${section.id}.${item.id}`,
         label: `${section.label}: ${item.label}`,
       });
     }
@@ -54,13 +55,13 @@ function findSectionAndId(
   sections: SettingsSection[],
   flatId: string,
 ): { section: SettingsSection; itemId: string } | null {
-  for (const section of sections) {
-    const ids = section.loadValues("project", "").map((i) => i.id);
-    if (ids.includes(flatId)) {
-      return { section, itemId: flatId };
-    }
-  }
-  return null;
+  const dotIndex = flatId.indexOf(".");
+  if (dotIndex === -1) return null;
+  const sectionId = flatId.slice(0, dotIndex);
+  const itemId = flatId.slice(dotIndex + 1);
+  const section = sections.find((s) => s.id === sectionId);
+  if (!section) return null;
+  return { section, itemId };
 }
 
 // ── Component ────────────────────────────────────────────────

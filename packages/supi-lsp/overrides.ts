@@ -4,7 +4,7 @@ import { formatDiagnostics } from "./diagnostics.ts";
 import type { LspManager } from "./manager.ts";
 
 interface LspOverrideState {
-  inlineSeverity: number;
+  getInlineSeverity(): number;
   getManager(): LspManager | null;
   cwd: string;
 }
@@ -32,7 +32,7 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
       return appendInlineDiagnostics({
         manager: state.getManager(),
         filePath: params.path,
-        inlineSeverity: state.inlineSeverity,
+        inlineSeverity: state.getInlineSeverity(),
         cwd: state.cwd,
         result,
       });
@@ -47,7 +47,7 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
       return appendInlineDiagnostics({
         manager: state.getManager(),
         filePath: params.path,
-        inlineSeverity: state.inlineSeverity,
+        inlineSeverity: state.getInlineSeverity(),
         cwd: state.cwd,
         result,
       });

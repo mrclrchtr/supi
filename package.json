@@ -20,6 +20,7 @@
       "./packages/supi-ask-user/ask-user.ts",
       "./packages/supi-bash-timeout/index.ts",
       "./packages/supi-claude-md/index.ts",
+      "./packages/supi/settings.ts",
       "./packages/supi-skill-shortcut/skill-shortcut.ts",
       "./packages/supi-lsp/lsp.ts"
     ],

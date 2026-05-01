@@ -1,4 +1,4 @@
-// LSP Extension for pi — provides Language Server Protocol integration.
+// LSP Extension for pi - provides Language Server Protocol integration.
 //
 // Gives the agent type-aware hover, go-to-definition,
 // diagnostics, document-symbols, rename, and code-actions via a registered
@@ -59,41 +59,25 @@ interface LspRuntimeState {
 
 export default function lspExtension(pi: ExtensionAPI) {
   registerLspSettings(process.cwd());
-  const lspSettings = loadLspSettings(process.cwd());
-
-  if (!lspSettings.enabled) {
-    registerDisabledStatusCommand(pi);
-    return;
-  }
-
-  const state = createRuntimeState(lspSettings.severity);
+  const state = createRuntimeState();
 
   registerLspAwareToolOverrides(pi, {
-    inlineSeverity: state.inlineSeverity,
+    getInlineSeverity: () => state.inlineSeverity,
     getManager: () => state.manager,
     cwd: process.cwd(),
   });
 
   registerLspTool(pi, state, lspPromptGuidelines);
-  registerSessionLifecycleHandlers(pi, state, lspSettings);
+  registerSessionLifecycleHandlers(pi, state);
   registerBehaviorHandlers(pi, state);
   registerLspStatusCommand(pi, state);
   registerResourcesDiscover(pi);
 }
 
-function registerDisabledStatusCommand(pi: ExtensionAPI): void {
-  pi.registerCommand("lsp-status", {
-    description: "Show LSP server status",
-    handler: async (_args, ctx) => {
-      ctx.ui.notify("LSP is disabled in settings", "warning");
-    },
-  });
-}
-
-function createRuntimeState(inlineSeverity: number): LspRuntimeState {
+function createRuntimeState(): LspRuntimeState {
   return {
     manager: null,
-    inlineSeverity,
+    inlineSeverity: 1,
     inspector: {
       handle: null,
       close: null,
@@ -106,19 +90,25 @@ function createRuntimeState(inlineSeverity: number): LspRuntimeState {
   };
 }
 
-function registerSessionLifecycleHandlers(
-  pi: ExtensionAPI,
-  state: LspRuntimeState,
-  _initialSettings: { servers: string[] },
-): void {
+function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
   pi.on("session_start", async (_event, ctx) => {
     if (state.manager) {
       await state.manager.shutdownAll();
     }
 
-    ensureLspToolActive(pi);
     const cwd = ctx.cwd;
     const lspSettings = loadLspSettings(cwd);
+
+    if (!lspSettings.enabled) {
+      state.manager = null;
+      state.detectedServers = [];
+      state.projectServers = [];
+      return;
+    }
+
+    state.inlineSeverity = lspSettings.severity;
+
+    ensureLspToolActive(pi);
     const config = loadConfig(cwd);
 
     // Apply server allowlist filter from supi shared config
@@ -284,6 +274,12 @@ function registerLspStatusCommand(pi: ExtensionAPI, state: LspRuntimeState): voi
   pi.registerCommand("lsp-status", {
     description: "Show detected LSP servers, roots, open files, and diagnostics",
     handler: async (_args, ctx) => {
+      const lspSettings = loadLspSettings(ctx.cwd);
+      if (!lspSettings.enabled) {
+        ctx.ui.notify("LSP is disabled in settings", "warning");
+        return;
+      }
+
       if (!state.manager) {
         ctx.ui.notify("LSP not initialized", "warning");
         return;
@@ -311,15 +307,15 @@ function refreshProjectServers(state: LspRuntimeState): void {
 }
 
 function buildDiagnosticsNotification(diagnostics: OutstandingDiagnosticSummaryEntry[]): string {
-  if (diagnostics.length === 0) return "ℹ️ LSP diagnostics injected";
+  if (diagnostics.length === 0) return "i️ LSP diagnostics injected";
   if (diagnostics.length === 1) {
     const [entry] = diagnostics;
-    if (!entry) return "ℹ️ LSP diagnostics injected";
-    return `ℹ️ LSP: ${entry.file} — ${formatNotificationCounts(entry, ", ")}`;
+    if (!entry) return "i️ LSP diagnostics injected";
+    return `i️ LSP: ${entry.file} - ${formatNotificationCounts(entry, ", ")}`;
   }
 
   const totals = collectDiagnosticTotals(diagnostics);
-  return `ℹ️ LSP: ${diagnostics.length} files • ${formatNotificationCounts(totals, " • ")}`;
+  return `i️ LSP: ${diagnostics.length} files • ${formatNotificationCounts(totals, " • ")}`;
 }
 
 function formatNotificationCounts(

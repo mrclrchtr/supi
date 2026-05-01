@@ -130,6 +130,8 @@ function createServerSubmenu(
     values: ["enabled", "disabled"],
   }));
 
+  let dirty = false;
+
   const container = new Container();
   const header = new Text("Active Servers — all enabled by default", 0, 0);
   container.addChild(header);
@@ -140,7 +142,8 @@ function createServerSubmenu(
     getSettingsListTheme(),
     (id, newValue) => {
       const idx = items.findIndex((i) => i.id === id);
-      if (idx >= 0) {
+      if (idx >= 0 && items[idx].currentValue !== newValue) {
+        dirty = true;
         items[idx].currentValue = newValue;
       }
     },
@@ -157,6 +160,10 @@ function createServerSubmenu(
     invalidate: () => container.invalidate(),
     handleInput: (data: string) => {
       if (matchesKey(data, Key.escape)) {
+        if (!dirty) {
+          done();
+          return true;
+        }
         const enabled = items.filter((i) => i.currentValue === "enabled").map((i) => i.id);
         done(enabled.join(", ") || undefined);
         return true;
