@@ -8,7 +8,7 @@ export function collectDiagnosticSummaryCounts(
   cwd: string,
 ): void {
   const file = relativeFilePathFromUri(entry.uri, cwd);
-  if (shouldIgnoreLspPath(file)) return;
+  if (shouldIgnoreLspPath(file, cwd)) return;
 
   const current = fileDiags.get(file) ?? { errors: 0, warnings: 0 };
   for (const diagnostic of entry.diagnostics) {

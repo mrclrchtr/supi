@@ -56,7 +56,7 @@ export class LspManager {
     // tracking and diagnostic summaries (shouldIgnoreLspPath). Keep runtime
     // guidance activation consistent: reading or editing a file under
     // node_modules / .pnpm must not arm LSP guidance for dependency sources.
-    if (shouldIgnoreLspPath(filePath)) return false;
+    if (shouldIgnoreLspPath(filePath, this.cwd)) return false;
     const match = getServerForFile(this.config, filePath);
     if (!match) return false;
     const [serverName, serverConfig] = match;
@@ -249,7 +249,7 @@ export class LspManager {
       const openFiles = activeServers.get(server.name) ?? new Set<string>();
       for (const file of server.openFiles) {
         const relativeFile = displayRelativeFilePath(file, this.cwd);
-        if (shouldIgnoreLspPath(relativeFile)) continue;
+        if (shouldIgnoreLspPath(relativeFile, this.cwd)) continue;
         openFiles.add(relativeFile);
       }
       activeServers.set(server.name, openFiles);
@@ -276,7 +276,9 @@ export class LspManager {
     const relevantEntries = this.getActiveCoverageSummary()
       .map((entry) => ({
         ...entry,
-        openFiles: entry.openFiles.filter((file) => isPathRelevant(file, normalizedPaths)),
+        openFiles: entry.openFiles.filter((file) =>
+          isPathRelevant(file, normalizedPaths, this.cwd),
+        ),
       }))
       .filter((entry) => entry.openFiles.length > 0);
     return formatCoverageSummaryText(relevantEntries, maxServers, maxFiles);
@@ -299,7 +301,7 @@ export class LspManager {
     for (const client of this.clients.values()) {
       for (const entry of client.getAllDiagnostics()) {
         const file = relativeFilePathFromUri(entry.uri, this.cwd);
-        if (shouldIgnoreLspPath(file)) continue;
+        if (shouldIgnoreLspPath(file, this.cwd)) continue;
         const current = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
         const next = accumulateOutstandingDiagnostics(current, entry.diagnostics, maxSeverity);
         if (next.total > 0) {
@@ -335,7 +337,7 @@ export class LspManager {
     const normalizedPaths = normalizeRelevantPaths(relevantPaths);
     if (normalizedPaths.length === 0) return null;
     const relevantEntries = this.getOutstandingDiagnosticSummary(maxSeverity).filter((entry) =>
-      isPathRelevant(entry.file, normalizedPaths),
+      isPathRelevant(entry.file, normalizedPaths, this.cwd),
     );
     return formatOutstandingDiagnosticsSummaryText(relevantEntries, maxFiles);
   }
@@ -348,7 +350,7 @@ export class LspManager {
     for (const client of this.clients.values()) {
       for (const entry of client.getAllDiagnostics()) {
         const file = relativeFilePathFromUri(entry.uri, this.cwd);
-        if (shouldIgnoreLspPath(file)) continue;
+        if (shouldIgnoreLspPath(file, this.cwd)) continue;
         const filtered = entry.diagnostics.filter(
           (d) => d.severity !== undefined && d.severity <= maxSeverity,
         );

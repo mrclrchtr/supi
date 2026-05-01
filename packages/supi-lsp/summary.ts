@@ -67,9 +67,9 @@ export function normalizeRelevantPaths(relevantPaths: string[]): string[] {
  *  - candidate has no "/" and no ".": treat as a directory name anywhere in the path
  *  - otherwise: treat as a filename and match the basename
  */
-export function isPathRelevant(filePath: string, relevantPaths: string[]): boolean {
+export function isPathRelevant(filePath: string, relevantPaths: string[], cwd: string): boolean {
   const normalizedFilePath = normalizeRelevantPath(filePath);
-  if (shouldIgnoreLspPath(normalizedFilePath)) return false;
+  if (shouldIgnoreLspPath(normalizedFilePath, cwd)) return false;
 
   return relevantPaths.some((candidate) => {
     if (normalizedFilePath === candidate) return true;
@@ -84,7 +84,9 @@ export function isPathRelevant(filePath: string, relevantPaths: string[]): boole
   });
 }
 
-export function shouldIgnoreLspPath(filePath: string): boolean {
+import { isFileExcludedByTsconfig } from "./tsconfig-scope.ts";
+
+export function shouldIgnoreLspPath(filePath: string, cwd: string): boolean {
   const normalized = normalizeRelevantPath(filePath);
   return (
     normalized === "node_modules" ||
@@ -92,7 +94,8 @@ export function shouldIgnoreLspPath(filePath: string): boolean {
     normalized.includes("/node_modules/") ||
     normalized === ".pnpm" ||
     normalized.startsWith(".pnpm/") ||
-    normalized.includes("/.pnpm/")
+    normalized.includes("/.pnpm/") ||
+    isFileExcludedByTsconfig(normalized, cwd)
   );
 }
 
