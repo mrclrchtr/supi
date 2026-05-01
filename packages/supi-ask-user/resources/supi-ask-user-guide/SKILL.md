@@ -35,13 +35,14 @@ Do not set recommendations when options are genuinely equal.
 ## Using allowOther and allowDiscuss
 
 - `allowOther: true` — only when a custom answer is genuinely useful (e.g., "Other version number"). Don't enable it for questions where the listed options are exhaustive.
+  - On `multichoice`, `allowOther` is a **mutually exclusive alternative path**, not an extra custom checkbox added on top of the selected options.
 - `allowDiscuss: true` — only when the user might need to talk through the choice instead of committing immediately. Good for architecture decisions, bad for "which port?".
 
 ## Using preview content
 
 Set `preview` on options when the user would understand the choice better from code, config, or ASCII mockups than from a one-line description.
 
-Rich sessions can show previews and richer inline interactions. Fallback UI is intentionally simpler and does not support the full rich experience, so only rely on previews when they are genuinely helpful rather than required to understand the question.
+Rich sessions can show previews and richer inline interactions. Fallback UI is intentionally simpler and does not support the full rich experience, though it still supports review + revise flows, so only rely on previews when they are genuinely helpful rather than required to understand the question.
 
 Good uses:
 - Show the config file snippet for each option

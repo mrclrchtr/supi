@@ -47,9 +47,10 @@ export function selectedIndexesForQuestion(
   state: Pick<OverlayRenderState, "stagedSelections">,
   question: NormalizedStructuredQuestion,
 ): number[] {
+  const answer = flow.getAnswer(question.id);
+  if (answer?.source === "other" || answer?.source === "discuss") return [];
   const staged = state.stagedSelections.get(question.id);
   if (staged) return [...staged];
-  const answer = flow.getAnswer(question.id);
   if (!answer) return [];
   if (answer.source === "option" || answer.source === "yesno") return [answer.optionIndex];
   if (answer.source === "options") return [...answer.optionIndexes];

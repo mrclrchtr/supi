@@ -35,60 +35,132 @@ interface RunOptions {
 
 type StepOutcome = "answered" | "cancelled" | "aborted";
 type CollectOutcome = Exclude<StepOutcome, "answered">;
+type ReviewOutcome =
+  | { kind: "submit" }
+  | { kind: "cancelled" }
+  | { kind: "aborted" }
+  | { kind: "revise"; questionIndex: number };
 
 const REVIEW_SUBMIT = "Submit answers";
 const REVIEW_CANCEL = "Cancel questionnaire";
 const MULTI_SUBMIT = "Submit selections";
+
+interface FallbackLoopState {
+  revisingFromReview: boolean;
+}
 
 export async function runFallbackQuestionnaire(
   questions: NormalizedQuestion[],
   options: RunOptions,
 ): Promise<QuestionnaireOutcome> {
   const flow = new QuestionnaireFlow(questions);
+  const state: FallbackLoopState = { revisingFromReview: false };
   while (!flow.isTerminal()) {
-    if (options.signal?.aborted) {
-      flow.abort();
-      break;
-    }
-    const question = flow.currentQuestion;
-    if (!question) break;
-    const step = await askAndStore(question, flow, options);
-    if (step === "aborted") flow.abort();
-    else if (step === "cancelled") flow.cancel();
-    else await applyAdvance(flow, options);
+    if (abortIfNeeded(flow, options.signal)) break;
+    if (await handleReviewMode(flow, options, state)) continue;
+    if (!(await handleAnsweringMode(flow, options, state))) break;
   }
   return flow.outcome();
 }
 
-async function applyAdvance(flow: QuestionnaireFlow, opts: RunOptions): Promise<void> {
-  flow.advance();
-  if (flow.currentMode !== "reviewing" || !flow.allAnswered()) return;
-  const review = await runReviewStep(flow, opts);
-  if (review === "aborted") flow.abort();
-  else if (review === "cancelled") flow.cancel();
-  else flow.submit();
+function abortIfNeeded(flow: QuestionnaireFlow, signal: AbortSignal | undefined): boolean {
+  if (!signal?.aborted) return false;
+  flow.abort();
+  return true;
 }
 
-async function runReviewStep(
+async function handleReviewMode(
   flow: QuestionnaireFlow,
   opts: RunOptions,
-): Promise<"submit" | "cancelled" | "aborted"> {
+  state: FallbackLoopState,
+): Promise<boolean> {
+  if (flow.currentMode !== "reviewing") return false;
+  const review = await runReviewStep(flow, opts);
+  applyReviewOutcome(flow, review, state);
+  return true;
+}
+
+function applyReviewOutcome(
+  flow: QuestionnaireFlow,
+  review: ReviewOutcome,
+  state: FallbackLoopState,
+): void {
+  if (review.kind === "aborted") {
+    flow.abort();
+    return;
+  }
+  if (review.kind === "cancelled") {
+    flow.cancel();
+    return;
+  }
+  if (review.kind === "submit") {
+    flow.submit();
+    return;
+  }
+  jumpToQuestion(flow, review.questionIndex);
+  state.revisingFromReview = true;
+}
+
+async function handleAnsweringMode(
+  flow: QuestionnaireFlow,
+  opts: RunOptions,
+  state: FallbackLoopState,
+): Promise<boolean> {
+  const question = flow.currentQuestion;
+  if (!question) return false;
+  const step = await askAndStore(question, flow, opts);
+  applyStepOutcome(flow, step, state);
+  return true;
+}
+
+function applyStepOutcome(
+  flow: QuestionnaireFlow,
+  step: StepOutcome,
+  state: FallbackLoopState,
+): void {
+  if (step === "aborted") {
+    flow.abort();
+    return;
+  }
+  if (step === "cancelled") {
+    flow.cancel();
+    return;
+  }
+  if (state.revisingFromReview) {
+    state.revisingFromReview = false;
+    if (!flow.enterReview()) flow.advance();
+    return;
+  }
+  flow.advance();
+}
+
+async function runReviewStep(flow: QuestionnaireFlow, opts: RunOptions): Promise<ReviewOutcome> {
   const summary = flow.questions
     .map(
       (question) =>
         `${question.header}: ${formatReviewLine(question, flow.getAnswer(question.id))}`,
     )
     .join("  |  ");
-  const choice = await opts.ui.select(
-    `Review answers — ${summary}`,
-    [REVIEW_SUBMIT, REVIEW_CANCEL],
-    {
-      signal: opts.signal,
-    },
+  const reviseLabels = flow.questions.map((question, index) =>
+    reviewReviseLabel(index, question.header),
   );
-  if (opts.signal?.aborted) return "aborted";
-  if (choice === undefined || choice === REVIEW_CANCEL) return "cancelled";
-  return "submit";
+  const labels = [REVIEW_SUBMIT, ...reviseLabels, REVIEW_CANCEL];
+  const choice = await opts.ui.select(`Review answers — ${summary}`, labels, {
+    signal: opts.signal,
+  });
+  if (opts.signal?.aborted) return { kind: "aborted" };
+  if (choice === undefined || choice === REVIEW_CANCEL) return { kind: "cancelled" };
+  if (choice === REVIEW_SUBMIT) return { kind: "submit" };
+  const questionIndex = reviseLabels.indexOf(choice);
+  if (questionIndex >= 0) return { kind: "revise", questionIndex };
+  return { kind: "cancelled" };
+}
+
+function jumpToQuestion(flow: QuestionnaireFlow, questionIndex: number): void {
+  if (flow.currentMode === "reviewing") flow.goBack();
+  while (flow.currentIndex > questionIndex) {
+    if (!flow.goBack()) break;
+  }
 }
 
 async function askAndStore(
@@ -241,7 +313,7 @@ async function collectMultichoice(
         selections,
       };
     }
-    return collectDiscuss(question, opts);
+    return collectStructuredAction(question, index - submitIndex - 1, opts);
   }
 }
 
@@ -260,13 +332,23 @@ function multichoiceLabels(
       ),
     );
   });
-  labels.push(numberedLabel(question.options.length, MULTI_SUBMIT));
-  if (question.allowDiscuss) labels.push(numberedLabel(question.options.length + 1, DISCUSS_LABEL));
+  let offset = question.options.length;
+  labels.push(numberedLabel(offset, MULTI_SUBMIT));
+  offset += 1;
+  if (question.allowOther) {
+    labels.push(numberedLabel(offset, OTHER_LABEL));
+    offset += 1;
+  }
+  if (question.allowDiscuss) labels.push(numberedLabel(offset, DISCUSS_LABEL));
   return labels;
 }
 
 function numberedLabel(index: number, label: string): string {
   return `${index + 1}. ${label}`;
+}
+
+function reviewReviseLabel(index: number, header: string): string {
+  return `Revise question ${index + 1} — ${header}`;
 }
 
 function appendDescription(label: string, description: string | undefined): string {

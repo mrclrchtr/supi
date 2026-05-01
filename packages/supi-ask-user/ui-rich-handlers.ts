@@ -33,11 +33,13 @@ export function onEditorSubmit(value: string, deps: OverlayDeps): void {
       refresh();
       return;
     }
+    clearStructuredDrafts(question, deps);
     deps.flow.setAnswer({ questionId: question.id, source: "other", value: trimmed });
     moveAfterAnswer(deps);
     return;
   }
   if (state.subMode === "discuss-input") {
+    clearStructuredDrafts(question, deps);
     deps.flow.setAnswer(
       trimmed.length > 0
         ? { questionId: question.id, source: "discuss", value: trimmed }
@@ -72,6 +74,12 @@ function applyNoteEdit(note: string, deps: OverlayDeps): void {
   else existing.delete(target.optionIndex);
   if (existing.size > 0) state.stagedMultiNotes.set(target.questionId, existing);
   else state.stagedMultiNotes.delete(target.questionId);
+}
+
+function clearStructuredDrafts(question: NormalizedQuestion, deps: OverlayDeps): void {
+  if (question.type !== "multichoice") return;
+  deps.state.stagedSelections.delete(question.id);
+  deps.state.stagedMultiNotes.delete(question.id);
 }
 
 export function handleOverlayInput(data: string, deps: OverlayDeps): void {

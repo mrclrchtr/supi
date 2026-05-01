@@ -23,9 +23,11 @@ Key behavior:
 
 - supports 1-4 grouped questions per questionnaire
 - supports `recommendation`, `allowOther`, and `allowDiscuss`
+- supports `allowOther` on `multichoice` as a mutually exclusive freeform alternative path
 - supports rich option `preview` content
 - uses a rich custom UI when available
-- falls back to simpler select/input prompts when rich UI is unavailable
+- falls back to simpler select/input prompts when rich UI is unavailable, including review + revise flows
+- trims question ids and structured option values during normalization so returned identifiers stay stable
 - aborts the current agent turn if the questionnaire is cancelled
 
 This package also bundles the `supi-ask-user-guide` skill.

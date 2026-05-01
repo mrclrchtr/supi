@@ -26,13 +26,13 @@ AskUserQuestion({
 
 | Feature | Claude Code | `ask-user` |
 |---|---|---|
-| Question types | Implicit (choice only) | Explicit: `choice`, `yesno`, `text` |
-| Recommendations | Via `(Recommended)` suffix in label | `recommendation` field, rendered as `★` marker |
-| Option previews | `preview` field on options, side-by-side layout | Not yet implemented |
-| Multi-select | `multiSelect: true`, checkbox UI | Not yet implemented |
-| Free-form "Other" | Always present ("Type something" / "Chat about this") | Always present (`Other` option with editor) |
-| Notes/annotations | Per-tool-call, not per-question | Per-question notes via `n` shortcut |
-| Review screen | Multi-select has inline review before submit | Dedicated review tab for multi-question flows |
+| Question types | Implicit (choice only) | Explicit: `choice`, `multichoice`, `yesno`, `text` |
+| Recommendations | Via `(Recommended)` suffix in label | `recommendation` field, rendered as a `(recommended)` label suffix |
+| Option previews | `preview` field on options, side-by-side layout | `preview` field on structured options; rich UI uses a split preview pane when width permits |
+| Multi-select | `multiSelect: true`, checkbox UI | Implemented via `type: "multichoice"`, checkbox UI, and review flow |
+| Free-form "Other" | Always present ("Type something" / "Chat about this") | Supported per question via `allowOther`; on `multichoice` it is an alternative freeform path |
+| Notes/annotations | Per-tool-call, not per-question | Per-option notes via `n` shortcut in the rich UI |
+| Review screen | Multi-select has inline review before submit | Dedicated review mode for multi-question and multichoice flows |
 | Text questions | Not supported | Supported (`type: "text"`) |
 | Yes/No | Not a separate type | Dedicated `yesno` type with recommendation |
 
@@ -92,15 +92,14 @@ Claude Code returns answers in a flat structure:
 }
 ```
 
-Where each `Answer`:
+Where each `Answer` is one of:
 ```
-{
-  questionId: string,
-  source: "option" | "other" | "text" | "yesno",
-  value: string,
-  optionIndex?: number,
-  comment?: string
-}
+{ questionId: string, source: "option", value: string, optionIndex: number, note?: string }
+{ questionId: string, source: "options", values: string[], optionIndexes: number[], selections: Array<{ value: string, optionIndex: number, note?: string }> }
+{ questionId: string, source: "other", value: string }
+{ questionId: string, source: "discuss", value?: string }
+{ questionId: string, source: "text", value: string }
+{ questionId: string, source: "yesno", value: "yes" | "no", optionIndex: 0 | 1, note?: string }
 ```
 
 ## Constraints
@@ -108,6 +107,6 @@ Where each `Answer`:
 | | Claude Code | `ask-user` |
 |---|---|---|
 | Questions per call | 1–4 | 1–4 |
-| Options per question | 2–4 observed | 2–12 |
+| Options per structured question | 2–4 observed | 2–12 |
 | Header length | ~12 chars observed | 40 chars max |
-| Prompt length | ~200 chars observed | 240 chars max |
+| Prompt length | ~200 chars observed | 2000 chars max |

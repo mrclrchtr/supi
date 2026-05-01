@@ -63,11 +63,12 @@ export function noteForMultiOption(
   question: Extract<NormalizedStructuredQuestion, { type: "multichoice" }>,
   optionIndex: number,
 ): string | undefined {
+  const answer = flow.getAnswer(question.id);
+  if (answer?.source === "other" || answer?.source === "discuss") return undefined;
   const staged = state.stagedMultiNotes.get(question.id)?.get(optionIndex);
   if (staged !== undefined) return staged;
-  return storedMultiSelections(flow.getAnswer(question.id)).find(
-    (selection) => selection.optionIndex === optionIndex,
-  )?.note;
+  return storedMultiSelections(answer).find((selection) => selection.optionIndex === optionIndex)
+    ?.note;
 }
 
 function storedMultiSelections(

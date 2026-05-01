@@ -13,7 +13,9 @@ Entrypoint: `ask-user.ts`
 - The extension has a split flow:
   - rich overlay via `ctx.ui.custom()` when available
   - fallback dialog when rich custom UI is unavailable
-- Fallback UI does **not** support notes, previews, or inline editing.
+- `allowOther` is supported on `multichoice` as a mutually exclusive freeform alternative path.
+- Fallback UI does **not** support notes, previews, or inline editing, but it does support review + revise flows.
+- Normalization trims question ids and structured option values before they reach the shared internal model.
 - On cancel/abort, call `ctx.abort()` so the agent turn stops; the questionnaire result should still be recorded in the transcript.
 
 ## Key files

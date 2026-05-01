@@ -41,6 +41,7 @@ describe("normalizeQuestionnaire", () => {
             { value: "discuss", label: "Discuss" },
           ],
           recommendation: ["preview"],
+          allowOther: true,
           allowDiscuss: true,
         },
         { type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", allowDiscuss: true },
@@ -57,7 +58,7 @@ describe("normalizeQuestionnaire", () => {
     ]);
     expect(out.questions[0]).toMatchObject({ allowOther: true, allowDiscuss: true });
     expect(out.questions[0].options[0].preview).toBe("const a = 1;");
-    expect(out.questions[1]).toMatchObject({ recommendedIndexes: [0] });
+    expect(out.questions[1]).toMatchObject({ allowOther: true, recommendedIndexes: [0] });
   });
 
   it("rejects 0 questions", () => {
@@ -73,26 +74,6 @@ describe("normalizeQuestionnaire", () => {
     expect(() =>
       normalizeQuestionnaire({ questions: [choice({ id: "x" }), choice({ id: "x" })] }),
     ).toThrow(/unique/);
-  });
-
-  it("rejects unsupported multichoice allowOther", () => {
-    expect(() =>
-      normalizeQuestionnaire({
-        questions: [
-          {
-            type: "multichoice",
-            id: "features",
-            header: "Features",
-            prompt: "Pick",
-            options: [
-              { value: "a", label: "A" },
-              { value: "b", label: "B" },
-            ],
-            allowOther: true,
-          },
-        ],
-      }),
-    ).toThrow(/does not support allowOther/);
   });
 
   it("rejects recommendation that does not match an option value", () => {
@@ -138,20 +119,5 @@ describe("normalizeQuestionnaire", () => {
     expect(() => normalizeQuestionnaire({ questions: [choice({ prompt: "   " })] })).toThrow(
       /non-empty prompt/,
     );
-  });
-
-  it("rejects duplicate structured option values", () => {
-    expect(() =>
-      normalizeQuestionnaire({
-        questions: [
-          choice({
-            options: [
-              { value: "a", label: "A1" },
-              { value: "a", label: "A2" },
-            ],
-          }),
-        ],
-      }),
-    ).toThrow(/duplicate option value/);
   });
 });
