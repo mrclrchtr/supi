@@ -51,7 +51,9 @@ describe("LSP prompt guidance", () => {
   });
 
   it("falls back to generic guidance when no servers are detected", () => {
-    expect(buildProjectGuidelines([], process.cwd())).toEqual(lspPromptGuidelines);
+    expect(buildProjectGuidelines([], process.cwd())).toEqual(
+      lspPromptGuidelines.slice(0, 2).concat([lspPromptGuidelines[2]]),
+    );
   });
 
   it("formats diagnostics as xml extension context", () => {
@@ -75,7 +77,7 @@ describe("LSP prompt guidance", () => {
     ]);
 
     expect(content).toContain('<extension-context source="supi-lsp">');
-    expect(content).toContain("Outstanding diagnostics:");
+    expect(content).toContain("Outstanding diagnostics — fix these before proceeding:");
     expect(content).toContain("packages/supi-lsp/lsp.ts: 1 error, 1 warning");
     expect(content).toContain("packages/supi-lsp/manager.ts: 1 error");
     expect(content).toContain("</extension-context>");

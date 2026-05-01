@@ -8,7 +8,9 @@ export type { ContextMessageLike } from "./context-messages.ts";
 export {
   findLastUserMessageIndex,
   getContextToken,
+  getPromptContent,
   pruneAndReorderContextMessages,
+  restorePromptContent,
 } from "./context-messages.ts";
 export { wrapExtensionContext } from "./context-tag.ts";
 export { registerSettingsCommand } from "./settings-command.ts";

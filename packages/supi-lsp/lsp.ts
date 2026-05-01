@@ -16,7 +16,7 @@ import { loadLspSettings, registerLspSettings } from "./settings-registration.ts
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
 
-import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core";
+import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import {
   buildProjectGuidelines,
   diagnosticsContextFingerprint,
@@ -25,8 +25,8 @@ import {
   lspPromptSnippet,
 } from "./guidance.ts";
 import { LspManager } from "./manager.ts";
-import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
+import { registerLspMessageRenderer } from "./renderer.ts";
 import {
   introspectCapabilities,
   scanProjectCapabilities,
@@ -75,6 +75,7 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerBehaviorHandlers(pi, state);
   registerLspStatusCommand(pi, state);
   registerResourcesDiscover(pi);
+  registerLspMessageRenderer(pi);
 }
 
 function createRuntimeState(): LspRuntimeState {
@@ -190,17 +191,23 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
 
     state.lastDiagnosticsFingerprint = fingerprint;
     state.currentContextToken = `lsp-context-${++state.contextCounter}`;
-    const hasErrors = diagnostics.some((d) => d.errors > 0);
-    ctx.ui.notify(buildDiagnosticsNotification(diagnostics), hasErrors ? "warning" : "info");
 
     return {
       message: {
         customType: "lsp-context",
-        content,
-        display: false,
+        content: formatDiagnosticsDisplayContent(diagnostics),
+        display: true,
         details: {
           contextToken: state.currentContextToken,
+          promptContent: content,
           inlineSeverity: state.inlineSeverity,
+          diagnostics: diagnostics.map((d) => ({
+            file: d.file,
+            errors: d.errors,
+            warnings: d.warnings,
+            information: d.information,
+            hints: d.hints,
+          })),
         },
       },
     };
@@ -208,18 +215,28 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
 
   pi.on("context", (event) => {
     const messages = pruneAndReorderContextMessages(
-      event.messages as Array<{ role?: string; customType?: string; details?: unknown }>,
+      event.messages as Array<{
+        role?: string;
+        customType?: string;
+        content?: unknown;
+        details?: unknown;
+      }>,
+      "lsp-context",
+      state.currentContextToken,
+    );
+    const contextMessages = restorePromptContent(
+      messages,
       "lsp-context",
       state.currentContextToken,
     ) as typeof event.messages;
 
     if (
-      messages.length === event.messages.length &&
-      messages.every((m, i) => m === event.messages[i])
+      contextMessages.length === event.messages.length &&
+      contextMessages.every((m, i) => m === event.messages[i])
     ) {
       return;
     }
-    return { messages };
+    return { messages: contextMessages };
   });
 
   pi.on("tool_result", async (event, ctx) => {
@@ -320,47 +337,38 @@ function refreshProjectServers(state: LspRuntimeState): void {
   state.projectServers = introspectCapabilities(state.manager, state.detectedServers);
 }
 
-function buildDiagnosticsNotification(diagnostics: OutstandingDiagnosticSummaryEntry[]): string {
-  if (diagnostics.length === 0) return "i️ LSP diagnostics injected";
-  if (diagnostics.length === 1) {
-    const [entry] = diagnostics;
-    if (!entry) return "i️ LSP diagnostics injected";
-    return `i️ LSP: ${entry.file} - ${formatNotificationCounts(entry, ", ")}`;
-  }
-
-  const totals = collectDiagnosticTotals(diagnostics);
-  return `i️ LSP: ${diagnostics.length} files • ${formatNotificationCounts(totals, " • ")}`;
+function isLspAwareTool(toolName: string): boolean {
+  return toolName === "lsp" || toolName === "read" || toolName === "write" || toolName === "edit";
 }
 
-function formatNotificationCounts(
-  entry: Pick<OutstandingDiagnosticSummaryEntry, "errors" | "warnings" | "information" | "hints">,
-  separator: string,
+function formatDiagnosticsDisplayContent(
+  diagnostics: Array<{
+    errors: number;
+    warnings: number;
+    information: number;
+    hints: number;
+  }>,
 ): string {
-  const parts: string[] = [];
-  if (entry.errors > 0) parts.push(`${entry.errors} error${entry.errors === 1 ? "" : "s"}`);
-  if (entry.warnings > 0) parts.push(`${entry.warnings} warning${entry.warnings === 1 ? "" : "s"}`);
-  if (entry.information > 0)
-    parts.push(`${entry.information} info${entry.information === 1 ? "" : "s"}`);
-  if (entry.hints > 0) parts.push(`${entry.hints} hint${entry.hints === 1 ? "" : "s"}`);
-  return parts.join(separator);
-}
-
-function collectDiagnosticTotals(
-  diagnostics: OutstandingDiagnosticSummaryEntry[],
-): Pick<OutstandingDiagnosticSummaryEntry, "errors" | "warnings" | "information" | "hints"> {
-  return diagnostics.reduce(
-    (totals, entry) => ({
-      errors: totals.errors + entry.errors,
-      warnings: totals.warnings + entry.warnings,
-      information: totals.information + entry.information,
-      hints: totals.hints + entry.hints,
+  const totals = diagnostics.reduce(
+    (acc, d) => ({
+      errors: acc.errors + d.errors,
+      warnings: acc.warnings + d.warnings,
+      information: acc.information + d.information,
+      hints: acc.hints + d.hints,
     }),
     { errors: 0, warnings: 0, information: 0, hints: 0 },
   );
-}
+  const parts: string[] = [];
+  if (totals.errors > 0) parts.push(`${totals.errors} error${totals.errors === 1 ? "" : "s"}`);
+  if (totals.warnings > 0)
+    parts.push(`${totals.warnings} warning${totals.warnings === 1 ? "" : "s"}`);
+  if (totals.information > 0)
+    parts.push(`${totals.information} info${totals.information === 1 ? "" : "s"}`);
+  if (totals.hints > 0) parts.push(`${totals.hints} hint${totals.hints === 1 ? "" : "s"}`);
 
-function isLspAwareTool(toolName: string): boolean {
-  return toolName === "lsp" || toolName === "read" || toolName === "write" || toolName === "edit";
+  return parts.length > 0
+    ? `LSP diagnostics injected (${parts.join(", ")})`
+    : "LSP diagnostics injected";
 }
 
 function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void {

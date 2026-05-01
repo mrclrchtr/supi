@@ -11,6 +11,7 @@
 export type ContextMessageLike = {
   role?: string;
   customType?: string;
+  content?: unknown;
   details?: unknown;
 };
 
@@ -75,4 +76,44 @@ export function pruneAndReorderContextMessages<T extends ContextMessageLike>(
   if (!contextMessage) return filtered;
   next.splice(userIndex, 0, contextMessage);
   return next;
+}
+
+/**
+ * Restore the raw prompt content on a context message that was swapped for display text.
+ *
+ * Extensions using `registerMessageRenderer` store their LLM-facing content in
+ * `details.promptContent` and put a human-readable summary in `content`. This function
+ * reverses the swap so the model sees the original prompt content.
+ *
+ * Returns the original array reference when no change is needed.
+ */
+export function restorePromptContent<T extends ContextMessageLike>(
+  messages: T[],
+  customType: string,
+  activeToken: string | null,
+): T[] {
+  if (!activeToken) return messages;
+
+  const index = messages.findIndex(
+    (message) =>
+      message.customType === customType && getContextToken(message.details) === activeToken,
+  );
+  if (index === -1) return messages;
+
+  const promptContent = getPromptContent(messages[index]?.details);
+  if (!promptContent || messages[index]?.content === promptContent) return messages;
+
+  const next = [...messages];
+  next[index] = { ...next[index], content: promptContent };
+  return next;
+}
+
+/**
+ * Extract the `promptContent` string from a message's `details` object.
+ * Returns `null` when absent or not a string.
+ */
+export function getPromptContent(details: unknown): string | null {
+  if (!details || typeof details !== "object") return null;
+  const promptContent = (details as { promptContent?: unknown }).promptContent;
+  return typeof promptContent === "string" ? promptContent : null;
 }

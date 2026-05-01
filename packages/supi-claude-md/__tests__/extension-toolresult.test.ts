@@ -14,8 +14,17 @@ const mockFns = vi.hoisted(() => ({
   pruneAndReorderContextMessages: vi.fn(),
 }));
 
-vi.mock("@mrclrchner/supi-core", () => ({
+vi.mock("@mrclrchtr/supi-core", () => ({
+  getContextToken: (details: unknown) =>
+    details && typeof details === "object"
+      ? ((details as { contextToken?: string }).contextToken ?? null)
+      : null,
+  loadSupiConfig: vi.fn(),
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
+  registerSettings: vi.fn(),
+  removeSupiConfigKey: vi.fn(),
+  restorePromptContent: vi.fn((msgs: unknown) => msgs),
+  writeSupiConfig: vi.fn(),
 }));
 
 vi.mock("../config.ts", () => ({

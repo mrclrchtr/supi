@@ -16,7 +16,8 @@ import type {
   SessionStartEvent,
   TurnEndEvent,
 } from "@mariozechner/pi-coding-agent";
-import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core";
+import { Box, Text } from "@mariozechner/pi-tui";
+import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import { loadClaudeMdConfig } from "./config.ts";
 import {
   extractPathFromToolEvent,
@@ -116,9 +117,15 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     return {
       message: {
         customType: "supi-claude-md-refresh",
-        content,
-        display: false,
-        details: { contextToken: state.currentContextToken, turn: state.completedTurns },
+        content: formatRefreshDisplayContent(nativeFiles.length),
+        display: true,
+        details: {
+          contextToken: state.currentContextToken,
+          promptContent: content,
+          turn: state.completedTurns,
+          fileCount: nativeFiles.length,
+          files: nativeFiles.map((file) => file.path),
+        },
       },
     };
   });
@@ -127,18 +134,28 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
 
   pi.on("context", (event) => {
     const messages = pruneAndReorderContextMessages(
-      event.messages as Array<{ role?: string; customType?: string; details?: unknown }>,
+      event.messages as Array<{
+        role?: string;
+        customType?: string;
+        content?: unknown;
+        details?: unknown;
+      }>,
+      "supi-claude-md-refresh",
+      state.currentContextToken,
+    );
+    const contextMessages = restorePromptContent(
+      messages,
       "supi-claude-md-refresh",
       state.currentContextToken,
     ) as typeof event.messages;
 
     if (
-      messages.length === event.messages.length &&
-      messages.every((m, i) => m === event.messages[i])
+      contextMessages.length === event.messages.length &&
+      contextMessages.every((m, i) => m === event.messages[i])
     ) {
       return;
     }
-    return { messages };
+    return { messages: contextMessages };
   });
 
   // ── Subdirectory injection (tool_result) ───────────────────
@@ -183,6 +200,33 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
   pi.on("resources_discover", () => ({
     skillPaths: [join(baseDir, "resources")],
   }));
+
+  // ── Message renderer ────────────────────────────────────────
+
+  pi.registerMessageRenderer("supi-claude-md-refresh", (message, { expanded }, theme) => {
+    const details = message.details as
+      | { contextToken?: string; turn?: number; fileCount?: number; files?: string[] }
+      | undefined;
+    const fileCount = details?.fileCount;
+    const token = details?.contextToken;
+    const files = details?.files ?? [];
+
+    const icon = theme.fg("accent", "\u{1F4C4}");
+    let text = `${icon} CLAUDE.md refreshed`;
+    if (fileCount != null && fileCount > 0) {
+      text += ` (${fileCount} file${fileCount === 1 ? "" : "s"})`;
+    }
+
+    if (expanded) {
+      const detailLines = files.map((file) => theme.fg("dim", `  ${file}`));
+      if (token) detailLines.push(theme.fg("dim", `  token: ${token}`));
+      if (detailLines.length > 0) text += `\n${detailLines.join("\n")}`;
+    }
+
+    const box = new Box(1, 1, (t) => theme.bg("customMessageBg", t));
+    box.addChild(new Text(text, 0, 0));
+    return box;
+  });
 }
 
 function captureNativePaths(
@@ -197,6 +241,10 @@ function captureNativePaths(
       state.nativeContextPaths.add(file.path);
     }
   }
+}
+
+function formatRefreshDisplayContent(fileCount: number): string {
+  return `CLAUDE.md refreshed (${fileCount} file${fileCount === 1 ? "" : "s"})`;
 }
 
 function collectStaleDirs(

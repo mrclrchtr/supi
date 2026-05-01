@@ -8,16 +8,21 @@ export const DEFAULT_CONFIG = {
 export function createPiMock() {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   const commands = new Map<string, unknown>();
+  const renderers = new Map<string, (...args: unknown[]) => unknown>();
 
   return {
     handlers,
     commands,
+    renderers,
     pi: {
       on(event: string, handler: (...args: unknown[]) => unknown) {
         handlers.set(event, handler);
       },
       registerCommand(name: string, spec: unknown) {
         commands.set(name, spec);
+      },
+      registerMessageRenderer(customType: string, renderer: (...args: unknown[]) => unknown) {
+        renderers.set(customType, renderer);
       },
     },
   };

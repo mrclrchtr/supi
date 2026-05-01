@@ -25,9 +25,14 @@ vi.mock("../scanner.ts", () => ({
   introspectCapabilities: mockFns.introspectCapabilities,
 }));
 vi.mock("@mrclrchtr/supi-core", () => ({
+  getContextToken: (details: unknown) =>
+    details && typeof details === "object"
+      ? ((details as { contextToken?: string }).contextToken ?? null)
+      : null,
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
   registerSettings: vi.fn(),
   loadSupiConfig: vi.fn(() => ({ enabled: true, severity: 1, servers: [] })),
+  restorePromptContent: vi.fn((msgs: unknown) => msgs),
 }));
 vi.mock("../guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
@@ -59,6 +64,7 @@ function setup(): Map<string, (...args: unknown[]) => unknown> {
     },
     registerTool() {},
     registerCommand() {},
+    registerMessageRenderer() {},
     getActiveTools: () => ["lsp"],
     setActiveTools: () => {},
   };

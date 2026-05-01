@@ -3,7 +3,9 @@ import {
   type ContextMessageLike,
   findLastUserMessageIndex,
   getContextToken,
+  getPromptContent,
   pruneAndReorderContextMessages,
+  restorePromptContent,
 } from "../context-messages.ts";
 
 describe("getContextToken", () => {
@@ -144,5 +146,91 @@ describe("pruneAndReorderContextMessages", () => {
     expect(result).toHaveLength(3);
     expect(result.some((m) => m.customType === "other-type")).toBe(true);
     expect(result.some((m) => m.customType === "lsp-context")).toBe(false);
+  });
+});
+
+describe("getPromptContent", () => {
+  it("returns promptContent string from valid details", () => {
+    expect(getPromptContent({ promptContent: "<xml>data</xml>" })).toBe("<xml>data</xml>");
+  });
+
+  it("returns null when promptContent is missing", () => {
+    expect(getPromptContent({ otherField: 42 })).toBeNull();
+  });
+
+  it("returns null when details is null", () => {
+    expect(getPromptContent(null)).toBeNull();
+  });
+
+  it("returns null when promptContent is not a string", () => {
+    expect(getPromptContent({ promptContent: 123 })).toBeNull();
+  });
+});
+
+describe("restorePromptContent", () => {
+  it("restores promptContent onto the matching message", () => {
+    const messages: ContextMessageLike[] = [
+      { role: "user" },
+      {
+        role: "custom",
+        customType: "lsp-context",
+        content: "display text",
+        details: { contextToken: "active-1", promptContent: "<xml>raw</xml>" },
+      },
+      { role: "user" },
+    ];
+
+    const result = restorePromptContent(messages, "lsp-context", "active-1");
+    expect(result[1]?.content).toBe("<xml>raw</xml>");
+  });
+
+  it("returns original array when activeToken is null", () => {
+    const messages: ContextMessageLike[] = [{ role: "user" }];
+    expect(restorePromptContent(messages, "lsp-context", null)).toBe(messages);
+  });
+
+  it("returns original array when no matching message found", () => {
+    const messages: ContextMessageLike[] = [{ role: "custom", customType: "other", content: "x" }];
+    expect(restorePromptContent(messages, "lsp-context", "active-1")).toBe(messages);
+  });
+
+  it("returns original array when promptContent is missing", () => {
+    const messages: ContextMessageLike[] = [
+      {
+        role: "custom",
+        customType: "lsp-context",
+        content: "display",
+        details: { contextToken: "active-1" },
+      },
+    ];
+    expect(restorePromptContent(messages, "lsp-context", "active-1")).toBe(messages);
+  });
+
+  it("returns original array when content already matches promptContent", () => {
+    const messages: ContextMessageLike[] = [
+      {
+        role: "custom",
+        customType: "lsp-context",
+        content: "same",
+        details: { contextToken: "active-1", promptContent: "same" },
+      },
+    ];
+    expect(restorePromptContent(messages, "lsp-context", "active-1")).toBe(messages);
+  });
+
+  it("does not mutate the original array", () => {
+    const messages: ContextMessageLike[] = [
+      {
+        role: "custom",
+        customType: "lsp-context",
+        content: "display",
+        details: { contextToken: "active-1", promptContent: "<raw>" },
+      },
+    ];
+
+    const result = restorePromptContent(messages, "lsp-context", "active-1");
+    expect(result).not.toBe(messages);
+    expect(messages[0]?.content).toBe("display");
+    expect(result[0]?.content).toBe("<raw>");
   });
 });

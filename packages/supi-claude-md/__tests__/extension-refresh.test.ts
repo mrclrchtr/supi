@@ -9,8 +9,42 @@ const mockFns = vi.hoisted(() => ({
   pruneAndReorderContextMessages: vi.fn(),
 }));
 
-vi.mock("@mrclrchner/supi-core", () => ({
+vi.mock("@mrclrchtr/supi-core", () => ({
+  getContextToken: (details: unknown) =>
+    details && typeof details === "object"
+      ? ((details as { contextToken?: string }).contextToken ?? null)
+      : null,
+  loadSupiConfig: vi.fn(),
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
+  registerSettings: vi.fn(),
+  removeSupiConfigKey: vi.fn(),
+  restorePromptContent(
+    messages: Array<{ customType?: string; content?: unknown; details?: unknown }>,
+    customType: string,
+    activeToken: string | null,
+  ) {
+    if (!activeToken) return messages;
+    const getContextToken = (d: unknown): string | null => {
+      if (!d || typeof d !== "object") return null;
+      const t = (d as { contextToken?: unknown }).contextToken;
+      return typeof t === "string" ? t : null;
+    };
+    const getPromptContent = (d: unknown): string | null => {
+      if (!d || typeof d !== "object") return null;
+      const p = (d as { promptContent?: unknown }).promptContent;
+      return typeof p === "string" ? p : null;
+    };
+    const idx = messages.findIndex(
+      (m) => m.customType === customType && getContextToken(m.details) === activeToken,
+    );
+    if (idx === -1) return messages;
+    const pc = getPromptContent(messages[idx]?.details);
+    if (!pc || messages[idx]?.content === pc) return messages;
+    const next = [...messages];
+    next[idx] = { ...next[idx], content: pc };
+    return next;
+  },
+  writeSupiConfig: vi.fn(),
 }));
 
 vi.mock("../config.ts", () => ({
@@ -77,12 +111,15 @@ describe("claudeMdExtension: before_agent_start (root refresh)", () => {
     expect(result).toEqual({
       message: {
         customType: "supi-claude-md-refresh",
-        content:
-          '<extension-context source="supi-claude-md" file="CLAUDE.md">\n# Root\n</extension-context>',
-        display: false,
+        content: "CLAUDE.md refreshed (1 file)",
+        display: true,
         details: {
           contextToken: expect.stringMatching(/^supi-claude-md-\d+$/),
+          promptContent:
+            '<extension-context source="supi-claude-md" file="CLAUDE.md">\n# Root\n</extension-context>',
           turn: 0,
+          fileCount: 1,
+          files: ["CLAUDE.md"],
         },
       },
     });
@@ -189,5 +226,34 @@ describe("claudeMdExtension: context event", () => {
     const result = handlers.get("context")?.({ messages });
 
     expect(result).toBeUndefined();
+  });
+
+  it("restores raw prompt content only for model context", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    mockFns.shouldRefreshRoot.mockReturnValue(true);
+    mockFns.readNativeContextFiles.mockReturnValue([{ path: "CLAUDE.md", content: "# Root" }]);
+    mockFns.formatRefreshContext.mockReturnValue("<extension-context>raw</extension-context>");
+    mockFns.pruneAndReorderContextMessages.mockImplementation((msgs: unknown) => msgs);
+
+    const refresh = (await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
+      makeCtx(),
+    )) as { message: Record<string, unknown> } | undefined;
+    const message = refresh?.message;
+
+    const result = handlers.get("context")?.({
+      messages: [{ role: "custom", ...message }],
+    });
+
+    expect(result).toEqual({
+      messages: [
+        expect.objectContaining({
+          content: "<extension-context>raw</extension-context>",
+        }),
+      ],
+    });
+    expect(message?.content).toBe("CLAUDE.md refreshed (1 file)");
   });
 });
