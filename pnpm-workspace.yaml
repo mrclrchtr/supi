@@ -4,3 +4,5 @@ packages:
 onlyBuiltDependencies:
   - koffi
   - protobufjs
+  - tree-sitter-javascript
+  - tree-sitter-typescript
