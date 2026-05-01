@@ -108,6 +108,6 @@ Where each `Answer`:
 | | Claude Code | `ask-user` |
 |---|---|---|
 | Questions per call | 1–4 | 1–4 |
-| Options per question | 2–4 observed | 2–8 |
+| Options per question | 2–4 observed | 2–12 |
 | Header length | ~12 chars observed | 40 chars max |
 | Prompt length | ~200 chars observed | 240 chars max |

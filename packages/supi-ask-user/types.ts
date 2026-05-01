@@ -133,7 +133,7 @@ export const QUESTION_LIMITS = {
   maxHeaderLength: 40,
   maxPromptLength: 2000,
   minChoiceOptions: 2,
-  maxChoiceOptions: 8,
+  maxChoiceOptions: 12,
 } as const;
 
 export function isStructuredQuestion(

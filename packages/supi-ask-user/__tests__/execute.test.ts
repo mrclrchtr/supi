@@ -85,7 +85,7 @@ describe("ask_user execute", () => {
       undefined,
       ctx,
     );
-    expect(result.content[0].text).toMatch(/2-8 options|structured question/);
+    expect(result.content[0].text).toMatch(/2-12 options|structured question/);
   });
 
   it("rejects a second concurrent ask_user call with an explicit error", async () => {

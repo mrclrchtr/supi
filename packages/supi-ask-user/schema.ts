@@ -23,7 +23,7 @@ const StructuredQuestionBaseSchema = {
   header: Type.String({ description: "Short label (chip) describing the decision" }),
   prompt: Type.String({ description: "Full question text shown to the user" }),
   options: Type.Array(StructuredOptionSchema, {
-    description: "Allowed answers (2-8). Use distinct, mutually exclusive options.",
+    description: "Allowed answers (2-12). Use distinct, mutually exclusive options.",
   }),
   allowOther: Type.Optional(
     Type.Boolean({
