@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 import { extractExports } from "../exports.ts";
@@ -130,6 +132,28 @@ describe("outline extraction", () => {
   });
 });
 
+describe("ambient namespace and module outlines", () => {
+  it("keeps declare namespace and declare module outlines shallow", async () => {
+    const runtime = new TreeSitterRuntime(FIXTURE_DIR);
+    const parseResult = await runtime.parseFile("ambient-scope.ts");
+    expect(parseResult.kind).toBe("success");
+
+    if (parseResult.kind !== "success") {
+      runtime.dispose();
+      return;
+    }
+
+    const items = collectOutline(parseResult.data.tree.rootNode, parseResult.data.source);
+    parseResult.data.tree.delete();
+    runtime.dispose();
+
+    expect(items.map((item) => [item.name, item.kind])).toEqual([
+      ["Ns", "namespace"],
+      ["pkg", "namespace"],
+    ]);
+  });
+});
+
 describe("import extraction", () => {
   it("extracts imports from TypeScript", async () => {
     const runtime = new TreeSitterRuntime(FIXTURE_DIR);
@@ -218,6 +242,30 @@ describe("export extraction", () => {
     }
     runtime.dispose();
   });
+
+  it("does not leak namespace or module-local exports into file exports", async () => {
+    const runtime = new TreeSitterRuntime(FIXTURE_DIR);
+    const result = await extractExports(runtime, "ambient-scope.ts");
+    expect(result.kind).toBe("success");
+
+    if (result.kind === "success") {
+      expect(result.data).toEqual([]);
+    }
+    runtime.dispose();
+  });
+
+  it("extracts TypeScript export assignments from cts files", async () => {
+    const runtime = new TreeSitterRuntime(FIXTURE_DIR);
+    const result = await extractExports(runtime, "export-assignment.cts");
+    expect(result.kind).toBe("success");
+
+    if (result.kind === "success") {
+      expect(result.data).toEqual([
+        expect.objectContaining({ kind: "export assignment", name: "foo" }),
+      ]);
+    }
+    runtime.dispose();
+  });
 });
 
 describe("node_at lookup", () => {
@@ -252,6 +300,19 @@ describe("node_at lookup", () => {
     const characterResult = await lookupNodeAt(runtime, "sample.ts", 1, 999);
     expect(characterResult.kind).toBe("validation-error");
     runtime.dispose();
+  });
+
+  it("treats CRLF line endings as line breaks, not line content", async () => {
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), "tree-sitter-crlf-"));
+    try {
+      writeFileSync(path.join(tmpDir, "crlf.ts"), "const a = 1;\r\nconst b = 2;\r\n");
+      const runtime = new TreeSitterRuntime(tmpDir);
+      const result = await lookupNodeAt(runtime, "crlf.ts", 1, 14);
+      expect(result.kind).toBe("validation-error");
+      runtime.dispose();
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("returns file-access-error for missing files", async () => {

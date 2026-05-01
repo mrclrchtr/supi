@@ -24,7 +24,7 @@ export function publicToTreeSitter(
   source: string,
 ): { row: number; column: number } {
   const row = line - 1;
-  const lines = splitLines(source);
+  const lines = splitSourceLines(source);
   const lineText = row < lines.length ? lines[row] : "";
   // character is 1-based; clamp to line length
   const charIndex = Math.max(0, Math.min(character - 1, lineText.length));
@@ -41,7 +41,7 @@ export function publicToTreeSitter(
  * code-unit index.
  */
 export function treeSitterToPublic(row: number, column: number, source: string): PublicPoint {
-  const lines = splitLines(source);
+  const lines = splitSourceLines(source);
   const lineText = row < lines.length ? lines[row] : "";
   // Convert byte offset to UTF-16 code unit index
   const charIndex = byteToUtf16Index(lineText, column);
@@ -79,9 +79,9 @@ export function nodeToRange(
   };
 }
 
-/** Split source into lines. */
-function splitLines(source: string): string[] {
-  return source.split("\n");
+/** Split source into logical lines without CRLF line-ending bytes. */
+export function splitSourceLines(source: string): string[] {
+  return source.replace(/\r\n?/g, "\n").split("\n");
 }
 
 /**

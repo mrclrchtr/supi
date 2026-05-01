@@ -17,20 +17,23 @@ export async function extractExports(
   const exports: ExportRecord[] = [];
 
   try {
-    walkForExports(tree.rootNode, source, exports);
+    collectTopLevelExports(tree.rootNode, source, exports);
     return { kind: "success", data: exports };
   } finally {
     tree.delete();
   }
 }
 
-function walkForExports(node: SyntaxNodeLike, source: string, exports: ExportRecord[]): void {
-  if (node.type !== "export_statement") {
-    for (const child of node.children) walkForExports(child, source, exports);
-    return;
+/** Only collect file-level exports; nested namespace/module exports are not module exports. */
+function collectTopLevelExports(
+  rootNode: SyntaxNodeLike,
+  source: string,
+  exports: ExportRecord[],
+): void {
+  for (const child of rootNode.children) {
+    if (child.type !== "export_statement") continue;
+    handleExportStatement(child, source, exports);
   }
-
-  handleExportStatement(node, source, exports);
 }
 
 /** Dispatch a single export statement into declaration, re-export, default, or named export records. */
@@ -49,6 +52,11 @@ function handleExportStatement(
   const sourceNode = findStringChild(node);
   if (sourceNode) {
     extractReExport(node, sourceNode, source, exports);
+    return;
+  }
+
+  if (hasExportAssignment(node)) {
+    extractExportAssignment(node, source, exports);
     return;
   }
 
@@ -75,6 +83,7 @@ const DECLARATION_EXPORT_NODE_TYPES = new Set([
   "lexical_declaration",
   "ambient_declaration",
   "internal_module",
+  "module",
 ]);
 
 function extractDeclarationExport(
@@ -92,11 +101,11 @@ function extractDeclarationExport(
     return;
   }
 
-  const nameNode = findNameNode(decl);
-  if (!nameNode) return;
+  const name = getDeclarationName(decl);
+  if (!name) return;
 
   exports.push({
-    name: nameNode.text,
+    name,
     kind: exportKindForDeclaration(decl.type),
     range: nodeToRange(decl, source),
   });
@@ -128,11 +137,11 @@ function extractAmbientDeclarationExport(
   const nested = decl.children.find((child) => child.type !== "declare" && child.type !== ";");
   if (!nested) return;
 
-  const nameNode = findNameNode(nested);
-  if (!nameNode) return;
+  const name = getDeclarationName(nested);
+  if (!name) return;
 
   exports.push({
-    name: nameNode.text,
+    name,
     kind: exportKindForDeclaration(nested.type),
     range: nodeToRange(decl, source),
   });
@@ -155,6 +164,7 @@ function exportKindForDeclaration(type: string): string {
     case "enum_declaration":
       return "enum";
     case "internal_module":
+    case "module":
       return "namespace";
     default:
       return type.replace(/_declaration$/, "");
@@ -163,6 +173,26 @@ function exportKindForDeclaration(type: string): string {
 
 function hasDefaultKeyword(node: SyntaxNodeLike): boolean {
   return node.children.some((child) => child.type === "default");
+}
+
+function hasExportAssignment(node: SyntaxNodeLike): boolean {
+  return node.children.some((child) => child.type === "=");
+}
+
+function extractExportAssignment(
+  node: SyntaxNodeLike,
+  source: string,
+  exports: ExportRecord[],
+): void {
+  const expr = node.children.find(
+    (child) => child.type !== "export" && child.type !== "=" && child.type !== ";",
+  );
+
+  exports.push({
+    name: expr ? expr.text.substring(0, 60) : "=",
+    kind: "export assignment",
+    range: nodeToRange(node, source),
+  });
 }
 
 function extractDefaultExport(node: SyntaxNodeLike, source: string, exports: ExportRecord[]): void {
@@ -271,4 +301,15 @@ function findNameNode(node: SyntaxNodeLike): SyntaxNodeLike | null {
     ) ??
     null
   );
+}
+
+function getDeclarationName(node: SyntaxNodeLike): string | null {
+  const nameNode =
+    node.childForFieldName("name") ?? node.children.find((child) => child.type === "string");
+  if (!nameNode) return null;
+  return nameNode.type === "string" ? stripQuotes(nameNode.text) : nameNode.text;
+}
+
+function stripQuotes(text: string): string {
+  return text.replace(/^["']|["']$/g, "");
 }

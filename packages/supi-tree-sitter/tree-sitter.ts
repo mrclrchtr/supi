@@ -29,7 +29,7 @@ const toolDescription = `Tree-sitter tool — provides structural AST analysis f
 Actions:
 - outline: Extract structural declarations (functions, classes, interfaces, etc.)
 - imports: List import statements with module specifiers
-- exports: List export declarations with names and kinds
+- exports: List export declarations, re-exports, and export assignments with names and kinds
 - node_at: Find the syntax node at a position. Params: file, line, character
 - query: Run a Tree-sitter query. Params: file, query
 

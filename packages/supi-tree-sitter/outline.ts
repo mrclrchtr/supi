@@ -19,6 +19,7 @@ const OUTLINE_DECLARATION_NODE_TYPES = new Set([
   "variable_declarator",
   "ambient_declaration",
   "internal_module",
+  "module",
   "function_signature",
 ]);
 
@@ -71,7 +72,8 @@ function extractItem(node: SyntaxNodeLike, source: string): OutlineItem | null {
     case "ambient_declaration":
       return extractAmbientDeclaration(node, source);
     case "internal_module":
-      return extractNamedDeclaration(node, "namespace", source);
+    case "module":
+      return extractModuleDeclaration(node, source);
     default:
       return null;
   }
@@ -173,6 +175,17 @@ function extractAmbientDeclaration(node: SyntaxNodeLike, source: string): Outlin
   return declaration ? extractItem(declaration, source) : null;
 }
 
+function extractModuleDeclaration(node: SyntaxNodeLike, source: string): OutlineItem | null {
+  const name = getModuleName(node);
+  if (!name) return null;
+
+  return {
+    name,
+    kind: "namespace",
+    range: nodeToRange(node, source),
+  };
+}
+
 function detectKind(node: SyntaxNodeLike): string {
   const valueNode = node.childForFieldName("value");
   if (!valueNode) return "variable";
@@ -255,6 +268,17 @@ function findNameNode(node: SyntaxNodeLike): SyntaxNodeLike | null {
 
 function hasDefaultKeyword(node: SyntaxNodeLike): boolean {
   return node.children.some((child) => child.type === "default");
+}
+
+function getModuleName(node: SyntaxNodeLike): string | null {
+  const nameNode =
+    node.childForFieldName("name") ?? node.children.find((child) => child.type === "string");
+  if (!nameNode) return null;
+  return nameNode.type === "string" ? stripQuotes(nameNode.text) : nameNode.text;
+}
+
+function stripQuotes(text: string): string {
+  return text.replace(/^["']|["']$/g, "");
 }
 
 function isFunctionLike(node: SyntaxNodeLike | null): boolean {

@@ -1,6 +1,6 @@
 // Node-at-position lookup.
 
-import { nodeToRange, publicToTreeSitter } from "./coordinates.ts";
+import { nodeToRange, publicToTreeSitter, splitSourceLines } from "./coordinates.ts";
 import type { TreeSitterRuntime } from "./runtime.ts";
 import type { NodeAtResult, SourceRange, TreeSitterResult } from "./types.ts";
 
@@ -56,7 +56,7 @@ function validateBounds(
   character: number,
   source: string,
 ): TreeSitterResult<NodeAtResult> | null {
-  const lines = source.split("\n");
+  const lines = splitSourceLines(source);
   if (line > lines.length) {
     return { kind: "validation-error", message: "line is beyond end of file" };
   }

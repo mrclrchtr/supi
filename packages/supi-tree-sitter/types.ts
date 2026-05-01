@@ -64,7 +64,7 @@ export interface TreeSitterSession {
   outline(file: string): Promise<TreeSitterResult<OutlineItem[]>>;
   /** Extract static ES import declarations. */
   imports(file: string): Promise<TreeSitterResult<ImportRecord[]>>;
-  /** Extract exported declarations, named exports, and re-exports. */
+  /** Extract exported declarations, named exports, re-exports, and TS export assignments. */
   exports(file: string): Promise<TreeSitterResult<ExportRecord[]>>;
   /** Return the smallest syntax node at a 1-based UTF-16 position. */
   nodeAt(file: string, line: number, character: number): Promise<TreeSitterResult<NodeAtResult>>;

@@ -31,7 +31,7 @@ Actions:
 
 - `outline` — list structural declarations such as functions, classes, interfaces, methods, and variables
 - `imports` — list import statements and module specifiers
-- `exports` — list exported declarations and re-exports
+- `exports` — list exported declarations, re-exports, and TypeScript `export =` assignments
 - `node_at` — return the smallest syntax node at a 1-based `line`/`character` position, plus ancestry
 - `query` — run a custom Tree-sitter query and return captures
 
