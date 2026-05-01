@@ -130,6 +130,13 @@ export interface SymbolInformation {
   containerName?: string;
 }
 
+export interface WorkspaceSymbol {
+  name: string;
+  kind: SymbolKind;
+  location: Location;
+  containerName?: string;
+}
+
 // ── Code Actions ──────────────────────────────────────────────────────
 
 export interface CodeActionContext {
@@ -219,6 +226,7 @@ export interface ServerCapabilities {
   definitionProvider?: boolean;
   referencesProvider?: boolean;
   documentSymbolProvider?: boolean;
+  workspaceSymbolProvider?: boolean;
   renameProvider?: boolean | { prepareProvider?: boolean };
   codeActionProvider?: boolean | { codeActionKinds?: string[] };
 }

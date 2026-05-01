@@ -4,8 +4,10 @@ import {
   formatDocumentSymbols,
   formatHover,
   formatLocations,
+  formatSearchResults,
   formatSymbolInformation,
   formatWorkspaceEdit,
+  formatWorkspaceSymbols,
   normalizeLocations,
 } from "../format.ts";
 import type {
@@ -169,6 +171,65 @@ describe("formatWorkspaceEdit", () => {
     const result = formatWorkspaceEdit(edit, "/project");
     expect(result).toContain("1 change(s)");
     expect(result).toContain("newName");
+  });
+});
+
+describe("formatWorkspaceSymbols", () => {
+  it("formats empty results", () => {
+    expect(formatWorkspaceSymbols([], "/project")).toBe("No symbols found.");
+  });
+
+  it("formats symbols with container", () => {
+    const symbols: SymbolInformation[] = [
+      {
+        name: "getSettings",
+        kind: 12,
+        location: loc("file:///src/config.ts", 10, 4),
+        containerName: "SettingsModule",
+      },
+    ];
+    const result = formatWorkspaceSymbols(symbols, "/project");
+    expect(result).toContain("getSettings");
+    expect(result).toContain("Function");
+    expect(result).toContain("SettingsModule");
+    expect(result).toContain("src/config.ts:11:5");
+  });
+
+  it("formats symbols without container", () => {
+    const symbols: SymbolInformation[] = [
+      {
+        name: "PI",
+        kind: 14,
+        location: loc("file:///src/math.ts", 0, 0),
+      },
+    ];
+    const result = formatWorkspaceSymbols(symbols, "/project");
+    expect(result).toContain("PI");
+    expect(result).toContain("Constant");
+    expect(result).not.toContain("(in");
+  });
+});
+
+describe("formatSearchResults", () => {
+  it("formats LSP symbols when available", () => {
+    const symbols: SymbolInformation[] = [
+      { name: "add", kind: 12, location: loc("file:///src/math.ts", 0, 0) },
+    ];
+    const result = formatSearchResults(symbols, null, "/project");
+    expect(result).toContain("add");
+    expect(result).toContain("Workspace symbols");
+  });
+
+  it("formats grep matches when LSP returns nothing", () => {
+    const matches = [{ file: "src/math.ts", line: 5, text: "export function add" }];
+    const result = formatSearchResults(null, matches, "/project");
+    expect(result).toContain("Text search results");
+    expect(result).toContain("src/math.ts:5");
+    expect(result).toContain("export function add");
+  });
+
+  it("reports no results when both are empty", () => {
+    expect(formatSearchResults(null, null, "/project")).toBe("No symbols or text matches found.");
   });
 });
 

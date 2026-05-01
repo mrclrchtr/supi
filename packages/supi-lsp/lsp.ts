@@ -44,6 +44,9 @@ const LspActionEnum = Type.Union([
   Type.Literal("symbols"),
   Type.Literal("rename"),
   Type.Literal("code_actions"),
+  Type.Literal("workspace_symbol"),
+  Type.Literal("search"),
+  Type.Literal("symbol_hover"),
 ]);
 
 interface LspRuntimeState {
@@ -246,6 +249,10 @@ function registerLspTool(
       line: Type.Optional(Type.Number({ description: "1-based line number" })),
       character: Type.Optional(Type.Number({ description: "1-based column number" })),
       newName: Type.Optional(Type.String({ description: "New name (for rename action)" })),
+      query: Type.Optional(
+        Type.String({ description: "Search query (for workspace_symbol and search actions)" }),
+      ),
+      symbol: Type.Optional(Type.String({ description: "Symbol name (for symbol_hover action)" })),
     }),
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
@@ -264,6 +271,8 @@ function registerLspTool(
           line?: number;
           character?: number;
           newName?: string;
+          query?: string;
+          symbol?: string;
         },
       );
 

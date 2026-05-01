@@ -52,12 +52,7 @@ export class LspManager {
   registerDetectedServers(detected: DetectedProjectServer[]): void {
     this.knownRoots = buildKnownRootsMap(detected);
   }
-  /**
-   * Synchronously check whether a file path maps to a configured LSP server
-   * whose binary is actually installed and has not already failed to start.
-   * Used by tool-event activation so we don't advertise LSP readiness for
-   * files whose server cannot run in this environment.
-   */
+  /** Check whether a file path has an available LSP server. */
   isSupportedSourceFile(filePath: string): boolean {
     // Dependency directories are intentionally excluded from recent-path
     // tracking and diagnostic summaries (shouldIgnoreLspPath). Keep runtime
@@ -85,10 +80,7 @@ export class LspManager {
     if (available) this.commandAvailability.set(command, true);
     return available;
   }
-  /**
-   * Get or create an LSP client for the given file.
-   * Returns null if no server is configured or available.
-   */
+  /** Get or create an LSP client for the given file. */
   async getClientForFile(filePath: string): Promise<LspClient | null> {
     const match = getServerForFile(this.config, filePath);
     if (!match) return null;
@@ -165,10 +157,7 @@ export class LspManager {
           a.status.localeCompare(b.status),
       );
   }
-  /**
-   * Sync a file with its LSP server and wait for diagnostics.
-   * Returns diagnostics filtered to the given severity threshold.
-   */
+  /** Sync a file and wait for diagnostics filtered to severity threshold. */
   async syncFileAndGetDiagnostics(
     filePath: string,
     maxSeverity: number = 1,
@@ -375,10 +364,12 @@ export class LspManager {
       .map(([file, diagnostics]) => ({ file, diagnostics }))
       .sort((a, b) => a.file.localeCompare(b.file));
   }
-  /**
-   * Ensure a file is open in its LSP server.
-   * Used when the agent needs to read a file for the first time.
-   */
+  async workspaceSymbol(query: string) {
+    const { managerWorkspaceSymbol } = await import("./manager-workspace-symbol.ts");
+    return managerWorkspaceSymbol(this.clients.values(), query);
+  }
+
+  /** Ensure a file is open in its LSP server. */
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
     const client = await this.getClientForFile(filePath);
     if (!client) return null;

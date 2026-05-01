@@ -148,6 +148,48 @@ export function formatCodeActions(actions: CodeAction[]): string {
   return lines.join("\n");
 }
 
+// ── Workspace Symbols ─────────────────────────────────────────────────
+
+export function formatWorkspaceSymbols(symbols: SymbolInformation[], cwd: string): string {
+  if (symbols.length === 0) return "No symbols found.";
+  const lines = [`Workspace symbols (${symbols.length}):\n`];
+  for (const sym of symbols) {
+    const kind = symbolKindName(sym.kind);
+    const file = relPath(uriToFile(sym.location.uri), cwd);
+    const line = sym.location.range.start.line + 1;
+    const col = sym.location.range.start.character + 1;
+    const container = sym.containerName ? ` — ${sym.containerName}` : "";
+    lines.push(`- **${sym.name}** (${kind})${container} — ${file}:${line}:${col}`);
+  }
+  return lines.join("\n");
+}
+
+// ── Search Results ────────────────────────────────────────────────────
+
+export interface GrepMatch {
+  file: string;
+  line: number;
+  text: string;
+}
+
+export function formatSearchResults(
+  lspSymbols: SymbolInformation[] | null,
+  grepMatches: GrepMatch[] | null,
+  cwd: string,
+): string {
+  if (lspSymbols && lspSymbols.length > 0) {
+    return formatWorkspaceSymbols(lspSymbols, cwd);
+  }
+  if (grepMatches && grepMatches.length > 0) {
+    const lines = [`Text search results (${grepMatches.length}):\n`];
+    for (const match of grepMatches) {
+      lines.push(`- ${match.file}:${match.line}: ${match.text}`);
+    }
+    return lines.join("\n");
+  }
+  return "No symbols or text matches found.";
+}
+
 // ── Symbol Kind Names ─────────────────────────────────────────────────
 
 const SYMBOL_KIND_NAMES: Record<number, string> = {

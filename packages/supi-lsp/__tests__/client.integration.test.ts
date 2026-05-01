@@ -162,9 +162,31 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     expect(actions === null || Array.isArray(actions)).toBe(true);
   }, 10_000);
 
+  it("returns workspace symbols for exact match", async () => {
+    const symbols = await client.workspaceSymbol("add");
+    expect(symbols).not.toBeNull();
+    expect(Array.isArray(symbols)).toBe(true);
+    expect(symbols?.length).toBeGreaterThan(0);
+    const text = JSON.stringify(symbols);
+    expect(text).toContain("add");
+  }, 10_000);
+
+  it("returns workspace symbols for partial query", async () => {
+    const symbols = await client.workspaceSymbol("Cal");
+    expect(symbols).not.toBeNull();
+    expect(Array.isArray(symbols)).toBe(true);
+    // Server-dependent: some LSP servers only support exact/prefix matching
+  }, 10_000);
+
   it("closes a document and removes from tracking", () => {
     client.didClose(goodFile);
     expect(client.openFiles).not.toContain(goodFile);
+  });
+
+  it("returns null when workspace symbol provider is not supported", async () => {
+    const unsupportedClient = new LspClient("none", TS_SERVER_CONFIG, tmpDir);
+    const symbols = await unsupportedClient.workspaceSymbol("add");
+    expect(symbols).toBeNull();
   });
 
   it("shuts down cleanly", async () => {

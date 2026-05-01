@@ -8,12 +8,16 @@ import {
   formatDocumentSymbols,
   formatHover,
   formatLocations,
+  formatSearchResults,
   formatSymbolInformation,
   formatWorkspaceEdit,
+  formatWorkspaceSymbols,
   normalizeLocations,
 } from "./format.ts";
 import type { LspManager } from "./manager.ts";
+import { fallbackGrep } from "./search-fallback.ts";
 import type { DocumentSymbol, Range, SymbolInformation } from "./types.ts";
+import { uriToFile } from "./utils.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -24,7 +28,10 @@ export type LspAction =
   | "diagnostics"
   | "symbols"
   | "rename"
-  | "code_actions";
+  | "code_actions"
+  | "workspace_symbol"
+  | "search"
+  | "symbol_hover";
 
 export interface LspToolParams {
   action: LspAction;
@@ -32,6 +39,8 @@ export interface LspToolParams {
   line?: number;
   character?: number;
   newName?: string;
+  query?: string;
+  symbol?: string;
 }
 
 // ── Tool Description ──────────────────────────────────────────────────
@@ -46,6 +55,9 @@ Actions:
 - symbols: List all symbols in a file. Params: file
 - rename: Rename a symbol across the project. Params: file, line, character, newName
 - code_actions: Get available fixes/refactors at a position. Params: file, line, character
+- workspace_symbol: Fuzzy symbol search across the project. Params: query
+- search: Search for symbols (LSP first, then text fallback). Params: query
+- symbol_hover: Hover info by symbol name (zero coordinates). Params: symbol
 
 Line and character are 1-based. File paths are relative to cwd.`;
 
@@ -68,6 +80,12 @@ export async function executeAction(manager: LspManager, params: LspToolParams):
       return handleRename(manager, params, cwd);
     case "code_actions":
       return handleCodeActions(manager, params);
+    case "workspace_symbol":
+      return handleWorkspaceSymbol(manager, params, cwd);
+    case "search":
+      return handleSearch(manager, params, cwd);
+    case "symbol_hover":
+      return handleSymbolHover(manager, params);
     default:
       return `Unknown action: ${params.action}`;
   }
@@ -208,6 +226,61 @@ async function handleCodeActions(manager: LspManager, params: LspToolParams): Pr
   if (!actions || actions.length === 0) return "No code actions available at this position.";
 
   return formatCodeActions(actions);
+}
+
+async function handleWorkspaceSymbol(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
+  if (!params.query || params.query.trim().length === 0) {
+    return "Error: 'query' parameter is required for workspace_symbol action.";
+  }
+  const symbols = await manager.workspaceSymbol(params.query);
+  if (!symbols) return "Workspace symbol search not supported by this language server.";
+  if (symbols.length === 0) return `No symbols found for query "${params.query}".`;
+
+  return formatWorkspaceSymbols(symbols as SymbolInformation[], cwd);
+}
+
+async function handleSearch(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
+  if (!params.query || params.query.trim().length === 0) {
+    return "Error: 'query' parameter is required for search action.";
+  }
+  const symbols = await manager.workspaceSymbol(params.query);
+  if (symbols && symbols.length > 0) {
+    return formatWorkspaceSymbols(symbols as SymbolInformation[], cwd);
+  }
+  const grepMatches = fallbackGrep(cwd, params.query);
+  return formatSearchResults(null, grepMatches, cwd);
+}
+
+async function handleSymbolHover(manager: LspManager, params: LspToolParams): Promise<string> {
+  if (!params.symbol || params.symbol.trim().length === 0) {
+    return "Error: 'symbol' parameter is required for symbol_hover action.";
+  }
+  const symbols = await manager.workspaceSymbol(params.symbol);
+  if (!symbols || symbols.length === 0) {
+    return `Symbol "${params.symbol}" not found.`;
+  }
+
+  const match = symbols[0];
+  const filePath = uriToFile(match.location.uri);
+  const client = await manager.ensureFileOpen(filePath);
+  if (!client) return noServerMessage(filePath);
+
+  const hover = await client.hover(filePath, match.location.range.start);
+  if (!hover) return `No hover information available for "${params.symbol}".`;
+
+  let result = formatHover(hover);
+  if (symbols.length > 1) {
+    result += `\n\n(${symbols.length - 1} other match${symbols.length === 2 ? "" : "es"} found — use workspace_symbol or search to disambiguate)`;
+  }
+  return result;
 }
 
 // ── Utility ───────────────────────────────────────────────────────────

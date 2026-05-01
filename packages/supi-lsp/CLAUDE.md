@@ -26,6 +26,8 @@ Entrypoint: `lsp.ts`
 - `/reload` reruns `session_start`; use it to refresh proactive scans, eager server startup, and rebuilt `promptGuidelines`.
 - `/lsp-status` should merge proactive scan roots with lazily started clients; do not assume UI state can rely on the session-start scan snapshot alone.
 - Use `pi.on("tool_result")` to append inline diagnostics to `write` / `edit` output.
+- After `write`/`edit`, severity-1 diagnostics are augmented with LSP `hover` (truncated to 3 lines) and `code_actions` (titles listed) at the first error position, with a 500ms timeout per call.
+- The `lsp` tool supports `workspace_symbol`, `search`, and `symbol_hover` actions for symbol exploration without exact coordinates.
 
 ## Settings
 

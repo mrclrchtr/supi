@@ -24,6 +24,7 @@ import type {
   TextDocumentItem,
   VersionedTextDocumentIdentifier,
   WorkspaceEdit,
+  WorkspaceSymbol,
 } from "./types.ts";
 import { detectLanguageId, fileToUri, uriToFile } from "./utils.ts";
 
@@ -31,7 +32,6 @@ const SHUTDOWN_TIMEOUT_MS = 5_000;
 const DIAGNOSTIC_WAIT_MS = 3_000;
 
 // ── Types ─────────────────────────────────────────────────────────────
-
 export type ClientStatus = "initializing" | "running" | "error" | "shutdown";
 
 export interface DiagnosticEntry {
@@ -40,7 +40,6 @@ export interface DiagnosticEntry {
 }
 
 // ── LspClient ─────────────────────────────────────────────────────────
-
 export class LspClient {
   readonly name: string;
   readonly root: string;
@@ -79,7 +78,6 @@ export class LspClient {
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────
-
   /** Spawn the server process and perform the initialize handshake. */
   async start(): Promise<void> {
     const cmd = this.config.command;
@@ -188,7 +186,6 @@ export class LspClient {
   }
 
   // ── Document Synchronization ────────────────────────────────────────
-
   /** Open a document (or re-sync if already open). */
   didOpen(filePath: string, content: string): void {
     if (!this.rpc || this._status !== "running") return;
@@ -271,7 +268,6 @@ export class LspClient {
   }
 
   // ── Diagnostics ─────────────────────────────────────────────────────
-
   /** Get stored diagnostics for a file. */
   getDiagnostics(filePath: string): Diagnostic[] {
     return this.diagnosticStore.get(fileToUri(filePath)) ?? [];
@@ -313,7 +309,6 @@ export class LspClient {
   }
 
   // ── LSP Requests ───────────────────────────────────────────────────
-
   async hover(filePath: string, position: Position): Promise<Hover | null> {
     return this.request("textDocument/hover", {
       textDocument: { uri: fileToUri(filePath) },
@@ -345,6 +340,11 @@ export class LspClient {
     });
   }
 
+  async workspaceSymbol(query: string): Promise<SymbolInformation[] | WorkspaceSymbol[] | null> {
+    if (!this.capabilities?.workspaceSymbolProvider) return null;
+    return this.request("workspace/symbol", { query });
+  }
+
   async rename(
     filePath: string,
     position: Position,
@@ -370,7 +370,6 @@ export class LspClient {
   }
 
   // ── Private ─────────────────────────────────────────────────────────
-
   private async request<T>(method: string, params: unknown): Promise<T | null> {
     if (!this.rpc || this._status !== "running") return null;
     try {

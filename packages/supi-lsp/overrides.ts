@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createEditTool, createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
+import { augmentDiagnostics } from "./diagnostic-augmentation.ts";
 import { formatDiagnostics } from "./diagnostics.ts";
 import type { LspManager } from "./manager.ts";
 
@@ -75,7 +76,18 @@ async function appendInlineDiagnostics<T extends { content: unknown[]; details: 
     );
     if (diags.length === 0) return options.result;
 
-    const diagText = formatDiagnostics(options.filePath, diags, options.cwd);
+    let diagText = formatDiagnostics(options.filePath, diags, options.cwd);
+
+    const augmentation = await augmentDiagnostics(
+      options.filePath,
+      diags,
+      options.manager,
+      options.cwd,
+    );
+    if (augmentation) {
+      diagText += `\n\n${augmentation}`;
+    }
+
     const diagnosticContent = {
       type: "text" as const,
       text: `\n\n⚠️ LSP Diagnostics — review before continuing:\n${diagText}\nIf these errors are unexpected or appear across multiple files, fix the root cause before editing more files.`,
