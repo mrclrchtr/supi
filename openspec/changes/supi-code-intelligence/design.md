@@ -13,6 +13,7 @@ The package must work across both repo install surfaces:
 
 It also depends on lower-layer readiness:
 - `supi-tree-sitter` is a prerequisite change and must land before this package can take a hard workspace dependency on it
+- `extract-project-root-utils` is a prerequisite change so architecture-model scanning can use shared `supi-core` project/root utilities instead of duplicating logic or importing `supi-lsp` internals
 - `supi-lsp` currently owns its `LspManager` privately, so this change must first expose a shared session-scoped semantic service rather than assuming one already exists
 
 It also has to respect existing repo constraints:
@@ -32,6 +33,8 @@ It also has to respect existing repo constraints:
 
 **Non-Goals:**
 - Replacing raw `lsp` or `tree_sitter` tools
+- Preserving a separate `codebase_map` tool; `code_intel brief` is the high-level replacement
+- Reintroducing broad regex-first import/export extraction for Python, Rust, Go, Ruby, Java, or other languages in v1
 - Moving prompt injection responsibilities down into `supi-lsp` or `supi-tree-sitter`
 - Building a persistent index, file watcher, or background cache in v1
 - Guaranteeing fully semantic fallback behavior when LSP is absent
@@ -88,6 +91,7 @@ It also has to respect existing repo constraints:
 
 **Base inputs:**
 - `package.json` and similar project metadata for package names, descriptions, entrypoints, and dependency edges
+- shared `supi-core` project/root utilities for module boundary discovery and focus-path resolution
 - directory/module layout for top-level structure
 - Tree-sitter-derived imports/exports/outlines for structural shape
 - LSP symbols/references/implementations when semantic support is available
@@ -134,7 +138,7 @@ It also has to respect existing repo constraints:
 
 **Decision:** All `code_intel` output SHALL be structured markdown with summaries, grouped sections, and file/path references. Auto-injected overview content SHALL target a compact budget rather than dumping full API detail.
 
-**Rationale:** The agent consumes markdown naturally, and grouped summaries improve triage. Bounded overview output preserves prompt budget while keeping richer detail available through on-demand `brief`.
+**Rationale:** The agent consumes markdown naturally, and grouped summaries improve triage. Bounded overview output preserves prompt budget while keeping richer detail available through on-demand `brief`. A dense module-edge format such as `supi-lsp → supi-core` should be preferred over verbose per-module prose in the auto-injected overview.
 
 **Alternatives considered:**
 - JSON-first output — better for machines, less ergonomic in the agent context
@@ -161,12 +165,18 @@ It also has to respect existing repo constraints:
 - **[Startup latency]** → Building the first architecture model may add noticeable delay. **Mitigation:** start from cheap metadata scans, enrich opportunistically, and avoid project-wide deep analysis in the auto-injected path.
 - **[Responsibility creep]** → The package may accumulate low-level features that belong in `supi-tree-sitter` or `supi-lsp`. **Mitigation:** keep raw parser/server operations in the substrate packages and limit `supi-code-intelligence` to synthesis and high-level UX.
 
+## Superseded Changes
+
+This change supersedes the earlier `supi-code-intel` and `supi-codebase-map` directions. The `code_intel` tool and its `brief`, `callers`, `implementations`, `affected`, and `pattern` actions replace `supi-code-intel`. `code_intel brief` replaces the separate `codebase_map` tool, while `supi-tree-sitter` replaces regex-first structural extraction for supported JS/TS-family files. Broad multi-language regex extraction and the standalone `codebase_map` API are intentionally deferred rather than accidentally omitted.
+
+One piece from `supi-codebase-map` remains valuable as independent shared infrastructure: extracting LSP-agnostic project/root utilities from `supi-lsp` into `supi-core`. That work is tracked as the `extract-project-root-utils` prerequisite change and should land before `supi-code-intelligence` builds its architecture model.
+
 ## Migration Plan
 
+- Land `extract-project-root-utils` so shared project/root scanning helpers are available from `supi-core`
 - Land `supi-tree-sitter` first so the workspace dependency is available
 - Extend `supi-lsp` with shared session-scoped service acquisition and `textDocument/implementation` support
 - Add `packages/supi-code-intelligence/` as a new standalone workspace package
 - Wire it into the workspace root pi manifest and the published `@mrclrchtr/supi` meta-package wrapper surface
 - Update root verification scripts so `pnpm verify` covers the new package
 - Keep existing lower-level packages unchanged from a user-facing tool-contract perspective; `supi-code-intelligence` composes them without altering the existing `lsp` or `tree_sitter` action surfaces
-- Future follow-up can archive or supersede the earlier overlapping `supi-code-intel` / `supi-codebase-map` proposal paths once implementation direction is settled

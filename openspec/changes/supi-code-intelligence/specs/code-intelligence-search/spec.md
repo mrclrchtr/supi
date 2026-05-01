@@ -52,7 +52,7 @@ The system SHALL support `action: "pattern"` using text search and return result
 - **THEN** the tool returns a message indicating that no matches were found
 
 ### Requirement: Search output SHALL be bounded to pi output limits
-The system SHALL truncate oversized search output to fit pi output limits and SHALL note when truncation occurred.
+The system SHALL truncate oversized search output to fit pi output limits (50KB / 2000 lines) using the repository standard truncation helper where practical, and SHALL note when truncation occurred.
 
 #### Scenario: Very large search result
 - **WHEN** a `callers`, `implementations`, or `pattern` action produces output larger than pi's tool output limits

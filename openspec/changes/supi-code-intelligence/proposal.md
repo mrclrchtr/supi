@@ -10,6 +10,7 @@ SuPi now has a clear layered direction: technical substrates such as `supi-lsp` 
 - Synthesize results from `supi-lsp` and `supi-tree-sitter`, preferring LSP for semantic truth, using Tree-sitter for structural enrichment/fallback, and using text search as a last resort
 - Extend `supi-lsp` with a shared session-scoped semantic service and `textDocument/implementation` support so `supi-code-intelligence` can reuse live LSP state without starting duplicate servers
 - Treat `supi-tree-sitter` as a prerequisite change for structural enrichment and package wiring; this change assumes that package lands before implementation begins
+- Consume shared project-root utilities from `supi-core` for architecture-model scanning once the `extract-project-root-utils` prerequisite lands
 - Publish the extension through both install surfaces used by this repo: the workspace root manifest and the published `@mrclrchtr/supi` meta-package wrapper surface
 
 ## Capabilities
@@ -26,6 +27,7 @@ SuPi now has a clear layered direction: technical substrates such as `supi-lsp` 
 
 - **New package**: `packages/supi-code-intelligence/`
 - **Modified package**: `supi-lsp` gains a shared session-scoped service acquisition API and `textDocument/implementation` client support for peer extensions
+- **Prerequisite change**: `extract-project-root-utils` moves LSP-agnostic project/root scanning helpers into `supi-core` so architecture-model scanning does not duplicate or reach into `supi-lsp` internals
 - **Prerequisite change**: `supi-tree-sitter` must land before `supi-code-intelligence` implementation begins so the workspace dependency resolves cleanly
 - **Root manifest**: `package.json` pi manifest gains a `supi-code-intelligence` extension entry
 - **Published meta-package**: `packages/supi/package.json` gains the package dependency and `pi.extensions` wrapper entry, plus a local wrapper file such as `packages/supi/code-intelligence.ts`

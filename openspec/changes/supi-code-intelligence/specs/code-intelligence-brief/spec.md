@@ -12,18 +12,39 @@ The system SHALL generate a lightweight architecture overview and inject it into
 - **THEN** the system does not inject the architecture overview again
 
 ### Requirement: The auto-injected overview SHALL be compact and structural
-The auto-injected overview SHALL summarize top-level project layout, module/package names, one-line purpose descriptions when available, and key dependency edges. It SHALL prefer concise summaries over detailed API listings.
+The auto-injected overview SHALL summarize top-level project layout, module/package names, one-line purpose descriptions when available, and key dependency edges. It SHALL prefer concise summaries over detailed API listings and SHOULD target roughly 500 tokens or less.
 
 #### Scenario: Multi-package workspace overview
 - **WHEN** the project contains multiple workspace packages with descriptions and internal dependencies
 - **THEN** the overview lists each package with a compact description and the most relevant dependency edges between them
 
+#### Scenario: Dense module-edge format
+- **WHEN** the project contains modules with internal dependencies
+- **THEN** the overview may use a dense line-oriented format such as:
+  ```
+  supi-core (leaf)
+  supi-lsp → supi-core
+  supi-tree-sitter → supi-core
+  supi → supi-lsp, supi-tree-sitter, supi-code-intelligence
+  ```
+
 #### Scenario: Large repository overview
 - **WHEN** the project contains more structural detail than fits comfortably in the prompt budget
 - **THEN** the overview prioritizes module names, purposes, and dependency edges while omitting lower-level API detail
 
-### Requirement: The system SHALL support `action: "brief"` for full-project and focused briefs
-The `code_intel` tool SHALL support `action: "brief"` to generate a structured architecture brief for the whole project or for a specific file or directory path.
+### Requirement: Code intelligence SHALL handle projects without a detectable architecture model
+If no project metadata, modules, or source structure can be detected, the system SHALL avoid noisy empty architecture sections. It SHALL either skip auto-injection or inject a short note that no structured project model was detected.
+
+#### Scenario: Empty project
+- **WHEN** the first `before_agent_start` occurs in a directory with no recognizable project metadata or source files
+- **THEN** the system does not inject an empty module map
+
+#### Scenario: Source-only project without module metadata
+- **WHEN** source files exist but no package/module metadata can be detected
+- **THEN** the overview uses the limited detected structure or reports that only a minimal project model is available
+
+### Requirement: The system SHALL support `action: "brief"` for project, module, directory, and file briefs
+The `code_intel` tool SHALL support `action: "brief"` to generate a structured architecture brief for the whole project or for a specific file or directory path. Focused briefs SHALL cover project-level, module/directory-level, and single-file focus paths where those paths exist.
 
 #### Scenario: Full-project brief
 - **WHEN** the agent calls `code_intel` with `action: "brief"` and no `path`
@@ -32,6 +53,21 @@ The `code_intel` tool SHALL support `action: "brief"` to generate a structured a
 #### Scenario: Focused brief for a package
 - **WHEN** the agent calls `code_intel` with `action: "brief"` and `path: "packages/supi-lsp/"`
 - **THEN** the tool returns a focused brief describing that package's purpose, internal structure, dependencies, dependents, and notable exports or entrypoints
+
+#### Scenario: Focused brief for a single file
+- **WHEN** the agent calls `code_intel` with `action: "brief"` and a file path
+- **THEN** the tool returns a file-focused brief describing the file's containing module, imports, exports, outline, and relevant relationships when available
+
+### Requirement: Focused briefs SHALL report dependency direction explicitly
+Focused briefs SHALL include dependencies and dependents/reverse dependencies when those relationships can be inferred. They SHALL distinguish internal project/module edges from external package dependencies where available.
+
+#### Scenario: Focused module with dependents
+- **WHEN** the agent requests a focused brief for a module used by other workspace modules
+- **THEN** the brief lists both the module's dependencies and the modules or files that depend on it
+
+#### Scenario: Internal and external dependencies
+- **WHEN** a focused path imports both local project modules and third-party packages
+- **THEN** the brief distinguishes internal dependency edges from external dependencies
 
 ### Requirement: Brief generation SHALL combine base architecture data with optional enrichment
 The system SHALL build briefs from project metadata and structural analysis, and SHALL enrich them with LSP and Tree-sitter data when those sources are available.
