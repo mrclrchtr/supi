@@ -43,7 +43,7 @@
 - [x] 7.1 Implement `shouldRefreshRoot(state, config)` in `packages/supi-claude-md/refresh.ts` — check turn interval only
 - [x] 7.2 Implement `formatRefreshContext(contextFiles)` — format root context files using `wrapExtensionContext`
 - [x] 7.3 Implement `pruneStaleRefreshMessages(messages, activeToken)` — filter out old refresh messages, reorder current one before last user message (same pattern as supi-lsp's `reorderDiagnosticContextMessages`)
-- [x] 7.4 Wire `before_agent_start` handler: check shouldRefreshRoot, read native context files from `event.systemPromptOptions.contextFiles`, return persistent message with `customType: "supi-claude-md-refresh"`, `display: false`, details with `contextToken` and `turn`
+- [x] 7.4 Wire `before_agent_start` handler: check shouldRefreshRoot, read native context files from `event.systemPromptOptions.contextFiles`, return persistent message with `customType: "supi-claude-md-refresh"`, `display: true`, details with `contextToken`, `turn`, `promptContent`, and `fileCount`
 - [x] 7.5 Wire `context` event handler: call `pruneStaleRefreshMessages`, return modified messages
 - [x] 7.6 Wire `turn_end` handler: increment `completedTurns` on `stopReason: "stop"`
 - [x] 7.7 Wire `session_compact` handler: clear `injectedDirs`
@@ -61,17 +61,13 @@
 - [x] 9.2 Ensure `filterAlreadyLoaded` is called in the `tool_result` handler before injection
 - [x] 9.3 Write unit tests: native paths excluded
 
-## 10. supi-claude-md: /supi-claude-md command
+## 10. supi-claude-md: settings integration
 
-- [x] 10.1 Register `/supi-claude-md` command with subcommand parsing in `packages/supi-claude-md/index.ts`
-- [x] 10.2 Implement `status` subcommand: display effective config, completed turns, last refresh turn, injected dirs count
-- [x] 10.3 Open the settings UI directly from `/supi-claude-md`
-- [x] 10.4 Implement `list` subcommand: display all discovered subdirectory context files (scan cwd tree)
-- [x] 10.5 Implement `interval <N|off|default>` subcommand: write to project or global config via `writeSupiConfig`
-- [x] 10.6 Implement `subdirs on|off` subcommand: write to config
-- [x] 10.7 No compaction toggle; root refresh follows the interval only
-- [x] 10.8 Implement `--global` flag parsing: route config writes to global scope
-- [x] 10.9 Implement argument autocompletion via `getArgumentCompletions`
+- [x] 10.1 Register claude-md settings with `supi-core` settings registry via `registerClaudeMdSettings()` in `packages/supi-claude-md/settings-registration.ts`
+- [x] 10.2 Implement settings items: `subdirs` (on/off), `rereadInterval` (input), `contextThreshold` (preset values), `fileNames` (input)
+- [x] 10.3 Implement `persistChange` handler: write to project or global config via `writeSupiConfig` / `removeSupiConfigKey`
+- [x] 10.4 Provide input submenu components for free-text settings (`rereadInterval`, `fileNames`)
+- [x] 10.5 No dedicated `/supi-claude-md` command; settings are managed through the unified `/supi-settings` command
 
 ## 11. supi-claude-md: CLAUDE.md
 
@@ -85,4 +81,4 @@
 - [x] 12.4 Manual smoke test: install SuPi in pi, verify subdirectory CLAUDE.md injection on file read
 - [x] 12.5 Manual smoke test: verify root context refresh after 3 completed turns
 - [x] 12.6 Manual smoke test: verify interval-based root refresh
-- [x] 12.7 Manual smoke test: verify `/supi-claude-md status`, `interval`, `refresh`, `list` commands
+- [x] 12.7 Manual smoke test: verify `/supi-settings` shows claude-md settings and changes persist to config

@@ -21,7 +21,7 @@ The extension SHALL re-inject root/ancestor context files (those pi loaded nativ
 
 ### Requirement: Inject root refresh via before_agent_start persistent message
 
-The extension SHALL inject root context refresh as a persistent message returned from `before_agent_start` with `customType: "supi-claude-md-refresh"` and `display: false`. The message details SHALL include `contextToken` (unique per injection) and `turn` (the turn count at injection time).
+The extension SHALL inject root context refresh as a persistent message returned from `before_agent_start` with `customType: "supi-claude-md-refresh"` and `display: true` (rendered via `registerMessageRenderer` as a compact UI summary). The message details SHALL include `contextToken` (unique per injection), `turn` (the turn count at injection time), and `promptContent` (the raw XML-wrapped content for the LLM).
 
 #### Scenario: Refresh message injected on before_agent_start
 
@@ -31,7 +31,7 @@ The extension SHALL inject root context refresh as a persistent message returned
 #### Scenario: Refresh message is hidden
 
 - **WHEN** a refresh message is injected
-- **THEN** the message SHALL have `display: false` and SHALL NOT appear in the TUI
+- **THEN** the message SHALL have `display: true` and SHALL appear in the TUI as a compact summary (e.g. "CLAUDE.md refreshed (1 file)")
 
 ### Requirement: Prune stale refresh messages via context event
 

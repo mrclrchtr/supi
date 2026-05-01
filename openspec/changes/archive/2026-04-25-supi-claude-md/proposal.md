@@ -6,7 +6,7 @@ Pi only loads `CLAUDE.md` / `AGENTS.md` from the current directory and ancestors
 
 - **New extension `supi-claude-md`**: Compound extension with two capabilities — subdirectory context discovery and root context refresh — using zero-cost injection methods (no prompt cache pollution, no extra LLM turns).
 - **New package `supi-core`**: Shared SuPi infrastructure — XML `<extension-context>` tag convention and unified config system (`~/.pi/agent/supi/config.json` global, `.pi/supi/config.json` per-project).
-- **New command prefix convention**: All SuPi commands use `/supi-*` prefix going forward. `supi-claude-md` launches with `/supi-claude-md`.
+- **New command prefix convention**: All SuPi commands use `/supi-*` prefix going forward. `supi-claude-md` settings are managed through the unified `/supi-settings` command.
 - `supi-lsp`: Adopt `supi-core` for `<extension-context>` formatting and rename `/lsp-status` → `/supi-lsp` (separate follow-up change).
 - `supi` meta-package: Add `supi-claude-md` and `supi-core` as dependencies.
 
@@ -15,7 +15,7 @@ Pi only loads `CLAUDE.md` / `AGENTS.md` from the current directory and ancestors
 ### New Capabilities
 
 - `subdir-discovery`: Discover and inject `CLAUDE.md` / `AGENTS.md` from subdirectories below cwd when the agent accesses files there. Inject via `tool_result` augmentation on `read`, `write`, `edit`, `ls`, `lsp` tools. Refresh stale injections after N turns. Walk up from file directory, stop at cwd. Deduplicate against pi's natively loaded context files.
-- `root-refresh`: Periodically re-inject root/ancestor context files that pi loaded at startup. Inject via `before_agent_start` persistent messages with `context` event pruning of stale copies. Triggers: every N completed assistant turns (default 3), after compaction, and manual `/supi-claude-md refresh`.
+- `root-refresh`: Periodically re-inject root/ancestor context files that pi loaded at startup. Inject via `before_agent_start` persistent messages with `context` event pruning of stale copies. Triggers: every N completed assistant turns (default 3).
 - `supi-config`: Shared configuration system for all SuPi extensions. Global config at `~/.pi/agent/supi/config.json`, project overrides at `.pi/supi/config.json`. Namespaced sections per extension. Read/write/merge utilities.
 - `extension-context-tag`: Shared XML tag convention `<extension-context source="..." ...>` for injecting structured context into LLM messages without polluting the system prompt. Supports arbitrary attributes for metadata (e.g., `file`, `turn`).
 

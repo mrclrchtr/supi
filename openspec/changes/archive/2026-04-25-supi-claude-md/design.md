@@ -44,7 +44,7 @@ Append context file content to the tool result of `read`, `write`, `edit`, `ls`,
 
 ### D2: Root refresh via `before_agent_start` + `context` event pruning
 
-Identical pattern to supi-lsp's diagnostics injection. `before_agent_start` returns a persistent message with `customType: "supi-claude-md-refresh"` and a `contextToken` in details. The `context` event handler prunes stale copies (old tokens) and reorders the current copy before the last user message.
+Identical pattern to supi-lsp's diagnostics injection. `before_agent_start` returns a persistent message with `customType: "supi-claude-md-refresh"`, `display: true` (with a `registerMessageRenderer` for a compact UI summary), and a `contextToken` in details. The `context` event handler prunes stale copies (old tokens) and reorders the current copy before the last user message. The raw prompt content is stored in `details.promptContent` and restored by the context handler so the LLM sees the full XML-wrapped context.
 
 **Why not tool_result for root refresh:** Root refresh is proactive (time-based), not reactive to file access. `before_agent_start` fires on every user prompt — the right cadence for periodic refresh.
 

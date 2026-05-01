@@ -78,25 +78,21 @@ The `supi-core` package SHALL export a `writeSupiConfig(section: string, scope: 
 - **WHEN** the target config file and directory do not exist
 - **THEN** the directory and file SHALL be created with the new content
 
-### Requirement: Command writes to project config by default
+### Requirement: Settings UI via `/supi-settings`
 
-The `/supi-claude-md` command SHALL write config changes to project config (`.pi/supi/config.json`) by default. When the `--global` flag is provided, it SHALL write to global config instead.
-
-#### Scenario: Command writes project config
-
-- **WHEN** user runs `/supi-claude-md interval 5`
-- **THEN** `.pi/supi/config.json` SHALL be updated with `{ "claude-md": { "rereadInterval": 5 } }`
-
-#### Scenario: Command writes global config
-
-- **WHEN** user runs `/supi-claude-md --global interval 5`
-- **THEN** `~/.pi/agent/supi/config.json` SHALL be updated with `{ "claude-md": { "rereadInterval": 5 } }`
-
-### Requirement: Command opens settings UI
-
-The `/supi-claude-md` command SHALL open the interactive settings UI directly. It SHALL NOT expose command-line subcommands.
+Claude-md settings SHALL be managed through the unified `/supi-settings` command provided by `supi-core`. The extension SHALL register its settings with the `supi-core` settings registry so they appear in the shared settings overlay.
 
 #### Scenario: User opens settings UI
 
-- **WHEN** the user runs `/supi-claude-md`
-- **THEN** the settings UI SHALL open and show the current effective config values
+- **WHEN** the user runs `/supi-settings`
+- **THEN** the settings UI SHALL show the `claude-md` section with its current effective config values
+
+#### Scenario: Settings write to project config
+
+- **WHEN** the user changes a setting in the `/supi-settings` UI with project scope active
+- **THEN** `.pi/supi/config.json` SHALL be updated with the new value in the `"claude-md"` section
+
+#### Scenario: Settings write to global config
+
+- **WHEN** the user changes a setting in the `/supi-settings` UI with global scope active
+- **THEN** `~/.pi/agent/supi/config.json` SHALL be updated with the new value in the `"claude-md"` section
