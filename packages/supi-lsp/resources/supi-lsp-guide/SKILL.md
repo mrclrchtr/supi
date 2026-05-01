@@ -62,7 +62,13 @@ Use `code_actions` to get available quick-fixes and refactors at a position. Use
 
 ## Automatic behavior
 
-In addition to the `lsp` tool itself, the extension automatically surfaces inline diagnostics around edit/write workflows and injects compact diagnostic context when outstanding diagnostics change.
+The extension operates on two guidance layers that work together:
+
+1. **System prompt guidelines** (`promptGuidelines`) — rebuilt on session start and baked into pi's stable system prompt. Tell the agent *when* to prefer LSP over grep/rg, list active servers with their file types/actions, and explain how to map tasks to LSP actions.
+
+2. **Diagnostic context messages** — dynamic, turn-by-turn `<extension-context>` blocks that tell the agent *what needs fixing*. Only injected when outstanding diagnostics exist.
+
+In addition, the extension surfaces inline diagnostics around `edit`/`write` tool results.
 
 Use `/lsp-status` to inspect detected servers, roots, open files, and diagnostics.
 

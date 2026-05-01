@@ -50,10 +50,13 @@ describe("LSP prompt guidance", () => {
     expect(guidelines.join(" ")).toContain("LSP unavailable: rust-analyzer");
   });
 
-  it("falls back to generic guidance when no servers are detected", () => {
-    expect(buildProjectGuidelines([], process.cwd())).toEqual(
-      lspPromptGuidelines.slice(0, 2).concat([lspPromptGuidelines[2]]),
-    );
+  it("falls back to generic stable system-prompt guidance when no servers are detected", () => {
+    const guidelines = buildProjectGuidelines([], process.cwd());
+
+    expect(guidelines).toContain(lspPromptGuidelines[0]);
+    expect(guidelines).toContain(lspPromptGuidelines[2]);
+    expect(guidelines.join(" ")).toContain("Use lsp before grep/rg/find");
+    expect(guidelines.join(" ")).toContain("Use lsp actions by task");
   });
 
   it("formats diagnostics as xml extension context", () => {

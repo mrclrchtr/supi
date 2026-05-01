@@ -80,6 +80,8 @@ registerSettings({
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
 - Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
+- pi flattens tool `promptGuidelines` into the system prompt `Guidelines:` section; each bullet must name its tool explicitly.
+- Prefer stable system-prompt guidance via tool `promptGuidelines`; avoid `before_agent_start` `systemPrompt` mutations unless dynamic per-turn guidance is worth the prompt-cache tradeoff.
 - Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
 - OpenSpec `PostHogFetchNetworkError` output is harmless when offline.

@@ -10,7 +10,8 @@ Entrypoint: `lsp.ts`
 
 ## Key files
 
-- `lsp.ts` — extension registration and tool wiring
+- `lsp.ts` — extension registration, tool wiring, and `before_agent_start` handler (diagnostic context only)
+- `guidance.ts` — `buildProjectGuidelines()`, stable system-prompt `promptGuidelines`, diagnostic formatting
 - `manager.ts` — client/server lifecycle and state
 - `summary.ts` — formatting/relevance helpers; keep summary logic here to avoid bloating `manager.ts`
 - `scanner.ts` — project scanning/guidance coverage logic
@@ -21,8 +22,10 @@ Entrypoint: `lsp.ts`
 ## Behavior notes
 
 - Per-project config lives in `.pi-lsp.json` at the project root. YAML is intentionally unsupported.
-- The `lsp` tool advertises semantic-first guidance via `promptSnippet` / `promptGuidelines`.
-- `before_agent_start` custom messages reach the LLM as user-role content; keep stable guidance in session-start `promptGuidelines` and reserve dynamic XML-framed context for diagnostics only.
+- The `lsp` tool advertises semantic-first guidance via `promptSnippet` / `promptGuidelines`; these guidelines are part of pi's stable system prompt.
+- `buildProjectGuidelines()` includes LSP Tool Priority-style instructions and active server/action details. It is applied by re-registering the tool at `session_start`, so guidance is baked into `_baseSystemPrompt` without per-turn mutation.
+- `before_agent_start` must not return `systemPrompt`; keep stable guidance in session-start `promptGuidelines` and reserve dynamic XML-framed custom messages for diagnostics only.
+- The combined effect: system prompt guidelines tell the agent *when/how* to prefer LSP (directional, persistent), and diagnostic context messages tell it *what needs fixing* (dynamic, turn-by-turn).
 - `/reload` reruns `session_start`; use it to refresh proactive scans, eager server startup, and rebuilt `promptGuidelines`.
 - `/lsp-status` should merge proactive scan roots with lazily started clients; do not assume UI state can rely on the session-start scan snapshot alone.
 - Use `pi.on("tool_result")` to append inline diagnostics to `write` / `edit` output.
@@ -64,6 +67,7 @@ Useful commands:
 ```bash
 pnpm exec vitest run packages/supi-lsp/__tests__/guidance.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/scanner.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/system-prompt.test.ts
 ```
 
 Testing gotchas:

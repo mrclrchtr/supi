@@ -9,7 +9,7 @@
 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { BeforeAgentStartEventResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import { loadConfig } from "./config.ts";
 import { loadLspSettings, registerLspSettings } from "./settings-registration.ts";
@@ -160,13 +160,46 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
   });
 }
 
+/** Remove the `lsp` tool from the active tool set when LSP is disabled. */
+function disableLspTool(pi: ExtensionAPI): void {
+  const activeTools = pi.getActiveTools();
+  if (activeTools.includes("lsp")) {
+    pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
+  }
+}
+
+/** Build the `lsp-context` custom message used to surface outstanding diagnostics. */
+function buildDiagnosticResult(
+  diagnostics: import("./manager-types.ts").OutstandingDiagnosticSummaryEntry[],
+  detailed: { file: string; diagnostics: import("./types.ts").Diagnostic[] }[] | undefined,
+  severity: number,
+  token: string,
+): BeforeAgentStartEventResult {
+  return {
+    message: {
+      customType: "lsp-context",
+      content: formatDiagnosticsDisplayContent(diagnostics, detailed),
+      display: true,
+      details: {
+        contextToken: token,
+        promptContent: formatDiagnosticsContext(diagnostics, 3, detailed),
+        inlineSeverity: severity,
+        diagnostics: diagnostics.map((d) => ({
+          file: d.file,
+          errors: d.errors,
+          warnings: d.warnings,
+          information: d.information,
+          hints: d.hints,
+        })),
+      },
+    },
+  };
+}
+
 function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
   pi.on("before_agent_start", async (_event, ctx) => {
     if (!state.manager) {
-      const activeTools = pi.getActiveTools();
-      if (activeTools.includes("lsp")) {
-        pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
-      }
+      disableLspTool(pi);
       return;
     }
 
@@ -199,25 +232,14 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
     state.lastDiagnosticsFingerprint = fingerprint;
     state.currentContextToken = `lsp-context-${++state.contextCounter}`;
 
-    return {
-      message: {
-        customType: "lsp-context",
-        content: formatDiagnosticsDisplayContent(diagnostics, detailed),
-        display: true,
-        details: {
-          contextToken: state.currentContextToken,
-          promptContent: content,
-          inlineSeverity: state.inlineSeverity,
-          diagnostics: diagnostics.map((d) => ({
-            file: d.file,
-            errors: d.errors,
-            warnings: d.warnings,
-            information: d.information,
-            hints: d.hints,
-          })),
-        },
-      },
-    };
+    const result = buildDiagnosticResult(
+      diagnostics,
+      detailed,
+      state.inlineSeverity,
+      state.currentContextToken,
+    );
+
+    return result;
   });
 
   pi.on("context", (event) => {

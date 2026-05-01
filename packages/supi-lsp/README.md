@@ -15,6 +15,7 @@ This extension registers the `lsp` tool and related agent guidance so pi can use
 Key capabilities:
 
 - `lsp` tool with `hover`, `definition`, `references`, `diagnostics`, `symbols`, `rename`, and `code_actions`
+- stable system-prompt guidance — `promptGuidelines` direct the agent to prefer LSP over grep/rg for code navigation, with active server info
 - proactive project scanning and eager startup of detected language servers on session start
 - inline diagnostic surfacing around reads, writes, and edits
 - compact diagnostic context injection when outstanding diagnostics change

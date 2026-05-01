@@ -15,6 +15,11 @@ export const lspPromptGuidelines = [
   "After changing package.json dependencies, imports, or peer dependencies, run the package manager install command (e.g., pnpm install) before concluding that module resolution errors are real code bugs.",
 ];
 
+/**
+ * Build per-project `promptGuidelines` for the `lsp` tool registration.
+ * These guidelines are part of pi's stable system prompt after session-start
+ * tool registration, avoiding per-turn `before_agent_start` prompt overrides.
+ */
 export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string): string[] {
   const dynamic = servers.map((server) => {
     const root = displayRoot(server.root, cwd);
@@ -25,7 +30,13 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
     return `LSP ${status}: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
   });
 
-  return [...lspPromptGuidelines.slice(0, 2), ...dynamic, lspPromptGuidelines[2]].filter(Boolean);
+  return [
+    ...lspPromptGuidelines.slice(0, 2),
+    "Use lsp before grep/rg/find for understanding code, finding usages, diagnostics, symbol lookup, and refactors in supported languages.",
+    ...dynamic,
+    "Use lsp actions by task: hover/definition/references/symbols for understanding code, references/workspace_symbol/search for usages, diagnostics/hover/code_actions for issues, and rename/code_actions for refactors.",
+    ...lspPromptGuidelines.slice(2),
+  ].filter(Boolean);
 }
 
 export const MAX_DETAILED_DIAGNOSTICS = 5;
