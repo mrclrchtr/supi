@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPiMock, makeCtx } from "./extension-helpers.ts";
+import { createPiMock, DEFAULT_CONFIG, makeCtx } from "./extension-helpers.ts";
 
 const mockFns = vi.hoisted(() => ({
   loadClaudeMdConfig: vi.fn(),
@@ -51,11 +51,7 @@ import claudeMdExtension from "../index.ts";
 
 function resetMocks() {
   vi.clearAllMocks();
-  mockFns.loadClaudeMdConfig.mockReturnValue({
-    rereadInterval: 3,
-    subdirs: true,
-    fileNames: ["CLAUDE.md"],
-  });
+  mockFns.loadClaudeMdConfig.mockReturnValue({ ...DEFAULT_CONFIG, fileNames: ["CLAUDE.md"] });
   mockFns.shouldRefreshRoot.mockReturnValue(false);
   mockFns.pruneAndReorderContextMessages.mockImplementation((msgs: unknown) => msgs);
 }
@@ -102,6 +98,24 @@ describe("claudeMdExtension: before_agent_start (root refresh)", () => {
     );
 
     expect(result).toBeUndefined();
+  });
+
+  it("passes context usage to root refresh decision", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    const usage = { tokens: 100_000, contextWindow: 128_000, percent: 85 };
+
+    await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [] } },
+      makeCtx("/project", usage),
+    );
+
+    expect(mockFns.shouldRefreshRoot).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.objectContaining({ contextThreshold: 80 }),
+      usage,
+    );
   });
 
   it("returns undefined when native files are empty", async () => {

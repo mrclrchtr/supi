@@ -23,9 +23,11 @@ import {
   filterAlreadyLoaded,
   findSubdirContextFiles,
 } from "./discovery.ts";
+import type { ContextUsage } from "./refresh.ts";
 import { formatRefreshContext, readNativeContextFiles, shouldRefreshRoot } from "./refresh.ts";
 import { registerClaudeMdSettings } from "./settings-registration.ts";
 import { type ClaudeMdState, createInitialState, reconstructState } from "./state.ts";
+import type { InjectionCheckOptions } from "./subdirectory.ts";
 import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -92,7 +94,8 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     };
 
     captureNativePaths(state, eventWithOpts);
-    if (!shouldRefreshRoot(state, config)) {
+    const contextUsage = _ctx.getContextUsage() as ContextUsage | undefined;
+    if (!shouldRefreshRoot(state, config, contextUsage)) {
       state.currentContextToken = null;
       return;
     }
@@ -157,12 +160,13 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     );
     if (found.length === 0) return;
 
-    const dirsToInject = collectStaleDirs(
-      found,
-      state.injectedDirs,
-      state.completedTurns,
-      config.rereadInterval,
-    );
+    const dirsToInject = collectStaleDirs(found, {
+      injectedDirs: state.injectedDirs,
+      currentTurn: state.completedTurns,
+      rereadInterval: config.rereadInterval,
+      contextThreshold: config.contextThreshold,
+      contextUsage: _ctx.getContextUsage() as ContextUsage | undefined,
+    });
     if (dirsToInject.size === 0) return;
 
     const filesToInject = Array.from(dirsToInject.values()).flat();
@@ -197,13 +201,11 @@ function captureNativePaths(
 
 function collectStaleDirs(
   found: ReturnType<typeof findSubdirContextFiles>,
-  injectedDirs: Map<string, { turn: number; file: string }>,
-  currentTurn: number,
-  rereadInterval: number,
+  injectionOpts: InjectionCheckOptions,
 ): Map<string, typeof found> {
   const dirsToInject = new Map<string, typeof found>();
   for (const file of found) {
-    if (shouldInjectSubdir(file.dir, injectedDirs, currentTurn, rereadInterval)) {
+    if (shouldInjectSubdir(file.dir, injectionOpts)) {
       const existing = dirsToInject.get(file.dir) ?? [];
       existing.push(file);
       dirsToInject.set(file.dir, existing);

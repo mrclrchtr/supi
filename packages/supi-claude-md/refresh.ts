@@ -9,11 +9,35 @@ import type { ClaudeMdConfig } from "./config.ts";
 import type { ClaudeMdState } from "./state.ts";
 
 /**
- * Check if root context should be refreshed.
+ * Context usage info from pi's ctx.getContextUsage().
  */
-export function shouldRefreshRoot(state: ClaudeMdState, config: ClaudeMdConfig): boolean {
+export interface ContextUsage {
+  tokens: number | null;
+  contextWindow: number;
+  percent: number | null;
+}
+
+/**
+ * Check if root context should be refreshed.
+ * Returns false when context usage is at or above the configured threshold.
+ */
+export function shouldRefreshRoot(
+  state: ClaudeMdState,
+  config: ClaudeMdConfig,
+  contextUsage?: ContextUsage,
+): boolean {
   // Disabled
   if (config.rereadInterval === 0) return false;
+
+  // Context pressure gate: skip refresh when context is nearly full
+  if (
+    config.contextThreshold < 100 &&
+    contextUsage &&
+    contextUsage.percent != null &&
+    contextUsage.percent >= config.contextThreshold
+  ) {
+    return false;
+  }
 
   // Check turn interval
   const turnDelta = state.completedTurns - state.lastRefreshTurn;

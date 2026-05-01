@@ -34,7 +34,20 @@ describe("loadClaudeMdConfig", () => {
 
     const config = loadClaudeMdConfig(tmpDir, tmpDir);
     expect(config.rereadInterval).toBe(10);
+    expect(config.contextThreshold).toBe(80); // default
     expect(config.subdirs).toBe(true); // default
+  });
+
+  it("loads configured contextThreshold", () => {
+    const projectDir = path.join(tmpDir, ".pi/supi");
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, "config.json"),
+      JSON.stringify({ "claude-md": { contextThreshold: 90 } }),
+    );
+
+    const config = loadClaudeMdConfig(tmpDir, tmpDir);
+    expect(config.contextThreshold).toBe(90);
   });
 
   it("merges project config overriding global", () => {

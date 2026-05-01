@@ -22,17 +22,21 @@ This can be triggered by reads, writes, edits, and other path-aware tooling such
 
 Each directory is injected at most once per session (by default). After the configured `rereadInterval` turns, the content is re-read in case it changed.
 
+Re-injection is skipped when context usage is at or above `contextThreshold`. First-time directory discovery is still injected even under context pressure.
+
 ## Root refresh
 
 Context files loaded natively by pi (like the root AGENTS.md) may go stale as the session progresses. supi-claude-md periodically re-reads and re-injects these files via a persistent message in `before_agent_start`.
 
 Refresh timing is controlled by the `rereadInterval` config option (default: every 3 turns). Set to `0` to disable.
 
+Root refresh is skipped when context usage is at or above `contextThreshold` (default: 80%). Set `contextThreshold` to `100` to disable context gating.
+
 Note: pi's system prompt already contains root context files and is re-sent on every LLM call. Root refresh is for **updating** the content when files change mid-session, not for re-adding missing context after compaction.
 
 ## Settings
 
-Run `/supi-claude-md` to open the interactive settings UI. It opens directly in the pi interface, replaces the editor area, and shows the current effective configuration with keyboard navigation:
+Run `/supi-settings` to open the interactive settings UI. It opens directly in the pi interface, replaces the editor area, and shows the current effective configuration with keyboard navigation:
 
 | Key | Action |
 |-----|--------|
@@ -52,7 +56,8 @@ Config lives in `.pi/supi/config.json` under the `claude-md` section:
   "claude-md": {
     "subdirs": true,
     "fileNames": ["CLAUDE.md", "AGENTS.md"],
-    "rereadInterval": 3
+    "rereadInterval": 3,
+    "contextThreshold": 80
   }
 }
 ```
@@ -62,9 +67,10 @@ Config lives in `.pi/supi/config.json` under the `claude-md` section:
 | `subdirs` | `true` | Enable subdirectory context injection |
 | `fileNames` | `["CLAUDE.md", "AGENTS.md"]` | Filenames to look for in subdirectories |
 | `rereadInterval` | `3` | Re-read root and subdirectory context every N turns (0 = off) |
+| `contextThreshold` | `80` | Skip refresh/re-injection when context usage is at or above this percent (100 = off) |
 
 ## Tips
 
 - Put project-specific guidelines in subdirectory CLAUDE.md files so the agent gets them only when working in that area.
-- Use the settings UI (`/supi-claude-md`) to adjust `rereadInterval` mid-session — changes take effect on the next turn.
+- Use the settings UI (`/supi-settings`) to adjust `rereadInterval` or `contextThreshold` mid-session — changes take effect on the next turn.
 - Context is injected as XML `<extension-context>` blocks with a `source="supi-claude-md"` attribute.

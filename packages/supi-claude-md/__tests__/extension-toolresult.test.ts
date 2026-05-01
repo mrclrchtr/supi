@@ -84,6 +84,8 @@ describe("claudeMdExtension: tool_result (injection)", () => {
       '<extension-context source="supi-claude-md" file="packages/foo/CLAUDE.md" turn="0">\n# Foo\n</extension-context>',
     );
 
+    const usage = { tokens: 50_000, contextWindow: 128_000, percent: 50 };
+
     const result = await handlers.get("tool_result")?.(
       {
         isError: false,
@@ -91,9 +93,19 @@ describe("claudeMdExtension: tool_result (injection)", () => {
         input: { path: "packages/foo/src/bar.ts" },
         content: [{ type: "text", text: "file content" }],
       },
-      makeCtx(),
+      makeCtx("/project", usage),
     );
 
+    expect(mockFns.shouldInjectSubdir).toHaveBeenCalledWith(
+      "/project/packages/foo",
+      expect.objectContaining({
+        contextThreshold: 80,
+        contextUsage: usage,
+        currentTurn: 0,
+        injectedDirs: expect.any(Map),
+        rereadInterval: 3,
+      }),
+    );
     expect(result).toEqual({
       content: [
         { type: "text", text: "file content" },

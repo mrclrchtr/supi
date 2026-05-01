@@ -31,6 +31,7 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 {
   "claude-md": {
     "rereadInterval": 3,
+    "contextThreshold": 80,
     "subdirs": true,
     "fileNames": ["CLAUDE.md", "AGENTS.md"]
   }

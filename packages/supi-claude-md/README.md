@@ -15,10 +15,10 @@ This extension combines two related behaviors:
 1. **Subdirectory discovery** — inject context files from subdirectories when the agent touches files there.
 2. **Root refresh** — periodically re-inject root or ancestor context files that pi already loaded natively.
 
-It also registers an interactive settings command:
+Settings are managed through the shared SuPi settings command:
 
 ```text
-/supi-claude-md
+/supi-settings
 ```
 
 This package bundles the `supi-claude-md-guide` skill.
@@ -38,6 +38,7 @@ Use the `claude-md` section:
 {
   "claude-md": {
     "rereadInterval": 3,
+    "contextThreshold": 80,
     "subdirs": true,
     "fileNames": ["CLAUDE.md", "AGENTS.md"]
   }
@@ -47,6 +48,7 @@ Use the `claude-md` section:
 Options:
 
 - `rereadInterval` — turns between refreshes; `0` disables refresh
+- `contextThreshold` — skip refresh/re-injection when context usage is at or above this percent; `100` disables context gating
 - `subdirs` — enable or disable subdirectory discovery
 - `fileNames` — ordered list of context filenames to search for
 

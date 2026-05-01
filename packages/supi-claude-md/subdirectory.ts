@@ -6,6 +6,7 @@
 import * as fs from "node:fs";
 import { wrapExtensionContext } from "@mrclrchtr/supi-core";
 import type { DiscoveredContextFile } from "./discovery.ts";
+import type { ContextUsage } from "./refresh.ts";
 import type { InjectedDir } from "./state.ts";
 
 /**
@@ -34,25 +35,42 @@ export function formatSubdirContext(files: DiscoveredContextFile[], turn: number
   return parts.join("\n\n");
 }
 
+export interface InjectionCheckOptions {
+  injectedDirs: Map<string, InjectedDir>;
+  currentTurn: number;
+  rereadInterval: number;
+  contextThreshold: number;
+  contextUsage?: ContextUsage;
+}
+
 /**
  * Determine if subdirectory context should be injected.
  * Returns true if:
- * - The directory has not been injected yet
+ * - The directory has not been injected yet (always, even under context pressure)
  * - The directory was injected but is stale (turn delta >= rereadInterval)
- * - rereadInterval is 0 (disabled — always false)
+ *   AND context usage is below the threshold
+ * - rereadInterval is 0 (disabled — always false for re-injections)
  */
-export function shouldInjectSubdir(
-  dir: string,
-  injectedDirs: Map<string, InjectedDir>,
-  currentTurn: number,
-  rereadInterval: number,
-): boolean {
+export function shouldInjectSubdir(dir: string, options: InjectionCheckOptions): boolean {
+  const { injectedDirs, currentTurn, rereadInterval, contextThreshold, contextUsage } = options;
+
   // Never-injected directory: always inject (even when rereadInterval is 0)
+  // First-time discovery is always allowed regardless of context pressure
   const injected = injectedDirs.get(dir);
   if (!injected) return true;
 
   // Already-injected directory: skip if reread is disabled
   if (rereadInterval === 0) return false;
+
+  // Re-injection: skip when context usage is at or above threshold
+  if (
+    contextThreshold < 100 &&
+    contextUsage &&
+    contextUsage.percent != null &&
+    contextUsage.percent >= contextThreshold
+  ) {
+    return false;
+  }
 
   return currentTurn - injected.turn >= rereadInterval;
 }

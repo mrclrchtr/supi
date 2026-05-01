@@ -11,6 +11,30 @@ import {
 } from "@mrclrchtr/supi-core";
 import { CLAUDE_MD_DEFAULTS, type ClaudeMdConfig } from "./config.ts";
 
+const THRESHOLD_VALUES = [
+  "0",
+  "5",
+  "10",
+  "15",
+  "20",
+  "25",
+  "30",
+  "35",
+  "40",
+  "45",
+  "50",
+  "55",
+  "60",
+  "65",
+  "70",
+  "75",
+  "80",
+  "85",
+  "90",
+  "95",
+  "100",
+];
+
 // ── Config helpers ───────────────────────────────────────────
 
 function loadClaudeMdSettings(cwd: string): ClaudeMdConfig {
@@ -38,20 +62,41 @@ export function registerClaudeMdSettings(_cwd: string): void {
     label: "Claude-MD",
     loadValues: (scope, _cwd) => buildClaudeMdSettingItems(scope, _cwd),
     persistChange: (scope, _cwd, settingId, value) => {
-      if (settingId === "subdirs") {
-        persistClaudeMdSetting(scope, _cwd, "subdirs", value === "on");
-      } else if (settingId === "rereadInterval") {
-        const num = Number.parseInt(value, 10);
-        persistClaudeMdSetting(scope, _cwd, "rereadInterval", Number.isNaN(num) ? 0 : num);
-      } else if (settingId === "fileNames") {
-        const names = value
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0);
-        persistClaudeMdSetting(scope, _cwd, "fileNames", names.length > 0 ? names : undefined);
-      }
+      handleSettingChange(scope, _cwd, settingId, value);
     },
   });
+}
+
+function handleSettingChange(
+  scope: SettingsScope,
+  cwd: string,
+  settingId: string,
+  value: string,
+): void {
+  switch (settingId) {
+    case "subdirs": {
+      persistClaudeMdSetting(scope, cwd, "subdirs", value === "on");
+      break;
+    }
+    case "rereadInterval": {
+      const num = Number.parseInt(value, 10);
+      persistClaudeMdSetting(scope, cwd, "rereadInterval", Number.isNaN(num) ? 0 : num);
+      break;
+    }
+    case "contextThreshold": {
+      const num = Number.parseInt(value, 10);
+      persistClaudeMdSetting(scope, cwd, "contextThreshold", Number.isNaN(num) ? 80 : num);
+      break;
+    }
+    case "fileNames": {
+      const names = value
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      persistClaudeMdSetting(scope, cwd, "fileNames", names.length > 0 ? names : undefined);
+      break;
+    }
+  }
 }
 
 function buildClaudeMdSettingItems(_scope: SettingsScope, cwd: string): SettingItem[] {
@@ -72,6 +117,13 @@ function buildClaudeMdSettingItems(_scope: SettingsScope, cwd: string): SettingI
       currentValue: String(settings.rereadInterval),
       submenu: (currentValue, done) =>
         createInputSubmenu(currentValue, "Interval (0 = off):", done),
+    },
+    {
+      id: "contextThreshold",
+      label: "Context Threshold",
+      description: "Skip injection when context window usage % ≥ threshold (100 = never skip)",
+      currentValue: String(settings.contextThreshold),
+      values: THRESHOLD_VALUES,
     },
     {
       id: "fileNames",
