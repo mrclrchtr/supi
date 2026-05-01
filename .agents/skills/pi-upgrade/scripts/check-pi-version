@@ -1,0 +1,404 @@
+#!/usr/bin/env bash
+#
+# Detect @mariozechner/pi-* version drift against badlogic/pi-mono releases.
+# Default: bump + install. Use --dry-run to preview.
+#
+
+set -Eeuo pipefail
+shopt -s inherit_errexit
+
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO="badlogic/pi-mono"
+
+# --- mutable state ---
+
+declare APPLY=true
+declare PKG_JSON="package.json"
+declare PKG_DIR=""
+declare WORKSPACE_ROOT=""
+
+declare CURRENT_VERSION=""
+declare DEP_NAME=""
+declare DEP_RANGE=""
+declare DEP_FIELD=""
+
+declare LATEST=""
+declare LATEST_NO_V=""
+
+declare -a ALL_PKG_FILES=()
+declare -a BUMPED_FILES=()
+declare BUMP_CHANGES="[]"
+
+declare INSTALL_CMD=""
+declare INSTALL_OUTPUT=""
+declare -i INSTALL_EXIT=0
+
+# --- helpers ---
+
+die() {
+  printf '%s\n' "{\"error\":\"$1\"}" >&2
+  exit 1
+}
+
+capture_stderr() {
+  local -n _var="$1"
+  shift
+  local _errfile; _errfile=$(mktemp)
+  local _rc=0
+  local _out
+
+  _out=$("$@" 2>"$_errfile") || _rc=$?
+  _var=$(<"$_errfile")
+  rm -f "$_errfile"
+
+  printf '%s' "$_out"
+  return "$_rc"
+}
+
+detect_package_manager() {
+  local root="$1"
+  declare -A lockfiles=(
+    [pnpm-lock.yaml]="pnpm"
+    [yarn.lock]="yarn"
+    [package-lock.json]="npm"
+    [bun.lockb]="bun"
+    [bun.lock]="bun"
+  )
+  for lock in "${!lockfiles[@]}"; do
+    [[ -f "$root/$lock" ]] && { printf '%s' "${lockfiles[$lock]}"; return; }
+  done
+  printf '%s' "npm"
+}
+
+find_workspace_packages() {
+  local root="$1"
+  local -n _out="$2"
+  local -a found=("$root/package.json")
+
+  # pnpm workspace
+  if [[ -f "$root/pnpm-workspace.yaml" ]]; then
+    while IFS= read -r -d '' f; do
+      found+=("$f")
+    done < <(find "$root" -name 'package.json' -not -path '*/node_modules/*' -print0 2>/dev/null || true)
+  fi
+
+  # npm/yarn workspaces
+  local has_ws
+  has_ws=$(node -e "
+    try {
+      const ws = require('$root/package.json').workspaces || [];
+      console.log(ws.length > 0 ? 'yes' : 'no');
+    } catch { console.log('no'); }
+  " 2>/dev/null || echo "no")
+
+  if [[ "$has_ws" == "yes" ]]; then
+    while IFS= read -r -d '' f; do
+      found+=("$f")
+    done < <(find "$root" -name 'package.json' -not -path '*/node_modules/*' -print0 2>/dev/null || true)
+  fi
+
+  # De-duplicate and sort
+  mapfile -t _out < <(printf '%s\n' "${found[@]}" | sort -u)
+}
+
+# --- arg parsing ---
+
+parse_args() {
+  while (($# > 0)); do
+    case "$1" in
+      --dry-run) APPLY=false; shift ;;
+      --help|-h)
+        cat <<-'EOF'
+Usage: check-pi-version [--dry-run] [path/to/package.json]
+
+  Detects @mariozechner/pi-* version in package.json, compares against
+  badlogic/pi-mono releases. Bumps versions and installs by default.
+
+  --dry-run   Only report what would be changed without modifying files
+EOF
+        exit 0
+        ;;
+      -*) die "Unknown flag: $1" ;;
+      *) PKG_JSON="$1"; shift ;;
+    esac
+  done
+}
+
+# --- version detection ---
+
+detect_current_version() {
+  for field in dependencies peerDependencies devDependencies; do
+    local raw
+    raw=$(node -e "
+      const pkg = require('./$PKG_JSON');
+      const deps = pkg.$field || {};
+      const key = Object.keys(deps).find(k => k.startsWith('@mariozechner/pi-'));
+      if (key) console.log(key + '|' + deps[key]);
+    " 2>/dev/null || true)
+
+    if [[ -n "$raw" ]]; then
+      DEP_NAME="${raw%%|*}"
+      DEP_RANGE="${raw#*|}"
+      CURRENT_VERSION="${DEP_RANGE//[^0-9.]/}"
+      CURRENT_VERSION="${CURRENT_VERSION%%.*}.${CURRENT_VERSION#*.}"
+      CURRENT_VERSION="${CURRENT_VERSION%%.*}.${CURRENT_VERSION#*.}.${CURRENT_VERSION##*.}"
+      # Actually just use regex
+      if [[ "$DEP_RANGE" =~ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+        CURRENT_VERSION="${BASH_REMATCH[1]}"
+      fi
+      DEP_FIELD="$field"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# --- release fetching ---
+
+fetch_releases() {
+  local gh_err
+  local releases_json
+
+  if ! releases_json=$(capture_stderr gh_err gh release list \
+      --repo "$REPO" --limit 50 --json tagName,name,publishedAt,isLatest); then
+    die "Failed to fetch releases from $REPO: ${gh_err:-unknown error}. Check gh auth status and network."
+  fi
+
+  printf '%s' "$releases_json"
+}
+
+compute_delta() {
+  local releases_json="$1"
+
+  node -e "
+    const releases = $releases_json;
+    const current = '$CURRENT_VERSION';
+    const semver = (t) => t.replace(/^v/, '').split('.').map(Number);
+    const cmp = (a, b) => {
+      for (let i = 0; i < 3; i++) {
+        if (a[i] > b[i]) return 1;
+        if (a[i] < b[i]) return -1;
+      }
+      return 0;
+    };
+    const cur = semver(current);
+    const newer = releases
+      .filter(r => cmp(semver(r.tagName), cur) > 0)
+      .sort((a, b) => cmp(semver(a.tagName), semver(b.tagName)));
+    console.log(JSON.stringify(newer));
+  "
+}
+
+fetch_release_notes() {
+  local newer_releases="$1"
+
+  node -e "
+    const tags = $newer_releases.map(r => r.tagName);
+    const results = [];
+    for (const tag of tags) {
+      try {
+        const out = require('child_process').execSync(
+          'gh release view ' + tag + ' --repo $REPO --json tagName,name,body,publishedAt',
+          { encoding: 'utf8', timeout: 15000 }
+        );
+        results.push(JSON.parse(out));
+      } catch (e) {
+        results.push({ tagName: tag, name: tag, body: '(failed to fetch notes)', publishedAt: null, error: true });
+      }
+    }
+    console.log(JSON.stringify(results));
+  "
+}
+
+# --- workspace discovery ---
+
+discover_workspace() {
+  PKG_DIR="$(cd "$(dirname "$PKG_JSON")" && pwd)"
+  PKG_JSON="$PKG_DIR/$(basename "$PKG_JSON")"
+  WORKSPACE_ROOT="$PKG_DIR"
+
+  find_workspace_packages "$PKG_DIR" ALL_PKG_FILES
+}
+
+# --- bump preview ---
+
+build_bump_preview() {
+  local -a files_quoted=()
+  for f in "${ALL_PKG_FILES[@]}"; do
+    files_quoted+=("$(printf '%s' "$f" | jq -R .)")
+  done
+  local files_json="[${files_quoted[*]}]"
+  files_json="${files_json// /, }"
+
+  BUMP_CHANGES=$(node -e "
+    const fs = require('fs');
+    const files = $files_json;
+    const latest = '$LATEST_NO_V';
+    const changes = [];
+
+    for (const f of files) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(f, 'utf8'));
+        const fields = ['dependencies', 'peerDependencies', 'devDependencies'];
+        const pkgChanges = [];
+        for (const field of fields) {
+          const deps = pkg[field];
+          if (!deps) continue;
+          for (const key of Object.keys(deps)) {
+            if (key.startsWith('@mariozechner/pi-')) {
+              const old = deps[key];
+              const m = old.match(/^([~^>=]*)([0-9]+\.[0-9]+\.[0-9]+)/);
+              if (m) {
+                const prefix = m[1] || '';
+                const newVal = prefix + latest;
+                if (old !== newVal) {
+                  pkgChanges.push({ field, package: key, old, new: newVal });
+                }
+              }
+            }
+          }
+        }
+        if (pkgChanges.length > 0) {
+          changes.push({ file: f, changes: pkgChanges });
+        }
+      } catch {}
+    }
+    console.log(JSON.stringify(changes));
+  ")
+
+  # Extract file list
+  mapfile -t BUMPED_FILES < <(node -e "
+    const c = $BUMP_CHANGES;
+    c.forEach(x => console.log(x.file));
+  ")
+}
+
+# --- apply changes ---
+
+apply_bumps() {
+  ((${#BUMPED_FILES[@]} == 0)) && return 0
+
+  for f in "${BUMPED_FILES[@]}"; do
+    node -e "
+      const fs = require('fs');
+      const pkg = JSON.parse(fs.readFileSync('${f//\'/\\\'}', 'utf8'));
+      const fields = ['dependencies', 'peerDependencies', 'devDependencies'];
+      for (const field of fields) {
+        const deps = pkg[field];
+        if (!deps) continue;
+        for (const key of Object.keys(deps)) {
+          if (key.startsWith('@mariozechner/pi-')) {
+            const m = deps[key].match(/^([~^>=]*)([0-9]+\.[0-9]+\.[0-9]+)/);
+            if (m) deps[key] = m[1] + '$LATEST_NO_V';
+          }
+        }
+      }
+      fs.writeFileSync('${f//\'/\\\'}', JSON.stringify(pkg, null, 2) + '\n');
+    " 2>/dev/null || true
+  done
+}
+
+run_install() {
+  ((${#BUMPED_FILES[@]} == 0)) && return 0
+
+  local pm
+  pm=$(detect_package_manager "$WORKSPACE_ROOT")
+  case "$pm" in
+    pnpm) INSTALL_CMD="pnpm install" ;;
+    yarn) INSTALL_CMD="yarn install" ;;
+    npm)  INSTALL_CMD="npm install" ;;
+    bun)  INSTALL_CMD="bun install" ;;
+  esac
+
+  INSTALL_OUTPUT=$(cd "$WORKSPACE_ROOT" && eval "$INSTALL_CMD" 2>&1) || INSTALL_EXIT=$?
+}
+
+# --- output ---
+
+emit_json() {
+  local notes="$1"
+  local tmp_json
+  tmp_json=$(mktemp)
+
+  # Extract bumped file list from bumpChanges
+  local bumped_list
+  bumped_list=$(node -e "const c = $BUMP_CHANGES; console.log(JSON.stringify(c.map(x => x.file)));" )
+
+  node -e "
+    const fs = require('fs');
+    const bumpChanges = $BUMP_CHANGES;
+    const installOutput = $(printf '%s' "$INSTALL_OUTPUT" | jq -Rs .);
+
+    const data = {
+      current: '$CURRENT_VERSION',
+      depName: '$DEP_NAME',
+      depField: '$DEP_FIELD',
+      depRange: '$DEP_RANGE',
+      latest: '$LATEST',
+      upToDate: false,
+      newerReleases: $notes,
+      applied: $APPLY,
+      bumpedFiles: $bumped_list,
+      bumpChanges: bumpChanges,
+      installCommand: '$INSTALL_CMD',
+      installExitCode: $INSTALL_EXIT,
+      installOutput: installOutput
+    };
+    fs.writeFileSync('$tmp_json', JSON.stringify(data, null, 2));
+  "
+
+  cat "$tmp_json"
+  rm -f "$tmp_json"
+}
+
+# --- main ---
+
+main() {
+  parse_args "$@"
+
+  # Validate env
+  command -v gh &>/dev/null || die "GitHub CLI (gh) is required but not found in PATH"
+  [[ -f "$PKG_JSON" ]] || die "No package.json found at $PKG_JSON"
+
+  # Detect version
+  detect_current_version || die "No @mariozechner/pi-* dependency found in $PKG_JSON"
+
+  # Fetch releases
+  local releases_json
+  releases_json=$(fetch_releases)
+
+  # Compute delta
+  local newer_releases
+  newer_releases=$(compute_delta "$releases_json")
+
+  # Up to date?
+  if [[ "$newer_releases" == "[]" ]]; then
+    printf '%s\n' "{\"current\":\"$CURRENT_VERSION\",\"depName\":\"$DEP_NAME\",\"depField\":\"$DEP_FIELD\",\"depRange\":\"$DEP_RANGE\",\"latest\":\"$CURRENT_VERSION\",\"newerReleases\":[],\"upToDate\":true}"
+    return 0
+  fi
+
+  # Determine latest
+  LATEST=$(node -e "const r = $newer_releases; console.log(r[r.length - 1].tagName);" )
+  LATEST_NO_V="${LATEST#v}"
+
+  # Fetch notes
+  local notes
+  notes=$(fetch_release_notes "$newer_releases")
+
+  # Discover workspace
+  discover_workspace
+
+  # Build bump preview
+  build_bump_preview
+
+  # Apply if not dry-run
+  if [[ "$APPLY" == true ]]; then
+    apply_bumps
+    run_install
+  fi
+
+  # Emit result
+  emit_json "$notes"
+}
+
+main "$@"
