@@ -6,11 +6,13 @@ export async function managerWorkspaceSymbol(
   query: string,
 ): Promise<(SymbolInformation | WorkspaceSymbol)[] | null> {
   const all: (SymbolInformation | WorkspaceSymbol)[] = [];
+  let hasSupport = false;
   for (const client of clients) {
     if (client.status !== "running") continue;
     if (!client.serverCapabilities?.workspaceSymbolProvider) continue;
+    hasSupport = true;
     const result = await client.workspaceSymbol(query);
     if (result) all.push(...result);
   }
-  return all.length > 0 ? all : null;
+  return hasSupport ? all : null;
 }

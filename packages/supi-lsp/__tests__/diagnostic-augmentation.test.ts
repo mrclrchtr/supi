@@ -107,4 +107,27 @@ describe("augmentDiagnostics", () => {
     expect(result).toContain("💡 Hover info:");
     expect(result).toContain("💡 Available fix:");
   });
+
+  it("only augments the first severity-1 error when multiple exist", async () => {
+    const firstError = makeErrorDiag({
+      range: { start: { line: 2, character: 5 }, end: { line: 2, character: 10 } },
+    });
+    const secondError = makeErrorDiag({
+      range: { start: { line: 8, character: 0 }, end: { line: 8, character: 5 } },
+    });
+    const client = {
+      hover: vi.fn().mockResolvedValue(null),
+      codeActions: vi.fn().mockResolvedValue(null),
+    };
+    const manager = makeManager(client);
+    await augmentDiagnostics("file.ts", [firstError, secondError], manager, "/project");
+    expect(client.hover).toHaveBeenCalledTimes(1);
+    expect(client.hover).toHaveBeenCalledWith(expect.any(String), { line: 2, character: 5 });
+    expect(client.codeActions).toHaveBeenCalledTimes(1);
+    expect(client.codeActions).toHaveBeenCalledWith(
+      expect.any(String),
+      { start: { line: 2, character: 5 }, end: { line: 2, character: 5 } },
+      { diagnostics: [firstError] },
+    );
+  });
 });
