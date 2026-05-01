@@ -8,6 +8,12 @@ It is a pnpm workspace monorepo of installable pi extensions. pi loads the exten
 
 SuPi is pre-release and not API-stable. Intentional breaking changes to package APIs, commands, configuration formats, and extension behavior are allowed when they improve the design. Do not treat backwards compatibility as a blocker unless a task explicitly asks for it.
 
+## Pi docs-first rule
+
+- Never assume pi harness APIs, behavior, or conventions from memory or model priors.
+- Before changing code or giving guidance about pi-specific behavior, read the relevant installed pi docs (`README.md`, matching files in `docs/`, and `examples/`) and follow linked `.md` cross-references.
+- Treat the pi docs as the source of truth for extensions, skills, prompt templates, TUI, SDK, providers, models, and package behavior.
+
 ## Commands
 
 ```bash
