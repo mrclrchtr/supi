@@ -80,6 +80,7 @@ function createManager(diagnostics: Array<{ file: string; total: number }>) {
   return {
     shutdownAll: vi.fn(),
     pruneMissingFiles: vi.fn(),
+    refreshOpenDiagnostics: vi.fn().mockResolvedValue(undefined),
     getOutstandingDiagnosticSummary: vi.fn(() =>
       diagnostics.map((d) => ({
         file: d.file,
@@ -182,5 +183,91 @@ describe("system prompt stability", () => {
 
     expect(result).toBeUndefined();
     expect(pi.getActiveTools()).not.toContain("lsp");
+  });
+});
+
+describe("before_agent_start diagnostic refresh", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFns.loadConfig.mockReturnValue({ servers: {} });
+    mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, servers: [] });
+  });
+
+  it("calls refreshOpenDiagnostics before reading diagnostic summary", async () => {
+    mockFns.formatDiagnosticsContext.mockReturnValue(null);
+    mockFns.diagnosticsContextFingerprint.mockReturnValue(null);
+
+    const manager = createManager([]);
+    const callOrder: string[] = [];
+    manager.pruneMissingFiles.mockImplementation(() => {
+      callOrder.push("prune");
+    });
+    manager.refreshOpenDiagnostics.mockImplementation(async () => {
+      callOrder.push("refresh");
+    });
+    manager.getOutstandingDiagnosticSummary.mockImplementation(() => {
+      callOrder.push("summary");
+      return [];
+    });
+
+    const { handlers, ctx } = await setupExtension(manager);
+    await handlers.get("before_agent_start")?.({ systemPrompt: "test" }, ctx);
+
+    expect(callOrder).toEqual(["prune", "refresh", "summary"]);
+  });
+
+  it("uses refreshed content for fingerprint deduplication", async () => {
+    mockFns.formatDiagnosticsContext
+      .mockReturnValueOnce('<extension-context source="supi-lsp">first</extension-context>')
+      .mockReturnValueOnce('<extension-context source="supi-lsp">second</extension-context>');
+    mockFns.diagnosticsContextFingerprint
+      .mockReturnValueOnce("fp-first")
+      .mockReturnValueOnce("fp-second");
+
+    const manager = createManager([{ file: "a.ts", total: 1 }]);
+    const { handlers, ctx } = await setupExtension(manager);
+
+    // First call — should inject diagnostics
+    const result1 = (await handlers.get("before_agent_start")?.(
+      { systemPrompt: "test" },
+      ctx,
+    )) as Record<string, unknown>;
+    expect(result1.message).toBeDefined();
+
+    // Change the diagnostics after refresh
+    manager.getOutstandingDiagnosticSummary.mockReturnValue([
+      { file: "b.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
+    ]);
+    mockFns.formatDiagnosticsContext.mockReturnValue(
+      '<extension-context source="supi-lsp">second</extension-context>',
+    );
+    mockFns.diagnosticsContextFingerprint.mockReturnValue("fp-second");
+
+    // Second call — different fingerprint, should inject new diagnostics
+    const result2 = (await handlers.get("before_agent_start")?.(
+      { systemPrompt: "test" },
+      ctx,
+    )) as Record<string, unknown>;
+    expect(result2.message).toBeDefined();
+    expect(mockFns.diagnosticsContextFingerprint).toHaveBeenCalledTimes(2);
+  });
+
+  it("continues when refreshOpenDiagnostics throws", async () => {
+    mockFns.formatDiagnosticsContext.mockReturnValue(
+      '<extension-context source="supi-lsp">diags</extension-context>',
+    );
+    mockFns.diagnosticsContextFingerprint.mockReturnValue("fp-1");
+
+    const manager = createManager([{ file: "a.ts", total: 1 }]);
+    manager.refreshOpenDiagnostics.mockRejectedValue(new Error("LSP timeout"));
+
+    const { handlers, ctx } = await setupExtension(manager);
+    const result = (await handlers.get("before_agent_start")?.(
+      { systemPrompt: "test" },
+      ctx,
+    )) as Record<string, unknown>;
+
+    // Should still produce a result despite refresh failure
+    expect(result.message).toBeDefined();
   });
 });

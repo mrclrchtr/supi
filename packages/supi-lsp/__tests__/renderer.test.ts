@@ -257,7 +257,7 @@ describe("lsp-context message renderer", () => {
 });
 
 describe("lsp-context before_agent_start message", () => {
-  it("emits visible diagnostic details for the renderer without notifying", async () => {
+  it("emits a visible summary while storing raw XML in promptContent", async () => {
     const diagnostics = [
       { file: "manager.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
       { file: "lsp.ts", total: 1, errors: 0, warnings: 1, information: 0, hints: 0 },
@@ -298,7 +298,7 @@ describe("lsp-context before_agent_start message", () => {
     expect(ctx.ui.notify).not.toHaveBeenCalled();
   });
 
-  it("restores raw prompt content only for model context", async () => {
+  it("restores raw prompt content for model context while keeping the visible summary", async () => {
     const diagnostics = [
       { file: "manager.ts", total: 1, errors: 1, warnings: 0, information: 0, hints: 0 },
     ];
@@ -321,13 +321,11 @@ describe("lsp-context before_agent_start message", () => {
 
     const result = handlers.get("context")?.({
       messages: [{ role: "custom", ...message }],
-    });
+    }) as { messages?: Array<{ content?: string }> } | undefined;
 
     expect(result).toEqual({
       messages: [
-        expect.objectContaining({
-          content: "<extension-context>raw</extension-context>",
-        }),
+        expect.objectContaining({ content: "<extension-context>raw</extension-context>" }),
       ],
     });
     expect(message?.content).toBe("LSP diagnostics injected (1 error)");

@@ -1,6 +1,7 @@
 // LSP Client — wraps a server process + JsonRpcClient.
 // Handles initialize handshake, document sync, shutdown, and crash recovery.
 
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: LspClient remains a cohesive stateful wrapper; refresh logic is already split out.
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { CLIENT_CAPABILITIES } from "./capabilities.ts";
@@ -39,6 +40,14 @@ export interface DiagnosticEntry {
   diagnostics: Diagnostic[];
 }
 
+/** Internal metadata tracked alongside cached diagnostics. */
+export interface DiagnosticCacheEntry {
+  diagnostics: Diagnostic[];
+  receivedAt: number;
+  version?: number;
+  resultId?: string;
+}
+
 // ── LspClient ─────────────────────────────────────────────────────────
 export class LspClient {
   readonly name: string;
@@ -51,8 +60,8 @@ export class LspClient {
 
   /** Open documents: uri → { version, languageId } */
   private openDocs = new Map<string, { version: number; languageId: string }>();
-  /** Per-file diagnostics from the server */
-  private diagnosticStore = new Map<string, Diagnostic[]>();
+  /** Per-file diagnostics with freshness metadata */
+  private diagnosticStore = new Map<string, DiagnosticCacheEntry>();
   /** Listeners waiting for diagnostics on a specific uri */
   private diagnosticWaiters = new Map<string, Array<() => void>>();
 
@@ -183,6 +192,7 @@ export class LspClient {
 
     this.openDocs.clear();
     this.diagnosticStore.clear();
+    this.releaseAllDiagnosticWaiters();
   }
 
   // ── Document Synchronization ────────────────────────────────────────
@@ -270,18 +280,47 @@ export class LspClient {
   // ── Diagnostics ─────────────────────────────────────────────────────
   /** Get stored diagnostics for a file. */
   getDiagnostics(filePath: string): Diagnostic[] {
-    return this.diagnosticStore.get(fileToUri(filePath)) ?? [];
+    return this.diagnosticStore.get(fileToUri(filePath))?.diagnostics ?? [];
   }
 
   /** Get all stored diagnostics across all files. */
   getAllDiagnostics(): DiagnosticEntry[] {
     const result: DiagnosticEntry[] = [];
-    for (const [uri, diagnostics] of this.diagnosticStore) {
-      if (diagnostics.length > 0) {
-        result.push({ uri, diagnostics });
+    for (const [uri, entry] of this.diagnosticStore) {
+      if (entry.diagnostics.length > 0) {
+        result.push({ uri, diagnostics: entry.diagnostics });
       }
     }
     return result;
+  }
+
+  /** Get the internal cache entry for a file (exposed for testing / version checks). */
+  getDiagnosticCacheEntry(uri: string): DiagnosticCacheEntry | undefined {
+    return this.diagnosticStore.get(uri);
+  }
+
+  /** Get all currently open document URIs. */
+  get openUris(): string[] {
+    return Array.from(this.openDocs.keys());
+  }
+
+  /** Check if server supports pull diagnostics. */
+  get hasDiagnosticProvider(): boolean {
+    return (
+      this.capabilities?.diagnosticProvider !== undefined &&
+      this.capabilities.diagnosticProvider !== false
+    );
+  }
+
+  /**
+   * Re-read and re-sync all currently open, existing documents.
+   * Delegates to client-refresh module.
+   */
+  async refreshOpenDiagnostics(
+    options: { maxWaitMs?: number; quietMs?: number } = {},
+  ): Promise<void> {
+    const { refreshClientOpenDiagnostics } = await import("./client-refresh.ts");
+    return refreshClientOpenDiagnostics(this, options);
   }
 
   /**
@@ -290,21 +329,28 @@ export class LspClient {
    */
   async syncAndWaitForDiagnostics(filePath: string, content: string): Promise<Diagnostic[]> {
     const uri = fileToUri(filePath);
+    const syncStart = Date.now();
 
     // Sync the content
     this.didChange(filePath, content);
 
-    // Wait for publishDiagnostics or timeout
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, DIAGNOSTIC_WAIT_MS);
-      const waiters = this.diagnosticWaiters.get(uri) ?? [];
-      waiters.push(() => {
-        clearTimeout(timer);
-        resolve();
-      });
-      this.diagnosticWaiters.set(uri, waiters);
-    });
+    // Prefer pull diagnostics when available, but fall back to push notifications.
+    if (this.hasDiagnosticProvider) {
+      const remaining = DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart);
+      if (remaining > 0) {
+        try {
+          const { pullDiagnosticsForUri } = await import("./client-refresh.ts");
+          const pulled = await pullDiagnosticsForUri(this, uri, remaining);
+          if (pulled) {
+            return this.getDiagnostics(filePath);
+          }
+        } catch {
+          // Pull diagnostics failed — fall back to push wait
+        }
+      }
+    }
 
+    await this.waitForDiagnostics(uri, Math.max(0, DIAGNOSTIC_WAIT_MS - (Date.now() - syncStart)));
     return this.getDiagnostics(filePath);
   }
 
@@ -380,16 +426,71 @@ export class LspClient {
   }
 
   private handlePublishDiagnostics(params: PublishDiagnosticsParams): void {
-    this.diagnosticStore.set(params.uri, params.diagnostics);
+    // If the publication includes a version and we have a newer synced
+    // version for this open document, ignore the stale publication.
+    if (params.version !== undefined && params.version !== null) {
+      const openDoc = this.openDocs.get(params.uri);
+      if (openDoc && params.version < openDoc.version) {
+        return;
+      }
+    }
+
+    this.diagnosticStore.set(params.uri, {
+      diagnostics: params.diagnostics,
+      receivedAt: Date.now(),
+      version: params.version ?? undefined,
+    });
     this.releaseDiagnosticWaiters(params.uri);
   }
 
+  /** Wait for diagnostics on a URI, resolving on publication or timeout. */
+  private waitForDiagnostics(uri: string, timeoutMs: number): Promise<void> {
+    if (timeoutMs <= 0) return Promise.resolve();
+
+    return new Promise<void>((resolve) => {
+      const waiter = () => {
+        clearTimeout(timer);
+        this.removeDiagnosticWaiter(uri, waiter);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        this.removeDiagnosticWaiter(uri, waiter);
+        resolve();
+      }, timeoutMs);
+      const waiters = this.diagnosticWaiters.get(uri) ?? [];
+      waiters.push(waiter);
+      this.diagnosticWaiters.set(uri, waiters);
+    });
+  }
+
+  /** Clear all per-file state and wake any diagnostics callers waiting on this URI. */
   private clearFileState(uri: string): void {
     this.openDocs.delete(uri);
     this.diagnosticStore.delete(uri);
     this.releaseDiagnosticWaiters(uri);
   }
 
+  /** Remove a single pending diagnostics waiter, usually after its timeout fires. */
+  private removeDiagnosticWaiter(uri: string, waiter: () => void): void {
+    const waiters = this.diagnosticWaiters.get(uri);
+    if (!waiters) return;
+
+    const next = waiters.filter((entry) => entry !== waiter);
+    if (next.length > 0) {
+      this.diagnosticWaiters.set(uri, next);
+    } else {
+      this.diagnosticWaiters.delete(uri);
+    }
+  }
+
+  /** Wake every pending diagnostics waiter during shutdown or bulk cleanup. */
+  private releaseAllDiagnosticWaiters(): void {
+    for (const uri of Array.from(this.diagnosticWaiters.keys())) {
+      this.releaseDiagnosticWaiters(uri);
+    }
+  }
+
+  /** Wake all diagnostics waiters for a URI and remove them from the waiter map. */
   private releaseDiagnosticWaiters(uri: string): void {
     const waiters = this.diagnosticWaiters.get(uri);
     if (!waiters) return;

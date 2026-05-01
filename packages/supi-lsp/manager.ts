@@ -10,6 +10,11 @@ import {
   createOutstandingDiagnosticSummary,
   relativeFilePathFromUri,
 } from "./diagnostic-summary.ts";
+import {
+  closeFileAcrossClients,
+  pruneMissingFilesFromClients,
+  refreshOpenDiagnosticsForClients,
+} from "./manager-client-state.ts";
 import { buildProjectServerInfo } from "./manager-project-info.ts";
 import type {
   ActiveCoverageSummaryEntry,
@@ -175,22 +180,17 @@ export class LspManager {
   }
   /** Close a file across any active LSP clients and clear its cached diagnostics. */
   closeFile(filePath: string): void {
-    const resolvedPath = path.resolve(filePath);
-    for (const client of this.clients.values()) {
-      client.didClose(resolvedPath);
-    }
+    closeFileAcrossClients(this.clients.values(), filePath);
   }
   /** Remove any missing files from open-document and diagnostic state. */
   pruneMissingFiles(): string[] {
-    const removed: string[] = [];
-    for (const client of this.clients.values()) {
-      const prune = (client as unknown as { pruneMissingFiles?: () => string[] }).pruneMissingFiles;
-      if (typeof prune === "function") {
-        removed.push(...prune.call(client));
-      }
-    }
-    return removed;
+    return pruneMissingFilesFromClients(this.clients.values());
   }
+  /** Re-sync all open documents across active clients and wait for diagnostics to settle. */
+  async refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void> {
+    await refreshOpenDiagnosticsForClients(this.clients.values(), options);
+  }
+
   /** Shut down all running LSP servers. */
   async shutdownAll(): Promise<void> {
     const shutdowns = Array.from(this.clients.values()).map((c) => c.shutdown().catch(() => {}));

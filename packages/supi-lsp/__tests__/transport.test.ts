@@ -143,6 +143,18 @@ describe("JsonRpcClient", () => {
     serverOut.emit("end");
     await expect(promise).rejects.toThrow("closed");
   });
+});
+
+// biome-ignore lint/security/noSecrets: test suite name, not a secret
+describe("JsonRpcClient request timeouts", () => {
+  it("uses per-request timeout overrides", async () => {
+    const { client, serverIn, serverOut } = createPair();
+    const promise = client.sendRequest("slow/override", undefined, { timeoutMs: 20 });
+    await expect(promise).rejects.toThrow("timed out after 20ms");
+    client.dispose();
+    serverIn.destroy();
+    serverOut.destroy();
+  });
 
   it("times out pending requests", async () => {
     const isolated = createPair();

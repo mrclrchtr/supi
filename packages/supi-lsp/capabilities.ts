@@ -46,9 +46,17 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
     },
     publishDiagnostics: {
       relatedInformation: true,
+      versionSupport: true,
+    },
+    diagnostic: {
+      dynamicRegistration: false,
+      relatedDocumentSupport: true,
     },
   },
   workspace: {
     workspaceFolders: false,
+    diagnostics: {
+      refreshSupport: false,
+    },
   },
 };

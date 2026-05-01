@@ -2,6 +2,7 @@
 // via a registered `lsp` tool. Keeps language servers warm, surfaces inline diagnostics,
 // and injects diagnostic context only when outstanding issues exist.
 
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: Extension registration is intentionally centralized around shared runtime state.
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StringEnum } from "@mariozechner/pi-ai";
@@ -207,6 +208,11 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
     ensureLspToolActive(pi);
 
     state.manager.pruneMissingFiles();
+    try {
+      await state.manager.refreshOpenDiagnostics();
+    } catch {
+      // Refresh failures must not prevent agent startup
+    }
     refreshProjectServers(state);
     updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
 

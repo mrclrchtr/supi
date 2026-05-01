@@ -169,6 +169,57 @@ export interface PublishDiagnosticsParams {
   diagnostics: Diagnostic[];
 }
 
+// ── LSP 3.17 Pull Diagnostics ─────────────────────────────────────────
+
+export interface DocumentDiagnosticParams {
+  textDocument: TextDocumentIdentifier;
+  identifier?: string;
+  previousResultId?: string;
+  workDoneToken?: unknown;
+  partialResultToken?: unknown;
+}
+
+/** LSP 3.17 document diagnostic report shape used by textDocument/diagnostic. */
+export type DocumentDiagnosticReport =
+  | RelatedFullDocumentDiagnosticReport
+  | RelatedUnchangedDocumentDiagnosticReport;
+
+/** Full document diagnostic report, optionally carrying related document reports. */
+export interface RelatedFullDocumentDiagnosticReport extends FullDocumentDiagnosticReport {
+  relatedDocuments?: Record<
+    string,
+    FullDocumentDiagnosticReport | UnchangedDocumentDiagnosticReport
+  >;
+}
+
+/** Unchanged document diagnostic report, optionally carrying related document reports. */
+export interface RelatedUnchangedDocumentDiagnosticReport
+  extends UnchangedDocumentDiagnosticReport {
+  relatedDocuments?: Record<
+    string,
+    FullDocumentDiagnosticReport | UnchangedDocumentDiagnosticReport
+  >;
+}
+
+/** Full diagnostic payload for a document. */
+export interface FullDocumentDiagnosticReport {
+  kind: "full";
+  resultId?: string;
+  items: Diagnostic[];
+}
+
+/** Result-id-only report indicating a document's diagnostics are unchanged. */
+export interface UnchangedDocumentDiagnosticReport {
+  kind: "unchanged";
+  resultId: string;
+}
+
+/** Client capability for pull diagnostics. */
+export interface ClientDiagnosticCapabilities {
+  dynamicRegistration?: boolean;
+  relatedDocumentSupport?: boolean;
+}
+
 // ── Initialize ────────────────────────────────────────────────────────
 
 export interface InitializeParams {
@@ -211,10 +262,16 @@ export interface ClientCapabilities {
     };
     publishDiagnostics?: {
       relatedInformation?: boolean;
+      versionSupport?: boolean;
     };
+    /** LSP 3.17+ pull diagnostic capability */
+    diagnostic?: ClientDiagnosticCapabilities;
   };
   workspace?: {
     workspaceFolders?: boolean;
+    diagnostics?: {
+      refreshSupport?: boolean;
+    };
   };
 }
 
@@ -231,6 +288,21 @@ export interface ServerCapabilities {
   workspaceSymbolProvider?: boolean;
   renameProvider?: boolean | { prepareProvider?: boolean };
   codeActionProvider?: boolean | { codeActionKinds?: string[] };
+  /** LSP 3.17+ pull diagnostic support */
+  diagnosticProvider?:
+    | boolean
+    | {
+        /** Document diagnostic provider */
+        documentIdentifierProvider?: boolean | { workDoneProgress?: boolean };
+        /** Workspace diagnostic provider */
+        workspaceDiagnostics?: boolean | { workDoneProgress?: boolean };
+        /** Identifier for result sets */
+        identifierSet?: boolean;
+        /** Inter-file dependency support */
+        interFileDependencies?: boolean;
+        /** Workspace-wide multi-file support */
+        workspaceDiagnosticsSupport?: boolean;
+      };
 }
 
 // ── Text Document Items ───────────────────────────────────────────────

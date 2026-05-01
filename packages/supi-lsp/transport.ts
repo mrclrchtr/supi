@@ -48,18 +48,23 @@ export class JsonRpcClient {
     this.notificationHandler = handler;
   }
 
-  /** Send a request and wait for the correlated response. */
-  sendRequest(method: string, params?: unknown): Promise<unknown> {
+  /** Send a request and wait for the correlated response, optionally overriding the timeout. */
+  sendRequest(
+    method: string,
+    params?: unknown,
+    options?: { timeoutMs?: number },
+  ): Promise<unknown> {
     if (this.closed) {
       return Promise.reject(new Error("JSON-RPC client is closed"));
     }
 
     const id = this.nextId++;
+    const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
     const promise = new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`Request ${method} (id=${id}) timed out after ${this.timeoutMs}ms`));
-      }, this.timeoutMs);
+        reject(new Error(`Request ${method} (id=${id}) timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
 
       this.pending.set(id, { resolve, reject, timer });
     });
