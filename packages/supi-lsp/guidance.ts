@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
-import type { ProjectServerInfo } from "./types.ts";
+import type { Diagnostic, ProjectServerInfo } from "./types.ts";
 
 export const lspPromptSnippet =
   "Use semantic code intelligence for hover, definitions, references, symbols, rename planning, code actions, and diagnostics in supported languages.";
@@ -28,16 +28,33 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
   return [...lspPromptGuidelines.slice(0, 2), ...dynamic, lspPromptGuidelines[2]].filter(Boolean);
 }
 
+export const MAX_DETAILED_DIAGNOSTICS = 5;
+const MAX_DETAIL_LINES_PER_FILE = 3;
+
+interface DetailedDiagnostics {
+  file: string;
+  diagnostics: Diagnostic[];
+}
+
 export function formatDiagnosticsContext(
   diagnostics: OutstandingDiagnosticSummaryEntry[],
   maxFiles: number = 3,
+  detailed?: DetailedDiagnostics[],
 ): string | null {
   if (diagnostics.length === 0) return null;
 
-  const lines = diagnostics
-    .slice(0, maxFiles)
-    .map((entry) => `- ${entry.file}: ${formatCounts(entry)}`);
-  const remaining = diagnostics.length - Math.min(diagnostics.length, maxFiles);
+  const totalDiags = diagnostics.reduce((sum, d) => sum + d.total, 0);
+  const detailMap = buildDetailMap(diagnostics, totalDiags, detailed);
+
+  const lines: string[] = [];
+  const visible = diagnostics.slice(0, maxFiles);
+
+  for (const entry of visible) {
+    lines.push(`- ${entry.file}: ${formatCounts(entry)}`);
+    appendDetailLines(lines, detailMap?.get(entry.file));
+  }
+
+  const remaining = diagnostics.length - visible.length;
   if (remaining > 0) {
     lines.push(`- +${remaining} more file${remaining === 1 ? "" : "s"}`);
   }
@@ -48,6 +65,29 @@ export function formatDiagnosticsContext(
     ...lines,
     "</extension-context>",
   ].join("\n");
+}
+
+function buildDetailMap(
+  _diagnostics: OutstandingDiagnosticSummaryEntry[],
+  totalDiags: number,
+  detailed?: DetailedDiagnostics[],
+): Map<string, Diagnostic[]> | null {
+  if (totalDiags > MAX_DETAILED_DIAGNOSTICS || !detailed || detailed.length === 0) return null;
+  return new Map(detailed.map((d) => [d.file, d.diagnostics]));
+}
+
+function appendDetailLines(lines: string[], details?: Diagnostic[]): void {
+  if (!details) return;
+  for (const d of details.slice(0, MAX_DETAIL_LINES_PER_FILE)) {
+    const line = d.range.start.line + 1;
+    const char = d.range.start.character + 1;
+    const source = d.source ? ` ${d.source}` : "";
+    lines.push(`  L${line} C${char}${source}: ${d.message}`);
+  }
+  if (details.length > MAX_DETAIL_LINES_PER_FILE) {
+    const extra = details.length - MAX_DETAIL_LINES_PER_FILE;
+    lines.push(`  +${extra} more`);
+  }
 }
 
 export function diagnosticsContextFingerprint(content: string | null): string | null {

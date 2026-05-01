@@ -17,12 +17,14 @@ import { loadLspSettings, registerLspSettings } from "./settings-registration.ts
 const baseDir = dirname(fileURLToPath(import.meta.url));
 
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
+import { formatDiagnosticsDisplayContent } from "./diagnostic-display.ts";
 import {
   buildProjectGuidelines,
   diagnosticsContextFingerprint,
   formatDiagnosticsContext,
   lspPromptGuidelines,
   lspPromptSnippet,
+  MAX_DETAILED_DIAGNOSTICS,
 } from "./guidance.ts";
 import { LspManager } from "./manager.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
@@ -175,7 +177,12 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
     updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
 
     const diagnostics = state.manager.getOutstandingDiagnosticSummary(state.inlineSeverity);
-    const content = formatDiagnosticsContext(diagnostics);
+    const totalDiags = diagnostics.reduce((sum, d) => sum + d.total, 0);
+    const detailed =
+      totalDiags <= MAX_DETAILED_DIAGNOSTICS
+        ? state.manager.getOutstandingDiagnostics(state.inlineSeverity)
+        : undefined;
+    const content = formatDiagnosticsContext(diagnostics, 3, detailed);
     const fingerprint = diagnosticsContextFingerprint(content);
 
     if (!content) {
@@ -195,7 +202,7 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
     return {
       message: {
         customType: "lsp-context",
-        content: formatDiagnosticsDisplayContent(diagnostics),
+        content: formatDiagnosticsDisplayContent(diagnostics, detailed),
         display: true,
         details: {
           contextToken: state.currentContextToken,
@@ -339,36 +346,6 @@ function refreshProjectServers(state: LspRuntimeState): void {
 
 function isLspAwareTool(toolName: string): boolean {
   return toolName === "lsp" || toolName === "read" || toolName === "write" || toolName === "edit";
-}
-
-function formatDiagnosticsDisplayContent(
-  diagnostics: Array<{
-    errors: number;
-    warnings: number;
-    information: number;
-    hints: number;
-  }>,
-): string {
-  const totals = diagnostics.reduce(
-    (acc, d) => ({
-      errors: acc.errors + d.errors,
-      warnings: acc.warnings + d.warnings,
-      information: acc.information + d.information,
-      hints: acc.hints + d.hints,
-    }),
-    { errors: 0, warnings: 0, information: 0, hints: 0 },
-  );
-  const parts: string[] = [];
-  if (totals.errors > 0) parts.push(`${totals.errors} error${totals.errors === 1 ? "" : "s"}`);
-  if (totals.warnings > 0)
-    parts.push(`${totals.warnings} warning${totals.warnings === 1 ? "" : "s"}`);
-  if (totals.information > 0)
-    parts.push(`${totals.information} info${totals.information === 1 ? "" : "s"}`);
-  if (totals.hints > 0) parts.push(`${totals.hints} hint${totals.hints === 1 ? "" : "s"}`);
-
-  return parts.length > 0
-    ? `LSP diagnostics injected (${parts.join(", ")})`
-    : "LSP diagnostics injected";
 }
 
 function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void {
