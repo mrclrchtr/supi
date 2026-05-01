@@ -86,6 +86,7 @@ registerSettings({
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
 - Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
+- `pnpm exec jiti /tmp/script.mjs` — use this for ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - pi flattens tool `promptGuidelines` into the system prompt `Guidelines:` section; each bullet must name its tool explicitly.
 - Prefer stable system-prompt guidance via tool `promptGuidelines`; avoid `before_agent_start` `systemPrompt` mutations unless dynamic per-turn guidance is worth the prompt-cache tradeoff.
 - `docs/extensions.md` + `examples/extensions/message-renderer.ts` — authoritative for custom-message rendering; `display: false` suppresses TUI rendering and `content` should hold the visible summary.
