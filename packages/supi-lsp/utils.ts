@@ -2,7 +2,6 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-
 // ── URI Handling ──────────────────────────────────────────────────────
 
 /** Convert a file path to a file:// URI. */
@@ -82,30 +81,6 @@ export function detectLanguageId(filePath: string): string {
 /** Get the file extension (without dot) from a file path. */
 export function getFileExtension(filePath: string): string {
   return path.extname(filePath).slice(1).toLowerCase();
-}
-
-// ── Root Marker Detection ─────────────────────────────────────────────
-
-/**
- * Search upward from `startDir` for any of the `markers` files/dirs.
- * Returns the directory containing the first found marker, or `fallback`.
- */
-export function findProjectRoot(startDir: string, markers: string[], fallback: string): string {
-  let dir = path.resolve(startDir);
-  const root = path.parse(dir).root;
-
-  while (dir !== root) {
-    for (const marker of markers) {
-      if (fs.existsSync(path.join(dir, marker))) {
-        return dir;
-      }
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-
-  return fallback;
 }
 
 // ── PATH Validation ───────────────────────────────────────────────────

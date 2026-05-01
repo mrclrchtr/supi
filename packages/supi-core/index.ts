@@ -13,6 +13,20 @@ export {
   restorePromptContent,
 } from "./context-messages.ts";
 export { wrapExtensionContext } from "./context-tag.ts";
+export type { KnownRootEntry } from "./project-roots.ts";
+export {
+  buildKnownRootsMap,
+  byPathDepth,
+  dedupeTopmostRoots,
+  findProjectRoot,
+  isWithin,
+  isWithinOrEqual,
+  mergeKnownRoots,
+  resolveKnownRoot,
+  segmentCount,
+  sortRootsBySpecificity,
+  walkProject,
+} from "./project-roots.ts";
 export { registerSettingsCommand } from "./settings-command.ts";
 export type { SettingsScope, SettingsSection } from "./settings-registry.ts";
 export {

@@ -1,7 +1,7 @@
 // LSP Manager — server pool with lazy spawning and diagnostic collection.
-
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as projectRoots from "@mrclrchtr/supi-core";
 import { LspClient } from "./client.ts";
 import { getServerForFile } from "./config.ts";
 import {
@@ -11,7 +11,6 @@ import {
   relativeFilePathFromUri,
 } from "./diagnostic-summary.ts";
 import { buildProjectServerInfo } from "./manager-project-info.ts";
-import { buildKnownRootsMap, mergeKnownRoots, resolveKnownRoot } from "./manager-roots.ts";
 import type {
   ActiveCoverageSummaryEntry,
   CoverageSummaryEntry,
@@ -29,7 +28,7 @@ import {
   shouldIgnoreLspPath,
 } from "./summary.ts";
 import type { DetectedProjectServer, Diagnostic, LspConfig, ProjectServerInfo } from "./types.ts";
-import { commandExists, findProjectRoot } from "./utils.ts";
+import { commandExists } from "./utils.ts";
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
@@ -44,13 +43,12 @@ export class LspManager {
     private readonly config: LspConfig,
     private readonly cwd: string,
   ) {}
-
   getCwd(): string {
     return this.cwd;
   }
   // ── Public API ────────────────────────────────────────────────────
   registerDetectedServers(detected: DetectedProjectServer[]): void {
-    this.knownRoots = buildKnownRootsMap(detected);
+    this.knownRoots = projectRoots.buildKnownRootsMap(detected);
   }
   /** Check whether a file path has an available LSP server. */
   isSupportedSourceFile(filePath: string): boolean {
@@ -341,7 +339,6 @@ export class LspManager {
     );
     return formatOutstandingDiagnosticsSummaryText(relevantEntries, maxFiles);
   }
-
   /** Get outstanding diagnostics with full detail per file. */
   getOutstandingDiagnostics(
     maxSeverity: number = 1,
@@ -368,7 +365,6 @@ export class LspManager {
     const { managerWorkspaceSymbol } = await import("./manager-workspace-symbol.ts");
     return managerWorkspaceSymbol(this.clients.values(), query);
   }
-
   /** Ensure a file is open in its LSP server. */
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
     const client = await this.getClientForFile(filePath);
@@ -388,13 +384,13 @@ export class LspManager {
   }
   private resolveRootForFile(filePath: string, serverName: string, rootMarkers: string[]): string {
     const preferredRoots = this.knownRoots.get(serverName) ?? [];
-    const knownRoot = resolveKnownRoot(filePath, preferredRoots);
+    const knownRoot = projectRoots.resolveKnownRoot(filePath, preferredRoots);
     if (knownRoot) return knownRoot;
     const fileDir = path.dirname(path.resolve(filePath));
-    return findProjectRoot(fileDir, rootMarkers, this.cwd);
+    return projectRoots.findProjectRoot(fileDir, rootMarkers, this.cwd);
   }
   private rememberKnownRoot(serverName: string, root: string): void {
     const roots = this.knownRoots.get(serverName) ?? [];
-    this.knownRoots.set(serverName, mergeKnownRoots(roots, root));
+    this.knownRoots.set(serverName, projectRoots.mergeKnownRoots(roots, root));
   }
 }

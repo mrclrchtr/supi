@@ -1,9 +1,9 @@
+import { findProjectRoot } from "@mrclrchtr/supi-core";
 import { describe, expect, it } from "vitest";
 import {
   commandExists,
   detectLanguageId,
   fileToUri,
-  findProjectRoot,
   getFileExtension,
   uriToFile,
 } from "../utils.ts";
