@@ -11,7 +11,7 @@
 //
 // ADR-0049: Gateway TUI via WebSocket
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { type ExtensionAPI, isToolCallEventType } from "@mariozechner/pi-coding-agent";
 
 const DEFAULT_TIMEOUT_SECONDS = 120;
 
@@ -26,14 +26,11 @@ function getDefaultTimeout(): number {
 
 export default function bashTimeout(pi: ExtensionAPI) {
   pi.on("tool_call", async (event) => {
-    if (event.toolName !== "bash") return;
-
-    const input = event.input as { command?: string; timeout?: number };
+    if (!isToolCallEventType("bash", event)) return;
 
     // Only inject when the LLM didn't specify a timeout
-    if (input.timeout !== undefined && input.timeout !== null) return;
+    if (event.input.timeout !== undefined && event.input.timeout !== null) return;
 
-    const defaultTimeout = getDefaultTimeout();
-    input.timeout = defaultTimeout;
+    event.input.timeout = getDefaultTimeout();
   });
 }
