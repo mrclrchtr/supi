@@ -10,7 +10,8 @@ Entrypoint: `lsp.ts`
 
 ## Key files
 
-- `lsp.ts` — extension registration, tool wiring, and `before_agent_start` handler (diagnostic context only)
+- `lsp.ts` — extension registration, tool wiring, `before_agent_start` handler (diagnostic context), `session_tree` handler (tool activation restore)
+- `tree-persist.ts` — `appendEntry`/`session_tree` persistence for LSP tool activation state
 - `guidance.ts` — `buildProjectGuidelines()`, stable system-prompt `promptGuidelines`, diagnostic formatting
 - `manager.ts` — client/server lifecycle and state
 - `summary.ts` — formatting/relevance helpers; keep summary logic here to avoid bloating `manager.ts`
@@ -31,6 +32,7 @@ Entrypoint: `lsp.ts`
 - Use `pi.on("tool_result")` to append inline diagnostics to `write` / `edit` output.
 - After `write`/`edit`, severity-1 diagnostics are augmented with LSP `hover` (truncated to 3 lines) and `code_actions` (titles listed) at the first error position, with a 500ms timeout per call.
 - The `lsp` tool supports `workspace_symbol`, `search`, and `symbol_hover` actions for symbol exploration without exact coordinates.
+- Tool activation state is persisted via `pi.appendEntry()` and restored on `session_tree` navigation. When LSP is enabled/disabled, `persistLspActiveState`/`persistLspInactiveState` appends a `lsp-active` entry. On `/tree` navigation, `registerTreePersistHandlers` inspects the branch for the last `lsp-active` entry and restores the tool set accordingly.
 
 ## Settings
 
@@ -50,12 +52,12 @@ LSP settings are managed via the supi shared config system and the `/supi-settin
 - `severity` (number 1-4, default `1`) — inline diagnostic threshold (`1` = errors only)
 - `servers` (string array, default `[]`) — allow-list active servers; empty means all servers enabled
 
-Settings are registered with the supi-core settings registry via `registerLspSettings(cwd)` in `lsp.ts`. The server allowlist is applied in `session_start` after loading config, not inside `loadConfig()`.
+Settings are registered with the supi-core settings registry via `registerLspSettings()` in `lsp.ts`. The server allowlist is applied in `session_start` after loading config, not inside `loadConfig()`.
 
 ## Packaging/runtime gotchas
 
 - `typebox` 1.x is the runtime import (migrated from `@sinclair/typebox` 0.34.x for pi >= 0.69.0).
-- Avoid `@mariozechner/pi-ai`'s `StringEnum`; use `Type.Union(Type.Literal(...))` to keep the dep tree smaller.
+- Use `StringEnum` from `@mariozechner/pi-ai` for string enums in tool parameters — `Type.Union`/`Type.Literal` doesn't work with Google's API.
 - Prefer splitting `manager.ts` helpers into focused `manager-*.ts` modules over relaxing the repo-wide Biome line-limit rule.
 - `process.cwd()` is no longer used for path resolution; `ctx.cwd` from the extension context is threaded through `LspManager` and all formatting utilities. When adding new formatting helpers that need relative paths, accept `cwd` as a parameter.
 - `LspManager` constructor: `new LspManager(config, cwd)` — `cwd` is required.

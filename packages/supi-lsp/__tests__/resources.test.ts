@@ -53,6 +53,16 @@ vi.mock("../ui.ts", () => ({
   updateLspUi: vi.fn(),
 }));
 vi.mock("../summary.ts", () => ({}));
+vi.mock("../tree-persist.ts", () => ({
+  persistLspActiveState: vi.fn(),
+  persistLspInactiveState: vi.fn(),
+  registerTreePersistHandlers: vi.fn(),
+}));
+vi.mock("../settings-registration.ts", () => ({
+  loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, servers: [] })),
+  registerLspSettings: vi.fn(),
+}));
+vi.mock("../manager.ts", () => ({ LspManager: vi.fn() }));
 
 import lspExtension from "../lsp.ts";
 
@@ -67,6 +77,7 @@ function setup(): Map<string, (...args: unknown[]) => unknown> {
     registerMessageRenderer() {},
     getActiveTools: () => ["lsp"],
     setActiveTools: () => {},
+    appendEntry: () => {},
   };
   lspExtension(pi as never);
   return handlers;

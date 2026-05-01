@@ -54,14 +54,14 @@ describe("registerLspSettings", () => {
   });
 
   it("registers an LSP settings section", () => {
-    registerLspSettings("/tmp");
+    registerLspSettings();
     const sections = getRegisteredSettings();
     expect(sections).toHaveLength(1);
     expect(sections[0]).toMatchObject({ id: "lsp", label: "LSP" });
   });
 
   it("loadValues returns three setting items", () => {
-    registerLspSettings("/tmp");
+    registerLspSettings();
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
     expect(items).toHaveLength(3);
@@ -69,7 +69,7 @@ describe("registerLspSettings", () => {
   });
 
   it("enabled item defaults to on", () => {
-    registerLspSettings("/tmp");
+    registerLspSettings();
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
     const enabledItem = items.find((i) => i.id === "enabled");
@@ -78,7 +78,7 @@ describe("registerLspSettings", () => {
   });
 
   it("severity item has cycling values", () => {
-    registerLspSettings("/tmp");
+    registerLspSettings();
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
     const severityItem = items.find((i) => i.id === "severity");
@@ -87,7 +87,7 @@ describe("registerLspSettings", () => {
   });
 
   it("servers item defaults to all", () => {
-    registerLspSettings("/tmp");
+    registerLspSettings();
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
     const serversItem = items.find((i) => i.id === "servers");
@@ -96,7 +96,7 @@ describe("registerLspSettings", () => {
 
   it("persistChange writes enabled to config", () => {
     const tmpDir = makeTempDir();
-    registerLspSettings(tmpDir);
+    registerLspSettings();
     const section = getRegisteredSettings()[0];
 
     section.persistChange("project", tmpDir, "enabled", "off");
@@ -114,7 +114,7 @@ describe("registerLspSettings", () => {
 
   it("persistChange writes severity to config", () => {
     const tmpDir = makeTempDir();
-    registerLspSettings(tmpDir);
+    registerLspSettings();
     const section = getRegisteredSettings()[0];
 
     section.persistChange("project", tmpDir, "severity", "3 (info)");
@@ -132,7 +132,7 @@ describe("registerLspSettings", () => {
 
   it("persistChange writes servers to config", () => {
     const tmpDir = makeTempDir();
-    registerLspSettings(tmpDir);
+    registerLspSettings();
     const section = getRegisteredSettings()[0];
 
     section.persistChange("project", tmpDir, "servers", "rust-analyzer, pyright");
@@ -150,7 +150,7 @@ describe("registerLspSettings", () => {
 
   it("persistChange removes servers when value is empty", () => {
     const tmpDir = makeTempDir();
-    registerLspSettings(tmpDir);
+    registerLspSettings();
     const section = getRegisteredSettings()[0];
 
     section.persistChange("project", tmpDir, "servers", "rust-analyzer");

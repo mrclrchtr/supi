@@ -35,7 +35,7 @@ const baseDir = dirname(fileURLToPath(import.meta.url));
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: extension entry point wires all events
 export default function claudeMdExtension(pi: ExtensionAPI) {
-  registerClaudeMdSettings(process.cwd());
+  registerClaudeMdSettings();
   const state: ClaudeMdState = createInitialState();
 
   // ── Session lifecycle ──────────────────────────────────────

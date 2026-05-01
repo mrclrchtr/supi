@@ -1,5 +1,6 @@
 // Tree-sitter extension entry point — registers the `tree_sitter` tool with pi.
 
+import { StringEnum } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import {
@@ -15,13 +16,13 @@ import { collectOutline } from "./outline.ts";
 import { TreeSitterRuntime } from "./runtime.ts";
 import { extractExports, extractImports, lookupNodeAt } from "./structure.ts";
 
-const TreeSitterActionEnum = Type.Union([
-  Type.Literal("outline"),
-  Type.Literal("imports"),
-  Type.Literal("exports"),
-  Type.Literal("node_at"),
-  Type.Literal("query"),
-]);
+const TreeSitterActionEnum = StringEnum([
+  "outline",
+  "imports",
+  "exports",
+  "node_at",
+  "query",
+] as const);
 
 const toolDescription = `Tree-sitter tool — provides structural AST analysis for supported files.
 

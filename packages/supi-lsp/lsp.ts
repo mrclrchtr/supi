@@ -1,14 +1,10 @@
-// LSP Extension for pi - provides Language Server Protocol integration.
-//
-// Gives the agent type-aware hover, go-to-definition,
-// diagnostics, document-symbols, rename, and code-actions via a registered
-// `lsp` tool. It keeps supported source files warm in their language servers,
-// surfaces inline diagnostics after edits/writes, eagerly starts detected
-// servers on session start, and injects compact diagnostic context only when
-// outstanding diagnostics exist.
+// LSP Extension for pi — provides hover, definition, diagnostics, symbols, rename, code-actions
+// via a registered `lsp` tool. Keeps language servers warm, surfaces inline diagnostics,
+// and injects diagnostic context only when outstanding issues exist.
 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { StringEnum } from "@mariozechner/pi-ai";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
 import { loadConfig } from "./config.ts";
@@ -35,21 +31,26 @@ import {
   startDetectedServers,
 } from "./scanner.ts";
 import { executeAction, type LspAction, lspToolDescription } from "./tool-actions.ts";
+import {
+  persistLspActiveState,
+  persistLspInactiveState,
+  registerTreePersistHandlers,
+} from "./tree-persist.ts";
 import type { DetectedProjectServer, ProjectServerInfo } from "./types.ts";
 import { type LspInspectorState, toggleLspStatusOverlay, updateLspUi } from "./ui.ts";
 
-const LspActionEnum = Type.Union([
-  Type.Literal("hover"),
-  Type.Literal("definition"),
-  Type.Literal("references"),
-  Type.Literal("diagnostics"),
-  Type.Literal("symbols"),
-  Type.Literal("rename"),
-  Type.Literal("code_actions"),
-  Type.Literal("workspace_symbol"),
-  Type.Literal("search"),
-  Type.Literal("symbol_hover"),
-]);
+const LspActionEnum = StringEnum([
+  "hover",
+  "definition",
+  "references",
+  "diagnostics",
+  "symbols",
+  "rename",
+  "code_actions",
+  "workspace_symbol",
+  "search",
+  "symbol_hover",
+] as const);
 
 interface LspRuntimeState {
   manager: LspManager | null;
@@ -60,10 +61,11 @@ interface LspRuntimeState {
   lastDiagnosticsFingerprint: string | null;
   currentContextToken: string | null;
   contextCounter: number;
+  lspActive: boolean;
 }
 
 export default function lspExtension(pi: ExtensionAPI) {
-  registerLspSettings(process.cwd());
+  registerLspSettings();
   const state = createRuntimeState();
 
   registerLspAwareToolOverrides(pi, {
@@ -75,6 +77,7 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerLspTool(pi, state, lspPromptGuidelines);
   registerSessionLifecycleHandlers(pi, state);
   registerBehaviorHandlers(pi, state);
+  registerTreePersistHandlers(pi, state);
   registerLspStatusCommand(pi, state);
   registerResourcesDiscover(pi);
   registerLspMessageRenderer(pi);
@@ -93,6 +96,7 @@ function createRuntimeState(): LspRuntimeState {
     lastDiagnosticsFingerprint: null,
     currentContextToken: null,
     contextCounter: 0,
+    lspActive: false,
   };
 }
 
@@ -107,12 +111,12 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
 
     if (!lspSettings.enabled) {
       disableLspState(pi, state);
+      persistLspInactiveState(pi, state);
       return;
     }
 
     state.inlineSeverity = lspSettings.severity;
 
-    ensureLspToolActive(pi);
     const config = loadConfig(cwd);
 
     // Apply server allowlist filter from supi shared config
@@ -132,8 +136,10 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     refreshProjectServers(state);
     state.lastDiagnosticsFingerprint = null;
     state.currentContextToken = null;
+    state.lspActive = true;
     registerLspTool(pi, state, buildProjectGuidelines(state.projectServers, cwd));
     ensureLspToolActive(pi);
+    persistLspActiveState(pi, state);
     updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
   });
 
@@ -158,14 +164,6 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
       updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
     }
   });
-}
-
-/** Remove the `lsp` tool from the active tool set when LSP is disabled. */
-function disableLspTool(pi: ExtensionAPI): void {
-  const activeTools = pi.getActiveTools();
-  if (activeTools.includes("lsp")) {
-    pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
-  }
 }
 
 /** Build the `lsp-context` custom message used to surface outstanding diagnostics. */
@@ -198,8 +196,11 @@ function buildDiagnosticResult(
 
 function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
   pi.on("before_agent_start", async (_event, ctx) => {
-    if (!state.manager) {
-      disableLspTool(pi);
+    if (!state.manager || !state.lspActive) {
+      removeLspTool(pi);
+      if (!state.manager && state.lspActive) {
+        persistLspInactiveState(pi, state);
+      }
       return;
     }
 
@@ -376,11 +377,14 @@ function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void {
   state.projectServers = [];
   state.lastDiagnosticsFingerprint = null;
   state.currentContextToken = null;
+  state.lspActive = false;
 
+  removeLspTool(pi);
+}
+
+function removeLspTool(pi: ExtensionAPI): void {
   const activeTools = pi.getActiveTools();
-  if (activeTools.includes("lsp")) {
-    pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
-  }
+  if (activeTools.includes("lsp")) pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
 }
 
 function ensureLspToolActive(pi: ExtensionAPI): void {

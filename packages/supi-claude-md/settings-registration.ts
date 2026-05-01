@@ -56,13 +56,13 @@ function persistClaudeMdSetting(
 
 // ── Settings registration ────────────────────────────────────
 
-export function registerClaudeMdSettings(_cwd: string): void {
+export function registerClaudeMdSettings(): void {
   registerSettings({
     id: "claude-md",
     label: "Claude-MD",
-    loadValues: (scope, _cwd) => buildClaudeMdSettingItems(scope, _cwd),
-    persistChange: (scope, _cwd, settingId, value) => {
-      handleSettingChange(scope, _cwd, settingId, value);
+    loadValues: (scope, cwd) => buildClaudeMdSettingItems(scope, cwd),
+    persistChange: (scope, cwd, settingId, value) => {
+      handleSettingChange(scope, cwd, settingId, value);
     },
   });
 }

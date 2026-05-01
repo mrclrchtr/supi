@@ -57,11 +57,11 @@ function severityLabel(severity: number): string {
 
 // ── Settings registration ────────────────────────────────────
 
-export function registerLspSettings(_cwd: string): void {
+export function registerLspSettings(): void {
   registerSettings({
     id: "lsp",
     label: "LSP",
-    loadValues: (_scope, _cwd) => buildLspSettingItems(_scope, _cwd),
+    loadValues: (_scope, cwd) => buildLspSettingItems(_scope, cwd),
     persistChange: (scope, cwd, settingId, value) => {
       if (settingId === "enabled") {
         persistLspSetting(scope, cwd, "enabled", value === "on");

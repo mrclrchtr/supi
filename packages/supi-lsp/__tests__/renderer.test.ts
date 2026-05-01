@@ -96,6 +96,12 @@ vi.mock("../tool-actions.ts", () => ({
   lspToolDescription: "",
 }));
 
+vi.mock("../tree-persist.ts", () => ({
+  persistLspActiveState: vi.fn(),
+  persistLspInactiveState: vi.fn(),
+  registerTreePersistHandlers: vi.fn(),
+}));
+
 vi.mock("../manager-types.ts", () => ({}));
 
 import lspExtension from "../lsp.ts";
@@ -141,6 +147,7 @@ function createPiWithRenderers() {
     },
     getActiveTools: () => ["lsp"] as string[],
     setActiveTools: vi.fn(),
+    appendEntry: vi.fn(),
   } as never;
 
   return { handlers, renderers, pi };

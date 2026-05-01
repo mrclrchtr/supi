@@ -25,6 +25,7 @@
     "@mrclrchtr/supi-core": "workspace:*"
   },
   "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*",
     "typebox": "*"

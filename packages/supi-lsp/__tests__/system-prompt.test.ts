@@ -97,14 +97,18 @@ function createManager(diagnostics: Array<{ file: string; total: number }>) {
 
 function createPiWithHandlers() {
   const handlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
+  let activeTools = ["lsp"];
   const pi = {
     on: vi.fn((event: string, handler: (...args: unknown[]) => Promise<unknown>) => {
       handlers.set(event, handler);
     }),
     registerTool: vi.fn(),
     registerCommand: vi.fn(),
-    getActiveTools: vi.fn(() => ["lsp"]),
-    setActiveTools: vi.fn(),
+    getActiveTools: vi.fn(() => activeTools),
+    setActiveTools: vi.fn((tools: string[]) => {
+      activeTools = tools;
+    }),
+    appendEntry: vi.fn(),
     onResource: vi.fn(),
   } as unknown as Parameters<typeof lspExtension>[0];
   return { handlers, pi };
@@ -118,7 +122,7 @@ async function setupExtension(manager: ReturnType<typeof createManager>) {
   lspExtension(pi);
   const ctx = { cwd: "/project", ui: { notify: vi.fn() } };
   await handlers.get("session_start")?.({}, ctx);
-  return { handlers, ctx };
+  return { handlers, ctx, pi };
 }
 
 describe("system prompt stability", () => {
@@ -155,5 +159,28 @@ describe("system prompt stability", () => {
 
     expect(result.message).toBeDefined();
     expect(result.systemPrompt).toBeUndefined();
+  });
+
+  it("does not reactivate LSP after session tree restores inactive state", async () => {
+    mockFns.formatDiagnosticsContext.mockReturnValue(
+      '<extension-context source="supi-lsp">\nOutstanding diagnostics\n</extension-context>',
+    );
+    const { handlers, ctx, pi } = await setupExtension(createManager([{ file: "a.ts", total: 1 }]));
+
+    await handlers.get("session_tree")?.(
+      {},
+      {
+        sessionManager: {
+          getBranch: () => [{ type: "custom", customType: "lsp-active", data: { active: false } }],
+        },
+      },
+    );
+    const result = await handlers.get("before_agent_start")?.(
+      { systemPrompt: "Base system prompt." },
+      ctx,
+    );
+
+    expect(result).toBeUndefined();
+    expect(pi.getActiveTools()).not.toContain("lsp");
   });
 });
