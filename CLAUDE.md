@@ -101,4 +101,6 @@ registerSettings({
 - Test helpers can export utilities (`createPiMock`, `makeCtx`, constants) but must not call `vi.mock` or `vi.hoisted` internally
 - Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
 - `pnpm vitest run packages/supi-<pkg>/` — run tests for a single package
+- `pnpm exec biome check packages/supi-<pkg>` — package-scoped Biome check for faster iteration on one extension
+- `pnpm exec tsc --noEmit -p packages/supi-<pkg>/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-<pkg>/__tests__/tsconfig.json` — package-scoped typecheck for one extension and its tests
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports and other unsafe lint issues
