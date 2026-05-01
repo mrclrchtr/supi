@@ -20,7 +20,7 @@ export function createTreeSitterSession(cwd: string): TreeSitterSession {
   const runtime = new TreeSitterRuntime(cwd);
 
   return {
-    async parse(file: string) {
+    async canParse(file: string) {
       const result = await runtime.parseFile(file);
       if (result.kind !== "success") return result;
       const { resolvedPath, grammarId, tree } = result.data;

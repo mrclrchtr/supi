@@ -105,9 +105,14 @@ describe("TreeSitterRuntime", () => {
       runtime.dispose();
     });
 
-    it("returns validation error for invalid query", async () => {
+    it.each([
+      "(((invalid",
+      "(not_a_node) @x",
+      "(identifier) @",
+      "(identifier) (#eq?)",
+    ])("returns validation error for invalid query %s", async (query) => {
       const runtime = new TreeSitterRuntime(FIXTURE_DIR);
-      const result = await runtime.queryFile("sample.ts", "(((invalid");
+      const result = await runtime.queryFile("sample.ts", query);
       expect(result.kind).toBe("validation-error");
       if (result.kind === "validation-error") {
         expect(result.message).toContain("Invalid query");

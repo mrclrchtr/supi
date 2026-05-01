@@ -50,6 +50,7 @@ export default function treeSitterExtension(pi: ExtensionAPI) {
   let runtime: TreeSitterRuntime | undefined;
 
   pi.on("session_start", (_event, ctx) => {
+    runtime?.dispose();
     runtime = new TreeSitterRuntime(ctx.cwd);
   });
 

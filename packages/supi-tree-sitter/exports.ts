@@ -26,15 +26,14 @@ export async function extractExports(
 
 function walkForExports(node: SyntaxNodeLike, source: string, exports: ExportRecord[]): void {
   if (node.type !== "export_statement") {
-    for (const child of node.children) {
-      walkForExports(child, source, exports);
-    }
+    for (const child of node.children) walkForExports(child, source, exports);
     return;
   }
 
   handleExportStatement(node, source, exports);
 }
 
+/** Dispatch a single export statement into declaration, re-export, default, or named export records. */
 function handleExportStatement(
   node: SyntaxNodeLike,
   source: string,
@@ -47,14 +46,14 @@ function handleExportStatement(
     return;
   }
 
-  if (hasDefaultKeyword(node)) {
-    extractDefaultExport(node, source, exports);
-    return;
-  }
-
   const sourceNode = findStringChild(node);
   if (sourceNode) {
     extractReExport(node, sourceNode, source, exports);
+    return;
+  }
+
+  if (hasDefaultKeyword(node)) {
+    extractDefaultExport(node, source, exports);
     return;
   }
 
@@ -62,16 +61,21 @@ function handleExportStatement(
 }
 
 function findDeclarationChild(node: SyntaxNodeLike): SyntaxNodeLike | undefined {
-  const declTypes = new Set([
-    "function_declaration",
-    "class_declaration",
-    "interface_declaration",
-    "type_alias_declaration",
-    "enum_declaration",
-    "lexical_declaration",
-  ]);
-  return node.children.find((c) => declTypes.has(c.type));
+  return node.children.find((child) => DECLARATION_EXPORT_NODE_TYPES.has(child.type));
 }
+
+const DECLARATION_EXPORT_NODE_TYPES = new Set([
+  "function_declaration",
+  "generator_function_declaration",
+  "class_declaration",
+  "abstract_class_declaration",
+  "interface_declaration",
+  "type_alias_declaration",
+  "enum_declaration",
+  "lexical_declaration",
+  "ambient_declaration",
+  "internal_module",
+]);
 
 function extractDeclarationExport(
   decl: SyntaxNodeLike,
@@ -79,40 +83,91 @@ function extractDeclarationExport(
   exports: ExportRecord[],
 ): void {
   if (decl.type === "lexical_declaration") {
-    for (const child of decl.children) {
-      if (child.type === "variable_declarator") {
-        const vn = child.childForFieldName("name");
-        if (vn) {
-          exports.push({
-            name: vn.text,
-            kind: "variable",
-            range: nodeToRange(child, source),
-          });
-        }
-      }
-    }
+    extractLexicalDeclarationExports(decl, source, exports);
     return;
   }
 
-  const nameNode =
-    decl.childForFieldName("name") ?? decl.children.find((c) => c.type === "identifier");
+  if (decl.type === "ambient_declaration") {
+    extractAmbientDeclarationExport(decl, source, exports);
+    return;
+  }
 
-  if (nameNode) {
+  const nameNode = findNameNode(decl);
+  if (!nameNode) return;
+
+  exports.push({
+    name: nameNode.text,
+    kind: exportKindForDeclaration(decl.type),
+    range: nodeToRange(decl, source),
+  });
+}
+
+function extractLexicalDeclarationExports(
+  decl: SyntaxNodeLike,
+  source: string,
+  exports: ExportRecord[],
+): void {
+  for (const child of decl.children) {
+    if (child.type !== "variable_declarator") continue;
+    const nameNode = findNameNode(child);
+    if (!nameNode) continue;
     exports.push({
       name: nameNode.text,
-      kind: decl.type.replace("_declaration", "").replace("lexical_", "variable "),
-      range: nodeToRange(decl, source),
+      kind: "variable",
+      range: nodeToRange(child, source),
     });
   }
 }
 
+/** Extract the declared symbol from `export declare ...` statements. */
+function extractAmbientDeclarationExport(
+  decl: SyntaxNodeLike,
+  source: string,
+  exports: ExportRecord[],
+): void {
+  const nested = decl.children.find((child) => child.type !== "declare" && child.type !== ";");
+  if (!nested) return;
+
+  const nameNode = findNameNode(nested);
+  if (!nameNode) return;
+
+  exports.push({
+    name: nameNode.text,
+    kind: exportKindForDeclaration(nested.type),
+    range: nodeToRange(decl, source),
+  });
+}
+
+/** Map Tree-sitter declaration node types to stable public export kinds. */
+function exportKindForDeclaration(type: string): string {
+  switch (type) {
+    case "function_declaration":
+    case "generator_function_declaration":
+    case "function_signature":
+      return "function";
+    case "class_declaration":
+    case "abstract_class_declaration":
+      return "class";
+    case "interface_declaration":
+      return "interface";
+    case "type_alias_declaration":
+      return "type";
+    case "enum_declaration":
+      return "enum";
+    case "internal_module":
+      return "namespace";
+    default:
+      return type.replace(/_declaration$/, "");
+  }
+}
+
 function hasDefaultKeyword(node: SyntaxNodeLike): boolean {
-  return node.children.some((c) => c.type === "default");
+  return node.children.some((child) => child.type === "default");
 }
 
 function extractDefaultExport(node: SyntaxNodeLike, source: string, exports: ExportRecord[]): void {
   const expr = node.children.find(
-    (c) => c.type !== "export" && c.type !== "default" && c.type !== ";",
+    (child) => child.type !== "export" && child.type !== "default" && child.type !== ";",
   );
   exports.push({
     name: expr ? expr.text.substring(0, 60) : "default",
@@ -122,7 +177,7 @@ function extractDefaultExport(node: SyntaxNodeLike, source: string, exports: Exp
 }
 
 function findStringChild(node: SyntaxNodeLike): SyntaxNodeLike | undefined {
-  return node.children.find((c) => c.type === "string");
+  return node.children.find((child) => child.type === "string");
 }
 
 function extractReExport(
@@ -132,8 +187,13 @@ function extractReExport(
   exports: ExportRecord[],
 ): void {
   const specifier = sourceNode.text.replace(/^["']|["']$/g, "");
-  const exportClause = node.children.find((c) => c.type === "export_clause");
+  const namespaceExport = node.children.find((child) => child.type === "namespace_export");
+  if (namespaceExport) {
+    extractNamespaceReExport(namespaceExport, specifier, source, exports);
+    return;
+  }
 
+  const exportClause = node.children.find((child) => child.type === "export_clause");
   if (exportClause) {
     extractExportSpecifiers(exportClause, source, exports, {
       kind: "re-export",
@@ -150,12 +210,30 @@ function extractReExport(
   });
 }
 
+/** Extract `export * as name from "module"` namespace re-export records. */
+function extractNamespaceReExport(
+  node: SyntaxNodeLike,
+  moduleSpecifier: string,
+  source: string,
+  exports: ExportRecord[],
+): void {
+  const nameNode = findNameNode(node);
+  if (!nameNode) return;
+
+  exports.push({
+    name: nameNode.text,
+    kind: "re-export",
+    range: nodeToRange(node, source),
+    moduleSpecifier,
+  });
+}
+
 function extractNamedExportClause(
   node: SyntaxNodeLike,
   source: string,
   exports: ExportRecord[],
 ): void {
-  const exportClause = node.children.find((c) => c.type === "export_clause");
+  const exportClause = node.children.find((child) => child.type === "export_clause");
   if (!exportClause) return;
 
   extractExportSpecifiers(exportClause, source, exports, { kind: "export" });
@@ -178,4 +256,19 @@ function extractExportSpecifiers(
       ...(options.moduleSpecifier ? { moduleSpecifier: options.moduleSpecifier } : {}),
     });
   }
+}
+
+function findNameNode(node: SyntaxNodeLike): SyntaxNodeLike | null {
+  return (
+    node.childForFieldName("name") ??
+    node.children.find((child) =>
+      [
+        "identifier",
+        "type_identifier",
+        "property_identifier",
+        "private_property_identifier",
+      ].includes(child.type),
+    ) ??
+    null
+  );
 }

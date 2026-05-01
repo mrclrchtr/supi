@@ -56,12 +56,19 @@ export interface QueryCapture {
 
 /** Session-level Tree-sitter service. */
 export interface TreeSitterSession {
-  parse(file: string): Promise<TreeSitterResult<{ file: string; language: string }>>;
+  /** Validate that a supported file can be read and parsed; does not expose the raw tree. */
+  canParse(file: string): Promise<TreeSitterResult<{ file: string; language: string }>>;
+  /** Run a Tree-sitter query and return all captures. */
   query(file: string, queryString: string): Promise<TreeSitterResult<QueryCapture[]>>;
+  /** Extract top-level declarations plus supported class/interface/enum members. */
   outline(file: string): Promise<TreeSitterResult<OutlineItem[]>>;
+  /** Extract static ES import declarations. */
   imports(file: string): Promise<TreeSitterResult<ImportRecord[]>>;
+  /** Extract exported declarations, named exports, and re-exports. */
   exports(file: string): Promise<TreeSitterResult<ExportRecord[]>>;
+  /** Return the smallest syntax node at a 1-based UTF-16 position. */
   nodeAt(file: string, line: number, character: number): Promise<TreeSitterResult<NodeAtResult>>;
+  /** Release parser and grammar resources owned by this session. */
   dispose(): void;
 }
 

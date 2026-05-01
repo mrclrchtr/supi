@@ -26,6 +26,9 @@ export async function lookupNodeAt(
   const { tree, source } = parseResult.data;
 
   try {
+    const boundsError = validateBounds(line, character, source);
+    if (boundsError) return boundsError;
+
     const tsPoint = publicToTreeSitter(line, character, source);
     const node = tree.rootNode.descendantForPosition(tsPoint);
 
@@ -45,6 +48,25 @@ export async function lookupNodeAt(
   } finally {
     tree.delete();
   }
+}
+
+/** Validate that a requested public position exists in the source text. */
+function validateBounds(
+  line: number,
+  character: number,
+  source: string,
+): TreeSitterResult<NodeAtResult> | null {
+  const lines = source.split("\n");
+  if (line > lines.length) {
+    return { kind: "validation-error", message: "line is beyond end of file" };
+  }
+
+  const lineText = lines[line - 1] ?? "";
+  if (character > lineText.length + 1) {
+    return { kind: "validation-error", message: "character is beyond end of line" };
+  }
+
+  return null;
 }
 
 function collectAncestry(

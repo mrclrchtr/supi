@@ -147,8 +147,7 @@ export class TreeSitterRuntime {
         data: { tree: tree as Tree, source, resolvedPath, grammarId },
       };
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Parser initialization failed";
-      return { kind: "runtime-error", message };
+      return { kind: "runtime-error", message: formatError(err, "Parser initialization failed") };
     }
   }
 
@@ -169,7 +168,13 @@ export class TreeSitterRuntime {
     try {
       const entry = await this.ensureGrammarParser(parseResult.data.grammarId);
       const mod = await this.ensureParserInit();
-      const query = new mod.Query(entry.language, queryString);
+      let query: InstanceType<typeof mod.Query>;
+
+      try {
+        query = new mod.Query(entry.language, queryString);
+      } catch (err: unknown) {
+        return { kind: "validation-error", message: `Invalid query: ${formatError(err)}` };
+      }
 
       try {
         const matches = query.matches(tree.rootNode);
@@ -189,19 +194,7 @@ export class TreeSitterRuntime {
         query.delete();
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Query execution failed";
-      // Distinguish query syntax errors from runtime errors
-      // Tree-sitter reports various error strings for bad queries
-      if (
-        message.includes("Bad") ||
-        message.includes("Invalid") ||
-        message.includes("query") ||
-        message.includes("syntax") ||
-        message.includes("pattern")
-      ) {
-        return { kind: "validation-error", message: `Invalid query: ${message}` };
-      }
-      return { kind: "runtime-error", message };
+      return { kind: "runtime-error", message: formatError(err, "Query execution failed") };
     } finally {
       tree.delete();
     }
@@ -235,4 +228,11 @@ export class TreeSitterRuntime {
       throw new Error("Tree-sitter runtime has been disposed");
     }
   }
+}
+
+/** Format errors with their cause chain's first message for user-facing tool output. */
+function formatError(err: unknown, fallback = "Operation failed"): string {
+  if (!(err instanceof Error)) return String(err || fallback);
+  if (err.cause instanceof Error) return `${err.message}: ${err.cause.message}`;
+  return err.message || fallback;
 }

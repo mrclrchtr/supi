@@ -61,7 +61,7 @@ describe("createTreeSitterSession", () => {
     mocks.lookupNodeAt.mockReset();
   });
 
-  it("delegates parse and deletes the parse tree", async () => {
+  it("delegates canParse and deletes the parse tree", async () => {
     const createTreeSitterSession = await importSessionFactory();
     const session = createTreeSitterSession("/repo");
     const runtime = mocks.instances[0];
@@ -71,7 +71,7 @@ describe("createTreeSitterSession", () => {
       data: { tree, source: "", resolvedPath: "/repo/sample.ts", grammarId: "typescript" },
     });
 
-    const result = await session.parse("sample.ts");
+    const result = await session.canParse("sample.ts");
 
     expect(result).toEqual({
       kind: "success",

@@ -46,6 +46,11 @@ import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
 
 const session = createTreeSitterSession(process.cwd());
 try {
+  const parseable = await session.canParse("src/index.ts");
+  if (parseable.kind === "success") {
+    console.log(parseable.data.file, parseable.data.language);
+  }
+
   const outline = await session.outline("src/index.ts");
   if (outline.kind === "success") {
     console.log(outline.data);
@@ -54,6 +59,8 @@ try {
   session.dispose();
 }
 ```
+
+`canParse(file)` validates that a supported file can be read and parsed, then returns the resolved file path and grammar id. It does not expose the raw Tree-sitter tree; use `outline`, `query`, `imports`, `exports`, or `nodeAt` for structured results.
 
 Exported types include `TreeSitterResult`, `TreeSitterSession`, `OutlineItem`, `ImportRecord`, `ExportRecord`, `NodeAtResult`, `QueryCapture`, `SourceRange`, `GrammarId`, and `SupportedExtension`.
 
