@@ -1,1 +1,2 @@
-export { default } from "@mrclrchtr/supi-context";
+import contextExtension from "@mrclrchtr/supi-context";
+export default contextExtension;
