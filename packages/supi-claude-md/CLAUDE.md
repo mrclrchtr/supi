@@ -46,7 +46,7 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 
 ## Gotchas
 
-- Settings are managed via `/supi-settings` (unified supi settings command) — claude-md registers its settings via `registerClaudeMdSettings()` in the supi-core registry
+- Settings are managed via `/supi-settings` (unified SuPi settings command) — claude-md registers its section via `registerClaudeMdSettings()` in the supi-core registry, with `rereadInterval` and `fileNames` edited through `SettingItem.submenu` text inputs
 - `reconstructState()` must parse real Pi `SessionEntry[]` branch entries (`message` + nested `message.role`, `custom_message`) and restore the highest `supi-claude-md-N` counter to avoid refresh-token collisions after `/reload`
 - Path-aware tool discovery should treat `tree_sitter` like `lsp` (`input.file`) so AST-first workflows still inject subdirectory context
 - `systemPromptOptions` is accessed via a typed intersection (`BeforeAgentStartEvent & { systemPromptOptions?: ... }`) for forward-compatibility with pi >= 0.68.0

@@ -47,6 +47,13 @@ Run `/supi-settings` to open the interactive settings UI. It opens directly in t
 
 Changes are persisted immediately to the selected scope's config file.
 
+Claude-MD currently contributes these setting types inside the shared UI:
+
+- `Subdirectory Discovery` — on/off toggle
+- `Context Refresh Interval` — text input; enter a number of turns or `0` to disable refresh
+- `Context Threshold` — choose from common percentage values
+- `Context File Names` — comma-separated text input; clearing it restores the default file list
+
 ## Configuration
 
 Config lives in `.pi/supi/config.json` under the `claude-md` section:

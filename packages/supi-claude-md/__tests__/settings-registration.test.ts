@@ -7,6 +7,7 @@ import {
   loadSupiConfig,
 } from "@mrclrchtr/supi-core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { CLAUDE_MD_DEFAULTS } from "../config.ts";
 import { registerClaudeMdSettings } from "../settings-registration.ts";
 
 function makeTempDir(): string {
@@ -29,7 +30,11 @@ function withHomeDir<T>(homeDir: string, run: () => T): T {
   }
 }
 
-describe("registerClaudeMdSettings", () => {
+function loadClaudeMdConfigForTest(dir: string) {
+  return loadSupiConfig("claude-md", dir, CLAUDE_MD_DEFAULTS, opts(dir));
+}
+
+describe("registerClaudeMdSettings: registration", () => {
   beforeEach(() => {
     clearRegisteredSettings();
   });
@@ -46,7 +51,7 @@ describe("registerClaudeMdSettings", () => {
     expect(sections[0]).toMatchObject({ id: "claude-md", label: "Claude-MD" });
   });
 
-  it("loadValues returns four setting items", () => {
+  it("loadValues returns four Claude-MD settings with current defaults", () => {
     registerClaudeMdSettings();
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
@@ -57,6 +62,22 @@ describe("registerClaudeMdSettings", () => {
       "contextThreshold",
       "fileNames",
     ]);
+    expect(items.find((item) => item.id === "subdirs")).toMatchObject({
+      currentValue: "on",
+      values: ["on", "off"],
+    });
+    expect(items.find((item) => item.id === "rereadInterval")).toMatchObject({
+      currentValue: "3",
+      submenu: expect.any(Function),
+    });
+    expect(items.find((item) => item.id === "contextThreshold")).toMatchObject({
+      currentValue: "80",
+      values: expect.arrayContaining(["0", "80", "100"]),
+    });
+    expect(items.find((item) => item.id === "fileNames")).toMatchObject({
+      currentValue: "CLAUDE.md, AGENTS.md",
+      submenu: expect.any(Function),
+    });
   });
 
   it("loadValues reads the selected scope instead of merged effective config", () => {
@@ -139,27 +160,111 @@ describe("registerClaudeMdSettings", () => {
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
+});
 
-  it("persistChange writes scope-specific config", () => {
+describe("registerClaudeMdSettings: persistence", () => {
+  beforeEach(() => {
+    clearRegisteredSettings();
+  });
+
+  afterEach(() => {
+    clearRegisteredSettings();
+  });
+
+  it("persistChange writes subdirs on and off", () => {
     const tmpDir = makeTempDir();
-
     registerClaudeMdSettings();
     const section = getRegisteredSettings()[0];
+
+    section.persistChange("project", tmpDir, "subdirs", "off");
+    expect(loadClaudeMdConfigForTest(tmpDir).subdirs).toBe(false);
+
+    section.persistChange("project", tmpDir, "subdirs", "on");
+    expect(loadClaudeMdConfigForTest(tmpDir).subdirs).toBe(true);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange writes rereadInterval numbers", () => {
+    const tmpDir = makeTempDir();
+    registerClaudeMdSettings();
+    const section = getRegisteredSettings()[0];
+
+    section.persistChange("project", tmpDir, "rereadInterval", "5");
+
+    expect(loadClaudeMdConfigForTest(tmpDir).rereadInterval).toBe(5);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange writes rereadInterval off as 0", () => {
+    const tmpDir = makeTempDir();
+    registerClaudeMdSettings();
+    const section = getRegisteredSettings()[0];
+
+    section.persistChange("project", tmpDir, "rereadInterval", "0");
+
+    expect(loadClaudeMdConfigForTest(tmpDir).rereadInterval).toBe(0);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange writes contextThreshold to config", () => {
+    const tmpDir = makeTempDir();
+    registerClaudeMdSettings();
+    const section = getRegisteredSettings()[0];
+
+    section.persistChange("project", tmpDir, "contextThreshold", "95");
+
+    expect(loadClaudeMdConfigForTest(tmpDir).contextThreshold).toBe(95);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange writes fileNames to config", () => {
+    const tmpDir = makeTempDir();
+    registerClaudeMdSettings();
+    const section = getRegisteredSettings()[0];
+
     section.persistChange("project", tmpDir, "fileNames", "CLAUDE.md, AGENTS.md, NOTES.md");
 
-    const config = loadSupiConfig(
-      "claude-md",
-      tmpDir,
-      {
-        rereadInterval: 3,
-        contextThreshold: 80,
-        subdirs: true,
-        fileNames: ["CLAUDE.md", "AGENTS.md"],
-      },
-      opts(tmpDir),
-    );
+    expect(loadClaudeMdConfigForTest(tmpDir).fileNames).toEqual([
+      "CLAUDE.md",
+      "AGENTS.md",
+      "NOTES.md",
+    ]);
 
-    expect(config.fileNames).toEqual(["CLAUDE.md", "AGENTS.md", "NOTES.md"]);
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange removes fileNames when the input is empty", () => {
+    const tmpDir = makeTempDir();
+    registerClaudeMdSettings();
+    const section = getRegisteredSettings()[0];
+
+    section.persistChange("project", tmpDir, "fileNames", "NOTES.md");
+    section.persistChange("project", tmpDir, "fileNames", "");
+
+    expect(loadClaudeMdConfigForTest(tmpDir).fileNames).toEqual(CLAUDE_MD_DEFAULTS.fileNames);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persists to the selected global scope without changing project defaults", () => {
+    const tmpDir = makeTempDir();
+
+    withHomeDir(tmpDir, () => {
+      registerClaudeMdSettings();
+      const section = getRegisteredSettings()[0];
+
+      section.persistChange("global", tmpDir, "subdirs", "off");
+
+      const globalItems = section.loadValues("global", tmpDir);
+      const projectItems = section.loadValues("project", tmpDir);
+
+      expect(globalItems.find((item) => item.id === "subdirs")?.currentValue).toBe("off");
+      expect(projectItems.find((item) => item.id === "subdirs")?.currentValue).toBe("on");
+    });
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

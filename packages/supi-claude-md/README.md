@@ -21,6 +21,13 @@ Settings are managed through the shared SuPi settings command:
 /supi-settings
 ```
 
+Inside `/supi-settings`, Claude-MD contributes:
+
+- `Subdirectory Discovery` — on/off toggle
+- `Context Refresh Interval` — text input; enter a number of turns or `0` to disable refresh
+- `Context Threshold` — common percentage values from `0` to `100`
+- `Context File Names` — comma-separated text input; empty input restores the default filenames
+
 This package bundles the `supi-claude-md-guide` skill.
 
 ## Configuration

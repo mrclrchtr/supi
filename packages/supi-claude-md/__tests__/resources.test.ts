@@ -14,8 +14,6 @@ const mockFns = vi.hoisted(() => ({
   readNativeContextFiles: vi.fn(),
   pruneAndReorderContextMessages: vi.fn(),
   reconstructState: vi.fn(),
-  getArgumentCompletions: vi.fn(),
-  handleCommand: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-core", () => ({
@@ -63,11 +61,6 @@ vi.mock("../state.ts", () => ({
     firstAgentStart: true,
   }),
   reconstructState: mockFns.reconstructState,
-}));
-
-vi.mock("../commands.ts", () => ({
-  getArgumentCompletions: mockFns.getArgumentCompletions,
-  handleCommand: mockFns.handleCommand,
 }));
 
 import claudeMdExtension from "../index.ts";
