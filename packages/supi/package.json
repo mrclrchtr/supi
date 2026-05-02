@@ -29,6 +29,7 @@
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-skill-shortcut": "workspace:*",
+    "@mrclrchtr/supi-context": "workspace:*",
     "@mrclrchtr/supi-review": "workspace:*",
     "@mrclrchtr/supi-tree-sitter": "workspace:*",
     "tree-sitter-javascript": "^0.23.0",
@@ -52,6 +53,7 @@
       "./skill-shortcut.ts",
       "./lsp.ts",
       "./review.ts",
+      "./context.ts",
       "./tree-sitter.ts"
     ],
     "prompts": [
