@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Extension registration and lifecycle
-The `supi-context` extension SHALL register a `/supi-context` command and cache system prompt options from `before_agent_start` events into extension state. The cached data SHALL include `contextFiles`, `skills`, `promptGuidelines`, and `customPrompt`. The cache SHALL be reset on `session_start`.
+The `supi-context` extension SHALL register a `/supi-context` command and cache system prompt options from `before_agent_start` events into extension state. The cached data SHALL include `contextFiles`, `skills`, `promptGuidelines`, `customPrompt`, `toolSnippets`, and `appendSystemPrompt`. The cache SHALL be reset on `session_start`.
 
 #### Scenario: Extension registers command on load
 - **WHEN** pi loads the `supi-context` extension
@@ -9,7 +9,7 @@ The `supi-context` extension SHALL register a `/supi-context` command and cache 
 
 #### Scenario: System prompt options are cached
 - **WHEN** a `before_agent_start` event fires with `systemPromptOptions`
-- **THEN** the extension caches `contextFiles`, `skills`, `promptGuidelines`, and `customPrompt`
+- **THEN** the extension caches `contextFiles`, `skills`, `promptGuidelines`, `customPrompt`, `toolSnippets`, and `appendSystemPrompt`
 
 #### Scenario: Cache resets on new session
 - **WHEN** a `session_start` event fires
@@ -26,9 +26,13 @@ The extension SHALL build the API view of the conversation using `buildSessionCo
 - **WHEN** `ctx.getContextUsage()` returns an actual token total
 - **THEN** the extension estimates tokens per category using `estimateTokens()`, computes a scale factor (`actual / rawTotal`), and applies it to each category so the sum matches the actual total
 
-#### Scenario: Tokens unavailable after compaction
-- **WHEN** `ctx.getContextUsage()` returns `tokens: null`
-- **THEN** the report shows "Token count pending — send a message to refresh" instead of the breakdown
+#### Scenario: Tokens unavailable
+- **WHEN** `ctx.getContextUsage()` returns `tokens: null` (e.g. right after compaction, before next LLM response)
+- **THEN** the report shows "Token count pending — send a message to refresh" and falls back to unscaled estimates
+
+#### Scenario: Context usage undefined
+- **WHEN** `ctx.getContextUsage()` returns `undefined` (no model selected or no usage data)
+- **THEN** the report shows unscaled estimates and notes the data is approximate
 
 ### Requirement: Visual block grid
 The report SHALL include a visual block grid (20 columns × 5 rows = 100 blocks) showing proportional context usage. Filled blocks represent used categories; empty blocks represent available space plus autocompact buffer.
@@ -52,6 +56,10 @@ The report SHALL include a text breakdown listing each category with its estimat
 - **WHEN** compaction settings have `reserveTokens` of 16384
 - **THEN** an "Autocompact buffer" line shows "16.4k" with its percentage of the context window
 
+#### Scenario: Autocompact buffer read from SettingsManager
+- **WHEN** the user has customized compaction `reserveTokens` in their settings
+- **THEN** the extension reads the value via `SettingsManager.create(ctx.cwd).getCompactionReserveTokens()` rather than using the default
+
 ### Requirement: Compaction status note
 The report SHALL show a compaction note when the session has been compacted, indicating how many older turns were summarized.
 
@@ -62,6 +70,9 @@ The report SHALL show a compaction note when the session has been compacted, ind
 #### Scenario: No compaction
 - **WHEN** `getLatestCompactionEntry()` returns null
 - **THEN** no compaction note is shown
+
+### Requirement: System prompt sub-category breakdown
+The report SHALL break down the system prompt into sub-categories using cached `systemPromptOptions` fields: context files (`.contextFiles`), skills (`.skills`), guidelines (`.promptGuidelines`), tool snippets (`.toolSnippets`), and append text (`.appendSystemPrompt`). The remainder after subtracting these from the total system prompt tokens is attributed to the base prompt.
 
 ### Requirement: System prompt context files section
 The report SHALL list context files loaded into the system prompt (from cached `systemPromptOptions.contextFiles`) with per-file token estimates. This section SHALL be omitted when no context files are loaded.
@@ -86,7 +97,7 @@ The report SHALL scan tool result messages in the API view for `<extension-conte
 - **THEN** the injected context files section is omitted
 
 ### Requirement: Skills section
-The report SHALL always list all loaded skills (from cached `systemPromptOptions.skills`) with per-skill token estimates derived from the skill description text length.
+The report SHALL always list all loaded skills (from cached `systemPromptOptions.skills`) with per-skill token estimates. Skill token estimates SHALL be based on the formatted skill prompt text (XML `<skill>` block with name, description, and location), not just the description text length.
 
 #### Scenario: Skills loaded
 - **WHEN** 12 skills are loaded with various description lengths
@@ -97,7 +108,7 @@ The report SHALL always list all loaded skills (from cached `systemPromptOptions
 - **THEN** the skills section shows "Send a message to see skill details"
 
 ### Requirement: Guidelines and tool definitions sections
-The report SHALL show a "Guidelines" line with the total estimated tokens for `promptGuidelines`, and a "Tool Definitions" line with the count of active tools and estimated tokens for their definitions.
+The report SHALL show a "Guidelines" line with the total estimated tokens for `promptGuidelines`. The report SHALL show a "Tool Definitions" line with the count of active tools and estimated tokens for their JSON schema definitions obtained via `pi.getActiveTools()`. Note: tool snippets (one-liners in the system prompt) are part of the system prompt sub-categories; tool definitions (full JSON schemas) are a separate API parameter.
 
 #### Scenario: Guidelines and tools shown
 - **WHEN** 5 guideline bullets and 8 active tools are loaded

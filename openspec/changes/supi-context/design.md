@@ -8,8 +8,8 @@ Pi exposes several APIs useful for context analysis:
 - `getLatestCompactionEntry(branch)` → finds compaction boundary
 - `estimateTokens(message)` → per-message token estimate (chars/4 heuristic)
 - `ctx.getSystemPrompt()` → full system prompt string
-- `systemPromptOptions` (from `before_agent_start`) → `contextFiles`, `skills`, `promptGuidelines`, `customPrompt`
-- `pi.getActiveTools()` / `pi.getAllTools()` → tool definitions
+- `systemPromptOptions` (from `before_agent_start`) → `contextFiles`, `skills`, `promptGuidelines`, `customPrompt`, `toolSnippets`, `appendSystemPrompt`
+- `pi.getActiveTools()` / `pi.getAllTools()` → tool definitions (full JSON schemas sent as API `tools` parameter)
 
 supi-claude-md injects subdirectory context files into tool result content as `<extension-context source="supi-claude-md" file="..." turn="N">` blocks, not into the system prompt.
 
@@ -68,7 +68,7 @@ pi-tui overlays do not support scrolling, so long content (many skills, many con
 
 ### D4: Cache `systemPromptOptions` from `before_agent_start`
 
-**Decision**: Cache `systemPromptOptions` (contextFiles, skills, promptGuidelines, customPrompt) during `before_agent_start` into extension state, read it during the `/supi-context` command.
+**Decision**: Cache `systemPromptOptions` (contextFiles, skills, promptGuidelines, customPrompt, toolSnippets, appendSystemPrompt) during `before_agent_start` into extension state, read it during the `/supi-context` command.
 
 **Alternatives**:
 - Parse the system prompt string: fragile, loses structure
@@ -88,7 +88,7 @@ pi-tui overlays do not support scrolling, so long content (many skills, many con
 
 ### D6: Show autocompact buffer from compaction settings
 
-**Decision**: Read `reserveTokens` from pi's compaction settings (default 16384) and display it as a separate "Autocompact buffer" category in the grid and breakdown, following Claude Code's approach.
+**Decision**: Read `reserveTokens` via `SettingsManager.create(ctx.cwd).getCompactionReserveTokens()` (which applies user overrides; default 16384) and display it as a separate "Autocompact buffer" category in the grid and breakdown, following Claude Code's approach.
 
 **Rationale**: Users need to understand that not all "available" context is usable — a portion is reserved for compaction. This prevents confusion when compaction triggers earlier than expected.
 
@@ -96,5 +96,6 @@ pi-tui overlays do not support scrolling, so long content (many skills, many con
 
 - **Token estimates are approximate** → Mitigated by scaling to the actual total; clearly labeled as "Estimated usage"
 - **`systemPromptOptions` cache may be stale** → Refreshed every turn via `before_agent_start`; before first turn, show "Send a message to see full breakdown"
-- **`ctx.getContextUsage().tokens` is null after compaction** → Show "Token count pending — send a message to refresh"
+- **`ctx.getContextUsage().tokens` is null after compaction** → Show "Token count pending — send a message to refresh"; fall back to unscaled estimates
+- **`ctx.getContextUsage()` returns `undefined`** → No model selected or no usage data yet; show unscaled estimates with approximation note
 - **regex for `<extension-context>` could match content in user messages** → Low risk; the format includes `source="supi-claude-md"` which is unlikely to appear in user text

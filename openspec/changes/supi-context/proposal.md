@@ -17,7 +17,7 @@ There is no way to see a detailed breakdown of what is consuming context in pi. 
   - All loaded skills with per-skill token estimates
   - Guidelines and tool definition token estimates
 - Uses pi's exported `estimateTokens`, `buildSessionContext`, and `getLatestCompactionEntry` for accurate API-view token estimation
-- Caches `systemPromptOptions` from `before_agent_start` for system prompt component breakdown
+- Caches `systemPromptOptions` from `before_agent_start` for system prompt component breakdown (contextFiles, skills, promptGuidelines, customPrompt, toolSnippets, appendSystemPrompt)
 - Registers a `MessageRenderer` so the report is styled and persisted in session history
 - Wired into the `supi` meta-package
 
