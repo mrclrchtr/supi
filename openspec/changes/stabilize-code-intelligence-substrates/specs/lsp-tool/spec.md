@@ -6,6 +6,7 @@ The system SHALL validate action-specific parameters for the standalone `lsp` to
 Parameter rules:
 - `hover`, `definition`, `references`, and `code_actions` require `file`, `line`, and `character`
 - `rename` requires `file`, `line`, `character`, and non-empty `newName`
+- `line` and `character`, when required, must be positive 1-based integers
 - `symbols` requires `file`
 - `diagnostics` accepts optional `file`
 - `workspace_symbol` and `search` require non-empty `query`
@@ -18,6 +19,11 @@ Parameter rules:
 #### Scenario: Missing rename target
 - **WHEN** the agent calls `lsp` with `action: "rename"` and omits `newName`
 - **THEN** the tool returns a validation error indicating that `newName` is required
+
+#### Scenario: Invalid file-position coordinates
+- **WHEN** the agent calls `lsp` with `action: "definition"`, a `file`, `line: 0`, and `character: -1`
+- **THEN** the tool returns a validation error indicating that `line` and `character` must be positive 1-based integer values
+- **AND** it does not issue an LSP request with invalid zero-based coordinates
 
 #### Scenario: Missing search query
 - **WHEN** the agent calls `lsp` with `action: "workspace_symbol"` or `action: "search"` and provides an empty `query`
@@ -35,6 +41,6 @@ The system SHALL resolve relative `file` inputs for the standalone `lsp` tool fr
 - **THEN** the tool resolves the request against `/repo`
 - **AND** the resulting LSP operations target `/repo/src/index.ts`
 
-#### Scenario: Missing file input for diagnostics
+#### Scenario: Missing diagnostics target file
 - **WHEN** the agent calls `lsp` with `action: "diagnostics"` and `file: "src/missing.ts"`
 - **THEN** the tool returns a clear file access or unavailable-server error instead of relying on a thrown exception or incorrect ambient cwd resolution
