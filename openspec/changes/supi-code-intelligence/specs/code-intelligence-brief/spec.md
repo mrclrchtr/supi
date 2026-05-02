@@ -14,6 +14,7 @@ The system SHALL generate a lightweight architecture overview and inject it into
 #### Scenario: Reload or resume with an existing overview on the active branch
 - **WHEN** the extension reloads or the user resumes a session whose active branch already contains the code-intelligence overview message
 - **THEN** the system does not inject a duplicate overview for that active branch
+- **AND** detection uses `ctx.sessionManager.getBranch()` scanning for entries with `customType === "code-intelligence-overview"` during `session_start`, following the established `supi-lsp` context-token pattern
 
 ### Requirement: The auto-injected overview SHALL be compact, structural, and actionable
 The auto-injected overview SHALL summarize top-level project layout, module/package names, one-line purpose descriptions when available, and key dependency edges. It SHALL prefer concise summaries over detailed API listings and SHOULD usually stay well below 500 tokens, using a much smaller budget in the common case and reserving the upper end only for unusually complex repositories. By default it SHOULD stay within a small predictable budget such as roughly eight modules/packages, roughly eight dependency edges, and at most one follow-up hint. It SHALL be built from cheap metadata and readily available structural data first, with deeper enrichment treated as opportunistic. When space allows, it SHOULD include a brief hint that richer focused context is available through `code_intel brief` instead of expanding the injected context itself.

@@ -86,10 +86,12 @@ It also has to respect existing repo constraints:
 
 **Decision:** Generate and inject the architecture overview on the first `before_agent_start` event of a session, not on every turn and not in `session_start`.
 
-**Rationale:** This timing allows `supi-lsp` to finish its own initialization while still providing the context before the agent responds for the first time. Injecting once keeps token cost bounded and reinforces the rule that only `supi-code-intelligence` owns high-level architecture context.
+**Rationale:** This timing ensures the extension's own `session_start` initialization (manifest scanning, Tree-sitter session creation, architecture model construction) completes before the overview is emitted. The overview itself is always metadata/structural-first and does NOT depend on LSP readiness. Injecting once keeps token cost bounded and reinforces the rule that only `supi-code-intelligence` owns high-level architecture context.
+
+**Duplicate detection mechanism:** The injected message uses `customType: "code-intelligence-overview"`. On `session_start` (which fires on reload/resume), the extension scans `ctx.sessionManager.getBranch()` for any entry with that `customType`. If found, a `hasInjectedOverview` flag is set and the next `before_agent_start` skips injection. This matches the established `supi-lsp` pattern with `lsp-context` and context tokens.
 
 **Alternatives considered:**
-- `session_start` injection — may run before LSP-backed enrichment is ready
+- `session_start` injection — extension initialization may not be complete yet; also prevents the extension from scanning the branch for prior overview presence
 - Inject on every `before_agent_start` — repetitive and token-expensive
 - No automatic injection — forces the agent to ask for context it should already have
 
@@ -124,7 +126,7 @@ It also has to respect existing repo constraints:
 **Action behavior:**
 - `brief` works from the shared architecture model and is enriched by LSP/Tree-sitter when available
 - `callers`, `implementations`, and `affected` prefer LSP and may return structural or heuristic, clearly-labeled output when semantic analysis is unavailable, unsupported, or not useful enough to answer with confidence
-- `callees` is a best-effort v1 action: it prefers semantic relationship data when available but may rely more heavily on structural or heuristic output in v1 than `callers` or `implementations`
+- `callees` is a best-effort v1 action: it prefers semantic relationship data when available but may rely more heavily on structural or heuristic output in v1 than `callers` or `implementations`. In v1, structural fallback for `callees` SHALL identify `call_expression` and `new_expression` AST nodes within the resolved symbol's body. It SHALL NOT include type references, import declarations, or non-invoked property accesses.
 - `pattern` is a direct text-search action and does not depend on LSP or Tree-sitter
 - discovery-oriented semantic actions may accept narrowing filters such as `path`, symbol `kind`, or `exportedOnly` when those filters reduce ambiguity or token cost
 - when LSP is unavailable, unsupported, or cannot resolve the target with useful confidence, the tool should return the best bounded result it can, label the current confidence mode, and suggest a retry only when a rerun is likely to materially improve confidence
@@ -260,7 +262,7 @@ The word `degraded` may be used as a short umbrella description for any non-sema
 **Decision:** The change includes both publish surfaces and root verification scripts as first-class implementation work.
 
 **Required wiring:**
-- root `package.json` `pi.extensions`, ordered after `supi-lsp` and `supi-tree-sitter` so session services and lower-layer tools are available before `code_intel` guidance/handlers run
+- root `package.json` `pi.extensions`, ordered after `supi-lsp` and `supi-tree-sitter` so session services and lower-layer tools are available before `code_intel` guidance/handlers run (pi guarantees handlers run in extension load order per `docs/extensions.md`)
 - `packages/supi/package.json` dependency and wrapper entrypoint, also ordered after the lower-layer wrappers
 - package `tsconfig.json` and test `tsconfig.json` placement under `packages/supi-code-intelligence/` so existing root glob scripts discover them
 - package files/dependency metadata that pack correctly through the standalone package and meta-package surfaces

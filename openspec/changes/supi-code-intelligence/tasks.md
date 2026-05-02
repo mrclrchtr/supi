@@ -35,7 +35,7 @@
 - [ ] 4.5 Implement focused `brief` generation for a specific file or directory path, including missing-path errors
 - [ ] 4.6 Implement anchored `brief` generation for `file` + 1-based `line` + `character`, returning enclosing-symbol or enclosing-node context when available
 - [ ] 4.7 Ensure focused briefs include dependencies, dependents/reverse dependencies, and internal versus external edges when available
-- [ ] 4.8 Include a bounded “start here” section and at most two short “best next queries” hints in full and focused briefs so agents know what to inspect or ask next
+- [ ] 4.8 Include a bounded "start here" section and at most two short "best next queries" hints in full and focused briefs so agents know what to inspect or ask next
 - [ ] 4.9 Wire a first-turn-only `before_agent_start` handler that injects the overview once per session and does not duplicate after `/reload` or session resume
 - [ ] 4.10 Keep first-turn overview generation latency-bounded by using cheap metadata and readily available structural data first and deferring deep enrichment to on-demand `brief`
 - [ ] 4.11 Return structured `details` metadata for `brief` results (confidence, focus target, start-here targets, public surfaces, dependency summary, omitted counts, next queries)
@@ -49,7 +49,7 @@
 - [ ] 5.4 Implement best-effort v1 `callees` using semantic relationship data when available and Tree-sitter or text-search heuristics otherwise, with clearly labeled degraded fallback output
 - [ ] 5.5 Implement `implementations` using `SessionLspService.implementation()` when available, with clearly labeled heuristic candidates or unavailable messaging when needed
 - [ ] 5.6 Implement `pattern` using structured text search with grouped matches, context lines, `path` scoping, and applied-scope summaries
-- [ ] 5.7 Implement `affected` with direct references, downstream dependents, explained `low` / `medium` / `high` risk assessment, highest-value “check next” files/modules, likely tests to inspect, prompt partial fallback behavior, and ambiguity-safe target handling
+- [ ] 5.7 Implement `affected` with direct references, downstream dependents, explained `low` / `medium` / `high` risk assessment, highest-value "check next" files/modules, likely tests to inspect, prompt partial fallback behavior, and ambiguity-safe target handling
 - [ ] 5.8 Add shared output truncation using pi output limits, explicit confidence/capability labeling, anti-noise output rules, and next-best-step messaging for semantic, structural, and text-search results
 - [ ] 5.9 Add optional `maxResults` / `contextLines` style controls with concrete token-efficient defaults so agents can intentionally trade detail for tokens
 - [ ] 5.10 Return structured `details` metadata for relationship and pattern results (confidence, scope, candidates, omitted counts, next queries)
@@ -65,13 +65,15 @@
 
 ## 7. Tests and verification
 
-- [ ] 7.1 Add unit tests for the shared architecture model, overview formatting, empty-project handling, focused path brief generation, anchored enclosing-symbol brief generation, and entrypoint/public-surface highlighting
-- [ ] 7.2 Add unit tests for dependency/reverse-dependency reporting and internal versus external edge labeling
-- [ ] 7.3 Add unit tests for target resolution, coordinate translation, rich ranked disambiguation, flat-schema parameter roles (`path` vs `file`), leading-`@` normalization, narrowing filters, `callers`, `callees`, `implementations`, path-scoped `pattern`, and `affected`, including ambiguity handling, omitted counts, and degraded fallback labeling
-- [ ] 7.4 Add unit tests for ranked top-target summaries and bounded “start here” sections in `brief`, structured `details` metadata across `brief`, relationship, and affected outputs, and likely-test suggestions plus discrete risk levels in `affected` outputs
-- [ ] 7.5 Add integration tests for `code_intel` tool registration, validation, example-call help text, prompt guidance deconfliction, and first-turn-only overview injection across reload/resume
-- [ ] 7.6 Verify the root `typecheck` and `typecheck:tests` glob scripts discover the new package and test tsconfig automatically
-- [ ] 7.7 Run `pnpm exec biome check --write packages/supi-code-intelligence/`
-- [ ] 7.8 Run targeted package typecheck/test commands for `supi-code-intelligence` and affected substrate consumers
-- [ ] 7.9 Run `pnpm typecheck`, `pnpm test`, and `pnpm verify`
-- [ ] 7.10 Manual test: load pi in the supi repo, verify `code_intel` appears, review prompt guidance, and exercise each action
+_Tier 1 tasks are required for initial merge. Tier 2 tasks are required before v1 release but may land as follow-up hardening._
+
+- [ ] 7.1 [Tier 1] Add unit tests for the shared architecture model, overview formatting, empty-project handling, focused path brief generation, anchored enclosing-symbol brief generation, and entrypoint/public-surface highlighting
+- [ ] 7.2 [Tier 2] Add unit tests for dependency/reverse-dependency reporting and internal versus external edge labeling
+- [ ] 7.3 [Tier 1] Add unit tests for target resolution, coordinate translation, rich ranked disambiguation, flat-schema parameter roles (`path` vs `file`), leading-`@` normalization, narrowing filters, `callers`, `callees`, `implementations`, path-scoped `pattern`, and `affected`, including ambiguity handling, omitted counts, and degraded fallback labeling
+- [ ] 7.4 [Tier 2] Add unit tests for ranked top-target summaries and bounded "start here" sections in `brief`, structured `details` metadata across `brief`, relationship, and affected outputs, and likely-test suggestions plus discrete risk levels in `affected` outputs
+- [ ] 7.5 [Tier 1] Add integration tests for `code_intel` tool registration, validation, example-call help text, prompt guidance deconfliction, and first-turn-only overview injection across reload/resume
+- [ ] 7.6 [Tier 1] Verify the root `typecheck` and `typecheck:tests` glob scripts discover the new package and test tsconfig automatically
+- [ ] 7.7 [Tier 1] Run `pnpm exec biome check --write packages/supi-code-intelligence/`
+- [ ] 7.8 [Tier 1] Run targeted package typecheck/test commands for `supi-code-intelligence` and affected substrate consumers
+- [ ] 7.9 [Tier 1] Run `pnpm typecheck`, `pnpm test`, and `pnpm verify`
+- [ ] 7.10 [Tier 2] Manual test: load pi in the supi repo, verify `code_intel` appears, review prompt guidance, and exercise each action

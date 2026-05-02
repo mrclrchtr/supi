@@ -82,6 +82,18 @@ Example v1 calls SHOULD stay short and copyable, for example:
 - **WHEN** the agent calls a discovery-oriented semantic action with `symbol`, `path`, and `exportedOnly`
 - **THEN** the tool limits candidate resolution to matching exported symbols within that scope when such filtering is supported
 
+#### Scenario: `exportedOnly` with LSP available
+- **WHEN** the agent uses `exportedOnly` and LSP provides symbol visibility information
+- **THEN** the tool filters candidates using LSP-provided visibility when available, or post-filters using Tree-sitter export detection on candidate files
+
+#### Scenario: `exportedOnly` with structural-only analysis
+- **WHEN** the agent uses `exportedOnly` and only Tree-sitter analysis is available
+- **THEN** the tool filters candidates using the Tree-sitter `exports` action to check whether candidate symbols appear in the file's export list
+
+#### Scenario: `exportedOnly` with text-search-only fallback
+- **WHEN** the agent uses `exportedOnly` but neither LSP nor Tree-sitter can verify export status
+- **THEN** the tool MAY silently ignore the filter and include a confidence note that export filtering was not applied
+
 #### Scenario: Agent uses `path` for a focused brief
 - **WHEN** the agent calls `code_intel` with `action: "brief"` and `path: "packages/supi-lsp/"`
 - **THEN** the tool treats `path` as the focus target rather than requiring an anchored `file` position
@@ -157,6 +169,8 @@ The system SHALL support `action: "callers"` to find call sites for a resolved s
 ### Requirement: `action: "callees"` SHALL return grouped outgoing-call results with confidence labeling
 The system SHALL support `action: "callees"` to find the most relevant outgoing calls made by a resolved symbol target and return results grouped by file or callee symbol with a summary. `callees` is a best-effort v1 action: when semantic relationship data is available it SHALL use it, and when it is not available it MAY fall back to structural or text-search hints. Non-semantic output SHALL be labeled clearly as `structural`, `heuristic`, or `unavailable` as appropriate and SHALL suggest the next best drill-down when useful.
 
+In v1, structural fallback for `callees` SHALL identify `call_expression` and `new_expression` AST nodes within the resolved symbol's body using Tree-sitter. It SHALL NOT include type references, import declarations, or non-invoked property accesses. This keeps structural callee output focused on actual invocations rather than noisy identifier mentions.
+
 #### Scenario: Semantic callee results available
 - **WHEN** the agent calls `code_intel` with `action: "callees"` for a resolved target that has semantic relationship data available
 - **THEN** the tool returns the main outgoing calls grouped and summarized with file paths, symbol names, and `semantic` confidence labeling
@@ -180,6 +194,8 @@ The system SHALL support `action: "implementations"` to find concrete implementa
 
 ### Requirement: `action: "pattern"` SHALL provide structured text search results
 The system SHALL support `action: "pattern"` using line-oriented text search and return results grouped by file with matching lines and nearby context. In v1, `pattern` SHALL be interpreted as a search pattern evaluated by the underlying search engine within the optional `path` scope; the tool does not promise language-aware semantic matching for this action.
+
+`pattern` is not a replacement for raw `rg` in shell scripts; it is a bounded, scope-aware, agent-friendly wrapper that provides: (1) structured markdown output grouped by file with match context, (2) `details` metadata with match counts, applied scope, and omitted counts for tests/automation, (3) automatic scope enforcement via `path`, default `maxResults` budget of ~8, and low-signal path filtering (node_modules, build outputs, generated artifacts), and (4) pi output-limit truncation with clear reporting. The value over raw `rg` is noise reduction, budget enforcement, and seamless integration with `code_intel` follow-up suggestions.
 
 #### Scenario: Pattern search with multiple matches
 - **WHEN** the agent calls `code_intel` with `action: "pattern"` and a pattern that matches multiple files
@@ -229,3 +245,34 @@ In addition to markdown content for the model, search and relationship actions S
 #### Scenario: Relationship result includes metadata
 - **WHEN** a `callers`, `callees`, `implementations`, or `pattern` action succeeds
 - **THEN** the tool result includes markdown content for the model and a compact `details` object describing the structured result
+
+### Requirement: Parameter validation SHALL return actionable error messages
+The `code_intel` tool SHALL validate input parameters per action and return clear, actionable error messages naming the specific violation and suggesting correct usage. Invalid or missing required inputs SHALL produce an error result rather than silently degrading.
+
+#### Scenario: Unknown action value
+- **WHEN** the agent calls `code_intel` with an unrecognized `action` value
+- **THEN** the tool returns an error naming the invalid action and listing supported actions: `brief`, `callers`, `callees`, `implementations`, `affected`, `pattern`
+
+#### Scenario: Anchored position without `file`
+- **WHEN** the agent provides `line` and/or `character` without `file`
+- **THEN** the tool returns an error: "`line` and `character` require `file`"
+
+#### Scenario: `pattern` action without pattern string
+- **WHEN** the agent calls `code_intel` with `action: "pattern"` but omits the `pattern` parameter
+- **THEN** the tool returns an error: "`pattern` action requires a `pattern` parameter"
+
+#### Scenario: Semantic action without target or discovery input
+- **WHEN** the agent calls a semantic action (`callers`, `callees`, `implementations`, `affected`) without `file`+`line`+`character` AND without `symbol`
+- **THEN** the tool returns an error explaining that semantic actions require either anchored coordinates or a `symbol` for discovery
+
+#### Scenario: `file` points to a non-existent path
+- **WHEN** the agent provides a `file` value that does not exist on disk
+- **THEN** the tool returns an error naming the missing file path
+
+#### Scenario: `file` points to an unsupported binary file
+- **WHEN** the agent provides a `file` value pointing to a binary or unsupported file type for semantic analysis
+- **THEN** the tool returns a clear message that the file type is not supported for semantic analysis and suggests `pattern` for text search if appropriate
+
+#### Scenario: `path` vs `file` role mistake
+- **WHEN** the agent provides `path` with `line`/`character` (suggesting they meant `file`) or provides `file` for a directory (suggesting they meant `path`)
+- **THEN** the tool returns an error explaining the distinction: `path` scopes/focuses analysis; `file` anchors a position

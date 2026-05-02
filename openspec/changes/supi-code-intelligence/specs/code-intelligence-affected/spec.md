@@ -32,6 +32,13 @@ Affected analysis SHOULD prioritize likely human-edited source files, tests, and
 ### Requirement: Affected analysis SHALL assign an explained `low` / `medium` / `high` risk level
 The affected output SHALL include a qualitative risk assessment with one of the labels `low`, `medium`, or `high`, derived from the number of affected files, affected modules, and downstream dependency breadth. The risk section SHALL briefly explain the evidence behind the rating so agents can decide whether to inspect more context, add tests, or make a narrower change.
 
+**Implementation guidance for thresholds (tunable heuristics, not hard requirements):**
+- `low`: ≤3 direct references, all within the same file or package, no downstream dependent modules
+- `medium`: 4–10 references OR references span 2–3 packages OR 1 downstream dependent module
+- `high`: >10 references OR >3 packages touched OR >1 downstream dependent module
+
+Thresholds are implementation heuristics and MAY be tuned based on observed agent behavior. The risk label SHOULD be directionally correct and accompanied by the evidence that produced it.
+
 #### Scenario: Small local change
 - **WHEN** a symbol change affects only one file or one module with no downstream dependents
 - **THEN** the tool reports a `low` risk level
