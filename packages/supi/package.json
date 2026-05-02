@@ -26,6 +26,7 @@
     "@mrclrchtr/supi-ask-user": "workspace:*",
     "@mrclrchtr/supi-bash-timeout": "workspace:*",
     "@mrclrchtr/supi-claude-md": "workspace:*",
+    "@mrclrchtr/supi-cache-monitor": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-skill-shortcut": "workspace:*",
@@ -54,7 +55,8 @@
       "./lsp.ts",
       "./review.ts",
       "./context.ts",
-      "./tree-sitter.ts"
+      "./tree-sitter.ts",
+      "./cache-monitor.ts"
     ],
     "prompts": [
       "./prompts"

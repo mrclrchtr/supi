@@ -25,7 +25,8 @@
       "./packages/supi-review/index.ts",
       "./packages/supi-skill-shortcut/skill-shortcut.ts",
       "./packages/supi-lsp/lsp.ts",
-      "./packages/supi-tree-sitter/tree-sitter.ts"
+      "./packages/supi-tree-sitter/tree-sitter.ts",
+      "./packages/supi-cache-monitor/index.ts"
     ],
     "prompts": [
       "./packages/supi/prompts"
