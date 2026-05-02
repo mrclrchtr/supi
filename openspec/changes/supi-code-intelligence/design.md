@@ -114,7 +114,7 @@ It also has to respect existing repo constraints:
 
 ### 5. Fallback policy is explicit and action-specific
 
-**Decision:** `code_intel` SHALL use explicit fallback order and label degraded results clearly.
+**Decision:** `code_intel` SHALL use explicit fallback order, label degraded results clearly, and prefer prompt partial answers over blocking when higher-confidence enrichment is pending.
 
 **Fallback order:**
 1. LSP first for semantic truth
@@ -123,10 +123,11 @@ It also has to respect existing repo constraints:
 
 **Action behavior:**
 - `brief` works from the shared architecture model and is enriched by LSP/Tree-sitter when available
-- `callers`, `implementations`, and `affected` prefer LSP and may return heuristic, clearly-labeled degraded output when only structural/text fallbacks are available
+- `callers`, `implementations`, and `affected` prefer LSP and may return structural or heuristic, clearly-labeled partial output when only lower-confidence data is promptly available
 - `callees` is a best-effort v1 action: it prefers semantic relationship data when available but may rely more heavily on structural or heuristic output in v1 than `callers` or `implementations`
 - `pattern` is a direct text-search action and does not depend on LSP or Tree-sitter
 - discovery-oriented semantic actions may accept narrowing filters such as `path`, symbol `kind`, or `exportedOnly` when those filters reduce ambiguity or token cost
+- when LSP is `pending` or unavailable, the tool should return the best prompt bounded result it can, label the current confidence mode, and suggest a retry only when a rerun is likely to materially improve confidence
 
 **Rationale:** Different actions need different confidence levels. This policy preserves a stable tool surface while being honest about precision.
 
@@ -138,7 +139,7 @@ It also has to respect existing repo constraints:
 
 **Decision:** Semantic actions (`callers`, `callees`, `implementations`, `affected`) SHALL accept either an explicit anchored target (`file`, `line`, `character`) or a discovery input such as `symbol`. The public `code_intel` tool uses 1-based `line` and `character` coordinates with UTF-16 character columns, matching the existing `lsp` and `tree_sitter` tools. Internally, `supi-code-intelligence` translates those public coordinates to the 0-based `Position` shape required by `SessionLspService`. When discovery is used, the tool may accept narrowing filters such as `path`, symbol `kind`, or `exportedOnly`. In v1, `exportedOnly` is the canonical public-surface filter; a broader language-specific `publicOnly` concept is deferred. If discovery input still resolves to multiple plausible targets, the tool returns a disambiguation result instead of silently merging or picking one.
 
-**Disambiguation output:** Candidate targets should be retry-ready: each candidate includes display name, kind/container when available, `file`, 1-based `line`, 1-based `character`, and a short reason/snippet. This lets the agent immediately rerun the same action with anchored coordinates instead of opening files just to locate the symbol.
+**Disambiguation output:** Candidate targets should be retry-ready and low-friction to compare: each candidate includes display name, kind/container when available, `file`, 1-based `line`, 1-based `character`, a short reason/snippet, and rank order. Candidate lists should stay bounded by default and report omitted counts when truncated. This lets the agent immediately rerun the same action with anchored coordinates instead of opening files just to locate the symbol.
 
 **Rationale:** LSP reference and implementation APIs are position-based, and symbol names are frequently duplicated across files. Requiring a concrete target or an explicit disambiguation round keeps semantic results trustworthy. Using the same public coordinate convention as the lower-level tools avoids off-by-one mistakes, while retry-ready candidates minimize follow-up token cost.
 
@@ -162,10 +163,12 @@ The word `degraded` may be used as a short umbrella description for any non-sema
 **Output shape:**
 - Start with a one-to-three line summary answering “what should the agent know now?”
 - Surface a small ranked set of highest-value files/modules/symbols before any long tail
+- Use predictable default budgets so agents can trust the tool to stay cheap: the auto overview should usually stay within roughly eight modules/packages, eight dependency edges, and one hint; on-demand briefs should usually stay within roughly three “start here” targets, five notable surfaces, and two next-query hints unless the agent explicitly asks for more
 - Group evidence by file/module and include `path:line` references when available
 - Label source confidence using the shared vocabulary: semantic, structural, heuristic, or unavailable
 - When the result is non-semantic or unavailable, say so explicitly and provide the next best move
 - Collapse long tails with counts such as “+12 more matches omitted; rerun with a narrower path or higher limit”
+- Omit empty sections, avoid boilerplate explanations, and prefer ranked summaries over exhaustive import/export dumps unless detail is the point of the request
 - End with a brief “best next query” only when it helps, for example `code_intel affected` before editing a public export
 - Include compact machine-readable `details` fields such as confidence, candidates, scope, omitted counts, and suggested next queries where practical
 
@@ -185,6 +188,7 @@ The word `degraded` may be used as a short umbrella description for any non-sema
 - Use `code_intel affected` before changing exported APIs, shared helpers, config surfaces, or cross-package contracts
 - Use `code_intel callers` / `callees` / `implementations` for semantic relationship questions before falling back to broad text search
 - Use `code_intel pattern` for bounded literal/regex search when the question is textual rather than semantic
+- Map plain-language intent to actions explicitly in guidance: “orient me” → `brief`, “who uses this?” → `callers`, “what does this call?” → `callees`, “what breaks if I change this?” → `affected`, and “find concrete implementations” → `implementations`
 - Use raw `lsp` and `tree_sitter` tools for precise drill-down after `code_intel` identifies the relevant file, symbol, or syntax node
 - When `lsp` and `tree_sitter` are also active, make `code_intel` the orchestrating first stop for architecture, impact, and summarized relationship questions; keep substrate guidance accurate but non-competing by positioning lower-level tools as exact drill-down after `code_intel` narrows the target
 
@@ -212,8 +216,8 @@ The word `degraded` may be used as a short umbrella description for any non-sema
   "pattern": "optional text-search pattern",
   "kind": "optional discovery kind filter",
   "exportedOnly": true,
-  "maxResults": 20,
-  "contextLines": 2
+  "maxResults": 8,
+  "contextLines": 1
 }
 ```
 

@@ -27,8 +27,15 @@ The tool SHALL provide compact `promptSnippet` and `promptGuidelines` that expla
 - **THEN** the combined guidance still presents `code_intel` as the preferred first stop for architecture, impact, and summarized relationship questions
 - **AND** it presents `lsp` and `tree_sitter` as precise drill-down tools after `code_intel` has narrowed the target
 
+### Requirement: Tool guidance SHALL map common agent intents to canonical actions
+Tool guidance, descriptions, or schema help SHALL map common agent intents to canonical `code_intel` actions in plain language so the agent does not have to infer the taxonomy. At minimum, guidance SHOULD make it obvious that “orient me” maps to `brief`, “who uses this?” maps to `callers`, “what does this call?” maps to `callees`, “what breaks if I change this?” maps to `affected`, “find concrete implementations” maps to `implementations`, and bounded text search maps to `pattern`.
+
+#### Scenario: Agent thinks in intent rather than tool vocabulary
+- **WHEN** the agent needs architecture, usage, impact, implementation, or text-search help but has not yet chosen an action name
+- **THEN** the tool guidance makes the correct action mapping obvious without requiring the agent to reason from first principles
+
 ### Requirement: Tool parameters SHALL support token-efficient refinement
-The `code_intel` parameter schema SHALL keep common calls short while allowing agents to bound result size intentionally. In addition to action-specific inputs (`path`, `symbol`, `file`, `line`, `character`, and search pattern), search-oriented actions SHOULD support optional result and context controls such as `maxResults` and `contextLines` with safe defaults. Text-search and discovery-oriented actions SHOULD support a `path` scope when practical so agents can restrict analysis to a package, directory, or file instead of paying for whole-repository results. Discovery-oriented semantic actions SHOULD also support optional narrowing filters such as symbol `kind` and `exportedOnly` when those filters materially reduce ambiguity or token cost. In v1, `exportedOnly` is the canonical public-surface filter; a broader language-specific `publicOnly` concept is deferred.
+The `code_intel` parameter schema SHALL keep common calls short while allowing agents to bound result size intentionally. In addition to action-specific inputs (`path`, `symbol`, `file`, `line`, `character`, and search pattern), search-oriented actions SHOULD support optional result and context controls such as `maxResults` and `contextLines` with concrete token-efficient defaults. In v1, `pattern` SHOULD default to about `maxResults: 8` and `contextLines: 1`, while relationship actions SHOULD default to surfacing about five ranked targets and grouped evidence for about eight files unless the agent asks for more. Text-search and discovery-oriented actions SHOULD support a `path` scope when practical so agents can restrict analysis to a package, directory, or file instead of paying for whole-repository results. Discovery-oriented semantic actions SHOULD also support optional narrowing filters such as symbol `kind` and `exportedOnly` when those filters materially reduce ambiguity or token cost. In v1, `exportedOnly` is the canonical public-surface filter; a broader language-specific `publicOnly` concept is deferred.
 
 The schema SHALL remain flat and role-oriented:
 - `path` scopes or focuses analysis to a package, directory, or file path
@@ -76,6 +83,10 @@ Example v1 calls SHOULD stay short and copyable, for example:
 - **WHEN** the agent calls any `code_intel` action without result-size controls
 - **THEN** the tool uses token-efficient defaults rather than returning an unbounded dump
 
+#### Scenario: Agent relies on predictable relationship budgets
+- **WHEN** the agent calls a relationship action without a custom result limit
+- **THEN** the tool returns a small ranked set of high-value targets and reports omitted counts instead of flooding the prompt with every match
+
 ### Requirement: Tool descriptions or schema help SHALL include concise example calls
 The tool description, parameter descriptions, or related prompt/schema help SHALL include a small set of representative flat-schema examples that show the intended call shape without bloating the system prompt.
 
@@ -88,7 +99,7 @@ The tool description, parameter descriptions, or related prompt/schema help SHAL
 - **THEN** it can see a concise example using `file`, `line`, and `character` for actions such as `callers`, `callees`, or `affected`
 
 ### Requirement: Semantic actions SHALL resolve a concrete target before returning semantic results
-For `callers`, `callees`, and `implementations`, the tool SHALL accept either an anchored target (`file`, `line`, and `character`) or a discovery input such as `symbol`. Public `line` and `character` parameters SHALL be 1-based and compatible with the existing `lsp` and `tree_sitter` tools; the implementation SHALL translate them to the 0-based LSP service API internally. If discovery input resolves to multiple plausible targets, the tool SHALL return a disambiguation result instead of silently merging or selecting one target. Disambiguation candidates SHALL include retry-ready `file`, 1-based `line`, and 1-based `character` values when available.
+For `callers`, `callees`, and `implementations`, the tool SHALL accept either an anchored target (`file`, `line`, and `character`) or a discovery input such as `symbol`. Public `line` and `character` parameters SHALL be 1-based and compatible with the existing `lsp` and `tree_sitter` tools; the implementation SHALL translate them to the 0-based LSP service API internally. If discovery input resolves to multiple plausible targets, the tool SHALL return a disambiguation result instead of silently merging or selecting one target. Disambiguation candidates SHALL include retry-ready display name, kind, container/module when available, explicit rank order, `file`, 1-based `line`, 1-based `character`, and a short distinguishing reason or snippet. Candidate lists SHOULD be ranked, bounded by default, and report omitted counts when additional matches exist.
 
 #### Scenario: Anchored semantic target
 - **WHEN** the agent calls `code_intel` with `action: "callers"`, `file`, `line`, and `character`
@@ -100,6 +111,17 @@ For `callers`, `callees`, and `implementations`, the tool SHALL accept either an
 
 ### Requirement: Search and relationship actions SHALL use a consistent confidence vocabulary
 Search and relationship actions SHALL label result confidence using a consistent four-mode vocabulary: `semantic`, `structural`, `heuristic`, or `unavailable`. The word `degraded` MAY appear as a short umbrella description for any non-semantic path, but user-visible labels and structured metadata SHOULD prefer one of the four explicit modes.
+
+### Requirement: Search and relationship actions SHOULD return prompt partial results when higher-confidence enrichment is pending
+When semantic analysis is still pending or partially unavailable, search and relationship actions SHOULD return the best prompt bounded result available rather than block for deeper analysis. Partial results SHALL clearly label the current confidence mode and SHOULD suggest a retry only when a later rerun is likely to materially improve confidence.
+
+#### Scenario: LSP is still pending for a relationship query
+- **WHEN** the agent calls `code_intel` for `callers`, `callees`, or `implementations` while LSP-backed enrichment is still pending but structural or text-search evidence is already available
+- **THEN** the tool returns the available bounded result promptly with `structural` or `heuristic` labeling instead of waiting indefinitely for semantic data
+
+#### Scenario: Retry is unlikely to help
+- **WHEN** the current fallback result already reflects the best practical confidence available for the project or language
+- **THEN** the tool does not add a noisy retry suggestion
 
 #### Scenario: Structural relationship result
 - **WHEN** a relationship action succeeds through parser-backed or manifest-backed analysis without semantic confirmation
@@ -157,7 +179,7 @@ The system SHALL support `action: "pattern"` using text search and return result
 - **THEN** the tool returns a message indicating that no matches were found
 
 ### Requirement: Search and relationship output SHALL be summary-first, ranked, and bounded to pi output limits
-The system SHALL return search and relationship output as structured markdown with a concise summary first, grouped evidence, confidence labels from the shared vocabulary (`semantic`, `structural`, `heuristic`, `unavailable`), and file/line references where available. Relationship-oriented actions SHALL surface a small ranked set of highest-value files, modules, or symbols before any long tail. It SHALL truncate oversized search output to fit pi output limits (50KB / 2000 lines) using the repository standard truncation helper where practical, and SHALL note when truncation occurred.
+The system SHALL return search and relationship output as structured markdown with a concise summary first, grouped evidence, confidence labels from the shared vocabulary (`semantic`, `structural`, `heuristic`, `unavailable`), and file/line references where available. Relationship-oriented actions SHALL surface a small ranked set of highest-value files, modules, or symbols before any long tail. Ranking SHOULD prefer direct symbol ties, public/exported surfaces, cross-module impact, likely edit surfaces, and nearby tests over low-signal or redundant matches. Output SHALL omit empty sections, avoid repeating boilerplate confidence explanations unless they change the agent's next step, and prefer ranked summaries over exhaustive dumps. It SHALL truncate oversized search output to fit pi output limits (50KB / 2000 lines) using the repository standard truncation helper where practical, and SHALL note when truncation occurred.
 
 #### Scenario: Semantic result summary
 - **WHEN** a `callers` or `implementations` action returns semantic results, or a `callees` action returns semantic results in contexts where semantic relationship data is available
@@ -174,6 +196,10 @@ The system SHALL return search and relationship output as structured markdown wi
 #### Scenario: Long tail omitted by default budget
 - **WHEN** a search action finds more matches than the default or requested result budget
 - **THEN** the tool reports how many matches were omitted and suggests narrowing the query or raising the limit
+
+#### Scenario: Low-value sections would add noise
+- **WHEN** a potential output section would be empty, redundant, or only restate already summarized information
+- **THEN** the tool omits that section instead of rendering low-value boilerplate
 
 ### Requirement: Tool results SHALL expose structured details metadata in addition to markdown
 In addition to markdown content for the model, search and relationship actions SHALL include compact structured `details` metadata suitable for tests, renderers, and future automation. Where applicable, `details` SHOULD include fields such as confidence mode from the shared vocabulary, applied scope, disambiguation candidates, omitted counts, and suggested next queries.

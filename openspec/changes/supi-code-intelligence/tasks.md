@@ -28,38 +28,38 @@
 
 ## 4. Brief generation and session context
 
-- [ ] 4.1 Implement compact overview formatting for first-turn session injection, targeting roughly 500 tokens or less
+- [ ] 4.1 Implement compact overview formatting for first-turn session injection, targeting roughly 500 tokens or less and a predictable small module/edge budget
 - [ ] 4.2 Support dense module-edge formatting for overview output, including leaf/module dependency annotations where useful
 - [ ] 4.3 Implement full-project `brief` generation from the shared architecture model
-- [ ] 4.4 Highlight notable entrypoints, public/exported API surfaces, and config/settings surfaces in project and module briefs without dumping full export lists
+- [ ] 4.4 Highlight notable entrypoints, top public/exported API surfaces, and config/settings surfaces in project and module briefs without dumping full export lists
 - [ ] 4.5 Implement focused `brief` generation for a specific file or directory path, including missing-path errors
 - [ ] 4.6 Implement anchored `brief` generation for `file` + 1-based `line` + `character`, returning enclosing-symbol or enclosing-node context when available
 - [ ] 4.7 Ensure focused briefs include dependencies, dependents/reverse dependencies, and internal versus external edges when available
-- [ ] 4.8 Include a short “best next queries” hint in full and focused briefs so agents know when to ask for `affected`, `callers`, `callees`, or a narrower `brief`
+- [ ] 4.8 Include a bounded “start here” section and at most two short “best next queries” hints in full and focused briefs so agents know what to inspect or ask next
 - [ ] 4.9 Wire a first-turn-only `before_agent_start` handler that injects the overview once per session and does not duplicate after `/reload` or session resume
 - [ ] 4.10 Keep first-turn overview generation latency-bounded by using cheap metadata and readily available structural data first and deferring deep enrichment to on-demand `brief`
-- [ ] 4.11 Return structured `details` metadata for `brief` results (confidence, focus target, public surfaces, dependency summary, next queries)
+- [ ] 4.11 Return structured `details` metadata for `brief` results (confidence, focus target, start-here targets, public surfaces, dependency summary, omitted counts, next queries)
 - [ ] 4.12 Register a compact custom-message renderer or suppress noisy display if needed so injected overview context remains readable in the TUI
 
 ## 5. Search and affected actions
 
-- [ ] 5.1 Implement target resolution for semantic actions using either anchored 1-based positions (`file`, `line`, `character`) or symbol discovery with retry-ready disambiguation results, translating public coordinates to the 0-based LSP service API internally
+- [ ] 5.1 Implement target resolution for semantic actions using either anchored 1-based positions (`file`, `line`, `character`) or symbol discovery with ranked, retry-ready disambiguation results (name, kind, container, rank, coordinates, reason), including omitted counts when candidates are truncated, translating public coordinates to the 0-based LSP service API internally
 - [ ] 5.2 Add optional narrowing filters for discovery-oriented semantic actions such as `path`, symbol `kind`, and canonical v1 `exportedOnly`
 - [ ] 5.3 Implement `callers` using LSP-first semantic results with grouped summaries, ranked top targets, and clearly labeled heuristic fallback output
 - [ ] 5.4 Implement best-effort v1 `callees` using semantic relationship data when available and Tree-sitter or text-search heuristics otherwise, with clearly labeled degraded fallback output
 - [ ] 5.5 Implement `implementations` using `SessionLspService.implementation()` when available, with clearly labeled heuristic candidates or unavailable messaging when needed
 - [ ] 5.6 Implement `pattern` using structured text search with grouped matches, context lines, `path` scoping, and applied-scope summaries
-- [ ] 5.7 Implement `affected` with direct references, downstream dependents, qualitative risk assessment, highest-value “check next” files/modules, likely tests to inspect, and ambiguity-safe target handling
-- [ ] 5.8 Add shared output truncation using pi output limits, explicit confidence/capability labeling, and next-best-step messaging for semantic, structural, and text-search results
-- [ ] 5.9 Add optional `maxResults` / `contextLines` style controls with safe defaults so agents can intentionally trade detail for tokens
-- [ ] 5.10 Return structured `details` metadata for relationship and pattern results (confidence, scope, candidates, omitted counts, next queries, likely tests where applicable)
+- [ ] 5.7 Implement `affected` with direct references, downstream dependents, explained `low` / `medium` / `high` risk assessment, highest-value “check next” files/modules, likely tests to inspect, prompt partial fallback behavior, and ambiguity-safe target handling
+- [ ] 5.8 Add shared output truncation using pi output limits, explicit confidence/capability labeling, anti-noise output rules, and next-best-step messaging for semantic, structural, and text-search results
+- [ ] 5.9 Add optional `maxResults` / `contextLines` style controls with concrete token-efficient defaults so agents can intentionally trade detail for tokens
+- [ ] 5.10 Return structured `details` metadata for relationship and pattern results (confidence, scope, candidates, omitted counts, next queries)
 
 ## 6. Tool integration and agent guidance
 
 - [ ] 6.1 Create the `code_intel` extension entry point and register the tool with `brief`, `callers`, `callees`, `implementations`, `affected`, and `pattern` actions
 - [ ] 6.2 Add action-specific parameter validation and error messages for required inputs such as `symbol`, `file`, `line`, `character`, `path`, search pattern, and optional narrowing filters such as `kind` and canonical v1 `exportedOnly`, including path-vs-file role mistakes and leading-`@` normalization
 - [ ] 6.3 Route tool actions through shared architecture/search services rather than duplicating logic in the entrypoint
-- [ ] 6.4 Add `promptSnippet` and `promptGuidelines` that explicitly name `code_intel`, explain when it beats `read`/`rg`, and deconflict active `lsp` / `tree_sitter` guidance by positioning them as drill-down tools rather than competitors
+- [ ] 6.4 Add `promptSnippet` and `promptGuidelines` that explicitly name `code_intel`, explain when it beats `read`/`rg`, map plain-language intents to canonical actions, and deconflict active `lsp` / `tree_sitter` guidance by positioning them as drill-down tools rather than competitors
 - [ ] 6.5 Ensure prompt guidance is compact but motivating: orientation before unfamiliar edits, `affected` before API/refactor changes, `callers`/`callees`/`implementations` for semantic relationships, and `pattern` for bounded text search
 - [ ] 6.6 Include 6-10 minimal flat-schema action examples in tool descriptions or schema descriptions without bloating the system prompt, covering `brief`, anchored `brief`, `callers`, `callees`, `implementations`, `affected`, and `pattern`
 
@@ -67,8 +67,8 @@
 
 - [ ] 7.1 Add unit tests for the shared architecture model, overview formatting, empty-project handling, focused path brief generation, anchored enclosing-symbol brief generation, and entrypoint/public-surface highlighting
 - [ ] 7.2 Add unit tests for dependency/reverse-dependency reporting and internal versus external edge labeling
-- [ ] 7.3 Add unit tests for target resolution, coordinate translation, retry-ready disambiguation, flat-schema parameter roles (`path` vs `file`), leading-`@` normalization, narrowing filters, `callers`, `callees`, `implementations`, path-scoped `pattern`, and `affected`, including ambiguity handling and degraded fallback labeling
-- [ ] 7.4 Add unit tests for ranked top-target summaries, likely-test suggestions, and structured `details` metadata across `brief`, relationship, and affected outputs
+- [ ] 7.3 Add unit tests for target resolution, coordinate translation, rich ranked disambiguation, flat-schema parameter roles (`path` vs `file`), leading-`@` normalization, narrowing filters, `callers`, `callees`, `implementations`, path-scoped `pattern`, and `affected`, including ambiguity handling, omitted counts, and degraded fallback labeling
+- [ ] 7.4 Add unit tests for ranked top-target summaries and bounded “start here” sections in `brief`, structured `details` metadata across `brief`, relationship, and affected outputs, and likely-test suggestions plus discrete risk levels in `affected` outputs
 - [ ] 7.5 Add integration tests for `code_intel` tool registration, validation, example-call help text, prompt guidance deconfliction, and first-turn-only overview injection across reload/resume
 - [ ] 7.6 Verify the root `typecheck` and `typecheck:tests` glob scripts discover the new package and test tsconfig automatically
 - [ ] 7.7 Run `pnpm exec biome check --write packages/supi-code-intelligence/`

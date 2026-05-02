@@ -5,10 +5,10 @@ SuPi now has the lower-level code-understanding substrates needed for a higher-l
 ## What Changes
 
 - Add a new `supi-code-intelligence` workspace package as the main agent-facing code understanding extension for SuPi
-- Register a `code_intel` tool with high-level actions: `brief`, `callers`, best-effort v1 `callees`, `implementations`, `affected`, and `pattern`
-- Make follow-up flows low-friction: public positions match the existing 1-based `lsp` / `tree_sitter` convention, ambiguous symbol responses include retry-ready coordinates, and search actions can be scoped for token-efficient refinement
-- Inject a lightweight architecture/module overview once per session so agents start with structural context
-- Synthesize results from the public `@mrclrchtr/supi-lsp` service API and `@mrclrchtr/supi-tree-sitter` session API, preferring LSP for semantic truth, using Tree-sitter for structural enrichment/fallback, and using text search as a last resort
+- Register a `code_intel` tool with high-level actions: `brief`, `callers`, best-effort v1 `callees`, `implementations`, `affected`, and `pattern`, with guidance that maps common agent intents like “orient me”, “who uses this?”, and “what breaks if I change this?” to the right action
+- Make follow-up flows low-friction: public positions match the existing 1-based `lsp` / `tree_sitter` convention, ambiguous symbol responses include rich retry-ready disambiguation payloads, and search actions can be scoped with predictable token-efficient defaults
+- Inject a lightweight architecture/module overview once per session so agents start with structural context without paying repeated prompt cost
+- Synthesize results from the public `@mrclrchtr/supi-lsp` service API and `@mrclrchtr/supi-tree-sitter` session API, preferring LSP for semantic truth, using Tree-sitter for structural enrichment/fallback, using text search as a last resort, and returning prompt bounded partial results when higher-confidence enrichment is still pending
 - Consume shared project-root utilities from `supi-core` for architecture-model scanning instead of duplicating root/path logic
 - Provide compact, motivating `promptSnippet` and `promptGuidelines` that make agents want to use `code_intel` for orientation, impact checks, and semantic relationship questions while deconflicting existing `lsp` / `tree_sitter` guidance
 - Publish the extension through both install surfaces used by this repo: the workspace root manifest and the published `@mrclrchtr/supi` meta-package wrapper surface
@@ -16,9 +16,9 @@ SuPi now has the lower-level code-understanding substrates needed for a higher-l
 ## Capabilities
 
 ### New Capabilities
-- `code-intelligence-brief`: Generate session-start architecture overviews and on-demand focused briefs for the repo or a specific path
-- `code-intelligence-search`: Expose the `code_intel` tool actions for callers, callees, implementations, and pattern search with structured summarized output, machine-readable details metadata, and agent-friendly usage guidance
-- `code-intelligence-affected`: Analyze the blast radius of changing a symbol, including direct references, downstream modules, and risk level
+- `code-intelligence-brief`: Generate session-start architecture overviews and on-demand focused briefs for the repo or a specific path, including bounded “start here” guidance when useful
+- `code-intelligence-search`: Expose the `code_intel` tool actions for callers, callees, implementations, and pattern search with structured summarized output, machine-readable details metadata, rich disambiguation, predictable default budgets, and agent-friendly usage guidance
+- `code-intelligence-affected`: Analyze the blast radius of changing a symbol, including direct references, downstream modules, likely tests, and an explained `low` / `medium` / `high` risk level
 
 ### Existing Capabilities Consumed
 - `lsp-client`: existing public `getSessionLspService()` / `SessionLspService` APIs provide shared semantic lookups, document/workspace symbols, implementation lookup, project server info, and diagnostics
@@ -33,4 +33,4 @@ SuPi now has the lower-level code-understanding substrates needed for a higher-l
 - **Dependencies**: `supi-code-intelligence` depends on `supi-lsp`, `supi-tree-sitter`, `supi-core`, and required pi peer dependencies
 - **Prerequisite state**: substrate work has landed separately: `extract-project-root-utils`, `supi-tree-sitter`, and `stabilize-code-intelligence-substrates` are available in the current codebase
 - **Verification scripts**: root `typecheck` / `typecheck:tests` already iterate over `packages/*`; implementation should verify the new package is picked up by those globs rather than adding a one-off script entry
-- **Agent prompt**: session-start architecture context and `code_intel` tool guidance are added without changing the existing `lsp` or `tree_sitter` tool surfaces
+- **Agent prompt**: session-start architecture context and `code_intel` tool guidance are added without changing the existing `lsp` or `tree_sitter` tool surfaces, while keeping output compact, low-noise, and copyable for follow-up queries
