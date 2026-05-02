@@ -22,8 +22,8 @@ The system SHALL support `action: "affected"` to report what files and modules w
 - **WHEN** the agent calls `code_intel` with `action: "affected"` for a resolved target used only in its defining file or package
 - **THEN** the tool reports the impact as local to that file or package
 
-### Requirement: Affected analysis SHALL assign a risk level
-The affected output SHALL include a qualitative risk assessment derived from the number of affected files, affected modules, and downstream dependency breadth.
+### Requirement: Affected analysis SHALL assign an explained risk level
+The affected output SHALL include a qualitative risk assessment derived from the number of affected files, affected modules, and downstream dependency breadth. The risk section SHALL briefly explain the evidence behind the rating so agents can decide whether to inspect more context, add tests, or make a narrower change.
 
 #### Scenario: Small local change
 - **WHEN** a symbol change affects only one file or one module with no downstream dependents
@@ -32,6 +32,18 @@ The affected output SHALL include a qualitative risk assessment derived from the
 #### Scenario: Broad cross-module change
 - **WHEN** a symbol change affects many files across multiple modules with downstream dependents
 - **THEN** the tool reports a higher risk level
+- **AND** the output names the main modules or edges that make the change risky
+
+### Requirement: Affected output SHALL be summary-first and action-oriented
+Affected output SHALL start with a concise answer card summarizing target identity, confidence source, direct references, downstream breadth, and risk. Detailed evidence SHALL be grouped after the summary, and the output MAY include one or two concrete next steps such as focused briefs, caller drill-down, or likely test areas.
+
+#### Scenario: Agent reviews blast radius before editing
+- **WHEN** `affected` finds direct references and downstream dependents
+- **THEN** the first lines summarize the likely blast radius before listing detailed references
+
+#### Scenario: Follow-up analysis would be useful
+- **WHEN** affected evidence points to a high-risk module or ambiguous dependency edge
+- **THEN** the output may suggest a focused `code_intel brief` or `code_intel callers` query for that path or symbol
 
 ### Requirement: Affected analysis SHALL label degraded fallback results clearly
 If semantic reference data is unavailable, the system SHALL either return clearly labeled heuristic impact output or explain that only limited impact analysis is available.

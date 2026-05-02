@@ -11,10 +11,12 @@ The package must work across both repo install surfaces:
 1. the workspace root pi manifest used for local development
 2. the published `@mrclrchtr/supi` meta-package, which exposes wrapper entrypoints
 
-It also depends on lower-layer readiness:
-- `supi-tree-sitter` is a prerequisite change and must land before this package can take a hard workspace dependency on it
-- `extract-project-root-utils` is a prerequisite change so architecture-model scanning can use shared `supi-core` project/root utilities instead of duplicating logic or importing `supi-lsp` internals
-- `supi-lsp` currently owns its `LspManager` privately, so this change must first expose a shared session-scoped semantic service rather than assuming one already exists
+The lower-layer readiness work has now landed in separate changes:
+- `supi-tree-sitter` exists as a workspace package and exports `createTreeSitterSession(cwd)` plus structural result types from the package root
+- `extract-project-root-utils` moved LSP-agnostic project/root helpers into `supi-core`
+- `supi-lsp` exports `getSessionLspService(cwd)` and a `SessionLspService` wrapper from the package root, including `implementation()` support
+
+This change should consume those public package-root APIs rather than reopen their already-archived substrate specs.
 
 It also has to respect existing repo constraints:
 - pi loads extensions directly from TypeScript source
@@ -28,6 +30,7 @@ It also has to respect existing repo constraints:
 - Register a single `code_intel` tool that exposes high-level actions: `brief`, `callers`, `implementations`, `affected`, and `pattern`
 - Inject a compact architecture overview once per session so agents start with structural context
 - Synthesize `supi-lsp`, `supi-tree-sitter`, and text search results behind one stable interface
+- Make the tool ergonomics good enough that agents naturally choose `code_intel` before broad file reads or ad-hoc `rg` when they need architecture, relationships, or impact
 - Publish the extension through both workspace and meta-package install surfaces
 - Ensure root verification scripts actually typecheck and validate the new package
 
@@ -59,10 +62,12 @@ It also has to respect existing repo constraints:
 
 **Rationale:** Direct composition preserves structure, typing, and richer result data. Using tool calls internally would introduce formatting/parse overhead, weaken testability, and make fallback orchestration harder.
 
-**Required prerequisite work:**
-- `supi-lsp` must expose a shared session-scoped service acquisition API so peer extensions can reuse the already initialized LSP runtime and avoid spawning duplicate server sets
-- `supi-lsp` must add `textDocument/implementation` client support so `supi-code-intelligence` can provide true semantic implementation results when servers support it
-- `supi-tree-sitter` must land first so `supi-code-intelligence` can depend on its reusable structural services
+**Available substrate contract:**
+- `@mrclrchtr/supi-lsp` package root exports `getSessionLspService(cwd)`, `SessionLspService`, `SessionLspServiceState`, and public LSP result types
+- `SessionLspServiceState` can be `ready`, `pending`, `disabled`, or `unavailable`; `supi-code-intelligence` must branch on those states and never start its own LSP lifecycle
+- `SessionLspService` provides semantic truth where available: hover, definitions, references, workspace symbols, document symbols, implementations, project server info, supported-file checks, and diagnostics
+- `@mrclrchtr/supi-tree-sitter` package root exports `createTreeSitterSession(cwd)` plus structural result types; `supi-code-intelligence` owns disposing sessions it creates
+- `supi-core` provides reusable project/root helpers for walking roots, resolving known roots, and path containment checks
 
 **Composition model:**
 - `supi-lsp` provides semantic truth where available: references, symbols, definitions, implementations, diagnostics-aware project context
@@ -134,32 +139,58 @@ It also has to respect existing repo constraints:
 - Silently pick the first match — simple to implement, but produces untrustworthy caller and impact reports
 - Require anchored positions for every request — precise, but less usable for discovery-oriented workflows
 
-### 7. Use structured markdown output with bounded overview size
+### 7. Use structured markdown output with bounded, decision-oriented summaries
 
-**Decision:** All `code_intel` output SHALL be structured markdown with summaries, grouped sections, and file/path references. Auto-injected overview content SHALL target a compact budget rather than dumping full API detail.
+**Decision:** All `code_intel` output SHALL be structured markdown with a short answer card first, grouped sections, confidence labels, and file/path references. Auto-injected overview content SHALL target a compact budget rather than dumping full API detail. On-demand actions SHALL default to concise output and expose bounded detail controls such as result/context limits.
 
-**Rationale:** The agent consumes markdown naturally, and grouped summaries improve triage. Bounded overview output preserves prompt budget while keeping richer detail available through on-demand `brief`. A dense module-edge format such as `supi-lsp → supi-core` should be preferred over verbose per-module prose in the auto-injected overview.
+**Output shape:**
+- Start with a one-to-three line summary answering “what should the agent know now?”
+- Group evidence by file/module and include `path:line` references when available
+- Label source confidence as semantic, structural, or text-search/heuristic
+- Collapse long tails with counts such as “+12 more matches omitted; rerun with a narrower path or higher limit”
+- End with a brief “best next query” only when it helps, for example `code_intel affected` before editing a public export
+
+**Rationale:** The agent consumes markdown naturally, and grouped summaries improve triage. Bounded overview output preserves prompt budget while keeping richer detail available through on-demand `brief`. A dense module-edge format such as `supi-lsp → supi-core` should be preferred over verbose per-module prose in the auto-injected overview. The summary-first format gives agents useful context even when they only read the top of the tool result.
 
 **Alternatives considered:**
 - JSON-first output — better for machines, less ergonomic in the agent context
 - Verbose prompt injection — easier to generate, but too expensive and distracting
+- Raw grep/LSP dumps — complete, but not motivating or token-efficient for agent workflows
 
-### 8. Match repository packaging and verification surfaces explicitly
+### 8. Make tool guidance compact, specific, and motivating
+
+**Decision:** The registered tool SHALL include a `promptSnippet` and `promptGuidelines` that make `code_intel` feel like the obvious first stop for architecture and impact questions. Because pi flattens tool prompt guidelines into the global `Guidelines:` section, every guideline bullet SHALL explicitly name `code_intel`.
+
+**Guidance content:**
+- Use `code_intel brief` before editing an unfamiliar package, directory, or file when architecture/context would reduce blind reads
+- Use `code_intel affected` before changing exported APIs, shared helpers, config surfaces, or cross-package contracts
+- Use `code_intel callers` / `implementations` for semantic relationship questions before falling back to broad text search
+- Use `code_intel pattern` for bounded literal/regex search when the question is textual rather than semantic
+- Use raw `lsp` and `tree_sitter` tools for precise drill-down after `code_intel` identifies the relevant file, symbol, or syntax node
+
+**Rationale:** Agents follow concise, concrete tool-selection rules better than abstract capability lists. The guidance should reduce hesitation by telling the agent exactly when `code_intel` saves tokens and improves correctness, while avoiding a bloated system prompt.
+
+**Alternatives considered:**
+- Rely on the tool description only — discoverable, but weaker than explicit prompt guidance
+- Add aggressive “always use” rules — increases unnecessary tool calls and token use
+- Compete with `lsp` / `tree_sitter` guidance — confusing; this package should orchestrate first and drill down when needed
+
+### 9. Match repository packaging and verification surfaces explicitly
 
 **Decision:** The change includes both publish surfaces and root verification scripts as first-class implementation work.
 
 **Required wiring:**
 - root `package.json` `pi.extensions`
 - `packages/supi/package.json` dependency and wrapper entrypoint
-- root `typecheck` update for `packages/supi-code-intelligence/tsconfig.json`
-- `typecheck:tests` update if package-specific test tsconfig is added
+- package `tsconfig.json` and test `tsconfig.json` placement under `packages/supi-code-intelligence/` so existing root glob scripts discover them
+- package files/dependency metadata that pack correctly through the standalone package and meta-package surfaces
 
-**Rationale:** This repo does not discover packages automatically for publishing or typechecking. If these surfaces are omitted, the extension can appear implemented locally while being absent from the published meta-package or skipped by `pnpm verify`.
+**Rationale:** This repo does not discover pi extensions automatically for publishing, but root verification now discovers package and test tsconfigs through `packages/*` globs. If these surfaces are omitted, the extension can appear implemented locally while being absent from the published meta-package or accidentally skipped by `pnpm verify`.
 
 ## Risks / Trade-offs
 
 - **[Coupling to lower-layer internals]** → Directly depending on `supi-lsp` and `supi-tree-sitter` service APIs creates workspace coupling. **Mitigation:** keep their reusable APIs explicit and update the stack in sync within the monorepo.
-- **[Blocked prerequisite]** → `supi-code-intelligence` cannot install cleanly until `supi-tree-sitter` exists as a workspace package. **Mitigation:** treat `supi-tree-sitter` as a prerequisite change and sequence implementation after it lands.
+- **[Substrate contract drift]** → `supi-code-intelligence` depends on public APIs from `supi-lsp`, `supi-tree-sitter`, and `supi-core`. **Mitigation:** import only from package roots, cover integration behavior with tests, and update this spec if substrate public contracts change.
 - **[Heuristic fallbacks can be misleading]** → Degraded `callers`/`implementations`/`affected` results may look more authoritative than they are. **Mitigation:** label non-LSP results clearly as heuristic and separate them from semantic truth sections.
 - **[Overview token cost]** → Session-start architecture context can crowd the prompt. **Mitigation:** inject only once per session and keep the overview compact, with deeper detail only via `brief`.
 - **[Startup latency]** → Building the first architecture model may add noticeable delay. **Mitigation:** start from cheap metadata scans, enrich opportunistically, and avoid project-wide deep analysis in the auto-injected path.
@@ -169,14 +200,12 @@ It also has to respect existing repo constraints:
 
 This change supersedes the earlier `supi-code-intel` and `supi-codebase-map` directions. The `code_intel` tool and its `brief`, `callers`, `implementations`, `affected`, and `pattern` actions replace `supi-code-intel`. `code_intel brief` replaces the separate `codebase_map` tool, while `supi-tree-sitter` replaces regex-first structural extraction for supported JS/TS-family files. Broad multi-language regex extraction and the standalone `codebase_map` API are intentionally deferred rather than accidentally omitted.
 
-One piece from `supi-codebase-map` remains valuable as independent shared infrastructure: extracting LSP-agnostic project/root utilities from `supi-lsp` into `supi-core`. That work is tracked as the `extract-project-root-utils` prerequisite change and should land before `supi-code-intelligence` builds its architecture model.
+One piece from `supi-codebase-map` remains valuable as independent shared infrastructure: extracting LSP-agnostic project/root utilities from `supi-lsp` into `supi-core`. That prerequisite has landed, so `supi-code-intelligence` should use `supi-core`'s public helpers instead of recreating the old local logic.
 
 ## Migration Plan
 
-- Land `extract-project-root-utils` so shared project/root scanning helpers are available from `supi-core`
-- Land `supi-tree-sitter` first so the workspace dependency is available
-- Extend `supi-lsp` with shared session-scoped service acquisition and `textDocument/implementation` support
+- Confirm landed substrate APIs from `supi-core`, `supi-tree-sitter`, and `supi-lsp` are consumed from package roots
 - Add `packages/supi-code-intelligence/` as a new standalone workspace package
 - Wire it into the workspace root pi manifest and the published `@mrclrchtr/supi` meta-package wrapper surface
-- Update root verification scripts so `pnpm verify` covers the new package
+- Verify root glob-based typecheck/test scripts and `pnpm verify` cover the new package
 - Keep existing lower-level packages unchanged from a user-facing tool-contract perspective; `supi-code-intelligence` composes them without altering the existing `lsp` or `tree_sitter` action surfaces

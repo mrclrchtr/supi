@@ -7,6 +7,32 @@ The extension SHALL register a tool named `code_intel` with an `action` paramete
 - **WHEN** the extension loads successfully
 - **THEN** the `code_intel` tool appears in the agent tool list with its supported actions documented in its description and prompt guidance
 
+### Requirement: `code_intel` guidance SHALL make correct tool use obvious and attractive
+The tool SHALL provide compact `promptSnippet` and `promptGuidelines` that explain when `code_intel` saves tokens or improves correctness compared with broad file reads, raw `rg`, or direct low-level tool use. Every prompt guideline SHALL explicitly name `code_intel` because pi flattens tool guidelines into the global `Guidelines:` section.
+
+#### Scenario: Agent needs orientation before editing
+- **WHEN** the agent is about to edit an unfamiliar package, directory, or file
+- **THEN** prompt guidance encourages `code_intel brief` as the preferred orientation step before reading many files manually
+
+#### Scenario: Agent needs impact analysis before a shared change
+- **WHEN** the agent is about to change an exported API, shared helper, config surface, or cross-package contract
+- **THEN** prompt guidance encourages `code_intel affected` before editing
+
+#### Scenario: Agent needs low-level drill-down
+- **WHEN** `code_intel` identifies a relevant file, symbol, or syntax node but the agent needs exact type, definition, or AST details
+- **THEN** prompt guidance positions raw `lsp` and `tree_sitter` as complementary drill-down tools rather than replacements for `code_intel`
+
+### Requirement: Tool parameters SHALL support token-efficient refinement
+The `code_intel` parameter schema SHALL keep common calls short while allowing agents to bound result size intentionally. In addition to action-specific inputs (`path`, `symbol`, `file`, `line`, `character`, and search pattern), search-oriented actions SHOULD support optional result and context controls such as `maxResults` and `contextLines` with safe defaults.
+
+#### Scenario: Agent asks for a concise pattern search
+- **WHEN** the agent calls `code_intel` with `action: "pattern"`, a search pattern, and a small `maxResults` value
+- **THEN** the tool limits returned matches to the requested budget and reports omitted-match counts when more evidence exists
+
+#### Scenario: Agent omits refinement controls
+- **WHEN** the agent calls any `code_intel` action without result-size controls
+- **THEN** the tool uses token-efficient defaults rather than returning an unbounded dump
+
 ### Requirement: Semantic actions SHALL resolve a concrete target before returning semantic results
 For `callers` and `implementations`, the tool SHALL accept either an anchored target (`file`, `line`, and `character`) or a discovery input such as `symbol`. If discovery input resolves to multiple plausible targets, the tool SHALL return a disambiguation result instead of silently merging or selecting one target.
 
@@ -51,9 +77,17 @@ The system SHALL support `action: "pattern"` using text search and return result
 - **WHEN** the agent calls `code_intel` with `action: "pattern"` and the pattern matches nothing
 - **THEN** the tool returns a message indicating that no matches were found
 
-### Requirement: Search output SHALL be bounded to pi output limits
-The system SHALL truncate oversized search output to fit pi output limits (50KB / 2000 lines) using the repository standard truncation helper where practical, and SHALL note when truncation occurred.
+### Requirement: Search output SHALL be summary-first and bounded to pi output limits
+The system SHALL return search and relationship output as structured markdown with a concise summary first, grouped evidence, confidence labels, and file/line references where available. It SHALL truncate oversized search output to fit pi output limits (50KB / 2000 lines) using the repository standard truncation helper where practical, and SHALL note when truncation occurred.
+
+#### Scenario: Semantic result summary
+- **WHEN** a `callers` or `implementations` action returns semantic results
+- **THEN** the first lines summarize the number of files, matches, and confidence source before listing grouped evidence
 
 #### Scenario: Very large search result
 - **WHEN** a `callers`, `implementations`, or `pattern` action produces output larger than pi's tool output limits
 - **THEN** the tool truncates the output and includes a note that the result was truncated
+
+#### Scenario: Long tail omitted by default budget
+- **WHEN** a search action finds more matches than the default or requested result budget
+- **THEN** the tool reports how many matches were omitted and suggests narrowing the query or raising the limit
