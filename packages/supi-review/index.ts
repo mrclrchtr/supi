@@ -1,10 +1,11 @@
 import { BorderedLoader, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { parseNonInteractiveArgs } from "./args.ts";
 import { getCommitShow, getDiff, getMergeBase, getUncommittedDiff } from "./git.ts";
+import { getReviewModelChoices } from "./model-choices.ts";
 import { buildReviewPrompt } from "./prompts.ts";
 import { registerReviewRenderer } from "./renderer.ts";
 import { runReviewer } from "./runner.ts";
-import { loadReviewSettings, registerReviewSettings } from "./settings.ts";
+import { loadReviewSettings, registerReviewSettings, setReviewModelChoices } from "./settings.ts";
 import type { ReviewDepth, ReviewResult, ReviewTarget } from "./types.ts";
 import { selectBranch, selectCommit, selectDepth, selectPreset } from "./ui.ts";
 
@@ -21,6 +22,20 @@ interface ReviewExecutionOptions {
 export default function reviewExtension(pi: ExtensionAPI) {
   registerReviewSettings();
   registerReviewRenderer(pi);
+
+  const syncReviewModelChoices = (ctx: {
+    modelRegistry: { getAvailable(): Array<{ provider: string; id: string; name?: string }> };
+  }) => {
+    setReviewModelChoices(getReviewModelChoices(ctx.modelRegistry.getAvailable()));
+  };
+
+  pi.on("session_start", async (_event, ctx) => {
+    syncReviewModelChoices(ctx);
+  });
+
+  pi.on("model_select", async (_event, ctx) => {
+    syncReviewModelChoices(ctx);
+  });
 
   pi.registerCommand("review", {
     description: "Run a structured code review",

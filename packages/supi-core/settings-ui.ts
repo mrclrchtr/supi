@@ -170,6 +170,7 @@ export function openSettingsOverlay(ctx: ExtensionContext): void {
           (c): c is SettingsList => c instanceof SettingsList,
         );
         settingsList?.handleInput?.(data);
+        deps.tui.requestRender();
         return true;
       },
     };

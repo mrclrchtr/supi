@@ -7,6 +7,8 @@ const mockFns = vi.hoisted(() => ({
     maxDiffBytes: 100_000,
   })),
   registerReviewSettings: vi.fn(),
+  setReviewModelChoices: vi.fn(),
+  getReviewModelChoices: vi.fn(() => ["session-model"]),
   registerReviewRenderer: vi.fn(),
   runReviewer: vi.fn(),
   selectPreset: vi.fn(async () => "custom"),
@@ -29,6 +31,11 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 vi.mock("../settings.ts", () => ({
   loadReviewSettings: mockFns.loadReviewSettings,
   registerReviewSettings: mockFns.registerReviewSettings,
+  setReviewModelChoices: mockFns.setReviewModelChoices,
+}));
+
+vi.mock("../model-choices.ts", () => ({
+  getReviewModelChoices: mockFns.getReviewModelChoices,
 }));
 
 vi.mock("../renderer.ts", () => ({
@@ -58,6 +65,7 @@ describe("/review command", () => {
         expect(name).toBe("review");
         commandHandler = spec.handler;
       }),
+      on: vi.fn(),
       sendMessage: vi.fn(),
     } as unknown as ExtensionAPI;
 
