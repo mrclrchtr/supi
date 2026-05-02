@@ -35,8 +35,7 @@ export function buildProjectServerInfo(
 function getSupportedActions(capabilities: LspClient["serverCapabilities"] | undefined): string[] {
   if (!capabilities) return [];
 
-  // biome-ignore lint/security/noSecrets: tool signature hint, not a secret
-  const actions: string[] = ["diagnostics(file?)"];
+  const actions: string[] = ["diagnostics [optional file]"];
   if (capabilities.hoverProvider) actions.push("hover(file,line,char)");
   if (capabilities.definitionProvider) actions.push("definition(file,line,char)");
   if (capabilities.referencesProvider) actions.push("references(file,line,char)");

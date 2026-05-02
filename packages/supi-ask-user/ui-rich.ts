@@ -98,7 +98,7 @@ function buildOverlay(args: BuildOverlayArgs): Component {
         state.maxHeight = 0;
       }
       if (!state.cachedLines) {
-        state.cachedLines = renderOverlay(width, theme, flow, state, editor);
+        state.cachedLines = renderOverlay({ width, theme, flow, state, editor });
         // Stabilize height — prevent shrinkage that triggers pi-tui's
         // viewport tracking bug with differential rendering.
         if (state.cachedLines.length > state.maxHeight) {

@@ -2,18 +2,13 @@
 // via a registered `lsp` tool. Keeps language servers warm, surfaces inline diagnostics,
 // and injects diagnostic context only when outstanding issues exist.
 
-// biome-ignore lint/nursery/noExcessiveLinesPerFile: Extension registration is intentionally centralized around shared runtime state.
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StringEnum } from "@mariozechner/pi-ai";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import { Type } from "typebox";
 import { loadConfig } from "./config.ts";
-import { loadLspSettings, registerLspSettings } from "./settings-registration.ts";
-
-const baseDir = dirname(fileURLToPath(import.meta.url));
-
-import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import { formatDiagnosticsDisplayContent } from "./diagnostic-display.ts";
 import {
   buildProjectGuidelines,
@@ -23,22 +18,29 @@ import {
   lspPromptSnippet,
   MAX_DETAILED_DIAGNOSTICS,
 } from "./guidance.ts";
+import {
+  createRuntimeState,
+  disableLspState,
+  ensureLspToolActive,
+  isLspAwareTool,
+  type LspRuntimeState,
+  refreshProjectServers,
+  removeLspTool,
+} from "./lsp-state.ts";
 import { LspManager } from "./manager.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
 import { registerLspMessageRenderer } from "./renderer.ts";
-import {
-  introspectCapabilities,
-  scanProjectCapabilities,
-  startDetectedServers,
-} from "./scanner.ts";
+import { scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
+import { loadLspSettings, registerLspSettings } from "./settings-registration.ts";
 import { executeAction, type LspAction, lspToolDescription } from "./tool-actions.ts";
 import {
   persistLspActiveState,
   persistLspInactiveState,
   registerTreePersistHandlers,
 } from "./tree-persist.ts";
-import type { DetectedProjectServer, ProjectServerInfo } from "./types.ts";
-import { type LspInspectorState, toggleLspStatusOverlay, updateLspUi } from "./ui.ts";
+import { toggleLspStatusOverlay, updateLspUi } from "./ui.ts";
+
+const baseDir = dirname(fileURLToPath(import.meta.url));
 
 const LspActionEnum = StringEnum([
   "hover",
@@ -52,18 +54,6 @@ const LspActionEnum = StringEnum([
   "search",
   "symbol_hover",
 ] as const);
-
-interface LspRuntimeState {
-  manager: LspManager | null;
-  inlineSeverity: number;
-  inspector: LspInspectorState;
-  detectedServers: DetectedProjectServer[];
-  projectServers: ProjectServerInfo[];
-  lastDiagnosticsFingerprint: string | null;
-  currentContextToken: string | null;
-  contextCounter: number;
-  lspActive: boolean;
-}
 
 export default function lspExtension(pi: ExtensionAPI) {
   registerLspSettings();
@@ -82,23 +72,6 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerLspStatusCommand(pi, state);
   registerResourcesDiscover(pi);
   registerLspMessageRenderer(pi);
-}
-
-function createRuntimeState(): LspRuntimeState {
-  return {
-    manager: null,
-    inlineSeverity: 1,
-    inspector: {
-      handle: null,
-      close: null,
-    },
-    detectedServers: [],
-    projectServers: [],
-    lastDiagnosticsFingerprint: null,
-    currentContextToken: null,
-    contextCounter: 0,
-    lspActive: false,
-  };
 }
 
 function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
@@ -362,41 +335,6 @@ function registerLspStatusCommand(pi: ExtensionAPI, state: LspRuntimeState): voi
       );
     },
   });
-}
-
-function refreshProjectServers(state: LspRuntimeState): void {
-  if (!state.manager) {
-    state.projectServers = [];
-    return;
-  }
-
-  state.projectServers = introspectCapabilities(state.manager, state.detectedServers);
-}
-
-function isLspAwareTool(toolName: string): boolean {
-  return toolName === "lsp" || toolName === "read" || toolName === "write" || toolName === "edit";
-}
-
-function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void {
-  state.manager = null;
-  state.detectedServers = [];
-  state.projectServers = [];
-  state.lastDiagnosticsFingerprint = null;
-  state.currentContextToken = null;
-  state.lspActive = false;
-
-  removeLspTool(pi);
-}
-
-function removeLspTool(pi: ExtensionAPI): void {
-  const activeTools = pi.getActiveTools();
-  if (activeTools.includes("lsp")) pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
-}
-
-function ensureLspToolActive(pi: ExtensionAPI): void {
-  const activeTools = pi.getActiveTools();
-  if (activeTools.includes("lsp")) return;
-  pi.setActiveTools([...activeTools, "lsp"]);
 }
 
 function registerResourcesDiscover(pi: ExtensionAPI): void {

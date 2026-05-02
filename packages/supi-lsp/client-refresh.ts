@@ -2,12 +2,21 @@
 // Extracted from client.ts to keep file sizes manageable.
 
 import { existsSync, readFileSync } from "node:fs";
-import type { LspClient } from "./client.ts";
+import type { DiagnosticCacheEntry, LspClient } from "./client.ts";
+import type { JsonRpcClient } from "./transport.ts";
 import type { DocumentDiagnosticReport, TextDocumentIdentifier } from "./types.ts";
 import { uriToFile } from "./utils.ts";
 
-// biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
-type ClientAccess = any;
+interface ClientAccess {
+  openDocs: Map<string, { version: number; languageId: string }>;
+  rpc: JsonRpcClient | null;
+  diagnosticStore: Map<string, DiagnosticCacheEntry>;
+  releaseDiagnosticWaiters(uri: string): void;
+}
+
+function accessClient(client: LspClient): ClientAccess {
+  return client as unknown as ClientAccess;
+}
 
 /**
  * Re-read and re-sync all currently open, existing documents for a client.
@@ -26,7 +35,7 @@ export async function refreshClientOpenDiagnostics(
   const syncStart = Date.now();
 
   // Re-sync all open documents that still exist on disk
-  const openDocs = (client as ClientAccess).openDocs as Map<
+  const openDocs = accessClient(client).openDocs as Map<
     string,
     { version: number; languageId: string }
   >;
@@ -75,15 +84,15 @@ function sendDidChange(client: LspClient, uri: string, version: number, content:
 
 /** Send an RPC notification through the client. */
 function sendNotification(client: LspClient, method: string, params: unknown): void {
-  const rpc = (client as ClientAccess).rpc;
+  const rpc = accessClient(client).rpc;
   if (rpc) rpc.sendNotification(method, params);
 }
 
 /** Clear open doc and diagnostic state for a URI. */
 function clearFileState(client: LspClient, uri: string): void {
-  (client as ClientAccess).openDocs.delete(uri);
-  (client as ClientAccess).diagnosticStore.delete(uri);
-  (client as ClientAccess).releaseDiagnosticWaiters(uri);
+  accessClient(client).openDocs.delete(uri);
+  accessClient(client).diagnosticStore.delete(uri);
+  accessClient(client).releaseDiagnosticWaiters(uri);
 }
 
 /**
@@ -96,7 +105,7 @@ async function pullDiagnosticsForOpenDocs(
   maxWaitMs: number,
 ): Promise<void> {
   const deadline = syncStart + maxWaitMs;
-  const uris = Array.from(((client as ClientAccess).openDocs as Map<string, unknown>).keys());
+  const uris = Array.from((accessClient(client).openDocs as Map<string, unknown>).keys());
   const results = await Promise.allSettled(
     uris.map(async (uri) => {
       const remaining = deadline - Date.now();
@@ -132,12 +141,12 @@ async function pullDocumentDiagnostics(
   uri: string,
   timeoutMs: number,
 ): Promise<DocumentDiagnosticReport | null> {
-  const rpc = (client as ClientAccess).rpc;
+  const rpc = accessClient(client).rpc;
   if (!rpc || client.status !== "running") {
     throw new Error("client not running");
   }
 
-  const previousResultId = (client as ClientAccess).diagnosticStore.get(uri)?.resultId;
+  const previousResultId = accessClient(client).diagnosticStore.get(uri)?.resultId;
   return rpc.sendRequest(
     "textDocument/diagnostic",
     {
@@ -151,13 +160,13 @@ async function pullDocumentDiagnostics(
 /** Apply a pull diagnostic report to the cache, including related documents. */
 function applyPullReport(client: LspClient, uri: string, report: DocumentDiagnosticReport): void {
   if (report.kind === "full") {
-    (client as ClientAccess).diagnosticStore.set(uri, {
+    accessClient(client).diagnosticStore.set(uri, {
       diagnostics: report.items,
       receivedAt: Date.now(),
       resultId: report.resultId,
     });
   } else if (report.kind === "unchanged" && report.resultId) {
-    const current = (client as ClientAccess).diagnosticStore.get(uri);
+    const current = accessClient(client).diagnosticStore.get(uri);
     if (current) current.resultId = report.resultId;
   }
 
@@ -173,7 +182,7 @@ function applyRelatedDocuments(client: LspClient, report: DocumentDiagnosticRepo
     related as Record<string, DocumentDiagnosticReport>,
   )) {
     if (relatedReport.kind === "full" && relatedReport.items) {
-      (client as ClientAccess).diagnosticStore.set(relatedUri, {
+      accessClient(client).diagnosticStore.set(relatedUri, {
         diagnostics: relatedReport.items,
         receivedAt: Date.now(),
         resultId: relatedReport.resultId,
@@ -210,7 +219,7 @@ async function waitForDiagnosticSettle(
 /** Get the most recent receivedAt timestamp after a given time. */
 function lastDiagnosticReceivedTimeAfter(client: LspClient, afterTime: number): number {
   let latest = 0;
-  const store = (client as ClientAccess).diagnosticStore as Map<string, { receivedAt: number }>;
+  const store = accessClient(client).diagnosticStore as Map<string, { receivedAt: number }>;
   for (const entry of store.values()) {
     if (entry.receivedAt > afterTime && entry.receivedAt > latest) {
       latest = entry.receivedAt;

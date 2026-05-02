@@ -1,8 +1,8 @@
 // Editor pane rendering helpers for the rich overlay.
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import type { Editor } from "@mariozechner/pi-tui";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import { type Editor, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import type { RenderEnv } from "./ui-rich-render-env.ts";
 import type { OverlayRenderState } from "./ui-rich-render-types.ts";
 
 export function editorCaption(state: OverlayRenderState): string {
@@ -29,17 +29,13 @@ export function renderEditorPane(
   return out;
 }
 
-// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
-export function renderEditorBlock(
-  add: (text: string) => void,
-  lines: string[],
-  theme: Theme,
-  editor: Editor,
-  width: number,
-  caption: string,
-): void {
-  add(theme.fg("muted", ` ${caption}:`));
-  for (const line of editor.render(width - 2)) lines.push(` ${truncateToWidth(line, width - 1)}`);
+export function renderEditorBlock(env: RenderEnv, caption: string): string[] {
+  const out: string[] = [];
+  out.push(env.theme.fg("muted", ` ${caption}:`));
+  for (const line of env.editor.render(env.width - 2)) {
+    out.push(` ${truncateToWidth(line, env.width - 1)}`);
+  }
+  return out;
 }
 
 export function padRight(text: string, width: number): string {

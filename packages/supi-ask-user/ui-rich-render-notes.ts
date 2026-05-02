@@ -82,7 +82,6 @@ function storedMultiSelections(
   }));
 }
 
-export function renderNoteStatus(add: (text: string) => void, theme: Theme, note: string): void {
-  add("");
-  add(theme.fg("muted", ` Notes: ${note}`));
+export function renderNoteStatus(theme: Theme, note: string): string[] {
+  return ["", theme.fg("muted", ` Notes: ${note}`)];
 }

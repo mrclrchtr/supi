@@ -109,7 +109,6 @@ export class JsonRpcClient {
   }
 
   private processBuffer(): void {
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       // Look for header delimiter
       const headerEnd = this.buffer.indexOf(HEADER_DELIMITER);

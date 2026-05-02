@@ -182,7 +182,7 @@ describe("introspectCapabilities", () => {
 
     const info = introspectCapabilities(manager, []);
     const expectedActions = [
-      ["diagnostics", "(file?)"].join(""),
+      ["diagnostics", " [optional file]"].join(""),
       ["hover", "(file,line,char)"].join(""),
       ["references", "(file,line,char)"].join(""),
     ];

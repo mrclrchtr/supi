@@ -2,9 +2,7 @@
 // ui-rich.ts to stay within Biome's per-file line limit and so the input
 // dispatch logic can be read without scrolling past a wall of theme strings.
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Editor, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
-import type { QuestionnaireFlow } from "./flow.ts";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import { decorateOption, formatReviewLines, NOTE_MARKER } from "./format.ts";
 import type { NormalizedStructuredQuestion } from "./types.ts";
 import { inlineStructuredRowLines, structuredRowLabel } from "./ui-rich-inline.ts";
@@ -15,9 +13,9 @@ import {
   renderEditorPane,
   usesSeparateEditorPane,
 } from "./ui-rich-render-editor.ts";
+import type { RenderEnv } from "./ui-rich-render-env.ts";
 import { footerHelp } from "./ui-rich-render-footer.ts";
 import { currentNote, renderNoteStatus, visibleNoteMarker } from "./ui-rich-render-notes.ts";
-import type { OverlayRenderState } from "./ui-rich-render-types.ts";
 import {
   hasPreview,
   type InteractiveRow,
@@ -25,237 +23,189 @@ import {
   selectedIndexesForQuestion,
 } from "./ui-rich-state.ts";
 
-// biome-ignore lint/complexity/useMaxParams: render entry needs full overlay context
-export function renderOverlay(
-  width: number,
-  theme: Theme,
-  flow: QuestionnaireFlow,
-  state: OverlayRenderState,
-  editor: Editor,
-): string[] {
+export function renderOverlay(env: RenderEnv): string[] {
   const lines: string[] = [];
-  const add = (text: string) => lines.push(truncateToWidth(text, width));
-  add(theme.fg("accent", "─".repeat(width)));
-  if (flow.isMultiQuestion) renderTabBar(add, theme, flow);
-  if (flow.currentMode === "reviewing") {
-    renderReview(add, width, theme, flow);
+  const add = (text: string) => lines.push(truncateToWidth(text, env.width));
+  add(env.theme.fg("accent", "─".repeat(env.width)));
+  if (env.flow.isMultiQuestion) renderTabBar(lines, env);
+  if (env.flow.currentMode === "reviewing") {
+    lines.push(...renderReview(env));
   } else {
-    renderQuestion(add, lines, width, theme, flow, state, editor);
+    renderQuestion(lines, env);
   }
-  add(theme.fg("dim", ` ${footerHelp(flow, state)}`));
-  add(theme.fg("accent", "─".repeat(width)));
+  add(env.theme.fg("dim", ` ${footerHelp(env.flow, env.state)}`));
+  add(env.theme.fg("accent", "─".repeat(env.width)));
   return lines;
 }
 
 function tabSegment(
-  theme: Theme,
+  env: RenderEnv,
   text: string,
   active: boolean,
   color: "success" | "muted" | "dim" | "text",
 ): string {
-  return active ? theme.bg("selectedBg", theme.fg("text", text)) : theme.fg(color, text);
+  return active
+    ? env.theme.bg("selectedBg", env.theme.fg("text", text))
+    : env.theme.fg(color, text);
 }
 
-function renderTabBar(add: (text: string) => void, theme: Theme, flow: QuestionnaireFlow): void {
-  // Active segment uses the selected-bg highlight (matches pi's reference
-  // questionnaire and Claude's UI). Inactive segments stay foreground-only:
-  // success when answered, muted when pending, dim when optional and skipped.
-  const segments: string[] = [theme.fg("dim", "← ")];
-  for (const [index, question] of flow.questions.entries()) {
-    const answered = flow.hasAnswer(question.id);
-    const active = flow.currentMode === "answering" && flow.currentIndex === index;
+function renderTabBar(lines: string[], env: RenderEnv): void {
+  const segments: string[] = [env.theme.fg("dim", "← ")];
+  for (const [index, question] of env.flow.questions.entries()) {
+    const answered = env.flow.hasAnswer(question.id);
+    const active = env.flow.currentMode === "answering" && env.flow.currentIndex === index;
     const marker = answered ? "■" : question.required ? "□" : "○";
     const color = answered ? "success" : question.required ? "muted" : "dim";
-    segments.push(tabSegment(theme, ` ${marker} ${question.header} `, active, color));
+    segments.push(tabSegment(env, ` ${marker} ${question.header} `, active, color));
     segments.push(" ");
   }
-  const reviewActive = flow.currentMode === "reviewing";
-  segments.push(tabSegment(theme, " ✓ Review ", reviewActive, reviewActive ? "text" : "dim"));
-  segments.push(theme.fg("dim", " →"));
-  add(` ${segments.join("")}`);
-  add("");
+  const reviewActive = env.flow.currentMode === "reviewing";
+  segments.push(tabSegment(env, " ✓ Review ", reviewActive, reviewActive ? "text" : "dim"));
+  segments.push(env.theme.fg("dim", " →"));
+  lines.push(truncateToWidth(` ${segments.join("")}`, env.width));
+  lines.push("");
 }
 
-// biome-ignore lint/complexity/useMaxParams: question render needs full context
-function renderQuestion(
-  add: (text: string) => void,
-  lines: string[],
-  width: number,
-  theme: Theme,
-  flow: QuestionnaireFlow,
-  state: OverlayRenderState,
-  editor: Editor,
-): void {
-  const question = flow.currentQuestion;
+function renderQuestion(lines: string[], env: RenderEnv): void {
+  const question = env.flow.currentQuestion;
   if (!question) return;
-  for (const line of wrapTextWithAnsi(` ${question.prompt}`, width)) {
-    add(theme.fg("text", line));
+  for (const line of wrapTextWithAnsi(` ${question.prompt}`, env.width)) {
+    lines.push(truncateToWidth(env.theme.fg("text", line), env.width));
   }
   lines.push("");
   if (question.type === "text") {
-    renderTextQuestion(add, lines, theme, editor, width);
+    renderTextQuestion(lines, env);
     return;
   }
-  renderStructuredQuestion(add, lines, width, theme, flow, state, editor, question);
+  renderStructuredQuestion(lines, env, question);
 }
 
-// biome-ignore lint/complexity/useMaxParams: split view layout needs full context
 function renderSplitView(
   lines: string[],
-  width: number,
-  theme: Theme,
-  flow: QuestionnaireFlow,
-  state: OverlayRenderState,
-  editor: Editor,
+  env: RenderEnv,
   question: NormalizedStructuredQuestion,
   rows: InteractiveRow[],
 ): void {
-  const leftWidth = Math.max(34, Math.floor(width * 0.42));
-  const rightWidth = Math.max(24, width - leftWidth - 3);
-  const leftLines = renderPaneRows(leftWidth, theme, flow, state, editor, question, rows);
-  const rightLines = usesSeparateEditorPane(state)
-    ? renderEditorPane(rightWidth, theme, editor, editorCaption(state))
+  const leftWidth = Math.max(34, Math.floor(env.width * 0.42));
+  const rightWidth = Math.max(24, env.width - leftWidth - 3);
+  const leftLines = renderPaneRows(env, question, rows);
+  const rightLines = usesSeparateEditorPane(env.state)
+    ? renderEditorPane(rightWidth, env.theme, env.editor, editorCaption(env.state))
     : renderPreviewPane(
         rightWidth,
-        theme,
-        previewForSelection(question, rows[state.selectedIndex]),
+        env.theme,
+        previewForSelection(question, rows[env.state.selectedIndex]),
       );
   const total = Math.max(leftLines.length, rightLines.length);
   for (let index = 0; index < total; index += 1) {
     const left = padRight(leftLines[index] ?? "", leftWidth);
     const right = padRight(rightLines[index] ?? "", rightWidth);
-    lines.push(`${left} ${theme.fg("accent", "│")} ${right}`);
+    lines.push(`${left} ${env.theme.fg("accent", "│")} ${right}`);
   }
 }
 
-// biome-ignore lint/complexity/useMaxParams: thin adapter for text question rendering
-function renderTextQuestion(
-  add: (text: string) => void,
-  lines: string[],
-  theme: Theme,
-  editor: Editor,
-  width: number,
-): void {
-  renderEditorBlock(add, lines, theme, editor, width, "Answer");
+function renderTextQuestion(lines: string[], env: RenderEnv): void {
+  lines.push(...renderEditorBlock(env, "Answer"));
 }
 
-// biome-ignore lint/complexity/useMaxParams: structured render needs full context
 function renderStructuredQuestion(
-  add: (text: string) => void,
   lines: string[],
-  width: number,
-  theme: Theme,
-  flow: QuestionnaireFlow,
-  state: OverlayRenderState,
-  editor: Editor,
+  env: RenderEnv,
   question: NormalizedStructuredQuestion,
 ): void {
   const rows = interactiveRows(question);
-  if (hasPreview(question) && width >= 100) {
-    renderSplitView(lines, width, theme, flow, state, editor, question, rows);
+  if (hasPreview(question) && env.width >= 100) {
+    renderSplitView(lines, env, question, rows);
   } else {
-    renderStandardStructuredQuestion(add, lines, width, theme, flow, state, editor, question, rows);
+    renderStandardStructuredQuestion(lines, env, question, rows);
   }
-  const note = currentNote(flow, state, question);
-  if (note) renderNoteStatus(add, theme, note);
+  const note = currentNote(env.flow, env.state, question);
+  if (note) lines.push(...renderNoteStatus(env.theme, note));
 }
 
-// biome-ignore lint/complexity/useMaxParams: standard layout needs full context
 function renderStandardStructuredQuestion(
-  add: (text: string) => void,
   lines: string[],
-  width: number,
-  theme: Theme,
-  flow: QuestionnaireFlow,
-  state: OverlayRenderState,
-  editor: Editor,
+  env: RenderEnv,
   question: NormalizedStructuredQuestion,
   rows: InteractiveRow[],
 ): void {
-  renderRows(add, width, theme, flow, state, editor, question, rows);
-  if (usesSeparateEditorPane(state)) {
-    renderEditorBlock(add, lines, theme, editor, width, editorCaption(state));
+  lines.push(...renderRows(env, question, rows));
+  if (usesSeparateEditorPane(env.state)) {
+    lines.push(...renderEditorBlock(env, editorCaption(env.state)));
     return;
   }
-  const preview = previewForSelection(question, rows[state.selectedIndex]);
-  if (preview) renderPreviewBlock(add, lines, theme, width, preview);
+  const preview = previewForSelection(question, rows[env.state.selectedIndex]);
+  if (preview) lines.push(...renderPreviewBlock(env, preview));
 }
 
-// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
 function renderPaneRows(
-  width: number,
-  theme: Theme,
-  flow: QuestionnaireFlow,
-  state: OverlayRenderState,
-  editor: Editor,
+  env: RenderEnv,
+  question: NormalizedStructuredQuestion,
+  rows: InteractiveRow[],
+): string[] {
+  return renderRows(env, question, rows);
+}
+
+function renderRows(
+  env: RenderEnv,
   question: NormalizedStructuredQuestion,
   rows: InteractiveRow[],
 ): string[] {
   const out: string[] = [];
-  const push = (text = "") => out.push(truncateToWidth(text, width));
-  renderRows(push, width, theme, flow, state, editor, question, rows);
-  return out;
-}
-
-// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
-function renderRows(
-  add: (text: string) => void,
-  width: number,
-  theme: Theme,
-  flow: QuestionnaireFlow,
-  state: OverlayRenderState,
-  editor: Editor,
-  question: NormalizedStructuredQuestion,
-  rows: InteractiveRow[],
-): void {
-  const selected = selectedIndexesForQuestion(flow, state, question);
   for (const [index, row] of rows.entries()) {
-    const active = state.selectedIndex === index;
-    const prefix = active ? theme.fg("accent", "> ") : "  ";
+    const active = env.state.selectedIndex === index;
+    const prefix = active ? env.theme.fg("accent", "> ") : "  ";
     const inlineEditorLines = inlineStructuredRowLines({
-      width,
-      theme,
-      state,
-      editor,
+      width: env.width,
+      theme: env.theme,
+      state: env.state,
+      editor: env.editor,
       row,
       prefix,
     });
     if (inlineEditorLines) {
       const rowContinuation = " ".repeat(visibleWidth(prefix));
       for (const [lineIndex, line] of inlineEditorLines.entries()) {
-        add(`${lineIndex === 0 ? prefix : rowContinuation}${line}`);
+        out.push(
+          truncateToWidth(`${lineIndex === 0 ? prefix : rowContinuation}${line}`, env.width),
+        );
       }
       continue;
     }
-    addWrapped(add, width, prefix, rowLabel(theme, flow, state, question, row, active, selected));
+    addWrapped(out, env, prefix, rowLabel(env, question, row, active));
     const description = rowDescription(question, row);
-    if (description) addWrapped(add, width, "     ", theme.fg("muted", description));
+    if (description) addWrapped(out, env, "     ", env.theme.fg("muted", description));
   }
+  return out;
 }
 
-// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
 function rowLabel(
-  theme: Theme,
-  flow: QuestionnaireFlow,
-  state: OverlayRenderState,
+  env: RenderEnv,
   question: NormalizedStructuredQuestion,
   row: InteractiveRow,
   active: boolean,
-  selected: number[],
 ): string {
+  const selected = selectedIndexesForQuestion(env.flow, env.state, question);
   if (row.kind === "option") {
     const option = question.options[row.optionIndex];
     const recommended = question.recommendedIndexes.includes(row.optionIndex);
-    const noteMarker = visibleNoteMarker({ flow, state, question, row, active });
+    const noteMarker = visibleNoteMarker({
+      flow: env.flow,
+      state: env.state,
+      question,
+      row,
+      active,
+    });
     const baseLabel = `${decorateOption(option.label, recommended)}${noteMarker ? ` ${NOTE_MARKER}` : ""}`;
     if (question.type === "multichoice") {
       const checked = selected.includes(row.optionIndex) ? "[x]" : "[ ]";
-      return theme.fg("text", `${checked} ${baseLabel}`);
+      return env.theme.fg("text", `${checked} ${baseLabel}`);
     }
-    return theme.fg("text", `${row.optionIndex + 1}. ${baseLabel}`);
+    return env.theme.fg("text", `${row.optionIndex + 1}. ${baseLabel}`);
   }
-  if (row.kind === "other") return theme.fg("text", structuredRowLabel(flow, question, row));
-  return theme.fg("text", structuredRowLabel(flow, question, row));
+  if (row.kind === "other")
+    return env.theme.fg("text", structuredRowLabel(env.flow, question, row));
+  return env.theme.fg("text", structuredRowLabel(env.flow, question, row));
 }
 
 function rowDescription(
@@ -266,7 +216,11 @@ function rowDescription(
   return undefined;
 }
 
-function renderPreviewPane(width: number, theme: Theme, preview: string | undefined): string[] {
+function renderPreviewPane(
+  width: number,
+  theme: RenderEnv["theme"],
+  preview: string | undefined,
+): string[] {
   const out: string[] = [];
   const push = (text = "") => out.push(truncateToWidth(text, width));
   push(theme.fg("accent", " Preview"));
@@ -279,19 +233,14 @@ function renderPreviewPane(width: number, theme: Theme, preview: string | undefi
   return out;
 }
 
-// biome-ignore lint/complexity/useMaxParams: helper mirrors render context
-function renderPreviewBlock(
-  add: (text: string) => void,
-  lines: string[],
-  theme: Theme,
-  width: number,
-  preview: string,
-): void {
-  add("");
-  add(theme.fg("accent", " Preview:"));
+function renderPreviewBlock(env: RenderEnv, preview: string): string[] {
+  const out: string[] = [];
+  out.push("");
+  out.push(env.theme.fg("accent", " Preview:"));
   for (const line of preview.split("\n")) {
-    lines.push(truncateToWidth(` ${line}`, width));
+    out.push(truncateToWidth(` ${line}`, env.width));
   }
+  return out;
 }
 
 function previewForSelection(
@@ -301,45 +250,43 @@ function previewForSelection(
   return row?.kind === "option" ? question.options[row.optionIndex].preview : undefined;
 }
 
-function renderReview(
-  add: (text: string) => void,
-  width: number,
-  theme: Theme,
-  flow: QuestionnaireFlow,
-): void {
-  add(theme.fg("accent", " Review answers:"));
+function renderReview(env: RenderEnv): string[] {
+  const out: string[] = [];
+  const add = (text: string) => out.push(truncateToWidth(text, env.width));
+  add(env.theme.fg("accent", " Review answers:"));
   add("");
-  for (const question of flow.questions) {
-    const answer = flow.getAnswer(question.id);
-    const lines = answer
+  for (const question of env.flow.questions) {
+    const answer = env.flow.getAnswer(question.id);
+    const answerLines = answer
       ? formatReviewLines(question, answer)
       : [question.required ? "(no answer)" : "(skipped)"];
-    add(theme.fg("muted", ` ${question.header}:`));
-    for (const line of lines) addWrapped(add, width, "   ", theme.fg("text", line));
+    add(env.theme.fg("muted", ` ${question.header}:`));
+    for (const line of answerLines) addWrapped(out, env, "   ", env.theme.fg("text", line));
   }
   add("");
-  if (flow.showSkip) {
+  if (env.flow.showSkip) {
     add(
-      theme.fg(
-        flow.allRequiredAnswered() ? "success" : "warning",
+      env.theme.fg(
+        env.flow.allRequiredAnswered() ? "success" : "warning",
         " Press Enter to submit • s to skip",
       ),
     );
   } else {
-    add(theme.fg(flow.allRequiredAnswered() ? "success" : "warning", " Press Enter to submit"));
+    add(
+      env.theme.fg(
+        env.flow.allRequiredAnswered() ? "success" : "warning",
+        " Press Enter to submit",
+      ),
+    );
   }
+  return out;
 }
 
-function addWrapped(
-  add: (text: string) => void,
-  width: number,
-  prefix: string,
-  text: string,
-): void {
+function addWrapped(lines: string[], env: RenderEnv, prefix: string, text: string): void {
   const prefixWidth = visibleWidth(prefix);
-  const contentWidth = Math.max(1, width - prefixWidth);
+  const contentWidth = Math.max(1, env.width - prefixWidth);
   const continuationPrefix = " ".repeat(prefixWidth);
   for (const [index, line] of wrapTextWithAnsi(text, contentWidth).entries()) {
-    add(`${index === 0 ? prefix : continuationPrefix}${line}`);
+    lines.push(truncateToWidth(`${index === 0 ? prefix : continuationPrefix}${line}`, env.width));
   }
 }

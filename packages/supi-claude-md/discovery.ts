@@ -18,7 +18,6 @@ export interface DiscoveredContextFile {
  * Stops at cwd (does not walk above).
  * Returns files ordered from nearest ancestor to farthest (closest to cwd).
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: walk-up loop with early exits
 export function findSubdirContextFiles(
   filePath: string,
   cwd: string,
@@ -27,55 +26,74 @@ export function findSubdirContextFiles(
   const absFilePath = path.resolve(cwd, filePath);
   const absCwd = path.resolve(cwd);
 
-  // File must be within cwd
-  const relativeToFile = path.relative(absCwd, absFilePath);
-  if (relativeToFile.startsWith("..") || path.isAbsolute(relativeToFile)) {
+  if (!isPathWithinCwd(absFilePath, absCwd)) {
     return [];
   }
 
-  // Start walking from the path itself (if it's a directory like `ls packages/foo`)
-  // or its containing directory (if it's a file like `read packages/foo/bar.ts`)
-  let currentDir: string;
+  const startDir = resolveStartDir(absFilePath);
+  if (!startDir) return [];
+
+  return walkUpForContextFiles(startDir, absCwd, fileNames);
+}
+
+function isPathWithinCwd(absFilePath: string, absCwd: string): boolean {
+  const relativeToFile = path.relative(absCwd, absFilePath);
+  return !relativeToFile.startsWith("..") && !path.isAbsolute(relativeToFile);
+}
+
+function resolveStartDir(absFilePath: string): string | null {
   try {
-    currentDir = fs.statSync(absFilePath).isDirectory() ? absFilePath : path.dirname(absFilePath);
+    return fs.statSync(absFilePath).isDirectory() ? absFilePath : path.dirname(absFilePath);
   } catch {
-    // Path doesn't exist (e.g. failed tool call resolved to missing file)
-    return [];
+    return null;
   }
+}
+
+function walkUpForContextFiles(
+  startDir: string,
+  absCwd: string,
+  fileNames: string[],
+): DiscoveredContextFile[] {
   const results: DiscoveredContextFile[] = [];
+  let currentDir = startDir;
 
   while (true) {
-    // Stop if we've gone above cwd
-    const relDir = path.relative(absCwd, currentDir);
-    if (relDir.startsWith("..") || (path.isAbsolute(relDir) && relDir !== "")) {
-      break;
-    }
+    if (!isWithinCwd(currentDir, absCwd)) break;
 
-    // Check for context file in this directory
-    for (const fileName of fileNames) {
-      const candidate = path.join(currentDir, fileName);
-      if (fs.existsSync(candidate)) {
-        results.push({
-          absolutePath: candidate,
-          relativePath: path.relative(absCwd, candidate),
-          dir: currentDir,
-        });
-        break; // first match per directory
-      }
-    }
+    const found = findFirstContextFile(currentDir, fileNames, absCwd);
+    if (found) results.push(found);
 
-    // Stop at cwd (don't walk above)
-    if (currentDir === absCwd) {
-      break;
-    }
+    if (currentDir === absCwd) break;
 
     const parent = path.dirname(currentDir);
-    if (parent === currentDir) break; // filesystem root
+    if (parent === currentDir) break;
     currentDir = parent;
   }
 
-  // Return from nearest (file dir) to farthest (cwd dir)
   return results;
+}
+
+function isWithinCwd(dir: string, absCwd: string): boolean {
+  const relDir = path.relative(absCwd, dir);
+  return !relDir.startsWith("..") && (!path.isAbsolute(relDir) || relDir === "");
+}
+
+function findFirstContextFile(
+  dir: string,
+  fileNames: string[],
+  absCwd: string,
+): DiscoveredContextFile | null {
+  for (const fileName of fileNames) {
+    const candidate = path.join(dir, fileName);
+    if (fs.existsSync(candidate)) {
+      return {
+        absolutePath: candidate,
+        relativePath: path.relative(absCwd, candidate),
+        dir,
+      };
+    }
+  }
+  return null;
 }
 
 /**

@@ -27,8 +27,7 @@ describe("LSP prompt guidance", () => {
           root: process.cwd(),
           fileTypes: ["ts", "tsx"],
           status: "running",
-          // biome-ignore lint/security/noSecrets: tool signature hints, not secrets
-          supportedActions: ["hover(file,line,char)", "diagnostics(file?)"],
+          supportedActions: ["hover(file,line,char)", "diagnostics [optional file]"],
           openFiles: [],
         } satisfies ProjectServerInfo,
         {

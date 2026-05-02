@@ -58,7 +58,6 @@ export function isFileExcludedByTsconfig(filePath: string, cwd: string): boolean
  */
 function findNearestTsconfig(startDir: string, rootDir: string): TsconfigInfo | null {
   let dir = startDir;
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const cached = cache.get(dir);
     if (cached !== undefined) return cached;
