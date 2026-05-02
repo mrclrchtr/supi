@@ -7,6 +7,7 @@ const choiceQuestion: NormalizedQuestion = {
   header: "Scope",
   type: "choice",
   prompt: "Scope?",
+  required: true,
   options: [
     { value: "api_only", label: "API only" },
     { value: "full_rewrite", label: "Full rewrite" },
@@ -21,6 +22,7 @@ const multichoiceQuestion: NormalizedQuestion = {
   header: "Features",
   type: "multichoice",
   prompt: "Features?",
+  required: true,
   options: [
     { value: "preview", label: "Preview" },
     { value: "multi", label: "Multi-select" },
@@ -79,6 +81,45 @@ describe("buildResult", () => {
     expect(
       buildResult([choiceQuestion], { terminalState: "aborted", answers: [] }).content[0].text,
     ).toMatch(/aborted/i);
+  });
+
+  it("includes skip flag and partial answers for skipped outcome", () => {
+    const optionalQuestion: NormalizedQuestion = {
+      id: "note",
+      header: "Note",
+      type: "text",
+      prompt: "Note?",
+      required: false,
+      options: [],
+    };
+    const result = buildResult([choiceQuestion, optionalQuestion], {
+      terminalState: "skipped",
+      answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],
+      skipped: true,
+    });
+    expect(result.skip).toBe(true);
+    expect(result.content[0].text).toContain("User skipped the questionnaire");
+    expect(result.content[0].text).toContain("Note: (skipped)");
+    expect(result.details.answersById.scope).toMatchObject({ value: "api_only" });
+    expect(result.details.answersById.note).toBeUndefined();
+  });
+
+  it("preserves undefined values for unanswered optional questions", () => {
+    const optionalQuestion: NormalizedQuestion = {
+      id: "note",
+      header: "Note",
+      type: "text",
+      prompt: "Note?",
+      required: false,
+      options: [],
+    };
+    const result = buildResult([choiceQuestion, optionalQuestion], {
+      terminalState: "submitted",
+      answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],
+    });
+    expect(result.details.answersById.scope).toMatchObject({ value: "api_only" });
+    expect(result.details.answersById.note).toBeUndefined();
+    expect(Object.keys(result.details.answersById)).toContain("note");
   });
 });
 

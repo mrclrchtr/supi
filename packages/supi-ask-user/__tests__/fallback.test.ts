@@ -51,7 +51,7 @@ const choiceParams: AskUserParams = {
 describe("runFallbackQuestionnaire", () => {
   it("submits when the user selects a single choice option", async () => {
     const ui = scriptedUi([{ kind: "select", result: "0" }]);
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams), {
       ui,
     });
     expect(outcome).toMatchObject({
@@ -65,7 +65,7 @@ describe("runFallbackQuestionnaire", () => {
       { kind: "select", result: "2" },
       { kind: "input", result: "scope to api/" },
     ]);
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams), {
       ui,
     });
     expect(outcome.answers[0]).toMatchObject({ source: "other", value: "scope to api/" });
@@ -76,7 +76,7 @@ describe("runFallbackQuestionnaire", () => {
       { kind: "select", result: "3" },
       { kind: "input", result: "need to compare risks first" },
     ]);
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams), {
       ui,
     });
     expect(outcome).toMatchObject({
@@ -108,7 +108,7 @@ describe("runFallbackQuestionnaire", () => {
       { kind: "select", result: "3" },
       { kind: "select", result: "Submit answers" },
     ]);
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params), {
       ui,
     });
     expect(outcome).toMatchObject({
@@ -139,7 +139,7 @@ describe("runFallbackQuestionnaire", () => {
       { kind: "select", result: "0" },
       { kind: "select", result: "Submit answers" },
     ]);
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params), {
       ui,
     });
     expect(outcome.answers.map((answer) => answer.questionId)).toEqual(["scope", "go"]);
@@ -155,7 +155,7 @@ describe("runFallbackQuestionnaire", () => {
     const params: AskUserParams = {
       questions: [{ type: "text", id: "name", header: "Name", prompt: "Name?" }],
     };
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params), {
       ui,
     });
     expect(outcome.answers[0]).toMatchObject({ source: "text", value: "actual answer" });
@@ -163,7 +163,7 @@ describe("runFallbackQuestionnaire", () => {
 
   it("treats undefined select return as cancellation", async () => {
     const ui = scriptedUi([{ kind: "select", result: undefined }]);
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams), {
       ui,
     });
     expect(outcome).toMatchObject({ terminalState: "cancelled", answers: [] });
@@ -178,10 +178,45 @@ describe("runFallbackQuestionnaire", () => {
       },
       input: async () => undefined,
     };
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(choiceParams), {
       ui,
       signal: controller.signal,
     });
     expect(outcome.terminalState).toBe("aborted");
+  });
+
+  it("allows skipping an optional text question with empty input", async () => {
+    const ui = scriptedUi([{ kind: "input", result: "" }]);
+    const params: AskUserParams = {
+      questions: [{ type: "text", id: "note", header: "Note", prompt: "Note?", required: false }],
+    };
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params), {
+      ui,
+    });
+    expect(outcome.terminalState).toBe("submitted");
+    expect(outcome.answers[0]).toMatchObject({ source: "text", value: "" });
+  });
+
+  it("shows skip action in review when allowSkip is true", async () => {
+    const params: AskUserParams = {
+      questions: [
+        choiceParams.questions[0],
+        { type: "yesno", id: "go", header: "Go?", prompt: "Proceed?" },
+      ],
+      allowSkip: true,
+    };
+    const ui = scriptedUi([
+      { kind: "select", result: "1" },
+      { kind: "select", result: "0" },
+      { kind: "select", result: "Skip questionnaire" },
+    ]);
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params), {
+      ui,
+    });
+    expect(outcome.terminalState).toBe("skipped");
+    expect(outcome.answers).toEqual([
+      { questionId: "scope", source: "option", value: "broad", optionIndex: 1 },
+      { questionId: "go", source: "yesno", value: "yes", optionIndex: 0 },
+    ]);
   });
 });

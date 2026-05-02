@@ -30,7 +30,10 @@ export class AskUserValidationError extends Error {
 
 export function normalizeQuestionnaire(params: AskUserParams): NormalizedQuestionnaire {
   validateQuestionnaireShape(params);
-  return { questions: params.questions.map((q) => normalizeQuestion(q)) };
+  return {
+    questions: params.questions.map((q) => normalizeQuestion(q)),
+    allowSkip: params.allowSkip ?? false,
+  };
 }
 
 function validateQuestionnaireShape(params: AskUserParams): void {
@@ -97,6 +100,7 @@ function normalizeChoice(q: ExternalChoiceQuestion): NormalizedQuestion {
     header: q.header,
     type: "choice",
     prompt: q.prompt,
+    required: q.required ?? true,
     options,
     allowOther: q.allowOther ?? false,
     allowDiscuss: q.allowDiscuss ?? false,
@@ -112,6 +116,7 @@ function normalizeMultiChoice(q: ExternalMultiChoiceQuestion): NormalizedQuestio
     header: q.header,
     type: "multichoice",
     prompt: q.prompt,
+    required: q.required ?? true,
     options,
     allowOther: q.allowOther ?? false,
     allowDiscuss: q.allowDiscuss ?? false,
@@ -125,6 +130,7 @@ function normalizeYesNo(q: ExternalYesNoQuestion): NormalizedQuestion {
     header: q.header,
     type: "yesno",
     prompt: q.prompt,
+    required: q.required ?? true,
     options: YES_NO_OPTIONS.map((option) => ({ ...option })),
     allowOther: q.allowOther ?? false,
     allowDiscuss: q.allowDiscuss ?? false,
@@ -132,12 +138,18 @@ function normalizeYesNo(q: ExternalYesNoQuestion): NormalizedQuestion {
   };
 }
 
-function normalizeText(q: { id: string; header: string; prompt: string }): NormalizedQuestion {
+function normalizeText(q: {
+  id: string;
+  header: string;
+  prompt: string;
+  required?: boolean;
+}): NormalizedQuestion {
   return {
     id: normalizeIdentifier(q.id),
     header: q.header,
     type: "text",
     prompt: q.prompt,
+    required: q.required ?? true,
     options: [],
   };
 }

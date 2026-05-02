@@ -4,7 +4,7 @@ import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/p
 import type { QuestionnaireFlow } from "./flow.ts";
 import { DISCUSS_LABEL, OTHER_LABEL } from "./format.ts";
 import type { NormalizedStructuredQuestion } from "./types.ts";
-import type { OverlayRenderState } from "./ui-rich-render.ts";
+import type { OverlayRenderState } from "./ui-rich-render-types.ts";
 import type { InteractiveRow } from "./ui-rich-state.ts";
 
 export function structuredRowLabel(

@@ -4,7 +4,7 @@
 
 export type QuestionType = "choice" | "multichoice" | "text" | "yesno";
 
-export type TerminalState = "submitted" | "cancelled" | "aborted";
+export type TerminalState = "submitted" | "cancelled" | "aborted" | "skipped";
 
 export interface NormalizedOption {
   value: string;
@@ -18,6 +18,7 @@ interface BaseQuestion {
   header: string;
   prompt: string;
   type: QuestionType;
+  required: boolean;
 }
 
 interface StructuredQuestionBase extends BaseQuestion {
@@ -57,6 +58,7 @@ export type NormalizedQuestion =
 
 export interface NormalizedQuestionnaire {
   questions: NormalizedQuestion[];
+  allowSkip: boolean;
 }
 
 export interface OptionAnswer {
@@ -118,12 +120,13 @@ export type Answer =
 export interface QuestionnaireOutcome {
   terminalState: TerminalState;
   answers: Answer[];
+  skipped?: true;
 }
 
 export interface AskUserDetails {
   questions: NormalizedQuestion[];
   answers: Answer[];
-  answersById: Record<string, Answer>;
+  answersById: Record<string, Answer | undefined>;
   terminalState: TerminalState;
 }
 

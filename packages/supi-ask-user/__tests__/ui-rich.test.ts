@@ -1,7 +1,6 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component, TUI } from "@mariozechner/pi-tui";
 import { describe, expect, it, vi } from "vitest";
-import { decorateOption } from "../format.ts";
 import type { NormalizedQuestion } from "../types.ts";
 import { type RichCustomOptions, type RichUiHost, runRichQuestionnaire } from "../ui-rich.ts";
 
@@ -10,6 +9,7 @@ const choice: NormalizedQuestion = {
   header: "Scope",
   type: "choice",
   prompt: "Pick",
+  required: true,
   options: [
     { value: "a", label: "A", preview: "preview A" },
     { value: "b", label: "B", preview: "preview B" },
@@ -24,6 +24,7 @@ const multichoice: NormalizedQuestion = {
   header: "Features",
   type: "multichoice",
   prompt: "Pick features",
+  required: true,
   options: [
     { value: "preview", label: "Preview" },
     { value: "multi", label: "Multi-select" },
@@ -39,6 +40,7 @@ const _yesNoGo: NormalizedQuestion = {
   header: "Go?",
   type: "yesno",
   prompt: "Proceed?",
+  required: true,
   options: [
     { value: "yes", label: "Yes" },
     { value: "no", label: "No" },
@@ -85,7 +87,10 @@ describe("runRichQuestionnaire lifecycle", () => {
     const controller = new AbortController();
     controller.abort();
     const host: RichUiHost = { custom: custom as unknown as RichUiHost["custom"] };
-    const result = await runRichQuestionnaire([choice], { ui: host, signal: controller.signal });
+    const result = await runRichQuestionnaire(
+      { questions: [choice], allowSkip: false },
+      { ui: host, signal: controller.signal },
+    );
     expect(result).not.toBe("unsupported");
     expect(result).toMatchObject({ terminalState: "aborted", answers: [] });
     expect(custom).not.toHaveBeenCalled();
@@ -93,7 +98,10 @@ describe("runRichQuestionnaire lifecycle", () => {
 
   it("reports 'unsupported' when the host declines to provide an overlay", async () => {
     const host: RichUiHost = { custom: (() => undefined) as unknown as RichUiHost["custom"] };
-    const result = await runRichQuestionnaire([choice], { ui: host });
+    const result = await runRichQuestionnaire(
+      { questions: [choice], allowSkip: false },
+      { ui: host },
+    );
     expect(result).toBe("unsupported");
   });
 
@@ -107,7 +115,7 @@ describe("runRichQuestionnaire lifecycle", () => {
         return new Promise(() => {});
       }) as unknown as RichUiHost["custom"],
     };
-    void runRichQuestionnaire([choice], { ui: host });
+    void runRichQuestionnaire({ questions: [choice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     expect(optionsArgPresent).toBe(false);
     expect(optionsArg).toBeUndefined();
@@ -119,7 +127,10 @@ describe("runRichQuestionnaire lifecycle", () => {
       answers: { questionId: string; source: string; value?: string }[];
     };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
-    const runPromise = runRichQuestionnaire([choice], { ui: host });
+    const runPromise = runRichQuestionnaire(
+      { questions: [choice], allowSkip: false },
+      { ui: host },
+    );
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -144,7 +155,10 @@ describe("runRichQuestionnaire lifecycle", () => {
       answers: { questionId: string; source: string; values?: string[]; selections?: unknown[] }[];
     };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
-    const runPromise = runRichQuestionnaire([multichoice], { ui: host });
+    const runPromise = runRichQuestionnaire(
+      { questions: [multichoice], allowSkip: false },
+      { ui: host },
+    );
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -192,7 +206,7 @@ describe("runRichQuestionnaire lifecycle", () => {
 describe("runRichQuestionnaire notes", () => {
   it("shows the note hotkey on selection rows but not on discuss rows", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([choice], { ui: host });
+    void runRichQuestionnaire({ questions: [choice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -209,7 +223,10 @@ describe("runRichQuestionnaire notes", () => {
       answers: { questionId: string; source: string; optionIndex?: number; note?: string }[];
     };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
-    const runPromise = runRichQuestionnaire([choice], { ui: host });
+    const runPromise = runRichQuestionnaire(
+      { questions: [choice], allowSkip: false },
+      { ui: host },
+    );
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -229,7 +246,7 @@ describe("runRichQuestionnaire notes", () => {
 
   it("preserves multichoice notes across uncheck and re-check and shows review lines", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([multichoice], { ui: host });
+    void runRichQuestionnaire({ questions: [multichoice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -268,6 +285,7 @@ const choiceWithVaryingPreviews: NormalizedQuestion = {
   header: "Strategy",
   type: "choice",
   prompt: "How to commit?",
+  required: true,
   options: [
     {
       value: "single",
@@ -290,7 +308,10 @@ const choiceWithVaryingPreviews: NormalizedQuestion = {
 describe("render height stability", () => {
   it("output length does not decrease when navigating from long preview to no preview", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([choiceWithVaryingPreviews], { ui: host });
+    void runRichQuestionnaire(
+      { questions: [choiceWithVaryingPreviews], allowSkip: false },
+      { ui: host },
+    );
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked");
 
@@ -307,7 +328,10 @@ describe("render height stability", () => {
 
   it("output length increases when navigating to an option with a longer preview", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([choiceWithVaryingPreviews], { ui: host });
+    void runRichQuestionnaire(
+      { questions: [choiceWithVaryingPreviews], allowSkip: false },
+      { ui: host },
+    );
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked");
 
@@ -331,6 +355,7 @@ describe("render height stability", () => {
         header: "Confirm",
         type: "yesno",
         prompt: "Sure?",
+        required: true,
         options: [
           { value: "yes", label: "Yes" },
           { value: "no", label: "No" },
@@ -342,7 +367,7 @@ describe("render height stability", () => {
     ];
 
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire(twoQuestions, { ui: host });
+    void runRichQuestionnaire({ questions: twoQuestions, allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked");
 
@@ -356,23 +381,5 @@ describe("render height stability", () => {
     // Render second question — yesno, much shorter, should NOT carry q1's height
     const q2Lines = captured.value.render(80);
     expect(q2Lines.length).toBeLessThan(q1Lines.length);
-  });
-});
-
-describe("decorateOption", () => {
-  it("does not double-append (recommended) when label already contains it", () => {
-    expect(decorateOption("Two commits (recommended)", true)).toBe("Two commits (recommended)");
-  });
-
-  it("appends (recommended) when label does not contain it", () => {
-    expect(decorateOption("Two commits", true)).toBe("Two commits (recommended)");
-  });
-
-  it("returns label unchanged when not recommended", () => {
-    expect(decorateOption("Two commits", false)).toBe("Two commits");
-  });
-
-  it("handles case-insensitive match", () => {
-    expect(decorateOption("Option (Recommended)", true)).toBe("Option (Recommended)");
   });
 });

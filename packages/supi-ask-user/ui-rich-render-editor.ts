@@ -3,7 +3,7 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Editor } from "@mariozechner/pi-tui";
 import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import type { OverlayRenderState } from "./ui-rich-render.ts";
+import type { OverlayRenderState } from "./ui-rich-render-types.ts";
 
 export function editorCaption(state: OverlayRenderState): string {
   if (state.subMode === "other-input") return "Other answer";

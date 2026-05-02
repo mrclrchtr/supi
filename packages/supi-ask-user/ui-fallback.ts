@@ -7,6 +7,7 @@ import { DISCUSS_LABEL, decorateOption, formatReviewLine, OTHER_LABEL } from "./
 import type {
   Answer,
   NormalizedQuestion,
+  NormalizedQuestionnaire,
   NormalizedStructuredQuestion,
   QuestionnaireOutcome,
 } from "./types.ts";
@@ -37,11 +38,13 @@ type StepOutcome = "answered" | "cancelled" | "aborted";
 type CollectOutcome = Exclude<StepOutcome, "answered">;
 type ReviewOutcome =
   | { kind: "submit" }
+  | { kind: "skip" }
   | { kind: "cancelled" }
   | { kind: "aborted" }
   | { kind: "revise"; questionIndex: number };
 
 const REVIEW_SUBMIT = "Submit answers";
+const REVIEW_SKIP = "Skip questionnaire";
 const REVIEW_CANCEL = "Cancel questionnaire";
 const MULTI_SUBMIT = "Submit selections";
 
@@ -50,10 +53,10 @@ interface FallbackLoopState {
 }
 
 export async function runFallbackQuestionnaire(
-  questions: NormalizedQuestion[],
+  questionnaire: NormalizedQuestionnaire,
   options: RunOptions,
 ): Promise<QuestionnaireOutcome> {
-  const flow = new QuestionnaireFlow(questions);
+  const flow = new QuestionnaireFlow(questionnaire.questions, questionnaire.allowSkip);
   const state: FallbackLoopState = { revisingFromReview: false };
   while (!flow.isTerminal()) {
     if (abortIfNeeded(flow, options.signal)) break;
@@ -95,6 +98,10 @@ function applyReviewOutcome(
   }
   if (review.kind === "submit") {
     flow.submit();
+    return;
+  }
+  if (review.kind === "skip") {
+    flow.skip();
     return;
   }
   jumpToQuestion(flow, review.questionIndex);
@@ -144,13 +151,16 @@ async function runReviewStep(flow: QuestionnaireFlow, opts: RunOptions): Promise
   const reviseLabels = flow.questions.map((question, index) =>
     reviewReviseLabel(index, question.header),
   );
-  const labels = [REVIEW_SUBMIT, ...reviseLabels, REVIEW_CANCEL];
+  const labels = [REVIEW_SUBMIT, ...reviseLabels];
+  if (flow.showSkip) labels.push(REVIEW_SKIP);
+  labels.push(REVIEW_CANCEL);
   const choice = await opts.ui.select(`Review answers — ${summary}`, labels, {
     signal: opts.signal,
   });
   if (opts.signal?.aborted) return { kind: "aborted" };
   if (choice === undefined || choice === REVIEW_CANCEL) return { kind: "cancelled" };
   if (choice === REVIEW_SUBMIT) return { kind: "submit" };
+  if (choice === REVIEW_SKIP) return { kind: "skip" };
   const questionIndex = reviseLabels.indexOf(choice);
   if (questionIndex >= 0) return { kind: "revise", questionIndex };
   return { kind: "cancelled" };
@@ -193,6 +203,7 @@ async function collectText(
     if (value === undefined) return "cancelled";
     const trimmed = value.trim();
     if (trimmed.length > 0) return { questionId: question.id, source: "text", value: trimmed };
+    if (!question.required) return { questionId: question.id, source: "text", value: "" };
   }
 }
 

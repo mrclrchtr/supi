@@ -15,47 +15,15 @@ import {
   renderEditorPane,
   usesSeparateEditorPane,
 } from "./ui-rich-render-editor.ts";
+import { footerHelp } from "./ui-rich-render-footer.ts";
+import { currentNote, renderNoteStatus, visibleNoteMarker } from "./ui-rich-render-notes.ts";
+import type { OverlayRenderState } from "./ui-rich-render-types.ts";
 import {
-  currentNote,
-  currentRowSupportsNotes,
-  renderNoteStatus,
-  visibleNoteMarker,
-} from "./ui-rich-render-notes.ts";
-import { hasPreview, type InteractiveRow, interactiveRows } from "./ui-rich-state.ts";
-
-export type SubMode = "select" | "other-input" | "text-input" | "discuss-input" | "note-input";
-
-export interface OverlayRenderState {
-  selectedIndex: number;
-  subMode: SubMode;
-  stagedSelections: Map<string, number[]>;
-  stagedSingleNotes: Map<string, string>;
-  stagedMultiNotes: Map<string, Map<number, string>>;
-}
-
-export function isEditorMode(mode: SubMode): boolean {
-  return (
-    mode === "text-input" ||
-    mode === "other-input" ||
-    mode === "discuss-input" ||
-    mode === "note-input"
-  );
-}
-
-export function selectedIndexesForQuestion(
-  flow: Pick<QuestionnaireFlow, "getAnswer">,
-  state: Pick<OverlayRenderState, "stagedSelections">,
-  question: NormalizedStructuredQuestion,
-): number[] {
-  const answer = flow.getAnswer(question.id);
-  if (answer?.source === "other" || answer?.source === "discuss") return [];
-  const staged = state.stagedSelections.get(question.id);
-  if (staged) return [...staged];
-  if (!answer) return [];
-  if (answer.source === "option" || answer.source === "yesno") return [answer.optionIndex];
-  if (answer.source === "options") return [...answer.optionIndexes];
-  return [];
-}
+  hasPreview,
+  type InteractiveRow,
+  interactiveRows,
+  selectedIndexesForQuestion,
+} from "./ui-rich-state.ts";
 
 // biome-ignore lint/complexity/useMaxParams: render entry needs full overlay context
 export function renderOverlay(
@@ -79,29 +47,30 @@ export function renderOverlay(
   return lines;
 }
 
+function tabSegment(
+  theme: Theme,
+  text: string,
+  active: boolean,
+  color: "success" | "muted" | "dim" | "text",
+): string {
+  return active ? theme.bg("selectedBg", theme.fg("text", text)) : theme.fg(color, text);
+}
+
 function renderTabBar(add: (text: string) => void, theme: Theme, flow: QuestionnaireFlow): void {
   // Active segment uses the selected-bg highlight (matches pi's reference
   // questionnaire and Claude's UI). Inactive segments stay foreground-only:
-  // success when answered, muted when pending.
+  // success when answered, muted when pending, dim when optional and skipped.
   const segments: string[] = [theme.fg("dim", "← ")];
   for (const [index, question] of flow.questions.entries()) {
     const answered = flow.hasAnswer(question.id);
     const active = flow.currentMode === "answering" && flow.currentIndex === index;
-    const marker = answered ? "■" : "□";
-    const text = ` ${marker} ${question.header} `;
-    segments.push(
-      active
-        ? theme.bg("selectedBg", theme.fg("text", text))
-        : theme.fg(answered ? "success" : "muted", text),
-    );
+    const marker = answered ? "■" : question.required ? "□" : "○";
+    const color = answered ? "success" : question.required ? "muted" : "dim";
+    segments.push(tabSegment(theme, ` ${marker} ${question.header} `, active, color));
     segments.push(" ");
   }
-  const reviewText = " ✓ Review ";
-  segments.push(
-    flow.currentMode === "reviewing"
-      ? theme.bg("selectedBg", theme.fg("text", reviewText))
-      : theme.fg("dim", reviewText),
-  );
+  const reviewActive = flow.currentMode === "reviewing";
+  segments.push(tabSegment(theme, " ✓ Review ", reviewActive, reviewActive ? "text" : "dim"));
   segments.push(theme.fg("dim", " →"));
   add(` ${segments.join("")}`);
   add("");
@@ -342,12 +311,23 @@ function renderReview(
   add("");
   for (const question of flow.questions) {
     const answer = flow.getAnswer(question.id);
-    const lines = answer ? formatReviewLines(question, answer) : ["(no answer)"];
+    const lines = answer
+      ? formatReviewLines(question, answer)
+      : [question.required ? "(no answer)" : "(skipped)"];
     add(theme.fg("muted", ` ${question.header}:`));
     for (const line of lines) addWrapped(add, width, "   ", theme.fg("text", line));
   }
   add("");
-  add(theme.fg(flow.allAnswered() ? "success" : "warning", " Press Enter to submit"));
+  if (flow.showSkip) {
+    add(
+      theme.fg(
+        flow.allRequiredAnswered() ? "success" : "warning",
+        " Press Enter to submit • s to skip",
+      ),
+    );
+  } else {
+    add(theme.fg(flow.allRequiredAnswered() ? "success" : "warning", " Press Enter to submit"));
+  }
 }
 
 function addWrapped(
@@ -362,30 +342,4 @@ function addWrapped(
   for (const [index, line] of wrapTextWithAnsi(text, contentWidth).entries()) {
     add(`${index === 0 ? prefix : continuationPrefix}${line}`);
   }
-}
-
-function footerHelp(flow: QuestionnaireFlow, state: OverlayRenderState): string {
-  if (state.subMode === "text-input") return "Enter to submit • Esc to cancel";
-  if (isEditorMode(state.subMode)) return "Enter to submit • Esc to go back";
-  if (flow.currentMode === "reviewing") {
-    return "Enter to submit • ←/Shift-Tab to revise • Esc to cancel";
-  }
-  const question = flow.currentQuestion;
-  if (!question || question.type === "text") return "Esc cancel";
-  const canGoBack = flow.currentIndex > 0;
-  const canReview = flow.allAnswered();
-  const parts = ["↑↓ navigate"];
-  if (question.type === "multichoice") {
-    parts.push("Space toggle");
-    if (selectedIndexesForQuestion(flow, state, question).length > 0) parts.push("Enter submit");
-  } else {
-    parts.push("Enter confirm/select");
-  }
-  if (currentRowSupportsNotes(question, state)) {
-    parts.push(currentNote(flow, state, question) ? "n edit note" : "n add note");
-  }
-  if (canGoBack) parts.push("←/Shift-Tab back");
-  if (canReview) parts.push("→/Tab review");
-  parts.push("Esc cancel");
-  return parts.join(" • ");
 }

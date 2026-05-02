@@ -8,7 +8,7 @@ import type {
   QuestionnaireOutcome,
 } from "./types.ts";
 import { isStructuredQuestion, primaryRecommendationIndex } from "./types.ts";
-import type { OverlayRenderState, SubMode } from "./ui-rich-render.ts";
+import type { OverlayRenderState, SubMode } from "./ui-rich-render-types.ts";
 
 export interface NoteTargetSingle {
   mode: "single";
@@ -115,6 +115,30 @@ export function mergedMultiNoteMap(deps: OverlayDeps, questionId: string): Map<n
   const merged = new Map(answerMap);
   for (const [optionIndex, note] of staged.entries()) merged.set(optionIndex, note);
   return merged;
+}
+
+export function isEditorMode(mode: SubMode): boolean {
+  return (
+    mode === "text-input" ||
+    mode === "other-input" ||
+    mode === "discuss-input" ||
+    mode === "note-input"
+  );
+}
+
+export function selectedIndexesForQuestion(
+  flow: Pick<QuestionnaireFlow, "getAnswer">,
+  state: Pick<OverlayRenderState, "stagedSelections">,
+  question: NormalizedStructuredQuestion,
+): number[] {
+  const answer = flow.getAnswer(question.id);
+  if (answer?.source === "other" || answer?.source === "discuss") return [];
+  const staged = state.stagedSelections.get(question.id);
+  if (staged) return [...staged];
+  if (!answer) return [];
+  if (answer.source === "option" || answer.source === "yesno") return [answer.optionIndex];
+  if (answer.source === "options") return [...answer.optionIndexes];
+  return [];
 }
 
 export function selectedRowIndex(

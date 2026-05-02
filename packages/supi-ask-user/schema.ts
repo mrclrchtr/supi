@@ -25,6 +25,12 @@ const StructuredQuestionBaseSchema = {
   options: Type.Array(StructuredOptionSchema, {
     description: "Allowed answers (2-12). Use distinct, mutually exclusive options.",
   }),
+  required: Type.Optional(
+    Type.Boolean({
+      default: true,
+      description: "Whether this question must be answered before submission (default true)",
+    }),
+  ),
   allowOther: Type.Optional(
     Type.Boolean({
       description: "Allow an explicit custom answer path instead of forcing one of the options",
@@ -62,6 +68,12 @@ const TextQuestionSchema = Type.Object({
   id: Type.String({ description: "Unique question id within this questionnaire" }),
   header: Type.String({ description: "Short label (chip) describing the prompt" }),
   prompt: Type.String({ description: "Full question text shown to the user" }),
+  required: Type.Optional(
+    Type.Boolean({
+      default: true,
+      description: "Whether this question must be answered before submission (default true)",
+    }),
+  ),
 });
 
 const YesNoQuestionSchema = Type.Object({
@@ -69,6 +81,12 @@ const YesNoQuestionSchema = Type.Object({
   id: Type.String({ description: "Unique question id within this questionnaire" }),
   header: Type.String({ description: "Short label (chip) describing the decision" }),
   prompt: Type.String({ description: "Full yes/no question shown to the user" }),
+  required: Type.Optional(
+    Type.Boolean({
+      default: true,
+      description: "Whether this question must be answered before submission (default true)",
+    }),
+  ),
   allowOther: Type.Optional(
     Type.Boolean({ description: "Allow an explicit custom answer path besides yes/no" }),
   ),
@@ -93,6 +111,12 @@ export const AskUserParamsSchema = Type.Object({
   questions: Type.Array(QuestionSchema, {
     description: "Between 1 and 4 focused decision questions",
   }),
+  allowSkip: Type.Optional(
+    Type.Boolean({
+      description:
+        "Expose a Skip action so the user can submit a partial result without answering all questions",
+    }),
+  ),
 });
 
 export type AskUserParams = Static<typeof AskUserParamsSchema>;

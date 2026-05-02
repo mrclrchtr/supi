@@ -9,6 +9,7 @@ const multichoiceWithOther: NormalizedQuestion = {
   header: "Features",
   type: "multichoice",
   prompt: "Pick features",
+  required: true,
   options: [
     { value: "preview", label: "Preview" },
     { value: "multi", label: "Multi-select" },
@@ -56,7 +57,10 @@ describe("runRichQuestionnaire multichoice other path", () => {
       answers: { questionId: string; source: string; value?: string }[];
     };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
-    const runPromise = runRichQuestionnaire([multichoiceWithOther], { ui: host });
+    const runPromise = runRichQuestionnaire(
+      { questions: [multichoiceWithOther], allowSkip: false },
+      { ui: host },
+    );
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 

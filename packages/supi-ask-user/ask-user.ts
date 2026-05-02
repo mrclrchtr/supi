@@ -22,7 +22,7 @@ import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render.ts";
 import { buildErrorResult, buildResult, type HybridResult } from "./result.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
-import type { NormalizedQuestion } from "./types.ts";
+import type { NormalizedQuestionnaire } from "./types.ts";
 import { type FallbackUi, runFallbackQuestionnaire } from "./ui-fallback.ts";
 import { type RichUiHost, runRichQuestionnaire } from "./ui-rich.ts";
 
@@ -90,9 +90,9 @@ async function executeAskUser(
   ctx: ExtensionUi,
   lock: ActiveQuestionnaireLock,
 ): Promise<HybridResult> {
-  let normalized: NormalizedQuestion[];
+  let normalized: NormalizedQuestionnaire;
   try {
-    normalized = normalizeQuestionnaire(params).questions;
+    normalized = normalizeQuestionnaire(params);
   } catch (err) {
     if (err instanceof AskUserValidationError) return buildErrorResult(`Error: ${err.message}`);
     throw err;
@@ -109,7 +109,10 @@ async function executeAskUser(
   }
   try {
     const result = await driveQuestionnaire(normalized, signal, ctx);
-    if (result.details.terminalState !== "submitted") {
+    if (
+      result.details.terminalState !== "submitted" &&
+      result.details.terminalState !== "skipped"
+    ) {
       ctx.abort();
     }
     return result;
@@ -119,20 +122,21 @@ async function executeAskUser(
 }
 
 async function driveQuestionnaire(
-  questions: NormalizedQuestion[],
+  questionnaire: NormalizedQuestionnaire,
   signal: AbortSignal | undefined,
   ctx: ExtensionUi,
 ): Promise<HybridResult> {
+  const questions = questionnaire.questions;
   if (typeof ctx.ui.custom === "function") {
     const richHost: RichUiHost = { custom: ctx.ui.custom.bind(ctx.ui) };
-    const outcome = await runRichQuestionnaire(questions, { ui: richHost, signal });
+    const outcome = await runRichQuestionnaire(questionnaire, { ui: richHost, signal });
     if (outcome !== "unsupported") return buildResult(questions, outcome);
   }
   const fallbackUi: FallbackUi = {
     select: ctx.ui.select.bind(ctx.ui),
     input: ctx.ui.input.bind(ctx.ui),
   };
-  const outcome = await runFallbackQuestionnaire(questions, { ui: fallbackUi, signal });
+  const outcome = await runFallbackQuestionnaire(questionnaire, { ui: fallbackUi, signal });
   return buildResult(questions, outcome);
 }
 

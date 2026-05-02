@@ -14,10 +14,21 @@ export class QuestionnaireFlow {
   private mode: FlowMode = "answering";
   private terminalState: TerminalState | null = null;
 
-  constructor(public readonly questions: NormalizedQuestion[]) {
+  constructor(
+    public readonly questions: NormalizedQuestion[],
+    public readonly allowSkip = false,
+  ) {
     if (questions.length === 0) {
       throw new Error("QuestionnaireFlow requires at least one question.");
     }
+  }
+
+  get hasOptionalQuestions(): boolean {
+    return this.questions.some((q) => !q.required);
+  }
+
+  get showSkip(): boolean {
+    return this.allowSkip || this.hasOptionalQuestions;
   }
 
   get currentIndex(): number {
@@ -48,6 +59,10 @@ export class QuestionnaireFlow {
     return this.questions.every((q) => this.answers.has(q.id));
   }
 
+  allRequiredAnswered(): boolean {
+    return this.questions.every((q) => !q.required || this.answers.has(q.id));
+  }
+
   setAnswer(answer: Answer): void {
     this.answers.set(answer.questionId, normalizeAnswer(answer));
   }
@@ -55,7 +70,7 @@ export class QuestionnaireFlow {
   advance(): boolean {
     if (this.mode !== "answering") return false;
     const current = this.currentQuestion;
-    if (current && !this.answers.has(current.id)) return false;
+    if (current?.required && !this.answers.has(current.id)) return false;
     if (this.index < this.questions.length - 1) {
       this.index += 1;
       return true;
@@ -85,15 +100,22 @@ export class QuestionnaireFlow {
   enterReview(): boolean {
     if (this.mode === "terminal") return false;
     if (!needsReview(this.questions)) return false;
-    if (!this.allAnswered()) return false;
+    if (!this.allRequiredAnswered()) return false;
     this.mode = "reviewing";
     return true;
   }
 
   submit(): boolean {
     if (this.mode === "terminal") return false;
-    if (!this.allAnswered()) return false;
+    if (!this.allRequiredAnswered()) return false;
     this.markSubmitted();
+    return true;
+  }
+
+  skip(): boolean {
+    if (this.mode === "terminal") return false;
+    this.mode = "terminal";
+    this.terminalState = "skipped";
     return true;
   }
 
@@ -117,7 +139,11 @@ export class QuestionnaireFlow {
     const state = this.terminalState ?? "cancelled";
     return {
       terminalState: state,
-      answers: state === "submitted" ? this.collectAnswers() : [...this.answers.values()],
+      answers:
+        state === "submitted" || state === "skipped"
+          ? this.collectAnswers()
+          : [...this.answers.values()],
+      ...(state === "skipped" ? { skipped: true } : {}),
     };
   }
 

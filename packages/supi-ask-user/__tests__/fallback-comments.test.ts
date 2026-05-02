@@ -37,7 +37,7 @@ describe("runFallbackQuestionnaire — reduced fallback semantics", () => {
         },
       ],
     };
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params), {
       ui: scriptedUi(["2", ""]),
     });
     expect(outcome).toMatchObject({
@@ -69,7 +69,7 @@ describe("runFallbackQuestionnaire — reduced fallback semantics", () => {
       },
       input: async () => undefined,
     };
-    await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, { ui });
+    await runFallbackQuestionnaire(normalizeQuestionnaire(params), { ui });
     expect(seen.join(" | ")).not.toContain("const a = 1;");
     expect(seen[0]).toContain("Narrow");
   });

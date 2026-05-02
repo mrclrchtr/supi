@@ -56,7 +56,7 @@ describe("runFallbackQuestionnaire review + multichoice other", () => {
       { kind: "select", result: "0" },
     ]);
 
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params), {
       ui,
     });
 
@@ -92,7 +92,7 @@ describe("runFallbackQuestionnaire review + multichoice other", () => {
       { kind: "select", result: "0" },
     ]);
 
-    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params).questions, {
+    const outcome = await runFallbackQuestionnaire(normalizeQuestionnaire(params), {
       ui,
     });
 

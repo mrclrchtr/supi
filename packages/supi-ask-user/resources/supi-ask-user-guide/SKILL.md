@@ -63,6 +63,85 @@ Bad uses:
 
 Never call `ask_user` while another `ask_user` interaction is in flight. Wait for the previous result before issuing the next call. The tool enforces a single-active-questionnaire lock and returns an error if a second questionnaire is attempted before the first completes.
 
+## Optional questions
+
+Mark individual questions as `required: false` when the user should be able to submit without answering them. Optional questions are visually distinguished in the UI and return `undefined` in the result when left unanswered.
+
+```json
+{
+  "questions": [
+    {
+      "type": "choice",
+      "id": "framework",
+      "header": "Framework",
+      "prompt": "Which framework?",
+      "required": true,
+      "options": [
+        { "value": "react", "label": "React" },
+        { "value": "vue", "label": "Vue" }
+      ]
+    },
+    {
+      "type": "text",
+      "id": "note",
+      "header": "Note",
+      "prompt": "Why this choice?",
+      "required": false
+    }
+  ]
+}
+```
+
+- The user can skip the optional `note` question and still submit.
+- The result includes `"note": undefined` so your code can detect it was skipped.
+- Default is `required: true`; omitting the field preserves the original mandatory behavior.
+
+## Skip action
+
+Add `allowSkip: true` at the questionnaire level (or include at least one optional question) to expose a **Skip** action. Skip returns a partial result with `skip: true` instead of treating the interaction as cancelled.
+
+Use skip when the user has filled in some fields but wants to bail on the rest without losing what they already entered:
+
+```json
+{
+  "allowSkip": true,
+  "questions": [
+    { "type": "yesno", "id": "go", "header": "Go?", "prompt": "Proceed?" },
+    { "type": "text", "id": "reason", "header": "Reason", "prompt": "Why?", "required": false }
+  ]
+}
+```
+
+- **Skip** (`s`) submits whatever is filled in and sets `skip: true` on the result.
+- **Cancel** (`Esc`) aborts with no result.
+- Only enable `allowSkip` when partial data is actually useful to your extension.
+
+## Chained questionnaires
+
+You can emit follow-up `ask_user` calls based on prior partial answers. This is useful for progressive exploration: ask a small initial set, receive the result, then conditionally ask follow-ups.
+
+```ts
+// First questionnaire
+const first = await ask_user({
+  questions: [
+    { type: "choice", id: "scope", header: "Scope", prompt: "Pick scope", required: true,
+      options: [{ value: "api", label: "API" }, { value: "ui", label: "UI" }] }
+  ]
+});
+
+// Conditional follow-up based on the answer
+if (first.details.answersById.scope?.value === "api") {
+  await ask_user({
+    questions: [
+      { type: "choice", id: "format", header: "Format", prompt: "Response format?", required: true,
+        options: [{ value: "json", label: "JSON" }, { value: "xml", label: "XML" }] }
+    ]
+  });
+}
+```
+
+Keep chains short (1–2 follow-ups max) and always respect the concurrency rule: wait for each questionnaire to complete before starting the next.
+
 ## Investigation first, questions second
 
 Before asking the user, use `read`, `bash`, `grep`, or `lsp` to investigate the codebase. A well-informed question with concrete options is better than a vague open-ended one.

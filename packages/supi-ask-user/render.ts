@@ -33,6 +33,13 @@ export function renderAskUserResult(
     const fallback = result.content[0];
     return new Text(fallback?.type === "text" ? (fallback.text ?? "") : "", 0, 0);
   }
+  if (details.terminalState === "skipped") {
+    return new Text(
+      `${theme.fg("dim", "Skipped")}\n${formatSubmittedSummary(details, theme)}`,
+      0,
+      0,
+    );
+  }
   if (details.terminalState === "cancelled") {
     return new Text(theme.fg("warning", "Cancelled"), 0, 0);
   }

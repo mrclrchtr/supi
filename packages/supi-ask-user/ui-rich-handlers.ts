@@ -2,16 +2,17 @@
 
 import { Key, matchesKey } from "@mariozechner/pi-tui";
 import type { NormalizedQuestion, NormalizedStructuredQuestion } from "./types.ts";
-import { isEditorMode, selectedIndexesForQuestion } from "./ui-rich-render.ts";
 import { currentNote, currentRowSupportsNotes } from "./ui-rich-render-notes.ts";
 import {
   existingStructuredInputValue,
   interactiveRows,
+  isEditorMode,
   mergedMultiNoteMap,
   multiNoteMapFromAnswer,
   type OverlayDeps,
   resetStateForCurrent,
   rowCount,
+  selectedIndexesForQuestion,
   singleNoteFromAnswer,
 } from "./ui-rich-state.ts";
 
@@ -21,7 +22,7 @@ export function onEditorSubmit(value: string, deps: OverlayDeps): void {
   const trimmed = value.trim();
   const { state, editor, refresh } = deps;
   if (state.subMode === "text-input") {
-    if (trimmed.length === 0) return;
+    if (trimmed.length === 0 && question.required) return;
     deps.flow.setAnswer({ questionId: question.id, source: "text", value: trimmed });
     moveAfterAnswer(deps);
     return;
@@ -108,6 +109,17 @@ export function handleOverlayInput(data: string, deps: OverlayDeps): void {
 function handleEditorEscape(deps: OverlayDeps): void {
   const { state, editor, flow, refresh } = deps;
   if (state.subMode === "text-input") {
+    const question = flow.currentQuestion;
+    if (question && !question.required) {
+      flow.advance();
+      if (flow.isTerminal()) {
+        deps.finish(flow.outcome());
+        return;
+      }
+      resetStateForCurrent(deps);
+      refresh();
+      return;
+    }
     flow.cancel();
     deps.finish(flow.outcome());
     return;
@@ -144,6 +156,11 @@ function handleSelectInput(data: string, deps: OverlayDeps): void {
     handleSelectEnter(question, deps);
     return;
   }
+  if (matchesKey(data, "s") && flow.showSkip) {
+    flow.skip();
+    deps.finish(flow.outcome());
+    return;
+  }
 }
 
 function openNoteEditor(question: NormalizedQuestion, deps: OverlayDeps): void {
@@ -169,7 +186,13 @@ function handleSelectNav(data: string, deps: OverlayDeps): boolean {
     return true;
   }
   if (matchesKey(data, Key.tab) || matchesKey(data, Key.right)) {
-    if (flow.allAnswered() && flow.enterReview()) refresh();
+    const question = flow.currentQuestion;
+    if (flow.allRequiredAnswered() && flow.enterReview()) {
+      refresh();
+    } else if (question && !question.required && !flow.hasAnswer(question.id) && flow.advance()) {
+      resetStateForCurrent(deps);
+      refresh();
+    }
     return true;
   }
   return false;
@@ -307,6 +330,11 @@ function handleReviewInput(data: string, deps: OverlayDeps): void {
       resetStateForCurrent(deps);
       refresh();
     }
+    return;
+  }
+  if (matchesKey(data, "s") && flow.showSkip) {
+    flow.skip();
+    deps.finish(flow.outcome());
   }
 }
 

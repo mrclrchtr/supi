@@ -5,7 +5,7 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { type Component, Editor, type EditorTheme, type TUI } from "@mariozechner/pi-tui";
 import { QuestionnaireFlow } from "./flow.ts";
-import type { NormalizedQuestion, QuestionnaireOutcome } from "./types.ts";
+import type { NormalizedQuestionnaire, QuestionnaireOutcome } from "./types.ts";
 import { handleOverlayInput, onEditorSubmit } from "./ui-rich-handlers.ts";
 import { renderOverlay } from "./ui-rich-render.ts";
 import { initialSubMode, type OverlayState, selectedRowIndex } from "./ui-rich-state.ts";
@@ -33,10 +33,10 @@ export interface RunRichOptions {
 }
 
 export async function runRichQuestionnaire(
-  questions: NormalizedQuestion[],
+  questionnaire: NormalizedQuestionnaire,
   opts: RunRichOptions,
 ): Promise<QuestionnaireOutcome | "unsupported"> {
-  const flow = new QuestionnaireFlow(questions);
+  const flow = new QuestionnaireFlow(questionnaire.questions, questionnaire.allowSkip);
   // Short-circuit before opening the overlay if we were already aborted.
   // Otherwise signal.addEventListener("abort", …) would never fire and the
   // overlay would stay open until the user dismissed it manually.

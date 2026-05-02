@@ -7,6 +7,7 @@ const choice = (id: string, header = id): NormalizedQuestion => ({
   header,
   type: "choice",
   prompt: `${id}?`,
+  required: true,
   options: [
     { value: "a", label: "A" },
     { value: "b", label: "B" },
@@ -21,6 +22,7 @@ const multichoice = (id: string, header = id): NormalizedQuestion => ({
   header,
   type: "multichoice",
   prompt: `${id}?`,
+  required: true,
   options: [
     { value: "a", label: "A" },
     { value: "b", label: "B" },
@@ -29,6 +31,21 @@ const multichoice = (id: string, header = id): NormalizedQuestion => ({
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0, 2],
+});
+
+const optional = (id: string, header = id): NormalizedQuestion => ({
+  id,
+  header,
+  type: "choice",
+  prompt: `${id}?`,
+  required: false,
+  options: [
+    { value: "a", label: "A" },
+    { value: "b", label: "B" },
+  ],
+  allowOther: false,
+  allowDiscuss: false,
+  recommendedIndexes: [],
 });
 
 describe("QuestionnaireFlow", () => {
@@ -138,6 +155,53 @@ describe("QuestionnaireFlow", () => {
     const aborted = new QuestionnaireFlow([choice("only")]);
     aborted.abort();
     expect(aborted.outcome().terminalState).toBe("aborted");
+  });
+});
+
+describe("QuestionnaireFlow optional questions", () => {
+  it("allows advancing past optional unanswered questions", () => {
+    const flow = new QuestionnaireFlow([optional("one"), choice("two")]);
+    expect(flow.advance()).toBe(true);
+    expect(flow.currentIndex).toBe(1);
+    flow.setAnswer({ questionId: "two", source: "option", value: "a", optionIndex: 0 });
+    flow.advance();
+    expect(flow.currentMode).toBe("reviewing");
+    flow.submit();
+    expect(flow.isTerminal()).toBe(true);
+    expect(flow.outcome().terminalState).toBe("submitted");
+  });
+
+  it("skip sets terminal state to skipped and includes prior answers", () => {
+    const flow = new QuestionnaireFlow([optional("one"), choice("two")]);
+    flow.setAnswer({ questionId: "one", source: "option", value: "a", optionIndex: 0 });
+    flow.skip();
+    expect(flow.outcome().terminalState).toBe("skipped");
+    expect(flow.outcome().skipped).toBe(true);
+    expect(flow.outcome().answers).toEqual([
+      { questionId: "one", source: "option", value: "a", optionIndex: 0 },
+    ]);
+  });
+
+  it("blocks submit when required questions are unanswered even if optional are skipped", () => {
+    const flow = new QuestionnaireFlow([optional("one"), choice("two")]);
+    flow.advance();
+    expect(flow.allRequiredAnswered()).toBe(false);
+    expect(flow.submit()).toBe(false);
+  });
+
+  it("showSkip is true when allowSkip is set", () => {
+    const flow = new QuestionnaireFlow([choice("one")], true);
+    expect(flow.showSkip).toBe(true);
+  });
+
+  it("showSkip is true when optional questions exist", () => {
+    const flow = new QuestionnaireFlow([optional("one"), choice("two")]);
+    expect(flow.showSkip).toBe(true);
+  });
+
+  it("showSkip is false when all questions are required and allowSkip is false", () => {
+    const flow = new QuestionnaireFlow([choice("one"), choice("two")]);
+    expect(flow.showSkip).toBe(false);
   });
 });
 

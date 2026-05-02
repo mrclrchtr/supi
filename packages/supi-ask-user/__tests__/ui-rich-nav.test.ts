@@ -9,6 +9,7 @@ const choice: NormalizedQuestion = {
   header: "Scope",
   type: "choice",
   prompt: "Pick",
+  required: true,
   options: [
     { value: "a", label: "A", preview: "preview A" },
     { value: "b", label: "B", preview: "preview B" },
@@ -23,6 +24,7 @@ const multichoice: NormalizedQuestion = {
   header: "Features",
   type: "multichoice",
   prompt: "Pick features",
+  required: true,
   options: [
     { value: "preview", label: "Preview" },
     { value: "multi", label: "Multi-select" },
@@ -38,6 +40,7 @@ const yesNoGo: NormalizedQuestion = {
   header: "Go?",
   type: "yesno",
   prompt: "Proceed?",
+  required: true,
   options: [
     { value: "yes", label: "Yes" },
     { value: "no", label: "No" },
@@ -86,7 +89,7 @@ describe("runRichQuestionnaire revisit behavior", () => {
     };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
     const runPromise = runRichQuestionnaire(
-      [choice, { ...yesNoGo, id: "confirm", header: "Confirm" }],
+      { questions: [choice, { ...yesNoGo, id: "confirm", header: "Confirm" }], allowSkip: false },
       {
         ui: host,
       },
@@ -132,7 +135,10 @@ describe("runRichQuestionnaire revisit behavior", () => {
 
   it("shows stored discuss text inline for multichoice discuss answers", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([multichoice, yesNoGo], { ui: host });
+    void runRichQuestionnaire(
+      { questions: [multichoice, yesNoGo], allowSkip: false },
+      { ui: host },
+    );
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -162,7 +168,7 @@ describe("runRichQuestionnaire revisit behavior", () => {
     };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
     const runPromise = runRichQuestionnaire(
-      [choice, { ...yesNoGo, id: "confirm", header: "Confirm" }],
+      { questions: [choice, { ...yesNoGo, id: "confirm", header: "Confirm" }], allowSkip: false },
       {
         ui: host,
       },
@@ -210,9 +216,10 @@ describe("runRichQuestionnaire revisit behavior", () => {
 describe("runRichQuestionnaire render state", () => {
   it("restores the previously selected answer when revising from review", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([choice, { ...yesNoGo, id: "confirm", header: "Confirm" }], {
-      ui: host,
-    });
+    void runRichQuestionnaire(
+      { questions: [choice, { ...yesNoGo, id: "confirm", header: "Confirm" }], allowSkip: false },
+      { ui: host },
+    );
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -228,7 +235,7 @@ describe("runRichQuestionnaire render state", () => {
 
   it("hides the review hint until review is actually available", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([choice, yesNoGo], { ui: host });
+    void runRichQuestionnaire({ questions: [choice, yesNoGo], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -239,7 +246,7 @@ describe("runRichQuestionnaire render state", () => {
 
   it("renders inline Other/Discuss rows without helper sub-lines", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([choice], { ui: host });
+    void runRichQuestionnaire({ questions: [choice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -258,7 +265,7 @@ describe("runRichQuestionnaire render state", () => {
 
   it("renders previews and note status in the rich UI", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([choice], { ui: host });
+    void runRichQuestionnaire({ questions: [choice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
     captured.value.handleInput?.("n");
@@ -276,7 +283,7 @@ describe("runRichQuestionnaire render state", () => {
       allowOther: false,
     };
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([discussOnlyChoice], { ui: host });
+    void runRichQuestionnaire({ questions: [discussOnlyChoice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -290,7 +297,7 @@ describe("runRichQuestionnaire render state", () => {
 
   it("renders multichoice footer guidance without a submit row", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([multichoice], { ui: host });
+    void runRichQuestionnaire({ questions: [multichoice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
@@ -320,7 +327,7 @@ describe("runRichQuestionnaire render state", () => {
         return new Promise(() => {});
       }) as unknown as RichUiHost["custom"],
     };
-    void runRichQuestionnaire([choice], { ui: host });
+    void runRichQuestionnaire({ questions: [choice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured) throw new Error("custom() was not invoked with a factory");
     const first = captured.render(80);
@@ -334,7 +341,7 @@ describe("runRichQuestionnaire render state", () => {
 describe("runRichQuestionnaire wrapping", () => {
   it("wraps long inline other input to the next line", async () => {
     const { captured, host } = makeRichFixture<unknown>();
-    void runRichQuestionnaire([choice], { ui: host });
+    void runRichQuestionnaire({ questions: [choice], allowSkip: false }, { ui: host });
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
