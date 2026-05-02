@@ -8,7 +8,7 @@ The extension SHALL register a tool named `code_intel` with an `action` paramete
 - **THEN** the `code_intel` tool appears in the agent tool list with its supported actions documented in its description and prompt guidance
 
 ### Requirement: `code_intel` guidance SHALL make correct tool use obvious and attractive
-The tool SHALL provide compact `promptSnippet` and `promptGuidelines` that explain when `code_intel` saves tokens or improves correctness compared with broad file reads, raw `rg`, or direct low-level tool use. Every prompt guideline SHALL explicitly name `code_intel` because pi flattens tool guidelines into the global `Guidelines:` section.
+The tool SHALL provide compact `promptSnippet` and `promptGuidelines` that explain when `code_intel` saves tokens or improves correctness compared with broad file reads, raw `rg`, or direct low-level tool use. Every prompt guideline SHALL explicitly name `code_intel` because pi flattens tool guidelines into the global `Guidelines:` section. Guidance SHOULD also make clear that `code_intel` is not preferred over direct file reads or lower-level tools for trivial, already-localized edits or exact drill-down tasks.
 
 #### Scenario: Agent needs orientation before editing
 - **WHEN** the agent is about to edit an unfamiliar package, directory, or file
@@ -27,12 +27,27 @@ The tool SHALL provide compact `promptSnippet` and `promptGuidelines` that expla
 - **THEN** the combined guidance still presents `code_intel` as the preferred first stop for architecture, impact, and summarized relationship questions
 - **AND** it presents `lsp` and `tree_sitter` as precise drill-down tools after `code_intel` has narrowed the target
 
+#### Scenario: Task is already localized and trivial
+- **WHEN** the agent already has an obvious single-file edit or needs exact symbol/AST drill-down rather than summarized context
+- **THEN** the guidance does not encourage unnecessary `code_intel` use and leaves direct reads or lower-level tools as the cheaper path
+
 ### Requirement: Tool guidance SHALL map common agent intents to canonical actions
-Tool guidance, descriptions, or schema help SHALL map common agent intents to canonical `code_intel` actions in plain language so the agent does not have to infer the taxonomy. At minimum, guidance SHOULD make it obvious that “orient me” maps to `brief`, “who uses this?” maps to `callers`, “what does this call?” maps to `callees`, “what breaks if I change this?” maps to `affected`, “find concrete implementations” maps to `implementations`, and bounded text search maps to `pattern`.
+Tool guidance, descriptions, or schema help SHALL map common agent intents to canonical `code_intel` actions in plain language so the agent does not have to infer the taxonomy. At minimum, guidance SHOULD make it obvious that “orient me” maps to `brief`, “who uses this?” maps to `callers`, “what does this call?” maps to `callees` for a quick best-effort outbound-call map in v1, “what breaks if I change this?” maps to `affected`, “find concrete implementations” maps to `implementations`, and bounded text search maps to `pattern`.
 
 #### Scenario: Agent thinks in intent rather than tool vocabulary
 - **WHEN** the agent needs architecture, usage, impact, implementation, or text-search help but has not yet chosen an action name
 - **THEN** the tool guidance makes the correct action mapping obvious without requiring the agent to reason from first principles
+
+### Requirement: Search and relationship results SHOULD avoid obvious low-signal paths by default
+By default, `code_intel` SHOULD prioritize human-authored project sources and avoid obvious low-signal generated, build-output, vendored, dependency-output, or cache-like paths when practical. If the agent explicitly scopes a query to such a path, the tool MAY include those results normally.
+
+#### Scenario: Source and generated matches both exist
+- **WHEN** a query would return matches from both project source files and obvious generated/build/vendor outputs
+- **THEN** the tool prioritizes source results and omits low-signal paths by default unless the agent explicitly scopes to them
+
+#### Scenario: Agent explicitly scopes to a generated path
+- **WHEN** the agent sets `path` to a generated, vendored, or build-output location
+- **THEN** the tool respects that scope instead of filtering those results out
 
 ### Requirement: Tool parameters SHALL support token-efficient refinement
 The `code_intel` parameter schema SHALL keep common calls short while allowing agents to bound result size intentionally. In addition to action-specific inputs (`path`, `symbol`, `file`, `line`, `character`, and search pattern), search-oriented actions SHOULD support optional result and context controls such as `maxResults` and `contextLines` with concrete token-efficient defaults. In v1, `pattern` SHOULD default to about `maxResults: 8` and `contextLines: 1`, while relationship actions SHOULD default to surfacing about five ranked targets and grouped evidence for about eight files unless the agent asks for more. Text-search and discovery-oriented actions SHOULD support a `path` scope when practical so agents can restrict analysis to a package, directory, or file instead of paying for whole-repository results. Discovery-oriented semantic actions SHOULD also support optional narrowing filters such as symbol `kind` and `exportedOnly` when those filters materially reduce ambiguity or token cost. In v1, `exportedOnly` is the canonical public-surface filter; a broader language-specific `publicOnly` concept is deferred.
@@ -112,24 +127,20 @@ For `callers`, `callees`, and `implementations`, the tool SHALL accept either an
 ### Requirement: Search and relationship actions SHALL use a consistent confidence vocabulary
 Search and relationship actions SHALL label result confidence using a consistent four-mode vocabulary: `semantic`, `structural`, `heuristic`, or `unavailable`. The word `degraded` MAY appear as a short umbrella description for any non-semantic path, but user-visible labels and structured metadata SHOULD prefer one of the four explicit modes.
 
-### Requirement: Search and relationship actions SHOULD return prompt partial results when higher-confidence enrichment is pending
-When semantic analysis is still pending or partially unavailable, search and relationship actions SHOULD return the best prompt bounded result available rather than block for deeper analysis. Partial results SHALL clearly label the current confidence mode and SHOULD suggest a retry only when a later rerun is likely to materially improve confidence.
+### Requirement: Search and relationship actions SHOULD prefer correct bounded results over latency-oriented partial responses in v1
+Search and relationship actions SHOULD prefer the highest-confidence bounded result practical for the current target. In v1, correctness, token efficiency, and usable summaries take precedence over latency optimization. When semantic analysis is unavailable or unsupported, the tool SHOULD return the best correctly labeled `structural`, `heuristic`, or `unavailable` result it can. The tool MAY return an early bounded fallback while higher-confidence enrichment is still pending, but this is optional in v1 and SHOULD NOT be required purely for responsiveness.
 
-#### Scenario: LSP is still pending for a relationship query
-- **WHEN** the agent calls `code_intel` for `callers`, `callees`, or `implementations` while LSP-backed enrichment is still pending but structural or text-search evidence is already available
-- **THEN** the tool returns the available bounded result promptly with `structural` or `heuristic` labeling instead of waiting indefinitely for semantic data
+#### Scenario: Semantic analysis is unavailable
+- **WHEN** the agent calls `code_intel` for `callers`, `callees`, or `implementations` in a context where semantic analysis is unavailable or unsupported
+- **THEN** the tool returns the best bounded structural, heuristic, or unavailable result with clear confidence labeling
+
+#### Scenario: Semantic analysis is still pending
+- **WHEN** semantic enrichment is still pending and a semantic answer is likely to materially improve correctness
+- **THEN** the tool MAY wait for the higher-confidence result rather than returning an early partial answer purely for responsiveness
 
 #### Scenario: Retry is unlikely to help
 - **WHEN** the current fallback result already reflects the best practical confidence available for the project or language
 - **THEN** the tool does not add a noisy retry suggestion
-
-#### Scenario: Structural relationship result
-- **WHEN** a relationship action succeeds through parser-backed or manifest-backed analysis without semantic confirmation
-- **THEN** the result is labeled `structural` rather than `semantic` or `heuristic`
-
-#### Scenario: No useful result available
-- **WHEN** the requested analysis cannot be produced with useful confidence
-- **THEN** the result is labeled `unavailable` and suggests the next best move when useful
 
 ### Requirement: `action: "callers"` SHALL return grouped caller results with confidence labeling
 The system SHALL support `action: "callers"` to find call sites for a resolved symbol target and return results grouped by file with a summary. If semantic support is unavailable, the result SHALL clearly label any fallback output as `structural`, `heuristic`, or `unavailable` as appropriate and suggest the next best drill-down when useful.
@@ -168,7 +179,7 @@ The system SHALL support `action: "implementations"` to find concrete implementa
 - **AND** it suggests the best next query or scope refinement when that would improve confidence
 
 ### Requirement: `action: "pattern"` SHALL provide structured text search results
-The system SHALL support `action: "pattern"` using text search and return results grouped by file with matching lines and nearby context.
+The system SHALL support `action: "pattern"` using line-oriented text search and return results grouped by file with matching lines and nearby context. In v1, `pattern` SHALL be interpreted as a search pattern evaluated by the underlying search engine within the optional `path` scope; the tool does not promise language-aware semantic matching for this action.
 
 #### Scenario: Pattern search with multiple matches
 - **WHEN** the agent calls `code_intel` with `action: "pattern"` and a pattern that matches multiple files
@@ -177,6 +188,17 @@ The system SHALL support `action: "pattern"` using text search and return result
 #### Scenario: No pattern matches
 - **WHEN** the agent calls `code_intel` with `action: "pattern"` and the pattern matches nothing
 - **THEN** the tool returns a message indicating that no matches were found
+
+### Requirement: Strongly implied follow-up queries SHOULD be copyable
+When disambiguation or next-step guidance strongly implies a follow-up `code_intel` query, the result SHOULD include a compact copyable rerun example with concrete parameter values.
+
+#### Scenario: Disambiguation requires rerunning the same action
+- **WHEN** a semantic action returns multiple candidate targets for disambiguation
+- **THEN** the result includes a compact rerun example for at least one concrete candidate target
+
+#### Scenario: A best next query is obvious
+- **WHEN** the tool recommends a specific follow-up `code_intel` query
+- **THEN** the result includes a compact copyable example with concrete parameter values when doing so materially reduces friction
 
 ### Requirement: Search and relationship output SHALL be summary-first, ranked, and bounded to pi output limits
 The system SHALL return search and relationship output as structured markdown with a concise summary first, grouped evidence, confidence labels from the shared vocabulary (`semantic`, `structural`, `heuristic`, `unavailable`), and file/line references where available. Relationship-oriented actions SHALL surface a small ranked set of highest-value files, modules, or symbols before any long tail. Ranking SHOULD prefer direct symbol ties, public/exported surfaces, cross-module impact, likely edit surfaces, and nearby tests over low-signal or redundant matches. Output SHALL omit empty sections, avoid repeating boilerplate confidence explanations unless they change the agent's next step, and prefer ranked summaries over exhaustive dumps. It SHALL truncate oversized search output to fit pi output limits (50KB / 2000 lines) using the repository standard truncation helper where practical, and SHALL note when truncation occurred.

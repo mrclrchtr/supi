@@ -15,8 +15,8 @@ The system SHALL generate a lightweight architecture overview and inject it into
 - **WHEN** the extension reloads or the user resumes a session whose active branch already contains the code-intelligence overview message
 - **THEN** the system does not inject a duplicate overview for that active branch
 
-### Requirement: The auto-injected overview SHALL be compact, structural, actionable, and latency-bounded
-The auto-injected overview SHALL summarize top-level project layout, module/package names, one-line purpose descriptions when available, and key dependency edges. It SHALL prefer concise summaries over detailed API listings and SHOULD target roughly 500 tokens or less. By default it SHOULD stay within a small predictable budget such as roughly eight modules/packages, roughly eight dependency edges, and at most one follow-up hint. It SHALL be built from cheap metadata and readily available structural data first, with deeper enrichment treated as opportunistic. When space allows, it SHOULD include a brief hint that richer focused context is available through `code_intel brief` instead of expanding the injected context itself.
+### Requirement: The auto-injected overview SHALL be compact, structural, and actionable
+The auto-injected overview SHALL summarize top-level project layout, module/package names, one-line purpose descriptions when available, and key dependency edges. It SHALL prefer concise summaries over detailed API listings and SHOULD usually stay well below 500 tokens, using a much smaller budget in the common case and reserving the upper end only for unusually complex repositories. By default it SHOULD stay within a small predictable budget such as roughly eight modules/packages, roughly eight dependency edges, and at most one follow-up hint. It SHALL be built from cheap metadata and readily available structural data first, with deeper enrichment treated as opportunistic. When space allows, it SHOULD include a brief hint that richer focused context is available through `code_intel brief` instead of expanding the injected context itself.
 
 #### Scenario: Multi-package workspace overview
 - **WHEN** the project contains multiple workspace packages with descriptions and internal dependencies
@@ -43,6 +43,17 @@ The auto-injected overview SHALL summarize top-level project layout, module/pack
 #### Scenario: Agent needs deeper context
 - **WHEN** the compact overview omits details for token budget reasons
 - **THEN** it nudges the agent toward a focused `code_intel brief` query rather than dumping additional detail automatically
+
+### Requirement: Brief generation SHOULD focus on source structure rather than low-signal artifacts by default
+Brief generation SHOULD prioritize source structure, public/shared surfaces, and likely human-edited files rather than obvious generated, build-output, vendored, dependency-output, or cache-like artifacts by default. If the requested focus path explicitly targets such a location, the tool MAY include it normally.
+
+#### Scenario: Brief target includes both source and generated artifacts
+- **WHEN** a brief would otherwise emphasize both project source structure and obvious generated/build/vendor outputs
+- **THEN** the brief prioritizes the source structure by default
+
+#### Scenario: Agent explicitly briefs a generated path
+- **WHEN** the agent calls `code_intel` with `action: "brief"` and a focus path inside a generated or build-output location
+- **THEN** the tool respects that focus path instead of filtering it out
 
 ### Requirement: Code intelligence SHALL handle projects without a detectable architecture model
 If no project metadata, modules, or source structure can be detected, the system SHALL avoid noisy empty architecture sections. It SHALL either skip auto-injection or inject a short note that no structured project model was detected.
@@ -120,7 +131,7 @@ Focused briefs SHALL include dependencies and dependents/reverse dependencies wh
 - **THEN** the brief distinguishes internal dependency edges from external dependencies
 
 ### Requirement: Brief output SHALL include concise next-query hints when useful
-Full-project and focused briefs SHALL end with at most two targeted next-query hints when those hints help the agent continue efficiently. Hints SHALL be specific to detected relationships and SHALL NOT become a generic boilerplate footer on every response. When the relevant target is known, hints SHOULD include copyable parameter values such as `path`, `file`, 1-based `line`, 1-based `character`, or `symbol` so the agent can issue the next query without extra file reads.
+Full-project and focused briefs SHALL end with at most two targeted next-query hints when those hints help the agent continue efficiently. Hints SHALL be specific to detected relationships and SHALL NOT become a generic boilerplate footer on every response. When the relevant target is known, hints SHOULD include copyable parameter values such as `path`, `file`, 1-based `line`, 1-based `character`, or `symbol` so the agent can issue the next query without extra file reads. When a follow-up `code_intel` query is strongly implied, hints SHOULD include a compact copyable rerun example with concrete parameter values.
 
 #### Scenario: Focused module exposes shared APIs
 - **WHEN** a focused brief identifies a module with exports or downstream dependents
@@ -131,7 +142,7 @@ Full-project and focused briefs SHALL end with at most two targeted next-query h
 - **THEN** the brief may suggest `code_intel callers`, `code_intel callees`, `code_intel implementations`, or raw `lsp` / `tree_sitter` drill-down as appropriate
 
 ### Requirement: Brief generation SHALL combine base architecture data with optional enrichment
-The system SHALL build briefs from project metadata and structural analysis, and SHALL enrich them with LSP and Tree-sitter data when those sources are available. When some enrichment sources are unavailable or still pending, the brief SHALL return the best prompt bounded result available, state the effective confidence mode using the shared vocabulary (`semantic`, `structural`, `heuristic`, or `unavailable`), and, when useful, recommend the next best follow-up query or retry.
+The system SHALL build briefs from project metadata and structural analysis, and SHALL enrich them with LSP and Tree-sitter data when those sources are available and useful. When some enrichment sources are unavailable, unsupported, or not useful for the target, the brief SHALL return the best bounded result available, state the effective confidence mode using the shared vocabulary (`semantic`, `structural`, `heuristic`, or `unavailable`), and, when useful, recommend the next best follow-up query or retry. In v1, correctness, token efficiency, and usable summaries take precedence over latency optimization; the tool MAY wait for higher-confidence enrichment instead of emitting an early partial answer solely for responsiveness.
 
 #### Scenario: LSP and Tree-sitter both available
 - **WHEN** the focused path is in a language supported by both `supi-lsp` and `supi-tree-sitter`
@@ -143,9 +154,9 @@ The system SHALL build briefs from project metadata and structural analysis, and
 - **AND** it labels the brief as `structural` rather than `semantic` when that distinction matters
 
 #### Scenario: Semantic enrichment is still pending
-- **WHEN** LSP-backed enrichment is still pending but structural brief data is already available
-- **THEN** the tool returns the structural brief promptly instead of blocking for deeper semantic analysis
-- **AND** it may suggest a retry only when a later rerun is likely to materially improve confidence
+- **WHEN** LSP-backed enrichment is still pending and semantic results are likely to materially improve the brief
+- **THEN** the tool MAY wait for higher-confidence enrichment rather than returning an early structural brief purely for responsiveness
+- **AND** if semantic enrichment ultimately proves unavailable or unsupported, the tool returns the best bounded structural, heuristic, or unavailable result with clear confidence labeling
 
 ### Requirement: Brief results SHALL expose structured details metadata in addition to markdown
 In addition to markdown content for the model, `brief` results SHALL include compact structured `details` metadata suitable for tests, renderers, and future automation. Where applicable, `details` SHOULD include confidence mode from the shared vocabulary, focus target identity, start-here targets, detected entrypoints/public surfaces, dependency summaries, omitted counts, and suggested next queries.

@@ -114,7 +114,7 @@ It also has to respect existing repo constraints:
 
 ### 5. Fallback policy is explicit and action-specific
 
-**Decision:** `code_intel` SHALL use explicit fallback order, label degraded results clearly, and prefer prompt partial answers over blocking when higher-confidence enrichment is pending.
+**Decision:** `code_intel` SHALL use explicit fallback order and clear confidence labeling. In v1, it SHALL prioritize correctness, token-efficient output, and actionable summaries over latency optimization. Caching, background enrichment, and latency-oriented partial-response strategies are out of scope in v1 unless they are needed to avoid returning no usable result when higher-confidence capabilities are unavailable.
 
 **Fallback order:**
 1. LSP first for semantic truth
@@ -123,11 +123,12 @@ It also has to respect existing repo constraints:
 
 **Action behavior:**
 - `brief` works from the shared architecture model and is enriched by LSP/Tree-sitter when available
-- `callers`, `implementations`, and `affected` prefer LSP and may return structural or heuristic, clearly-labeled partial output when only lower-confidence data is promptly available
+- `callers`, `implementations`, and `affected` prefer LSP and may return structural or heuristic, clearly-labeled output when semantic analysis is unavailable, unsupported, or not useful enough to answer with confidence
 - `callees` is a best-effort v1 action: it prefers semantic relationship data when available but may rely more heavily on structural or heuristic output in v1 than `callers` or `implementations`
 - `pattern` is a direct text-search action and does not depend on LSP or Tree-sitter
 - discovery-oriented semantic actions may accept narrowing filters such as `path`, symbol `kind`, or `exportedOnly` when those filters reduce ambiguity or token cost
-- when LSP is `pending` or unavailable, the tool should return the best prompt bounded result it can, label the current confidence mode, and suggest a retry only when a rerun is likely to materially improve confidence
+- when LSP is unavailable, unsupported, or cannot resolve the target with useful confidence, the tool should return the best bounded result it can, label the current confidence mode, and suggest a retry only when a rerun is likely to materially improve confidence
+- when LSP is merely pending, v1 may wait for higher-confidence semantic results rather than returning an early partial answer purely for responsiveness
 
 **Rationale:** Different actions need different confidence levels. This policy preserves a stable tool surface while being honest about precision.
 
@@ -150,7 +151,7 @@ It also has to respect existing repo constraints:
 
 ### 7. Use structured markdown output with bounded, decision-oriented summaries
 
-**Decision:** All `code_intel` output SHALL be structured markdown with a short answer card first, grouped sections, confidence labels, ranked high-value targets, and file/path references. Auto-injected overview content SHALL target a compact budget rather than dumping full API detail. On-demand actions SHALL default to concise output and expose bounded detail controls such as result/context limits. Tool results SHOULD also include structured `details` metadata for renderers, tests, and future automation.
+**Decision:** All `code_intel` output SHALL be structured markdown with a short answer card first, grouped sections, confidence labels, ranked high-value targets, and file/path references. Auto-injected overview content SHALL target a compact budget rather than dumping full API detail. The auto-injected overview SHOULD usually stay well below 500 tokens, using a much smaller budget in the common case and reserving the upper end only for unusually complex repositories. On-demand actions SHALL default to concise output and expose bounded detail controls such as result/context limits. Tool results SHOULD also include structured `details` metadata for renderers, tests, and future automation.
 
 **Confidence vocabulary:** `code_intel` SHOULD use a consistent four-mode vocabulary across actions and metadata:
 - `semantic` — confirmed by semantic tooling such as LSP references, symbols, or implementations
@@ -187,9 +188,11 @@ The word `degraded` may be used as a short umbrella description for any non-sema
 - Use `code_intel brief` before editing an unfamiliar package, directory, or file when architecture/context would reduce blind reads
 - Use `code_intel affected` before changing exported APIs, shared helpers, config surfaces, or cross-package contracts
 - Use `code_intel callers` / `callees` / `implementations` for semantic relationship questions before falling back to broad text search
-- Use `code_intel pattern` for bounded literal/regex search when the question is textual rather than semantic
+- Use `code_intel callees` for a quick best-effort outbound-call map in v1; if its confidence is not semantic, use raw `lsp` or `tree_sitter` for precise drill-down
+- Use `code_intel pattern` for bounded text search when the question is textual rather than semantic
 - Map plain-language intent to actions explicitly in guidance: “orient me” → `brief`, “who uses this?” → `callers`, “what does this call?” → `callees`, “what breaks if I change this?” → `affected`, and “find concrete implementations” → `implementations`
 - Use raw `lsp` and `tree_sitter` tools for precise drill-down after `code_intel` identifies the relevant file, symbol, or syntax node
+- Do not prefer `code_intel` over direct file reads or lower-level tools for trivial, already-localized edits or exact symbol/AST drill-down tasks
 - When `lsp` and `tree_sitter` are also active, make `code_intel` the orchestrating first stop for architecture, impact, and summarized relationship questions; keep substrate guidance accurate but non-competing by positioning lower-level tools as exact drill-down after `code_intel` narrows the target
 
 **Rationale:** Agents follow concise, concrete tool-selection rules better than abstract capability lists. The guidance should reduce hesitation by telling the agent exactly when `code_intel` saves tokens and improves correctness, while avoiding a bloated system prompt. Because existing `lsp` guidance also encourages semantic navigation, this change must explicitly deconflict the stack so agents do not hesitate between peer tools for high-level questions.
