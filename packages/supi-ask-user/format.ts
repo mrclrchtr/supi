@@ -1,7 +1,6 @@
-// Shared formatting helpers used by both UI paths and result rendering.
-// Keeps summary/review formatting in one place so the rich overlay, dialog
-// fallback, transcript renderer, and tool-content summary cannot accidentally
-// diverge.
+// Shared formatting helpers used by the overlay UI and result rendering.
+// Keeps summary/review formatting in one place so the overlay, transcript
+// renderer, and tool-content summary cannot accidentally diverge.
 
 import type { Answer, MultiSelection, NormalizedQuestion } from "./types.ts";
 

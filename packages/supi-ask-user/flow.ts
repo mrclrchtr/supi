@@ -1,7 +1,7 @@
-// Shared questionnaire flow state used by both UI paths and the
+// Shared questionnaire flow state used by the overlay UI and the
 // single-active-questionnaire concurrency guard. The flow owns terminal-state
-// transitions (`submitted`, `cancelled`, `aborted`) so overlay and fallback
-// cannot drift apart on cancellation/abort semantics.
+// transitions (`submitted`, `cancelled`, `aborted`) to keep cancellation/abort
+// semantics consistent.
 
 import type { Answer, NormalizedQuestion, QuestionnaireOutcome, TerminalState } from "./types.ts";
 import { needsReview } from "./types.ts";

@@ -141,17 +141,6 @@ For multi-question questionnaires and questionnaires containing `multichoice` an
 - **WHEN** the user chooses to revise an answer from the review state
 - **THEN** the extension returns to the relevant question without losing previously stored answers for other questions
 
-### Requirement: Fallback SHALL provide reduced compatibility for the redesigned contract
-When rich custom UI is unavailable, the extension SHALL provide a reduced fallback path for the redesigned questionnaire contract. The fallback path MAY flatten previews or simplify advanced interactions, but it SHALL either preserve the core answer semantics or return an explicit unsupported/degraded response instead of silently changing the meaning of the questionnaire.
-
-#### Scenario: Fallback preserves core choice semantics
-- **WHEN** a supported questionnaire is executed without rich custom UI
-- **THEN** the fallback path still returns structured answers using the redesigned result model
-
-#### Scenario: Unsupported fallback combination fails explicitly
-- **WHEN** a questionnaire depends on an advanced rich-only affordance that fallback cannot represent safely
-- **THEN** the extension reports explicit degraded or unsupported behavior instead of silently inventing a different flow
-
 ### Requirement: Ask User results SHALL use structured answer variants and terminal states
 Submitted `ask_user` results SHALL include a concise model-facing summary and structured details keyed by question id. Structured details SHALL preserve answer variants for single option, multiple options, other, discuss, text, and yes/no answers, and SHALL continue to distinguish `submitted`, `cancelled`, and `aborted` terminal states.
 
@@ -177,3 +166,20 @@ When the user cancels a questionnaire (Escape) or the questionnaire is aborted (
 #### Scenario: Submitted questionnaire does not stop the agent turn
 - **WHEN** the user submits a questionnaire successfully
 - **THEN** the extension does NOT call `ctx.abort()`, allowing the LLM to continue with the submitted answers
+
+## REMOVED Requirements
+
+### Requirement: Fallback SHALL provide reduced compatibility for the redesigned contract
+When rich custom UI is unavailable, the extension SHALL provide a reduced fallback path for the redesigned questionnaire contract. The fallback path MAY flatten previews or simplify advanced interactions, but it SHALL either preserve the core answer semantics or return an explicit unsupported/degraded response instead of silently changing the meaning of the questionnaire.
+
+#### Scenario: Fallback preserves core choice semantics
+- **WHEN** a supported questionnaire is executed without rich custom UI
+- **THEN** the fallback path still returns structured answers using the redesigned result model
+
+#### Scenario: Unsupported fallback combination fails explicitly
+- **WHEN** a questionnaire depends on an advanced rich-only affordance that fallback cannot represent safely
+- **THEN** the extension reports explicit degraded or unsupported behavior instead of silently inventing a different flow
+
+**Reason**: Pi's TUI has been stable and every supported environment provides `ctx.ui.custom()`. The fallback path (`ui-fallback.ts`) added ~300 lines of dead code and ~200 lines of tests for a compatibility surface with no known consumers.
+
+**Migration**: None required. The extension now returns an explicit error when `custom()` is unavailable, instructing the agent not to use `ask_user` in non-interactive or degraded UI sessions. All existing rich overlay behavior is unchanged.

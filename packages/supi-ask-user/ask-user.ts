@@ -1,7 +1,6 @@
 // `ask_user` extension entry point. Registers a single model-callable tool
 // for focused interactive decisions during an agent run. Holds the per-session
-// single-active-questionnaire lock and chooses between the rich overlay and
-// the dialog fallback at execute time.
+// single-active-questionnaire lock and drives the rich overlay UI.
 //
 // Implementation modules:
 //   schema.ts           — external (LLM-facing) parameter schema
@@ -9,7 +8,6 @@
 //   flow.ts             — shared questionnaire flow + concurrency lock
 //   ui-rich.ts          — overlay UI via ctx.ui.custom()
 //   ui-rich-render.ts   — overlay rendering helpers
-//   ui-fallback.ts      — dialog/input fallback adapter
 //   result.ts           — hybrid (content + details) result formatting
 //   render.ts           — custom renderCall / renderResult for the transcript
 
@@ -23,7 +21,6 @@ import { renderAskUserCall, renderAskUserResult } from "./render.ts";
 import { buildErrorResult, buildResult, type HybridResult } from "./result.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import type { NormalizedQuestionnaire } from "./types.ts";
-import { type FallbackUi, runFallbackQuestionnaire } from "./ui-fallback.ts";
 import { type RichUiHost, runRichQuestionnaire } from "./ui-rich.ts";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
@@ -49,8 +46,6 @@ const PROMPT_GUIDELINES = [
 
 interface ExtensionUi {
   ui: {
-    select: FallbackUi["select"];
-    input: FallbackUi["input"];
     custom?: RichUiHost["custom"];
   };
   hasUI: boolean;
@@ -127,16 +122,18 @@ async function driveQuestionnaire(
   ctx: ExtensionUi,
 ): Promise<HybridResult> {
   const questions = questionnaire.questions;
-  if (typeof ctx.ui.custom === "function") {
-    const richHost: RichUiHost = { custom: ctx.ui.custom.bind(ctx.ui) };
-    const outcome = await runRichQuestionnaire(questionnaire, { ui: richHost, signal });
-    if (outcome !== "unsupported") return buildResult(questions, outcome);
+  if (typeof ctx.ui.custom !== "function") {
+    return buildErrorResult(
+      "Error: ask_user requires a TUI with custom overlay support. Do not use ask_user in non-interactive or degraded UI sessions.",
+    );
   }
-  const fallbackUi: FallbackUi = {
-    select: ctx.ui.select.bind(ctx.ui),
-    input: ctx.ui.input.bind(ctx.ui),
-  };
-  const outcome = await runFallbackQuestionnaire(questionnaire, { ui: fallbackUi, signal });
+  const richHost: RichUiHost = { custom: ctx.ui.custom.bind(ctx.ui) };
+  const outcome = await runRichQuestionnaire(questionnaire, { ui: richHost, signal });
+  if (outcome === "unsupported") {
+    return buildErrorResult(
+      "Error: ask_user requires a TUI with custom overlay support. Do not use ask_user in non-interactive or degraded UI sessions.",
+    );
+  }
   return buildResult(questions, outcome);
 }
 
@@ -144,5 +141,4 @@ export { ActiveQuestionnaireLock, QuestionnaireFlow } from "./flow.ts";
 // Re-exports used by tests.
 export { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 export { buildResult } from "./result.ts";
-export { runFallbackQuestionnaire } from "./ui-fallback.ts";
 export { PROMPT_GUIDELINES as askUserPromptGuidelines, PROMPT_SNIPPET as askUserPromptSnippet };
