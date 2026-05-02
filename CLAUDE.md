@@ -12,7 +12,7 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 
 - Never assume pi harness APIs, behavior, or conventions from memory or model priors.
 - Before changing code or giving guidance about pi-specific behavior, read the relevant installed pi docs (`README.md`, matching files in `docs/`, and `examples/`) and follow linked `.md` cross-references.
-- Treat the pi docs as the source of truth for extensions, skills, prompt templates, TUI, SDK, providers, models, and package behavior.
+- Start with `docs/index.md` for getting an overview of PI's docs.
 
 ## Documentation expectations
 
@@ -23,19 +23,10 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 ## Commands
 
 ```bash
-mise install
-pnpm install
-mise run hooks
 pnpm verify
-pnpm typecheck
-pnpm typecheck:tests
-pnpm biome:ai
-pnpm biome:fix && pnpm biome:ai
-pnpm exec biome check --write [--unsafe] <files...>
+pnpm typecheck[:tests]
+pnpm biome<:ai/:fix>
 pnpm test
-pnpm test:watch
-hk run fix
-hk run check
 pnpm pack:check
 ```
 
