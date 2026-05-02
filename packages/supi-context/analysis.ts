@@ -188,11 +188,12 @@ function applyScaling(
 } {
   let scaled = false;
   let approximationNote: string | null = null;
-  const totalTokens = actualTokens ?? rawTotal;
+  const hasActualTotal = actualTokens !== null && actualTokens > 0;
+  const totalTokens = hasActualTotal ? actualTokens : rawTotal;
 
   if (contextUsage === undefined) {
     approximationNote = "Approximate (no usage data available)";
-  } else if (actualTokens !== null && rawTotal > 0) {
+  } else if (hasActualTotal && rawTotal > 0) {
     const scale = actualTokens / rawTotal;
     categories.systemPrompt = Math.round(categories.systemPrompt * scale);
     categories.userMessages = Math.round(categories.userMessages * scale);
@@ -201,7 +202,7 @@ function applyScaling(
     categories.toolResults = Math.round(categories.toolResults * scale);
     categories.other = Math.round(categories.other * scale);
     scaled = true;
-  } else if (actualTokens === null) {
+  } else if (actualTokens === null || actualTokens === 0) {
     approximationNote = "Token count pending — send a message to refresh";
   }
 

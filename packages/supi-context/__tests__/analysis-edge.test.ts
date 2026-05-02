@@ -86,6 +86,7 @@ describe("analyzeContext edge cases", () => {
     const ctx = createMockCtx({
       branch: [],
       contextUsage: { tokens: 0, contextWindow: 8192, percent: 0 },
+      systemPrompt: "",
     });
     const pi = createMockPi();
     const result = analyzeContext(ctx, pi, undefined);
@@ -94,6 +95,20 @@ describe("analyzeContext edge cases", () => {
     expect(result.categories.assistantMessages).toBe(0);
     expect(result.categories.toolResults).toBe(0);
     expect(result.totalTokens).toBe(0);
+  });
+
+  it("keeps raw estimates when usage tokens is zero", () => {
+    const ctx = createMockCtx({
+      contextUsage: { tokens: 0, contextWindow: 8192, percent: 0 },
+      systemPrompt: "S".repeat(400),
+    });
+    const pi = createMockPi();
+    const result = analyzeContext(ctx, pi, undefined);
+
+    expect(result.scaled).toBe(false);
+    expect(result.approximationNote).toBe("Token count pending — send a message to refresh");
+    expect(result.categories.systemPrompt).toBe(100);
+    expect(result.totalTokens).toBe(100);
   });
 
   it("detects compaction and reports summarized turns", () => {
