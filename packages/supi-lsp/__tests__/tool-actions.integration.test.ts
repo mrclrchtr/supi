@@ -204,9 +204,9 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
     expect(result).toContain("No LSP server available");
   });
 
-  it("returns error for missing parameters", async () => {
-    await expect(executeAction(manager, { action: "hover", file: goodFile })).rejects.toThrow(
-      "line",
-    );
+  it("returns validation error for missing parameters", async () => {
+    const result = await executeAction(manager, { action: "hover", file: goodFile });
+    expect(result).toContain("Validation error");
+    expect(result).toContain("'line' is required");
   });
 });

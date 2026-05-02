@@ -40,8 +40,9 @@ Relative file paths resolve from the session working directory.
 Supported extensions: .ts, .tsx, .js, .jsx, .mts, .cts, .mjs, .cjs`;
 
 const promptGuidelines = [
-  "Prefer tree_sitter for structural queries when LSP is unavailable or when you need syntax-tree-level analysis (AST node types, exact ranges, queries).",
-  "Use lsp for semantic operations (hover, definition, references, diagnostics, rename).",
+  "Use tree_sitter for structural syntax-tree analysis: extracting declarations, imports, exports, node-at-position lookup, and custom queries.",
+  "Prefer tree_sitter when you need AST node types, exact source ranges, or parser-level structure that semantic language-server tooling does not expose.",
+  "tree_sitter is a standalone structural analysis tool; use semantic language-server features separately when they are available for hover, definitions, references, or diagnostics.",
 ];
 
 const promptSnippet = `Use the tree_sitter tool for structural code analysis — outline, imports, exports, node-at-position lookup, and custom queries.`;

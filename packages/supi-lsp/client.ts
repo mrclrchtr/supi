@@ -415,6 +415,17 @@ export class LspClient {
     });
   }
 
+  async implementation(
+    filePath: string,
+    position: Position,
+  ): Promise<Location | Location[] | LocationLink[] | null> {
+    if (!this.capabilities?.implementationProvider) return null;
+    return this.request("textDocument/implementation", {
+      textDocument: { uri: fileToUri(filePath) },
+      position,
+    });
+  }
+
   // ── Private ─────────────────────────────────────────────────────────
   private async request<T>(method: string, params: unknown): Promise<T | null> {
     if (!this.rpc || this._status !== "running") return null;

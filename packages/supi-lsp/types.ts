@@ -288,6 +288,7 @@ export interface ServerCapabilities {
   workspaceSymbolProvider?: boolean;
   renameProvider?: boolean | { prepareProvider?: boolean };
   codeActionProvider?: boolean | { codeActionKinds?: string[] };
+  implementationProvider?: boolean;
   /** LSP 3.17+ pull diagnostic support */
   diagnosticProvider?:
     | boolean

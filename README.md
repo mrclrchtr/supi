@@ -20,8 +20,8 @@ Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent)
 | `@mrclrchtr/supi-bash-timeout` | **bash-timeout** | Injects a default timeout on every bash tool call when the LLM omits one. Configurable via `PI_BASH_DEFAULT_TIMEOUT` (seconds, default 120). |
 | `@mrclrchtr/supi-skill-shortcut` | **skill-shortcut** | Type `$skill-name` as a shorthand for `/skill:skill-name`. Autocomplete triggers on `$`. |
 | `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
-| `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. |
-| `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis for JavaScript and TypeScript files: outline, imports, exports, node-at-position lookup, and custom queries. |
+| `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, workspace symbol search, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. Also exports a reusable `SessionLspService` library surface for peer extensions. |
+| `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis for JavaScript and TypeScript files: outline, imports, exports, node-at-position lookup, and custom queries. Designed as a standalone substrate independent of semantic LSP tooling. |
 
 ## Install
 
@@ -58,29 +58,28 @@ When installed from a local path, pi loads the working tree directly; after edit
 
 ## Tree-sitter extension
 
-The `tree_sitter` extension provides syntax-tree-level analysis when an LSP server is unavailable or when exact AST structure is useful:
+The `tree_sitter` extension provides syntax-tree-level structural analysis for JavaScript and TypeScript files:
 
 - supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, and `.cjs`
 - exposes actions for `outline`, `imports`, `exports`, `node_at`, and `query`
-- uses 1-based `line`/`character` coordinates compatible with the `lsp` tool; `character` is a UTF-16 code-unit column
+- uses 1-based `line`/`character` coordinates; `character` is a UTF-16 code-unit column
 - caps tool responses at 100 emitted items, including nested outline children
 - exports `createTreeSitterSession(cwd)` for other SuPi packages that need reusable parse/query/structure services
+- remains correct and self-contained when installed without `supi-lsp`
 
 ## LSP extension
 
-The `lsp` extension is meant to make pi more semantic in supported languages:
+The `lsp` extension adds semantic code navigation and diagnostics:
 
-- exposes a single `lsp` tool with actions for hover, definition, references, diagnostics, symbols, rename, and code actions
+- exposes a single `lsp` tool with actions for hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, and symbol_hover
 - appends LSP diagnostics after `write`/`edit`
 - performs a proactive project scan at `session_start` to detect matching roots and available language servers, then eagerly starts them
 - builds project-specific semantic-first `promptSnippet` / `promptGuidelines` from detected servers, roots, file types, and supported actions so the agent prefers `lsp` for code navigation and diagnostics
 - injects compact XML-framed diagnostic context only when outstanding diagnostics exist, deduped across turns so unchanged diagnostics do not re-inject
 - provides `/lsp-status` for server roots, capabilities, open files, and diagnostics
+- exports a public `SessionLspService` library surface from the package root so peer extensions can reuse the active LSP runtime without starting duplicate servers
 
 Configuration:
 
-- `PI_LSP_DISABLED=1` — disable the extension
-- `PI_LSP_SERVERS=rust-analyzer,pyright` — allow-list servers
-- `PI_LSP_SEVERITY=1|2|3|4` — inline diagnostic threshold
+- Settings are managed through `/supi-settings` (LSP panel)
 - `.pi-lsp.json` in the project root — override/add/disable server definitions
-

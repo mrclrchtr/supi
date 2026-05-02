@@ -60,6 +60,18 @@ Use `rename` instead of `edit` find-and-replace. The LSP handles renaming across
 
 Use `code_actions` to get available quick-fixes and refactors at a position. Useful for auto-imports, adding missing return statements, or applying suggested fixes.
 
+### `workspace_symbol` — fuzzy symbol search
+
+Use `workspace_symbol` to search for symbols across the entire project by name. Useful when you know the name but not the file.
+
+### `search` — symbol search with fallback
+
+Use `search` when you want symbol search that falls back to text search if the language server does not support workspace symbols.
+
+### `symbol_hover` — hover by name
+
+Use `symbol_hover` when you know a symbol name and want hover information without knowing its exact file location. The tool resolves the symbol via workspace search and then requests hover at its definition.
+
 ## Automatic behavior
 
 The extension operates on two guidance layers that work together:
@@ -110,5 +122,5 @@ LSP diagnostics report four severity levels:
 | Information (3) | Suggestion or note | Consider fixing |
 | Hint (4) | Style or optimization | Optional, low priority |
 
-The active severity threshold is controlled by `PI_LSP_SEVERITY` (default: 1 = errors only).
+The active severity threshold is controlled through `/supi-settings` (LSP panel). The default is 1 (errors only).
 Use `/lsp-status` to see the current threshold and all diagnostics.

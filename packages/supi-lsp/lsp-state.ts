@@ -2,6 +2,7 @@
 // Extracted from lsp.ts to keep file sizes within Biome limits.
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { clearSessionLspService } from "./service-registry.ts";
 import type { LspManager } from "./manager.ts";
 import { introspectCapabilities } from "./scanner.ts";
 import type { DetectedProjectServer, ProjectServerInfo } from "./types.ts";
@@ -46,6 +47,9 @@ export function isLspAwareTool(toolName: string): boolean {
 }
 
 export function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void {
+  if (state.manager) {
+    clearSessionLspService(state.manager.getCwd());
+  }
   state.manager = null;
   state.detectedServers = [];
   state.projectServers = [];

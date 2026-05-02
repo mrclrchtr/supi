@@ -2,7 +2,7 @@
 
 Tree-sitter structural analysis for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
 
-This package registers a `tree_sitter` tool and also exports a small TypeScript service API for other SuPi extensions.
+This package registers a `tree_sitter` tool and also exports a small TypeScript service API for other SuPi extensions. It is designed as a standalone structural-analysis substrate: it does not depend on `supi-lsp` or semantic language-server tooling, and it remains correct and useful when installed by itself.
 
 ## Install
 
@@ -65,3 +65,13 @@ try {
 Exported types include `TreeSitterResult`, `TreeSitterSession`, `OutlineItem`, `ImportRecord`, `ExportRecord`, `NodeAtResult`, `QueryCapture`, `SourceRange`, `GrammarId`, and `SupportedExtension`.
 
 Always call `dispose()` when the session is no longer needed. The runtime lazily initializes grammars, reuses parser instances within a session, deduplicates concurrent first-use grammar initialization, and retries after initialization failures.
+
+## Positioning
+
+`supi-tree-sitter` is the structural-analysis substrate in SuPi's layered code-understanding stack:
+
+- `supi-tree-sitter` — parser-backed structural analysis (this package)
+- `supi-lsp` — live semantic analysis through language servers
+- `supi-code-intelligence` (future) — unified agent-facing layer above both substrates
+
+Each substrate can be installed and used independently. `supi-tree-sitter` does not require `supi-lsp` to be present, and its prompt guidance is written so it remains correct in standalone installs.

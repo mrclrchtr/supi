@@ -6,6 +6,8 @@
 - `tree-sitter.ts` — registers the `tree_sitter` tool for pi
 - `index.ts` — exports `createTreeSitterSession()` and shared types for other SuPi packages
 
+The package is designed as a standalone structural-analysis substrate. It does not depend on `supi-lsp` and must remain correct when installed independently.
+
 ## Key files
 
 - `runtime.ts`, `session.ts` — grammar initialization, parser reuse, session lifecycle, and `dispose()`
@@ -25,3 +27,14 @@
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
 - Outline should stay shallow: top-level declarations plus supported class/interface/enum members, not local function bodies.
+- Prompt guidance in `tree-sitter.ts` must be standalone-safe: describe structural analysis directly and do not name the `lsp` tool as an available sibling. Use generic terms like "semantic language-server tooling" if a distinction is needed.
+
+## Layering
+
+`supi-tree-sitter` is the structural substrate in SuPi's code-understanding stack:
+
+1. `supi-tree-sitter` — parser-backed structural analysis (this package)
+2. `supi-lsp` — live semantic analysis through language servers
+3. `supi-code-intelligence` (future) — unified agent-facing layer above both
+
+Keep this package independent of `supi-lsp` internals. Any shared utilities belong in `supi-core`.

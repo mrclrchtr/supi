@@ -30,6 +30,11 @@ import {
 import { LspManager } from "./manager.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
 import { registerLspMessageRenderer } from "./renderer.ts";
+import {
+  clearSessionLspService,
+  SessionLspService,
+  setSessionLspServiceState,
+} from "./service-registry.ts";
 import { scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
 import { loadLspSettings, registerLspSettings } from "./settings-registration.ts";
 import { executeAction, type LspAction, lspToolDescription } from "./tool-actions.ts";
@@ -77,6 +82,7 @@ export default function lspExtension(pi: ExtensionAPI) {
 function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
   pi.on("session_start", async (_event, ctx) => {
     if (state.manager) {
+      clearSessionLspService(state.manager.getCwd());
       await state.manager.shutdownAll();
     }
 
@@ -84,8 +90,10 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     const lspSettings = loadLspSettings(cwd);
 
     if (!lspSettings.enabled) {
+      clearSessionLspService(cwd);
       disableLspState(pi, state);
       persistLspInactiveState(pi, state);
+      setSessionLspServiceState(cwd, { kind: "disabled" });
       return;
     }
 
@@ -103,7 +111,9 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
       }
     }
 
+    clearSessionLspService(cwd);
     state.manager = new LspManager(config, cwd);
+    setSessionLspServiceState(cwd, { kind: "pending" });
     state.detectedServers = scanProjectCapabilities(config, cwd);
     state.manager.registerDetectedServers(state.detectedServers);
     await startDetectedServers(state.manager, state.detectedServers);
@@ -111,6 +121,10 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     state.lastDiagnosticsFingerprint = null;
     state.currentContextToken = null;
     state.lspActive = true;
+    setSessionLspServiceState(cwd, {
+      kind: "ready",
+      service: new SessionLspService(state.manager),
+    });
     registerLspTool(pi, state, buildProjectGuidelines(state.projectServers, cwd));
     ensureLspToolActive(pi);
     persistLspActiveState(pi, state);
@@ -119,6 +133,7 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
 
   pi.on("session_shutdown", async () => {
     if (state.manager) {
+      clearSessionLspService(state.manager.getCwd());
       await state.manager.shutdownAll();
       state.manager = null;
     }

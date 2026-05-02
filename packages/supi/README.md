@@ -81,11 +81,11 @@ Keeps directory-specific `CLAUDE.md` and `AGENTS.md` guidance flowing into sessi
 
 ### `lsp`
 
-Adds semantic code navigation and diagnostics through a single `lsp` tool plus inline diagnostic surfacing and `/lsp-status`.
+Adds semantic code navigation and diagnostics through a single `lsp` tool plus inline diagnostic surfacing and `/lsp-status`. Also exports a reusable `SessionLspService` library surface from the package root so peer extensions can reuse the active LSP runtime without starting duplicate servers.
 
 ### `tree_sitter`
 
-Adds syntax-tree-level structure for JavaScript and TypeScript files through `outline`, `imports`, `exports`, `node_at`, and custom query actions. Results use 1-based coordinates compatible with `lsp` and are capped for agent-friendly output.
+Adds syntax-tree-level structure for JavaScript and TypeScript files through `outline`, `imports`, `exports`, `node_at`, and custom query actions. Results use 1-based coordinates compatible with `lsp` and are capped for agent-friendly output. Designed as a standalone structural-analysis substrate that remains correct when installed without `supi-lsp`.
 
 ### Small UX improvements
 

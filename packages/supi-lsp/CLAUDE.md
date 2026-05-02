@@ -4,15 +4,19 @@ This file contains non-obvious guidance for future work in `packages/supi-lsp/`.
 
 ## Scope
 
-`@mrclrchtr/supi-lsp` registers the `lsp` tool, LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer.
+`@mrclrchtr/supi-lsp` registers the `lsp` tool, LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer. It also exposes a public reusable library surface from the package root.
 
-Entrypoint: `lsp.ts`
+Entrypoints:
+- `lsp.ts` — extension wiring, lifecycle, commands, and resources
+- `index.ts` — public library surface (`getSessionLspService`, `SessionLspService`, types)
 
 ## Key files
 
 - `lsp.ts` — extension wiring, lifecycle, commands, and resources
 - `tool-actions.ts` — tool action execution and formatting
 - `manager.ts` + `manager-*.ts` — client lifecycle, roots, and diagnostic state
+- `client.ts` — LSP client wrapper (initialize, document sync, requests)
+- `service-registry.ts` — shared session-scoped registry for peer extension reuse
 - `guidance.ts` — prompt guidelines/snippet and diagnostic-context formatting
 - `overrides.ts`, `renderer.ts`, `ui.ts` — tool-result augmentation, custom messages, and status overlay
 
@@ -27,6 +31,9 @@ Entrypoint: `lsp.ts`
 - `buildProjectGuidelines()` is applied by re-registering the `lsp` tool at `session_start`, so `/reload` is needed to refresh scanned server guidance.
 - `/lsp-status` must merge proactive scan roots with lazily started clients; the session-start scan snapshot is incomplete.
 - Tool activation state is persisted via `pi.appendEntry()` as `lsp-active` entries and restored by inspecting the active branch on `session_tree`.
+- The public library surface (`index.ts`) must not import from extension-only modules (e.g., `lsp.ts`, `renderer.ts`, `ui.ts`). Keep the root API limited to `service-registry.ts`, `client.ts`, `manager.ts`, and `types.ts`.
+- `SessionLspService` is an intentional wrapper: it exposes stable semantic operations without leaking `LspManager` internals as the public contract.
+- The session registry is process-global via `Symbol.for("@mrclrchtr/supi-lsp/session-registry")` and keyed by normalized `cwd`, so independently loaded package module roots can share the same published LSP service. It is updated synchronously in `session_start` / `session_shutdown` handlers and read synchronously by `getSessionLspService(cwd)`.
 
 ## Diagnostic behavior gotchas
 
@@ -39,6 +46,13 @@ Entrypoint: `lsp.ts`
 - `syncAndWaitForDiagnostics()` backs both `write`/`edit` inline diagnostics and the `lsp diagnostics` action; keep its pull/push behavior aligned with `refreshOpenDiagnostics()`.
 - After `write`/`edit`, severity-1 diagnostics are augmented with LSP `hover` (3-line truncation) and `code_actions` titles at the first error position, each with a 500ms timeout.
 
+## Tool action gotchas
+
+- Standalone `lsp` tool actions validate parameters explicitly and return `Validation error: ...` strings instead of throwing.
+- Relative `file` inputs resolve from `manager.getCwd()`, not `process.cwd()`.
+- `line` and `character` are validated as positive 1-based integers before conversion to zero-based coordinates.
+- Missing-file errors in `diagnostics` return a clear file-access message rather than relying on thrown exceptions.
+
 ## Package-specific conventions
 
 - Keep summary/relevance formatting out of `manager.ts`; prefer focused helpers like `summary.ts` or `manager-*.ts` modules.
@@ -49,6 +63,8 @@ Entrypoint: `lsp.ts`
 ## Focused test commands
 
 - `pnpm exec vitest run packages/supi-lsp/__tests__/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/renderer.test.ts` — minimal regression pass for pull-diagnostic + custom-message context changes.
+- `pnpm exec vitest run packages/supi-lsp/__tests__/service-registry.test.ts` — public API + registry lifecycle.
+- `pnpm exec vitest run packages/supi-lsp/__tests__/tool-actions.validation.test.ts` — parameter validation + path resolution.
 
 ```bash
 pnpm exec vitest run packages/supi-lsp/__tests__/client-refresh.test.ts packages/supi-lsp/__tests__/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/transport.test.ts

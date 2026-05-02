@@ -67,7 +67,7 @@ export async function executeAction(manager: LspManager, params: LspToolParams):
   const cwd = manager.getCwd();
   switch (params.action) {
     case "hover":
-      return handleHover(manager, params);
+      return handleHover(manager, params, cwd);
     case "definition":
       return handleDefinition(manager, params, cwd);
     case "references":
@@ -79,26 +79,75 @@ export async function executeAction(manager: LspManager, params: LspToolParams):
     case "rename":
       return handleRename(manager, params, cwd);
     case "code_actions":
-      return handleCodeActions(manager, params);
+      return handleCodeActions(manager, params, cwd);
     case "workspace_symbol":
       return handleWorkspaceSymbol(manager, params, cwd);
     case "search":
       return handleSearch(manager, params, cwd);
     case "symbol_hover":
-      return handleSymbolHover(manager, params);
+      return handleSymbolHover(manager, params, cwd);
     default:
       return `Unknown action: ${params.action}`;
   }
 }
 
+// ── Validation helpers ────────────────────────────────────────────────
+
+function validateFilePosition(
+  params: LspToolParams,
+  action: string,
+): { file: string; line: number; character: number } | string {
+  if (!params.file) return `Validation error: 'file' is required for ${action} action.`;
+  if (params.line === undefined)
+    return `Validation error: 'line' is required for ${action} action.`;
+  if (params.character === undefined)
+    return `Validation error: 'character' is required for ${action} action.`;
+  if (!Number.isInteger(params.line) || params.line < 1)
+    return `Validation error: 'line' must be a positive 1-based integer for ${action} action.`;
+  if (!Number.isInteger(params.character) || params.character < 1)
+    return `Validation error: 'character' must be a positive 1-based integer for ${action} action.`;
+  return { file: params.file, line: params.line, character: params.character };
+}
+
+function validateNonEmptyString(
+  value: string | undefined,
+  name: string,
+  action: string,
+): { value: string } | string {
+  if (!value || value.trim().length === 0) {
+    return `Validation error: '${name}' is required for ${action} action.`;
+  }
+  return { value };
+}
+
+function resolveFilePath(file: string, cwd: string): string {
+  return path.resolve(cwd, file);
+}
+
+function toZeroBased(line: number, character: number): { line: number; character: number } {
+  return { line: line - 1, character: character - 1 };
+}
+
+function noServerMessage(file: string): string {
+  return `No LSP server available for this file type (${path.extname(file) || "unknown"})`;
+}
+
 // ── Action Handlers ───────────────────────────────────────────────────
 
-async function handleHover(manager: LspManager, params: LspToolParams): Promise<string> {
-  const { file, line, character } = requireFilePosition(params);
-  const client = await manager.ensureFileOpen(file);
-  if (!client) return noServerMessage(file);
+async function handleHover(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
+  const validation = validateFilePosition(params, "hover");
+  if (typeof validation === "string") return validation;
+  const { file, line, character } = validation;
+  const resolvedPath = resolveFilePath(file, cwd);
 
-  const hover = await client.hover(path.resolve(file), toZeroBased(line, character));
+  const client = await manager.ensureFileOpen(resolvedPath);
+  if (!client) return noServerMessage(resolvedPath);
+
+  const hover = await client.hover(resolvedPath, toZeroBased(line, character));
   if (!hover) return "No hover information available at this position.";
   return formatHover(hover);
 }
@@ -108,11 +157,15 @@ async function handleDefinition(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const { file, line, character } = requireFilePosition(params);
-  const client = await manager.ensureFileOpen(file);
-  if (!client) return noServerMessage(file);
+  const validation = validateFilePosition(params, "definition");
+  if (typeof validation === "string") return validation;
+  const { file, line, character } = validation;
+  const resolvedPath = resolveFilePath(file, cwd);
 
-  const result = await client.definition(path.resolve(file), toZeroBased(line, character));
+  const client = await manager.ensureFileOpen(resolvedPath);
+  if (!client) return noServerMessage(resolvedPath);
+
+  const result = await client.definition(resolvedPath, toZeroBased(line, character));
   if (!result) return "No definition found.";
 
   const locations = normalizeLocations(result);
@@ -126,11 +179,15 @@ async function handleReferences(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const { file, line, character } = requireFilePosition(params);
-  const client = await manager.ensureFileOpen(file);
-  if (!client) return noServerMessage(file);
+  const validation = validateFilePosition(params, "references");
+  if (typeof validation === "string") return validation;
+  const { file, line, character } = validation;
+  const resolvedPath = resolveFilePath(file, cwd);
 
-  const locations = await client.references(path.resolve(file), toZeroBased(line, character));
+  const client = await manager.ensureFileOpen(resolvedPath);
+  if (!client) return noServerMessage(resolvedPath);
+
+  const locations = await client.references(resolvedPath, toZeroBased(line, character));
   if (!locations || locations.length === 0) return "No references found.";
 
   return formatLocations("References", locations, cwd);
@@ -142,9 +199,9 @@ async function handleDiagnostics(
   cwd: string,
 ): Promise<string> {
   if (params.file) {
-    const resolvedPath = path.resolve(params.file);
-    const client = await manager.ensureFileOpen(params.file);
-    if (!client) return noServerMessage(params.file);
+    const resolvedPath = resolveFilePath(params.file, cwd);
+    const client = await manager.ensureFileOpen(resolvedPath);
+    if (!client) return noServerMessage(resolvedPath);
 
     let content: string;
     try {
@@ -172,12 +229,13 @@ async function handleSymbols(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  if (!params.file) return "Error: 'file' parameter is required for symbols action.";
+  if (!params.file) return "Validation error: 'file' is required for symbols action.";
+  const resolvedPath = resolveFilePath(params.file, cwd);
 
-  const client = await manager.ensureFileOpen(params.file);
-  if (!client) return noServerMessage(params.file);
+  const client = await manager.ensureFileOpen(resolvedPath);
+  if (!client) return noServerMessage(resolvedPath);
 
-  const symbols = await client.documentSymbols(path.resolve(params.file));
+  const symbols = await client.documentSymbols(resolvedPath);
   if (!symbols || symbols.length === 0) return "No symbols found.";
 
   if ("children" in symbols[0] || "selectionRange" in symbols[0]) {
@@ -191,36 +249,46 @@ async function handleRename(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const { file, line, character } = requireFilePosition(params);
-  if (!params.newName) return "Error: 'newName' parameter is required for rename action.";
+  const validation = validateFilePosition(params, "rename");
+  if (typeof validation === "string") return validation;
+  const { file, line, character } = validation;
+  const resolvedPath = resolveFilePath(file, cwd);
 
-  const client = await manager.ensureFileOpen(file);
-  if (!client) return noServerMessage(file);
+  const nameValidation = validateNonEmptyString(params.newName, "newName", "rename");
+  if (typeof nameValidation === "string") return nameValidation;
+  const newName = nameValidation.value;
 
-  const edit = await client.rename(
-    path.resolve(file),
-    toZeroBased(line, character),
-    params.newName,
-  );
+  const client = await manager.ensureFileOpen(resolvedPath);
+  if (!client) return noServerMessage(resolvedPath);
+
+  const edit = await client.rename(resolvedPath, toZeroBased(line, character), newName);
   if (!edit) return "Rename not available at this position.";
 
   return formatWorkspaceEdit(edit, cwd);
 }
 
-async function handleCodeActions(manager: LspManager, params: LspToolParams): Promise<string> {
-  const { file, line, character } = requireFilePosition(params);
-  const client = await manager.ensureFileOpen(file);
-  if (!client) return noServerMessage(file);
+async function handleCodeActions(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+): Promise<string> {
+  const validation = validateFilePosition(params, "code_actions");
+  if (typeof validation === "string") return validation;
+  const { file, line, character } = validation;
+  const resolvedPath = resolveFilePath(file, cwd);
+
+  const client = await manager.ensureFileOpen(resolvedPath);
+  if (!client) return noServerMessage(resolvedPath);
 
   const pos = toZeroBased(line, character);
   const range: Range = { start: pos, end: pos };
-  const diags = client.getDiagnostics(path.resolve(file));
+  const diags = client.getDiagnostics(resolvedPath);
 
   const relevantDiags = diags.filter(
     (d) => d.range.start.line <= pos.line && d.range.end.line >= pos.line,
   );
 
-  const actions = await client.codeActions(path.resolve(file), range, {
+  const actions = await client.codeActions(resolvedPath, range, {
     diagnostics: relevantDiags,
   });
   if (!actions || actions.length === 0) return "No code actions available at this position.";
@@ -233,12 +301,13 @@ async function handleWorkspaceSymbol(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  if (!params.query || params.query.trim().length === 0) {
-    return "Error: 'query' parameter is required for workspace_symbol action.";
-  }
-  const symbols = await manager.workspaceSymbol(params.query);
+  const validation = validateNonEmptyString(params.query, "query", "workspace_symbol");
+  if (typeof validation === "string") return validation;
+  const query = validation.value;
+
+  const symbols = await manager.workspaceSymbol(query);
   if (!symbols) return "Workspace symbol search not supported by this language server.";
-  if (symbols.length === 0) return `No symbols found for query "${params.query}".`;
+  if (symbols.length === 0) return `No symbols found for query "${query}".`;
 
   return formatWorkspaceSymbols(symbols as SymbolInformation[], cwd);
 }
@@ -248,24 +317,30 @@ async function handleSearch(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  if (!params.query || params.query.trim().length === 0) {
-    return "Error: 'query' parameter is required for search action.";
-  }
-  const symbols = await manager.workspaceSymbol(params.query);
+  const validation = validateNonEmptyString(params.query, "query", "search");
+  if (typeof validation === "string") return validation;
+  const query = validation.value;
+
+  const symbols = await manager.workspaceSymbol(query);
   if (symbols && symbols.length > 0) {
     return formatWorkspaceSymbols(symbols as SymbolInformation[], cwd);
   }
-  const grepMatches = fallbackGrep(cwd, params.query);
+  const grepMatches = fallbackGrep(cwd, query);
   return formatSearchResults(null, grepMatches, cwd);
 }
 
-async function handleSymbolHover(manager: LspManager, params: LspToolParams): Promise<string> {
-  if (!params.symbol || params.symbol.trim().length === 0) {
-    return "Error: 'symbol' parameter is required for symbol_hover action.";
-  }
-  const symbols = await manager.workspaceSymbol(params.symbol);
+async function handleSymbolHover(
+  manager: LspManager,
+  params: LspToolParams,
+  _cwd: string,
+): Promise<string> {
+  const validation = validateNonEmptyString(params.symbol, "symbol", "symbol_hover");
+  if (typeof validation === "string") return validation;
+  const symbol = validation.value;
+
+  const symbols = await manager.workspaceSymbol(symbol);
   if (!symbols || symbols.length === 0) {
-    return `Symbol "${params.symbol}" not found.`;
+    return `Symbol "${symbol}" not found.`;
   }
 
   // Use the first match arbitrarily; LSP servers return results in their own
@@ -276,32 +351,11 @@ async function handleSymbolHover(manager: LspManager, params: LspToolParams): Pr
   if (!client) return noServerMessage(filePath);
 
   const hover = await client.hover(filePath, match.location.range.start);
-  if (!hover) return `No hover information available for "${params.symbol}".`;
+  if (!hover) return `No hover information available for "${symbol}".`;
 
   let result = formatHover(hover);
   if (symbols.length > 1) {
     result += `\n\n(${symbols.length - 1} other match${symbols.length === 2 ? "" : "es"} found — use workspace_symbol or search to disambiguate)`;
   }
   return result;
-}
-
-// ── Utility ───────────────────────────────────────────────────────────
-
-function requireFilePosition(params: LspToolParams): {
-  file: string;
-  line: number;
-  character: number;
-} {
-  if (!params.file) throw new Error("'file' parameter is required.");
-  if (params.line === undefined) throw new Error("'line' parameter is required.");
-  if (params.character === undefined) throw new Error("'character' parameter is required.");
-  return { file: params.file, line: params.line, character: params.character };
-}
-
-function toZeroBased(line: number, character: number): { line: number; character: number } {
-  return { line: line - 1, character: character - 1 };
-}
-
-function noServerMessage(file: string): string {
-  return `No LSP server available for this file type (${path.extname(file) || "unknown"})`;
 }
