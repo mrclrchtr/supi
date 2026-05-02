@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
@@ -109,6 +112,53 @@ describe("analyzeContext edge cases", () => {
     expect(result.approximationNote).toBe("Token count pending — send a message to refresh");
     expect(result.categories.systemPrompt).toBe(100);
     expect(result.totalTokens).toBe(100);
+  });
+
+  it("derives skills and context files from the current system prompt", () => {
+    const dir = mkdtempSync(join(tmpdir(), "supi-context-"));
+    const agentsPath = join(dir, "AGENTS.md");
+    writeFileSync(agentsPath, "A".repeat(120));
+
+    try {
+      const ctx = createMockCtx({
+        contextUsage: { tokens: 0, contextWindow: 8192, percent: 0 },
+        systemPrompt: [
+          "Base prompt",
+          "",
+          "# Project Context",
+          "",
+          "Project-specific instructions and guidelines:",
+          "",
+          `## ${agentsPath}`,
+          "",
+          "placeholder",
+          "",
+          "The following skills provide specialized instructions for specific tasks.",
+          "Use the read tool to load a skill's file when the task matches its description.",
+          "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
+          "",
+          "<available_skills>",
+          "  <skill>",
+          "    <name>find-docs</name>",
+          "    <description>Find docs</description>",
+          "    <location>/tmp/find-docs/SKILL.md</location>",
+          "  </skill>",
+          "</available_skills>",
+          "Current date: 2026-04-27",
+          `Current working directory: ${dir}`,
+        ].join("\n"),
+      });
+      const pi = createMockPi();
+      const result = analyzeContext(ctx, pi, undefined);
+
+      expect(result.skills).toHaveLength(1);
+      expect(result.skills[0].name).toBe("find-docs");
+      expect(result.systemPromptBreakdown.contextFiles).toHaveLength(1);
+      expect(result.systemPromptBreakdown.contextFiles[0].path).toBe(agentsPath);
+      expect(result.systemPromptBreakdown.contextFiles[0].tokens).toBe(30);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("detects compaction and reports summarized turns", () => {

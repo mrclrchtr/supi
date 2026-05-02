@@ -8,6 +8,7 @@ import {
   getLatestCompactionEntry,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
+import { deriveOptionsFromSystemPrompt } from "./prompt-inference.ts";
 
 type AgentMessage = Parameters<typeof estimateTokens>[0];
 
@@ -210,21 +211,21 @@ function applyScaling(
 }
 
 function computeContextFiles(
-  cachedOptions: BuildSystemPromptOptions | undefined,
+  promptOptions: BuildSystemPromptOptions | undefined,
 ): ContextFileInfo[] {
   const files: ContextFileInfo[] = [];
-  if (cachedOptions?.contextFiles) {
-    for (const cf of cachedOptions.contextFiles) {
+  if (promptOptions?.contextFiles) {
+    for (const cf of promptOptions.contextFiles) {
       files.push({ path: cf.path, tokens: estimateTextTokens(cf.content) });
     }
   }
   return files;
 }
 
-function computeSkills(cachedOptions: BuildSystemPromptOptions | undefined): SkillInfo[] {
+function computeSkills(promptOptions: BuildSystemPromptOptions | undefined): SkillInfo[] {
   const skills: SkillInfo[] = [];
-  if (cachedOptions?.skills) {
-    for (const skill of cachedOptions.skills) {
+  if (promptOptions?.skills) {
+    for (const skill of promptOptions.skills) {
       const skillText = formatSkillsForPrompt([skill]);
       skills.push({ name: skill.name, tokens: estimateTextTokens(skillText) });
     }
@@ -233,24 +234,24 @@ function computeSkills(cachedOptions: BuildSystemPromptOptions | undefined): Ski
 }
 
 function computeSystemPromptBreakdown(
-  cachedOptions: BuildSystemPromptOptions | undefined,
+  promptOptions: BuildSystemPromptOptions | undefined,
   systemPromptTokens: number,
 ): ContextAnalysis["systemPromptBreakdown"] {
-  const contextFiles = computeContextFiles(cachedOptions);
-  const skills = computeSkills(cachedOptions);
+  const contextFiles = computeContextFiles(promptOptions);
+  const skills = computeSkills(promptOptions);
 
   const skillsTotal = skills.reduce((s, c) => s + c.tokens, 0);
-  const guidelines = cachedOptions?.promptGuidelines
-    ? estimateTextTokens(cachedOptions.promptGuidelines.join("\n"))
+  const guidelines = promptOptions?.promptGuidelines
+    ? estimateTextTokens(promptOptions.promptGuidelines.join("\n"))
     : 0;
-  const toolSnippets = cachedOptions?.toolSnippets
-    ? estimateTextTokens(Object.values(cachedOptions.toolSnippets).join("\n"))
+  const toolSnippets = promptOptions?.toolSnippets
+    ? estimateTextTokens(Object.values(promptOptions.toolSnippets).join("\n"))
     : 0;
-  const appendText = cachedOptions?.appendSystemPrompt
-    ? estimateTextTokens(cachedOptions.appendSystemPrompt)
+  const appendText = promptOptions?.appendSystemPrompt
+    ? estimateTextTokens(promptOptions.appendSystemPrompt)
     : 0;
-  const customTokens = cachedOptions?.customPrompt
-    ? estimateTextTokens(cachedOptions.customPrompt)
+  const customTokens = promptOptions?.customPrompt
+    ? estimateTextTokens(promptOptions.customPrompt)
     : 0;
 
   const knownSubtotal =
@@ -366,7 +367,8 @@ export function analyzeContext(
     scaling.categories.other;
   const freeSpace = Math.max(0, contextWindow - used - autocompactBuffer);
 
-  const breakdown = computeSystemPromptBreakdown(cachedOptions, scaling.categories.systemPrompt);
+  const promptOptions = deriveOptionsFromSystemPrompt(ctx, cachedOptions);
+  const breakdown = computeSystemPromptBreakdown(promptOptions, scaling.categories.systemPrompt);
   const injectedFiles = extractInjectedContextFiles(apiView.messages);
   const toolDefinitions = computeToolDefinitions(pi);
   const compaction = detectCompaction(branch);
