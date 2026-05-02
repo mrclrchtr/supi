@@ -24,8 +24,9 @@ const TEST_DEFAULTS: TestConfig = {
   tags: [],
 };
 
-function registerTestSettings(): void {
+function registerTestSettings(homeDir?: string): void {
   registerConfigSettings({
+    homeDir,
     id: "test",
     label: "Test",
     section: "test",
@@ -102,22 +103,12 @@ describe("registerConfigSettings persistence", () => {
   it("persistChange set writes to global scope when selected", () => {
     const tmpDir = makeTempDir();
 
-    const prevHome = process.env.HOME;
-    process.env.HOME = tmpDir;
-    try {
-      registerTestSettings();
-      const section = getRegisteredSettings()[0];
-      section.persistChange("global", tmpDir, "severity", "3");
+    registerTestSettings(tmpDir);
+    const section = getRegisteredSettings()[0];
+    section.persistChange("global", tmpDir, "severity", "3");
 
-      const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
-      expect(config.severity).toBe(3);
-    } finally {
-      if (prevHome === undefined) {
-        delete process.env.HOME;
-      } else {
-        process.env.HOME = prevHome;
-      }
-    }
+    const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
+    expect(config.severity).toBe(3);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -157,23 +148,13 @@ describe("registerConfigSettings persistence", () => {
       JSON.stringify({ test: { severity: 4, tags: ["project"] } }),
     );
 
-    const prevHome = process.env.HOME;
-    process.env.HOME = tmpDir;
-    try {
-      registerTestSettings();
-      const section = getRegisteredSettings()[0];
-      section.persistChange("global", tmpDir, "tags", "");
+    registerTestSettings(tmpDir);
+    const section = getRegisteredSettings()[0];
+    section.persistChange("global", tmpDir, "tags", "");
 
-      const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
-      expect(config.severity).toBe(4);
-      expect(config.tags).toEqual(["project"]);
-    } finally {
-      if (prevHome === undefined) {
-        delete process.env.HOME;
-      } else {
-        process.env.HOME = prevHome;
-      }
-    }
+    const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
+    expect(config.severity).toBe(4);
+    expect(config.tags).toEqual(["project"]);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

@@ -32,6 +32,8 @@ export interface ConfigSettingsOptions<T> {
     value: string,
     helpers: ConfigSettingsHelpers,
   ) => void;
+  /** Optional home directory for config resolution (testing). */
+  homeDir?: string;
 }
 
 /**
@@ -47,16 +49,25 @@ export function registerConfigSettings<T>(options: ConfigSettingsOptions<T>): vo
     id: options.id,
     label: options.label,
     loadValues: (scope, cwd) => {
-      const settings = loadSupiConfigForScope(options.section, cwd, options.defaults, { scope });
+      const settings = loadSupiConfigForScope(options.section, cwd, options.defaults, {
+        scope,
+        homeDir: options.homeDir,
+      });
       return options.buildItems(settings, scope, cwd);
     },
     persistChange: (scope, cwd, settingId, value) => {
       const helpers: ConfigSettingsHelpers = {
         set: (key, val) => {
-          writeSupiConfig({ section: options.section, scope, cwd }, { [key]: val });
+          writeSupiConfig(
+            { section: options.section, scope, cwd },
+            { [key]: val },
+            { homeDir: options.homeDir },
+          );
         },
         unset: (key) => {
-          removeSupiConfigKey({ section: options.section, scope, cwd }, key);
+          removeSupiConfigKey({ section: options.section, scope, cwd }, key, {
+            homeDir: options.homeDir,
+          });
         },
       };
       options.persistChange(scope, cwd, settingId, value, helpers);

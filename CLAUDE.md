@@ -120,7 +120,7 @@ registerSettings({
 - Test helpers can export utilities (`createPiMock`, `makeCtx`, constants) but must not call `vi.mock` or `vi.hoisted` internally
 - Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
 - `pnpm vitest run packages/supi-<pkg>/` — run tests for a single package
-- Global-scope settings-registry tests can temporarily set `process.env.HOME` to a temp dir; `loadValues(scope, cwd)` has no `homeDir` injection.
+- Global-scope tests for `registerConfigSettings` should pass `homeDir` in the options object rather than mutating `process.env.HOME`.
 - `pnpm vitest run packages/supi-core/ packages/supi-lsp/ packages/supi-claude-md/` — targeted regression sweep for shared config/settings/session-state changes
 - `pnpm exec biome check packages/supi-<pkg>` — package-scoped Biome check for faster iteration on one extension
 - `pnpm exec tsc --noEmit -p packages/supi-<pkg>/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-<pkg>/__tests__/tsconfig.json` — package-scoped typecheck for one extension and its tests

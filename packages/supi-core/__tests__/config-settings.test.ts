@@ -21,8 +21,9 @@ const TEST_DEFAULTS: TestConfig = {
   tags: [],
 };
 
-function registerTestSettings(): void {
+function registerTestSettings(homeDir?: string): void {
   registerConfigSettings({
+    homeDir,
     id: "test",
     label: "Test",
     section: "test",
@@ -118,29 +119,19 @@ describe("registerConfigSettings", () => {
       JSON.stringify({ test: { enabled: true, severity: 4, tags: ["project"] } }),
     );
 
-    const prevHome = process.env.HOME;
-    process.env.HOME = tmpDir;
-    try {
-      registerTestSettings();
-      const section = getRegisteredSettings()[0];
+    registerTestSettings(tmpDir);
+    const section = getRegisteredSettings()[0];
 
-      const globalItems = section.loadValues("global", tmpDir);
-      const projectItems = section.loadValues("project", tmpDir);
+    const globalItems = section.loadValues("global", tmpDir);
+    const projectItems = section.loadValues("project", tmpDir);
 
-      expect(globalItems.find((i) => i.id === "enabled")?.currentValue).toBe("off");
-      expect(globalItems.find((i) => i.id === "severity")?.currentValue).toBe("2");
-      expect(globalItems.find((i) => i.id === "tags")?.currentValue).toBe("global");
+    expect(globalItems.find((i) => i.id === "enabled")?.currentValue).toBe("off");
+    expect(globalItems.find((i) => i.id === "severity")?.currentValue).toBe("2");
+    expect(globalItems.find((i) => i.id === "tags")?.currentValue).toBe("global");
 
-      expect(projectItems.find((i) => i.id === "enabled")?.currentValue).toBe("on");
-      expect(projectItems.find((i) => i.id === "severity")?.currentValue).toBe("4");
-      expect(projectItems.find((i) => i.id === "tags")?.currentValue).toBe("project");
-    } finally {
-      if (prevHome === undefined) {
-        delete process.env.HOME;
-      } else {
-        process.env.HOME = prevHome;
-      }
-    }
+    expect(projectItems.find((i) => i.id === "enabled")?.currentValue).toBe("on");
+    expect(projectItems.find((i) => i.id === "severity")?.currentValue).toBe("4");
+    expect(projectItems.find((i) => i.id === "tags")?.currentValue).toBe("project");
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
