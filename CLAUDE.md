@@ -41,7 +41,7 @@ This repo has two install surfaces:
 Current workspace packages:
 - `packages/supi-aliases` — `/exit`, `/e`, `/clear` shortcuts
 - `packages/supi-core` — shared infrastructure: XML `<extension-context>` tag, config system
-- `packages/supi-claude-md` — subdirectory CLAUDE.md injection + root context refresh
+- `packages/supi-claude-md` — subdirectory CLAUDE.md injection
 - `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
 - `packages/supi-bash-timeout` — default timeout injection for `bash`
 - `packages/supi-lsp` — Language Server Protocol integration + diagnostics guardrails
@@ -118,3 +118,6 @@ registerSettings({
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports and other unsafe lint issues
 - Adding a new runtime export to `supi-core/index.ts` breaks every downstream `vi.mock("@mrclrchtr/supi-core")` factory that omits it; audit all `vi.mock` blocks in consuming packages
 - The same applies to new runtime exports from local modules (e.g., `CLAUDE_MD_DEFAULTS` from `config.ts`) consumed by `vi.mock("../config.ts")` factories
+- **Deleting a source file breaks every test with `vi.mock("../<file>")` referencing it** — audit all test files for stale mock factories after module deletion
+- **Removing code may leave `// biome-ignore` suppression comments unused** — Biome flags these; remove them
+- **Changing state shape requires updating every `createInitialState` mock in test files** — keep mock shapes in sync with real types
