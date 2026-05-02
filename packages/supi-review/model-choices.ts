@@ -4,6 +4,11 @@ type ModelChoice = {
   name?: string;
 };
 
+export interface ReviewModelChoiceOptions {
+  argv?: string[];
+  settingsPatterns?: string[];
+}
+
 const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh"]);
 
 /**
@@ -28,20 +33,22 @@ export function extractScopedModelPatterns(argv: string[] = process.argv): strin
 /**
  * Derive model choices for review settings.
  *
- * When pi was started with `--models`, prefer that scoped subset. Otherwise,
- * fall back to all currently available models.
+ * Precedence matches pi startup behavior:
+ * 1. active CLI `--models`
+ * 2. persisted `enabledModels` from settings
+ * 3. no explicit review-model choices
  */
 export function getReviewModelChoices(
   availableModels: ModelChoice[],
-  argv: string[] = process.argv,
+  options: ReviewModelChoiceOptions = {},
 ): string[] {
-  const scopedPatterns = extractScopedModelPatterns(argv);
-  const scopedChoices = resolveScopedModelChoices(scopedPatterns, availableModels);
-  const baseChoices =
-    scopedChoices.length > 0
-      ? scopedChoices
-      : availableModels.map((model) => toCanonicalModelId(model));
-  return dedupe(baseChoices);
+  const scopedPatterns = extractScopedModelPatterns(options.argv ?? process.argv);
+  const effectivePatterns =
+    scopedPatterns.length > 0 ? scopedPatterns : (options.settingsPatterns ?? []);
+  if (effectivePatterns.length === 0) {
+    return [];
+  }
+  return resolveScopedModelChoices(effectivePatterns, availableModels);
 }
 
 function splitModelPatterns(value: string | undefined): string[] {

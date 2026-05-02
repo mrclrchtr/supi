@@ -1,4 +1,4 @@
-import { BorderedLoader, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { BorderedLoader, type ExtensionAPI, SettingsManager } from "@mariozechner/pi-coding-agent";
 import { parseNonInteractiveArgs } from "./args.ts";
 import { getCommitShow, getDiff, getMergeBase, getUncommittedDiff } from "./git.ts";
 import { getReviewModelChoices } from "./model-choices.ts";
@@ -24,9 +24,13 @@ export default function reviewExtension(pi: ExtensionAPI) {
   registerReviewRenderer(pi);
 
   const syncReviewModelChoices = (ctx: {
+    cwd: string;
     modelRegistry: { getAvailable(): Array<{ provider: string; id: string; name?: string }> };
   }) => {
-    setReviewModelChoices(getReviewModelChoices(ctx.modelRegistry.getAvailable()));
+    const settingsPatterns = SettingsManager.create(ctx.cwd).getEnabledModels() ?? [];
+    setReviewModelChoices(
+      getReviewModelChoices(ctx.modelRegistry.getAvailable(), { settingsPatterns }),
+    );
   };
 
   pi.on("session_start", async (_event, ctx) => {

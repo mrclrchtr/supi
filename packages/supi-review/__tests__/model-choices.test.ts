@@ -31,15 +31,22 @@ describe("review model choices", () => {
 
   it("uses the current model scope when --models is present", () => {
     expect(
-      getReviewModelChoices(models, ["node", "pi", "--models", "anthropic/*,gpt-4o-mini:low"]),
+      getReviewModelChoices(models, {
+        argv: ["node", "pi", "--models", "anthropic/*,gpt-4o-mini:low"],
+      }),
     ).toEqual(["anthropic/claude-sonnet-4-5", "anthropic/claude-haiku-4-5", "openai/gpt-4o-mini"]);
   });
 
-  it("falls back to all available models when no scope is configured", () => {
-    expect(getReviewModelChoices(models, ["node", "pi"])).toEqual([
-      "anthropic/claude-sonnet-4-5",
-      "anthropic/claude-haiku-4-5",
-      "openai/gpt-4o-mini",
-    ]);
+  it("falls back to persisted enabledModels when no CLI scope is present", () => {
+    expect(
+      getReviewModelChoices(models, {
+        argv: ["node", "pi"],
+        settingsPatterns: ["anthropic/*"],
+      }),
+    ).toEqual(["anthropic/claude-sonnet-4-5", "anthropic/claude-haiku-4-5"]);
+  });
+
+  it("returns no explicit choices when neither CLI nor settings define a scope", () => {
+    expect(getReviewModelChoices(models, { argv: ["node", "pi"] })).toEqual([]);
   });
 });

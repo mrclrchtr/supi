@@ -26,6 +26,11 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
       this.onAbort?.();
     }
   },
+  SettingsManager: {
+    create: () => ({
+      getEnabledModels: () => undefined,
+    }),
+  },
 }));
 
 vi.mock("../settings.ts", () => ({
