@@ -56,10 +56,13 @@ Current workspace packages:
 - `packages/supi-lsp` — Language Server Protocol integration + diagnostics guardrails
 - `packages/supi-tree-sitter` — Tree-sitter structural analysis tool + reusable parse/query service
 - `packages/supi-skill-shortcut` — `$skill-name` shorthand for `/skill:name`
-- `packages/supi` — meta-package, prompts, and bundled skills
+- `packages/supi` — meta-package wrapper entrypoints plus `prompts/` and `resources.ts` prompt rediscovery
 
 Other notable areas:
 - `openspec/changes/` and `openspec/specs/` — OpenSpec artifacts
+
+Meta-package note:
+- `packages/supi/resources.ts` contributes prompt paths on `resources_discover`, so prompt changes are picked up after `/reload`.
 
 ## Settings registry
 

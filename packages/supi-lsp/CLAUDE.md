@@ -2,6 +2,24 @@
 
 This file contains non-obvious guidance for future work in `packages/supi-lsp/`.
 
+## Scope
+
+`@mrclrchtr/supi-lsp` registers the `lsp` tool, LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer.
+
+Entrypoint: `lsp.ts`
+
+## Key files
+
+- `lsp.ts` — extension wiring, lifecycle, commands, and resources
+- `tool-actions.ts` — tool action execution and formatting
+- `manager.ts` + `manager-*.ts` — client lifecycle, roots, and diagnostic state
+- `guidance.ts` — prompt guidelines/snippet and diagnostic-context formatting
+- `overrides.ts`, `renderer.ts`, `ui.ts` — tool-result augmentation, custom messages, and status overlay
+
+## Validation
+
+- `pnpm exec biome check packages/supi-lsp && pnpm vitest run packages/supi-lsp/ && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json`
+
 ## Architecture gotchas
 
 - Stable LSP guidance belongs in tool `promptGuidelines`; `before_agent_start` should inject only dynamic XML-framed diagnostic messages, not mutate `systemPrompt`.
