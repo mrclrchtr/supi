@@ -86,6 +86,27 @@ function deriveContextFiles(systemPrompt: string): Array<{ path: string; content
   return contextFiles;
 }
 
+export function extractGuidelinesSection(systemPrompt: string): string | null {
+  const marker = "\nGuidelines:\n";
+  const start = systemPrompt.indexOf(marker);
+  if (start < 0) {
+    return null;
+  }
+
+  const afterStart = start + marker.length;
+  const endMarkers = ["\n\nPi documentation", "\n\n# Project Context", "\nCurrent date: "];
+  let end = systemPrompt.length;
+  for (const endMarker of endMarkers) {
+    const index = systemPrompt.indexOf(endMarker, afterStart);
+    if (index >= 0) {
+      end = Math.min(end, index);
+    }
+  }
+
+  const section = systemPrompt.slice(afterStart, end).trim();
+  return section.length > 0 ? section : null;
+}
+
 export function deriveOptionsFromSystemPrompt(
   ctx: ExtensionCommandContext,
   cachedOptions: BuildSystemPromptOptions | undefined,

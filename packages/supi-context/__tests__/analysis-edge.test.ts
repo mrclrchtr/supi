@@ -125,6 +125,10 @@ describe("analyzeContext edge cases", () => {
         systemPrompt: [
           "Base prompt",
           "",
+          "Guidelines:",
+          "- Use bash for file operations like ls, rg, find",
+          "- Be concise in your responses",
+          "",
           "# Project Context",
           "",
           "Project-specific instructions and guidelines:",
@@ -153,6 +157,7 @@ describe("analyzeContext edge cases", () => {
 
       expect(result.skills).toHaveLength(1);
       expect(result.skills[0].name).toBe("find-docs");
+      expect(result.guidelines).toBeGreaterThan(0);
       expect(result.systemPromptBreakdown.contextFiles).toHaveLength(1);
       expect(result.systemPromptBreakdown.contextFiles[0].path).toBe(agentsPath);
       expect(result.systemPromptBreakdown.contextFiles[0].tokens).toBe(30);

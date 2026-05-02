@@ -8,7 +8,7 @@ import {
   getLatestCompactionEntry,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
-import { deriveOptionsFromSystemPrompt } from "./prompt-inference.ts";
+import { deriveOptionsFromSystemPrompt, extractGuidelinesSection } from "./prompt-inference.ts";
 
 type AgentMessage = Parameters<typeof estimateTokens>[0];
 
@@ -235,15 +235,19 @@ function computeSkills(promptOptions: BuildSystemPromptOptions | undefined): Ski
 
 function computeSystemPromptBreakdown(
   promptOptions: BuildSystemPromptOptions | undefined,
+  systemPromptText: string,
   systemPromptTokens: number,
 ): ContextAnalysis["systemPromptBreakdown"] {
   const contextFiles = computeContextFiles(promptOptions);
   const skills = computeSkills(promptOptions);
 
   const skillsTotal = skills.reduce((s, c) => s + c.tokens, 0);
-  const guidelines = promptOptions?.promptGuidelines
-    ? estimateTextTokens(promptOptions.promptGuidelines.join("\n"))
-    : 0;
+  const inferredGuidelines = extractGuidelinesSection(systemPromptText);
+  const guidelines = inferredGuidelines
+    ? estimateTextTokens(inferredGuidelines)
+    : promptOptions?.promptGuidelines
+      ? estimateTextTokens(promptOptions.promptGuidelines.join("\n"))
+      : 0;
   const toolSnippets = promptOptions?.toolSnippets
     ? estimateTextTokens(Object.values(promptOptions.toolSnippets).join("\n"))
     : 0;
@@ -329,10 +333,6 @@ export function extractInjectedContextFiles(messages: AgentMessage[]): InjectedF
   return Array.from(seen.values()).sort((a, b) => a.turn - b.turn || a.file.localeCompare(b.file));
 }
 
-export function getAutocompactBuffer(cwd: string): number {
-  return SettingsManager.create(cwd).getCompactionReserveTokens();
-}
-
 export function analyzeContext(
   ctx: ExtensionCommandContext,
   pi: ExtensionAPI,
@@ -344,8 +344,9 @@ export function analyzeContext(
   const contextWindow = contextUsage?.contextWindow ?? 0;
   const actualTokens = contextUsage?.tokens ?? null;
 
+  const systemPromptText = ctx.getSystemPrompt();
   const categories = computeMessageCategories(apiView.messages);
-  categories.systemPrompt = estimateTextTokens(ctx.getSystemPrompt());
+  categories.systemPrompt = estimateTextTokens(systemPromptText);
 
   const rawTotal =
     categories.systemPrompt +
@@ -357,7 +358,8 @@ export function analyzeContext(
 
   const scaling = applyScaling(categories, actualTokens, rawTotal, contextUsage);
 
-  const autocompactBuffer = contextWindow > 0 ? getAutocompactBuffer(ctx.cwd) : 0;
+  const autocompactBuffer =
+    contextWindow > 0 ? SettingsManager.create(ctx.cwd).getCompactionReserveTokens() : 0;
   const used =
     scaling.categories.systemPrompt +
     scaling.categories.userMessages +
@@ -368,7 +370,11 @@ export function analyzeContext(
   const freeSpace = Math.max(0, contextWindow - used - autocompactBuffer);
 
   const promptOptions = deriveOptionsFromSystemPrompt(ctx, cachedOptions);
-  const breakdown = computeSystemPromptBreakdown(promptOptions, scaling.categories.systemPrompt);
+  const breakdown = computeSystemPromptBreakdown(
+    promptOptions,
+    systemPromptText,
+    scaling.categories.systemPrompt,
+  );
   const injectedFiles = extractInjectedContextFiles(apiView.messages);
   const toolDefinitions = computeToolDefinitions(pi);
   const compaction = detectCompaction(branch);
