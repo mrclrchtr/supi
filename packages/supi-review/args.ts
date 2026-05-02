@@ -1,10 +1,10 @@
 import type { ReviewDepth, ReviewTarget } from "./types.ts";
 
 const USAGE = `Usage:
-  /review base-branch <branch> [--depth inherit|fast|deep]
-  /review uncommitted [--depth inherit|fast|deep]
-  /review commit <sha> [--depth inherit|fast|deep]
-  /review custom [--depth inherit|fast|deep] -- <instructions...>`;
+  /supi-review base-branch <branch> [--depth inherit|fast|deep]
+  /supi-review uncommitted [--depth inherit|fast|deep]
+  /supi-review commit <sha> [--depth inherit|fast|deep]
+  /supi-review custom [--depth inherit|fast|deep] -- <instructions...>`;
 
 export interface ParsedArgs {
   ok: true;

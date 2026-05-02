@@ -41,7 +41,7 @@ export default function reviewExtension(pi: ExtensionAPI) {
     syncReviewModelChoices(ctx);
   });
 
-  pi.registerCommand("review", {
+  pi.registerCommand("supi-review", {
     description: "Run a structured code review",
     handler: async (args, ctx) => {
       const settings = loadReviewSettings(ctx.cwd);
@@ -240,7 +240,18 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
       : undefined,
   );
 
-  return runReviewer({ prompt, model, cwd: ctx.cwd, target, signal });
+  return runReviewer({
+    prompt,
+    model,
+    cwd: ctx.cwd,
+    target,
+    signal,
+    options: { timeout: resolveReviewTimeoutMs(settings) },
+  });
+}
+
+function resolveReviewTimeoutMs(settings: ReturnType<typeof loadReviewSettings>): number {
+  return Math.max(1, Math.floor(settings.reviewTimeoutMinutes)) * 60_000;
 }
 
 function resolveModel(
@@ -250,7 +261,14 @@ function resolveModel(
 ): string | undefined {
   if (depth === "fast" && settings.reviewFastModel) return settings.reviewFastModel;
   if (depth === "deep" && settings.reviewDeepModel) return settings.reviewDeepModel;
-  return ctx.model?.id;
+  return resolveSessionModelId(ctx.model);
+}
+
+function resolveSessionModelId(
+  model: Pick<NonNullable<CommandContext["model"]>, "id" | "provider"> | undefined,
+): string | undefined {
+  if (!model?.id) return undefined;
+  return model.provider ? `${model.provider}/${model.id}` : model.id;
 }
 
 function maybeTruncateDiff(

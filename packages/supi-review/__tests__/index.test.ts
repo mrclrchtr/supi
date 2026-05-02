@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
   loadReviewSettings: vi.fn(() => ({
     reviewFastModel: "",
     reviewDeepModel: "",
     maxDiffBytes: 100_000,
+    reviewTimeoutMinutes: 15,
   })),
   registerReviewSettings: vi.fn(),
   setReviewModelChoices: vi.fn(),
@@ -61,13 +62,81 @@ vi.mock("../ui.ts", () => ({
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import reviewExtension from "../index.ts";
 
-describe("/review command", () => {
+describe("/supi-review command", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFns.loadReviewSettings.mockReturnValue({
+      reviewFastModel: "",
+      reviewDeepModel: "",
+      maxDiffBytes: 100_000,
+      reviewTimeoutMinutes: 15,
+    });
+  });
+
+  it("passes the configured timeout to the reviewer", async () => {
+    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
+
+    const pi = {
+      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
+        expect(name).toBe("supi-review");
+        commandHandler = spec.handler;
+      }),
+      on: vi.fn(),
+      sendMessage: vi.fn(),
+    } as unknown as ExtensionAPI;
+
+    mockFns.loadReviewSettings.mockReturnValue({
+      reviewFastModel: "",
+      reviewDeepModel: "",
+      maxDiffBytes: 100_000,
+      reviewTimeoutMinutes: 20,
+    });
+    mockFns.runReviewer.mockResolvedValue({
+      kind: "success",
+      target: { type: "custom", instructions: "Focus on correctness" },
+      output: {
+        findings: [],
+        overall_correctness: "patch is correct",
+        overall_explanation: "Looks good",
+        overall_confidence_score: 0.7,
+      },
+    });
+
+    reviewExtension(pi);
+    if (!commandHandler) throw new Error("/supi-review handler was not registered");
+
+    const ctx = {
+      cwd: "/project",
+      hasUI: true,
+      model: { provider: "github-copilot", id: "session-model" },
+      ui: {
+        editor: vi.fn(async () => "Focus on correctness"),
+        notify: vi.fn(),
+        custom: vi.fn(
+          (factory: (...args: unknown[]) => unknown) =>
+            new Promise((resolve) => {
+              factory({}, {}, undefined, resolve);
+            }),
+        ),
+      },
+    };
+
+    await commandHandler("", ctx);
+
+    expect(mockFns.runReviewer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "github-copilot/session-model",
+        options: { timeout: 20 * 60_000 },
+      }),
+    );
+  });
+
   it("aborts the in-flight reviewer when the loader is canceled", async () => {
     let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
 
     const pi = {
       registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("review");
+        expect(name).toBe("supi-review");
         commandHandler = spec.handler;
       }),
       on: vi.fn(),
@@ -84,12 +153,12 @@ describe("/review command", () => {
     );
 
     reviewExtension(pi);
-    if (!commandHandler) throw new Error("/review handler was not registered");
+    if (!commandHandler) throw new Error("/supi-review handler was not registered");
 
     const ctx = {
       cwd: "/project",
       hasUI: true,
-      model: { id: "session-model" },
+      model: { provider: "github-copilot", id: "session-model" },
       ui: {
         editor: vi.fn(async () => "Focus on correctness"),
         notify: vi.fn(),
