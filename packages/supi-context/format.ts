@@ -54,35 +54,55 @@ function padRight(text: string, width: number): string {
   return text.padEnd(width, " ");
 }
 
+function allocateGridBlocks(segments: number[]): number[] {
+  const total = segments.reduce((sum, value) => sum + value, 0);
+  if (total <= 0) {
+    return segments.map(() => 0);
+  }
+
+  const exact = segments.map((value) => (value / total) * GRID_BLOCKS);
+  const counts = exact.map((value) => Math.floor(value));
+  const remaining = GRID_BLOCKS - counts.reduce((sum, value) => sum + value, 0);
+
+  const byRemainder = exact
+    .map((value, index) => ({ index, remainder: value - counts[index] }))
+    .sort((a, b) => b.remainder - a.remainder);
+
+  for (let i = 0; i < remaining; i++) {
+    counts[byRemainder[i]?.index ?? 0] += 1;
+  }
+
+  return counts;
+}
+
 function renderGrid(analysis: ContextAnalysis, theme: Theme): string[] {
   const { contextWindow, categories } = analysis;
   if (contextWindow <= 0) {
     return [theme.fg("dim", "No model selected — grid unavailable")];
   }
 
-  const filledBlocks: { color: Parameters<Theme["fg"]>["0"]; count: number }[] = [];
-  let allocated = 0;
+  const segments = [
+    ...CATEGORY_ORDER.map((key) => ({
+      color: CATEGORY_COLORS[key],
+      tokens: categories[key],
+      block: "█",
+    })),
+    { color: "dim" as Parameters<Theme["fg"]>["0"], tokens: categories.freeSpace, block: "░" },
+    {
+      color: "warning" as Parameters<Theme["fg"]>["0"],
+      tokens: categories.autocompactBuffer,
+      block: "░",
+    },
+  ];
 
-  for (const key of CATEGORY_ORDER) {
-    const count = Math.round((categories[key] / contextWindow) * GRID_BLOCKS);
-    filledBlocks.push({ color: CATEGORY_COLORS[key], count });
-    allocated += count;
-  }
-
-  const emptyCount = Math.max(0, GRID_BLOCKS - allocated);
-
-  // Build the 100 blocks in order
+  const counts = allocateGridBlocks(segments.map((segment) => segment.tokens));
   const blocks: string[] = [];
-  for (const fb of filledBlocks) {
-    for (let i = 0; i < fb.count; i++) {
-      blocks.push(theme.fg(fb.color, "█"));
+  for (const [index, segment] of segments.entries()) {
+    for (let i = 0; i < (counts[index] ?? 0); i++) {
+      blocks.push(theme.fg(segment.color, segment.block));
     }
   }
-  for (let i = 0; i < emptyCount; i++) {
-    blocks.push(theme.fg("dim", "░"));
-  }
 
-  // Build rows
   const gridLines: string[] = [];
   for (let row = 0; row < GRID_ROWS; row++) {
     const start = row * GRID_COLS;
@@ -138,7 +158,7 @@ function renderCategoryBreakdown(analysis: ContextAnalysis, theme: Theme): strin
     {
       key: "autocompactBuffer",
       label: "Autocompact buffer",
-      color: "dim" as Parameters<Theme["fg"]>["0"],
+      color: "warning" as Parameters<Theme["fg"]>["0"],
       tokens: categories.autocompactBuffer,
     },
     {

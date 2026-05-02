@@ -65,6 +65,17 @@ describe("formatContextReport", () => {
     expect(lines.some((l) => l.includes("Assistant messages"))).toBe(true);
     expect(lines.some((l) => l.includes("Autocompact buffer"))).toBe(true);
     expect(lines.some((l) => l.includes("Free space"))).toBe(true);
+    expect(lines.some((l) => l.includes("[warning]●[/warning] Autocompact buffer"))).toBe(true);
+  });
+
+  it("renders the autocompact buffer at the end of the grid", () => {
+    const analysis = makeAnalysis();
+    const lines = formatContextReport(analysis, mockTheme);
+    const gridLines = lines.filter((line) => line.includes("█") || line.includes("░")).slice(0, 5);
+
+    expect(gridLines).toHaveLength(5);
+    expect(gridLines[4]).toContain("[dim]░[/dim][dim]░[/dim][dim]░[/dim][dim]░[/dim]");
+    expect(gridLines[4]).toContain("[warning]░[/warning]");
   });
 
   it("omits context files section when empty", () => {
