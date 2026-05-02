@@ -9,6 +9,8 @@ export {
   removeSupiConfigKey,
   writeSupiConfig,
 } from "./config.ts";
+export type { ConfigSettingsHelpers, ConfigSettingsOptions } from "./config-settings.ts";
+export { registerConfigSettings } from "./config-settings.ts";
 export type { ContextMessageLike } from "./context-messages.ts";
 export {
   findLastUserMessageIndex,

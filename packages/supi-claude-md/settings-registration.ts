@@ -2,13 +2,7 @@
 
 import type { SettingItem } from "@mariozechner/pi-tui";
 import { Input, Key, matchesKey } from "@mariozechner/pi-tui";
-import {
-  loadSupiConfigForScope,
-  registerSettings,
-  removeSupiConfigKey,
-  type SettingsScope,
-  writeSupiConfig,
-} from "@mrclrchtr/supi-core";
+import { type ConfigSettingsHelpers, registerConfigSettings } from "@mrclrchtr/supi-core";
 import { CLAUDE_MD_DEFAULTS, type ClaudeMdConfig } from "./config.ts";
 
 const THRESHOLD_VALUES = [
@@ -35,57 +29,40 @@ const THRESHOLD_VALUES = [
   "100",
 ];
 
-// ── Config helpers ───────────────────────────────────────────
-
-function loadClaudeMdSettings(scope: SettingsScope, cwd: string): ClaudeMdConfig {
-  return loadSupiConfigForScope("claude-md", cwd, CLAUDE_MD_DEFAULTS, { scope });
-}
-
-function persistClaudeMdSetting(
-  scope: SettingsScope,
-  cwd: string,
-  key: string,
-  value: unknown,
-): void {
-  if (value === undefined) {
-    removeSupiConfigKey({ section: "claude-md", scope, cwd }, key);
-  } else {
-    writeSupiConfig({ section: "claude-md", scope, cwd }, { [key]: value });
-  }
-}
-
 // ── Settings registration ────────────────────────────────────
 
 export function registerClaudeMdSettings(): void {
-  registerSettings({
+  registerConfigSettings({
     id: "claude-md",
     label: "Claude-MD",
-    loadValues: (scope, cwd) => buildClaudeMdSettingItems(scope, cwd),
-    persistChange: (scope, cwd, settingId, value) => {
-      handleSettingChange(scope, cwd, settingId, value);
+    section: "claude-md",
+    defaults: CLAUDE_MD_DEFAULTS,
+    buildItems: (_settings) => buildClaudeMdSettingItems(_settings),
+    // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
+    persistChange: (_scope, _cwd, settingId, value, helpers) => {
+      handleSettingChange(settingId, value, helpers);
     },
   });
 }
 
 function handleSettingChange(
-  scope: SettingsScope,
-  cwd: string,
   settingId: string,
   value: string,
+  helpers: ConfigSettingsHelpers,
 ): void {
   switch (settingId) {
     case "subdirs": {
-      persistClaudeMdSetting(scope, cwd, "subdirs", value === "on");
+      helpers.set("subdirs", value === "on");
       break;
     }
     case "rereadInterval": {
       const num = Number.parseInt(value, 10);
-      persistClaudeMdSetting(scope, cwd, "rereadInterval", Number.isNaN(num) ? 0 : num);
+      helpers.set("rereadInterval", Number.isNaN(num) ? 0 : num);
       break;
     }
     case "contextThreshold": {
       const num = Number.parseInt(value, 10);
-      persistClaudeMdSetting(scope, cwd, "contextThreshold", Number.isNaN(num) ? 80 : num);
+      helpers.set("contextThreshold", Number.isNaN(num) ? 80 : num);
       break;
     }
     case "fileNames": {
@@ -93,15 +70,17 @@ function handleSettingChange(
         .split(",")
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
-      persistClaudeMdSetting(scope, cwd, "fileNames", names.length > 0 ? names : undefined);
+      if (names.length > 0) {
+        helpers.set("fileNames", names);
+      } else {
+        helpers.unset("fileNames");
+      }
       break;
     }
   }
 }
 
-function buildClaudeMdSettingItems(scope: SettingsScope, cwd: string): SettingItem[] {
-  const settings = loadClaudeMdSettings(scope, cwd);
-
+function buildClaudeMdSettingItems(settings: ClaudeMdConfig): SettingItem[] {
   return [
     {
       id: "subdirs",

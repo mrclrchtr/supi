@@ -88,6 +88,7 @@ registerSettings({
 - `/supi-settings` (registered by `packages/supi/settings.ts`) renders all registered sections
 - Scope toggle (Tab) switches between project/global config; values are strings — extensions handle string↔typed conversion
 - `loadValues(scope, cwd)` should use raw scope reads (`loadSupiConfigForScope()`), while `loadSupiConfig()` is for merged runtime config
+- For config-backed sections, prefer `registerConfigSettings()` in `supi-core` over manual `registerSettings()` + `loadSupiConfigForScope()` + `writeSupiConfig()` wiring
 - Submenus use `SettingItem.submenu` returning a pi-tui `Component`; Escape confirms, empty-string done() cancels
 
 ## Shared gotchas
@@ -124,3 +125,5 @@ registerSettings({
 - `pnpm exec biome check packages/supi-<pkg>` — package-scoped Biome check for faster iteration on one extension
 - `pnpm exec tsc --noEmit -p packages/supi-<pkg>/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-<pkg>/__tests__/tsconfig.json` — package-scoped typecheck for one extension and its tests
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports and other unsafe lint issues
+- Adding a new runtime export to `supi-core/index.ts` breaks every downstream `vi.mock("@mrclrchtr/supi-core")` factory that omits it; audit all `vi.mock` blocks in consuming packages
+- The same applies to new runtime exports from local modules (e.g., `CLAUDE_MD_DEFAULTS` from `config.ts`) consumed by `vi.mock("../config.ts")` factories

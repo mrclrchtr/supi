@@ -41,7 +41,7 @@ describe("loadLspSettings", () => {
   });
 
   it("returns defaults when no config exists", () => {
-    const result = loadLspSettings(tmpDir);
+    const result = loadLspSettings(tmpDir, tmpDir);
     expect(result).toEqual({ enabled: true, severity: 1, servers: [] });
   });
 
@@ -53,7 +53,7 @@ describe("loadLspSettings", () => {
       JSON.stringify({ lsp: { enabled: false, severity: 2 } }),
     );
 
-    const result = loadLspSettings(tmpDir);
+    const result = loadLspSettings(tmpDir, tmpDir);
     expect(result).toEqual({ enabled: false, severity: 2, servers: [] });
   });
 });
@@ -219,6 +219,61 @@ describe("registerLspSettings: persistence", () => {
       opts(tmpDir),
     );
     expect(config.servers).toEqual([]);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange writes to global scope when selected", () => {
+    const tmpDir = makeTempDir();
+
+    withHomeDir(tmpDir, () => {
+      registerLspSettings();
+      const section = getRegisteredSettings()[0];
+
+      section.persistChange("global", tmpDir, "enabled", "off");
+
+      const config = loadSupiConfig(
+        "lsp",
+        tmpDir,
+        { enabled: true, severity: 1, servers: [] },
+        opts(tmpDir),
+      );
+      expect(config.enabled).toBe(false);
+    });
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange unsets a key in the selected scope without affecting the other scope", () => {
+    const tmpDir = makeTempDir();
+
+    fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({ lsp: { enabled: false, severity: 2, servers: ["gopls"] } }),
+    );
+
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { enabled: true, severity: 4, servers: ["pyright"] } }),
+    );
+
+    withHomeDir(tmpDir, () => {
+      registerLspSettings();
+      const section = getRegisteredSettings()[0];
+      section.persistChange("global", tmpDir, "servers", "");
+
+      const config = loadSupiConfig(
+        "lsp",
+        tmpDir,
+        { enabled: true, severity: 1, servers: [] },
+        opts(tmpDir),
+      );
+      expect(config.enabled).toBe(true);
+      expect(config.severity).toBe(4);
+      expect(config.servers).toEqual(["pyright"]);
+    });
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

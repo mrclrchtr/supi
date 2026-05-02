@@ -22,6 +22,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
       : null,
   loadSupiConfig: vi.fn(),
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
+  registerConfigSettings: vi.fn(),
   registerSettings: vi.fn(),
   removeSupiConfigKey: vi.fn(),
   restorePromptContent: vi.fn((msgs: unknown) => msgs),
@@ -29,6 +30,12 @@ vi.mock("@mrclrchtr/supi-core", () => ({
 }));
 
 vi.mock("../config.ts", () => ({
+  CLAUDE_MD_DEFAULTS: {
+    rereadInterval: 3,
+    contextThreshold: 80,
+    subdirs: true,
+    fileNames: ["CLAUDE.md", "AGENTS.md"],
+  },
   loadClaudeMdConfig: mockFns.loadClaudeMdConfig,
 }));
 

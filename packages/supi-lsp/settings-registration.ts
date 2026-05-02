@@ -3,14 +3,7 @@
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import type { SettingItem } from "@mariozechner/pi-tui";
 import { Container, Key, matchesKey, SettingsList, Text } from "@mariozechner/pi-tui";
-import {
-  loadSupiConfig,
-  loadSupiConfigForScope,
-  registerSettings,
-  removeSupiConfigKey,
-  type SettingsScope,
-  writeSupiConfig,
-} from "@mrclrchtr/supi-core";
+import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core";
 import { loadConfig } from "./config.ts";
 
 // ── Types ────────────────────────────────────────────────────
@@ -29,20 +22,8 @@ const LSP_DEFAULTS: LspSettings = {
 
 // ── Config helpers ───────────────────────────────────────────
 
-export function loadLspSettings(cwd: string): LspSettings {
-  return loadSupiConfig("lsp", cwd, LSP_DEFAULTS);
-}
-
-function loadLspSettingsForScope(scope: SettingsScope, cwd: string): LspSettings {
-  return loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope });
-}
-
-function persistLspSetting(scope: SettingsScope, cwd: string, key: string, value: unknown): void {
-  if (value === undefined) {
-    removeSupiConfigKey({ section: "lsp", scope, cwd }, key);
-  } else {
-    writeSupiConfig({ section: "lsp", scope, cwd }, { [key]: value });
-  }
+export function loadLspSettings(cwd: string, homeDir?: string): LspSettings {
+  return loadSupiConfig("lsp", cwd, LSP_DEFAULTS, { homeDir });
 }
 
 function severityLabel(severity: number): string {
@@ -63,30 +44,39 @@ function severityLabel(severity: number): string {
 // ── Settings registration ────────────────────────────────────
 
 export function registerLspSettings(): void {
-  registerSettings({
+  registerConfigSettings({
     id: "lsp",
     label: "LSP",
-    loadValues: (_scope, cwd) => buildLspSettingItems(_scope, cwd),
-    persistChange: (scope, cwd, settingId, value) => {
+    section: "lsp",
+    defaults: LSP_DEFAULTS,
+    buildItems: (settings, scope, cwd) => buildLspSettingItems(settings, scope, cwd),
+    // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
+    persistChange: (_scope, _cwd, settingId, value, helpers) => {
       if (settingId === "enabled") {
-        persistLspSetting(scope, cwd, "enabled", value === "on");
+        helpers.set("enabled", value === "on");
       } else if (settingId === "severity") {
         const num = Number.parseInt(value.split(" ")[0] ?? "1", 10);
-        persistLspSetting(scope, cwd, "severity", Number.isNaN(num) ? 1 : num);
+        helpers.set("severity", Number.isNaN(num) ? 1 : num);
       } else if (settingId === "servers") {
         const servers = value
           .split(",")
           .map((s) => s.trim())
           .filter((s) => s.length > 0);
-        persistLspSetting(scope, cwd, "servers", servers.length > 0 ? servers : undefined);
+        if (servers.length > 0) {
+          helpers.set("servers", servers);
+        } else {
+          helpers.unset("servers");
+        }
       }
     },
   });
 }
 
-function buildLspSettingItems(scope: SettingsScope, cwd: string): SettingItem[] {
-  const settings = loadLspSettingsForScope(scope, cwd);
-
+function buildLspSettingItems(
+  settings: LspSettings,
+  scope: "project" | "global",
+  cwd: string,
+): SettingItem[] {
   return [
     {
       id: "enabled",
@@ -107,7 +97,7 @@ function buildLspSettingItems(scope: SettingsScope, cwd: string): SettingItem[] 
       label: "Active Servers",
       description: "Press Enter to configure which language servers are active",
       currentValue: settings.servers.length > 0 ? settings.servers.join(", ") : "all",
-      submenu: (_currentValue, done) => createServerSubmenu(scope, cwd, done),
+      submenu: (_currentValue, done) => createServerSubmenu(scope, cwd, settings, done),
     },
   ];
 }
@@ -115,8 +105,9 @@ function buildLspSettingItems(scope: SettingsScope, cwd: string): SettingItem[] 
 // ── Server submenu ───────────────────────────────────────────
 
 function createServerSubmenu(
-  scope: SettingsScope,
+  _scope: "project" | "global",
   cwd: string,
+  settings: LspSettings,
   done: (selectedValue?: string) => void,
 ): {
   render: (width: number) => string[];
@@ -124,7 +115,6 @@ function createServerSubmenu(
   handleInput: (data: string) => boolean;
 } {
   const config = loadConfig(cwd);
-  const settings = loadLspSettingsForScope(scope, cwd);
   const allServers = Object.keys(config.servers);
   const allEnabled = settings.servers.length === 0;
   const enabledServers = new Set(settings.servers);
