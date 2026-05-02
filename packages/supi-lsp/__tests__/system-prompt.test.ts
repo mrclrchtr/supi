@@ -75,9 +75,11 @@ vi.mock("../diagnostic-summary.ts", () => ({
 }));
 
 import lspExtension from "../lsp.ts";
+import { clearSessionLspService, getSessionLspService } from "../service-registry.ts";
 
-function createManager(diagnostics: Array<{ file: string; total: number }>) {
+function createManager(diagnostics: Array<{ file: string; total: number }>, cwd = "/project") {
   return {
+    getCwd: vi.fn(() => cwd),
     shutdownAll: vi.fn(),
     pruneMissingFiles: vi.fn(),
     refreshOpenDiagnostics: vi.fn().mockResolvedValue(undefined),
@@ -129,8 +131,33 @@ async function setupExtension(manager: ReturnType<typeof createManager>) {
 describe("system prompt stability", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    clearSessionLspService("/project");
+    clearSessionLspService("/old-project");
+    clearSessionLspService("/new-project");
     mockFns.loadConfig.mockReturnValue({ servers: {} });
     mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, servers: [] });
+  });
+
+  it("clears the previous cwd service when a new session starts before shutdown", async () => {
+    const oldManager = createManager([], "/old-project");
+    const newManager = createManager([], "/new-project");
+    mockFns.LspManager.mockImplementationOnce(function LspManagerOldMock() {
+      return oldManager;
+    });
+    mockFns.LspManager.mockImplementationOnce(function LspManagerNewMock() {
+      return newManager;
+    });
+    const { handlers, pi } = createPiWithHandlers();
+    lspExtension(pi);
+
+    await handlers.get("session_start")?.({}, { cwd: "/old-project", ui: { notify: vi.fn() } });
+    expect(getSessionLspService("/old-project").kind).toBe("ready");
+
+    await handlers.get("session_start")?.({}, { cwd: "/new-project", ui: { notify: vi.fn() } });
+
+    expect(oldManager.shutdownAll).toHaveBeenCalled();
+    expect(getSessionLspService("/old-project").kind).toBe("unavailable");
+    expect(getSessionLspService("/new-project").kind).toBe("ready");
   });
 
   it("does not modify the system prompt when no diagnostics are injected", async () => {

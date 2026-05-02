@@ -30,12 +30,12 @@ import {
 import { LspManager } from "./manager.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
 import { registerLspMessageRenderer } from "./renderer.ts";
+import { scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
 import {
   clearSessionLspService,
   SessionLspService,
   setSessionLspServiceState,
 } from "./service-registry.ts";
-import { scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
 import { loadLspSettings, registerLspSettings } from "./settings-registration.ts";
 import { executeAction, type LspAction, lspToolDescription } from "./tool-actions.ts";
 import {

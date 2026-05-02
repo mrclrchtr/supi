@@ -211,7 +211,7 @@ async function handleDiagnostics(
     }
 
     const diags = await client.syncAndWaitForDiagnostics(resolvedPath, content);
-    return formatDiagnostics(params.file, diags, cwd);
+    return formatDiagnostics(resolvedPath, diags, cwd);
   }
 
   const summary = manager.getDiagnosticSummary();

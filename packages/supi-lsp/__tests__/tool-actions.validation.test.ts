@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { LspManager } from "../manager.ts";
 import { executeAction } from "../tool-actions.ts";
@@ -202,5 +205,38 @@ describe("tool action missing file behavior", () => {
     });
 
     expect(result).toContain("Error: cannot read file");
+  });
+
+  it("diagnostics: formats relative file paths from the session cwd", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-diagnostics-path-"));
+    try {
+      const sourceDir = path.join(tmpDir, "src");
+      fs.mkdirSync(sourceDir);
+      fs.writeFileSync(path.join(sourceDir, "index.ts"), "const value: number = 'bad';\n");
+
+      const client = {
+        syncAndWaitForDiagnostics: vi.fn().mockResolvedValue([
+          {
+            severity: 1,
+            message: "Type 'string' is not assignable to type 'number'.",
+            range: { start: { line: 0, character: 6 }, end: { line: 0, character: 11 } },
+          },
+        ]),
+      };
+      const manager = {
+        getCwd: vi.fn().mockReturnValue(tmpDir),
+        ensureFileOpen: vi.fn().mockResolvedValue(client),
+      } as unknown as LspManager;
+
+      const result = await executeAction(manager, {
+        action: "diagnostics",
+        file: "src/index.ts",
+      });
+
+      expect(result).toContain("**src/index.ts**:");
+      expect(result).not.toContain("..");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
