@@ -1,23 +1,23 @@
 ## Context
 
-SuPi is a pi extension monorepo. pi exposes an `ExtensionAPI` that supports commands, tools, event handlers, custom TUI components, and custom message renderers. SuPi already has a settings registry (`supi-core`), TUI selectors (`supi-ask-user`), and LSP integration (`supi-lsp`). The goal is to add a `/review` command that mimics OpenAI Codex's review feature: preset selection, dedicated reviewer, structured findings, and custom transcript rendering.
+SuPi is a pi extension monorepo. pi exposes an `ExtensionAPI` that supports commands, tools, event handlers, custom TUI components, and custom message renderers. SuPi already has a settings registry (`supi-core`), TUI selectors (`supi-ask-user`), and LSP integration (`supi-lsp`). The goal is to add a `/supi-review` command that mimics OpenAI Codex's review feature: preset selection, dedicated reviewer, structured findings, and custom transcript rendering.
 
 The local Codex checkout at `/Users/mrclrchtr/Development/public/codex` serves as the reference implementation for review semantics, prompt construction, and JSON output schema.
 
 The pi documentation for version `0.70.2` confirms the subprocess CLI contract used by this design:
-- `README.md` documents `--mode json` for JSONL events, `--model <pattern>`, `--no-session`, and `--tools <list>` / `-t <list>`.
+- `README.md` documents `--mode json` for JSONL events, `--model <pattern>`, session files, and `--tools <list>` / `-t <list>`.
 - `docs/json.md` documents `pi --mode json "Your prompt"` and the JSONL event stream (`message_end`, `turn_end`, `agent_end`, tool execution events).
 - `-p` / `--print` is a separate print mode and is not part of the JSON subprocess invocation.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- `/review` command with interactive preset and depth selectors.
+- `/supi-review` command with interactive preset and depth selectors.
 - Extension resolves git targets (diff, merge-base, commits) and constructs a rich review prompt.
 - Dedicated subprocess reviewer with isolated context and read-only built-in tools.
 - Structured `ReviewOutputEvent` JSON parsing with plain-text fallback.
 - Custom `supi-review` transcript message with a tailored renderer.
-- Settings registry integration for review model overrides.
+- Settings registry integration for review model overrides and timeout configuration.
 - Non-interactive fallback for print/RPC modes with a documented argument grammar.
 - Graceful error handling for subprocess spawn failures, non-zero exits, aborts, timeouts, and malformed output.
 
@@ -33,8 +33,8 @@ The pi documentation for version `0.70.2` confirms the subprocess CLI contract u
 ## Decisions
 
 ### 1. Dedicated subprocess reviewer (not inline)
-**Decision:** Run the reviewer as a separate `pi --mode json -p --no-session` subprocess.
-**Rationale:** Isolates the reviewer's context window from the main session, prevents accidental file mutations by omitting mutation-capable tools, and allows a different model without changing the session model. The `-p` flag ensures non-interactive exit after the single prompt completes, matching the official pi subagent example. This matches Codex's dedicated reviewer behavior while staying within documented pi CLI flags.
+**Decision:** Run the reviewer as a separate `pi --mode json -p` subprocess and keep its session file.
+**Rationale:** Isolates the reviewer's context window from the main session, prevents accidental file mutations by omitting mutation-capable tools, and allows a different model without changing the session model. The `-p` flag ensures non-interactive exit after the single prompt completes, matching the official pi subagent example. Keeping the child session file makes timeout and failure debugging much easier because users can inspect the saved subprocess transcript after the run. The default reviewer timeout is 900000ms (15 minutes), giving slower models and larger review prompts enough time to finish without making timeouts indefinite. This matches Codex's dedicated reviewer behavior while staying within documented pi CLI flags.
 **Alternatives considered:**
 - *Inline review* (same session, inject system prompt): faster, no process spawn, but shares context and risks working-tree mutation. Rejected for safety.
 - *Custom tool in same session*: simpler but same context-sharing issues. Rejected.
@@ -97,11 +97,12 @@ interface ReviewCodeLocation {
 
 ### 7. Model resolution for reviewer subprocess
 **Decision:** Depth maps to model string via settings:
-- `Inherit` -> current session model (`ctx.model?.id` or no `--model` flag if unavailable).
+- `Inherit` -> current session model (`<provider>/<id>` when available, or no `--model` flag if unavailable).
 - `Fast` -> `settings.reviewFastModel`.
 - `Deep` -> `settings.reviewDeepModel`.
-If a Fast/Deep setting is missing, fall back to the session model.
-**Rationale:** Simple, predictable, and matches Codex's `review_model` override without introducing a redundant default review model setting. Using string model IDs lets pi resolve them in the subprocess via its own model registry.
+- Timeout -> `settings.reviewTimeoutMinutes`, converted from minutes to milliseconds for the subprocess runner.
+If a Fast/Deep setting is missing, fall back to the session model. If the timeout setting is unset or invalid, fall back to the 15-minute default.
+**Rationale:** Simple, predictable, and matches Codex's `review_model` override without introducing a redundant default review model setting. Using string model IDs lets pi resolve them in the subprocess via its own model registry. Storing the timeout in minutes matches the user-facing `/supi-settings` UX and keeps project- or user-specific review budgets configurable without touching code.
 **Alternatives considered:**
 - *Provider/model object in settings*: more structured, but harder for users to edit in JSON. Rejected in favor of simple strings like `"anthropic/claude-sonnet-4-5"`.
 - *Separate `reviewModel` default*: overlaps with `Inherit` and creates ambiguous precedence. Rejected.
@@ -130,12 +131,12 @@ Then a thin wrapper in `packages/supi/review.ts`.
 - *Smart truncation (keep modified function signatures)*: complex, fragile. Rejected for v1.
 
 ### 10. Non-interactive argument grammar
-**Decision:** When `ctx.hasUI` is false, `/review` accepts this grammar:
+**Decision:** When `ctx.hasUI` is false, `/supi-review` accepts this grammar:
 ```
-/review base-branch <branch> [--depth inherit|fast|deep]
-/review uncommitted [--depth inherit|fast|deep]
-/review commit <sha> [--depth inherit|fast|deep]
-/review custom [--depth inherit|fast|deep] -- <instructions...>
+/supi-review base-branch <branch> [--depth inherit|fast|deep]
+/supi-review uncommitted [--depth inherit|fast|deep]
+/supi-review commit <sha> [--depth inherit|fast|deep]
+/supi-review custom [--depth inherit|fast|deep] -- <instructions...>
 ```
 `--depth` defaults to `inherit`. Custom instructions may also be provided as all remaining arguments after `custom` when `--` is omitted.
 **Rationale:** This keeps print/RPC mode deterministic and scriptable while matching the interactive preset choices.
@@ -168,7 +169,7 @@ Then a thin wrapper in `packages/supi/review.ts`.
 No migration needed. This is a new capability:
 1. Merge the new `packages/supi-review/` package.
 2. Update `packages/supi/` wrapper and root `package.json`.
-3. Users get `/review` automatically on next `/reload` or pi restart.
+3. Users get `/supi-review` automatically on next `/reload` or pi restart.
 4. Settings are optional; defaults work out of the box.
 
 Rollback: remove the extension entry from `package.json` `pi.extensions` and `/reload`.

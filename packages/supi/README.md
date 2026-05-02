@@ -37,6 +37,7 @@ Included extension entrypoints:
 - `lsp.ts`
 - `tree-sitter.ts`
 - `skill-shortcut.ts`
+- `review.ts`
 - `resources.ts`
 
 Current bundled prompt templates:
@@ -54,6 +55,7 @@ Current bundled prompt templates:
 | [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | extension | Subdirectory context injection and root context refresh |
 | [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | extension | Language Server Protocol tool, diagnostics, and semantic guidance |
 | [`@mrclrchtr/supi-tree-sitter`](../supi-tree-sitter/README.md) | extension/library | Tree-sitter structural analysis tool and reusable parse/query services |
+| [`@mrclrchtr/supi-review`](../supi-review/package.json) | extension | Structured `/supi-review` command with configurable models, diff size, and review timeout |
 | [`@mrclrchtr/supi-skill-shortcut`](../supi-skill-shortcut/README.md) | extension | `$skill-name` shorthand and autocomplete |
 | [`@mrclrchtr/supi-core`](../supi-core/README.md) | library | Shared config and context utilities used by SuPi packages |
 
@@ -67,6 +69,7 @@ pi install npm:@mrclrchtr/supi-claude-md
 pi install npm:@mrclrchtr/supi-lsp
 pi install npm:@mrclrchtr/supi-tree-sitter
 pi install npm:@mrclrchtr/supi-skill-shortcut
+pi install npm:@mrclrchtr/supi-review
 ```
 
 ## Notable included behavior
@@ -86,6 +89,10 @@ Adds semantic code navigation and diagnostics through a single `lsp` tool plus i
 ### `tree_sitter`
 
 Adds syntax-tree-level structure for JavaScript and TypeScript files through `outline`, `imports`, `exports`, `node_at`, and custom query actions. Results use 1-based coordinates compatible with `lsp` and are capped for agent-friendly output. Designed as a standalone structural-analysis substrate that remains correct when installed without `supi-lsp`.
+
+### `review`
+
+Adds `/supi-review` for structured code review in a dedicated read-only subprocess. Configure fast/deep model overrides, max diff size, and review timeout in minutes through `/supi-settings`.
 
 ### Small UX improvements
 

@@ -22,6 +22,7 @@ Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent)
 | `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
 | `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, workspace symbol search, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. Also exports a reusable `SessionLspService` library surface for peer extensions. |
 | `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis for JavaScript and TypeScript files: outline, imports, exports, node-at-position lookup, and custom queries. Designed as a standalone substrate independent of semantic LSP tooling. |
+| `@mrclrchtr/supi-review` | **review** | Adds `/supi-review` for structured code review with configurable fast/deep models, diff limits, and review timeout via `/supi-settings`. |
 
 ## Install
 
@@ -40,6 +41,7 @@ pi install npm:@mrclrchtr/supi-ask-user
 pi install npm:@mrclrchtr/supi-skill-shortcut
 pi install npm:@mrclrchtr/supi-bash-timeout
 pi install npm:@mrclrchtr/supi-aliases
+pi install npm:@mrclrchtr/supi-review
 ```
 
 ### From git or local path
@@ -66,6 +68,15 @@ The `tree_sitter` extension provides syntax-tree-level structural analysis for J
 - caps tool responses at 100 emitted items, including nested outline children
 - exports `createTreeSitterSession(cwd)` for other SuPi packages that need reusable parse/query/structure services
 - remains correct and self-contained when installed without `supi-lsp`
+
+## Review extension
+
+The `review` extension adds structured code review through `/supi-review`.
+
+- runs reviews in a dedicated read-only subprocess
+- supports interactive target/depth selection plus non-interactive `/supi-review ...` arguments
+- stores fast/deep model overrides, diff size limit, and review timeout in minutes in `/supi-settings`
+- preserves child review sessions for timeout/failure debugging
 
 ## LSP extension
 

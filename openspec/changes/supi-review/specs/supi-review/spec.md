@@ -1,10 +1,10 @@
 ## ADDED Requirements
 
 ### Requirement: Review command presents preset selector
-The extension SHALL register a `/review` command that, when invoked interactively, displays a TUI preset selector with four options: "Review against a base branch", "Review uncommitted changes", "Review a commit", and "Custom review instructions".
+The extension SHALL register a `/supi-review` command that, when invoked interactively, displays a TUI preset selector with four options: "Review against a base branch", "Review uncommitted changes", "Review a commit", and "Custom review instructions".
 
-#### Scenario: User invokes /review in interactive mode
-- **WHEN** the user types `/review` and presses Enter
+#### Scenario: User invokes /supi-review in interactive mode
+- **WHEN** the user types `/supi-review` and presses Enter
 - **THEN** the TUI displays a preset selector with the four options
 
 #### Scenario: User cancels preset selection
@@ -67,11 +67,12 @@ After selecting a review target, the extension SHALL present a depth selector wi
 - **THEN** the reviewer subprocess uses the current session model
 
 ### Requirement: Reviewer runs in isolated subprocess
-The reviewer SHALL run in a dedicated `pi --mode json --no-session` subprocess with an isolated context window, restricted to `read`, `grep`, `find`, and `ls` tools.
+The reviewer SHALL run in a dedicated `pi --mode json` subprocess with an isolated context window, restricted to `read`, `grep`, `find`, and `ls` tools, while preserving the child session for debugging. The default reviewer timeout SHALL be 900000ms (15 minutes).
 
 #### Scenario: Subprocess starts with correct arguments
 - **WHEN** the extension launches the reviewer with a resolved model
-- **THEN** the subprocess is invoked with `--mode json`, `--no-session`, `--tools read,grep,find,ls`, `--model <model>`, and the resolved review prompt
+- **THEN** the subprocess is invoked with `--mode json`, `--tools read,grep,find,ls`, `--model <model>`, and the resolved review prompt
+- **AND** the child session is saved so users can inspect the subprocess transcript after timeouts or failures
 
 #### Scenario: Subprocess starts without resolved model
 - **WHEN** the extension launches the reviewer and no model can be resolved
@@ -132,8 +133,8 @@ The extension SHALL inject a custom `supi-review` message into the session trans
 - **WHEN** the review completes with no findings
 - **THEN** the transcript shows a custom message indicating the review passed with the overall explanation
 
-### Requirement: Settings support review model configuration
-The extension SHALL register `reviewFastModel`, `reviewDeepModel`, and `maxDiffBytes` settings with the SuPi settings registry.
+### Requirement: Settings support review model and timeout configuration
+The extension SHALL register `reviewFastModel`, `reviewDeepModel`, `maxDiffBytes`, and `reviewTimeoutMinutes` settings with the SuPi settings registry.
 
 #### Scenario: User configures fast model
 - **WHEN** the user sets `reviewFastModel` to `openai/gpt-4o-mini` in settings
@@ -147,39 +148,47 @@ The extension SHALL register `reviewFastModel`, `reviewDeepModel`, and `maxDiffB
 - **WHEN** no review model settings are configured
 - **THEN** all depths default to the current session model
 
+#### Scenario: User configures review timeout
+- **WHEN** the user sets `reviewTimeoutMinutes` to `25` in settings
+- **THEN** subsequent reviews use a subprocess timeout of `1500000ms`
+
+#### Scenario: No timeout configured
+- **WHEN** no review timeout setting is configured
+- **THEN** reviews default to a subprocess timeout of `900000ms` (15 minutes)
+
 ### Requirement: Non-interactive fallback runs without TUI
-When `ctx.hasUI` is false, the `/review` command SHALL accept arguments to specify the target directly and skip the TUI selectors.
+When `ctx.hasUI` is false, the `/supi-review` command SHALL accept arguments to specify the target directly and skip the TUI selectors.
 
 The non-interactive grammar SHALL be:
 ```text
-/review base-branch <branch> [--depth inherit|fast|deep]
-/review uncommitted [--depth inherit|fast|deep]
-/review commit <sha> [--depth inherit|fast|deep]
-/review custom [--depth inherit|fast|deep] -- <instructions...>
+/supi-review base-branch <branch> [--depth inherit|fast|deep]
+/supi-review uncommitted [--depth inherit|fast|deep]
+/supi-review commit <sha> [--depth inherit|fast|deep]
+/supi-review custom [--depth inherit|fast|deep] -- <instructions...>
 ```
 
 #### Scenario: Print mode reviews a base branch
-- **WHEN** pi runs in print mode and the user invokes `/review base-branch main`
+- **WHEN** pi runs in print mode and the user invokes `/supi-review base-branch main`
 - **THEN** the extension resolves the base branch target and runs the reviewer without showing a TUI
 
 #### Scenario: Print mode reviews uncommitted changes
-- **WHEN** pi runs in print mode and the user invokes `/review uncommitted --depth fast`
+- **WHEN** pi runs in print mode and the user invokes `/supi-review uncommitted --depth fast`
 - **THEN** the extension resolves uncommitted changes and runs the reviewer with Fast depth without showing a TUI
 
 #### Scenario: Print mode reviews a commit
-- **WHEN** pi runs in print mode and the user invokes `/review commit abc123 --depth deep`
+- **WHEN** pi runs in print mode and the user invokes `/supi-review commit abc123 --depth deep`
 - **THEN** the extension runs `git show abc123` and runs the reviewer with Deep depth without showing a TUI
 
 #### Scenario: Print mode runs custom review
-- **WHEN** pi runs in print mode and the user invokes `/review custom -- Focus on security regressions`
+- **WHEN** pi runs in print mode and the user invokes `/supi-review custom -- Focus on security regressions`
 - **THEN** the extension passes `Focus on security regressions` as the review prompt without showing a TUI
 
 #### Scenario: Print mode without arguments
-- **WHEN** pi runs in print mode and the user invokes `/review` without arguments
+- **WHEN** pi runs in print mode and the user invokes `/supi-review` without arguments
 - **THEN** the extension returns an error message explaining the required arguments
 
 #### Scenario: Print mode with invalid arguments
-- **WHEN** pi runs in print mode and the user invokes `/review unknown`
+- **WHEN** pi runs in print mode and the user invokes `/supi-review unknown`
 - **THEN** the extension returns an error message showing the supported grammar and does not start a review
 
 ### Requirement: Large diffs are truncated
@@ -205,8 +214,9 @@ The extension SHALL surface subprocess failures as user-facing review errors wit
 - **THEN** the extension terminates the subprocess and records the review as canceled rather than failed
 
 #### Scenario: Reviewer times out
-- **WHEN** the reviewer subprocess exceeds the configured timeout
+- **WHEN** the reviewer subprocess exceeds the configured timeout (900000ms by default)
 - **THEN** the extension terminates the subprocess, notifies the user, and records the review as timed out
+- **AND** the timeout result includes the saved child session details so the subprocess transcript can be inspected afterward
 
 #### Scenario: Reviewer produces no assistant output
 - **WHEN** the reviewer subprocess exits successfully but no assistant `message_end` output is found

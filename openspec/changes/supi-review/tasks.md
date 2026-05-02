@@ -30,12 +30,13 @@
 
 - [x] 4.1 Create `packages/supi-review/runner.ts` with `runReviewer(prompt, model, cwd, signal)`.
 - [x] 4.2 Implement `getPiInvocation()` to detect runtime and build the subprocess command.
-- [x] 4.3 Spawn `pi --mode json -p --no-session --tools read,grep,find,ls --model <model> <prompt>` when a model is resolved; omit `--model` when no model is resolved. The `-p` flag ensures non-interactive exit after completion (matches the official pi subagent example).
+- [x] 4.3 Spawn `pi --mode json -p --tools read,grep,find,ls --model <model> <prompt>` when a model is resolved; omit `--model` when no model is resolved. The `-p` flag ensures non-interactive exit after completion (matches the official pi subagent example), and the saved child session can be inspected for timeout/failure debugging.
 - [x] 4.4 Parse JSONL events from stdout and collect the final assistant message from the last assistant `message_end` event. Normalize the message `content` from an array of parts (`{ type: "text", text: ... }`) to a single plain string before passing to `parseReviewOutput()`.
 - [x] 4.5 Handle subprocess spawn errors, non-zero exits, stderr, and missing assistant output as graceful failed review results.
 - [x] 4.6 Listen to the `AbortSignal` and explicitly terminate the child process: first `proc.kill("SIGTERM")`, then `proc.kill("SIGKILL")` after a 5-second grace period if the process is still alive.
-- [x] 4.7 Add reviewer timeout handling with a default of **300000ms** (5 minutes) and expose it through internal runner options.
+- [x] 4.7 Add reviewer timeout handling with a default of **900000ms** (15 minutes), expose it through internal runner options, and allow the timeout to be overridden from review settings.
 - [x] 4.8 Preserve stdout/stderr excerpts in failed review details for renderer/debug visibility.
+- [x] 4.9 Preserve the child reviewer session (and surface its path/id in timeout/failure details) so stuck reviews can be inspected after the fact.
 
 ## 5. Read-only Subprocess Tool Policy
 
@@ -63,7 +64,7 @@
 
 ## 8. Settings Registry Integration
 
-- [x] 8.1 Create `packages/supi-review/settings.ts` registering `reviewFastModel`, `reviewDeepModel`, and `maxDiffBytes`.
+- [x] 8.1 Create `packages/supi-review/settings.ts` registering `reviewFastModel`, `reviewDeepModel`, `maxDiffBytes`, and `reviewTimeoutMinutes`.
 - [x] 8.2 Use `@mrclrchtr/supi-core` `registerConfigSettings()` API (not raw `registerSettings()`).
 - [x] 8.3 Implement `loadReviewSettings(cwd)` returning merged global + project config via `loadSupiConfig("review", cwd, REVIEW_DEFAULTS)`.
 
@@ -72,13 +73,14 @@ const REVIEW_DEFAULTS = {
   reviewFastModel: "",
   reviewDeepModel: "",
   maxDiffBytes: 100_000,
+  reviewTimeoutMinutes: 15,
 };
 ```
-- [x] 8.4 Add settings persistence callbacks (`persistChange`) for `supi-settings` UI.
+- [x] 8.4 Add settings persistence callbacks (`persistChange`) for `supi-settings` UI, including the numeric timeout override.
 
 ## 9. Command and UI Wiring
 
-- [x] 9.1 Register `/review` command in `index.ts`.
+- [x] 9.1 Register `/supi-review` command in `index.ts`.
 - [x] 9.2 Implement non-interactive argument parsing for `base-branch <branch>`, `uncommitted`, `commit <sha>`, and `custom -- <instructions...>` with optional `--depth inherit|fast|deep`. The `--depth` flag (if present) must be consumed **before** the `--` sentinel; everything after `--` (or all remaining args if `--` is omitted) becomes the custom instructions.
 - [x] 9.3 Implement interactive preset selector using `ctx.ui.custom()` + `SelectList` + `DynamicBorder`.
 - [x] 9.4 Implement depth selector (Inherit, Fast, Deep) showing configured model names inline.
@@ -94,7 +96,7 @@ const REVIEW_DEFAULTS = {
 - [x] 10.1 Ensure `packages/supi/review.ts` correctly imports and calls the factory.
 - [x] ~~10.2 Update root `package.json` scripts so `pnpm typecheck` includes the new package.~~ (Not needed — the existing `for p in packages/*/tsconfig.json` loop auto-discovers new packages.)
 - [x] 10.3 Run `pnpm install` to update lockfile for new workspace dependency.
-- [x] 10.4 Verify `/review` appears in `pi.getCommands()` after `/reload`.
+- [x] 10.4 Verify `/supi-review` appears in `pi.getCommands()` after `/reload`.
 
 ## 11. Testing and Validation
 
@@ -105,5 +107,5 @@ const REVIEW_DEFAULTS = {
 - [x] 11.5 Add unit tests for subprocess failure handling (spawn failure, non-zero exit, timeout, abort, missing assistant output).
 - [x] 11.6 Add integration test for the full flow mocking the subprocess runner.
 - [x] 11.7 Run `pnpm typecheck` and `pnpm biome` on the new package.
-- [ ] 11.8 Manual test: run `/review` in a real pi session and verify findings render correctly.
-- [ ] 11.9 Verify settings appear in `/supi-settings` and persist correctly.
+- [x] 11.8 Manual test: run `/supi-review` in a real pi session and verify findings render correctly.
+- [x] 11.9 Verify settings appear in `/supi-settings` and persist correctly, including the review timeout override.
