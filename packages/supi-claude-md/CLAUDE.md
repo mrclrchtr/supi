@@ -1,13 +1,14 @@
 # supi-claude-md
 
-Subdirectory context injection and root context refresh for the pi coding agent.
+Subdirectory context injection for the pi coding agent.
 
 ## Architecture
 
-Two capabilities wired into a single extension:
+One capability wired into a single extension:
 
 1. **Subdirectory discovery** — `tool_result` handler augments `read`/`write`/`edit`/`ls`/`lsp`/`tree_sitter` tool results with CLAUDE.md/AGENTS.md content from subdirectories below cwd
-2. **Root refresh** — `before_agent_start` periodically re-injects root context files (via turn interval), `context` event prunes stale copies
+
+Root and ancestor instruction files are loaded natively by pi into the system prompt on every turn. SuPi does not re-inject them.
 
 ## Key files
 
@@ -17,7 +18,7 @@ Two capabilities wired into a single extension:
 - `state.ts` — `ClaudeMdState` type, `createInitialState()`, `reconstructState()` from real pi `SessionEntry[]` branch data
 - `discovery.ts` — `findSubdirContextFiles()`, `filterAlreadyLoaded()`, `extractPathFromToolEvent()`
 - `subdirectory.ts` — `formatSubdirContext()`, `shouldInjectSubdir()`
-- `refresh.ts` — `shouldRefreshRoot()`, `formatRefreshContext()`, `pruneStaleRefreshMessages()`
+- `refresh.ts` — Historical root-refresh helpers (inert); kept for backward compatibility
 
 ## Dependencies
 
@@ -47,8 +48,8 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 ## Gotchas
 
 - Settings are managed via `/supi-settings` (unified SuPi settings command) — claude-md registers its section via `registerClaudeMdSettings()` in the supi-core registry, with `rereadInterval` and `fileNames` edited through `SettingItem.submenu` text inputs
-- `reconstructState()` must parse real Pi `SessionEntry[]` branch entries (`message` + nested `message.role`, `custom_message`) and restore the highest `supi-claude-md-N` counter to avoid refresh-token collisions after `/reload`
+- `reconstructState()` must parse real Pi `SessionEntry[]` branch entries (`message` + nested `message.role`, `custom_message`) and restore subdirectory injection state from tool-result `<extension-context>` tags
 - Path-aware tool discovery should treat `tree_sitter` like `lsp` (`input.file`) so AST-first workflows still inject subdirectory context
 - `systemPromptOptions` is accessed via a typed intersection (`BeforeAgentStartEvent & { systemPromptOptions?: ... }`) for forward-compatibility with pi >= 0.68.0
 - `os.homedir()` cannot be mocked in ESM — config functions accept optional `homeDir` parameter for testability
-- Post-compaction refresh is **not needed**: pi's system prompt (which contains root context files) survives compaction and is re-sent every turn
+- Root/native context files are never re-injected by this extension; they live in pi's system prompt. Use `/reload` or restart the session to pick up changes to root instruction files

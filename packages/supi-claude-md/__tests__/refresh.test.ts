@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ClaudeMdConfig } from "../config.ts";
 import { CLAUDE_MD_DEFAULTS } from "../config.ts";
 import type { ContextUsage } from "../refresh.ts";
+// biome-ignore lint/suspicious/noDeprecatedImports: testing inert historical helpers
 import { readNativeContextFiles, shouldRefreshRoot } from "../refresh.ts";
 import type { ClaudeMdState } from "../state.ts";
 import { createInitialState } from "../state.ts";
@@ -11,104 +12,38 @@ function makeState(overrides: Partial<ClaudeMdState> = {}): ClaudeMdState {
 }
 
 describe("shouldRefreshRoot", () => {
-  it("returns false when interval is 0", () => {
+  it("always returns false because root/native refresh is retired", () => {
     const state = makeState({ completedTurns: 5 });
     const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, rereadInterval: 0 };
     expect(shouldRefreshRoot(state, config)).toBe(false);
   });
 
-  it("returns true when turn interval is met", () => {
+  it("returns false even when turn interval would have been met", () => {
     const state = makeState({
       completedTurns: 6,
-      lastRefreshTurn: 3,
-    });
-    expect(shouldRefreshRoot(state, CLAUDE_MD_DEFAULTS)).toBe(true);
-  });
-
-  it("returns false when turn interval is not met", () => {
-    const state = makeState({
-      completedTurns: 4,
       lastRefreshTurn: 3,
     });
     expect(shouldRefreshRoot(state, CLAUDE_MD_DEFAULTS)).toBe(false);
   });
 
-  it("returns true at exact boundary", () => {
-    const state = makeState({
-      completedTurns: 6,
-      lastRefreshTurn: 3,
-    });
-    // 6 - 3 = 3 >= 3
-    expect(shouldRefreshRoot(state, CLAUDE_MD_DEFAULTS)).toBe(true);
+  it("returns false regardless of context usage", () => {
+    const state = makeState({ completedTurns: 6, lastRefreshTurn: 3 });
+    const usage: ContextUsage = { tokens: 100_000, contextWindow: 128_000, percent: 85 };
+    expect(shouldRefreshRoot(state, CLAUDE_MD_DEFAULTS, usage)).toBe(false);
   });
 
-  it("returns false when rereadInterval is 0 but turns elapsed", () => {
-    const state = makeState({ completedTurns: 10, lastRefreshTurn: 0 });
-    const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, rereadInterval: 0 };
-    expect(shouldRefreshRoot(state, config)).toBe(false);
-  });
-
-  describe("context threshold gating", () => {
-    const freshState = makeState({ completedTurns: 6, lastRefreshTurn: 3 });
-
-    it("returns false when context usage percent >= threshold", () => {
-      const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, contextThreshold: 80 };
-      const usage: ContextUsage = { tokens: 100_000, contextWindow: 128_000, percent: 85 };
-      expect(shouldRefreshRoot(freshState, config, usage)).toBe(false);
-    });
-
-    it("returns true when context usage percent < threshold", () => {
-      const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, contextThreshold: 80 };
-      const usage: ContextUsage = { tokens: 50_000, contextWindow: 128_000, percent: 50 };
-      expect(shouldRefreshRoot(freshState, config, usage)).toBe(true);
-    });
-
-    it("returns false when context usage percent equals threshold exactly", () => {
-      const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, contextThreshold: 80 };
-      const usage: ContextUsage = { tokens: 102_400, contextWindow: 128_000, percent: 80 };
-      expect(shouldRefreshRoot(freshState, config, usage)).toBe(false);
-    });
-
-    it("returns true when contextUsage.percent is null (post-compaction)", () => {
-      const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, contextThreshold: 80 };
-      const usage: ContextUsage = { tokens: null, contextWindow: 128_000, percent: null };
-      expect(shouldRefreshRoot(freshState, config, usage)).toBe(true);
-    });
-
-    it("returns true when contextUsage is undefined", () => {
-      const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, contextThreshold: 80 };
-      expect(shouldRefreshRoot(freshState, config, undefined)).toBe(true);
-    });
-
-    it("with threshold 100, injection proceeds at 99% usage", () => {
-      const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, contextThreshold: 100 };
-      const usage: ContextUsage = { tokens: 126_720, contextWindow: 128_000, percent: 99 };
-      expect(shouldRefreshRoot(freshState, config, usage)).toBe(true);
-    });
-
-    it("with threshold 100, injection proceeds at 100% usage", () => {
-      const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, contextThreshold: 100 };
-      const usage: ContextUsage = { tokens: 128_000, contextWindow: 128_000, percent: 100 };
-      expect(shouldRefreshRoot(freshState, config, usage)).toBe(true);
-    });
-
-    it("disable flag (rereadInterval=0) takes precedence over context threshold", () => {
-      const state = makeState({ completedTurns: 10, lastRefreshTurn: 0 });
-      const config: ClaudeMdConfig = {
-        ...CLAUDE_MD_DEFAULTS,
-        rereadInterval: 0,
-        contextThreshold: 80,
-      };
-      const usage: ContextUsage = { tokens: 10_000, contextWindow: 128_000, percent: 10 };
-      expect(shouldRefreshRoot(state, config, usage)).toBe(false);
-    });
+  it("returns false even with threshold 100 and low usage", () => {
+    const state = makeState({ completedTurns: 6, lastRefreshTurn: 3 });
+    const config: ClaudeMdConfig = { ...CLAUDE_MD_DEFAULTS, contextThreshold: 100 };
+    const usage: ContextUsage = { tokens: 10_000, contextWindow: 128_000, percent: 10 };
+    expect(shouldRefreshRoot(state, config, usage)).toBe(false);
   });
 });
 
 describe("readNativeContextFiles", () => {
   const cwd = "/Users/alice/projects/myapp";
 
-  it("excludes files outside the project tree (home directory)", () => {
+  it("returns empty array for home directory files", () => {
     const result = readNativeContextFiles(
       [{ path: "/Users/alice/AGENTS.md", content: "dotfiles guide" }],
       cwd,
@@ -116,35 +51,33 @@ describe("readNativeContextFiles", () => {
     expect(result).toEqual([]);
   });
 
-  it("includes files at project root", () => {
+  it("returns empty array for project root files", () => {
     const result = readNativeContextFiles(
       [{ path: "/Users/alice/projects/myapp/CLAUDE.md", content: "# Root" }],
       cwd,
     );
-    expect(result).toEqual([{ path: "/Users/alice/projects/myapp/CLAUDE.md", content: "# Root" }]);
+    expect(result).toEqual([]);
   });
 
-  it("includes files in subdirectories", () => {
+  it("returns empty array for native subdirectory files", () => {
     const result = readNativeContextFiles(
       [{ path: "/Users/alice/projects/myapp/packages/foo/CLAUDE.md", content: "# Foo" }],
       cwd,
     );
-    expect(result).toEqual([
-      { path: "/Users/alice/projects/myapp/packages/foo/CLAUDE.md", content: "# Foo" },
-    ]);
+    expect(result).toEqual([]);
   });
 
-  it("excludes entries with no path", () => {
+  it("returns empty array for entries with no path", () => {
     const result = readNativeContextFiles([{ path: undefined, content: "stuff" }], cwd);
     expect(result).toEqual([]);
   });
 
-  it("excludes entries with no content", () => {
+  it("returns empty array for entries with no content", () => {
     const result = readNativeContextFiles([{ path: "/foo.md", content: undefined }], cwd);
     expect(result).toEqual([]);
   });
 
-  it("mixes included and excluded files", () => {
+  it("returns empty array for mixed inputs", () => {
     const result = readNativeContextFiles(
       [
         { path: "/Users/alice/AGENTS.md", content: "dotfiles" },
@@ -153,9 +86,6 @@ describe("readNativeContextFiles", () => {
       ],
       cwd,
     );
-    expect(result).toEqual([
-      { path: "/Users/alice/projects/myapp/CLAUDE.md", content: "# Root" },
-      { path: "/Users/alice/projects/myapp/packages/bar/CLAUDE.md", content: "# Bar" },
-    ]);
+    expect(result).toEqual([]);
   });
 });

@@ -10,10 +10,9 @@ pi install npm:@mrclrchtr/supi-claude-md
 
 ## What it adds
 
-This extension combines two related behaviors:
+This extension adds **subdirectory discovery** — injecting `CLAUDE.md` / `AGENTS.md` from subdirectories when the agent touches files there.
 
-1. **Subdirectory discovery** — inject context files from subdirectories when the agent touches files there.
-2. **Root refresh** — periodically re-inject root or ancestor context files that pi already loaded natively.
+Pi loads root and ancestor instruction files natively into the system prompt on every turn. To update root instruction files mid-session, use pi's `/reload` command or restart the session.
 
 Settings are managed through the shared SuPi settings command:
 
@@ -24,7 +23,7 @@ Settings are managed through the shared SuPi settings command:
 Inside `/supi-settings`, Claude-MD contributes:
 
 - `Subdirectory Discovery` — on/off toggle
-- `Context Refresh Interval` — text input; enter a number of turns or `0` to disable refresh
+- `Subdirectory Re-read Interval` — text input; enter a number of turns or `0` to disable subdirectory re-reads
 - `Context Threshold` — common percentage values from `0` to `100`
 - `Context File Names` — comma-separated text input; empty input restores the default filenames
 
@@ -54,16 +53,16 @@ Use the `claude-md` section:
 
 Options:
 
-- `rereadInterval` — turns between refreshes; `0` disables refresh
-- `contextThreshold` — skip refresh/re-injection when context usage is at or above this percent; `100` disables context gating
+- `rereadInterval` — turns between re-reading previously injected subdirectory context; `0` disables subdirectory re-reads (first-time discovery is unaffected)
+- `contextThreshold` — skip subdirectory re-injection when context usage is at or above this percent; `100` disables context gating; first-time discovery is always allowed
 - `subdirs` — enable or disable subdirectory discovery
 - `fileNames` — ordered list of context filenames to search for
 
 ## Behavior notes
 
-- pi still loads root context files natively; this extension augments that behavior.
-- subdirectory context is injected from path-aware tool activity such as reads, writes, edits, LSP operations, and Tree-sitter operations.
-- the settings UI opens directly in the pi interface rather than as a separate modal dialog.
+- root and ancestor instruction files are loaded natively by pi's system prompt; this extension does not re-inject them
+- subdirectory context is injected from path-aware tool activity such as reads, writes, edits, LSP operations, and Tree-sitter operations
+- the settings UI opens directly in the pi interface rather than as a separate modal dialog
 
 ## Requirements
 

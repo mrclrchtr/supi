@@ -1,6 +1,6 @@
 ---
 name: supi-claude-md-guide
-description: How supi-claude-md context injection works — subdirectory discovery, root refresh, settings UI, and configuration.
+description: How supi-claude-md context injection works — subdirectory discovery, settings UI, and configuration.
 ---
 
 # Context Injection Guide
@@ -10,7 +10,7 @@ description: How supi-claude-md context injection works — subdirectory discove
 supi-claude-md gives the agent project context beyond what pi loads natively:
 
 1. **Subdirectory discovery** — when the agent accesses files in a subdirectory, CLAUDE.md/AGENTS.md files from that directory (and its ancestors up to cwd) are injected into the tool result.
-2. **Root refresh** — root/ancestor context files that pi loaded natively are periodically re-read and re-injected so the agent sees fresh content.
+2. **Native root context** — root/ancestor context files that pi loaded natively are part of the system prompt on every LLM call. SuPi does not re-inject them.
 
 ## Subdirectory discovery
 
@@ -22,17 +22,13 @@ This can be triggered by reads, writes, edits, and other path-aware tooling such
 
 Each directory is injected at most once per session (by default). After the configured `rereadInterval` turns, the content is re-read in case it changed.
 
-Re-injection is skipped when context usage is at or above `contextThreshold`. First-time directory discovery is still injected even under context pressure.
+Re-injection of already-seen directories is skipped when context usage is at or above `contextThreshold`. First-time directory discovery is still injected even under context pressure.
 
-## Root refresh
+## Native root context
 
-Context files loaded natively by pi (like the root AGENTS.md) may go stale as the session progresses. supi-claude-md periodically re-reads and re-injects these files via a persistent message in `before_agent_start`.
+Pi loads root and ancestor instruction files (`AGENTS.md`, `CLAUDE.md`) into the system prompt automatically. Because the system prompt is sent on every LLM call, that context is always present.
 
-Refresh timing is controlled by the `rereadInterval` config option (default: every 3 turns). Set to `0` to disable.
-
-Root refresh is skipped when context usage is at or above `contextThreshold` (default: 80%). Set `contextThreshold` to `100` to disable context gating.
-
-Note: pi's system prompt already contains root context files and is re-sent on every LLM call. Root refresh is for **updating** the content when files change mid-session, not for re-adding missing context after compaction.
+SuPi **does not** re-inject these files. If you edit a root instruction file mid-session, use pi's `/reload` command or restart the session so pi rebuilds the native system prompt.
 
 ## Settings
 
@@ -50,7 +46,7 @@ Changes are persisted immediately to the selected scope's config file.
 Claude-MD currently contributes these setting types inside the shared UI:
 
 - `Subdirectory Discovery` — on/off toggle
-- `Context Refresh Interval` — text input; enter a number of turns or `0` to disable refresh
+- `Subdirectory Re-read Interval` — text input; enter a number of turns or `0` to disable subdirectory re-reads
 - `Context Threshold` — choose from common percentage values
 - `Context File Names` — comma-separated text input; clearing it restores the default file list
 
@@ -72,9 +68,9 @@ Config lives in `.pi/supi/config.json` under the `claude-md` section:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `subdirs` | `true` | Enable subdirectory context injection |
-| `fileNames` | `["CLAUDE.md", "AGENTS.md"]` | Filenames to look for in subdirectories |
-| `rereadInterval` | `3` | Re-read root and subdirectory context every N turns (0 = off) |
-| `contextThreshold` | `80` | Skip refresh/re-injection when context usage is at or above this percent (100 = off) |
+| `fileNames` | `["CLAUDE.md", "AGENTS.md"]` | Filenames to look for in each directory |
+| `rereadInterval` | `3` | Re-read previously injected subdirectory context every N turns (0 = off) |
+| `contextThreshold` | `80` | Skip subdirectory re-injection when context usage is at or above this percent (100 = off). First-time discovery is always allowed. |
 
 ## Tips
 

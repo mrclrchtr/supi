@@ -1,10 +1,9 @@
-// supi-claude-md — subdirectory context injection and root context refresh for pi.
+// supi-claude-md — subdirectory context injection for pi.
 //
-// Two capabilities:
-// 1. Subdirectory discovery: inject CLAUDE.md/AGENTS.md from subdirectories
-//    below cwd when the agent accesses files there (via tool_result augmentation).
-// 2. Root refresh: periodically re-inject root/ancestor context files that
-//    pi loaded natively (via before_agent_start persistent messages).
+// Subdirectory discovery: inject CLAUDE.md/AGENTS.md from subdirectories
+// below cwd when the agent accesses files there (via tool_result augmentation).
+// Root/ancestor context files are owned by pi's native system prompt and are
+// never re-injected by this extension.
 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,7 +24,6 @@ import {
   findSubdirContextFiles,
 } from "./discovery.ts";
 import type { ContextUsage } from "./refresh.ts";
-import { formatRefreshContext, readNativeContextFiles, shouldRefreshRoot } from "./refresh.ts";
 import { registerClaudeMdSettings } from "./settings-registration.ts";
 import { type ClaudeMdState, createInitialState, reconstructState } from "./state.ts";
 import type { InjectionCheckOptions } from "./subdirectory.ts";
@@ -73,48 +71,17 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     state.injectedDirs.clear();
   });
 
-  // ── Root refresh (before_agent_start) ──────────────────────
+  // ── Native context path capture (before_agent_start) ───────
 
   pi.on("before_agent_start", async (event: BeforeAgentStartEvent, _ctx: ExtensionContext) => {
-    const config = loadClaudeMdConfig(_ctx.cwd);
     const eventWithOpts = event as BeforeAgentStartEvent & {
       systemPromptOptions?: { contextFiles?: Array<{ path?: string; content?: string }> };
     };
 
     captureNativePaths(state, eventWithOpts);
-    const contextUsage = _ctx.getContextUsage() as ContextUsage | undefined;
-    if (!shouldRefreshRoot(state, config, contextUsage)) {
-      state.currentContextToken = null;
-      return;
-    }
-
-    const nativeFiles = readNativeContextFiles(
-      eventWithOpts.systemPromptOptions?.contextFiles ?? [],
-      _ctx.cwd,
-    );
-    const content = nativeFiles.length > 0 ? formatRefreshContext(nativeFiles) : null;
-    if (!content) {
-      state.currentContextToken = null;
-      return;
-    }
-
-    state.currentContextToken = `supi-claude-md-${++state.contextCounter}`;
-    state.lastRefreshTurn = state.completedTurns;
-
-    return {
-      message: {
-        customType: "supi-claude-md-refresh",
-        content: formatRefreshDisplayContent(nativeFiles.length),
-        display: true,
-        details: {
-          contextToken: state.currentContextToken,
-          promptContent: content,
-          turn: state.completedTurns,
-          fileCount: nativeFiles.length,
-          files: nativeFiles.map((file) => file.path),
-        },
-      },
-    };
+    // Root/ancestor context files are owned by pi's system prompt.
+    // SuPi never re-injects them; subdirectory injection handles directories below cwd.
+    state.currentContextToken = null;
   });
 
   // ── Context pruning ────────────────────────────────────────
@@ -188,7 +155,9 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     skillPaths: [join(baseDir, "resources")],
   }));
 
-  // ── Message renderer ────────────────────────────────────────
+  // ── Message renderer (historical compatibility) ────────────
+  // Old sessions may contain supi-claude-md-refresh messages; keep a renderer
+  // so the TUI can display them, but new sessions never emit this type.
 
   pi.registerMessageRenderer("supi-claude-md-refresh", (message, { expanded }, theme) => {
     const details = message.details as
@@ -228,10 +197,6 @@ function captureNativePaths(
       state.nativeContextPaths.add(file.path);
     }
   }
-}
-
-function formatRefreshDisplayContent(fileCount: number): string {
-  return `CLAUDE.md refreshed (${fileCount} file${fileCount === 1 ? "" : "s"})`;
 }
 
 function collectStaleDirs(

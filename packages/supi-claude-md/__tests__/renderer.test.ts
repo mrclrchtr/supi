@@ -116,7 +116,7 @@ function renderClaudeMdMessage(details: unknown, options: RenderOutputOptions = 
   return (result as { render: (w: number) => string[] }).render(options.width ?? 80).join("\n");
 }
 
-describe("supi-claude-md-refresh message renderer", () => {
+describe("supi-claude-md-refresh message renderer (historical compatibility)", () => {
   it("renders collapsed view with file count", () => {
     const output = renderClaudeMdMessage({
       contextToken: "supi-claude-md-3",

@@ -1,9 +1,9 @@
-// Root context refresh logic.
+// Root context refresh helpers (historical compatibility).
 //
-// Handles periodic re-injection of root/ancestor context files
-// that pi loaded natively at startup.
+// These functions are no longer used for active root refresh because
+// pi's system prompt already contains native context files on every turn.
+// SuPi never re-injects systemPromptOptions.contextFiles contents.
 
-import * as path from "node:path";
 import { wrapExtensionContext } from "@mrclrchtr/supi-core";
 import type { ClaudeMdConfig } from "./config.ts";
 import type { ClaudeMdState } from "./state.ts";
@@ -19,29 +19,14 @@ export interface ContextUsage {
 
 /**
  * Check if root context should be refreshed.
- * Returns false when context usage is at or above the configured threshold.
+ * @deprecated Root/native context refresh is retired. Always returns false.
  */
 export function shouldRefreshRoot(
-  state: ClaudeMdState,
-  config: ClaudeMdConfig,
-  contextUsage?: ContextUsage,
+  _state: ClaudeMdState,
+  _config: ClaudeMdConfig,
+  _contextUsage?: ContextUsage,
 ): boolean {
-  // Disabled
-  if (config.rereadInterval === 0) return false;
-
-  // Context pressure gate: skip refresh when context is nearly full
-  if (
-    config.contextThreshold < 100 &&
-    contextUsage &&
-    contextUsage.percent != null &&
-    contextUsage.percent >= config.contextThreshold
-  ) {
-    return false;
-  }
-
-  // Check turn interval
-  const turnDelta = state.completedTurns - state.lastRefreshTurn;
-  return turnDelta >= config.rereadInterval;
+  return false;
 }
 
 interface NativeContextFile {
@@ -71,20 +56,11 @@ export function formatRefreshContext(contextFiles: NativeContextFile[]): string 
 
 /**
  * Read native context files from pi's system prompt options.
- * Filters out files resolved outside the project tree (cwd).
+ * @deprecated Root/native context refresh is retired. Always returns empty array.
  */
 export function readNativeContextFiles(
-  contextFiles: Array<{ path?: string; content?: string }>,
-  cwd: string,
+  _contextFiles: Array<{ path?: string; content?: string }>,
+  _cwd: string,
 ): NativeContextFile[] {
-  const absCwd = path.resolve(cwd);
-  const result: NativeContextFile[] = [];
-  for (const file of contextFiles) {
-    if (!file.path || !file.content) continue;
-    const absPath = path.resolve(file.path);
-    const rel = path.relative(absCwd, absPath);
-    if (rel.startsWith("..") || path.isAbsolute(rel)) continue;
-    result.push({ path: file.path, content: file.content });
-  }
-  return result;
+  return [];
 }

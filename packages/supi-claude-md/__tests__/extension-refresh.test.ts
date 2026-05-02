@@ -7,6 +7,11 @@ const mockFns = vi.hoisted(() => ({
   formatRefreshContext: vi.fn(),
   readNativeContextFiles: vi.fn(),
   pruneAndReorderContextMessages: vi.fn(),
+  extractPathFromToolEvent: vi.fn(),
+  findSubdirContextFiles: vi.fn(),
+  filterAlreadyLoaded: vi.fn(),
+  formatSubdirContext: vi.fn(),
+  shouldInjectSubdir: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-core", () => ({
@@ -59,14 +64,14 @@ vi.mock("../config.ts", () => ({
 }));
 
 vi.mock("../discovery.ts", () => ({
-  extractPathFromToolEvent: vi.fn(),
-  filterAlreadyLoaded: vi.fn(),
-  findSubdirContextFiles: vi.fn(),
+  extractPathFromToolEvent: mockFns.extractPathFromToolEvent,
+  filterAlreadyLoaded: mockFns.filterAlreadyLoaded,
+  findSubdirContextFiles: mockFns.findSubdirContextFiles,
 }));
 
 vi.mock("../subdirectory.ts", () => ({
-  formatSubdirContext: vi.fn(),
-  shouldInjectSubdir: vi.fn(),
+  formatSubdirContext: mockFns.formatSubdirContext,
+  shouldInjectSubdir: mockFns.shouldInjectSubdir,
 }));
 
 vi.mock("../refresh.ts", () => ({
@@ -95,99 +100,17 @@ function resetMocks() {
   mockFns.loadClaudeMdConfig.mockReturnValue({ ...DEFAULT_CONFIG, fileNames: ["CLAUDE.md"] });
   mockFns.shouldRefreshRoot.mockReturnValue(false);
   mockFns.pruneAndReorderContextMessages.mockImplementation((msgs: unknown) => msgs);
+  mockFns.extractPathFromToolEvent.mockReturnValue(null);
+  mockFns.findSubdirContextFiles.mockReturnValue([]);
+  mockFns.filterAlreadyLoaded.mockImplementation((files: unknown[]) => files);
 }
 
-describe("claudeMdExtension: before_agent_start (root refresh)", () => {
+describe("claudeMdExtension: before_agent_start (no root refresh)", () => {
   beforeEach(resetMocks);
 
-  it("injects root refresh message when refresh is due", async () => {
+  it("does not emit a refresh message at turn 0", async () => {
     const { handlers, pi } = createPiMock();
     claudeMdExtension(pi as never);
-
-    mockFns.shouldRefreshRoot.mockReturnValue(true);
-    mockFns.readNativeContextFiles.mockReturnValue([{ path: "CLAUDE.md", content: "# Root" }]);
-    mockFns.formatRefreshContext.mockReturnValue(
-      '<extension-context source="supi-claude-md" file="CLAUDE.md">\n# Root\n</extension-context>',
-    );
-
-    const result = await handlers.get("before_agent_start")?.(
-      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
-      makeCtx(),
-    );
-
-    expect(result).toEqual({
-      message: {
-        customType: "supi-claude-md-refresh",
-        content: "CLAUDE.md refreshed (1 file)",
-        display: true,
-        details: {
-          contextToken: expect.stringMatching(/^supi-claude-md-\d+$/),
-          promptContent:
-            '<extension-context source="supi-claude-md" file="CLAUDE.md">\n# Root\n</extension-context>',
-          turn: 0,
-          fileCount: 1,
-          files: ["CLAUDE.md"],
-        },
-      },
-    });
-  });
-
-  it("returns undefined when no refresh is needed", async () => {
-    const { handlers, pi } = createPiMock();
-    claudeMdExtension(pi as never);
-
-    const result = await handlers.get("before_agent_start")?.(
-      { systemPromptOptions: { contextFiles: [] } },
-      makeCtx(),
-    );
-
-    expect(result).toBeUndefined();
-  });
-
-  it("passes context usage to root refresh decision", async () => {
-    const { handlers, pi } = createPiMock();
-    claudeMdExtension(pi as never);
-
-    const usage = { tokens: 100_000, contextWindow: 128_000, percent: 85 };
-
-    await handlers.get("before_agent_start")?.(
-      { systemPromptOptions: { contextFiles: [] } },
-      makeCtx("/project", usage),
-    );
-
-    expect(mockFns.shouldRefreshRoot).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.objectContaining({ contextThreshold: 80 }),
-      usage,
-    );
-  });
-
-  it("returns undefined when native files are empty", async () => {
-    const { handlers, pi } = createPiMock();
-    claudeMdExtension(pi as never);
-
-    mockFns.shouldRefreshRoot.mockReturnValue(true);
-    mockFns.readNativeContextFiles.mockReturnValue([]);
-    mockFns.formatRefreshContext.mockReturnValue("");
-
-    const result = await handlers.get("before_agent_start")?.(
-      { systemPromptOptions: { contextFiles: [] } },
-      makeCtx(),
-    );
-
-    expect(result).toBeUndefined();
-  });
-});
-
-describe("claudeMdExtension: before_agent_start (no duplication at session start)", () => {
-  beforeEach(resetMocks);
-
-  it("does not emit refresh on turn 0 with fresh state", async () => {
-    const { handlers, pi } = createPiMock();
-    claudeMdExtension(pi as never);
-
-    // shouldRefreshRoot returns false → no refresh message on first before_agent_start
-    mockFns.shouldRefreshRoot.mockReturnValue(false);
 
     const result = await handlers.get("before_agent_start")?.(
       { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
@@ -196,6 +119,113 @@ describe("claudeMdExtension: before_agent_start (no duplication at session start
 
     expect(result).toBeUndefined();
     expect(mockFns.readNativeContextFiles).not.toHaveBeenCalled();
+    expect(mockFns.formatRefreshContext).not.toHaveBeenCalled();
+  });
+
+  it("does not emit a refresh message at rereadInterval", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    // Simulate turns so interval would be met
+    const turnEnd = handlers.get("turn_end") as (...args: unknown[]) => unknown;
+    await turnEnd({ message: { stopReason: "stop" } }, makeCtx());
+    await turnEnd({ message: { stopReason: "stop" } }, makeCtx());
+    await turnEnd({ message: { stopReason: "stop" } }, makeCtx());
+
+    const result = await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
+      makeCtx(),
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it("does not emit a refresh message when context usage is high", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    const usage = { tokens: 100_000, contextWindow: 128_000, percent: 85 };
+
+    const result = await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
+      makeCtx("/project", usage),
+    );
+
+    expect(result).toBeUndefined();
+    expect(mockFns.shouldRefreshRoot).not.toHaveBeenCalled();
+  });
+
+  it("does not emit a refresh message when context usage is low", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    const usage = { tokens: 10_000, contextWindow: 128_000, percent: 10 };
+
+    const result = await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
+      makeCtx("/project", usage),
+    );
+
+    expect(result).toBeUndefined();
+    expect(mockFns.shouldRefreshRoot).not.toHaveBeenCalled();
+  });
+
+  it("does not emit a refresh message after compaction", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    await handlers.get("session_compact")?.({}, makeCtx());
+
+    const result = await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
+      makeCtx(),
+    );
+
+    expect(result).toBeUndefined();
+  });
+
+  it("still captures native context paths on first before_agent_start", async () => {
+    const { handlers, pi } = createPiMock();
+    claudeMdExtension(pi as never);
+
+    mockFns.extractPathFromToolEvent.mockReturnValue("src/foo.ts");
+    mockFns.findSubdirContextFiles.mockReturnValue([
+      { absolutePath: "/project/CLAUDE.md", relativePath: "CLAUDE.md", dir: "/project" },
+    ]);
+    mockFns.filterAlreadyLoaded.mockImplementation(
+      (files: Array<{ absolutePath: string }>, nativePaths: Set<string>) =>
+        files.filter((f) => !nativePaths.has(f.absolutePath)),
+    );
+
+    // First before_agent_start captures native paths
+    await handlers.get("before_agent_start")?.(
+      {
+        systemPromptOptions: {
+          contextFiles: [
+            { path: "/project/CLAUDE.md", content: "# Root" },
+            { path: "/project/AGENTS.md", content: "agents" },
+          ],
+        },
+      },
+      makeCtx(),
+    );
+
+    // Second before_agent_start should not re-capture
+    await handlers.get("before_agent_start")?.(
+      { systemPromptOptions: { contextFiles: [{ path: "/project/NEW.md", content: "new" }] } },
+      makeCtx(),
+    );
+
+    // tool_result should use the originally captured paths for deduplication
+    mockFns.formatSubdirContext.mockReturnValue("context");
+    mockFns.shouldInjectSubdir.mockReturnValue(true);
+
+    await handlers.get("tool_result")?.(
+      { isError: false, toolName: "read", input: { path: "src/foo.ts" }, content: [] },
+      makeCtx(),
+    );
+
+    expect(mockFns.formatSubdirContext).not.toHaveBeenCalled();
   });
 });
 
@@ -233,34 +263,5 @@ describe("claudeMdExtension: context event", () => {
     const result = handlers.get("context")?.({ messages });
 
     expect(result).toBeUndefined();
-  });
-
-  it("restores raw prompt content only for model context", async () => {
-    const { handlers, pi } = createPiMock();
-    claudeMdExtension(pi as never);
-
-    mockFns.shouldRefreshRoot.mockReturnValue(true);
-    mockFns.readNativeContextFiles.mockReturnValue([{ path: "CLAUDE.md", content: "# Root" }]);
-    mockFns.formatRefreshContext.mockReturnValue("<extension-context>raw</extension-context>");
-    mockFns.pruneAndReorderContextMessages.mockImplementation((msgs: unknown) => msgs);
-
-    const refresh = (await handlers.get("before_agent_start")?.(
-      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "# Root" }] } },
-      makeCtx(),
-    )) as { message: Record<string, unknown> } | undefined;
-    const message = refresh?.message;
-
-    const result = handlers.get("context")?.({
-      messages: [{ role: "custom", ...message }],
-    });
-
-    expect(result).toEqual({
-      messages: [
-        expect.objectContaining({
-          content: "<extension-context>raw</extension-context>",
-        }),
-      ],
-    });
-    expect(message?.content).toBe("CLAUDE.md refreshed (1 file)");
   });
 });

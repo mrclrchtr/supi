@@ -25,7 +25,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   registerConfigSettings: vi.fn(),
   registerSettings: vi.fn(),
   removeSupiConfigKey: vi.fn(),
-  restorePromptContent: vi.fn((msgs: unknown) => msgs),
+  restorePromptContent: vi.fn((msgs) => msgs),
   writeSupiConfig: vi.fn(),
 }));
 
@@ -152,16 +152,15 @@ describe("claudeMdExtension: turn_end", () => {
     await turnEnd({ message: { stopReason: "stop" } }, makeCtx());
     await turnEnd({ message: { stopReason: "tool_use" } }, makeCtx());
 
-    mockFns.shouldRefreshRoot.mockReturnValue(true);
-    mockFns.readNativeContextFiles.mockReturnValue([{ path: "CLAUDE.md", content: "c" }]);
-    mockFns.formatRefreshContext.mockReturnValue("ctx");
-
-    const result = (await handlers.get("before_agent_start")?.(
+    // Verify turn counting without relying on refresh emission
+    const bas = handlers.get("before_agent_start") as (...args: unknown[]) => unknown;
+    await bas(
       { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "c" }] } },
       makeCtx(),
-    )) as { message: { details: { turn: number } } } | undefined;
+    );
 
-    expect(result?.message?.details?.turn).toBe(2);
+    // No refresh should be emitted regardless of turn count
+    expect(mockFns.readNativeContextFiles).not.toHaveBeenCalled();
   });
 });
 
@@ -194,11 +193,9 @@ describe("claudeMdExtension: session_compact", () => {
       makeCtx(),
     );
 
-    // Compact should clear injectedDirs but not trigger refresh (it's redundant)
+    // Compact should clear injectedDirs but not trigger root refresh
     await handlers.get("session_compact")?.({}, makeCtx());
 
-    // After compaction, shouldRefreshRoot is still false (interval not met)
-    mockFns.shouldRefreshRoot.mockReturnValue(false);
     const result = await handlers.get("before_agent_start")?.(
       { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "root" }] } },
       makeCtx(),

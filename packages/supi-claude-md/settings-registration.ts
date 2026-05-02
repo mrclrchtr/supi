@@ -91,8 +91,8 @@ function buildClaudeMdSettingItems(settings: ClaudeMdConfig): SettingItem[] {
     },
     {
       id: "rereadInterval",
-      label: "Context Refresh Interval",
-      description: "Turns between re-reading context files (0 = off)",
+      label: "Subdirectory Re-read Interval",
+      description: "Turns between re-reading previously injected subdirectory context (0 = off)",
       currentValue: String(settings.rereadInterval),
       submenu: (currentValue, done) =>
         createInputSubmenu(currentValue, "Interval (0 = off):", done),
