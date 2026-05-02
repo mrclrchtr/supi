@@ -27,15 +27,7 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review this" },
     });
 
-    mockProc.stdout?.emit(
-      "data",
-      `${JSON.stringify({
-        type: "message_end",
-        role: "assistant",
-        content:
-          '{"findings":[],"overall_correctness":"ok","overall_explanation":"x","overall_confidence_score":0.5}',
-      })}\n`,
-    );
+    mockProc.stdout?.emit("data", `${assistantMessageEnd()}\n`);
     mockProc.emit("exit", 0);
 
     const result = await promise;
@@ -58,15 +50,7 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review this" },
     });
 
-    mockProc.stdout?.emit(
-      "data",
-      `${JSON.stringify({
-        type: "message_end",
-        role: "assistant",
-        content:
-          '{"findings":[],"overall_correctness":"ok","overall_explanation":"x","overall_confidence_score":0.5}',
-      })}\n`,
-    );
+    mockProc.stdout?.emit("data", `${assistantMessageEnd()}\n`);
     mockProc.emit("exit", 0);
 
     await promise;
@@ -85,15 +69,7 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review this" },
     });
 
-    mockProc.stdout?.emit(
-      "data",
-      `${JSON.stringify({
-        type: "message_end",
-        role: "assistant",
-        content:
-          '{"findings":[],"overall_correctness":"ok","overall_explanation":"x","overall_confidence_score":0.5}',
-      })}\n`,
-    );
+    mockProc.stdout?.emit("data", `${assistantMessageEnd()}\n`);
     mockProc.emit("exit", 0);
 
     await promise;
@@ -101,6 +77,22 @@ describe("runReviewer", () => {
     expect(args).toContain("--mode");
     expect(args).toContain("json");
     expect(args).toContain("--no-session");
+  });
+
+  it("returns canceled immediately when the signal is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await runReviewer({
+      prompt: "review",
+      model: undefined,
+      cwd: "/tmp",
+      signal: controller.signal,
+      target: { type: "custom", instructions: "review" },
+    });
+
+    expect(result.kind).toBe("canceled");
+    expect(spawn).not.toHaveBeenCalled();
   });
 
   it("handles spawn errors gracefully", async () => {
@@ -173,7 +165,6 @@ describe("runReviewer", () => {
     });
 
     controller.abort();
-    // Give microtask queue time to process abort listener
     await new Promise((r) => setTimeout(r, 10));
     mockProc.emit("exit", null, "SIGTERM");
 
@@ -203,6 +194,20 @@ describe("runReviewer", () => {
     );
   });
 });
+
+function assistantMessageEnd(content = defaultReviewJson()): string {
+  return JSON.stringify({
+    type: "message_end",
+    message: {
+      role: "assistant",
+      content,
+    },
+  });
+}
+
+function defaultReviewJson(): string {
+  return '{"findings":[],"overall_correctness":"ok","overall_explanation":"x","overall_confidence_score":0.5}';
+}
 
 function createMockProc() {
   const listeners: Record<string, Array<(arg?: unknown) => void>> = {};

@@ -8,6 +8,16 @@ import { loadReviewSettings, registerReviewSettings } from "./settings.ts";
 import type { ReviewDepth, ReviewResult, ReviewTarget } from "./types.ts";
 import { selectBranch, selectCommit, selectDepth, selectPreset } from "./ui.ts";
 
+type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
+
+interface ReviewExecutionOptions {
+  target: ReviewTarget;
+  depth: ReviewDepth;
+  maxDiffBytes: number;
+  ctx: CommandContext;
+  signal?: AbortSignal;
+}
+
 export default function reviewExtension(pi: ExtensionAPI) {
   registerReviewSettings();
   registerReviewRenderer(pi);
@@ -30,7 +40,7 @@ export default function reviewExtension(pi: ExtensionAPI) {
 async function handleNonInteractive(
   args: string,
   maxDiffBytes: number,
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
+  ctx: CommandContext,
   pi: ExtensionAPI,
 ): Promise<void> {
   const parsed = parseNonInteractiveArgs(args);
@@ -42,13 +52,18 @@ async function handleNonInteractive(
     });
     return;
   }
-  const result = await executeReview(parsed.target, parsed.depth, maxDiffBytes, ctx);
+  const result = await executeReview({
+    target: parsed.target,
+    depth: parsed.depth,
+    maxDiffBytes,
+    ctx,
+  });
   injectReviewMessage(pi, result);
 }
 
 async function handleInteractive(
   maxDiffBytes: number,
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
+  ctx: CommandContext,
   pi: ExtensionAPI,
 ): Promise<void> {
   const preset = await selectPreset(ctx);
@@ -66,7 +81,7 @@ async function handleInteractive(
 
 async function resolvePresetTarget(
   preset: import("./ui.ts").Preset,
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
+  ctx: CommandContext,
 ): Promise<ReviewTarget | undefined> {
   switch (preset) {
     case "base-branch": {
@@ -108,20 +123,19 @@ async function resolvePresetTarget(
   }
 }
 
-async function executeReview(
-  target: ReviewTarget,
-  depth: ReviewDepth,
-  maxDiffBytes: number,
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
-): Promise<ReviewResult> {
+async function executeReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
+  const { target, ctx, signal } = options;
   const resolved = await resolveGitTarget(target, ctx);
   if (resolved.kind !== "success") return resolved;
-  return runReview(resolved.target, depth, maxDiffBytes, ctx);
+  if (signal?.aborted) {
+    return { kind: "canceled", target: resolved.target };
+  }
+  return runReview({ ...options, target: resolved.target });
 }
 
 async function resolveGitTarget(
   target: ReviewTarget,
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
+  ctx: CommandContext,
 ): Promise<{ kind: "success"; target: ReviewTarget } | ReviewResult> {
   switch (target.type) {
     case "base-branch": {
@@ -154,32 +168,40 @@ async function runReviewWithLoader(
   target: ReviewTarget,
   depth: ReviewDepth,
   maxDiffBytes: number,
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
+  ctx: CommandContext,
 ): Promise<ReviewResult> {
   return ctx.ui.custom<ReviewResult>((tui, theme, _kb, done) => {
     const loader = new BorderedLoader(tui, theme, "Running code review…");
-    loader.onAbort = () => done({ kind: "canceled", target });
+    let finished = false;
 
-    executeReview(target, depth, maxDiffBytes, ctx)
-      .then(done)
-      .catch((err) =>
-        done({
+    const finish = (result: ReviewResult) => {
+      if (finished) return;
+      finished = true;
+      done(result);
+    };
+
+    loader.onAbort = () => finish({ kind: "canceled", target });
+
+    executeReview({ target, depth, maxDiffBytes, ctx, signal: loader.signal })
+      .then((result) => {
+        if (loader.signal.aborted) return;
+        finish(result);
+      })
+      .catch((err) => {
+        if (loader.signal.aborted) return;
+        finish({
           kind: "failed",
           reason: err instanceof Error ? err.message : String(err),
           target,
-        }),
-      );
+        });
+      });
 
     return loader;
   });
 }
 
-function runReview(
-  target: ReviewTarget,
-  depth: ReviewDepth,
-  maxDiffBytes: number,
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
-): Promise<ReviewResult> {
+function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
+  const { target, depth, maxDiffBytes, ctx, signal } = options;
   const settings = loadReviewSettings(ctx.cwd);
   const model = resolveModel(depth, settings, ctx);
 
@@ -199,13 +221,13 @@ function runReview(
       : undefined,
   );
 
-  return runReviewer({ prompt, model, cwd: ctx.cwd, target });
+  return runReviewer({ prompt, model, cwd: ctx.cwd, target, signal });
 }
 
 function resolveModel(
   depth: ReviewDepth,
   settings: ReturnType<typeof loadReviewSettings>,
-  ctx: Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1],
+  ctx: CommandContext,
 ): string | undefined {
   if (depth === "fast" && settings.reviewFastModel) return settings.reviewFastModel;
   if (depth === "deep" && settings.reviewDeepModel) return settings.reviewDeepModel;

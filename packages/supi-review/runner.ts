@@ -71,6 +71,10 @@ export interface ReviewerInvocation {
 
 export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult> {
   const { prompt, model, cwd, signal, target, options = {} } = inv;
+  if (signal?.aborted) {
+    return { kind: "canceled", target };
+  }
+
   const { command, args: baseArgs } = getPiInvocation();
 
   const args = [
@@ -116,6 +120,7 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
 
     const cleanup = (result: ReviewResult) => {
       if (timeoutId) clearTimeout(timeoutId);
+      signal?.removeEventListener("abort", onAbort);
       resolve(result);
     };
 
@@ -172,10 +177,17 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
   });
 }
 
+interface JsonlMessage {
+  role?: string;
+  content?: string | Array<{ type?: string; text?: string }>;
+}
+
 interface JsonlEvent {
   type?: string;
+  message?: JsonlMessage;
+  // Backward-compatible fallback for tests or alternate emitters.
   role?: string;
-  content?: string | Array<{ type: string; text: string }>;
+  content?: JsonlMessage["content"];
 }
 
 function extractFinalAssistantContent(stdout: string): string | undefined {
@@ -187,14 +199,13 @@ function extractFinalAssistantContent(stdout: string): string | undefined {
     if (!trimmed) continue;
     try {
       const event = JSON.parse(trimmed) as JsonlEvent;
-      if (event.type === "message_end" && event.role === "assistant") {
-        if (typeof event.content === "string") {
-          lastContent = event.content;
-        } else if (Array.isArray(event.content)) {
-          lastContent = event.content
-            .map((p) => (typeof p === "object" && p !== null ? (p.text ?? "") : ""))
-            .join("");
-        }
+      const message =
+        event.message && typeof event.message === "object"
+          ? event.message
+          : { role: event.role, content: event.content };
+
+      if (event.type === "message_end" && message.role === "assistant") {
+        lastContent = flattenMessageContent(message.content);
       }
     } catch {
       // ignore invalid JSONL lines
@@ -202,4 +213,12 @@ function extractFinalAssistantContent(stdout: string): string | undefined {
   }
 
   return lastContent;
+}
+
+function flattenMessageContent(content: JsonlMessage["content"]): string | undefined {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return undefined;
+  return content
+    .map((part) => (typeof part === "object" && part !== null ? (part.text ?? "") : ""))
+    .join("");
 }

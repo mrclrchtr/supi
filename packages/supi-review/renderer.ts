@@ -34,9 +34,12 @@ function renderSuccess(
   container.addChild(new Text(theme.fg("accent", "◆ Code Review Results"), 1, 0));
   container.addChild(new Spacer(1));
 
-  const verdictColor = output.overall_correctness.toLowerCase().includes("correct")
-    ? "success"
-    : "warning";
+  const normalizedVerdict = output.overall_correctness.toLowerCase();
+  const verdictColor = normalizedVerdict.includes("incorrect")
+    ? "warning"
+    : normalizedVerdict.includes("correct")
+      ? "success"
+      : "warning";
   container.addChild(
     new Text(
       `${theme.fg(verdictColor, "●")} ${theme.fg(verdictColor, output.overall_correctness)}` +
