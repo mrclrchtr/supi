@@ -1,6 +1,16 @@
 {
   "version": 1,
   "skills": {
+    "brave-search": {
+      "source": "badlogic/pi-skills",
+      "sourceType": "github",
+      "computedHash": "f65c8b9679272d3de03b0850ebed158d65d81642c9e208eec663764dc6575525"
+    },
+    "bx": {
+      "source": "brave/brave-search-skills",
+      "sourceType": "github",
+      "computedHash": "b846bd21e3476a10f262d40a765e65149e339e85b37d7dfa8f128317e7cbf090"
+    },
     "claude-md-improver": {
       "source": "anthropics/claude-plugins-official",
       "sourceType": "github",
