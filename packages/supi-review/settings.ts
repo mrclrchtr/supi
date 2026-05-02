@@ -10,6 +10,7 @@ export const REVIEW_DEFAULTS: ReviewSettings = {
   reviewFastModel: "",
   reviewDeepModel: "",
   maxDiffBytes: 100_000,
+  reviewTimeoutMinutes: 15,
 };
 
 const INHERIT_MODEL_VALUE = "(inherit)";
@@ -51,6 +52,9 @@ export function registerReviewSettings(): void {
         case "maxDiffBytes":
           persistMaxDiffBytes(value, helpers);
           break;
+        case "reviewTimeoutMinutes":
+          persistReviewTimeoutMinutes(value, helpers);
+          break;
       }
     },
   });
@@ -74,6 +78,15 @@ function persistMaxDiffBytes(value: string, helpers: ConfigSettingsHelpers): voi
     helpers.set("maxDiffBytes", num);
   } else {
     helpers.unset("maxDiffBytes");
+  }
+}
+
+function persistReviewTimeoutMinutes(value: string, helpers: ConfigSettingsHelpers): void {
+  const num = Number.parseInt(value, 10);
+  if (Number.isFinite(num) && num > 0) {
+    helpers.set("reviewTimeoutMinutes", num);
+  } else {
+    helpers.unset("reviewTimeoutMinutes");
   }
 }
 
@@ -102,6 +115,14 @@ function buildReviewSettingItems(settings: ReviewSettings): SettingItem[] {
       currentValue: String(settings.maxDiffBytes),
       submenu: (currentValue, done) =>
         createInputSubmenu(currentValue, "Max diff bytes before truncation:", done),
+    },
+    {
+      id: "reviewTimeoutMinutes",
+      label: "Review Timeout",
+      description: "Maximum review runtime in minutes (default 15)",
+      currentValue: String(settings.reviewTimeoutMinutes),
+      submenu: (currentValue, done) =>
+        createInputSubmenu(currentValue, "Review timeout in minutes:", done),
     },
   ];
 }

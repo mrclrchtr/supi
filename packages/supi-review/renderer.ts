@@ -17,7 +17,7 @@ export function registerReviewRenderer(pi: ExtensionAPI): void {
       case "canceled":
         return renderSimpleBanner("Review canceled", theme, "warning");
       case "timeout":
-        return renderSimpleBanner("Review timed out", theme, "warning");
+        return renderTimeout(result, theme);
       default:
         return new Text(theme.fg("dim", "Unknown review state"), 1, 0);
     }
@@ -114,18 +114,55 @@ function renderFailed(
   container.addChild(new Text(theme.fg("error", "◆ Review Failed"), 1, 0));
   container.addChild(new Spacer(1));
   container.addChild(new Text(theme.fg("error", result.reason), 1, 0));
-  if (result.stdout || result.stderr) {
-    container.addChild(new Spacer(1));
-    if (result.stdout) {
-      container.addChild(new Text(theme.fg("dim", "stdout excerpt:"), 1, 0));
-      container.addChild(new Text(theme.fg("dim", result.stdout.slice(0, 500)), 1, 0));
-    }
-    if (result.stderr) {
-      container.addChild(new Text(theme.fg("dim", "stderr excerpt:"), 1, 0));
-      container.addChild(new Text(theme.fg("dim", result.stderr.slice(0, 500)), 1, 0));
-    }
-  }
+  appendDiagnostics(container, result, theme);
   return container;
+}
+
+function renderTimeout(
+  result: Extract<ReviewResult, { kind: "timeout" }>,
+  theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
+): Container {
+  const container = new Container();
+  container.addChild(new Text(theme.fg("warning", "◆ Review Timed Out"), 1, 0));
+  container.addChild(new Spacer(1));
+  container.addChild(
+    new Text(
+      theme.fg("warning", `Reviewer exceeded the ${(result.timeoutMs / 1000).toFixed(0)}s timeout`),
+      1,
+      0,
+    ),
+  );
+  appendDiagnostics(container, result, theme);
+  return container;
+}
+
+function appendDiagnostics(
+  container: Container,
+  result: Pick<ReviewResult, "sessionPath" | "sessionId"> & { stdout?: string; stderr?: string },
+  theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
+): void {
+  if (!result.sessionPath && !result.sessionId && !result.stdout && !result.stderr) {
+    return;
+  }
+
+  container.addChild(new Spacer(1));
+
+  if (result.sessionPath) {
+    container.addChild(new Text(theme.fg("dim", `session: ${result.sessionPath}`), 1, 0));
+  } else if (result.sessionId) {
+    container.addChild(new Text(theme.fg("dim", `session id: ${result.sessionId}`), 1, 0));
+  }
+
+  if (result.stdout) {
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("dim", "stdout excerpt:"), 1, 0));
+    container.addChild(new Text(theme.fg("dim", result.stdout.slice(0, 500)), 1, 0));
+  }
+  if (result.stderr) {
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("dim", "stderr excerpt:"), 1, 0));
+    container.addChild(new Text(theme.fg("dim", result.stderr.slice(0, 500)), 1, 0));
+  }
 }
 
 function renderSimpleBanner(

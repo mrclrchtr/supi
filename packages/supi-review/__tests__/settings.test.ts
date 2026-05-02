@@ -35,6 +35,7 @@ describe("review settings registration", () => {
     const fast = items.find((item) => item.id === "reviewFastModel");
     const deep = items.find((item) => item.id === "reviewDeepModel");
     const maxDiff = items.find((item) => item.id === "maxDiffBytes");
+    const timeout = items.find((item) => item.id === "reviewTimeoutMinutes");
 
     expect(fast?.currentValue).toBe("(inherit)");
     expect(fast?.values).toEqual([
@@ -48,6 +49,8 @@ describe("review settings registration", () => {
       "openai/gpt-4o-mini",
     ]);
     expect(maxDiff?.submenu).toBeTypeOf("function");
+    expect(timeout?.currentValue).toBe("15");
+    expect(timeout?.submenu).toBeTypeOf("function");
   });
 
   it("treats the inherit sentinel as an unset persisted value", () => {
@@ -66,7 +69,22 @@ describe("review settings registration", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("opens a submenu to edit maxDiffBytes", () => {
+  it("persists reviewTimeoutMinutes as a scoped numeric setting", () => {
+    const tmpDir = makeTempDir();
+
+    registerReviewSettings();
+    const section = getRegisteredSettings().find((item) => item.id === "review");
+    if (!section) throw new Error("review settings section was not registered");
+
+    section.persistChange("project", tmpDir, "reviewTimeoutMinutes", "25");
+
+    const config = loadSupiConfig("review", tmpDir, REVIEW_DEFAULTS);
+    expect(config.reviewTimeoutMinutes).toBe(25);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("opens submenus to edit numeric review settings", () => {
     registerReviewSettings();
     const section = getRegisteredSettings().find((item) => item.id === "review");
     if (!section) throw new Error("review settings section was not registered");
@@ -80,5 +98,17 @@ describe("review settings registration", () => {
     expect(submenu.render(80).join("\n")).toContain("Max diff bytes before truncation:");
     submenu.handleInput?.("\r");
     expect(done).toHaveBeenCalledWith("100000");
+
+    const timeoutItem = section
+      .loadValues("project", "/tmp")
+      .find((entry) => entry.id === "reviewTimeoutMinutes");
+    if (!timeoutItem?.submenu) throw new Error("reviewTimeoutMinutes submenu was not registered");
+
+    const timeoutDone = vi.fn();
+    const timeoutSubmenu = timeoutItem.submenu("15", timeoutDone);
+
+    expect(timeoutSubmenu.render(80).join("\n")).toContain("Review timeout in minutes:");
+    timeoutSubmenu.handleInput?.("\r");
+    expect(timeoutDone).toHaveBeenCalledWith("15");
   });
 });

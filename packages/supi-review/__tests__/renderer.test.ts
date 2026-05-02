@@ -60,4 +60,20 @@ describe("supi-review renderer", () => {
     expect(output).toContain("[warning]patch is incorrect[/warning]");
     expect(output).not.toContain("[success]patch is incorrect[/success]");
   });
+
+  it("shows timeout diagnostics including the saved session path", () => {
+    const output = renderReview({
+      kind: "timeout",
+      target: { type: "custom", instructions: "Focus on correctness" },
+      timeoutMs: 900_000,
+      sessionPath: "/pi-agent/sessions/--tmp--/2026-04-27T17-00-00-000Z_review-session-id.jsonl",
+      stderr: "still running",
+    });
+
+    expect(output).toContain("[warning]◆ Review Timed Out[/warning]");
+    expect(output).toContain(
+      "session: /pi-agent/sessions/--tmp--/2026-04-27T17-00-00-000Z_review-session-id.jsonl",
+    );
+    expect(output).toContain("stderr excerpt:");
+  });
 });

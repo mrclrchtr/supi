@@ -37,10 +37,41 @@ export interface ReviewSettings {
   reviewFastModel: string;
   reviewDeepModel: string;
   maxDiffBytes: number;
+  reviewTimeoutMinutes: number;
+}
+
+/** Session/debug metadata captured from the reviewer subprocess. */
+export interface ReviewRunDiagnostics {
+  sessionId?: string;
+  sessionPath?: string;
+  stdout?: string;
+  stderr?: string;
 }
 
 export type ReviewResult =
-  | { kind: "success"; output: ReviewOutputEvent; target: ReviewTarget }
-  | { kind: "failed"; reason: string; stdout?: string; stderr?: string; target: ReviewTarget }
-  | { kind: "canceled"; target: ReviewTarget }
-  | { kind: "timeout"; target: ReviewTarget };
+  | {
+      kind: "success";
+      output: ReviewOutputEvent;
+      target: ReviewTarget;
+      sessionId?: string;
+      sessionPath?: string;
+    }
+  | {
+      kind: "failed";
+      reason: string;
+      stdout?: string;
+      stderr?: string;
+      target: ReviewTarget;
+      sessionId?: string;
+      sessionPath?: string;
+    }
+  | { kind: "canceled"; target: ReviewTarget; sessionId?: string; sessionPath?: string }
+  | {
+      kind: "timeout";
+      target: ReviewTarget;
+      timeoutMs: number;
+      stdout?: string;
+      stderr?: string;
+      sessionId?: string;
+      sessionPath?: string;
+    };

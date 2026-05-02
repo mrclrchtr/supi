@@ -7,13 +7,21 @@ vi.mock("node:child_process", () => ({
 }));
 
 describe("runReviewer", () => {
+  const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
+
   beforeEach(() => {
     vi.useFakeTimers();
+    process.env.PI_CODING_AGENT_DIR = "/pi-agent";
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
+    if (originalAgentDir === undefined) {
+      delete process.env.PI_CODING_AGENT_DIR;
+    } else {
+      process.env.PI_CODING_AGENT_DIR = originalAgentDir;
+    }
   });
 
   it("constructs read-only tool allowlist", async () => {
@@ -27,7 +35,7 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review this" },
     });
 
-    mockProc.stdout?.emit("data", `${assistantMessageEnd()}\n`);
+    mockProc.stdout?.emit("data", `${sessionHeader()}\n${assistantMessageEnd()}\n`);
     mockProc.emit("exit", 0);
 
     const result = await promise;
@@ -50,7 +58,7 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review this" },
     });
 
-    mockProc.stdout?.emit("data", `${assistantMessageEnd()}\n`);
+    mockProc.stdout?.emit("data", `${sessionHeader()}\n${assistantMessageEnd()}\n`);
     mockProc.emit("exit", 0);
 
     await promise;
@@ -58,7 +66,7 @@ describe("runReviewer", () => {
     expect(args).not.toContain("--model");
   });
 
-  it("includes --mode json and --no-session", async () => {
+  it("includes --mode json and keeps reviewer sessions", async () => {
     const mockProc = createMockProc();
     vi.mocked(spawn).mockReturnValue(mockProc as never);
 
@@ -69,14 +77,14 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review this" },
     });
 
-    mockProc.stdout?.emit("data", `${assistantMessageEnd()}\n`);
+    mockProc.stdout?.emit("data", `${sessionHeader()}\n${assistantMessageEnd()}\n`);
     mockProc.emit("exit", 0);
 
     await promise;
     const args = vi.mocked(spawn).mock.calls[0]?.[1] as string[];
     expect(args).toContain("--mode");
     expect(args).toContain("json");
-    expect(args).toContain("--no-session");
+    expect(args).not.toContain("--no-session");
   });
 
   it("returns canceled immediately when the signal is already aborted", async () => {
@@ -124,15 +132,19 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review" },
     });
 
+    mockProc.stdout?.emit("data", `${sessionHeader()}\n`);
     mockProc.stderr?.emit("data", "some error");
     mockProc.emit("exit", 1);
 
     const result = await promise;
     expect(result.kind).toBe("failed");
     expect((result as Extract<typeof result, { kind: "failed" }>).stderr).toBe("some error");
+    expect((result as Extract<typeof result, { kind: "failed" }>).sessionPath).toBe(
+      "/pi-agent/sessions/--tmp--/2026-04-27T17-00-00-000Z_review-session-id.jsonl",
+    );
   });
 
-  it("handles timeout", async () => {
+  it("handles timeout and reports session diagnostics", async () => {
     const mockProc = createMockProc();
     vi.mocked(spawn).mockReturnValue(mockProc as never);
 
@@ -144,10 +156,19 @@ describe("runReviewer", () => {
       options: { timeout: 1000 },
     });
 
+    mockProc.stdout?.emit("data", `${sessionHeader()}\n`);
+    mockProc.stderr?.emit("data", "still running");
     vi.advanceTimersByTime(2000);
 
     const result = await promise;
     expect(result.kind).toBe("timeout");
+    const timeout = result as Extract<typeof result, { kind: "timeout" }>;
+    expect(timeout.timeoutMs).toBe(1000);
+    expect(timeout.stderr).toBe("still running");
+    expect(timeout.sessionId).toBe("review-session-id");
+    expect(timeout.sessionPath).toBe(
+      "/pi-agent/sessions/--tmp--/2026-04-27T17-00-00-000Z_review-session-id.jsonl",
+    );
   });
 
   it("handles abort signal", async () => {
@@ -164,12 +185,16 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review" },
     });
 
+    mockProc.stdout?.emit("data", `${sessionHeader()}\n`);
     controller.abort();
     await new Promise((r) => setTimeout(r, 10));
     mockProc.emit("exit", null, "SIGTERM");
 
     const result = await promise;
     expect(result.kind).toBe("canceled");
+    expect((result as Extract<typeof result, { kind: "canceled" }>).sessionId).toBe(
+      "review-session-id",
+    );
     vi.useFakeTimers();
   });
 
@@ -184,7 +209,7 @@ describe("runReviewer", () => {
       target: { type: "custom", instructions: "review" },
     });
 
-    mockProc.stdout?.emit("data", `${JSON.stringify({ type: "turn_end" })}\n`);
+    mockProc.stdout?.emit("data", `${sessionHeader()}\n${JSON.stringify({ type: "turn_end" })}\n`);
     mockProc.emit("exit", 0);
 
     const result = await promise;
@@ -209,12 +234,21 @@ function defaultReviewJson(): string {
   return '{"findings":[],"overall_correctness":"ok","overall_explanation":"x","overall_confidence_score":0.5}';
 }
 
+function sessionHeader(): string {
+  return JSON.stringify({
+    type: "session",
+    id: "review-session-id",
+    timestamp: "2026-04-27T17:00:00.000Z",
+    cwd: "/tmp",
+  });
+}
+
 function createMockProc() {
-  const listeners: Record<string, Array<(arg?: unknown) => void>> = {};
+  const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
   const stdoutListeners: Record<string, Array<(arg?: unknown) => void>> = {};
   const stderrListeners: Record<string, Array<(arg?: unknown) => void>> = {};
 
-  const on = (event: string, fn: (arg?: unknown) => void) => {
+  const on = (event: string, fn: (...args: unknown[]) => void) => {
     listeners[event] = listeners[event] || [];
     listeners[event].push(fn);
   };
