@@ -84,6 +84,7 @@ registerSettings({
 - The registry stores `SettingItem[]` compatible with pi-tui's `SettingsList`
 - `/supi-settings` (registered by `packages/supi/settings.ts`) renders all registered sections
 - Scope toggle (Tab) switches between project/global config; values are strings — extensions handle string↔typed conversion
+- `loadValues(scope, cwd)` should use raw scope reads (`loadSupiConfigForScope()`), while `loadSupiConfig()` is for merged runtime config
 - Submenus use `SettingItem.submenu` returning a pi-tui `Component`; Escape confirms, empty-string done() cancels
 
 ## Shared gotchas
@@ -101,6 +102,7 @@ registerSettings({
 - `pnpm exec jiti /tmp/script.mjs` — use this for ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - pi flattens tool `promptGuidelines` into the system prompt `Guidelines:` section; each bullet must name its tool explicitly.
 - Prefer stable system-prompt guidance via tool `promptGuidelines`; avoid `before_agent_start` `systemPrompt` mutations unless dynamic per-turn guidance is worth the prompt-cache tradeoff.
+- `ctx.sessionManager.getBranch()` returns `SessionEntry[]`; reconstruct state from `type === "message"` / `entry.message.role` and `type === "custom_message"`, not flattened branch entries.
 - `docs/extensions.md` + `examples/extensions/message-renderer.ts` — authoritative for custom-message rendering; `display: false` suppresses TUI rendering and `content` should hold the visible summary.
 - Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
@@ -114,6 +116,8 @@ registerSettings({
 - Test helpers can export utilities (`createPiMock`, `makeCtx`, constants) but must not call `vi.mock` or `vi.hoisted` internally
 - Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
 - `pnpm vitest run packages/supi-<pkg>/` — run tests for a single package
+- Global-scope settings-registry tests can temporarily set `process.env.HOME` to a temp dir; `loadValues(scope, cwd)` has no `homeDir` injection.
+- `pnpm vitest run packages/supi-core/ packages/supi-lsp/ packages/supi-claude-md/` — targeted regression sweep for shared config/settings/session-state changes
 - `pnpm exec biome check packages/supi-<pkg>` — package-scoped Biome check for faster iteration on one extension
 - `pnpm exec tsc --noEmit -p packages/supi-<pkg>/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-<pkg>/__tests__/tsconfig.json` — package-scoped typecheck for one extension and its tests
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports and other unsafe lint issues
