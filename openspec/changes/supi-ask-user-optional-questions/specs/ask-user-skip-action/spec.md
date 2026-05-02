@@ -7,6 +7,11 @@ The system SHALL expose a "Skip" action for questionnaires when the questionnair
 - **WHEN** an extension sends an `ask_user` questionnaire with `allowSkip: true`
 - **THEN** the rendered UI includes a "Skip" button or keybinding alongside Submit and Cancel
 
+#### Scenario: Skip is available while typing text
+- **WHEN** an extension sends a required `text` question with `allowSkip: true`
+- **THEN** the rich text input exposes a skip keybinding that does not conflict with normal text entry
+- **AND** pressing that keybinding returns a skipped result instead of inserting text
+
 ### Requirement: Skip returns a partial or empty result
 The system SHALL return a result that includes `skip: true` and any values the user may have filled in before skipping.
 

@@ -86,6 +86,11 @@ function clearStructuredDrafts(question: NormalizedQuestion, deps: OverlayDeps):
 export function handleOverlayInput(data: string, deps: OverlayDeps): void {
   const { state, flow } = deps;
   if (isEditorMode(state.subMode)) {
+    if (state.subMode === "text-input" && matchesKey(data, Key.ctrl("s")) && flow.showSkip) {
+      flow.skip();
+      deps.finish(flow.outcome());
+      return;
+    }
     if (matchesKey(data, Key.escape)) {
       handleEditorEscape(deps);
       return;

@@ -27,7 +27,7 @@
 ## 5. Tests
 
 - [x] 5.1 Add unit tests for partial result building with optional questions
-- [x] 5.2 Add unit tests for skip action behavior (skip vs cancel)
+- [x] 5.2 Add unit tests for skip action behavior (skip vs cancel), including rich text input skip keybinding
 - [x] 5.3 Add tests verifying required questions still block submission
 - [x] 5.4 Run `pnpm test` for `packages/supi-ask-user/` and ensure all pass
 

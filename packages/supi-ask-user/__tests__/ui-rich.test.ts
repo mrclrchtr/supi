@@ -50,6 +50,15 @@ const _yesNoGo: NormalizedQuestion = {
   recommendedIndexes: [0],
 };
 
+const textQuestion: NormalizedQuestion = {
+  id: "reason",
+  header: "Reason",
+  type: "text",
+  prompt: "Why?",
+  required: true,
+  options: [],
+};
+
 interface RichFixture<Outcome> {
   captured: { value: Component | undefined };
   host: RichUiHost;
@@ -57,7 +66,7 @@ interface RichFixture<Outcome> {
 }
 
 function makeRichFixture<Outcome>(): RichFixture<Outcome> {
-  const tuiStub = { requestRender: () => {} } as unknown as TUI;
+  const tuiStub = { requestRender: () => {}, terminal: { rows: 40 } } as unknown as TUI;
   const themeStub = {
     fg: (_color: string, text: string) => text,
     bold: (text: string) => text,
@@ -119,6 +128,24 @@ describe("runRichQuestionnaire lifecycle", () => {
     await Promise.resolve();
     expect(optionsArgPresent).toBe(false);
     expect(optionsArg).toBeUndefined();
+  });
+
+  it("skips required text questions with Ctrl-S when skip is allowed", async () => {
+    type Outcome = { terminalState: string; skipped?: true; answers: unknown[] };
+    const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
+    const runPromise = runRichQuestionnaire(
+      { questions: [textQuestion], allowSkip: true },
+      { ui: host },
+    );
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    expect(captured.value.render(100).join("\n")).toContain("Ctrl-S skip");
+    captured.value.handleInput?.("\x13");
+
+    const outcome = await outcomePromise;
+    await expect(runPromise).resolves.toEqual(outcome);
+    expect(outcome).toMatchObject({ terminalState: "skipped", skipped: true, answers: [] });
   });
 
   it("supports an explicit discuss flow", async () => {

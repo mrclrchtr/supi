@@ -112,7 +112,7 @@ Use skip when the user has filled in some fields but wants to bail on the rest w
 }
 ```
 
-- **Skip** (`s`) submits whatever is filled in and sets `skip: true` on the result.
+- **Skip** submits whatever is filled in and sets `skip: true` on the result. In the rich UI, use `s` on structured/review screens and `Ctrl-S` while typing in text prompts; fallback dialogs show an explicit Skip option where available.
 - **Cancel** (`Esc`) aborts with no result.
 - Only enable `allowSkip` when partial data is actually useful to your extension.
 

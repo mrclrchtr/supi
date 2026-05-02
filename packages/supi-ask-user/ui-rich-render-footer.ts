@@ -9,8 +9,11 @@ import { isEditorMode, selectedIndexesForQuestion } from "./ui-rich-state.ts";
 export function footerHelp(flow: QuestionnaireFlow, state: OverlayRenderState): string {
   if (state.subMode === "text-input") {
     const question = flow.currentQuestion;
-    if (question && !question.required) return "Enter to submit • Esc skip question";
-    return "Enter to submit • Esc to cancel";
+    const parts = ["Enter to submit"];
+    if (question && !question.required) parts.push("Esc skip question");
+    else parts.push("Esc to cancel");
+    if (flow.showSkip) parts.push("Ctrl-S skip");
+    return parts.join(" • ");
   }
   if (isEditorMode(state.subMode)) return "Enter to submit • Esc to go back";
   if (flow.currentMode === "reviewing") {
