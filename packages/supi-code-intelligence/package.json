@@ -1,0 +1,43 @@
+{
+  "name": "@mrclrchtr/supi-code-intelligence",
+  "version": "0.1.0",
+  "description": "SuPi Code Intelligence extension \u2014 architecture briefs, caller/callee analysis, impact assessment, and pattern search for pi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "*.ts",
+    "actions/*.ts",
+    "*.json",
+    "!__tests__"
+  ],
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*",
+    "@mrclrchtr/supi-lsp": "workspace:*",
+    "@mrclrchtr/supi-tree-sitter": "workspace:*"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "vitest": "^4.1.4"
+  },
+  "pi": {
+    "extensions": [
+      "./code-intelligence.ts"
+    ]
+  }
+}

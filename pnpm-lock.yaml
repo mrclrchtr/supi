@@ -69,6 +69,9 @@ importers:
       '@mrclrchtr/supi-claude-md':
         specifier: workspace:*
         version: link:../supi-claude-md
+      '@mrclrchtr/supi-code-intelligence':
+        specifier: workspace:*
+        version: link:../supi-code-intelligence
       '@mrclrchtr/supi-context':
         specifier: workspace:*
         version: link:../supi-context
@@ -163,6 +166,34 @@ importers:
       vitest:
         specifier: ^4.1.4
         version: 4.1.4(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
+
+  packages/supi-code-intelligence:
+    dependencies:
+      '@mariozechner/pi-ai':
+        specifier: '*'
+        version: 0.70.2(ws@8.20.0)(zod@4.3.6)
+      '@mariozechner/pi-coding-agent':
+        specifier: '*'
+        version: 0.70.2(ws@8.20.0)(zod@4.3.6)
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
+      '@mrclrchtr/supi-lsp':
+        specifier: workspace:*
+        version: link:../supi-lsp
+      '@mrclrchtr/supi-tree-sitter':
+        specifier: workspace:*
+        version: link:../supi-tree-sitter
+      typebox:
+        specifier: '*'
+        version: 1.1.34
+    devDependencies:
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
+      vitest:
+        specifier: ^4.1.4
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
 
   packages/supi-context:
     dependencies:
