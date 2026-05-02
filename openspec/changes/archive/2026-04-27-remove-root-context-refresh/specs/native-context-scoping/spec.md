@@ -1,8 +1,4 @@
-# Native Context Scoping
-
-Purpose: Ensure pi-native context files are excluded from SuPi refresh re-injection.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Native context files outside the project tree are excluded from refresh
 `readNativeContextFiles` SHALL NOT return files for SuPi root refresh re-injection. All files supplied by pi through `systemPromptOptions.contextFiles` SHALL be treated as native system-prompt context and excluded from SuPi refresh payloads, regardless of whether the resolved path is outside cwd, at cwd, or below cwd. The extension MAY continue to inspect native context paths for subdirectory deduplication, but it SHALL NOT use native context file contents to build a refresh message.
