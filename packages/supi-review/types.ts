@@ -38,6 +38,7 @@ export interface ReviewSettings {
   reviewDeepModel: string;
   maxDiffBytes: number;
   reviewTimeoutMinutes: number;
+  autoFix: boolean;
 }
 
 /** Session/debug metadata captured from the reviewer subprocess. */

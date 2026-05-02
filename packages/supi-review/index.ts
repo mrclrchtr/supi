@@ -1,5 +1,6 @@
 import { BorderedLoader, type ExtensionAPI, SettingsManager } from "@mariozechner/pi-coding-agent";
 import { parseNonInteractiveArgs } from "./args.ts";
+import { formatReviewContent } from "./format-content.ts";
 import { getCommitShow, getDiff, getMergeBase, getUncommittedDiff } from "./git.ts";
 import { getReviewModelChoices } from "./model-choices.ts";
 import { buildReviewPrompt } from "./prompts.ts";
@@ -7,7 +8,7 @@ import { registerReviewRenderer } from "./renderer.ts";
 import { runReviewer } from "./runner.ts";
 import { loadReviewSettings, registerReviewSettings, setReviewModelChoices } from "./settings.ts";
 import type { ReviewDepth, ReviewResult, ReviewTarget } from "./types.ts";
-import { selectBranch, selectCommit, selectDepth, selectPreset } from "./ui.ts";
+import { selectAutoFix, selectBranch, selectCommit, selectDepth, selectPreset } from "./ui.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
 
@@ -47,41 +48,57 @@ export default function reviewExtension(pi: ExtensionAPI) {
       const settings = loadReviewSettings(ctx.cwd);
 
       if (!ctx.hasUI) {
-        await handleNonInteractive(args, settings.maxDiffBytes, ctx, pi);
+        await handleNonInteractive({
+          args,
+          maxDiffBytes: settings.maxDiffBytes,
+          autoFixDefault: settings.autoFix,
+          ctx,
+          pi,
+        });
         return;
       }
 
-      await handleInteractive(settings.maxDiffBytes, ctx, pi);
+      await handleInteractive(settings.maxDiffBytes, settings.autoFix, ctx, pi);
     },
   });
 }
 
-async function handleNonInteractive(
-  args: string,
-  maxDiffBytes: number,
-  ctx: CommandContext,
-  pi: ExtensionAPI,
-): Promise<void> {
+interface NonInteractiveOptions {
+  args: string;
+  maxDiffBytes: number;
+  autoFixDefault: boolean;
+  ctx: CommandContext;
+  pi: ExtensionAPI;
+}
+
+async function handleNonInteractive(options: NonInteractiveOptions): Promise<void> {
+  const { args, maxDiffBytes, autoFixDefault, ctx, pi } = options;
   const parsed = parseNonInteractiveArgs(args);
   if (!parsed.ok) {
-    injectReviewMessage(pi, {
-      kind: "failed",
-      reason: parsed.error,
-      target: { type: "custom", instructions: args },
-    });
+    injectReviewMessage(
+      pi,
+      {
+        kind: "failed",
+        reason: parsed.error,
+        target: { type: "custom", instructions: args },
+      },
+      false,
+    );
     return;
   }
+  const autoFix = parsed.autoFix ?? autoFixDefault;
   const result = await executeReview({
     target: parsed.target,
     depth: parsed.depth,
     maxDiffBytes,
     ctx,
   });
-  injectReviewMessage(pi, result);
+  injectReviewMessage(pi, result, autoFix);
 }
 
 async function handleInteractive(
   maxDiffBytes: number,
+  autoFixDefault: boolean,
   ctx: CommandContext,
   pi: ExtensionAPI,
 ): Promise<void> {
@@ -91,11 +108,14 @@ async function handleInteractive(
   const depth = await selectDepth(ctx);
   if (!depth) return;
 
+  const autoFix = await selectAutoFix(ctx, autoFixDefault);
+  if (autoFix === undefined) return;
+
   const target = await resolvePresetTarget(preset, ctx);
   if (!target) return;
 
   const result = await runReviewWithLoader(target, depth, maxDiffBytes, ctx);
-  injectReviewMessage(pi, result);
+  injectReviewMessage(pi, result, autoFix);
 }
 
 async function resolvePresetTarget(
@@ -317,27 +337,15 @@ function maybeTruncateDiff(
   };
 }
 
-function injectReviewMessage(pi: ExtensionAPI, result: ReviewResult): void {
-  let content: string;
-  switch (result.kind) {
-    case "success":
-      content = `${result.output.findings.length} findings • ${result.output.overall_correctness}`;
-      break;
-    case "failed":
-      content = `Review failed: ${result.reason}`;
-      break;
-    case "canceled":
-      content = "Review canceled";
-      break;
-    case "timeout":
-      content = "Review timed out";
-      break;
-  }
-
+function injectReviewMessage(pi: ExtensionAPI, result: ReviewResult, autoFix: boolean): void {
   pi.sendMessage({
     customType: "supi-review",
-    content,
+    content: formatReviewContent(result),
     display: true,
     details: { result },
   });
+
+  if (autoFix && result.kind === "success" && result.output.findings.length > 0) {
+    pi.sendUserMessage("Fix all findings from the review above.");
+  }
 }

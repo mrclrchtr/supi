@@ -11,6 +11,7 @@ export const REVIEW_DEFAULTS: ReviewSettings = {
   reviewDeepModel: "",
   maxDiffBytes: 100_000,
   reviewTimeoutMinutes: 15,
+  autoFix: false,
 };
 
 const INHERIT_MODEL_VALUE = "(inherit)";
@@ -55,6 +56,9 @@ export function registerReviewSettings(): void {
         case "reviewTimeoutMinutes":
           persistReviewTimeoutMinutes(value, helpers);
           break;
+        case "autoFix":
+          persistAutoFix(value, helpers);
+          break;
       }
     },
   });
@@ -87,6 +91,14 @@ function persistReviewTimeoutMinutes(value: string, helpers: ConfigSettingsHelpe
     helpers.set("reviewTimeoutMinutes", num);
   } else {
     helpers.unset("reviewTimeoutMinutes");
+  }
+}
+
+function persistAutoFix(value: string, helpers: ConfigSettingsHelpers): void {
+  if (value === "on") {
+    helpers.set("autoFix", true);
+  } else {
+    helpers.unset("autoFix");
   }
 }
 
@@ -123,6 +135,13 @@ function buildReviewSettingItems(settings: ReviewSettings): SettingItem[] {
       currentValue: String(settings.reviewTimeoutMinutes),
       submenu: (currentValue, done) =>
         createInputSubmenu(currentValue, "Review timeout in minutes:", done),
+    },
+    {
+      id: "autoFix",
+      label: "Auto-Fix After Review",
+      description: "Automatically trigger a fix turn after review completes with findings",
+      currentValue: settings.autoFix ? "on" : "off",
+      values: ["on", "off"],
     },
   ];
 }

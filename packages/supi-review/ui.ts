@@ -83,6 +83,45 @@ export async function selectDepth(ctx: ExtensionContext): Promise<ReviewDepth | 
   });
 }
 
+export async function selectAutoFix(
+  ctx: ExtensionContext,
+  defaultValue: boolean,
+): Promise<boolean | undefined> {
+  const items: SelectItem[] = [
+    { value: "true", label: "Yes — fix all findings" },
+    { value: "false", label: "No — review only" },
+  ];
+
+  return ctx.ui.custom<boolean | undefined>((tui, theme, _kb, done) => {
+    const container = new Container();
+    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
+    container.addChild(new Text(theme.fg("accent", "Auto-fix after review?"), 1, 0));
+
+    const selectList = new SelectList(items, items.length, {
+      selectedPrefix: (t) => theme.fg("accent", t),
+      selectedText: (t) => theme.fg("accent", t),
+      description: (t) => theme.fg("muted", t),
+      scrollInfo: (t) => theme.fg("dim", t),
+      noMatch: (t) => theme.fg("warning", t),
+    });
+    selectList.setSelectedIndex(defaultValue ? 0 : 1);
+    selectList.onSelect = (item) => done(item.value === "true");
+    selectList.onCancel = () => done(undefined);
+    container.addChild(selectList);
+    container.addChild(new Text(theme.fg("dim", "↑↓ navigate • enter select • esc cancel"), 1, 0));
+    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
+
+    return {
+      render: (w) => container.render(w),
+      invalidate: () => container.invalidate(),
+      handleInput: (data) => {
+        selectList.handleInput(data);
+        tui.requestRender();
+      },
+    };
+  });
+}
+
 export async function selectBranch(ctx: ExtensionContext): Promise<string | undefined> {
   const branches = await getLocalBranches(ctx.cwd);
   if (branches.length === 0) {
