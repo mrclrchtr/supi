@@ -1,6 +1,6 @@
 ## 1. Package Setup
 
-- [ ] 1.1 Create `packages/supi-review/` directory with `package.json` (workspace package, no build step).
+- [ ] 1.1 Create `packages/supi-review/` directory with `package.json` (workspace package, no build step). Include `*.md` in the `files` array so `review-prompt.md` is included in the published package.
 - [ ] 1.2 Create stub `packages/supi-review/index.ts` exporting the default extension factory.
 - [ ] 1.3 Create `packages/supi-review/tsconfig.json` extending the workspace config.
 - [ ] 1.4 Create thin wrapper `packages/supi/review.ts` that re-exports from `packages/supi-review/`.
@@ -30,11 +30,11 @@
 
 - [ ] 4.1 Create `packages/supi-review/runner.ts` with `runReviewer(prompt, model, cwd, signal)`.
 - [ ] 4.2 Implement `getPiInvocation()` to detect runtime and build the subprocess command.
-- [ ] 4.3 Spawn `pi --mode json --no-session --tools read,grep,find,ls --model <model> <prompt>` when a model is resolved; omit `--model` when no model is resolved.
-- [ ] 4.4 Parse JSONL events from stdout and collect the final assistant message from the last assistant `message_end` event.
+- [ ] 4.3 Spawn `pi --mode json -p --no-session --tools read,grep,find,ls --model <model> <prompt>` when a model is resolved; omit `--model` when no model is resolved. The `-p` flag ensures non-interactive exit after completion (matches the official pi subagent example).
+- [ ] 4.4 Parse JSONL events from stdout and collect the final assistant message from the last assistant `message_end` event. Normalize the message `content` from an array of parts (`{ type: "text", text: ... }`) to a single plain string before passing to `parseReviewOutput()`.
 - [ ] 4.5 Handle subprocess spawn errors, non-zero exits, stderr, and missing assistant output as graceful failed review results.
-- [ ] 4.6 Propagate `AbortSignal` to the subprocess (SIGTERM, then SIGKILL after timeout).
-- [ ] 4.7 Add reviewer timeout handling and expose the timeout through internal runner options.
+- [ ] 4.6 Listen to the `AbortSignal` and explicitly terminate the child process: first `proc.kill("SIGTERM")`, then `proc.kill("SIGKILL")` after a 5-second grace period if the process is still alive.
+- [ ] 4.7 Add reviewer timeout handling with a default of **300000ms** (5 minutes) and expose it through internal runner options.
 - [ ] 4.8 Preserve stdout/stderr excerpts in failed review details for renderer/debug visibility.
 
 ## 5. Read-only Subprocess Tool Policy
@@ -64,14 +64,22 @@
 ## 8. Settings Registry Integration
 
 - [ ] 8.1 Create `packages/supi-review/settings.ts` registering `reviewFastModel`, `reviewDeepModel`, and `maxDiffBytes`.
-- [ ] 8.2 Use `@mrclrchtr/supi-core` `registerSettings()` API.
-- [ ] 8.3 Implement `loadReviewSettings(cwd)` returning merged global + project config.
+- [ ] 8.2 Use `@mrclrchtr/supi-core` `registerConfigSettings()` API (not raw `registerSettings()`).
+- [ ] 8.3 Implement `loadReviewSettings(cwd)` returning merged global + project config via `loadSupiConfig("review", cwd, REVIEW_DEFAULTS)`.
+
+```ts
+const REVIEW_DEFAULTS = {
+  reviewFastModel: "",
+  reviewDeepModel: "",
+  maxDiffBytes: 100_000,
+};
+```
 - [ ] 8.4 Add settings persistence callbacks (`persistChange`) for `supi-settings` UI.
 
 ## 9. Command and UI Wiring
 
 - [ ] 9.1 Register `/review` command in `index.ts`.
-- [ ] 9.2 Implement non-interactive argument parsing for `base-branch <branch>`, `uncommitted`, `commit <sha>`, and `custom -- <instructions...>` with optional `--depth inherit|fast|deep`.
+- [ ] 9.2 Implement non-interactive argument parsing for `base-branch <branch>`, `uncommitted`, `commit <sha>`, and `custom -- <instructions...>` with optional `--depth inherit|fast|deep`. The `--depth` flag (if present) must be consumed **before** the `--` sentinel; everything after `--` (or all remaining args if `--` is omitted) becomes the custom instructions.
 - [ ] 9.3 Implement interactive preset selector using `ctx.ui.custom()` + `SelectList` + `DynamicBorder`.
 - [ ] 9.4 Implement depth selector (Inherit, Fast, Deep) showing configured model names inline.
 - [ ] 9.5 Implement branch picker for base-branch mode.
@@ -84,7 +92,7 @@
 ## 10. Meta-Package and Manifest Updates
 
 - [ ] 10.1 Ensure `packages/supi/review.ts` correctly imports and calls the factory.
-- [ ] 10.2 Update root `package.json` scripts so `pnpm typecheck` includes the new package.
+- [ ] ~~10.2 Update root `package.json` scripts so `pnpm typecheck` includes the new package.~~ (Not needed — the existing `for p in packages/*/tsconfig.json` loop auto-discovers new packages.)
 - [ ] 10.3 Run `pnpm install` to update lockfile for new workspace dependency.
 - [ ] 10.4 Verify `/review` appears in `pi.getCommands()` after `/reload`.
 

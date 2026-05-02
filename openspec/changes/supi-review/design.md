@@ -33,12 +33,12 @@ The pi documentation for version `0.70.2` confirms the subprocess CLI contract u
 ## Decisions
 
 ### 1. Dedicated subprocess reviewer (not inline)
-**Decision:** Run the reviewer as a separate `pi --mode json --no-session` subprocess.
-**Rationale:** Isolates the reviewer's context window from the main session, prevents accidental file mutations by omitting mutation-capable tools, and allows a different model without changing the session model. This matches Codex's dedicated reviewer behavior while staying within documented pi CLI flags.
+**Decision:** Run the reviewer as a separate `pi --mode json -p --no-session` subprocess.
+**Rationale:** Isolates the reviewer's context window from the main session, prevents accidental file mutations by omitting mutation-capable tools, and allows a different model without changing the session model. The `-p` flag ensures non-interactive exit after the single prompt completes, matching the official pi subagent example. This matches Codex's dedicated reviewer behavior while staying within documented pi CLI flags.
 **Alternatives considered:**
 - *Inline review* (same session, inject system prompt): faster, no process spawn, but shares context and risks working-tree mutation. Rejected for safety.
 - *Custom tool in same session*: simpler but same context-sharing issues. Rejected.
-- *Print mode via `-p`*: produces only final text, but loses structured event streaming. Rejected because `--mode json` is documented for event parsing.
+- *Omitting `-p`*: possible but unverified; the official subagent example includes `-p` and it is harmless. Kept for alignment.
 
 ### 2. Extension pre-computes git targets
 **Decision:** The extension runs `git merge-base`, `git diff`, `git log`, `git show`, etc., and feeds the results into the review prompt.
@@ -116,10 +116,10 @@ packages/supi-review/
   prompts.ts        # Review prompt construction (target -> prompt text)
   renderer.ts       # Custom message renderer for TUI
   settings.ts       # Settings registry registration
-  review-prompt.md  # System prompt / rubric for the reviewer
+  review-prompt.md  # Reviewer rubric / JSON schema reference
 ```
 Then a thin wrapper in `packages/supi/review.ts`.
-**Rationale:** Matches existing SuPi package conventions (`packages/supi-<name>/`). Keeps the meta-package clean. No build step needed since pi loads TypeScript directly.
+**Rationale:** Matches existing SuPi package conventions (`packages/supi-<name>/`). Keeps the meta-package clean. No build step needed since pi loads TypeScript directly. The `review-prompt.md` is passed to the subprocess via `--append-system-prompt review-prompt.md`; pi reads the file contents automatically.
 
 ### 9. Diff truncation strategy
 **Decision:** Truncate diffs to `maxDiffBytes` (default 100KB) using middle truncation: keep the beginning and end, replace the omitted center with a clear `[... truncated N bytes ...]` marker, and append a prompt note indicating truncation.
