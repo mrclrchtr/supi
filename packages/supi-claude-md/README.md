@@ -55,7 +55,7 @@ Options:
 ## Behavior notes
 
 - pi still loads root context files natively; this extension augments that behavior.
-- subdirectory context is injected from path-aware tool activity such as reads, writes, edits, and LSP operations.
+- subdirectory context is injected from path-aware tool activity such as reads, writes, edits, LSP operations, and Tree-sitter operations.
 - the settings UI opens directly in the pi interface rather than as a separate modal dialog.
 
 ## Requirements

@@ -102,6 +102,7 @@ describe("claudeMdExtension: session_start", () => {
       completedTurns: 12,
       lastRefreshTurn: 9,
       injectedDirs: new Map([["packages/foo", { turn: 5, file: "packages/foo/CLAUDE.md" }]]),
+      contextCounter: 4,
     });
 
     await handlers.get("session_start")?.(

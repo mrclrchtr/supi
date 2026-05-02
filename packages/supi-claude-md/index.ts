@@ -44,27 +44,14 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     Object.assign(state, createInitialState());
 
     try {
-      const branch =
-        (
-          ctx.sessionManager as unknown as {
-            getBranch?: () => Array<unknown>;
-          }
-        ).getBranch?.() ?? [];
+      const branch = ctx.sessionManager.getBranch();
 
       if (branch.length > 0) {
-        const reconstructed = reconstructState(
-          branch as Array<{
-            type: string;
-            role?: string;
-            stopReason?: string;
-            customType?: string;
-            details?: unknown;
-            content?: unknown;
-          }>,
-        );
+        const reconstructed = reconstructState(branch);
         state.completedTurns = reconstructed.completedTurns;
         state.lastRefreshTurn = reconstructed.lastRefreshTurn;
         state.injectedDirs = reconstructed.injectedDirs;
+        state.contextCounter = reconstructed.contextCounter;
       }
     } catch {
       // Reconstruction failed — start fresh

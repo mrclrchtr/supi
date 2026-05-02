@@ -66,6 +66,29 @@ export function loadSupiConfig<T>(
   return shallowMerge(defaults, globalSection, projectSection);
 }
 
+/**
+ * Load config for a single scope only.
+ *
+ * Resolution order: defaults ← selected scope
+ *
+ * This is useful for settings UIs that need to show the raw values stored in
+ * one scope, rather than the effective merged config.
+ */
+export function loadSupiConfigForScope<T>(
+  section: string,
+  cwd: string,
+  defaults: T,
+  options: { scope: "global" | "project" } & SupiConfigOptions,
+): T {
+  const config =
+    options.scope === "global"
+      ? readJsonFile(getGlobalConfigPath(options.homeDir))
+      : readJsonFile(getProjectConfigPath(cwd));
+
+  const scopedSection = extractSection(config, section);
+  return shallowMerge(defaults, scopedSection);
+}
+
 export interface SupiConfigLocation {
   section: string;
   scope: "global" | "project";

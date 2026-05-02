@@ -166,6 +166,10 @@ describe("extractPathFromToolEvent", () => {
     expect(extractPathFromToolEvent("lsp", { file: "qux.ts" })).toBe("qux.ts");
   });
 
+  it("extracts file from tree_sitter tool", () => {
+    expect(extractPathFromToolEvent("tree_sitter", { file: "ast.ts" })).toBe("ast.ts");
+  });
+
   it("returns null for bash tool", () => {
     expect(extractPathFromToolEvent("bash", { command: "cat foo.ts" })).toBeNull();
   });

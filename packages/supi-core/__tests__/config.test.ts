@@ -2,7 +2,12 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadSupiConfig, removeSupiConfigKey, writeSupiConfig } from "../config.ts";
+import {
+  loadSupiConfig,
+  loadSupiConfigForScope,
+  removeSupiConfigKey,
+  writeSupiConfig,
+} from "../config.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-core-config-test-"));
@@ -117,6 +122,66 @@ describe("loadSupiConfig", () => {
 
     const result = loadSupiConfig("claude-md", tmpDir, { rereadInterval: 3 }, opts(tmpDir));
     expect(result).toEqual({ rereadInterval: 3 });
+  });
+});
+
+describe("scope-aware config loading", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("loads only global config for global scope", () => {
+    const globalDir = path.join(tmpDir, ".pi/agent/supi");
+    fs.mkdirSync(globalDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(globalDir, "config.json"),
+      JSON.stringify({ "claude-md": { rereadInterval: 5 } }),
+    );
+
+    const projectDir = path.join(tmpDir, ".pi/supi");
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, "config.json"),
+      JSON.stringify({ "claude-md": { rereadInterval: 10 } }),
+    );
+
+    const result = loadSupiConfigForScope(
+      "claude-md",
+      tmpDir,
+      { rereadInterval: 3, subdirs: true },
+      { scope: "global", ...opts(tmpDir) },
+    );
+    expect(result).toEqual({ rereadInterval: 5, subdirs: true });
+  });
+
+  it("loads only project config for project scope", () => {
+    const globalDir = path.join(tmpDir, ".pi/agent/supi");
+    fs.mkdirSync(globalDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(globalDir, "config.json"),
+      JSON.stringify({ "claude-md": { rereadInterval: 5 } }),
+    );
+
+    const projectDir = path.join(tmpDir, ".pi/supi");
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, "config.json"),
+      JSON.stringify({ "claude-md": { rereadInterval: 10 } }),
+    );
+
+    const result = loadSupiConfigForScope(
+      "claude-md",
+      tmpDir,
+      { rereadInterval: 3, subdirs: true },
+      { scope: "project", ...opts(tmpDir) },
+    );
+    expect(result).toEqual({ rereadInterval: 10, subdirs: true });
   });
 });
 

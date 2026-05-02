@@ -3,7 +3,7 @@
 import type { SettingItem } from "@mariozechner/pi-tui";
 import { Input, Key, matchesKey } from "@mariozechner/pi-tui";
 import {
-  loadSupiConfig,
+  loadSupiConfigForScope,
   registerSettings,
   removeSupiConfigKey,
   type SettingsScope,
@@ -37,8 +37,8 @@ const THRESHOLD_VALUES = [
 
 // ── Config helpers ───────────────────────────────────────────
 
-function loadClaudeMdSettings(cwd: string): ClaudeMdConfig {
-  return loadSupiConfig("claude-md", cwd, CLAUDE_MD_DEFAULTS);
+function loadClaudeMdSettings(scope: SettingsScope, cwd: string): ClaudeMdConfig {
+  return loadSupiConfigForScope("claude-md", cwd, CLAUDE_MD_DEFAULTS, { scope });
 }
 
 function persistClaudeMdSetting(
@@ -99,8 +99,8 @@ function handleSettingChange(
   }
 }
 
-function buildClaudeMdSettingItems(_scope: SettingsScope, cwd: string): SettingItem[] {
-  const settings = loadClaudeMdSettings(cwd);
+function buildClaudeMdSettingItems(scope: SettingsScope, cwd: string): SettingItem[] {
+  const settings = loadClaudeMdSettings(scope, cwd);
 
   return [
     {

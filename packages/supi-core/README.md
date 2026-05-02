@@ -35,7 +35,8 @@ Config file locations:
 
 Main helpers:
 
-- `loadSupiConfig()`
+- `loadSupiConfig()` — effective merged config (`defaults <- global <- project`)
+- `loadSupiConfigForScope()` — raw single-scope config for settings UIs (`defaults <- selected scope`)
 - `writeSupiConfig()`
 - `removeSupiConfigKey()`
 

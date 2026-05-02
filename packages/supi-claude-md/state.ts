@@ -3,6 +3,8 @@
 // State is reconstructed from session history on session_start
 // and mutated in-place during the session lifecycle.
 
+import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+
 export interface InjectedDir {
   /** Turn number when this directory's context was last injected */
   turn: number;
@@ -44,44 +46,66 @@ const CONTEXT_TAG_REGEX =
 
 const REFRESH_CUSTOM_TYPE = "supi-claude-md-refresh";
 
-type BranchEntry = {
-  type: string;
-  role?: string;
-  stopReason?: string;
-  customType?: string;
-  details?: unknown;
-  content?: unknown;
-};
-
-export function reconstructState(branch: BranchEntry[]): {
+export function reconstructState(branch: SessionEntry[]): {
   completedTurns: number;
   lastRefreshTurn: number;
   injectedDirs: Map<string, InjectedDir>;
+  contextCounter: number;
 } {
   let completedTurns = 0;
   let lastRefreshTurn = 0;
+  let contextCounter = 0;
   const injectedDirs = new Map<string, InjectedDir>();
 
   for (const entry of branch) {
     if (isCompletedAssistantTurn(entry)) completedTurns++;
-    if (isRefreshMessage(entry)) lastRefreshTurn = getRefreshTurn(entry.details);
-    if (entry.type === "toolResult") extractInjectedDirs(entry.content, injectedDirs);
+    if (isRefreshMessage(entry)) {
+      lastRefreshTurn = getRefreshTurn(entry.details);
+      contextCounter = Math.max(contextCounter, getRefreshCounter(entry.details));
+    }
+
+    const toolResultContent = getToolResultContent(entry);
+    if (toolResultContent) {
+      extractInjectedDirs(toolResultContent, injectedDirs);
+    }
   }
 
-  return { completedTurns, lastRefreshTurn, injectedDirs };
+  return { completedTurns, lastRefreshTurn, injectedDirs, contextCounter };
 }
 
-function isCompletedAssistantTurn(entry: BranchEntry): boolean {
-  return entry.type === "assistant" && entry.stopReason === "stop";
+function isCompletedAssistantTurn(entry: SessionEntry): boolean {
+  return (
+    entry.type === "message" &&
+    entry.message.role === "assistant" &&
+    entry.message.stopReason === "stop"
+  );
 }
 
-function isRefreshMessage(entry: BranchEntry): boolean {
-  return entry.customType === REFRESH_CUSTOM_TYPE;
+function isRefreshMessage(
+  entry: SessionEntry,
+): entry is Extract<SessionEntry, { type: "custom_message" }> {
+  return entry.type === "custom_message" && entry.customType === REFRESH_CUSTOM_TYPE;
 }
 
 function getRefreshTurn(details: unknown): number {
   const d = details as { turn?: number } | undefined;
   return d?.turn ?? 0;
+}
+
+function getRefreshCounter(details: unknown): number {
+  const d = details as { contextToken?: string } | undefined;
+  const match = d?.contextToken?.match(/^supi-claude-md-(\d+)$/);
+  if (!match?.[1]) return 0;
+
+  const counter = Number.parseInt(match[1], 10);
+  return Number.isNaN(counter) ? 0 : counter;
+}
+
+function getToolResultContent(entry: SessionEntry): unknown {
+  if (entry.type !== "message" || entry.message.role !== "toolResult") {
+    return undefined;
+  }
+  return entry.message.content;
 }
 
 function extractInjectedDirs(content: unknown, injectedDirs: Map<string, InjectedDir>): void {
@@ -101,7 +125,7 @@ function parseContextTags(text: string, injectedDirs: Map<string, InjectedDir>):
     const file = match[1];
     const turn = Number.parseInt(match[2] ?? "0", 10);
     if (file) {
-      const lastSlash = file.lastIndexOf("/");
+      const lastSlash = Math.max(file.lastIndexOf("/"), file.lastIndexOf("\\"));
       const dir = lastSlash >= 0 ? file.substring(0, lastSlash) : ".";
       injectedDirs.set(dir, { turn, file });
     }

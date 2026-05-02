@@ -15,6 +15,20 @@ function makeTempDir(): string {
 
 const opts = (dir: string) => ({ homeDir: dir });
 
+function withHomeDir<T>(homeDir: string, run: () => T): T {
+  const prevHome = process.env.HOME;
+  process.env.HOME = homeDir;
+  try {
+    return run();
+  } finally {
+    if (prevHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = prevHome;
+    }
+  }
+}
+
 describe("loadLspSettings", () => {
   let tmpDir: string;
 
@@ -44,7 +58,7 @@ describe("loadLspSettings", () => {
   });
 });
 
-describe("registerLspSettings", () => {
+describe("registerLspSettings: registration", () => {
   beforeEach(() => {
     clearRegisteredSettings();
   });
@@ -92,6 +106,48 @@ describe("registerLspSettings", () => {
     const items = section.loadValues("project", "/tmp");
     const serversItem = items.find((i) => i.id === "servers");
     expect(serversItem?.currentValue).toBe("all");
+  });
+
+  it("loadValues reads the selected scope instead of merged effective config", () => {
+    const tmpDir = makeTempDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({ lsp: { enabled: false, severity: 2, servers: ["gopls"] } }),
+    );
+
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { enabled: true, severity: 4, servers: ["pyright"] } }),
+    );
+
+    withHomeDir(tmpDir, () => {
+      registerLspSettings();
+      const section = getRegisteredSettings()[0];
+      const globalItems = section.loadValues("global", tmpDir);
+      const projectItems = section.loadValues("project", tmpDir);
+
+      expect(globalItems.find((i) => i.id === "enabled")?.currentValue).toBe("off");
+      expect(globalItems.find((i) => i.id === "severity")?.currentValue).toBe("2 (warnings)");
+      expect(globalItems.find((i) => i.id === "servers")?.currentValue).toBe("gopls");
+
+      expect(projectItems.find((i) => i.id === "enabled")?.currentValue).toBe("on");
+      expect(projectItems.find((i) => i.id === "severity")?.currentValue).toBe("4 (hints)");
+      expect(projectItems.find((i) => i.id === "servers")?.currentValue).toBe("pyright");
+    });
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+});
+
+describe("registerLspSettings: persistence", () => {
+  beforeEach(() => {
+    clearRegisteredSettings();
+  });
+
+  afterEach(() => {
+    clearRegisteredSettings();
   });
 
   it("persistChange writes enabled to config", () => {

@@ -104,7 +104,8 @@ export function extractPathFromToolEvent(
       const p = input.path;
       return typeof p === "string" ? p : null;
     }
-    case "lsp": {
+    case "lsp":
+    case "tree_sitter": {
       const f = input.file;
       return typeof f === "string" ? f : null;
     }

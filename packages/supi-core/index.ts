@@ -3,7 +3,12 @@
 // and settings registry for supi-wide TUI settings.
 
 export type { SupiConfigLocation, SupiConfigOptions } from "./config.ts";
-export { loadSupiConfig, removeSupiConfigKey, writeSupiConfig } from "./config.ts";
+export {
+  loadSupiConfig,
+  loadSupiConfigForScope,
+  removeSupiConfigKey,
+  writeSupiConfig,
+} from "./config.ts";
 export type { ContextMessageLike } from "./context-messages.ts";
 export {
   findLastUserMessageIndex,

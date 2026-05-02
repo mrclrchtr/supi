@@ -5,6 +5,7 @@ import type { SettingItem } from "@mariozechner/pi-tui";
 import { Container, Key, matchesKey, SettingsList, Text } from "@mariozechner/pi-tui";
 import {
   loadSupiConfig,
+  loadSupiConfigForScope,
   registerSettings,
   removeSupiConfigKey,
   type SettingsScope,
@@ -30,6 +31,10 @@ const LSP_DEFAULTS: LspSettings = {
 
 export function loadLspSettings(cwd: string): LspSettings {
   return loadSupiConfig("lsp", cwd, LSP_DEFAULTS);
+}
+
+function loadLspSettingsForScope(scope: SettingsScope, cwd: string): LspSettings {
+  return loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope });
 }
 
 function persistLspSetting(scope: SettingsScope, cwd: string, key: string, value: unknown): void {
@@ -79,8 +84,8 @@ export function registerLspSettings(): void {
   });
 }
 
-function buildLspSettingItems(_scope: SettingsScope, cwd: string): SettingItem[] {
-  const settings = loadLspSettings(cwd);
+function buildLspSettingItems(scope: SettingsScope, cwd: string): SettingItem[] {
+  const settings = loadLspSettingsForScope(scope, cwd);
 
   return [
     {
@@ -102,7 +107,7 @@ function buildLspSettingItems(_scope: SettingsScope, cwd: string): SettingItem[]
       label: "Active Servers",
       description: "Press Enter to configure which language servers are active",
       currentValue: settings.servers.length > 0 ? settings.servers.join(", ") : "all",
-      submenu: (_currentValue, done) => createServerSubmenu(cwd, done),
+      submenu: (_currentValue, done) => createServerSubmenu(scope, cwd, done),
     },
   ];
 }
@@ -110,6 +115,7 @@ function buildLspSettingItems(_scope: SettingsScope, cwd: string): SettingItem[]
 // ── Server submenu ───────────────────────────────────────────
 
 function createServerSubmenu(
+  scope: SettingsScope,
   cwd: string,
   done: (selectedValue?: string) => void,
 ): {
@@ -118,7 +124,7 @@ function createServerSubmenu(
   handleInput: (data: string) => boolean;
 } {
   const config = loadConfig(cwd);
-  const settings = loadLspSettings(cwd);
+  const settings = loadLspSettingsForScope(scope, cwd);
   const allServers = Object.keys(config.servers);
   const allEnabled = settings.servers.length === 0;
   const enabledServers = new Set(settings.servers);
