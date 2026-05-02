@@ -11,8 +11,12 @@ The system SHALL generate a lightweight architecture overview and inject it into
 - **WHEN** `before_agent_start` fires again later in the same session
 - **THEN** the system does not inject the architecture overview again
 
-### Requirement: The auto-injected overview SHALL be compact, structural, and actionable
-The auto-injected overview SHALL summarize top-level project layout, module/package names, one-line purpose descriptions when available, and key dependency edges. It SHALL prefer concise summaries over detailed API listings and SHOULD target roughly 500 tokens or less. When space allows, it SHOULD include a brief hint that richer focused context is available through `code_intel brief` instead of expanding the injected context itself.
+#### Scenario: Reload or resume with an existing overview on the active branch
+- **WHEN** the extension reloads or the user resumes a session whose active branch already contains the code-intelligence overview message
+- **THEN** the system does not inject a duplicate overview for that active branch
+
+### Requirement: The auto-injected overview SHALL be compact, structural, actionable, and latency-bounded
+The auto-injected overview SHALL summarize top-level project layout, module/package names, one-line purpose descriptions when available, and key dependency edges. It SHALL prefer concise summaries over detailed API listings and SHOULD target roughly 500 tokens or less. It SHALL be built from cheap metadata and readily available structural data first, with deeper enrichment treated as opportunistic. When space allows, it SHOULD include a brief hint that richer focused context is available through `code_intel brief` instead of expanding the injected context itself.
 
 #### Scenario: Multi-package workspace overview
 - **WHEN** the project contains multiple workspace packages with descriptions and internal dependencies
@@ -32,6 +36,10 @@ The auto-injected overview SHALL summarize top-level project layout, module/pack
 - **WHEN** the project contains more structural detail than fits comfortably in the prompt budget
 - **THEN** the overview prioritizes module names, purposes, and dependency edges while omitting lower-level API detail
 
+#### Scenario: Deep enrichment would be slow
+- **WHEN** LSP, Tree-sitter, or repository scans would require slow whole-project work during the first agent turn
+- **THEN** the overview uses the best cheap architecture model available and points the agent to an on-demand `code_intel brief` for deeper context
+
 #### Scenario: Agent needs deeper context
 - **WHEN** the compact overview omits details for token budget reasons
 - **THEN** it nudges the agent toward a focused `code_intel brief` query rather than dumping additional detail automatically
@@ -47,8 +55,8 @@ If no project metadata, modules, or source structure can be detected, the system
 - **WHEN** source files exist but no package/module metadata can be detected
 - **THEN** the overview uses the limited detected structure or reports that only a minimal project model is available
 
-### Requirement: The system SHALL support `action: "brief"` for project, module, directory, and file briefs
-The `code_intel` tool SHALL support `action: "brief"` to generate a structured architecture brief for the whole project or for a specific file or directory path. Focused briefs SHALL cover project-level, module/directory-level, and single-file focus paths where those paths exist.
+### Requirement: The system SHALL support `action: "brief"` for project, module, directory, file, and anchored-symbol briefs
+The `code_intel` tool SHALL support `action: "brief"` to generate a structured architecture brief for the whole project or for a specific file or directory path. Focused briefs SHALL cover project-level, module/directory-level, single-file focus paths, and anchored file-position briefs where those targets exist.
 
 #### Scenario: Full-project brief
 - **WHEN** the agent calls `code_intel` with `action: "brief"` and no `path`
@@ -62,6 +70,22 @@ The `code_intel` tool SHALL support `action: "brief"` to generate a structured a
 - **WHEN** the agent calls `code_intel` with `action: "brief"` and a file path
 - **THEN** the tool returns a file-focused brief describing the file's containing module, imports, exports, outline, and relevant relationships when available
 
+#### Scenario: Focused brief for an enclosing symbol
+- **WHEN** the agent calls `code_intel` with `action: "brief"`, `file`, `line`, and `character`
+- **THEN** the tool returns a brief for the enclosing symbol or syntax node when LSP or Tree-sitter can identify one
+- **AND** the brief includes the containing file/module plus imports, exports, callers or next-query hints when available
+
+### Requirement: Briefs SHALL surface entrypoints and public API surfaces when useful
+Project and module-level briefs SHALL highlight notable entrypoints, exported surfaces, settings/config entrypoints, or other public/shared APIs when those surfaces can be inferred cheaply. They SHOULD prioritize the most relevant public surfaces rather than enumerating every export.
+
+#### Scenario: Workspace package with a public entrypoint
+- **WHEN** the agent requests a brief for a package that exposes a documented entrypoint or notable exported surface
+- **THEN** the brief highlights that entrypoint or API surface near the top of the result
+
+#### Scenario: Module with many exports
+- **WHEN** a module exports many symbols
+- **THEN** the brief highlights the most relevant public exports or shared surfaces rather than dumping the entire export list inline
+
 ### Requirement: Focused briefs SHALL report dependency direction explicitly
 Focused briefs SHALL include dependencies and dependents/reverse dependencies when those relationships can be inferred. They SHALL distinguish internal project/module edges from external package dependencies where available.
 
@@ -74,18 +98,18 @@ Focused briefs SHALL include dependencies and dependents/reverse dependencies wh
 - **THEN** the brief distinguishes internal dependency edges from external dependencies
 
 ### Requirement: Brief output SHALL include concise next-query hints when useful
-Full-project and focused briefs SHALL end with at most a few targeted next-query hints when those hints help the agent continue efficiently. Hints SHALL be specific to detected relationships and SHALL NOT become a generic boilerplate footer on every response.
+Full-project and focused briefs SHALL end with at most a few targeted next-query hints when those hints help the agent continue efficiently. Hints SHALL be specific to detected relationships and SHALL NOT become a generic boilerplate footer on every response. When the relevant target is known, hints SHOULD include copyable parameter values such as `path`, `file`, 1-based `line`, 1-based `character`, or `symbol` so the agent can issue the next query without extra file reads.
 
 #### Scenario: Focused module exposes shared APIs
 - **WHEN** a focused brief identifies a module with exports or downstream dependents
-- **THEN** the brief may suggest `code_intel affected` before modifying those exports
+- **THEN** the brief may suggest `code_intel affected` before modifying those exports, including the path or anchored target when available
 
 #### Scenario: Focused file has many relationships
-- **WHEN** a focused brief identifies a file with callers, imports, or dependents that need semantic drill-down
-- **THEN** the brief may suggest `code_intel callers`, `code_intel implementations`, or raw `lsp` / `tree_sitter` drill-down as appropriate
+- **WHEN** a focused brief identifies a file with callers, callees, imports, or dependents that need semantic drill-down
+- **THEN** the brief may suggest `code_intel callers`, `code_intel callees`, `code_intel implementations`, or raw `lsp` / `tree_sitter` drill-down as appropriate
 
 ### Requirement: Brief generation SHALL combine base architecture data with optional enrichment
-The system SHALL build briefs from project metadata and structural analysis, and SHALL enrich them with LSP and Tree-sitter data when those sources are available.
+The system SHALL build briefs from project metadata and structural analysis, and SHALL enrich them with LSP and Tree-sitter data when those sources are available. When some enrichment sources are unavailable, the brief SHALL state the effective confidence mode using the shared vocabulary (`semantic`, `structural`, `heuristic`, or `unavailable`) and, when useful, recommend the next best follow-up query.
 
 #### Scenario: LSP and Tree-sitter both available
 - **WHEN** the focused path is in a language supported by both `supi-lsp` and `supi-tree-sitter`
@@ -94,6 +118,14 @@ The system SHALL build briefs from project metadata and structural analysis, and
 #### Scenario: LSP unavailable but structural analysis available
 - **WHEN** LSP is unavailable for the focused path but Tree-sitter support exists
 - **THEN** the brief still returns structural information from project metadata and Tree-sitter analysis without failing the action
+- **AND** it labels the brief as `structural` rather than `semantic` when that distinction matters
+
+### Requirement: Brief results SHALL expose structured details metadata in addition to markdown
+In addition to markdown content for the model, `brief` results SHALL include compact structured `details` metadata suitable for tests, renderers, and future automation. Where applicable, `details` SHOULD include confidence mode from the shared vocabulary, focus target identity, detected entrypoints/public surfaces, dependency summaries, and suggested next queries.
+
+#### Scenario: Brief result includes metadata
+- **WHEN** a `code_intel` `brief` action succeeds
+- **THEN** the tool result includes markdown content for the model and a compact `details` object describing the structured brief
 
 ### Requirement: Brief requests for missing paths SHALL return a clear error
 If the agent requests a brief for a path that does not exist, the tool SHALL return a clear error naming the missing path.

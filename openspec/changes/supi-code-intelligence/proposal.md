@@ -5,18 +5,19 @@ SuPi now has the lower-level code-understanding substrates needed for a higher-l
 ## What Changes
 
 - Add a new `supi-code-intelligence` workspace package as the main agent-facing code understanding extension for SuPi
-- Register a `code_intel` tool with high-level actions: `brief`, `callers`, `implementations`, `affected`, and `pattern`
+- Register a `code_intel` tool with high-level actions: `brief`, `callers`, best-effort v1 `callees`, `implementations`, `affected`, and `pattern`
+- Make follow-up flows low-friction: public positions match the existing 1-based `lsp` / `tree_sitter` convention, ambiguous symbol responses include retry-ready coordinates, and search actions can be scoped for token-efficient refinement
 - Inject a lightweight architecture/module overview once per session so agents start with structural context
 - Synthesize results from the public `@mrclrchtr/supi-lsp` service API and `@mrclrchtr/supi-tree-sitter` session API, preferring LSP for semantic truth, using Tree-sitter for structural enrichment/fallback, and using text search as a last resort
 - Consume shared project-root utilities from `supi-core` for architecture-model scanning instead of duplicating root/path logic
-- Provide compact, motivating `promptSnippet` and `promptGuidelines` that make agents want to use `code_intel` for orientation, impact checks, and semantic relationship questions
+- Provide compact, motivating `promptSnippet` and `promptGuidelines` that make agents want to use `code_intel` for orientation, impact checks, and semantic relationship questions while deconflicting existing `lsp` / `tree_sitter` guidance
 - Publish the extension through both install surfaces used by this repo: the workspace root manifest and the published `@mrclrchtr/supi` meta-package wrapper surface
 
 ## Capabilities
 
 ### New Capabilities
 - `code-intelligence-brief`: Generate session-start architecture overviews and on-demand focused briefs for the repo or a specific path
-- `code-intelligence-search`: Expose the `code_intel` tool actions for callers, implementations, and pattern search with structured summarized output and agent-friendly usage guidance
+- `code-intelligence-search`: Expose the `code_intel` tool actions for callers, callees, implementations, and pattern search with structured summarized output, machine-readable details metadata, and agent-friendly usage guidance
 - `code-intelligence-affected`: Analyze the blast radius of changing a symbol, including direct references, downstream modules, and risk level
 
 ### Existing Capabilities Consumed
