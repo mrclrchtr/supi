@@ -9,10 +9,6 @@ const mockFns = vi.hoisted(() => ({
   findSubdirContextFiles: vi.fn(),
   formatSubdirContext: vi.fn(),
   shouldInjectSubdir: vi.fn(),
-  shouldRefreshRoot: vi.fn(),
-  formatRefreshContext: vi.fn(),
-  readNativeContextFiles: vi.fn(),
-  pruneAndReorderContextMessages: vi.fn(),
   reconstructState: vi.fn(),
 }));
 
@@ -22,11 +18,9 @@ vi.mock("@mrclrchtr/supi-core", () => ({
       ? ((details as { contextToken?: string }).contextToken ?? null)
       : null,
   loadSupiConfig: vi.fn(),
-  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
   registerConfigSettings: vi.fn(),
   registerSettings: vi.fn(),
   removeSupiConfigKey: vi.fn(),
-  restorePromptContent: vi.fn((msgs: unknown) => msgs),
   writeSupiConfig: vi.fn(),
 }));
 
@@ -51,19 +45,10 @@ vi.mock("../subdirectory.ts", () => ({
   shouldInjectSubdir: mockFns.shouldInjectSubdir,
 }));
 
-vi.mock("../refresh.ts", () => ({
-  shouldRefreshRoot: mockFns.shouldRefreshRoot,
-  formatRefreshContext: mockFns.formatRefreshContext,
-  readNativeContextFiles: mockFns.readNativeContextFiles,
-}));
-
 vi.mock("../state.ts", () => ({
   createInitialState: () => ({
     completedTurns: 0,
-    lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    currentContextToken: null,
-    contextCounter: 0,
     nativeContextPaths: new Set(),
     firstAgentStart: true,
   }),
@@ -101,8 +86,6 @@ describe("supi-claude-md resources_discover", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFns.loadClaudeMdConfig.mockReturnValue({ ...DEFAULT_CONFIG });
-    mockFns.shouldRefreshRoot.mockReturnValue(false);
-    mockFns.pruneAndReorderContextMessages.mockImplementation((msgs) => msgs);
   });
 
   it("registers a resources_discover handler", () => {

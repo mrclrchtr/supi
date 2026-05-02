@@ -6,8 +6,16 @@
 import * as fs from "node:fs";
 import { wrapExtensionContext } from "@mrclrchtr/supi-core";
 import type { DiscoveredContextFile } from "./discovery.ts";
-import type { ContextUsage } from "./refresh.ts";
 import type { InjectedDir } from "./state.ts";
+
+/**
+ * Context usage info from pi's ctx.getContextUsage().
+ */
+export interface ContextUsage {
+  tokens: number | null;
+  contextWindow: number;
+  percent: number | null;
+}
 
 /**
  * Format discovered context files into <extension-context> blocks.

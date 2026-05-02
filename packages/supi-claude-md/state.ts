@@ -15,14 +15,8 @@ export interface InjectedDir {
 export interface ClaudeMdState {
   /** Count of completed assistant turns (stopReason: "stop") */
   completedTurns: number;
-  /** Turn number of the last root context refresh */
-  lastRefreshTurn: number;
   /** Map of directory path → injection info */
   injectedDirs: Map<string, InjectedDir>;
-  /** Token of the current active root refresh message (for pruning) */
-  currentContextToken: string | null;
-  /** Counter for generating unique context tokens */
-  contextCounter: number;
   /** Set of paths already loaded by pi natively (dedup) */
   nativeContextPaths: Set<string>;
   /** Whether this is the first before_agent_start (for native path capture) */
@@ -32,10 +26,7 @@ export interface ClaudeMdState {
 export function createInitialState(): ClaudeMdState {
   return {
     completedTurns: 0,
-    lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    currentContextToken: null,
-    contextCounter: 0,
     nativeContextPaths: new Set(),
     firstAgentStart: true,
   };
@@ -44,25 +35,15 @@ export function createInitialState(): ClaudeMdState {
 const CONTEXT_TAG_REGEX =
   /<extension-context\s+source="supi-claude-md"\s+file="([^"]+)"\s+turn="(\d+)">/g;
 
-const REFRESH_CUSTOM_TYPE = "supi-claude-md-refresh";
-
 export function reconstructState(branch: SessionEntry[]): {
   completedTurns: number;
-  lastRefreshTurn: number;
   injectedDirs: Map<string, InjectedDir>;
-  contextCounter: number;
 } {
   let completedTurns = 0;
-  let lastRefreshTurn = 0;
-  let contextCounter = 0;
   const injectedDirs = new Map<string, InjectedDir>();
 
   for (const entry of branch) {
     if (isCompletedAssistantTurn(entry)) completedTurns++;
-    if (isRefreshMessage(entry)) {
-      lastRefreshTurn = getRefreshTurn(entry.details);
-      contextCounter = Math.max(contextCounter, getRefreshCounter(entry.details));
-    }
 
     const toolResultContent = getToolResultContent(entry);
     if (toolResultContent) {
@@ -70,7 +51,7 @@ export function reconstructState(branch: SessionEntry[]): {
     }
   }
 
-  return { completedTurns, lastRefreshTurn, injectedDirs, contextCounter };
+  return { completedTurns, injectedDirs };
 }
 
 function isCompletedAssistantTurn(entry: SessionEntry): boolean {
@@ -79,26 +60,6 @@ function isCompletedAssistantTurn(entry: SessionEntry): boolean {
     entry.message.role === "assistant" &&
     entry.message.stopReason === "stop"
   );
-}
-
-function isRefreshMessage(
-  entry: SessionEntry,
-): entry is Extract<SessionEntry, { type: "custom_message" }> {
-  return entry.type === "custom_message" && entry.customType === REFRESH_CUSTOM_TYPE;
-}
-
-function getRefreshTurn(details: unknown): number {
-  const d = details as { turn?: number } | undefined;
-  return d?.turn ?? 0;
-}
-
-function getRefreshCounter(details: unknown): number {
-  const d = details as { contextToken?: string } | undefined;
-  const match = d?.contextToken?.match(/^supi-claude-md-(\d+)$/);
-  if (!match?.[1]) return 0;
-
-  const counter = Number.parseInt(match[1], 10);
-  return Number.isNaN(counter) ? 0 : counter;
 }
 
 function getToolResultContent(entry: SessionEntry): unknown {

@@ -62,26 +62,11 @@ function makeToolResultEntry(text: string): SessionEntry {
   };
 }
 
-function makeRefreshEntry(turn: number, contextToken?: string): SessionEntry {
-  return {
-    type: "custom_message",
-    id: `refresh-${Math.random()}`,
-    parentId: null,
-    timestamp: new Date().toISOString(),
-    customType: "supi-claude-md-refresh",
-    content: "refresh",
-    display: true,
-    details: { turn, contextToken },
-  };
-}
-
 describe("reconstructState", () => {
-  it("returns zeros for empty branch", () => {
+  it("returns defaults for empty branch", () => {
     const result = reconstructState([]);
     expect(result.completedTurns).toBe(0);
-    expect(result.lastRefreshTurn).toBe(0);
     expect(result.injectedDirs.size).toBe(0);
-    expect(result.contextCounter).toBe(0);
   });
 
   it("counts completed assistant turns from session message entries", () => {
@@ -96,27 +81,6 @@ describe("reconstructState", () => {
 
     const result = reconstructState(branch);
     expect(result.completedTurns).toBe(2);
-  });
-
-  it("finds last refresh turn from custom message entries", () => {
-    const branch = [
-      makeRefreshEntry(3, "supi-claude-md-1"),
-      makeUserEntry(),
-      makeRefreshEntry(6, "supi-claude-md-2"),
-    ];
-
-    const result = reconstructState(branch);
-    expect(result.lastRefreshTurn).toBe(6);
-  });
-
-  it("tracks the highest refresh token counter", () => {
-    const branch = [
-      makeRefreshEntry(3, "supi-claude-md-2"),
-      makeRefreshEntry(6, "supi-claude-md-8"),
-    ];
-
-    const result = reconstructState(branch);
-    expect(result.contextCounter).toBe(8);
   });
 
   it("extracts injected dirs from tool result tags", () => {
@@ -168,15 +132,12 @@ describe("reconstructState", () => {
         '<extension-context source="supi-claude-md" file="pkg/a/CLAUDE.md" turn="1">\na\n</extension-context>',
       ),
       makeAssistantEntry("stop"),
-      makeRefreshEntry(2, "supi-claude-md-4"),
       makeAssistantEntry("stop"),
     ];
 
     const result = reconstructState(branch);
     expect(result.completedTurns).toBe(3);
-    expect(result.lastRefreshTurn).toBe(2);
     expect(result.injectedDirs.size).toBe(1);
-    expect(result.contextCounter).toBe(4);
   });
 
   it("handles missing or non-text tool result content gracefully", () => {

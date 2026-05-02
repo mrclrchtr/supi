@@ -8,10 +8,6 @@ const mockFns = vi.hoisted(() => ({
   findSubdirContextFiles: vi.fn(),
   formatSubdirContext: vi.fn(),
   shouldInjectSubdir: vi.fn(),
-  shouldRefreshRoot: vi.fn(),
-  formatRefreshContext: vi.fn(),
-  readNativeContextFiles: vi.fn(),
-  pruneAndReorderContextMessages: vi.fn(),
   reconstructState: vi.fn(),
 }));
 
@@ -21,11 +17,9 @@ vi.mock("@mrclrchtr/supi-core", () => ({
       ? ((details as { contextToken?: string }).contextToken ?? null)
       : null,
   loadSupiConfig: vi.fn(),
-  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
   registerConfigSettings: vi.fn(),
   registerSettings: vi.fn(),
   removeSupiConfigKey: vi.fn(),
-  restorePromptContent: vi.fn((msgs) => msgs),
   writeSupiConfig: vi.fn(),
 }));
 
@@ -50,19 +44,10 @@ vi.mock("../subdirectory.ts", () => ({
   shouldInjectSubdir: mockFns.shouldInjectSubdir,
 }));
 
-vi.mock("../refresh.ts", () => ({
-  shouldRefreshRoot: mockFns.shouldRefreshRoot,
-  formatRefreshContext: mockFns.formatRefreshContext,
-  readNativeContextFiles: mockFns.readNativeContextFiles,
-}));
-
 vi.mock("../state.ts", () => ({
   createInitialState: () => ({
     completedTurns: 0,
-    lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    currentContextToken: null,
-    contextCounter: 0,
     nativeContextPaths: new Set(),
     firstAgentStart: true,
   }),
@@ -74,8 +59,6 @@ import claudeMdExtension from "../index.ts";
 function resetMocks() {
   vi.clearAllMocks();
   mockFns.loadClaudeMdConfig.mockReturnValue({ ...DEFAULT_CONFIG });
-  mockFns.shouldRefreshRoot.mockReturnValue(false);
-  mockFns.pruneAndReorderContextMessages.mockImplementation((msgs) => msgs);
 }
 
 describe("claudeMdExtension: registration", () => {
@@ -90,7 +73,6 @@ describe("claudeMdExtension: registration", () => {
       "turn_end",
       "session_compact",
       "before_agent_start",
-      "context",
       "tool_result",
     ]) {
       expect(handlers.has(event), `missing handler for ${event}`).toBe(true);
@@ -107,9 +89,7 @@ describe("claudeMdExtension: session_start", () => {
 
     mockFns.reconstructState.mockReturnValue({
       completedTurns: 12,
-      lastRefreshTurn: 9,
       injectedDirs: new Map([["packages/foo", { turn: 5, file: "packages/foo/CLAUDE.md" }]]),
-      contextCounter: 4,
     });
 
     await handlers.get("session_start")?.(
@@ -159,8 +139,7 @@ describe("claudeMdExtension: turn_end", () => {
       makeCtx(),
     );
 
-    // No refresh should be emitted regardless of turn count
-    expect(mockFns.readNativeContextFiles).not.toHaveBeenCalled();
+    expect(mockFns.extractPathFromToolEvent).not.toHaveBeenCalled();
   });
 });
 
@@ -193,7 +172,7 @@ describe("claudeMdExtension: session_compact", () => {
       makeCtx(),
     );
 
-    // Compact should clear injectedDirs but not trigger root refresh
+    // Compact should clear injectedDirs
     await handlers.get("session_compact")?.({}, makeCtx());
 
     const result = await handlers.get("before_agent_start")?.(

@@ -3,9 +3,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { DiscoveredContextFile } from "../discovery.ts";
-import type { ContextUsage } from "../refresh.ts";
 import type { InjectedDir } from "../state.ts";
-import type { InjectionCheckOptions } from "../subdirectory.ts";
+import type { ContextUsage, InjectionCheckOptions } from "../subdirectory.ts";
 import { formatSubdirContext, shouldInjectSubdir } from "../subdirectory.ts";
 
 function makeTempDir(): string {

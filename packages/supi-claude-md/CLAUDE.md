@@ -18,7 +18,6 @@ Root and ancestor instruction files are loaded natively by pi into the system pr
 - `state.ts` — `ClaudeMdState` type, `createInitialState()`, `reconstructState()` from real pi `SessionEntry[]` branch data
 - `discovery.ts` — `findSubdirContextFiles()`, `filterAlreadyLoaded()`, `extractPathFromToolEvent()`
 - `subdirectory.ts` — `formatSubdirContext()`, `shouldInjectSubdir()`
-- `refresh.ts` — Historical root-refresh helpers (inert); kept for backward compatibility
 
 ## Dependencies
 
@@ -41,7 +40,7 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 
 ## Testing
 
-- Pure function unit tests in `__tests__/` — no pi mocks needed for discovery, subdirectory, refresh, state
+- Pure function unit tests in `__tests__/` — no pi mocks needed for discovery, subdirectory, state
 - Config tests use temp directories with `homeDir` parameter injection
 - Run: `pnpm vitest run packages/supi-claude-md/`
 

@@ -15,23 +15,19 @@ import type {
   SessionStartEvent,
   TurnEndEvent,
 } from "@mariozechner/pi-coding-agent";
-import { Box, Text } from "@mariozechner/pi-tui";
-import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import { loadClaudeMdConfig } from "./config.ts";
 import {
   extractPathFromToolEvent,
   filterAlreadyLoaded,
   findSubdirContextFiles,
 } from "./discovery.ts";
-import type { ContextUsage } from "./refresh.ts";
 import { registerClaudeMdSettings } from "./settings-registration.ts";
 import { type ClaudeMdState, createInitialState, reconstructState } from "./state.ts";
-import type { InjectionCheckOptions } from "./subdirectory.ts";
+import type { ContextUsage, InjectionCheckOptions } from "./subdirectory.ts";
 import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
 
 const baseDir = dirname(fileURLToPath(import.meta.url));
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: extension entry point wires all events
 export default function claudeMdExtension(pi: ExtensionAPI) {
   registerClaudeMdSettings();
   const state: ClaudeMdState = createInitialState();
@@ -47,9 +43,7 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
       if (branch.length > 0) {
         const reconstructed = reconstructState(branch);
         state.completedTurns = reconstructed.completedTurns;
-        state.lastRefreshTurn = reconstructed.lastRefreshTurn;
         state.injectedDirs = reconstructed.injectedDirs;
-        state.contextCounter = reconstructed.contextCounter;
       }
     } catch {
       // Reconstruction failed — start fresh
@@ -81,35 +75,6 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     captureNativePaths(state, eventWithOpts);
     // Root/ancestor context files are owned by pi's system prompt.
     // SuPi never re-injects them; subdirectory injection handles directories below cwd.
-    state.currentContextToken = null;
-  });
-
-  // ── Context pruning ────────────────────────────────────────
-
-  pi.on("context", (event) => {
-    const messages = pruneAndReorderContextMessages(
-      event.messages as Array<{
-        role?: string;
-        customType?: string;
-        content?: unknown;
-        details?: unknown;
-      }>,
-      "supi-claude-md-refresh",
-      state.currentContextToken,
-    );
-    const contextMessages = restorePromptContent(
-      messages,
-      "supi-claude-md-refresh",
-      state.currentContextToken,
-    ) as typeof event.messages;
-
-    if (
-      contextMessages.length === event.messages.length &&
-      contextMessages.every((m, i) => m === event.messages[i])
-    ) {
-      return;
-    }
-    return { messages: contextMessages };
   });
 
   // ── Subdirectory injection (tool_result) ───────────────────
@@ -154,35 +119,6 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
   pi.on("resources_discover", () => ({
     skillPaths: [join(baseDir, "resources")],
   }));
-
-  // ── Message renderer (historical compatibility) ────────────
-  // Old sessions may contain supi-claude-md-refresh messages; keep a renderer
-  // so the TUI can display them, but new sessions never emit this type.
-
-  pi.registerMessageRenderer("supi-claude-md-refresh", (message, { expanded }, theme) => {
-    const details = message.details as
-      | { contextToken?: string; turn?: number; fileCount?: number; files?: string[] }
-      | undefined;
-    const fileCount = details?.fileCount;
-    const token = details?.contextToken;
-    const files = details?.files ?? [];
-
-    const icon = theme.fg("accent", "\u{1F4C4}");
-    let text = `${icon} CLAUDE.md refreshed`;
-    if (fileCount != null && fileCount > 0) {
-      text += ` (${fileCount} file${fileCount === 1 ? "" : "s"})`;
-    }
-
-    if (expanded) {
-      const detailLines = files.map((file) => theme.fg("dim", `  ${file}`));
-      if (token) detailLines.push(theme.fg("dim", `  token: ${token}`));
-      if (detailLines.length > 0) text += `\n${detailLines.join("\n")}`;
-    }
-
-    const box = new Box(1, 1, (t) => theme.bg("customMessageBg", t));
-    box.addChild(new Text(text, 0, 0));
-    return box;
-  });
 }
 
 function captureNativePaths(

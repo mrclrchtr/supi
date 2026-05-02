@@ -8,10 +8,6 @@ const mockFns = vi.hoisted(() => ({
   findSubdirContextFiles: vi.fn(),
   formatSubdirContext: vi.fn(),
   shouldInjectSubdir: vi.fn(),
-  shouldRefreshRoot: vi.fn(),
-  formatRefreshContext: vi.fn(),
-  readNativeContextFiles: vi.fn(),
-  pruneAndReorderContextMessages: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-core", () => ({
@@ -20,11 +16,9 @@ vi.mock("@mrclrchtr/supi-core", () => ({
       ? ((details as { contextToken?: string }).contextToken ?? null)
       : null,
   loadSupiConfig: vi.fn(),
-  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
   registerConfigSettings: vi.fn(),
   registerSettings: vi.fn(),
   removeSupiConfigKey: vi.fn(),
-  restorePromptContent: vi.fn((msgs: unknown) => msgs),
   writeSupiConfig: vi.fn(),
 }));
 
@@ -49,19 +43,10 @@ vi.mock("../subdirectory.ts", () => ({
   shouldInjectSubdir: mockFns.shouldInjectSubdir,
 }));
 
-vi.mock("../refresh.ts", () => ({
-  shouldRefreshRoot: mockFns.shouldRefreshRoot,
-  formatRefreshContext: mockFns.formatRefreshContext,
-  readNativeContextFiles: mockFns.readNativeContextFiles,
-}));
-
 vi.mock("../state.ts", () => ({
   createInitialState: () => ({
     completedTurns: 0,
-    lastRefreshTurn: 0,
     injectedDirs: new Map(),
-    currentContextToken: null,
-    contextCounter: 0,
     nativeContextPaths: new Set(),
     firstAgentStart: true,
   }),
@@ -76,8 +61,6 @@ function resetMocks() {
   mockFns.extractPathFromToolEvent.mockReturnValue(null);
   mockFns.findSubdirContextFiles.mockReturnValue([]);
   mockFns.filterAlreadyLoaded.mockImplementation((files: unknown) => files);
-  mockFns.shouldRefreshRoot.mockReturnValue(false);
-  mockFns.pruneAndReorderContextMessages.mockImplementation((msgs: unknown) => msgs);
 }
 
 describe("claudeMdExtension: tool_result (injection)", () => {
@@ -257,12 +240,6 @@ describe("claudeMdExtension: native path deduplication", () => {
     const { handlers, pi } = createPiMock();
     claudeMdExtension(pi as never);
 
-    mockFns.shouldRefreshRoot.mockReturnValue(true);
-    mockFns.readNativeContextFiles.mockReturnValue([
-      { path: "/project/CLAUDE.md", content: "root" },
-    ]);
-    mockFns.formatRefreshContext.mockReturnValue("context");
-
     const bas = handlers.get("before_agent_start") as (...args: unknown[]) => unknown;
     await bas(
       {
@@ -276,7 +253,7 @@ describe("claudeMdExtension: native path deduplication", () => {
       makeCtx(),
     );
 
-    mockFns.shouldRefreshRoot.mockReturnValue(false);
+    // Second before_agent_start should not re-capture
     await bas(
       { systemPromptOptions: { contextFiles: [{ path: "/project/NEW.md", content: "new" }] } },
       makeCtx(),
@@ -302,12 +279,6 @@ describe("claudeMdExtension: native path deduplication", () => {
   it("calls filterAlreadyLoaded with native paths set", async () => {
     const { handlers, pi } = createPiMock();
     claudeMdExtension(pi as never);
-
-    mockFns.shouldRefreshRoot.mockReturnValue(true);
-    mockFns.readNativeContextFiles.mockReturnValue([
-      { path: "/project/CLAUDE.md", content: "root" },
-    ]);
-    mockFns.formatRefreshContext.mockReturnValue("context");
 
     await handlers.get("before_agent_start")?.(
       { systemPromptOptions: { contextFiles: [{ path: "/project/CLAUDE.md", content: "root" }] } },
