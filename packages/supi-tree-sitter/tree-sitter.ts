@@ -12,6 +12,7 @@ import {
   truncateText,
   validationError,
 } from "./formatting.ts";
+import { detectGrammar, isJsTsGrammar } from "./language.ts";
 import { collectOutline } from "./outline.ts";
 import { TreeSitterRuntime } from "./runtime.ts";
 import { extractExports, extractImports, lookupNodeAt } from "./structure.ts";
@@ -131,6 +132,9 @@ async function executeToolAction(runtime: TreeSitterRuntime, params: ToolParams)
 async function handleOutline(runtime: TreeSitterRuntime, file: string): Promise<string> {
   const parseResult = await runtime.parseFile(file);
   if (parseResult.kind !== "success") return formatNonSuccess(parseResult);
+  if (!isJsTsGrammar(parseResult.data.grammarId)) {
+    return `Unsupported language: outline is only supported for JavaScript and TypeScript files`;
+  }
 
   const { tree, source } = parseResult.data;
   let items: ReturnType<typeof collectOutline>;
@@ -149,6 +153,10 @@ async function handleOutline(runtime: TreeSitterRuntime, file: string): Promise<
 }
 
 async function handleImports(runtime: TreeSitterRuntime, file: string): Promise<string> {
+  const grammarId = detectGrammar(file);
+  if (grammarId && !isJsTsGrammar(grammarId)) {
+    return `Unsupported language: imports is only supported for JavaScript and TypeScript files`;
+  }
   const result = await extractImports(runtime, file);
   if (result.kind !== "success") return formatNonSuccess(result);
 
@@ -166,6 +174,10 @@ async function handleImports(runtime: TreeSitterRuntime, file: string): Promise<
 }
 
 async function handleExports(runtime: TreeSitterRuntime, file: string): Promise<string> {
+  const grammarId = detectGrammar(file);
+  if (grammarId && !isJsTsGrammar(grammarId)) {
+    return `Unsupported language: exports is only supported for JavaScript and TypeScript files`;
+  }
   const result = await extractExports(runtime, file);
   if (result.kind !== "success") return formatNonSuccess(result);
 

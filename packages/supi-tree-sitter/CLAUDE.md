@@ -13,6 +13,19 @@ The package is designed as a standalone structural-analysis substrate. It does n
 - `runtime.ts`, `session.ts` — grammar initialization, parser reuse, session lifecycle, and `dispose()`
 - `outline.ts`, `structure.ts`, `formatting.ts` — tool action extraction, formatting, and output caps
 - `coordinates.ts` — 1-based UTF-16 coordinate conversion shared with `node_at` and query results
+- `language.ts` — file extension → grammar ID detection and WASM path resolution
+
+## Supported languages
+
+Grammars are resolved via npm peer dependencies. Supported file families:
+- **JavaScript/TypeScript**: `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.tsx`
+- **Python**: `.py`, `.pyi`
+- **Rust**: `.rs`
+- **Go**: `.go`, `.mod`
+- **C/C++**: `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, `.cxx`, `.hxx`, `.c++`, `.h++`
+- **Java**: `.java`
+- **Kotlin**: `.kt`, `.kts`
+- **Ruby**: `.rb`
 
 ## Validation
 

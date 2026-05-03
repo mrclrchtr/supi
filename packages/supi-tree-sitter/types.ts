@@ -73,7 +73,18 @@ export interface TreeSitterSession {
 }
 
 /** Supported grammar identifiers. */
-export type GrammarId = "javascript" | "typescript" | "tsx";
+export type GrammarId =
+  | "javascript"
+  | "typescript"
+  | "tsx"
+  | "python"
+  | "rust"
+  | "go"
+  | "c"
+  | "cpp"
+  | "java"
+  | "kotlin"
+  | "ruby";
 
 /** Supported file extension. */
 export type SupportedExtension =
@@ -84,4 +95,22 @@ export type SupportedExtension =
   | ".mts"
   | ".cts"
   | ".mjs"
-  | ".cjs";
+  | ".cjs"
+  | ".py"
+  | ".pyi"
+  | ".rs"
+  | ".go"
+  | ".mod"
+  | ".c"
+  | ".h"
+  | ".cpp"
+  | ".hpp"
+  | ".cc"
+  | ".cxx"
+  | ".hxx"
+  | ".c++"
+  | ".h++"
+  | ".java"
+  | ".kt"
+  | ".kts"
+  | ".rb";

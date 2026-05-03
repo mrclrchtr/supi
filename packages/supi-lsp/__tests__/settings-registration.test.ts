@@ -46,7 +46,7 @@ describe("loadLspSettings", () => {
 
   it("returns defaults when no config exists", () => {
     const result = loadLspSettings(tmpDir, tmpDir);
-    expect(result).toEqual({ enabled: true, severity: 1, servers: [] });
+    expect(result).toEqual({ enabled: true, severity: 1, active: [] });
   });
 
   it("reads project config", () => {
@@ -58,7 +58,7 @@ describe("loadLspSettings", () => {
     );
 
     const result = loadLspSettings(tmpDir, tmpDir);
-    expect(result).toEqual({ enabled: false, severity: 2, servers: [] });
+    expect(result).toEqual({ enabled: false, severity: 2, active: [] });
   });
 });
 
@@ -141,7 +141,7 @@ describe("registerLspSettings: registration", () => {
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
     expect(items).toHaveLength(3);
-    expect(items.map((i) => i.id)).toEqual(["enabled", "severity", "servers"]);
+    expect(items.map((i) => i.id)).toEqual(["enabled", "severity", "active"]);
   });
 
   it("enabled item defaults to on", () => {
@@ -162,12 +162,12 @@ describe("registerLspSettings: registration", () => {
     expect(severityItem?.values).toEqual(["1 (errors)", "2 (warnings)", "3 (info)", "4 (hints)"]);
   });
 
-  it("servers item defaults to all", () => {
+  it("active item defaults to all", () => {
     registerLspSettings();
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
-    const serversItem = items.find((i) => i.id === "servers");
-    expect(serversItem?.currentValue).toBe("all");
+    const activeItem = items.find((i) => i.id === "active");
+    expect(activeItem?.currentValue).toBe("all");
   });
 
   it("loadValues reads the selected scope instead of merged effective config", () => {
@@ -175,13 +175,13 @@ describe("registerLspSettings: registration", () => {
     fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, ".pi/agent/supi/config.json"),
-      JSON.stringify({ lsp: { enabled: false, severity: 2, servers: ["gopls"] } }),
+      JSON.stringify({ lsp: { enabled: false, severity: 2, active: ["go"] } }),
     );
 
     fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, ".pi/supi/config.json"),
-      JSON.stringify({ lsp: { enabled: true, severity: 4, servers: ["pyright"] } }),
+      JSON.stringify({ lsp: { enabled: true, severity: 4, active: ["python"] } }),
     );
 
     withHomeDir(tmpDir, () => {
@@ -192,11 +192,11 @@ describe("registerLspSettings: registration", () => {
 
       expect(globalItems.find((i) => i.id === "enabled")?.currentValue).toBe("off");
       expect(globalItems.find((i) => i.id === "severity")?.currentValue).toBe("2 (warnings)");
-      expect(globalItems.find((i) => i.id === "servers")?.currentValue).toBe("gopls");
+      expect(globalItems.find((i) => i.id === "active")?.currentValue).toBe("go");
 
       expect(projectItems.find((i) => i.id === "enabled")?.currentValue).toBe("on");
       expect(projectItems.find((i) => i.id === "severity")?.currentValue).toBe("4 (hints)");
-      expect(projectItems.find((i) => i.id === "servers")?.currentValue).toBe("pyright");
+      expect(projectItems.find((i) => i.id === "active")?.currentValue).toBe("python");
     });
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -222,7 +222,7 @@ describe("registerLspSettings: persistence", () => {
     const config = loadSupiConfig(
       "lsp",
       tmpDir,
-      { enabled: true, severity: 1, servers: [] },
+      { enabled: true, severity: 1, active: [] },
       opts(tmpDir),
     );
     expect(config.enabled).toBe(false);
@@ -240,7 +240,7 @@ describe("registerLspSettings: persistence", () => {
     const config = loadSupiConfig(
       "lsp",
       tmpDir,
-      { enabled: true, severity: 1, servers: [] },
+      { enabled: true, severity: 1, active: [] },
       opts(tmpDir),
     );
     expect(config.severity).toBe(3);
@@ -253,15 +253,15 @@ describe("registerLspSettings: persistence", () => {
     registerLspSettings();
     const section = getRegisteredSettings()[0];
 
-    section.persistChange("project", tmpDir, "servers", "rust-analyzer, pyright");
+    section.persistChange("project", tmpDir, "active", "rust, python");
 
     const config = loadSupiConfig(
       "lsp",
       tmpDir,
-      { enabled: true, severity: 1, servers: [] },
+      { enabled: true, severity: 1, active: [] },
       opts(tmpDir),
     );
-    expect(config.servers).toEqual(["rust-analyzer", "pyright"]);
+    expect(config.active).toEqual(["rust", "python"]);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -271,16 +271,16 @@ describe("registerLspSettings: persistence", () => {
     registerLspSettings();
     const section = getRegisteredSettings()[0];
 
-    section.persistChange("project", tmpDir, "servers", "rust-analyzer");
-    section.persistChange("project", tmpDir, "servers", "");
+    section.persistChange("project", tmpDir, "active", "rust");
+    section.persistChange("project", tmpDir, "active", "");
 
     const config = loadSupiConfig(
       "lsp",
       tmpDir,
-      { enabled: true, severity: 1, servers: [] },
+      { enabled: true, severity: 1, active: [] },
       opts(tmpDir),
     );
-    expect(config.servers).toEqual([]);
+    expect(config.active).toEqual([]);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -297,7 +297,7 @@ describe("registerLspSettings: persistence", () => {
       const config = loadSupiConfig(
         "lsp",
         tmpDir,
-        { enabled: true, severity: 1, servers: [] },
+        { enabled: true, severity: 1, active: [] },
         opts(tmpDir),
       );
       expect(config.enabled).toBe(false);
@@ -312,29 +312,29 @@ describe("registerLspSettings: persistence", () => {
     fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, ".pi/agent/supi/config.json"),
-      JSON.stringify({ lsp: { enabled: false, severity: 2, servers: ["gopls"] } }),
+      JSON.stringify({ lsp: { enabled: false, severity: 2, active: ["go"] } }),
     );
 
     fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, ".pi/supi/config.json"),
-      JSON.stringify({ lsp: { enabled: true, severity: 4, servers: ["pyright"] } }),
+      JSON.stringify({ lsp: { enabled: true, severity: 4, active: ["python"] } }),
     );
 
     withHomeDir(tmpDir, () => {
       registerLspSettings();
       const section = getRegisteredSettings()[0];
-      section.persistChange("global", tmpDir, "servers", "");
+      section.persistChange("global", tmpDir, "active", "");
 
       const config = loadSupiConfig(
         "lsp",
         tmpDir,
-        { enabled: true, severity: 1, servers: [] },
+        { enabled: true, severity: 1, active: [] },
         opts(tmpDir),
       );
       expect(config.enabled).toBe(true);
       expect(config.severity).toBe(4);
-      expect(config.servers).toEqual(["pyright"]);
+      expect(config.active).toEqual(["python"]);
     });
 
     fs.rmSync(tmpDir, { recursive: true, force: true });

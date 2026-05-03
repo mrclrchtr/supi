@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
   loadConfig: vi.fn(),
-  loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, servers: [] })),
+  loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, active: [] })),
   pruneAndReorderContextMessages: vi.fn((msgs: unknown) => msgs),
   buildProjectGuidelines: vi.fn(() => []),
   diagnosticsContextFingerprint: vi.fn(),
@@ -136,7 +136,7 @@ describe("system prompt stability", () => {
     clearSessionLspService("/old-project");
     clearSessionLspService("/new-project");
     mockFns.loadConfig.mockReturnValue({ servers: {} });
-    mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, servers: [] });
+    mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, active: [] });
   });
 
   it("clears the previous cwd service when a new session starts before shutdown", async () => {
@@ -218,7 +218,7 @@ describe("before_agent_start diagnostic refresh", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFns.loadConfig.mockReturnValue({ servers: {} });
-    mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, servers: [] });
+    mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, active: [] });
   });
 
   it("calls refreshOpenDiagnostics before reading diagnostic summary", async () => {

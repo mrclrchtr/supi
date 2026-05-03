@@ -8,7 +8,7 @@ import { StringEnum } from "@mariozechner/pi-ai";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import { Type } from "typebox";
-import { loadConfig } from "./config.ts";
+import { loadConfig, resolveLanguageAlias } from "./config.ts";
 import { formatDiagnosticsDisplayContent } from "./diagnostic-display.ts";
 import {
   buildProjectGuidelines,
@@ -106,8 +106,8 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     const config = loadConfig(cwd);
 
     // Apply server allowlist filter from supi shared config
-    if (lspSettings.servers.length > 0) {
-      const allowList = new Set(lspSettings.servers);
+    if (lspSettings.active.length > 0) {
+      const allowList = new Set(lspSettings.active.map(resolveLanguageAlias));
       for (const name of Object.keys(config.servers)) {
         if (!allowList.has(name)) {
           delete config.servers[name];

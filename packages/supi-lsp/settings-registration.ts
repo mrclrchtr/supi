@@ -15,13 +15,13 @@ import { loadConfig } from "./config.ts";
 export interface LspSettings {
   enabled: boolean;
   severity: number;
-  servers: string[];
+  active: string[];
 }
 
 const LSP_DEFAULTS: LspSettings = {
   enabled: true,
   severity: 1,
-  servers: [],
+  active: [],
 };
 
 // ── Config helpers ───────────────────────────────────────────
@@ -77,15 +77,15 @@ export function registerLspSettings(): void {
       } else if (settingId === "severity") {
         const num = Number.parseInt(value.split(" ")[0] ?? "1", 10);
         helpers.set("severity", Number.isNaN(num) ? 1 : num);
-      } else if (settingId === "servers") {
-        const servers = value
+      } else if (settingId === "active") {
+        const active = value
           .split(",")
           .map((s) => s.trim())
           .filter((s) => s.length > 0);
-        if (servers.length > 0) {
-          helpers.set("servers", servers);
+        if (active.length > 0) {
+          helpers.set("active", active);
         } else {
-          helpers.unset("servers");
+          helpers.unset("active");
         }
       }
     },
@@ -113,10 +113,10 @@ function buildLspSettingItems(
       values: ["1 (errors)", "2 (warnings)", "3 (info)", "4 (hints)"],
     },
     {
-      id: "servers",
+      id: "active",
       label: "Active Servers",
       description: "Press Enter to configure which language servers are active",
-      currentValue: settings.servers.length > 0 ? settings.servers.join(", ") : "all",
+      currentValue: settings.active.length > 0 ? settings.active.join(", ") : "all",
       submenu: (_currentValue, done) => createServerSubmenu(scope, cwd, settings, done),
     },
   ];
@@ -136,8 +136,8 @@ function createServerSubmenu(
 } {
   const config = loadConfig(cwd);
   const allServers = Object.keys(config.servers);
-  const allEnabled = settings.servers.length === 0;
-  const enabledServers = new Set(settings.servers);
+  const allEnabled = settings.active.length === 0;
+  const enabledServers = new Set(settings.active);
 
   const items: SettingItem[] = allServers.map((name) => ({
     id: name,

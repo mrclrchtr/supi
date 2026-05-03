@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
   loadConfig: vi.fn(),
-  loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, servers: [] })),
+  loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, active: [] })),
   pruneAndReorderContextMessages: vi.fn((msgs: unknown) => msgs),
   buildProjectGuidelines: vi.fn(() => []),
   diagnosticsContextFingerprint: vi.fn(),
@@ -110,7 +110,7 @@ import lspExtension from "../lsp.ts";
 function resetMocks() {
   vi.clearAllMocks();
   mockFns.loadConfig.mockReturnValue({ servers: {} });
-  mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, servers: [] });
+  mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, active: [] });
   mockFns.pruneAndReorderContextMessages.mockImplementation((msgs: unknown) => msgs);
   mockFns.buildProjectGuidelines.mockReturnValue([]);
   mockFns.diagnosticsContextFingerprint.mockReturnValue(null);

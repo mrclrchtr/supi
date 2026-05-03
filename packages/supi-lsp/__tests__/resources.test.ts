@@ -31,7 +31,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
       : null,
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
   registerSettings: vi.fn(),
-  loadSupiConfig: vi.fn(() => ({ enabled: true, severity: 1, servers: [] })),
+  loadSupiConfig: vi.fn(() => ({ enabled: true, severity: 1, active: [] })),
   restorePromptContent: vi.fn((msgs: unknown) => msgs),
 }));
 vi.mock("../guidance.ts", () => ({
@@ -59,7 +59,7 @@ vi.mock("../tree-persist.ts", () => ({
   registerTreePersistHandlers: vi.fn(),
 }));
 vi.mock("../settings-registration.ts", () => ({
-  loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, servers: [] })),
+  loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, active: [] })),
   getLspDisabledMessage: vi.fn(() => "LSP is disabled in settings"),
   registerLspSettings: vi.fn(),
 }));

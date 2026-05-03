@@ -176,9 +176,9 @@ describe("tree_sitter tool actions", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns unsupported language for .py files", async () => {
+  it("returns unsupported language for .lua files", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "outline", file: "script.py" });
+    const text = await executeTool(pi, { action: "outline", file: "script.lua" });
     expect(text).toContain("Unsupported language");
   });
 

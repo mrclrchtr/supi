@@ -16,6 +16,24 @@ const EXTENSION_GRAMMAR: Record<string, GrammarId> = {
   ".mts": "typescript",
   ".cts": "typescript",
   ".tsx": "tsx",
+  ".py": "python",
+  ".pyi": "python",
+  ".rs": "rust",
+  ".go": "go",
+  ".mod": "go",
+  ".c": "c",
+  ".h": "c",
+  ".cpp": "cpp",
+  ".hpp": "cpp",
+  ".cc": "cpp",
+  ".cxx": "cpp",
+  ".hxx": "cpp",
+  ".c++": "cpp",
+  ".h++": "cpp",
+  ".java": "java",
+  ".kt": "kotlin",
+  ".kts": "kotlin",
+  ".rb": "ruby",
 };
 
 const SUPPORTED_EXTENSIONS = new Set<string>(Object.keys(EXTENSION_GRAMMAR));
@@ -37,11 +55,26 @@ export function detectGrammar(filePath: string): GrammarId | undefined {
   return EXTENSION_GRAMMAR[ext];
 }
 
+const JS_TS_GRAMMARS: ReadonlySet<GrammarId> = new Set(["javascript", "typescript", "tsx"]);
+
+/** Returns true if the grammar is one the JS/TS extractors understand. */
+export function isJsTsGrammar(grammarId: GrammarId): boolean {
+  return JS_TS_GRAMMARS.has(grammarId);
+}
+
 /** Grammar WASM file names within their respective npm packages. */
 const GRAMMAR_WASM: Record<GrammarId, string> = {
   javascript: "tree-sitter-javascript.wasm",
   typescript: "tree-sitter-typescript.wasm",
   tsx: "tree-sitter-tsx.wasm",
+  python: "tree-sitter-python.wasm",
+  rust: "tree-sitter-rust.wasm",
+  go: "tree-sitter-go.wasm",
+  c: "tree-sitter-c.wasm",
+  cpp: "tree-sitter-cpp.wasm",
+  java: "tree-sitter-java.wasm",
+  kotlin: "tree-sitter-kotlin.wasm",
+  ruby: "tree-sitter-ruby.wasm",
 };
 
 /** Grammar npm package names. */
@@ -49,6 +82,14 @@ const GRAMMAR_PACKAGE: Record<GrammarId, string> = {
   javascript: "tree-sitter-javascript",
   typescript: "tree-sitter-typescript",
   tsx: "tree-sitter-typescript",
+  python: "tree-sitter-python",
+  rust: "tree-sitter-rust",
+  go: "tree-sitter-go",
+  c: "tree-sitter-c",
+  cpp: "tree-sitter-cpp",
+  java: "tree-sitter-java",
+  kotlin: "@tree-sitter-grammars/tree-sitter-kotlin",
+  ruby: "tree-sitter-ruby",
 };
 
 /**

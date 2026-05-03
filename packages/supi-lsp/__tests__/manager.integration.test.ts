@@ -67,7 +67,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
     const client = await manager.ensureFileOpen(validFile);
 
     expect(client).not.toBeNull();
-    expect(client?.name).toBe("typescript-language-server");
+    expect(client?.name).toBe("typescript");
     expect(client?.status).toBe("running");
   }, 15_000);
 
@@ -113,7 +113,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
     const status = manager.getStatus();
     expect(status.servers.length).toBeGreaterThan(0);
 
-    const tsServer = status.servers.find((s) => s.name === "typescript-language-server");
+    const tsServer = status.servers.find((s) => s.name === "typescript");
     expect(tsServer).toBeDefined();
     expect(tsServer?.status).toBe("running");
     expect(tsServer?.root).toBe(tmpDir);

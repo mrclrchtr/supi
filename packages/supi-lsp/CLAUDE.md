@@ -58,7 +58,8 @@ Entrypoints:
 - Keep summary/relevance formatting out of `manager.ts`; prefer focused helpers like `summary.ts` or `manager-*.ts` modules.
 - `manager.ts` + Biome `noExcessiveLinesPerFile` — extract focused `manager-*.ts` helpers before commit hooks fail on the 400-line cap.
 - `ctx.cwd` is threaded through `LspManager` and formatting utilities; do not use `process.cwd()` for path resolution.
-- `loadConfig()` handles only `.pi-lsp.json` server definitions; settings allowlists are applied in `session_start` after loading config.
+- `loadConfig()` reads server definitions from supi config (`~/.pi/agent/supi/config.json` and `.pi/supi/config.json`) under the `lsp.servers` key. `.pi-lsp.json` is no longer read. Keys are **language names** (e.g., `typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, `kotlin`), not server binary names. Each language entry merges individually against built-in defaults; omitted fields fall back to the code default for that language.
+- The settings allowlist is stored under `lsp.active` (array of language names) and applied in `session_start` after loading config.
 
 ## Focused test commands
 

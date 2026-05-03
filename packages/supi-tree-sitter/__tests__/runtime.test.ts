@@ -10,13 +10,13 @@ describe("TreeSitterRuntime", () => {
   });
 
   describe("parseFile — unsupported language", () => {
-    it("returns unsupported-language for .py files", async () => {
+    it("returns unsupported-language for .lua files", async () => {
       const runtime = new TreeSitterRuntime("/tmp");
-      const result = await runtime.parseFile("script.py");
+      const result = await runtime.parseFile("script.lua");
       expect(result.kind).toBe("unsupported-language");
       if (result.kind === "unsupported-language") {
-        expect(result.file).toBe("script.py");
-        expect(result.message).toContain(".py");
+        expect(result.file).toBe("script.lua");
+        expect(result.message).toContain(".lua");
       }
       runtime.dispose();
     });

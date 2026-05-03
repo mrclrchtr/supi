@@ -16,8 +16,17 @@ describe("isSupportedFile", () => {
     ["file.cts", true],
     ["file.mjs", true],
     ["file.cjs", true],
-    ["file.py", false],
-    ["file.rs", false],
+    ["file.py", true],
+    ["file.pyi", true],
+    ["file.rs", true],
+    ["file.go", true],
+    ["file.mod", true],
+    ["file.c", true],
+    ["file.cpp", true],
+    ["file.java", true],
+    ["file.kt", true],
+    ["file.kts", true],
+    ["file.rb", true],
     ["Makefile", false],
     ["file.TS", true], // case-insensitive
   ])("%s → %s", (filePath, expected) => {
@@ -29,11 +38,13 @@ describe("getSupportedExtension", () => {
   it("returns the extension for supported files", () => {
     expect(getSupportedExtension("index.ts")).toBe(".ts");
     expect(getSupportedExtension("component.tsx")).toBe(".tsx");
+    expect(getSupportedExtension("main.py")).toBe(".py");
+    expect(getSupportedExtension("lib.rs")).toBe(".rs");
   });
 
   it("returns undefined for unsupported files", () => {
-    expect(getSupportedExtension("main.py")).toBeUndefined();
     expect(getSupportedExtension("Makefile")).toBeUndefined();
+    expect(getSupportedExtension("readme.txt")).toBeUndefined();
   });
 });
 
@@ -55,8 +66,42 @@ describe("detectGrammar", () => {
     expect(detectGrammar("comp.tsx")).toBe("tsx");
   });
 
+  it("maps Python extensions to python grammar", () => {
+    expect(detectGrammar("main.py")).toBe("python");
+    expect(detectGrammar("types.pyi")).toBe("python");
+  });
+
+  it("maps Rust extensions to rust grammar", () => {
+    expect(detectGrammar("lib.rs")).toBe("rust");
+  });
+
+  it("maps Go extensions to go grammar", () => {
+    expect(detectGrammar("main.go")).toBe("go");
+    expect(detectGrammar("go.mod")).toBe("go");
+  });
+
+  it("maps C/C++ extensions to c and cpp grammars", () => {
+    expect(detectGrammar("main.c")).toBe("c");
+    expect(detectGrammar("main.h")).toBe("c");
+    expect(detectGrammar("main.cpp")).toBe("cpp");
+    expect(detectGrammar("main.hpp")).toBe("cpp");
+  });
+
+  it("maps Java extensions to java grammar", () => {
+    expect(detectGrammar("App.java")).toBe("java");
+  });
+
+  it("maps Kotlin extensions to kotlin grammar", () => {
+    expect(detectGrammar("App.kt")).toBe("kotlin");
+    expect(detectGrammar("build.gradle.kts")).toBe("kotlin");
+  });
+
+  it("maps Ruby extensions to ruby grammar", () => {
+    expect(detectGrammar("app.rb")).toBe("ruby");
+  });
+
   it("returns undefined for unsupported extensions", () => {
-    expect(detectGrammar("main.py")).toBeUndefined();
+    expect(detectGrammar("main.txt")).toBeUndefined();
   });
 });
 
@@ -77,5 +122,17 @@ describe("resolveGrammarWasmPath", () => {
     const path = resolveGrammarWasmPath("tsx");
     expect(path).toContain("tree-sitter-typescript");
     expect(path).toMatch(/tree-sitter-tsx\.wasm$/);
+  });
+
+  it("resolves python grammar WASM path", () => {
+    const path = resolveGrammarWasmPath("python");
+    expect(path).toContain("tree-sitter-python");
+    expect(path).toMatch(/tree-sitter-python\.wasm$/);
+  });
+
+  it("resolves rust grammar WASM path", () => {
+    const path = resolveGrammarWasmPath("rust");
+    expect(path).toContain("tree-sitter-rust");
+    expect(path).toMatch(/tree-sitter-rust\.wasm$/);
   });
 });

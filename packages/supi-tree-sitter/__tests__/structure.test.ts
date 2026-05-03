@@ -168,9 +168,9 @@ describe("import extraction", () => {
     runtime.dispose();
   });
 
-  it("returns unsupported-language for .py files", async () => {
+  it("returns unsupported-language for .lua files", async () => {
     const runtime = new TreeSitterRuntime(FIXTURE_DIR);
-    const result = await extractImports(runtime, "script.py");
+    const result = await extractImports(runtime, "script.lua");
     expect(result.kind).toBe("unsupported-language");
     runtime.dispose();
   });

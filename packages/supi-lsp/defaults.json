@@ -1,12 +1,12 @@
 {
   "servers": {
-    "typescript-language-server": {
+    "typescript": {
       "command": "typescript-language-server",
       "args": ["--stdio"],
       "fileTypes": ["ts", "tsx", "js", "jsx", "mts", "cts", "mjs", "cjs"],
       "rootMarkers": ["tsconfig.json", "jsconfig.json", "package.json"]
     },
-    "pyright": {
+    "python": {
       "command": "pyright-langserver",
       "args": ["--stdio"],
       "fileTypes": ["py", "pyi"],
@@ -18,23 +18,41 @@
         "pyrightconfig.json"
       ]
     },
-    "rust-analyzer": {
+    "rust": {
       "command": "rust-analyzer",
       "args": [],
       "fileTypes": ["rs"],
       "rootMarkers": ["Cargo.toml"]
     },
-    "gopls": {
+    "go": {
       "command": "gopls",
       "args": ["serve"],
       "fileTypes": ["go", "mod"],
       "rootMarkers": ["go.mod", "go.sum"]
     },
-    "clangd": {
+    "c": {
       "command": "clangd",
       "args": ["--background-index"],
       "fileTypes": ["c", "h", "cpp", "hpp", "cc", "cxx", "hxx", "c++", "h++"],
       "rootMarkers": ["compile_commands.json", "CMakeLists.txt", ".clangd", "Makefile"]
+    },
+    "ruby": {
+      "command": "ruby-lsp",
+      "args": [],
+      "fileTypes": ["rb", "erb", "gemspec"],
+      "rootMarkers": ["Gemfile", ".ruby-version"]
+    },
+    "java": {
+      "command": "jdtls",
+      "args": [],
+      "fileTypes": ["java"],
+      "rootMarkers": ["pom.xml", "build.gradle"]
+    },
+    "kotlin": {
+      "command": "kotlin-lsp",
+      "args": [],
+      "fileTypes": ["kt", "kts"],
+      "rootMarkers": ["build.gradle.kts", "pom.xml"]
     }
   }
 }

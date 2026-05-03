@@ -23,7 +23,7 @@ describe("LSP prompt guidance", () => {
     const guidelines = buildProjectGuidelines(
       [
         {
-          name: "typescript-language-server",
+          name: "typescript",
           root: process.cwd(),
           fileTypes: ["ts", "tsx"],
           status: "running",
@@ -31,7 +31,7 @@ describe("LSP prompt guidance", () => {
           openFiles: [],
         } satisfies ProjectServerInfo,
         {
-          name: "rust-analyzer",
+          name: "rust",
           root: `${process.cwd()}/crates/core`,
           fileTypes: ["rs"],
           status: "unavailable",
@@ -42,11 +42,11 @@ describe("LSP prompt guidance", () => {
       process.cwd(),
     );
 
-    expect(guidelines.join(" ")).toContain("LSP active: typescript-language-server");
+    expect(guidelines.join(" ")).toContain("LSP active: typescript");
     expect(guidelines.join(" ")).toContain("root: .");
     expect(guidelines.join(" ")).toContain(".ts, .tsx");
     expect(guidelines.join(" ")).toContain("hover(file,line,char)");
-    expect(guidelines.join(" ")).toContain("LSP unavailable: rust-analyzer");
+    expect(guidelines.join(" ")).toContain("LSP unavailable: rust");
   });
 
   it("falls back to generic stable system-prompt guidance when no servers are detected", () => {
@@ -139,13 +139,13 @@ describe("LspManager inactive coverage summaries", () => {
     const manager = new LspManager(
       {
         servers: {
-          "typescript-language-server": {
+          typescript: {
             command: "typescript-language-server",
             args: ["--stdio"],
             fileTypes: ["ts", "tsx", "js", "jsx"],
             rootMarkers: ["package.json"],
           },
-          pyright: {
+          python: {
             command: "pyright-langserver",
             args: ["--stdio"],
             fileTypes: ["py", "pyi"],
@@ -165,7 +165,7 @@ describe("LspManager relevant coverage summaries", () => {
     const manager = new LspManager(
       {
         servers: {
-          "typescript-language-server": {
+          typescript: {
             command: "typescript-language-server",
             args: ["--stdio"],
             fileTypes: ["ts", "tsx", "js", "jsx"],
@@ -191,8 +191,8 @@ describe("LspManager relevant coverage summaries", () => {
       }
     ).clients;
 
-    clients.set("typescript-language-server:/tmp/project", {
-      name: "typescript-language-server",
+    clients.set("typescript:/tmp/project", {
+      name: "typescript",
       status: "running",
       root: "/tmp/project",
       openFiles: [path.join(process.cwd(), "lsp/lsp.ts"), path.join(process.cwd(), "README.md")],

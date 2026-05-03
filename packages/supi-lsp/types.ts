@@ -364,6 +364,7 @@ export interface ServerConfig {
   initializationOptions?: unknown;
 }
 
+/** LSP configuration keyed by language name (e.g. `typescript`, `python`). */
 export interface LspConfig {
   servers: Record<string, ServerConfig>;
 }

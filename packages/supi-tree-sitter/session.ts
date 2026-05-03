@@ -1,5 +1,6 @@
 // Session factory — creates a TreeSitterSession bound to a working directory.
 
+import { detectGrammar, isJsTsGrammar } from "./language.ts";
 import { TreeSitterRuntime } from "./runtime.ts";
 import { extractExports, extractImports, extractOutline, lookupNodeAt } from "./structure.ts";
 import type {
@@ -41,6 +42,13 @@ export function createTreeSitterSession(cwd: string): TreeSitterSession {
     async outline(file: string): Promise<TreeSitterResult<OutlineItem[]>> {
       const parseResult = await runtime.parseFile(file);
       if (parseResult.kind !== "success") return parseResult;
+      if (!isJsTsGrammar(parseResult.data.grammarId)) {
+        return {
+          kind: "unsupported-language",
+          file,
+          message: `outline is not supported for ${parseResult.data.grammarId} files`,
+        };
+      }
       const { tree, source } = parseResult.data;
       try {
         const items = extractOutline(tree.rootNode, source);
@@ -51,10 +59,26 @@ export function createTreeSitterSession(cwd: string): TreeSitterSession {
     },
 
     async imports(file: string): Promise<TreeSitterResult<ImportRecord[]>> {
+      const grammarId = detectGrammar(file);
+      if (grammarId && !isJsTsGrammar(grammarId)) {
+        return {
+          kind: "unsupported-language",
+          file,
+          message: `imports is not supported for ${grammarId} files`,
+        };
+      }
       return extractImports(runtime, file);
     },
 
     async exports(file: string): Promise<TreeSitterResult<ExportRecord[]>> {
+      const grammarId = detectGrammar(file);
+      if (grammarId && !isJsTsGrammar(grammarId)) {
+        return {
+          kind: "unsupported-language",
+          file,
+          message: `exports is not supported for ${grammarId} files`,
+        };
+      }
       return extractExports(runtime, file);
     },
 
