@@ -163,7 +163,33 @@ describe("rtkExtension", () => {
     expect(lastCall?.[0]).toBe("/project");
     expect(lastCall?.[1]).toMatchObject({
       shellPath: "/bin/zsh",
-      commandPrefix: "source ~/.zshrc",
+    });
+    expect(lastCall?.[1]).not.toHaveProperty("commandPrefix");
+  });
+
+  it("spawnHook strips commandPrefix before RTK and re-applies it after", async () => {
+    const { pi, tools } = createPiMock();
+    rtkExtension(pi as never);
+
+    const bashTool = getRegisteredBashTool(tools);
+    if (!bashTool) {
+      throw new Error("bash tool not registered");
+    }
+
+    mockFns.getShellCommandPrefix.mockReturnValue("source ~/.zshrc");
+
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, createUiCtx());
+
+    const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
+    const result = spawnHook?.({
+      command: "source ~/.zshrc\ngit status",
+      cwd: "/project",
+      env: {},
+    });
+    expect(result).toEqual({
+      command: "source ~/.zshrc\nrtk git status",
+      cwd: "/project",
+      env: {},
     });
   });
 

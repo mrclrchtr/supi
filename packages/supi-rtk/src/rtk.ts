@@ -190,12 +190,22 @@ function resolveRtkCommand(command: string, cwd: string, ctx?: RtkUiContext): Rt
 
 function createRtkAwareBashTool(cwd: string, ctx?: RtkUiContext) {
   const settings = SettingsManager.create(cwd);
+  const commandPrefix = settings.getShellCommandPrefix();
   return createBashTool(cwd, {
     shellPath: settings.getShellPath(),
-    commandPrefix: settings.getShellCommandPrefix(),
     spawnHook: ({ command, cwd: spawnCwd, env }) => {
-      const resolution = resolveRtkCommand(command, spawnCwd, ctx);
-      return { command: resolution.command, cwd: spawnCwd, env };
+      let userCommand = command;
+      if (commandPrefix) {
+        const prefixWithNewline = `${commandPrefix}\n`;
+        if (command.startsWith(prefixWithNewline)) {
+          userCommand = command.slice(prefixWithNewline.length);
+        }
+      }
+      const resolution = resolveRtkCommand(userCommand, spawnCwd, ctx);
+      const finalCommand = commandPrefix
+        ? `${commandPrefix}\n${resolution.command}`
+        : resolution.command;
+      return { command: finalCommand, cwd: spawnCwd, env };
     },
   });
 }
