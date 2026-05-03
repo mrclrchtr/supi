@@ -1,1 +1,1 @@
-export { default } from "@mrclrchtr/supi-skill-shortcut/skill-shortcut.ts";
+export { default } from "@mrclrchtr/supi-skill-shortcut";

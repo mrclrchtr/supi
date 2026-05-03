@@ -32,7 +32,7 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./cache-monitor.ts"
     ]
   },
   "main": "index.ts"

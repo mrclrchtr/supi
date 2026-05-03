@@ -33,7 +33,7 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./rtk.ts"
     ]
   },
   "main": "index.ts"

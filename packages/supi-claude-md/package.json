@@ -33,7 +33,7 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./claude-md.ts"
     ],
     "skills": [
       "./resources"

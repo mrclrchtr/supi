@@ -1,1 +1,1 @@
-export { default } from "@mrclrchtr/supi-claude-md/index.ts";
+export { default } from "@mrclrchtr/supi-claude-md";

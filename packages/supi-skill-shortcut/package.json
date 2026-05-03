@@ -16,8 +16,9 @@
     "pi-coding-agent"
   ],
   "files": [
-    "skill-shortcut.ts"
+    "*.ts"
   ],
+  "main": "index.ts",
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*"

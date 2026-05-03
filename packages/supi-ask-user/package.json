@@ -20,6 +20,7 @@
     "resources",
     "!__tests__"
   ],
+  "main": "index.ts",
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*",

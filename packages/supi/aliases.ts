@@ -1,1 +1,1 @@
-export { default } from "@mrclrchtr/supi-aliases/aliases.ts";
+export { default } from "@mrclrchtr/supi-aliases";

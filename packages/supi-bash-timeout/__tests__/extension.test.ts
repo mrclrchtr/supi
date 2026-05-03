@@ -1,7 +1,7 @@
 import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import bashTimeout from "../bash-timeout.ts";
 import { loadBashTimeoutConfig } from "../config.ts";
-import bashTimeout from "../index.ts";
 
 vi.mock("../config.ts", () => ({
   loadBashTimeoutConfig: vi.fn(),

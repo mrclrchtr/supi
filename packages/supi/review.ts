@@ -1,2 +1,1 @@
-import reviewExtension from "@mrclrchtr/supi-review";
-export default reviewExtension;
+export { default } from "@mrclrchtr/supi-review";

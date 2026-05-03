@@ -23,7 +23,7 @@ vi.mock("../settings-registration.ts", () => ({
   registerCacheMonitorSettings: vi.fn(),
 }));
 
-import cacheMonitorExtension from "../index.ts";
+import cacheMonitorExtension from "../cache-monitor.ts";
 
 type Handler = (event: unknown, ctx: unknown) => Promise<void>;
 

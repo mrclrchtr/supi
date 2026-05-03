@@ -32,7 +32,7 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./bash-timeout.ts"
     ]
   },
   "main": "index.ts"

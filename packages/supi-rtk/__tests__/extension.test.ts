@@ -35,7 +35,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
 }));
 
 import { registerConfigSettings, registerContextProvider } from "@mrclrchtr/supi-core";
-import rtkExtension from "../index.ts";
+import rtkExtension from "../rtk.ts";
 import { resetTracking } from "../tracking.ts";
 
 interface PiMock {

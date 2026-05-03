@@ -64,7 +64,7 @@ vi.mock("../ui.ts", () => ({
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { formatReviewContent } from "../format-content.ts";
-import reviewExtension from "../index.ts";
+import reviewExtension from "../review.ts";
 
 describe("formatReviewContent", () => {
   it("formats success with findings", () => {

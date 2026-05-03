@@ -33,7 +33,7 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./debug.ts"
     ]
   },
   "main": "index.ts"

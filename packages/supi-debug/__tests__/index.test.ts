@@ -26,7 +26,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   registerContextProvider: mockFns.registerContextProvider,
 }));
 
-import debugExtension from "../index.ts";
+import debugExtension from "../debug.ts";
 
 interface PiMock {
   handlers: Map<string, (...args: unknown[]) => unknown>;

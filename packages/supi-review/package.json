@@ -33,7 +33,7 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./review.ts"
     ]
   },
   "main": "index.ts"

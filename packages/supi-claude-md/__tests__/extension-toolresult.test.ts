@@ -53,7 +53,7 @@ vi.mock("../state.ts", () => ({
   reconstructState: vi.fn(),
 }));
 
-import claudeMdExtension from "../index.ts";
+import claudeMdExtension from "../claude-md.ts";
 
 function resetMocks() {
   vi.clearAllMocks();

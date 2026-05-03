@@ -33,7 +33,7 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./context.ts"
     ]
   },
   "main": "index.ts"

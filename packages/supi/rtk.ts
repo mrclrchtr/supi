@@ -1,1 +1,1 @@
-export { default } from "@mrclrchtr/supi-rtk/index.ts";
+export { default } from "@mrclrchtr/supi-rtk";
