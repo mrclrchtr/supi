@@ -102,6 +102,9 @@ registerSettings({
 - Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
 - OpenSpec `PostHogFetchNetworkError` output is harmless when offline.
+- `npm pack <pkg>@<ver> --silent && tar -tzf` — inspect actual npm tarball contents; `npm view` only shows registry metadata which may not match shipped files
+- pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli)
+- RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward
 
 ## Testing patterns
 
