@@ -98,6 +98,9 @@ registerSettings({
 - pi flattens tool `promptGuidelines` into the system prompt `Guidelines:` section; each bullet must name its tool explicitly.
 - Prefer stable system-prompt guidance via tool `promptGuidelines`; avoid `before_agent_start` `systemPrompt` mutations unless dynamic per-turn guidance is worth the prompt-cache tradeoff.
 - `ctx.sessionManager.getBranch()` returns `SessionEntry[]`; reconstruct state from `type === "message"` / `entry.message.role` and `type === "custom_message"`, not flattened branch entries.
+- `parseSessionEntries()` returns raw entries; call `migrateSessionEntries(entries)` afterward to handle legacy v1/v2 session files that lack `id`/`parentId`.
+- Session files are append-only trees. The active branch is the path from the **last entry** (current leaf) back to root via `parentId` — do not count every entry in the file.
+- Cache keys for session-derived data should include `sessionId + filePath hash + modified timestamp` to handle branch deduplication and stale-cache invalidation.
 - `docs/extensions.md` + `examples/extensions/message-renderer.ts` — authoritative for custom-message rendering; `display: false` suppresses TUI rendering and `content` should hold the visible summary.
 - Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
