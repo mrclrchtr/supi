@@ -26,6 +26,7 @@
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*",
     "typebox": "*"
   },
   "devDependencies": {

@@ -1,4 +1,3 @@
-import { inspect } from "node:util";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   clearDebugEvents,
@@ -6,6 +5,7 @@ import {
   DEBUG_REGISTRY_DEFAULTS,
   type DebugAgentAccess,
   type DebugEventQuery,
+  type DebugEventView,
   type DebugLevel,
   type DebugNotifyLevel,
   getDebugEvents,
@@ -15,6 +15,8 @@ import {
   registerContextProvider,
 } from "@mrclrchtr/supi-core";
 import { Type } from "typebox";
+import { formatDataLines } from "./format.ts";
+import { registerDebugMessageRenderer } from "./renderer.ts";
 
 const DEBUG_SECTION = "debug";
 const DEBUG_REPORT_TYPE = "supi-debug-report";
@@ -170,48 +172,20 @@ function isDebugLevel(value: string): value is DebugLevel {
   return value === "debug" || value === "info" || value === "warning" || value === "error";
 }
 
-function safeJsonStringify(value: unknown): string | undefined {
-  const seen = new WeakSet<object>();
-  return JSON.stringify(
-    value,
-    (_key, currentValue) => {
-      if (typeof currentValue === "bigint") {
-        return `${currentValue}n`;
-      }
-      if (typeof currentValue === "object" && currentValue !== null) {
-        if (seen.has(currentValue)) {
-          return "[Circular]";
-        }
-        seen.add(currentValue);
-      }
-      return currentValue;
-    },
-    2,
-  );
-}
-
-function formatDebugValue(value: unknown): string {
-  if (value === undefined) return "";
-  if (typeof value === "string") return value;
-
-  try {
-    const json = safeJsonStringify(value);
-    if (json !== undefined) {
-      return json;
+function pushFormattedData(lines: string[], label: string, value: unknown): void {
+  const dataLines = formatDataLines(value);
+  if (dataLines.length === 0) return;
+  if (dataLines.length === 1) {
+    lines.push(`  ${label}: ${dataLines[0]}`);
+  } else {
+    lines.push(`  ${label}:`);
+    for (const dl of dataLines) {
+      lines.push(`    ${dl}`);
     }
-  } catch {
-    // Fall back to inspect() below for unsupported payloads.
   }
-
-  return inspect(value, {
-    compact: false,
-    depth: 6,
-    sorted: true,
-  });
 }
 
-function formatEventLines(query: DebugEventQuery): string[] {
-  const { events, rawAccessDenied } = getDebugEvents(query);
+function formatEvents(events: DebugEventView[], rawAccessDenied: boolean): string[] {
   if (events.length === 0) {
     return ["No matching debug events available."];
   }
@@ -222,16 +196,19 @@ function formatEventLines(query: DebugEventQuery): string[] {
       `[${new Date(event.timestamp).toISOString()}] ${event.level.toUpperCase()} ${event.source}/${event.category}: ${event.message}`,
     );
     if (event.cwd) lines.push(`  cwd: ${event.cwd}`);
-    const data = formatDebugValue(event.data);
-    if (data) lines.push(`  data: ${data}`);
-    const rawData = formatDebugValue(event.rawData);
-    if (rawData) lines.push(`  rawData: ${rawData}`);
+    pushFormattedData(lines, "data", event.data);
+    pushFormattedData(lines, "rawData", event.rawData);
   }
   if (rawAccessDenied) {
     lines.push("");
     lines.push("Raw debug data was requested but is not enabled in SuPi Debug settings.");
   }
   return lines;
+}
+
+function formatEventLines(query: DebugEventQuery): string[] {
+  const { events, rawAccessDenied } = getDebugEvents(query);
+  return formatEvents(events, rawAccessDenied);
 }
 
 function buildSummaryData(): Record<string, string | number> | null {
@@ -299,6 +276,7 @@ function buildToolResult(params: DebugToolParams, config: DebugConfig) {
 export default function debugExtension(pi: ExtensionAPI) {
   applyDebugConfig(process.cwd());
   registerDebugSettings();
+  registerDebugMessageRenderer(pi);
 
   registerContextProvider({
     id: "debug",
@@ -324,11 +302,14 @@ export default function debugExtension(pi: ExtensionAPI) {
         return;
       }
 
-      const lines = formatEventLines(parseCommandArgs(args));
+      const query = parseCommandArgs(args);
+      const { events, rawAccessDenied } = getDebugEvents(query);
+      const lines = formatEvents(events, rawAccessDenied);
       pi.sendMessage({
         customType: DEBUG_REPORT_TYPE,
         content: lines.join("\n"),
         display: true,
+        details: { events, rawAccessDenied },
       });
     },
   });

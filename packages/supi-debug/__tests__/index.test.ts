@@ -39,11 +39,17 @@ interface PiMock {
       name: string,
       spec: { handler: (args: string, ctx: { cwd: string }) => Promise<void> },
     ) => void;
+    registerMessageRenderer: (customType: string, renderer: unknown) => void;
     registerTool: (tool: {
       name: string;
       execute: (...args: unknown[]) => Promise<unknown>;
     }) => void;
-    sendMessage: (message: { customType: string; content: string; display: boolean }) => void;
+    sendMessage: (message: {
+      customType: string;
+      content: string;
+      display: boolean;
+      details?: unknown;
+    }) => void;
   };
 }
 
@@ -81,6 +87,7 @@ function createPiMock(): PiMock {
       registerCommand(name, spec) {
         commands.set(name, spec);
       },
+      registerMessageRenderer() {},
       registerTool(tool) {
         tools.push(tool);
       },
