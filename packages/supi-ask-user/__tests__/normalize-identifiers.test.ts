@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeQuestionnaire } from "../normalize.ts";
+import { normalizeQuestionnaire } from "../src/normalize.ts";
 
 describe("normalizeQuestionnaire identifier canonicalization", () => {
   it("accepts allowOther on multichoice questions", () => {

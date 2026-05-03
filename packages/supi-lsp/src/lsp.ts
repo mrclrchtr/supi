@@ -49,7 +49,7 @@ import {
 } from "./tree-persist.ts";
 import { toggleLspStatusOverlay, updateLspUi } from "./ui.ts";
 
-const baseDir = dirname(fileURLToPath(import.meta.url));
+const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const LspActionEnum = StringEnum([
   "hover",

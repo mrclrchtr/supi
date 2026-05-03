@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nodeToRange, publicToTreeSitter, treeSitterToPublic } from "../coordinates.ts";
+import { nodeToRange, publicToTreeSitter, treeSitterToPublic } from "../src/coordinates.ts";
 
 describe("publicToTreeSitter", () => {
   it("converts 1-based line 1 char 1 to row 0 column 0", () => {

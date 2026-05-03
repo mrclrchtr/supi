@@ -1,9 +1,9 @@
 // Unit tests for LSP pull diagnostic capability detection.
 
 import { describe, expect, it, vi } from "vitest";
-import { CLIENT_CAPABILITIES } from "../capabilities.ts";
-import { LspClient } from "../client.ts";
-import type { ServerCapabilities } from "../types.ts";
+import { CLIENT_CAPABILITIES } from "../src/capabilities.ts";
+import { LspClient } from "../src/client.ts";
+import type { ServerCapabilities } from "../src/types.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
 type AnyClient = any;

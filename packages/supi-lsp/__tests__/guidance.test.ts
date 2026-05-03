@@ -7,10 +7,10 @@ import {
   formatDiagnosticsContext,
   lspPromptGuidelines,
   lspPromptSnippet,
-} from "../guidance.ts";
-import { LspManager } from "../manager.ts";
-import type { ProjectServerInfo } from "../types.ts";
-import { DiagnosticSeverity } from "../types.ts";
+} from "../src/guidance.ts";
+import { LspManager } from "../src/manager.ts";
+import type { ProjectServerInfo } from "../src/types.ts";
+import { DiagnosticSeverity } from "../src/types.ts";
 
 describe("LSP prompt guidance", () => {
   it("exports a semantic-first prompt snippet and fallback guidance", () => {

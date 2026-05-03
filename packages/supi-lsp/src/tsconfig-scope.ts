@@ -85,8 +85,10 @@ function findNearestTsconfig(startDir: string, rootDir: string): TsconfigInfo | 
 function parseTsconfig(dir: string, tsconfigPath: string): TsconfigInfo | null {
   try {
     const raw = fs.readFileSync(tsconfigPath, "utf-8");
-    // Strip comments (minimal — handles single-line // and block /* */)
-    const cleaned = raw.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+    // Strip comments without touching content inside double-quoted strings.
+    const cleaned = raw
+      .replace(/("(?:\\.|[^"\\])*")|\/\/.*$/gm, "$1")
+      .replace(/("(?:\\.|[^"\\])*")|\/[\s\S]*?\*\//g, "$1");
     const json = JSON.parse(cleaned);
     return {
       dir,
@@ -104,6 +106,16 @@ function parseTsconfig(dir: string, tsconfigPath: string): TsconfigInfo | null {
  */
 function matchesPattern(filePath: string, pattern: string): boolean {
   const normalizedPattern = pattern.replaceAll("\\", "/");
+
+  // Directory-prefixed recursive glob: prefix/**/*.ext
+  if (normalizedPattern.includes("/**/")) {
+    const idx = normalizedPattern.indexOf("/**/");
+    const prefix = normalizedPattern.slice(0, idx);
+    const suffix = normalizedPattern.slice(idx + 4);
+    return (
+      filePath.startsWith(`${prefix}/`) && matchesPattern(filePath.slice(prefix.length + 1), suffix)
+    );
+  }
 
   // Recursive glob: **/*.ext
   if (normalizedPattern.startsWith("**/")) {

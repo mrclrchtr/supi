@@ -1,7 +1,7 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { renderAskUserCall, renderAskUserResult } from "../render.ts";
-import { ASK_USER_ERROR_MARKER, buildErrorResult } from "../result.ts";
+import { renderAskUserCall, renderAskUserResult } from "../src/render.ts";
+import { ASK_USER_ERROR_MARKER, buildErrorResult } from "../src/result.ts";
 
 const theme: Theme = {
   fg: (color: string, text: string) => `[${color}]${text}[/${color}]`,

@@ -2,8 +2,8 @@
 // no-UI error path, validation errors, unsupported custom overlay.
 
 import { describe, expect, it, vi } from "vitest";
-import askUserExtension from "../ask-user.ts";
-import type { QuestionnaireOutcome } from "../types.ts";
+import askUserExtension from "../src/ask-user.ts";
+import type { QuestionnaireOutcome } from "../src/types.ts";
 
 interface MockTool {
   name: string;

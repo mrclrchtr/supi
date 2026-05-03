@@ -17,15 +17,15 @@
   "pi": {
     "extensions": [
       "./packages/supi-aliases/aliases.ts",
-      "./packages/supi-ask-user/ask-user.ts",
+      "./packages/supi-ask-user/src/ask-user.ts",
       "./packages/supi-bash-timeout/index.ts",
       "./packages/supi-claude-md/index.ts",
       "./packages/supi-context/index.ts",
       "./packages/supi/settings.ts",
       "./packages/supi-review/index.ts",
       "./packages/supi-skill-shortcut/skill-shortcut.ts",
-      "./packages/supi-lsp/lsp.ts",
-      "./packages/supi-tree-sitter/tree-sitter.ts",
+      "./packages/supi-lsp/src/lsp.ts",
+      "./packages/supi-tree-sitter/src/tree-sitter.ts",
       "./packages/supi-cache-monitor/index.ts",
       "./packages/supi-code-intelligence/code-intelligence.ts",
       "./packages/supi-debug/index.ts",

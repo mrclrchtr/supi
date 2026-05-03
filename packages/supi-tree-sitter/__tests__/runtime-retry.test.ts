@@ -28,7 +28,7 @@ describe("TreeSitterRuntime retry behavior", () => {
       Query: class {},
     }));
 
-    const { TreeSitterRuntime } = await import("../runtime.ts");
+    const { TreeSitterRuntime } = await import("../src/runtime.ts");
     const runtime = new TreeSitterRuntime("/tmp");
 
     await expect(runtime.ensureGrammarParser("typescript")).rejects.toThrow("setLanguage failed");
@@ -55,7 +55,7 @@ describe("TreeSitterRuntime retry behavior", () => {
       Query: class {},
     }));
 
-    const { TreeSitterRuntime } = await import("../runtime.ts");
+    const { TreeSitterRuntime } = await import("../src/runtime.ts");
     const runtime = new TreeSitterRuntime("/tmp");
 
     await expect(runtime.ensureGrammarParser("typescript")).rejects.toThrow(
@@ -87,7 +87,7 @@ describe("TreeSitterRuntime retry behavior", () => {
       Query: class {},
     }));
 
-    const { TreeSitterRuntime } = await import("../runtime.ts");
+    const { TreeSitterRuntime } = await import("../src/runtime.ts");
     const runtime = new TreeSitterRuntime("/tmp");
 
     const [first, second] = await Promise.all([

@@ -3,8 +3,8 @@
 // are internal to the client and not exposed through public API.
 
 import { describe, expect, it } from "vitest";
-import { LspClient } from "../client.ts";
-import type { PublishDiagnosticsParams } from "../types.ts";
+import { LspClient } from "../src/client.ts";
+import type { PublishDiagnosticsParams } from "../src/types.ts";
 
 function createClient(): LspClient {
   return new LspClient(

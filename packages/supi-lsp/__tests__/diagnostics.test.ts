@@ -4,8 +4,8 @@ import {
   formatDiagnostic,
   formatDiagnostics,
   severityLabel,
-} from "../diagnostics.ts";
-import type { Diagnostic } from "../types.ts";
+} from "../src/diagnostics.ts";
+import type { Diagnostic } from "../src/types.ts";
 
 function makeDiag(overrides: Partial<Diagnostic> = {}): Diagnostic {
   return {

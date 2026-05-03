@@ -11,7 +11,7 @@ import {
   getLspDisabledMessage,
   loadLspSettings,
   registerLspSettings,
-} from "../settings-registration.ts";
+} from "../src/settings-registration.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "lsp-settings-test-"));

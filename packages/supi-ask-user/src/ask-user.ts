@@ -23,7 +23,7 @@ import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import type { NormalizedQuestionnaire } from "./types.ts";
 import { type RichUiHost, runRichQuestionnaire } from "./ui-rich.ts";
 
-const baseDir = dirname(fileURLToPath(import.meta.url));
+const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const TOOL_NAME = "ask_user";
 const TOOL_LABEL = "Ask User";

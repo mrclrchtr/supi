@@ -1,8 +1,8 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component, TUI } from "@mariozechner/pi-tui";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { NormalizedQuestion } from "../types.ts";
-import { type RichCustomOptions, type RichUiHost, runRichQuestionnaire } from "../ui-rich.ts";
+import type { NormalizedQuestion } from "../src/types.ts";
+import { type RichCustomOptions, type RichUiHost, runRichQuestionnaire } from "../src/ui-rich.ts";
 
 const mockRenderMarkdown = vi.hoisted(() =>
   vi.fn((text: string, _width: number, _theme: unknown, options?: { paddingX?: number }) => {
@@ -15,7 +15,7 @@ const mockRenderMarkdown = vi.hoisted(() =>
   }),
 );
 
-vi.mock("../ui-rich-render-markdown", () => ({
+vi.mock("../src/ui-rich-render-markdown", () => ({
   renderMarkdown: mockRenderMarkdown,
   renderMarkdownPreview: mockRenderMarkdown,
 }));

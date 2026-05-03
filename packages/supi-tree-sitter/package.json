@@ -16,8 +16,8 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts",
-    "*.json",
+    "src/**/*.ts",
+    "src/**/*.json",
     "resources",
     "!__tests__"
   ],
@@ -54,8 +54,8 @@
   },
   "pi": {
     "extensions": [
-      "./tree-sitter.ts"
+      "./src/tree-sitter.ts"
     ]
   },
-  "main": "index.ts"
+  "main": "src/index.ts"
 }

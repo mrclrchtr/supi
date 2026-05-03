@@ -3,7 +3,7 @@
 // future edits can't quietly remove the boundedness/focus emphasis.
 
 import { describe, expect, it } from "vitest";
-import { askUserPromptGuidelines, askUserPromptSnippet } from "../ask-user.ts";
+import { askUserPromptGuidelines, askUserPromptSnippet } from "../src/ask-user.ts";
 
 describe("ask_user prompt guidance", () => {
   it("snippet emphasizes pause-for-decision intent and bounded count", () => {

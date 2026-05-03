@@ -20,9 +20,9 @@ const mockFns = vi.hoisted(() => ({
   executeAction: vi.fn(),
 }));
 
-vi.mock("../config.ts", () => ({ loadConfig: mockFns.loadConfig }));
+vi.mock("../src/config.ts", () => ({ loadConfig: mockFns.loadConfig }));
 
-vi.mock("../guidance.ts", () => ({
+vi.mock("../src/guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
   diagnosticsContextFingerprint: mockFns.diagnosticsContextFingerprint,
   formatDiagnosticsContext: mockFns.formatDiagnosticsContext,
@@ -36,47 +36,47 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   restorePromptContent: vi.fn((msgs: unknown[]) => msgs),
 }));
 
-vi.mock("../settings-registration.ts", () => ({
+vi.mock("../src/settings-registration.ts", () => ({
   loadLspSettings: mockFns.loadLspSettings,
   getLspDisabledMessage: vi.fn(() => "LSP is disabled in settings"),
   registerLspSettings: mockFns.registerLspSettings,
 }));
 
-vi.mock("../overrides.ts", () => ({
+vi.mock("../src/overrides.ts", () => ({
   registerLspAwareToolOverrides: mockFns.registerLspAwareToolOverrides,
 }));
 
-vi.mock("../manager.ts", () => ({ LspManager: mockFns.LspManager }));
+vi.mock("../src/manager.ts", () => ({ LspManager: mockFns.LspManager }));
 
-vi.mock("../scanner.ts", () => ({
+vi.mock("../src/scanner.ts", () => ({
   introspectCapabilities: mockFns.introspectCapabilities,
   scanProjectCapabilities: mockFns.scanProjectCapabilities,
   startDetectedServers: mockFns.startDetectedServers,
 }));
 
-vi.mock("../ui.ts", () => ({
+vi.mock("../src/ui.ts", () => ({
   toggleLspStatusOverlay: mockFns.toggleLspStatusOverlay,
   updateLspUi: mockFns.updateLspUi,
 }));
 
-vi.mock("../tool-actions.ts", () => ({
+vi.mock("../src/tool-actions.ts", () => ({
   executeAction: mockFns.executeAction,
   lspToolDescription: "test",
 }));
 
-vi.mock("../renderer.ts", () => ({ registerLspMessageRenderer: vi.fn() }));
-vi.mock("../diagnostic-display.ts", () => ({
+vi.mock("../src/renderer.ts", () => ({ registerLspMessageRenderer: vi.fn() }));
+vi.mock("../src/diagnostic-display.ts", () => ({
   formatDiagnosticsDisplayContent: vi.fn(() => "display content"),
 }));
-vi.mock("../diagnostic-augmentation.ts", () => ({
+vi.mock("../src/diagnostic-augmentation.ts", () => ({
   registerDiagnosticAugmentation: vi.fn(),
 }));
-vi.mock("../diagnostic-summary.ts", () => ({
+vi.mock("../src/diagnostic-summary.ts", () => ({
   registerDiagnosticSummary: vi.fn(),
 }));
 
-import lspExtension from "../lsp.ts";
-import { clearSessionLspService, getSessionLspService } from "../service-registry.ts";
+import lspExtension from "../src/lsp.ts";
+import { clearSessionLspService, getSessionLspService } from "../src/service-registry.ts";
 
 function createManager(diagnostics: Array<{ file: string; total: number }>, cwd = "/project") {
   return {

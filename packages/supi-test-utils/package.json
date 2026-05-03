@@ -1,0 +1,15 @@
+{
+  "name": "@mrclrchtr/supi-test-utils",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Shared test utilities for SuPi extensions.",
+  "license": "MIT",
+  "main": "index.ts",
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "vitest": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0"
+  }
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LspManager } from "../manager.ts";
-import { executeAction } from "../tool-actions.ts";
+import type { LspManager } from "../src/manager.ts";
+import { executeAction } from "../src/tool-actions.ts";
 
 describe("workspace_symbol action", () => {
   it("returns unsupported message when no server supports workspace symbols", async () => {

@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
-import treeSitterExtension from "../tree-sitter.ts";
+import treeSitterExtension from "../src/tree-sitter.ts";
 
 type RegisteredTool = { name: string };
 

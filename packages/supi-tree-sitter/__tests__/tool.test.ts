@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import treeSitterExtension from "../tree-sitter.ts";
+import treeSitterExtension from "../src/tree-sitter.ts";
 
 const FIXTURE_DIR = path.resolve(__dirname, "fixtures");
 

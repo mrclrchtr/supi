@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderMarkdown, renderMarkdownPreview } from "../ui-rich-render-markdown.ts";
+import { renderMarkdown, renderMarkdownPreview } from "../src/ui-rich-render-markdown.ts";
 
 const mockRender = vi.hoisted(() => vi.fn(() => ["rendered line"]));
 

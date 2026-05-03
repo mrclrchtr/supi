@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { LspManager } from "../manager.ts";
-import { executeAction } from "../tool-actions.ts";
+import type { LspManager } from "../src/manager.ts";
+import { executeAction } from "../src/tool-actions.ts";
 
 function makeManager(): LspManager {
   return {

@@ -1,8 +1,8 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component, TUI } from "@mariozechner/pi-tui";
 import { describe, expect, it } from "vitest";
-import type { NormalizedQuestion } from "../types.ts";
-import { type RichUiHost, runRichQuestionnaire } from "../ui-rich.ts";
+import type { NormalizedQuestion } from "../src/types.ts";
+import { type RichUiHost, runRichQuestionnaire } from "../src/ui-rich.ts";
 
 const multichoiceWithOther: NormalizedQuestion = {
   id: "features",

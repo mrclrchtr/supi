@@ -18,8 +18,8 @@ const mockFns = vi.hoisted(() => ({
   registerLspAwareToolOverrides: vi.fn(),
 }));
 
-vi.mock("../config.ts", () => ({ loadConfig: mockFns.loadConfig }));
-vi.mock("../scanner.ts", () => ({
+vi.mock("../src/config.ts", () => ({ loadConfig: mockFns.loadConfig }));
+vi.mock("../src/scanner.ts", () => ({
   scanProjectCapabilities: mockFns.scanProjectCapabilities,
   startDetectedServers: mockFns.startDetectedServers,
   introspectCapabilities: mockFns.introspectCapabilities,
@@ -34,38 +34,38 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   loadSupiConfig: vi.fn(() => ({ enabled: true, severity: 1, active: [] })),
   restorePromptContent: vi.fn((msgs: unknown) => msgs),
 }));
-vi.mock("../guidance.ts", () => ({
+vi.mock("../src/guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
   diagnosticsContextFingerprint: mockFns.diagnosticsContextFingerprint,
   formatDiagnosticsContext: mockFns.formatDiagnosticsContext,
   lspPromptGuidelines: mockFns.lspPromptGuidelines,
   lspPromptSnippet: mockFns.lspPromptSnippet,
 }));
-vi.mock("../overrides.ts", () => ({
+vi.mock("../src/overrides.ts", () => ({
   registerLspAwareToolOverrides: mockFns.registerLspAwareToolOverrides,
 }));
-vi.mock("../tool-actions.ts", () => ({
+vi.mock("../src/tool-actions.ts", () => ({
   executeAction: mockFns.executeAction,
   lspToolDescription: mockFns.lspToolDescription,
 }));
-vi.mock("../ui.ts", () => ({
+vi.mock("../src/ui.ts", () => ({
   toggleLspStatusOverlay: vi.fn(),
   updateLspUi: vi.fn(),
 }));
-vi.mock("../summary.ts", () => ({}));
-vi.mock("../tree-persist.ts", () => ({
+vi.mock("../src/summary.ts", () => ({}));
+vi.mock("../src/tree-persist.ts", () => ({
   persistLspActiveState: vi.fn(),
   persistLspInactiveState: vi.fn(),
   registerTreePersistHandlers: vi.fn(),
 }));
-vi.mock("../settings-registration.ts", () => ({
+vi.mock("../src/settings-registration.ts", () => ({
   loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, active: [] })),
   getLspDisabledMessage: vi.fn(() => "LSP is disabled in settings"),
   registerLspSettings: vi.fn(),
 }));
-vi.mock("../manager.ts", () => ({ LspManager: vi.fn() }));
+vi.mock("../src/manager.ts", () => ({ LspManager: vi.fn() }));
 
-import lspExtension from "../lsp.ts";
+import lspExtension from "../src/lsp.ts";
 
 function setup(): Map<string, (...args: unknown[]) => unknown> {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();

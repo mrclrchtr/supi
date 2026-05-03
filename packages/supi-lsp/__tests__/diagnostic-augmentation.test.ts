@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { augmentDiagnostics } from "../diagnostic-augmentation.ts";
-import type { LspManager } from "../manager.ts";
-import type { CodeAction, Diagnostic, Hover } from "../types.ts";
+import { augmentDiagnostics } from "../src/diagnostic-augmentation.ts";
+import type { LspManager } from "../src/manager.ts";
+import type { CodeAction, Diagnostic, Hover } from "../src/types.ts";
 
 function makeManager(mockClient: {
   hover: ReturnType<typeof vi.fn>;

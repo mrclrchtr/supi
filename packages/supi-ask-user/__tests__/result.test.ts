@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildErrorResult, buildResult } from "../result.ts";
-import type { Answer, NormalizedQuestion } from "../types.ts";
+import { buildErrorResult, buildResult } from "../src/result.ts";
+import type { Answer, NormalizedQuestion } from "../src/types.ts";
 
 const choiceQuestion: NormalizedQuestion = {
   id: "scope",

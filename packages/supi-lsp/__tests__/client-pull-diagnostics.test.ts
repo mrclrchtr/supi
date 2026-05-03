@@ -4,8 +4,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LspClient } from "../client.ts";
-import type { Diagnostic, ServerCapabilities } from "../types.ts";
+import { LspClient } from "../src/client.ts";
+import type { Diagnostic, ServerCapabilities } from "../src/types.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing
 type AnyClient = any;

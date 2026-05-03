@@ -20,11 +20,11 @@ const mockFns = vi.hoisted(() => ({
   executeAction: vi.fn(),
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("../src/config.ts", () => ({
   loadConfig: mockFns.loadConfig,
 }));
 
-vi.mock("../guidance.ts", () => ({
+vi.mock("../src/guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
   diagnosticsContextFingerprint: mockFns.diagnosticsContextFingerprint,
   formatDiagnosticsContext: mockFns.formatDiagnosticsContext,
@@ -67,45 +67,45 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   },
 }));
 
-vi.mock("../manager.ts", () => ({
+vi.mock("../src/manager.ts", () => ({
   LspManager: mockFns.LspManager,
 }));
 
-vi.mock("../settings-registration.ts", () => ({
+vi.mock("../src/settings-registration.ts", () => ({
   loadLspSettings: mockFns.loadLspSettings,
   getLspDisabledMessage: vi.fn(() => "LSP is disabled in settings"),
   registerLspSettings: mockFns.registerLspSettings,
 }));
 
-vi.mock("../overrides.ts", () => ({
+vi.mock("../src/overrides.ts", () => ({
   registerLspAwareToolOverrides: mockFns.registerLspAwareToolOverrides,
 }));
 
-vi.mock("../scanner.ts", () => ({
+vi.mock("../src/scanner.ts", () => ({
   introspectCapabilities: mockFns.introspectCapabilities,
   scanProjectCapabilities: mockFns.scanProjectCapabilities,
   startDetectedServers: mockFns.startDetectedServers,
 }));
 
-vi.mock("../ui.ts", () => ({
+vi.mock("../src/ui.ts", () => ({
   toggleLspStatusOverlay: mockFns.toggleLspStatusOverlay,
   updateLspUi: mockFns.updateLspUi,
 }));
 
-vi.mock("../tool-actions.ts", () => ({
+vi.mock("../src/tool-actions.ts", () => ({
   executeAction: mockFns.executeAction,
   lspToolDescription: "",
 }));
 
-vi.mock("../tree-persist.ts", () => ({
+vi.mock("../src/tree-persist.ts", () => ({
   persistLspActiveState: vi.fn(),
   persistLspInactiveState: vi.fn(),
   registerTreePersistHandlers: vi.fn(),
 }));
 
-vi.mock("../manager-types.ts", () => ({}));
+vi.mock("../src/manager-types.ts", () => ({}));
 
-import lspExtension from "../lsp.ts";
+import lspExtension from "../src/lsp.ts";
 
 function resetMocks() {
   vi.clearAllMocks();

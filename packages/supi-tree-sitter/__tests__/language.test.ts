@@ -4,7 +4,7 @@ import {
   getSupportedExtension,
   isSupportedFile,
   resolveGrammarWasmPath,
-} from "../language.ts";
+} from "../src/language.ts";
 
 describe("isSupportedFile", () => {
   it.each([

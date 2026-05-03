@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LspClient } from "../client.ts";
-import type { LspManager } from "../manager.ts";
+import type { LspClient } from "../src/client.ts";
+import type { LspManager } from "../src/manager.ts";
 import {
   clearSessionLspService,
   getSessionLspService,
   SessionLspService,
   setSessionLspServiceState,
-} from "../service-registry.ts";
-import type { DocumentSymbol, Hover, Location, SymbolInformation } from "../types.ts";
+} from "../src/service-registry.ts";
+import type { DocumentSymbol, Hover, Location, SymbolInformation } from "../src/types.ts";
 
 describe("session registry", () => {
   beforeEach(() => {
@@ -65,11 +65,11 @@ describe("session registry", () => {
 
   it("shares registry state across module instances", async () => {
     vi.resetModules();
-    const first = await import("../service-registry.ts");
+    const first = await import("../src/service-registry.ts");
     first.setSessionLspServiceState("/module-copy-test", { kind: "pending" });
 
     vi.resetModules();
-    const second = await import("../service-registry.ts");
+    const second = await import("../src/service-registry.ts");
 
     expect(second.getSessionLspService("/module-copy-test").kind).toBe("pending");
     second.clearSessionLspService("/module-copy-test");
@@ -258,13 +258,13 @@ describe("SessionLspService implementation support", () => {
 
 describe("public API imports from package root", () => {
   it("can import getSessionLspService and SessionLspService from the package root", async () => {
-    const mod = await import("../index.ts");
+    const mod = await import("../src/index.ts");
     expect(mod.getSessionLspService).toBeInstanceOf(Function);
     expect(mod.SessionLspService).toBeInstanceOf(Function);
   });
 
   it("can import public types from the package root", async () => {
-    const mod = await import("../index.ts");
+    const mod = await import("../src/index.ts");
     // Type-only exports vanish at runtime; just verify the module loads
     expect(mod).toBeDefined();
   });

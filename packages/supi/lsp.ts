@@ -1,1 +1,1 @@
-export { default } from "@mrclrchtr/supi-lsp/lsp.ts";
+export { default } from "@mrclrchtr/supi-lsp/src/lsp.ts";

@@ -6,8 +6,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { LspClient } from "../client.ts";
-import type { Diagnostic, ServerConfig } from "../types.ts";
+import { LspClient } from "../src/client.ts";
+import type { Diagnostic, ServerConfig } from "../src/types.ts";
 import { hasCommand, waitFor } from "./integration-utils.ts";
 
 const TS_SERVER_CONFIG: ServerConfig = {

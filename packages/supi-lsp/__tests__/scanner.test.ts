@@ -3,9 +3,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { dedupeTopmostRoots } from "@mrclrchtr/supi-core";
 import { afterEach, describe, expect, it } from "vitest";
-import { LspManager } from "../manager.ts";
-import { introspectCapabilities, scanProjectCapabilities } from "../scanner.ts";
-import type { LspConfig } from "../types.ts";
+import { LspManager } from "../src/manager.ts";
+import { introspectCapabilities, scanProjectCapabilities } from "../src/scanner.ts";
+import type { LspConfig } from "../src/types.ts";
 
 const tmpDirs: string[] = [];
 

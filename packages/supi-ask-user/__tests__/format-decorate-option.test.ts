@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decorateOption } from "../format.ts";
+import { decorateOption } from "../src/format.ts";
 
 describe("decorateOption", () => {
   it("does not double-append (recommended) when label already contains it", () => {

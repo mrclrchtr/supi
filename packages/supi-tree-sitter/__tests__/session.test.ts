@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TreeSitterRuntime } from "../runtime.ts";
+import type { TreeSitterRuntime } from "../src/runtime.ts";
 
 const mocks = vi.hoisted(() => {
   const instances: RuntimeMock[] = [];
@@ -19,7 +19,7 @@ type RuntimeMock = {
   dispose: ReturnType<typeof vi.fn>;
 };
 
-vi.mock("../runtime.ts", () => ({
+vi.mock("../src/runtime.ts", () => ({
   TreeSitterRuntime: class {
     cwd: string;
     parseFile = vi.fn();
@@ -33,7 +33,7 @@ vi.mock("../runtime.ts", () => ({
   },
 }));
 
-vi.mock("../structure.ts", () => ({
+vi.mock("../src/structure.ts", () => ({
   extractExports: mocks.extractExports,
   extractImports: mocks.extractImports,
   extractOutline: mocks.extractOutline,
@@ -41,7 +41,7 @@ vi.mock("../structure.ts", () => ({
 }));
 
 async function importSessionFactory() {
-  const mod = await import("../session.ts");
+  const mod = await import("../src/session.ts");
   return mod.createTreeSitterSession;
 }
 

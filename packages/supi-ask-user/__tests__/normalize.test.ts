@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AskUserValidationError, normalizeQuestionnaire } from "../normalize.ts";
-import type { AskUserParams } from "../schema.ts";
+import { AskUserValidationError, normalizeQuestionnaire } from "../src/normalize.ts";
+import type { AskUserParams } from "../src/schema.ts";
 
 type ChoiceQuestion = Extract<AskUserParams["questions"][number], { type: "choice" }>;
 

@@ -6,7 +6,7 @@ import {
   fileToUri,
   getFileExtension,
   uriToFile,
-} from "../utils.ts";
+} from "../src/utils.ts";
 
 describe("fileToUri", () => {
   it("converts absolute unix path", () => {

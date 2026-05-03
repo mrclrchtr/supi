@@ -9,7 +9,7 @@ import {
   formatWorkspaceEdit,
   formatWorkspaceSymbols,
   normalizeLocations,
-} from "../format.ts";
+} from "../src/format.ts";
 import type {
   CodeAction,
   DocumentSymbol,
@@ -18,7 +18,7 @@ import type {
   LocationLink,
   SymbolInformation,
   WorkspaceEdit,
-} from "../types.ts";
+} from "../src/types.ts";
 
 const loc = (uri: string, line: number, char: number): Location => ({
   uri,

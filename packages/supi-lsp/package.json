@@ -16,8 +16,8 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts",
-    "*.json",
+    "src/**/*.ts",
+    "src/**/*.json",
     "resources",
     "!__tests__"
   ],
@@ -35,11 +35,11 @@
   },
   "pi": {
     "extensions": [
-      "./lsp.ts"
+      "./src/lsp.ts"
     ],
     "skills": [
       "./resources"
     ]
   },
-  "main": "index.ts"
+  "main": "src/index.ts"
 }

@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { clearTsconfigCache, isFileExcludedByTsconfig } from "../tsconfig-scope.ts";
+import { clearTsconfigCache, isFileExcludedByTsconfig } from "../src/tsconfig-scope.ts";
 
 // Use the repo root as cwd — this matches how LspManager passes this.cwd
 const CWD = path.resolve(__dirname, "../../../");
@@ -14,8 +14,8 @@ describe("isFileExcludedByTsconfig", () => {
   });
 
   it("returns false for a file included by tsconfig", () => {
-    // packages/supi-lsp/summary.ts is included by the package tsconfig (*.ts)
-    expect(isFileExcludedByTsconfig("packages/supi-lsp/summary.ts", CWD)).toBe(false);
+    // packages/supi-lsp/src/summary.ts is included by the package tsconfig (src/**/*.ts)
+    expect(isFileExcludedByTsconfig("packages/supi-lsp/src/summary.ts", CWD)).toBe(false);
   });
 
   it("returns false for a file in __tests__ included by its own tsconfig", () => {
