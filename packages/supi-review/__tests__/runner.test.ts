@@ -85,6 +85,11 @@ describe("runReviewer", () => {
     expect(args).toContain("--mode");
     expect(args).toContain("json");
     expect(args).not.toContain("--no-session");
+    expect(args).toContain("--no-extensions");
+    expect(args).toContain("--no-themes");
+    expect(args).toContain("--no-skills");
+    expect(args).toContain("--no-prompt-templates");
+    expect(args).toContain("--no-context-files");
   });
 
   it("returns canceled immediately when the signal is already aborted", async () => {

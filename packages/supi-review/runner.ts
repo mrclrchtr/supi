@@ -88,6 +88,11 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
     "json",
     "-p",
     // Keep session persistence enabled so timeouts/failures can be inspected later.
+    "--no-extensions",
+    "--no-themes",
+    "--no-skills",
+    "--no-prompt-templates",
+    "--no-context-files",
     "--tools",
     "read,grep,find,ls",
     "--append-system-prompt",
