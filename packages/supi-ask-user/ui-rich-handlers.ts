@@ -83,6 +83,26 @@ function clearStructuredDrafts(question: NormalizedQuestion, deps: OverlayDeps):
   deps.state.stagedMultiNotes.delete(question.id);
 }
 
+function handleInlineEditorNav(data: string, deps: OverlayDeps): boolean {
+  const { state, flow } = deps;
+  if (
+    (state.subMode !== "other-input" && state.subMode !== "discuss-input") ||
+    (!matchesKey(data, Key.up) && !matchesKey(data, Key.down))
+  ) {
+    return false;
+  }
+  const question = flow.currentQuestion;
+  if (!question || question.type === "text") return false;
+  const maxIndex = Math.max(0, rowCount(question) - 1);
+  const nextIndex = matchesKey(data, Key.up)
+    ? Math.max(0, state.selectedIndex - 1)
+    : Math.min(maxIndex, state.selectedIndex + 1);
+  state.subMode = "select";
+  deps.editor.setText("");
+  moveSelection(question, nextIndex, deps);
+  return true;
+}
+
 export function handleOverlayInput(data: string, deps: OverlayDeps): void {
   const { state, flow } = deps;
   if (isEditorMode(state.subMode)) {
@@ -94,6 +114,7 @@ export function handleOverlayInput(data: string, deps: OverlayDeps): void {
       handleEditorEscape(deps);
       return;
     }
+    if (handleInlineEditorNav(data, deps)) return;
     deps.editor.handleInput(data);
     deps.refresh();
     return;

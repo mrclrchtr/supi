@@ -433,6 +433,66 @@ describe("runRichQuestionnaire skip in multi-question mode", () => {
   });
 });
 
+describe("runRichQuestionnaire inline editor navigation", () => {
+  it("navigates away from auto-activated discuss row with Up/Down without ESC", async () => {
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire({ questions: [choice], allowSkip: false }, { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    // Navigate to discuss row — auto-enters discuss-input
+    captured.value.handleInput?.("\u001b[B"); // B
+    captured.value.handleInput?.("\u001b[B"); // Other (auto-enter)
+    captured.value.handleInput?.("\u001b[B"); // Discuss (auto-enter via Up/Down handler)
+    const inEditor = captured.value.render(120).join("\n");
+    expect(inEditor).toContain("Discuss instead:");
+
+    // Press Up to move back to Other row — should exit editor without ESC
+    captured.value.handleInput?.("\u001b[A");
+    const backToOther = captured.value.render(120).join("\n");
+    expect(backToOther).toContain("> Other answer");
+    expect(backToOther).not.toContain("Discuss instead:");
+
+    // Press Down to return to discuss — auto-enters discuss-input again
+    captured.value.handleInput?.("\u001b[B");
+    const backToDiscuss = captured.value.render(120).join("\n");
+    expect(backToDiscuss).toContain("Discuss instead:");
+  });
+
+  it("navigates through multiple auto-activated rows with Up/Down keys", async () => {
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire({ questions: [choice], allowSkip: false }, { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    // Start on option A, go down through options via Down key
+    captured.value.handleInput?.("\u001b[B"); // option B
+    let rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("> 2. B");
+
+    captured.value.handleInput?.("\u001b[B"); // Other (auto-enter)
+    rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("Other answer:");
+
+    captured.value.handleInput?.("\u001b[B"); // Discuss (auto-enter via Up/Down handler)
+    rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("Discuss instead:");
+
+    // Go back up through all rows
+    captured.value.handleInput?.("\u001b[A"); // Other (auto-enter via Up/Down handler)
+    rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("Other answer:");
+
+    captured.value.handleInput?.("\u001b[A"); // option B
+    rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("> 2. B");
+
+    captured.value.handleInput?.("\u001b[A"); // option A
+    rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("> 1. A");
+  });
+});
+
 describe("runRichQuestionnaire wrapping", () => {
   it("wraps long inline other input to the next line", async () => {
     const { captured, host } = makeRichFixture<unknown>();
