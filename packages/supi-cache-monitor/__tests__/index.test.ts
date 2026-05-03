@@ -329,7 +329,10 @@ describe("cause tracking events", () => {
     );
     await msgHandler(assistantMessage(0, 5000, 5000), ctx);
 
-    expect(ctx.ui.notify).toHaveBeenCalledWith(expect.stringContaining("model changed"), "warning");
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      expect.stringContaining("model changed to anthropic/claude-4"),
+      "warning",
+    );
   });
 
   it("flags prompt change on before_agent_start hash diff", async () => {
@@ -415,7 +418,7 @@ describe("/supi-cache command", () => {
 describe("no-data turns (zero cache counters)", () => {
   beforeEach(resetMocks);
 
-  it("does not trigger false regression from no-cache-metrics turn", async () => {
+  it("does not trigger false regression from a no-cache-metrics turn", async () => {
     const { handlers, pi } = createPiMock();
     cacheMonitorExtension(pi as never);
 
@@ -431,5 +434,51 @@ describe("no-data turns (zero cache counters)", () => {
     expect(ctx.ui.notify).not.toHaveBeenCalled();
     // Status should show — not 0%
     expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-cache", "cache: \u2014");
+  });
+
+  it("does not compare across a no-data gap", async () => {
+    const { handlers, entries, pi } = createPiMock();
+    cacheMonitorExtension(pi as never);
+
+    const ctx = makeCtx();
+    const handler = getHandler(handlers, "message_end");
+
+    await handler(assistantMessage(9000, 0, 1000), ctx);
+    await handler(assistantMessage(0, 0, 10000), ctx);
+    await handler(assistantMessage(1000, 0, 9000), ctx);
+
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
+    expect(entries).toHaveLength(3);
+    expect((entries[2].data as Record<string, unknown>).note).toBeUndefined();
+    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-cache", "cache: 10%");
+  });
+
+  it("carries model-change attribution across a no-data gap", async () => {
+    const { handlers, entries, pi } = createPiMock();
+    cacheMonitorExtension(pi as never);
+
+    const ctx = makeCtx();
+    const handler = getHandler(handlers, "message_end");
+
+    await handler(assistantMessage(9000, 0, 1000), ctx);
+    await getHandler(handlers, "model_select")(
+      {
+        type: "model_select",
+        model: { provider: "anthropic", id: "claude-4" },
+        previousModel: undefined,
+        source: "user",
+      },
+      ctx,
+    );
+    await handler(assistantMessage(0, 0, 10000), ctx);
+    await handler(assistantMessage(1000, 0, 9000), ctx);
+
+    expect(ctx.ui.notify).not.toHaveBeenCalled();
+    expect((entries[1].data as Record<string, unknown>).note).toBeUndefined();
+    expect((entries[2].data as Record<string, unknown>).note).toBe("⚠ model changed");
+    expect((entries[2].data as Record<string, unknown>).cause).toEqual({
+      type: "model_change",
+      model: "anthropic/claude-4",
+    });
   });
 });

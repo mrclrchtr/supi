@@ -116,6 +116,19 @@ describe("CacheMonitorState", () => {
       const turn3 = state.recordTurn({ cacheRead: 5000, cacheWrite: 0, input: 5000 }, 3000);
       expect(turn3.note).toBeUndefined();
     });
+
+    it("defers model change attribution until the next comparable turn", () => {
+      const state = new CacheMonitorState();
+      state.recordTurn({ cacheRead: 8000, cacheWrite: 0, input: 2000 }, 1000);
+      state.flagModelChange("anthropic/claude-4");
+
+      const noDataTurn = state.recordTurn({ cacheRead: 0, cacheWrite: 0, input: 5000 }, 2000);
+      const comparableTurn = state.recordTurn({ cacheRead: 100, cacheWrite: 0, input: 9900 }, 3000);
+
+      expect(noDataTurn.note).toBeUndefined();
+      expect(comparableTurn.note).toBe("⚠ model changed");
+      expect(comparableTurn.cause).toEqual({ type: "model_change", model: "anthropic/claude-4" });
+    });
   });
 
   describe("detectRegression", () => {
@@ -148,7 +161,15 @@ describe("CacheMonitorState", () => {
       const state = new CacheMonitorState();
       state.recordTurn({ cacheRead: 9000, cacheWrite: 0, input: 1000 }, 1000);
       state.recordTurn({ cacheRead: 0, cacheWrite: 0, input: 0 }, 2000); // undefined
-      // Only 1 turn with defined rate → no regression
+      // Only 1 adjacent comparable turn pair → no regression
+      expect(state.detectRegression(25)).toBeNull();
+    });
+
+    it("does not compare across a no-data gap", () => {
+      const state = new CacheMonitorState();
+      state.recordTurn({ cacheRead: 9000, cacheWrite: 0, input: 1000 }, 1000);
+      state.recordTurn({ cacheRead: 0, cacheWrite: 0, input: 5000 }, 2000);
+      state.recordTurn({ cacheRead: 1000, cacheWrite: 0, input: 9000 }, 3000);
       expect(state.detectRegression(25)).toBeNull();
     });
 
@@ -171,6 +192,16 @@ describe("CacheMonitorState", () => {
       const result = state.detectRegression(25);
       expect(result).not.toBeNull();
       expect(result?.cause.type).toBe("prompt_change");
+    });
+
+    it("preserves the selected model in model-change diagnosis", () => {
+      const state = new CacheMonitorState();
+      state.recordTurn({ cacheRead: 9000, cacheWrite: 0, input: 1000 }, 1000);
+      state.flagModelChange("anthropic/claude-4");
+      state.recordTurn({ cacheRead: 0, cacheWrite: 5000, input: 5000 }, 2000);
+      const result = state.detectRegression(25);
+      expect(result).not.toBeNull();
+      expect(result?.cause).toEqual({ type: "model_change", model: "anthropic/claude-4" });
     });
   });
 
