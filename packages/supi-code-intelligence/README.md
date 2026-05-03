@@ -9,9 +9,25 @@ Registers a single `code_intel` tool with high-level actions:
 - **`callees`** — Best-effort outbound call map for a symbol
 - **`implementations`** — Find concrete implementations of interfaces/abstract types
 - **`affected`** — Blast-radius analysis with risk assessment before changing shared APIs
-- **`pattern`** — Bounded, scope-aware text search with structured output
+- **`pattern`** — Bounded, scope-aware text search with structured output, literal search by default, and optional `regex: true`
 
 Injects a compact architecture overview once per session so agents start with structural context.
+
+## Pattern search behavior
+
+`code_intel`'s `pattern` action is optimized for common agent lookups:
+
+- `pattern` is treated as a **literal string by default**
+- Set `regex: true` to opt into raw ripgrep regex semantics
+- Malformed regex input returns an explicit error instead of a misleading "No matches found"
+- Nearby matches in the same file deduplicate overlapping context lines to reduce token waste
+
+Examples:
+
+```json
+{ "action": "pattern", "pattern": "sendMessage({", "path": "packages/" }
+{ "action": "pattern", "pattern": "register(Settings|Config)", "path": "packages/", "regex": true }
+```
 
 ## Architecture
 

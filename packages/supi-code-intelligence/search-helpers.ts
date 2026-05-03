@@ -44,42 +44,90 @@ export interface RgMatch {
   context?: Array<{ line: number; text: string }>;
 }
 
-/** Run ripgrep with JSON output and parse matches, filtering low-signal paths. */
+/** Result of a ripgrep invocation for callers that need both matches and execution errors. */
+export interface RipgrepRunResult {
+  /** Parsed ripgrep matches, if any. */
+  matches: RgMatch[];
+  /** Non-no-match ripgrep execution error text, such as invalid regex syntax. */
+  error?: string;
+}
+
+/**
+ * Run ripgrep with JSON output and parse matches, filtering low-signal paths.
+ *
+ * This helper preserves the historical behavior used by most `code_intel`
+ * actions: any ripgrep execution failure is treated like an empty match set.
+ * Call `runRipgrepDetailed()` when a caller needs to surface regex parse errors
+ * or other non-no-match failures to the agent.
+ */
 export function runRipgrep(
   pattern: string,
   scopePath: string,
   cwd: string,
   opts?: { maxMatches?: number; contextLines?: number; filterLowSignal?: boolean },
 ): RgMatch[] {
-  const max = opts?.maxMatches ?? 30;
-  const ctx = opts?.contextLines ?? 0;
+  return runRipgrepDetailed(pattern, scopePath, cwd, opts).matches;
+}
+
+/**
+ * Run ripgrep and preserve non-no-match execution errors for callers that need
+ * to distinguish invalid regex syntax from a genuine empty search result.
+ */
+export function runRipgrepDetailed(
+  pattern: string,
+  scopePath: string,
+  cwd: string,
+  opts?: { maxMatches?: number; contextLines?: number; filterLowSignal?: boolean },
+): RipgrepRunResult {
   const filter = opts?.filterLowSignal ?? true;
 
   try {
-    const args = ["--json", "-m", String(max)];
-    if (ctx > 0) {
-      args.push("-C", String(ctx));
-    }
-    args.push("-e", pattern, scopePath);
-
-    const result = execFileSync("rg", args, {
+    const result = execFileSync("rg", buildRipgrepArgs(pattern, scopePath, opts), {
       encoding: "utf-8",
       cwd,
       timeout: 10000,
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    return parseRgJson(result, filter);
+    return { matches: parseRgJson(result, filter) };
   } catch (err: unknown) {
-    // rg exits 1 for no-match; treat as empty result
-    if (isExecError(err) && err.stdout) {
-      return parseRgJson(err.stdout as string, filter);
-    }
-    return [];
+    return handleRipgrepError(err, filter);
   }
 }
 
-function isExecError(err: unknown): err is { status: number; stdout: unknown } {
+function buildRipgrepArgs(
+  pattern: string,
+  scopePath: string,
+  opts?: { maxMatches?: number; contextLines?: number },
+): string[] {
+  const args = ["--json", "-m", String(opts?.maxMatches ?? 30)];
+  if ((opts?.contextLines ?? 0) > 0) {
+    args.push("-C", String(opts?.contextLines ?? 0));
+  }
+  args.push("-e", pattern, scopePath);
+  return args;
+}
+
+function handleRipgrepError(err: unknown, filterLowSignal: boolean): RipgrepRunResult {
+  if (!isExecError(err)) {
+    return { matches: [] };
+  }
+
+  const stdout = typeof err.stdout === "string" ? err.stdout : "";
+  const stderr = typeof err.stderr === "string" ? err.stderr.trim() : "";
+  const matches = stdout ? parseRgJson(stdout, filterLowSignal) : [];
+
+  if (err.status === 1) {
+    return { matches };
+  }
+
+  return {
+    matches,
+    ...(stderr ? { error: stderr } : {}),
+  };
+}
+
+function isExecError(err: unknown): err is { status: number; stdout?: unknown; stderr?: unknown } {
   return typeof err === "object" && err !== null && "status" in err;
 }
 

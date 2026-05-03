@@ -17,6 +17,7 @@ export type CodeIntelAction =
   | "affected"
   | "pattern";
 
+/** Flat parameter bag shared by `code_intel` action handlers. */
 export interface ActionParams {
   action: CodeIntelAction;
   path?: string;
@@ -24,7 +25,10 @@ export interface ActionParams {
   line?: number;
   character?: number;
   symbol?: string;
+  /** Text search input for `action: "pattern"`; treated as literal unless `regex` is true. */
   pattern?: string;
+  /** Opt into raw ripgrep regex semantics for `action: "pattern"`. */
+  regex?: boolean;
   kind?: string;
   exportedOnly?: boolean;
   maxResults?: number;

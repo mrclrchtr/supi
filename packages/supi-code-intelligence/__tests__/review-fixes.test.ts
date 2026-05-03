@@ -125,6 +125,31 @@ describe("contextLines in pattern results", () => {
 
     expect(result).toContain("X");
   });
+
+  it("deduplicates overlapping context lines without hiding distinct matches", async () => {
+    writeJson(tmpDir, "package.json", { name: "test" });
+    writeFileSync(
+      path.join(tmpDir, "sample.ts"),
+      [
+        "// line 1 before",
+        "export const TARGET_ONE = 1;",
+        "// shared context",
+        "export const TARGET_TWO = 2;",
+        "// line 5 after",
+      ].join("\n"),
+    );
+
+    const result = await executeAction(
+      { action: "pattern", pattern: "TARGET", contextLines: 1 },
+      { cwd: tmpDir },
+    );
+
+    expect(result.match(/L3:/g)).toHaveLength(1);
+    expect(result.match(/L2:/g)).toHaveLength(1);
+    expect(result.match(/L4:/g)).toHaveLength(1);
+    expect(result).toContain("TARGET_ONE");
+    expect(result).toContain("TARGET_TWO");
+  });
 });
 
 describe("path scoping uses proper containment", () => {

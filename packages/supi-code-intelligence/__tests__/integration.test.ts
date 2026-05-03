@@ -9,6 +9,9 @@ interface MockInternals {
   tools: Array<{
     name: string;
     description: string;
+    parameters?: {
+      properties?: Record<string, unknown>;
+    };
     promptSnippet?: string;
     promptGuidelines?: string[];
   }>;
@@ -59,6 +62,13 @@ describe("code_intel tool registration", () => {
     expect(desc).toContain('"action": "callers"');
     expect(desc).toContain('"action": "affected"');
     expect(desc).toContain('"action": "pattern"');
+    expect(desc).toContain('"regex": true');
+  });
+
+  it("registers an optional regex parameter for pattern searches", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi);
+    expect(pi.tools[0].parameters?.properties).toHaveProperty("regex");
   });
 
   it("has promptSnippet naming code_intel", () => {
@@ -85,6 +95,14 @@ describe("code_intel tool registration", () => {
     expect(combined).toContain("lsp");
     expect(combined).toContain("tree_sitter");
     expect(combined).toContain("drill-down");
+  });
+
+  it("guidance explains literal-default pattern search and regex opt-in", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi);
+    const combined = (pi.tools[0].promptGuidelines ?? []).join(" ");
+    expect(combined).toContain("literal strings by default");
+    expect(combined).toContain("regex: true");
   });
 
   it("guidance discourages code_intel for trivial tasks", () => {

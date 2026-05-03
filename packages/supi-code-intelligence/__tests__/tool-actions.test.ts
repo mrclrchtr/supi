@@ -131,4 +131,47 @@ describe("pattern action", () => {
     expect(result).toContain("src/");
     expect(result).toContain("target");
   });
+
+  it("treats regex metacharacters literally by default", async () => {
+    writeJson(tmpDir, "package.json", { name: "test" });
+    writeFileSync(path.join(tmpDir, "index.ts"), "const x = sendMessage({ ok: true });");
+
+    const result = await executeAction(
+      { action: "pattern", pattern: "sendMessage({" },
+      { cwd: tmpDir },
+    );
+
+    expect(result).toContain("sendMessage({");
+    expect(result).not.toContain("No matches");
+  });
+
+  it("supports opt-in regex pattern searches", async () => {
+    writeJson(tmpDir, "package.json", { name: "test" });
+    writeFileSync(
+      path.join(tmpDir, "index.ts"),
+      ["export const registerSettings = 1;", "export const registerConfig = 2;"].join("\n"),
+    );
+
+    const result = await executeAction(
+      { action: "pattern", pattern: "register(Settings|Config)", regex: true },
+      { cwd: tmpDir },
+    );
+
+    expect(result).toContain("registerSettings");
+    expect(result).toContain("registerConfig");
+  });
+
+  it("returns an explicit error for malformed regex patterns", async () => {
+    writeJson(tmpDir, "package.json", { name: "test" });
+    writeFileSync(path.join(tmpDir, "index.ts"), "const x = sendMessage({ ok: true });");
+
+    const result = await executeAction(
+      { action: "pattern", pattern: "sendMessage(", regex: true },
+      { cwd: tmpDir },
+    );
+
+    expect(result).toContain("**Error:** Invalid regex pattern");
+    expect(result).toContain("sendMessage(");
+    expect(result).not.toContain("No matches");
+  });
 });

@@ -20,6 +20,10 @@ const CodeIntelActionEnum = StringEnum([
   "pattern",
 ] as const);
 
+/**
+ * Register the `code_intel` tool and inject a lightweight architecture overview
+ * once per session.
+ */
 export default function codeIntelligenceExtension(pi: ExtensionAPI) {
   let hasInjectedOverview = false;
 
@@ -78,7 +82,14 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
         Type.String({ description: "Symbol name for discovery-based resolution" }),
       ),
       pattern: Type.Optional(
-        Type.String({ description: "Text search pattern (pattern action only)" }),
+        Type.String({
+          description: "Text search pattern (pattern action only; literal by default)",
+        }),
+      ),
+      regex: Type.Optional(
+        Type.Boolean({
+          description: "Use regex semantics for pattern action (default: false, literal search)",
+        }),
       ),
       kind: Type.Optional(Type.String({ description: "Symbol kind filter for discovery" })),
       exportedOnly: Type.Optional(
