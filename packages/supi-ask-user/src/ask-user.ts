@@ -47,6 +47,7 @@ const PROMPT_GUIDELINES = [
 interface ExtensionUi {
   ui: {
     custom?: RichUiHost["custom"];
+    setWorkingVisible?(visible: boolean): void;
   };
   hasUI: boolean;
   abort(): void;
@@ -103,6 +104,8 @@ async function executeAskUser(
     );
   }
   try {
+    // Hide the built-in working loader so it doesn't compete with the overlay.
+    ctx.ui.setWorkingVisible?.(false);
     const result = await driveQuestionnaire(normalized, signal, ctx);
     if (
       result.details.terminalState !== "submitted" &&
@@ -112,6 +115,8 @@ async function executeAskUser(
     }
     return result;
   } finally {
+    // Restore the working loader regardless of how the overlay closed.
+    ctx.ui.setWorkingVisible?.(true);
     lock.release();
   }
 }

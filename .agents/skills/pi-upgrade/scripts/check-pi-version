@@ -481,7 +481,7 @@ run_install() {
   case "$pm" in
     pnpm)
       if ((${#UPDATE_PACKAGES[@]} > 0)); then
-        primary=(pnpm update --recursive "${latest_packages[@]}" --latest)
+        primary=(pnpm update --recursive "${UPDATE_PACKAGES[@]}" --latest)
         secondary=(pnpm install)
       else
         primary=(pnpm install)
@@ -544,6 +544,7 @@ emit_json() {
     const fs = require('fs');
     const bumpChanges = $BUMP_CHANGES;
     const installOutput = $(printf '%s' "$INSTALL_OUTPUT" | jq -Rs .);
+    const installCommand = $(printf '%s' "$INSTALL_CMD" | jq -Rs .);
     const updatePackages = $(printf '%s\n' "${UPDATE_PACKAGES[@]}" | jq -R . | jq -s .);
 
     const data = {
@@ -559,7 +560,7 @@ emit_json() {
       bumpedFiles: $bumped_list,
       bumpChanges: bumpChanges,
       updatePackages,
-      installCommand: '$INSTALL_CMD',
+      installCommand: installCommand,
       installExitCode: $INSTALL_EXIT,
       installOutput: installOutput
     };
