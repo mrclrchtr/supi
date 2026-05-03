@@ -119,8 +119,13 @@ registerSettings({
 - `pnpm exec biome check packages/supi-<pkg>` — package-scoped Biome check for faster iteration on one extension
 - `pnpm exec tsc --noEmit -p packages/supi-<pkg>/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-<pkg>/__tests__/tsconfig.json` — package-scoped typecheck for one extension and its tests
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports and other unsafe lint issues
+- `pnpm exec biome check --max-diagnostics=20 <files>` — when the full workspace check OOMs, cap diagnostics
+- `ctx.ui.select()` accepts only `string[]`; use label-encoding (e.g. `"[id] name"`) if you need metadata
+- `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` — required to trigger `setInterval` callbacks in vitest
 - Adding a new runtime export to `supi-core/index.ts` breaks every downstream `vi.mock("@mrclrchtr/supi-core")` factory that omits it; audit all `vi.mock` blocks in consuming packages
 - The same applies to new runtime exports from local modules (e.g., `CLAUDE_MD_DEFAULTS` from `config.ts`) consumed by `vi.mock("../config.ts")` factories
 - **Deleting a source file breaks every test with `vi.mock("../<file>")` referencing it** — audit all test files for stale mock factories after module deletion
 - **Removing code may leave `// biome-ignore` suppression comments unused** — Biome flags these; remove them
 - **Changing state shape requires updating every `createInitialState` mock in test files** — keep mock shapes in sync with real types
+- New workspace package: add `package.json` + `tsconfig.json` + `__tests__/tsconfig.json`, wire into root `pi.extensions` array, run `pnpm install`
+- Package-scoped test tsconfig: `{"extends": "../../../tsconfig.json", "include": ["*.ts"], "exclude": []}`

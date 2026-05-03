@@ -38,6 +38,8 @@ Entrypoints:
 ## Diagnostic behavior gotchas
 
 - Diagnostic cleanup (`didClose`, prune, refresh deletion, shutdown) must release pending waiters, not just delete waiter maps.
+- `before_agent_start` uses a **two-pass prune/refresh** pattern: prune missing files → refresh open diagnostics → prune again. Late `publishDiagnostics` notifications (already in-flight) can recreate stale `diagnosticStore` entries for deleted files after the first prune.
+- `getAllDiagnostics()` should filter by `existsSync(uriToFile(uri))` as a read-side guard against the same race — late notifications recreate entries even after the second prune.
 - Push diagnostic refresh should settle after `quietMs` even when no publications arrive; avoid forcing every turn to wait `maxWaitMs`.
 - Pull diagnostics should use `JsonRpcClient.sendRequest(..., { timeoutMs })` so timed-out requests leave the pending map promptly.
 - Pull diagnostic reports can include `relatedDocuments` on `unchanged` top-level reports; apply related full reports regardless of top-level kind.
