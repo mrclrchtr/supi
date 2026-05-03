@@ -1,0 +1,42 @@
+{
+  "name": "@mrclrchtr/supi-insights",
+  "version": "0.1.0",
+  "description": "SuPi Insights extension — generate usage reports analyzing your PI sessions",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "src/**/*.ts",
+    "!__tests__"
+  ],
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*",
+    "diff": "^7.0.0"
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@types/diff": "^7.0.0",
+    "@types/node": "^25.6.0",
+    "vitest": "^4.1.4"
+  },
+  "pi": {
+    "extensions": [
+      "./src/insights.ts"
+    ]
+  },
+  "main": "src/index.ts"
+}
