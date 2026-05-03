@@ -38,5 +38,6 @@
     "skills": [
       "./resources"
     ]
-  }
+  },
+  "main": "index.ts"
 }

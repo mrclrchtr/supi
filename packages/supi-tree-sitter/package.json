@@ -40,5 +40,6 @@
     "extensions": [
       "./tree-sitter.ts"
     ]
-  }
+  },
+  "main": "index.ts"
 }

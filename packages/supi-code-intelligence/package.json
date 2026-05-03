@@ -39,5 +39,6 @@
     "extensions": [
       "./code-intelligence.ts"
     ]
-  }
+  },
+  "main": "index.ts"
 }

@@ -35,5 +35,6 @@
     "extensions": [
       "./index.ts"
     ]
-  }
+  },
+  "main": "index.ts"
 }

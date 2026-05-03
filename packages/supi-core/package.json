@@ -29,5 +29,6 @@
   },
   "pi": {
     "extensions": []
-  }
+  },
+  "main": "index.ts"
 }
