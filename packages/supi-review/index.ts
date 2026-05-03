@@ -178,6 +178,9 @@ async function resolveGitTarget(
 ): Promise<{ kind: "success"; target: ReviewTarget } | ReviewResult> {
   switch (target.type) {
     case "base-branch": {
+      if (target.diff) {
+        return { kind: "success", target };
+      }
       const baseSha = await getMergeBase(ctx.cwd, target.branch);
       if (!baseSha) {
         return { kind: "failed", reason: `No merge base found for ${target.branch}`, target };
@@ -185,6 +188,9 @@ async function resolveGitTarget(
       return { kind: "success", target: { ...target, diff: await getDiff(ctx.cwd, baseSha) } };
     }
     case "uncommitted": {
+      if (target.diff) {
+        return { kind: "success", target };
+      }
       const diff = await getUncommittedDiff(ctx.cwd);
       if (!diff) {
         return { kind: "failed", reason: "No uncommitted changes", target };
@@ -192,6 +198,9 @@ async function resolveGitTarget(
       return { kind: "success", target: { ...target, diff } };
     }
     case "commit": {
+      if (target.show) {
+        return { kind: "success", target };
+      }
       return {
         kind: "success",
         target: { ...target, show: await getCommitShow(ctx.cwd, target.sha) },

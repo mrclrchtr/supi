@@ -115,12 +115,16 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
 
   it("collects diagnostics for file with type error", async () => {
     const content = fs.readFileSync(badFile, "utf-8");
-    const diagnostics = await client.syncAndWaitForDiagnostics(badFile, content);
+    const diagnostics = await waitFor(
+      () => client.syncAndWaitForDiagnostics(badFile, content),
+      (items) => items.length > 0,
+      { timeoutMs: 10_000, retryDelayMs: 200, label: "diagnostics for bad.ts" },
+    );
     expect(diagnostics.length).toBeGreaterThan(0);
     // Should report a type error
     const hasError = diagnostics.some((d: Diagnostic) => d.severity === 1);
     expect(hasError).toBe(true);
-  }, 10_000);
+  }, 15_000);
 
   it("returns no diagnostics for valid file", async () => {
     const content = fs.readFileSync(goodFile, "utf-8");

@@ -7,18 +7,20 @@ import type { LspManager } from "./manager.ts";
 interface LspOverrideState {
   getInlineSeverity(): number;
   getManager(): LspManager | null;
-  cwd: string;
+  getCwd(): string;
 }
 
 export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverrideState): void {
-  const originalRead = createReadTool(state.cwd);
-  const originalWrite = createWriteTool(state.cwd);
-  const originalEdit = createEditTool(state.cwd);
+  const readMeta = createReadTool(process.cwd());
+  const writeMeta = createWriteTool(process.cwd());
+  const editMeta = createEditTool(process.cwd());
 
   pi.registerTool({
-    ...originalRead,
+    ...readMeta,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(toolCallId, params, signal, onUpdate, _ctx) {
+      const cwd = state.getCwd();
+      const originalRead = createReadTool(cwd);
       const result = await originalRead.execute(toolCallId, params, signal, onUpdate);
       await ensureFileOpen(state.getManager(), params.path);
       return result;
@@ -26,30 +28,34 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
   });
 
   pi.registerTool({
-    ...originalWrite,
+    ...writeMeta,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(toolCallId, params, signal, onUpdate, _ctx) {
+      const cwd = state.getCwd();
+      const originalWrite = createWriteTool(cwd);
       const result = await originalWrite.execute(toolCallId, params, signal, onUpdate);
       return appendInlineDiagnostics({
         manager: state.getManager(),
         filePath: params.path,
         inlineSeverity: state.getInlineSeverity(),
-        cwd: state.cwd,
+        cwd,
         result,
       });
     },
   });
 
   pi.registerTool({
-    ...originalEdit,
+    ...editMeta,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(toolCallId, params, signal, onUpdate, _ctx) {
+      const cwd = state.getCwd();
+      const originalEdit = createEditTool(cwd);
       const result = await originalEdit.execute(toolCallId, params, signal, onUpdate);
       return appendInlineDiagnostics({
         manager: state.getManager(),
         filePath: params.path,
         inlineSeverity: state.getInlineSeverity(),
-        cwd: state.cwd,
+        cwd,
         result,
       });
     },

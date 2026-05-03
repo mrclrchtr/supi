@@ -3,10 +3,13 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
+const GIT_TIMEOUT_MS = 30_000;
+
 export async function getMergeBase(repoPath: string, branch: string): Promise<string | undefined> {
   try {
     const { stdout } = await execFileAsync("git", ["merge-base", "HEAD", branch], {
       cwd: repoPath,
+      timeout: GIT_TIMEOUT_MS,
     });
     return stdout.trim() || undefined;
   } catch {
@@ -15,21 +18,27 @@ export async function getMergeBase(repoPath: string, branch: string): Promise<st
 }
 
 export async function getDiff(repoPath: string, baseSha: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["diff", baseSha], { cwd: repoPath });
+  const { stdout } = await execFileAsync("git", ["diff", baseSha], {
+    cwd: repoPath,
+    timeout: GIT_TIMEOUT_MS,
+  });
   return stdout;
 }
 
 export async function getUncommittedDiff(repoPath: string): Promise<string> {
   const [staged, unstaged, untracked] = await Promise.all([
-    execFileAsync("git", ["diff", "--cached"], { cwd: repoPath }).then(
+    execFileAsync("git", ["diff", "--cached"], { cwd: repoPath, timeout: GIT_TIMEOUT_MS }).then(
       (r) => r.stdout,
       () => "",
     ),
-    execFileAsync("git", ["diff"], { cwd: repoPath }).then(
+    execFileAsync("git", ["diff"], { cwd: repoPath, timeout: GIT_TIMEOUT_MS }).then(
       (r) => r.stdout,
       () => "",
     ),
-    execFileAsync("git", ["ls-files", "--others", "--exclude-standard"], { cwd: repoPath }).then(
+    execFileAsync("git", ["ls-files", "--others", "--exclude-standard"], {
+      cwd: repoPath,
+      timeout: GIT_TIMEOUT_MS,
+    }).then(
       (r) => r.stdout,
       () => "",
     ),
@@ -64,7 +73,7 @@ export async function getRecentCommits(repoPath: string, limit = 20): Promise<Co
   const { stdout } = await execFileAsync(
     "git",
     ["log", `--max-count=${limit}`, "--pretty=format:%H %s"],
-    { cwd: repoPath },
+    { cwd: repoPath, timeout: GIT_TIMEOUT_MS },
   );
   return stdout
     .split("\n")
@@ -77,14 +86,23 @@ export async function getRecentCommits(repoPath: string, limit = 20): Promise<Co
 }
 
 export async function getCommitShow(repoPath: string, sha: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["show", sha], { cwd: repoPath });
+  const { stdout } = await execFileAsync("git", ["show", sha], {
+    cwd: repoPath,
+    timeout: GIT_TIMEOUT_MS,
+  });
   return stdout;
 }
 
 export async function getLocalBranches(repoPath: string): Promise<string[]> {
   const [{ stdout: local }, { stdout: current }] = await Promise.all([
-    execFileAsync("git", ["branch", "--format=%(refname:short)"], { cwd: repoPath }),
-    execFileAsync("git", ["branch", "--show-current"], { cwd: repoPath }),
+    execFileAsync("git", ["branch", "--format=%(refname:short)"], {
+      cwd: repoPath,
+      timeout: GIT_TIMEOUT_MS,
+    }),
+    execFileAsync("git", ["branch", "--show-current"], {
+      cwd: repoPath,
+      timeout: GIT_TIMEOUT_MS,
+    }),
   ]);
 
   const names = local

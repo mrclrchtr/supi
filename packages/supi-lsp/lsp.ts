@@ -71,7 +71,7 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerLspAwareToolOverrides(pi, {
     getInlineSeverity: () => state.inlineSeverity,
     getManager: () => state.manager,
-    cwd: process.cwd(),
+    getCwd: () => state.manager?.getCwd() ?? process.cwd(),
   });
 
   registerLspTool(pi, state, lspPromptGuidelines);

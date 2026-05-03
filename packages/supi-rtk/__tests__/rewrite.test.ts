@@ -21,10 +21,22 @@ describe("rtkRewrite", () => {
     });
   });
 
-  it("returns undefined when rtk exits non-zero", () => {
+  it("returns stdout when rtk exits non-zero with a usable rewrite", () => {
+    vi.mocked(execFileSync).mockImplementation(() => {
+      const err = new Error("exit 3") as Error & { stdout?: string };
+      err.stdout = "rtk git status\n";
+      throw err;
+    });
+
+    const result = rtkRewrite("git status", 5000);
+    expect(result).toBe("rtk git status");
+  });
+
+  it("returns undefined when rtk exits non-zero without stdout", () => {
     vi.mocked(execFileSync).mockImplementation(() => {
       throw new Error("exit 1");
     });
+
     const result = rtkRewrite("unknown-cmd", 5000);
     expect(result).toBeUndefined();
   });

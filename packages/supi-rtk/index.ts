@@ -19,14 +19,22 @@ const RTK_DEFAULTS = {
   rewriteTimeout: 5000,
 };
 
-function verifyRtkBinary(): void {
+/** Cached RTK availability probe — reset when the extension/session starts. */
+let rtkAvailable: boolean | null = null;
+
+function checkRtkAvailable(): boolean {
+  if (rtkAvailable !== null) {
+    return rtkAvailable;
+  }
+
   try {
     execFileSync("rtk", ["--version"], { encoding: "utf-8", timeout: 5000 });
-  } catch (_error) {
-    throw new Error("rtk binary not found on PATH. Install RTK to use supi-rtk.", {
-      cause: _error,
-    });
+    rtkAvailable = true;
+  } catch {
+    rtkAvailable = false;
   }
+
+  return rtkAvailable;
 }
 
 function loadRtkConfig(cwd: string) {
@@ -68,8 +76,29 @@ function registerRtkSettings(): void {
   });
 }
 
+/**
+ * Try to rewrite a command through RTK, recording the outcome.
+ * Returns the rewritten command, or the original when unavailable or unchanged.
+ */
+function tryRtkRewrite(command: string, timeoutMs: number): string {
+  if (!checkRtkAvailable()) {
+    return command;
+  }
+
+  const rewritten = rtkRewrite(command, timeoutMs);
+  if (!rewritten || rewritten === command) {
+    if (!rewritten) {
+      recordFallback(command);
+    }
+    return command;
+  }
+
+  recordRewrite(command, rewritten);
+  return rewritten;
+}
+
 export default function rtkExtension(pi: ExtensionAPI) {
-  verifyRtkBinary();
+  rtkAvailable = null;
   registerRtkSettings();
 
   registerContextProvider({
@@ -80,39 +109,31 @@ export default function rtkExtension(pi: ExtensionAPI) {
 
   pi.on("session_start", async () => {
     resetTracking();
+    rtkAvailable = null;
   });
 
-  const cwd = process.cwd();
-  const settings = SettingsManager.create(cwd);
-  const shellPath = settings.getShellPath();
-  const shellCommandPrefix = settings.getShellCommandPrefix();
-
-  const bashTool = createBashTool(cwd, {
-    shellPath,
-    commandPrefix: shellCommandPrefix,
-    spawnHook: ({ command, cwd: spawnCwd, env }) => {
-      const config = loadRtkConfig(spawnCwd);
-      if (!config.enabled) {
-        return { command, cwd: spawnCwd, env };
-      }
-
-      const rewritten = rtkRewrite(command, config.rewriteTimeout);
-      if (rewritten && rewritten !== command) {
-        recordRewrite(command, rewritten);
-        return { command: rewritten, cwd: spawnCwd, env };
-      }
-      if (!rewritten) {
-        recordFallback(command);
-      }
-      return { command, cwd: spawnCwd, env };
-    },
-  });
+  const baseBashTool = createBashTool(process.cwd());
 
   pi.registerTool({
-    ...bashTool,
+    ...baseBashTool,
     // biome-ignore lint/complexity/useMaxParams: pi tool execute signature
-    execute: async (id, params, signal, onUpdate, _ctx) => {
-      return bashTool.execute(id, params, signal, onUpdate);
+    async execute(toolCallId, params, signal, onUpdate, ctx) {
+      const cwd = ctx.cwd;
+      const settings = SettingsManager.create(cwd);
+      const bashTool = createBashTool(cwd, {
+        shellPath: settings.getShellPath(),
+        commandPrefix: settings.getShellCommandPrefix(),
+        spawnHook: ({ command, cwd: spawnCwd, env }) => {
+          const config = loadRtkConfig(spawnCwd);
+          if (!config.enabled) {
+            return { command, cwd: spawnCwd, env };
+          }
+
+          const rewritten = tryRtkRewrite(command, config.rewriteTimeout);
+          return { command: rewritten, cwd: spawnCwd, env };
+        },
+      });
+      return bashTool.execute(toolCallId, params, signal, onUpdate);
     },
   });
 
@@ -126,16 +147,13 @@ export default function rtkExtension(pi: ExtensionAPI) {
       return;
     }
 
-    const rewritten = rtkRewrite(event.command, config.rewriteTimeout);
-    if (!rewritten || rewritten === event.command) {
-      if (!rewritten) {
-        recordFallback(event.command);
-      }
+    const rewritten = tryRtkRewrite(event.command, config.rewriteTimeout);
+    if (rewritten === event.command) {
       return;
     }
 
-    recordRewrite(event.command, rewritten);
-    const local = createLocalBashOperations({ shellPath });
+    const settings = SettingsManager.create(event.cwd);
+    const local = createLocalBashOperations({ shellPath: settings.getShellPath() });
     return {
       operations: {
         exec: (_command, cwd, options) => local.exec(rewritten, cwd, options),

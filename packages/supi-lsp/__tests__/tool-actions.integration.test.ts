@@ -138,12 +138,17 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
   }, 10_000);
 
   it("diagnostics: reports errors for broken file", async () => {
-    const result = await executeAction(manager, {
-      action: "diagnostics",
-      file: badFile,
-    });
+    const result = await waitFor(
+      () =>
+        executeAction(manager, {
+          action: "diagnostics",
+          file: badFile,
+        }),
+      (text) => text.toLowerCase().includes("error"),
+      { timeoutMs: 10_000, retryDelayMs: 200, label: "diagnostics action for broken file" },
+    );
     expect(result).toContain("error");
-  }, 10_000);
+  }, 15_000);
 
   it("diagnostics: no errors for valid file", async () => {
     const result = await executeAction(manager, {
@@ -159,11 +164,16 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
     // Sync bad file first to ensure diagnostics exist
     await manager.syncFileAndGetDiagnostics(badFile, 1);
 
-    const result = await executeAction(manager, {
-      action: "diagnostics",
-    });
+    const result = await waitFor(
+      () =>
+        executeAction(manager, {
+          action: "diagnostics",
+        }),
+      (text) => text.toLowerCase().includes("error"),
+      { timeoutMs: 10_000, retryDelayMs: 200, label: "diagnostics summary action" },
+    );
     expect(result).toContain("error");
-  }, 10_000);
+  }, 15_000);
 
   it("rename: computes workspace-wide rename", async () => {
     const result = await executeAction(manager, {

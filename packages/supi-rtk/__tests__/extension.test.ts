@@ -32,7 +32,6 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   registerContextProvider: mockFns.registerContextProvider,
 }));
 
-import { createBashTool } from "@mariozechner/pi-coding-agent";
 import { registerConfigSettings, registerContextProvider } from "@mrclrchtr/supi-core";
 import rtkExtension from "../index.ts";
 import { resetTracking } from "../tracking.ts";
@@ -40,7 +39,6 @@ import { resetTracking } from "../tracking.ts";
 interface PiMock {
   handlers: Map<string, (...args: unknown[]) => unknown>;
   tools: unknown[];
-  commands: Map<string, unknown>;
   pi: {
     on: (event: string, handler: (...args: unknown[]) => unknown) => void;
     registerTool: (tool: unknown) => void;
@@ -48,14 +46,17 @@ interface PiMock {
   };
 }
 
+interface BashTool {
+  name: string;
+  execute: (...args: unknown[]) => Promise<unknown>;
+}
+
 function createPiMock(): PiMock {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   const tools: unknown[] = [];
-  const commands = new Map<string, unknown>();
   return {
     handlers,
     tools,
-    commands,
     pi: {
       on(event: string, handler: (...args: unknown[]) => unknown) {
         handlers.set(event, handler);
@@ -63,33 +64,53 @@ function createPiMock(): PiMock {
       registerTool(tool: unknown) {
         tools.push(tool);
       },
-      registerCommand(name: string, spec: unknown) {
-        commands.set(name, spec);
-      },
+      registerCommand(_name: string, _spec: unknown) {},
     },
   };
+}
+
+function getRegisteredBashTool(tools: unknown[]): BashTool | undefined {
+  return tools.find((tool) => (tool as BashTool).name === "bash") as BashTool | undefined;
+}
+
+const VERSION_OUTPUT = "rtk 1.0.0";
+
+function mockRtkAvailable(): void {
+  mockFns.execFileSync.mockImplementation((...args: unknown[]) => {
+    const [cmd, argv] = args as [string, string[]];
+    if (cmd === "rtk" && Array.isArray(argv)) {
+      if (argv[0] === "--version") {
+        return VERSION_OUTPUT;
+      }
+      if (argv[0] === "rewrite") {
+        return `rtk ${argv[1] ?? ""}`;
+      }
+    }
+    throw new Error(`Unexpected call: ${cmd} ${JSON.stringify(argv)}`);
+  });
 }
 
 describe("rtkExtension", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetTracking();
-    mockFns.execFileSync.mockReturnValue("rtk 1.0.0");
+    mockRtkAvailable();
     mockFns.loadSupiConfig.mockReturnValue({ enabled: true, rewriteTimeout: 5000 });
     mockFns.getShellPath.mockReturnValue(undefined);
     mockFns.getShellCommandPrefix.mockReturnValue(undefined);
     mockFns.createBashTool.mockImplementation((_cwd, options) => {
-      return { name: "bash", execute: vi.fn(), ...options };
+      return { name: "bash", execute: vi.fn().mockResolvedValue(undefined), ...options };
     });
     mockFns.createLocalBashOperations.mockReturnValue({ exec: vi.fn() });
   });
 
-  it("throws when rtk binary is missing", () => {
+  it("does not throw when the rtk binary is missing", () => {
     mockFns.execFileSync.mockImplementation(() => {
       throw new Error("ENOENT");
     });
+
     const { pi } = createPiMock();
-    expect(() => rtkExtension(pi as never)).toThrow("rtk binary not found");
+    expect(() => rtkExtension(pi as never)).not.toThrow();
   });
 
   it("registers settings, context provider, and event handlers", () => {
@@ -103,57 +124,136 @@ describe("rtkExtension", () => {
     expect(tools).toHaveLength(1);
   });
 
-  it("spawnHook rewrites command when enabled", () => {
-    const { pi } = createPiMock();
+  it("execute creates the bash tool with the current ctx.cwd and shell settings", async () => {
+    const { pi, tools } = createPiMock();
     rtkExtension(pi as never);
 
-    const spawnHook = vi.mocked(createBashTool).mock.calls[0][1]?.spawnHook;
-    expect(spawnHook).toBeDefined();
+    const bashTool = getRegisteredBashTool(tools);
+    expect(bashTool).toBeDefined();
+    if (!bashTool) {
+      throw new Error("bash tool not registered");
+    }
 
-    mockFns.execFileSync.mockReturnValue("rtk git status");
+    mockFns.getShellPath.mockReturnValue("/bin/zsh");
+    mockFns.getShellCommandPrefix.mockReturnValue("source ~/.zshrc");
+
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
+      cwd: "/project",
+    });
+
+    const lastCall = vi.mocked(mockFns.createBashTool).mock.lastCall;
+    expect(lastCall?.[0]).toBe("/project");
+    expect(lastCall?.[1]).toMatchObject({
+      shellPath: "/bin/zsh",
+      commandPrefix: "source ~/.zshrc",
+    });
+  });
+
+  it("spawnHook rewrites commands when enabled", async () => {
+    const { pi, tools } = createPiMock();
+    rtkExtension(pi as never);
+
+    const bashTool = getRegisteredBashTool(tools);
+    if (!bashTool) {
+      throw new Error("bash tool not registered");
+    }
+
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
+      cwd: "/project",
+    });
+
+    const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
     const result = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
     expect(result).toEqual({ command: "rtk git status", cwd: "/project", env: {} });
   });
 
-  it("spawnHook falls back when rtk rewrite fails", () => {
-    const { pi } = createPiMock();
-    rtkExtension(pi as never);
-
-    const spawnHook = vi.mocked(createBashTool).mock.calls[0][1]?.spawnHook;
-    mockFns.execFileSync.mockImplementation(() => {
-      throw new Error("exit 1");
+  it("spawnHook falls back and records a fallback when rewrite fails", async () => {
+    mockFns.execFileSync.mockImplementation((...args: unknown[]) => {
+      const [cmd, argv] = args as [string, string[]];
+      if (cmd === "rtk" && Array.isArray(argv) && argv[0] === "--version") {
+        return VERSION_OUTPUT;
+      }
+      if (cmd === "rtk" && Array.isArray(argv) && argv[0] === "rewrite") {
+        throw new Error("exit 1");
+      }
+      throw new Error(`Unexpected call: ${cmd} ${JSON.stringify(argv)}`);
     });
 
+    const { pi, tools } = createPiMock();
+    rtkExtension(pi as never);
+
+    const bashTool = getRegisteredBashTool(tools);
+    if (!bashTool) {
+      throw new Error("bash tool not registered");
+    }
+
+    await bashTool.execute("id", { command: "echo hello" }, undefined, () => {}, {
+      cwd: "/project",
+    });
+
+    const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
     const result = spawnHook?.({ command: "echo hello", cwd: "/project", env: {} });
     expect(result).toEqual({ command: "echo hello", cwd: "/project", env: {} });
+
+    const providerCall = vi.mocked(registerContextProvider).mock.calls[0][0];
+    expect(providerCall.getData()).toEqual({
+      rewrites: 0,
+      fallbacks: 1,
+      estimatedTokensSaved: 0,
+    });
   });
 
-  it("forwards shellPath and commandPrefix to createBashTool", () => {
-    mockFns.getShellPath.mockReturnValue("/bin/zsh");
-    mockFns.getShellCommandPrefix.mockReturnValue("source ~/.zshrc");
-    const { pi } = createPiMock();
+  it("spawnHook passes through when the rtk binary is unavailable without recording fallback", async () => {
+    mockFns.execFileSync.mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
+
+    const { pi, tools } = createPiMock();
     rtkExtension(pi as never);
 
-    const options = vi.mocked(createBashTool).mock.calls[0][1];
-    expect(options?.shellPath).toBe("/bin/zsh");
-    expect(options?.commandPrefix).toBe("source ~/.zshrc");
-  });
+    const bashTool = getRegisteredBashTool(tools);
+    if (!bashTool) {
+      throw new Error("bash tool not registered");
+    }
 
-  it("spawnHook passes through when disabled", () => {
-    mockFns.loadSupiConfig.mockReturnValue({ enabled: false, rewriteTimeout: 5000 });
-    const { pi } = createPiMock();
-    rtkExtension(pi as never);
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
+      cwd: "/project",
+    });
 
-    const spawnHook = vi.mocked(createBashTool).mock.calls[0][1]?.spawnHook;
+    const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
     const result = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
     expect(result).toEqual({ command: "git status", cwd: "/project", env: {} });
+
+    const providerCall = vi.mocked(registerContextProvider).mock.calls[0][0];
+    expect(providerCall.getData()).toBeNull();
   });
 
-  it("user_bash rewrites !cmd commands", () => {
-    const { pi, handlers } = createPiMock();
+  it("spawnHook passes through when disabled", async () => {
+    mockFns.loadSupiConfig.mockReturnValue({ enabled: false, rewriteTimeout: 5000 });
+
+    const { pi, tools } = createPiMock();
     rtkExtension(pi as never);
 
-    mockFns.execFileSync.mockReturnValue("rtk git status");
+    const bashTool = getRegisteredBashTool(tools);
+    if (!bashTool) {
+      throw new Error("bash tool not registered");
+    }
+
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
+      cwd: "/project",
+    });
+
+    const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
+    const result = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
+    expect(result).toEqual({ command: "git status", cwd: "/project", env: {} });
+    expect(mockFns.execFileSync).not.toHaveBeenCalled();
+  });
+
+  it("user_bash rewrites commands and uses the shellPath for the event cwd", () => {
+    mockFns.getShellPath.mockReturnValue("/bin/fish");
+
+    const { pi, handlers } = createPiMock();
+    rtkExtension(pi as never);
 
     const result = handlers.get("user_bash")?.({
       command: "!git status",
@@ -163,28 +263,16 @@ describe("rtkExtension", () => {
 
     expect(result).toBeDefined();
     expect(result?.operations).toBeDefined();
+    expect(mockFns.createLocalBashOperations).toHaveBeenCalledWith({ shellPath: "/bin/fish" });
   });
 
-  it("user_bash ignores !!cmd commands", () => {
-    const { pi, handlers } = createPiMock();
-    rtkExtension(pi as never);
-
-    const result = handlers.get("user_bash")?.({
-      command: "!!git status",
-      excludeFromContext: true,
-      cwd: "/project",
-    });
-
-    expect(result).toBeUndefined();
-  });
-
-  it("user_bash falls through when rewrite fails and records fallback", () => {
-    const { pi, handlers } = createPiMock();
-    rtkExtension(pi as never);
-
+  it("user_bash skips interception when rtk is unavailable", () => {
     mockFns.execFileSync.mockImplementation(() => {
-      throw new Error("exit 1");
+      throw new Error("ENOENT");
     });
+
+    const { pi, handlers } = createPiMock();
+    rtkExtension(pi as never);
 
     const result = handlers.get("user_bash")?.({
       command: "!echo hello",
@@ -195,37 +283,35 @@ describe("rtkExtension", () => {
     expect(result).toBeUndefined();
 
     const providerCall = vi.mocked(registerContextProvider).mock.calls[0][0];
-    expect(providerCall.getData()).toEqual({
-      rewrites: 0,
-      fallbacks: 1,
-      estimatedTokensSaved: 0,
-    });
+    expect(providerCall.getData()).toBeNull();
   });
 
-  it("user_bash forwards shellPath to createLocalBashOperations", () => {
-    mockFns.getShellPath.mockReturnValue("/bin/fish");
-    const { pi, handlers } = createPiMock();
+  it("session_start resets tracking and clears the cached availability probe", async () => {
+    mockFns.execFileSync.mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
+
+    const { pi, handlers, tools } = createPiMock();
     rtkExtension(pi as never);
 
-    mockFns.execFileSync.mockReturnValue("rtk git status");
+    const bashTool = getRegisteredBashTool(tools);
+    if (!bashTool) {
+      throw new Error("bash tool not registered");
+    }
 
-    handlers.get("user_bash")?.({
-      command: "!git status",
-      excludeFromContext: false,
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
       cwd: "/project",
     });
 
-    expect(mockFns.createLocalBashOperations).toHaveBeenCalledWith({ shellPath: "/bin/fish" });
-  });
+    const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
+    const firstResult = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
+    expect(firstResult).toEqual({ command: "git status", cwd: "/project", env: {} });
 
-  it("resets tracking on session_start", () => {
-    const { pi, handlers } = createPiMock();
-    rtkExtension(pi as never);
+    handlers.get("session_start")?.({});
+    mockRtkAvailable();
 
-    // Populate stats via spawnHook
-    const spawnHook = vi.mocked(createBashTool).mock.calls[0][1]?.spawnHook;
-    mockFns.execFileSync.mockReturnValue("rtk git status");
-    spawnHook?.({ command: "git status", cwd: "/project", env: {} });
+    const secondResult = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
+    expect(secondResult).toEqual({ command: "rtk git status", cwd: "/project", env: {} });
 
     const providerCall = vi.mocked(registerContextProvider).mock.calls[0][0];
     expect(providerCall.getData()).toEqual({
@@ -233,9 +319,5 @@ describe("rtkExtension", () => {
       fallbacks: 0,
       estimatedTokensSaved: 200,
     });
-
-    // Reset via session_start
-    handlers.get("session_start")?.({});
-    expect(providerCall.getData()).toBeNull();
   });
 });

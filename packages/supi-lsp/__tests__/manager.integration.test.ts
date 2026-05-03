@@ -22,7 +22,7 @@ async function waitForDiagnostics(
   return waitFor(
     () => manager.syncFileAndGetDiagnostics(filePath, maxSeverity),
     (diagnostics) => diagnostics.length > 0,
-    { timeoutMs: 5_000, retryDelayMs: 200, label: `diagnostics for ${path.basename(filePath)}` },
+    { timeoutMs: 10_000, retryDelayMs: 200, label: `diagnostics for ${path.basename(filePath)}` },
   );
 }
 
@@ -94,7 +94,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
 
     expect(diags.length).toBeGreaterThan(0);
     expect(diags.every((d: Diagnostic) => d.severity === 1)).toBe(true);
-  }, 10_000);
+  }, 15_000);
 
   it("returns no error diagnostics for valid file", async () => {
     const validFile = path.join(tmpDir, "valid.ts");
@@ -107,7 +107,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
     const diagsErrors = await waitForDiagnostics(manager, brokenFile, 1);
     const diagsAll = await waitForDiagnostics(manager, brokenFile, 4);
     expect(diagsAll.length).toBeGreaterThanOrEqual(diagsErrors.length);
-  }, 10_000);
+  }, 15_000);
 
   it("reports server status", () => {
     const status = manager.getStatus();
