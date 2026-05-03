@@ -338,6 +338,101 @@ describe("runRichQuestionnaire render state", () => {
   });
 });
 
+describe("runRichQuestionnaire skip in multi-question mode", () => {
+  const optionalTextQ: NormalizedQuestion = {
+    id: "extra",
+    header: "Extra",
+    type: "text",
+    prompt: "Anything else?",
+    required: false,
+    options: [],
+  };
+
+  const optionalChoiceQ: NormalizedQuestion = {
+    ...choice,
+    id: "opt",
+    header: "Opt",
+    required: false,
+  };
+
+  it("Escape skips the current non-required unanswered text question without closing", async () => {
+    type Outcome = {
+      terminalState: string;
+      answers: { questionId: string; source: string; value?: string }[];
+    };
+    const { captured, host } = makeRichFixture<Outcome>();
+    const _runPromise = runRichQuestionnaire(
+      { questions: [optionalTextQ, choice, yesNoGo], allowSkip: false },
+      { ui: host },
+    );
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    // We're on the first question (optional text). Press Escape to skip it.
+    captured.value.handleInput?.("\u001b");
+
+    // We should now be on the second question (choice), not terminal.
+    const rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("Pick");
+  });
+
+  it("s skips the current non-required unanswered structured question without closing", async () => {
+    type Outcome = {
+      terminalState: string;
+      answers: { questionId: string; source: string; value?: string }[];
+    };
+    const { captured, host } = makeRichFixture<Outcome>();
+    const _runPromise = runRichQuestionnaire(
+      { questions: [optionalChoiceQ, choice], allowSkip: false },
+      { ui: host },
+    );
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    // We're on the first question (optional choice). Press 's' to skip just it.
+    captured.value.handleInput?.("s");
+
+    // We should now be on the second question (required choice), not terminal.
+    const rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("Pick");
+  });
+
+  it("Escape on a single non-required text question advances to submitted", async () => {
+    type Outcome = { terminalState: string; answers: unknown[] };
+    const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
+    const _runPromise = runRichQuestionnaire(
+      { questions: [optionalTextQ], allowSkip: false },
+      { ui: host },
+    );
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    // For a non-required text question in single-question mode, Escape
+    // advances past it → terminal with submitted (no answer provided).
+    captured.value.handleInput?.("\u001b");
+
+    const outcome = await outcomePromise;
+    expect(outcome.terminalState).toBe("submitted");
+  });
+
+  it("s skips the entire questionnaire when current question is required and allowSkip is true", async () => {
+    type Outcome = { terminalState: string; answers: unknown[] };
+    const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
+    const _runPromise = runRichQuestionnaire(
+      { questions: [choice, yesNoGo], allowSkip: true },
+      { ui: host },
+    );
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    // Current question is required (choice). Press 's'.
+    captured.value.handleInput?.("s");
+
+    const outcome = await outcomePromise;
+    expect(outcome.terminalState).toBe("skipped");
+  });
+});
+
 describe("runRichQuestionnaire wrapping", () => {
   it("wraps long inline other input to the next line", async () => {
     const { captured, host } = makeRichFixture<unknown>();

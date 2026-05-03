@@ -87,8 +87,7 @@ export function handleOverlayInput(data: string, deps: OverlayDeps): void {
   const { state, flow } = deps;
   if (isEditorMode(state.subMode)) {
     if (state.subMode === "text-input" && matchesKey(data, Key.ctrl("s")) && flow.showSkip) {
-      flow.skip();
-      deps.finish(flow.outcome());
+      handleSkipAction(deps);
       return;
     }
     if (matchesKey(data, Key.escape)) {
@@ -162,10 +161,27 @@ function handleSelectInput(data: string, deps: OverlayDeps): void {
     return;
   }
   if (matchesKey(data, "s") && flow.showSkip) {
-    flow.skip();
-    deps.finish(flow.outcome());
+    handleSkipAction(deps);
     return;
   }
+}
+
+/** Skip action shared by Ctrl-S (text-input) and 's' (select) handlers. */
+function handleSkipAction(deps: OverlayDeps): void {
+  const { flow } = deps;
+  const question = flow.currentQuestion;
+  if (flow.isMultiQuestion && question && !question.required && !flow.hasAnswer(question.id)) {
+    flow.advance();
+    if (flow.isTerminal()) {
+      deps.finish(flow.outcome());
+      return;
+    }
+    resetStateForCurrent(deps);
+    deps.refresh();
+    return;
+  }
+  flow.skip();
+  deps.finish(flow.outcome());
 }
 
 function openNoteEditor(question: NormalizedQuestion, deps: OverlayDeps): void {
