@@ -26,16 +26,17 @@ import {
 
 export function renderOverlay(env: RenderEnv): string[] {
   const lines: string[] = [];
-  const add = (text: string) => lines.push(truncateToWidth(text, env.width));
-  add(env.theme.fg("accent", "─".repeat(env.width)));
+  lines.push(env.theme.fg("accent", "─".repeat(env.width)));
   if (env.flow.isMultiQuestion) renderTabBar(lines, env);
   if (env.flow.currentMode === "reviewing") {
     lines.push(...renderReview(env));
   } else {
     renderQuestion(lines, env);
   }
-  add(env.theme.fg("dim", ` ${footerHelp(env.flow, env.state)}`));
-  add(env.theme.fg("accent", "─".repeat(env.width)));
+  lines.push(
+    truncateToWidth(env.theme.fg("dim", ` ${footerHelp(env.flow, env.state)}`), env.width),
+  );
+  lines.push(env.theme.fg("accent", "─".repeat(env.width)));
   return lines;
 }
 
@@ -165,9 +166,7 @@ function renderRows(
     if (inlineEditorLines) {
       const rowContinuation = " ".repeat(visibleWidth(prefix));
       for (const [lineIndex, line] of inlineEditorLines.entries()) {
-        out.push(
-          truncateToWidth(`${lineIndex === 0 ? prefix : rowContinuation}${line}`, env.width),
-        );
+        out.push(`${lineIndex === 0 ? prefix : rowContinuation}${line}`);
       }
       continue;
     }
@@ -221,7 +220,7 @@ function renderRowDescription(out: string[], env: RenderEnv, description: string
     defaultColor: "muted",
   });
   for (const line of descLines) {
-    out.push(truncateToWidth(`     ${line}`, env.width));
+    out.push(`     ${line}`);
   }
 }
 
@@ -231,7 +230,7 @@ function renderReviewAnswer(out: string[], env: RenderEnv, line: string): void {
     defaultColor: "text",
   });
   for (const reviewLine of reviewLines) {
-    out.push(truncateToWidth(`   ${reviewLine}`, env.width));
+    out.push(`   ${reviewLine}`);
   }
 }
 
@@ -241,7 +240,7 @@ function renderPreviewPane(
   preview: string | undefined,
 ): string[] {
   const out: string[] = [];
-  const push = (text = "") => out.push(truncateToWidth(text, width));
+  const push = (text = "") => out.push(text);
   push(theme.fg("accent", " Preview"));
   push("");
   if (!preview) {
@@ -304,6 +303,6 @@ function addWrapped(lines: string[], env: RenderEnv, prefix: string, text: strin
   const contentWidth = Math.max(1, env.width - prefixWidth);
   const continuationPrefix = " ".repeat(prefixWidth);
   for (const [index, line] of wrapTextWithAnsi(text, contentWidth).entries()) {
-    lines.push(truncateToWidth(`${index === 0 ? prefix : continuationPrefix}${line}`, env.width));
+    lines.push(`${index === 0 ? prefix : continuationPrefix}${line}`);
   }
 }

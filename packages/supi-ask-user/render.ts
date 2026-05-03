@@ -3,12 +3,10 @@
 // the call, and a compact ✓ / cancelled / aborted summary on the result.
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Text, truncateToWidth } from "@mariozechner/pi-tui";
+import { Text } from "@mariozechner/pi-tui";
 import { formatSummaryBody } from "./format.ts";
 import { ASK_USER_ERROR_MARKER } from "./result.ts";
 import type { AskUserDetails, NormalizedQuestion } from "./types.ts";
-
-const MAX_HEADER_LIST = 60;
 
 export function renderAskUserCall(args: unknown, theme: Theme): Text {
   const headers = extractHeadersFromArgs(args);
@@ -16,7 +14,7 @@ export function renderAskUserCall(args: unknown, theme: Theme): Text {
   let text = theme.fg("toolTitle", theme.bold("ask_user "));
   text += theme.fg("muted", `${count || "?"} question${count === 1 ? "" : "s"}`);
   if (count > 0) {
-    text += theme.fg("dim", ` (${truncateToWidth(headers.join(", "), MAX_HEADER_LIST)})`);
+    text += theme.fg("dim", ` (${headers.join(", ")})`);
   }
   return new Text(text, 0, 0);
 }
