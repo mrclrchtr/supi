@@ -106,6 +106,7 @@ registerSettings({
 - Cache keys for session-derived data should include `sessionId + filePath hash + modified timestamp` to handle branch deduplication and stale-cache invalidation.
 - `docs/extensions.md` + `examples/extensions/message-renderer.ts` — authoritative for custom-message rendering; `display: false` suppresses TUI rendering and `content` should hold the visible summary.
 - `pi.registerMessageRenderer(customType, renderer)` — `message.content` is what the LLM sees in conversation context; `message.details` is renderer-only data. Pass structured events in `details` and plain text in `content` so agents see JSON while users see styled, themed output.
+- Custom `registerMessageRenderer` handlers must explicitly display `warning` for all result states (including `success` and `canceled`), not just `failed`/`timeout`.
 - Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
 - OpenSpec `PostHogFetchNetworkError` output is harmless when offline.
