@@ -28,6 +28,7 @@
       "./packages/supi-tree-sitter/tree-sitter.ts",
       "./packages/supi-cache-monitor/index.ts",
       "./packages/supi-code-intelligence/code-intelligence.ts",
+      "./packages/supi-debug/index.ts",
       "./packages/supi-rtk/index.ts"
     ],
     "prompts": [

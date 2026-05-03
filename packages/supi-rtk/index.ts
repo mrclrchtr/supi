@@ -7,10 +7,11 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import {
   loadSupiConfig,
+  recordDebugEvent,
   registerConfigSettings,
   registerContextProvider,
 } from "@mrclrchtr/supi-core";
-import { rtkRewrite } from "./rewrite.ts";
+import { type RtkRewriteFailureReason, rtkRewriteDetailed } from "./rewrite.ts";
 import { getStats, recordFallback, recordRewrite, resetTracking } from "./tracking.ts";
 
 const RTK_SECTION = "rtk";
@@ -33,6 +34,15 @@ interface RtkUiContext {
 type RtkRewriteResolution =
   | { kind: "disabled" | "unavailable" | "failed" | "unchanged"; command: string }
   | { kind: "rewritten"; command: string };
+
+interface RtkDebugEventDetails {
+  command: string;
+  cwd: string;
+  durationMs: number;
+  timeoutMs: number;
+  reason?: RtkRewriteFailureReason | "unavailable";
+  rewrittenCommand?: string;
+}
 
 function checkRtkAvailable(): boolean {
   if (rtkAvailable !== null) {
@@ -100,6 +110,28 @@ function notifyUnavailableRtkOnce(ctx?: RtkUiContext): void {
   );
 }
 
+function recordRtkDebugEvent(
+  category: "fallback" | "rewrite" | "unchanged",
+  details: RtkDebugEventDetails,
+): void {
+  const message =
+    category === "fallback"
+      ? `RTK rewrite fell back: ${details.reason ?? "unknown"}`
+      : category === "rewrite"
+        ? "RTK rewrote command"
+        : "RTK rewrite returned the original command";
+
+  recordDebugEvent({
+    source: "rtk",
+    level: category === "fallback" ? "warning" : "debug",
+    category,
+    message,
+    cwd: details.cwd,
+    data: details,
+    rawData: details,
+  });
+}
+
 /**
  * Resolve the command RTK should execute for the given cwd.
  * Records rewrite/fallback stats and optionally warns once per session when RTK is unavailable.
@@ -112,21 +144,48 @@ function resolveRtkCommand(command: string, cwd: string, ctx?: RtkUiContext): Rt
 
   if (!checkRtkAvailable()) {
     notifyUnavailableRtkOnce(ctx);
+    recordRtkDebugEvent("fallback", {
+      command,
+      cwd,
+      durationMs: 0,
+      timeoutMs: config.rewriteTimeout,
+      reason: "unavailable",
+    });
     return { kind: "unavailable", command };
   }
 
-  const rewritten = rtkRewrite(command, config.rewriteTimeout);
-  if (!rewritten) {
+  const result = rtkRewriteDetailed(command, config.rewriteTimeout);
+  if (result.kind === "failed") {
     recordFallback(command);
+    recordRtkDebugEvent("fallback", {
+      command,
+      cwd,
+      durationMs: result.durationMs,
+      timeoutMs: config.rewriteTimeout,
+      reason: result.reason,
+    });
     return { kind: "failed", command };
   }
 
-  if (rewritten === command) {
+  if (result.kind === "unchanged") {
+    recordRtkDebugEvent("unchanged", {
+      command,
+      cwd,
+      durationMs: result.durationMs,
+      timeoutMs: config.rewriteTimeout,
+    });
     return { kind: "unchanged", command };
   }
 
-  recordRewrite(command, rewritten);
-  return { kind: "rewritten", command: rewritten };
+  recordRewrite(command, result.command);
+  recordRtkDebugEvent("rewrite", {
+    command,
+    rewrittenCommand: result.command,
+    cwd,
+    durationMs: result.durationMs,
+    timeoutMs: config.rewriteTimeout,
+  });
+  return { kind: "rewritten", command: result.command };
 }
 
 function createRtkAwareBashTool(cwd: string, ctx?: RtkUiContext) {

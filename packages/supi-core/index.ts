@@ -26,6 +26,29 @@ export {
   registerContextProvider,
 } from "./context-provider-registry.ts";
 export { wrapExtensionContext } from "./context-tag.ts";
+export type {
+  DebugAgentAccess,
+  DebugEvent,
+  DebugEventInput,
+  DebugEventQuery,
+  DebugEventQueryResult,
+  DebugEventView,
+  DebugLevel,
+  DebugNotifyLevel,
+  DebugRegistryConfig,
+  DebugSummary,
+} from "./debug-registry.ts";
+export {
+  clearDebugEvents,
+  configureDebugRegistry,
+  DEBUG_REGISTRY_DEFAULTS,
+  getDebugEvents,
+  getDebugRegistryConfig,
+  getDebugSummary,
+  recordDebugEvent,
+  redactDebugData,
+  resetDebugRegistry,
+} from "./debug-registry.ts";
 export type { KnownRootEntry } from "./project-roots.ts";
 export {
   buildKnownRootsMap,
