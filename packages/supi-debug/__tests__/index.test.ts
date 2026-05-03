@@ -52,6 +52,13 @@ const ENABLED_CONFIG = {
   agentAccess: "sanitized",
   maxEvents: 100,
   notifyLevel: "off",
+} as const;
+
+type MockDebugConfig = {
+  enabled: unknown;
+  agentAccess: unknown;
+  maxEvents: unknown;
+  notifyLevel: unknown;
 };
 
 function createPiMock(): PiMock {
@@ -84,7 +91,7 @@ function createPiMock(): PiMock {
   };
 }
 
-function setup(config = ENABLED_CONFIG): PiMock {
+function setup(config: MockDebugConfig = ENABLED_CONFIG): PiMock {
   mockFns.loadSupiConfig.mockReturnValue(config);
   mockFns.configureDebugRegistry.mockImplementation((value) => value);
   mockFns.getDebugEvents.mockReturnValue({ events: [], rawAccessDenied: false });
@@ -114,6 +121,17 @@ describe("supi-debug extension setup", () => {
 
     expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
       enabled: true,
+      agentAccess: "raw",
+      maxEvents: 250,
+      notifyLevel: "warning",
+    });
+  });
+
+  it("treats string enabled values explicitly instead of using truthiness", () => {
+    setup({ enabled: "false", agentAccess: "raw", maxEvents: 250, notifyLevel: "warning" });
+
+    expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
+      enabled: false,
       agentAccess: "raw",
       maxEvents: 250,
       notifyLevel: "warning",
@@ -172,6 +190,13 @@ describe("supi-debug settings", () => {
     ]);
 
     const helpers = { set: vi.fn(), unset: vi.fn() };
+    mockFns.configureDebugRegistry.mockClear();
+    mockFns.loadSupiConfig.mockReturnValue({
+      enabled: true,
+      agentAccess: "raw",
+      maxEvents: 500,
+      notifyLevel: "warning",
+    });
     options.persistChange("project", "/repo", "enabled", "on", helpers);
     options.persistChange("project", "/repo", "agentAccess", "raw", helpers);
     options.persistChange("project", "/repo", "maxEvents", "500", helpers);
@@ -183,6 +208,38 @@ describe("supi-debug settings", () => {
       ["maxEvents", 500],
       ["notifyLevel", "warning"],
     ]);
+    expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
+      enabled: true,
+      agentAccess: "raw",
+      maxEvents: 500,
+      notifyLevel: "warning",
+    });
+  });
+
+  it("reconfigures the live registry immediately and clears events when disabling", () => {
+    setup();
+
+    const options = mockFns.registerConfigSettings.mock.calls[0][0];
+    const helpers = { set: vi.fn(), unset: vi.fn() };
+    mockFns.configureDebugRegistry.mockClear();
+    mockFns.clearDebugEvents.mockClear();
+    mockFns.loadSupiConfig.mockReturnValue({
+      enabled: false,
+      agentAccess: "raw",
+      maxEvents: 50,
+      notifyLevel: "error",
+    });
+
+    options.persistChange("project", "/repo", "enabled", "off", helpers);
+
+    expect(helpers.set).toHaveBeenCalledWith("enabled", false);
+    expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
+      enabled: false,
+      agentAccess: "raw",
+      maxEvents: 50,
+      notifyLevel: "error",
+    });
+    expect(mockFns.clearDebugEvents).toHaveBeenCalledOnce();
   });
 });
 
@@ -234,6 +291,32 @@ describe("supi-debug command and tool", () => {
     });
     expect(mock.messages[0]?.content).toContain("rtk");
     expect(mock.messages[0]?.content).toContain("git status");
+  });
+
+  it("command handles circular and bigint payloads without crashing", async () => {
+    const mock = setup();
+    const circular: Record<string, unknown> = { count: 1n };
+    circular.self = circular;
+    mockFns.getDebugEvents.mockReturnValue({
+      rawAccessDenied: false,
+      events: [
+        {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "rtk",
+          level: "warning",
+          category: "fallback",
+          message: "timeout",
+          data: circular,
+        },
+      ],
+    });
+
+    await expect(
+      mock.commands.get("supi-debug")?.handler("source=rtk", { cwd: "/repo" }),
+    ).resolves.toBeUndefined();
+    expect(mock.messages[0]?.content).toContain('"[Circular]"');
+    expect(mock.messages[0]?.content).toContain("1n");
   });
 
   it("tool denies access when agent access is off", async () => {
@@ -303,5 +386,35 @@ describe("supi-debug command and tool", () => {
       includeRaw: true,
       allowRaw: true,
     });
+  });
+
+  it("tool renders resilient payload formatting for raw events", async () => {
+    const mock = setup({ enabled: true, agentAccess: "raw", maxEvents: 100, notifyLevel: "off" });
+    const circular: Record<string, unknown> = { count: 2n };
+    circular.self = circular;
+    mockFns.getDebugEvents.mockReturnValue({
+      rawAccessDenied: false,
+      events: [
+        {
+          id: 1,
+          timestamp: 1_700_000_000_000,
+          source: "rtk",
+          level: "warning",
+          category: "fallback",
+          message: "timeout",
+          rawData: circular,
+        },
+      ],
+    });
+    const tool = mock.tools[0];
+
+    const result = (await tool?.execute("id", { includeRaw: true }, undefined, undefined, {
+      cwd: "/repo",
+    })) as {
+      content: Array<{ text: string }>;
+    };
+
+    expect(result.content[0]?.text).toContain('"[Circular]"');
+    expect(result.content[0]?.text).toContain("2n");
   });
 });

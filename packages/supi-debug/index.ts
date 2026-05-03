@@ -1,3 +1,4 @@
+import { inspect } from "node:util";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   clearDebugEvents,
@@ -42,10 +43,42 @@ function normalizeMaxEvents(value: string | number): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEBUG_DEFAULTS.maxEvents;
 }
 
+function normalizeEnabled(value: unknown): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (
+      normalized === "true" ||
+      normalized === "on" ||
+      normalized === "1" ||
+      normalized === "yes"
+    ) {
+      return true;
+    }
+    if (
+      normalized === "false" ||
+      normalized === "off" ||
+      normalized === "0" ||
+      normalized === "no" ||
+      normalized === ""
+    ) {
+      return false;
+    }
+    return DEBUG_DEFAULTS.enabled;
+  }
+
+  if (value === 1) return true;
+  if (value === 0) return false;
+  return DEBUG_DEFAULTS.enabled;
+}
+
 function loadDebugConfig(cwd: string): DebugConfig {
   const config = loadSupiConfig(DEBUG_SECTION, cwd, DEBUG_DEFAULTS);
   return {
-    enabled: Boolean(config.enabled),
+    enabled: normalizeEnabled(config.enabled),
     agentAccess: normalizeAgentAccess(String(config.agentAccess)),
     maxEvents: normalizeMaxEvents(config.maxEvents),
     notifyLevel: normalizeNotifyLevel(String(config.notifyLevel)),
@@ -55,6 +88,14 @@ function loadDebugConfig(cwd: string): DebugConfig {
 function applyDebugConfig(cwd: string): DebugConfig {
   const config = loadDebugConfig(cwd);
   configureDebugRegistry(config);
+  return config;
+}
+
+function syncLiveDebugRegistry(cwd: string): DebugConfig {
+  const config = applyDebugConfig(cwd);
+  if (!config.enabled) {
+    clearDebugEvents();
+  }
   return config;
 }
 
@@ -95,7 +136,7 @@ function registerDebugSettings(): void {
       },
     ],
     // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
-    persistChange: (_scope, _cwd, settingId, value, helpers) => {
+    persistChange: (_scope, cwd, settingId, value, helpers) => {
       if (settingId === "enabled") {
         helpers.set("enabled", value === "on");
       } else if (settingId === "agentAccess") {
@@ -105,6 +146,8 @@ function registerDebugSettings(): void {
       } else if (settingId === "notifyLevel") {
         helpers.set("notifyLevel", normalizeNotifyLevel(value));
       }
+
+      syncLiveDebugRegistry(cwd);
     },
   });
 }
@@ -127,10 +170,44 @@ function isDebugLevel(value: string): value is DebugLevel {
   return value === "debug" || value === "info" || value === "warning" || value === "error";
 }
 
+function safeJsonStringify(value: unknown): string | undefined {
+  const seen = new WeakSet<object>();
+  return JSON.stringify(
+    value,
+    (_key, currentValue) => {
+      if (typeof currentValue === "bigint") {
+        return `${currentValue}n`;
+      }
+      if (typeof currentValue === "object" && currentValue !== null) {
+        if (seen.has(currentValue)) {
+          return "[Circular]";
+        }
+        seen.add(currentValue);
+      }
+      return currentValue;
+    },
+    2,
+  );
+}
+
 function formatDebugValue(value: unknown): string {
   if (value === undefined) return "";
   if (typeof value === "string") return value;
-  return JSON.stringify(value, null, 2);
+
+  try {
+    const json = safeJsonStringify(value);
+    if (json !== undefined) {
+      return json;
+    }
+  } catch {
+    // Fall back to inspect() below for unsupported payloads.
+  }
+
+  return inspect(value, {
+    compact: false,
+    depth: 6,
+    sorted: true,
+  });
 }
 
 function formatEventLines(query: DebugEventQuery): string[] {

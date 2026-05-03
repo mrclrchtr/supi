@@ -84,9 +84,10 @@ interface DebugRegistryState {
 const REGISTRY_KEY = Symbol.for("@mrclrchtr/supi-core/debug-registry");
 const SECRET_KEY_RE = /(?:token|password|passwd|secret|api[_-]?key|authorization|credential)/i;
 const ENV_SECRET_RE =
-  /\b([A-Z0-9_]*(?:TOKEN|PASSWORD|PASSWD|SECRET|API[_-]?KEY|AUTHORIZATION|CREDENTIAL)[A-Z0-9_]*)=(?:'[^']*'|"[^"]*"|\S+)/gi;
+  /\b([A-Za-z0-9_]*(?:token|password|passwd|secret|api[_-]?key|authorization|credential)[A-Za-z0-9_]*)=(?:'[^']*'|"[^"]*"|\S+)/gi;
 const AUTH_HEADER_RE = /\b(authorization\s*[:=]\s*)(?:bearer\s+)?[^\s;&|]+/gi;
-const URL_SECRET_RE = /([?&](?:token|password|secret|api[_-]?key)=)[^&\s]+/gi;
+const URL_SECRET_RE =
+  /([?&](?:token|password|passwd|secret|api[_-]?key|authorization|credential)=)[^&\s]+/gi;
 const REDACTED = "[REDACTED]";
 
 function cloneConfig(config: DebugRegistryConfig): DebugRegistryConfig {

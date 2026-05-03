@@ -85,8 +85,9 @@ describe("debug registry", () => {
 
   it("returns sanitized data by default and raw data only when explicitly allowed", () => {
     configureDebugRegistry({ enabled: true, agentAccess: "sanitized" });
-    const secretKey = ["API", "_KEY"].join("");
-    const rawCommand = `${secretKey}=abc echo ok`;
+    const secretKey = ["api", "_key"].join("");
+    const queryKey = ["api", "Key"].join("");
+    const rawCommand = `${secretKey}=abc echo ok https://example.test?${queryKey}=xyz`;
     recordDebugEvent({
       source: "rtk",
       level: "warning",
@@ -97,7 +98,7 @@ describe("debug registry", () => {
     });
 
     const sanitized = getDebugEvents();
-    const expectedRedactedCommand = `${secretKey}=[REDACTED] echo ok`;
+    const expectedRedactedCommand = `${secretKey}=[REDACTED] echo ok https://example.test?${queryKey}=[REDACTED]`;
     expect(sanitized.rawAccessDenied).toBe(false);
     expect(sanitized.events[0]?.data).toEqual({
       command: expectedRedactedCommand,
