@@ -6,31 +6,23 @@
 // blocks all subsequent messages indefinitely.
 //
 // This extension intercepts every bash `tool_call` event and sets a default
-// timeout when the LLM omits one.  The timeout is configurable via the
-// PI_BASH_DEFAULT_TIMEOUT env var (seconds, default 120).
-//
-// ADR-0049: Gateway TUI via WebSocket
+// timeout when the LLM omits one.  The timeout is configurable via
+// /supi-settings or the SuPi config system (default 120s).
 
 import { type ExtensionAPI, isToolCallEventType } from "@mariozechner/pi-coding-agent";
-
-const DEFAULT_TIMEOUT_SECONDS = 120;
-
-function getDefaultTimeout(): number {
-  const env = process.env.PI_BASH_DEFAULT_TIMEOUT;
-  if (env) {
-    const parsed = parseInt(env, 10);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  }
-  return DEFAULT_TIMEOUT_SECONDS;
-}
+import { loadBashTimeoutConfig } from "./config.ts";
+import { registerBashTimeoutSettings } from "./settings-registration.ts";
 
 export default function bashTimeout(pi: ExtensionAPI) {
-  pi.on("tool_call", async (event) => {
+  registerBashTimeoutSettings();
+
+  pi.on("tool_call", async (event, ctx) => {
     if (!isToolCallEventType("bash", event)) return;
 
     // Only inject when the LLM didn't specify a timeout
     if (event.input.timeout !== undefined && event.input.timeout !== null) return;
 
-    event.input.timeout = getDefaultTimeout();
+    const config = loadBashTimeoutConfig(ctx.cwd);
+    event.input.timeout = config.defaultTimeout;
   });
 }

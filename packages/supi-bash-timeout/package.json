@@ -16,10 +16,19 @@
     "pi-coding-agent"
   ],
   "files": [
-    "index.ts"
+    "*.ts",
+    "!__tests__"
   ],
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*"
+  },
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "*"
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "vitest": "^4.1.4"
   },
   "pi": {
     "extensions": [
