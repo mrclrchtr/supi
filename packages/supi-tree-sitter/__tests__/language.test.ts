@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   detectGrammar,
@@ -134,5 +135,12 @@ describe("resolveGrammarWasmPath", () => {
     const path = resolveGrammarWasmPath("rust");
     expect(path).toContain("tree-sitter-rust");
     expect(path).toMatch(/tree-sitter-rust\.wasm$/);
+  });
+
+  it("resolves Kotlin to the vendored fwcd WASM", () => {
+    const wasmPath = resolveGrammarWasmPath("kotlin");
+    expect(wasmPath).toMatch(/resources[\\/]grammars[\\/]kotlin/);
+    expect(wasmPath).toMatch(/tree-sitter-kotlin\.wasm$/);
+    expect(existsSync(wasmPath)).toBe(true);
   });
 });

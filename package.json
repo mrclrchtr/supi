@@ -49,7 +49,7 @@
     "pack:check": "pnpm --filter \"./packages/supi*\" exec pnpm pack --dry-run",
     "check": "pnpm biome",
     "check:fix": "pnpm biome:fix",
-    "verify": "pnpm typecheck && pnpm typecheck:tests && pnpm biome:ai && pnpm test && pnpm pack:check",
+    "verify": "pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm typecheck && pnpm typecheck:tests && pnpm biome:ai && pnpm test && pnpm pack:check",
     "test": "vitest run",
     "test:watch": "vitest"
   },

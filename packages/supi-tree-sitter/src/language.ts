@@ -2,9 +2,11 @@
 
 import { createRequire } from "node:module";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { GrammarId, SupportedExtension } from "./types.ts";
 
 const require = createRequire(import.meta.url);
+const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 
 /** Mapping from file extension to grammar identifier. */
 const EXTENSION_GRAMMAR: Record<string, GrammarId> = {
@@ -77,8 +79,15 @@ const GRAMMAR_WASM: Record<GrammarId, string> = {
   ruby: "tree-sitter-ruby.wasm",
 };
 
+type VendoredGrammarId = "kotlin";
+
+/** Vendored grammar WASM files generated from trusted upstream packages. */
+const VENDORED_GRAMMAR_WASM: Record<VendoredGrammarId, string> = {
+  kotlin: path.resolve(sourceDir, "../resources/grammars/kotlin/tree-sitter-kotlin.wasm"),
+};
+
 /** Grammar npm package names. */
-const GRAMMAR_PACKAGE: Record<GrammarId, string> = {
+const GRAMMAR_PACKAGE: Record<Exclude<GrammarId, VendoredGrammarId>, string> = {
   javascript: "tree-sitter-javascript",
   typescript: "tree-sitter-typescript",
   tsx: "tree-sitter-typescript",
@@ -88,16 +97,18 @@ const GRAMMAR_PACKAGE: Record<GrammarId, string> = {
   c: "tree-sitter-c",
   cpp: "tree-sitter-cpp",
   java: "tree-sitter-java",
-  kotlin: "@tree-sitter-grammars/tree-sitter-kotlin",
   ruby: "tree-sitter-ruby",
 };
 
 /**
  * Resolve the WASM grammar file path for a given grammar ID.
- * Uses `require.resolve(<grammar>/package.json)` to locate the installed
- * package directory, then appends the WASM filename.
+ * Vendored grammars return their bundled resource path. Other grammars use
+ * `require.resolve(<grammar>/package.json)` to locate the installed package
+ * directory, then append the WASM filename.
  */
 export function resolveGrammarWasmPath(grammarId: GrammarId): string {
+  if (isVendoredGrammar(grammarId)) return VENDORED_GRAMMAR_WASM[grammarId];
+
   const packageName = GRAMMAR_PACKAGE[grammarId];
   const wasmFile = GRAMMAR_WASM[grammarId];
 
@@ -106,4 +117,8 @@ export function resolveGrammarWasmPath(grammarId: GrammarId): string {
   const packageDir = path.dirname(packageJsonPath);
 
   return path.join(packageDir, wasmFile);
+}
+
+function isVendoredGrammar(grammarId: GrammarId): grammarId is VendoredGrammarId {
+  return grammarId === "kotlin";
 }

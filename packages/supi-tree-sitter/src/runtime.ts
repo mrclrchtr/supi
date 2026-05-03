@@ -2,7 +2,6 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-// biome-ignore lint/correctness/noUnresolvedImports: web-tree-sitter exports types via declare module
 import type { Language, Parser, Tree } from "web-tree-sitter";
 import { nodeToRange } from "./coordinates.ts";
 import { detectGrammar, resolveGrammarWasmPath } from "./language.ts";

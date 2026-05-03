@@ -1,0 +1,12 @@
+{
+  "source": {
+    "npmPackage": "tree-sitter-kotlin",
+    "version": "0.3.8",
+    "repository": "https://github.com/fwcd/tree-sitter-kotlin",
+    "releaseAsset": "https://github.com/fwcd/tree-sitter-kotlin/releases/download/0.3.8/tree-sitter-kotlin.wasm"
+  },
+  "generatedWith": {
+    "treeSitterCli": "0.22.6"
+  },
+  "sha256": "c624e7443b371c28adc5d81674e73067564c12555ebe3ed96a6c8db814b7602d"
+}

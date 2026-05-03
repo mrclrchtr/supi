@@ -14,10 +14,12 @@ The package is designed as a standalone structural-analysis substrate. It does n
 - `outline.ts`, `structure.ts`, `formatting.ts` — tool action extraction, formatting, and output caps
 - `coordinates.ts` — 1-based UTF-16 coordinate conversion shared with `node_at` and query results
 - `language.ts` — file extension → grammar ID detection and WASM path resolution
+- `resources/grammars/kotlin/` — vendored Kotlin WASM plus source/version/checksum metadata
+- `scripts/generate-kotlin-wasm.mjs` — regenerates/checks the vendored Kotlin grammar from `tree-sitter-kotlin`
 
 ## Supported languages
 
-Grammars are resolved via npm peer dependencies. Supported file families:
+Grammars are resolved via npm peer dependencies, except Kotlin which uses a vendored WASM generated from the trusted `fwcd/tree-sitter-kotlin` npm package. Supported file families:
 - **JavaScript/TypeScript**: `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.tsx`
 - **Python**: `.py`, `.pyi`
 - **Rust**: `.rs`
@@ -29,7 +31,7 @@ Grammars are resolved via npm peer dependencies. Supported file families:
 
 ## Validation
 
-- `pnpm exec biome check packages/supi-tree-sitter && pnpm vitest run packages/supi-tree-sitter/ && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json`
+- `pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm exec biome check packages/supi-tree-sitter && pnpm vitest run packages/supi-tree-sitter/ && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json`
 
 ## Gotchas
 

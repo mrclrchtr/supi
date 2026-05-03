@@ -23,8 +23,10 @@ SuPi's `supi-tree-sitter` currently supports only JavaScript and TypeScript gram
 
 **Alternative considered:** `@kreuzberg/tree-sitter-language-pack` bundles 305+ languages. Rejected because it uses on-demand downloads and a different directory layout, adding complexity for marginal gain.
 
-### 2. Map Kotlin to `tree-sitter-kotlin` and Ruby to `tree-sitter-ruby`
-**Rationale:** Both have official or well-maintained community npm packages with WASM builds. `tree-sitter-kotlin` is actively used by Sourcegraph and Neovim. `tree-sitter-ruby` is maintained by the core Tree-sitter org.
+### 2. Map Kotlin to vendored `fwcd/tree-sitter-kotlin` WASM and Ruby to `tree-sitter-ruby`
+**Rationale:** `fwcd/tree-sitter-kotlin` is the trusted Kotlin grammar source used by Sourcegraph and Neovim, but its npm package does not ship a WASM artifact. SuPi vendors a generated `tree-sitter-kotlin.wasm` with source/version/checksum metadata and a maintainer script that rebuilds it from the `tree-sitter-kotlin` npm package. `tree-sitter-ruby` is maintained by the core Tree-sitter org and ships WASM via npm.
+
+**Alternative considered:** `@tree-sitter-grammars/tree-sitter-kotlin` ships a ready-made npm WASM artifact. Rejected because the repository has a lower trust signal than `fwcd/tree-sitter-kotlin`.
 
 ### 3. Keep C and C++ as separate grammars
 **Rationale:** `tree-sitter-c` and `tree-sitter-cpp` are separate packages with separate WASM files. The C++ grammar can parse C but is heavier; using the C grammar for `.c`/`.h` files is faster and more precise.
@@ -71,6 +73,9 @@ SuPi's `supi-tree-sitter` currently supports only JavaScript and TypeScript gram
 
 - **[Risk]** Some `tree-sitter-*` npm packages may have peer dependency conflicts with `web-tree-sitter` versions.
   → **Mitigation:** Pin compatible versions in `peerDependencies` and test with `pnpm install` after changes.
+
+- **[Risk]** The vendored `tree-sitter-kotlin` WASM may become stale when the trusted npm package updates.
+  → **Mitigation:** `pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm` compares the installed `tree-sitter-kotlin` version and SHA256 metadata; regenerate with `generate:kotlin-wasm` after dependency updates.
 
 - **[Risk]** `tree-sitter-kotlin` WASM may be larger than JS/TS grammars, increasing parser initialization time.
   → **Mitigation:** Lazy initialization already happens per-grammar in `TreeSitterRuntime`; only languages used in a session are loaded.

@@ -44,7 +44,7 @@ The system SHALL recognize `.java` files and map them to the `java` grammar ID, 
 - **THEN** the runtime detects the file as supported and uses the Java grammar for parsing
 
 ### Requirement: Tree-sitter extension SHALL support Kotlin files
-The system SHALL recognize `.kt` and `.kts` files and map them to the `kotlin` grammar ID, resolving the WASM from the `tree-sitter-kotlin` package.
+The system SHALL recognize `.kt` and `.kts` files and map them to the `kotlin` grammar ID, resolving the WASM from a vendored artifact generated from the trusted `fwcd/tree-sitter-kotlin` npm package.
 
 #### Scenario: Kotlin file detection
 - **WHEN** a consumer requests Tree-sitter services for `src/App.kt`
@@ -61,9 +61,9 @@ The system SHALL recognize `.rb` files and map them to the `ruby` grammar ID, re
 - **WHEN** a consumer requests Tree-sitter services for `lib/app.rb`
 - **THEN** the runtime detects the file as supported and uses the Ruby grammar for parsing
 
-### Requirement: Tree-sitter extension SHALL declare all new grammar packages as peer dependencies
-The system SHALL list `tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-c`, `tree-sitter-cpp`, `tree-sitter-java`, `tree-sitter-kotlin`, and `tree-sitter-ruby` as `peerDependencies` in `packages/supi-tree-sitter/package.json` so consumers install only the languages they need.
+### Requirement: Tree-sitter extension SHALL declare npm-resolved grammar packages as peer dependencies
+The system SHALL list `tree-sitter-python`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-c`, `tree-sitter-cpp`, `tree-sitter-java`, and `tree-sitter-ruby` as `peerDependencies` in `packages/supi-tree-sitter/package.json` so consumers install only the npm-resolved languages they need. Kotlin SHALL NOT use the low-trust `@tree-sitter-grammars/tree-sitter-kotlin` package; it SHALL use the vendored WASM generated from `tree-sitter-kotlin` instead.
 
 #### Scenario: Package installation
 - **WHEN** a consumer installs `@mrclrchtr/supi-tree-sitter`
-- **THEN** the package manager reports the new peer dependencies and allows selective installation
+- **THEN** the package manager reports the npm-resolved peer dependencies and Kotlin parsing works from the bundled vendored WASM

@@ -1,8 +1,19 @@
 packages:
   - "packages/*"
+ignoredBuiltDependencies:
+  - tree-sitter
+  - tree-sitter-kotlin
 
 onlyBuiltDependencies:
   - koffi
   - protobufjs
+  - tree-sitter-c
+  - tree-sitter-cli
+  - tree-sitter-cpp
+  - tree-sitter-go
+  - tree-sitter-java
   - tree-sitter-javascript
+  - tree-sitter-python
+  - tree-sitter-ruby
+  - tree-sitter-rust
   - tree-sitter-typescript
