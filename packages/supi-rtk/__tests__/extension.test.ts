@@ -51,6 +51,14 @@ interface BashTool {
   execute: (...args: unknown[]) => Promise<unknown>;
 }
 
+interface UiCtx {
+  cwd: string;
+  hasUI: boolean;
+  ui: {
+    notify: ReturnType<typeof vi.fn>;
+  };
+}
+
 function createPiMock(): PiMock {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   const tools: unknown[] = [];
@@ -71,6 +79,16 @@ function createPiMock(): PiMock {
 
 function getRegisteredBashTool(tools: unknown[]): BashTool | undefined {
   return tools.find((tool) => (tool as BashTool).name === "bash") as BashTool | undefined;
+}
+
+function createUiCtx(cwd = "/project"): UiCtx {
+  return {
+    cwd,
+    hasUI: true,
+    ui: {
+      notify: vi.fn(),
+    },
+  };
 }
 
 const VERSION_OUTPUT = "rtk 1.0.0";
@@ -137,9 +155,7 @@ describe("rtkExtension", () => {
     mockFns.getShellPath.mockReturnValue("/bin/zsh");
     mockFns.getShellCommandPrefix.mockReturnValue("source ~/.zshrc");
 
-    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
-      cwd: "/project",
-    });
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, createUiCtx());
 
     const lastCall = vi.mocked(mockFns.createBashTool).mock.lastCall;
     expect(lastCall?.[0]).toBe("/project");
@@ -158,13 +174,13 @@ describe("rtkExtension", () => {
       throw new Error("bash tool not registered");
     }
 
-    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
-      cwd: "/project",
-    });
+    const uiCtx = createUiCtx();
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, uiCtx);
 
     const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
     const result = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
     expect(result).toEqual({ command: "rtk git status", cwd: "/project", env: {} });
+    expect(uiCtx.ui.notify).not.toHaveBeenCalled();
   });
 
   it("spawnHook falls back and records a fallback when rewrite fails", async () => {
@@ -187,9 +203,7 @@ describe("rtkExtension", () => {
       throw new Error("bash tool not registered");
     }
 
-    await bashTool.execute("id", { command: "echo hello" }, undefined, () => {}, {
-      cwd: "/project",
-    });
+    await bashTool.execute("id", { command: "echo hello" }, undefined, () => {}, createUiCtx());
 
     const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
     const result = spawnHook?.({ command: "echo hello", cwd: "/project", env: {} });
@@ -203,7 +217,7 @@ describe("rtkExtension", () => {
     });
   });
 
-  it("spawnHook passes through when the rtk binary is unavailable without recording fallback", async () => {
+  it("spawnHook warns once per session when the rtk binary is unavailable", async () => {
     mockFns.execFileSync.mockImplementation(() => {
       throw new Error("ENOENT");
     });
@@ -216,13 +230,26 @@ describe("rtkExtension", () => {
       throw new Error("bash tool not registered");
     }
 
-    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
-      cwd: "/project",
-    });
+    const uiCtx = createUiCtx();
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, uiCtx);
 
     const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
-    const result = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
-    expect(result).toEqual({ command: "git status", cwd: "/project", env: {} });
+    expect(spawnHook?.({ command: "git status", cwd: "/project", env: {} })).toEqual({
+      command: "git status",
+      cwd: "/project",
+      env: {},
+    });
+    expect(spawnHook?.({ command: "git diff", cwd: "/project", env: {} })).toEqual({
+      command: "git diff",
+      cwd: "/project",
+      env: {},
+    });
+
+    expect(uiCtx.ui.notify).toHaveBeenCalledTimes(1);
+    expect(uiCtx.ui.notify).toHaveBeenCalledWith(
+      "RTK is enabled but the rtk binary is not available on PATH. Falling back to normal bash execution.",
+      "warning",
+    );
 
     const providerCall = vi.mocked(registerContextProvider).mock.calls[0][0];
     expect(providerCall.getData()).toBeNull();
@@ -239,9 +266,7 @@ describe("rtkExtension", () => {
       throw new Error("bash tool not registered");
     }
 
-    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
-      cwd: "/project",
-    });
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, createUiCtx());
 
     const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
     const result = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
@@ -255,18 +280,21 @@ describe("rtkExtension", () => {
     const { pi, handlers } = createPiMock();
     rtkExtension(pi as never);
 
-    const result = handlers.get("user_bash")?.({
-      command: "!git status",
-      excludeFromContext: false,
-      cwd: "/project",
-    }) as { operations?: unknown } | undefined;
+    const result = handlers.get("user_bash")?.(
+      {
+        command: "!git status",
+        excludeFromContext: false,
+        cwd: "/project",
+      },
+      createUiCtx(),
+    ) as { operations?: unknown } | undefined;
 
     expect(result).toBeDefined();
     expect(result?.operations).toBeDefined();
     expect(mockFns.createLocalBashOperations).toHaveBeenCalledWith({ shellPath: "/bin/fish" });
   });
 
-  it("user_bash skips interception when rtk is unavailable", () => {
+  it("user_bash warns and skips interception when rtk is unavailable", () => {
     mockFns.execFileSync.mockImplementation(() => {
       throw new Error("ENOENT");
     });
@@ -274,19 +302,24 @@ describe("rtkExtension", () => {
     const { pi, handlers } = createPiMock();
     rtkExtension(pi as never);
 
-    const result = handlers.get("user_bash")?.({
-      command: "!echo hello",
-      excludeFromContext: false,
-      cwd: "/project",
-    });
+    const uiCtx = createUiCtx();
+    const result = handlers.get("user_bash")?.(
+      {
+        command: "!echo hello",
+        excludeFromContext: false,
+        cwd: "/project",
+      },
+      uiCtx,
+    );
 
     expect(result).toBeUndefined();
+    expect(uiCtx.ui.notify).toHaveBeenCalledTimes(1);
 
     const providerCall = vi.mocked(registerContextProvider).mock.calls[0][0];
     expect(providerCall.getData()).toBeNull();
   });
 
-  it("session_start resets tracking and clears the cached availability probe", async () => {
+  it("session_start resets the cached availability probe and warning state", async () => {
     mockFns.execFileSync.mockImplementation(() => {
       throw new Error("ENOENT");
     });
@@ -299,25 +332,22 @@ describe("rtkExtension", () => {
       throw new Error("bash tool not registered");
     }
 
-    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, {
-      cwd: "/project",
-    });
+    const firstCtx = createUiCtx();
+    await bashTool.execute("id", { command: "git status" }, undefined, () => {}, firstCtx);
+    const firstSpawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
+    firstSpawnHook?.({ command: "git status", cwd: "/project", env: {} });
 
-    const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
-    const firstResult = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
-    expect(firstResult).toEqual({ command: "git status", cwd: "/project", env: {} });
+    expect(firstCtx.ui.notify).toHaveBeenCalledTimes(1);
+    expect(mockFns.execFileSync).toHaveBeenCalledTimes(1);
 
     handlers.get("session_start")?.({});
-    mockRtkAvailable();
 
-    const secondResult = spawnHook?.({ command: "git status", cwd: "/project", env: {} });
-    expect(secondResult).toEqual({ command: "rtk git status", cwd: "/project", env: {} });
+    const secondCtx = createUiCtx();
+    await bashTool.execute("id", { command: "git diff" }, undefined, () => {}, secondCtx);
+    const secondSpawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
+    secondSpawnHook?.({ command: "git diff", cwd: "/project", env: {} });
 
-    const providerCall = vi.mocked(registerContextProvider).mock.calls[0][0];
-    expect(providerCall.getData()).toEqual({
-      rewrites: 1,
-      fallbacks: 0,
-      estimatedTokensSaved: 200,
-    });
+    expect(secondCtx.ui.notify).toHaveBeenCalledTimes(1);
+    expect(mockFns.execFileSync).toHaveBeenCalledTimes(2);
   });
 });

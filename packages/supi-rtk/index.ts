@@ -21,6 +21,18 @@ const RTK_DEFAULTS = {
 
 /** Cached RTK availability probe — reset when the extension/session starts. */
 let rtkAvailable: boolean | null = null;
+let warnedAboutUnavailableRtk = false;
+
+interface RtkUiContext {
+  hasUI: boolean;
+  ui: {
+    notify(message: string, severity: "info" | "warning" | "error"): void;
+  };
+}
+
+type RtkRewriteResolution =
+  | { kind: "disabled" | "unavailable" | "failed" | "unchanged"; command: string }
+  | { kind: "rewritten"; command: string };
 
 function checkRtkAvailable(): boolean {
   if (rtkAvailable !== null) {
@@ -76,29 +88,62 @@ function registerRtkSettings(): void {
   });
 }
 
-/**
- * Try to rewrite a command through RTK, recording the outcome.
- * Returns the rewritten command, or the original when unavailable or unchanged.
- */
-function tryRtkRewrite(command: string, timeoutMs: number): string {
-  if (!checkRtkAvailable()) {
-    return command;
+function notifyUnavailableRtkOnce(ctx?: RtkUiContext): void {
+  if (!ctx?.hasUI || warnedAboutUnavailableRtk) {
+    return;
   }
 
-  const rewritten = rtkRewrite(command, timeoutMs);
-  if (!rewritten || rewritten === command) {
-    if (!rewritten) {
-      recordFallback(command);
-    }
-    return command;
+  warnedAboutUnavailableRtk = true;
+  ctx.ui.notify(
+    "RTK is enabled but the rtk binary is not available on PATH. Falling back to normal bash execution.",
+    "warning",
+  );
+}
+
+/**
+ * Resolve the command RTK should execute for the given cwd.
+ * Records rewrite/fallback stats and optionally warns once per session when RTK is unavailable.
+ */
+function resolveRtkCommand(command: string, cwd: string, ctx?: RtkUiContext): RtkRewriteResolution {
+  const config = loadRtkConfig(cwd);
+  if (!config.enabled) {
+    return { kind: "disabled", command };
+  }
+
+  if (!checkRtkAvailable()) {
+    notifyUnavailableRtkOnce(ctx);
+    return { kind: "unavailable", command };
+  }
+
+  const rewritten = rtkRewrite(command, config.rewriteTimeout);
+  if (!rewritten) {
+    recordFallback(command);
+    return { kind: "failed", command };
+  }
+
+  if (rewritten === command) {
+    return { kind: "unchanged", command };
   }
 
   recordRewrite(command, rewritten);
-  return rewritten;
+  return { kind: "rewritten", command: rewritten };
+}
+
+function createRtkAwareBashTool(cwd: string, ctx?: RtkUiContext) {
+  const settings = SettingsManager.create(cwd);
+  return createBashTool(cwd, {
+    shellPath: settings.getShellPath(),
+    commandPrefix: settings.getShellCommandPrefix(),
+    spawnHook: ({ command, cwd: spawnCwd, env }) => {
+      const resolution = resolveRtkCommand(command, spawnCwd, ctx);
+      return { command: resolution.command, cwd: spawnCwd, env };
+    },
+  });
 }
 
 export default function rtkExtension(pi: ExtensionAPI) {
   rtkAvailable = null;
+  warnedAboutUnavailableRtk = false;
   registerRtkSettings();
 
   registerContextProvider({
@@ -110,45 +155,28 @@ export default function rtkExtension(pi: ExtensionAPI) {
   pi.on("session_start", async () => {
     resetTracking();
     rtkAvailable = null;
+    warnedAboutUnavailableRtk = false;
   });
 
+  // Reuse the built-in bash tool metadata/renderers; actual execution uses ctx.cwd per call.
   const baseBashTool = createBashTool(process.cwd());
 
   pi.registerTool({
     ...baseBashTool,
     // biome-ignore lint/complexity/useMaxParams: pi tool execute signature
     async execute(toolCallId, params, signal, onUpdate, ctx) {
-      const cwd = ctx.cwd;
-      const settings = SettingsManager.create(cwd);
-      const bashTool = createBashTool(cwd, {
-        shellPath: settings.getShellPath(),
-        commandPrefix: settings.getShellCommandPrefix(),
-        spawnHook: ({ command, cwd: spawnCwd, env }) => {
-          const config = loadRtkConfig(spawnCwd);
-          if (!config.enabled) {
-            return { command, cwd: spawnCwd, env };
-          }
-
-          const rewritten = tryRtkRewrite(command, config.rewriteTimeout);
-          return { command: rewritten, cwd: spawnCwd, env };
-        },
-      });
+      const bashTool = createRtkAwareBashTool(ctx.cwd, ctx);
       return bashTool.execute(toolCallId, params, signal, onUpdate);
     },
   });
 
-  pi.on("user_bash", (event) => {
+  pi.on("user_bash", (event, ctx) => {
     if (event.excludeFromContext) {
       return;
     }
 
-    const config = loadRtkConfig(event.cwd);
-    if (!config.enabled) {
-      return;
-    }
-
-    const rewritten = tryRtkRewrite(event.command, config.rewriteTimeout);
-    if (rewritten === event.command) {
+    const resolution = resolveRtkCommand(event.command, event.cwd, ctx);
+    if (resolution.kind !== "rewritten") {
       return;
     }
 
@@ -156,7 +184,7 @@ export default function rtkExtension(pi: ExtensionAPI) {
     const local = createLocalBashOperations({ shellPath: settings.getShellPath() });
     return {
       operations: {
-        exec: (_command, cwd, options) => local.exec(rewritten, cwd, options),
+        exec: (_command, cwd, options) => local.exec(resolution.command, cwd, options),
       },
     };
   });
