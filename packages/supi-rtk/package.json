@@ -16,7 +16,7 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts",
+    "src/**/*.ts",
     "*.json",
     "*.md",
     "!__tests__"
@@ -33,8 +33,8 @@
   },
   "pi": {
     "extensions": [
-      "./rtk.ts"
+      "./src/rtk.ts"
     ]
   },
-  "main": "index.ts"
+  "main": "src/index.ts"
 }

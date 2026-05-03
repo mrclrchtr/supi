@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { runReviewer } from "../runner.ts";
+import { runReviewer } from "../src/runner.ts";
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),

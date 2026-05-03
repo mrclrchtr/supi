@@ -2,9 +2,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildArchitectureModel, getDependents } from "../architecture.ts";
-import { runRipgrep } from "../search-helpers.ts";
-import { executeAction } from "../tool-actions.ts";
+import { buildArchitectureModel, getDependents } from "../src/architecture.ts";
+import { runRipgrep } from "../src/search-helpers.ts";
+import { executeAction } from "../src/tool-actions.ts";
 
 let tmpDir: string;
 

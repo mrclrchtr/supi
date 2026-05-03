@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { wrapExtensionContext } from "../context-tag.ts";
+import { wrapExtensionContext } from "../src/context-tag.ts";
 
 describe("wrapExtensionContext", () => {
   it("wraps content with source only", () => {

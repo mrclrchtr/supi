@@ -42,6 +42,7 @@
         "useMaxParams": "error"
       },
       "correctness": {
+        "noUnresolvedImports": "off",
         "noUnusedVariables": "error",
         "noUnusedImports": "error"
       },

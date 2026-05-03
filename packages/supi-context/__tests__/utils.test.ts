@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatTokens, pluralize } from "../utils.ts";
+import { formatTokens, pluralize } from "../src/utils.ts";
 
 describe("formatTokens", () => {
   it("formats values under 1k as-is", () => {

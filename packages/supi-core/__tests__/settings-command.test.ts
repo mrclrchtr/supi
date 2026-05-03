@@ -4,11 +4,11 @@ const mockFns = vi.hoisted(() => ({
   openSettingsOverlay: vi.fn(),
 }));
 
-vi.mock("../settings-ui.ts", () => ({
+vi.mock("../src/settings-ui.ts", () => ({
   openSettingsOverlay: mockFns.openSettingsOverlay,
 }));
 
-import { registerSettingsCommand } from "../settings-command.ts";
+import { registerSettingsCommand } from "../src/settings-command.ts";
 
 describe("registerSettingsCommand", () => {
   beforeEach(() => {

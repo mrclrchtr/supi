@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getStats, recordFallback, recordRewrite, resetTracking } from "../tracking.ts";
+import { getStats, recordFallback, recordRewrite, resetTracking } from "../src/tracking.ts";
 
 describe("tracking", () => {
   beforeEach(() => {

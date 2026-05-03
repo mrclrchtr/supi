@@ -16,7 +16,7 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts",
+    "src/**/*.ts",
     "prompts",
     "README.md",
     "LICENSE"
@@ -48,21 +48,21 @@
   },
   "pi": {
     "extensions": [
-      "./aliases.ts",
-      "./ask-user.ts",
-      "./bash-timeout.ts",
-      "./claude-md.ts",
-      "./resources.ts",
-      "./settings.ts",
-      "./skill-shortcut.ts",
-      "./lsp.ts",
-      "./review.ts",
-      "./debug.ts",
-      "./rtk.ts",
-      "./context.ts",
-      "./tree-sitter.ts",
-      "./cache-monitor.ts",
-      "./code-intelligence.ts"
+      "./src/aliases.ts",
+      "./src/ask-user.ts",
+      "./src/bash-timeout.ts",
+      "./src/claude-md.ts",
+      "./src/resources.ts",
+      "./src/settings.ts",
+      "./src/skill-shortcut.ts",
+      "./src/lsp.ts",
+      "./src/review.ts",
+      "./src/debug.ts",
+      "./src/rtk.ts",
+      "./src/context.ts",
+      "./src/tree-sitter.ts",
+      "./src/cache-monitor.ts",
+      "./src/code-intelligence.ts"
     ],
     "prompts": [
       "./prompts"

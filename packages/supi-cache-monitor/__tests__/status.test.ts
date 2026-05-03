@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CacheMonitorState } from "../state.ts";
-import { formatCacheStatus } from "../status.ts";
+import { CacheMonitorState } from "../src/state.ts";
+import { formatCacheStatus } from "../src/status.ts";
 
 describe("formatCacheStatus", () => {
   it("returns undefined when no turns recorded", () => {

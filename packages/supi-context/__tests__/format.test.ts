@@ -1,7 +1,7 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import type { ContextAnalysis } from "../analysis.ts";
-import { formatContextReport } from "../format.ts";
+import type { ContextAnalysis } from "../src/analysis.ts";
+import { formatContextReport } from "../src/format.ts";
 
 const mockTheme = {
   fg: (color: string, text: string) => `[${color}]${text}[/${color}]`,

@@ -8,7 +8,7 @@ import {
   recordDebugEvent,
   redactDebugData,
   resetDebugRegistry,
-} from "../debug-registry.ts";
+} from "../src/debug-registry.ts";
 
 describe("debug registry", () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { rtkRewrite, rtkRewriteDetailed } from "../rewrite.ts";
+import { rtkRewrite, rtkRewriteDetailed } from "../src/rewrite.ts";
 
 vi.mock("node:child_process", () => ({
   execFileSync: vi.fn(),

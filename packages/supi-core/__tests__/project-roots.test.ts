@@ -14,7 +14,7 @@ import {
   segmentCount,
   sortRootsBySpecificity,
   walkProject,
-} from "../project-roots.ts";
+} from "../src/project-roots.ts";
 
 const tmpDirs: string[] = [];
 

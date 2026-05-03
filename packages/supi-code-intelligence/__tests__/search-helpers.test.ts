@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { escapeRegex, isLowSignalPath, normalizePath } from "../search-helpers.ts";
+import { escapeRegex, isLowSignalPath, normalizePath } from "../src/search-helpers.ts";
 
 // biome-ignore lint/security/noSecrets: function name in test describe
 describe("isLowSignalPath", () => {

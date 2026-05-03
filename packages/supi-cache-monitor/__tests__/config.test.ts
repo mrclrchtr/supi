@@ -3,8 +3,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CACHE_MONITOR_DEFAULTS, loadCacheMonitorConfig } from "../config.ts";
-import { registerCacheMonitorSettings } from "../settings-registration.ts";
+import { CACHE_MONITOR_DEFAULTS, loadCacheMonitorConfig } from "../src/config.ts";
+import { registerCacheMonitorSettings } from "../src/settings-registration.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "cache-monitor-settings-test-"));

@@ -22,7 +22,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   writeSupiConfig: vi.fn(),
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("../src/config.ts", () => ({
   CLAUDE_MD_DEFAULTS: {
     rereadInterval: 3,
     contextThreshold: 80,
@@ -32,18 +32,18 @@ vi.mock("../config.ts", () => ({
   loadClaudeMdConfig: mockFns.loadClaudeMdConfig,
 }));
 
-vi.mock("../discovery.ts", () => ({
+vi.mock("../src/discovery.ts", () => ({
   extractPathFromToolEvent: mockFns.extractPathFromToolEvent,
   filterAlreadyLoaded: mockFns.filterAlreadyLoaded,
   findSubdirContextFiles: mockFns.findSubdirContextFiles,
 }));
 
-vi.mock("../subdirectory.ts", () => ({
+vi.mock("../src/subdirectory.ts", () => ({
   formatSubdirContext: mockFns.formatSubdirContext,
   shouldInjectSubdir: mockFns.shouldInjectSubdir,
 }));
 
-vi.mock("../state.ts", () => ({
+vi.mock("../src/state.ts", () => ({
   createInitialState: () => ({
     completedTurns: 0,
     injectedDirs: new Map(),
@@ -53,7 +53,7 @@ vi.mock("../state.ts", () => ({
   reconstructState: vi.fn(),
 }));
 
-import claudeMdExtension from "../claude-md.ts";
+import claudeMdExtension from "../src/claude-md.ts";
 
 function resetMocks() {
   vi.clearAllMocks();

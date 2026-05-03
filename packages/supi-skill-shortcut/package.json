@@ -16,16 +16,16 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts"
+    "src/**/*.ts"
   ],
-  "main": "index.ts",
+  "main": "src/index.ts",
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-tui": "*"
   },
   "pi": {
     "extensions": [
-      "./skill-shortcut.ts"
+      "./src/skill-shortcut.ts"
     ]
   }
 }

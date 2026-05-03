@@ -21,7 +21,7 @@ describe("supi-tree-sitter smoke", () => {
   });
 
   it("the meta-package wrapper exports the extension", async () => {
-    const wrapper = await import("../../supi/tree-sitter.ts");
+    const wrapper = await import("../../supi/src/tree-sitter.ts");
     expect(wrapper.default).toBe(treeSitterExtension);
   });
 });

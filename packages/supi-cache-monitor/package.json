@@ -16,7 +16,7 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts",
+    "src/**/*.ts",
     "*.json",
     "!__tests__"
   ],
@@ -32,8 +32,8 @@
   },
   "pi": {
     "extensions": [
-      "./cache-monitor.ts"
+      "./src/cache-monitor.ts"
     ]
   },
-  "main": "index.ts"
+  "main": "src/index.ts"
 }

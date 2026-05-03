@@ -10,7 +10,7 @@ import {
   getMergeBase,
   getRecentCommits,
   getUncommittedDiff,
-} from "../git.ts";
+} from "../src/git.ts";
 
 const GIT_TEST_TIMEOUT_MS = 15_000;
 

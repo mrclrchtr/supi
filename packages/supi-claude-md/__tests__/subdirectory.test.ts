@@ -2,10 +2,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { DiscoveredContextFile } from "../discovery.ts";
-import type { InjectedDir } from "../state.ts";
-import type { ContextUsage, InjectionCheckOptions } from "../subdirectory.ts";
-import { formatSubdirContext, shouldInjectSubdir } from "../subdirectory.ts";
+import type { DiscoveredContextFile } from "../src/discovery.ts";
+import type { InjectedDir } from "../src/state.ts";
+import type { ContextUsage, InjectionCheckOptions } from "../src/subdirectory.ts";
+import { formatSubdirContext, shouldInjectSubdir } from "../src/subdirectory.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-claude-md-subdir-test-"));

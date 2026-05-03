@@ -36,25 +36,25 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   },
 }));
 
-vi.mock("../settings.ts", () => ({
+vi.mock("../src/settings.ts", () => ({
   loadReviewSettings: mockFns.loadReviewSettings,
   registerReviewSettings: mockFns.registerReviewSettings,
   setReviewModelChoices: mockFns.setReviewModelChoices,
 }));
 
-vi.mock("../model-choices.ts", () => ({
+vi.mock("../src/model-choices.ts", () => ({
   getReviewModelChoices: mockFns.getReviewModelChoices,
 }));
 
-vi.mock("../renderer.ts", () => ({
+vi.mock("../src/renderer.ts", () => ({
   registerReviewRenderer: mockFns.registerReviewRenderer,
 }));
 
-vi.mock("../runner.ts", () => ({
+vi.mock("../src/runner.ts", () => ({
   runReviewer: mockFns.runReviewer,
 }));
 
-vi.mock("../ui.ts", () => ({
+vi.mock("../src/ui.ts", () => ({
   selectPreset: mockFns.selectPreset,
   selectDepth: mockFns.selectDepth,
   selectAutoFix: mockFns.selectAutoFix,
@@ -63,8 +63,8 @@ vi.mock("../ui.ts", () => ({
 }));
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { formatReviewContent } from "../format-content.ts";
-import reviewExtension from "../review.ts";
+import { formatReviewContent } from "../src/format-content.ts";
+import reviewExtension from "../src/review.ts";
 
 describe("formatReviewContent", () => {
   it("formats success with findings", () => {

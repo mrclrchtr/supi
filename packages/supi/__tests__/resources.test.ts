@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import resourcesExtension from "../resources.ts";
+import resourcesExtension from "../src/resources.ts";
 
 function setup(): Map<string, (...args: unknown[]) => unknown> {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();

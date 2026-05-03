@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractScopedModelPatterns, getReviewModelChoices } from "../model-choices.ts";
+import { extractScopedModelPatterns, getReviewModelChoices } from "../src/model-choices.ts";
 
 const models = [
   {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseReviewOutput } from "../parser.ts";
+import { parseReviewOutput } from "../src/parser.ts";
 
 describe("parseReviewOutput", () => {
   it("parses valid JSON", () => {

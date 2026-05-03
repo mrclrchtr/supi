@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import { normalizePath, resolveAnchoredTarget, toZeroBased } from "../target-resolution.ts";
+import { normalizePath, resolveAnchoredTarget, toZeroBased } from "../src/target-resolution.ts";
 
 describe("normalizePath", () => {
   it("resolves relative path against cwd", () => {

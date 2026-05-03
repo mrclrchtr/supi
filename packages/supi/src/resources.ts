@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
-const baseDir = dirname(fileURLToPath(import.meta.url));
+const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export default function resourcesExtension(pi: ExtensionAPI) {
   pi.on("resources_discover", () => ({

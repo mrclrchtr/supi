@@ -16,15 +16,15 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts"
+    "src/**/*.ts"
   ],
-  "main": "index.ts",
+  "main": "src/index.ts",
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
   },
   "pi": {
     "extensions": [
-      "./aliases.ts"
+      "./src/aliases.ts"
     ]
   }
 }

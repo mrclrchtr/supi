@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CacheMonitorState } from "../state.ts";
+import { CacheMonitorState } from "../src/state.ts";
 
 describe("CacheMonitorState", () => {
   describe("recordTurn", () => {

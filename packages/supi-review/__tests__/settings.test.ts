@@ -7,7 +7,7 @@ import {
   loadSupiConfig,
 } from "@mrclrchtr/supi-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { REVIEW_DEFAULTS, registerReviewSettings, setReviewModelChoices } from "../settings.ts";
+import { REVIEW_DEFAULTS, registerReviewSettings, setReviewModelChoices } from "../src/settings.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-review-settings-test-"));

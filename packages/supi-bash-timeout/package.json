@@ -16,7 +16,7 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts",
+    "src/**/*.ts",
     "!__tests__"
   ],
   "dependencies": {
@@ -32,8 +32,8 @@
   },
   "pi": {
     "extensions": [
-      "./bash-timeout.ts"
+      "./src/bash-timeout.ts"
     ]
   },
-  "main": "index.ts"
+  "main": "src/index.ts"
 }

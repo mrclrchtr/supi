@@ -1,7 +1,7 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { type CacheReportSnapshot, formatCacheReport } from "../report.ts";
-import { CacheMonitorState } from "../state.ts";
+import { type CacheReportSnapshot, formatCacheReport } from "../src/report.ts";
+import { CacheMonitorState } from "../src/state.ts";
 
 // Minimal theme mock — fg wraps text with color name for assertion
 const mockTheme: Theme = {

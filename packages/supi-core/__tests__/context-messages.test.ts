@@ -6,7 +6,7 @@ import {
   getPromptContent,
   pruneAndReorderContextMessages,
   restorePromptContent,
-} from "../context-messages.ts";
+} from "../src/context-messages.ts";
 
 describe("getContextToken", () => {
   it("returns token string from valid details", () => {

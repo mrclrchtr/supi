@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { parseReviewOutput } from "./parser.ts";
 import type { ReviewResult, ReviewRunDiagnostics, ReviewTarget } from "./types.ts";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const __dirname = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export interface RunnerOptions {
   timeout?: number;

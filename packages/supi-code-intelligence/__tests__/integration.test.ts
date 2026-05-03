@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import codeIntelligenceExtension from "../code-intelligence.ts";
+import codeIntelligenceExtension from "../src/code-intelligence.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: test mock
 type AnyFunction = (...args: any[]) => any;

@@ -4,7 +4,7 @@ import {
   getRegisteredSettings,
   registerSettings,
   type SettingsSection,
-} from "../settings-registry.ts";
+} from "../src/settings-registry.ts";
 
 describe("settings-registry", () => {
   afterEach(() => {

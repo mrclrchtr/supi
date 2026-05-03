@@ -7,7 +7,7 @@ import {
   loadSupiConfigForScope,
   removeSupiConfigKey,
   writeSupiConfig,
-} from "../config.ts";
+} from "../src/config.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-core-config-test-"));

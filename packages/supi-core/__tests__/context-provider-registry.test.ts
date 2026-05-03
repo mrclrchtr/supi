@@ -4,7 +4,7 @@ import {
   clearRegisteredContextProviders,
   getRegisteredContextProviders,
   registerContextProvider,
-} from "../context-provider-registry.ts";
+} from "../src/context-provider-registry.ts";
 
 describe("context-provider-registry", () => {
   afterEach(() => {

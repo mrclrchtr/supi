@@ -16,7 +16,7 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts",
+    "src/**/*.ts",
     "!__tests__"
   ],
   "peerDependencies": {
@@ -30,5 +30,5 @@
   "pi": {
     "extensions": []
   },
-  "main": "index.ts"
+  "main": "src/index.ts"
 }

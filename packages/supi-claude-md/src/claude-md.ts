@@ -26,7 +26,7 @@ import { type ClaudeMdState, createInitialState, reconstructState } from "./stat
 import type { ContextUsage, InjectionCheckOptions } from "./subdirectory.ts";
 import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
 
-const baseDir = dirname(fileURLToPath(import.meta.url));
+const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export default function claudeMdExtension(pi: ExtensionAPI) {
   registerClaudeMdSettings();

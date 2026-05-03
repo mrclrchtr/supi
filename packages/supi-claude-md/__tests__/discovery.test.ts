@@ -7,7 +7,7 @@ import {
   extractPathFromToolEvent,
   filterAlreadyLoaded,
   findSubdirContextFiles,
-} from "../discovery.ts";
+} from "../src/discovery.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-claude-md-disc-test-"));

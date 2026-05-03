@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CLAUDE_MD_DEFAULTS, loadClaudeMdConfig } from "../config.ts";
+import { CLAUDE_MD_DEFAULTS, loadClaudeMdConfig } from "../src/config.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-claude-md-config-test-"));

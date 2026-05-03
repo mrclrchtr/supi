@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseNonInteractiveArgs } from "../args.ts";
+import { parseNonInteractiveArgs } from "../src/args.ts";
 
 describe("parseNonInteractiveArgs", () => {
   it("parses base-branch with default depth", () => {

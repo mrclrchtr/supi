@@ -28,7 +28,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
 }));
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import { analyzeContext } from "../analysis.ts";
+import { analyzeContext } from "../src/analysis.ts";
 
 function createMockMessage(
   role: "user" | "assistant" | "toolResult",

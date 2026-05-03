@@ -16,7 +16,7 @@
     "pi-coding-agent"
   ],
   "files": [
-    "*.ts",
+    "src/**/*.ts",
     "resources",
     "!__tests__"
   ],
@@ -33,11 +33,11 @@
   },
   "pi": {
     "extensions": [
-      "./claude-md.ts"
+      "./src/claude-md.ts"
     ],
     "skills": [
       "./resources"
     ]
   },
-  "main": "index.ts"
+  "main": "src/index.ts"
 }

@@ -24,7 +24,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 }));
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
-import { analyzeContext } from "../analysis.ts";
+import { analyzeContext } from "../src/analysis.ts";
 
 function createMockCtx(overrides?: {
   branch?: ReturnType<ExtensionCommandContext["sessionManager"]["getBranch"]>;

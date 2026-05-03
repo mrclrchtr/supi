@@ -2,9 +2,9 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadSupiConfig } from "../config.ts";
-import { registerConfigSettings } from "../config-settings.ts";
-import { clearRegisteredSettings, getRegisteredSettings } from "../settings-registry.ts";
+import { loadSupiConfig } from "../src/config.ts";
+import { registerConfigSettings } from "../src/config-settings.ts";
+import { clearRegisteredSettings, getRegisteredSettings } from "../src/settings-registry.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-core-config-settings-test-"));

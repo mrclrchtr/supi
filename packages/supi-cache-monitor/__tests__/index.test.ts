@@ -10,7 +10,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   registerSettings: vi.fn(),
 }));
 
-vi.mock("../config.ts", () => ({
+vi.mock("../src/config.ts", () => ({
   CACHE_MONITOR_DEFAULTS: {
     enabled: true,
     notifications: true,
@@ -19,11 +19,11 @@ vi.mock("../config.ts", () => ({
   loadCacheMonitorConfig: mockFns.loadCacheMonitorConfig,
 }));
 
-vi.mock("../settings-registration.ts", () => ({
+vi.mock("../src/settings-registration.ts", () => ({
   registerCacheMonitorSettings: vi.fn(),
 }));
 
-import cacheMonitorExtension from "../cache-monitor.ts";
+import cacheMonitorExtension from "../src/cache-monitor.ts";
 
 type Handler = (event: unknown, ctx: unknown) => Promise<void>;
 

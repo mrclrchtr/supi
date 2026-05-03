@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { registerClaudeMdSettings } from "../settings-registration.ts";
+import { registerClaudeMdSettings } from "../src/settings-registration.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "claude-md-settings-test-"));
