@@ -30,7 +30,7 @@
       "./packages/supi-code-intelligence/src/code-intelligence.ts",
       "./packages/supi-debug/src/index.ts",
       "./packages/supi-rtk/src/index.ts",
-      "./packages/supi-extras/src/tab-spinner.ts"
+      "./packages/supi-extras/src/index.ts"
     ],
     "prompts": [
       "./packages/supi/prompts"
