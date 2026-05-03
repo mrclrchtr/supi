@@ -13,7 +13,7 @@ import type {
  * matching, and it broke diagnostic correlation for tracked external paths.
  */
 export function displayRelativeFilePath(filePath: string, cwd: string): string {
-  const absolutePath = path.resolve(filePath);
+  const absolutePath = path.resolve(cwd, filePath);
   const relativePath = path.relative(cwd, absolutePath);
   if (relativePath === "") return path.basename(absolutePath);
   if (relativePath.startsWith(`..${path.sep}`) || relativePath === "..") {
@@ -86,9 +86,34 @@ export function isPathRelevant(filePath: string, relevantPaths: string[], cwd: s
 
 import { isFileExcludedByTsconfig } from "./tsconfig-scope.ts";
 
+/** Check whether a file path is inside the project tree (within cwd, not node_modules/.pnpm/out-of-tree).
+ *  Does NOT check tsconfig exclusion — use `shouldIgnoreLspPath` for diagnostics/guidance filtering. */
+export function isInProjectTree(filePath: string, cwd: string): boolean {
+  const normalized = normalizeRelevantPath(filePath);
+  if (
+    normalized === "node_modules" ||
+    normalized.startsWith("node_modules/") ||
+    normalized.includes("/node_modules/") ||
+    normalized === ".pnpm" ||
+    normalized.startsWith(".pnpm/") ||
+    normalized.includes("/.pnpm/")
+  ) {
+    return false;
+  }
+
+  const absolutePath = path.resolve(cwd, filePath);
+  const relativePath = path.relative(cwd, absolutePath);
+  return !(relativePath.startsWith(`..${path.sep}`) || relativePath === "..");
+}
+
+/** Check whether a file path is inside the current project (not ignored and within cwd). */
+export function isProjectSource(filePath: string, cwd: string): boolean {
+  return isInProjectTree(filePath, cwd);
+}
+
 export function shouldIgnoreLspPath(filePath: string, cwd: string): boolean {
   const normalized = normalizeRelevantPath(filePath);
-  return (
+  if (
     normalized === "node_modules" ||
     normalized.startsWith("node_modules/") ||
     normalized.includes("/node_modules/") ||
@@ -96,7 +121,11 @@ export function shouldIgnoreLspPath(filePath: string, cwd: string): boolean {
     normalized.startsWith(".pnpm/") ||
     normalized.includes("/.pnpm/") ||
     isFileExcludedByTsconfig(normalized, cwd)
-  );
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function normalizeRelevantPath(filePath: string): string {

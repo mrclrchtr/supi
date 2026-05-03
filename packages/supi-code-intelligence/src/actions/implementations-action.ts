@@ -3,7 +3,13 @@
 import * as path from "node:path";
 import { getSessionLspService } from "@mrclrchtr/supi-lsp";
 import { resolveTarget } from "../resolve-target.ts";
-import { escapeRegex, normalizePath, runRipgrep } from "../search-helpers.ts";
+import {
+  escapeRegex,
+  isInProjectPath,
+  normalizePath,
+  runRipgrep,
+  uriToFile,
+} from "../search-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
 
 export async function executeImplementationsAction(
@@ -33,6 +39,29 @@ export async function executeImplementationsAction(
   return `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.\n\nLSP implementation lookup may not be available. Try \`code_intel pattern\` with the type name.`;
 }
 
+function partitionImpls(
+  locations: Array<{
+    uri?: string;
+    targetUri?: string;
+    range?: { start: { line: number } };
+    targetRange?: { start: { line: number } };
+  }>,
+  cwd: string,
+): { project: typeof locations; external: typeof locations } {
+  const project: typeof locations = [];
+  const external: typeof locations = [];
+  for (const loc of locations) {
+    const uri = loc.uri ?? loc.targetUri ?? "";
+    const filePath = uriToFile(uri);
+    if (filePath && isInProjectPath(filePath, cwd)) {
+      project.push(loc);
+    } else {
+      external.push(loc);
+    }
+  }
+  return { project, external };
+}
+
 function formatSemanticImpls(
   locations: Array<{
     uri?: string;
@@ -43,26 +72,35 @@ function formatSemanticImpls(
   cwd: string,
   maxResults: number,
 ): string {
+  const { project: projectLocs, external: externalLocs } = partitionImpls(locations, cwd);
+
   const lines: string[] = [];
   lines.push("# Implementations (semantic)");
   lines.push("");
-  lines.push(`**${locations.length} implementation${locations.length > 1 ? "s" : ""}**`);
+  lines.push(`**${projectLocs.length} implementation${projectLocs.length !== 1 ? "s" : ""}**`);
+  if (externalLocs.length > 0) {
+    const suffix =
+      externalLocs.length === 1
+        ? "+1 external implementation"
+        : `+${externalLocs.length} external implementations`;
+    lines.push(`_${suffix} (node_modules, .pnpm, or out-of-tree)_`);
+  }
   lines.push("");
 
   let shown = 0;
-  for (const loc of locations) {
+  for (const loc of projectLocs) {
     if (shown >= maxResults) break;
     const uri = loc.uri ?? loc.targetUri ?? "";
     const range = loc.range ?? loc.targetRange ?? null;
-    const filePath = uri.startsWith("file://") ? decodeURIComponent(uri.slice(7)) : uri;
+    const filePath = uriToFile(uri);
     const implRelPath = path.relative(cwd, filePath);
     const line = range ? range.start.line + 1 : 0;
     lines.push(`- \`${implRelPath}\`:${line}`);
     shown++;
   }
 
-  if (locations.length > maxResults) {
-    lines.push(`- _+${locations.length - maxResults} more omitted_`);
+  if (projectLocs.length > maxResults) {
+    lines.push(`- _+${projectLocs.length - maxResults} more omitted_`);
   }
   lines.push("");
   return lines.join("\n");

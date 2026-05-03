@@ -2,6 +2,7 @@
 
 import * as path from "node:path";
 import type { GrepMatch } from "./search-fallback.ts";
+import { isProjectSource } from "./summary.ts";
 import type {
   CodeAction,
   DocumentSymbol,
@@ -37,23 +38,78 @@ export function formatHover(hover: Hover): string {
 
 // ── Locations ─────────────────────────────────────────────────────────
 
-export function formatLocations(label: string, locations: Location[], cwd: string): string {
-  if (locations.length === 1) {
-    const loc = locations[0];
-    const file = relPath(uriToFile(loc.uri), cwd);
-    const line = loc.range.start.line + 1;
-    const col = loc.range.start.character + 1;
-    return `${label}: ${file}:${line}:${col}`;
-  }
+function formatLocationLine(loc: Location, cwd: string): string {
+  const file = relPath(uriToFile(loc.uri), cwd);
+  const line = loc.range.start.line + 1;
+  const col = loc.range.start.character + 1;
+  return `${file}:${line}:${col}`;
+}
 
-  const lines = [`${label} (${locations.length} locations):\n`];
-  for (const loc of locations) {
-    const file = relPath(uriToFile(loc.uri), cwd);
-    const line = loc.range.start.line + 1;
-    const col = loc.range.start.character + 1;
-    lines.push(`- ${file}:${line}:${col}`);
+function formatLocationList(label: string, locs: Location[], cwd: string): string {
+  const lines = [`${label} (${locs.length} locations):\n`];
+  for (const loc of locs) {
+    lines.push(`- ${formatLocationLine(loc, cwd)}`);
   }
   return lines.join("\n");
+}
+
+function formatExternalFallback(label: string, locs: Location[], cwd: string): string {
+  const maxShown = 3;
+  const shown = locs.slice(0, maxShown);
+  const hidden = locs.length - maxShown;
+
+  let result: string;
+  if (shown.length === 1) {
+    result = `${label}: ${formatLocationLine(shown[0], cwd)}`;
+  } else {
+    const lines = [`${label} (${locs.length} locations):\n`];
+    for (const loc of shown) {
+      lines.push(`- ${formatLocationLine(loc, cwd)}`);
+    }
+    result = lines.join("\n");
+  }
+
+  if (hidden > 0) {
+    result += `\n+${hidden} more external ${hidden === 1 ? "location" : "locations"}`;
+  }
+
+  return result;
+}
+
+function formatExternalSuffix(count: number): string {
+  return count === 1
+    ? "+1 external location (node_modules, .pnpm, or out-of-tree)"
+    : `+${count} external locations (node_modules, .pnpm, or out-of-tree)`;
+}
+
+export function formatLocations(label: string, locations: Location[], cwd: string): string {
+  const projectLocs: Location[] = [];
+  const externalLocs: Location[] = [];
+  for (const loc of locations) {
+    if (isProjectSource(uriToFile(loc.uri), cwd)) {
+      projectLocs.push(loc);
+    } else {
+      externalLocs.push(loc);
+    }
+  }
+
+  let result: string;
+
+  if (projectLocs.length === 1) {
+    result = `${label}: ${formatLocationLine(projectLocs[0], cwd)}`;
+  } else if (projectLocs.length > 1) {
+    result = formatLocationList(label, projectLocs, cwd);
+  } else if (externalLocs.length > 0) {
+    return formatExternalFallback(label, externalLocs, cwd);
+  } else {
+    return `${label}: No locations found.`;
+  }
+
+  if (externalLocs.length > 0) {
+    result += `\n${formatExternalSuffix(externalLocs.length)}`;
+  }
+
+  return result;
 }
 
 export function normalizeLocations(result: Location | Location[] | LocationLink[]): Location[] {
@@ -90,42 +146,94 @@ export function formatDocumentSymbols(symbols: DocumentSymbol[], indent: number)
 }
 
 export function formatSymbolInformation(symbols: SymbolInformation[], cwd: string): string {
-  const lines: string[] = [];
+  const projectSyms: SymbolInformation[] = [];
+  const externalSyms: SymbolInformation[] = [];
   for (const sym of symbols) {
+    if (isProjectSource(uriToFile(sym.location.uri), cwd)) {
+      projectSyms.push(sym);
+    } else {
+      externalSyms.push(sym);
+    }
+  }
+
+  const lines: string[] = [];
+  const symbolsToShow = projectSyms.length > 0 ? projectSyms : externalSyms;
+  for (const sym of symbolsToShow) {
     const kind = symbolKindName(sym.kind);
     const file = relPath(uriToFile(sym.location.uri), cwd);
     const line = sym.location.range.start.line + 1;
     const container = sym.containerName ? ` (in ${sym.containerName})` : "";
     lines.push(`- ${kind} **${sym.name}**${container} — ${file}:${line}`);
   }
+
+  if (projectSyms.length > 0 && externalSyms.length > 0) {
+    const suffix =
+      externalSyms.length === 1
+        ? "+1 external symbol (node_modules, .pnpm, or out-of-tree)"
+        : `+${externalSyms.length} external symbols (node_modules, .pnpm, or out-of-tree)`;
+    lines.push(`- _${suffix}_`);
+  }
+
   return lines.join("\n");
 }
 
 // ── Workspace Edits ───────────────────────────────────────────────────
 
-export function formatWorkspaceEdit(edit: WorkspaceEdit, cwd: string): string {
-  const lines: string[] = ["Rename workspace edit:\n"];
+interface EditEntry {
+  file: string;
+  edits: Array<{ range: { start: { line: number } }; newText: string }>;
+}
+
+function partitionWorkspaceEdit(
+  edit: WorkspaceEdit,
+  cwd: string,
+): { projectChanges: EditEntry[]; externalCount: number } {
+  const projectChanges: EditEntry[] = [];
+  let externalCount = 0;
 
   if (edit.changes) {
     for (const [uri, edits] of Object.entries(edit.changes)) {
-      const file = relPath(uriToFile(uri), cwd);
-      lines.push(`**${file}** (${edits.length} change(s))`);
-      for (const e of edits) {
-        const line = e.range.start.line + 1;
-        lines.push(`  Line ${line}: → "${e.newText}"`);
+      const filePath = uriToFile(uri);
+      if (isProjectSource(filePath, cwd)) {
+        projectChanges.push({ file: relPath(filePath, cwd), edits });
+      } else {
+        externalCount++;
       }
     }
   }
 
   if (edit.documentChanges) {
     for (const dc of edit.documentChanges) {
-      const file = relPath(uriToFile(dc.textDocument.uri), cwd);
-      lines.push(`**${file}** (${dc.edits.length} change(s))`);
-      for (const e of dc.edits) {
-        const line = e.range.start.line + 1;
-        lines.push(`  Line ${line}: → "${e.newText}"`);
+      const filePath = uriToFile(dc.textDocument.uri);
+      if (isProjectSource(filePath, cwd)) {
+        projectChanges.push({ file: relPath(filePath, cwd), edits: dc.edits });
+      } else {
+        externalCount++;
       }
     }
+  }
+
+  return { projectChanges, externalCount };
+}
+
+export function formatWorkspaceEdit(edit: WorkspaceEdit, cwd: string): string {
+  const { projectChanges, externalCount } = partitionWorkspaceEdit(edit, cwd);
+
+  const lines: string[] = ["Rename workspace edit:\n"];
+  for (const { file, edits } of projectChanges) {
+    lines.push(`**${file}** (${edits.length} change(s))`);
+    for (const e of edits) {
+      const line = e.range.start.line + 1;
+      lines.push(`  Line ${line}: → "${e.newText}"`);
+    }
+  }
+
+  if (externalCount > 0) {
+    const suffix =
+      externalCount === 1
+        ? "+1 external file (node_modules, .pnpm, or out-of-tree)"
+        : `+${externalCount} external files (node_modules, .pnpm, or out-of-tree)`;
+    lines.push(`\n_${suffix}_`);
   }
 
   return lines.join("\n");
@@ -153,8 +261,23 @@ export function formatCodeActions(actions: CodeAction[]): string {
 
 export function formatWorkspaceSymbols(symbols: SymbolInformation[], cwd: string): string {
   if (symbols.length === 0) return "No symbols found.";
-  const lines = [`Workspace symbols (${symbols.length}):\n`];
+
+  const projectSyms: SymbolInformation[] = [];
+  const externalSyms: SymbolInformation[] = [];
   for (const sym of symbols) {
+    if (isProjectSource(uriToFile(sym.location.uri), cwd)) {
+      projectSyms.push(sym);
+    } else {
+      externalSyms.push(sym);
+    }
+  }
+
+  if (projectSyms.length === 0 && externalSyms.length > 0) {
+    return `Workspace symbols: No in-project symbols found.\n+${externalSyms.length} external symbol${externalSyms.length === 1 ? "" : "s"} (node_modules, .pnpm, or out-of-tree).`;
+  }
+
+  const lines = [`Workspace symbols (${projectSyms.length}):\n`];
+  for (const sym of projectSyms) {
     const kind = symbolKindName(sym.kind);
     const file = relPath(uriToFile(sym.location.uri), cwd);
     const line = sym.location.range.start.line + 1;
@@ -162,6 +285,15 @@ export function formatWorkspaceSymbols(symbols: SymbolInformation[], cwd: string
     const container = sym.containerName ? ` — ${sym.containerName}` : "";
     lines.push(`- **${sym.name}** (${kind})${container} — ${file}:${line}:${col}`);
   }
+
+  if (externalSyms.length > 0) {
+    const suffix =
+      externalSyms.length === 1
+        ? "+1 external symbol (node_modules, .pnpm, or out-of-tree)"
+        : `+${externalSyms.length} external symbols (node_modules, .pnpm, or out-of-tree)`;
+    lines.push(`\n_${suffix}_`);
+  }
+
   return lines.join("\n");
 }
 

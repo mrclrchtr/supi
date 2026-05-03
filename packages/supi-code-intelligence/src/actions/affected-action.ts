@@ -4,7 +4,13 @@ import * as path from "node:path";
 import { getSessionLspService } from "@mrclrchtr/supi-lsp";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../architecture.ts";
 import { resolveTarget } from "../resolve-target.ts";
-import { escapeRegex, normalizePath, runRipgrep } from "../search-helpers.ts";
+import {
+  escapeRegex,
+  isInProjectPath,
+  normalizePath,
+  runRipgrep,
+  uriToFile,
+} from "../search-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
 import type { ConfidenceMode } from "../types.ts";
 
@@ -35,6 +41,7 @@ interface ImpactAnalysis {
   checkNext: string[];
   likelyTests: string[];
   riskLevel: "low" | "medium" | "high";
+  externalRefs: number;
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-source reference gathering with fallback logic
@@ -42,9 +49,10 @@ async function gatherReferences(
   target: { file: string; position: { line: number; character: number }; name: string | null },
   params: ActionParams,
   cwd: string,
-): Promise<{ refs: GatheredRef[]; confidence: ConfidenceMode }> {
+): Promise<{ refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number }> {
   const lspState = getSessionLspService(cwd);
   const refs: GatheredRef[] = [];
+  let externalCount = 0;
 
   if (lspState.kind === "ready") {
     const lspRefs = await lspState.service.references(target.file, target.position);
@@ -53,12 +61,14 @@ async function gatherReferences(
       // The declaration is the symbol being changed, not something affected by the change.
       const filtered = filterOutDeclaration(lspRefs, target.file, target.position);
       for (const ref of filtered) {
-        const filePath = ref.uri.startsWith("file://")
-          ? decodeURIComponent(ref.uri.slice(7))
-          : ref.uri;
-        refs.push({ file: path.relative(cwd, filePath), line: ref.range.start.line + 1 });
+        const filePath = uriToFile(ref.uri);
+        if (isInProjectPath(filePath, cwd)) {
+          refs.push({ file: path.relative(cwd, filePath), line: ref.range.start.line + 1 });
+        } else {
+          externalCount++;
+        }
       }
-      return { refs, confidence: "semantic" };
+      return { refs, confidence: "semantic", externalCount };
     }
   }
 
@@ -69,15 +79,15 @@ async function gatherReferences(
     for (const m of matches) {
       refs.push({ file: m.file, line: m.line });
     }
-    return { refs, confidence: "heuristic" };
+    return { refs, confidence: "heuristic", externalCount: 0 };
   }
 
-  return { refs, confidence: "unavailable" };
+  return { refs, confidence: "unavailable", externalCount: 0 };
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: impact analysis with downstream module traversal
 function analyzeImpact(
-  result: { refs: GatheredRef[]; confidence: ConfidenceMode },
+  result: { refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number },
   model: Awaited<ReturnType<typeof buildArchitectureModel>>,
   symbolName: string | null,
   cwd: string,
@@ -114,7 +124,8 @@ function analyzeImpact(
   }
 
   const likelyTests = findLikelyTests(affectedFiles, symbolName);
-  const riskLevel = assessRisk(result.refs.length, affectedModules.size, downstreamCount);
+  const totalRefs = result.refs.length + result.externalCount;
+  const riskLevel = assessRisk(totalRefs, affectedModules.size, downstreamCount);
 
   return {
     confidence: result.confidence,
@@ -124,6 +135,7 @@ function analyzeImpact(
     checkNext,
     likelyTests,
     riskLevel,
+    externalRefs: result.externalCount,
   };
 }
 
@@ -149,21 +161,31 @@ function assessRisk(
 
 function formatAffectedOutput(
   symbolName: string,
-  result: { refs: GatheredRef[]; confidence: ConfidenceMode },
+  result: { refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number },
   analysis: ImpactAnalysis,
   params: ActionParams,
 ): string {
   const _maxResults = params.maxResults ?? 8;
+  const totalRefs = result.refs.length + analysis.externalRefs;
   const lines: string[] = [];
 
   lines.push(`# Affected: \`${symbolName}\``);
   lines.push("");
+  const refSummary =
+    analysis.externalRefs > 0
+      ? `${totalRefs} refs (${result.refs.length} direct + ${analysis.externalRefs} external)`
+      : `${totalRefs} ref${totalRefs !== 1 ? "s" : ""}`;
   lines.push(
-    `**Risk: ${analysis.riskLevel.toUpperCase()}** | ${result.refs.length} direct ref${result.refs.length !== 1 ? "s" : ""} | ${analysis.affectedFiles.size} file${analysis.affectedFiles.size !== 1 ? "s" : ""} | ${analysis.affectedModules.size} module${analysis.affectedModules.size !== 1 ? "s" : ""} | ${analysis.downstreamCount} downstream (${analysis.confidence})`,
+    `**Risk: ${analysis.riskLevel.toUpperCase()}** | ${refSummary} | ${analysis.affectedFiles.size} file${analysis.affectedFiles.size !== 1 ? "s" : ""} | ${analysis.affectedModules.size} module${analysis.affectedModules.size !== 1 ? "s" : ""} | ${analysis.downstreamCount} downstream (${analysis.confidence})`,
   );
+  if (analysis.externalRefs > 0) {
+    lines.push(
+      `_External references are not listed individually (node_modules, .pnpm, or out-of-tree)_`,
+    );
+  }
   lines.push("");
 
-  addRiskSection(lines, analysis, result.refs.length);
+  addRiskSection(lines, analysis, totalRefs);
   addReferencesSection(lines, result.refs, params.maxResults ?? 8);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
@@ -250,7 +272,7 @@ function filterOutDeclaration(
   targetPos: { line: number; character: number },
 ): LspRef[] {
   return refs.filter((ref) => {
-    const filePath = ref.uri.startsWith("file://") ? decodeURIComponent(ref.uri.slice(7)) : ref.uri;
+    const filePath = uriToFile(ref.uri);
     if (filePath !== targetFile) return true;
     const start = ref.range.start;
     return start.line !== targetPos.line || start.character !== targetPos.character;

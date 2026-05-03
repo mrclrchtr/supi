@@ -25,6 +25,33 @@ export function isLowSignalPath(filePath: string): boolean {
   return segments.some((s) => LOW_SIGNAL_DIRS.has(s));
 }
 
+/** Convert a file:// URI to a file path, matching the normalization in supi-lsp. */
+export function uriToFile(uri: string): string {
+  if (!uri.startsWith("file://")) return uri;
+  let filePath = decodeURIComponent(uri.slice(7));
+  if (
+    process.platform === "win32" &&
+    filePath.startsWith("/") &&
+    /^[A-Za-z]:/.test(filePath.slice(1))
+  ) {
+    filePath = filePath.slice(1);
+  }
+  return filePath;
+}
+
+/** Check whether a resolved file path is inside the current project (within cwd, not under node_modules or .pnpm). */
+export function isInProjectPath(filePath: string, cwd: string): boolean {
+  const relativePath = path.relative(cwd, path.resolve(cwd, filePath));
+  if (relativePath.startsWith(`..${path.sep}`) || relativePath === "..") return false;
+  const normalized = relativePath.replaceAll("\\", "/");
+  return !(
+    normalized.includes("/node_modules/") ||
+    normalized.startsWith("node_modules/") ||
+    normalized.includes("/.pnpm/") ||
+    normalized.startsWith(".pnpm/")
+  );
+}
+
 /** Escape regex special characters. */
 export function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

@@ -3,7 +3,14 @@
 import * as path from "node:path";
 import { getSessionLspService } from "@mrclrchtr/supi-lsp";
 import { resolveTarget } from "../resolve-target.ts";
-import { escapeRegex, groupByFile, normalizePath, runRipgrep } from "../search-helpers.ts";
+import {
+  escapeRegex,
+  groupByFile,
+  isInProjectPath,
+  normalizePath,
+  runRipgrep,
+  uriToFile,
+} from "../search-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
 
 export async function executeCallersAction(params: ActionParams, cwd: string): Promise<string> {
@@ -32,26 +39,61 @@ export async function executeCallersAction(params: ActionParams, cwd: string): P
   return `No caller data available for ${relPath}:${target.displayLine}:${target.displayCharacter}. LSP may not be active.\n\nTry \`code_intel pattern\` with the symbol name for text-search matches.`;
 }
 
+function partitionRefs(
+  refs: Array<{ uri: string; range: { start: { line: number; character: number } } }>,
+  cwd: string,
+): { project: typeof refs; external: typeof refs } {
+  const project: typeof refs = [];
+  const external: typeof refs = [];
+  for (const ref of refs) {
+    if (isInProjectPath(uriToFile(ref.uri), cwd)) {
+      project.push(ref);
+    } else {
+      external.push(ref);
+    }
+  }
+  return { project, external };
+}
+
+function groupRefsByFile(
+  refs: Array<{ uri: string; range: { start: { line: number; character: number } } }>,
+  cwd: string,
+): Map<string, number[]> {
+  const byFile = new Map<string, number[]>();
+  for (const ref of refs) {
+    const filePath = uriToFile(ref.uri);
+    const relPath = path.relative(cwd, filePath);
+    const group = byFile.get(relPath) ?? [];
+    group.push(ref.range.start.line + 1);
+    byFile.set(relPath, group);
+  }
+  return byFile;
+}
+
 function formatSemanticCallers(
   refs: Array<{ uri: string; range: { start: { line: number; character: number } } }>,
   name: string | null,
   cwd: string,
   maxResults: number,
 ): string {
+  const { project: projectRefs, external: externalRefs } = partitionRefs(refs, cwd);
+
   const lines: string[] = [];
   lines.push(`# Callers of \`${name ?? "symbol"}\``);
   lines.push("");
-  lines.push(`**${refs.length} reference${refs.length > 1 ? "s" : ""}** (semantic)`);
+  lines.push(
+    `**${projectRefs.length} reference${projectRefs.length !== 1 ? "s" : ""}** (semantic)`,
+  );
+  if (externalRefs.length > 0) {
+    const suffix =
+      externalRefs.length === 1
+        ? "+1 external reference"
+        : `+${externalRefs.length} external references`;
+    lines.push(`_${suffix} (node_modules, .pnpm, or out-of-tree)_`);
+  }
   lines.push("");
 
-  const byFile = new Map<string, number[]>();
-  for (const ref of refs) {
-    const filePath = ref.uri.startsWith("file://") ? decodeURIComponent(ref.uri.slice(7)) : ref.uri;
-    const relPath = path.relative(cwd, filePath);
-    const group = byFile.get(relPath) ?? [];
-    group.push(ref.range.start.line + 1);
-    byFile.set(relPath, group);
-  }
+  const byFile = groupRefsByFile(projectRefs, cwd);
 
   let shown = 0;
   for (const [file, locations] of byFile) {

@@ -53,18 +53,62 @@ describe("formatHover", () => {
 });
 
 describe("formatLocations", () => {
-  it("formats single location", () => {
-    const result = formatLocations("Definition", [loc("file:///src/app.ts", 9, 4)], "/project");
+  it("formats single in-project location", () => {
+    const result = formatLocations(
+      "Definition",
+      [loc("file:///project/src/app.ts", 9, 4)],
+      "/project",
+    );
     expect(result).toContain("Definition:");
-    expect(result).toContain("10:5");
+    expect(result).toContain("src/app.ts:10:5");
   });
 
-  it("formats multiple locations", () => {
-    const locs = [loc("file:///src/a.ts", 0, 0), loc("file:///src/b.ts", 5, 3)];
+  it("formats multiple in-project locations", () => {
+    const locs = [loc("file:///project/src/a.ts", 0, 0), loc("file:///project/src/b.ts", 5, 3)];
     const result = formatLocations("References", locs, "/project");
     expect(result).toContain("2 locations");
-    expect(result).toContain("1:1");
-    expect(result).toContain("6:4");
+    expect(result).toContain("src/a.ts:1:1");
+    expect(result).toContain("src/b.ts:6:4");
+  });
+
+  it("shrinks external locations into a count", () => {
+    const locs = [
+      loc("file:///project/src/a.ts", 0, 0),
+      loc("file:///other/lib.ts", 5, 3),
+      loc("file:///project/src/b.ts", 2, 1),
+    ];
+    const result = formatLocations("References", locs, "/project");
+    expect(result).toContain("2 locations");
+    expect(result).toContain("src/a.ts:1:1");
+    expect(result).toContain("src/b.ts:3:2");
+    expect(result).toContain("+1 external location");
+  });
+
+  it("shows external locations when no project ones exist", () => {
+    const locs = [
+      loc("file:///other/lib.ts", 0, 0),
+      loc("file:///node_modules/foo/index.ts", 1, 1),
+    ];
+    const result = formatLocations("References", locs, "/project");
+    expect(result).toContain("other/lib.ts:1:1");
+    expect(result).toContain("node_modules/foo/index.ts:2:2");
+    expect(result).not.toContain("No in-project");
+  });
+
+  it("caps external locations and shows a count for the rest", () => {
+    const locs = [
+      loc("file:///other/a.ts", 0, 0),
+      loc("file:///other/b.ts", 1, 1),
+      loc("file:///other/c.ts", 2, 2),
+      loc("file:///other/d.ts", 3, 3),
+    ];
+    const result = formatLocations("References", locs, "/project");
+    expect(result).toContain("References (4 locations):");
+    expect(result).toContain("other/a.ts:1:1");
+    expect(result).toContain("other/b.ts:2:2");
+    expect(result).toContain("other/c.ts:3:3");
+    expect(result).not.toContain("other/d.ts");
+    expect(result).toContain("+1 more external location");
   });
 });
 
@@ -140,12 +184,12 @@ describe("formatDocumentSymbols", () => {
 });
 
 describe("formatSymbolInformation", () => {
-  it("formats symbols with container", () => {
+  it("formats in-project symbols with container", () => {
     const symbols: SymbolInformation[] = [
       {
         name: "handler",
         kind: 12,
-        location: loc("file:///src/app.ts", 10, 0),
+        location: loc("file:///project/src/app.ts", 10, 0),
         containerName: "AppModule",
       },
     ];
@@ -153,14 +197,50 @@ describe("formatSymbolInformation", () => {
     expect(result).toContain("Function");
     expect(result).toContain("**handler**");
     expect(result).toContain("(in AppModule)");
+    expect(result).toContain("src/app.ts:11");
+  });
+
+  it("shrinks external symbols into a count", () => {
+    const symbols: SymbolInformation[] = [
+      {
+        name: "handler",
+        kind: 12,
+        location: loc("file:///project/src/app.ts", 10, 0),
+        containerName: "AppModule",
+      },
+      {
+        name: "externalHelper",
+        kind: 12,
+        location: loc("file:///node_modules/lib/helper.ts", 0, 0),
+        containerName: "Lib",
+      },
+    ];
+    const result = formatSymbolInformation(symbols, "/project");
+    expect(result).toContain("handler");
+    expect(result).not.toContain("externalHelper");
+    expect(result).toContain("+1 external symbol");
+  });
+
+  it("shows external symbols when no project symbols exist", () => {
+    const symbols: SymbolInformation[] = [
+      {
+        name: "externalHelper",
+        kind: 12,
+        location: loc("file:///other/lib/helper.ts", 0, 0),
+        containerName: "Lib",
+      },
+    ];
+    const result = formatSymbolInformation(symbols, "/project");
+    expect(result).toContain("externalHelper");
+    expect(result).toContain("other/lib/helper.ts:1");
   });
 });
 
 describe("formatWorkspaceEdit", () => {
-  it("formats changes map", () => {
+  it("formats in-project changes map", () => {
     const edit: WorkspaceEdit = {
       changes: {
-        "file:///src/a.ts": [
+        "file:///project/src/a.ts": [
           {
             range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
             newText: "newName",
@@ -171,6 +251,30 @@ describe("formatWorkspaceEdit", () => {
     const result = formatWorkspaceEdit(edit, "/project");
     expect(result).toContain("1 change(s)");
     expect(result).toContain("newName");
+    expect(result).toContain("src/a.ts");
+  });
+
+  it("shrinks external files into a count", () => {
+    const edit: WorkspaceEdit = {
+      changes: {
+        "file:///project/src/a.ts": [
+          {
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+            newText: "newName",
+          },
+        ],
+        "file:///node_modules/lib/index.ts": [
+          {
+            range: { start: { line: 1, character: 0 }, end: { line: 1, character: 3 } },
+            newText: "newName",
+          },
+        ],
+      },
+    };
+    const result = formatWorkspaceEdit(edit, "/project");
+    expect(result).toContain("src/a.ts");
+    expect(result).not.toContain("lib/index.ts");
+    expect(result).toContain("+1 external file");
   });
 });
 
@@ -179,12 +283,12 @@ describe("formatWorkspaceSymbols", () => {
     expect(formatWorkspaceSymbols([], "/project")).toBe("No symbols found.");
   });
 
-  it("formats symbols with container", () => {
+  it("formats in-project symbols with container", () => {
     const symbols: SymbolInformation[] = [
       {
         name: "getSettings",
         kind: 12,
-        location: loc("file:///src/config.ts", 10, 4),
+        location: loc("file:///project/src/config.ts", 10, 4),
         containerName: "SettingsModule",
       },
     ];
@@ -195,12 +299,12 @@ describe("formatWorkspaceSymbols", () => {
     expect(result).toContain("src/config.ts:11:5");
   });
 
-  it("formats symbols without container", () => {
+  it("formats in-project symbols without container", () => {
     const symbols: SymbolInformation[] = [
       {
         name: "PI",
         kind: 14,
-        location: loc("file:///src/math.ts", 0, 0),
+        location: loc("file:///project/src/math.ts", 0, 0),
       },
     ];
     const result = formatWorkspaceSymbols(symbols, "/project");
@@ -208,12 +312,47 @@ describe("formatWorkspaceSymbols", () => {
     expect(result).toContain("Constant");
     expect(result).not.toContain("(in");
   });
+
+  it("shrinks external symbols into a count", () => {
+    const symbols: SymbolInformation[] = [
+      {
+        name: "getSettings",
+        kind: 12,
+        location: loc("file:///project/src/config.ts", 10, 4),
+        containerName: "SettingsModule",
+      },
+      {
+        name: "externalFn",
+        kind: 12,
+        location: loc("file:///node_modules/lib/index.ts", 0, 0),
+        containerName: "Lib",
+      },
+    ];
+    const result = formatWorkspaceSymbols(symbols, "/project");
+    expect(result).toContain("getSettings");
+    expect(result).not.toContain("externalFn");
+    expect(result).toContain("+1 external symbol");
+  });
+
+  it("summarizes all-external symbols", () => {
+    const symbols: SymbolInformation[] = [
+      {
+        name: "externalFn",
+        kind: 12,
+        location: loc("file:///node_modules/lib/index.ts", 0, 0),
+        containerName: "Lib",
+      },
+    ];
+    const result = formatWorkspaceSymbols(symbols, "/project");
+    expect(result).toContain("No in-project symbols found.");
+    expect(result).toContain("+1 external symbol");
+  });
 });
 
 describe("formatSearchResults", () => {
   it("formats LSP symbols when available", () => {
     const symbols: SymbolInformation[] = [
-      { name: "add", kind: 12, location: loc("file:///src/math.ts", 0, 0) },
+      { name: "add", kind: 12, location: loc("file:///project/src/math.ts", 0, 0) },
     ];
     const result = formatSearchResults(symbols, null, "/project");
     expect(result).toContain("add");
