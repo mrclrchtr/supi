@@ -56,11 +56,11 @@ describe("promptStash extension", () => {
     _resetStashes();
   });
 
-  it("registers ctrl+s shortcut", () => {
+  it("registers alt+s shortcut", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    expect(pi.getShortcutHandlers("ctrl+s")).toHaveLength(1);
+    expect(pi.getShortcutHandlers("alt+s")).toHaveLength(1);
   });
 
   it("registers ctrl+shift+s shortcut", () => {
@@ -79,7 +79,7 @@ describe("promptStash extension", () => {
     expect(pi.getCommandHandler("stash-clear")).toBeDefined();
   });
 
-  it("stashes editor text on ctrl+s and clears editor", async () => {
+  it("stashes editor text on alt+s and clears editor", async () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
@@ -87,7 +87,7 @@ describe("promptStash extension", () => {
     ctx.ui.getEditorText = vi.fn(() => "Fix the auth bug in login.ts");
     ctx.ui.input = vi.fn(async () => "auth bug");
 
-    await pi.getShortcutHandlers("ctrl+s")[0](ctx);
+    await pi.getShortcutHandlers("alt+s")[0](ctx);
 
     expect(ctx.ui.setEditorText).toHaveBeenCalledWith("");
     expect(ctx.ui.notify).toHaveBeenCalledWith('Stashed: "auth bug"', "info");
@@ -101,19 +101,19 @@ describe("promptStash extension", () => {
     ctx.ui.getEditorText = vi.fn(() => "Refactor the database layer");
     ctx.ui.input = vi.fn(async () => "");
 
-    await pi.getShortcutHandlers("ctrl+s")[0](ctx);
+    await pi.getShortcutHandlers("alt+s")[0](ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith('Stashed: "Refactor the database layer"', "info");
   });
 
-  it("warns when editor is empty on ctrl+s", async () => {
+  it("warns when editor is empty on alt+s", async () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
     const ctx = createCtxMock();
     ctx.ui.getEditorText = vi.fn(() => "   ");
 
-    await pi.getShortcutHandlers("ctrl+s")[0](ctx);
+    await pi.getShortcutHandlers("alt+s")[0](ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("Editor is empty — nothing to stash", "warning");
     expect(ctx.ui.input).not.toHaveBeenCalled();
@@ -153,14 +153,14 @@ describe("promptStash extension", () => {
     const stashCtx = createCtxMock();
     stashCtx.ui.getEditorText = vi.fn(() => "restore me");
     stashCtx.ui.input = vi.fn(async () => "restore test");
-    await pi.getShortcutHandlers("ctrl+s")[0](stashCtx);
+    await pi.getShortcutHandlers("alt+s")[0](stashCtx);
 
     // Now restore it
     const restoreCtx = createCtxMock();
     restoreCtx.ui.select = vi.fn(async () => "[stash-123] restore test");
 
     // Need the real stash id, so let's capture it from the actual select call
-    await pi.getCommandHandler("stash")!("", restoreCtx);
+    await pi.getCommandHandler("stash")?.("", restoreCtx);
 
     expect(restoreCtx.ui.select).toHaveBeenCalledWith(
       "Restore stash:",
@@ -173,7 +173,7 @@ describe("promptStash extension", () => {
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
     const ctx = createCtxMock();
-    await pi.getCommandHandler("stash")!("", ctx);
+    await pi.getCommandHandler("stash")?.("", ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("No stashed prompts", "info");
   });
@@ -185,17 +185,17 @@ describe("promptStash extension", () => {
     const ctx = createCtxMock();
     ctx.ui.getEditorText = vi.fn(() => "text to clear");
     ctx.ui.input = vi.fn(async () => "clear me");
-    await pi.getShortcutHandlers("ctrl+s")[0](ctx);
+    await pi.getShortcutHandlers("alt+s")[0](ctx);
 
     const clearCtx = createCtxMock();
     clearCtx.ui.confirm = vi.fn(async () => true);
-    await pi.getCommandHandler("stash-clear")!("", clearCtx);
+    await pi.getCommandHandler("stash-clear")?.("", clearCtx);
 
     expect(clearCtx.ui.notify).toHaveBeenCalledWith("All stashes cleared", "info");
 
     // Verify empty
     const listCtx = createCtxMock();
-    await pi.getCommandHandler("stash")!("", listCtx);
+    await pi.getCommandHandler("stash")?.("", listCtx);
     expect(listCtx.ui.notify).toHaveBeenCalledWith("No stashed prompts", "info");
   });
 });

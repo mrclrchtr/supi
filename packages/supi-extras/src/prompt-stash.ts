@@ -85,7 +85,7 @@ async function copyToClipboard(text: string, cwd: string, pi: ExtensionAPI): Pro
 }
 
 export default function promptStash(pi: ExtensionAPI) {
-  pi.registerShortcut("ctrl+s", {
+  pi.registerShortcut("alt+s", {
     description: "Stash current editor text",
     handler: async (ctx) => {
       const text = ctx.ui.getEditorText();
