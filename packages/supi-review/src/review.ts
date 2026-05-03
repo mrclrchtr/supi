@@ -83,6 +83,7 @@ async function handleNonInteractive(options: NonInteractiveOptions): Promise<voi
         target: { type: "custom", instructions: args },
       },
       false,
+      ctx,
     );
     return;
   }
@@ -93,7 +94,7 @@ async function handleNonInteractive(options: NonInteractiveOptions): Promise<voi
     maxDiffBytes,
     ctx,
   });
-  injectReviewMessage(pi, result, autoFix);
+  injectReviewMessage(pi, result, autoFix, ctx);
 }
 
 async function handleInteractive(
@@ -115,7 +116,7 @@ async function handleInteractive(
   if (!target) return;
 
   const result = await runReviewWithLoader(target, depth, maxDiffBytes, ctx);
-  injectReviewMessage(pi, result, autoFix);
+  injectReviewMessage(pi, result, autoFix, ctx);
 }
 
 async function resolvePresetTarget(
@@ -275,12 +276,23 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
     cwd: ctx.cwd,
     target,
     signal,
-    options: { timeout: resolveReviewTimeoutMs(settings) },
+    onSessionStart: (sessionName) => {
+      if (ctx.hasUI) {
+        ctx.ui.notify(`Review running in tmux session ${sessionName}`, "info");
+        return;
+      }
+      process.stderr.write(formatSessionAnnouncement(sessionName));
+    },
   });
 }
 
-function resolveReviewTimeoutMs(settings: ReturnType<typeof loadReviewSettings>): number {
-  return Math.max(1, Math.floor(settings.reviewTimeoutMinutes)) * 60_000;
+function formatSessionAnnouncement(sessionName: string): string {
+  return [
+    `Review running in tmux session ${sessionName}`,
+    `Attach: tmux attach -t ${sessionName}`,
+    `Kill:   tmux kill-session -t ${sessionName}`,
+    "",
+  ].join("\n");
 }
 
 function resolveModel(
@@ -346,13 +358,22 @@ function maybeTruncateDiff(
   };
 }
 
-function injectReviewMessage(pi: ExtensionAPI, result: ReviewResult, autoFix: boolean): void {
+function injectReviewMessage(
+  pi: ExtensionAPI,
+  result: ReviewResult,
+  autoFix: boolean,
+  ctx?: CommandContext,
+): void {
   pi.sendMessage({
     customType: "supi-review",
     content: formatReviewContent(result),
     display: true,
     details: { result },
   });
+
+  if (result.warning && ctx?.hasUI) {
+    ctx.ui.notify(result.warning, "warning");
+  }
 
   if (autoFix && result.kind === "success" && result.output.findings.length > 0) {
     pi.sendUserMessage("Fix all findings from the review above.");

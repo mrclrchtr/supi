@@ -61,19 +61,17 @@ describe("supi-review renderer", () => {
     expect(output).not.toContain("[success]patch is incorrect[/success]");
   });
 
-  it("shows timeout diagnostics including the saved session path", () => {
+  it("shows timeout diagnostics including the warning", () => {
     const output = renderReview({
       kind: "timeout",
       target: { type: "custom", instructions: "Focus on correctness" },
       timeoutMs: 900_000,
-      sessionPath: "/pi-agent/sessions/--tmp--/2026-04-27T17-00-00-000Z_review-session-id.jsonl",
+      warning: "Review timed out. Attach with `tmux attach -t supi-review-abc123` to inspect.",
       stderr: "still running",
     });
 
     expect(output).toContain("[warning]◆ Review Timed Out[/warning]");
-    expect(output).toContain(
-      "session: /pi-agent/sessions/--tmp--/2026-04-27T17-00-00-000Z_review-session-id.jsonl",
-    );
+    expect(output).toContain("tmux attach -t supi-review-abc123");
     expect(output).toContain("stderr excerpt:");
   });
 });

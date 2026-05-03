@@ -36,7 +36,9 @@ export function buildReviewPrompt(
   }
 
   parts.push("");
-  parts.push("Please review the changes above and respond with the required JSON format.");
+  parts.push(
+    "Please review the changes above and call the submit_review tool with the required structure.",
+  );
 
   return parts.join("\n");
 }

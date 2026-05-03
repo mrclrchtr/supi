@@ -138,19 +138,17 @@ function renderTimeout(
 
 function appendDiagnostics(
   container: Container,
-  result: Pick<ReviewResult, "sessionPath" | "sessionId"> & { stdout?: string; stderr?: string },
+  result: { warning?: string; stdout?: string; stderr?: string },
   theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
 ): void {
-  if (!result.sessionPath && !result.sessionId && !result.stdout && !result.stderr) {
+  if (!result.warning && !result.stdout && !result.stderr) {
     return;
   }
 
   container.addChild(new Spacer(1));
 
-  if (result.sessionPath) {
-    container.addChild(new Text(theme.fg("dim", `session: ${result.sessionPath}`), 1, 0));
-  } else if (result.sessionId) {
-    container.addChild(new Text(theme.fg("dim", `session id: ${result.sessionId}`), 1, 0));
+  if (result.warning) {
+    container.addChild(new Text(theme.fg("dim", result.warning), 1, 0));
   }
 
   if (result.stdout) {

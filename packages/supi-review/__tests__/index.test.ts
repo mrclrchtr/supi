@@ -5,7 +5,6 @@ const mockFns = vi.hoisted(() => ({
     reviewFastModel: "",
     reviewDeepModel: "",
     maxDiffBytes: 100_000,
-    reviewTimeoutMinutes: 15,
     autoFix: false,
   })),
   registerReviewSettings: vi.fn(),
@@ -166,13 +165,12 @@ describe("/supi-review command", () => {
       reviewFastModel: "",
       reviewDeepModel: "",
       maxDiffBytes: 100_000,
-      reviewTimeoutMinutes: 15,
       autoFix: false,
     });
     mockFns.selectAutoFix.mockResolvedValue(false);
   });
 
-  it("passes the configured timeout to the reviewer", async () => {
+  it("starts the reviewer with the resolved session model", async () => {
     let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
 
     const pi = {
@@ -185,13 +183,6 @@ describe("/supi-review command", () => {
       sendUserMessage: vi.fn(),
     } as unknown as ExtensionAPI;
 
-    mockFns.loadReviewSettings.mockReturnValue({
-      reviewFastModel: "",
-      reviewDeepModel: "",
-      maxDiffBytes: 100_000,
-      reviewTimeoutMinutes: 20,
-      autoFix: false,
-    });
     mockFns.runReviewer.mockResolvedValue({
       kind: "success",
       target: { type: "custom", instructions: "Focus on correctness" },
@@ -227,7 +218,11 @@ describe("/supi-review command", () => {
     expect(mockFns.runReviewer).toHaveBeenCalledWith(
       expect.objectContaining({
         model: "github-copilot/session-model",
-        options: { timeout: 20 * 60_000 },
+      }),
+    );
+    expect(mockFns.runReviewer).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.anything(),
       }),
     );
   });
@@ -409,6 +404,68 @@ describe("/supi-review command", () => {
     expect(
       (pi as unknown as { sendUserMessage: ReturnType<typeof vi.fn> }).sendUserMessage,
     ).not.toHaveBeenCalled();
+  });
+
+  it("prints the tmux session announcement immediately in non-interactive mode", async () => {
+    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
+
+    const pi = {
+      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
+        expect(name).toBe("supi-review");
+        commandHandler = spec.handler;
+      }),
+      on: vi.fn(),
+      sendMessage: vi.fn(),
+      sendUserMessage: vi.fn(),
+    } as unknown as ExtensionAPI;
+
+    let startSession: ((sessionName: string) => void) | undefined;
+    let resolveReview:
+      | ((value: { kind: "canceled"; target: { type: "custom"; instructions: string } }) => void)
+      | undefined;
+    mockFns.runReviewer.mockImplementation(
+      async (invocation: {
+        onSessionStart?: (sessionName: string) => void;
+        target: { type: "custom"; instructions: string };
+      }) => {
+        startSession = invocation.onSessionStart;
+        return new Promise((resolve) => {
+          resolveReview = resolve;
+        });
+      },
+    );
+
+    reviewExtension(pi);
+    if (!commandHandler) throw new Error("/supi-review handler was not registered");
+
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+    const ctx = {
+      cwd: "/project",
+      hasUI: false,
+      model: { provider: "github-copilot", id: "session-model" },
+      ui: undefined,
+    };
+
+    const pending = commandHandler("custom -- Focus on correctness", ctx);
+    await Promise.resolve();
+    startSession?.("supi-review-deadbeef");
+
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Review running in tmux session supi-review-deadbeef"),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Attach: tmux attach -t supi-review-deadbeef"),
+    );
+    expect(stderrSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Kill:   tmux kill-session -t supi-review-deadbeef"),
+    );
+
+    resolveReview?.({
+      kind: "canceled",
+      target: { type: "custom", instructions: "Focus on correctness" },
+    });
+    await pending;
+    stderrSpy.mockRestore();
   });
 
   it("does not send follow-up when there are no findings", async () => {

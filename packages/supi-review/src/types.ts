@@ -37,7 +37,6 @@ export interface ReviewSettings {
   reviewFastModel: string;
   reviewDeepModel: string;
   maxDiffBytes: number;
-  reviewTimeoutMinutes: number;
   autoFix: boolean;
 }
 
@@ -54,8 +53,7 @@ export type ReviewResult =
       kind: "success";
       output: ReviewOutputEvent;
       target: ReviewTarget;
-      sessionId?: string;
-      sessionPath?: string;
+      warning?: string;
     }
   | {
       kind: "failed";
@@ -63,16 +61,14 @@ export type ReviewResult =
       stdout?: string;
       stderr?: string;
       target: ReviewTarget;
-      sessionId?: string;
-      sessionPath?: string;
+      warning?: string;
     }
-  | { kind: "canceled"; target: ReviewTarget; sessionId?: string; sessionPath?: string }
+  | { kind: "canceled"; target: ReviewTarget; warning?: string }
   | {
       kind: "timeout";
       target: ReviewTarget;
       timeoutMs: number;
       stdout?: string;
       stderr?: string;
-      sessionId?: string;
-      sessionPath?: string;
+      warning?: string;
     };

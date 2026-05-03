@@ -1,7 +1,7 @@
 # Capability: supi-review
 
 ## Purpose
-Structured code review via the `/supi-review` command. Provides interactive preset selection (base branch, uncommitted changes, specific commit, custom instructions), runs a dedicated read-only subprocess reviewer, parses structured findings, and renders them as a custom transcript message.
+Structured code review via the `/supi-review` command. Provides interactive preset selection (base branch, uncommitted changes, specific commit, custom instructions), runs a dedicated read-only reviewer inside a tmux session, parses structured findings, and renders them as a custom transcript message.
 
 ## Requirements
 
@@ -61,34 +61,45 @@ After selecting a review target, the extension SHALL present a depth selector wi
 
 #### Scenario: User selects Fast depth
 - **WHEN** the user selects "Fast" in the depth selector
-- **THEN** the reviewer subprocess uses the model configured as `reviewFastModel` (or the session model if unset)
+- **THEN** the reviewer uses the model configured as `reviewFastModel` (or the session model if unset)
 
 #### Scenario: User selects Deep depth
 - **WHEN** the user selects "Deep" in the depth selector
-- **THEN** the reviewer subprocess uses the model configured as `reviewDeepModel` (or the session model if unset)
+- **THEN** the reviewer uses the model configured as `reviewDeepModel` (or the session model if unset)
 
 #### Scenario: User selects Inherit depth
 - **WHEN** the user selects "Inherit" in the depth selector
-- **THEN** the reviewer subprocess uses the current session model
+- **THEN** the reviewer uses the current session model
 
-### Requirement: Reviewer runs in isolated subprocess
-The reviewer SHALL run in a dedicated `pi --mode json` subprocess with an isolated context window, restricted to `read`, `grep`, `find`, and `ls` tools, while preserving the child session for debugging. The default reviewer timeout SHALL be 900000ms (15 minutes).
+### Requirement: Reviewer runs in isolated tmux session with a submit_review tool
+The reviewer SHALL run inside a named tmux session (`supi-review-<id>`). The extension SHALL:
 
-#### Scenario: Subprocess starts with correct arguments
+1. Generate a unique review ID and temp file paths for the structured result (`/tmp/supi-review-<id>.json`), reviewer output log (`/tmp/supi-review-<id>-pane.log`), and exit status (`/tmp/supi-review-<id>-exit.json`).
+2. Write a temporary extension file (`/tmp/supi-review-<id>-tool.ts`) that registers a `submit_review` tool with a TypeBox schema matching `ReviewOutputEvent`. The tool's `execute` handler SHALL write the validated arguments as JSON to the temp file path and return a confirmation message.
+3. Write a temporary runner script (`/tmp/supi-review-<id>-runner.mjs`) that spawns the resolved pi invocation with `--mode json -e /tmp/supi-review-<id>-tool.ts --tools read,grep,find,ls,submit_review --model <model> "<review prompt>"`, tees stdout/stderr to both the tmux pane and the reviewer output log from process start, and writes the reviewer exit status to the exit status file.
+4. Spawn tmux: `tmux new-session -d -s supi-review-<id> -- node /tmp/supi-review-<id>-runner.mjs`.
+5. Notify the user of the tmux session name so they can attach to observe progress (`tmux attach -t supi-review-<id>`).
+
+#### Scenario: Tmux session starts with correct arguments
 - **WHEN** the extension launches the reviewer with a resolved model
-- **THEN** the subprocess is invoked with `--mode json`, `--tools read,grep,find,ls`, `--model <model>`, and the resolved review prompt
-- **AND** the child session is saved so users can inspect the subprocess transcript after timeouts or failures
+- **THEN** tmux is invoked with the full pi command including `-e`, `--tools`, `--model`, and the review prompt
 
-#### Scenario: Subprocess starts without resolved model
+#### Scenario: Tmux session starts without resolved model
 - **WHEN** the extension launches the reviewer and no model can be resolved
-- **THEN** the subprocess omits `--model` and allows pi to use its configured default model
+- **THEN** the pi command omits `--model` and allows pi to use its configured default model
 
-#### Scenario: Subprocess completes and returns output
-- **WHEN** the reviewer subprocess finishes successfully
-- **THEN** the extension captures stdout, parses it as JSONL events, and extracts the final assistant message from the last assistant `message_end` event
+#### Scenario: Observability via tmux
+- **WHEN** the reviewer is running in a tmux session
+- **THEN** the user can run `tmux attach -t supi-review-<id>` at any time to see the reviewer's live output
+- **AND** `tmux ls` lists the active review session
+
+#### Scenario: Persistence across disconnect
+- **WHEN** the user's terminal disconnects while a review is running
+- **THEN** the tmux session continues running the reviewer
+- **AND** the user can re-attach later to see the result or check progress
 
 ### Requirement: Structured review output is parsed
-The extension SHALL parse the reviewer's final assistant message as JSON matching the `ReviewOutputEvent` schema. If JSON parsing fails, it SHALL fall back to treating the entire output as `overall_explanation`.
+The extension SHALL read the review result from `/tmp/supi-review-<id>.json` after the tmux session exits. Because the `submit_review` tool uses a TypeBox schema, pi's AJV validation guarantees the JSON is structurally valid before it is written.
 
 The `ReviewOutputEvent` schema SHALL be:
 ```json
@@ -111,17 +122,32 @@ The `ReviewOutputEvent` schema SHALL be:
 }
 ```
 
-#### Scenario: Valid JSON output
-- **WHEN** the reviewer returns valid `ReviewOutputEvent` JSON
-- **THEN** the extension populates `findings`, `overall_correctness`, `overall_explanation`, and `overall_confidence_score`
+#### Scenario: Tool submission succeeds
+- **WHEN** the reviewer calls `submit_review` with valid arguments
+- **THEN** pi validates the JSON against the TypeBox schema
+- **AND** the tool writes the JSON to `/tmp/supi-review-<id>.json`
+- **AND** the extension reads and uses it without additional parsing
 
-#### Scenario: Invalid JSON output
-- **WHEN** the reviewer returns plain text instead of JSON
-- **THEN** the extension creates a `ReviewOutputEvent` with `overall_explanation` set to the plain text and empty `findings`
+#### Scenario: Tool submission with invalid arguments
+- **WHEN** the reviewer calls `submit_review` with malformed arguments
+- **THEN** pi returns a validation error to the model (e.g., `"findings[0].priority must be integer"`)
+- **AND** the model can retry with corrected arguments
 
-#### Scenario: JSON wrapped in surrounding text
-- **WHEN** the reviewer returns text containing a valid JSON object substring
-- **THEN** the extension extracts and parses the first valid object before falling back to plain text
+#### Scenario: Model never calls submit_review
+- **WHEN** the reviewer finishes without calling `submit_review`
+- **THEN** no temp file is written
+- **AND** the extension warns the user that the reviewer did not submit a structured result
+- **AND** the extension falls back to the reviewer output log written by the tmux runner, extracts final assistant text from JSONL when present, and applies review JSON extraction heuristics
+
+#### Scenario: Fallback extraction finds valid JSON substring
+- **WHEN** the fallback extraction finds text containing a valid JSON object substring
+- **THEN** the extension extracts and parses the first valid object
+- **AND** the user is warned that the result was recovered from unstructured output
+
+#### Scenario: Fallback extraction finds no valid JSON
+- **WHEN** the fallback extraction finds no valid JSON
+- **THEN** the extension creates a `ReviewOutputEvent` with `overall_explanation` set to the captured pane text and empty `findings`
+- **AND** the user is warned that the review result could not be parsed and is shown as plain text
 
 #### Scenario: Finding priority is out of range
 - **WHEN** the reviewer returns a finding priority outside `0` through `3`
@@ -173,7 +199,7 @@ After the depth selector, the interactive flow SHALL present an auto-fix selecto
 - **THEN** the extension SHALL NOT send a follow-up user message
 
 #### Scenario: Auto-fix with non-success result
-- **WHEN** auto-fix is enabled but the review result is failed, canceled, or timed out
+- **WHEN** auto-fix is enabled but the review result is failed or canceled
 - **THEN** the extension SHALL NOT send a follow-up user message
 
 ### Requirement: Auto-fix flag in non-interactive arguments
@@ -206,8 +232,8 @@ The review settings section SHALL include an `autoFix` boolean setting with a de
 - **WHEN** the user sets `autoFix` to `off` in `/supi-settings`
 - **THEN** the persisted config stores `autoFix: false` (or removes the key) and the interactive auto-fix selector pre-selects "No"
 
-### Requirement: Settings support review model and timeout configuration
-The extension SHALL register `reviewFastModel`, `reviewDeepModel`, `maxDiffBytes`, `reviewTimeoutMinutes`, and `autoFix` settings with the SuPi settings registry.
+### Requirement: Settings support review model configuration
+The extension SHALL register `reviewFastModel`, `reviewDeepModel`, `maxDiffBytes`, and `autoFix` settings with the SuPi settings registry.
 
 #### Scenario: User configures fast model
 - **WHEN** the user sets `reviewFastModel` to `openai/gpt-4o-mini` in settings
@@ -221,13 +247,6 @@ The extension SHALL register `reviewFastModel`, `reviewDeepModel`, `maxDiffBytes
 - **WHEN** no review model settings are configured
 - **THEN** all depths default to the current session model
 
-#### Scenario: User configures review timeout
-- **WHEN** the user sets `reviewTimeoutMinutes` to `25` in settings
-- **THEN** subsequent reviews use a subprocess timeout of `1500000ms`
-
-#### Scenario: No timeout configured
-- **WHEN** no review timeout setting is configured
-- **THEN** reviews default to a subprocess timeout of `900000ms` (15 minutes)
 
 #### Scenario: User configures autoFix
 - **WHEN** the user sets `autoFix` to `on` in settings
@@ -280,25 +299,30 @@ The extension SHALL truncate diffs that exceed a configurable maximum size befor
 - **THEN** the extension keeps the beginning and end of the diff, replaces the omitted middle with a `[... truncated N bytes ...]` marker, and appends a note to the reviewer prompt indicating truncation
 
 ### Requirement: Subprocess errors are handled gracefully
-The extension SHALL surface subprocess failures as user-facing review errors without crashing the main pi session.
+The extension SHALL surface reviewer failures as user-facing review errors without crashing the main pi session.
 
 #### Scenario: pi executable cannot be found
-- **WHEN** the extension cannot spawn the `pi` subprocess
+- **WHEN** the extension cannot spawn `pi` inside tmux
 - **THEN** the extension notifies the user and injects a failed `supi-review` message containing the spawn error summary
 
 #### Scenario: Reviewer exits non-zero
-- **WHEN** the reviewer subprocess exits with a non-zero status
-- **THEN** the extension captures stderr/stdout, notifies the user, and injects a failed `supi-review` message containing the exit status and error summary
+- **WHEN** the reviewer inside tmux exits with a non-zero status
+- **THEN** the extension reads the captured reviewer output log, notifies the user, and injects a failed `supi-review` message containing the exit status and error summary
 
 #### Scenario: Reviewer is aborted
 - **WHEN** the user cancels the review or the command receives an abort signal
-- **THEN** the extension terminates the subprocess and records the review as canceled rather than failed
+- **THEN** the extension sends `tmux send-keys -t supi-review-<id> C-c` to interrupt the reviewer
+- **AND** records the review as canceled rather than failed
 
-#### Scenario: Reviewer times out
-- **WHEN** the reviewer subprocess exceeds the configured timeout (900000ms by default)
-- **THEN** the extension terminates the subprocess, notifies the user, and records the review as timed out
-- **AND** the timeout result includes the saved child session details so the subprocess transcript can be inspected afterward
+
+#### Scenario: Tmux not installed
+- **WHEN** `tmux` is not available in `$PATH`
+- **THEN** the extension aborts with a clear failed review result explaining that tmux is required
+
+#### Scenario: Tmux session already exists
+- **WHEN** a session name collision occurs
+- **THEN** the extension retries with an incremented suffix (`supi-review-<id>-1`)
 
 #### Scenario: Reviewer produces no assistant output
-- **WHEN** the reviewer subprocess exits successfully but no assistant `message_end` output is found
+- **WHEN** the reviewer exits successfully but no temp file exists and no assistant output is found in the captured pane
 - **THEN** the extension returns a failed review result explaining that no reviewer output was produced

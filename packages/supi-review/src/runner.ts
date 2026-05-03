@@ -1,302 +1,305 @@
-import { spawn } from "node:child_process";
-import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { parseReviewOutput } from "./parser.ts";
-import type { ReviewResult, ReviewRunDiagnostics, ReviewTarget } from "./types.ts";
+import {
+  buildPiArgs,
+  generateReviewId,
+  getPiInvocation,
+  getTempPaths,
+  makeFailedResult,
+  readRunnerExitStatus,
+  readStructuredOutput,
+  writeSubmitReviewTool,
+  writeTmuxRunnerScript,
+} from "./runner-shared.ts";
+import type { ReviewerInvocation } from "./runner-types.ts";
+import type { ReviewResult, ReviewTarget } from "./types.ts";
 
-const __dirname = dirname(dirname(fileURLToPath(import.meta.url)));
+export type { ReviewerInvocation } from "./runner-types.ts";
 
-export interface RunnerOptions {
-  timeout?: number;
-}
-
-const DEFAULT_TIMEOUT = 900_000;
+const POLL_INTERVAL_MS = 1_000;
 const MAX_EXCERPT_LENGTH = 2000;
 
-function makeFailedResult(
-  reason: string,
-  target: ReviewTarget,
-  diagnostics: ReviewRunDiagnostics,
-): ReviewResult {
-  return {
-    kind: "failed",
-    reason,
-    target,
-    ...diagnostics,
-  };
+function isTmuxAvailable(): boolean {
+  const result = spawnSync("tmux", ["-V"], { encoding: "utf-8" });
+  return result.error === undefined && result.status === 0;
 }
 
-function buildExitResult(options: {
-  code: number | null;
-  stdout: string;
-  stderr: string;
-  target: ReviewTarget;
-  cwd: string;
-}): ReviewResult {
-  const { code, stdout, stderr, target, cwd } = options;
-  const diagnostics = collectRunDiagnostics(stdout, stderr, cwd);
-
-  if (code !== 0) {
-    return makeFailedResult(`Reviewer exited with code ${code ?? "unknown"}`, target, diagnostics);
-  }
-
-  const content = extractFinalAssistantContent(stdout);
-  if (content === undefined) {
-    return makeFailedResult("Reviewer produced no assistant output", target, diagnostics);
-  }
-
-  return {
-    kind: "success",
-    output: parseReviewOutput(content),
-    target,
-    sessionId: diagnostics.sessionId,
-    sessionPath: diagnostics.sessionPath,
-  };
+function tmuxHasSession(name: string): boolean {
+  const result = spawnSync("tmux", ["has-session", "-t", name], { encoding: "utf-8" });
+  return result.status === 0;
 }
 
-function getPiInvocation(): { command: string; args: string[] } {
-  const argv1 = process.argv[1];
-  if (argv1 && (argv1.endsWith(".ts") || argv1.endsWith(".js") || argv1.endsWith(".mjs"))) {
-    // Running from a script entrypoint — use the same interpreter.
-    return { command: process.execPath, args: [argv1] };
-  }
-  // Generic runtime fallback.
-  return { command: "pi", args: [] };
+function tmuxSendInterrupt(name: string): void {
+  spawnSync("tmux", ["send-keys", "-t", name, "C-c"], { encoding: "utf-8" });
 }
 
-export interface ReviewerInvocation {
-  prompt: string;
-  model: string | undefined;
-  cwd: string;
-  signal?: AbortSignal;
-  target: ReviewTarget;
-  options?: RunnerOptions;
+function tmuxKillSession(name: string): void {
+  spawnSync("tmux", ["kill-session", "-t", name], { encoding: "utf-8" });
+}
+
+function getTmuxSessionName(id: string, attempt = 0): string {
+  return attempt === 0 ? `supi-review-${id}` : `supi-review-${id}-${attempt}`;
 }
 
 export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult> {
-  const { prompt, model, cwd, signal, target, options = {} } = inv;
+  const { prompt, model, cwd, signal, target, onSessionStart } = inv;
+
   if (signal?.aborted) {
     return { kind: "canceled", target };
   }
 
-  const { command, args: baseArgs } = getPiInvocation();
-
-  const args = [
-    ...baseArgs,
-    "--mode",
-    "json",
-    "-p",
-    // Keep session persistence enabled so timeouts/failures can be inspected later.
-    "--no-extensions",
-    "--no-themes",
-    "--no-skills",
-    "--no-prompt-templates",
-    "--no-context-files",
-    "--tools",
-    "read,grep,find,ls",
-    "--append-system-prompt",
-    join(__dirname, "review-prompt.md"),
-  ];
-
-  if (model) {
-    args.push("--model", model);
+  if (!isTmuxAvailable()) {
+    return makeFailedResult("tmux is required for supi-review. Install tmux and retry.", target);
   }
 
-  args.push(prompt);
+  const id = generateReviewId();
+  const paths = getTempPaths(id);
+  const sessionName = resolveSessionName(id);
+  writeSubmitReviewTool(paths.toolPath, paths.outputPath);
+
+  const { command, args: baseArgs } = getPiInvocation();
+  const piArgs = [...baseArgs, ...buildPiArgs({ model, toolPath: paths.toolPath, prompt })];
+  writeTmuxRunnerScript({
+    runnerPath: paths.runnerPath,
+    command,
+    args: piArgs,
+    paneLogPath: paths.paneLogPath,
+    exitPath: paths.exitPath,
+  });
+
+  const proc = spawn(
+    "tmux",
+    ["new-session", "-d", "-s", sessionName, "--", process.execPath, paths.runnerPath],
+    {
+      cwd,
+      stdio: "ignore",
+    },
+  );
 
   return new Promise<ReviewResult>((resolve) => {
-    const timeoutMs = options.timeout ?? DEFAULT_TIMEOUT;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let killed = false;
-    let stdout = "";
-    let stderr = "";
-
-    const proc = spawn(command, args, {
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    proc.stdout?.setEncoding("utf-8");
-    proc.stderr?.setEncoding("utf-8");
-    proc.stdout?.on("data", (chunk: string) => {
-      stdout += chunk;
-    });
-    proc.stderr?.on("data", (chunk: string) => {
-      stderr += chunk;
-    });
-
-    let killReason: "abort" | "timeout" | null = null;
+    let pollId: ReturnType<typeof setInterval> | undefined;
+    let settled = false;
+    let sessionAnnounced = false;
 
     const cleanup = (result: ReviewResult) => {
-      if (timeoutId) clearTimeout(timeoutId);
+      if (settled) return;
+      settled = true;
+      if (pollId) clearInterval(pollId);
       signal?.removeEventListener("abort", onAbort);
+      if (result.kind === "success") {
+        cleanupTempFiles([
+          paths.toolPath,
+          paths.outputPath,
+          paths.paneLogPath,
+          paths.runnerPath,
+          paths.exitPath,
+        ]);
+      }
       resolve(result);
     };
 
     const onAbort = () => {
-      if (killed) return;
-      killed = true;
-      killReason = "abort";
-      proc.kill("SIGTERM");
-      const killTimeout = setTimeout(() => {
-        if (!proc.killed) {
-          proc.kill("SIGKILL");
-        }
-      }, 5000);
-      proc.on("exit", () => clearTimeout(killTimeout));
+      tmuxSendInterrupt(sessionName);
+      const killTimer = setTimeout(() => killSessionIfPresent(sessionName), 5000);
+      killTimer.unref?.();
+      cleanup({
+        kind: "canceled",
+        target,
+        warning: `Review canceled. Sent interrupt to tmux session \`${sessionName}\`; if it remains active, kill it with \`tmux kill-session -t ${sessionName}\`.`,
+      });
     };
 
-    signal?.addEventListener("abort", onAbort);
-
-    timeoutId = setTimeout(() => {
-      if (killed) return;
-      killed = true;
-      killReason = "timeout";
-      proc.kill("SIGTERM");
-      const killTimeout = setTimeout(() => {
-        if (!proc.killed) {
-          proc.kill("SIGKILL");
-        }
-      }, 5000);
-      proc.on("exit", () => clearTimeout(killTimeout));
-      cleanup({
-        kind: "timeout",
-        target,
-        timeoutMs,
-        ...collectRunDiagnostics(stdout, stderr, cwd),
-      });
-    }, timeoutMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
 
     proc.on("error", (err) => {
-      if (killed) return;
-      killed = true;
-      cleanup(
-        makeFailedResult(
-          `Failed to spawn reviewer: ${err.message}`,
-          target,
-          collectRunDiagnostics(stdout, stderr, cwd),
-        ),
-      );
+      cleanup(makeFailedResult(`Failed to spawn tmux reviewer: ${err.message}`, target));
     });
 
     proc.on("exit", (code) => {
-      if (killed) {
-        if (killReason === "abort") {
-          cleanup({
-            kind: "canceled",
-            target,
-            ...collectRunDiagnostics(stdout, stderr, cwd),
-          });
+      if (settled) return;
+      if (code === 0 || code === null) {
+        if (!sessionAnnounced && tmuxHasSession(sessionName)) {
+          sessionAnnounced = true;
+          onSessionStart?.(sessionName);
         }
         return;
       }
-      killed = true;
-      if (timeoutId) clearTimeout(timeoutId);
-      cleanup(buildExitResult({ code, stdout, stderr, target, cwd }));
+      cleanup(
+        makeFailedResult(`Failed to start tmux reviewer: tmux exited with code ${code}`, target),
+      );
     });
+
+    pollId = setInterval(() => {
+      if (!tmuxHasSession(sessionName)) {
+        cleanup(buildTmuxResult({ ...paths, target }));
+      }
+    }, POLL_INTERVAL_MS);
   });
 }
 
-interface JsonlMessage {
-  role?: string;
-  content?: string | Array<{ type?: string; text?: string }>;
+interface TmuxResultOptions {
+  outputPath: string;
+  paneLogPath: string;
+  exitPath: string;
+  target: ReviewTarget;
+}
+
+function buildTmuxResult(options: TmuxResultOptions): ReviewResult {
+  const { outputPath, paneLogPath, exitPath, target } = options;
+  const paneOutput = readPaneLog(paneLogPath);
+  const exitStatus = readRunnerExitStatus(exitPath);
+  const failedResult = getFailedExitResult(exitStatus, target, paneOutput);
+  if (failedResult) return failedResult;
+
+  const output = readStructuredOutput(outputPath);
+  if (output) {
+    return { kind: "success", output, target };
+  }
+
+  const warning = getStructuredFallbackWarning(outputPath);
+  const reviewText = extractFinalAssistantContent(paneOutput) ?? paneOutput;
+  const extracted = parseReviewOutput(reviewText);
+  if (extracted.findings.length > 0 || extracted.overall_correctness !== "review incomplete") {
+    return {
+      kind: "success",
+      output: extracted,
+      target,
+      warning: `${warning} Recovered a valid JSON object from the session output.`,
+    };
+  }
+
+  const explanation = reviewText.trim();
+  if (!explanation) {
+    return makeFailedResult("Reviewer produced no output", target, warning);
+  }
+
+  return {
+    kind: "success",
+    output: {
+      findings: [],
+      overall_correctness: "review incomplete",
+      overall_explanation: explanation,
+      overall_confidence_score: 0,
+    },
+    target,
+    warning: `${warning} The output is shown as plain text.`,
+  };
+}
+
+function getFailedExitResult(
+  exitStatus: ReturnType<typeof readRunnerExitStatus>,
+  target: ReviewTarget,
+  paneOutput: string,
+): ReviewResult | undefined {
+  if (!exitStatus) return undefined;
+  const stderr = sliceExcerpt(paneOutput);
+  if (exitStatus.error) {
+    return {
+      kind: "failed",
+      reason: `Failed to spawn reviewer: ${exitStatus.error}`,
+      target,
+      stderr,
+    };
+  }
+  if (typeof exitStatus.code === "number" && exitStatus.code !== 0) {
+    return {
+      kind: "failed",
+      reason: `Reviewer exited with code ${exitStatus.code}`,
+      target,
+      stderr,
+    };
+  }
+  if (exitStatus.signal) {
+    return {
+      kind: "failed",
+      reason: `Reviewer exited from signal ${exitStatus.signal}`,
+      target,
+      stderr,
+    };
+  }
+  return undefined;
+}
+
+function getStructuredFallbackWarning(outputPath: string): string {
+  return existsSync(outputPath)
+    ? "The reviewer submitted malformed JSON."
+    : "The reviewer did not submit a structured result via the submit_review tool.";
+}
+
+function readPaneLog(path: string): string {
+  try {
+    return readFileSync(path, "utf-8");
+  } catch {
+    return "";
+  }
+}
+
+function extractFinalAssistantContent(output: string): string | undefined {
+  let lastContent: string | undefined;
+  for (const line of output.split("\n")) {
+    const event = parseJsonlEvent(line);
+    if (event?.type !== "message_end") continue;
+    const message = event.message ?? { role: event.role, content: event.content };
+    if (message.role === "assistant") lastContent = flattenMessageContent(message.content);
+  }
+  return lastContent;
+}
+
+function parseJsonlEvent(line: string): JsonlEvent | undefined {
+  const trimmed = line.trim();
+  if (!trimmed) return undefined;
+  try {
+    return JSON.parse(trimmed) as JsonlEvent;
+  } catch {
+    return undefined;
+  }
 }
 
 interface JsonlEvent {
   type?: string;
   message?: JsonlMessage;
-  // Backward-compatible fallback for tests or alternate emitters.
   role?: string;
   content?: JsonlMessage["content"];
 }
 
-interface SessionHeader {
-  type?: string;
-  id?: string;
-  timestamp?: string;
-  cwd?: string;
-}
-
-function collectRunDiagnostics(stdout: string, stderr: string, cwd: string): ReviewRunDiagnostics {
-  const sessionHeader = extractSessionHeader(stdout);
-  return {
-    sessionId: typeof sessionHeader?.id === "string" ? sessionHeader.id : undefined,
-    sessionPath: getSessionPath(sessionHeader, cwd),
-    stdout: sliceExcerpt(stdout),
-    stderr: sliceExcerpt(stderr),
-  };
-}
-
-function extractFinalAssistantContent(stdout: string): string | undefined {
-  const lines = stdout.split("\n");
-  let lastContent: string | undefined;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const event = JSON.parse(trimmed) as JsonlEvent;
-      const message =
-        event.message && typeof event.message === "object"
-          ? event.message
-          : { role: event.role, content: event.content };
-
-      if (event.type === "message_end" && message.role === "assistant") {
-        lastContent = flattenMessageContent(message.content);
-      }
-    } catch {
-      // Ignore invalid JSONL lines.
-    }
-  }
-
-  return lastContent;
-}
-
-function extractSessionHeader(stdout: string): SessionHeader | undefined {
-  for (const line of stdout.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    try {
-      const event = JSON.parse(trimmed) as SessionHeader;
-      if (event.type === "session") return event;
-    } catch {
-      // Ignore invalid JSONL lines.
-    }
-  }
-  return undefined;
-}
-
-function getSessionPath(
-  header: SessionHeader | undefined,
-  fallbackCwd: string,
-): string | undefined {
-  const sessionId = typeof header?.id === "string" ? header.id : undefined;
-  const timestamp = typeof header?.timestamp === "string" ? header.timestamp : undefined;
-  if (!sessionId || !timestamp) return undefined;
-
-  const sessionCwd =
-    typeof header?.cwd === "string" && header.cwd.length > 0 ? header.cwd : fallbackCwd;
-  const sessionDir = `--${sessionCwd.replace(/^[\\/]+/, "").replace(/[\\/]/g, "-")}--`;
-  const fileName = `${timestamp.replaceAll(":", "-").replaceAll(".", "-")}_${sessionId}.jsonl`;
-  return join(getPiAgentDir(), "sessions", sessionDir, fileName);
-}
-
-function getPiAgentDir(): string {
-  const envDir = process.env.PI_CODING_AGENT_DIR?.trim();
-  if (envDir) return resolve(envDir);
-  return join(homedir(), ".pi", "agent");
-}
-
-function sliceExcerpt(text: string): string | undefined {
-  if (!text) return undefined;
-  return text.slice(0, MAX_EXCERPT_LENGTH);
+interface JsonlMessage {
+  role?: string;
+  content?: string | Array<{ text?: string }>;
 }
 
 function flattenMessageContent(content: JsonlMessage["content"]): string | undefined {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return undefined;
-  return content
-    .map((part) => (typeof part === "object" && part !== null ? (part.text ?? "") : ""))
-    .join("");
+  return content.map((part) => part.text ?? "").join("");
+}
+
+function resolveSessionName(id: string): string {
+  let sessionName = getTmuxSessionName(id);
+  let sessionAttempt = 0;
+  while (tmuxHasSession(sessionName)) {
+    sessionAttempt++;
+    sessionName = getTmuxSessionName(id, sessionAttempt);
+  }
+  return sessionName;
+}
+
+function killSessionIfPresent(sessionName: string): void {
+  if (tmuxHasSession(sessionName)) {
+    tmuxKillSession(sessionName);
+  }
+}
+
+function cleanupTempFiles(paths: string[]): void {
+  for (const path of paths) {
+    try {
+      unlinkSync(path);
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function sliceExcerpt(text: string): string | undefined {
+  return text ? text.slice(0, MAX_EXCERPT_LENGTH) : undefined;
 }

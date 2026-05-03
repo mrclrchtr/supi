@@ -16,7 +16,7 @@ Your job is to:
 
 ## Output Format
 
-Respond with a single JSON object matching this exact schema:
+When you have completed your review, call the `submit_review` tool with your findings structured as a JSON object matching this exact schema:
 
 ```json
 {
@@ -50,4 +50,4 @@ Respond with a single JSON object matching this exact schema:
 - `overall_explanation`: high-level summary of the review.
 - `overall_confidence_score`: 0.0 to 1.0 for the entire review.
 
-Output ONLY the JSON object. Do not wrap it in markdown code fences.
+**Do NOT output JSON directly in your response text.** Use the `submit_review` tool to submit the result. The tool validates the schema automatically.
