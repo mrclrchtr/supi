@@ -28,6 +28,10 @@ export function formatReviewContent(result: ReviewResult): string {
   }
 }
 
+function withWarning(text: string, warning: string | undefined): string {
+  return warning ? `${text}\n\n⚠️ ${warning}` : text;
+}
+
 function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>): string {
   const output = result.output;
   const confidencePercent = Math.round(output.overall_confidence_score * 100);
@@ -42,7 +46,6 @@ function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>
   }
 
   lines.push("", `Overall: ${output.overall_explanation}`);
-  if (result.warning) lines.push("", `⚠️ ${result.warning}`);
   return lines.join("\n");
 }
 
@@ -61,8 +64,4 @@ function formatFindings(
       `   ${finding.body}`,
     ];
   });
-}
-
-function withWarning(text: string, warning: string | undefined): string {
-  return warning ? `${text}\n\n⚠️ ${warning}` : text;
 }

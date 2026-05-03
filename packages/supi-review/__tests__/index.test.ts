@@ -140,12 +140,33 @@ describe("formatReviewContent", () => {
     expect(formatReviewContent(result)).toBe("Review failed: Reviewer subprocess crashed");
   });
 
+  it("formats failed result with warning", () => {
+    const result = {
+      kind: "failed" as const,
+      reason: "Reviewer subprocess crashed",
+      target: { type: "custom" as const, instructions: "test" },
+      warning: "Check tmux session",
+    };
+    expect(formatReviewContent(result)).toContain("Review failed: Reviewer subprocess crashed");
+    expect(formatReviewContent(result)).toContain("⚠️ Check tmux session");
+  });
+
   it("formats canceled result", () => {
     const result = {
       kind: "canceled" as const,
       target: { type: "custom" as const, instructions: "test" },
     };
     expect(formatReviewContent(result)).toBe("Review canceled");
+  });
+
+  it("formats canceled result with warning", () => {
+    const result = {
+      kind: "canceled" as const,
+      target: { type: "custom" as const, instructions: "test" },
+      warning: "Kill with tmux kill-session -t abc",
+    };
+    expect(formatReviewContent(result)).toContain("Review canceled");
+    expect(formatReviewContent(result)).toContain("⚠️ Kill with tmux kill-session -t abc");
   });
 
   it("formats timeout result", () => {
@@ -155,6 +176,17 @@ describe("formatReviewContent", () => {
       timeoutMs: 900000,
     };
     expect(formatReviewContent(result)).toBe("Review timed out");
+  });
+
+  it("formats timeout result with warning", () => {
+    const result = {
+      kind: "timeout" as const,
+      target: { type: "custom" as const, instructions: "test" },
+      timeoutMs: 900000,
+      warning: "Attach with tmux attach",
+    };
+    expect(formatReviewContent(result)).toContain("Review timed out");
+    expect(formatReviewContent(result)).toContain("⚠️ Attach with tmux attach");
   });
 });
 
@@ -406,68 +438,6 @@ describe("/supi-review command", () => {
     ).not.toHaveBeenCalled();
   });
 
-  it("prints the tmux session announcement immediately in non-interactive mode", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
-    const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
-      on: vi.fn(),
-      sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
-    } as unknown as ExtensionAPI;
-
-    let startSession: ((sessionName: string) => void) | undefined;
-    let resolveReview:
-      | ((value: { kind: "canceled"; target: { type: "custom"; instructions: string } }) => void)
-      | undefined;
-    mockFns.runReviewer.mockImplementation(
-      async (invocation: {
-        onSessionStart?: (sessionName: string) => void;
-        target: { type: "custom"; instructions: string };
-      }) => {
-        startSession = invocation.onSessionStart;
-        return new Promise((resolve) => {
-          resolveReview = resolve;
-        });
-      },
-    );
-
-    reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
-
-    const stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
-    const ctx = {
-      cwd: "/project",
-      hasUI: false,
-      model: { provider: "github-copilot", id: "session-model" },
-      ui: undefined,
-    };
-
-    const pending = commandHandler("custom -- Focus on correctness", ctx);
-    await Promise.resolve();
-    startSession?.("supi-review-deadbeef");
-
-    expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Review running in tmux session supi-review-deadbeef"),
-    );
-    expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Attach: tmux attach -t supi-review-deadbeef"),
-    );
-    expect(stderrSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Kill:   tmux kill-session -t supi-review-deadbeef"),
-    );
-
-    resolveReview?.({
-      kind: "canceled",
-      target: { type: "custom", instructions: "Focus on correctness" },
-    });
-    await pending;
-    stderrSpy.mockRestore();
-  });
-
   it("does not send follow-up when there are no findings", async () => {
     let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
 
@@ -563,56 +533,5 @@ describe("/supi-review command", () => {
     expect(
       (pi as unknown as { sendUserMessage: ReturnType<typeof vi.fn> }).sendUserMessage,
     ).not.toHaveBeenCalled();
-  });
-
-  it("sends follow-up in non-interactive mode when --auto-fix is set", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
-    const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
-      on: vi.fn(),
-      sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
-    } as unknown as ExtensionAPI;
-
-    mockFns.runReviewer.mockResolvedValue({
-      kind: "success",
-      target: { type: "custom", instructions: "test" },
-      output: {
-        findings: [
-          {
-            title: "Bug",
-            body: "Something is wrong",
-            confidence_score: 0.9,
-            priority: 2,
-            code_location: {
-              absolute_file_path: "/project/src/x.ts",
-              line_range: { start: 1, end: 1 },
-            },
-          },
-        ],
-        overall_correctness: "mostly correct",
-        overall_explanation: "One issue found",
-        overall_confidence_score: 0.8,
-      },
-    });
-
-    reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
-
-    const ctx = {
-      cwd: "/project",
-      hasUI: false,
-      model: { provider: "github-copilot", id: "session-model" },
-    };
-
-    await commandHandler("custom --auto-fix -- test", ctx);
-
-    expect(
-      (pi as unknown as { sendUserMessage: ReturnType<typeof vi.fn> }).sendUserMessage,
-    ).toHaveBeenCalledWith("Fix all findings from the review above.");
   });
 });

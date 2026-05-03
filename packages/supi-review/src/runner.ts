@@ -1,6 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
-import { parseReviewOutput } from "./parser.ts";
+import { unlinkSync } from "node:fs";
 import {
   buildPiArgs,
   generateReviewId,
@@ -18,7 +17,6 @@ import type { ReviewResult, ReviewTarget } from "./types.ts";
 export type { ReviewerInvocation } from "./runner-types.ts";
 
 const POLL_INTERVAL_MS = 1_000;
-const MAX_EXCERPT_LENGTH = 2000;
 
 function isTmuxAvailable(): boolean {
   const result = spawnSync("tmux", ["-V"], { encoding: "utf-8" });
@@ -140,16 +138,14 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
 
 interface TmuxResultOptions {
   outputPath: string;
-  paneLogPath: string;
   exitPath: string;
   target: ReviewTarget;
 }
 
 function buildTmuxResult(options: TmuxResultOptions): ReviewResult {
-  const { outputPath, paneLogPath, exitPath, target } = options;
-  const paneOutput = readPaneLog(paneLogPath);
+  const { outputPath, exitPath, target } = options;
   const exitStatus = readRunnerExitStatus(exitPath);
-  const failedResult = getFailedExitResult(exitStatus, target, paneOutput);
+  const failedResult = getFailedExitResult(exitStatus, target);
   if (failedResult) return failedResult;
 
   const output = readStructuredOutput(outputPath);
@@ -157,48 +153,19 @@ function buildTmuxResult(options: TmuxResultOptions): ReviewResult {
     return { kind: "success", output, target };
   }
 
-  const warning = getStructuredFallbackWarning(outputPath);
-  const extracted = parseReviewOutput(paneOutput);
-  if (extracted.findings.length > 0 || extracted.overall_correctness !== "review incomplete") {
-    return {
-      kind: "success",
-      output: extracted,
-      target,
-      warning: `${warning} Recovered a valid JSON object from the session output.`,
-    };
-  }
-
-  const explanation = paneOutput.trim();
-  if (!explanation) {
-    return makeFailedResult("Reviewer produced no output", target, warning);
-  }
-
-  return {
-    kind: "success",
-    output: {
-      findings: [],
-      overall_correctness: "review incomplete",
-      overall_explanation: explanation,
-      overall_confidence_score: 0,
-    },
-    target,
-    warning: `${warning} The output is shown as plain text.`,
-  };
+  return makeFailedResult("Reviewer did not submit a structured result via submit_review.", target);
 }
 
 function getFailedExitResult(
   exitStatus: ReturnType<typeof readRunnerExitStatus>,
   target: ReviewTarget,
-  paneOutput: string,
 ): ReviewResult | undefined {
   if (!exitStatus) return undefined;
-  const stderr = sliceExcerpt(paneOutput);
   if (exitStatus.error) {
     return {
       kind: "failed",
       reason: `Failed to spawn reviewer: ${exitStatus.error}`,
       target,
-      stderr,
     };
   }
   if (typeof exitStatus.code === "number" && exitStatus.code !== 0) {
@@ -206,7 +173,6 @@ function getFailedExitResult(
       kind: "failed",
       reason: `Reviewer exited with code ${exitStatus.code}`,
       target,
-      stderr,
     };
   }
   if (exitStatus.signal) {
@@ -214,24 +180,9 @@ function getFailedExitResult(
       kind: "failed",
       reason: `Reviewer exited from signal ${exitStatus.signal}`,
       target,
-      stderr,
     };
   }
   return undefined;
-}
-
-function getStructuredFallbackWarning(outputPath: string): string {
-  return existsSync(outputPath)
-    ? "The reviewer submitted malformed JSON."
-    : "The reviewer did not submit a structured result via the submit_review tool.";
-}
-
-function readPaneLog(path: string): string {
-  try {
-    return readFileSync(path, "utf-8");
-  } catch {
-    return "";
-  }
 }
 
 function resolveSessionName(id: string): string {
@@ -258,8 +209,4 @@ function cleanupTempFiles(paths: string[]): void {
       // ignore
     }
   }
-}
-
-function sliceExcerpt(text: string): string | undefined {
-  return text ? text.slice(0, MAX_EXCERPT_LENGTH) : undefined;
 }

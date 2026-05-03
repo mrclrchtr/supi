@@ -49,4 +49,13 @@ describe("review model choices", () => {
   it("returns no explicit choices when neither CLI nor settings define a scope", () => {
     expect(getReviewModelChoices(models, { argv: ["node", "pi"] })).toEqual([]);
   });
+
+  it("returns no explicit choices when available models are unavailable", () => {
+    expect(
+      getReviewModelChoices(undefined, {
+        argv: ["node", "pi"],
+        settingsPatterns: ["anthropic/*"],
+      }),
+    ).toEqual([]);
+  });
 });

@@ -1,5 +1,4 @@
 import { BorderedLoader, type ExtensionAPI, SettingsManager } from "@mariozechner/pi-coding-agent";
-import { parseNonInteractiveArgs } from "./args.ts";
 import { formatReviewContent } from "./format-content.ts";
 import { getCommitShow, getDiff, getMergeBase, getUncommittedDiff } from "./git.ts";
 import { getReviewModelChoices } from "./model-choices.ts";
@@ -26,7 +25,9 @@ export default function reviewExtension(pi: ExtensionAPI) {
 
   const syncReviewModelChoices = (ctx: {
     cwd: string;
-    modelRegistry: { getAvailable(): Array<{ provider: string; id: string; name?: string }> };
+    modelRegistry: {
+      getAvailable(): Array<{ provider: string; id: string; name?: string }> | undefined;
+    };
   }) => {
     const settingsPatterns = SettingsManager.create(ctx.cwd).getEnabledModels() ?? [];
     setReviewModelChoices(
@@ -44,57 +45,11 @@ export default function reviewExtension(pi: ExtensionAPI) {
 
   pi.registerCommand("supi-review", {
     description: "Run a structured code review",
-    handler: async (args, ctx) => {
+    handler: async (_args, ctx) => {
       const settings = loadReviewSettings(ctx.cwd);
-
-      if (!ctx.hasUI) {
-        await handleNonInteractive({
-          args,
-          maxDiffBytes: settings.maxDiffBytes,
-          autoFixDefault: settings.autoFix,
-          ctx,
-          pi,
-        });
-        return;
-      }
-
       await handleInteractive(settings.maxDiffBytes, settings.autoFix, ctx, pi);
     },
   });
-}
-
-interface NonInteractiveOptions {
-  args: string;
-  maxDiffBytes: number;
-  autoFixDefault: boolean;
-  ctx: CommandContext;
-  pi: ExtensionAPI;
-}
-
-async function handleNonInteractive(options: NonInteractiveOptions): Promise<void> {
-  const { args, maxDiffBytes, autoFixDefault, ctx, pi } = options;
-  const parsed = parseNonInteractiveArgs(args);
-  if (!parsed.ok) {
-    injectReviewMessage(
-      pi,
-      {
-        kind: "failed",
-        reason: parsed.error,
-        target: { type: "custom", instructions: args },
-      },
-      false,
-      ctx,
-    );
-    return;
-  }
-  const autoFix = parsed.autoFix ?? autoFixDefault;
-  const result = await executeReview({
-    target: parsed.target,
-    depth: parsed.depth,
-    maxDiffBytes,
-    ctx,
-  });
-  injectReviewMessage(pi, result, autoFix, ctx);
 }
 
 async function handleInteractive(
@@ -277,22 +232,9 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
     target,
     signal,
     onSessionStart: (sessionName) => {
-      if (ctx.hasUI) {
-        ctx.ui.notify(`Review running in tmux session ${sessionName}`, "info");
-        return;
-      }
-      process.stderr.write(formatSessionAnnouncement(sessionName));
+      ctx.ui.notify(`Review running in tmux session ${sessionName}`, "info");
     },
   });
-}
-
-function formatSessionAnnouncement(sessionName: string): string {
-  return [
-    `Review running in tmux session ${sessionName}`,
-    `Attach: tmux attach -t ${sessionName}`,
-    `Kill:   tmux kill-session -t ${sessionName}`,
-    "",
-  ].join("\n");
 }
 
 function resolveModel(
@@ -370,10 +312,6 @@ function injectReviewMessage(
     display: true,
     details: { result },
   });
-
-  if (result.warning && ctx?.hasUI) {
-    ctx.ui.notify(result.warning, "warning");
-  }
 
   if (autoFix && result.kind === "success" && result.output.findings.length > 0) {
     pi.sendUserMessage("Fix all findings from the review above.");

@@ -189,6 +189,25 @@ describe("runReviewer", () => {
     expect(piArgs).not.toContain("--model");
   });
 
+  it("passes a non-matching --models scope to isolate reviewer from host enabledModels", async () => {
+    const promise = runReviewer({
+      prompt: "review this",
+      model: undefined,
+      cwd: "/tmp",
+      target: { type: "custom", instructions: "review this" },
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    const piArgs = getPiArgsFromSpawn();
+    writeDefaultOutputFromSpawn();
+    vi.advanceTimersByTime(1500);
+    await promise;
+
+    const modelsIndex = piArgs.indexOf("--models");
+    expect(modelsIndex).toBeGreaterThanOrEqual(0);
+    expect(piArgs[modelsIndex + 1]).toBe("__supi_review_no_scoped_models__");
+  });
+
   it("reads valid JSON from the temp output file on success", async () => {
     const promise = runReviewer({
       prompt: "review this",
@@ -227,13 +246,7 @@ describe("runReviewer", () => {
     expect(successResult.output.findings[0]?.title).toBe("Bug");
   });
 
-  it("warns when the model never calls submit_review and falls back to pane capture", async () => {
-    const paneOutput = `Some review text here.
-
-{"findings":[],"overall_correctness":"patch is correct","overall_explanation":"Looks good","overall_confidence_score":0.95}
-
-End.`;
-
+  it("fails when the reviewer does not submit structured output", async () => {
     const promise = runReviewer({
       prompt: "review this",
       model: undefined,
@@ -242,63 +255,14 @@ End.`;
     });
 
     await vi.advanceTimersByTimeAsync(50);
-    const paneLogPath = getPaneLogPathFromSpawn();
-    tempFiles.set(paneLogPath, paneOutput);
-
+    // Do not write any output file
     vi.advanceTimersByTime(1500);
     const result = await promise;
 
-    expect(result.kind).toBe("success");
-    const successResult = result as Extract<typeof result, { kind: "success" }>;
-    expect(successResult.warning).toContain("did not submit a structured result");
-    expect(successResult.warning).toContain("Recovered a valid JSON object");
-  });
-
-  it("warns and falls back when the structured output file is malformed", async () => {
-    const promise = runReviewer({
-      prompt: "review this",
-      model: undefined,
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
-    tempFiles.set(getToolPathFromSpawn().replace("-tool.ts", ".json"), '{"findings":[]}');
-    tempFiles.set(
-      getPaneLogPathFromSpawn(),
-      '{"findings":[],"overall_correctness":"patch is correct","overall_explanation":"Recovered from log","overall_confidence_score":0.95}',
-    );
-
-    vi.advanceTimersByTime(1500);
-    const result = await promise;
-
-    expect(result.kind).toBe("success");
-    const successResult = result as Extract<typeof result, { kind: "success" }>;
-    expect(successResult.warning).toContain("submitted malformed JSON");
-    expect(successResult.warning).toContain("Recovered a valid JSON object");
-    expect(successResult.output.overall_explanation).toBe("Recovered from log");
-  });
-
-  it("warns when fallback extraction finds no valid JSON", async () => {
-    const promise = runReviewer({
-      prompt: "review this",
-      model: undefined,
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
-    const paneLogPath = getPaneLogPathFromSpawn();
-    tempFiles.set(paneLogPath, "This is just some plain text review.");
-
-    vi.advanceTimersByTime(1500);
-    const result = await promise;
-
-    expect(result.kind).toBe("success");
-    const successResult = result as Extract<typeof result, { kind: "success" }>;
-    expect(successResult.warning).toContain("did not submit a structured result");
-    expect(successResult.warning).toContain("shown as plain text");
-    expect(successResult.output.overall_explanation).toBe("This is just some plain text review.");
+    expect(result.kind).toBe("failed");
+    const failedResult = result as Extract<typeof result, { kind: "failed" }>;
+    expect(failedResult.reason).toContain("did not submit a structured result");
+    expect(failedResult.warning).toBeUndefined();
   });
 
   it("announces the tmux session only after startup succeeds", async () => {
@@ -472,10 +436,6 @@ function getRunnerPathFromSpawn(index = 0): string {
   const call = vi.mocked(spawn).mock.calls[index];
   const args = call?.[1] as string[];
   return args.at(-1) as string;
-}
-
-function getPaneLogPathFromSpawn(index = 0): string {
-  return getToolPathFromSpawn(index).replace("-tool.ts", "-pane.log");
 }
 
 function writeDefaultOutputFromSpawn(index = 0): void {

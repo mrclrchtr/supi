@@ -61,7 +61,7 @@ describe("supi-review renderer", () => {
     expect(output).not.toContain("[success]patch is incorrect[/success]");
   });
 
-  it("shows timeout diagnostics including the warning", () => {
+  it("shows timeout diagnostics with warning", () => {
     const output = renderReview({
       kind: "timeout",
       target: { type: "custom", instructions: "Focus on correctness" },

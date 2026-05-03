@@ -55,11 +55,6 @@ function renderSuccess(
     container.addChild(new Text(theme.fg("dim", output.overall_explanation), 1, 0));
   }
 
-  if (result.warning) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("warning", `⚠️ ${result.warning}`), 1, 0));
-  }
-
   if (expanded) {
     container.addChild(new Spacer(1));
 

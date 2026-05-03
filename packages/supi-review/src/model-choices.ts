@@ -39,9 +39,12 @@ export function extractScopedModelPatterns(argv: string[] = process.argv): strin
  * 3. no explicit review-model choices
  */
 export function getReviewModelChoices(
-  availableModels: ModelChoice[],
+  availableModels: ModelChoice[] | undefined,
   options: ReviewModelChoiceOptions = {},
 ): string[] {
+  if (!availableModels) {
+    return [];
+  }
   const scopedPatterns = extractScopedModelPatterns(options.argv ?? process.argv);
   const effectivePatterns =
     scopedPatterns.length > 0 ? scopedPatterns : (options.settingsPatterns ?? []);

@@ -49,12 +49,7 @@ export interface ReviewRunDiagnostics {
 }
 
 export type ReviewResult =
-  | {
-      kind: "success";
-      output: ReviewOutputEvent;
-      target: ReviewTarget;
-      warning?: string;
-    }
+  | { kind: "success"; output: ReviewOutputEvent; target: ReviewTarget }
   | {
       kind: "failed";
       reason: string;

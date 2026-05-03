@@ -3,11 +3,11 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseReviewOutput } from "./parser.ts";
 import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "./types.ts";
 
 const __dirname = dirname(dirname(fileURLToPath(import.meta.url)));
 const REVIEW_PROMPT = readFileSync(join(__dirname, "review-prompt.md"), "utf-8");
+const DISABLED_MODEL_SCOPE_PATTERN = "__supi_review_no_scoped_models__";
 
 export interface TempPaths {
   toolPath: string;
@@ -155,6 +155,11 @@ export function buildPiArgs(options: {
   const { model, toolPath, prompt } = options;
   const args = [
     "--print",
+    // Workaround: pass a deliberately non-matching --models scope so the reviewer
+    // subprocess does not inherit the user's enabledModels settings. An empty
+    // pattern is not safe because pi treats it as a substring match for every model.
+    "--models",
+    DISABLED_MODEL_SCOPE_PATTERN,
     "-e",
     toolPath,
     "--no-extensions",
@@ -180,10 +185,10 @@ export function readStructuredOutput(outputPath: string): ReviewOutputEvent | un
     const content = readFileSync(outputPath, "utf-8");
     const parsed = JSON.parse(content) as unknown;
     if (isReviewOutputEventLike(parsed)) {
-      return parseReviewOutput(content);
+      return parsed as ReviewOutputEvent;
     }
   } catch {
-    // ignore malformed output; callers will choose a fallback
+    // ignore malformed output
   }
   return undefined;
 }
