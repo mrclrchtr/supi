@@ -73,6 +73,7 @@ vi.mock("../manager.ts", () => ({
 
 vi.mock("../settings-registration.ts", () => ({
   loadLspSettings: mockFns.loadLspSettings,
+  getLspDisabledMessage: vi.fn(() => "LSP is disabled in settings"),
   registerLspSettings: mockFns.registerLspSettings,
 }));
 

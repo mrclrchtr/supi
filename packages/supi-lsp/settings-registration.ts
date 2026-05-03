@@ -3,7 +3,11 @@
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import type { SettingItem } from "@mariozechner/pi-tui";
 import { Container, Key, matchesKey, SettingsList, Text } from "@mariozechner/pi-tui";
-import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core";
+import {
+  loadSupiConfig,
+  loadSupiConfigForScope,
+  registerConfigSettings,
+} from "@mrclrchtr/supi-core";
 import { loadConfig } from "./config.ts";
 
 // ── Types ────────────────────────────────────────────────────
@@ -24,6 +28,22 @@ const LSP_DEFAULTS: LspSettings = {
 
 export function loadLspSettings(cwd: string, homeDir?: string): LspSettings {
   return loadSupiConfig("lsp", cwd, LSP_DEFAULTS, { homeDir });
+}
+
+/**
+ * Return a user-facing message that indicates which config scope disabled LSP.
+ */
+export function getLspDisabledMessage(cwd: string, homeDir?: string): string {
+  const global = loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope: "global", homeDir });
+  const project = loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope: "project", homeDir });
+
+  if (project.enabled === false) {
+    return "LSP is disabled in project settings (.pi/supi/config.json)";
+  }
+  if (global.enabled === false) {
+    return "LSP is disabled in global settings (~/.pi/agent/supi/config.json)";
+  }
+  return "LSP is disabled in settings";
 }
 
 function severityLabel(severity: number): string {

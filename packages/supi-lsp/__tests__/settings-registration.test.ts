@@ -7,7 +7,11 @@ import {
   loadSupiConfig,
 } from "@mrclrchtr/supi-core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadLspSettings, registerLspSettings } from "../settings-registration.ts";
+import {
+  getLspDisabledMessage,
+  loadLspSettings,
+  registerLspSettings,
+} from "../settings-registration.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "lsp-settings-test-"));
@@ -55,6 +59,64 @@ describe("loadLspSettings", () => {
 
     const result = loadLspSettings(tmpDir, tmpDir);
     expect(result).toEqual({ enabled: false, severity: 2, servers: [] });
+  });
+});
+
+describe("getLspDisabledMessage", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns generic message when no config exists", () => {
+    const result = getLspDisabledMessage(tmpDir, tmpDir);
+    expect(result).toBe("LSP is disabled in settings");
+  });
+
+  it("returns project message when project config disabled LSP", () => {
+    const projectDir = path.join(tmpDir, ".pi/supi");
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, "config.json"),
+      JSON.stringify({ lsp: { enabled: false } }),
+    );
+
+    const result = getLspDisabledMessage(tmpDir, tmpDir);
+    expect(result).toBe("LSP is disabled in project settings (.pi/supi/config.json)");
+  });
+
+  it("returns global message when global config disabled LSP", () => {
+    const globalDir = path.join(tmpDir, ".pi/agent/supi");
+    fs.mkdirSync(globalDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(globalDir, "config.json"),
+      JSON.stringify({ lsp: { enabled: false } }),
+    );
+
+    const result = getLspDisabledMessage(tmpDir, tmpDir);
+    expect(result).toBe("LSP is disabled in global settings (~/.pi/agent/supi/config.json)");
+  });
+
+  it("prefers project message when both scopes disabled LSP", () => {
+    fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({ lsp: { enabled: false } }),
+    );
+
+    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/supi/config.json"),
+      JSON.stringify({ lsp: { enabled: false } }),
+    );
+
+    const result = getLspDisabledMessage(tmpDir, tmpDir);
+    expect(result).toBe("LSP is disabled in project settings (.pi/supi/config.json)");
   });
 });
 

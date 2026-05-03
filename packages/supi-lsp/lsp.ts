@@ -36,7 +36,11 @@ import {
   SessionLspService,
   setSessionLspServiceState,
 } from "./service-registry.ts";
-import { loadLspSettings, registerLspSettings } from "./settings-registration.ts";
+import {
+  getLspDisabledMessage,
+  loadLspSettings,
+  registerLspSettings,
+} from "./settings-registration.ts";
 import { executeAction, type LspAction, lspToolDescription } from "./tool-actions.ts";
 import {
   persistLspActiveState,
@@ -331,7 +335,7 @@ function registerLspStatusCommand(pi: ExtensionAPI, state: LspRuntimeState): voi
     handler: async (_args, ctx) => {
       const lspSettings = loadLspSettings(ctx.cwd);
       if (!lspSettings.enabled) {
-        ctx.ui.notify("LSP is disabled in settings", "warning");
+        ctx.ui.notify(getLspDisabledMessage(ctx.cwd), "warning");
         return;
       }
 

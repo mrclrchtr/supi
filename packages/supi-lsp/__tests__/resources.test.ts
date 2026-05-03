@@ -60,6 +60,7 @@ vi.mock("../tree-persist.ts", () => ({
 }));
 vi.mock("../settings-registration.ts", () => ({
   loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, servers: [] })),
+  getLspDisabledMessage: vi.fn(() => "LSP is disabled in settings"),
   registerLspSettings: vi.fn(),
 }));
 vi.mock("../manager.ts", () => ({ LspManager: vi.fn() }));
