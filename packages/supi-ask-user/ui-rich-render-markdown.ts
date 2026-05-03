@@ -2,7 +2,18 @@ import type { Theme } from "@mariozechner/pi-coding-agent";
 import { getMarkdownTheme, highlightCode } from "@mariozechner/pi-coding-agent";
 import { Markdown } from "@mariozechner/pi-tui";
 
-export function renderMarkdownPreview(preview: string, width: number, theme: Theme): string[] {
+export interface RenderMarkdownOptions {
+  paddingX?: number;
+  defaultColor?: "text" | "muted" | "dim";
+}
+
+export function renderMarkdown(
+  text: string,
+  width: number,
+  theme: Theme,
+  options: RenderMarkdownOptions = {},
+): string[] {
+  const { paddingX = 1, defaultColor = "text" } = options;
   const markdownTheme = getMarkdownTheme();
   markdownTheme.highlightCode = (code: string, lang?: string) => {
     try {
@@ -11,8 +22,12 @@ export function renderMarkdownPreview(preview: string, width: number, theme: The
       return code.split("\n").map((line) => markdownTheme.codeBlock(line));
     }
   };
-  const markdown = new Markdown(preview, 1, 0, markdownTheme, {
-    color: (text: string) => theme.fg("text", text),
+  const markdown = new Markdown(text, paddingX, 0, markdownTheme, {
+    color: (text: string) => theme.fg(defaultColor, text),
   });
   return markdown.render(width);
+}
+
+export function renderMarkdownPreview(preview: string, width: number, theme: Theme): string[] {
+  return renderMarkdown(preview, width, theme);
 }

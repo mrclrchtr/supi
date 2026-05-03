@@ -4,19 +4,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NormalizedQuestion } from "../types.ts";
 import { type RichCustomOptions, type RichUiHost, runRichQuestionnaire } from "../ui-rich.ts";
 
-const mockRenderMarkdownPreview = vi.hoisted(() =>
-  vi.fn((preview: string) => preview.split("\n").map((line) => ` ${line}`)),
+const mockRenderMarkdown = vi.hoisted(() =>
+  vi.fn((text: string, _width: number, _theme: unknown, options?: { paddingX?: number }) => {
+    const lines = text.split("\n");
+    const paddingX = options?.paddingX ?? 1;
+    if (paddingX > 0) {
+      return lines.map((line) => " ".repeat(paddingX) + line);
+    }
+    return lines;
+  }),
 );
 
 vi.mock("../ui-rich-render-markdown", () => ({
-  renderMarkdownPreview: mockRenderMarkdownPreview,
+  renderMarkdown: mockRenderMarkdown,
+  renderMarkdownPreview: mockRenderMarkdown,
 }));
 
 beforeEach(() => {
-  mockRenderMarkdownPreview.mockImplementation((preview: string) =>
-    preview.split("\n").map((line: string) => ` ${line}`),
-  );
-  mockRenderMarkdownPreview.mockClear();
+  mockRenderMarkdown.mockClear();
 });
 
 const choice: NormalizedQuestion = {
@@ -428,7 +433,7 @@ describe("render height stability", () => {
 
 describe("markdown preview rendering", () => {
   it("renders option previews as markdown in split view", async () => {
-    mockRenderMarkdownPreview.mockReturnValueOnce([" md line 1", " md line 2"]);
+    mockRenderMarkdown.mockReturnValueOnce([" md line 1", " md line 2"]);
     const markdownQuestion: NormalizedQuestion = {
       id: "md",
       header: "Markdown",
@@ -448,7 +453,7 @@ describe("markdown preview rendering", () => {
     const rendered = captured.value.render(120).join("\n");
     expect(rendered).toContain("md line 1");
     expect(rendered).toContain("md line 2");
-    expect(mockRenderMarkdownPreview).toHaveBeenCalledWith(
+    expect(mockRenderMarkdown).toHaveBeenCalledWith(
       "# Hello\nWorld",
       expect.any(Number),
       expect.any(Object),
@@ -456,7 +461,7 @@ describe("markdown preview rendering", () => {
   });
 
   it("renders option previews as markdown in narrow fallback block", async () => {
-    mockRenderMarkdownPreview.mockReturnValueOnce([" fallback md"]);
+    mockRenderMarkdown.mockReturnValueOnce([" fallback md"]);
     const markdownQuestion: NormalizedQuestion = {
       id: "md",
       header: "Markdown",
@@ -476,7 +481,7 @@ describe("markdown preview rendering", () => {
     // Render at 80 cols — split view requires >= 100, so this falls back to block
     const rendered = captured.value.render(80).join("\n");
     expect(rendered).toContain("fallback md");
-    expect(mockRenderMarkdownPreview).toHaveBeenCalledWith(
+    expect(mockRenderMarkdown).toHaveBeenCalledWith(
       "`code`",
       expect.any(Number),
       expect.any(Object),

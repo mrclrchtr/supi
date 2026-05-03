@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderMarkdownPreview } from "../ui-rich-render-markdown.ts";
+import { renderMarkdown, renderMarkdownPreview } from "../ui-rich-render-markdown.ts";
 
 const mockRender = vi.hoisted(() => vi.fn(() => ["rendered line"]));
 
@@ -96,5 +96,25 @@ describe("renderMarkdownPreview", () => {
     };
     const result = passedTheme.highlightCode("some code", "badlang");
     expect(result).toEqual(["code:some code"]);
+  });
+
+  it("passes custom paddingX and defaultColor through options", () => {
+    const theme = {
+      fg: (color: string, text: string) => `[${color}]${text}`,
+    } as unknown as import("@mariozechner/pi-coding-agent").Theme;
+    renderMarkdown("hello", 40, theme, { paddingX: 3, defaultColor: "muted" });
+    expect(MockMarkdown).toHaveBeenCalledWith(
+      "hello",
+      3,
+      0,
+      expect.any(Object),
+      expect.objectContaining({
+        color: expect.any(Function),
+      }),
+    );
+    const passedDefaultStyle = (MockMarkdown.mock.calls[0] as unknown[])[4] as {
+      color: (text: string) => string;
+    };
+    expect(passedDefaultStyle.color("x")).toBe("[muted]x");
   });
 });

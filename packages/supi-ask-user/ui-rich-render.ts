@@ -15,7 +15,7 @@ import {
 } from "./ui-rich-render-editor.ts";
 import type { RenderEnv } from "./ui-rich-render-env.ts";
 import { footerHelp } from "./ui-rich-render-footer.ts";
-import { renderMarkdownPreview } from "./ui-rich-render-markdown.ts";
+import { renderMarkdown, renderMarkdownPreview } from "./ui-rich-render-markdown.ts";
 import { currentNote, renderNoteStatus, visibleNoteMarker } from "./ui-rich-render-notes.ts";
 import {
   hasPreview,
@@ -70,9 +70,7 @@ function renderTabBar(lines: string[], env: RenderEnv): void {
 function renderQuestion(lines: string[], env: RenderEnv): void {
   const question = env.flow.currentQuestion;
   if (!question) return;
-  for (const line of wrapTextWithAnsi(` ${question.prompt}`, env.width)) {
-    lines.push(truncateToWidth(env.theme.fg("text", line), env.width));
-  }
+  lines.push(...renderMarkdown(question.prompt, env.width - 1, env.theme, { paddingX: 0 }));
   lines.push("");
   if (question.type === "text") {
     renderTextQuestion(lines, env);
@@ -175,7 +173,7 @@ function renderRows(
     }
     addWrapped(out, env, prefix, rowLabel(env, question, row, active));
     const description = rowDescription(question, row);
-    if (description) addWrapped(out, env, "     ", env.theme.fg("muted", description));
+    if (description) renderRowDescription(out, env, description);
   }
   return out;
 }
@@ -215,6 +213,26 @@ function rowDescription(
 ): string | undefined {
   if (row.kind === "option") return question.options[row.optionIndex].description;
   return undefined;
+}
+
+function renderRowDescription(out: string[], env: RenderEnv, description: string): void {
+  const descLines = renderMarkdown(description, env.width - 5, env.theme, {
+    paddingX: 0,
+    defaultColor: "muted",
+  });
+  for (const line of descLines) {
+    out.push(truncateToWidth(`     ${line}`, env.width));
+  }
+}
+
+function renderReviewAnswer(out: string[], env: RenderEnv, line: string): void {
+  const reviewLines = renderMarkdown(line, env.width - 3, env.theme, {
+    paddingX: 0,
+    defaultColor: "text",
+  });
+  for (const reviewLine of reviewLines) {
+    out.push(truncateToWidth(`   ${reviewLine}`, env.width));
+  }
 }
 
 function renderPreviewPane(
@@ -260,7 +278,7 @@ function renderReview(env: RenderEnv): string[] {
       ? formatReviewLines(question, answer)
       : [question.required ? "(no answer)" : "(skipped)"];
     add(env.theme.fg("muted", ` ${question.header}:`));
-    for (const line of answerLines) addWrapped(out, env, "   ", env.theme.fg("text", line));
+    for (const line of answerLines) renderReviewAnswer(out, env, line);
   }
   add("");
   if (env.flow.showSkip) {
