@@ -1,0 +1,74 @@
+#!/bin/sh
+set -eu
+
+# Verify that the local SuPi worktree can be loaded by pi inside a Linux container.
+# This is a fast preflight for Harbor/Terminal-Bench local-path package setup: it
+# mounts the worktree at /mnt/supi-worktree, points PI_CODING_AGENT_DIR at a
+# writable config mount, and executes the /supi-debug slash command as a sentinel.
+# It also enables SUPI_LOG_STATUS so pi stderr includes a SUPI_STATUS JSON line
+# that is captured in logs but is not injected into the LLM context.
+# If SuPi does not load, /supi-debug is not registered and pi falls through to a
+# model call, which fails in this clean container without API credentials.
+
+SUPI_WORKTREE=${SUPI_WORKTREE:-$(pwd)}
+PI_PREFLIGHT_IMAGE=${PI_PREFLIGHT_IMAGE:-node:22-bookworm}
+PI_PREFLIGHT_PLATFORM=${PI_PREFLIGHT_PLATFORM:-linux/amd64}
+PI_PACKAGE_VERSION=${PI_PACKAGE_VERSION:-latest}
+DOCKER_BIN=${DOCKER_BIN:-docker}
+
+if [ ! -f "$SUPI_WORKTREE/package.json" ]; then
+  echo "error: SUPI_WORKTREE must point to the SuPi repository root: $SUPI_WORKTREE" >&2
+  exit 2
+fi
+
+CONFIG_DIR=$(mktemp -d "$SUPI_WORKTREE/.supi-preflight-config.XXXXXX")
+cleanup() {
+  rm -rf "$CONFIG_DIR"
+}
+trap cleanup EXIT INT HUP TERM
+
+cat > "$CONFIG_DIR/settings.json" <<'JSON'
+{
+  "enableInstallTelemetry": false,
+  "packages": ["/mnt/supi-worktree"]
+}
+JSON
+
+# The container script is single-quoted intentionally; variables inside it are
+# expanded by the container shell, not by this host-side script.
+# shellcheck disable=SC2016
+"$DOCKER_BIN" run --rm \
+  --platform "$PI_PREFLIGHT_PLATFORM" \
+  -v "$CONFIG_DIR:/tmp/pi-config" \
+  -v "$SUPI_WORKTREE:/mnt/supi-worktree:ro" \
+  -e PI_CODING_AGENT_DIR=/tmp/pi-config \
+  -e PI_PACKAGE_VERSION="$PI_PACKAGE_VERSION" \
+  -e SUPI_LOG_STATUS=1 \
+  -w /app \
+  "$PI_PREFLIGHT_IMAGE" \
+  sh -lc '
+    set -eu
+    npm install -g "@mariozechner/pi-coding-agent@${PI_PACKAGE_VERSION}" >/tmp/npm-install.log 2>&1
+    echo "pi-version=$(pi --version 2>&1)" >&2
+    pi list >&2
+    pi --print --mode json --no-session --offline "/supi-debug" \
+      > /tmp/supi-preflight.log \
+      2>&1
+    cat /tmp/supi-preflight.log
+    grep -q "supi-debug-report" /tmp/supi-preflight.log
+    grep "^SUPI_STATUS " /tmp/supi-preflight.log | sed "s/^SUPI_STATUS //" > /tmp/supi-status.json
+    node - /tmp/supi-status.json <<"NODE"
+const fs = require("node:fs");
+const status = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+const requiredTools = ["ask_user", "lsp", "tree_sitter", "code_intel", "supi_debug"];
+const missing = requiredTools.filter((name) => !status.expectedTools?.[name]?.registered);
+const inactive = requiredTools.filter((name) => !status.expectedTools?.[name]?.active);
+if (missing.length || inactive.length) {
+  console.error("SuPi tool status check failed", { missing, inactive, status });
+  process.exit(1);
+}
+console.error("SuPi tool status", JSON.stringify(status.expectedTools));
+NODE
+  '
+
+echo "SuPi container load preflight passed." >&2

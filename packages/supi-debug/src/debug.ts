@@ -15,6 +15,7 @@ import {
   registerContextProvider,
 } from "@mrclrchtr/supi-core";
 import { Type } from "typebox";
+import { maybeLogLoadStatus } from "../status-log.ts";
 import { formatDataLines } from "./format.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
 
@@ -287,6 +288,7 @@ export default function debugExtension(pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     clearDebugEvents();
     applyDebugConfig(ctx.cwd);
+    maybeLogLoadStatus(pi, ctx.cwd);
   });
 
   pi.registerCommand("supi-debug", {
