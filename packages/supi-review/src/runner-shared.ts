@@ -154,8 +154,7 @@ export function buildPiArgs(options: {
 }): string[] {
   const { model, toolPath, prompt } = options;
   const args = [
-    "--mode",
-    "json",
+    "--print",
     "-e",
     toolPath,
     "--no-extensions",

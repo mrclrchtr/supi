@@ -279,27 +279,6 @@ End.`;
     expect(successResult.output.overall_explanation).toBe("Recovered from log");
   });
 
-  it("recovers JSON from JSONL assistant output", async () => {
-    const promise = runReviewer({
-      prompt: "review this",
-      model: undefined,
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
-    const paneLogPath = getPaneLogPathFromSpawn();
-    tempFiles.set(paneLogPath, `${sessionHeader()}\n${assistantMessageEnd()}\n`);
-
-    vi.advanceTimersByTime(1500);
-    const result = await promise;
-
-    expect(result.kind).toBe("success");
-    const successResult = result as Extract<typeof result, { kind: "success" }>;
-    expect(successResult.warning).toContain("Recovered a valid JSON object");
-    expect(successResult.output.overall_explanation).toBe("x");
-  });
-
   it("warns when fallback extraction finds no valid JSON", async () => {
     const promise = runReviewer({
       prompt: "review this",
@@ -510,27 +489,8 @@ function getSessionNameFromSpawn(index = 0): string {
   return args[sIndex + 1] as string;
 }
 
-function assistantMessageEnd(content = defaultReviewJson()): string {
-  return JSON.stringify({
-    type: "message_end",
-    message: {
-      role: "assistant",
-      content,
-    },
-  });
-}
-
 function defaultReviewJson(): string {
   return '{"findings":[],"overall_correctness":"ok","overall_explanation":"x","overall_confidence_score":0.5}';
-}
-
-function sessionHeader(): string {
-  return JSON.stringify({
-    type: "session",
-    id: "review-session-id",
-    timestamp: "2026-04-27T17:00:00.000Z",
-    cwd: "/tmp",
-  });
 }
 
 interface MockProc {

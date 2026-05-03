@@ -158,8 +158,7 @@ function buildTmuxResult(options: TmuxResultOptions): ReviewResult {
   }
 
   const warning = getStructuredFallbackWarning(outputPath);
-  const reviewText = extractFinalAssistantContent(paneOutput) ?? paneOutput;
-  const extracted = parseReviewOutput(reviewText);
+  const extracted = parseReviewOutput(paneOutput);
   if (extracted.findings.length > 0 || extracted.overall_correctness !== "review incomplete") {
     return {
       kind: "success",
@@ -169,7 +168,7 @@ function buildTmuxResult(options: TmuxResultOptions): ReviewResult {
     };
   }
 
-  const explanation = reviewText.trim();
+  const explanation = paneOutput.trim();
   if (!explanation) {
     return makeFailedResult("Reviewer produced no output", target, warning);
   }
@@ -233,45 +232,6 @@ function readPaneLog(path: string): string {
   } catch {
     return "";
   }
-}
-
-function extractFinalAssistantContent(output: string): string | undefined {
-  let lastContent: string | undefined;
-  for (const line of output.split("\n")) {
-    const event = parseJsonlEvent(line);
-    if (event?.type !== "message_end") continue;
-    const message = event.message ?? { role: event.role, content: event.content };
-    if (message.role === "assistant") lastContent = flattenMessageContent(message.content);
-  }
-  return lastContent;
-}
-
-function parseJsonlEvent(line: string): JsonlEvent | undefined {
-  const trimmed = line.trim();
-  if (!trimmed) return undefined;
-  try {
-    return JSON.parse(trimmed) as JsonlEvent;
-  } catch {
-    return undefined;
-  }
-}
-
-interface JsonlEvent {
-  type?: string;
-  message?: JsonlMessage;
-  role?: string;
-  content?: JsonlMessage["content"];
-}
-
-interface JsonlMessage {
-  role?: string;
-  content?: string | Array<{ text?: string }>;
-}
-
-function flattenMessageContent(content: JsonlMessage["content"]): string | undefined {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return undefined;
-  return content.map((part) => part.text ?? "").join("");
 }
 
 function resolveSessionName(id: string): string {

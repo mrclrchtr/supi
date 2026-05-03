@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Box, Container, Spacer, Text } from "@mariozechner/pi-tui";
-import type { ReviewFinding, ReviewOutputEvent, ReviewResult } from "./types.ts";
+import type { ReviewFinding, ReviewResult } from "./types.ts";
 
 export function registerReviewRenderer(pi: ExtensionAPI): void {
   pi.registerMessageRenderer("supi-review", (message, { expanded }, theme) => {
@@ -11,11 +11,11 @@ export function registerReviewRenderer(pi: ExtensionAPI): void {
 
     switch (result.kind) {
       case "success":
-        return renderSuccess(result.output, theme, expanded);
+        return renderSuccess(result, theme, expanded);
       case "failed":
         return renderFailed(result, theme);
       case "canceled":
-        return renderSimpleBanner("Review canceled", theme, "warning");
+        return renderCanceled(result, theme);
       case "timeout":
         return renderTimeout(result, theme);
       default:
@@ -25,11 +25,12 @@ export function registerReviewRenderer(pi: ExtensionAPI): void {
 }
 
 function renderSuccess(
-  output: ReviewOutputEvent,
+  result: Extract<ReviewResult, { kind: "success" }>,
   theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
   expanded: boolean,
 ): Container {
   const container = new Container();
+  const output = result.output;
 
   container.addChild(new Text(theme.fg("accent", "◆ Code Review Results"), 1, 0));
   container.addChild(new Spacer(1));
@@ -52,6 +53,11 @@ function renderSuccess(
   if (output.overall_explanation) {
     container.addChild(new Spacer(1));
     container.addChild(new Text(theme.fg("dim", output.overall_explanation), 1, 0));
+  }
+
+  if (result.warning) {
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("warning", `⚠️ ${result.warning}`), 1, 0));
   }
 
   if (expanded) {
@@ -163,12 +169,17 @@ function appendDiagnostics(
   }
 }
 
-function renderSimpleBanner(
-  text: string,
+function renderCanceled(
+  result: Extract<ReviewResult, { kind: "canceled" }>,
   theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
-  color: "success" | "warning" | "error",
-): Text {
-  return new Text(theme.fg(color, `◆ ${text}`), 1, 0);
+): Container {
+  const container = new Container();
+  container.addChild(new Text(theme.fg("warning", "◆ Review Canceled"), 1, 0));
+  if (result.warning) {
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("warning", result.warning), 1, 0));
+  }
+  return container;
 }
 
 function priorityColorName(priority: number): "success" | "warning" | "error" {

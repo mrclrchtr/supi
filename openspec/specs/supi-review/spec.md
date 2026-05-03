@@ -76,7 +76,7 @@ The reviewer SHALL run inside a named tmux session (`supi-review-<id>`). The ext
 
 1. Generate a unique review ID and temp file paths for the structured result (`/tmp/supi-review-<id>.json`), reviewer output log (`/tmp/supi-review-<id>-pane.log`), and exit status (`/tmp/supi-review-<id>-exit.json`).
 2. Write a temporary extension file (`/tmp/supi-review-<id>-tool.ts`) that registers a `submit_review` tool with a TypeBox schema matching `ReviewOutputEvent`. The tool's `execute` handler SHALL write the validated arguments as JSON to the temp file path and return a confirmation message.
-3. Write a temporary runner script (`/tmp/supi-review-<id>-runner.mjs`) that spawns the resolved pi invocation with `--mode json -e /tmp/supi-review-<id>-tool.ts --tools read,grep,find,ls,submit_review --model <model> "<review prompt>"`, tees stdout/stderr to both the tmux pane and the reviewer output log from process start, and writes the reviewer exit status to the exit status file.
+3. Write a temporary runner script (`/tmp/supi-review-<id>-runner.mjs`) that spawns the resolved pi invocation with `--print -e /tmp/supi-review-<id>-tool.ts --tools read,grep,find,ls,submit_review --model <model> "<review prompt>"`, tees stdout/stderr to both the tmux pane and the reviewer output log from process start, and writes the reviewer exit status to the exit status file.
 4. Spawn tmux: `tmux new-session -d -s supi-review-<id> -- node /tmp/supi-review-<id>-runner.mjs`.
 5. Notify the user of the tmux session name so they can attach to observe progress (`tmux attach -t supi-review-<id>`).
 
