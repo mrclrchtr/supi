@@ -1,0 +1,34 @@
+{
+  "name": "@mrclrchtr/supi-extras",
+  "version": "0.1.0",
+  "description": "SuPi UI extras — tab spinner, prompt stash, and other small UI utilities",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "src/**/*.ts",
+    "!__tests__"
+  ],
+  "devDependencies": {
+    "vitest": "^4.1.5"
+  },
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/tab-spinner.ts"
+    ]
+  }
+}
