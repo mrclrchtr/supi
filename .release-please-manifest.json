@@ -3,6 +3,17 @@
   "packages/supi-aliases": "0.1.0",
   "packages/supi-ask-user": "0.1.0",
   "packages/supi-bash-timeout": "0.1.0",
+  "packages/supi-cache-monitor": "0.1.0",
+  "packages/supi-claude-md": "0.1.0",
+  "packages/supi-code-intelligence": "0.1.0",
+  "packages/supi-context": "0.1.0",
+  "packages/supi-core": "0.1.0",
+  "packages/supi-debug": "0.1.0",
+  "packages/supi-extras": "0.1.0",
+  "packages/supi-insights": "0.1.0",
   "packages/supi-lsp": "0.1.0",
-  "packages/supi-skill-shortcut": "0.1.0"
+  "packages/supi-review": "0.1.0",
+  "packages/supi-rtk": "0.1.0",
+  "packages/supi-skill-shortcut": "0.1.0",
+  "packages/supi-tree-sitter": "0.1.0"
 }

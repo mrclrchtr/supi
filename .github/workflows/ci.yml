@@ -10,13 +10,59 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  verify:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Lint GitHub Actions workflows
+        uses: rhysd/actionlint@03d0035246f3e81f36aed592ffb4bebf33a03106 # v1.7.7
+
+  conventional-commits:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up workspace dependencies
+        uses: ./.github/actions/setup-pnpm
+
+      - name: Validate PR title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          REGEX='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?(!)?: .+$'
+
+          if [[ ! "$PR_TITLE" =~ $REGEX ]]; then
+            echo "PR title must follow Conventional Commits."
+            echo "Example: feat(lsp): add diagnostics summary"
+            echo "Got: $PR_TITLE"
+            exit 1
+          fi
+
+      - name: Validate current commit (last commit)
+        if: github.event_name == 'push'
+        run: pnpm exec commitlint --last --verbose
+
+      - name: Validate PR commits
+        if: github.event_name == 'pull_request'
+        run: pnpm exec commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -25,33 +71,61 @@ jobs:
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
 
+      - name: Check release-please config coverage
+        run: |
+          publishable=$(mktemp)
+          configured=$(mktemp)
+          for dir in packages/*/; do
+            if [ "$(jq -r '.private // false' "$dir/package.json")" = "false" ]; then
+              echo "${dir%/}"
+            fi
+          done | sort > "$publishable"
+          jq -r '.packages | keys[]' release-please-config.json | sort > "$configured"
+          if ! diff -q "$publishable" "$configured"; then
+            echo "::error::Mismatch between publishable packages and release-please config"
+            diff "$publishable" "$configured" || true
+            exit 1
+          fi
+
       - name: Verify package
         run: pnpm verify
 
-  smoke-test:
+  release-please:
+    needs: [actionlint, conventional-commits, verify]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    name: Smoke test — clean install
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      releases_created: ${{ steps.release.outputs.releases_created }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+    steps:
+      - uses: google-github-actions/release-please-action@e4dc86ba9405554aeba3c6bb2d169500e7d3b4ee # v4.1.1
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
+  publish:
+    needs: release-please
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.release-please.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
-        with:
-          version: 10.33.0
+      - name: Set up workspace dependencies
+        uses: ./.github/actions/setup-pnpm
 
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
-        with:
-          node-version: 24
-          registry-url: "https://registry.npmjs.org"
-          cache: pnpm
-
-      - name: Clean install and verify
-        shell: bash
-        run: |
-          rm -rf node_modules packages/*/node_modules
-          pnpm install
-          pnpm verify
+      - name: Publish released packages
+        env:
+          PATHS_RELEASED: ${{ needs.release-please.outputs.paths_released }}
+        run: node scripts/publish-released.mjs
