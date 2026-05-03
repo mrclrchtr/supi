@@ -283,13 +283,22 @@ export class LspClient {
     return this.diagnosticStore.get(fileToUri(filePath))?.diagnostics ?? [];
   }
 
-  /** Get all stored diagnostics across all files. */
+  /**
+   * Get all stored diagnostics across all files.
+   *
+   * Filters out empty entries and — defensively — files that no longer exist
+   * on disk. The latter guards against a race where a `publishDiagnostics`
+   * notification (already in-flight) arrives *after* `pruneMissingFiles()`
+   * has removed the file from `openDocs`, recreating a stale cache entry.
+   */
   getAllDiagnostics(): DiagnosticEntry[] {
     const result: DiagnosticEntry[] = [];
     for (const [uri, entry] of this.diagnosticStore) {
-      if (entry.diagnostics.length > 0) {
-        result.push({ uri, diagnostics: entry.diagnostics });
-      }
+      if (entry.diagnostics.length === 0) continue;
+      // Defensive: drop diagnostics for files deleted after prune. Late
+      // in-flight publishDiagnostics notifications can recreate stale entries.
+      if (!existsSync(uriToFile(uri))) continue;
+      result.push({ uri, diagnostics: entry.diagnostics });
     }
     return result;
   }

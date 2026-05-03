@@ -241,7 +241,7 @@ describe("before_agent_start diagnostic refresh", () => {
     const { handlers, ctx } = await setupExtension(manager);
     await handlers.get("before_agent_start")?.({ systemPrompt: "test" }, ctx);
 
-    expect(callOrder).toEqual(["prune", "refresh", "summary"]);
+    expect(callOrder).toEqual(["prune", "refresh", "prune", "summary"]);
   });
 
   it("uses refreshed content for fingerprint deduplication", async () => {

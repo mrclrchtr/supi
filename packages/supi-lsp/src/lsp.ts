@@ -199,12 +199,23 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
 
     ensureLspToolActive(pi);
 
+    /**
+     * Two-pass prune/refresh pattern:
+     *
+     * 1. Prune files deleted since the last turn and send didClose.
+     * 2. Re-sync remaining open docs and wait for diagnostics to settle.
+     * 3. Prune *again* — late publishDiagnostics notifications (already
+     *    in-flight when step 1 ran) may have re-created stale entries for
+     *    files that no longer exist. `getAllDiagnostics()` also filters
+     *    by existence, so this second pass is belt-and-suspenders.
+     */
     state.manager.pruneMissingFiles();
     try {
       await state.manager.refreshOpenDiagnostics();
     } catch {
       // Refresh failures must not prevent agent startup
     }
+    state.manager.pruneMissingFiles();
     refreshProjectServers(state);
     updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
 

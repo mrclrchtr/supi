@@ -1,8 +1,18 @@
+/**
+ * Prompt stash extension for pi.
+ *
+ * Provides `Alt+S` to stash the current editor text, `Ctrl+Shift+S` to copy
+ * it to the system clipboard, and `/stash`, `/stash-copy`, `/stash-clear`
+ * commands for browsing and managing stashed drafts.
+ *
+ * Stashes are kept in-memory (session-scoped, not persisted).
+ */
 import { unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
+/** In-memory stash entry. */
 interface Stash {
   id: string;
   name: string;
@@ -10,6 +20,7 @@ interface Stash {
   createdAt: number;
 }
 
+/** Session-scoped stash store. Cleared on session shutdown or `/stash-clear`. */
 const STASHES = new Map<string, Stash>();
 
 /** Reset stashes — intended for tests only. */
@@ -17,10 +28,15 @@ export function _resetStashes(): void {
   STASHES.clear();
 }
 
+/** Generate a unique stash id. */
 function generateId(): string {
   return `stash-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/**
+ * Derive a default name from the first line of the prompt text.
+ * Falls back to "Untitled" for empty input.
+ */
 function generateName(text: string): string {
   const firstLine = text.split("\n")[0]?.trim() ?? "";
   if (firstLine.length > 0 && firstLine.length <= 40) return firstLine;
@@ -28,17 +44,24 @@ function generateName(text: string): string {
   return "Untitled";
 }
 
+/** Build selectable labels for the TUI `select` dialog, newest first. */
 function getStashLabels(): string[] {
   return Array.from(STASHES.values())
     .sort((a, b) => b.createdAt - a.createdAt)
     .map((s) => `[${s.id}] ${s.name}`);
 }
 
+/** Extract the stash id from a label formatted as `[id] name`. */
 function parseStashId(label: string): string | undefined {
   const match = label.match(/^\[([^\]]+)\]/);
   return match?.[1];
 }
 
+/**
+ * Copy text to the system clipboard using the best available tool for the
+ * current platform (macOS `pbcopy`, Linux `wl-copy`/`xclip`, Windows
+ * `powershell Set-Clipboard`). Writes to a temp file and pipes it in.
+ */
 async function copyToClipboard(text: string, cwd: string, pi: ExtensionAPI): Promise<boolean> {
   const tmpFile = join(tmpdir(), `pi-stash-clipboard-${Date.now()}.txt`);
 
@@ -79,11 +102,12 @@ async function copyToClipboard(text: string, cwd: string, pi: ExtensionAPI): Pro
     try {
       unlinkSync(tmpFile);
     } catch {
-      /* ignore */
+      /* ignore temp file cleanup errors */
     }
   }
 }
 
+/** Register the prompt-stash shortcuts and commands. */
 export default function promptStash(pi: ExtensionAPI) {
   pi.registerShortcut("alt+s", {
     description: "Stash current editor text",
