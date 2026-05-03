@@ -15,6 +15,7 @@ import {
 } from "./ui-rich-render-editor.ts";
 import type { RenderEnv } from "./ui-rich-render-env.ts";
 import { footerHelp } from "./ui-rich-render-footer.ts";
+import { renderMarkdownPreview } from "./ui-rich-render-markdown.ts";
 import { currentNote, renderNoteStatus, visibleNoteMarker } from "./ui-rich-render-notes.ts";
 import {
   hasPreview,
@@ -229,7 +230,7 @@ function renderPreviewPane(
     push(theme.fg("muted", " No preview for the current selection."));
     return out;
   }
-  for (const line of preview.split("\n")) push(theme.fg("text", ` ${line}`));
+  out.push(...renderMarkdownPreview(preview, width, theme));
   return out;
 }
 
@@ -237,9 +238,7 @@ function renderPreviewBlock(env: RenderEnv, preview: string): string[] {
   const out: string[] = [];
   out.push("");
   out.push(env.theme.fg("accent", " Preview:"));
-  for (const line of preview.split("\n")) {
-    out.push(truncateToWidth(` ${line}`, env.width));
-  }
+  out.push(...renderMarkdownPreview(preview, env.width, env.theme));
   return out;
 }
 

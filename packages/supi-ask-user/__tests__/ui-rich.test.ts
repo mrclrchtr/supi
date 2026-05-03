@@ -1,8 +1,23 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Component, TUI } from "@mariozechner/pi-tui";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NormalizedQuestion } from "../types.ts";
 import { type RichCustomOptions, type RichUiHost, runRichQuestionnaire } from "../ui-rich.ts";
+
+const mockRenderMarkdownPreview = vi.hoisted(() =>
+  vi.fn((preview: string) => preview.split("\n").map((line) => ` ${line}`)),
+);
+
+vi.mock("../ui-rich-render-markdown", () => ({
+  renderMarkdownPreview: mockRenderMarkdownPreview,
+}));
+
+beforeEach(() => {
+  mockRenderMarkdownPreview.mockImplementation((preview: string) =>
+    preview.split("\n").map((line: string) => ` ${line}`),
+  );
+  mockRenderMarkdownPreview.mockClear();
+});
 
 const choice: NormalizedQuestion = {
   id: "scope",
@@ -408,5 +423,63 @@ describe("render height stability", () => {
     // Render second question — yesno, much shorter, should NOT carry q1's height
     const q2Lines = captured.value.render(80);
     expect(q2Lines.length).toBeLessThan(q1Lines.length);
+  });
+});
+
+describe("markdown preview rendering", () => {
+  it("renders option previews as markdown in split view", async () => {
+    mockRenderMarkdownPreview.mockReturnValueOnce([" md line 1", " md line 2"]);
+    const markdownQuestion: NormalizedQuestion = {
+      id: "md",
+      header: "Markdown",
+      type: "choice",
+      prompt: "Pick",
+      required: true,
+      options: [{ value: "a", label: "A", preview: "# Hello\nWorld" }],
+      allowOther: false,
+      allowDiscuss: false,
+      recommendedIndexes: [0],
+    };
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire({ questions: [markdownQuestion], allowSkip: false }, { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked");
+
+    const rendered = captured.value.render(120).join("\n");
+    expect(rendered).toContain("md line 1");
+    expect(rendered).toContain("md line 2");
+    expect(mockRenderMarkdownPreview).toHaveBeenCalledWith(
+      "# Hello\nWorld",
+      expect.any(Number),
+      expect.any(Object),
+    );
+  });
+
+  it("renders option previews as markdown in narrow fallback block", async () => {
+    mockRenderMarkdownPreview.mockReturnValueOnce([" fallback md"]);
+    const markdownQuestion: NormalizedQuestion = {
+      id: "md",
+      header: "Markdown",
+      type: "choice",
+      prompt: "Pick",
+      required: true,
+      options: [{ value: "a", label: "A", preview: "`code`" }],
+      allowOther: false,
+      allowDiscuss: false,
+      recommendedIndexes: [0],
+    };
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire({ questions: [markdownQuestion], allowSkip: false }, { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked");
+
+    // Render at 80 cols — split view requires >= 100, so this falls back to block
+    const rendered = captured.value.render(80).join("\n");
+    expect(rendered).toContain("fallback md");
+    expect(mockRenderMarkdownPreview).toHaveBeenCalledWith(
+      "`code`",
+      expect.any(Number),
+      expect.any(Object),
+    );
   });
 });
