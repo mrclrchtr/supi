@@ -49,7 +49,10 @@ async function gatherReferences(
   if (lspState.kind === "ready") {
     const lspRefs = await lspState.service.references(target.file, target.position);
     if (lspRefs && lspRefs.length > 0) {
-      for (const ref of lspRefs) {
+      // Filter out the declaration itself — LSP includes it with includeDeclaration.
+      // The declaration is the symbol being changed, not something affected by the change.
+      const filtered = filterOutDeclaration(lspRefs, target.file, target.position);
+      for (const ref of filtered) {
         const filePath = ref.uri.startsWith("file://")
           ? decodeURIComponent(ref.uri.slice(7))
           : ref.uri;
@@ -232,6 +235,26 @@ function addTestsSection(lines: string[], tests: string[]): void {
     lines.push(`- \`${t}\``);
   }
   lines.push("");
+}
+
+type LspRef = { uri: string; range: { start: { line: number; character: number } } };
+
+/**
+ * Filter out the declaration/definition location from LSP references.
+ * LSP's `textDocument/references` includes the declaration by default;
+ * for affected analysis, the declaration is the change site, not an affected reference.
+ */
+function filterOutDeclaration(
+  refs: LspRef[],
+  targetFile: string,
+  targetPos: { line: number; character: number },
+): LspRef[] {
+  return refs.filter((ref) => {
+    const filePath = ref.uri.startsWith("file://") ? decodeURIComponent(ref.uri.slice(7)) : ref.uri;
+    if (filePath !== targetFile) return true;
+    const start = ref.range.start;
+    return start.line !== targetPos.line || start.character !== targetPos.character;
+  });
 }
 
 function addAffectedNextQueries(

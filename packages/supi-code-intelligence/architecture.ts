@@ -46,30 +46,6 @@ export interface DependencyEdge {
   to: string;
 }
 
-// ── Low-signal path filtering ─────────────────────────────────────────
-
-const LOW_SIGNAL_DIRS = new Set([
-  "node_modules",
-  ".git",
-  ".pnpm",
-  "dist",
-  "build",
-  "out",
-  ".next",
-  ".nuxt",
-  "coverage",
-  ".turbo",
-  ".cache",
-  "__pycache__",
-  ".tsbuildinfo",
-]);
-
-/** Check if a path segment indicates a low-signal artifact directory. */
-export function isLowSignalPath(filePath: string): boolean {
-  const segments = filePath.split(path.sep);
-  return segments.some((s) => LOW_SIGNAL_DIRS.has(s));
-}
-
 // ── Model building ────────────────────────────────────────────────────
 
 const PROJECT_MARKERS = [
@@ -240,7 +216,6 @@ async function detectWorkspaceModules(
   return modules;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: glob expansion with conditional directory scanning
 function resolveWorkspaceGlobs(root: string, globs: string[]): string[] {
   const dirs: string[] = [];
 
@@ -249,18 +224,9 @@ function resolveWorkspaceGlobs(root: string, globs: string[]): string[] {
       // Expand glob: "packages/*" -> list all dirs under packages/
       const prefix = glob.replace(/\/?\*.*$/, "");
       const baseDir = path.join(root, prefix);
+      const recursive = glob.includes("**");
       try {
-        const entries = fs.readdirSync(baseDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isDirectory()) continue;
-          if (entry.name.startsWith(".")) continue;
-          if (entry.name === "node_modules") continue;
-          const fullPath = path.join(baseDir, entry.name);
-          // Only include if it has a package.json
-          if (fs.existsSync(path.join(fullPath, "package.json"))) {
-            dirs.push(fullPath);
-          }
-        }
+        collectPackageDirs(baseDir, dirs, recursive ? 5 : 0);
       } catch {
         // Glob base directory doesn't exist
       }
@@ -274,6 +240,30 @@ function resolveWorkspaceGlobs(root: string, globs: string[]): string[] {
   }
 
   return dirs;
+}
+
+/**
+ * Collect directories containing a package.json.
+ * When depth > 0, recurse into subdirectories (for `**` globs).
+ */
+function collectPackageDirs(baseDir: string, dirs: string[], depth: number): void {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(baseDir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith(".")) continue;
+    if (entry.name === "node_modules") continue;
+    const fullPath = path.join(baseDir, entry.name);
+    if (fs.existsSync(path.join(fullPath, "package.json"))) {
+      dirs.push(fullPath);
+    } else if (depth > 0) {
+      collectPackageDirs(fullPath, dirs, depth - 1);
+    }
+  }
 }
 
 // ── Fallback models ───────────────────────────────────────────────────

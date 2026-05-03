@@ -15,6 +15,8 @@ const LOW_SIGNAL_DIRS = new Set([
   "coverage",
   ".turbo",
   ".cache",
+  "__pycache__",
+  ".tsbuildinfo",
 ]);
 
 /** Check if a file path contains an obviously low-signal directory segment. */
@@ -117,25 +119,42 @@ function parseRgJson(output: string, filterLowSignal: boolean): RgMatch[] {
       const lineNum = parsed.data.line_number;
       const text = (parsed.data.lines?.text ?? "").trim();
       if (filePath && lineNum) {
+        // Split pendingContext: lines before this match are "before" context,
+        // lines from before this match line that trail the previous match stay with it.
+        const beforeCtx = pendingContext.filter((c) => c.line < lineNum);
+        const trailingCtx = pendingContext.filter((c) => c.line >= lineNum);
+
+        // Attach trailing context from previous match to the last accepted match
+        if (beforeCtx.length > 0 && matches.length > 0) {
+          const prev = matches[matches.length - 1];
+          const prevTrailing = beforeCtx.filter((c) => c.line > prev.line);
+          if (prevTrailing.length > 0) {
+            prev.context = [...(prev.context ?? []), ...prevTrailing];
+          }
+        }
+
         if (filterLowSignal && isLowSignalPath(filePath)) {
           pendingContext = [];
           continue;
         }
+
         const match: RgMatch = { file: filePath, line: lineNum, text };
-        if (pendingContext.length > 0) {
-          match.context = pendingContext;
-          pendingContext = [];
+        // Leading context: lines just before this match
+        const leadingCtx =
+          matches.length > 0
+            ? beforeCtx.filter(
+                (c) => c.line <= lineNum && c.line > (matches[matches.length - 1]?.line ?? 0),
+              )
+            : beforeCtx;
+        if (leadingCtx.length > 0) {
+          match.context = leadingCtx;
         }
+        // Also include any pending context at/after this match's line (trailing from rg ordering)
+        pendingContext = trailingCtx;
         matches.push(match);
       } else {
         pendingContext = [];
       }
-      continue;
-    }
-
-    // Attach trailing context to the last match
-    if (parsed.type === "context" && matches.length > 0) {
-      // Already handled above
     }
   }
 

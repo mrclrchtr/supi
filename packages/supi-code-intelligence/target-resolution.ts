@@ -5,7 +5,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core";
 import { getSessionLspService, type Position, type SessionLspService } from "@mrclrchtr/supi-lsp";
-import { normalizePath } from "./search-helpers.ts";
+import { escapeRegex, normalizePath } from "./search-helpers.ts";
 import type { ConfidenceMode, DisambiguationCandidate } from "./types.ts";
 
 export interface ResolvedTarget {
@@ -58,7 +58,6 @@ export function resolveAnchoredTarget(
   }
 
   const position = toZeroBased(line, character);
-  const _relPath = path.relative(cwd, resolvedFile);
 
   return {
     kind: "resolved",
@@ -131,6 +130,16 @@ async function resolveSymbolViaLsp(
     });
   }
 
+  // Filter to exported symbols only (heuristic: non-local SymbolKinds)
+  if (options?.exportedOnly) {
+    candidates = candidates.filter((s) => {
+      // LSP workspace symbols don't expose export visibility directly.
+      // Filter out SymbolKinds that are typically local/private (Variable, Field, Property).
+      const NON_EXPORTED_KINDS = new Set([7, 8, 13]); // Property, Field, Variable
+      return !NON_EXPORTED_KINDS.has(s.kind);
+    });
+  }
+
   if (candidates.length === 0) {
     return {
       kind: "error",
@@ -183,7 +192,10 @@ async function resolveSymbolViaSearch(
   const scopePath = options?.path ? normalizePath(options.path, cwd) : cwd;
 
   try {
-    const pattern = `(function|class|interface|type|const|let|var|export)\\s+${escapeRegex(symbol)}\\b`;
+    const exportOnly = options?.exportedOnly;
+    const pattern = exportOnly
+      ? `export\\s+(function|class|interface|type|const|let|var)\\s+${escapeRegex(symbol)}\\b`
+      : `(function|class|interface|type|const|let|var|export)\\s+${escapeRegex(symbol)}\\b`;
     let output: string;
     try {
       output = execFileSync("rg", ["--json", "-m", "10", "-e", pattern, scopePath], {
@@ -291,10 +303,6 @@ function mapCandidateToDisambiguation(
   };
 }
 
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 const BINARY_EXTENSIONS = new Set([
   ".png",
   ".jpg",
@@ -303,7 +311,6 @@ const BINARY_EXTENSIONS = new Set([
   ".webp",
   ".bmp",
   ".ico",
-  ".svg",
   ".woff",
   ".woff2",
   ".ttf",
