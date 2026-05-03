@@ -1,3 +1,4 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: analysis file is inherently large
 import {
   type BuildSystemPromptOptions,
   buildSessionContext,
@@ -8,6 +9,7 @@ import {
   getLatestCompactionEntry,
   SettingsManager,
 } from "@mariozechner/pi-coding-agent";
+import { getRegisteredContextProviders } from "@mrclrchtr/supi-core";
 import { deriveOptionsFromSystemPrompt, extractGuidelinesSection } from "./prompt-inference.ts";
 
 type AgentMessage = Parameters<typeof estimateTokens>[0];
@@ -37,6 +39,12 @@ export interface SkillInfo {
   tokens: number;
 }
 
+export interface ContextProviderSection {
+  id: string;
+  label: string;
+  data: Record<string, string | number>;
+}
+
 export interface ContextAnalysis {
   modelName: string;
   contextWindow: number;
@@ -60,6 +68,7 @@ export interface ContextAnalysis {
   guidelines: number;
   toolDefinitions: { count: number; tokens: number };
   compaction: { summarizedTurns: number } | null;
+  providerSections: ContextProviderSection[];
 }
 
 export function estimateTextTokens(text: string): number {
@@ -208,6 +217,20 @@ function applyScaling(
   }
 
   return { categories, scaled, approximationNote, totalTokens };
+}
+
+/**
+ * Collect data from registered context providers.
+ */
+function collectProviderData(): ContextProviderSection[] {
+  const sections: ContextProviderSection[] = [];
+  for (const provider of getRegisteredContextProviders()) {
+    const data = provider.getData();
+    if (data) {
+      sections.push({ id: provider.id, label: provider.label, data });
+    }
+  }
+  return sections;
 }
 
 function computeContextFiles(
@@ -396,5 +419,6 @@ export function analyzeContext(
     guidelines: breakdown.guidelines,
     toolDefinitions,
     compaction,
+    providerSections: collectProviderData(),
   };
 }

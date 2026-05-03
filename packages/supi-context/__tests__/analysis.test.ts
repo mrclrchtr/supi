@@ -8,6 +8,7 @@ const mockFns = vi.hoisted(() => ({
   formatSkillsForPrompt: vi.fn((skills: Array<{ name: string }>) =>
     skills.map((s) => `<skill>${s.name}</skill>`).join("\n"),
   ),
+  getRegisteredContextProviders: vi.fn(),
 }));
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
@@ -20,6 +21,10 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
     }),
   },
   formatSkillsForPrompt: mockFns.formatSkillsForPrompt,
+}));
+
+vi.mock("@mrclrchtr/supi-core", () => ({
+  getRegisteredContextProviders: mockFns.getRegisteredContextProviders,
 }));
 
 import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
@@ -109,6 +114,7 @@ describe("analyzeContext", () => {
       return Math.ceil(contentStr.length / 4);
     });
     mockFns.getLatestCompactionEntry.mockReturnValue(null);
+    mockFns.getRegisteredContextProviders.mockReturnValue([]);
   });
 
   it("builds API view from branch entries", () => {
@@ -238,5 +244,48 @@ describe("analyzeContext", () => {
 
     expect(result.toolDefinitions.count).toBe(1);
     expect(result.toolDefinitions.tokens).toBeGreaterThan(0);
+  });
+
+  it("includes provider sections from registered context providers", () => {
+    mockFns.buildSessionContext.mockReturnValue({ messages: [] });
+    mockFns.getRegisteredContextProviders.mockReturnValue([
+      {
+        id: "rtk",
+        label: "RTK",
+        getData: () => ({ rewrites: 5, fallbacks: 1 }),
+      },
+    ]);
+
+    const ctx = createMockCtx({
+      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
+    });
+    const pi = createMockPi();
+    const result = analyzeContext(ctx, pi, undefined);
+
+    expect(result.providerSections).toHaveLength(1);
+    expect(result.providerSections[0]).toMatchObject({
+      id: "rtk",
+      label: "RTK",
+      data: { rewrites: 5, fallbacks: 1 },
+    });
+  });
+
+  it("omits providers that return null", () => {
+    mockFns.buildSessionContext.mockReturnValue({ messages: [] });
+    mockFns.getRegisteredContextProviders.mockReturnValue([
+      {
+        id: "rtk",
+        label: "RTK",
+        getData: () => null,
+      },
+    ]);
+
+    const ctx = createMockCtx({
+      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
+    });
+    const pi = createMockPi();
+    const result = analyzeContext(ctx, pi, undefined);
+
+    expect(result.providerSections).toHaveLength(0);
   });
 });

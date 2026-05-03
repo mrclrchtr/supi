@@ -84,6 +84,9 @@ importers:
       '@mrclrchtr/supi-review':
         specifier: workspace:*
         version: link:../supi-review
+      '@mrclrchtr/supi-rtk':
+        specifier: workspace:*
+        version: link:../supi-rtk
       '@mrclrchtr/supi-skill-shortcut':
         specifier: workspace:*
         version: link:../supi-skill-shortcut
@@ -250,6 +253,22 @@ importers:
         version: 4.1.4(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
 
   packages/supi-review:
+    dependencies:
+      '@mariozechner/pi-coding-agent':
+        specifier: '*'
+        version: 0.70.2(ws@8.20.0)(zod@4.3.6)
+      '@mariozechner/pi-tui':
+        specifier: '*'
+        version: 0.70.2
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
+    devDependencies:
+      vitest:
+        specifier: ^4.1.4
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
+
+  packages/supi-rtk:
     dependencies:
       '@mariozechner/pi-coding-agent':
         specifier: '*'

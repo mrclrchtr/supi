@@ -19,6 +19,12 @@ export {
   pruneAndReorderContextMessages,
   restorePromptContent,
 } from "./context-messages.ts";
+export type { ContextProvider } from "./context-provider-registry.ts";
+export {
+  clearRegisteredContextProviders,
+  getRegisteredContextProviders,
+  registerContextProvider,
+} from "./context-provider-registry.ts";
 export { wrapExtensionContext } from "./context-tag.ts";
 export type { KnownRootEntry } from "./project-roots.ts";
 export {

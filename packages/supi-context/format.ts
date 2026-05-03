@@ -247,6 +247,20 @@ function renderCompactionNote(analysis: ContextAnalysis, theme: Theme): string[]
   ];
 }
 
+function renderProviderSections(analysis: ContextAnalysis, theme: Theme): string[] {
+  if (analysis.providerSections.length === 0) return [];
+
+  const lines: string[] = [];
+  for (const section of analysis.providerSections) {
+    lines.push("");
+    lines.push(theme.fg("accent", section.label));
+    for (const [key, value] of Object.entries(section.data)) {
+      lines.push(`  ${theme.fg("text", key)}: ${theme.fg("dim", String(value))}`);
+    }
+  }
+  return lines;
+}
+
 export function formatContextReport(analysis: ContextAnalysis, theme: Theme): string[] {
   const lines: string[] = [];
 
@@ -260,6 +274,7 @@ export function formatContextReport(analysis: ContextAnalysis, theme: Theme): st
   lines.push(...renderSkillsSection(analysis, theme));
   lines.push(...renderGuidelinesAndTools(analysis, theme));
   lines.push(...renderCompactionNote(analysis, theme));
+  lines.push(...renderProviderSections(analysis, theme));
 
   return lines;
 }

@@ -37,6 +37,7 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
     guidelines: 500,
     toolDefinitions: { count: 5, tokens: 2_500 },
     compaction: null,
+    providerSections: [],
     ...overrides,
   };
 }
@@ -147,5 +148,36 @@ describe("formatContextReport", () => {
     const lines = formatContextReport(analysis, mockTheme);
 
     expect(lines.some((l) => l.includes("summarized (compaction)"))).toBe(false);
+  });
+
+  it("omits provider sections when empty", () => {
+    const analysis = makeAnalysis();
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("RTK"))).toBe(false);
+  });
+
+  it("renders provider sections when present", () => {
+    const analysis = makeAnalysis({
+      providerSections: [{ id: "rtk", label: "RTK", data: { rewrites: 5, fallbacks: 1 } }],
+    });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("RTK"))).toBe(true);
+    expect(lines.some((l) => l.includes("[text]rewrites[/text]"))).toBe(true);
+    expect(lines.some((l) => l.includes("[text]fallbacks[/text]"))).toBe(true);
+  });
+
+  it("renders multiple provider sections", () => {
+    const analysis = makeAnalysis({
+      providerSections: [
+        { id: "rtk", label: "RTK", data: { rewrites: 5 } },
+        { id: "cache", label: "Cache", data: { hits: 10 } },
+      ],
+    });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("RTK"))).toBe(true);
+    expect(lines.some((l) => l.includes("Cache"))).toBe(true);
   });
 });
