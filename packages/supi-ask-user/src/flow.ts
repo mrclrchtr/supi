@@ -84,7 +84,7 @@ export class QuestionnaireFlow {
   }
 
   goBack(): boolean {
-    if (this.mode === "terminal") return false;
+    if (!this.guardNotTerminal()) return false;
     if (this.mode === "reviewing") {
       this.mode = "answering";
       this.index = this.questions.length - 1;
@@ -98,7 +98,7 @@ export class QuestionnaireFlow {
   }
 
   enterReview(): boolean {
-    if (this.mode === "terminal") return false;
+    if (!this.guardNotTerminal()) return false;
     if (!needsReview(this.questions)) return false;
     if (!this.allRequiredAnswered()) return false;
     this.mode = "reviewing";
@@ -106,27 +106,27 @@ export class QuestionnaireFlow {
   }
 
   submit(): boolean {
-    if (this.mode === "terminal") return false;
+    if (!this.guardNotTerminal()) return false;
     if (!this.allRequiredAnswered()) return false;
     this.markSubmitted();
     return true;
   }
 
   skip(): boolean {
-    if (this.mode === "terminal") return false;
+    if (!this.guardNotTerminal()) return false;
     this.mode = "terminal";
     this.terminalState = "skipped";
     return true;
   }
 
   cancel(): void {
-    if (this.mode === "terminal") return;
+    if (!this.guardNotTerminal()) return;
     this.mode = "terminal";
     this.terminalState = "cancelled";
   }
 
   abort(): void {
-    if (this.mode === "terminal") return;
+    if (!this.guardNotTerminal()) return;
     this.mode = "terminal";
     this.terminalState = "aborted";
   }
@@ -145,6 +145,10 @@ export class QuestionnaireFlow {
           : [...this.answers.values()],
       ...(state === "skipped" ? { skipped: true } : {}),
     };
+  }
+
+  private guardNotTerminal(): boolean {
+    return this.mode !== "terminal";
   }
 
   private markSubmitted(): void {
