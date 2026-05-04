@@ -394,9 +394,18 @@ importers:
         specifier: '*'
         version: 1.1.31
     devDependencies:
+      '@davisvaughan/tree-sitter-r':
+        specifier: ^1.2.0
+        version: 1.2.0
+      '@derekstride/tree-sitter-sql':
+        specifier: ^0.3.11
+        version: 0.3.11
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
+      tree-sitter-bash:
+        specifier: ^0.23.0
+        version: 0.23.3
       tree-sitter-c:
         specifier: ^0.23.0
         version: 0.23.6
@@ -409,6 +418,9 @@ importers:
       tree-sitter-go:
         specifier: ^0.23.0
         version: 0.23.4
+      tree-sitter-html:
+        specifier: ^0.23.0
+        version: 0.23.2
       tree-sitter-java:
         specifier: ^0.23.0
         version: 0.23.5
@@ -745,6 +757,23 @@ packages:
       conventional-commits-filter:
         optional: true
       conventional-commits-parser:
+        optional: true
+
+  '@davisvaughan/tree-sitter-r@1.2.0':
+    resolution: {integrity: sha512-KnvUaJJS6h1oCcRaq8fFb/xYyvqodMcE5M48vYmIWW7uOJCFkNwaHdGXuLzTipOWfXGzrKuq4EFRifHphLu9GQ==}
+    peerDependencies:
+      tree-sitter: ^0.21.1
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
+
+  '@derekstride/tree-sitter-sql@0.3.11':
+    resolution: {integrity: sha512-YRtTXVWK4n7/3BUGchhGcW/IF1u2ldR2fd0t3Uw7ymbGXcRfiG3v1T6N43jQKXz2LwN+Nx+Ab96T0HtusBVH9g==}
+    peerDependencies:
+      tree-sitter: ^0.21.0
+      tree_sitter: '*'
+    peerDependenciesMeta:
+      tree_sitter:
         optional: true
 
   '@emnapi/core@1.9.2':
@@ -2186,6 +2215,14 @@ packages:
     resolution: {integrity: sha512-dRXchy+C0IgK8WPC6xvCHFRIWYUbqqdEIKPaKo/AcTUNzwLTK6AH7RjdLWsEZcAN/TBdtfUw3PYEgPr5VPr6ww==}
     engines: {node: '>=14.16'}
 
+  tree-sitter-bash@0.23.3:
+    resolution: {integrity: sha512-36cg/GQ2YmIbeiBeqeuh4fBJ6i4kgVouDaqTxqih5ysPag+zHufyIaxMOFeM8CeplwAK/Luj1o5XHqgdAfoCZg==}
+    peerDependencies:
+      tree-sitter: ^0.21.1
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
+
   tree-sitter-c@0.23.6:
     resolution: {integrity: sha512-0dxXKznVyUA0s6PjNolJNs2yF87O5aL538A/eR6njA5oqX3C3vH4vnx3QdOKwuUdpKEcFdHuiDpRKLLCA/tjvQ==}
     peerDependencies:
@@ -2208,6 +2245,14 @@ packages:
 
   tree-sitter-go@0.23.4:
     resolution: {integrity: sha512-iQaHEs4yMa/hMo/ZCGqLfG61F0miinULU1fFh+GZreCRtKylFLtvn798ocCZjO2r/ungNZgAY1s1hPFyAwkc7w==}
+    peerDependencies:
+      tree-sitter: ^0.21.1
+    peerDependenciesMeta:
+      tree-sitter:
+        optional: true
+
+  tree-sitter-html@0.23.2:
+    resolution: {integrity: sha512-TN+l+7cCeLx9db/1RhRSqMAZO/266Oh2BHb8J8hMSSFLuzYvFTYP/UnD3S0mny5awzw05KzFNgu2vnwzN9wVJg==}
     peerDependencies:
       tree-sitter: ^0.21.1
     peerDependenciesMeta:
@@ -3070,6 +3115,16 @@ snapshots:
     optionalDependencies:
       conventional-commits-filter: 5.0.0
       conventional-commits-parser: 6.4.0
+
+  '@davisvaughan/tree-sitter-r@1.2.0':
+    dependencies:
+      node-addon-api: 8.7.0
+      node-gyp-build: 4.8.4
+
+  '@derekstride/tree-sitter-sql@0.3.11':
+    dependencies:
+      node-addon-api: 7.1.1
+      node-gyp-build: 4.8.4
 
   '@emnapi/core@1.9.2':
     dependencies:
@@ -4619,6 +4674,11 @@ snapshots:
       '@tokenizer/token': 0.3.0
       ieee754: 1.2.1
 
+  tree-sitter-bash@0.23.3:
+    dependencies:
+      node-addon-api: 8.7.0
+      node-gyp-build: 4.8.4
+
   tree-sitter-c@0.23.6:
     dependencies:
       node-addon-api: 8.7.0
@@ -4633,6 +4693,11 @@ snapshots:
       tree-sitter-c: 0.23.6
 
   tree-sitter-go@0.23.4:
+    dependencies:
+      node-addon-api: 8.7.0
+      node-gyp-build: 4.8.4
+
+  tree-sitter-html@0.23.2:
     dependencies:
       node-addon-api: 8.7.0
       node-gyp-build: 4.8.4

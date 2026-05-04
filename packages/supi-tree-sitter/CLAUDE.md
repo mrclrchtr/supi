@@ -15,11 +15,13 @@ The package is designed as a standalone structural-analysis substrate. It does n
 - `coordinates.ts` — 1-based UTF-16 coordinate conversion shared with `node_at` and query results
 - `language.ts` — file extension → grammar ID detection and WASM path resolution
 - `resources/grammars/kotlin/` — vendored Kotlin WASM plus source/version/checksum metadata
+- `resources/grammars/sql/` — vendored SQL WASM plus source/version/checksum metadata
 - `scripts/generate-kotlin-wasm.mjs` — regenerates/checks the vendored Kotlin grammar from `tree-sitter-kotlin`
+- `scripts/generate-sql-wasm.mjs` — regenerates/checks the vendored SQL grammar from `@derekstride/tree-sitter-sql`
 
 ## Supported languages
 
-Grammars are resolved via npm peer dependencies, except Kotlin which uses a vendored WASM generated from the trusted `fwcd/tree-sitter-kotlin` npm package. Supported file families:
+Grammars are resolved via npm peer dependencies, except Kotlin and SQL which use vendored WASM files generated from `fwcd/tree-sitter-kotlin` and `@derekstride/tree-sitter-sql` respectively. Supported file families:
 - **JavaScript/TypeScript**: `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.tsx`
 - **Python**: `.py`, `.pyi`
 - **Rust**: `.rs`
@@ -28,10 +30,14 @@ Grammars are resolved via npm peer dependencies, except Kotlin which uses a vend
 - **Java**: `.java`
 - **Kotlin**: `.kt`, `.kts`
 - **Ruby**: `.rb`
+- **Bash/Shell**: `.sh`, `.bash`, `.zsh`
+- **HTML**: `.html`, `.htm`, `.xhtml`
+- **R**: `.r`
+- **SQL**: `.sql`
 
 ## Validation
 
-- `pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm exec biome check packages/supi-tree-sitter && pnpm vitest run packages/supi-tree-sitter/ && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json`
+- `pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && pnpm exec biome check packages/supi-tree-sitter && pnpm vitest run packages/supi-tree-sitter/ && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json`
 
 ## Gotchas
 

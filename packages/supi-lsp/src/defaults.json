@@ -53,6 +53,30 @@
       "args": [],
       "fileTypes": ["kt", "kts"],
       "rootMarkers": ["build.gradle.kts", "pom.xml"]
+    },
+    "bash": {
+      "command": "bash-language-server",
+      "args": ["start"],
+      "fileTypes": ["sh", "bash", "zsh", "ksh"],
+      "rootMarkers": []
+    },
+    "html": {
+      "command": "vscode-html-language-server",
+      "args": ["--stdio"],
+      "fileTypes": ["html", "htm", "xhtml"],
+      "rootMarkers": ["package.json"]
+    },
+    "sql": {
+      "command": "sql-language-server",
+      "args": ["up", "--method", "stdio"],
+      "fileTypes": ["sql"],
+      "rootMarkers": []
+    },
+    "r": {
+      "command": "R",
+      "args": ["--slave", "-e", "languageserver::run()"],
+      "fileTypes": ["r"],
+      "rootMarkers": ["DESCRIPTION", "renv.lock", ".Rprofile"]
     }
   }
 }

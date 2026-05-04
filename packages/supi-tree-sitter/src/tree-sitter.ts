@@ -38,7 +38,7 @@ Coordinates are 1-based (line, character), compatible with the lsp tool conventi
 Character is a UTF-16 code-unit column.
 Relative file paths resolve from the session working directory.
 
-Supported extensions: .ts, .tsx, .js, .jsx, .mts, .cts, .mjs, .cjs`;
+Supported extensions: .ts, .tsx, .js, .jsx, .mts, .cts, .mjs, .cjs, .py, .pyi, .rs, .go, .mod, .c, .h, .cpp, .hpp, .cc, .cxx, .hxx, .c++, .h++, .java, .kt, .kts, .rb, .sh, .bash, .zsh, .html, .htm, .xhtml, .r, .sql`;
 
 const promptGuidelines = [
   "Use tree_sitter for structural syntax-tree analysis: extracting declarations, imports, exports, node-at-position lookup, and custom queries.",

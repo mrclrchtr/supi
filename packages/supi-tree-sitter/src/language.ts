@@ -36,6 +36,14 @@ const EXTENSION_GRAMMAR: Record<string, GrammarId> = {
   ".kt": "kotlin",
   ".kts": "kotlin",
   ".rb": "ruby",
+  ".sh": "bash",
+  ".bash": "bash",
+  ".zsh": "bash",
+  ".html": "html",
+  ".htm": "html",
+  ".xhtml": "html",
+  ".r": "r",
+  ".sql": "sql",
 };
 
 const SUPPORTED_EXTENSIONS = new Set<string>(Object.keys(EXTENSION_GRAMMAR));
@@ -77,13 +85,18 @@ const GRAMMAR_WASM: Record<GrammarId, string> = {
   java: "tree-sitter-java.wasm",
   kotlin: "tree-sitter-kotlin.wasm",
   ruby: "tree-sitter-ruby.wasm",
+  bash: "tree-sitter-bash.wasm",
+  html: "tree-sitter-html.wasm",
+  r: "tree-sitter-r.wasm",
+  sql: "tree-sitter-sql.wasm",
 };
 
-type VendoredGrammarId = "kotlin";
+type VendoredGrammarId = "kotlin" | "sql";
 
 /** Vendored grammar WASM files generated from trusted upstream packages. */
 const VENDORED_GRAMMAR_WASM: Record<VendoredGrammarId, string> = {
   kotlin: path.resolve(sourceDir, "../resources/grammars/kotlin/tree-sitter-kotlin.wasm"),
+  sql: path.resolve(sourceDir, "../resources/grammars/sql/tree-sitter-sql.wasm"),
 };
 
 /** Grammar npm package names. */
@@ -98,6 +111,9 @@ const GRAMMAR_PACKAGE: Record<Exclude<GrammarId, VendoredGrammarId>, string> = {
   cpp: "tree-sitter-cpp",
   java: "tree-sitter-java",
   ruby: "tree-sitter-ruby",
+  bash: "tree-sitter-bash",
+  html: "tree-sitter-html",
+  r: "@davisvaughan/tree-sitter-r",
 };
 
 /**
@@ -120,5 +136,5 @@ export function resolveGrammarWasmPath(grammarId: GrammarId): string {
 }
 
 function isVendoredGrammar(grammarId: GrammarId): grammarId is VendoredGrammarId {
-  return grammarId === "kotlin";
+  return grammarId === "kotlin" || grammarId === "sql";
 }

@@ -1,6 +1,5 @@
 {
   "review": {
-    "reviewModel": "openai-codex/gpt-5.5",
     "autoFix": true
   },
   "debug": {

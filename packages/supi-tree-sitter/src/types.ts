@@ -84,7 +84,11 @@ export type GrammarId =
   | "cpp"
   | "java"
   | "kotlin"
-  | "ruby";
+  | "ruby"
+  | "bash"
+  | "html"
+  | "r"
+  | "sql";
 
 /** Supported file extension. */
 export type SupportedExtension =
@@ -113,4 +117,12 @@ export type SupportedExtension =
   | ".java"
   | ".kt"
   | ".kts"
-  | ".rb";
+  | ".rb"
+  | ".sh"
+  | ".bash"
+  | ".zsh"
+  | ".html"
+  | ".htm"
+  | ".xhtml"
+  | ".r"
+  | ".sql";

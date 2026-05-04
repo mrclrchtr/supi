@@ -28,6 +28,14 @@ describe("isSupportedFile", () => {
     ["file.kt", true],
     ["file.kts", true],
     ["file.rb", true],
+    ["file.sh", true],
+    ["file.bash", true],
+    ["file.zsh", true],
+    ["file.html", true],
+    ["file.htm", true],
+    ["file.xhtml", true],
+    ["file.r", true],
+    ["file.sql", true],
     ["Makefile", false],
     ["file.TS", true], // case-insensitive
   ])("%s → %s", (filePath, expected) => {
@@ -101,6 +109,26 @@ describe("detectGrammar", () => {
     expect(detectGrammar("app.rb")).toBe("ruby");
   });
 
+  it("maps Shell extensions to bash grammar", () => {
+    expect(detectGrammar("script.sh")).toBe("bash");
+    expect(detectGrammar("script.bash")).toBe("bash");
+    expect(detectGrammar("script.zsh")).toBe("bash");
+  });
+
+  it("maps HTML extensions to html grammar", () => {
+    expect(detectGrammar("index.html")).toBe("html");
+    expect(detectGrammar("index.htm")).toBe("html");
+    expect(detectGrammar("index.xhtml")).toBe("html");
+  });
+
+  it("maps R extension to r grammar", () => {
+    expect(detectGrammar("analysis.r")).toBe("r");
+  });
+
+  it("maps SQL extension to sql grammar", () => {
+    expect(detectGrammar("schema.sql")).toBe("sql");
+  });
+
   it("returns undefined for unsupported extensions", () => {
     expect(detectGrammar("main.txt")).toBeUndefined();
   });
@@ -141,6 +169,31 @@ describe("resolveGrammarWasmPath", () => {
     const wasmPath = resolveGrammarWasmPath("kotlin");
     expect(wasmPath).toMatch(/resources[\\/]grammars[\\/]kotlin/);
     expect(wasmPath).toMatch(/tree-sitter-kotlin\.wasm$/);
+    expect(existsSync(wasmPath)).toBe(true);
+  });
+
+  it("resolves bash grammar WASM path", () => {
+    const wasmPath = resolveGrammarWasmPath("bash");
+    expect(wasmPath).toContain("tree-sitter-bash");
+    expect(wasmPath).toMatch(/tree-sitter-bash\.wasm$/);
+  });
+
+  it("resolves html grammar WASM path", () => {
+    const wasmPath = resolveGrammarWasmPath("html");
+    expect(wasmPath).toContain("tree-sitter-html");
+    expect(wasmPath).toMatch(/tree-sitter-html\.wasm$/);
+  });
+
+  it("resolves r grammar WASM path", () => {
+    const wasmPath = resolveGrammarWasmPath("r");
+    expect(wasmPath).toContain("@davisvaughan");
+    expect(wasmPath).toMatch(/tree-sitter-r\.wasm$/);
+  });
+
+  it("resolves SQL to the vendored WASM", () => {
+    const wasmPath = resolveGrammarWasmPath("sql");
+    expect(wasmPath).toMatch(/resources[\\/]grammars[\\/]sql/);
+    expect(wasmPath).toMatch(/tree-sitter-sql\.wasm$/);
     expect(existsSync(wasmPath)).toBe(true);
   });
 });
