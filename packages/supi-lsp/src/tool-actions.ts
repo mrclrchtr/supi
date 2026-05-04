@@ -2,6 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { LspClient } from "./client.ts";
 import { formatDiagnostics } from "./diagnostics.ts";
 import {
   formatCodeActions,
@@ -132,6 +133,33 @@ function noServerMessage(file: string): string {
   return `No LSP server available for this file type (${path.extname(file) || "unknown"})`;
 }
 
+// ── Higher-order helpers ──────────────────────────────────────────────
+
+/**
+ * Encapsulates the common preamble shared by file-position-based action handlers:
+ * validates file/line/character, resolves the path, obtains the LSP client, and
+ * returns an error string if any step fails. Passes the ready client and zero-based
+ * coordinates to the callback.
+ */
+// biome-ignore lint/complexity/useMaxParams: Higher-order callback wrapper intentionally takes 5 params.
+async function withFileClient(
+  manager: LspManager,
+  params: LspToolParams,
+  cwd: string,
+  action: string,
+  fn: (client: LspClient, file: string, line: number, character: number) => Promise<string>,
+): Promise<string> {
+  const validation = validateFilePosition(params, action);
+  if (typeof validation === "string") return validation;
+  const { file, line, character } = validation;
+  const resolvedPath = resolveFilePath(file, cwd);
+
+  const client = await manager.ensureFileOpen(resolvedPath);
+  if (!client) return noServerMessage(resolvedPath);
+
+  return fn(client, resolvedPath, line, character);
+}
+
 // ── Action Handlers ───────────────────────────────────────────────────
 
 async function handleHover(
@@ -139,17 +167,11 @@ async function handleHover(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const validation = validateFilePosition(params, "hover");
-  if (typeof validation === "string") return validation;
-  const { file, line, character } = validation;
-  const resolvedPath = resolveFilePath(file, cwd);
-
-  const client = await manager.ensureFileOpen(resolvedPath);
-  if (!client) return noServerMessage(resolvedPath);
-
-  const hover = await client.hover(resolvedPath, toZeroBased(line, character));
-  if (!hover) return "No hover information available at this position.";
-  return formatHover(hover);
+  return withFileClient(manager, params, cwd, "hover", async (client, file, line, character) => {
+    const hover = await client.hover(file, toZeroBased(line, character));
+    if (!hover) return "No hover information available at this position.";
+    return formatHover(hover);
+  });
 }
 
 async function handleDefinition(
@@ -157,21 +179,21 @@ async function handleDefinition(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const validation = validateFilePosition(params, "definition");
-  if (typeof validation === "string") return validation;
-  const { file, line, character } = validation;
-  const resolvedPath = resolveFilePath(file, cwd);
+  return withFileClient(
+    manager,
+    params,
+    cwd,
+    "definition",
+    async (client, file, line, character) => {
+      const result = await client.definition(file, toZeroBased(line, character));
+      if (!result) return "No definition found.";
 
-  const client = await manager.ensureFileOpen(resolvedPath);
-  if (!client) return noServerMessage(resolvedPath);
+      const locations = normalizeLocations(result);
+      if (locations.length === 0) return "No definition found.";
 
-  const result = await client.definition(resolvedPath, toZeroBased(line, character));
-  if (!result) return "No definition found.";
-
-  const locations = normalizeLocations(result);
-  if (locations.length === 0) return "No definition found.";
-
-  return formatLocations("Definition", locations, cwd);
+      return formatLocations("Definition", locations, cwd);
+    },
+  );
 }
 
 async function handleReferences(
@@ -179,18 +201,18 @@ async function handleReferences(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const validation = validateFilePosition(params, "references");
-  if (typeof validation === "string") return validation;
-  const { file, line, character } = validation;
-  const resolvedPath = resolveFilePath(file, cwd);
+  return withFileClient(
+    manager,
+    params,
+    cwd,
+    "references",
+    async (client, file, line, character) => {
+      const locations = await client.references(file, toZeroBased(line, character));
+      if (!locations || locations.length === 0) return "No references found.";
 
-  const client = await manager.ensureFileOpen(resolvedPath);
-  if (!client) return noServerMessage(resolvedPath);
-
-  const locations = await client.references(resolvedPath, toZeroBased(line, character));
-  if (!locations || locations.length === 0) return "No references found.";
-
-  return formatLocations("References", locations, cwd);
+      return formatLocations("References", locations, cwd);
+    },
+  );
 }
 
 async function handleDiagnostics(
@@ -249,22 +271,16 @@ async function handleRename(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const validation = validateFilePosition(params, "rename");
-  if (typeof validation === "string") return validation;
-  const { file, line, character } = validation;
-  const resolvedPath = resolveFilePath(file, cwd);
-
   const nameValidation = validateNonEmptyString(params.newName, "newName", "rename");
   if (typeof nameValidation === "string") return nameValidation;
   const newName = nameValidation.value;
 
-  const client = await manager.ensureFileOpen(resolvedPath);
-  if (!client) return noServerMessage(resolvedPath);
+  return withFileClient(manager, params, cwd, "rename", async (client, file, line, character) => {
+    const edit = await client.rename(file, toZeroBased(line, character), newName);
+    if (!edit) return "Rename not available at this position.";
 
-  const edit = await client.rename(resolvedPath, toZeroBased(line, character), newName);
-  if (!edit) return "Rename not available at this position.";
-
-  return formatWorkspaceEdit(edit, cwd);
+    return formatWorkspaceEdit(edit, cwd);
+  });
 }
 
 async function handleCodeActions(
@@ -272,28 +288,28 @@ async function handleCodeActions(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const validation = validateFilePosition(params, "code_actions");
-  if (typeof validation === "string") return validation;
-  const { file, line, character } = validation;
-  const resolvedPath = resolveFilePath(file, cwd);
+  return withFileClient(
+    manager,
+    params,
+    cwd,
+    "code_actions",
+    async (client, file, line, character) => {
+      const pos = toZeroBased(line, character);
+      const range: Range = { start: pos, end: pos };
+      const diags = client.getDiagnostics(file);
 
-  const client = await manager.ensureFileOpen(resolvedPath);
-  if (!client) return noServerMessage(resolvedPath);
+      const relevantDiags = diags.filter(
+        (d) => d.range.start.line <= pos.line && d.range.end.line >= pos.line,
+      );
 
-  const pos = toZeroBased(line, character);
-  const range: Range = { start: pos, end: pos };
-  const diags = client.getDiagnostics(resolvedPath);
+      const actions = await client.codeActions(file, range, {
+        diagnostics: relevantDiags,
+      });
+      if (!actions || actions.length === 0) return "No code actions available at this position.";
 
-  const relevantDiags = diags.filter(
-    (d) => d.range.start.line <= pos.line && d.range.end.line >= pos.line,
+      return formatCodeActions(actions);
+    },
   );
-
-  const actions = await client.codeActions(resolvedPath, range, {
-    diagnostics: relevantDiags,
-  });
-  if (!actions || actions.length === 0) return "No code actions available at this position.";
-
-  return formatCodeActions(actions);
 }
 
 async function handleWorkspaceSymbol(
