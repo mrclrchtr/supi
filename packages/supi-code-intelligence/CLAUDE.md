@@ -28,6 +28,7 @@ src/
 ├── architecture.ts         # Project model builder (workspace scan, module detection)
 ├── brief.ts                # Overview + project brief generation
 ├── brief-focused.ts        # Directory/file/symbol focused brief generation
+├── git-context.ts          # Git branch, dirty files, last commit helpers
 ├── target-resolution.ts    # Symbol → file:position resolution (LSP / ripgrep)
 ├── resolve-target.ts       # Action params → resolved target or disambiguation
 ├── search-helpers.ts       # ripgrep wrapper, path normalization, URI helpers
@@ -37,7 +38,8 @@ src/
     ├── callees-action.ts       # Outgoing call map (tree-sitter)
     ├── implementations-action.ts # Find implementations (LSP → ripgrep)
     ├── affected-action.ts      # Blast-radius + risk assessment
-    └── pattern-action.ts       # Bounded text search (literal or regex)
+    ├── pattern-action.ts       # Bounded text search (literal or regex)
+    └── index-action.ts         # Factual project map (file counts, directories, landmarks)
 ```
 
 ### Injection Points (6 hooks into pi)
@@ -63,6 +65,7 @@ switch (params.action) {
   case "implementations": → executeImplementationsAction(params, cwd)
   case "affected":    → executeAffectedAction(params, cwd)
   case "pattern":     → executePatternAction(params, cwd)
+  case "index":       → executeIndexAction(cwd)
 }
 ```
 
@@ -85,11 +88,17 @@ LSP → Tree-sitter → ripgrep text search, with explicit confidence labeling o
 - `line`/`character` without `file` is rejected.
 - Unknown action is rejected with a list of supported actions.
 
+### Git Context (git-context.ts)
+- `gatherGitContext()` uses `git branch --show-current`, `git status --porcelain`, and `git log -1`.
+- Returns `null` for non-git directories ( graceful fallback — brief output omits the section).
+- Git config in test environments should disable GPG signing and hooks (`commit.gpgsign=false`, `core.hooksPath=/dev/null`).
+
 ### Pattern Search (pattern-action.ts)
 - `pattern` is treated as a **literal string by default** — the action calls `escapeRegex()` on the input before passing to ripgrep.
 - Set `regex: true` to opt into raw ripgrep regex semantics.
 - Malformed regex input returns an explicit error message via `formatRegexError()` — never a misleading "No matches found."
 - Internally searches with `maxMatches: maxResults * 3` for dedup filtering.
+- `summary: true` returns aggregate counts by directory instead of line-level matches. Use for "how common is this pattern?" questions.
 
 ### Target Resolution (resolve-target.ts, target-resolution.ts)
 - Symbol resolution goes through LSP `workspaceSymbol` first, then ripgrep fallback.
@@ -103,6 +112,7 @@ LSP → Tree-sitter → ripgrep text search, with explicit confidence labeling o
 - On reload/resume, `session_start` scans the branch for an existing `code-intelligence-overview` custom message.
 - Uses `display: false` so the overview is agent-visible but TUI-invisible.
 - `buildArchitectureModel` supports: pnpm-workspace.yaml, package.json workspaces, single-package, and minimal (no manifest but source files exist).
+- Now includes git context (branch, dirty files, last commit) when inside a git repository.
 
 ### Architecture Model (architecture.ts)
 - Project markers searched: `package.json`, `pnpm-workspace.yaml`, `deno.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`.
@@ -124,6 +134,12 @@ LSP → Tree-sitter → ripgrep text search, with explicit confidence labeling o
 - `runRipgrepDetailed()` — preserves non-no-match errors (used by pattern-action for regex validation).
 - Low-signal paths (`node_modules`, `.pnpm`, `dist`, `.next`, `__pycache__`, etc.) are filtered out unless `filterLowSignal: false`.
 - Context lines: trailing context from one match that overlaps with the next match's leading context is deduplicated.
+
+### Index Action (index-action.ts)
+- Factual, non-interpretive project map: file counts by extension, top-level directory tree, landmark config files.
+- Skips low-signal directories: `node_modules`, `dist`, `build`, `.git`, and dot-prefixed entries.
+- Landmark file list is a curated set of common config files (package.json, tsconfig.json, Makefile, etc.).
+- Not a replacement for `brief` — `index` answers "what's here?" while `brief` answers "how is it organized?"
 
 ### Programmatic API (index.ts)
 - `buildArchitectureModel`, `generateOverview`, `generateProjectBrief`, `generateFocusedBrief` are exported for peer extensions.

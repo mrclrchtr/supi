@@ -2,7 +2,7 @@
 
 SuPi Code Intelligence extension — the main agent-facing code understanding tool for [pi](https://github.com/mariozechner/pi-coding-agent).
 
-Registers the `code_intel` tool with six high-level actions and injects structural project context into the agent's first turn.
+Registers the `code_intel` tool with seven high-level actions and injects structural project context into the agent's first turn.
 
 ## Injection Points
 
@@ -12,7 +12,7 @@ The extension hooks into pi's lifecycle at six points:
 |---|---|---|
 | 1 | `package.json` → `pi.extensions` | Manifest entry that tells pi to load the extension at startup |
 | 2 | `pi.registerTool({ name: "code_intel", ... })` | Makes the `code_intel` tool callable from agent turns |
-| 3 | `promptGuidelines` (6 guidelines) | Flattened into the system prompt's `Guidelines:` section — teaches the agent *when* to use each action |
+| 3 | `promptGuidelines` (7 guidelines) | Flattened into the system prompt's `Guidelines:` section — teaches the agent *when* to use each action |
 | 4 | `promptSnippet` (1 line) | Injected near the tool definition in context — short reminder to use `code_intel` over broad file reads |
 | 5 | `pi.on("session_start", ...)` | Resets injection dedup state and scans the active branch to avoid re-injecting on reload/resume |
 | 6 | `pi.on("before_agent_start", ...)` | On the first agent turn, builds an architecture model and injects a compact Markdown overview as a custom message (`customType: "code-intelligence-overview"`, `display: false`) — the agent sees it in conversation context without UI clutter |
@@ -21,7 +21,7 @@ The extension hooks into pi's lifecycle at six points:
 
 1. `session_start` fires → resets `hasInjectedOverview`, scans branch for existing `code-intelligence-overview` custom message
 2. First `before_agent_start` fires → calls `buildArchitectureModel(ctx.cwd)` to parse the project
-3. If modules are found, `generateOverview(model)` produces a dense Markdown summary (~500 tokens, max 8 modules)
+3. If modules are found, `generateOverview(model)` produces a dense Markdown summary (~500 tokens, max 8 modules) with git context when available
 4. Returns a `BeforeAgentStartEventResult` with a `customMessage` — pi places it in the agent's context
 5. Subsequent turns skip injection entirely
 
@@ -33,6 +33,7 @@ Scopes: project (no params), package/directory (`path`), file (`file`), or ancho
 
 - Project-level brief: module listing, dependency graph, "start here" recommendations, suggested next queries
 - Focused brief (`path` or anchored symbol): stripped-down version with a single module or symbol focus
+- Now includes git context (branch, dirty files, last commit) when inside a git repository
 - Metadata returned: `BriefDetails` with confidence, focus target, public surfaces, dependency summary
 
 ### `callers` — Find call sites for a symbol
@@ -60,6 +61,21 @@ Before changing exported APIs, shared helpers, config surfaces, or cross-package
 - Likely test files
 - Returns `AffectedDetails` metadata
 
+### `index` — Factual project map
+
+A non-interpretive project overview for quick orientation:
+
+- File counts by language/extension
+- Top-level directory tree with file counts
+- Landmark config files detected (package.json, tsconfig.json, Makefile, etc.)
+- Skips low-signal directories (`node_modules`, `dist`, `build`, `.git`)
+
+Use when you need to understand "what's here?" before diving into specific files.
+
+```json
+{ "action": "index" }
+```
+
 ### `pattern` — Bounded, scope-aware text search
 
 Optimized for common agent lookups:
@@ -69,12 +85,14 @@ Optimized for common agent lookups:
 - Malformed regex input returns an explicit error instead of a misleading "No matches found"
 - Nearby matches in the same file deduplicate overlapping context lines to reduce token waste
 - Results grouped with file and context lines
+- `summary: true` returns aggregate counts by directory instead of line-level matches — use for "how common is this pattern?"
 
 Examples:
 
 ```json
 { "action": "pattern", "pattern": "sendMessage({", "path": "packages/" }
 { "action": "pattern", "pattern": "register(Settings|Config)", "path": "packages/", "regex": true }
+{ "action": "pattern", "pattern": "createServerFn", "summary": true }
 ```
 
 ## Confidence Labeling
@@ -141,12 +159,13 @@ export type { AffectedDetails, BriefDetails, CodeIntelResult, ConfidenceMode, Di
 
 ## Prompt Guidelines (full text)
 
-These six guidelines are injected into the system prompt:
+These seven guidelines are injected into the system prompt:
 
 > - Use `code_intel brief` before editing an unfamiliar package, directory, or file to get architecture context and reduce blind reads.
 > - Use `code_intel affected` before changing exported APIs, shared helpers, config surfaces, or cross-package contracts to check blast radius and risk.
 > - Use `code_intel callers` / `callees` / `implementations` for semantic relationship questions before falling back to broad `rg` text search.
 > - Use `code_intel pattern` for bounded, scope-aware text search when the question is textual rather than semantic; it treats patterns as literal strings by default and supports `regex: true` when needed.
+> - Use `code_intel index` for a factual project map (file counts, directory structure, landmark files) when you need to orient yourself in a new codebase.
 > - After `code_intel` narrows the target, use raw `lsp` and `tree_sitter` tools for precise drill-down on exact symbols, types, or AST nodes.
 > - Do not prefer `code_intel` over direct file reads or lower-level tools for trivial, already-localized edits or exact symbol/AST drill-down tasks.
 
