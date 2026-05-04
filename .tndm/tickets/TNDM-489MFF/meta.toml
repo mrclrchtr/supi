@@ -1,0 +1,9 @@
+schema_version = 1
+id = "TNDM-489MFF"
+title = "LSP diagnostic invalidation on file creation for newly-created modules"
+
+type = "bug"
+priority = "p2"
+
+depends_on = []
+tags = []
