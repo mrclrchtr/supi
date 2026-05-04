@@ -96,19 +96,25 @@ function estimateUserMessage(msg: Extract<AgentMessage, { role: "user" }>): numb
   if (typeof content === "string") {
     return estimateTextTokens(content);
   }
-  let chars = 0;
-  for (const block of content) {
-    if (block.type === "text" && block.text) {
-      chars += block.text.length;
+  if (Array.isArray(content)) {
+    let chars = 0;
+    for (const block of content) {
+      if (block.type === "text" && block.text) {
+        chars += block.text.length;
+      }
     }
+    return Math.ceil(chars / 4);
   }
-  return Math.ceil(chars / 4);
+  return 0;
 }
 
 function estimateAssistantMessage(msg: Extract<AgentMessage, { role: "assistant" }>): {
   text: number;
   toolCalls: number;
 } {
+  if (!Array.isArray(msg.content)) {
+    return { text: 0, toolCalls: 0 };
+  }
   let textChars = 0;
   let toolChars = 0;
   for (const block of msg.content) {

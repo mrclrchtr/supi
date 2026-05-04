@@ -1,0 +1,19 @@
+{
+  "source": {
+    "npmPackage": "@derekstride/tree-sitter-sql",
+    "version": "0.3.11",
+    "repository": "https://github.com/derekstride/tree-sitter-sql"
+  },
+  "generatedWith": {
+    "treeSitterCli": "0.22.6"
+  },
+  "sha256": "0871a3bd488ed39f5a521484337f07a43bd6aa95dbdf1cdd24744deecafa58fc",
+  "trust": {
+    "note": "The @derekstride/tree-sitter-sql npm package is a devDependency only. It is never resolved at runtime — the vendored WASM above is the sole runtime artifact. The npm package's install script uses 'npx --yes' which some package managers flag as a supply-chain risk; pnpm ignores build scripts by default, so this script never runs during install. The WASM was built locally from the package source (not downloaded from npm). See scripts/generate-sql-wasm.mjs for the rebuild procedure.",
+    "alternativesConsidered": [
+      "tree-sitter-sql (m-novikov, 2021, stale)",
+      "tree-sitter-sql-bigquery (BigQuery-specific)",
+      "dialect-specific grammars (too narrow)"
+    ]
+  }
+}
