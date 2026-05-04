@@ -11,6 +11,7 @@ import {
   registerConfigSettings,
   registerContextProvider,
 } from "@mrclrchtr/supi-core";
+import { shouldBypassRtkRewrite } from "./guards.ts";
 import { type RtkRewriteFailureReason, rtkRewriteDetailed } from "./rewrite.ts";
 import { getStats, recordFallback, recordRewrite, resetTracking } from "./tracking.ts";
 
@@ -40,7 +41,7 @@ interface RtkDebugEventDetails {
   cwd: string;
   durationMs: number;
   timeoutMs: number;
-  reason?: RtkRewriteFailureReason | "unavailable";
+  reason?: RtkRewriteFailureReason | "unavailable" | "guarded-passthrough";
   rewrittenCommand?: string;
 }
 
@@ -140,6 +141,17 @@ function resolveRtkCommand(command: string, cwd: string, ctx?: RtkUiContext): Rt
   const config = loadRtkConfig(cwd);
   if (!config.enabled) {
     return { kind: "disabled", command };
+  }
+
+  if (shouldBypassRtkRewrite(command, cwd)) {
+    recordRtkDebugEvent("unchanged", {
+      command,
+      cwd,
+      durationMs: 0,
+      timeoutMs: config.rewriteTimeout,
+      reason: "guarded-passthrough",
+    });
+    return { kind: "unchanged", command };
   }
 
   if (!checkRtkAvailable()) {

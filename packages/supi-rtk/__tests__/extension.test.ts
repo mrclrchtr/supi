@@ -222,6 +222,40 @@ describe("rtkExtension", () => {
     expect(uiCtx.ui.notify).not.toHaveBeenCalled();
   });
 
+  it("spawnHook passes guarded Biome commands through without calling rtk", async () => {
+    const { pi, tools } = createPiMock();
+    rtkExtension(pi as never);
+
+    const bashTool = getRegisteredBashTool(tools);
+    if (!bashTool) {
+      throw new Error("bash tool not registered");
+    }
+
+    await bashTool.execute(
+      "id",
+      { command: "pnpm exec biome check ." },
+      undefined,
+      () => {},
+      createUiCtx(),
+    );
+
+    const spawnHook = vi.mocked(mockFns.createBashTool).mock.lastCall?.[1]?.spawnHook;
+    const result = spawnHook?.({ command: "pnpm exec biome check .", cwd: "/project", env: {} });
+    expect(result).toEqual({ command: "pnpm exec biome check .", cwd: "/project", env: {} });
+    expect(mockFns.execFileSync).not.toHaveBeenCalled();
+    expect(mockFns.recordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: "rtk",
+        level: "debug",
+        category: "unchanged",
+        data: expect.objectContaining({
+          command: "pnpm exec biome check .",
+          reason: "guarded-passthrough",
+        }),
+      }),
+    );
+  });
+
   it("spawnHook falls back and records a fallback when rewrite fails", async () => {
     mockFns.execFileSync.mockImplementation((...args: unknown[]) => {
       const [cmd, argv] = args as [string, string[]];
