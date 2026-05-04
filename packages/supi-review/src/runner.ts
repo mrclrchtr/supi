@@ -16,7 +16,6 @@ export type { ReviewerInvocation } from "./runner-types.ts";
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
 const GRACE_TURNS = 3;
 const STEER_MESSAGE = "Time limit reached. Wrap up and submit your review now.";
-
 /** Maps tool names to human-readable activity descriptions. */
 function toolNameToActivity(name: string, phase: "start" | "end"): string {
   if (phase === "end") return "";
@@ -97,7 +96,6 @@ async function createReviewerSession(
     appendSystemPrompt: [buildReviewerSystemPrompt()],
   });
   await resourceLoader.reload();
-
   const { session } = await createAgentSession({
     cwd,
     model,
@@ -107,27 +105,42 @@ async function createReviewerSession(
     resourceLoader,
     sessionManager: SessionManager.inMemory(cwd),
   });
-
   return session;
 }
 function extractLastAssistantText(session: AgentSession): string | undefined {
   const messages = session.messages;
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
-    if (msg?.role === "assistant") {
-      const content = msg.content;
-      if (typeof content === "string") return content;
-      if (Array.isArray(content)) {
-        const texts = content
-          .filter((c): c is { type: "text"; text: string } => c.type === "text")
-          .map((c) => c.text);
-        if (texts.length > 0) return texts.join("\n");
-      }
-    }
+    if (msg?.role !== "assistant") continue;
+    const text = extractAssistantTextContent(msg);
+    if (text) return text;
+    const errorMsg = extractAssistantErrorMessage(msg);
+    if (errorMsg) return errorMsg;
   }
   return undefined;
 }
-
+/** Extract non-empty text content from an assistant message (or undefined). */
+function extractAssistantTextContent(msg: {
+  role: string;
+  content: string | Array<{ type: string; text?: string }>;
+}): string | undefined {
+  if (typeof msg.content === "string") return msg.content || undefined;
+  if (!Array.isArray(msg.content)) return undefined;
+  const texts = msg.content
+    .filter((c): c is { type: "text"; text: string } => c.type === "text")
+    .map((c) => c.text);
+  if (texts.length > 0 && texts.some((t) => t.length > 0)) return texts.join("\n");
+  return undefined;
+}
+/** Extract errorMessage or stopReason description from a failed assistant message. */
+function extractAssistantErrorMessage(msg: unknown): string | undefined {
+  const errMsg = (msg as Record<string, unknown>).errorMessage;
+  if (typeof errMsg === "string" && errMsg.length > 0) return errMsg;
+  const stopReason = (msg as Record<string, unknown>).stopReason;
+  if (stopReason === "error") return "Reviewer model returned an error";
+  if (stopReason === "aborted") return "Reviewer was aborted";
+  return undefined;
+}
 /** Format token count for display. */
 export function formatTokens(count: number): string {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
@@ -149,7 +162,6 @@ interface RunnerContext {
   state: { settled: boolean };
   timeout: { steered: boolean; graceTurnsRemaining: number | undefined; aborting?: boolean };
 }
-
 function emitProgress(ctx: RunnerContext): void {
   try {
     const stats = ctx.session.getSessionStats();
@@ -191,7 +203,6 @@ function handleTurnEnd(ctx: RunnerContext): number | undefined {
   emitProgress(ctx);
   return ctx.timeout.graceTurnsRemaining;
 }
-
 function handleToolStart(
   event: Extract<AgentSessionEvent, { type: "tool_execution_start" }>,
   ctx: RunnerContext,
@@ -233,7 +244,6 @@ function handleAgentEnd(ctx: RunnerContext): void {
     );
   }
 }
-
 function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext): void {
   switch (event.type) {
     case "turn_end":
@@ -253,7 +263,6 @@ function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext): void 
       break;
   }
 }
-
 export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult> {
   const {
     prompt,
@@ -266,11 +275,9 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
     onProgress,
     timeoutMs = DEFAULT_TIMEOUT_MS,
   } = inv;
-
   if (signal?.aborted) {
     return { kind: "canceled", target };
   }
-
   // Holder for the submit_review tool result
   const resultHolder: { value: ReviewOutputEvent | undefined } = { value: undefined };
   const submitReviewTool = createSubmitReviewTool(resultHolder);
@@ -284,7 +291,6 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
   const progress: ReviewProgress = { turns: 0, toolUses: 0, activities: [], tokens: undefined };
   const state = { settled: false };
   let cancelTeardown: (() => void) | undefined;
-
   const cleanup = (result: ReviewResult): ReviewResult => {
     if (state.settled) return result;
     state.settled = true;
@@ -292,7 +298,6 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
     session.dispose();
     return result;
   };
-
   return new Promise<ReviewResult>((resolve) => {
     const timeoutRef = {
       steered: false,
@@ -305,7 +310,6 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
         timeoutRef.hardAbortTimer = undefined;
       }
     };
-
     const ctx: RunnerContext = {
       progress,
       session,
@@ -320,9 +324,7 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
       state,
       timeout: timeoutRef,
     };
-
     session.subscribe((event: AgentSessionEvent) => handleSessionEvent(event, ctx));
-
     // --- abort ---
     const onAbort = () => {
       if (state.settled) return;
@@ -335,7 +337,6 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
         });
     };
     signal?.addEventListener("abort", onAbort, { once: true });
-
     // --- timeout ---
     const HARD_ABORT_GRACE_MS = 120_000;
     const hardAbort = () => {
@@ -349,7 +350,6 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
           resolve(cleanup({ kind: "timeout", target, timeoutMs, partialOutput: partialText }));
         });
     };
-
     const onTimeout = () => {
       if (state.settled) return;
       timeoutRef.steered = true;
@@ -366,23 +366,19 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
           hardAbort();
         });
     };
-
     const timeoutId = setTimeout(onTimeout, timeoutMs);
     timeoutId.unref?.();
-
     cancelTeardown = () => {
       signal?.removeEventListener("abort", onAbort);
       clearTimeout(timeoutId);
       clearHardAbort();
     };
-
     let cancelledDuringSetup = false;
     if (signal?.aborted) {
       signal.removeEventListener("abort", onAbort);
       cancelledDuringSetup = true;
       onAbort();
     }
-
     if (!cancelledDuringSetup) {
       session.prompt(prompt).catch((err: unknown) => {
         if (!state.settled) {
