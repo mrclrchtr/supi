@@ -247,6 +247,7 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
   const invocation: ReviewerInvocation = {
     prompt,
     model,
+    modelRegistry: ctx.modelRegistry,
     cwd: ctx.cwd,
     target,
     signal,

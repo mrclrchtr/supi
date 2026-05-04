@@ -4,6 +4,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   defineTool,
+  type ModelRegistry,
   SessionManager,
 } from "@mariozechner/pi-coding-agent";
 import { Type } from "typebox";
@@ -28,7 +29,6 @@ function toolNameToActivity(name: string, phase: "start" | "end"): string {
   };
   return map[name] ?? name;
 }
-
 function createSubmitReviewTool(resultHolder: {
   value: ReviewOutputEvent | undefined;
 }): ReturnType<typeof defineTool> {
@@ -69,7 +69,6 @@ function createSubmitReviewTool(resultHolder: {
     },
   });
 }
-
 function buildReviewerSystemPrompt(): string {
   return [
     "You are a code reviewer. Review the provided code changes carefully and report any issues you find.",
@@ -80,12 +79,12 @@ function buildReviewerSystemPrompt(): string {
     "Do NOT output JSON directly — use the submit_review tool to submit the result.",
   ].join("\n");
 }
-
 async function createReviewerSession(
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: import("@mariozechner/pi-ai").Model<any> | undefined,
   cwd: string,
   submitReviewTool: ReturnType<typeof defineTool>,
+  modelRegistry?: ModelRegistry,
 ): Promise<AgentSession> {
   const resourceLoader = new DefaultResourceLoader({
     cwd,
@@ -102,6 +101,7 @@ async function createReviewerSession(
   const { session } = await createAgentSession({
     cwd,
     model,
+    modelRegistry,
     tools: ["read", "grep", "find", "ls", "submit_review"],
     customTools: [submitReviewTool],
     resourceLoader,
@@ -110,7 +110,6 @@ async function createReviewerSession(
 
   return session;
 }
-
 function extractLastAssistantText(session: AgentSession): string | undefined {
   const messages = session.messages;
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -259,6 +258,7 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
   const {
     prompt,
     model,
+    modelRegistry,
     cwd,
     signal,
     target,
@@ -276,7 +276,7 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
   const submitReviewTool = createSubmitReviewTool(resultHolder);
   let session: AgentSession;
   try {
-    session = await createReviewerSession(model, cwd, submitReviewTool);
+    session = await createReviewerSession(model, cwd, submitReviewTool, modelRegistry);
   } catch (err) {
     const reason = `Failed to create reviewer session: ${err instanceof Error ? err.message : String(err)}`;
     return { kind: "failed" as const, reason, target };

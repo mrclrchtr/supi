@@ -1,4 +1,5 @@
 import type { Model } from "@mariozechner/pi-ai";
+import type { ModelRegistry } from "@mariozechner/pi-coding-agent";
 import type { ReviewTarget } from "./types.ts";
 
 /** Progress state exposed by the runner for widget integration. */
@@ -17,6 +18,9 @@ export interface ReviewerInvocation {
   prompt: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: Model<any> | undefined;
+  /** Model registry from the parent session — passed to createAgentSession
+   *  so that provider registrations, auth, and streaming work correctly. */
+  modelRegistry?: ModelRegistry;
   cwd: string;
   signal?: AbortSignal;
   target: ReviewTarget;
