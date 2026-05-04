@@ -70,4 +70,4 @@ export {
   getRegisteredSettings,
   registerSettings,
 } from "./settings-registry.ts";
-export { openSettingsOverlay } from "./settings-ui.ts";
+export { createInputSubmenu, openSettingsOverlay } from "./settings-ui.ts";

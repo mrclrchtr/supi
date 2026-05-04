@@ -24,6 +24,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 }));
 
 vi.mock("@mrclrchtr/supi-core", () => ({
+  createInputSubmenu: vi.fn(),
   getRegisteredContextProviders: mockFns.getRegisteredContextProviders,
 }));
 

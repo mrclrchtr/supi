@@ -1,6 +1,5 @@
 import type { SettingItem } from "@mariozechner/pi-tui";
-import { Input, Key, matchesKey } from "@mariozechner/pi-tui";
-import { registerConfigSettings } from "@mrclrchtr/supi-core";
+import { createInputSubmenu, registerConfigSettings } from "@mrclrchtr/supi-core";
 import { BASH_TIMEOUT_DEFAULTS, type BashTimeoutConfig } from "./config.ts";
 
 export function registerBashTimeoutSettings(): void {
@@ -35,41 +34,4 @@ function buildBashTimeoutSettingItems(settings: BashTimeoutConfig): SettingItem[
         createInputSubmenu(currentValue, "Timeout in seconds:", done),
     },
   ];
-}
-
-function createInputSubmenu(
-  currentValue: string,
-  label: string,
-  done: (selectedValue?: string) => void,
-): {
-  render: (width: number) => string[];
-  invalidate: () => void;
-  handleInput: (data: string) => boolean;
-} {
-  const input = new Input();
-  input.setValue(currentValue);
-
-  return {
-    render: (_width: number) => {
-      const lines = [`  ${label}`];
-      lines.push(...input.render(_width));
-      lines.push("  enter confirm • esc cancel");
-      return lines;
-    },
-    invalidate: () => {
-      input.invalidate();
-    },
-    handleInput: (data: string) => {
-      if (matchesKey(data, Key.escape)) {
-        done();
-        return true;
-      }
-      if (matchesKey(data, Key.enter)) {
-        done(input.getValue());
-        return true;
-      }
-      input.handleInput(data);
-      return true;
-    },
-  };
 }

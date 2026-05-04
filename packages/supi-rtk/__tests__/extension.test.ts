@@ -28,6 +28,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 }));
 
 vi.mock("@mrclrchtr/supi-core", () => ({
+  createInputSubmenu: vi.fn(),
   loadSupiConfig: mockFns.loadSupiConfig,
   recordDebugEvent: mockFns.recordDebugEvent,
   registerConfigSettings: mockFns.registerConfigSettings,

@@ -7,6 +7,7 @@ import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import {
   Container,
+  Input,
   Key,
   matchesKey,
   type SettingItem,
@@ -18,6 +19,53 @@ import {
   type SettingsScope,
   type SettingsSection,
 } from "./settings-registry.ts";
+
+// ── Input submenu component ──────────────────────────────────
+
+/**
+ * Creates a pi-tui Input-backed submenu component with enter-to-confirm
+ * and escape-to-cancel handling.
+ *
+ * @param currentValue - Initial value for the text input.
+ * @param label - Label text displayed above the input.
+ * @param done - Callback invoked with the confirmed value, or undefined on cancel.
+ */
+export function createInputSubmenu(
+  currentValue: string,
+  label: string,
+  done: (selectedValue?: string) => void,
+): {
+  render: (width: number) => string[];
+  invalidate: () => void;
+  handleInput: (data: string) => boolean;
+} {
+  const input = new Input();
+  input.setValue(currentValue);
+
+  return {
+    render: (_width: number) => {
+      const lines = [`  ${label}`];
+      lines.push(...input.render(_width));
+      lines.push("  enter confirm • esc cancel");
+      return lines;
+    },
+    invalidate: () => {
+      input.invalidate();
+    },
+    handleInput: (data: string) => {
+      if (matchesKey(data, Key.escape)) {
+        done();
+        return true;
+      }
+      if (matchesKey(data, Key.enter)) {
+        done(input.getValue());
+        return true;
+      }
+      input.handleInput(data);
+      return true;
+    },
+  };
+}
 
 // ── Types ────────────────────────────────────────────────────
 

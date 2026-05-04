@@ -11,6 +11,7 @@ const mockFns = vi.hoisted(() => ({
 }));
 
 vi.mock("@mrclrchtr/supi-core", () => ({
+  createInputSubmenu: vi.fn(),
   getContextToken: (details: unknown) =>
     details && typeof details === "object"
       ? ((details as { contextToken?: string }).contextToken ?? null)
