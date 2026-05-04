@@ -103,5 +103,3 @@ function buildPreamble(target: ReviewTarget): string {
     }
   }
 }
-
-
