@@ -7,6 +7,8 @@ const PACKAGE_MANAGER_SCRIPT_RE = /^(?:pnpm|npm|yarn|bun)\s+(?:run\s+)?biome(?:\
 const PACKAGE_LINT_RE = /^(?:pnpm|npm|yarn|bun)\s+(?:run\s+)?lint(?:\s|$)/;
 const DIRECT_BIOME_RE =
   /^(?:biome|\.\/node_modules\/\.bin\/biome|node_modules\/\.bin\/biome)(?:\s|$)/;
+// rtk-ai/rtk#1367, rtk-ai/rtk#1604 — rg → grep rewrite is lossy (grep has no -g, -U, --glob, etc.)
+const RG_RE = /^rg(?:\s|$)/;
 
 /**
  * Return whether SuPi should bypass RTK's rewrite registry for commands with
@@ -17,11 +19,19 @@ const DIRECT_BIOME_RE =
  *
  * TODO: Remove this workaround after rtk-ai/rtk#665 and rtk-ai/rtk#1489 are
  * closed and the `pnpm exec biome ...` routing gap is fixed upstream.
+ *
+ * `rg` (ripgrep) commands are also guarded: RTK rewrites `rg` to `rtk grep` or
+ * native `grep`, but doesn't translate ripgrep-specific flags (`-g`, `-U`,
+ * `--glob`, `--type`, etc.), producing broken commands like `grep -g '*.ts'`.
+ * See rtk-ai/rtk#1367 and rtk-ai/rtk#1604.
+ *
+ * TODO: Remove this workaround after RTK properly handles rg-native flags.
  */
 export function shouldBypassRtkRewrite(command: string, cwd: string): boolean {
   const normalized = command.trimStart();
   if (hasRtkDisabledPrefix(normalized)) return true;
   if (DIRECT_BIOME_RE.test(normalized)) return true;
+  if (RG_RE.test(normalized)) return true;
   if (PACKAGE_MANAGER_BIN_RE.test(normalized)) return true;
   if (PACKAGE_MANAGER_SCRIPT_RE.test(normalized)) return true;
   return PACKAGE_LINT_RE.test(normalized) && projectUsesBiome(cwd);

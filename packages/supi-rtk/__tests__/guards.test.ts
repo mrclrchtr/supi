@@ -48,6 +48,15 @@ describe("rtk rewrite guards", () => {
     expect(shouldBypassRtkRewrite("pnpm lint", eslintProject)).toBe(false);
   });
 
+  it("bypasses ripgrep invocations (rg → grep rewrite is lossy)", () => {
+    const cwd = makeProject();
+
+    expect(shouldBypassRtkRewrite("rg -l 'pattern' src/ -g '*.ts'", cwd)).toBe(true);
+    expect(shouldBypassRtkRewrite("rg -n -U 'regex' file", cwd)).toBe(true);
+    expect(shouldBypassRtkRewrite("rg --glob '*.test.ts' 'test' src/", cwd)).toBe(true);
+    expect(shouldBypassRtkRewrite("rg 'hello' .", cwd)).toBe(true);
+  });
+
   it("bypasses explicit RTK_DISABLED prefixes", () => {
     const cwd = makeProject();
 

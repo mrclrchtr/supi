@@ -8,7 +8,7 @@
 
 - `rtk.ts` — extension wiring, tool override, settings, `user_bash` interception
 - `rewrite.ts` — `rtk rewrite` CLI invocation with structured error classification
-- `guards.ts` — SuPi-side passthrough guard for RTK rewrite collisions (notably Biome commands rewritten to `rtk lint`)
+- `guards.ts` — SuPi-side passthrough guard for RTK rewrite collisions (Biome commands rewritten to `rtk lint`, ripgrep commands rewritten to `grep` with untranslated flags)
 - `tracking.ts` — session-level rewrite/fallback stats
 
 ## Validation
@@ -21,6 +21,7 @@
 - RTK cannot rewrite multi-line commands; if the shell `commandPrefix` is present, it must be stripped before calling `rtk rewrite` and re-applied to the result.
 - Guard known lossy RTK rewrite collisions before invoking `rtk rewrite`; for example, Biome commands and Biome-backed `lint` scripts should pass through until upstream RTK fixes `pnpm exec biome` / `npm run lint` routing.
 - TODO: remove the SuPi Biome rewrite workaround after rtk-ai/rtk#665 and rtk-ai/rtk#1489 close and the `pnpm exec biome ...` routing gap is fixed upstream.
+- `rg` (ripgrep) commands are guarded because RTK rewrites `rg → grep` without translating ripgrep-specific flags (`-g`, `-U`, `--glob`). Tracked upstream at rtk-ai/rtk#1367 and rtk-ai/rtk#1604.
 
 ## Testing gotchas
 
