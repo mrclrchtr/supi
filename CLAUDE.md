@@ -35,7 +35,7 @@ Toolchain versions are pinned in `.mise.toml`.
 ## Architecture
 
 This repo has two install surfaces:
-- repository root `package.json` exposes a `pi` manifest for local-path and git installs
+- repository root `package.json` exposes a `pi` manifest for local-path and git installs — supports `extensions`, `prompts`, `skills`, `themes` keys
 - `packages/supi/` is the published meta-package bundling the full stack
 
 Current workspace packages:
@@ -96,6 +96,7 @@ registerSettings({
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
+- Pi discovers package skills from `node_modules` scanning, not workspace packages' `package.json` — register workspace skills in root `pi.skills` (same pattern as `pi.prompts`).
 - Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
 - `pnpm exec jiti /tmp/script.mjs` — use this for ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - pi flattens tool `promptGuidelines` into the system prompt `Guidelines:` section; each bullet must name its tool explicitly.

@@ -36,6 +36,9 @@
     ],
     "prompts": [
       "./packages/supi/prompts"
+    ],
+    "skills": [
+      "./packages/supi-flow/skills"
     ]
   },
   "scripts": {
