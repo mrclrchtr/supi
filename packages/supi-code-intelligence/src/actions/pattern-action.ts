@@ -37,7 +37,7 @@ export async function executePatternAction(params: ActionParams, cwd: string): P
         contextLines,
       })
     : runRipgrep(escapeRegex(params.pattern), scopePath, cwd, {
-        maxMatches: maxResults * 3,
+        maxMatches: params.summary ? undefined : maxResults * 3,
         contextLines,
         filterLowSignal: true,
       });
@@ -48,6 +48,10 @@ export async function executePatternAction(params: ActionParams, cwd: string): P
 
   if (matches.length === 0) {
     return `No matches found for \`${params.pattern}\` in \`${relScope}\`.`;
+  }
+
+  if (params.summary) {
+    return formatPatternSummary(params.pattern, relScope, matches, maxResults);
   }
 
   return formatPatternResults(params.pattern, relScope, matches, maxResults);
@@ -123,6 +127,40 @@ function formatPatternResults(
     );
   }
 
+  return lines.join("\n");
+}
+
+function formatPatternSummary(
+  pattern: string,
+  relScope: string,
+  matches: RgMatch[],
+  maxResults: number,
+): string {
+  const byFile = groupByFile(matches);
+  const byDir = new Map<string, number>();
+  for (const [file] of byFile) {
+    const dir = file.includes("/") ? file.split("/").slice(0, -1).join("/") : ".";
+    byDir.set(dir, (byDir.get(dir) ?? 0) + 1);
+  }
+
+  const lines: string[] = [];
+  lines.push(`# Pattern Summary: \`${pattern}\``);
+  lines.push("");
+  lines.push(
+    `**${matches.length} match${matches.length > 1 ? "es" : ""}** across **${byFile.size} file${byFile.size !== 1 ? "s" : ""}** in \`${relScope}\``,
+  );
+  lines.push("");
+
+  const sortedDirs = [...byDir.entries()].sort((a, b) => b[1] - a[1]).slice(0, maxResults);
+  for (const [dir, count] of sortedDirs) {
+    lines.push(`- \`${dir}/\` — ${count} file${count !== 1 ? "s" : ""}`);
+  }
+
+  if (byDir.size > maxResults) {
+    lines.push(`- _+${byDir.size - maxResults} more directories_`);
+  }
+
+  lines.push("");
   return lines.join("\n");
 }
 

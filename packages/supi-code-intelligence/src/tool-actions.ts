@@ -35,6 +35,7 @@ export interface ActionParams {
   exportedOnly?: boolean;
   maxResults?: number;
   contextLines?: number;
+  summary?: boolean;
 }
 
 const SUPPORTED_ACTIONS = new Set<string>([
