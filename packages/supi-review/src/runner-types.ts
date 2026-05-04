@@ -6,5 +6,6 @@ export interface ReviewerInvocation {
   cwd: string;
   signal?: AbortSignal;
   target: ReviewTarget;
+  timeoutMs?: number;
   onSessionStart?: (sessionName: string) => void;
 }

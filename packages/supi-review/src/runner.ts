@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { unlinkSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import {
   buildPiArgs,
   generateReviewId,
@@ -17,6 +17,7 @@ import type { ReviewResult, ReviewTarget } from "./types.ts";
 export type { ReviewerInvocation } from "./runner-types.ts";
 
 const POLL_INTERVAL_MS = 1_000;
+const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
 
 function isTmuxAvailable(): boolean {
   const result = spawnSync("tmux", ["-V"], { encoding: "utf-8" });
@@ -41,7 +42,15 @@ function getTmuxSessionName(id: string, attempt = 0): string {
 }
 
 export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult> {
-  const { prompt, model, cwd, signal, target, onSessionStart } = inv;
+  const {
+    prompt,
+    model,
+    cwd,
+    signal,
+    target,
+    onSessionStart,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+  } = inv;
 
   if (signal?.aborted) {
     return { kind: "canceled", target };
@@ -77,6 +86,7 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
 
   return new Promise<ReviewResult>((resolve) => {
     let pollId: ReturnType<typeof setInterval> | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     let settled = false;
     let sessionAnnounced = false;
 
@@ -84,6 +94,7 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
       if (settled) return;
       settled = true;
       if (pollId) clearInterval(pollId);
+      if (timeoutId) clearTimeout(timeoutId);
       signal?.removeEventListener("abort", onAbort);
       if (result.kind === "success") {
         cleanupTempFiles([
@@ -104,11 +115,29 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
       cleanup({
         kind: "canceled",
         target,
-        warning: `Review canceled. Sent interrupt to tmux session \`${sessionName}\`; if it remains active, kill it with \`tmux kill-session -t ${sessionName}\`.`,
+        warning: [
+          `Review canceled. Sent interrupt to tmux session \`${sessionName}\`.`,
+          `If it remains active, kill it with \`tmux kill-session -t ${sessionName}\`.`,
+        ].join(" "),
+      });
+    };
+
+    const onTimeout = () => {
+      tmuxSendInterrupt(sessionName);
+      const killTimer = setTimeout(() => killSessionIfPresent(sessionName), 5000);
+      killTimer.unref?.();
+      cleanup({
+        kind: "timeout",
+        target,
+        timeoutMs,
+        stdout: readPaneLogExcerpt(paths.paneLogPath),
+        warning: formatSessionWarning(sessionName, paths.paneLogPath),
       });
     };
 
     signal?.addEventListener("abort", onAbort, { once: true });
+    timeoutId = setTimeout(onTimeout, timeoutMs);
+    timeoutId.unref?.();
 
     proc.on("error", (err) => {
       cleanup(makeFailedResult(`Failed to spawn tmux reviewer: ${err.message}`, target));
@@ -129,8 +158,12 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
     });
 
     pollId = setInterval(() => {
+      if (existsSync(paths.exitPath)) {
+        cleanup(buildTmuxResult({ ...paths, sessionName, target }));
+        return;
+      }
       if (!tmuxHasSession(sessionName)) {
-        cleanup(buildTmuxResult({ ...paths, target }));
+        cleanup(buildTmuxResult({ ...paths, sessionName, target }));
       }
     }, POLL_INTERVAL_MS);
   });
@@ -139,13 +172,15 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
 interface TmuxResultOptions {
   outputPath: string;
   exitPath: string;
+  paneLogPath: string;
+  sessionName: string;
   target: ReviewTarget;
 }
 
 function buildTmuxResult(options: TmuxResultOptions): ReviewResult {
   const { outputPath, exitPath, target } = options;
   const exitStatus = readRunnerExitStatus(exitPath);
-  const failedResult = getFailedExitResult(exitStatus, target);
+  const failedResult = getFailedExitResult(exitStatus, options);
   if (failedResult) return failedResult;
 
   const output = readStructuredOutput(outputPath);
@@ -153,36 +188,82 @@ function buildTmuxResult(options: TmuxResultOptions): ReviewResult {
     return { kind: "success", output, target };
   }
 
-  return makeFailedResult("Reviewer did not submit a structured result via submit_review.", target);
+  return withDiagnostics(
+    {
+      kind: "failed",
+      reason: "Reviewer did not submit a structured result via submit_review.",
+      target,
+    },
+    options,
+  );
 }
 
 function getFailedExitResult(
   exitStatus: ReturnType<typeof readRunnerExitStatus>,
-  target: ReviewTarget,
+  options: TmuxResultOptions,
 ): ReviewResult | undefined {
   if (!exitStatus) return undefined;
+  const { target } = options;
   if (exitStatus.error) {
-    return {
-      kind: "failed",
-      reason: `Failed to spawn reviewer: ${exitStatus.error}`,
-      target,
-    };
+    return withDiagnostics(
+      {
+        kind: "failed",
+        reason: `Failed to spawn reviewer: ${exitStatus.error}`,
+        target,
+      },
+      options,
+    );
   }
   if (typeof exitStatus.code === "number" && exitStatus.code !== 0) {
-    return {
-      kind: "failed",
-      reason: `Reviewer exited with code ${exitStatus.code}`,
-      target,
-    };
+    return withDiagnostics(
+      {
+        kind: "failed",
+        reason: `Reviewer exited with code ${exitStatus.code}`,
+        target,
+      },
+      options,
+    );
   }
   if (exitStatus.signal) {
-    return {
-      kind: "failed",
-      reason: `Reviewer exited from signal ${exitStatus.signal}`,
-      target,
-    };
+    return withDiagnostics(
+      {
+        kind: "failed",
+        reason: `Reviewer exited from signal ${exitStatus.signal}`,
+        target,
+      },
+      options,
+    );
   }
   return undefined;
+}
+
+function withDiagnostics(
+  result: Extract<ReviewResult, { kind: "failed" }>,
+  options: Pick<TmuxResultOptions, "paneLogPath" | "sessionName">,
+): ReviewResult {
+  return {
+    ...result,
+    stdout: readPaneLogExcerpt(options.paneLogPath),
+    warning: formatSessionWarning(options.sessionName, options.paneLogPath),
+  };
+}
+
+function readPaneLogExcerpt(paneLogPath: string): string | undefined {
+  if (!existsSync(paneLogPath)) return undefined;
+  try {
+    const content = readFileSync(paneLogPath, "utf-8");
+    return content.slice(-4000) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function formatSessionWarning(sessionName: string, paneLogPath: string): string {
+  return [
+    `Review logs are in ${paneLogPath}.`,
+    `Inspect with \`tmux attach -t ${sessionName}\`;`,
+    `clean up with \`tmux kill-session -t ${sessionName}\`.`,
+  ].join(" ");
 }
 
 function resolveSessionName(id: string): string {

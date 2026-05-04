@@ -7,8 +7,7 @@ import {
 import type { ReviewSettings } from "./types.ts";
 
 export const REVIEW_DEFAULTS: ReviewSettings = {
-  reviewFastModel: "",
-  reviewDeepModel: "",
+  reviewModel: "",
   maxDiffBytes: 100_000,
   autoFix: false,
 };
@@ -24,8 +23,7 @@ export function loadReviewSettings(cwd: string, homeDir?: string): ReviewSetting
 /**
  * Update the model ids offered by `/supi-settings` for review depth overrides.
  *
- * The list is session-local and typically mirrors pi's current `--models` scope
- * when present, otherwise the currently available authenticated models.
+ * The list is session-local and mirrors the currently available authenticated models.
  */
 export function setReviewModelChoices(modelChoices: string[]): void {
   reviewModelChoices = Array.from(
@@ -43,11 +41,8 @@ export function registerReviewSettings(): void {
     // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
     persistChange: (_scope, _cwd, settingId, value, helpers) => {
       switch (settingId) {
-        case "reviewFastModel":
-          persistModelOverride("reviewFastModel", value, helpers);
-          break;
-        case "reviewDeepModel":
-          persistModelOverride("reviewDeepModel", value, helpers);
+        case "reviewModel":
+          persistModelOverride(value, helpers);
           break;
         case "maxDiffBytes":
           persistMaxDiffBytes(value, helpers);
@@ -60,15 +55,11 @@ export function registerReviewSettings(): void {
   });
 }
 
-function persistModelOverride(
-  key: "reviewFastModel" | "reviewDeepModel",
-  value: string,
-  helpers: ConfigSettingsHelpers,
-): void {
+function persistModelOverride(value: string, helpers: ConfigSettingsHelpers): void {
   if (value.trim() && value !== INHERIT_MODEL_VALUE) {
-    helpers.set(key, value.trim());
+    helpers.set("reviewModel", value.trim());
   } else {
-    helpers.unset(key);
+    helpers.unset("reviewModel");
   }
 }
 
@@ -92,20 +83,12 @@ function persistAutoFix(value: string, helpers: ConfigSettingsHelpers): void {
 function buildReviewSettingItems(settings: ReviewSettings): SettingItem[] {
   return [
     {
-      id: "reviewFastModel",
-      label: "Fast Review Model",
+      id: "reviewModel",
+      label: "Review Model",
       description:
-        "Cycle through the current pi model scope (or available models). Inherit uses the active session model.",
-      currentValue: settings.reviewFastModel || INHERIT_MODEL_VALUE,
-      values: buildModelCycleValues(settings.reviewFastModel),
-    },
-    {
-      id: "reviewDeepModel",
-      label: "Deep Review Model",
-      description:
-        "Cycle through the current pi model scope (or available models). Inherit uses the active session model.",
-      currentValue: settings.reviewDeepModel || INHERIT_MODEL_VALUE,
-      values: buildModelCycleValues(settings.reviewDeepModel),
+        "Preselect the model used by /supi-review. Inherit uses the active session model.",
+      currentValue: settings.reviewModel || INHERIT_MODEL_VALUE,
+      values: buildModelCycleValues(settings.reviewModel),
     },
     {
       id: "maxDiffBytes",

@@ -7,7 +7,6 @@ import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "./types.ts";
 
 const __dirname = dirname(dirname(fileURLToPath(import.meta.url)));
 const REVIEW_PROMPT = readFileSync(join(__dirname, "review-prompt.md"), "utf-8");
-const DISABLED_MODEL_SCOPE_PATTERN = "__supi_review_no_scoped_models__";
 
 export interface TempPaths {
   toolPath: string;
@@ -39,13 +38,16 @@ export function getTempPaths(id: string): TempPaths {
 }
 
 export function writeSubmitReviewTool(toolPath: string, outputPath: string): void {
-  const content = `import { Type } from "@sinclair/typebox";
+  const content = `import { Type } from "typebox";
 
 export default function (pi) {
   pi.registerTool({
     name: "submit_review",
     label: "Submit Review",
-    description: "Submit the final structured review result. Call this tool when you have completed your review and are ready to submit the findings.",
+    description: [
+      "Submit the final structured review result.",
+      "Call this tool when you have completed your review and are ready to submit the findings.",
+    ].join(" "),
     parameters: Type.Object({
       findings: Type.Array(
         Type.Object({
@@ -69,7 +71,11 @@ export default function (pi) {
     execute: async (_toolCallId, args) => {
       const fs = await import("node:fs/promises");
       await fs.writeFile(${JSON.stringify(outputPath)}, JSON.stringify(args, null, 2));
-      return { output: "Review submitted successfully." };
+      return {
+        content: [{ type: "text", text: "Review submitted successfully." }],
+        details: args,
+        terminate: true,
+      };
     },
   });
 }`;
@@ -155,11 +161,7 @@ export function buildPiArgs(options: {
   const { model, toolPath, prompt } = options;
   const args = [
     "--print",
-    // Workaround: pass a deliberately non-matching --models scope so the reviewer
-    // subprocess does not inherit the user's enabledModels settings. An empty
-    // pattern is not safe because pi treats it as a substring match for every model.
-    "--models",
-    DISABLED_MODEL_SCOPE_PATTERN,
+    "--no-session",
     "-e",
     toolPath,
     "--no-extensions",

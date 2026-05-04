@@ -1,19 +1,17 @@
-import { BorderedLoader, type ExtensionAPI, SettingsManager } from "@mariozechner/pi-coding-agent";
+import { BorderedLoader, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { formatReviewContent } from "./format-content.ts";
 import { getCommitShow, getDiff, getMergeBase, getUncommittedDiff } from "./git.ts";
-import { getReviewModelChoices } from "./model-choices.ts";
 import { buildReviewPrompt } from "./prompts.ts";
 import { registerReviewRenderer } from "./renderer.ts";
 import { runReviewer } from "./runner.ts";
 import { loadReviewSettings, registerReviewSettings, setReviewModelChoices } from "./settings.ts";
-import type { ReviewDepth, ReviewResult, ReviewTarget } from "./types.ts";
-import { selectAutoFix, selectBranch, selectCommit, selectDepth, selectPreset } from "./ui.ts";
+import type { ReviewResult, ReviewTarget } from "./types.ts";
+import { selectAutoFix, selectBranch, selectCommit, selectPreset } from "./ui.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
 
 interface ReviewExecutionOptions {
   target: ReviewTarget;
-  depth: ReviewDepth;
   maxDiffBytes: number;
   ctx: CommandContext;
   signal?: AbortSignal;
@@ -24,15 +22,11 @@ export default function reviewExtension(pi: ExtensionAPI) {
   registerReviewRenderer(pi);
 
   const syncReviewModelChoices = (ctx: {
-    cwd: string;
     modelRegistry: {
-      getAvailable(): Array<{ provider: string; id: string; name?: string }> | undefined;
+      getAvailable(): Array<{ provider: string; id: string }> | undefined;
     };
   }) => {
-    const settingsPatterns = SettingsManager.create(ctx.cwd).getEnabledModels() ?? [];
-    setReviewModelChoices(
-      getReviewModelChoices(ctx.modelRegistry.getAvailable(), { settingsPatterns }),
-    );
+    setReviewModelChoices(toCanonicalModelIds(ctx.modelRegistry.getAvailable()));
   };
 
   pi.on("session_start", async (_event, ctx) => {
@@ -61,16 +55,13 @@ async function handleInteractive(
   const preset = await selectPreset(ctx);
   if (!preset) return;
 
-  const depth = await selectDepth(ctx);
-  if (!depth) return;
-
   const autoFix = await selectAutoFix(ctx, autoFixDefault);
   if (autoFix === undefined) return;
 
   const target = await resolvePresetTarget(preset, ctx);
   if (!target) return;
 
-  const result = await runReviewWithLoader(target, depth, maxDiffBytes, ctx);
+  const result = await runReviewWithLoader(target, maxDiffBytes, ctx);
   injectReviewMessage(pi, result, autoFix, ctx);
 }
 
@@ -170,7 +161,6 @@ async function resolveGitTarget(
 
 async function runReviewWithLoader(
   target: ReviewTarget,
-  depth: ReviewDepth,
   maxDiffBytes: number,
   ctx: CommandContext,
 ): Promise<ReviewResult> {
@@ -186,7 +176,7 @@ async function runReviewWithLoader(
 
     loader.onAbort = () => finish({ kind: "canceled", target });
 
-    executeReview({ target, depth, maxDiffBytes, ctx, signal: loader.signal })
+    executeReview({ target, maxDiffBytes, ctx, signal: loader.signal })
       .then((result) => {
         if (loader.signal.aborted) return;
         finish(result);
@@ -205,9 +195,9 @@ async function runReviewWithLoader(
 }
 
 function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
-  const { target, depth, maxDiffBytes, ctx, signal } = options;
+  const { target, maxDiffBytes, ctx, signal } = options;
   const settings = loadReviewSettings(ctx.cwd);
-  const model = resolveModel(depth, settings, ctx);
+  const model = resolveReviewerModel(settings, ctx);
 
   let diffOrBody = "";
   if (target.type === "base-branch" || target.type === "uncommitted") {
@@ -232,19 +222,28 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
     target,
     signal,
     onSessionStart: (sessionName) => {
-      ctx.ui.notify(`Review running in tmux session ${sessionName}`, "info");
+      const message = `Review running in tmux session ${sessionName}`;
+      if (ctx.hasUI) {
+        ctx.ui.notify(message, "info");
+      } else {
+        process.stderr.write(`${message}\n`);
+      }
     },
   });
 }
 
-function resolveModel(
-  depth: ReviewDepth,
+function toCanonicalModelIds(
+  models: Array<{ provider: string; id: string }> | undefined,
+): string[] {
+  if (!models) return [];
+  return Array.from(new Set(models.map((model) => `${model.provider}/${model.id}`)));
+}
+
+function resolveReviewerModel(
   settings: ReturnType<typeof loadReviewSettings>,
   ctx: CommandContext,
 ): string | undefined {
-  if (depth === "fast" && settings.reviewFastModel) return settings.reviewFastModel;
-  if (depth === "deep" && settings.reviewDeepModel) return settings.reviewDeepModel;
-  return resolveSessionModelId(ctx.model);
+  return settings.reviewModel || resolveSessionModelId(ctx.model);
 }
 
 function resolveSessionModelId(

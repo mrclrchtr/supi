@@ -24,7 +24,7 @@ describe("review settings registration", () => {
     setReviewModelChoices([]);
   });
 
-  it("cycles fast and deep models through the current review model choices", () => {
+  it("cycles the review model through the current review model choices", () => {
     setReviewModelChoices(["anthropic/claude-sonnet-4-5", "openai/gpt-4o-mini"]);
     registerReviewSettings();
 
@@ -32,17 +32,11 @@ describe("review settings registration", () => {
     expect(section).toBeDefined();
 
     const items = section?.loadValues("project", "/tmp") ?? [];
-    const fast = items.find((item) => item.id === "reviewFastModel");
-    const deep = items.find((item) => item.id === "reviewDeepModel");
+    const reviewModel = items.find((item) => item.id === "reviewModel");
     const maxDiff = items.find((item) => item.id === "maxDiffBytes");
 
-    expect(fast?.currentValue).toBe("(inherit)");
-    expect(fast?.values).toEqual([
-      "(inherit)",
-      "anthropic/claude-sonnet-4-5",
-      "openai/gpt-4o-mini",
-    ]);
-    expect(deep?.values).toEqual([
+    expect(reviewModel?.currentValue).toBe("(inherit)");
+    expect(reviewModel?.values).toEqual([
       "(inherit)",
       "anthropic/claude-sonnet-4-5",
       "openai/gpt-4o-mini",
@@ -57,11 +51,11 @@ describe("review settings registration", () => {
     const section = getRegisteredSettings().find((item) => item.id === "review");
     if (!section) throw new Error("review settings section was not registered");
 
-    section.persistChange("project", tmpDir, "reviewFastModel", "anthropic/claude-sonnet-4-5");
-    section.persistChange("project", tmpDir, "reviewFastModel", "(inherit)");
+    section.persistChange("project", tmpDir, "reviewModel", "anthropic/claude-sonnet-4-5");
+    section.persistChange("project", tmpDir, "reviewModel", "(inherit)");
 
     const config = loadSupiConfig("review", tmpDir, REVIEW_DEFAULTS);
-    expect(config.reviewFastModel).toBe("");
+    expect(config.reviewModel).toBe("");
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

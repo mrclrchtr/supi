@@ -1,7 +1,6 @@
 {
   "review": {
-    "reviewFastModel": "openai-codex/gpt-5.4-mini",
-    "reviewDeepModel": "openai-codex/gpt-5.5",
+    "reviewModel": "openai-codex/gpt-5.5",
     "autoFix": true
   },
   "debug": {

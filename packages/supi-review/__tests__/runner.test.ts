@@ -125,6 +125,8 @@ describe("runReviewer", () => {
     expect(toolPath).toMatch(/supi-review-.*-tool\.ts$/);
     expect(tempFiles.has(toolPath)).toBe(true);
     expect(tempFiles.get(toolPath)).toContain("submit_review");
+    expect(tempFiles.get(toolPath)).toContain('from "typebox"');
+    expect(tempFiles.get(toolPath)).toContain("terminate: true");
     writeDefaultOutputFromSpawn();
 
     vi.advanceTimersByTime(1500);
@@ -189,7 +191,7 @@ describe("runReviewer", () => {
     expect(piArgs).not.toContain("--model");
   });
 
-  it("passes a non-matching --models scope to isolate reviewer from host enabledModels", async () => {
+  it("does not pass a synthetic --models scope", async () => {
     const promise = runReviewer({
       prompt: "review this",
       model: undefined,
@@ -203,9 +205,7 @@ describe("runReviewer", () => {
     vi.advanceTimersByTime(1500);
     await promise;
 
-    const modelsIndex = piArgs.indexOf("--models");
-    expect(modelsIndex).toBeGreaterThanOrEqual(0);
-    expect(piArgs[modelsIndex + 1]).toBe("__supi_review_no_scoped_models__");
+    expect(piArgs).not.toContain("--models");
   });
 
   it("reads valid JSON from the temp output file on success", async () => {
@@ -262,7 +262,7 @@ describe("runReviewer", () => {
     expect(result.kind).toBe("failed");
     const failedResult = result as Extract<typeof result, { kind: "failed" }>;
     expect(failedResult.reason).toContain("did not submit a structured result");
-    expect(failedResult.warning).toBeUndefined();
+    expect(failedResult.warning).toContain("tmux attach");
   });
 
   it("announces the tmux session only after startup succeeds", async () => {
@@ -450,7 +450,12 @@ function getSessionNameFromSpawn(index = 0): string {
 }
 
 function defaultReviewJson(): string {
-  return '{"findings":[],"overall_correctness":"ok","overall_explanation":"x","overall_confidence_score":0.5}';
+  return JSON.stringify({
+    findings: [],
+    overall_correctness: "ok",
+    overall_explanation: "x",
+    overall_confidence_score: 0.5,
+  });
 }
 
 interface MockProc {

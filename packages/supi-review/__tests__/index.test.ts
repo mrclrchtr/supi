@@ -2,18 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
   loadReviewSettings: vi.fn(() => ({
-    reviewFastModel: "",
-    reviewDeepModel: "",
+    reviewModel: "",
     maxDiffBytes: 100_000,
     autoFix: false,
   })),
   registerReviewSettings: vi.fn(),
   setReviewModelChoices: vi.fn(),
-  getReviewModelChoices: vi.fn(() => ["session-model"]),
   registerReviewRenderer: vi.fn(),
   runReviewer: vi.fn(),
   selectPreset: vi.fn(async () => "custom"),
-  selectDepth: vi.fn(async () => "inherit"),
   selectAutoFix: vi.fn(async () => false),
 }));
 
@@ -41,10 +38,6 @@ vi.mock("../src/settings.ts", () => ({
   setReviewModelChoices: mockFns.setReviewModelChoices,
 }));
 
-vi.mock("../src/model-choices.ts", () => ({
-  getReviewModelChoices: mockFns.getReviewModelChoices,
-}));
-
 vi.mock("../src/renderer.ts", () => ({
   registerReviewRenderer: mockFns.registerReviewRenderer,
 }));
@@ -55,7 +48,6 @@ vi.mock("../src/runner.ts", () => ({
 
 vi.mock("../src/ui.ts", () => ({
   selectPreset: mockFns.selectPreset,
-  selectDepth: mockFns.selectDepth,
   selectAutoFix: mockFns.selectAutoFix,
   selectBranch: vi.fn(),
   selectCommit: vi.fn(),
@@ -194,8 +186,7 @@ describe("/supi-review command", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFns.loadReviewSettings.mockReturnValue({
-      reviewFastModel: "",
-      reviewDeepModel: "",
+      reviewModel: "",
       maxDiffBytes: 100_000,
       autoFix: false,
     });

@@ -31,11 +31,8 @@ export type ReviewTarget =
   | { type: "commit"; sha: string; show: string }
   | { type: "custom"; instructions: string };
 
-export type ReviewDepth = "inherit" | "fast" | "deep";
-
 export interface ReviewSettings {
-  reviewFastModel: string;
-  reviewDeepModel: string;
+  reviewModel: string;
   maxDiffBytes: number;
   autoFix: boolean;
 }
