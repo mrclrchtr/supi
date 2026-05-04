@@ -26,6 +26,12 @@
       "sourceType": "github",
       "computedHash": "922dc38cd7eb697a910a1800949ed2d120e718ffe89bbbf2bdf27f7081bb7fdd"
     },
+    "ticket": {
+      "source": "mrclrchtr/tandem",
+      "sourceType": "github",
+      "skillPath": "skills/ticket/SKILL.md",
+      "computedHash": "a327cbf4c946c5abd2b7fb169c58d9bf340180527f7b5a7e9481b1adf75848d3"
+    },
     "web-fetch-to-markdown": {
       "source": "mrclrchtr/skills",
       "sourceType": "github",
