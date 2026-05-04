@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
+import type { PromptFingerprint } from "../src/fingerprint.ts";
 import { CacheMonitorState } from "../src/state.ts";
+
+/** Build a minimal PromptFingerprint inline for tests. */
+function fp(overrides: Partial<PromptFingerprint> = {}): PromptFingerprint {
+  return {
+    customPromptHash: 0,
+    appendSystemPromptHash: 0,
+    promptGuidelinesHash: 0,
+    selectedToolsHash: 0,
+    toolSnippetsHash: 0,
+    contextFiles: [],
+    skills: [],
+    ...overrides,
+  };
+}
 
 describe("CacheMonitorState", () => {
   describe("recordTurn", () => {
@@ -93,19 +108,33 @@ describe("CacheMonitorState", () => {
     it("annotates prompt change on next turn", () => {
       const state = new CacheMonitorState();
       state.recordTurn({ cacheRead: 8000, cacheWrite: 0, input: 2000 }, 1000);
-      state.updatePromptHash(12345);
-      state.updatePromptHash(67890); // different → flag prompt change
+      state.updatePromptFingerprint(fp({ customPromptHash: 12345 }));
+      state.updatePromptFingerprint(fp({ customPromptHash: 67890 })); // different → flag prompt change
       const turn = state.recordTurn({ cacheRead: 0, cacheWrite: 5000, input: 5000 }, 2000);
       expect(turn.note).toBe("⚠ prompt changed");
     });
 
-    it("does not flag prompt change for same hash", () => {
+    it("does not flag prompt change for same fingerprint", () => {
       const state = new CacheMonitorState();
       state.recordTurn({ cacheRead: 8000, cacheWrite: 0, input: 2000 }, 1000);
-      state.updatePromptHash(12345);
-      state.updatePromptHash(12345); // same → no flag
+      state.updatePromptFingerprint(fp({ selectedToolsHash: 12345 }));
+      state.updatePromptFingerprint(fp({ selectedToolsHash: 12345 })); // same → no flag
       const turn = state.recordTurn({ cacheRead: 5000, cacheWrite: 0, input: 5000 }, 2000);
       expect(turn.note).toBeUndefined();
+    });
+
+    it("attaches promptFingerprint to turn record", () => {
+      const state = new CacheMonitorState();
+      const testFp = fp({ selectedToolsHash: 42, contextFiles: [{ path: "test.md", hash: 7 }] });
+      state.updatePromptFingerprint(testFp);
+      const turn = state.recordTurn({ cacheRead: 8000, cacheWrite: 0, input: 2000 }, 1000);
+      expect(turn.promptFingerprint).toEqual(testFp);
+    });
+
+    it("does not attach promptFingerprint when none computed", () => {
+      const state = new CacheMonitorState();
+      const turn = state.recordTurn({ cacheRead: 8000, cacheWrite: 0, input: 2000 }, 1000);
+      expect(turn.promptFingerprint).toBeUndefined();
     });
 
     it("clears flags after recording", () => {
@@ -186,8 +215,8 @@ describe("CacheMonitorState", () => {
     it("diagnoses prompt change cause", () => {
       const state = new CacheMonitorState();
       state.recordTurn({ cacheRead: 9000, cacheWrite: 0, input: 1000 }, 1000);
-      state.updatePromptHash(111);
-      state.updatePromptHash(222);
+      state.updatePromptFingerprint(fp({ customPromptHash: 111 }));
+      state.updatePromptFingerprint(fp({ customPromptHash: 222 }));
       state.recordTurn({ cacheRead: 500, cacheWrite: 0, input: 9500 }, 2000);
       const result = state.detectRegression(25);
       expect(result).not.toBeNull();
@@ -260,6 +289,48 @@ describe("CacheMonitorState", () => {
       state.restoreFromEntries([]);
       expect(state.getTurns()).toHaveLength(0);
     });
+
+    it("restores promptFingerprint from the last turn", () => {
+      const testFp = fp({ skills: [{ name: "test", hash: 99 }] });
+
+      const original = new CacheMonitorState();
+      original.updatePromptFingerprint(testFp);
+      original.recordTurn({ cacheRead: 9000, cacheWrite: 0, input: 1000 }, 1000);
+      original.recordTurn({ cacheRead: 8000, cacheWrite: 0, input: 2000 }, 2000);
+
+      const entries = [
+        {
+          type: "custom" as const,
+          customType: "supi-cache-turn",
+          data: original.getTurns()[0],
+          id: "1",
+          parentId: null,
+        },
+        {
+          type: "custom" as const,
+          customType: "supi-cache-turn",
+          data: original.getTurns()[1],
+          id: "2",
+          parentId: "1",
+        },
+      ];
+
+      const restored = new CacheMonitorState();
+      restored.restoreFromEntries(entries as never);
+
+      // The last turn should have promptFingerprint
+      expect(restored.getTurns()[1].promptFingerprint).toEqual(testFp);
+
+      // Now simulate a new before_agent_start with the same fingerprint → no flag
+      restored.updatePromptFingerprint(testFp);
+      const turn3 = restored.recordTurn({ cacheRead: 7000, cacheWrite: 0, input: 3000 }, 3000);
+      expect(turn3.note).toBeUndefined();
+
+      // Different fingerprint → flag prompt change
+      restored.updatePromptFingerprint(fp({ skills: [{ name: "test", hash: 999 }] }));
+      const turn4 = restored.recordTurn({ cacheRead: 1000, cacheWrite: 0, input: 9000 }, 4000);
+      expect(turn4.note).toBe("⚠ prompt changed");
+    });
   });
 
   describe("reset", () => {
@@ -267,7 +338,7 @@ describe("CacheMonitorState", () => {
       const state = new CacheMonitorState();
       state.recordTurn({ cacheRead: 8000, cacheWrite: 0, input: 2000 }, 1000);
       state.flagCompaction();
-      state.updatePromptHash(123);
+      state.updatePromptFingerprint(fp({ customPromptHash: 123 }));
       state.reset();
       expect(state.getTurns()).toHaveLength(0);
       expect(state.cacheSupported).toBe(false);

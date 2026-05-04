@@ -1,6 +1,7 @@
 // Per-turn cache state management, regression detection, and session persistence.
 
 import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+import { diffFingerprints, type PromptFingerprint } from "./fingerprint.ts";
 
 /** Persisted per-turn cache record. */
 export interface TurnRecord {
@@ -15,6 +16,8 @@ export interface TurnRecord {
   note?: string;
   /** Structured cause metadata for later regression diagnosis. */
   cause?: RegressionCause;
+  /** Fingerprint of the system prompt used for this turn, if available. */
+  promptFingerprint?: PromptFingerprint;
 }
 
 /** Cause of a detected regression. */
@@ -55,7 +58,7 @@ export class CacheMonitorState {
 
   private compactionFlag = false;
   private modelChangeFlag: string | undefined;
-  private lastPromptHash: number | undefined;
+  private lastPromptFingerprint: PromptFingerprint | undefined;
   private promptChangeFlag = false;
 
   // ── Turn recording ────────────────────────────────────────
@@ -97,6 +100,7 @@ export class CacheMonitorState {
       timestamp,
       ...(note ? { note } : {}),
       ...(cause ? { cause } : {}),
+      ...(this.lastPromptFingerprint ? { promptFingerprint: this.lastPromptFingerprint } : {}),
     };
 
     this.turns.push(record);
@@ -122,14 +126,17 @@ export class CacheMonitorState {
   }
 
   /**
-   * Update the system prompt hash. If it differs from the previous hash,
-   * flag a prompt change (consumed on next comparable recordTurn).
+   * Store the computed prompt fingerprint. If it differs from the previous
+   * fingerprint, flag a prompt change (consumed on next comparable recordTurn).
    */
-  updatePromptHash(hash: number): void {
-    if (this.lastPromptHash !== undefined && hash !== this.lastPromptHash) {
-      this.promptChangeFlag = true;
+  updatePromptFingerprint(fp: PromptFingerprint): void {
+    if (this.lastPromptFingerprint !== undefined) {
+      const diffs = diffFingerprints(this.lastPromptFingerprint, fp);
+      if (diffs.length > 0) {
+        this.promptChangeFlag = true;
+      }
     }
-    this.lastPromptHash = hash;
+    this.lastPromptFingerprint = fp;
   }
 
   // ── Regression detection ──────────────────────────────────
@@ -188,7 +195,7 @@ export class CacheMonitorState {
     this.cacheSupported = false;
     this.compactionFlag = false;
     this.modelChangeFlag = undefined;
-    this.lastPromptHash = undefined;
+    this.lastPromptFingerprint = undefined;
     this.promptChangeFlag = false;
 
     for (const entry of entries) {
@@ -200,6 +207,13 @@ export class CacheMonitorState {
           this.cacheSupported = true;
         }
       }
+    }
+
+    // Restore last fingerprint from the most recently restored turn so that
+    // cross-session prompt-change detection works correctly.
+    const lastTurn = this.turns[this.turns.length - 1];
+    if (lastTurn?.promptFingerprint) {
+      this.lastPromptFingerprint = lastTurn.promptFingerprint;
     }
   }
 
@@ -227,8 +241,19 @@ export class CacheMonitorState {
     this.cacheSupported = false;
     this.compactionFlag = false;
     this.modelChangeFlag = undefined;
-    this.lastPromptHash = undefined;
+    this.lastPromptFingerprint = undefined;
     this.promptChangeFlag = false;
+  }
+
+  /** Get the latest prompt fingerprint (for diffing in regression messages). */
+  getLatestFingerprint(): PromptFingerprint | undefined {
+    return this.lastPromptFingerprint;
+  }
+
+  /** Get the previous turn's prompt fingerprint (for diffing in regression messages). */
+  getPreviousFingerprint(): PromptFingerprint | undefined {
+    const prev = this.getPreviousTurn();
+    return prev?.promptFingerprint;
   }
 }
 

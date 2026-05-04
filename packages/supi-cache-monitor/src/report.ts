@@ -1,6 +1,7 @@
 // Report formatting for the /supi-cache history table.
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
+import { diffFingerprints } from "./fingerprint.ts";
 import type { TurnRecord } from "./state.ts";
 
 /** Snapshot payload persisted in message.details for the report renderer. */
@@ -62,7 +63,107 @@ export function formatCacheReport(snapshot: CacheReportSnapshot, theme: Theme): 
     }
   }
 
+  // ── Regression details section ────────────────────────────
+
+  const detailLines = formatRegressionDetails(turns, theme);
+  if (detailLines.length > 0) {
+    lines.push("");
+    lines.push(theme.fg("accent", "Regression details:"));
+    lines.push(...detailLines);
+  }
+
   return lines;
+}
+
+/**
+ * Build a compact regression-detail section for turns with diagnosed causes.
+ *
+ * Each entry shows the turn index, hit-rate drop (when computable), and
+ * fingerprint diff bullet points for prompt_change regressions.
+ */
+function formatRegressionDetails(turns: TurnRecord[], theme: Theme): string[] {
+  const lines: string[] = [];
+
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i];
+    const prevTurn = i > 0 ? turns[i - 1] : undefined;
+    addTurnDetail(lines, turn, prevTurn, theme);
+  }
+
+  return lines;
+}
+
+function addTurnDetail(
+  lines: string[],
+  turn: TurnRecord,
+  prevTurn: TurnRecord | undefined,
+  theme: Theme,
+): void {
+  const causeLabel = getCauseLabel(turn);
+  if (!causeLabel) return;
+
+  const drop = describeDrop(prevTurn, turn);
+  const header = drop
+    ? `  Turn ${turn.turnIndex}: ${drop} (${causeLabel})`
+    : `  Turn ${turn.turnIndex}: (${causeLabel})`;
+  lines.push(theme.fg("warning", header));
+
+  addFingerprintBullets(lines, turn, prevTurn);
+}
+
+function addFingerprintBullets(
+  lines: string[],
+  turn: TurnRecord,
+  prevTurn: TurnRecord | undefined,
+): void {
+  if (!isPromptChange(turn)) return;
+
+  const prevFp = prevTurn?.promptFingerprint;
+  const currFp = turn.promptFingerprint;
+  if (!prevFp || !currFp) return;
+
+  for (const d of diffFingerprints(prevFp, currFp)) {
+    lines.push(`    • ${d}`);
+  }
+}
+
+/** Determine the cause label for a turn, or undefined if it's a regular turn. */
+function getCauseLabel(turn: TurnRecord): string | undefined {
+  if (turn.cause) {
+    switch (turn.cause.type) {
+      case "compaction":
+        return "compaction";
+      case "model_change":
+        return "model changed";
+      case "prompt_change":
+        return "prompt changed";
+      case "unknown":
+        return "unknown";
+    }
+  }
+  // Fall back to note-based detection for legacy records
+  if (turn.note?.startsWith("⚠")) {
+    const label = turn.note.replace("⚠ ", "");
+    return label;
+  }
+  return undefined;
+}
+
+/** Check if a turn's cause is prompt_change. */
+function isPromptChange(turn: TurnRecord): boolean {
+  if (turn.cause?.type === "prompt_change") return true;
+  return turn.note === "⚠ prompt changed";
+}
+
+/**
+ * Describe the hit-rate drop between two adjacent turns.
+ * Returns "80% → 5%" or undefined when not computable.
+ */
+function describeDrop(prev: TurnRecord | undefined, curr: TurnRecord): string | undefined {
+  if (!prev || prev.hitRate === undefined || curr.hitRate === undefined) {
+    return undefined;
+  }
+  return `${prev.hitRate}% → ${curr.hitRate}%`;
 }
 
 interface RowData {

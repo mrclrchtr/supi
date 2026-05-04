@@ -6,7 +6,7 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Container, Spacer, Text } from "@mariozechner/pi-tui";
 import { loadCacheMonitorConfig } from "./config.ts";
-import { fastHash } from "./hash.ts";
+import { computePromptFingerprint, diffFingerprints, zeroFingerprint } from "./fingerprint.ts";
 import { type CacheReportSnapshot, formatCacheReport } from "./report.ts";
 import { registerCacheMonitorSettings } from "./settings-registration.ts";
 import { CacheMonitorState, type RegressionResult } from "./state.ts";
@@ -58,7 +58,14 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
     // Check regression
     const regression = state.detectRegression(getThreshold(ctx));
     if (regression && notificationsEnabled(ctx)) {
-      ctx.ui.notify(formatRegressionMessage(regression), "warning");
+      const diffs =
+        regression.cause.type === "prompt_change"
+          ? diffFingerprints(
+              state.getPreviousFingerprint() ?? zeroFingerprint(),
+              state.getLatestFingerprint() ?? zeroFingerprint(),
+            )
+          : undefined;
+      ctx.ui.notify(formatRegressionMessage(regression, diffs), "warning");
     }
   });
 
@@ -77,12 +84,12 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
     state.flagModelChange(modelStr);
   });
 
-  // ── before_agent_start: hash system prompt ────────────────
+  // ── before_agent_start: fingerprint system prompt ────────
 
   pi.on("before_agent_start", async (event, ctx) => {
     if (!isEnabled(ctx)) return;
-    const hash = fastHash(event.systemPrompt);
-    state.updatePromptHash(hash);
+    const fp = computePromptFingerprint(event.systemPromptOptions);
+    state.updatePromptFingerprint(fp);
   });
 
   // ── session_start: restore state from entries ─────────────
@@ -149,7 +156,7 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
   });
 }
 
-function formatRegressionMessage(regression: RegressionResult): string {
+function formatRegressionMessage(regression: RegressionResult, diffs?: string[]): string {
   if (!regression) return "";
   const { previousRate, currentRate, cause } = regression;
   let causeStr: string;
@@ -162,7 +169,10 @@ function formatRegressionMessage(regression: RegressionResult): string {
       causeStr = `model changed${cause.model !== "unknown" ? ` to ${cause.model}` : ""}`;
       break;
     case "prompt_change":
-      causeStr = "system prompt changed";
+      causeStr =
+        diffs && diffs.length > 0
+          ? `system prompt changed (${diffs.join(", ")})`
+          : "system prompt changed";
       break;
     default:
       causeStr = "unknown";

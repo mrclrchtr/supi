@@ -335,7 +335,7 @@ describe("cause tracking events", () => {
     );
   });
 
-  it("flags prompt change on before_agent_start hash diff", async () => {
+  it("flags prompt change on before_agent_start fingerprint diff", async () => {
     const { handlers, pi } = createPiMock();
     cacheMonitorExtension(pi as never);
 
@@ -348,7 +348,7 @@ describe("cause tracking events", () => {
         type: "before_agent_start",
         systemPrompt: "system prompt v1",
         prompt: "",
-        systemPromptOptions: {},
+        systemPromptOptions: { cwd: "/project", selectedTools: ["read", "bash"] },
       },
       ctx,
     );
@@ -359,14 +359,18 @@ describe("cause tracking events", () => {
         type: "before_agent_start",
         systemPrompt: "system prompt v2 different",
         prompt: "",
-        systemPromptOptions: {},
+        systemPromptOptions: {
+          cwd: "/project",
+          selectedTools: ["read", "bash", "edit"],
+        },
       },
       ctx,
     );
     await msgHandler(assistantMessage(500, 0, 9500), ctx);
 
+    // Should contain the diff list with tool change description
     expect(ctx.ui.notify).toHaveBeenCalledWith(
-      expect.stringContaining("system prompt changed"),
+      expect.stringContaining("system prompt changed (tools)"),
       "warning",
     );
   });
