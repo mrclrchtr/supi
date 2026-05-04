@@ -33,13 +33,26 @@ Each task is one action (2-5 minutes):
 - [ ] 1.4 Run test to verify it passes — show exact command + expected output
 - [ ] 1.5 Commit — show exact commit message
 
+## TDD by default
+
+Every code task follows red-green-refactor:
+
+```
+RED → Write failing test → VERIFY it fails for the right reason
+GREEN → Minimal code to pass → VERIFY test passes + no regressions
+REFACTOR → Clean up, stay green → then commit
+```
+
+Critical rule: **If you didn't watch the test fail, you don't know if it tests the right thing.** Every test step must include the expected failure message.
+
 ## Rules
 
 - **No placeholders.** Never write: TBD, TODO, "implement later", "add error handling", "write tests for the above". Every step must contain the actual content.
 - **Exact file paths** always.
 - **Complete code** in every step — if a step changes code, show the code.
-- **Exact commands** with expected output.
+- **Exact commands** with expected output, including expected failure output for test steps.
 - **Include doc updates** as tasks (from the design's "Docs to update" section).
+- **No code before test.** Every task that produces code starts with a failing test step.
 
 ## Output
 

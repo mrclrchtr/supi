@@ -5,6 +5,14 @@ description: Verify implementation against plan, update living documentation, ru
 
 # Archive and document
 
+## The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+Before claiming any task is done, the change is complete, or docs are accurate: run the command fresh, read the full output, check exit codes. Only then make the claim.
+
 ## Step 1: Find the change
 
 - If a TNDM-ID was given as argument: `tndm ticket show <ID>`
@@ -13,14 +21,37 @@ description: Verify implementation against plan, update living documentation, ru
 
 ## Step 2: Verify completion
 
-Compare the plan against what was actually done:
+Compare the plan against what was actually done. Run every check fresh — previous runs don't count.
 
 - [ ] Every task checked? If not, complete remaining tasks first.
-- [ ] Tests pass? Run the test command fresh and confirm zero failures.
+- [ ] Tests pass? Run the test command fresh. Confirm zero failures. Show the output.
 - [ ] Intent satisfied? Re-read the Intent section — does the implemented change match?
 - [ ] Verification plan executed? Run every verification command listed in the plan. Record actual results.
 
-If anything fails: stop. Fix before continuing.
+If anything fails: stop. Fix before continuing. Do not proceed to documentation with unverified claims.
+
+### Verification gate function
+
+```
+BEFORE claiming any status:
+1. IDENTIFY: What command proves this claim?
+2. RUN: Execute the FULL command (fresh, complete)
+3. READ: Full output, check exit code
+4. CONFIRM: Does output match the claim?
+   - NO → State actual status with evidence
+   - YES → State claim WITH evidence
+5. ONLY THEN: Proceed
+
+Skip any step = lying, not verifying
+```
+
+### Red flags — STOP
+
+- Using "should", "probably", "seems to"
+- Expressing satisfaction before verification ("Great!", "Done!", etc.)
+- Trusting previous test runs
+- Relying on partial verification
+- ANY wording implying success without having run verification
 
 ## Step 3: Update living documentation
 
@@ -31,6 +62,20 @@ From the design's "Docs to update" section (or infer from what changed):
 3. **Apply edits:** update each target with grounded, specific language — explain what changed and why. Reference actual commands, filenames, configuration options.
 4. **Quality scan:** run slop detection. Load `/skill:supi-flow-slop-detect`, scan the edited docs, fix any AI-prose markers found.
 5. **Verify accuracy:** do version numbers, file paths, and claims in the docs match the actual code?
+
+### Documentation quality gate
+
+Before proceeding to close-out, verify against this checklist:
+
+- [ ] No tier-1 slop words in edited docs
+- [ ] Em dash count < 3 per 1000 words
+- [ ] Bullet ratio < 40% (unless listing is appropriate)
+- [ ] All claims grounded with specifics (version numbers, file paths, measurements)
+- [ ] No formulaic openers or closers ("In conclusion", "To summarize")
+- [ ] No AI-sycophantic phrases ("Great question!", "I'd be happy to")
+- [ ] Slop score < 1.5
+
+If any gate fails: fix before continuing. Re-scan after fixes.
 
 ## Step 4: Close out
 
