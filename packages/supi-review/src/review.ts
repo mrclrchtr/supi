@@ -303,7 +303,7 @@ function injectReviewMessage(
   pi: ExtensionAPI,
   result: ReviewResult,
   autoFix: boolean,
-  ctx?: CommandContext,
+  _ctx?: CommandContext,
 ): void {
   pi.sendMessage({
     customType: "supi-review",

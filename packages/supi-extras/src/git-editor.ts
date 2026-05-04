@@ -7,7 +7,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
  * every git subprocess spawned by pi (bash tool calls, `!`/`!!` user commands,
  * scripts) runs `true` instead of blocking on an editor that will never appear.
  */
-export default function gitEditor(pi: ExtensionAPI) {
+export default function gitEditor(_pi: ExtensionAPI) {
   // Set unconditionally; pi runs headless and any editor invocation hangs.
   process.env.GIT_EDITOR = "true";
   process.env.GIT_SEQUENCE_EDITOR = "true";

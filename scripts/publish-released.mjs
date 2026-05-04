@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { execSync } from "node:child_process";
 /**
  * Publish packages that were released by Release Please.
  *
@@ -7,31 +8,30 @@
  * (`packages/supi`) always last.
  */
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
 
 const pathsReleasedJson = process.env.PATHS_RELEASED;
 if (!pathsReleasedJson) {
-	console.log("PATHS_RELEASED not set; nothing to publish.");
-	process.exit(0);
+  console.log("PATHS_RELEASED not set; nothing to publish.");
+  process.exit(0);
 }
 
 let pathsReleased;
 try {
-	pathsReleased = JSON.parse(pathsReleasedJson);
+  pathsReleased = JSON.parse(pathsReleasedJson);
 } catch {
-	console.error("PATHS_RELEASED is not valid JSON:", pathsReleasedJson);
-	process.exit(1);
+  console.error("PATHS_RELEASED is not valid JSON:", pathsReleasedJson);
+  process.exit(1);
 }
 
 if (!Array.isArray(pathsReleased) || pathsReleased.length === 0) {
-	console.log("No packages to publish.");
-	process.exit(0);
+  console.log("No packages to publish.");
+  process.exit(0);
 }
 
 const pkgMap = new Map();
 for (const path of pathsReleased) {
-	const pkgJson = JSON.parse(readFileSync(`${path}/package.json`, "utf-8"));
-	pkgMap.set(path, pkgJson);
+  const pkgJson = JSON.parse(readFileSync(`${path}/package.json`, "utf-8"));
+  pkgMap.set(path, pkgJson);
 }
 
 // Build reverse-dependency graph and in-degree map.
@@ -39,75 +39,75 @@ const graph = new Map();
 const inDegree = new Map();
 
 for (const path of pkgMap.keys()) {
-	graph.set(path, []);
-	inDegree.set(path, 0);
+  graph.set(path, []);
+  inDegree.set(path, 0);
 }
 
 for (const [path, pkg] of pkgMap) {
-	const deps = {
-		...pkg.dependencies,
-		...pkg.peerDependencies,
-		...pkg.optionalDependencies,
-	};
-	for (const [depName, depSpec] of Object.entries(deps)) {
-		if (!depSpec.startsWith("workspace:")) continue;
-		for (const [otherPath, otherPkg] of pkgMap) {
-			if (otherPkg.name === depName) {
-				inDegree.set(path, inDegree.get(path) + 1);
-				graph.get(otherPath).push(path);
-				break;
-			}
-		}
-	}
+  const deps = {
+    ...pkg.dependencies,
+    ...pkg.peerDependencies,
+    ...pkg.optionalDependencies,
+  };
+  for (const [depName, depSpec] of Object.entries(deps)) {
+    if (!depSpec.startsWith("workspace:")) continue;
+    for (const [otherPath, otherPkg] of pkgMap) {
+      if (otherPkg.name === depName) {
+        inDegree.set(path, inDegree.get(path) + 1);
+        graph.get(otherPath).push(path);
+        break;
+      }
+    }
+  }
 }
 
 // Kahn's algorithm.
 const queue = [];
 for (const [path, degree] of inDegree) {
-	if (degree === 0) queue.push(path);
+  if (degree === 0) queue.push(path);
 }
 
 const sorted = [];
 while (queue.length > 0) {
-	const path = queue.shift();
-	sorted.push(path);
-	for (const dependent of graph.get(path)) {
-		inDegree.set(dependent, inDegree.get(dependent) - 1);
-		if (inDegree.get(dependent) === 0) {
-			queue.push(dependent);
-		}
-	}
+  const path = queue.shift();
+  sorted.push(path);
+  for (const dependent of graph.get(path)) {
+    inDegree.set(dependent, inDegree.get(dependent) - 1);
+    if (inDegree.get(dependent) === 0) {
+      queue.push(dependent);
+    }
+  }
 }
 
 if (sorted.length !== pkgMap.size) {
-	console.error("Cycle detected in workspace dependencies among released packages.");
-	process.exit(1);
+  console.error("Cycle detected in workspace dependencies among released packages.");
+  process.exit(1);
 }
 
 // Ensure meta-package is always published last.
 const metaPath = "packages/supi";
 const metaIndex = sorted.indexOf(metaPath);
 if (metaIndex !== -1 && metaIndex !== sorted.length - 1) {
-	sorted.splice(metaIndex, 1);
-	sorted.push(metaPath);
+  sorted.splice(metaIndex, 1);
+  sorted.push(metaPath);
 }
 
 for (const path of sorted) {
-	const pkg = pkgMap.get(path);
-	const { name, version } = pkg;
+  const pkg = pkgMap.get(path);
+  const { name, version } = pkg;
 
-	// Idempotent skip — handles retries without failing.
-	try {
-		execSync(`npm view "${name}@${version}" version`, { stdio: "pipe" });
-		console.log(`${name}@${version} already published — skipping`);
-		continue;
-	} catch {
-		// Not published yet; proceed.
-	}
+  // Idempotent skip — handles retries without failing.
+  try {
+    execSync(`npm view "${name}@${version}" version`, { stdio: "pipe" });
+    console.log(`${name}@${version} already published — skipping`);
+    continue;
+  } catch {
+    // Not published yet; proceed.
+  }
 
-	console.log(`Publishing ${name}@${version} ...`);
-	execSync("pnpm publish --no-git-checks --access public --provenance", {
-		cwd: path,
-		stdio: "inherit",
-	});
+  console.log(`Publishing ${name}@${version} ...`);
+  execSync("pnpm publish --no-git-checks --access public --provenance", {
+    cwd: path,
+    stdio: "inherit",
+  });
 }

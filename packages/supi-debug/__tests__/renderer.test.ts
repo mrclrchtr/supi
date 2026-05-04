@@ -39,11 +39,19 @@ function makeOptions(expanded: boolean) {
   return { expanded };
 }
 
+function getRegisteredRenderer() {
+  const pi = createMockPi();
+  registerDebugMessageRenderer(pi as never);
+  const renderer = pi.renderers.get("supi-debug-report");
+  if (!renderer) {
+    throw new Error("Expected supi-debug-report renderer to be registered");
+  }
+  return renderer;
+}
+
 describe("debug message renderer", () => {
   it("shows fallback text when no events in details", () => {
-    const pi = createMockPi();
-    registerDebugMessageRenderer(pi as never);
-    const renderer = pi.renderers.get("supi-debug-report")!;
+    const renderer = getRegisteredRenderer();
 
     const result = renderer(
       makeMessage("disabled", undefined),
@@ -54,9 +62,7 @@ describe("debug message renderer", () => {
   });
 
   it("shows summary when collapsed", () => {
-    const pi = createMockPi();
-    registerDebugMessageRenderer(pi as never);
-    const renderer = pi.renderers.get("supi-debug-report")!;
+    const renderer = getRegisteredRenderer();
 
     const result = renderer(
       makeMessage("", {
@@ -87,9 +93,7 @@ describe("debug message renderer", () => {
   });
 
   it("renders full events when expanded", () => {
-    const pi = createMockPi();
-    registerDebugMessageRenderer(pi as never);
-    const renderer = pi.renderers.get("supi-debug-report")!;
+    const renderer = getRegisteredRenderer();
 
     const result = renderer(
       makeMessage("", {
@@ -120,9 +124,7 @@ describe("debug message renderer", () => {
   });
 
   it("handles multi-line string data in expanded mode", () => {
-    const pi = createMockPi();
-    registerDebugMessageRenderer(pi as never);
-    const renderer = pi.renderers.get("supi-debug-report")!;
+    const renderer = getRegisteredRenderer();
 
     const result = renderer(
       makeMessage("", {
