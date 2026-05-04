@@ -15,10 +15,13 @@ Entrypoints:
 - `lsp.ts` — extension wiring, lifecycle, commands, and resources
 - `tool-actions.ts` — tool action execution and formatting
 - `manager.ts` + `manager-*.ts` — client lifecycle, roots, and diagnostic state
+- `manager-helpers.ts` — extracted private helpers (clientKey, resolveRootForFile, isExcludedByPattern)
 - `client.ts` — LSP client wrapper (initialize, document sync, requests)
 - `service-registry.ts` — shared session-scoped registry for peer extension reuse
 - `guidance.ts` — prompt guidelines/snippet and diagnostic-context formatting
 - `overrides.ts`, `renderer.ts`, `ui.ts` — tool-result augmentation, custom messages, and status overlay
+- `pattern-matcher.ts` — gitignore-style glob matching for user-configured path exclusion
+- `settings-registration.ts` — LSP settings (enable, severity, active servers, exclude patterns)
 
 ## Validation
 
@@ -63,6 +66,8 @@ Entrypoints:
 - `ctx.cwd` is threaded through `LspManager` and formatting utilities; do not use `process.cwd()` for path resolution.
 - `loadConfig()` reads server definitions from supi config (`~/.pi/agent/supi/config.json` and `.pi/supi/config.json`) under the `lsp.servers` key. `.pi-lsp.json` is no longer read. Keys are **language names** (e.g., `typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, `kotlin`), not server binary names. Each language entry merges individually against built-in defaults; omitted fields fall back to the code default for that language.
 - The settings allowlist is stored under `lsp.active` (array of language names) and applied in `session_start` after loading config.
+- User exclusion patterns are stored under `lsp.exclude` (array of gitignore-style glob strings). They are loaded in `session_start` and stored on `LspManager` via `setExcludePatterns()`. Only diagnostic/coverage collection methods apply the filter — explicit `lsp` tool actions are unaffected.
+- `isGlobMatch()` in `pattern-matcher.ts` provides gitignore-style matching (leading `/` → anchored, trailing `/` → directory-only, `**` → recursive, `*` → single-segment wildcard).
 
 ## Focused test commands
 
