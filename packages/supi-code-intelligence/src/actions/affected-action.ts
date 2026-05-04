@@ -6,6 +6,7 @@ import { buildArchitectureModel, findModuleForPath, getDependents } from "../arc
 import { resolveTarget } from "../resolve-target.ts";
 import {
   escapeRegex,
+  filterOutDeclaration,
   isInProjectPath,
   normalizePath,
   runRipgrep,
@@ -257,26 +258,6 @@ function addTestsSection(lines: string[], tests: string[]): void {
     lines.push(`- \`${t}\``);
   }
   lines.push("");
-}
-
-type LspRef = { uri: string; range: { start: { line: number; character: number } } };
-
-/**
- * Filter out the declaration/definition location from LSP references.
- * LSP's `textDocument/references` includes the declaration by default;
- * for affected analysis, the declaration is the change site, not an affected reference.
- */
-function filterOutDeclaration(
-  refs: LspRef[],
-  targetFile: string,
-  targetPos: { line: number; character: number },
-): LspRef[] {
-  return refs.filter((ref) => {
-    const filePath = uriToFile(ref.uri);
-    if (filePath !== targetFile) return true;
-    const start = ref.range.start;
-    return start.line !== targetPos.line || start.character !== targetPos.character;
-  });
 }
 
 function addAffectedNextQueries(

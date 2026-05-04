@@ -242,6 +242,35 @@ function parseRgJson(output: string, filterLowSignal: boolean): RgMatch[] {
   return matches;
 }
 
+/**
+ * Minimal interface for a reference-like object with a URI and range start.
+ * Used by {@link filterOutDeclaration} to avoid coupling to a specific LspRef type.
+ */
+export interface HasLspPosition {
+  uri: string;
+  range: { start: { line: number; character: number } };
+}
+
+/**
+ * Filter out the declaration/definition location from LSP references.
+ * LSP's `textDocument/references` includes the declaration by default;
+ * for callers/affected analysis, the declaration is not a call site or affected reference.
+ *
+ * Uses {@link uriToFile} for robust URI-to-path conversion.
+ */
+export function filterOutDeclaration<T extends HasLspPosition>(
+  refs: T[],
+  targetFile: string,
+  targetPos: { line: number; character: number },
+): T[] {
+  return refs.filter((ref) => {
+    const filePath = uriToFile(ref.uri);
+    if (filePath !== targetFile) return true;
+    const start = ref.range.start;
+    return start.line !== targetPos.line || start.character !== targetPos.character;
+  });
+}
+
 /** Group matches by file. */
 export function groupByFile(matches: RgMatch[]): Map<string, RgMatch[]> {
   const byFile = new Map<string, RgMatch[]>();

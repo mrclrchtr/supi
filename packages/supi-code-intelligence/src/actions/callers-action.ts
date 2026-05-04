@@ -5,6 +5,7 @@ import { getSessionLspService } from "@mrclrchtr/supi-lsp";
 import { resolveTarget } from "../resolve-target.ts";
 import {
   escapeRegex,
+  filterOutDeclaration,
   groupByFile,
   isInProjectPath,
   normalizePath,
@@ -157,22 +158,4 @@ function formatHeuristicCallers(symbol: string, params: ActionParams, cwd: strin
   }
 
   return lines.join("\n");
-}
-
-type LspRef = { uri: string; range: { start: { line: number; character: number } } };
-type LspPos = { line: number; character: number };
-
-/**
- * Filter out the declaration/definition location from LSP references.
- * LSP's `textDocument/references` includes the declaration by default;
- * for a callers query, the declaration is not a call site.
- */
-function filterOutDeclaration(refs: LspRef[], targetFile: string, targetPos: LspPos): LspRef[] {
-  return refs.filter((ref) => {
-    const uri = ref.uri;
-    const filePath = uri.startsWith("file://") ? decodeURIComponent(uri.slice(7)) : uri;
-    if (filePath !== targetFile) return true;
-    const start = ref.range.start;
-    return start.line !== targetPos.line || start.character !== targetPos.character;
-  });
 }
