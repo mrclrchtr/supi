@@ -153,7 +153,15 @@ LSP → Tree-sitter → ripgrep text search, with explicit confidence labeling o
 - Architecture tests verify model shape (name, modules, edges, leaf marking).
 - Action tests verify validation, error messages, and output formatting.
 - No `vi.mock` needed — tests operate on real filesystem in temp dirs.
-- Package test tsconfig extends root `tsconfig.json` with `include: ["*.ts"]`.
+- Package test tsconfig extends root `tsconfig.json` with `include: ["*.ts"].`
+- Tests that operate on real git repos (e.g., `git-context.ts` tests) must disable GPG signing and pre-commit hooks to avoid failures in environments with global git config:
+
+  ```ts
+  execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
+  execFileSync("git", ["config", "core.hooksPath", "/dev/null"], { cwd: dir });
+  ```
+
+  **Why**: `commit.gpgsign` fails with `fatal: either user.signingkey or gpg.ssh.defaultKeyCommand needs to be configured` when a global signingkey is set. `core.hooksPath` skips pre-commit hooks (e.g., pre-commit) that may error on missing config.
 
 ```ts
 // Standard pattern
