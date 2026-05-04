@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -86,6 +87,24 @@ describe("generateOverview", () => {
     // Rough token estimate: ~4 chars per token
     const estimatedTokens = (overview?.length ?? 0) / 4;
     expect(estimatedTokens).toBeLessThan(600);
+  });
+
+  it("includes git context when in a git repo", async () => {
+    setupWorkspace();
+    execFileSync("git", ["init"], { cwd: tmpDir });
+    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tmpDir });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
+    execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: tmpDir });
+    execFileSync("git", ["config", "core.hooksPath", "/dev/null"], { cwd: tmpDir });
+    execFileSync("git", ["add", "."], { cwd: tmpDir });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
+
+    const model = await buildArchitectureModel(tmpDir);
+    const overview = generateOverview(model as NonNullable<typeof model>);
+    expect(overview).toContain("## Git Context");
+    expect(overview).toContain("Branch: `main`");
+    expect(overview).toContain("Working tree clean.");
+    expect(overview).toContain("Last commit: `init`");
   });
 });
 

@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ArchitectureModel } from "./architecture.ts";
 import { findModuleForPath, getDependencies, getDependents } from "./architecture.ts";
+import { formatGitContext, gatherGitContext } from "./git-context.ts";
 import type { BriefDetails, ConfidenceMode } from "./types.ts";
 
 /**
@@ -63,6 +64,11 @@ function generateDirectoryBrief(
     for (const q of nextQueries.slice(0, 2)) {
       lines.push(`- ${q}`);
     }
+  }
+
+  const gitCtx = gatherGitContext(model.root);
+  if (gitCtx) {
+    lines.push(formatGitContext(gitCtx));
   }
 
   lines.push("");
@@ -275,6 +281,11 @@ function generateFileBrief(
     for (const q of nextQueries.slice(0, 2)) {
       lines.push(`- ${q}`);
     }
+  }
+
+  const gitCtx = gatherGitContext(model.root);
+  if (gitCtx) {
+    lines.push(formatGitContext(gitCtx));
   }
 
   lines.push("");

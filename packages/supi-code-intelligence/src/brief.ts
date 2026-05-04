@@ -2,6 +2,7 @@
 
 import type { ArchitectureModel } from "./architecture.ts";
 import { getDependents } from "./architecture.ts";
+import { formatGitContext, gatherGitContext } from "./git-context.ts";
 import type { BriefDetails, ConfidenceMode } from "./types.ts";
 
 // Re-export focused brief generation
@@ -57,6 +58,12 @@ export function generateOverview(model: ArchitectureModel): string | null {
   }
 
   lines.push("");
+
+  const gitCtx = gatherGitContext(model.root);
+  if (gitCtx) {
+    lines.push(formatGitContext(gitCtx));
+  }
+
   lines.push("_Use `code_intel brief` for deeper context on any module or file._");
 
   return lines.join("\n");
@@ -80,6 +87,11 @@ export function generateProjectBrief(model: ArchitectureModel): {
   if (model.name) {
     lines.push(`**${model.name}**${model.description ? ` — ${model.description}` : ""}`);
     lines.push("");
+  }
+
+  const gitCtx = gatherGitContext(model.root);
+  if (gitCtx) {
+    lines.push(formatGitContext(gitCtx));
   }
 
   if (model.modules.length === 0) {
