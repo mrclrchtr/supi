@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildReviewerSystemPrompt } from "../src/runner.ts";
 
+// biome-ignore lint/security/noSecrets: test description, not a real secret
 describe("buildReviewerSystemPrompt", () => {
   it("includes review categories", () => {
     const prompt = buildReviewerSystemPrompt();

@@ -1,3 +1,4 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: pre-existing, needs refactoring
 import {
   type AgentSession,
   type AgentSessionEvent,
@@ -10,7 +11,9 @@ import {
 import { Type } from "typebox";
 import type { ReviewerInvocation, ReviewProgress } from "./runner-types.ts";
 import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "./types.ts";
+
 export type { ReviewerInvocation } from "./runner-types.ts";
+
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
 const GRACE_TURNS = 3;
 const STEER_MESSAGE = "Time limit reached. Wrap up and submit your review now.";
@@ -107,8 +110,7 @@ function resolveReviewThinkingLevel(
   // OpenRouter normalizes reasoning_effort to OpenAI-standard values.
   // Non-standard thinkingLevelMap mappings (e.g. DeepSeek-native) get rejected.
   // For other providers, the model's thinkingLevelMap provides correct native values.
-  const viaOpenRouter =
-    model.provider === "openrouter" || model.baseUrl?.includes("openrouter.ai");
+  const viaOpenRouter = model.provider === "openrouter" || model.baseUrl?.includes("openrouter.ai");
   for (const level of ["xhigh", "high", "medium", "low", "minimal", "off"] as const) {
     const mapped = model.thinkingLevelMap?.[level];
     if (mapped === null) continue;
