@@ -25,6 +25,12 @@ import {
   pruneMissingFilesFromClients,
   refreshOpenDiagnosticsForClients,
 } from "./manager-client-state.ts";
+import {
+  clientKey,
+  isExcludedByPattern,
+  rememberKnownRoot,
+  resolveRootForFile,
+} from "./manager-helpers.ts";
 import { buildProjectServerInfo } from "./manager-project-info.ts";
 import type {
   ActiveCoverageSummaryEntry,
@@ -44,12 +50,17 @@ export class LspManager {
   private commandAvailability = new Map<string, boolean>();
   /** Preferred project roots discovered by proactive scan or lazy startup */
   private knownRoots = new Map<string, string[]>();
+  /** User-configured gitignore-style exclude patterns */
+  private excludePatterns: string[] = [];
   constructor(
     private readonly config: LspConfig,
     private readonly cwd: string,
   ) {}
   getCwd(): string {
     return this.cwd;
+  }
+  setExcludePatterns(patterns: string[]): void {
+    this.excludePatterns = patterns;
   }
   // ── Public API ────────────────────────────────────────────────────
   registerDetectedServers(detected: DetectedProjectServer[]): void {
@@ -68,7 +79,7 @@ export class LspManager {
     // Mirror getClientForFile's root resolution so the unavailable check stays
     // root-specific. A failed startup in one workspace must not suppress
     // activation for unrelated roots served by the same language server.
-    const root = this.resolveRootForFile(filePath, serverName, serverConfig.rootMarkers);
+    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, { knownRoots: this.knownRoots, cwd: this.cwd });
     if (this.unavailable.has(`${serverName}:${root}`)) return false;
     return this.isServerCommandAvailable(serverConfig.command);
   }
@@ -88,14 +99,13 @@ export class LspManager {
     const match = getServerForFile(this.config, filePath);
     if (!match) return null;
     const [serverName, serverConfig] = match;
-    // Find project root
-    const root = this.resolveRootForFile(filePath, serverName, serverConfig.rootMarkers);
+    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, { knownRoots: this.knownRoots, cwd: this.cwd });
     return this.startServerForRoot(serverName, root);
   }
   async startServerForRoot(serverName: string, root: string): Promise<LspClient | null> {
     const serverConfig = this.config.servers[serverName];
     if (!serverConfig) return null;
-    const key = this.clientKey(serverName, root);
+    const key = clientKey(serverName, root);
     if (this.unavailable.has(key)) return null;
     // Return existing client
     const existing = this.clients.get(key);
@@ -114,7 +124,7 @@ export class LspManager {
     // Spawn new client
     const client = new LspClient(serverName, serverConfig, root);
     this.clients.set(key, client);
-    this.rememberKnownRoot(serverName, root);
+    rememberKnownRoot(this.knownRoots, serverName, root);
     try {
       await client.start();
       return client;
@@ -125,7 +135,7 @@ export class LspManager {
     }
   }
   getProjectServerInfo(serverName: string, root: string, fileTypes: string[]): ProjectServerInfo {
-    const key = this.clientKey(serverName, root);
+    const key = clientKey(serverName, root);
     return buildProjectServerInfo(
       {
         serverName,
@@ -140,10 +150,10 @@ export class LspManager {
   getKnownProjectServers(detected: DetectedProjectServer[]): ProjectServerInfo[] {
     const known = new Map<string, DetectedProjectServer>();
     for (const entry of detected) {
-      known.set(this.clientKey(entry.name, entry.root), entry);
+      known.set(clientKey(entry.name, entry.root), entry);
     }
     for (const client of this.clients.values()) {
-      const key = this.clientKey(client.name, client.root);
+      const key = clientKey(client.name, client.root);
       if (known.has(key)) continue;
       known.set(key, {
         name: client.name,
@@ -255,6 +265,7 @@ export class LspManager {
       for (const file of server.openFiles) {
         const relativeFile = displayRelativeFilePath(file, this.cwd);
         if (shouldIgnoreLspPath(relativeFile, this.cwd)) continue;
+        if (isExcludedByPattern(relativeFile, this.excludePatterns)) continue;
         openFiles.add(relativeFile);
       }
       activeServers.set(server.name, openFiles);
@@ -266,11 +277,9 @@ export class LspManager {
       }))
       .sort((a, b) => b.openFiles.length - a.openFiles.length || a.name.localeCompare(b.name));
   }
-  /** Get active coverage as compact text suitable for pre-turn context. */
   getCoverageSummaryText(maxServers: number = 2, maxFiles: number = 2): string | null {
     return formatCoverageSummaryText(this.getActiveCoverageSummary(), maxServers, maxFiles);
   }
-  /** Get active coverage filtered to files or directories relevant to the current turn. */
   getRelevantCoverageSummaryText(
     relevantPaths: string[],
     maxServers: number = 2,
@@ -294,7 +303,7 @@ export class LspManager {
     const fileDiags = new Map<string, { errors: number; warnings: number }>();
     for (const client of this.clients.values()) {
       for (const entry of client.getAllDiagnostics()) {
-        collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd);
+        collectDiagnosticSummaryCounts(fileDiags, entry, this.cwd, this.excludePatterns);
       }
     }
     return Array.from(fileDiags.entries()).map(([file, counts]) => ({ file, ...counts }));
@@ -307,6 +316,7 @@ export class LspManager {
       for (const entry of client.getAllDiagnostics()) {
         const file = relativeFilePathFromUri(entry.uri, this.cwd);
         if (shouldIgnoreLspPath(file, this.cwd)) continue;
+        if (isExcludedByPattern(file, this.excludePatterns)) continue;
         const current = fileDiags.get(file) ?? createOutstandingDiagnosticSummary(file);
         const next = accumulateOutstandingDiagnostics(current, entry.diagnostics, maxSeverity);
         if (next.total > 0) {
@@ -356,6 +366,7 @@ export class LspManager {
       for (const entry of client.getAllDiagnostics()) {
         const file = relativeFilePathFromUri(entry.uri, this.cwd);
         if (shouldIgnoreLspPath(file, this.cwd)) continue;
+        if (isExcludedByPattern(file, this.excludePatterns)) continue;
         const filtered = entry.diagnostics.filter(
           (d) => d.severity !== undefined && d.severity <= maxSeverity,
         );
@@ -385,19 +396,5 @@ export class LspManager {
       this.closeFile(resolvedPath);
       return null;
     }
-  }
-  private clientKey(serverName: string, root: string): string {
-    return `${serverName}:${root}`;
-  }
-  private resolveRootForFile(filePath: string, serverName: string, rootMarkers: string[]): string {
-    const preferredRoots = this.knownRoots.get(serverName) ?? [];
-    const knownRoot = projectRoots.resolveKnownRoot(filePath, preferredRoots);
-    if (knownRoot) return knownRoot;
-    const fileDir = path.dirname(path.resolve(filePath));
-    return projectRoots.findProjectRoot(fileDir, rootMarkers, this.cwd);
-  }
-  private rememberKnownRoot(serverName: string, root: string): void {
-    const roots = this.knownRoots.get(serverName) ?? [];
-    this.knownRoots.set(serverName, projectRoots.mergeKnownRoots(roots, root));
   }
 }

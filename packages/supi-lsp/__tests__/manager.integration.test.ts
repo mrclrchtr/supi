@@ -56,6 +56,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
   beforeAll(() => {
     const config = loadConfig(tmpDir);
     manager = new LspManager(config, tmpDir);
+    manager.setExcludePatterns([]);
   });
 
   afterAll(async () => {
@@ -125,6 +126,50 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
     const brokenEntry = summary.find((s) => s.file.includes("broken"));
     expect(brokenEntry).toBeDefined();
     expect(brokenEntry?.errors).toBeGreaterThan(0);
+  });
+
+  it("excludes files matching exclude patterns from diagnostic summary", () => {
+    const summary = manager.getDiagnosticSummary();
+    // Verify broken.ts is present before exclusion
+    const beforeEntry = summary.find((s) => s.file.includes("broken"));
+    expect(beforeEntry).toBeDefined();
+
+    manager.setExcludePatterns(["broken.ts"]);
+    try {
+      const filtered = manager.getDiagnosticSummary();
+      const brokenEntry = filtered.find((s) => s.file.includes("broken"));
+      expect(brokenEntry).toBeUndefined();
+    } finally {
+      manager.setExcludePatterns([]);
+    }
+  });
+
+  it("excludes files matching exclude patterns from outstanding diagnostics", () => {
+    const outstanding = manager.getOutstandingDiagnosticSummary(4);
+    const beforeEntry = outstanding.find((s) => s.file.includes("broken"));
+    expect(beforeEntry).toBeDefined();
+
+    manager.setExcludePatterns(["broken.ts"]);
+    try {
+      const filtered = manager.getOutstandingDiagnosticSummary(4);
+      const brokenEntry = filtered.find((s) => s.file.includes("broken"));
+      expect(brokenEntry).toBeUndefined();
+    } finally {
+      manager.setExcludePatterns([]);
+    }
+  });
+
+  it("excludes files matching exclude patterns from coverage", () => {
+    manager.setExcludePatterns(["broken.ts"]);
+    try {
+      const filtered = manager.getActiveCoverageSummary();
+      const brokenEntry = filtered.find((c) =>
+        c.openFiles.some((f) => f.includes("broken")),
+      );
+      expect(brokenEntry).toBeUndefined();
+    } finally {
+      manager.setExcludePatterns([]);
+    }
   });
 
   it("shuts down all servers cleanly", async () => {
