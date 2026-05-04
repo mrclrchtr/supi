@@ -81,6 +81,9 @@ importers:
       '@mrclrchtr/supi-debug':
         specifier: workspace:*
         version: link:../supi-debug
+      '@mrclrchtr/supi-flow':
+        specifier: workspace:*
+        version: link:../supi-flow
       '@mrclrchtr/supi-insights':
         specifier: workspace:*
         version: link:../supi-insights
@@ -276,6 +279,22 @@ importers:
     devDependencies:
       vitest:
         specifier: ^4.1.5
+        version: 4.1.5(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
+
+  packages/supi-flow:
+    dependencies:
+      '@mariozechner/pi-coding-agent':
+        specifier: '*'
+        version: 0.72.1(ws@8.20.0)(zod@4.3.6)
+      '@mariozechner/pi-tui':
+        specifier: '*'
+        version: 0.72.1
+    devDependencies:
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
+      vitest:
+        specifier: ^4.1.4
         version: 4.1.5(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
 
   packages/supi-insights:

@@ -20,6 +20,7 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
   - `src/resources.ts`
   - `src/cache-monitor.ts`
   - `src/code-intelligence.ts`
+  - `src/flow.ts`
   - `src/insights.ts`
 - expose bundled prompt templates from `prompts/`
 

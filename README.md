@@ -23,6 +23,7 @@ Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent)
 | `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, workspace symbol search, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. Also exports a reusable `SessionLspService` library surface for peer extensions. |
 | `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis for JavaScript and TypeScript files: outline, imports, exports, node-at-position lookup, and custom queries. Designed as a standalone substrate independent of semantic LSP tooling. |
 | `@mrclrchtr/supi-review` | **review** | Adds `/supi-review` for structured code review with configurable fast/deep models, diff limits, and review timeout via `/supi-settings`. |
+| `@mrclrchtr/supi-flow` | **flow** | Lightweight spec-driven workflow: brainstorm → plan → apply → archive. Skills with HARD-GATE before implementation, bite-sized tasks, and slop-free doc updates. Optional tndm ticket tracking for multi-session changes. |
 
 ## Install
 
@@ -42,6 +43,7 @@ pi install npm:@mrclrchtr/supi-skill-shortcut
 pi install npm:@mrclrchtr/supi-bash-timeout
 pi install npm:@mrclrchtr/supi-aliases
 pi install npm:@mrclrchtr/supi-review
+pi install npm:@mrclrchtr/supi-flow
 ```
 
 ### From git or local path
@@ -77,6 +79,16 @@ The `review` extension adds structured code review through `/supi-review`.
 - supports interactive target/depth selection plus non-interactive `/supi-review ...` arguments
 - stores fast/deep model overrides, diff size limit, and review timeout in minutes in `/supi-settings`
 - preserves child review sessions for timeout/failure debugging
+
+## Flow extension
+
+The `flow` extension adds a lightweight spec-driven workflow through skills and commands.
+
+- **brainstorm → plan → apply → archive** — structured workflow with HARD-GATE before implementation, bite-sized tasks, no placeholders, and slop-free documentation updates
+- optional tndm ticket tracking for multi-session changes; single-session changes skip tickets entirely
+- `/supi-flow-status` shows active tickets from session history; `/supi-flow` lists all commands
+- skills accessible via `/skill:supi-flow-*` or `$supi-flow-*` shorthand
+- distills the best parts of OpenSpec (artifact structure), Superpowers (verification discipline), and Claude Night Market (slop detection) — without CLI, config files, or multi-file ceremony
 
 ## LSP extension
 

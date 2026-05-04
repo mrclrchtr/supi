@@ -39,6 +39,7 @@
     "tree-sitter-typescript": "^0.23.0",
     "web-tree-sitter": "^0.26.8",
     "@mrclrchtr/supi-code-intelligence": "workspace:*",
+    "@mrclrchtr/supi-flow": "workspace:*",
     "@mrclrchtr/supi-insights": "workspace:*"
   },
   "peerDependencies": {
@@ -64,6 +65,7 @@
       "./src/tree-sitter.ts",
       "./src/cache-monitor.ts",
       "./src/code-intelligence.ts",
+      "./src/flow.ts",
       "./src/insights.ts"
     ],
     "prompts": [

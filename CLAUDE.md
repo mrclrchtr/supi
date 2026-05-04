@@ -114,6 +114,11 @@ registerSettings({
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli)
 - RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward
 
+## Workflow
+
+- Before implementing any change: use `/supi-flow-brainstorm` to design first.
+- Close changes with `/supi-flow-archive` to verify, update docs, and commit.
+
 ## Testing patterns
 
 - `vi.hoisted()` callbacks execute before imports — must be inline arrow functions, cannot reference imported values
