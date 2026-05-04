@@ -46,7 +46,7 @@ describe("loadLspSettings", () => {
 
   it("returns defaults when no config exists", () => {
     const result = loadLspSettings(tmpDir, tmpDir);
-    expect(result).toEqual({ enabled: true, severity: 1, active: [] });
+    expect(result).toEqual({ enabled: true, severity: 1, active: [], exclude: [] });
   });
 
   it("reads project config", () => {
@@ -58,7 +58,24 @@ describe("loadLspSettings", () => {
     );
 
     const result = loadLspSettings(tmpDir, tmpDir);
-    expect(result).toEqual({ enabled: false, severity: 2, active: [] });
+    expect(result).toEqual({ enabled: false, severity: 2, active: [], exclude: [] });
+  });
+
+  it("reads exclude patterns from config", () => {
+    const projectDir = path.join(tmpDir, ".pi/supi");
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, "config.json"),
+      JSON.stringify({ lsp: { exclude: ["__tests__/", "*.generated.ts"] } }),
+    );
+
+    const result = loadLspSettings(tmpDir, tmpDir);
+    expect(result).toEqual({
+      enabled: true,
+      severity: 1,
+      active: [],
+      exclude: ["__tests__/", "*.generated.ts"],
+    });
   });
 });
 
@@ -136,12 +153,12 @@ describe("registerLspSettings: registration", () => {
     expect(sections[0]).toMatchObject({ id: "lsp", label: "LSP" });
   });
 
-  it("loadValues returns three setting items", () => {
+  it("loadValues returns four setting items", () => {
     registerLspSettings();
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
-    expect(items).toHaveLength(3);
-    expect(items.map((i) => i.id)).toEqual(["enabled", "severity", "active"]);
+    expect(items).toHaveLength(4);
+    expect(items.map((i) => i.id)).toEqual(["enabled", "severity", "active", "exclude"]);
   });
 
   it("enabled item defaults to on", () => {
@@ -168,6 +185,14 @@ describe("registerLspSettings: registration", () => {
     const items = section.loadValues("project", "/tmp");
     const activeItem = items.find((i) => i.id === "active");
     expect(activeItem?.currentValue).toBe("all");
+  });
+
+  it("exclude item defaults to none", () => {
+    registerLspSettings();
+    const section = getRegisteredSettings()[0];
+    const items = section.loadValues("project", "/tmp");
+    const excludeItem = items.find((i) => i.id === "exclude");
+    expect(excludeItem?.currentValue).toBe("none");
   });
 
   it("loadValues reads the selected scope instead of merged effective config", () => {
@@ -281,6 +306,43 @@ describe("registerLspSettings: persistence", () => {
       opts(tmpDir),
     );
     expect(config.active).toEqual([]);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange writes exclude patterns to config", () => {
+    const tmpDir = makeTempDir();
+    registerLspSettings();
+    const section = getRegisteredSettings()[0];
+
+    section.persistChange("project", tmpDir, "exclude", "__tests__/, *.generated.ts");
+
+    const config = loadSupiConfig(
+      "lsp",
+      tmpDir,
+      { enabled: true, severity: 1, active: [], exclude: [] as string[] },
+      opts(tmpDir),
+    );
+    expect(config.exclude).toEqual(["__tests__/", "*.generated.ts"]);
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("persistChange removes exclude patterns when value is empty", () => {
+    const tmpDir = makeTempDir();
+    registerLspSettings();
+    const section = getRegisteredSettings()[0];
+
+    section.persistChange("project", tmpDir, "exclude", "__tests__/");
+    section.persistChange("project", tmpDir, "exclude", "");
+
+    const config = loadSupiConfig(
+      "lsp",
+      tmpDir,
+      { enabled: true, severity: 1, active: [], exclude: [] as string[] },
+      opts(tmpDir),
+    );
+    expect(config.exclude).toEqual([]);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
