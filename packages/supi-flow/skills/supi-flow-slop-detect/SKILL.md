@@ -109,6 +109,8 @@ Count em dashes (—) per 1000 words:
 grep -o '—' file.md | wc -l
 ```
 
+_Also detected by `scripts/slop-scan-structural.ts` (included in structural score)._
+
 ### Tricolon detection
 
 AI loves groups of three adjectives with alliteration or similar sounds:
@@ -169,6 +171,8 @@ AI uses this template to express scope at much higher rates:
 
 Flag when >1 per 500 words. Replace with direct statement: "works for all skill levels."
 
+_Detected by `scripts/slop-scan-structural.ts`._
+
 ### Correlative conjunction overuse
 
 AI over-relies on correlative pairs in close proximity:
@@ -197,6 +201,8 @@ AI uses `->` and `→` as prose shorthand instead of writing "to", "into", or "p
 ```bash
 # Detect arrows in prose (exclude code blocks)
 awk '/^```/{c=!c}!c' file.md | rg -o '\s->\s|→' | wc -l
+
+_Also detected by `scripts/slop-scan-structural.ts` (included in structural score)._
 ```
 
 ### Plus-sign conjunction
@@ -207,6 +213,8 @@ AI uses `+` as a conjunction ("X + Y") in prose instead of "and" or "with". Fine
 - "1 + 1 = 2" (fine, math)
 
 Flag when >1 prose plus-sign appears outside code blocks.
+
+_Also detected by `scripts/slop-scan-structural.ts` (included in structural score)._
 
 ### Conclusion mirroring
 
@@ -255,3 +263,86 @@ final_score = vocab_score + structural_score (cap at 10)
 | 5.0+ | Heavy | Full document review — do not commit |
 
 Target: score < 1.5 before committing documentation.
+
+## Automated scripts
+
+Cross-platform Node.js/TypeScript scripts in `scripts/` automate the detection. They run anywhere pi runs (macOS, Linux, Windows).
+
+### Prerequisites
+
+The scripts use `pnpm exec jiti` (already available in the SuPi workspace).
+
+```bash
+# From repo root
+pnpm exec jiti packages/supi-flow/skills/supi-flow-slop-detect/scripts/slop-scan.ts <file>
+
+# Or from anywhere via relative path
+pnpm exec jiti path/to/scripts/slop-scan.ts <file>
+```
+
+### Available scripts
+
+#### `slop-scan.ts` — Combined scanner
+
+Runs vocabulary + structural detection, computes final density score (capped at 10).
+
+```bash
+# Human-readable summary
+pnpm exec jiti scripts/slop-scan.ts README.md
+
+# Machine-readable JSON (for agent post-processing)
+pnpm exec jiti scripts/slop-scan.ts README.md --json-only
+
+# Multiple files
+pnpm exec jiti scripts/slop-scan.ts docs/*.md --json-only
+```
+
+Output fields consumed by the agent:
+
+```json
+{
+  "file": "README.md",
+  "wordCount": 1612,
+  "vocabScore": 11.10,
+  "structuralScore": 7,
+  "finalScore": 10.00,
+  "rating": "heavy",
+  "recommendation": "Full document review — do not commit without fixing.",
+  "vocab": { "hits": [...] },
+  "structural": { "flags": [...], "metrics": {...} }
+}
+```
+
+#### `slop-scan-vocab.ts` — Vocabulary-only scan
+
+Scans for Tier 1-4 vocabulary markers (AI-prose vocabulary, phrases, and sycophantic language).
+
+```bash
+pnpm exec jiti scripts/slop-scan-vocab.ts README.md
+```
+
+#### `slop-scan-structural.ts` — Structural-only scan
+
+Analyzes structural patterns: em dash density, bullet ratios, sentence clustering, participial tails, arrow connectors, correlative pairs, plus-sign conjunctions, five-paragraph essay structure, conclusion mirroring, and more.
+
+```bash
+pnpm exec jiti scripts/slop-scan-structural.ts README.md
+```
+
+### Script location
+
+```
+skills/supi-flow-slop-detect/
+├── SKILL.md
+└── scripts/
+    ├── slop-helpers.ts          # Shared detection utilities
+    ├── slop-scan-vocab.ts       # Vocabulary marker detection
+    ├── slop-scan-structural.ts  # Structural pattern detection
+    └── slop-scan.ts             # Combined scanner + density scoring
+```
+
+### Tips
+
+- **For agents**: Pipe `--json-only` output into `jq` or parse directly from the tool call.
+- **For manual use**: Omit `--json-only` for the human-readable summary with score bar and metrics table.
+- The SKILL.md itself scores high because it documents all slop patterns in its tables. Normal docs should score < 1.5.

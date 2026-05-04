@@ -1,6 +1,7 @@
 {
   "review": {
-    "autoFix": true
+    "autoFix": true,
+    "reviewModel": "kimi-coding/k2p6"
   },
   "debug": {
     "enabled": true,
