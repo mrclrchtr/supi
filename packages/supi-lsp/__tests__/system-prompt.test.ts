@@ -14,6 +14,7 @@ const mockFns = vi.hoisted(() => ({
   registerLspSettings: vi.fn(),
   introspectCapabilities: vi.fn(() => []),
   scanProjectCapabilities: vi.fn(() => []),
+  scanMissingServers: vi.fn(() => []),
   startDetectedServers: vi.fn(),
   toggleLspStatusOverlay: vi.fn(),
   updateLspUi: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock("../src/manager.ts", () => ({ LspManager: mockFns.LspManager }));
 
 vi.mock("../src/scanner.ts", () => ({
   introspectCapabilities: mockFns.introspectCapabilities,
+  scanMissingServers: mockFns.scanMissingServers,
   scanProjectCapabilities: mockFns.scanProjectCapabilities,
   startDetectedServers: mockFns.startDetectedServers,
 }));

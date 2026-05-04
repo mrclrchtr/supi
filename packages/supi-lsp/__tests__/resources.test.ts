@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 const mockFns = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   scanProjectCapabilities: vi.fn(() => []),
+  scanMissingServers: vi.fn(() => []),
   startDetectedServers: vi.fn(),
   introspectCapabilities: vi.fn(() => []),
   buildProjectGuidelines: vi.fn(() => []),
@@ -21,6 +22,7 @@ const mockFns = vi.hoisted(() => ({
 vi.mock("../src/config.ts", () => ({ loadConfig: mockFns.loadConfig }));
 vi.mock("../src/scanner.ts", () => ({
   scanProjectCapabilities: mockFns.scanProjectCapabilities,
+  scanMissingServers: mockFns.scanMissingServers,
   startDetectedServers: mockFns.startDetectedServers,
   introspectCapabilities: mockFns.introspectCapabilities,
 }));

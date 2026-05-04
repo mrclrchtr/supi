@@ -30,7 +30,7 @@ import {
 import { LspManager } from "./manager.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
 import { registerLspMessageRenderer } from "./renderer.ts";
-import { scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
+import { scanMissingServers, scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
 import {
   clearSessionLspService,
   SessionLspService,
@@ -121,6 +121,16 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     state.detectedServers = scanProjectCapabilities(config, cwd);
     state.manager.registerDetectedServers(state.detectedServers);
     await startDetectedServers(state.manager, state.detectedServers);
+
+    const missing = scanMissingServers(config, cwd);
+    if (missing.length > 0) {
+      const parts = missing.map((m) => `${m.name} (${m.command})`);
+      ctx.ui.notify(
+        `LSP server not found for: ${parts.join(", ")}. Install the server to enable language intelligence.`,
+        "warning",
+      );
+    }
+
     refreshProjectServers(state);
     state.lastDiagnosticsFingerprint = null;
     state.currentContextToken = null;

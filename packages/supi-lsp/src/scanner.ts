@@ -1,6 +1,12 @@
+import * as path from "node:path";
 import { dedupeTopmostRoots, walkProject } from "@mrclrchtr/supi-core";
 import type { LspManager } from "./manager.ts";
-import type { DetectedProjectServer, LspConfig, ProjectServerInfo } from "./types.ts";
+import type {
+  DetectedProjectServer,
+  LspConfig,
+  MissingServer,
+  ProjectServerInfo,
+} from "./types.ts";
 import { commandExists } from "./utils.ts";
 
 const DEFAULT_MAX_DEPTH = 3;
@@ -51,4 +57,37 @@ export function introspectCapabilities(
   detected: DetectedProjectServer[],
 ): ProjectServerInfo[] {
   return manager.getKnownProjectServers(detected);
+}
+
+/**
+ * Scan the project for languages whose source files exist but whose LSP server
+ * binary is not installed on PATH. Walks the project directory tree collecting
+ * file extensions, then checks each configured server.
+ */
+export function scanMissingServers(
+  config: LspConfig,
+  cwd: string,
+  maxDepth: number = DEFAULT_MAX_DEPTH,
+): MissingServer[] {
+  const foundExtensions = new Set<string>();
+
+  walkProject(cwd, maxDepth, (_directory, entryNames) => {
+    for (const name of entryNames) {
+      const ext = path.extname(name).slice(1).toLowerCase();
+      if (ext) foundExtensions.add(ext);
+    }
+  });
+
+  const missing: MissingServer[] = [];
+
+  for (const [name, server] of Object.entries(config.servers)) {
+    if (commandExists(server.command)) continue;
+
+    const matching = server.fileTypes.filter((ft) => foundExtensions.has(ft));
+    if (matching.length === 0) continue;
+
+    missing.push({ name, command: server.command, foundExtensions: matching });
+  }
+
+  return missing;
 }

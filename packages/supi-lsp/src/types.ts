@@ -380,3 +380,13 @@ export interface ProjectServerInfo extends DetectedProjectServer {
   supportedActions: string[];
   openFiles: string[];
 }
+
+/** A language whose source files are present but the server binary is missing. */
+export interface MissingServer {
+  /** Language name (e.g. "python", "rust"). */
+  name: string;
+  /** Server command that was not found on PATH. */
+  command: string;
+  /** File extensions found in the project (subset of server.fileTypes). */
+  foundExtensions: string[];
+}
