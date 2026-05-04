@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { getAgentDir } from "@mariozechner/pi-coding-agent";
 import { Input, Key, matchesKey, type SettingItem } from "@mariozechner/pi-tui";
 import {
   type ConfigSettingsHelpers,
@@ -78,6 +81,94 @@ function persistAutoFix(value: string, helpers: ConfigSettingsHelpers): void {
   } else {
     helpers.unset("autoFix");
   }
+}
+
+// ─── Scoped model helpers (workaround for pi-mono#3535) ──────────────────────
+
+/**
+ * Read PI’s `enabledModels` from settings.json (the user’s configured scoped model patterns).
+ * Returns undefined when no scope is configured (all models available).
+ */
+export function readPiEnabledModels(): string[] | undefined {
+  try {
+    const settingsPath = join(getAgentDir(), "settings.json");
+    if (!existsSync(settingsPath)) return undefined;
+    const raw = readFileSync(settingsPath, "utf-8");
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed?.enabledModels)) {
+      const patterns = parsed.enabledModels.filter(
+        (p: unknown): p is string => typeof p === "string" && p.length > 0,
+      );
+      return patterns.length > 0 ? patterns : undefined;
+    }
+  } catch {
+    // settings.json may not exist or be invalid JSON
+  }
+  return undefined;
+}
+
+/**
+ * Filter available models to only those matching enabled model patterns.
+ * Uses simple glob-style matching (* and ? wildcards) on both bare model IDs
+ * and canonical provider/modelId references.
+ */
+export function filterByEnabledModels<T extends { provider: string; id: string }>(
+  patterns: string[],
+  available: T[],
+): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+
+  for (const model of available) {
+    for (const pattern of patterns) {
+      if (matchModelPattern(model, pattern)) {
+        const key = `${model.provider}/${model.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push(model);
+        }
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Match a model against a single pattern.
+ * - If pattern contains "/", match against canonical “provider/modelId”
+ * - Otherwise, match against both bare modelId and canonical ref
+ * - Supports * (any chars) and ? (single char) wildcards
+ */
+function matchModelPattern(model: { provider: string; id: string }, pattern: string): boolean {
+  const canonical = `${model.provider}/${model.id}`;
+
+  // Pattern with a slash is always canonical
+  if (pattern.includes("/")) {
+    return simpleGlobMatch(canonical, pattern);
+  }
+
+  // Bare pattern: try both canonical and bare model id
+  return simpleGlobMatch(canonical, pattern) || simpleGlobMatch(model.id, pattern);
+}
+
+/**
+ * Simple glob matching with * (any chars) and ? (single char) wildcards.
+ * Falls back to exact case-insensitive comparison when no wildcards are present.
+ */
+function simpleGlobMatch(text: string, pattern: string): boolean {
+  if (!pattern.includes("*") && !pattern.includes("?")) {
+    return text.toLowerCase() === pattern.toLowerCase();
+  }
+
+  // Convert simple glob to regex
+  const regexStr = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
+
+  return new RegExp(`^${regexStr}$`, "i").test(text);
 }
 
 function buildReviewSettingItems(settings: ReviewSettings): SettingItem[] {

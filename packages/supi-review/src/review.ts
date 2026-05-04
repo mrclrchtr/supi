@@ -7,7 +7,13 @@ import { buildReviewPrompt } from "./prompts.ts";
 import { registerReviewRenderer } from "./renderer.ts";
 import { runReviewer } from "./runner.ts";
 import type { ReviewerInvocation } from "./runner-types.ts";
-import { loadReviewSettings, registerReviewSettings, setReviewModelChoices } from "./settings.ts";
+import {
+  filterByEnabledModels,
+  loadReviewSettings,
+  readPiEnabledModels,
+  registerReviewSettings,
+  setReviewModelChoices,
+} from "./settings.ts";
 import type { ReviewResult, ReviewTarget } from "./types.ts";
 import { selectAutoFix, selectBranch, selectCommit, selectPreset } from "./ui.ts";
 
@@ -31,7 +37,18 @@ export default function reviewExtension(pi: ExtensionAPI) {
       getAvailable(): Array<{ provider: string; id: string }> | undefined;
     };
   }) => {
-    setReviewModelChoices(toCanonicalModelIds(ctx.modelRegistry.getAvailable()));
+    const allModels = ctx.modelRegistry.getAvailable();
+    if (!allModels) {
+      setReviewModelChoices([]);
+      return;
+    }
+
+    // Try to respect PI’s scoped models (enabledModels).
+    // Workaround for pi-mono#3535 — swap to ctx.scopedModels when exposed by PI.
+    const enabledPatterns = readPiEnabledModels();
+    const models = enabledPatterns ? filterByEnabledModels(enabledPatterns, allModels) : allModels;
+
+    setReviewModelChoices(toCanonicalModelIds(models));
   };
 
   pi.on("session_start", async (_event, ctx) => {

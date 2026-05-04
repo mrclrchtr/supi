@@ -33,7 +33,9 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
 }));
 
 vi.mock("../src/settings", () => ({
+  filterByEnabledModels: vi.fn((_patterns, available) => available),
   loadReviewSettings: mockFns.loadReviewSettings,
+  readPiEnabledModels: vi.fn(() => undefined),
   registerReviewSettings: mockFns.registerReviewSettings,
   setReviewModelChoices: mockFns.setReviewModelChoices,
 }));
