@@ -93,6 +93,12 @@ export type AggregatedData = {
     sessionsInvolved: number;
     userMessagesDuring: number;
   };
+  /** Number of sessions attempted for LLM facet extraction. */
+  facetExtractionAttempted: number;
+  /** Number of sessions where LLM facet extraction failed. */
+  facetExtractionFailed: number;
+  /** List of insight section names that failed to generate. */
+  insightSectionsFailed: string[];
 };
 
 export type InsightSectionName =

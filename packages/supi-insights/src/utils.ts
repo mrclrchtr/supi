@@ -2,6 +2,29 @@
 
 import { extname } from "node:path";
 
+// ── Retry helper for LLM calls ────────────────────────────
+
+/**
+ * Attempt an async operation with retries and exponential backoff.
+ * Returns the result on success, or null if all attempts fail.
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  retries = 2,
+  baseDelayMs = 1000,
+): Promise<T | null> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (_err) {
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** attempt));
+      }
+    }
+  }
+  return null;
+}
+
 const EXTENSION_TO_LANGUAGE: Record<string, string> = {
   ".ts": "TypeScript",
   ".tsx": "TypeScript",

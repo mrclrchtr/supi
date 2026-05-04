@@ -50,6 +50,9 @@ export function aggregateData(
       sessionsInvolved: 0,
       userMessagesDuring: 0,
     },
+    facetExtractionAttempted: 0,
+    facetExtractionFailed: 0,
+    insightSectionsFailed: [],
   };
 
   const dates: string[] = [];

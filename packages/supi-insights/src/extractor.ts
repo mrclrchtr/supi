@@ -1,8 +1,9 @@
 // LLM facet extraction — analyze session transcripts and extract structured facets.
 
-import { complete, getModel } from "@mariozechner/pi-ai";
+import { complete } from "@mariozechner/pi-ai";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { SessionFacets } from "./types.ts";
+import { withRetry } from "./utils.ts";
 
 const FACET_EXTRACTION_PROMPT = `Analyze this PI coding agent session and extract structured facets.
 
@@ -48,18 +49,18 @@ export async function extractFacets(
   sessionId: string,
   ctx: ExtensionContext,
 ): Promise<SessionFacets | null> {
-  try {
-    const model = getModel("anthropic", "claude-sonnet-4-5");
-    if (!model) return null;
+  // Resolve model: prefer active model, fall back to any available configured model
+  const model = ctx.model ?? ctx.modelRegistry.getAvailable()[0];
+  if (!model) return null;
 
-    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-    if (!auth.ok || !auth.apiKey) return null;
+  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+  if (!auth.ok || !auth.apiKey) return null;
 
-    // For long transcripts, summarize in chunks first
-    const processedTranscript =
-      transcript.length > 30000 ? await summarizeTranscript(transcript, ctx) : transcript;
+  // For long transcripts, summarize in chunks first
+  const processedTranscript =
+    transcript.length > 30000 ? await summarizeTranscript(transcript, ctx) : transcript;
 
-    const jsonPrompt = `${FACET_EXTRACTION_PROMPT}${processedTranscript}
+  const jsonPrompt = `${FACET_EXTRACTION_PROMPT}${processedTranscript}
 
 RESPOND WITH ONLY A VALID JSON OBJECT matching this schema:
 {
@@ -75,26 +76,37 @@ RESPOND WITH ONLY A VALID JSON OBJECT matching this schema:
   "briefSummary": "One sentence: what user wanted and whether they got it"
 }`;
 
-    const response = await complete(
-      model,
-      {
-        systemPrompt: "",
-        messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: jsonPrompt }],
-            timestamp: Date.now(),
-          },
-        ],
-      },
-      {
-        apiKey: auth.apiKey,
-        headers: auth.headers,
-        signal: ctx.signal,
-        maxTokens: 4096,
-      },
-    );
+  // Attempt the LLM call with up to 2 retries
+  const response = await withRetry(
+    async () => {
+      const res = await complete(
+        model,
+        {
+          systemPrompt: "",
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: jsonPrompt }],
+              timestamp: Date.now(),
+            },
+          ],
+        },
+        {
+          apiKey: auth.apiKey,
+          headers: auth.headers,
+          signal: ctx.signal,
+          maxTokens: 4096,
+        },
+      );
+      return res;
+    },
+    2,
+    1000,
+  );
 
+  if (!response) return null;
+
+  try {
     const text = response.content
       .filter((c): c is { type: "text"; text: string } => c.type === "text")
       .map((c) => c.text)
@@ -113,7 +125,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT matching this schema:
 }
 
 async function summarizeTranscript(transcript: string, ctx: ExtensionContext): Promise<string> {
-  const model = getModel("anthropic", "claude-sonnet-4-5");
+  const model = ctx.model ?? ctx.modelRegistry.getAvailable()[0];
   if (!model) return transcript.slice(0, 30000);
 
   const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);

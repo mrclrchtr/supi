@@ -379,8 +379,11 @@ function getActiveBranchEntries(entries: FileEntry[]): SessionEntry[] {
   if (!leaf) return [];
 
   const path: SessionEntry[] = [];
+  const visited = new Set<string>();
   let current: SessionEntry | undefined = leaf;
   while (current) {
+    if (visited.has(current.id)) break;
+    visited.add(current.id);
     path.unshift(current);
     current = current.parentId ? byId.get(current.parentId) : undefined;
   }

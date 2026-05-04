@@ -1,8 +1,9 @@
 // Insight generator — produce narrative insights from aggregated data via LLM calls.
 
-import { complete, getModel } from "@mariozechner/pi-ai";
+import { complete } from "@mariozechner/pi-ai";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import type { AggregatedData, InsightResults, SessionFacets } from "./types.ts";
+import { withRetry } from "./utils.ts";
 
 type InsightSection = {
   name: keyof InsightResults;
@@ -144,51 +145,67 @@ export async function generateInsights(
   return insights;
 }
 
+async function resolveModel(ctx: ExtensionContext): Promise<{
+  model: NonNullable<ExtensionContext["model"]>;
+  apiKey: string;
+  headers: Record<string, string>;
+} | null> {
+  const model = ctx.model ?? ctx.modelRegistry.getAvailable()[0] ?? null;
+  if (!model) return null;
+  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+  if (!auth.ok || !auth.apiKey) return null;
+  return { model, apiKey: auth.apiKey, headers: auth.headers ?? {} };
+}
+
 async function generateSectionInsight(
   section: InsightSection,
   dataContext: string,
   ctx: ExtensionContext,
 ): Promise<{ name: keyof InsightResults; result: unknown }> {
+  const resolved = await resolveModel(ctx);
+  if (!resolved) return { name: section.name, result: null };
+
+  const { model, apiKey, headers } = resolved;
+
+  const response = await withRetry(
+    async () => {
+      const res = await complete(
+        model,
+        {
+          systemPrompt: "",
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: `${section.prompt}\n\nDATA:\n${dataContext}` }],
+              timestamp: Date.now(),
+            },
+          ],
+        },
+        {
+          apiKey,
+          headers,
+          signal: ctx.signal,
+          maxTokens: section.maxTokens,
+        },
+      );
+      return res;
+    },
+    2,
+    1000,
+  );
+
+  if (!response) return { name: section.name, result: null };
+
+  const text = response.content
+    .filter((c): c is { type: "text"; text: string } => c.type === "text")
+    .map((c) => c.text)
+    .join("");
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return { name: section.name, result: null };
+
   try {
-    const model = getModel("anthropic", "claude-sonnet-4-5");
-    if (!model) return { name: section.name, result: null };
-
-    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-    if (!auth.ok || !auth.apiKey) return { name: section.name, result: null };
-
-    const response = await complete(
-      model,
-      {
-        systemPrompt: "",
-        messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: `${section.prompt}\n\nDATA:\n${dataContext}` }],
-            timestamp: Date.now(),
-          },
-        ],
-      },
-      {
-        apiKey: auth.apiKey,
-        headers: auth.headers,
-        signal: ctx.signal,
-        maxTokens: section.maxTokens,
-      },
-    );
-
-    const text = response.content
-      .filter((c): c is { type: "text"; text: string } => c.type === "text")
-      .map((c) => c.text)
-      .join("");
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { name: section.name, result: null };
-
-    try {
-      return { name: section.name, result: JSON.parse(jsonMatch[0]) };
-    } catch {
-      return { name: section.name, result: null };
-    }
+    return { name: section.name, result: JSON.parse(jsonMatch[0]) };
   } catch {
     return { name: section.name, result: null };
   }
@@ -285,41 +302,49 @@ ${featuresText}
 ## On the Horizon
 ${horizonText}`;
 
+  const resolved = await resolveModel(ctx);
+  if (!resolved) return null;
+
+  const { model, apiKey, headers } = resolved;
+
+  const response = await withRetry(
+    async () => {
+      const res = await complete(
+        model,
+        {
+          systemPrompt: "",
+          messages: [
+            {
+              role: "user",
+              content: [{ type: "text", text: prompt }],
+              timestamp: Date.now(),
+            },
+          ],
+        },
+        {
+          apiKey,
+          headers,
+          signal: ctx.signal,
+          maxTokens: 4096,
+        },
+      );
+      return res;
+    },
+    2,
+    1000,
+  );
+
+  if (!response) return null;
+
+  const text = response.content
+    .filter((c): c is { type: "text"; text: string } => c.type === "text")
+    .map((c) => c.text)
+    .join("");
+
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return null;
+
   try {
-    const model = getModel("anthropic", "claude-sonnet-4-5");
-    if (!model) return null;
-
-    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-    if (!auth.ok || !auth.apiKey) return null;
-
-    const response = await complete(
-      model,
-      {
-        systemPrompt: "",
-        messages: [
-          {
-            role: "user",
-            content: [{ type: "text", text: prompt }],
-            timestamp: Date.now(),
-          },
-        ],
-      },
-      {
-        apiKey: auth.apiKey,
-        headers: auth.headers,
-        signal: ctx.signal,
-        maxTokens: 4096,
-      },
-    );
-
-    const text = response.content
-      .filter((c): c is { type: "text"; text: string } => c.type === "text")
-      .map((c) => c.text)
-      .join("");
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
     return JSON.parse(jsonMatch[0]);
   } catch {
     return null;

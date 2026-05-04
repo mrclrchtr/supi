@@ -3,6 +3,7 @@
 // Scans historical PI sessions, extracts structured metadata and LLM facets,
 // generates narrative insights, and produces a shareable HTML report.
 
+// biome-ignore lint: factory + pipeline in one file keeps phase ordering explicit.
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type {
@@ -112,9 +113,9 @@ export default function insightsExtension(pi: ExtensionAPI) {
     },
   });
 
-  // ── /insights command ──────────────────────────────────
+  // ── /supi-insights command ──────────────────────────────────
 
-  pi.registerCommand("insights", {
+  pi.registerCommand("supi-insights", {
     description: "Generate a report analyzing your PI sessions",
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: command handler coordinates UI and report generation flow.
     handler: async (_args, ctx) => {
@@ -142,11 +143,18 @@ export default function insightsExtension(pi: ExtensionAPI) {
         await writeFile(htmlPath, report.html, { encoding: "utf-8", mode: 0o600 });
 
         // Send custom message with summary
+        const failureNote =
+          report.data.facetExtractionFailed > 0
+            ? `${report.data.facetExtractionFailed} facet extractions failed`
+            : report.data.insightSectionsFailed.length > 0
+              ? `${report.data.insightSectionsFailed.length} insight sections unavailable`
+              : undefined;
         const stats = [
           `${report.data.totalSessions} sessions`,
           `${report.data.totalMessages.toLocaleString()} messages`,
           `${Math.round(report.data.totalDurationHours)}h`,
           `${report.data.gitCommits} commits`,
+          ...(failureNote ? [`⚠ ${failureNote}`] : []),
         ].join(" · ");
 
         const header = `# PI Insights\n\n${stats}\n${report.data.dateRange.start} to ${report.data.dateRange.end}\n`;
@@ -307,12 +315,16 @@ async function generateReport(
     }
   }
 
-  // Extract facets in parallel batches.
+  // Extract facets in parallel batches, tracking attempts and failures.
+  let facetExtractionAttempted = 0;
+  let facetExtractionFailed = 0;
+  ctx.ui.setStatus("supi-insights", `Extracting facets... 0/${toExtract.length}`);
   for (let i = 0; i < toExtract.length; i += FACET_CONCURRENCY) {
     const batch = toExtract.slice(i, i + FACET_CONCURRENCY);
     const results = await Promise.all(
       batch.map(async ({ record, entries }) => {
         const transcript = formatTranscriptForFacets(entries, record.meta);
+        facetExtractionAttempted++;
         return {
           record,
           facets: await extractFacets(transcript, record.meta.sessionId, ctx),
@@ -326,12 +338,19 @@ async function generateReport(
       if (newFacets) {
         facets.set(result.record.meta.sessionId, newFacets);
         facetsToSave.push({ facets: newFacets, cacheKey: result.record.cacheKey });
+      } else {
+        facetExtractionFailed++;
       }
     }
     await Promise.all(
       facetsToSave.map(({ facets, cacheKey }) => saveCachedFacets(cacheKey, facets)),
     );
+    ctx.ui.setStatus(
+      "supi-insights",
+      `Extracting facets... ${Math.min(i + FACET_CONCURRENCY, toExtract.length)}/${toExtract.length}`,
+    );
   }
+  ctx.ui.setStatus("supi-insights", undefined);
 
   // Filter out warmup-only sessions.
   const isMinimalSession = (sessionId: string): boolean => {
@@ -354,9 +373,29 @@ async function generateReport(
   // Phase 4: Aggregate
   const aggregated = aggregateData(finalSessions, finalFacets);
   aggregated.totalSessionsScanned = totalSessionsScanned;
+  aggregated.facetExtractionAttempted = facetExtractionAttempted;
+  aggregated.facetExtractionFailed = facetExtractionFailed;
 
   // Phase 5: Generate insights
   const insights = await generateInsights(aggregated, finalFacets, ctx);
+
+  // Track which insight sections failed to generate.
+  const insightSectionsFailed: string[] = [];
+  for (const sectionName of [
+    "projectAreas",
+    "interactionStyle",
+    "whatWorks",
+    "frictionAnalysis",
+    "suggestions",
+    "onTheHorizon",
+    "funEnding",
+    "atAGlance",
+  ] as const) {
+    if (!insights[sectionName]) {
+      insightSectionsFailed.push(sectionName);
+    }
+  }
+  aggregated.insightSectionsFailed = insightSectionsFailed;
 
   // Phase 6: Render HTML
   const htmlReport = generateHtmlReport(aggregated, insights);

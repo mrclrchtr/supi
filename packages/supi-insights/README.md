@@ -39,10 +39,10 @@ Or add to your project's `.pi/extensions/` for local development.
 
 ## Usage
 
-Type `/insights` in the PI editor and press Enter.
+Type `/supi-insights` in the PI editor and press Enter.
 
 ```
-/insights
+/supi-insights
 ```
 
 The extension will:
@@ -206,7 +206,7 @@ The extension detects when you run multiple PI sessions simultaneously ("multi-c
 
 ## Compared to Claude Code `/insights`
 
-| Feature | Claude Code | supi-insights |
+| Feature | Claude Code | /supi-insights |
 |---------|-------------|---------------|
 | Session discovery | Manual filesystem scan | `SessionManager.listAll()` |
 | LLM access | Internal `queryWithModel()` | `@mariozechner/pi-ai/complete()` |
@@ -234,7 +234,7 @@ pnpm vitest run packages/supi-insights/
 - [ ] **TUI overlay dashboard** — native PI terminal UI with ASCII bar charts, keyboard-navigable sections
 - [ ] **Export formats** — Markdown, JSON, CSV
 - [ ] **Trend comparison** — compare current report with previous reports
-- [ ] **Session drill-down** — `/insights --session <id>` to analyze a specific session
+- [ ] **Session drill-down** — `/supi-insights --session <id>` to analyze a specific session
 
 ## License
 

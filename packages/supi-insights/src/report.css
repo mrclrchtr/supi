@@ -63,4 +63,6 @@
     .fun-ending { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px; padding: 24px; margin-top: 40px; text-align: center; }
     .fun-headline { font-size: 18px; font-weight: 600; color: #78350f; margin-bottom: 8px; }
     .fun-detail { font-size: 14px; color: #92400e; }
+    .failure-banner { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #991b1b; display: flex; flex-direction: column; gap: 4px; }
+    .failure-hint { font-size: 12px; color: #64748b; }
     @media (max-width: 640px) { .charts-row { grid-template-columns: 1fr; } .stats-row { justify-content: center; } }

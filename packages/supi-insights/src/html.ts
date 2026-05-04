@@ -404,6 +404,15 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
       ? `${data.totalSessionsScanned.toLocaleString()} sessions total \u00b7 ${data.totalSessions} analyzed`
       : `${data.totalSessions} sessions`;
 
+  const failureBanner =
+    data.facetExtractionFailed > 0 || data.insightSectionsFailed.length > 0
+      ? `<div class="failure-banner">
+          ${data.facetExtractionFailed > 0 ? `<span>⚠ ${data.facetExtractionFailed} of ${data.facetExtractionAttempted} LLM facet extractions failed</span>` : ""}
+          ${data.insightSectionsFailed.length > 0 ? `<span>⚠ ${data.insightSectionsFailed.length} insight section(s) unavailable: ${escapeXmlAttr(data.insightSectionsFailed.join(", "))}</span>` : ""}
+          <span class="failure-hint">Run \`/supi-insights\` again later to retry.</span>
+        </div>`
+      : "";
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -416,6 +425,8 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
   <div class="container">
     <h1>PI Insights</h1>
     <p class="subtitle">${data.totalMessages.toLocaleString()} messages across ${sessionLabel} | ${data.dateRange.start} to ${data.dateRange.end}</p>
+
+    ${failureBanner}
 
     ${atAGlanceHtml}
 
