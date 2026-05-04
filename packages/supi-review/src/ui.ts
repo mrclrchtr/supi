@@ -4,27 +4,39 @@ import { getLocalBranches, getRecentCommits } from "./git.ts";
 
 export type Preset = "base-branch" | "uncommitted" | "commit" | "custom";
 
-export async function selectPreset(ctx: ExtensionContext): Promise<Preset | undefined> {
-  const items: SelectItem[] = [
-    { value: "base-branch", label: "Review against a base branch" },
-    { value: "uncommitted", label: "Review uncommitted changes" },
-    { value: "commit", label: "Review a commit" },
-    { value: "custom", label: "Custom review instructions" },
-  ];
+interface SelectFromListOptions<T> {
+  items: SelectItem[];
+  title: string;
+  maxHeight: number;
+  onSelect: (item: SelectItem) => T | undefined;
+  initialIndex?: number;
+}
 
-  return ctx.ui.custom<Preset | undefined>((tui, theme, _kb, done) => {
+/**
+ * Shared TUI helper: renders a SelectList inside a bordered container with
+ * standard theme colors, keyboard hints, and cancel-on-escape behavior.
+ */
+function selectFromList<T>(
+  ctx: ExtensionContext,
+  options: SelectFromListOptions<T>,
+): Promise<T | undefined> {
+  const { items, title, maxHeight, onSelect, initialIndex } = options;
+  return ctx.ui.custom<T | undefined>((tui, theme, _kb, done) => {
     const container = new Container();
     container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-    container.addChild(new Text(theme.fg("accent", "Select review target"), 1, 0));
+    container.addChild(new Text(theme.fg("accent", title), 1, 0));
 
-    const selectList = new SelectList(items, Math.min(items.length, 10), {
+    const selectList = new SelectList(items, Math.min(items.length, maxHeight), {
       selectedPrefix: (t) => theme.fg("accent", t),
       selectedText: (t) => theme.fg("accent", t),
       description: (t) => theme.fg("muted", t),
       scrollInfo: (t) => theme.fg("dim", t),
       noMatch: (t) => theme.fg("warning", t),
     });
-    selectList.onSelect = (item) => done(item.value as Preset);
+    if (initialIndex !== undefined) {
+      selectList.setSelectedIndex(initialIndex);
+    }
+    selectList.onSelect = (item) => done(onSelect(item));
     selectList.onCancel = () => done(undefined);
     container.addChild(selectList);
     container.addChild(new Text(theme.fg("dim", "↑↓ navigate • enter select • esc cancel"), 1, 0));
@@ -41,42 +53,33 @@ export async function selectPreset(ctx: ExtensionContext): Promise<Preset | unde
   });
 }
 
+export async function selectPreset(ctx: ExtensionContext): Promise<Preset | undefined> {
+  return selectFromList(ctx, {
+    items: [
+      { value: "base-branch", label: "Review against a base branch" },
+      { value: "uncommitted", label: "Review uncommitted changes" },
+      { value: "commit", label: "Review a commit" },
+      { value: "custom", label: "Custom review instructions" },
+    ],
+    title: "Select review target",
+    maxHeight: 10,
+    onSelect: (item) => item.value as Preset,
+  });
+}
+
 export async function selectAutoFix(
   ctx: ExtensionContext,
   defaultValue: boolean,
 ): Promise<boolean | undefined> {
-  const items: SelectItem[] = [
-    { value: "true", label: "Yes — fix all findings" },
-    { value: "false", label: "No — review only" },
-  ];
-
-  return ctx.ui.custom<boolean | undefined>((tui, theme, _kb, done) => {
-    const container = new Container();
-    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-    container.addChild(new Text(theme.fg("accent", "Auto-fix after review?"), 1, 0));
-
-    const selectList = new SelectList(items, items.length, {
-      selectedPrefix: (t) => theme.fg("accent", t),
-      selectedText: (t) => theme.fg("accent", t),
-      description: (t) => theme.fg("muted", t),
-      scrollInfo: (t) => theme.fg("dim", t),
-      noMatch: (t) => theme.fg("warning", t),
-    });
-    selectList.setSelectedIndex(defaultValue ? 0 : 1);
-    selectList.onSelect = (item) => done(item.value === "true");
-    selectList.onCancel = () => done(undefined);
-    container.addChild(selectList);
-    container.addChild(new Text(theme.fg("dim", "↑↓ navigate • enter select • esc cancel"), 1, 0));
-    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-
-    return {
-      render: (w) => container.render(w),
-      invalidate: () => container.invalidate(),
-      handleInput: (data) => {
-        selectList.handleInput(data);
-        tui.requestRender();
-      },
-    };
+  return selectFromList(ctx, {
+    items: [
+      { value: "true", label: "Yes — fix all findings" },
+      { value: "false", label: "No — review only" },
+    ],
+    title: "Auto-fix after review?",
+    maxHeight: 2,
+    onSelect: (item) => item.value === "true",
+    initialIndex: defaultValue ? 0 : 1,
   });
 }
 
@@ -86,35 +89,11 @@ export async function selectBranch(ctx: ExtensionContext): Promise<string | unde
     ctx.ui.notify("No local branches found", "warning");
     return undefined;
   }
-
-  const items: SelectItem[] = branches.map((b) => ({ value: b, label: b }));
-
-  return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
-    const container = new Container();
-    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-    container.addChild(new Text(theme.fg("accent", "Select base branch"), 1, 0));
-
-    const selectList = new SelectList(items, Math.min(items.length, 15), {
-      selectedPrefix: (t) => theme.fg("accent", t),
-      selectedText: (t) => theme.fg("accent", t),
-      description: (t) => theme.fg("muted", t),
-      scrollInfo: (t) => theme.fg("dim", t),
-      noMatch: (t) => theme.fg("warning", t),
-    });
-    selectList.onSelect = (item) => done(item.value);
-    selectList.onCancel = () => done(undefined);
-    container.addChild(selectList);
-    container.addChild(new Text(theme.fg("dim", "↑↓ navigate • enter select • esc cancel"), 1, 0));
-    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-
-    return {
-      render: (w) => container.render(w),
-      invalidate: () => container.invalidate(),
-      handleInput: (data) => {
-        selectList.handleInput(data);
-        tui.requestRender();
-      },
-    };
+  return selectFromList(ctx, {
+    items: branches.map((b) => ({ value: b, label: b })),
+    title: "Select base branch",
+    maxHeight: 15,
+    onSelect: (item) => item.value,
   });
 }
 
@@ -124,38 +103,14 @@ export async function selectCommit(ctx: ExtensionContext): Promise<string | unde
     ctx.ui.notify("No recent commits found", "warning");
     return undefined;
   }
-
-  const items: SelectItem[] = commits.map((c) => ({
-    value: c.sha,
-    label: `${c.sha.slice(0, 7)}  ${c.subject}`,
-    description: c.sha,
-  }));
-
-  return ctx.ui.custom<string | undefined>((tui, theme, _kb, done) => {
-    const container = new Container();
-    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-    container.addChild(new Text(theme.fg("accent", "Select commit to review"), 1, 0));
-
-    const selectList = new SelectList(items, Math.min(items.length, 15), {
-      selectedPrefix: (t) => theme.fg("accent", t),
-      selectedText: (t) => theme.fg("accent", t),
-      description: (t) => theme.fg("muted", t),
-      scrollInfo: (t) => theme.fg("dim", t),
-      noMatch: (t) => theme.fg("warning", t),
-    });
-    selectList.onSelect = (item) => done(item.value);
-    selectList.onCancel = () => done(undefined);
-    container.addChild(selectList);
-    container.addChild(new Text(theme.fg("dim", "↑↓ navigate • enter select • esc cancel"), 1, 0));
-    container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-
-    return {
-      render: (w) => container.render(w),
-      invalidate: () => container.invalidate(),
-      handleInput: (data) => {
-        selectList.handleInput(data);
-        tui.requestRender();
-      },
-    };
+  return selectFromList(ctx, {
+    items: commits.map((c) => ({
+      value: c.sha,
+      label: `${c.sha.slice(0, 7)}  ${c.subject}`,
+      description: c.sha,
+    })),
+    title: "Select commit to review",
+    maxHeight: 15,
+    onSelect: (item) => item.value,
   });
 }

@@ -325,12 +325,7 @@ function maybeTruncateDiff(
   };
 }
 
-function injectReviewMessage(
-  pi: ExtensionAPI,
-  result: ReviewResult,
-  autoFix: boolean,
-  _ctx?: CommandContext,
-): void {
+function injectReviewMessage(pi: ExtensionAPI, result: ReviewResult, autoFix: boolean): void {
   pi.sendMessage({
     customType: "supi-review",
     content: formatReviewContent(result),
