@@ -6,7 +6,7 @@ description: >
   "show ticket", "list tickets", "what tickets are open", "add a tag to ticket", "set priority on
   ticket", "ticket status", "ticket blocked", or any ticket lifecycle operation, or when a
   conversation references a ticket ID (e.g. "fix TNDM-XXXXXX").
-version: 0.4.1
+version: 0.5.0
 argument-hint: create <title> | update <ID> [--status <s>] [--priority <p>] | show <ID> | list
 ---
 
@@ -100,13 +100,23 @@ tndm ticket create "Urgent hotfix" \
   --status in_progress --priority p0 --type bug
 ```
 
-With optional content body (use a heredoc — do **not** create temporary files):
+With optional content body (use a heredoc — do **not** create temporary files).
+
+Always tag fenced code blocks with a language so `tndm ticket show` can syntax-highlight them:
 
 ```sh
 tndm ticket create "Implement OAuth flow" <<'EOF'
 ## Context
 
 Users need to sign in with Google.
+
+The login endpoint validates tokens:
+
+```rust
+pub fn validate(token: &str) -> bool {
+    !token.is_empty() && token.len() > 10
+}
+```
 
 ## Goal
 
@@ -117,6 +127,8 @@ Support OAuth 2.0 authorization code flow.
 - Users can sign in with Google
 EOF
 ```
+
+Unrecognised or bare fences fall back to termimad's native code styling.
 
 ### Update
 

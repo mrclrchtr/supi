@@ -108,7 +108,7 @@ tndm ticket update TNDM-A1B2C3 --content-file /tmp/blocker.md
 
 ## tndm ticket show
 
-Display a single ticket by ID.
+Display a single ticket by ID with a rich, human-readable layout.
 
 ```sh
 tndm ticket show <ID> [OPTIONS]
@@ -116,6 +116,15 @@ tndm ticket show <ID> [OPTIONS]
 Options:
   --json    Output as JSON.
 ```
+
+The standard (non-JSON) output includes:
+- **Header** — ticket ID and title
+- **Metadata** — status, priority, type, effort, tags, dependencies, timestamp
+- **Status color-coding** — todo (yellow), in_progress (blue), blocked (red), done (green)
+- **Markdown rendered content** — headings, bold, italic, inline code, code blocks,
+  lists, and blockquotes are all styled in the terminal
+
+Colors and markdown rendering automatically disable when output is piped.
 
 Examples:
 
