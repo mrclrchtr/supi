@@ -163,7 +163,7 @@ These seven guidelines are injected into the system prompt:
 
 > - Use `code_intel brief` before editing an unfamiliar package, directory, or file to get architecture context and reduce blind reads.
 > - Use `code_intel affected` before changing exported APIs, shared helpers, config surfaces, or cross-package contracts to check blast radius and risk.
-> - Use `code_intel callers` / `callees` / `implementations` for semantic relationship questions before falling back to broad `rg` text search.
+> - Use `code_intel callers` before modifying a function to verify all call sites; use `callees` and `implementations` for dependency and interface analysis.
 > - Use `code_intel pattern` for bounded, scope-aware text search when the question is textual rather than semantic; it treats patterns as literal strings by default and supports `regex: true` when needed.
 > - Use `code_intel index` for a factual project map (file counts, directory structure, landmark files) when you need to orient yourself in a new codebase.
 > - After `code_intel` narrows the target, use raw `lsp` and `tree_sitter` tools for precise drill-down on exact symbols, types, or AST nodes.
