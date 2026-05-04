@@ -47,6 +47,7 @@ Entrypoints:
 - Single-file diagnostic sync (`syncAndWaitForDiagnostics`) should prefer pull diagnostics when `diagnosticProvider` is advertised, then fall back to push waits.
 - `syncAndWaitForDiagnostics()` backs both `write`/`edit` inline diagnostics and the `lsp diagnostics` action; keep its pull/push behavior aligned with `refreshOpenDiagnostics()`.
 - After `write`/`edit`, severity-1 diagnostics are augmented with LSP `hover` (3-line truncation) and `code_actions` titles at the first error position, each with a 500ms timeout.
+- After a file creation (`syncFileAndGetDiagnostics`), `LspManager` calls `client.clearPullResultIds()` to clear all `resultId` values from the diagnostic cache. This forces the next `before_agent_start` diagnostic refresh to send full pull requests (without `previousResultId`) so cross-file diagnostics (e.g., resolved `Cannot find module` errors in importing files) are fully re-computed instead of short-circuited by `unchanged` pull responses.
 
 ## Tool action gotchas
 

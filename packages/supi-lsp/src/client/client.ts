@@ -5,7 +5,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { CLIENT_CAPABILITIES } from "../capabilities.ts";
-import { JsonRpcClient } from "./transport.ts";
 import type {
   CodeAction,
   CodeActionContext,
@@ -28,6 +27,7 @@ import type {
   WorkspaceSymbol,
 } from "../types.ts";
 import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
+import { JsonRpcClient } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
 const DIAGNOSTIC_WAIT_MS = 3_000;
@@ -306,6 +306,20 @@ export class LspClient {
   /** Get the internal cache entry for a file (exposed for testing / version checks). */
   getDiagnosticCacheEntry(uri: string): DiagnosticCacheEntry | undefined {
     return this.diagnosticStore.get(uri);
+  }
+
+  /**
+   * Clear all pull-diagnostic result IDs, forcing full (not `unchanged`)
+   * pull diagnostic responses on the next refresh cycle.
+   *
+   * Use this after file creation/write operations so that cross-file
+   * diagnostics (e.g., `Cannot find module` errors in importing files)
+   * are fully re-computed instead of returned as `unchanged`.
+   */
+  clearPullResultIds(): void {
+    for (const entry of this.diagnosticStore.values()) {
+      delete entry.resultId;
+    }
   }
 
   /** Get all currently open document URIs. */

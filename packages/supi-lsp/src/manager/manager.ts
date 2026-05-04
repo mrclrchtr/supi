@@ -11,6 +11,16 @@ import {
   relativeFilePathFromUri,
 } from "../diagnostics/diagnostic-summary.ts";
 import {
+  displayRelativeFilePath,
+  formatCoverageSummaryText,
+  formatOutstandingDiagnosticsSummaryText,
+  isPathRelevant,
+  normalizeRelevantPaths,
+  shouldIgnoreLspPath,
+} from "../summary.ts";
+import type { DetectedProjectServer, Diagnostic, LspConfig, ProjectServerInfo } from "../types.ts";
+import { commandExists } from "../utils.ts";
+import {
   closeFileAcrossClients,
   pruneMissingFilesFromClients,
   refreshOpenDiagnosticsForClients,
@@ -24,16 +34,6 @@ import type {
   OutstandingDiagnosticSummaryEntry,
   ServerStatus,
 } from "./manager-types.ts";
-import {
-  displayRelativeFilePath,
-  formatCoverageSummaryText,
-  formatOutstandingDiagnosticsSummaryText,
-  isPathRelevant,
-  normalizeRelevantPaths,
-  shouldIgnoreLspPath,
-} from "../summary.ts";
-import type { DetectedProjectServer, Diagnostic, LspConfig, ProjectServerInfo } from "../types.ts";
-import { commandExists } from "../utils.ts";
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
@@ -176,6 +176,11 @@ export class LspManager {
       return [];
     }
     const diagnostics = await client.syncAndWaitForDiagnostics(resolvedPath, content);
+    // Clear pull result IDs so the next diagnostic refresh (in
+    // `before_agent_start`) does a full pull for all open files in this
+    // client, not an `unchanged` shortcut. This is essential when a
+    // newly-created file resolves import errors in other open files.
+    client.clearPullResultIds();
     return diagnostics.filter((d) => d.severity !== undefined && d.severity <= maxSeverity);
   }
   /** Close a file across any active LSP clients and clear its cached diagnostics. */

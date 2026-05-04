@@ -165,4 +165,57 @@ describe("LspClient diagnostic cache", () => {
     expect(entry).toBe(originalEntry); // Same reference — not replaced
     expect(entry.diagnostics[0].message).toBe("v5-diag");
   });
+
+  it("clearPullResultIds removes all resultId values", () => {
+    const client = createClient();
+
+    // Add cache entries with resultId
+    publish(client, {
+      uri: "file:///project/a.ts",
+      diagnostics: [makeDiagnostic("err-a")],
+    });
+    publish(client, {
+      uri: "file:///project/b.ts",
+      diagnostics: [makeDiagnostic("err-b")],
+    });
+
+    const uriA = "file:///project/a.ts";
+    const uriB = "file:///project/b.ts";
+
+    getCacheEntry(client, uriA).resultId = "result-a";
+    getCacheEntry(client, uriB).resultId = "result-b";
+
+    expect(getCacheEntry(client, uriA).resultId).toBe("result-a");
+    expect(getCacheEntry(client, uriB).resultId).toBe("result-b");
+
+    client.clearPullResultIds();
+
+    expect(getCacheEntry(client, uriA).resultId).toBeUndefined();
+    expect(getCacheEntry(client, uriB).resultId).toBeUndefined();
+
+    // Diagnostics themselves are preserved
+    expect(getCacheEntry(client, uriA).diagnostics[0].message).toBe("err-a");
+    expect(getCacheEntry(client, uriB).diagnostics[0].message).toBe("err-b");
+  });
+
+  it("clearPullResultIds is safe on empty store", () => {
+    const client = createClient();
+    expect(() => client.clearPullResultIds()).not.toThrow();
+  });
+
+  it("clearPullResultIds is safe on entries without resultId", () => {
+    const client = createClient();
+
+    publish(client, {
+      uri: "file:///project/a.ts",
+      diagnostics: [makeDiagnostic("err-a")],
+    });
+
+    // entry has no resultId — should be a no-op
+    expect(() => client.clearPullResultIds()).not.toThrow();
+
+    const entry = getCacheEntry(client, "file:///project/a.ts");
+    expect(entry.resultId).toBeUndefined();
+    expect(entry.diagnostics[0].message).toBe("err-a");
+  });
 });
