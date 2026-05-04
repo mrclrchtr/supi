@@ -45,7 +45,7 @@ function validateQuestionnaireShape(params: AskUserParams): void {
   }
   const seen = new Set<string>();
   for (const q of params.questions) {
-    const questionId = normalizeIdentifier(q.id);
+    const questionId = q.id.trim();
     if (questionId.length === 0) continue;
     if (seen.has(questionId)) {
       throw new AskUserValidationError(
@@ -93,7 +93,7 @@ function validateCommonFields(q: ExternalQuestion): void {
 }
 
 function normalizeChoice(q: ExternalChoiceQuestion): NormalizedQuestion {
-  const id = normalizeIdentifier(q.id);
+  const id = q.id.trim();
   const options = normalizeStructuredOptions(id, q.options);
   return {
     id,
@@ -109,7 +109,7 @@ function normalizeChoice(q: ExternalChoiceQuestion): NormalizedQuestion {
 }
 
 function normalizeMultiChoice(q: ExternalMultiChoiceQuestion): NormalizedQuestion {
-  const id = normalizeIdentifier(q.id);
+  const id = q.id.trim();
   const options = normalizeStructuredOptions(id, q.options);
   return {
     id,
@@ -126,7 +126,7 @@ function normalizeMultiChoice(q: ExternalMultiChoiceQuestion): NormalizedQuestio
 
 function normalizeYesNo(q: ExternalYesNoQuestion): NormalizedQuestion {
   return {
-    id: normalizeIdentifier(q.id),
+    id: q.id.trim(),
     header: q.header,
     type: "yesno",
     prompt: q.prompt,
@@ -145,7 +145,7 @@ function normalizeText(q: {
   required?: boolean;
 }): NormalizedQuestion {
   return {
-    id: normalizeIdentifier(q.id),
+    id: q.id.trim(),
     header: q.header,
     type: "text",
     prompt: q.prompt,
@@ -169,7 +169,7 @@ function normalizeStructuredOptions(
   }
   const seenValues = new Set<string>();
   return options.map((opt) => {
-    const value = normalizeIdentifier(opt.value);
+    const value = opt.value.trim();
     if (value.length === 0 || opt.label.trim().length === 0) {
       throw new AskUserValidationError(
         `structured question "${questionId}" has an option with empty value or label.`,
@@ -196,7 +196,7 @@ function resolveSingleRecommendation(
   recommendation: string | undefined,
 ): number[] {
   if (recommendation === undefined) return [];
-  const value = normalizeIdentifier(recommendation);
+  const value = recommendation.trim();
   const idx = options.findIndex((opt) => opt.value === value);
   if (idx < 0) {
     throw new AskUserValidationError(
@@ -214,7 +214,7 @@ function resolveMultiRecommendation(
   if (!recommendation || recommendation.length === 0) return [];
   const seen = new Set<string>();
   return recommendation.map((recommendationValue) => {
-    const value = normalizeIdentifier(recommendationValue);
+    const value = recommendationValue.trim();
     if (seen.has(value)) {
       throw new AskUserValidationError(
         `multichoice question "${questionId}" has duplicate recommended value "${value}".`,
@@ -229,8 +229,4 @@ function resolveMultiRecommendation(
     }
     return idx;
   });
-}
-
-function normalizeIdentifier(value: string): string {
-  return value.trim();
 }
