@@ -10,9 +10,7 @@ import {
 import { Type } from "typebox";
 import type { ReviewerInvocation, ReviewProgress } from "./runner-types.ts";
 import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "./types.ts";
-
 export type { ReviewerInvocation } from "./runner-types.ts";
-
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
 const GRACE_TURNS = 3;
 const STEER_MESSAGE = "Time limit reached. Wrap up and submit your review now.";
@@ -237,12 +235,17 @@ function handleAgentEnd(ctx: RunnerContext): void {
       ctx.cleanup({
         kind: "failed",
         reason: lastText
-          ? "Reviewer did not call submit_review. Final assistant text captured as explanation."
+          ? `Reviewer did not call submit_review. Assistant said: ${truncateText(lastText, 400)}`
           : "Reviewer did not produce any output.",
         target: ctx.target,
       }),
     );
   }
+}
+
+function truncateText(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen)}... (${text.length - maxLen} more chars)`;
 }
 function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext): void {
   switch (event.type) {
