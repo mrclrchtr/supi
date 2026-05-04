@@ -10,9 +10,7 @@ import {
 import { Type } from "typebox";
 import type { ReviewerInvocation, ReviewProgress } from "./runner-types.ts";
 import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "./types.ts";
-
 export type { ReviewerInvocation } from "./runner-types.ts";
-
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
 const GRACE_TURNS = 3;
 const STEER_MESSAGE = "Time limit reached. Wrap up and submit your review now.";
@@ -78,6 +76,17 @@ function buildReviewerSystemPrompt(): string {
     "Do NOT output JSON directly — use the submit_review tool to submit the result.",
   ].join("\n");
 }
+function resolveReviewThinkingLevel(
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
+  model: import("@mariozechner/pi-ai").Model<any> | undefined,
+): import("@mariozechner/pi-ai").ModelThinkingLevel {
+  if (!model?.reasoning) return "off";
+  for (const level of ["xhigh", "high", "medium", "low", "minimal", "off"] as const) {
+    const mapped = model.thinkingLevelMap?.[level];
+    if (mapped !== null && (level !== "xhigh" || mapped !== undefined)) return level;
+  }
+  return "off";
+}
 async function createReviewerSession(
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: import("@mariozechner/pi-ai").Model<any> | undefined,
@@ -100,7 +109,7 @@ async function createReviewerSession(
     cwd,
     model,
     modelRegistry,
-    thinkingLevel: "off",
+    thinkingLevel: resolveReviewThinkingLevel(model),
     tools: ["read", "grep", "find", "ls", "submit_review"],
     customTools: [submitReviewTool],
     resourceLoader,
@@ -245,7 +254,6 @@ function handleAgentEnd(ctx: RunnerContext): void {
     );
   }
 }
-
 function truncateText(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
   return `${text.slice(0, maxLen)}... (${text.length - maxLen} more chars)`;
