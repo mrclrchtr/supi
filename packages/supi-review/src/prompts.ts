@@ -1,5 +1,11 @@
 import type { ReviewTarget } from "./types.ts";
 
+export interface DiffStats {
+  files: number;
+  additions: number;
+  deletions: number;
+}
+
 export interface BuildPromptOptions {
   truncated?: boolean;
   truncatedBytes?: number;
@@ -38,26 +44,58 @@ export function buildReviewPrompt(
   return parts.join("\n");
 }
 
+export function parseDiffStats(text: string): DiffStats {
+  let files = 0;
+  let additions = 0;
+  let deletions = 0;
+  let inDiff = false;
+
+  for (const line of text.split("\n")) {
+    if (line.startsWith("diff --git ")) {
+      files++;
+      inDiff = true;
+    } else if (inDiff) {
+      if (line.startsWith("+") && !line.startsWith("+++")) {
+        additions++;
+      } else if (line.startsWith("-") && !line.startsWith("---")) {
+        deletions++;
+      }
+    }
+  }
+
+  return { files, additions, deletions };
+}
+
 function buildPreamble(target: ReviewTarget): string {
   switch (target.type) {
     case "base-branch": {
+      const stats = parseDiffStats(target.diff);
       const lines = [
         `# Review: changes on current branch vs ${target.branch}`,
         `**Target:** base branch \`${target.branch}\``,
-        `**Files changed:** ${countFilesInDiff(target.diff)}`,
+        `**Files changed:** ${stats.files}`,
+        `**Changes:** +${stats.additions} / -${stats.deletions} lines`,
       ];
       return lines.join("\n");
     }
     case "uncommitted": {
+      const stats = parseDiffStats(target.diff);
       const lines = [
         "# Review: uncommitted changes",
         "**Target:** working tree (staged + unstaged + untracked)",
-        `**Files changed:** ${countFilesInDiff(target.diff)}`,
+        `**Files changed:** ${stats.files}`,
+        `**Changes:** +${stats.additions} / -${stats.deletions} lines`,
       ];
       return lines.join("\n");
     }
     case "commit": {
-      const lines = [`# Review: commit ${target.sha}`, `**Target:** commit \`${target.sha}\``];
+      const stats = parseDiffStats(target.show);
+      const lines = [
+        `# Review: commit ${target.sha}`,
+        `**Target:** commit \`${target.sha}\``,
+        `**Files changed:** ${stats.files}`,
+        `**Changes:** +${stats.additions} / -${stats.deletions} lines`,
+      ];
       return lines.join("\n");
     }
     case "custom": {
@@ -66,8 +104,4 @@ function buildPreamble(target: ReviewTarget): string {
   }
 }
 
-function countFilesInDiff(diff: string): number {
-  if (!diff) return 0;
-  const matches = diff.match(/^diff --git /gm);
-  return matches ? matches.length : 0;
-}
+
