@@ -196,7 +196,7 @@ AI uses `->` and `→` as prose shorthand instead of writing "to", "into", or "p
 
 ```bash
 # Detect arrows in prose (exclude code blocks)
-awk '/^```/{c=!c}!c' file.md | grep -oP '\s->\s|→' | wc -l
+awk '/^```/{c=!c}!c' file.md | rg -o '\s->\s|→' | wc -l
 ```
 
 ### Plus-sign conjunction
