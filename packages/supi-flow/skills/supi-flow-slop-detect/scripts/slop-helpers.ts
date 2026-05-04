@@ -138,8 +138,9 @@ export function computeBulletRatio(content: string): number {
   return bulletLines / totalLines;
 }
 
-/** Detect "five-paragraph essay" structure — intro, three sections, conclusion. */
-export function detectFiveParagraphEssay(content: string): boolean {
+/** Detect intro-body-conclusion structure where the closing paragraph mirrors
+ *  the opening (the "five-paragraph essay" pattern common in AI-generated prose). */
+export function detectIntroBodyConclusion(content: string): boolean {
   const paragraphs = content
     .split(/\n\s*\n/)
     .map((p) => p.trim())
@@ -151,12 +152,32 @@ export function detectFiveParagraphEssay(content: string): boolean {
   const lastLen = countWords(paragraphs[paragraphs.length - 1]);
   const bodyLens = paragraphs.slice(1, -1).map(countWords);
 
-  // Heuristic: intro + 3 body sections + short conclusion
+  // Heuristic: intro + 3+ body sections + short conclusion
   const hasThreeMiddleSections = bodyLens.length >= 3;
   const conclusionShorter = lastLen < firstLen * 0.8;
   const startsWithIntro = firstLen > 20;
 
   return hasThreeMiddleSections && conclusionShorter && startsWithIntro;
+}
+
+/** Compute paragraph word-count uniformity score (0-1).
+ *  Higher = more uniform paragraph lengths (strong AI signal).
+ *  Uses inverted coefficient of variation: 1 - min(1, stddev/mean).
+ *  Score > 0.7 means paragraphs are suspiciously uniform. */
+export function paragraphUniformity(content: string): number {
+  const paragraphs = content
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0 && !p.startsWith("```"))
+    .map(countWords);
+
+  if (paragraphs.length < 3) return 0;
+
+  const mean = paragraphs.reduce((s, w) => s + w, 0) / paragraphs.length;
+  if (mean === 0) return 0;
+  const variance = paragraphs.reduce((s, w) => s + (w - mean) ** 2, 0) / paragraphs.length;
+  const cv = Math.sqrt(variance) / mean;
+  return Math.round((1 - Math.min(1, cv)) * 100) / 100;
 }
 
 /** Compute sentence length clustering score (0-1). Ratio of sentences in 15-25 word range. */

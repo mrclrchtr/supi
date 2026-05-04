@@ -2,6 +2,9 @@
 /**
  * Vocabulary marker scanner — scans markdown files for AI-prose vocabulary markers.
  *
+ * Reads vocabulary definitions from `../references/vocabulary.json` — the single
+ * source of truth shared with SKILL.md documentation tables.
+ *
  * Usage:
  *   pnpm exec jiti scripts/slop-scan-vocab.ts <file> [<file>...]
  *
@@ -9,86 +12,40 @@
  * Output: JSON array with one result per file.
  */
 
-import { outputJSON, readFile } from "./slop-helpers.ts";
+import { readFileSync } from "node:fs";
+import { outputJSON } from "./slop-helpers.ts";
+
+/** Resolve path relative to this script file. jiti provides __dirname at runtime. */
+function resolveAdjacent(filename: string): string {
+  const dir = (typeof __dirname !== "undefined" ? __dirname : "").replace(/\+$/, "");
+  return `${dir}/${filename}`;
+}
 
 interface VocabEntry {
   term: string;
-  tier: 1 | 2 | 3 | 4;
   score: number;
 }
 
-const TIER_1: VocabEntry[] = [
-  { term: "delve", tier: 1, score: 3 },
-  { term: "tapestry", tier: 1, score: 3 },
-  { term: "realm", tier: 1, score: 3 },
-  { term: "embark", tier: 1, score: 3 },
-  { term: "beacon", tier: 1, score: 3 },
-  { term: "spearheaded", tier: 1, score: 3 },
-  { term: "leverage", tier: 1, score: 3 },
-  { term: "robust", tier: 1, score: 3 },
-  { term: "seamless", tier: 1, score: 3 },
-  { term: "pivotal", tier: 1, score: 3 },
-  { term: "multifaceted", tier: 1, score: 3 },
-  { term: "comprehensive", tier: 1, score: 3 },
-  { term: "nuanced", tier: 1, score: 3 },
-  { term: "meticulous", tier: 1, score: 3 },
-  { term: "intricate", tier: 1, score: 3 },
-  { term: "showcasing", tier: 1, score: 3 },
-  { term: "streamline", tier: 1, score: 3 },
-  { term: "facilitate", tier: 1, score: 3 },
-  { term: "utilize", tier: 1, score: 3 },
-];
+interface VocabData {
+  tier1: VocabEntry[];
+  tier2: VocabEntry[];
+  tier3: VocabEntry[];
+  tier4: VocabEntry[];
+}
 
-const TIER_2: VocabEntry[] = [
-  { term: "moreover", tier: 2, score: 2 },
-  { term: "furthermore", tier: 2, score: 2 },
-  { term: "indeed", tier: 2, score: 2 },
-  { term: "notably", tier: 2, score: 2 },
-  { term: "subsequently", tier: 2, score: 2 },
-  { term: "significantly", tier: 2, score: 2 },
-  { term: "substantially", tier: 2, score: 2 },
-  { term: "fundamentally", tier: 2, score: 2 },
-  { term: "profoundly", tier: 2, score: 2 },
-  { term: "potentially", tier: 2, score: 2 },
-  { term: "typically", tier: 2, score: 2 },
-  { term: "might", tier: 2, score: 2 },
-  { term: "perhaps", tier: 2, score: 2 },
-  { term: "revolutionize", tier: 2, score: 2 },
-  { term: "transform", tier: 2, score: 2 },
-  { term: "unlock", tier: 2, score: 2 },
-  { term: "unleash", tier: 2, score: 2 },
-  { term: "elevate", tier: 2, score: 2 },
-  { term: "crucial", tier: 2, score: 2 },
-  { term: "vital", tier: 2, score: 2 },
-  { term: "essential", tier: 2, score: 2 },
-  { term: "paramount", tier: 2, score: 2 },
-];
+const vocabulary: VocabData = JSON.parse(
+  readFileSync(resolveAdjacent("../references/vocabulary.json"), "utf-8"),
+);
 
-const TIER_3: VocabEntry[] = [
-  { term: "in today's fast-paced world", tier: 3, score: 4 },
-  { term: "it's worth noting that", tier: 3, score: 3 },
-  { term: "at its core", tier: 3, score: 2 },
-  { term: "cannot be overstated", tier: 3, score: 3 },
-  { term: "navigate the complexities", tier: 3, score: 4 },
-  { term: "unlock the potential", tier: 3, score: 4 },
-  { term: "a testament to", tier: 3, score: 3 },
-  { term: "treasure trove of", tier: 3, score: 3 },
-  { term: "game changer", tier: 3, score: 3 },
-  { term: "ever-evolving landscape", tier: 3, score: 4 },
-  { term: "look no further", tier: 3, score: 4 },
-  { term: "hustle and bustle", tier: 3, score: 3 },
-];
-
-const TIER_4: VocabEntry[] = [
-  { term: "I'd be happy to", tier: 4, score: 2 },
-  { term: "Great question!", tier: 4, score: 2 },
-  { term: "Absolutely!", tier: 4, score: 2 },
-  { term: "That's a wonderful point", tier: 4, score: 2 },
-  { term: "I'm glad you asked", tier: 4, score: 2 },
-  { term: "You're absolutely right", tier: 4, score: 2 },
-];
-
-const ALL_VOCAB = [...TIER_1, ...TIER_2, ...TIER_3, ...TIER_4];
+/** Build flat list with tier annotation. */
+function allVocab(): Array<VocabEntry & { tier: 1 | 2 | 3 | 4 }> {
+  return [
+    ...vocabulary.tier1.map((e) => ({ ...e, tier: 1 as const })),
+    ...vocabulary.tier2.map((e) => ({ ...e, tier: 2 as const })),
+    ...vocabulary.tier3.map((e) => ({ ...e, tier: 3 as const })),
+    ...vocabulary.tier4.map((e) => ({ ...e, tier: 4 as const })),
+  ];
+}
 
 interface VocabHit {
   term: string;
@@ -111,10 +68,7 @@ interface VocabResult {
 
 function rate(normalizedScore: number): Pick<VocabResult, "rating" | "recommendation"> {
   if (normalizedScore <= 1.0) {
-    return {
-      rating: "clean",
-      recommendation: "No action needed — vocabulary is clean.",
-    };
+    return { rating: "clean", recommendation: "No action needed — vocabulary is clean." };
   }
   if (normalizedScore <= 2.5) {
     return {
@@ -139,6 +93,11 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/** Read a file as UTF-8 string. */
+function readFile(path: string): string {
+  return readFileSync(path, "utf-8");
+}
+
 /** Scan a single file for vocabulary markers. */
 function scanFile(filePath: string): VocabResult {
   const content = readFile(filePath);
@@ -148,7 +107,7 @@ function scanFile(filePath: string): VocabResult {
   const hits: VocabHit[] = [];
   let totalScore = 0;
 
-  for (const entry of ALL_VOCAB) {
+  for (const entry of allVocab()) {
     const pattern = escapeRegex(entry.term.toLowerCase());
     const re = new RegExp(pattern, "gi");
     const matches = [...lowerContent.matchAll(re)];
@@ -164,13 +123,7 @@ function scanFile(filePath: string): VocabResult {
     const end = Math.min(content.length, idx + entry.term.length + 30);
     const context = content.slice(start, end).replace(/\n/g, " ").trim();
 
-    hits.push({
-      term: entry.term,
-      tier: entry.tier,
-      score: entry.score,
-      count,
-      context,
-    });
+    hits.push({ term: entry.term, tier: entry.tier, score: entry.score, count, context });
   }
 
   hits.sort((a, b) => b.count * b.score - a.count * a.score);
@@ -198,7 +151,7 @@ function scanFile(filePath: string): VocabResult {
 // --- CLI ---
 const files = process.argv.slice(2);
 if (files.length === 0) {
-  console.error("Usage: pnpm exec jiti scripts/slop-scan-vocab.ts <file> [<file>...]");
+  process.stderr.write("Usage: pnpm exec jiti scripts/slop-scan-vocab.ts <file> [<file>...]\n");
   process.exit(1);
 }
 

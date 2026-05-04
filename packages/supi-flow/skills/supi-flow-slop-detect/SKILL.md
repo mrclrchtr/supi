@@ -1,6 +1,6 @@
 ---
 name: supi-flow-slop-detect
-description: Detect and fix AI-generated prose markers in documentation. Load on demand during /supi-flow-archive when updating docs.
+description: Detect and fix AI-generated prose markers ("slop") in documentation. Use this whenever the user wants to check, review, or improve docs for AI-sounding language — slop detection, prose quality, writing review, AI text cleanup, documentation polish. Automatically loaded during /supi-flow-archive when updating docs.
 ---
 
 # Slop Detection
@@ -130,6 +130,8 @@ Check: if >70% of sentences fall in 15-25 word range → strong AI signal. Vary 
 
 AI produces "blocky" text with uniform paragraph lengths. If most paragraphs cluster around the same word count (e.g., 40-60 words each) → flag. Break symmetry: vary paragraph length, use single-sentence paragraphs for emphasis.
 
+_Detected by `scripts/slop-scan-structural.ts` as `paragraphUniformity` score (threshold: > 0.7)._
+
 ### Bullet-to-prose ratio
 
 | Ratio | Signal |
@@ -141,7 +143,7 @@ AI produces "blocky" text with uniform paragraph lengths. If most paragraphs clu
 
 Emoji-led bullets (e.g., `✅`, `❌`, `🔴`) in technical documentation are a strong AI tell.
 
-### Five-paragraph essay structure
+### Intro-body-conclusion structure
 
 AI defaults to: intro paragraph + three body sections + conclusion that restates intro. Check for:
 1. Opening paragraph that restates the question
@@ -149,6 +151,8 @@ AI defaults to: intro paragraph + three body sections + conclusion that restates
 3. Closing paragraph that summarizes without adding new information
 
 If detected: cut the intro and conclusion. Start at the first paragraph with actual content.
+
+_Detected by `scripts/slop-scan-structural.ts` as `introBodyConclusion`._
 
 ### Participial phrase tail-loading
 
@@ -242,10 +246,10 @@ structural_score:
   +2 if em_dash_density > 5
   +2 if sentence_cluster_ratio > 0.7
   +2 if bullet_ratio > 0.5
-  +2 if paragraph_uniformity detected
-  +3 if emoji_bullets present
-  +2 if participial_tail_count > 3 in 500 words
-  +2 if 5-paragraph-essay structure detected
+  +2 if paragraph_uniformity > 0.7
+  +1 if emoji_bullets present
+  +2 if participial_tail_count > 3 per 500 words
+  +2 if intro-body-conclusion structure detected
   +1 if correlative_pairs > 2
   +1 if arrow_connectors > 0
   +1 if plus_conjunctions > 1
@@ -334,9 +338,11 @@ pnpm exec jiti scripts/slop-scan-structural.ts README.md
 ```
 skills/supi-flow-slop-detect/
 ├── SKILL.md
+├── references/
+│   └── vocabulary.json         # Single source of truth for vocabulary markers
 └── scripts/
     ├── slop-helpers.ts          # Shared detection utilities
-    ├── slop-scan-vocab.ts       # Vocabulary marker detection
+    ├── slop-scan-vocab.ts       # Vocabulary marker detection (reads vocabulary.json)
     ├── slop-scan-structural.ts  # Structural pattern detection
     └── slop-scan.ts             # Combined scanner + density scoring
 ```

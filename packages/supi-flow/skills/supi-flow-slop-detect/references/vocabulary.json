@@ -1,0 +1,161 @@
+{
+  "tier1": [
+    {
+      "term": "delve",
+      "score": 3,
+      "context": "\"delve into\"",
+      "replacement": "explore, examine, look at"
+    },
+    {
+      "term": "tapestry",
+      "score": 3,
+      "context": "\"rich tapestry\"",
+      "replacement": "mix, combination, variety"
+    },
+    {
+      "term": "realm",
+      "score": 3,
+      "context": "\"in the realm of\"",
+      "replacement": "in, within, regarding"
+    },
+    {
+      "term": "embark",
+      "score": 3,
+      "context": "\"embark on a journey\"",
+      "replacement": "start, begin"
+    },
+    { "term": "beacon", "score": 3, "context": "\"a beacon of\"", "replacement": "example, model" },
+    {
+      "term": "spearheaded",
+      "score": 3,
+      "context": "formal attribution",
+      "replacement": "led, started"
+    },
+    { "term": "leverage", "score": 3, "context": "business jargon", "replacement": "use, apply" },
+    {
+      "term": "robust",
+      "score": 3,
+      "context": "quality signal",
+      "replacement": "solid, strong, reliable"
+    },
+    {
+      "term": "seamless",
+      "score": 3,
+      "context": "integration claim",
+      "replacement": "smooth, easy, simple"
+    },
+    {
+      "term": "pivotal",
+      "score": 3,
+      "context": "importance marker",
+      "replacement": "key, important"
+    },
+    {
+      "term": "multifaceted",
+      "score": 3,
+      "context": "complexity signal",
+      "replacement": "complex, varied"
+    },
+    {
+      "term": "comprehensive",
+      "score": 3,
+      "context": "scope claim",
+      "replacement": "thorough, complete"
+    },
+    {
+      "term": "nuanced",
+      "score": 3,
+      "context": "sophistication signal",
+      "replacement": "subtle, detailed"
+    },
+    {
+      "term": "meticulous",
+      "score": 3,
+      "context": "care signal",
+      "replacement": "careful, detailed"
+    },
+    {
+      "term": "intricate",
+      "score": 3,
+      "context": "complexity marker",
+      "replacement": "detailed, complex"
+    },
+    {
+      "term": "showcasing",
+      "score": 3,
+      "context": "display verb",
+      "replacement": "showing, displaying"
+    },
+    {
+      "term": "streamline",
+      "score": 3,
+      "context": "optimization verb",
+      "replacement": "simplify, improve"
+    },
+    {
+      "term": "facilitate",
+      "score": 3,
+      "context": "enablement verb",
+      "replacement": "enable, help, allow"
+    },
+    { "term": "utilize", "score": 3, "context": "formal \"use\"", "replacement": "use" }
+  ],
+  "tier2": [
+    { "term": "moreover", "score": 2, "category": "Transition overuse" },
+    { "term": "furthermore", "score": 2, "category": "Transition overuse" },
+    { "term": "indeed", "score": 2, "category": "Transition overuse" },
+    { "term": "notably", "score": 2, "category": "Transition overuse" },
+    { "term": "subsequently", "score": 2, "category": "Transition overuse" },
+    { "term": "significantly", "score": 2, "category": "Intensity clustering" },
+    { "term": "substantially", "score": 2, "category": "Intensity clustering" },
+    { "term": "fundamentally", "score": 2, "category": "Intensity clustering" },
+    { "term": "profoundly", "score": 2, "category": "Intensity clustering" },
+    { "term": "potentially", "score": 2, "category": "Hedging stacks" },
+    { "term": "typically", "score": 2, "category": "Hedging stacks" },
+    { "term": "might", "score": 2, "category": "Hedging stacks" },
+    { "term": "perhaps", "score": 2, "category": "Hedging stacks" },
+    { "term": "revolutionize", "score": 2, "category": "Action inflation" },
+    { "term": "transform", "score": 2, "category": "Action inflation" },
+    { "term": "unlock", "score": 2, "category": "Action inflation" },
+    { "term": "unleash", "score": 2, "category": "Action inflation" },
+    { "term": "elevate", "score": 2, "category": "Action inflation" },
+    { "term": "crucial", "score": 2, "category": "Empty emphasis" },
+    { "term": "vital", "score": 2, "category": "Empty emphasis" },
+    { "term": "essential", "score": 2, "category": "Empty emphasis" },
+    { "term": "paramount", "score": 2, "category": "Empty emphasis" }
+  ],
+  "tier3": [
+    {
+      "term": "in today's fast-paced world",
+      "score": 4,
+      "replacement": "Delete — start with the point"
+    },
+    {
+      "term": "it's worth noting that",
+      "score": 3,
+      "replacement": "Delete — just state the thing"
+    },
+    { "term": "at its core", "score": 2, "replacement": "\"Fundamentally\" or delete" },
+    {
+      "term": "cannot be overstated",
+      "score": 3,
+      "replacement": "\"is important because [reason]\""
+    },
+    { "term": "navigate the complexities", "score": 4, "replacement": "handle, work through" },
+    { "term": "unlock the potential", "score": 4, "replacement": "enable, make possible" },
+    { "term": "a testament to", "score": 3, "replacement": "shows, demonstrates" },
+    { "term": "treasure trove of", "score": 3, "replacement": "collection, set" },
+    { "term": "game changer", "score": 3, "replacement": "Delete — be specific" },
+    { "term": "ever-evolving landscape", "score": 4, "replacement": "Delete — be specific" },
+    { "term": "look no further", "score": 4, "replacement": "Delete — state the answer" },
+    { "term": "hustle and bustle", "score": 3, "replacement": "Delete — filler" }
+  ],
+  "tier4": [
+    { "term": "I'd be happy to", "score": 2, "issue": "Servile opener" },
+    { "term": "Great question!", "score": 2, "issue": "Empty validation" },
+    { "term": "Absolutely!", "score": 2, "issue": "Over-agreement" },
+    { "term": "That's a wonderful point", "score": 2, "issue": "Flattery" },
+    { "term": "I'm glad you asked", "score": 2, "issue": "Filler" },
+    { "term": "You're absolutely right", "score": 2, "issue": "Sycophancy" }
+  ]
+}

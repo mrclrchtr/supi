@@ -32,6 +32,7 @@ interface StructuralResult {
     emDashDensity: number;
     bulletRatio: number;
     participialTails: number;
+    participialTailsPer500: number;
     arrowConnectors: number;
     correlativePairs: number;
     plusSigns: number;
@@ -40,8 +41,9 @@ interface StructuralResult {
     sentenceClusterRatio: number;
     fromToRanges: number;
     emojiBullets: number;
-    fiveParagraphEssay: boolean;
+    introBodyConclusion: boolean;
     conclusionMirroring: boolean;
+    paragraphUniformity: number;
   };
   structuralScore: number;
   flags: string[];
@@ -61,14 +63,8 @@ interface CombinedReport {
 
 /** Get the directory of the currently running script. */
 function scriptDir(): string {
-  // jiti (CJS polyfill) provides __dirname; fallback to import.meta.url for ESM
-  try {
-    // @ts-expect-error - __dirname available in jiti CJS mode
-    return __dirname.replace(/\\+$/, "") + "/";
-  } catch {
-    const url = new URL(".", import.meta.url);
-    return url.pathname.replace(/\\+$/, "") + "/";
-  }
+  const dir = (typeof __dirname !== "undefined" ? __dirname : "").replace(/\\+$/, "");
+  return `${dir}/`;
 }
 
 function siblingPath(name: string): string {
@@ -182,14 +178,15 @@ if (jsonOnly) {
     console.log(`    Em dash density:        ${m.emDashDensity.toFixed(1)}/1000 words`);
     console.log(`    Sentence clustering:    ${(m.sentenceClusterRatio * 100).toFixed(0)}%`);
     console.log(`    Bullet ratio:           ${(m.bulletRatio * 100).toFixed(0)}%`);
-    console.log(`    Participial tails:      ${m.participialTails}`);
+    console.log(`    Paragraph uniformity:   ${(m.paragraphUniformity * 100).toFixed(0)}%`);
+    console.log(`    Participial tails:      ${m.participialTailsPer500.toFixed(1)}/500 words`);
     console.log(`    Correlative pairs:      ${m.correlativePairs}`);
     console.log(`    Arrow connectors:       ${m.arrowConnectors}`);
     console.log(`    Plus-sign conjunctions: ${m.plusSigns}`);
     console.log(`    Emoji bullets:          ${m.emojiBullets}`);
     console.log(`    Colons vs semicolons:   ${m.colons} / ${m.semicolons}`);
     console.log(`    From→To ranges:         ${m.fromToRanges}`);
-    console.log(`    Five-paragraph essay:   ${m.fiveParagraphEssay}`);
+    console.log(`    Intro-body-conclusion:  ${m.introBodyConclusion}`);
     console.log(`    Conclusion mirroring:   ${m.conclusionMirroring}`);
     console.log("───");
     console.log();

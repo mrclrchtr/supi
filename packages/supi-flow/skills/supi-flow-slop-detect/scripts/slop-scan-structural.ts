@@ -21,10 +21,11 @@ import {
   countPlusSigns,
   countSemicolons,
   countWords,
-  detectFiveParagraphEssay,
+  detectIntroBodyConclusion,
   getFirstAndLastParagraph,
   isNearParaphrase,
   outputJSON,
+  paragraphUniformity,
   readFile,
   sentenceLengthClustering,
   stripCodeBlocks,
@@ -34,6 +35,8 @@ interface StructuralMetrics {
   emDashDensity: number;
   bulletRatio: number;
   participialTails: number;
+  /** Normalized participial tails per 500 words. */
+  participialTailsPer500: number;
   arrowConnectors: number;
   correlativePairs: number;
   plusSigns: number;
@@ -42,8 +45,10 @@ interface StructuralMetrics {
   sentenceClusterRatio: number;
   fromToRanges: number;
   emojiBullets: number;
-  fiveParagraphEssay: boolean;
+  introBodyConclusion: boolean;
   conclusionMirroring: boolean;
+  /** Paragraph uniformity score (0-1), higher = more uniform (more AI-like). */
+  paragraphUniformity: number;
 }
 
 interface StructuralResult {
@@ -59,9 +64,10 @@ function computeStructuralScore(metrics: StructuralMetrics): number {
   if (metrics.emDashDensity > 5) score += 2;
   if (metrics.sentenceClusterRatio > 0.7) score += 2;
   if (metrics.bulletRatio > 0.5) score += 2;
-  if (metrics.emojiBullets > 0) score += 3;
-  if (metrics.participialTails > 3) score += 2;
-  if (metrics.fiveParagraphEssay) score += 2;
+  if (metrics.paragraphUniformity > 0.7) score += 2;
+  if (metrics.emojiBullets > 0) score += 1;
+  if (metrics.participialTailsPer500 > 3) score += 2;
+  if (metrics.introBodyConclusion) score += 2;
   if (metrics.correlativePairs > 2) score += 1;
   if (metrics.arrowConnectors > 0) score += 1;
   if (metrics.plusSigns > 1) score += 1;
@@ -95,18 +101,24 @@ function genFlags(metrics: StructuralMetrics): string[] {
     );
   }
 
+  if (metrics.paragraphUniformity > 0.7) {
+    flags.push(
+      `Paragraph uniformity ${(metrics.paragraphUniformity * 100).toFixed(0)}% (threshold: 70%) — vary paragraph length`,
+    );
+  }
+
   if (metrics.emojiBullets > 0) {
     flags.push(`Emoji-led bullets: ${metrics.emojiBullets} — strong AI tell in technical docs`);
   }
 
-  if (metrics.participialTails > 3) {
+  if (metrics.participialTailsPer500 > 3) {
     flags.push(
-      `Participial phrase tails: ${metrics.participialTails} (threshold: 3) — split or restructure`,
+      `Participial phrase tails: ${metrics.participialTailsPer500.toFixed(1)}/500 words (threshold: 3) — split or restructure`,
     );
   }
 
-  if (metrics.fiveParagraphEssay) {
-    flags.push("Five-paragraph essay structure — cut the intro and start with content");
+  if (metrics.introBodyConclusion) {
+    flags.push("Intro-body-conclusion structure — cut the intro and start with content");
   }
 
   if (metrics.correlativePairs > 2) {
@@ -141,11 +153,14 @@ function scanFile(filePath: string): StructuralResult {
 
   const emDashCount = countEmDashes(prose);
   const emDashDensity = wordCount > 0 ? (emDashCount / wordCount) * 1000 : 0;
+  const rawTails = countParticipialTails(prose);
+  const tailsPer500 = wordCount > 0 ? (rawTails / wordCount) * 500 : 0;
 
   const metrics: StructuralMetrics = {
     emDashDensity: Math.round(emDashDensity * 100) / 100,
     bulletRatio: Math.round(computeBulletRatio(content) * 100) / 100,
-    participialTails: countParticipialTails(prose),
+    participialTails: rawTails,
+    participialTailsPer500: Math.round(tailsPer500 * 10) / 10,
     arrowConnectors: countArrowConnectors(content),
     correlativePairs: countCorrelativePairs(prose),
     plusSigns: countPlusSigns(content),
@@ -154,8 +169,9 @@ function scanFile(filePath: string): StructuralResult {
     sentenceClusterRatio: Math.round(sentenceLengthClustering(prose) * 100) / 100,
     fromToRanges: countFromToRanges(prose),
     emojiBullets: countEmojiBullets(content),
-    fiveParagraphEssay: detectFiveParagraphEssay(content),
+    introBodyConclusion: detectIntroBodyConclusion(content),
     conclusionMirroring: isNearParaphrase(...getFirstAndLastParagraph(content)),
+    paragraphUniformity: paragraphUniformity(content),
   };
 
   return {
@@ -170,7 +186,9 @@ function scanFile(filePath: string): StructuralResult {
 // --- CLI ---
 const files = process.argv.slice(2);
 if (files.length === 0) {
-  console.error("Usage: pnpm exec jiti scripts/slop-scan-structural.ts <file> [<file>...]");
+  process.stderr.write(
+    "Usage: pnpm exec jiti scripts/slop-scan-structural.ts <file> [<file>...]\n",
+  );
   process.exit(1);
 }
 
