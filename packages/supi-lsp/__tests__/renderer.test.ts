@@ -68,7 +68,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   },
 }));
 
-vi.mock("../src/manager.ts", () => ({
+vi.mock("../src/manager/manager.ts", () => ({
   LspManager: mockFns.LspManager,
 }));
 
@@ -105,7 +105,7 @@ vi.mock("../src/tree-persist.ts", () => ({
   registerTreePersistHandlers: vi.fn(),
 }));
 
-vi.mock("../src/manager-types.ts", () => ({}));
+vi.mock("../src/manager/manager-types.ts", () => ({}));
 
 import lspExtension from "../src/lsp.ts";
 

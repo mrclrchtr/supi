@@ -3,9 +3,9 @@
 // dispatch logic can be read without scrolling past a wall of theme strings.
 
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
-import { decorateOption, formatReviewLines, NOTE_MARKER } from "./format.ts";
-import type { NormalizedStructuredQuestion } from "./types.ts";
-import { inlineStructuredRowLines, structuredRowLabel } from "./ui-rich-inline.ts";
+import { decorateOption, formatReviewLines, NOTE_MARKER } from "../format.ts";
+import type { NormalizedStructuredQuestion } from "../types.ts";
+import { inlineStructuredRowLines, structuredRowLabel } from "../ui/ui-rich-inline.ts";
 import {
   editorCaption,
   padRight,
@@ -22,7 +22,7 @@ import {
   type InteractiveRow,
   interactiveRows,
   selectedIndexesForQuestion,
-} from "./ui-rich-state.ts";
+} from "../ui/ui-rich-state.ts";
 
 export function renderOverlay(env: RenderEnv): string[] {
   const lines: string[] = [];

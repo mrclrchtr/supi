@@ -2,8 +2,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { LspClient } from "./client.ts";
-import { formatDiagnostics } from "./diagnostics.ts";
+import type { LspClient } from "./client/client.ts";
+import { formatDiagnostics } from "./diagnostics/diagnostics.ts";
 import {
   formatCodeActions,
   formatDocumentSymbols,
@@ -15,7 +15,7 @@ import {
   formatWorkspaceSymbols,
   normalizeLocations,
 } from "./format.ts";
-import type { LspManager } from "./manager.ts";
+import type { LspManager } from "./manager/manager.ts";
 import { fallbackGrep } from "./search-fallback.ts";
 import type { DocumentSymbol, Range, SymbolInformation } from "./types.ts";
 import { uriToFile } from "./utils.ts";

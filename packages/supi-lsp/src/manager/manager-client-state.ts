@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import type { LspClient } from "./client.ts";
+import type { LspClient } from "../client/client.ts";
 
 export function closeFileAcrossClients(clients: Iterable<LspClient>, filePath: string): void {
   const resolvedPath = path.resolve(filePath);

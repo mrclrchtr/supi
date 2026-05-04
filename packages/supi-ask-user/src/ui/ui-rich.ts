@@ -4,10 +4,10 @@
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { type Component, Editor, type EditorTheme, type TUI } from "@mariozechner/pi-tui";
-import { QuestionnaireFlow } from "./flow.ts";
-import type { NormalizedQuestionnaire, QuestionnaireOutcome } from "./types.ts";
+import { QuestionnaireFlow } from "../flow.ts";
+import type { NormalizedQuestionnaire, QuestionnaireOutcome } from "../types.ts";
 import { handleOverlayInput, onEditorSubmit } from "./ui-rich-handlers.ts";
-import { renderOverlay } from "./ui-rich-render.ts";
+import { renderOverlay } from "../render/ui-rich-render.ts";
 import { initialSubMode, type OverlayState, selectedRowIndex } from "./ui-rich-state.ts";
 
 export interface RichCustomOptions {

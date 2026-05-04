@@ -2,7 +2,7 @@
 // Extracted from lsp.ts to keep file sizes within Biome limits.
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import type { LspManager } from "./manager.ts";
+import type { LspManager } from "./manager/manager.ts";
 import { introspectCapabilities } from "./scanner.ts";
 import { clearSessionLspService } from "./service-registry.ts";
 import type { DetectedProjectServer, ProjectServerInfo } from "./types.ts";

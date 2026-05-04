@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LspManager } from "../src/manager.ts";
+import type { LspManager } from "../src/manager/manager.ts";
 import { executeAction } from "../src/tool-actions.ts";
 
 describe("workspace_symbol action", () => {

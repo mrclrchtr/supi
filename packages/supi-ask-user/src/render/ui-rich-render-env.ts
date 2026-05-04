@@ -3,7 +3,7 @@
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import type { Editor } from "@mariozechner/pi-tui";
-import type { QuestionnaireFlow } from "./flow.ts";
+import type { QuestionnaireFlow } from "../flow.ts";
 import type { OverlayRenderState } from "./ui-rich-render-types.ts";
 
 export interface RenderEnv {

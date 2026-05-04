@@ -2,14 +2,14 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as projectRoots from "@mrclrchtr/supi-core";
-import { LspClient } from "./client.ts";
-import { getServerForFile } from "./config.ts";
+import { LspClient } from "../client/client.ts";
+import { getServerForFile } from "../config.ts";
 import {
   accumulateOutstandingDiagnostics,
   collectDiagnosticSummaryCounts,
   createOutstandingDiagnosticSummary,
   relativeFilePathFromUri,
-} from "./diagnostic-summary.ts";
+} from "../diagnostics/diagnostic-summary.ts";
 import {
   closeFileAcrossClients,
   pruneMissingFilesFromClients,
@@ -31,9 +31,9 @@ import {
   isPathRelevant,
   normalizeRelevantPaths,
   shouldIgnoreLspPath,
-} from "./summary.ts";
-import type { DetectedProjectServer, Diagnostic, LspConfig, ProjectServerInfo } from "./types.ts";
-import { commandExists } from "./utils.ts";
+} from "../summary.ts";
+import type { DetectedProjectServer, Diagnostic, LspConfig, ProjectServerInfo } from "../types.ts";
+import { commandExists } from "../utils.ts";
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */

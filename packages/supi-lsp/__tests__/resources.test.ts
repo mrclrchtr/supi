@@ -65,7 +65,7 @@ vi.mock("../src/settings-registration.ts", () => ({
   getLspDisabledMessage: vi.fn(() => "LSP is disabled in settings"),
   registerLspSettings: vi.fn(),
 }));
-vi.mock("../src/manager.ts", () => ({ LspManager: vi.fn() }));
+vi.mock("../src/manager/manager.ts", () => ({ LspManager: vi.fn() }));
 
 import lspExtension from "../src/lsp.ts";
 

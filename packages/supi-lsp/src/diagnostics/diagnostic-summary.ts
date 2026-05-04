@@ -1,6 +1,6 @@
-import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
-import { displayRelativeFilePath, shouldIgnoreLspPath } from "./summary.ts";
-import { type Diagnostic, DiagnosticSeverity } from "./types.ts";
+import type { OutstandingDiagnosticSummaryEntry } from "../manager/manager-types.ts";
+import { displayRelativeFilePath, shouldIgnoreLspPath } from "../summary.ts";
+import { type Diagnostic, DiagnosticSeverity } from "../types.ts";
 
 export function collectDiagnosticSummaryCounts(
   fileDiags: Map<string, { errors: number; warnings: number }>,

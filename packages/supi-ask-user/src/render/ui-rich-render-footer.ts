@@ -1,10 +1,10 @@
 // Footer help text generation for the rich overlay questionnaire UI.
 // Extracted from ui-rich-render.ts to stay within Biome's per-file line limit.
 
-import type { QuestionnaireFlow } from "./flow.ts";
+import type { QuestionnaireFlow } from "../flow.ts";
 import { currentNote, currentRowSupportsNotes } from "./ui-rich-render-notes.ts";
 import type { OverlayRenderState } from "./ui-rich-render-types.ts";
-import { isEditorMode, selectedIndexesForQuestion } from "./ui-rich-state.ts";
+import { isEditorMode, selectedIndexesForQuestion } from "../ui/ui-rich-state.ts";
 
 export function footerHelp(flow: QuestionnaireFlow, state: OverlayRenderState): string {
   if (state.subMode === "text-input") {

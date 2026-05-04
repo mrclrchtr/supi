@@ -6,7 +6,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadConfig } from "../src/config.ts";
-import { LspManager } from "../src/manager.ts";
+import { LspManager } from "../src/manager/manager.ts";
 import type { Diagnostic } from "../src/types.ts";
 import { hasCommand, waitFor } from "./integration-utils.ts";
 

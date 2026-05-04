@@ -9,7 +9,7 @@ import type { BeforeAgentStartEventResult, ExtensionAPI } from "@mariozechner/pi
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import { Type } from "typebox";
 import { loadConfig, resolveLanguageAlias } from "./config.ts";
-import { formatDiagnosticsDisplayContent } from "./diagnostic-display.ts";
+import { formatDiagnosticsDisplayContent } from "./diagnostics/diagnostic-display.ts";
 import {
   buildProjectGuidelines,
   diagnosticsContextFingerprint,
@@ -27,7 +27,7 @@ import {
   refreshProjectServers,
   removeLspTool,
 } from "./lsp-state.ts";
-import { LspManager } from "./manager.ts";
+import { LspManager } from "./manager/manager.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
 import { registerLspMessageRenderer } from "./renderer.ts";
 import { scanMissingServers, scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
@@ -171,7 +171,7 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
 
 /** Build the `lsp-context` custom message used to surface outstanding diagnostics. */
 function buildDiagnosticResult(
-  diagnostics: import("./manager-types.ts").OutstandingDiagnosticSummaryEntry[],
+  diagnostics: import("./manager/manager-types.ts").OutstandingDiagnosticSummaryEntry[],
   detailed: { file: string; diagnostics: import("./types.ts").Diagnostic[] }[] | undefined,
   severity: number,
   token: string,

@@ -1,6 +1,6 @@
-import type { LspClient } from "./client.ts";
-import { displayRelativeFilePath } from "./summary.ts";
-import type { ProjectServerInfo } from "./types.ts";
+import type { LspClient } from "../client/client.ts";
+import { displayRelativeFilePath } from "../summary.ts";
+import type { ProjectServerInfo } from "../types.ts";
 
 interface ProjectServerInfoInput {
   serverName: string;

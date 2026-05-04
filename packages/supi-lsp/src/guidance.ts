@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
+import type { OutstandingDiagnosticSummaryEntry } from "./manager/manager-types.ts";
 import type { Diagnostic, ProjectServerInfo } from "./types.ts";
 
 export const lspPromptSnippet =

@@ -1,14 +1,14 @@
 // Shared state types and pure helpers for the rich overlay.
 
 import type { Editor } from "@mariozechner/pi-tui";
-import type { QuestionnaireFlow } from "./flow.ts";
+import type { QuestionnaireFlow } from "../flow.ts";
 import type {
   NormalizedQuestion,
   NormalizedStructuredQuestion,
   QuestionnaireOutcome,
-} from "./types.ts";
-import { isStructuredQuestion, primaryRecommendationIndex } from "./types.ts";
-import type { OverlayRenderState, SubMode } from "./ui-rich-render-types.ts";
+} from "../types.ts";
+import { isStructuredQuestion, primaryRecommendationIndex } from "../types.ts";
+import type { OverlayRenderState, SubMode } from "../render/ui-rich-render-types.ts";
 
 export interface NoteTargetSingle {
   mode: "single";

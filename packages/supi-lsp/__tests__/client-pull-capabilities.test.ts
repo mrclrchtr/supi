@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import { CLIENT_CAPABILITIES } from "../src/capabilities.ts";
-import { LspClient } from "../src/client.ts";
+import { LspClient } from "../src/client/client.ts";
 import type { ServerCapabilities } from "../src/types.ts";
 
 // biome-ignore lint/suspicious/noExplicitAny: accessing private members for testing

@@ -1,10 +1,10 @@
 // Note-related rendering helpers for the rich overlay.
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import type { QuestionnaireFlow } from "./flow.ts";
-import type { MultiSelection, NormalizedQuestion, NormalizedStructuredQuestion } from "./types.ts";
+import type { QuestionnaireFlow } from "../flow.ts";
+import type { MultiSelection, NormalizedQuestion, NormalizedStructuredQuestion } from "../types.ts";
 import type { OverlayRenderState } from "./ui-rich-render-types.ts";
-import { type InteractiveRow, interactiveRows } from "./ui-rich-state.ts";
+import { type InteractiveRow, interactiveRows } from "../ui/ui-rich-state.ts";
 
 export function currentNote(
   flow: Pick<QuestionnaireFlow, "getAnswer">,

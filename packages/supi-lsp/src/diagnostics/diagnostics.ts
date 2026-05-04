@@ -1,7 +1,7 @@
 // Diagnostic formatting and severity utilities.
 
 import * as path from "node:path";
-import type { Diagnostic } from "./types.ts";
+import type { Diagnostic } from "../types.ts";
 
 /** Map severity number to label. */
 export function severityLabel(severity: number | undefined): string {

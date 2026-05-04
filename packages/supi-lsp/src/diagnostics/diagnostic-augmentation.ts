@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import type { LspManager } from "./manager.ts";
-import type { Diagnostic, Hover, MarkedString, MarkupContent } from "./types.ts";
+import type { LspManager } from "../manager/manager.ts";
+import type { Diagnostic, Hover, MarkedString, MarkupContent } from "../types.ts";
 
 const AUGMENT_TIMEOUT_MS = 500;
 

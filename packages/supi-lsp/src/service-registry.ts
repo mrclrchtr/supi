@@ -3,7 +3,7 @@
 // to reuse the active LSP runtime without starting duplicate servers.
 
 import * as path from "node:path";
-import type { LspManager } from "./manager.ts";
+import type { LspManager } from "./manager/manager.ts";
 import type {
   Diagnostic,
   DocumentSymbol,
@@ -97,7 +97,7 @@ export class SessionLspService {
 
   getOutstandingDiagnosticSummary(
     maxSeverity: number = 1,
-  ): import("./manager-types.ts").OutstandingDiagnosticSummaryEntry[] {
+  ): import("./manager/manager-types.ts").OutstandingDiagnosticSummaryEntry[] {
     return this.manager.getOutstandingDiagnosticSummary(maxSeverity);
   }
 

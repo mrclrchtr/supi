@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LspClient } from "../src/client.ts";
-import type { LspManager } from "../src/manager.ts";
+import type { LspClient } from "../src/client/client.ts";
+import type { LspManager } from "../src/manager/manager.ts";
 import {
   clearSessionLspService,
   getSessionLspService,

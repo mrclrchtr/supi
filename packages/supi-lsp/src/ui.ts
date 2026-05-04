@@ -2,8 +2,8 @@ import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { DynamicBorder } from "@mariozechner/pi-coding-agent";
 import type { OverlayHandle } from "@mariozechner/pi-tui";
 import { Container, Spacer, Text } from "@mariozechner/pi-tui";
-import type { LspManager } from "./manager.ts";
-import type { OutstandingDiagnosticSummaryEntry } from "./manager-types.ts";
+import type { LspManager } from "./manager/manager.ts";
+import type { OutstandingDiagnosticSummaryEntry } from "./manager/manager-types.ts";
 import type { Diagnostic, ProjectServerInfo } from "./types.ts";
 import { DiagnosticSeverity } from "./types.ts";
 

@@ -6,7 +6,7 @@ import type {
   JsonRpcNotification,
   JsonRpcRequest,
   JsonRpcResponse,
-} from "./types.ts";
+} from "../types.ts";
 
 const CONTENT_LENGTH = "Content-Length: ";
 const HEADER_DELIMITER = "\r\n\r\n";

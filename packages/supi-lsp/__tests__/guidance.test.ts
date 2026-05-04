@@ -8,7 +8,7 @@ import {
   lspPromptGuidelines,
   lspPromptSnippet,
 } from "../src/guidance.ts";
-import { LspManager } from "../src/manager.ts";
+import { LspManager } from "../src/manager/manager.ts";
 import type { ProjectServerInfo } from "../src/types.ts";
 import { DiagnosticSeverity } from "../src/types.ts";
 

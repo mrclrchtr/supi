@@ -21,7 +21,7 @@ import { renderAskUserCall, renderAskUserResult } from "./render.ts";
 import { buildErrorResult, buildResult, type HybridResult } from "./result.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import type { NormalizedQuestionnaire } from "./types.ts";
-import { type RichUiHost, runRichQuestionnaire } from "./ui-rich.ts";
+import { type RichUiHost, runRichQuestionnaire } from "./ui/ui-rich.ts";
 
 const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 

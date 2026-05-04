@@ -1,8 +1,8 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createEditTool, createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
-import { augmentDiagnostics } from "./diagnostic-augmentation.ts";
-import { formatDiagnostics } from "./diagnostics.ts";
-import type { LspManager } from "./manager.ts";
+import { augmentDiagnostics } from "./diagnostics/diagnostic-augmentation.ts";
+import { formatDiagnostics } from "./diagnostics/diagnostics.ts";
+import type { LspManager } from "./manager/manager.ts";
 
 interface LspOverrideState {
   getInlineSeverity(): number;

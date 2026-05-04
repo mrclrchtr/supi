@@ -1,8 +1,8 @@
 // Input handlers for the rich overlay questionnaire UI.
 
 import { Key, matchesKey } from "@mariozechner/pi-tui";
-import type { NormalizedQuestion, NormalizedStructuredQuestion } from "./types.ts";
-import { currentNote, currentRowSupportsNotes } from "./ui-rich-render-notes.ts";
+import type { NormalizedQuestion, NormalizedStructuredQuestion } from "../types.ts";
+import { currentNote, currentRowSupportsNotes } from "../render/ui-rich-render-notes.ts";
 import {
   existingStructuredInputValue,
   interactiveRows,

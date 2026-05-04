@@ -4,7 +4,7 @@
 // biome-ignore lint/nursery/noExcessiveLinesPerFile: LspClient remains a cohesive stateful wrapper; refresh logic is already split out.
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { CLIENT_CAPABILITIES } from "./capabilities.ts";
+import { CLIENT_CAPABILITIES } from "../capabilities.ts";
 import { JsonRpcClient } from "./transport.ts";
 import type {
   CodeAction,
@@ -26,8 +26,8 @@ import type {
   VersionedTextDocumentIdentifier,
   WorkspaceEdit,
   WorkspaceSymbol,
-} from "./types.ts";
-import { detectLanguageId, fileToUri, uriToFile } from "./utils.ts";
+} from "../types.ts";
+import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
 const DIAGNOSTIC_WAIT_MS = 3_000;

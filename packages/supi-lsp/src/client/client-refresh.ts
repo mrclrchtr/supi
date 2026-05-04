@@ -4,8 +4,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { DiagnosticCacheEntry, LspClient } from "./client.ts";
 import type { JsonRpcClient } from "./transport.ts";
-import type { DocumentDiagnosticReport, TextDocumentIdentifier } from "./types.ts";
-import { uriToFile } from "./utils.ts";
+import type { DocumentDiagnosticReport, TextDocumentIdentifier } from "../types.ts";
+import { uriToFile } from "../utils.ts";
 
 interface ClientAccess {
   openDocs: Map<string, { version: number; languageId: string }>;

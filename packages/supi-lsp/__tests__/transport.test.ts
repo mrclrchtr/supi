@@ -1,6 +1,6 @@
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { JsonRpcClient } from "../src/transport.ts";
+import { JsonRpcClient } from "../src/client/transport.ts";
 
 function createPair() {
   const serverIn = new PassThrough(); // client writes here (server stdin)

@@ -47,7 +47,7 @@ vi.mock("../src/overrides.ts", () => ({
   registerLspAwareToolOverrides: mockFns.registerLspAwareToolOverrides,
 }));
 
-vi.mock("../src/manager.ts", () => ({ LspManager: mockFns.LspManager }));
+vi.mock("../src/manager/manager.ts", () => ({ LspManager: mockFns.LspManager }));
 
 vi.mock("../src/scanner.ts", () => ({
   introspectCapabilities: mockFns.introspectCapabilities,
@@ -67,13 +67,13 @@ vi.mock("../src/tool-actions.ts", () => ({
 }));
 
 vi.mock("../src/renderer.ts", () => ({ registerLspMessageRenderer: vi.fn() }));
-vi.mock("../src/diagnostic-display.ts", () => ({
+vi.mock("../src/diagnostics/diagnostic-display.ts", () => ({
   formatDiagnosticsDisplayContent: vi.fn(() => "display content"),
 }));
-vi.mock("../src/diagnostic-augmentation.ts", () => ({
+vi.mock("../src/diagnostics/diagnostic-augmentation.ts", () => ({
   registerDiagnosticAugmentation: vi.fn(),
 }));
-vi.mock("../src/diagnostic-summary.ts", () => ({
+vi.mock("../src/diagnostics/diagnostic-summary.ts", () => ({
   registerDiagnosticSummary: vi.fn(),
 }));
 
