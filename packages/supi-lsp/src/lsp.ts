@@ -117,6 +117,7 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
 
     clearSessionLspService(cwd);
     state.manager = new LspManager(config, cwd);
+    state.manager.setExcludePatterns(lspSettings.exclude ?? []);
     setSessionLspServiceState(cwd, { kind: "pending" });
     state.detectedServers = scanProjectCapabilities(config, cwd);
     state.manager.registerDetectedServers(state.detectedServers);

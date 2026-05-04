@@ -98,6 +98,7 @@ function createManager(diagnostics: Array<{ file: string; total: number }>, cwd 
     ),
     getOutstandingDiagnostics: vi.fn(() => []),
     registerDetectedServers: vi.fn(),
+    setExcludePatterns: vi.fn(),
   };
 }
 

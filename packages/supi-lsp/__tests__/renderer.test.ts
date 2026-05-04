@@ -129,6 +129,7 @@ function createManager(diagnostics: unknown[] = []) {
     pruneMissingFiles: vi.fn(),
     getOutstandingDiagnosticSummary: vi.fn(() => diagnostics),
     getOutstandingDiagnostics: vi.fn(() => []),
+    setExcludePatterns: vi.fn(),
   };
 }
 
