@@ -10,7 +10,9 @@ import {
 import { Type } from "typebox";
 import type { ReviewerInvocation, ReviewProgress } from "./runner-types.ts";
 import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "./types.ts";
+
 export type { ReviewerInvocation } from "./runner-types.ts";
+
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
 const GRACE_TURNS = 3;
 const STEER_MESSAGE = "Time limit reached. Wrap up and submit your review now.";
@@ -98,6 +100,7 @@ async function createReviewerSession(
     cwd,
     model,
     modelRegistry,
+    thinkingLevel: "off",
     tools: ["read", "grep", "find", "ls", "submit_review"],
     customTools: [submitReviewTool],
     resourceLoader,
