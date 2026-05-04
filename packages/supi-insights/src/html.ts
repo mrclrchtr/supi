@@ -1,5 +1,7 @@
 // HTML report renderer — generate a shareable HTML insights report.
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { AggregatedData, InsightResults } from "./types.ts";
 import {
   emptyHtml,
@@ -13,9 +15,14 @@ import {
   SATISFACTION_ORDER,
 } from "./utils.ts";
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: report rendering intentionally assembles many optional sections.
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: keeping the HTML template together preserves report structure readability.
-export function generateHtmlReport(data: AggregatedData, insights: InsightResults): string {
+const REPORT_CSS = readFileSync(join(__dirname, "report.css"), "utf-8");
+const REPORT_JS_TEMPLATE = readFileSync(join(__dirname, "report.js"), "utf-8");
+
+function generateReportJs(hourCountsJson: string): string {
+  return REPORT_JS_TEMPLATE.replace("__HOUR_COUNTS_JSON__", hourCountsJson);
+}
+
+function renderAtAGlanceHtml(insights: InsightResults): string {
   const atAGlance = insights.atAGlance as
     | {
         whatsWorking?: string;
@@ -25,8 +32,9 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
       }
     | undefined;
 
-  const atAGlanceHtml = atAGlance
-    ? `
+  if (!atAGlance) return "";
+
+  return `
     <div class="at-a-glance">
       <div class="glance-title">At a Glance</div>
       <div class="glance-sections">
@@ -36,18 +44,20 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         ${atAGlance.ambitiousWorkflows ? `<div class="glance-section"><strong>Ambitious workflows:</strong> ${escapeHtmlWithBold(atAGlance.ambitiousWorkflows)}</div>` : ""}
       </div>
     </div>
-    `
-    : "";
+    `;
+}
 
+function renderProjectAreasHtml(insights: InsightResults): string {
   const projectAreas =
     (
       insights.projectAreas as
         | { areas?: Array<{ name: string; sessionCount: number; description: string }> }
         | undefined
     )?.areas || [];
-  const projectAreasHtml =
-    projectAreas.length > 0
-      ? `
+
+  if (projectAreas.length === 0) return "";
+
+  return `
     <h2>What You Work On</h2>
     <div class="project-areas">
       ${projectAreas
@@ -64,28 +74,33 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         )
         .join("")}
     </div>
-    `
-      : "";
+    `;
+}
 
+function renderInteractionHtml(insights: InsightResults): string {
   const interactionStyle = insights.interactionStyle as
     | { narrative?: string; keyPattern?: string }
     | undefined;
-  const interactionHtml = interactionStyle?.narrative
-    ? `
+
+  if (!interactionStyle?.narrative) return "";
+
+  return `
     <h2>How You Use PI</h2>
     <div class="narrative">
       ${markdownToHtml(interactionStyle.narrative)}
       ${interactionStyle.keyPattern ? `<div class="key-insight"><strong>Key pattern:</strong> ${escapeXmlAttr(interactionStyle.keyPattern)}</div>` : ""}
     </div>
-    `
-    : "";
+    `;
+}
 
+function renderWhatWorksHtml(insights: InsightResults): string {
   const whatWorks = insights.whatWorks as
     | { intro?: string; impressiveWorkflows?: Array<{ title: string; description: string }> }
     | undefined;
-  const whatWorksHtml =
-    whatWorks?.impressiveWorkflows && whatWorks.impressiveWorkflows.length > 0
-      ? `
+
+  if (!whatWorks?.impressiveWorkflows?.length) return "";
+
+  return `
     <h2>Impressive Things You Did</h2>
     ${whatWorks.intro ? `<p class="section-intro">${escapeXmlAttr(whatWorks.intro)}</p>` : ""}
     <div class="big-wins">
@@ -100,18 +115,20 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         )
         .join("")}
     </div>
-    `
-      : "";
+    `;
+}
 
+function renderFrictionHtml(insights: InsightResults): string {
   const frictionAnalysis = insights.frictionAnalysis as
     | {
         intro?: string;
         categories?: Array<{ category: string; description: string; examples?: string[] }>;
       }
     | undefined;
-  const frictionHtml =
-    frictionAnalysis?.categories && frictionAnalysis.categories.length > 0
-      ? `
+
+  if (!frictionAnalysis?.categories?.length) return "";
+
+  return `
     <h2>Where Things Go Wrong</h2>
     ${frictionAnalysis.intro ? `<p class="section-intro">${escapeXmlAttr(frictionAnalysis.intro)}</p>` : ""}
     <div class="friction-categories">
@@ -127,9 +144,10 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         )
         .join("")}
     </div>
-    `
-      : "";
+    `;
+}
 
+function renderSuggestionsHtml(insights: InsightResults): string {
   const suggestions = insights.suggestions as
     | {
         claudeMdAdditions?: Array<{ addition: string; why: string; promptScaffold?: string }>;
@@ -148,10 +166,11 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
       }
     | undefined;
 
-  const suggestionsHtml = suggestions
-    ? `
+  if (!suggestions) return "";
+
+  return `
     ${
-      suggestions.claudeMdAdditions && suggestions.claudeMdAdditions.length > 0
+      suggestions.claudeMdAdditions?.length
         ? `
     <h2>Suggested CLAUDE.md Additions</h2>
     <div class="claude-md-section">
@@ -170,7 +189,7 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         : ""
     }
     ${
-      suggestions.featuresToTry && suggestions.featuresToTry.length > 0
+      suggestions.featuresToTry?.length
         ? `
     <h2>Features to Try</h2>
     <div class="features-section">
@@ -191,7 +210,7 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         : ""
     }
     ${
-      suggestions.usagePatterns && suggestions.usagePatterns.length > 0
+      suggestions.usagePatterns?.length
         ? `
     <h2>New Ways to Use PI</h2>
     <div class="patterns-section">
@@ -211,9 +230,10 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
     `
         : ""
     }
-    `
-    : "";
+    `;
+}
 
+function renderHorizonHtml(insights: InsightResults): string {
   const horizonData = insights.onTheHorizon as
     | {
         intro?: string;
@@ -225,9 +245,10 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         }>;
       }
     | undefined;
-  const horizonHtml =
-    horizonData?.opportunities && horizonData.opportunities.length > 0
-      ? `
+
+  if (!horizonData?.opportunities?.length) return "";
+
+  return `
     <h2>On the Horizon</h2>
     ${horizonData.intro ? `<p class="section-intro">${escapeXmlAttr(horizonData.intro)}</p>` : ""}
     <div class="horizon-section">
@@ -244,154 +265,24 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         )
         .join("")}
     </div>
-    `
-      : "";
+    `;
+}
 
+function renderFunEndingHtml(insights: InsightResults): string {
   const funEnding = insights.funEnding as { headline?: string; detail?: string } | undefined;
-  const funEndingHtml = funEnding?.headline
-    ? `
+
+  if (!funEnding?.headline) return "";
+
+  return `
     <div class="fun-ending">
       <div class="fun-headline">"${escapeXmlAttr(funEnding.headline)}"</div>
       ${funEnding.detail ? `<div class="fun-detail">${escapeXmlAttr(funEnding.detail)}</div>` : ""}
     </div>
-    `
-    : "";
+    `;
+}
 
-  const hourCountsJson = getHourCountsJson(data.messageHours);
-
-  const css = `
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f8fafc; color: #334155; line-height: 1.65; padding: 48px 24px; }
-    .container { max-width: 800px; margin: 0 auto; }
-    h1 { font-size: 32px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
-    h2 { font-size: 20px; font-weight: 600; color: #0f172a; margin-top: 48px; margin-bottom: 16px; }
-    .subtitle { color: #64748b; font-size: 15px; margin-bottom: 32px; }
-    .stats-row { display: flex; gap: 24px; margin-bottom: 40px; padding: 20px 0; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; }
-    .stat { text-align: center; }
-    .stat-value { font-size: 24px; font-weight: 700; color: #0f172a; }
-    .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; }
-    .at-a-glance { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #f59e0b; border-radius: 12px; padding: 20px 24px; margin-bottom: 32px; }
-    .glance-title { font-size: 16px; font-weight: 700; color: #92400e; margin-bottom: 16px; }
-    .glance-sections { display: flex; flex-direction: column; gap: 12px; }
-    .glance-section { font-size: 14px; color: #78350f; line-height: 1.6; }
-    .glance-section strong { color: #92400e; }
-    .project-areas { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-    .project-area { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
-    .area-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .area-name { font-weight: 600; font-size: 15px; color: #0f172a; }
-    .area-count { font-size: 12px; color: #64748b; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
-    .area-desc { font-size: 14px; color: #475569; line-height: 1.5; }
-    .narrative { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px; margin-bottom: 24px; }
-    .narrative p { margin-bottom: 12px; font-size: 14px; color: #475569; line-height: 1.7; }
-    .key-insight { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: 14px; color: #166534; }
-    .section-intro { font-size: 14px; color: #64748b; margin-bottom: 16px; }
-    .big-wins { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
-    .big-win { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; }
-    .big-win-title { font-weight: 600; font-size: 15px; color: #166534; margin-bottom: 8px; }
-    .big-win-desc { font-size: 14px; color: #15803d; line-height: 1.5; }
-    .friction-categories { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
-    .friction-category { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 16px; }
-    .friction-title { font-weight: 600; font-size: 15px; color: #991b1b; margin-bottom: 6px; }
-    .friction-desc { font-size: 13px; color: #7f1d1d; margin-bottom: 10px; }
-    .friction-examples { margin: 0 0 0 20px; font-size: 13px; color: #334155; }
-    .friction-examples li { margin-bottom: 4px; }
-    .claude-md-section { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-    .claude-md-item { padding: 10px 0; border-bottom: 1px solid #dbeafe; }
-    .claude-md-item:last-child { border-bottom: none; }
-    .cmd-code { background: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #1e40af; border: 1px solid #bfdbfe; font-family: monospace; display: block; white-space: pre-wrap; word-break: break-word; }
-    .cmd-why { font-size: 12px; color: #64748b; margin-top: 4px; }
-    .features-section, .patterns-section { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
-    .feature-card { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; }
-    .pattern-card { background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px; padding: 16px; }
-    .feature-title, .pattern-title { font-weight: 600; font-size: 15px; color: #0f172a; margin-bottom: 6px; }
-    .feature-oneliner { font-size: 14px; color: #475569; margin-bottom: 8px; }
-    .pattern-summary { font-size: 14px; color: #475569; margin-bottom: 8px; }
-    .feature-why, .pattern-detail { font-size: 13px; color: #334155; line-height: 1.5; }
-    .example-code, .copyable-prompt { display: block; background: #f1f5f9; padding: 8px 12px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #334155; margin-top: 8px; white-space: pre-wrap; }
-    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 24px 0; }
-    .chart-card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }
-    .chart-title { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-bottom: 12px; }
-    .bar-row { display: flex; align-items: center; margin-bottom: 6px; }
-    .bar-label { width: 120px; font-size: 11px; color: #475569; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .bar-track { flex: 1; height: 6px; background: #f1f5f9; border-radius: 3px; margin: 0 8px; }
-    .bar-fill { height: 100%; border-radius: 3px; }
-    .bar-value { width: 28px; font-size: 11px; font-weight: 500; color: #64748b; text-align: right; }
-    .empty { color: #94a3b8; font-size: 13px; }
-    .horizon-section { display: flex; flex-direction: column; gap: 16px; }
-    .horizon-card { background: linear-gradient(135deg, #faf5ff 0%, #f5f3ff 100%); border: 1px solid #c4b5fd; border-radius: 8px; padding: 16px; }
-    .horizon-title { font-weight: 600; font-size: 15px; color: #5b21b6; margin-bottom: 8px; }
-    .horizon-possible { font-size: 14px; color: #334155; margin-bottom: 10px; line-height: 1.5; }
-    .horizon-tip { font-size: 13px; color: #6b21a8; background: rgba(255,255,255,0.6); padding: 8px 12px; border-radius: 4px; }
-    .fun-ending { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px; padding: 24px; margin-top: 40px; text-align: center; }
-    .fun-headline { font-size: 18px; font-weight: 600; color: #78350f; margin-bottom: 8px; }
-    .fun-detail { font-size: 14px; color: #92400e; }
-    @media (max-width: 640px) { .charts-row { grid-template-columns: 1fr; } .stats-row { justify-content: center; } }
-  `;
-
-  const js = `
-    const rawHourCounts = ${hourCountsJson};
-    function updateHourHistogram(utcOffset) {
-      const periods = [
-        { label: "Morning (6-12)", range: [6,7,8,9,10,11] },
-        { label: "Afternoon (12-18)", range: [12,13,14,15,16,17] },
-        { label: "Evening (18-24)", range: [18,19,20,21,22,23] },
-        { label: "Night (0-6)", range: [0,1,2,3,4,5] }
-      ];
-      const adjustedCounts = {};
-      for (const [hour, count] of Object.entries(rawHourCounts)) {
-        const newHour = (parseInt(hour) + utcOffset + 24) % 24;
-        adjustedCounts[newHour] = (adjustedCounts[newHour] || 0) + count;
-      }
-      const periodCounts = periods.map(p => ({
-        label: p.label,
-        count: p.range.reduce((sum, h) => sum + (adjustedCounts[h] || 0), 0)
-      }));
-      const maxCount = Math.max(...periodCounts.map(p => p.count)) || 1;
-      const container = document.getElementById('hour-histogram');
-      if (!container) return;
-      container.innerHTML = periodCounts.map(p => \`
-        <div class="bar-row">
-          <div class="bar-label">\${p.label}</div>
-          <div class="bar-track"><div class="bar-fill" style="width:\${(p.count / maxCount) * 100}%;background:#8b5cf6"></div></div>
-          <div class="bar-value">\${p.count}</div>
-        </div>
-      \`).join('');
-    }
-    document.getElementById('timezone-select')?.addEventListener('change', function() {
-      updateHourHistogram(parseInt(this.value));
-    });
-  `;
-
-  const sessionLabel =
-    data.totalSessionsScanned && data.totalSessionsScanned > data.totalSessions
-      ? `${data.totalSessionsScanned.toLocaleString()} sessions total · ${data.totalSessions} analyzed`
-      : `${data.totalSessions} sessions`;
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>PI Insights</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>${css}</style>
-</head>
-<body>
-  <div class="container">
-    <h1>PI Insights</h1>
-    <p class="subtitle">${data.totalMessages.toLocaleString()} messages across ${sessionLabel} | ${data.dateRange.start} to ${data.dateRange.end}</p>
-
-    ${atAGlanceHtml}
-
-    <div class="stats-row">
-      <div class="stat"><div class="stat-value">${data.totalMessages.toLocaleString()}</div><div class="stat-label">Messages</div></div>
-      <div class="stat"><div class="stat-value">+${data.totalLinesAdded.toLocaleString()}/-${data.totalLinesRemoved.toLocaleString()}</div><div class="stat-label">Lines</div></div>
-      <div class="stat"><div class="stat-value">${data.totalFilesModified}</div><div class="stat-label">Files</div></div>
-      <div class="stat"><div class="stat-value">${data.daysActive}</div><div class="stat-label">Days</div></div>
-      <div class="stat"><div class="stat-value">${data.messagesPerDay}</div><div class="stat-label">Msgs/Day</div></div>
-    </div>
-
-    ${projectAreasHtml}
-
+function renderGoalToolChartRow(data: AggregatedData): string {
+  return `
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title">What You Wanted</div>
@@ -401,8 +292,11 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         <div class="chart-title">Top Tools Used</div>
         ${generateBarChartHtml(data.toolCounts, "#0891b2")}
       </div>
-    </div>
+    </div>`;
+}
 
+function renderLanguageSessionChartRow(data: AggregatedData): string {
+  return `
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title">Languages</div>
@@ -412,18 +306,22 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         <div class="chart-title">Session Types</div>
         ${generateBarChartHtml(data.sessionTypes || {}, "#8b5cf6")}
       </div>
-    </div>
+    </div>`;
+}
 
-    ${interactionHtml}
-
+function renderResponseTimeCard(data: AggregatedData): string {
+  return `
     <div class="chart-card" style="margin: 24px 0;">
       <div class="chart-title">User Response Time Distribution</div>
       ${generateResponseTimeHistogramHtml(data.userResponseTimes)}
       <div style="font-size: 12px; color: #64748b; margin-top: 8px;">
         Median: ${data.medianResponseTime.toFixed(1)}s · Average: ${data.avgResponseTime.toFixed(1)}s
       </div>
-    </div>
+    </div>`;
+}
 
+function renderMultiClaudingCard(data: AggregatedData): string {
+  return `
     <div class="chart-card" style="margin: 24px 0;">
       <div class="chart-title">Multi-PI (Parallel Sessions)</div>
       ${
@@ -436,8 +334,11 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         </div>
       `
       }
-    </div>
+    </div>`;
+}
 
+function renderTimeOfDayChartRow(data: AggregatedData): string {
+  return `
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title" style="display: flex; align-items: center; gap: 12px;">
@@ -456,10 +357,11 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         <div class="chart-title">Tool Errors Encountered</div>
         ${Object.keys(data.toolErrorCategories).length > 0 ? generateBarChartHtml(data.toolErrorCategories, "#dc2626") : emptyHtml("No tool errors")}
       </div>
-    </div>
+    </div>`;
+}
 
-    ${whatWorksHtml}
-
+function renderOutcomeChartRow(data: AggregatedData): string {
+  return `
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title">What Helped Most</div>
@@ -469,10 +371,11 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         <div class="chart-title">Outcomes</div>
         ${generateBarChartHtml(data.outcomes, "#8b5cf6", 6, OUTCOME_ORDER)}
       </div>
-    </div>
+    </div>`;
+}
 
-    ${frictionHtml}
-
+function renderFrictionChartRow(data: AggregatedData): string {
+  return `
     <div class="charts-row">
       <div class="chart-card">
         <div class="chart-title">Primary Friction Types</div>
@@ -482,13 +385,72 @@ export function generateHtmlReport(data: AggregatedData, insights: InsightResult
         <div class="chart-title">Inferred Satisfaction</div>
         ${generateBarChartHtml(data.satisfaction, "#eab308", 6, SATISFACTION_ORDER)}
       </div>
+    </div>`;
+}
+
+export function generateHtmlReport(data: AggregatedData, insights: InsightResults): string {
+  const atAGlanceHtml = renderAtAGlanceHtml(insights);
+  const projectAreasHtml = renderProjectAreasHtml(insights);
+  const interactionHtml = renderInteractionHtml(insights);
+  const whatWorksHtml = renderWhatWorksHtml(insights);
+  const frictionHtml = renderFrictionHtml(insights);
+  const suggestionsHtml = renderSuggestionsHtml(insights);
+  const horizonHtml = renderHorizonHtml(insights);
+  const funEndingHtml = renderFunEndingHtml(insights);
+  const hourCountsJson = getHourCountsJson(data.messageHours);
+
+  const sessionLabel =
+    data.totalSessionsScanned && data.totalSessionsScanned > data.totalSessions
+      ? `${data.totalSessionsScanned.toLocaleString()} sessions total \u00b7 ${data.totalSessions} analyzed`
+      : `${data.totalSessions} sessions`;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PI Insights</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>${REPORT_CSS}</style>
+</head>
+<body>
+  <div class="container">
+    <h1>PI Insights</h1>
+    <p class="subtitle">${data.totalMessages.toLocaleString()} messages across ${sessionLabel} | ${data.dateRange.start} to ${data.dateRange.end}</p>
+
+    ${atAGlanceHtml}
+
+    <div class="stats-row">
+      <div class="stat"><div class="stat-value">${data.totalMessages.toLocaleString()}</div><div class="stat-label">Messages</div></div>
+      <div class="stat"><div class="stat-value">+${data.totalLinesAdded.toLocaleString()}/-${data.totalLinesRemoved.toLocaleString()}</div><div class="stat-label">Lines</div></div>
+      <div class="stat"><div class="stat-value">${data.totalFilesModified}</div><div class="stat-label">Files</div></div>
+      <div class="stat"><div class="stat-value">${data.daysActive}</div><div class="stat-label">Days</div></div>
+      <div class="stat"><div class="stat-value">${data.messagesPerDay}</div><div class="stat-label">Msgs/Day</div></div>
     </div>
+
+    ${projectAreasHtml}
+
+    ${renderGoalToolChartRow(data)}
+    ${renderLanguageSessionChartRow(data)}
+
+    ${interactionHtml}
+
+    ${renderResponseTimeCard(data)}
+    ${renderMultiClaudingCard(data)}
+    ${renderTimeOfDayChartRow(data)}
+
+    ${whatWorksHtml}
+
+    ${renderOutcomeChartRow(data)}
+
+    ${frictionHtml}
+
+    ${renderFrictionChartRow(data)}
 
     ${suggestionsHtml}
     ${horizonHtml}
     ${funEndingHtml}
   </div>
-  <script>${js}</script>
+  <script>${generateReportJs(hourCountsJson)}</script>
 </body>
 </html>`;
 }

@@ -17,6 +17,8 @@
   ],
   "files": [
     "src/**/*.ts",
+    "src/report.css",
+    "src/report.js",
     "!__tests__"
   ],
   "dependencies": {
