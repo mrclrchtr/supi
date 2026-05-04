@@ -1,7 +1,7 @@
 # Capability: supi-review
 
 ## Purpose
-Structured code review via the `/supi-review` command. Provides interactive preset selection (base branch, uncommitted changes, specific commit, custom instructions), runs a dedicated read-only reviewer inside a tmux session, parses structured findings, and renders them as a custom transcript message.
+Structured code review via the `/supi-review` command. Provides interactive preset selection (base branch, uncommitted changes, specific commit, custom instructions), runs a dedicated read-only reviewer as an in-process managed child session via `createAgentSession()`, parses structured findings, and renders them as a custom transcript message.
 
 ## Requirements
 
@@ -71,35 +71,95 @@ After selecting a review target, the extension SHALL present a depth selector wi
 - **WHEN** the user selects "Inherit" in the depth selector
 - **THEN** the reviewer uses the current session model
 
-### Requirement: Reviewer runs in isolated tmux session with a submit_review tool
-The reviewer SHALL run inside a named tmux session (`supi-review-<id>`). The extension SHALL:
+### Requirement: Reviewer runs via createAgentSession with in-memory session
+The reviewer SHALL run as an in-process managed child session via `createAgentSession()` with `SessionManager.inMemory()`. The extension SHALL:
 
-1. Generate a unique review ID and temp file paths for the structured result (`/tmp/supi-review-<id>.json`), reviewer output log (`/tmp/supi-review-<id>-pane.log`), and exit status (`/tmp/supi-review-<id>-exit.json`).
-2. Write a temporary extension file (`/tmp/supi-review-<id>-tool.ts`) that registers a `submit_review` tool with a TypeBox schema matching `ReviewOutputEvent`. The tool's `execute` handler SHALL write the validated arguments as JSON to the temp file path and return a confirmation message.
-3. Write a temporary runner script (`/tmp/supi-review-<id>-runner.mjs`) that spawns the resolved pi invocation with `--print -e /tmp/supi-review-<id>-tool.ts --tools read,grep,find,ls,submit_review --model <model> "<review prompt>"`, tees stdout/stderr to both the tmux pane and the reviewer output log from process start, and writes the reviewer exit status to the exit status file.
-4. Spawn tmux: `tmux new-session -d -s supi-review-<id> -- node /tmp/supi-review-<id>-runner.mjs`.
-5. Notify the user of the tmux session name so they can attach to observe progress (`tmux attach -t supi-review-<id>`).
+1. Register a `submit_review` custom tool on the session via the `customTools` option, using the same TypeBox schema as the current `ReviewOutputEvent`. The tool's `execute` handler stores the validated result in a closure variable, then returns with `terminate: true`.
+2. Set the session's active tools to `["read", "grep", "find", "ls"]` via the `tools` option.
+3. Suppress extensions, themes, skills, prompt templates, and context files by constructing a `DefaultResourceLoader` with `noExtensions: true`, `noSkills: true`, `noPromptTemplates: true`, `noThemes: true`, `noContextFiles: true`, and `appendSystemPrompt: [REVIEW_PROMPT]`.
+4. Resolve the model string from settings or the parent session into a `Model<any>` object via `ModelRegistry.find()`, and pass it to `createAgentSession()` via the `model` option.
+5. Call `session.prompt(reviewPrompt)` to start the review, subscribe to session events via `session.subscribe()`, and await the `agent_end` event to detect completion.
 
-#### Scenario: Tmux session starts with correct arguments
-- **WHEN** the extension launches the reviewer with a resolved model
-- **THEN** tmux is invoked with the full pi command including `-e`, `--tools`, `--model`, and the review prompt
+#### Scenario: Reviewer calls submit_review successfully
+- **WHEN** the reviewer session calls `submit_review` with valid arguments
+- **THEN** the tool stores the `ReviewOutputEvent` in the closure variable and sets `terminate: true`
+- **AND** the agent emits `agent_end` after the tool batch finishes
+- **AND** the parent reads the stored result and returns it as a `ReviewResult` with `kind: "success"`
 
-#### Scenario: Tmux session starts without resolved model
-- **WHEN** the extension launches the reviewer and no model can be resolved
-- **THEN** the pi command omits `--model` and allows pi to use its configured default model
+#### Scenario: Reviewer calls submit_review with invalid arguments
+- **WHEN** the reviewer session calls `submit_review` with malformed arguments
+- **THEN** pi's TypeBox validation returns a validation error to the model
+- **AND** the model can retry with corrected arguments
 
-#### Scenario: Observability via tmux
-- **WHEN** the reviewer is running in a tmux session
-- **THEN** the user can run `tmux attach -t supi-review-<id>` at any time to see the reviewer's live output
-- **AND** `tmux ls` lists the active review session
+#### Scenario: Reviewer finishes without calling submit_review
+- **WHEN** the reviewer session emits `agent_end` without calling `submit_review`
+- **THEN** the parent extracts the final assistant message text from `session.messages`
+- **AND** returns a `ReviewResult` with `kind: "failed"` and reason indicating no structured output
 
-#### Scenario: Persistence across disconnect
-- **WHEN** the user's terminal disconnects while a review is running
-- **THEN** the tmux session continues running the reviewer
-- **AND** the user can re-attach later to see the result or check progress
+#### Scenario: Session creation fails
+- **WHEN** `createAgentSession()` throws an error (e.g., model unavailable, invalid auth)
+- **THEN** the extension SHALL catch the error and return a `ReviewResult` with `kind: "failed"` containing the error message
+
+### Requirement: Live progress widget shows reviewer activity
+During review execution, the extension SHALL display a progress widget above the editor showing:
+
+- An animated spinner indicating the review is running
+- The current turn count (e.g., `⟳3`)
+- The number of tool uses so far
+- Human-readable descriptions of active tools (e.g., "reading, searching…")
+- Token usage when available from session stats
+
+The widget SHALL update via the session's `subscribe()` event stream, reacting to `tool_execution_start`, `tool_execution_end`, and `turn_end` events. Token counts MAY be updated after each `turn_end` by reading `session.getSessionStats()`.
+
+#### Scenario: Reviewer starts reading files
+- **WHEN** the reviewer begins a `read` tool execution
+- **THEN** the widget shows "reading" in the activity description
+
+#### Scenario: Reviewer searches with grep
+- **WHEN** the reviewer begins a `grep` tool execution
+- **THEN** the widget shows "searching" in the activity description
+
+#### Scenario: Reviewer completes a turn
+- **WHEN** the reviewer finishes an agentic turn
+- **THEN** the widget increments the displayed turn count
+- **AND** the widget continues showing the spinner
+
+#### Scenario: Review completes
+- **WHEN** the reviewer session emits `agent_end`
+- **THEN** the widget is cleared from the editor
+
+### Requirement: Graceful timeout via steering
+The review SHALL support a configurable timeout. When the timeout is reached:
+
+1. The parent SHALL call `session.steer("Time limit reached. Wrap up and submit your review now.")` to give the reviewer a chance to produce a final result.
+2. The reviewer gets a fixed grace period of 3 additional turns to call `submit_review`.
+3. If the reviewer does not emit `agent_end` within the grace turns, the parent SHALL call `session.abort()`, wait for the session to idle, and return a `ReviewResult` with `kind: "timeout"` and the final assistant text as `partialOutput`.
+
+#### Scenario: Reviewer finishes within grace turns
+- **WHEN** the timeout fires and the reviewer receives a steering message
+- **AND** the reviewer calls `submit_review` within 3 additional turns
+- **THEN** the result is returned normally with `kind: "success"`
+
+#### Scenario: Reviewer exceeds grace turns
+- **WHEN** the timeout fires and the reviewer exceeds 3 grace turns without calling `submit_review`
+- **THEN** the parent calls `session.abort()` and awaits the session to become idle
+- **AND** returns a `ReviewResult` with `kind: "timeout"` and the final assistant text as `partialOutput`
+
+### Requirement: Cancellation via session.abort
+When the review is canceled (user presses Escape or abort signal fires), the extension SHALL call `session.abort()` to immediately stop the reviewer. The result SHALL be a `ReviewResult` with `kind: "canceled"`.
+
+#### Scenario: User cancels review
+- **WHEN** the user presses Escape on the progress widget
+- **THEN** the abort signal fires
+- **AND** `session.abort()` stops the reviewer session
+- **AND** the extension returns `kind: "canceled"`
+
+#### Scenario: Review is already complete when cancel fires
+- **WHEN** the abort signal fires but the reviewer has already emitted `agent_end`
+- **THEN** the completed result is returned instead of `canceled`
 
 ### Requirement: Structured review output is parsed
-The extension SHALL read the review result from `/tmp/supi-review-<id>.json` after the tmux session exits. Because the `submit_review` tool uses a TypeBox schema, pi's AJV validation guarantees the JSON is structurally valid before it is written.
+The extension SHALL obtain the review result from the `ReviewOutputEvent` stored by the `submit_review` custom tool. Because the `submit_review` tool uses a TypeBox schema, pi's AJV validation guarantees the JSON is structurally valid before the tool's execute handler is called.
 
 The `ReviewOutputEvent` schema SHALL be:
 ```json
@@ -125,7 +185,7 @@ The `ReviewOutputEvent` schema SHALL be:
 #### Scenario: Tool submission succeeds
 - **WHEN** the reviewer calls `submit_review` with valid arguments
 - **THEN** pi validates the JSON against the TypeBox schema
-- **AND** the tool writes the JSON to `/tmp/supi-review-<id>.json`
+- **AND** the tool stores the validated result in the closure variable
 - **AND** the extension reads and uses it without additional parsing
 
 #### Scenario: Tool submission with invalid arguments
@@ -135,19 +195,9 @@ The `ReviewOutputEvent` schema SHALL be:
 
 #### Scenario: Model never calls submit_review
 - **WHEN** the reviewer finishes without calling `submit_review`
-- **THEN** no temp file is written
-- **AND** the extension warns the user that the reviewer did not submit a structured result
-- **AND** the extension falls back to the reviewer output log written by the tmux runner, extracts final assistant text from JSONL when present, and applies review JSON extraction heuristics
-
-#### Scenario: Fallback extraction finds valid JSON substring
-- **WHEN** the fallback extraction finds text containing a valid JSON object substring
-- **THEN** the extension extracts and parses the first valid object
-- **AND** the user is warned that the result was recovered from unstructured output
-
-#### Scenario: Fallback extraction finds no valid JSON
-- **WHEN** the fallback extraction finds no valid JSON
-- **THEN** the extension creates a `ReviewOutputEvent` with `overall_explanation` set to the captured pane text and empty `findings`
-- **AND** the user is warned that the review result could not be parsed and is shown as plain text
+- **THEN** the closure variable remains undefined
+- **AND** the extension extracts the final assistant message text from `session.messages`
+- **AND** returns a failed `ReviewResult` with the extracted text as explanation
 
 #### Scenario: Finding priority is out of range
 - **WHEN** the reviewer returns a finding priority outside `0` through `3`
@@ -298,31 +348,22 @@ The extension SHALL truncate diffs that exceed a configurable maximum size befor
 - **WHEN** the computed diff is larger than `maxDiffBytes` (default 100KB)
 - **THEN** the extension keeps the beginning and end of the diff, replaces the omitted middle with a `[... truncated N bytes ...]` marker, and appends a note to the reviewer prompt indicating truncation
 
-### Requirement: Subprocess errors are handled gracefully
+### Requirement: Session errors are handled gracefully
 The extension SHALL surface reviewer failures as user-facing review errors without crashing the main pi session.
 
-#### Scenario: pi executable cannot be found
-- **WHEN** the extension cannot spawn `pi` inside tmux
-- **THEN** the extension notifies the user and injects a failed `supi-review` message containing the spawn error summary
+#### Scenario: createAgentSession fails
+- **WHEN** `createAgentSession()` throws an error (e.g., model not available, invalid auth)
+- **THEN** the extension SHALL catch the error and inject a failed `supi-review` message containing the error message
 
-#### Scenario: Reviewer exits non-zero
-- **WHEN** the reviewer inside tmux exits with a non-zero status
-- **THEN** the extension reads the captured reviewer output log, notifies the user, and injects a failed `supi-review` message containing the exit status and error summary
+#### Scenario: Reviewer session errors during execution
+- **WHEN** an error occurs after `session.prompt()` is submitted (e.g., model error emitted via `agent_end` with error state)
+- **THEN** the extension SHALL catch the error and inject a failed `supi-review` message containing the error summary
 
 #### Scenario: Reviewer is aborted
 - **WHEN** the user cancels the review or the command receives an abort signal
-- **THEN** the extension sends `tmux send-keys -t supi-review-<id> C-c` to interrupt the reviewer
-- **AND** records the review as canceled rather than failed
-
-
-#### Scenario: Tmux not installed
-- **WHEN** `tmux` is not available in `$PATH`
-- **THEN** the extension aborts with a clear failed review result explaining that tmux is required
-
-#### Scenario: Tmux session already exists
-- **WHEN** a session name collision occurs
-- **THEN** the extension retries with an incremented suffix (`supi-review-<id>-1`)
+- **THEN** the extension SHALL call `session.abort()` to stop the reviewer
+- **AND** record the review as canceled rather than failed
 
 #### Scenario: Reviewer produces no assistant output
-- **WHEN** the reviewer exits successfully but no temp file exists and no assistant output is found in the captured pane
-- **THEN** the extension returns a failed review result explaining that no reviewer output was produced
+- **WHEN** the reviewer session emits `agent_end` but no `submit_review` was called and the final assistant text is empty
+- **THEN** the extension SHALL return a failed review result explaining that no reviewer output was produced

@@ -102,17 +102,26 @@ export function buildReviewerSystemPrompt(): string {
 }
 /** Standard OpenAI reasoning_effort values accepted by OpenRouter. */
 const OPENAI_REASONING_VALUES = new Set(["xhigh", "high", "medium", "low", "minimal", "none"]);
+/**
+ * Thinking levels that can be passed to `createAgentSession`.
+ * These match the literal values pi's SDK accepts internally.
+ */
+type ReviewThinkingLevel = "xhigh" | "high" | "medium" | "low" | "minimal" | "off";
 function resolveReviewThinkingLevel(
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: import("@mariozechner/pi-ai").Model<any> | undefined,
-): import("@mariozechner/pi-ai").ModelThinkingLevel {
+): ReviewThinkingLevel {
   if (!model?.reasoning) return "off";
   // OpenRouter normalizes reasoning_effort to OpenAI-standard values.
   // Non-standard thinkingLevelMap mappings (e.g. DeepSeek-native) get rejected.
   // For other providers, the model's thinkingLevelMap provides correct native values.
   const viaOpenRouter = model.provider === "openrouter" || model.baseUrl?.includes("openrouter.ai");
+  // biome-ignore lint/suspicious/noExplicitAny: thinkingLevelMap is not on pi-ai's Model type at v0.70.2
+  const thinkingLevelMap = (model as unknown as Record<string, unknown>)["thinkingLevelMap"] as
+    | Record<string, string | null>
+    | undefined;
   for (const level of ["xhigh", "high", "medium", "low", "minimal", "off"] as const) {
-    const mapped = model.thinkingLevelMap?.[level];
+    const mapped = thinkingLevelMap?.[level];
     if (mapped === null) continue;
     if (viaOpenRouter) {
       const mappedValue = mapped ?? level;
