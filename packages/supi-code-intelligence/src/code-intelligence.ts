@@ -18,6 +18,7 @@ const CodeIntelActionEnum = StringEnum([
   "implementations",
   "affected",
   "pattern",
+  "index",
 ] as const);
 
 /**

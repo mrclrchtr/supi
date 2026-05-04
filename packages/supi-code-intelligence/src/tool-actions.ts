@@ -6,6 +6,7 @@ import { executeBriefAction } from "./actions/brief-action.ts";
 import { executeCalleesAction } from "./actions/callees-action.ts";
 import { executeCallersAction } from "./actions/callers-action.ts";
 import { executeImplementationsAction } from "./actions/implementations-action.ts";
+import { executeIndexAction } from "./actions/index-action.ts";
 import { executePatternAction } from "./actions/pattern-action.ts";
 import { normalizePath } from "./search-helpers.ts";
 
@@ -15,7 +16,8 @@ export type CodeIntelAction =
   | "callees"
   | "implementations"
   | "affected"
-  | "pattern";
+  | "pattern"
+  | "index";
 
 /** Flat parameter bag shared by `code_intel` action handlers. */
 export interface ActionParams {
@@ -42,6 +44,7 @@ const SUPPORTED_ACTIONS = new Set<string>([
   "implementations",
   "affected",
   "pattern",
+  "index",
 ]);
 
 /**
@@ -65,6 +68,8 @@ export async function executeAction(params: ActionParams, ctx: { cwd: string }):
       return executeAffectedAction(params, cwd);
     case "pattern":
       return executePatternAction(params, cwd);
+    case "index":
+      return executeIndexAction(cwd);
     default:
       return `**Error:** Unknown action \`${params.action}\`.`;
   }
@@ -72,7 +77,7 @@ export async function executeAction(params: ActionParams, ctx: { cwd: string }):
 
 function validateParams(params: ActionParams, cwd: string): string | null {
   if (!params.action || !SUPPORTED_ACTIONS.has(params.action)) {
-    return `**Error:** Unknown action \`${params.action ?? "(none)"}\`. Supported: \`brief\`, \`callers\`, \`callees\`, \`implementations\`, \`affected\`, \`pattern\`.`;
+    return `**Error:** Unknown action \`${params.action ?? "(none)"}\`. Supported: \`brief\`, \`callers\`, \`callees\`, \`implementations\`, \`affected\`, \`pattern\`, \`index\`.`;
   }
 
   if (params.path && (params.line != null || params.character != null)) {
