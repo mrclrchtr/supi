@@ -1,0 +1,10 @@
+schema_version = 1
+id = "TNDM-YB5Q5M"
+title = "supi-ask-user: extract guardNotTerminal helper in QuestionnaireFlow"
+
+type = "task"
+priority = "p3"
+effort = "xs"
+
+depends_on = []
+tags = ["refactor", "supi-ask-user"]
