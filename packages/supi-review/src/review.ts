@@ -1,9 +1,12 @@
-import { BorderedLoader, type ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { Model } from "@mariozechner/pi-ai";
+import type { ExtensionAPI, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import { formatReviewContent } from "./format-content.ts";
 import { getCommitShow, getDiff, getMergeBase, getUncommittedDiff } from "./git.ts";
+import { ReviewProgressWidget } from "./progress-widget.ts";
 import { buildReviewPrompt } from "./prompts.ts";
 import { registerReviewRenderer } from "./renderer.ts";
 import { runReviewer } from "./runner.ts";
+import type { ReviewerInvocation } from "./runner-types.ts";
 import { loadReviewSettings, registerReviewSettings, setReviewModelChoices } from "./settings.ts";
 import type { ReviewResult, ReviewTarget } from "./types.ts";
 import { selectAutoFix, selectBranch, selectCommit, selectPreset } from "./ui.ts";
@@ -15,6 +18,8 @@ interface ReviewExecutionOptions {
   maxDiffBytes: number;
   ctx: CommandContext;
   signal?: AbortSignal;
+  onToolActivity?: ReviewerInvocation["onToolActivity"];
+  onProgress?: ReviewerInvocation["onProgress"];
 }
 
 export default function reviewExtension(pi: ExtensionAPI) {
@@ -62,7 +67,7 @@ async function handleInteractive(
   if (!target) return;
 
   const result = await runReviewWithLoader(target, maxDiffBytes, ctx);
-  injectReviewMessage(pi, result, autoFix, ctx);
+  injectReviewMessage(pi, result, autoFix);
 }
 
 async function resolvePresetTarget(
@@ -165,7 +170,7 @@ async function runReviewWithLoader(
   ctx: CommandContext,
 ): Promise<ReviewResult> {
   return ctx.ui.custom<ReviewResult>((tui, theme, _kb, done) => {
-    const loader = new BorderedLoader(tui, theme, "Running code review…");
+    const widget = new ReviewProgressWidget(tui, theme, "Running code review…");
     let finished = false;
 
     const finish = (result: ReviewResult) => {
@@ -174,15 +179,21 @@ async function runReviewWithLoader(
       done(result);
     };
 
-    loader.onAbort = () => finish({ kind: "canceled", target });
+    widget.onAbort = () => finish({ kind: "canceled", target });
 
-    executeReview({ target, maxDiffBytes, ctx, signal: loader.signal })
+    executeReview({
+      target,
+      maxDiffBytes,
+      ctx,
+      signal: widget.signal,
+      onProgress: (progress) => widget.updateProgress(progress),
+    })
       .then((result) => {
-        if (loader.signal.aborted) return;
+        if (widget.signal.aborted) return;
         finish(result);
       })
       .catch((err) => {
-        if (loader.signal.aborted) return;
+        if (widget.signal.aborted) return;
         finish({
           kind: "failed",
           reason: err instanceof Error ? err.message : String(err),
@@ -190,14 +201,15 @@ async function runReviewWithLoader(
         });
       });
 
-    return loader;
+    return widget;
   });
 }
 
 function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
-  const { target, maxDiffBytes, ctx, signal } = options;
+  const { target, maxDiffBytes, ctx, signal, onToolActivity, onProgress } = options;
   const settings = loadReviewSettings(ctx.cwd);
-  const model = resolveReviewerModel(settings, ctx);
+  // ctx.modelRegistry is available because CommandContext extends ExtensionContext
+  const model = resolveReviewerModel(settings, ctx.modelRegistry, ctx.model);
 
   let diffOrBody = "";
   if (target.type === "base-branch" || target.type === "uncommitted") {
@@ -215,21 +227,17 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
       : undefined,
   );
 
-  return runReviewer({
+  const invocation: ReviewerInvocation = {
     prompt,
     model,
     cwd: ctx.cwd,
     target,
     signal,
-    onSessionStart: (sessionName) => {
-      const message = `Review running in tmux session ${sessionName}`;
-      if (ctx.hasUI) {
-        ctx.ui.notify(message, "info");
-      } else {
-        process.stderr.write(`${message}\n`);
-      }
-    },
-  });
+    onToolActivity,
+    onProgress,
+  };
+
+  return runReviewer(invocation);
 }
 
 function toCanonicalModelIds(
@@ -241,9 +249,27 @@ function toCanonicalModelIds(
 
 function resolveReviewerModel(
   settings: ReturnType<typeof loadReviewSettings>,
-  ctx: CommandContext,
-): string | undefined {
-  return settings.reviewModel || resolveSessionModelId(ctx.model);
+  modelRegistry: ModelRegistry,
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
+  sessionModel: Model<any> | undefined,
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
+): Model<any> | undefined {
+  const modelString = settings.reviewModel || resolveSessionModelId(sessionModel);
+  if (!modelString) return undefined;
+
+  // Parse "provider/model-id" format
+  const slashIndex = modelString.indexOf("/");
+  if (slashIndex === -1) {
+    throw new Error(`Invalid review model format: "${modelString}". Expected "provider/model-id".`);
+  }
+
+  const provider = modelString.slice(0, slashIndex);
+  const modelId = modelString.slice(slashIndex + 1);
+  const found = modelRegistry.find(provider, modelId);
+  if (!found) {
+    throw new Error(`Review model "${modelString}" not found. Check your review model setting.`);
+  }
+  return found;
 }
 
 function resolveSessionModelId(

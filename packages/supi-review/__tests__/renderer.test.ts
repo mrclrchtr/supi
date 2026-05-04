@@ -61,17 +61,49 @@ describe("supi-review renderer", () => {
     expect(output).not.toContain("[success]patch is incorrect[/success]");
   });
 
-  it("shows timeout diagnostics with warning", () => {
+  it("shows timeout without tmux-specific warnings", () => {
     const output = renderReview({
       kind: "timeout",
       target: { type: "custom", instructions: "Focus on correctness" },
       timeoutMs: 900_000,
-      warning: "Review timed out. Attach with `tmux attach -t supi-review-abc123` to inspect.",
-      stderr: "still running",
     });
 
     expect(output).toContain("[warning]◆ Review Timed Out[/warning]");
-    expect(output).toContain("tmux attach -t supi-review-abc123");
-    expect(output).toContain("stderr excerpt:");
+    expect(output).not.toContain("tmux");
+  });
+
+  it("shows timeout with partial output", () => {
+    const output = renderReview({
+      kind: "timeout",
+      target: { type: "custom", instructions: "Focus on correctness" },
+      timeoutMs: 900_000,
+      partialOutput: "I reviewed the code and found issues with...",
+    });
+
+    expect(output).toContain("[warning]◆ Review Timed Out[/warning]");
+    expect(output).toContain("Partial output:");
+    expect(output).toContain("I reviewed the code and found issues with...");
+  });
+
+  it("shows failed result without tmux warnings", () => {
+    const output = renderReview({
+      kind: "failed",
+      reason: "Reviewer session error: API rate limit",
+      target: { type: "custom", instructions: "Focus on correctness" },
+    });
+
+    expect(output).toContain("[error]◆ Review Failed[/error]");
+    expect(output).toContain("API rate limit");
+    expect(output).not.toContain("tmux");
+  });
+
+  it("shows canceled result without tmux warnings", () => {
+    const output = renderReview({
+      kind: "canceled",
+      target: { type: "custom", instructions: "Focus on correctness" },
+    });
+
+    expect(output).toContain("[warning]◆ Review Canceled[/warning]");
+    expect(output).not.toContain("tmux");
   });
 });

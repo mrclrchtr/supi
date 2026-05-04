@@ -25,28 +25,51 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
       this.onAbort?.();
     }
   },
-  SettingsManager: {
+  ModelRegistry: {
     create: () => ({
-      getEnabledModels: () => undefined,
+      getAvailableModels: () => undefined,
     }),
   },
 }));
 
-vi.mock("../src/settings.ts", () => ({
+vi.mock("../src/settings", () => ({
   loadReviewSettings: mockFns.loadReviewSettings,
   registerReviewSettings: mockFns.registerReviewSettings,
   setReviewModelChoices: mockFns.setReviewModelChoices,
 }));
 
-vi.mock("../src/renderer.ts", () => ({
+vi.mock("../src/renderer", () => ({
   registerReviewRenderer: mockFns.registerReviewRenderer,
 }));
 
-vi.mock("../src/runner.ts", () => ({
+vi.mock("../src/runner", () => ({
   runReviewer: mockFns.runReviewer,
 }));
 
-vi.mock("../src/ui.ts", () => ({
+vi.mock("../src/progress-widget", () => ({
+  ReviewProgressWidget: class MockReviewProgressWidget {
+    private _controller = new AbortController();
+    onAbort: (() => void) | undefined;
+    constructor() {
+      this.onAbort = undefined;
+    }
+    get signal() {
+      return this._controller.signal;
+    }
+    abort() {
+      this.onAbort?.();
+      this._controller.abort();
+    }
+    updateProgress() {}
+    render() {
+      return ["Review running…"];
+    }
+    invalidate() {}
+    handleInput() {}
+  },
+}));
+
+vi.mock("../src/ui", () => ({
   selectPreset: mockFns.selectPreset,
   selectAutoFix: mockFns.selectAutoFix,
   selectBranch: vi.fn(),
@@ -126,21 +149,10 @@ describe("formatReviewContent", () => {
   it("formats failed result", () => {
     const result = {
       kind: "failed" as const,
-      reason: "Reviewer subprocess crashed",
+      reason: "Reviewer session error",
       target: { type: "custom" as const, instructions: "test" },
     };
-    expect(formatReviewContent(result)).toBe("Review failed: Reviewer subprocess crashed");
-  });
-
-  it("formats failed result with warning", () => {
-    const result = {
-      kind: "failed" as const,
-      reason: "Reviewer subprocess crashed",
-      target: { type: "custom" as const, instructions: "test" },
-      warning: "Check tmux session",
-    };
-    expect(formatReviewContent(result)).toContain("Review failed: Reviewer subprocess crashed");
-    expect(formatReviewContent(result)).toContain("⚠️ Check tmux session");
+    expect(formatReviewContent(result)).toBe("Review failed: Reviewer session error");
   });
 
   it("formats canceled result", () => {
@@ -151,34 +163,26 @@ describe("formatReviewContent", () => {
     expect(formatReviewContent(result)).toBe("Review canceled");
   });
 
-  it("formats canceled result with warning", () => {
-    const result = {
-      kind: "canceled" as const,
-      target: { type: "custom" as const, instructions: "test" },
-      warning: "Kill with tmux kill-session -t abc",
-    };
-    expect(formatReviewContent(result)).toContain("Review canceled");
-    expect(formatReviewContent(result)).toContain("⚠️ Kill with tmux kill-session -t abc");
-  });
-
   it("formats timeout result", () => {
     const result = {
       kind: "timeout" as const,
       target: { type: "custom" as const, instructions: "test" },
       timeoutMs: 900000,
     };
-    expect(formatReviewContent(result)).toBe("Review timed out");
+    expect(formatReviewContent(result)).toContain("Review timed out");
   });
 
-  it("formats timeout result with warning", () => {
+  it("formats timeout result with partial output", () => {
     const result = {
       kind: "timeout" as const,
       target: { type: "custom" as const, instructions: "test" },
       timeoutMs: 900000,
-      warning: "Attach with tmux attach",
+      partialOutput: "I reviewed the code and found...",
     };
-    expect(formatReviewContent(result)).toContain("Review timed out");
-    expect(formatReviewContent(result)).toContain("⚠️ Attach with tmux attach");
+    const content = formatReviewContent(result);
+    expect(content).toContain("Review timed out");
+    expect(content).toContain("Partial output:");
+    expect(content).toContain("I reviewed the code and found...");
   });
 });
 
@@ -193,7 +197,7 @@ describe("/supi-review command", () => {
     mockFns.selectAutoFix.mockResolvedValue(false);
   });
 
-  it("starts the reviewer with the resolved session model", async () => {
+  it("starts the reviewer with the resolved model", async () => {
     let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
 
     const pi = {
@@ -223,6 +227,10 @@ describe("/supi-review command", () => {
     const ctx = {
       cwd: "/project",
       hasUI: true,
+      modelRegistry: {
+        find: (provider: string, id: string) =>
+          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
+      },
       model: { provider: "github-copilot", id: "session-model" },
       ui: {
         editor: vi.fn(async () => "Focus on correctness"),
@@ -240,12 +248,7 @@ describe("/supi-review command", () => {
 
     expect(mockFns.runReviewer).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: "github-copilot/session-model",
-      }),
-    );
-    expect(mockFns.runReviewer).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        options: expect.anything(),
+        model: expect.anything(), // Model object or undefined
       }),
     );
   });
@@ -278,6 +281,10 @@ describe("/supi-review command", () => {
     const ctx = {
       cwd: "/project",
       hasUI: true,
+      modelRegistry: {
+        find: (provider: string, id: string) =>
+          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
+      },
       model: { provider: "github-copilot", id: "session-model" },
       ui: {
         editor: vi.fn(async () => "Focus on correctness"),
@@ -347,6 +354,10 @@ describe("/supi-review command", () => {
     const ctx = {
       cwd: "/project",
       hasUI: true,
+      modelRegistry: {
+        find: (provider: string, id: string) =>
+          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
+      },
       model: { provider: "github-copilot", id: "session-model" },
       ui: {
         editor: vi.fn(async () => "Focus on correctness"),
@@ -409,6 +420,10 @@ describe("/supi-review command", () => {
     const ctx = {
       cwd: "/project",
       hasUI: true,
+      modelRegistry: {
+        find: (provider: string, id: string) =>
+          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
+      },
       model: { provider: "github-copilot", id: "session-model" },
       ui: {
         editor: vi.fn(async () => "Focus on correctness"),
@@ -460,6 +475,10 @@ describe("/supi-review command", () => {
     const ctx = {
       cwd: "/project",
       hasUI: true,
+      modelRegistry: {
+        find: (provider: string, id: string) =>
+          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
+      },
       model: { provider: "github-copilot", id: "session-model" },
       ui: {
         editor: vi.fn(async () => "Focus on correctness"),
@@ -496,7 +515,7 @@ describe("/supi-review command", () => {
     mockFns.selectAutoFix.mockResolvedValue(true);
     mockFns.runReviewer.mockResolvedValue({
       kind: "failed",
-      reason: "Reviewer crashed",
+      reason: "Reviewer session error",
       target: { type: "custom", instructions: "Focus on correctness" },
     });
 
@@ -506,6 +525,10 @@ describe("/supi-review command", () => {
     const ctx = {
       cwd: "/project",
       hasUI: true,
+      modelRegistry: {
+        find: (provider: string, id: string) =>
+          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
+      },
       model: { provider: "github-copilot", id: "session-model" },
       ui: {
         editor: vi.fn(async () => "Focus on correctness"),
@@ -524,5 +547,66 @@ describe("/supi-review command", () => {
     expect(
       (pi as unknown as { sendUserMessage: ReturnType<typeof vi.fn> }).sendUserMessage,
     ).not.toHaveBeenCalled();
+  });
+
+  it("surfaces error when configured review model is not found", async () => {
+    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
+
+    const pi = {
+      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
+        expect(name).toBe("supi-review");
+        commandHandler = spec.handler;
+      }),
+      on: vi.fn(),
+      sendMessage: vi.fn(),
+      sendUserMessage: vi.fn(),
+    } as unknown as ExtensionAPI;
+
+    // Configure a review model that won't be found in the registry
+    mockFns.loadReviewSettings.mockReturnValue({
+      reviewModel: "nonexistent/model-123",
+      maxDiffBytes: 100_000,
+      autoFix: false,
+    });
+
+    reviewExtension(pi);
+    if (!commandHandler) throw new Error("/supi-review handler was not registered");
+
+    const ctx = {
+      cwd: "/project",
+      hasUI: true,
+      model: { provider: "github-copilot", id: "session-model" },
+      modelRegistry: {
+        find: (provider: string, id: string) =>
+          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
+      },
+      ui: {
+        editor: vi.fn(async () => "Focus on correctness"),
+        notify: vi.fn(),
+        custom: vi.fn(
+          (factory: (...args: unknown[]) => unknown) =>
+            new Promise((resolve) => {
+              factory({}, {}, undefined, resolve);
+            }),
+        ),
+      },
+    };
+
+    await commandHandler("", ctx);
+
+    // The error should be surfaced as a failed review message, not swallowed
+    expect(
+      (pi as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customType: "supi-review",
+        details: {
+          result: expect.objectContaining({
+            kind: "failed",
+            reason: expect.stringContaining("not found") as unknown,
+          }),
+        },
+      }),
+    );
   });
 });

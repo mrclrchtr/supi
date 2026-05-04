@@ -20,16 +20,20 @@ export function formatReviewContent(result: ReviewResult): string {
     case "success":
       return formatSuccessContent(result);
     case "failed":
-      return withWarning(`Review failed: ${result.reason}`, result.warning);
+      return `Review failed: ${result.reason}`;
     case "canceled":
-      return withWarning("Review canceled", result.warning);
+      return "Review canceled";
     case "timeout":
-      return withWarning("Review timed out", result.warning);
+      return formatTimeoutContent(result);
   }
 }
 
-function withWarning(text: string, warning: string | undefined): string {
-  return warning ? `${text}\n\n⚠️ ${warning}` : text;
+function formatTimeoutContent(result: Extract<ReviewResult, { kind: "timeout" }>): string {
+  const parts = [`Review timed out (exceeded ${(result.timeoutMs / 1000).toFixed(0)}s)`];
+  if (result.partialOutput) {
+    parts.push("", "Partial output:", result.partialOutput);
+  }
+  return parts.join("\n");
 }
 
 function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>): string {

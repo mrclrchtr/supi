@@ -1,95 +1,97 @@
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReviewOutputEvent, ReviewTarget } from "../src/types.ts";
+
+// Mock session object reused across tests
+const mockSession = {
+  prompt: vi.fn(),
+  subscribe: vi.fn(),
+  steer: vi.fn(),
+  abort: vi.fn(),
+  dispose: vi.fn(),
+  messages: [] as Array<{ role: string; content: string | Array<{ type: string; text: string }> }>,
+  getSessionStats: vi.fn(),
+};
+
+let capturedCustomTools: Array<{ execute: (...args: unknown[]) => Promise<unknown> }> = [];
+
+const mockCreateAgentSession = vi.fn();
+
+vi.mock("@mariozechner/pi-coding-agent", () => ({
+  createAgentSession: mockCreateAgentSession,
+  DefaultResourceLoader: vi.fn().mockImplementation(() => ({
+    reload: vi.fn().mockResolvedValue(undefined),
+  })),
+  SessionManager: {
+    inMemory: vi.fn().mockReturnValue({}),
+  },
+  defineTool: vi.fn((tool) => tool),
+  AgentSession: vi.fn(),
+}));
+
+vi.mock("typebox", () => ({
+  Type: {
+    Object: vi.fn((schema) => schema),
+    Array: vi.fn((schema) => schema),
+    String: vi.fn(() => ({})),
+    Number: vi.fn(() => ({})),
+  },
+}));
+
+// Import after mocks are set up
 import { runReviewer } from "../src/runner.ts";
 
-vi.mock("node:child_process", () => ({
-  spawn: vi.fn(),
-  spawnSync: vi.fn(),
-}));
+function resetMockSession(): void {
+  mockSession.prompt.mockReset();
+  mockSession.subscribe.mockReset();
+  mockSession.steer.mockReset();
+  mockSession.abort.mockReset();
+  mockSession.dispose.mockReset();
+  mockSession.messages = [];
+  mockSession.getSessionStats.mockReset();
 
-vi.mock("node:fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs")>();
+  // Default: prompt resolves immediately
+  mockSession.prompt.mockResolvedValue(undefined);
+  // Default: subscribe returns unsubscribe fn
+  mockSession.subscribe.mockReturnValue(vi.fn());
+  // Default: steer resolves
+  mockSession.steer.mockResolvedValue(undefined);
+  // Default: abort resolves
+  mockSession.abort.mockResolvedValue(undefined);
+}
+
+function setupCreateAgentSession(): void {
+  capturedCustomTools = [];
+  mockCreateAgentSession.mockImplementation(
+    async (opts: {
+      customTools?: Array<{ execute: (...args: unknown[]) => Promise<unknown> }>;
+    }) => {
+      capturedCustomTools = opts.customTools ?? [];
+      return { session: mockSession };
+    },
+  );
+}
+
+const defaultTarget: ReviewTarget = { type: "custom", instructions: "test review" };
+
+function defaultReviewOutput(): ReviewOutputEvent {
   return {
-    existsSync: vi.fn(),
-    readFileSync: vi.fn((path: unknown, encoding?: BufferEncoding) => {
-      if (String(path).endsWith("review-prompt.md")) {
-        return actual.readFileSync(path as string, encoding ?? "utf-8");
-      }
-      return undefined;
-    }),
-    writeFileSync: vi.fn(),
-    unlinkSync: vi.fn(),
+    findings: [],
+    overall_correctness: "patch is correct",
+    overall_explanation: "Looks good",
+    overall_confidence_score: 0.8,
   };
-});
-
-vi.mock("node:crypto", () => ({
-  randomBytes: (_size: number) => Buffer.from([0xde, 0xad, 0xbe, 0xef]),
-}));
-
-let tempFiles: Map<string, string> = new Map();
-let tmuxAvailable = true;
-let tmuxSessions: Set<string> = new Set();
+}
 
 describe("runReviewer", () => {
-  const originalAgentDir = process.env.PI_CODING_AGENT_DIR;
-  let mockSpawnProcs: MockProc[] = [];
-
   beforeEach(() => {
     vi.useFakeTimers();
-    process.env.PI_CODING_AGENT_DIR = "/pi-agent";
-    tmuxAvailable = true;
-    tmuxSessions = new Set();
-    tempFiles = new Map();
-    mockSpawnProcs = [];
-
-    vi.mocked(spawnSync).mockImplementation(mockSpawnSync);
-
-    vi.mocked(spawn).mockImplementation(
-      (cmd: string, args?: readonly string[], _options?: unknown) => {
-        const proc = createMockProc();
-        mockSpawnProcs.push(proc);
-
-        if (cmd === "tmux" && args?.[0] === "new-session") {
-          const name = args[3];
-          tmuxSessions.add(name);
-          setTimeout(() => {
-            proc.emit("exit", 0);
-          }, 10);
-          setTimeout(() => {
-            tmuxSessions.delete(name);
-          }, 100);
-        }
-
-        return proc as never;
-      },
-    );
-
-    vi.mocked(writeFileSync).mockImplementation((path: unknown, data: unknown) => {
-      tempFiles.set(path as string, data as string);
-    });
-
-    vi.mocked(existsSync).mockImplementation((path: unknown) => tempFiles.has(String(path)));
-
-    vi.mocked(readFileSync).mockImplementation((path: unknown) => {
-      const content = tempFiles.get(String(path));
-      if (content === undefined) throw new Error(`ENOENT: ${String(path)}`);
-      return content;
-    });
-
-    vi.mocked(unlinkSync).mockImplementation((path: unknown) => {
-      tempFiles.delete(String(path));
-    });
+    resetMockSession();
+    setupCreateAgentSession();
   });
 
   afterEach(() => {
     vi.useRealTimers();
     vi.clearAllMocks();
-    if (originalAgentDir === undefined) {
-      delete process.env.PI_CODING_AGENT_DIR;
-    } else {
-      process.env.PI_CODING_AGENT_DIR = originalAgentDir;
-    }
   });
 
   it("returns canceled immediately when the signal is already aborted", async () => {
@@ -97,432 +99,362 @@ describe("runReviewer", () => {
     controller.abort();
 
     const result = await runReviewer({
-      prompt: "review",
+      prompt: "review this",
       model: undefined,
       cwd: "/tmp",
       signal: controller.signal,
-      target: { type: "custom", instructions: "review" },
+      target: defaultTarget,
     });
 
     expect(result.kind).toBe("canceled");
-    expect(spawn).not.toHaveBeenCalled();
+    expect(mockCreateAgentSession).not.toHaveBeenCalled();
   });
 
-  it("spawns tmux with the submit_review tool extension", async () => {
-    const promise = runReviewer({
-      prompt: "review this",
-      model: "openai/gpt-4o",
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
+  it("creates session with correct tools and options", async () => {
+    let listener: ((event: unknown) => void) | undefined;
+    mockSession.subscribe.mockImplementation((l: (event: unknown) => void) => {
+      listener = l;
+      return vi.fn();
     });
 
-    await vi.advanceTimersByTimeAsync(50);
-    const spawnCall = vi.mocked(spawn).mock.calls[0];
-    expect(spawnCall?.[0]).toBe("tmux");
-    const spawnArgs = spawnCall?.[1] as string[];
-    expect(spawnArgs).toContain("new-session");
-    const toolPath = getToolPathFromSpawn();
-    expect(toolPath).toMatch(/supi-review-.*-tool\.ts$/);
-    expect(tempFiles.has(toolPath)).toBe(true);
-    expect(tempFiles.get(toolPath)).toContain("submit_review");
-    expect(tempFiles.get(toolPath)).toContain('from "typebox"');
-    expect(tempFiles.get(toolPath)).toContain("terminate: true");
-    writeDefaultOutputFromSpawn();
-
-    vi.advanceTimersByTime(1500);
-    const result = await promise;
-    expect(result.kind).toBe("success");
-  });
-
-  it("passes the review prompt content via --append-system-prompt", async () => {
-    const promise = runReviewer({
-      prompt: "review this",
-      model: "openai/gpt-4o",
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
-    const piArgs = getPiArgsFromSpawn();
-    const runnerScript = tempFiles.get(getRunnerPathFromSpawn()) ?? "";
-    writeDefaultOutputFromSpawn();
-    vi.advanceTimersByTime(1500);
-    await promise;
-
-    expect(piArgs).toContain("--append-system-prompt");
-    expect(runnerScript).toContain("submit_review");
-    expect(runnerScript).toContain("Do NOT output JSON directly");
-    expect(runnerScript).not.toContain("review-prompt.md");
-  });
-
-  it("includes submit_review in the tool allowlist", async () => {
-    const promise = runReviewer({
-      prompt: "review this",
-      model: "openai/gpt-4o",
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
-    const piArgs = getPiArgsFromSpawn();
-    writeDefaultOutputFromSpawn();
-    vi.advanceTimersByTime(1500);
-    await promise;
-
-    expect(piArgs).toContain("--tools");
-    const toolsIndex = piArgs.indexOf("--tools");
-    expect(piArgs[toolsIndex + 1]).toBe("read,grep,find,ls,submit_review");
-  });
-
-  it("omits --model when no model is resolved", async () => {
-    const promise = runReviewer({
+    const resultPromise = runReviewer({
       prompt: "review this",
       model: undefined,
       cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
+      target: defaultTarget,
     });
 
-    await vi.advanceTimersByTimeAsync(50);
-    const piArgs = getPiArgsFromSpawn();
-    writeDefaultOutputFromSpawn();
-    vi.advanceTimersByTime(1500);
-    await promise;
+    // Wait for session creation, then fire agent_end synchronously
+    await vi.advanceTimersByTimeAsync(1);
+    listener?.({ type: "agent_end", messages: [] });
+    await vi.advanceTimersByTimeAsync(10);
+    await resultPromise;
 
-    expect(piArgs).not.toContain("--model");
+    expect(mockCreateAgentSession).toHaveBeenCalledTimes(1);
+    const callOpts = mockCreateAgentSession.mock.calls[0]?.[0];
+    expect(callOpts.tools).toContain("submit_review");
+    expect(callOpts.tools).toContain("read");
+    expect(callOpts.tools).toContain("grep");
+    expect(callOpts.sessionManager).toBeDefined();
+    expect(callOpts.resourceLoader).toBeDefined();
   });
 
-  it("does not pass a synthetic --models scope", async () => {
-    const promise = runReviewer({
+  it("returns success when submit_review tool was called", async () => {
+    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
+      // Emit agent_end after a short delay (not synchronously, so the tool
+      // gets a chance to be registered first)
+      setTimeout(() => {
+        listener({ type: "agent_end", messages: [] });
+      }, 10);
+      return vi.fn();
+    });
+
+    const resultPromise = runReviewer({
       prompt: "review this",
       model: undefined,
       cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
+      target: defaultTarget,
     });
 
+    // Wait for session creation + tool registration
+    await vi.advanceTimersByTimeAsync(5);
+
+    // Manually trigger the submit_review tool's execute to simulate the
+    // tool being called by the reviewer agent. This populates the closure
+    // variable that runReviewer reads on agent_end.
+    const submitReviewTool = capturedCustomTools[0];
+    expect(submitReviewTool).toBeDefined();
+
+    const reviewOutput = defaultReviewOutput();
+    await submitReviewTool.execute("toolcall-1", reviewOutput);
+
+    // Now let agent_end fire
     await vi.advanceTimersByTimeAsync(50);
-    const piArgs = getPiArgsFromSpawn();
-    writeDefaultOutputFromSpawn();
-    vi.advanceTimersByTime(1500);
-    await promise;
-
-    expect(piArgs).not.toContain("--models");
-  });
-
-  it("reads valid JSON from the temp output file on success", async () => {
-    const promise = runReviewer({
-      prompt: "review this",
-      model: "test-model",
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
-    const toolPath = getToolPathFromSpawn();
-    const outputPath = toolPath.replace("-tool.ts", ".json");
-    tempFiles.set(
-      outputPath,
-      JSON.stringify({
-        findings: [
-          {
-            title: "Bug",
-            body: "There is a bug",
-            confidence_score: 0.9,
-            priority: 2,
-            code_location: { absolute_file_path: "/tmp/a.ts", line_range: { start: 5, end: 10 } },
-          },
-        ],
-        overall_correctness: "patch is incorrect",
-        overall_explanation: "Found issues",
-        overall_confidence_score: 0.8,
-      }),
-    );
-
-    vi.advanceTimersByTime(1500);
-    const result = await promise;
+    const result = await resultPromise;
 
     expect(result.kind).toBe("success");
-    const successResult = result as Extract<typeof result, { kind: "success" }>;
-    expect(successResult.output.findings).toHaveLength(1);
-    expect(successResult.output.findings[0]?.title).toBe("Bug");
+    if (result.kind === "success") {
+      expect(result.output).toEqual(reviewOutput);
+      expect(result.target).toEqual(defaultTarget);
+    }
   });
 
-  it("fails when the reviewer does not submit structured output", async () => {
-    const promise = runReviewer({
+  it("returns failed when reviewer does not call submit_review", async () => {
+    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
+      setTimeout(() => {
+        listener({ type: "agent_end", messages: [] });
+      }, 10);
+      return vi.fn();
+    });
+
+    // No messages means no assistant text to fall back to
+    mockSession.messages = [];
+
+    const resultPromise = runReviewer({
       prompt: "review this",
       model: undefined,
       cwd: "/tmp",
-      target: { type: "custom", instructions: "review this" },
+      target: defaultTarget,
     });
 
     await vi.advanceTimersByTimeAsync(50);
-    // Do not write any output file
-    vi.advanceTimersByTime(1500);
-    const result = await promise;
+    const result = await resultPromise;
 
     expect(result.kind).toBe("failed");
-    const failedResult = result as Extract<typeof result, { kind: "failed" }>;
-    expect(failedResult.reason).toContain("did not submit a structured result");
-    expect(failedResult.warning).toContain("tmux attach");
+    if (result.kind === "failed") {
+      expect(result.reason).toContain("did not produce");
+    }
+    expect(mockSession.dispose).toHaveBeenCalled();
   });
 
-  it("announces the tmux session only after startup succeeds", async () => {
-    const onSessionStart = vi.fn();
-    const promise = runReviewer({
-      prompt: "review",
+  it("returns failed when session creation fails", async () => {
+    mockCreateAgentSession.mockRejectedValue(new Error("Model not available"));
+
+    const result = await runReviewer({
+      prompt: "review this",
       model: undefined,
       cwd: "/tmp",
-      target: { type: "custom", instructions: "review" },
-      onSessionStart,
+      target: defaultTarget,
     });
 
-    expect(onSessionStart).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(50);
-    expect(onSessionStart).toHaveBeenCalledTimes(1);
-    expect(onSessionStart).toHaveBeenCalledWith(getSessionNameFromSpawn());
-    writeDefaultOutputFromSpawn();
-    vi.advanceTimersByTime(1500);
-    await promise;
+    expect(result.kind).toBe("failed");
+    if (result.kind === "failed") {
+      expect(result.reason).toContain("Failed to create reviewer session");
+    }
   });
 
   it("handles abort signal", async () => {
     vi.useRealTimers();
     const controller = new AbortController();
-    const promise = runReviewer({
-      prompt: "review",
+
+    mockSession.subscribe.mockReturnValue(vi.fn());
+    mockSession.abort.mockResolvedValue(undefined);
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
       model: undefined,
       cwd: "/tmp",
       signal: controller.signal,
-      target: { type: "custom", instructions: "review" },
+      target: defaultTarget,
     });
 
-    controller.abort();
-    const result = await promise;
+    // Wait for session creation to finish before aborting
+    await vi.dynamicImportSettled?.();
+    await new Promise((resolve) => setTimeout(resolve, 5));
 
+    // Abort the signal
+    controller.abort();
+
+    const result = await resultPromise;
     expect(result.kind).toBe("canceled");
     vi.useFakeTimers();
   });
 
-  it("fails clearly when tmux is unavailable", async () => {
-    tmuxAvailable = false;
+  it("detects aborted signal that fired during session creation", async () => {
+    vi.useRealTimers();
+    const controller = new AbortController();
+
+    mockSession.subscribe.mockReturnValue(vi.fn());
+    mockSession.abort.mockResolvedValue(undefined);
+
+    // Simulate abort firing during session creation
+    mockCreateAgentSession.mockImplementation(async () => {
+      controller.abort();
+      return { session: mockSession };
+    });
 
     const result = await runReviewer({
-      prompt: "review",
+      prompt: "review this",
       model: undefined,
       cwd: "/tmp",
-      target: { type: "custom", instructions: "review" },
+      signal: controller.signal,
+      target: defaultTarget,
+    });
+
+    // The abort fired during session creation, so the post-registration
+    // check should catch it and return canceled.
+    expect(result.kind).toBe("canceled");
+    vi.useFakeTimers();
+  });
+
+  it("calls onProgress callbacks with tool activity", async () => {
+    const onProgress = vi.fn();
+    const onToolActivity = vi.fn();
+
+    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
+      setTimeout(() => {
+        listener({
+          type: "tool_execution_start",
+          toolCallId: "1",
+          toolName: "read",
+          args: {},
+        });
+        listener({
+          type: "tool_execution_end",
+          toolCallId: "1",
+          toolName: "read",
+          result: {},
+          isError: false,
+        });
+        listener({
+          type: "turn_end",
+          message: { role: "assistant", content: "done" },
+        });
+        listener({ type: "agent_end", messages: [] });
+      }, 10);
+      return vi.fn();
+    });
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model: undefined,
+      cwd: "/tmp",
+      target: defaultTarget,
+      onProgress,
+      onToolActivity,
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    await resultPromise;
+
+    expect(onToolActivity).toHaveBeenCalledWith({ toolName: "read", phase: "start" });
+    expect(onToolActivity).toHaveBeenCalledWith({ toolName: "read", phase: "end" });
+    expect(onProgress).toHaveBeenCalled();
+  });
+
+  it("steers on timeout then aborts after grace turns", async () => {
+    vi.useRealTimers();
+
+    let sessionListener: ((event: unknown) => void) | undefined;
+    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
+      sessionListener = listener;
+      return vi.fn();
+    });
+
+    mockSession.steer.mockResolvedValue(undefined);
+    mockSession.abort.mockResolvedValue(undefined);
+    mockSession.getSessionStats.mockReturnValue({
+      tokens: { input: 100, output: 50, total: 150 },
+    });
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model: undefined,
+      cwd: "/tmp",
+      target: defaultTarget,
+      timeoutMs: 100, // Very short timeout for testing
+    });
+
+    // Wait for timeout to trigger, then simulate grace turns
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining("Time limit reached"));
+
+    // Simulate 3 grace turns expiring
+    if (sessionListener) {
+      sessionListener({
+        type: "turn_end",
+        message: { role: "assistant", content: "continuing" },
+      });
+      sessionListener({
+        type: "turn_end",
+        message: { role: "assistant", content: "still going" },
+      });
+      sessionListener({
+        type: "turn_end",
+        message: { role: "assistant", content: "one more" },
+      });
+    }
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("timeout");
+    if (result.kind === "timeout") {
+      expect(result.timeoutMs).toBe(100);
+    }
+
+    vi.useFakeTimers();
+  });
+
+  it("does not abort on grace turns when already settled", async () => {
+    vi.useRealTimers();
+
+    let sessionListener: ((event: unknown) => void) | undefined;
+    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
+      sessionListener = listener;
+      return vi.fn();
+    });
+
+    mockSession.steer.mockResolvedValue(undefined);
+    mockSession.abort.mockResolvedValue(undefined);
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model: undefined,
+      cwd: "/tmp",
+      target: defaultTarget,
+      timeoutMs: 100,
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    // agent_end (settled) fires BEFORE grace turns run out
+    if (sessionListener) {
+      sessionListener({ type: "agent_end", messages: [] });
+    }
+
+    const result = await resultPromise;
+    expect(result.kind).toBe("failed"); // No submit_review called
+    // abort() should NOT have been called since the session already ended
+    expect(mockSession.abort).not.toHaveBeenCalled();
+
+    vi.useFakeTimers();
+  });
+
+  it("returns session error when prompt fails", async () => {
+    mockSession.subscribe.mockReturnValue(vi.fn());
+    mockSession.prompt.mockRejectedValue(new Error("API error: rate limit"));
+
+    const result = await runReviewer({
+      prompt: "review this",
+      model: undefined,
+      cwd: "/tmp",
+      target: defaultTarget,
     });
 
     expect(result.kind).toBe("failed");
-    expect((result as Extract<typeof result, { kind: "failed" }>).reason).toContain(
-      "tmux is required",
-    );
-    expect(spawn).not.toHaveBeenCalled();
+    if (result.kind === "failed") {
+      expect(result.reason).toContain("Reviewer session error");
+    }
   });
 
-  it("handles tmux spawn errors gracefully", async () => {
-    const mockProc = createMockProc();
-    vi.mocked(spawn).mockImplementation(
-      (cmd: string, _args?: readonly string[], _options?: unknown) => {
-        if (cmd === "tmux") {
-          const proc = createMockProc();
-          mockSpawnProcs.push(proc);
-          setTimeout(() => {
-            proc.emit("error", new Error("ENOENT"));
-          }, 10);
-          return proc as never;
-        }
-        return mockProc as never;
+  it("falls back to last assistant text when submit_review not called", async () => {
+    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
+      setTimeout(() => {
+        listener({ type: "agent_end", messages: [] });
+      }, 10);
+      return vi.fn();
+    });
+
+    mockSession.messages = [
+      {
+        role: "assistant",
+        content: "I reviewed the code but forgot to call submit_review",
       },
-    );
+    ];
 
-    const promise = runReviewer({
-      prompt: "review",
+    const resultPromise = runReviewer({
+      prompt: "review this",
       model: undefined,
       cwd: "/tmp",
-      target: { type: "custom", instructions: "review" },
+      target: defaultTarget,
     });
 
-    vi.advanceTimersByTime(100);
-    const result = await promise;
+    await vi.advanceTimersByTimeAsync(50);
+    const result = await resultPromise;
 
     expect(result.kind).toBe("failed");
-    expect((result as Extract<typeof result, { kind: "failed" }>).reason).toContain("spawn");
-  });
-
-  it("resolves tmux session name collisions", async () => {
-    // Pre-register the first session name so collision handling kicks in
-    const promise = runReviewer({
-      prompt: "review",
-      model: undefined,
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review" },
-    });
-
-    const firstSessionName = getSessionNameFromSpawn();
-    tmuxSessions.add(firstSessionName);
-
-    // Start a second review
-    const promise2 = runReviewer({
-      prompt: "review2",
-      model: undefined,
-      cwd: "/tmp",
-      target: { type: "custom", instructions: "review2" },
-    });
-
-    const secondSessionName = getSessionNameFromSpawn(1);
-
-    // Clean up
-    tmuxSessions.delete(firstSessionName);
-    vi.advanceTimersByTime(1500);
-    await promise;
-    await promise2;
-
-    expect(secondSessionName).not.toBe(firstSessionName);
-    expect(secondSessionName).toMatch(/^supi-review-.*-1$/);
+    if (result.kind === "failed") {
+      expect(result.reason).toContain("did not call submit_review");
+    }
   });
 });
-
-function mockSpawnSync(cmd: string, args?: readonly string[]): never {
-  if (cmd !== "tmux") return syncResult();
-  return handleTmuxCommand(args ?? []);
-}
-
-function handleTmuxCommand(args: readonly string[]): never {
-  const handlers: Record<string, (args: readonly string[]) => never> = {
-    "-V": tmuxVersionResult,
-    "has-session": tmuxHasSessionResult,
-    "send-keys": () => syncResult(),
-    "kill-session": tmuxKillSessionResult,
-  };
-  return (handlers[args[0] ?? ""] ?? (() => syncResult()))(args);
-}
-
-function tmuxVersionResult(): never {
-  return syncResult(
-    tmuxAvailable ? 0 : 1,
-    "tmux 3.4",
-    tmuxAvailable ? undefined : new Error("not found"),
-  );
-}
-
-function tmuxHasSessionResult(args: readonly string[]): never {
-  return syncResult(tmuxSessions.has(args[2] ?? "") ? 0 : 1);
-}
-
-function tmuxKillSessionResult(args: readonly string[]): never {
-  tmuxSessions.delete(args[2] ?? "");
-  return syncResult();
-}
-
-function syncResult(status = 0, stdout = "", error?: Error): never {
-  return { status, error, stdout, stderr: "" } as never;
-}
-
-function getToolPathFromSpawn(index = 0): string {
-  const piArgs = getPiArgsFromSpawn(index);
-  const eIndex = piArgs.indexOf("-e");
-  return piArgs[eIndex + 1] as string;
-}
-
-function getPiArgsFromSpawn(index = 0): string[] {
-  const runnerPath = getRunnerPathFromSpawn(index);
-  const script = tempFiles.get(runnerPath);
-  const match = script?.match(/^const args = (.*);$/m);
-  if (!match?.[1]) throw new Error("runner args were not written");
-  return JSON.parse(match[1]) as string[];
-}
-
-function getRunnerPathFromSpawn(index = 0): string {
-  const call = vi.mocked(spawn).mock.calls[index];
-  const args = call?.[1] as string[];
-  return args.at(-1) as string;
-}
-
-function writeDefaultOutputFromSpawn(index = 0): void {
-  tempFiles.set(getToolPathFromSpawn(index).replace("-tool.ts", ".json"), defaultReviewJson());
-}
-
-function getSessionNameFromSpawn(index = 0): string {
-  const call = vi.mocked(spawn).mock.calls[index];
-  const args = call?.[1] as string[];
-  const sIndex = args.indexOf("-s");
-  return args[sIndex + 1] as string;
-}
-
-function defaultReviewJson(): string {
-  return JSON.stringify({
-    findings: [],
-    overall_correctness: "ok",
-    overall_explanation: "x",
-    overall_confidence_score: 0.5,
-  });
-}
-
-interface MockProc {
-  on: (event: string, fn: (...args: unknown[]) => void) => void;
-  emit: (event: string, ...args: unknown[]) => void;
-  stdout?: {
-    setEncoding: () => void;
-    on: (event: string, fn: (arg?: unknown) => void) => void;
-    emit: (event: string, arg?: unknown) => void;
-  };
-  stderr?: {
-    setEncoding: () => void;
-    on: (event: string, fn: (arg?: unknown) => void) => void;
-    emit: (event: string, arg?: unknown) => void;
-  };
-  kill: ReturnType<typeof vi.fn>;
-  killed: boolean;
-}
-
-function createMockProc(): MockProc {
-  const listeners: Record<string, Array<(...args: unknown[]) => void>> = {};
-  const stdoutListeners: Record<string, Array<(arg?: unknown) => void>> = {};
-  const stderrListeners: Record<string, Array<(arg?: unknown) => void>> = {};
-
-  const on = (event: string, fn: (...args: unknown[]) => void) => {
-    listeners[event] = listeners[event] || [];
-    listeners[event].push(fn);
-  };
-
-  const emit = (event: string, ...args: unknown[]) => {
-    for (const fn of listeners[event] || []) {
-      fn(...args);
-    }
-  };
-
-  const stdout = {
-    setEncoding: () => {},
-    on: (event: string, fn: (arg?: unknown) => void) => {
-      stdoutListeners[event] = stdoutListeners[event] || [];
-      stdoutListeners[event].push(fn);
-    },
-    emit: (event: string, arg?: unknown) => {
-      for (const fn of stdoutListeners[event] || []) {
-        fn(arg);
-      }
-    },
-  };
-
-  const stderr = {
-    setEncoding: () => {},
-    on: (event: string, fn: (arg?: unknown) => void) => {
-      stderrListeners[event] = stderrListeners[event] || [];
-      stderrListeners[event].push(fn);
-    },
-    emit: (event: string, arg?: unknown) => {
-      for (const fn of stderrListeners[event] || []) {
-        fn(arg);
-      }
-    },
-  };
-
-  return {
-    on,
-    emit,
-    stdout,
-    stderr,
-    kill: vi.fn(),
-    killed: false,
-  };
-}

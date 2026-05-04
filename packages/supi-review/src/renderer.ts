@@ -115,7 +115,6 @@ function renderFailed(
   container.addChild(new Text(theme.fg("error", "◆ Review Failed"), 1, 0));
   container.addChild(new Spacer(1));
   container.addChild(new Text(theme.fg("error", result.reason), 1, 0));
-  appendDiagnostics(container, result, theme);
   return container;
 }
 
@@ -133,47 +132,21 @@ function renderTimeout(
       0,
     ),
   );
-  appendDiagnostics(container, result, theme);
+  if (result.partialOutput) {
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(theme.fg("dim", "Partial output:"), 1, 0));
+    const excerpt = result.partialOutput.slice(0, 500);
+    container.addChild(new Text(theme.fg("dim", excerpt), 1, 0));
+  }
   return container;
 }
 
-function appendDiagnostics(
-  container: Container,
-  result: { warning?: string; stdout?: string; stderr?: string },
-  theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
-): void {
-  if (!result.warning && !result.stdout && !result.stderr) {
-    return;
-  }
-
-  container.addChild(new Spacer(1));
-
-  if (result.warning) {
-    container.addChild(new Text(theme.fg("dim", result.warning), 1, 0));
-  }
-
-  if (result.stdout) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("dim", "stdout excerpt:"), 1, 0));
-    container.addChild(new Text(theme.fg("dim", result.stdout.slice(0, 500)), 1, 0));
-  }
-  if (result.stderr) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("dim", "stderr excerpt:"), 1, 0));
-    container.addChild(new Text(theme.fg("dim", result.stderr.slice(0, 500)), 1, 0));
-  }
-}
-
 function renderCanceled(
-  result: Extract<ReviewResult, { kind: "canceled" }>,
+  _result: Extract<ReviewResult, { kind: "canceled" }>,
   theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
 ): Container {
   const container = new Container();
   container.addChild(new Text(theme.fg("warning", "◆ Review Canceled"), 1, 0));
-  if (result.warning) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("warning", result.warning), 1, 0));
-  }
   return container;
 }
 
