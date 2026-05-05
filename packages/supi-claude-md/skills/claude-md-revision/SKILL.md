@@ -26,16 +26,24 @@ Review the current session for actionable learnings and update the project's CLA
 
 ### Step 1: Reflect
 
-Identify what context would have helped this session go smoother. Scan the conversation for:
+Identify what context would have helped this session go smoother. Scan the conversation for learnings worth preserving.
 
-- **Bash commands** that were used, discovered, or should have been known upfront
-- **Code style patterns** followed (naming conventions, file organization, import styles)
-- **Testing approaches** that worked or didn't work
-- **Environment/configuration quirks** (build tools, version requirements, path oddities)
-- **Warnings or gotchas** encountered (deprecated APIs, common pitfalls, tricky behaviors)
-- **Workflow steps** that were non-obvious (deployment process, review rituals, tool invocation patterns)
+**What TO capture:**
+- **Commands/workflows** discovered or used repeatedly
+- **Gotchas and non-obvious patterns** (deprecated APIs, common pitfalls, tricky behaviors)
+- **Package relationships** or ordering dependencies not obvious from code
+- **Testing approaches** that worked (or didn't)
+- **Configuration quirks** (env vars, build tools, path oddities)
 
-Filter ruthlessly: if a learning is obvious, well-documented elsewhere, or unlikely to recur, skip it. CLAUDE.md is part of the prompt — brevity directly improves future sessions.
+**What NOT to capture:**
+- Obvious info already clear from code or naming
+- Generic best practices ("write tests", "use meaningful names")
+- One-off fixes unlikely to recur ("fixed typo on line 42")
+- Verbose explanations — one line per concept; link to docs for detail
+
+Filter ruthlessly. CLAUDE.md is part of the prompt — brevity directly improves future sessions.
+
+> See also: [detailed update guidelines](references/update-guidelines.md) and [quality criteria](references/quality-criteria.md)
 
 ### Step 2: Find Context Files
 
@@ -80,7 +88,7 @@ Avoid:
 
 For each addition, present it in this format:
 
-```
+```markdown
 ### Update: ./path/to/CLAUDE.md
 
 **Why:** [one-line reason this belongs here]
@@ -91,6 +99,11 @@ For each addition, present it in this format:
 ```
 
 Group related additions under a single heading. If multiple files need updates, show each separately.
+
+**Diff structure:**
+1. **Identify the file and section** — existing heading, or note if new
+2. **Show the change** — concise diff or quoted block
+3. **Explain why** — one sentence on how this helps future sessions
 
 ### Step 5: Apply with Approval
 
@@ -103,6 +116,14 @@ If the user approves:
 
 If the user rejects or modifies a proposal, adjust and re-present.
 
+**Validation checklist** — before finalizing, verify:
+- [ ] Each addition is project-specific, not generic advice
+- [ ] No duplication with existing content (read the file first)
+- [ ] Commands are tested and work
+- [ ] File paths are accurate
+- [ ] Team-shared vs. personal-local scope is respected
+- [ ] This is the most concise way to express the info
+
 ## Guidelines
 
 - **Brevity is the priority** — CLAUDE.md content is injected into every prompt. Long files hurt performance.
@@ -110,3 +131,9 @@ If the user rejects or modifies a proposal, adjust and re-present.
 - **No duplication** — read the existing file before adding; merge with existing entries when possible.
 - **Respect scope** — team-shared vs. personal-local. Don't put machine-specific paths in CLAUDE.md.
 - **Format consistency** — match the existing format in the target file. If the file uses backticks for commands, use backticks. If it uses bullet points, use bullet points.
+
+## References
+
+- [Update guidelines](references/update-guidelines.md) — detailed rubric for what to add and what to skip
+- [Quality criteria](references/quality-criteria.md) — scoring rubric for assessing CLAUDE.md quality
+- [Templates](references/templates.md) — section templates for creating new CLAUDE.md files

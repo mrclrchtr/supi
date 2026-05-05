@@ -25,6 +25,15 @@ Root and ancestor instruction files are loaded natively by pi into the system pr
 
 > Note: `@mariozechner/pi-tui` remains in `peerDependencies` for historical installs but is no longer imported by this package.
 
+## Skills
+
+Two skills are shipped under `skills/`:
+
+- `claude-md-improver` — bulk audit and scoring of CLAUDE.md files across the repo
+- `claude-md-revision` — targeted session-capture additions to CLAUDE.md
+
+Both skills share a set of reference files (`references/quality-criteria.md`, `references/templates.md`, `references/update-guidelines.md`). The revision skill duplicates these for self-containment. **When editing one copy, keep the other in sync** — `__tests__/skill-references-sync.test.ts` enforces this.
+
 ## Config
 
 Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
