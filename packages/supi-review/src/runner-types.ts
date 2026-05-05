@@ -17,7 +17,7 @@ export interface ReviewProgress {
 export interface ReviewerInvocation {
   prompt: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
-  model: Model<any> | undefined;
+  model: Model<any>;
   /** Model registry from the parent session — passed to createAgentSession
    *  so that provider registrations, auth, and streaming work correctly. */
   modelRegistry?: ModelRegistry;

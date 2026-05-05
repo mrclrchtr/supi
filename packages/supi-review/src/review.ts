@@ -227,6 +227,14 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
   const settings = loadReviewSettings(ctx.cwd);
   // ctx.modelRegistry is available because CommandContext extends ExtensionContext
   const model = resolveReviewerModel(settings, ctx.modelRegistry, ctx.model);
+  if (!model) {
+    return Promise.resolve({
+      kind: "failed",
+      reason:
+        "No review model configured. Set a review model in settings or load a model in the session.",
+      target,
+    });
+  }
 
   let diffOrBody = "";
   if (target.type === "base-branch" || target.type === "uncommitted") {

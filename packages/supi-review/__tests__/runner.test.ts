@@ -1,5 +1,12 @@
+import type { Model } from "@mariozechner/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReviewOutputEvent, ReviewTarget } from "../src/types.ts";
+
+// Minimal model stub — the reviewer tests don't exercise the actual
+// model path (they were passing `undefined` before tightening the type).
+// `reasoning: false` causes `clampThinkingLevel` to return "off".
+// biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
+const mockModel = { reasoning: false } as unknown as Model<any>;
 
 // Mock session object reused across tests
 const mockSession = {
@@ -100,7 +107,7 @@ describe("runReviewer", () => {
 
     const result = await runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       signal: controller.signal,
       target: defaultTarget,
@@ -119,7 +126,7 @@ describe("runReviewer", () => {
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
     });
@@ -151,7 +158,7 @@ describe("runReviewer", () => {
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
     });
@@ -192,7 +199,7 @@ describe("runReviewer", () => {
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
     });
@@ -212,7 +219,7 @@ describe("runReviewer", () => {
 
     const result = await runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
     });
@@ -232,7 +239,7 @@ describe("runReviewer", () => {
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       signal: controller.signal,
       target: defaultTarget,
@@ -265,7 +272,7 @@ describe("runReviewer", () => {
 
     const result = await runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       signal: controller.signal,
       target: defaultTarget,
@@ -307,7 +314,7 @@ describe("runReviewer", () => {
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
       onProgress,
@@ -339,7 +346,7 @@ describe("runReviewer", () => {
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
       timeoutMs: 100, // Very short timeout for testing
@@ -389,7 +396,7 @@ describe("runReviewer", () => {
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
       timeoutMs: 100,
@@ -416,7 +423,7 @@ describe("runReviewer", () => {
 
     const result = await runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
     });
@@ -444,7 +451,7 @@ describe("runReviewer", () => {
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: undefined,
+      model: mockModel,
       cwd: "/tmp",
       target: defaultTarget,
     });

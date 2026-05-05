@@ -1,5 +1,5 @@
 // biome-ignore lint/nursery/noExcessiveLinesPerFile: pre-existing, needs refactoring
-import { clampThinkingLevel, type ModelThinkingLevel } from "@mariozechner/pi-ai";
+import { clampThinkingLevel, type Model } from "@mariozechner/pi-ai";
 import {
   type AgentSession,
   type AgentSessionEvent,
@@ -101,16 +101,9 @@ export function buildReviewerSystemPrompt(): string {
     "Do NOT output JSON directly — call submit_review with the structured result.",
   ].join("\n");
 }
-function resolveReviewThinkingLevel(
-  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
-  model: import("@mariozechner/pi-ai").Model<any> | undefined,
-): ModelThinkingLevel {
-  if (!model) return "off";
-  return clampThinkingLevel(model, "xhigh");
-}
 async function createReviewerSession(
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
-  model: import("@mariozechner/pi-ai").Model<any> | undefined,
+  model: Model<any>,
   cwd: string,
   submitReviewTool: ReturnType<typeof defineTool>,
   modelRegistry?: ModelRegistry,
@@ -130,7 +123,7 @@ async function createReviewerSession(
     cwd,
     model,
     modelRegistry,
-    thinkingLevel: resolveReviewThinkingLevel(model),
+    thinkingLevel: clampThinkingLevel(model, "xhigh"),
     tools: ["read", "grep", "find", "ls", "submit_review"],
     customTools: [submitReviewTool],
     resourceLoader,
