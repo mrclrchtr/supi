@@ -54,3 +54,18 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 - `systemPromptOptions` is accessed via a typed intersection (`BeforeAgentStartEvent & { systemPromptOptions?: ... }`) for forward-compatibility with pi >= 0.68.0
 - `os.homedir()` cannot be mocked in ESM — config functions accept optional `homeDir` parameter for testability
 - Root/native context files are never re-injected by this extension; they live in pi's system prompt. Use `/reload` or restart the session to pick up changes to root instruction files
+- Subdirectory context is injected from path-aware tool activity such as reads, writes, edits, LSP operations, and Tree-sitter operations
+- Each directory is injected at most once per session (by default). After the configured `rereadInterval` turns, the content is re-read in case it changed
+- Re-injection of already-seen directories is skipped when context usage is at or above `contextThreshold`. First-time directory discovery is still injected even under context pressure
+
+## Injection pipeline
+
+The extension operates through three stages on `tool_result` events:
+
+1. **Path extraction** (`discovery.ts`) — identifies file paths from tool input (reads, writes, edits, LSP, and Tree-sitter operations). Determines parent directories to scan.
+2. **Subdirectory scan** (`discovery.ts`) — walks from the deepest subdirectory up to (but not including) cwd, checking for ordered `fileNames`. Skips directories already injected this session.
+3. **Context formatting** (`subdirectory.ts`) — wraps discovered file content in `<extension-context source="supi-claude-md">` blocks and appends them to the tool result.
+
+Root and ancestor files are handled natively by pi's system prompt — this extension never re-injects them. Use `/reload` to refresh native root context.
+
+Reread and threshold gating (`shouldInjectSubDir()` in `subdirectory.ts`): first-time discovery always passes; re-injection is controlled by `rereadInterval` turns and gated by context-usage percentage.

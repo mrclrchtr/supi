@@ -20,6 +20,27 @@ Entrypoint: `ask-user.ts`
 - Normalization trims question ids and structured option values before they reach the shared internal model.
 - On cancel/abort, call `ctx.abort()` so the agent turn stops; the questionnaire result should still be recorded in the transcript.
 
+## Questionnaire pipeline
+
+The `ask_user` tool processes questionnaires through a staged pipeline:
+
+1. **Schema validation** (`schema.ts`) — validates input against `QuestionnaireSchema` (TypeBox). Rejects malformed shapes before normalization.
+2. **Normalization** (`normalize.ts`) — trims question IDs and structured option values so they stay consistent across encoding layers.
+3. **Execution flow** (`flow.ts`) — dispatches to the rich overlay or fallback dialog depending on `ctx.ui.custom()` availability.
+4. **Result shaping** (`result.ts`, `format.ts`) — packages structured answers into the tool result format.
+
+### Rich vs fallback split
+
+- `ui-rich*.ts` — full overlay state, rendering, inline editing, and keyboard handlers (notes, previews, inline selection).
+- `ui-fallback.ts` — degraded `ctx.ui.select()` / `ctx.ui.prompt()` path. No notes, previews, or inline editing, but supports review + revise flows.
+
+### Tool contract
+
+- `allowOther` on `multichoice` is a mutually exclusive freeform alternative — clears staged selections when selected.
+- `allowSkip` exposes a partial-submit path (sets `skip: true` on result, returns completed fields).
+- Cancellation calls `ctx.abort()` to stop the agent turn; the result is still recorded in the transcript.
+- Single-active-questionnaire lock — subsequent `ask_user` calls before the first resolves return an error.
+
 ## Key files
 
 - `ask-user.ts` — tool registration

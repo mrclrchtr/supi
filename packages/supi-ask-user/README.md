@@ -14,23 +14,19 @@ This extension registers the `ask_user` tool for focused agent-user decisions.
 
 Supported question types:
 
-- `choice`
-- `multichoice`
-- `text`
-- `yesno`
+- `choice` — Pick exactly one from known options
+- `multichoice` — Pick multiple from a short list
+- `text` — Freeform text input
+- `yesno` — Binary go/no-go
 
-Key behavior:
+Key features:
 
-- supports 1-4 grouped questions per questionnaire
-- supports `recommendation`, `allowOther`, and `allowDiscuss`
-- supports `allowOther` on `multichoice` as a mutually exclusive freeform alternative path
-- supports rich option `preview` content
-- uses a rich custom UI when available
-- falls back to simpler select/input prompts when rich UI is unavailable, including review + revise flows
-- trims question ids and structured option values during normalization so returned identifiers stay stable
-- aborts the current agent turn if the questionnaire is cancelled
-
-This package also bundles the `supi-ask-user-guide` skill.
+- rich questionnaire UI with 1–4 grouped questions
+- recommendation highlighting for the preferred option
+- `allowOther` and `allowDiscuss` for flexibility
+- rich option `preview` content
+- automatic fallback to simpler prompts when the rich UI is unavailable
+- abort on cancel to stop the current agent turn
 
 ## Example
 
@@ -52,17 +48,6 @@ This package also bundles the `supi-ask-user-guide` skill.
 }
 ```
 
-## When to use it
-
-Use `ask_user` for narrow decisions that require explicit user input, such as:
-
-- picking between a small set of implementation options
-- confirming destructive actions
-- choosing priorities from a short list
-- clarifying intent before risky work
-
-Do not use it as a substitute for reading code, investigating the repo, or broad open-ended discovery.
-
 ## Requirements
 
 - `@mariozechner/pi-coding-agent`
@@ -72,4 +57,3 @@ Do not use it as a substitute for reading code, investigating the repo, or broad
 ## Source
 
 - Entrypoint: `ask-user.ts`
-- Skill resources: `resources/supi-ask-user-guide/`

@@ -17,7 +17,6 @@
   ],
   "files": [
     "src/**/*.ts",
-    "resources",
     "!__tests__"
   ],
   "main": "src/index.ts",
@@ -32,9 +31,6 @@
   "pi": {
     "extensions": [
       "./src/ask-user.ts"
-    ],
-    "skills": [
-      "./resources"
     ]
   }
 }

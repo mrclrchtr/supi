@@ -10,6 +10,25 @@ Entrypoints:
 - `lsp.ts` — extension wiring, lifecycle, commands, and resources
 - `index.ts` — public library surface (`getSessionLspService`, `SessionLspService`, types)
 
+## Tool actions overview
+
+The `lsp` tool exposes standard LSP features behind 1-based position coordinates, validated and formatted in `tool-actions.ts`:
+
+- **Language-level actions** — `hover`, `definition`, `references`, `implementation`, `symbols`, `rename`, `code_actions`
+- **Workspace search** — `workspace_symbol` (fuzzy symbol search), `search` (symbol search with text fallback), `symbol_hover` (hover by name via workspace resolution)
+- **Diagnostics** — per-file or project-wide; also surfaced inline after `write`/`edit` to overrides
+
+### Guidance layering
+
+Two layers work together to steer the agent toward LSP over raw text search:
+
+1. **Stable `promptGuidelines`** — baked into pi's system prompt at session start. Describes when to prefer each action and lists active servers with supported file types.
+2. **Dynamic diagnostic context** — `<extension-context>` messages injected per-turn only when outstanding diagnostics exist. Renderer keeps a summary in `content` and raw XML in `details.promptContent`; the `context` hook restores `promptContent` before the model sees it.
+
+### Severity levels
+
+Diagnostics are surfaced at four severity levels controlled via `/supi-settings` (default threshold: 1, errors only): Error (1) — won't compile, Warning (2) — potential issues, Information (3) — suggestions, Hint (4) — style/optimization.
+
 ## Key files
 
 - `lsp.ts` — extension wiring, lifecycle, commands, and resources

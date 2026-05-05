@@ -10,16 +10,12 @@ pi install npm:@mrclrchtr/supi-lsp
 
 ## What it adds
 
-This extension registers the `lsp` tool and related agent guidance so pi can use language-server features instead of relying only on plain-text search.
-
-Key capabilities:
-
 - `lsp` tool with `hover`, `definition`, `references`, `diagnostics`, `symbols`, `rename`, `code_actions`, `workspace_symbol`, `search`, and `symbol_hover`
-- stable system-prompt guidance — `promptGuidelines` direct the agent to prefer LSP over grep/rg for code navigation, with active server info
-- proactive project scanning and eager startup of detected language servers on session start
-- inline diagnostic surfacing around reads, writes, and edits
-- compact diagnostic context injection when outstanding diagnostics change
-- `/lsp-status` status overlay for servers, roots, open files, and diagnostics
+- Stable system-prompt guidance that directs the agent to prefer LSP over grep/rg for code navigation
+- Proactive project scanning and eager startup of detected language servers
+- Inline diagnostic surfacing around reads, writes, and edits
+- Compact diagnostic context injection when outstanding diagnostics change
+- `/lsp-status` status overlay
 
 ## Public library API
 
@@ -41,7 +37,7 @@ if (state.kind === "ready") {
 }
 ```
 
-Peer extensions can import from the package root without reaching into private files. The shared registry is keyed by session `cwd` and updated automatically during `session_start` and `session_shutdown`. Service file path inputs may be absolute or relative to that session `cwd`.
+Peer extensions can import from the package root without reaching into private files.
 
 ## Tool actions
 
@@ -73,11 +69,12 @@ Example:
 
 ## Configuration
 
-Settings are managed through `/supi-settings` (registered by the `supi` meta-package). Use the LSP settings panel to enable/disable LSP, control the severity threshold, and select active servers.
+Settings are managed through `/supi-settings` (registered by the `supi` meta-package). Use the LSP settings panel to:
 
-Project config:
-
-- `.pi-lsp.json` in the project root — override, add, or disable server definitions
+- enable or disable LSP globally
+- control the severity threshold
+- select active language servers
+- configure file exclusion patterns
 
 ## Commands
 
@@ -97,4 +94,3 @@ Project config:
 
 - Extension entrypoint: `lsp.ts`
 - Public library surface: `index.ts`
-- Skill resources: `resources/supi-lsp-guide/`

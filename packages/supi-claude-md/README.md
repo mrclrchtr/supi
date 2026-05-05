@@ -10,7 +10,7 @@ pi install npm:@mrclrchtr/supi-claude-md
 
 ## What it adds
 
-This extension adds **subdirectory discovery** — injecting `CLAUDE.md` / `AGENTS.md` from subdirectories when the agent touches files there.
+This extension adds **subdirectory context discovery** — injecting `CLAUDE.md` / `AGENTS.md` from subdirectories when the agent touches files there.
 
 Pi loads root and ancestor instruction files natively into the system prompt on every turn. To update root instruction files mid-session, use pi's `/reload` command or restart the session.
 
@@ -27,9 +27,8 @@ Inside `/supi-settings`, Claude-MD contributes:
 - `Context Threshold` — common percentage values from `0` to `100`
 - `Context File Names` — comma-separated text input; empty input restores the default filenames
 
-This package bundles two skills and a command:
+This package bundles a skill and a command:
 
-- `supi-claude-md-guide` — explains how subdirectory context injection works
 - `claude-md-improver` — audit CLAUDE.md files, evaluate quality, and propose targeted updates
 - `/revise-claude-md` — capture session learnings into CLAUDE.md with user approval
 
@@ -62,12 +61,6 @@ Options:
 - `subdirs` — enable or disable subdirectory discovery
 - `fileNames` — ordered list of context filenames to search for
 
-## Behavior notes
-
-- root and ancestor instruction files are loaded natively by pi's system prompt; this extension does not re-inject them
-- subdirectory context is injected from path-aware tool activity such as reads, writes, edits, LSP operations, and Tree-sitter operations
-- the settings UI opens directly in the pi interface rather than as a separate modal dialog
-
 ## Requirements
 
 - `@mariozechner/pi-coding-agent`
@@ -77,5 +70,5 @@ Options:
 ## Source
 
 - Entrypoint: `src/claude-md.ts`
-- Skills: `skills/supi-claude-md-guide/`, `skills/claude-md-improver/`
+- Skills: `skills/claude-md-improver/`
 - Prompt templates: `prompts/`

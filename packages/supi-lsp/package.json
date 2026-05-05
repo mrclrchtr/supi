@@ -18,7 +18,6 @@
   "files": [
     "src/**/*.ts",
     "src/**/*.json",
-    "resources",
     "!__tests__"
   ],
   "dependencies": {
@@ -36,9 +35,6 @@
   "pi": {
     "extensions": [
       "./src/lsp.ts"
-    ],
-    "skills": [
-      "./resources"
     ]
   },
   "main": "src/index.ts"
