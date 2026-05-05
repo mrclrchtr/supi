@@ -19,6 +19,8 @@ Entrypoints:
 - `client.ts` — LSP client wrapper (initialize, document sync, requests)
 - `service-registry.ts` — shared session-scoped registry for peer extension reuse
 - `guidance.ts` — prompt guidelines/snippet and diagnostic-context formatting
+- `diagnostics/suppression-diagnostics.ts` — stale suppression detection/splitting for inline + pre-turn output
+- `manager/manager-diagnostics.ts` — extracted file-sync and cascade-diagnostic helpers to keep `manager.ts` under the Biome line cap
 - `overrides.ts`, `renderer.ts`, `ui.ts` — tool-result augmentation, custom messages, and status overlay
 - `pattern-matcher.ts` — gitignore-style glob matching for user-configured path exclusion
 - `settings-registration.ts` — LSP settings (enable, severity, active servers, exclude patterns)
@@ -49,6 +51,8 @@ Entrypoints:
 - Track pull diagnostic `resultId` in the diagnostic cache and send it back as `previousResultId`.
 - Single-file diagnostic sync (`syncAndWaitForDiagnostics`) should prefer pull diagnostics when `diagnosticProvider` is advertised, then fall back to push waits.
 - `syncAndWaitForDiagnostics()` backs both `write`/`edit` inline diagnostics and the `lsp diagnostics` action; keep its pull/push behavior aligned with `refreshOpenDiagnostics()`.
+- `write`/`edit` inline diagnostics now surface cascade updates from other open files when pull diagnostics refresh their `receivedAt` timestamps via `relatedDocuments`; the cascade diffing logic lives in `manager/manager-diagnostics.ts`.
+- Stale suppression diagnostics (`biome` “Suppression comment has no effect”, unused `@ts-expect-error`) are split out in `diagnostics/suppression-diagnostics.ts` and shown even when normal inline diagnostics are error-only.
 - After `write`/`edit`, severity-1 diagnostics are augmented with LSP `hover` (3-line truncation) and `code_actions` titles at the first error position, each with a 500ms timeout.
 - After a file creation (`syncFileAndGetDiagnostics`), `LspManager` calls `client.clearPullResultIds()` to clear all `resultId` values from the diagnostic cache. This forces the next `before_agent_start` diagnostic refresh to send full pull requests (without `previousResultId`) so cross-file diagnostics (e.g., resolved `Cannot find module` errors in importing files) are fully re-computed instead of short-circuited by `unchanged` pull responses.
 
@@ -74,6 +78,7 @@ Entrypoints:
 - `pnpm exec vitest run packages/supi-lsp/__tests__/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/renderer.test.ts` — minimal regression pass for pull-diagnostic + custom-message context changes.
 - `pnpm exec vitest run packages/supi-lsp/__tests__/service-registry.test.ts` — public API + registry lifecycle.
 - `pnpm exec vitest run packages/supi-lsp/__tests__/tool-actions.validation.test.ts` — parameter validation + path resolution.
+- `pnpm exec vitest run packages/supi-lsp/__tests__/diagnostic-cascade.test.ts packages/supi-lsp/__tests__/overrides-cascade.test.ts packages/supi-lsp/__tests__/suppression-diagnostics.test.ts` — cascade detection, inline output, and stale suppression coverage.
 
 ```bash
 pnpm exec vitest run packages/supi-lsp/__tests__/client-refresh.test.ts packages/supi-lsp/__tests__/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/transport.test.ts
