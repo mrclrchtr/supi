@@ -85,6 +85,46 @@ describe("LSP prompt guidance", () => {
     expect(content).toContain("</extension-context>");
   });
 
+  it("includes stale suppression cleanup when detailed diagnostics contain suppressions", () => {
+    const content = formatDiagnosticsContext(
+      [
+        {
+          file: "src/app.ts",
+          total: 2,
+          errors: 1,
+          warnings: 1,
+          information: 0,
+          hints: 0,
+        },
+      ],
+      3,
+      [
+        {
+          file: "src/app.ts",
+          diagnostics: [
+            {
+              severity: 1,
+              message: "Type 'number' is not assignable to type 'string'.",
+              range: { start: { line: 4, character: 0 }, end: { line: 4, character: 1 } },
+              source: "ts",
+            },
+            {
+              severity: 2,
+              message: "Unused '@ts-expect-error' directive.",
+              range: { start: { line: 10, character: 0 }, end: { line: 10, character: 1 } },
+              source: "ts",
+            },
+          ],
+        },
+      ],
+    );
+
+    expect(content).toContain("Outstanding diagnostics — fix these before proceeding:");
+    expect(content).toContain("src/app.ts: 1 error, 1 warning");
+    expect(content).toContain("Stale suppression comments — clean these up:");
+    expect(content).toContain("Unused '@ts-expect-error' directive.");
+  });
+
   it("returns null for empty diagnostics context", () => {
     expect(formatDiagnosticsContext([])).toBeNull();
     expect(diagnosticsContextFingerprint(null)).toBeNull();

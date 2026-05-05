@@ -26,6 +26,11 @@ import {
   refreshOpenDiagnosticsForClients,
 } from "./manager-client-state.ts";
 import {
+  collectOutstandingDiagnosticsDetailed,
+  mapCascadeDiagnosticsToFiles,
+  syncClientFileAndGetCascadingDiagnostics,
+} from "./manager-diagnostics.ts";
+import {
   clientKey,
   isExcludedByPattern,
   rememberKnownRoot,
@@ -79,7 +84,10 @@ export class LspManager {
     // Mirror getClientForFile's root resolution so the unavailable check stays
     // root-specific. A failed startup in one workspace must not suppress
     // activation for unrelated roots served by the same language server.
-    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, { knownRoots: this.knownRoots, cwd: this.cwd });
+    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, {
+      knownRoots: this.knownRoots,
+      cwd: this.cwd,
+    });
     if (this.unavailable.has(`${serverName}:${root}`)) return false;
     return this.isServerCommandAvailable(serverConfig.command);
   }
@@ -99,7 +107,10 @@ export class LspManager {
     const match = getServerForFile(this.config, filePath);
     if (!match) return null;
     const [serverName, serverConfig] = match;
-    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, { knownRoots: this.knownRoots, cwd: this.cwd });
+    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, {
+      knownRoots: this.knownRoots,
+      cwd: this.cwd,
+    });
     return this.startServerForRoot(serverName, root);
   }
   async startServerForRoot(serverName: string, root: string): Promise<LspClient | null> {
@@ -170,28 +181,38 @@ export class LspManager {
           a.status.localeCompare(b.status),
       );
   }
-  /** Sync a file and wait for diagnostics filtered to severity threshold. */
   async syncFileAndGetDiagnostics(
     filePath: string,
     maxSeverity: number = 1,
   ): Promise<Diagnostic[]> {
+    const resolvedPath = path.resolve(filePath);
+    return (
+      (await this.syncFileAndGetCascadingDiagnostics(resolvedPath, maxSeverity)).find(
+        (entry) => entry.file === resolvedPath,
+      )?.diagnostics ?? []
+    );
+  }
+  async syncFileAndGetCascadingDiagnostics(
+    filePath: string,
+    maxSeverity: number = 1,
+  ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>> {
     const client = await this.getClientForFile(filePath);
     if (!client) return [];
     const resolvedPath = path.resolve(filePath);
-    let content: string;
     try {
-      content = fs.readFileSync(resolvedPath, "utf-8");
+      const { primary, cascade } = await syncClientFileAndGetCascadingDiagnostics(
+        client,
+        resolvedPath,
+        maxSeverity,
+      );
+      return [
+        ...(primary.length > 0 ? [{ file: resolvedPath, diagnostics: primary }] : []),
+        ...mapCascadeDiagnosticsToFiles(cascade),
+      ];
     } catch {
       this.closeFile(resolvedPath);
       return [];
     }
-    const diagnostics = await client.syncAndWaitForDiagnostics(resolvedPath, content);
-    // Clear pull result IDs so the next diagnostic refresh (in
-    // `before_agent_start`) does a full pull for all open files in this
-    // client, not an `unchanged` shortcut. This is essential when a
-    // newly-created file resolves import errors in other open files.
-    client.clearPullResultIds();
-    return diagnostics.filter((d) => d.severity !== undefined && d.severity <= maxSeverity);
   }
   /** Close a file across any active LSP clients and clear its cached diagnostics. */
   closeFile(filePath: string): void {
@@ -333,17 +354,6 @@ export class LspManager {
         a.file.localeCompare(b.file),
     );
   }
-  /** Get outstanding diagnostics as compact text suitable for pre-turn context. */
-  getOutstandingDiagnosticsSummaryText(
-    maxSeverity: number = 1,
-    maxFiles: number = 3,
-  ): string | null {
-    return formatOutstandingDiagnosticsSummaryText(
-      this.getOutstandingDiagnosticSummary(maxSeverity),
-      maxFiles,
-    );
-  }
-  /** Get outstanding diagnostics filtered to files or directories relevant to the current turn. */
   getRelevantOutstandingDiagnosticsSummaryText(
     relevantPaths: string[],
     maxSeverity: number = 1,
@@ -351,46 +361,36 @@ export class LspManager {
   ): string | null {
     const normalizedPaths = normalizeRelevantPaths(relevantPaths);
     if (normalizedPaths.length === 0) return null;
-    const relevantEntries = this.getOutstandingDiagnosticSummary(maxSeverity).filter((entry) =>
-      isPathRelevant(entry.file, normalizedPaths, this.cwd),
+    return formatOutstandingDiagnosticsSummaryText(
+      this.getOutstandingDiagnosticSummary(maxSeverity).filter((entry) =>
+        isPathRelevant(entry.file, normalizedPaths, this.cwd),
+      ),
+      maxFiles,
     );
-    return formatOutstandingDiagnosticsSummaryText(relevantEntries, maxFiles);
   }
-  /** Get outstanding diagnostics with full detail per file. */
   getOutstandingDiagnostics(
     maxSeverity: number = 1,
   ): Array<{ file: string; diagnostics: Diagnostic[] }> {
     this.pruneMissingFiles();
-    const fileDiags = new Map<string, Diagnostic[]>();
-    for (const client of this.clients.values()) {
-      for (const entry of client.getAllDiagnostics()) {
-        const file = relativeFilePathFromUri(entry.uri, this.cwd);
-        if (shouldIgnoreLspPath(file, this.cwd)) continue;
-        if (isExcludedByPattern(file, this.excludePatterns)) continue;
-        const filtered = entry.diagnostics.filter(
-          (d) => d.severity !== undefined && d.severity <= maxSeverity,
-        );
-        if (filtered.length === 0) continue;
-        const existing = fileDiags.get(file) ?? [];
-        fileDiags.set(file, [...existing, ...filtered]);
-      }
-    }
-    return Array.from(fileDiags.entries())
-      .map(([file, diagnostics]) => ({ file, diagnostics }))
-      .sort((a, b) => a.file.localeCompare(b.file));
+    return collectOutstandingDiagnosticsDetailed(
+      this.clients.values(),
+      this.cwd,
+      this.excludePatterns,
+      maxSeverity,
+    );
   }
   async workspaceSymbol(query: string) {
-    const { managerWorkspaceSymbol } = await import("./manager-workspace-symbol.ts");
-    return managerWorkspaceSymbol(this.clients.values(), query);
+    return (await import("./manager-workspace-symbol.ts")).managerWorkspaceSymbol(
+      this.clients.values(),
+      query,
+    );
   }
-  /** Ensure a file is open in its LSP server. */
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
     const client = await this.getClientForFile(filePath);
-    if (!client) return null;
     const resolvedPath = path.resolve(filePath);
+    if (!client) return null;
     try {
-      const content = fs.readFileSync(resolvedPath, "utf-8");
-      client.didOpen(resolvedPath, content);
+      client.didOpen(resolvedPath, fs.readFileSync(resolvedPath, "utf-8"));
       return client;
     } catch {
       this.closeFile(resolvedPath);

@@ -1,8 +1,10 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { createEditTool, createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
 import { augmentDiagnostics } from "./diagnostics/diagnostic-augmentation.ts";
-import { formatDiagnostics } from "./diagnostics/diagnostics.ts";
+import { formatGroupedDiagnostics } from "./diagnostics/diagnostics.ts";
+import { splitSuppressionDiagnostics } from "./diagnostics/suppression-diagnostics.ts";
 import type { LspManager } from "./manager/manager.ts";
+import type { Diagnostic } from "./types.ts";
 
 interface LspOverrideState {
   getInlineSeverity(): number;
@@ -76,27 +78,32 @@ async function appendInlineDiagnostics<T extends { content: unknown[]; details: 
   if (!options.manager) return options.result;
 
   try {
-    const diags = await options.manager.syncFileAndGetDiagnostics(
+    const effectiveSeverity = Math.max(options.inlineSeverity, 2);
+    const entries = await options.manager.syncFileAndGetCascadingDiagnostics(
       options.filePath,
-      options.inlineSeverity,
+      effectiveSeverity,
     );
-    if (diags.length === 0) return options.result;
+    if (entries.length === 0) return options.result;
 
-    let diagText = formatDiagnostics(options.filePath, diags, options.cwd);
-
+    const primaryDiagnostics =
+      entries.find((entry) => entry.file === options.filePath)?.diagnostics ?? [];
     const augmentation = await augmentDiagnostics(
       options.filePath,
-      diags,
+      splitSuppressionDiagnostics(primaryDiagnostics, options.inlineSeverity).regular,
       options.manager,
       options.cwd,
     );
-    if (augmentation) {
-      diagText += `\n\n${augmentation}`;
-    }
+    const diagText = buildInlineDiagnosticsMessage(
+      entries,
+      options.cwd,
+      options.inlineSeverity,
+      augmentation ?? undefined,
+    );
+    if (!diagText) return options.result;
 
     const diagnosticContent = {
       type: "text" as const,
-      text: `\n\n⚠️ LSP Diagnostics — review before continuing:\n${diagText}\nIf these errors are unexpected or appear across multiple files, fix the root cause before editing more files.`,
+      text: `\n\n${diagText}`,
     } as T["content"][number];
 
     return {
@@ -106,6 +113,53 @@ async function appendInlineDiagnostics<T extends { content: unknown[]; details: 
   } catch {
     return options.result;
   }
+}
+
+export function buildInlineDiagnosticsMessage(
+  entries: Array<{ file: string; diagnostics: Diagnostic[] }>,
+  cwd: string,
+  inlineSeverity: number = 1,
+  augmentation?: string,
+): string | null {
+  const regularEntries: Array<{ file: string; diagnostics: Diagnostic[] }> = [];
+  const suppressionEntries: Array<{ file: string; diagnostics: Diagnostic[] }> = [];
+
+  for (const entry of entries) {
+    const { regular, suppressions } = splitSuppressionDiagnostics(
+      entry.diagnostics,
+      inlineSeverity,
+    );
+    if (regular.length > 0) {
+      regularEntries.push({ file: entry.file, diagnostics: regular });
+    }
+    if (suppressions.length > 0) {
+      suppressionEntries.push({ file: entry.file, diagnostics: suppressions });
+    }
+  }
+
+  if (regularEntries.length === 0 && suppressionEntries.length === 0) {
+    return null;
+  }
+
+  const sections = ["⚠️ LSP Diagnostics — review before continuing:"];
+
+  if (regularEntries.length > 0) {
+    sections.push(formatGroupedDiagnostics(regularEntries, cwd));
+    if (augmentation) {
+      sections.push(augmentation);
+    }
+  }
+
+  if (suppressionEntries.length > 0) {
+    sections.push(
+      `🗑️ Stale suppressions — cleanup available:\n${formatGroupedDiagnostics(suppressionEntries, cwd)}`,
+    );
+  }
+
+  sections.push(
+    "If these errors are unexpected or appear across multiple files, fix the root cause before editing more files.",
+  );
+  return sections.join("\n\n");
 }
 
 async function ensureFileOpen(manager: LspManager | null, filePath: string): Promise<void> {

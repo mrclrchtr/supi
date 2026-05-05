@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { splitSuppressionDiagnostics } from "./diagnostics/suppression-diagnostics.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "./manager/manager-types.ts";
 import type { Diagnostic, ProjectServerInfo } from "./types.ts";
 
@@ -70,6 +71,12 @@ export function formatDiagnosticsContext(
     lines.push(`- +${remaining} more file${remaining === 1 ? "" : "s"}`);
   }
 
+  appendSuppressionCleanup(
+    lines,
+    visible.map((entry) => entry.file),
+    detailMap,
+  );
+
   return [
     '<extension-context source="supi-lsp">',
     "Outstanding diagnostics — fix these before proceeding:",
@@ -99,6 +106,29 @@ function appendDetailLines(lines: string[], details?: Diagnostic[]): void {
     const extra = details.length - MAX_DETAIL_LINES_PER_FILE;
     lines.push(`  +${extra} more`);
   }
+}
+
+function appendSuppressionCleanup(
+  lines: string[],
+  visibleFiles: string[],
+  detailMap: Map<string, Diagnostic[]> | null,
+): void {
+  if (!detailMap) return;
+
+  const suppressionLines: string[] = [];
+  for (const file of visibleFiles) {
+    const diagnostics = detailMap.get(file);
+    if (!diagnostics) continue;
+
+    const { suppressions } = splitSuppressionDiagnostics(diagnostics, 1);
+    if (suppressions.length === 0) continue;
+
+    suppressionLines.push(`- ${file}`);
+    appendDetailLines(suppressionLines, suppressions);
+  }
+
+  if (suppressionLines.length === 0) return;
+  lines.push("", "Stale suppression comments — clean these up:", ...suppressionLines);
 }
 
 export function diagnosticsContextFingerprint(content: string | null): string | null {
