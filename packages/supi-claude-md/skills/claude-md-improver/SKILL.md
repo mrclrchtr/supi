@@ -46,6 +46,7 @@ For each CLAUDE.md file, evaluate against quality criteria. See [references/qual
 | Conciseness | Medium | No verbose explanations or obvious info? |
 | Currency | High | Does it reflect current codebase state? |
 | Actionability | High | Are instructions executable, not vague? |
+| Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? |
 
 **Quality Scores:**
 - **A (90-100)**: Comprehensive, current, actionable
@@ -53,6 +54,19 @@ For each CLAUDE.md file, evaluate against quality criteria. See [references/qual
 - **C (50-69)**: Basic info, missing key sections
 - **D (30-49)**: Sparse or outdated
 - **F (0-29)**: Missing or severely outdated
+
+### Phase 2.5: SuPi Overlap Check
+
+For each CLAUDE.md file found, check for content that duplicates what SuPi extensions auto-deliver:
+
+1. **Detect SuPi usage** — check if `@mrclrchtr/supi` or `@mrclrchtr/supi-code-intelligence` appears in `package.json` dependencies, or if `.pi/supi/config.json` exists
+2. **If SuPi is present**, scan for redundant sections:
+   - `## Modules` / `## Packages` tables with name/description/path columns
+   - Dependency graphs that don't add reasoning
+   - High-level architecture overviews without project-specific conventions
+3. **Flag for removal** in the quality report, with rationale
+
+**Note:** This check is opinionated — it assumes SuPi extensions are active and delivering their standard content. If SuPi is not detected, skip this phase.
 
 ### Phase 3: Quality Report Output
 
@@ -75,12 +89,13 @@ Format:
 
 | Criterion | Score | Notes |
 |-----------|-------|-------|
-| Commands/workflows | X/20 | ... |
-| Architecture clarity | X/20 | ... |
+| Commands/workflows | X/15 | ... |
+| Architecture clarity | X/15 | ... |
 | Non-obvious patterns | X/15 | ... |
 | Conciseness | X/15 | ... |
 | Currency | X/15 | ... |
 | Actionability | X/15 | ... |
+| Auto-delivered overlap | X/10 | ... |
 
 **Issues:**
 - [List specific problems]
