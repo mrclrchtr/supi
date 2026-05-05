@@ -61,6 +61,22 @@ Why: Establishes patterns that work.
 
 Why: Environment-specific knowledge.
 
+## What SuPi Extensions Already Deliver
+
+When auditing or updating CLAUDE.md in a project using SuPi extensions, these sections are redundant because they're auto-injected on every session:
+
+| Extension | What It Injects | When |
+|-----------|----------------|------|
+| `supi-code-intelligence` | Workspace module graph (names, descriptions, paths, dependency edges) | First `before_agent_start` per session |
+| `supi-claude-md` | Subdirectory `CLAUDE.md` files wrapped in `<extension-context>` | On `read`/`edit`/`lsp`/`tree_sitter` to subdirectories |
+| `supi-core` | `findProjectRoot`, `walkProject`, XML `<extension-context>` tagging | Available to all extensions |
+
+**Implication:** A root CLAUDE.md doesn't need to document what `code_intel brief` would say. Focus instead on:
+- Commands and workflows
+- Cross-package conventions and patterns
+- Gotchas that aren't in code
+- Human-curated guidance ("start here for X")
+
 ## What NOT to Add
 
 ### 1. Obvious Code Info
@@ -138,6 +154,33 @@ Section: Commands (new section after ## Architecture)
 > confusion about how to run the project. This saves future sessions
 > from needing to inspect `package.json`.
 
+## What NOT to Add (SuPi Projects)
+
+In addition to the existing guidelines, avoid these when SuPi is active:
+
+**Redundant: Package/module inventory**
+```markdown
+Bad:
+## Packages
+| Package | Description | Path |
+|---------|-------------|------|
+| `api` | REST API | `packages/api/` |
+
+Better: Skip entirely, or if relationships are non-obvious:
+## Cross-Package Patterns
+The `api` package must be initialized before `worker` due to shared DB migrations.
+```
+
+**Redundant: High-level dependency graph**
+```markdown
+Bad:
+## Dependencies
+- `api` depends on `db`, `auth`
+- `web` depends on `api`
+
+Better: Skip — `code_intel brief` shows this live.
+```
+
 ## Validation Checklist
 
 Before finalizing an update, verify:
@@ -148,3 +191,4 @@ Before finalizing an update, verify:
 - [ ] File paths are accurate
 - [ ] Would a new Claude session find this helpful?
 - [ ] Is this the most concise way to express the info?
+- [ ] No overlap with SuPi auto-delivered content (when SuPi is active)

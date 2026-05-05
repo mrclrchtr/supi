@@ -2,34 +2,34 @@
 
 ## Scoring Rubric
 
-### 1. Commands/Workflows (20 points)
+### 1. Commands/Workflows (15 points)
 
-**20 points**: All essential commands documented with context
+**15 points**: All essential commands documented with context
 - Build, test, lint, deploy commands present
 - Development workflow clear
 - Common operations documented
 
-**15 points**: Most commands present, some missing context
+**12 points**: Most commands present, some missing context
 
-**10 points**: Basic commands only, no workflow
+**8 points**: Basic commands only, no workflow
 
-**5 points**: Few commands, many missing
+**4 points**: Few commands, many missing
 
 **0 points**: No commands documented
 
-### 2. Architecture Clarity (20 points)
+### 2. Architecture Clarity (15 points)
 
-**20 points**: Clear codebase map
+**15 points**: Clear codebase map
 - Key directories explained
 - Module relationships documented
 - Entry points identified
 - Data flow described where relevant
 
-**15 points**: Good structure overview, minor gaps
+**12 points**: Good structure overview, minor gaps
 
-**10 points**: Basic directory listing only
+**8 points**: Basic directory listing only
 
-**5 points**: Vague or incomplete
+**4 points**: Vague or incomplete
 
 **0 points**: No architecture info
 
@@ -86,6 +86,28 @@
 
 **0 points**: Vague or theoretical
 
+### 7. Auto-Delivered Overlap (10 points)
+
+**10 points**: No overlap with auto-delivered content. CLAUDE.md focuses on curated, non-obvious context only.
+
+**7 points**: Minor overlap (e.g., a brief package list that adds relationships beyond the auto-generated module graph)
+
+**4 points**: Significant overlap — package tables, architecture overviews, or dependency graphs that duplicate `code_intel` output
+
+**0 points**: Large sections that are purely auto-generated data (module lists with descriptions, dense dependency tables)
+
+**What is NOT overlap:**
+- Gotchas specific to a package's behavior
+- Cross-package patterns that aren't discoverable from manifests
+- Commands and workflows
+- Human-curated "Start Here" guidance with reasoning
+
+**What IS overlap:**
+- Monorepo package tables where every row is `{name, description, path}`
+- Root-level "Modules" or "Packages" sections with >5 entries
+- High-level architecture overviews that don't add relationships, gotchas, or conventions beyond what's in `package.json`
+- Dependency graphs that could be generated from `pnpm-workspace.yaml`
+
 ## Assessment Process
 
 1. Read the CLAUDE.md file completely
@@ -107,3 +129,4 @@
 - Generic advice not specific to the project
 - "TODO" items never completed
 - Duplicate info across multiple CLAUDE.md files
+- Sections that duplicate `code_intel brief` output (package tables, module graphs, dependency lists)
