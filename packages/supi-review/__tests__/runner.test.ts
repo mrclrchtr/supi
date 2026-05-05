@@ -14,13 +14,13 @@ const mockSession = {
 
 let capturedCustomTools: Array<{ execute: (...args: unknown[]) => Promise<unknown> }> = [];
 
-const mockCreateAgentSession = vi.fn();
+const mockCreateAgentSession = vi.hoisted(() => vi.fn());
 
 vi.mock("@mariozechner/pi-coding-agent", () => ({
   createAgentSession: mockCreateAgentSession,
-  DefaultResourceLoader: vi.fn().mockImplementation(() => ({
-    reload: vi.fn().mockResolvedValue(undefined),
-  })),
+  DefaultResourceLoader: class MockDefaultResourceLoader {
+    reload = vi.fn().mockResolvedValue(undefined);
+  },
   SessionManager: {
     inMemory: vi.fn().mockReturnValue({}),
   },
