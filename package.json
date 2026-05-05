@@ -16,14 +16,12 @@
   ],
   "pi": {
     "extensions": [
-      "./packages/supi-aliases/src/aliases.ts",
       "./packages/supi-ask-user/src/ask-user.ts",
       "./packages/supi-bash-timeout/src/index.ts",
       "./packages/supi-claude-md/src/index.ts",
       "./packages/supi-context/src/index.ts",
       "./packages/supi/src/settings.ts",
       "./packages/supi-review/src/index.ts",
-      "./packages/supi-skill-shortcut/src/skill-shortcut.ts",
       "./packages/supi-lsp/src/lsp.ts",
       "./packages/supi-tree-sitter/src/tree-sitter.ts",
       "./packages/supi-cache-monitor/src/index.ts",

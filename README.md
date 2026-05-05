@@ -16,9 +16,8 @@ Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent)
 
 | Package | Extension | Description |
 |---------|-----------|-------------|
-| `@mrclrchtr/supi-aliases` | **aliases** | Registers `/exit` to quit pi, `/e` as a shorthand alias, and `/clear` to start a new session (alias for `/new`) |
+| `@mrclrchtr/supi-extras` | **extras** | Command aliases (`/exit`, `/e`, `/clear`), `$skill-name` shorthand, tab spinner, prompt stash, and other small utilities |
 | `@mrclrchtr/supi-bash-timeout` | **bash-timeout** | Injects a default timeout on every bash tool call when the LLM omits one. Configurable via `PI_BASH_DEFAULT_TIMEOUT` (seconds, default 120). |
-| `@mrclrchtr/supi-skill-shortcut` | **skill-shortcut** | Type `$skill-name` as a shorthand for `/skill:skill-name`. Autocomplete triggers on `$`. |
 | `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
 | `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, workspace symbol search, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. Also exports a reusable `SessionLspService` library surface for peer extensions. |
 | `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis for JavaScript and TypeScript files: outline, imports, exports, node-at-position lookup, and custom queries. Designed as a standalone substrate independent of semantic LSP tooling. |
@@ -39,9 +38,8 @@ pi install npm:@mrclrchtr/supi
 pi install npm:@mrclrchtr/supi-lsp
 pi install npm:@mrclrchtr/supi-tree-sitter
 pi install npm:@mrclrchtr/supi-ask-user
-pi install npm:@mrclrchtr/supi-skill-shortcut
+pi install npm:@mrclrchtr/supi-extras
 pi install npm:@mrclrchtr/supi-bash-timeout
-pi install npm:@mrclrchtr/supi-aliases
 pi install npm:@mrclrchtr/supi-review
 pi install npm:@mrclrchtr/supi-flow
 ```

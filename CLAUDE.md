@@ -39,15 +39,14 @@ This repo has two install surfaces:
 - `packages/supi/` is the published meta-package bundling the full stack
 
 Current workspace packages:
-- `packages/supi-aliases` — `/exit`, `/e`, `/clear` shortcuts
-- `packages/supi-core` — shared infrastructure: XML `<extension-context>` tag, config system
-- `packages/supi-claude-md` — subdirectory CLAUDE.md injection
+- `packages/supi` — meta-package wrapper entrypoints plus `prompts/` and `resources.ts` prompt rediscovery
 - `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
 - `packages/supi-bash-timeout` — default timeout injection for `bash`
+- `packages/supi-claude-md` — subdirectory CLAUDE.md injection
+- `packages/supi-core` — shared infrastructure: XML `<extension-context>` tag, config system
+- `packages/supi-extras` — command aliases, skill shorthand, tab spinner, prompt stash, and other small utilities
 - `packages/supi-lsp` — Language Server Protocol integration + diagnostics guardrails
 - `packages/supi-tree-sitter` — Tree-sitter structural analysis tool + reusable parse/query service
-- `packages/supi-skill-shortcut` — `$skill-name` shorthand for `/skill:name`
-- `packages/supi` — meta-package wrapper entrypoints plus `prompts/` and `resources.ts` prompt rediscovery
 
 Other notable areas:
 - `openspec/changes/` and `openspec/specs/` — OpenSpec artifacts

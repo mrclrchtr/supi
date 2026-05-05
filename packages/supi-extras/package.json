@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-extras",
   "version": "0.1.0",
-  "description": "SuPi UI extras — tab spinner, prompt stash, and other small UI utilities",
+  "description": "SuPi extras — command aliases, skill shorthand, tab spinner, prompt stash, and other small utilities",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,11 +24,12 @@
   },
   "main": "src/index.ts",
   "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "*"
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-tui": "*"
   },
   "pi": {
     "extensions": [
-      "./src/tab-spinner.ts"
+      "./src/index.ts"
     ]
   }
 }

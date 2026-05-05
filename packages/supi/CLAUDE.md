@@ -9,14 +9,13 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
 ## Key responsibilities
 
 - re-export workspace extensions through local wrapper entrypoints in `src/`:
-  - `src/aliases.ts`
+  - `src/extras.ts`
   - `src/ask-user.ts`
   - `src/bash-timeout.ts`
   - `src/claude-md.ts`
   - `src/settings.ts`
   - `src/lsp.ts`
   - `src/tree-sitter.ts`
-  - `src/skill-shortcut.ts`
   - `src/resources.ts`
   - `src/cache-monitor.ts`
   - `src/code-intelligence.ts`

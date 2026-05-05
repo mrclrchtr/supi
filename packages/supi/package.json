@@ -22,7 +22,6 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-aliases": "workspace:*",
     "@mrclrchtr/supi-ask-user": "workspace:*",
     "@mrclrchtr/supi-bash-timeout": "workspace:*",
     "@mrclrchtr/supi-claude-md": "workspace:*",
@@ -30,7 +29,6 @@
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-debug": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
-    "@mrclrchtr/supi-skill-shortcut": "workspace:*",
     "@mrclrchtr/supi-context": "workspace:*",
     "@mrclrchtr/supi-review": "workspace:*",
     "@mrclrchtr/supi-rtk": "workspace:*",
@@ -40,7 +38,8 @@
     "web-tree-sitter": "^0.26.8",
     "@mrclrchtr/supi-code-intelligence": "workspace:*",
     "@mrclrchtr/supi-flow": "workspace:*",
-    "@mrclrchtr/supi-insights": "workspace:*"
+    "@mrclrchtr/supi-insights": "workspace:*",
+    "@mrclrchtr/supi-extras": "workspace:*"
   },
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
@@ -50,13 +49,12 @@
   },
   "pi": {
     "extensions": [
-      "./src/aliases.ts",
+      "./src/extras.ts",
       "./src/ask-user.ts",
       "./src/bash-timeout.ts",
       "./src/claude-md.ts",
       "./src/resources.ts",
       "./src/settings.ts",
-      "./src/skill-shortcut.ts",
       "./src/lsp.ts",
       "./src/review.ts",
       "./src/debug.ts",

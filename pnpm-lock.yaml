@@ -54,9 +54,6 @@ importers:
       '@mariozechner/pi-coding-agent':
         specifier: '*'
         version: 0.70.2(ws@8.20.0)(zod@4.3.6)
-      '@mrclrchtr/supi-aliases':
-        specifier: workspace:*
-        version: link:../supi-aliases
       '@mrclrchtr/supi-ask-user':
         specifier: workspace:*
         version: link:../supi-ask-user
@@ -81,6 +78,9 @@ importers:
       '@mrclrchtr/supi-debug':
         specifier: workspace:*
         version: link:../supi-debug
+      '@mrclrchtr/supi-extras':
+        specifier: workspace:*
+        version: link:../supi-extras
       '@mrclrchtr/supi-flow':
         specifier: workspace:*
         version: link:../supi-flow
@@ -96,9 +96,6 @@ importers:
       '@mrclrchtr/supi-rtk':
         specifier: workspace:*
         version: link:../supi-rtk
-      '@mrclrchtr/supi-skill-shortcut':
-        specifier: workspace:*
-        version: link:../supi-skill-shortcut
       '@mrclrchtr/supi-tree-sitter':
         specifier: workspace:*
         version: link:../supi-tree-sitter
@@ -115,12 +112,6 @@ importers:
       vitest:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
-
-  packages/supi-aliases:
-    dependencies:
-      '@mariozechner/pi-coding-agent':
-        specifier: '*'
-        version: 0.70.2(ws@8.20.0)(zod@4.3.6)
 
   packages/supi-ask-user:
     dependencies:
@@ -276,6 +267,9 @@ importers:
       '@mariozechner/pi-coding-agent':
         specifier: '*'
         version: 0.70.2(ws@8.20.0)(zod@4.3.6)
+      '@mariozechner/pi-tui':
+        specifier: '*'
+        version: 0.72.1
     devDependencies:
       vitest:
         specifier: ^4.1.5
@@ -384,15 +378,6 @@ importers:
       vitest:
         specifier: ^4.1.4
         version: 4.1.5(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
-
-  packages/supi-skill-shortcut:
-    dependencies:
-      '@mariozechner/pi-coding-agent':
-        specifier: '*'
-        version: 0.70.2(ws@8.20.0)(zod@4.3.6)
-      '@mariozechner/pi-tui':
-        specifier: '*'
-        version: 0.70.2
 
   packages/supi-test-utils:
     dependencies:

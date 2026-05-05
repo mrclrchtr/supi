@@ -28,6 +28,23 @@ function extractDollarPrefix(textBeforeCursor: string): string | null {
 
 // ── Extension entry point ─────────────────────────────────────────
 
+/**
+ * Register `$skill-name` → `/skill:skill-name` expansion and autocomplete.
+ *
+ * ## Behavior gotchas
+ *
+ * - Installed skill names are snapshotted at `session_start` via
+ *   `pi.getCommands()`; after adding or removing skills, use `/reload` or
+ *   start a new session before testing expansion behavior.
+ * - Outside `$...` tokens, autocomplete must delegate back to the current
+ *   provider so built-in completion and file completion continue to work.
+ *
+ * ## Testing
+ *
+ * If behavior changes, test both:
+ * - expansion inside `$...` tokens
+ * - normal autocomplete everywhere else
+ */
 export default function (pi: ExtensionAPI) {
   let skillNames: string[] = [];
   let skillCommands: { name: string; description?: string }[] = [];

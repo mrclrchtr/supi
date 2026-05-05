@@ -30,13 +30,12 @@ The `@mrclrchtr/supi` package exposes wrapper entrypoints for the main SuPi exte
 
 Included extension entrypoints:
 
-- `aliases.ts`
+- `extras.ts` — command aliases, skill shorthand, tab spinner, prompt stash, git editor
 - `ask-user.ts`
 - `bash-timeout.ts`
 - `claude-md.ts`
 - `lsp.ts`
 - `tree-sitter.ts`
-- `skill-shortcut.ts`
 - `review.ts`
 - `resources.ts`
 
@@ -49,26 +48,24 @@ Current bundled prompt templates:
 | Package | Type | Purpose |
 | --- | --- | --- |
 | [`@mrclrchtr/supi`](./README.md) | meta-package | Full SuPi bundle for pi installs |
-| [`@mrclrchtr/supi-aliases`](../supi-aliases/README.md) | extension | `/exit`, `/e`, and `/clear` shortcuts |
+| [`@mrclrchtr/supi-extras`](../supi-extras/README.md) | extension | Command aliases, skill shorthand, tab spinner, prompt stash, and other small utilities |
 | [`@mrclrchtr/supi-ask-user`](../supi-ask-user/README.md) | extension | Structured `ask_user` tool and rich questionnaire UI |
 | [`@mrclrchtr/supi-bash-timeout`](../supi-bash-timeout/README.md) | extension | Injects default timeouts into `bash` tool calls |
 | [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | extension | Subdirectory context injection and root context refresh |
 | [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | extension | Language Server Protocol tool, diagnostics, and semantic guidance |
 | [`@mrclrchtr/supi-tree-sitter`](../supi-tree-sitter/README.md) | extension/library | Tree-sitter structural analysis tool and reusable parse/query services |
 | [`@mrclrchtr/supi-review`](../supi-review/package.json) | extension | Structured `/supi-review` command with configurable models, diff size, and review timeout |
-| [`@mrclrchtr/supi-skill-shortcut`](../supi-skill-shortcut/README.md) | extension | `$skill-name` shorthand and autocomplete |
 | [`@mrclrchtr/supi-core`](../supi-core/README.md) | library | Shared config and context utilities used by SuPi packages |
 
 ## Install individual packages
 
 ```bash
-pi install npm:@mrclrchtr/supi-aliases
+pi install npm:@mrclrchtr/supi-extras
 pi install npm:@mrclrchtr/supi-ask-user
 pi install npm:@mrclrchtr/supi-bash-timeout
 pi install npm:@mrclrchtr/supi-claude-md
 pi install npm:@mrclrchtr/supi-lsp
 pi install npm:@mrclrchtr/supi-tree-sitter
-pi install npm:@mrclrchtr/supi-skill-shortcut
 pi install npm:@mrclrchtr/supi-review
 ```
 
@@ -96,7 +93,6 @@ Adds `/supi-review` for structured code review in a dedicated read-only subproce
 
 ### Small UX improvements
 
-- command aliases via `supi-aliases`
+- command aliases and `$skill-name` shorthand via `supi-extras`
 - default shell timeouts via `supi-bash-timeout`
-- `$skill-name` shorthand via `supi-skill-shortcut`
 
