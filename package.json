@@ -31,12 +31,6 @@
       "./packages/supi-rtk/src/index.ts",
       "./packages/supi-extras/src/index.ts",
       "./packages/supi-insights/src/insights.ts"
-    ],
-    "prompts": [
-      "./packages/supi/prompts"
-    ],
-    "skills": [
-      "./packages/supi-flow/skills"
     ]
   },
   "scripts": {

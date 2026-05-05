@@ -1,9 +1,13 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+
+const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /**
  * SuPi Flow — lightweight spec-driven workflow extension.
  *
- * Skills (auto-discovered from skills/):
+ * Skills (auto-discovered via resources_discover from skills/):
  *   /skill:supi-flow-brainstorm — or $supi-flow-brainstorm
  *   /skill:supi-flow-plan [ID]
  *   /skill:supi-flow-apply [ID]
@@ -15,6 +19,9 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
  *   /supi-flow        — list available flow commands
  */
 export default function (pi: ExtensionAPI) {
+  pi.on("resources_discover", () => ({
+    skillPaths: [join(baseDir, "skills")],
+  }));
   pi.registerCommand("supi-flow-status", {
     description: "Show current flow workflow state",
     handler: async (_args, ctx) => {

@@ -39,7 +39,7 @@ This repo has two install surfaces:
 - `packages/supi/` is the published meta-package bundling the full stack
 
 Current workspace packages:
-- `packages/supi` — meta-package wrapper entrypoints plus `prompts/` and `resources.ts` prompt rediscovery
+- `packages/supi` — meta-package wrapper entrypoints re-exporting all sub-extensions
 - `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
 - `packages/supi-bash-timeout` — default timeout injection for `bash`
 - `packages/supi-claude-md` — subdirectory CLAUDE.md injection
@@ -51,8 +51,29 @@ Current workspace packages:
 Other notable areas:
 - `openspec/changes/` and `openspec/specs/` — OpenSpec artifacts
 
-Meta-package note:
-- `packages/supi/resources.ts` contributes prompt paths on `resources_discover`, so prompt changes are picked up after `/reload`.
+## Self-registering resources via `resources_discover`
+
+SuPi extensions self-register their prompts, skills, and themes using the `resources_discover` event rather than relying on static `pi.prompts` / `pi.skills` / `pi.themes` in `package.json`. This ensures resources are discovered regardless of whether the package is installed standalone or consumed through the meta-package (`@mrclrchtr/supi`).
+
+Pattern:
+```ts
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
+
+export default function (pi: ExtensionAPI) {
+  pi.on("resources_discover", () => ({
+    skillPaths: [join(baseDir, "skills")],
+    promptPaths: [join(baseDir, "prompts")],
+  }));
+}
+```
+
+Extension packages with prompts/skills:
+- `packages/supi-claude-md` — skills + prompts via `resources_discover`
+- `packages/supi-flow` — skills via `resources_discover`
+- Root `package.json` and sub-package `package.json` files omit `pi.prompts` / `pi.skills` entries to avoid redundancy.
 
 ## Settings registry
 
@@ -95,7 +116,7 @@ registerSettings({
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
-- Pi discovers package skills from `node_modules` scanning, not workspace packages' `package.json` — register workspace skills in root `pi.skills` (same pattern as `pi.prompts`).
+- Pi discovers package skills from `node_modules` scanning, not workspace packages' `package.json`. Workspace skills must be registered explicitly — SuPi uses `resources_discover` for this (see documentation section above).
 - Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
 - `pnpm exec jiti /tmp/script.mjs` — use this for ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - pi flattens tool `promptGuidelines` into the system prompt `Guidelines:` section; each bullet must name its tool explicitly.

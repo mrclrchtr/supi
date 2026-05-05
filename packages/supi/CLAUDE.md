@@ -20,6 +20,7 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
   - `src/code-intelligence.ts`
   - `src/flow.ts`
   - `src/insights.ts`
+- Sub-packages self-register prompts, skills, and themes via `resources_discover` — the meta-package does not need static `pi.prompts` or `pi.skills` entries.
 ## Packaging gotchas
 
 - `pi.extensions` entries are package-relative paths.

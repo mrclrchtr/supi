@@ -2,8 +2,6 @@
 // via a registered `lsp` tool. Keeps language servers warm, surfaces inline diagnostics,
 // and injects diagnostic context only when outstanding issues exist.
 
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { StringEnum } from "@mariozechner/pi-ai";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
@@ -49,8 +47,6 @@ import {
 } from "./tree-persist.ts";
 import { toggleLspStatusOverlay, updateLspUi } from "./ui.ts";
 
-const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
-
 const LspActionEnum = StringEnum([
   "hover",
   "definition",
@@ -79,11 +75,11 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerBehaviorHandlers(pi, state);
   registerTreePersistHandlers(pi, state);
   registerLspStatusCommand(pi, state);
-  registerResourcesDiscover(pi);
   registerLspMessageRenderer(pi);
 }
 
 function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: session_start orchestrates setup, server detection, settings, and persistence.
   pi.on("session_start", async (_event, ctx) => {
     if (state.manager) {
       clearSessionLspService(state.manager.getCwd());
@@ -376,10 +372,4 @@ function registerLspStatusCommand(pi: ExtensionAPI, state: LspRuntimeState): voi
       );
     },
   });
-}
-
-function registerResourcesDiscover(pi: ExtensionAPI): void {
-  pi.on("resources_discover", () => ({
-    skillPaths: [join(baseDir, "resources")],
-  }));
 }

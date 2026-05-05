@@ -35,12 +35,6 @@
   "pi": {
     "extensions": [
       "./src/claude-md.ts"
-    ],
-    "skills": [
-      "./skills"
-    ],
-    "prompts": [
-      "./prompts"
     ]
   },
   "main": "src/index.ts"
