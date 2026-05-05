@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   loadSupiConfig,
   loadSupiConfigForScope,
@@ -17,12 +17,15 @@ const opts = (dir: string) => ({ homeDir: dir });
 
 describe("loadSupiConfig", () => {
   let tmpDir: string;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     tmpDir = makeTempDir();
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(() => {
+    warnSpy.mockRestore();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -101,15 +104,17 @@ describe("loadSupiConfig", () => {
 
     const result = loadSupiConfig("claude-md", tmpDir, { rereadInterval: 3 }, opts(tmpDir));
     expect(result).toEqual({ rereadInterval: 3 });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("Failed to parse config file"));
   });
 
-  it("ignores non-object config (array)", () => {
+  it("falls back to defaults for non-object config root (array)", () => {
     const projectDir = path.join(tmpDir, ".pi/supi");
     fs.mkdirSync(projectDir, { recursive: true });
     fs.writeFileSync(path.join(projectDir, "config.json"), "[1,2,3]");
 
     const result = loadSupiConfig("claude-md", tmpDir, { rereadInterval: 3 }, opts(tmpDir));
     expect(result).toEqual({ rereadInterval: 3 });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("root is not an object"));
   });
 
   it("returns defaults when section is missing", () => {

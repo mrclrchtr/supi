@@ -117,7 +117,7 @@ function findSectionAndId(
 interface SettingsOverlayDeps {
   state: OverlayState;
   container: Container;
-  settingsList: SettingsList;
+  settingsList: SettingsList | null;
   tui: Parameters<Parameters<ExtensionContext["ui"]["custom"]>[0]>[0];
   theme: Parameters<Parameters<ExtensionContext["ui"]["custom"]>[0]>[1];
   done: () => void;
@@ -126,30 +126,31 @@ interface SettingsOverlayDeps {
 function createSettingsList(deps: SettingsOverlayDeps): SettingsList {
   const sections = getRegisteredSettings();
   const items = buildFlatItems(sections, deps.state.scope, deps.state.cwd);
-
-  return new SettingsList(
+  const onChange = (flatId: string, newValue: string) => {
+    const found = findSectionAndId(sections, flatId);
+    if (found) {
+      found.section.persistChange(deps.state.scope, deps.state.cwd, found.itemId, newValue);
+    }
+    // Re-read all values to reflect persisted changes, but keep the list
+    // instance (and its selectedIndex) intact.
+    const updatedItems = buildFlatItems(sections, deps.state.scope, deps.state.cwd);
+    for (const updated of updatedItems) {
+      const existing = items.find((i) => i.id === updated.id);
+      if (existing && existing.currentValue !== updated.currentValue) {
+        settingsList.updateValue(updated.id, updated.currentValue);
+      }
+    }
+    deps.tui.requestRender();
+  };
+  const settingsList = new SettingsList(
     items,
     Math.min(items.length + 4, 20),
     getSettingsListTheme(),
-    (flatId: string, newValue: string) => {
-      const found = findSectionAndId(sections, flatId);
-      if (found) {
-        found.section.persistChange(deps.state.scope, deps.state.cwd, found.itemId, newValue);
-      }
-      // Re-read all values to reflect persisted changes, but keep the list
-      // instance (and its selectedIndex) intact.
-      const updatedItems = buildFlatItems(sections, deps.state.scope, deps.state.cwd);
-      for (const updated of updatedItems) {
-        const existing = items.find((i) => i.id === updated.id);
-        if (existing && existing.currentValue !== updated.currentValue) {
-          deps.settingsList.updateValue(updated.id, updated.currentValue);
-        }
-      }
-      deps.tui.requestRender();
-    },
+    onChange,
     () => deps.done(),
     { enableSearch: true },
   );
+  return settingsList;
 }
 
 function rebuildSettingsList(deps: SettingsOverlayDeps): SettingsList {
@@ -194,10 +195,10 @@ export function openSettingsOverlay(ctx: ExtensionContext): void {
     const state: OverlayState = { scope: "project", cwd: ctx.cwd };
     const container = new Container();
 
-    const deps = {
+    const deps: SettingsOverlayDeps = {
       state,
       container,
-      settingsList: null as unknown as SettingsList,
+      settingsList: null,
       tui,
       theme,
       done,
@@ -213,11 +214,8 @@ export function openSettingsOverlay(ctx: ExtensionContext): void {
           handleScopeToggle(deps);
           return true;
         }
-        // Find the SettingsList child and delegate
-        const settingsList = container.children.find(
-          (c): c is SettingsList => c instanceof SettingsList,
-        );
-        settingsList?.handleInput?.(data);
+        // Delegate input to the settings list (always set after rebuildSettingsList)
+        deps.settingsList?.handleInput?.(data);
         deps.tui.requestRender();
         return true;
       },

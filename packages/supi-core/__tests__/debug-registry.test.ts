@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearDebugEvents,
   configureDebugRegistry,
+  DEBUG_REGISTRY_DEFAULTS,
   getDebugEvents,
   getDebugRegistryConfig,
   getDebugSummary,
@@ -145,6 +146,21 @@ describe("debug registry", () => {
       byLevel: { warning: 2, debug: 1 },
       bySource: { rtk: 2, lsp: 1 },
     });
+  });
+
+  it("clamps NaN maxEvents to default", () => {
+    configureDebugRegistry({ enabled: true, maxEvents: Number.NaN });
+    expect(getDebugRegistryConfig().maxEvents).toBe(DEBUG_REGISTRY_DEFAULTS.maxEvents);
+  });
+
+  it("clamps negative maxEvents to default", () => {
+    configureDebugRegistry({ enabled: true, maxEvents: -1 });
+    expect(getDebugRegistryConfig().maxEvents).toBe(DEBUG_REGISTRY_DEFAULTS.maxEvents);
+  });
+
+  it("clamps Infinity maxEvents to default", () => {
+    configureDebugRegistry({ enabled: true, maxEvents: Infinity });
+    expect(getDebugRegistryConfig().maxEvents).toBe(DEBUG_REGISTRY_DEFAULTS.maxEvents);
   });
 
   it("clears events and resets configuration", () => {

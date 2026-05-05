@@ -15,10 +15,48 @@ import {
   getRegisteredSettings,
   registerSettings,
 } from "../src/settings-registry.ts";
-import { openSettingsOverlay } from "../src/settings-ui.ts";
+import { createInputSubmenu, openSettingsOverlay } from "../src/settings-ui.ts";
 
 afterEach(() => {
   clearRegisteredSettings();
+});
+
+describe("createInputSubmenu", () => {
+  it("calls done with the input value on Enter", () => {
+    const done = vi.fn();
+    const submenu = createInputSubmenu("hello", "Test Label", done);
+
+    submenu.handleInput("\r");
+
+    expect(done).toHaveBeenCalledWith("hello");
+  });
+
+  it("calls done without value on Escape", () => {
+    const done = vi.fn();
+    const submenu = createInputSubmenu("hello", "Test Label", done);
+
+    submenu.handleInput("\u001b");
+
+    expect(done).toHaveBeenCalledWith();
+  });
+
+  it("delegates text input then confirms with updated value", () => {
+    const done = vi.fn();
+    const submenu = createInputSubmenu("", "Label", done);
+
+    submenu.handleInput("x");
+    submenu.handleInput("\r");
+
+    expect(done).toHaveBeenCalledWith("x");
+  });
+
+  it("renders label and hint lines", () => {
+    const submenu = createInputSubmenu("val", "My Label", vi.fn());
+
+    const lines = submenu.render(80);
+    expect(lines[0]).toContain("My Label");
+    expect(lines[lines.length - 1]).toContain("enter confirm");
+  });
 });
 
 describe("settings-ui id collision", () => {

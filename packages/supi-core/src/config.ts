@@ -21,16 +21,30 @@ function getProjectConfigPath(cwd: string): string {
 }
 
 function readJsonFile(filePath: string): Record<string, unknown> | null {
+  let content: string;
   try {
-    const content = fs.readFileSync(filePath, "utf-8");
-    const parsed = JSON.parse(content);
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
-      return parsed as Record<string, unknown>;
-    }
-    return null;
+    content = fs.readFileSync(filePath, "utf-8");
   } catch {
+    // ENOENT or permission error — silent, file may not exist
     return null;
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    // biome-ignore lint/suspicious/noConsole: deliberate config parse warning
+    console.warn(`[supi-core] Failed to parse config file, ignoring: ${filePath}`);
+    return null;
+  }
+
+  if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    return parsed as Record<string, unknown>;
+  }
+
+  // biome-ignore lint/suspicious/noConsole: deliberate config parse warning
+  console.warn(`[supi-core] Config file root is not an object, ignoring: ${filePath}`);
+  return null;
 }
 
 function shallowMerge<T>(base: T, ...overrides: Array<Record<string, unknown> | null>): T {
@@ -148,6 +162,7 @@ export function removeSupiConfigKey(
   const content = Object.keys(existing).length > 0 ? `${JSON.stringify(existing, null, 2)}\n` : "";
 
   if (content) {
+    // Directory guaranteed to exist since we just read from it
     fs.writeFileSync(configPath, content, "utf-8");
   } else {
     try {
