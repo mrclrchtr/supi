@@ -76,19 +76,26 @@ function buildReviewerSystemPrompt(): string {
     "Do NOT output JSON directly — use the submit_review tool to submit the result.",
   ].join("\n");
 }
+/** Standard OpenAI reasoning_effort values accepted by OpenRouter. */
 const OPENAI_REASONING_VALUES = new Set(["xhigh", "high", "medium", "low", "minimal", "none"]);
 function resolveReviewThinkingLevel(
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: import("@mariozechner/pi-ai").Model<any> | undefined,
 ): import("@mariozechner/pi-ai").ModelThinkingLevel {
   if (!model?.reasoning) return "off";
+  // OpenRouter normalizes reasoning_effort to OpenAI-standard values.
+  // Non-standard thinkingLevelMap mappings (e.g. DeepSeek-native) get rejected.
+  // For other providers, the model's thinkingLevelMap provides correct native values.
+  const viaOpenRouter =
+    model.provider === "openrouter" || model.baseUrl?.includes("openrouter.ai");
   for (const level of ["xhigh", "high", "medium", "low", "minimal", "off"] as const) {
     const mapped = model.thinkingLevelMap?.[level];
     if (mapped === null) continue;
-    // Only use levels whose thinkingLevelMap value is a standard OpenAI reasoning_effort.
-    // Non-standard mappings (e.g. DeepSeek-native values) get rejected by OpenRouter.
-    const mappedValue = mapped ?? level;
-    if (OPENAI_REASONING_VALUES.has(mappedValue)) return level;
+    if (viaOpenRouter) {
+      const mappedValue = mapped ?? level;
+      if (!OPENAI_REASONING_VALUES.has(mappedValue)) continue;
+    }
+    return level;
   }
   return "off";
 }
