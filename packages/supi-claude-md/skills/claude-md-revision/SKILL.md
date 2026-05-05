@@ -40,6 +40,7 @@ Identify what context would have helped this session go smoother. Scan the conve
 - Generic best practices ("write tests", "use meaningful names")
 - One-off fixes unlikely to recur ("fixed typo on line 42")
 - Verbose explanations — one line per concept; link to docs for detail
+- Content that SuPi extensions already auto-deliver (package tables, module graphs, dependency lists from manifests — see update guidelines)
 
 Filter ruthlessly. CLAUDE.md is part of the prompt — brevity directly improves future sessions.
 
