@@ -76,6 +76,7 @@ function buildReviewerSystemPrompt(): string {
     "Do NOT output JSON directly — use the submit_review tool to submit the result.",
   ].join("\n");
 }
+const OPENAI_REASONING_VALUES = new Set(["xhigh", "high", "medium", "low", "minimal", "none"]);
 function resolveReviewThinkingLevel(
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: import("@mariozechner/pi-ai").Model<any> | undefined,
@@ -83,7 +84,11 @@ function resolveReviewThinkingLevel(
   if (!model?.reasoning) return "off";
   for (const level of ["xhigh", "high", "medium", "low", "minimal", "off"] as const) {
     const mapped = model.thinkingLevelMap?.[level];
-    if (mapped !== null && (level !== "xhigh" || mapped !== undefined)) return level;
+    if (mapped === null) continue;
+    // Only use levels whose thinkingLevelMap value is a standard OpenAI reasoning_effort.
+    // Non-standard mappings (e.g. DeepSeek-native values) get rejected by OpenRouter.
+    const mappedValue = mapped ?? level;
+    if (OPENAI_REASONING_VALUES.has(mappedValue)) return level;
   }
   return "off";
 }
