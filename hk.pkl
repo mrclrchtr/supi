@@ -38,6 +38,10 @@ local precommit = new Mapping<String, Step> {
   }
 
   ["trailing-whitespace"] = Builtins.trailing_whitespace
+
+  ["test"] {
+    check = "HK_SKIP=* pnpm -s test"
+  }
 }
 
 local commitmsg = new Mapping<String, Step> {

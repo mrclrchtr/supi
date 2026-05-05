@@ -66,7 +66,6 @@ const DEFAULT_CONFIG = {
 
 type DiscoverResult = {
   skillPaths?: string[];
-  promptPaths?: string[];
 };
 
 function setup(): Map<string, (...args: unknown[]) => unknown> {
@@ -128,25 +127,7 @@ describe("supi-claude-md resources_discover", () => {
     }
   });
 
-  it("returns absolute prompt paths", async () => {
-    const handler = getDiscoverHandler(setup());
-    const result = await handler({}, { cwd: "/tmp" });
 
-    expect(result.promptPaths).toBeDefined();
-    expect(result.promptPaths!.length).toBeGreaterThan(0);
-    for (const p of result.promptPaths!) {
-      expect(p).toMatch(/^\//);
-    }
-  });
-
-  it("points at a prompts directory that exists on disk", async () => {
-    const handler = getDiscoverHandler(setup());
-    const result = await handler({}, { cwd: "/tmp" });
-
-    for (const p of result.promptPaths ?? []) {
-      expect(existsSync(p)).toBe(true);
-    }
-  });
 });
 
 function findSkillFile(dir: string): string | null {
