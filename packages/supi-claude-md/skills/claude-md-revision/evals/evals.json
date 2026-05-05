@@ -1,0 +1,43 @@
+{
+  "skill_name": "claude-md-revision",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I just spent way too long figuring out that `pnpm exec biome check --write --unsafe` is the only way to auto-fix unused imports in this repo. The regular `--write` doesn't catch them. Can you add this to the project memory so I don't waste time on it again?",
+      "expected_output": "Updates CLAUDE.md with a concise entry about biome's --unsafe flag for fixing unused imports, presented as a diff for approval",
+      "files": [],
+      "expectations": [
+        "The assistant finds the project's CLAUDE.md file",
+        "The proposed addition is concise (one line)",
+        "The addition uses the format `command` — description",
+        "The assistant asks for approval before editing",
+        "The addition is specific and actionable"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "This session taught me that `os.homedir()` can't be mocked in ESM, so we have to pass `homeDir` as a parameter to config functions for testability. Also, `ctx.ui.theme` doesn't expose an 'info' color — you have to use 'accent' or 'dim' instead. Update the project docs with these gotchas.",
+      "expected_output": "Updates CLAUDE.md with two concise entries covering the os.homedir() mocking issue and the missing 'info' color in ctx.ui.theme",
+      "files": [],
+      "expectations": [
+        "Both gotchas are captured",
+        "Each entry is one line",
+        "Entries are formatted consistently",
+        "The assistant asks for approval before editing",
+        "No verbose explanations are added"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Remember for next time: the pre-push hook in this repo runs `pnpm verify`, which includes both linting and tests. Don't try to run them separately.",
+      "expected_output": "Updates CLAUDE.md with a brief note about the pre-push hook running pnpm verify",
+      "files": [],
+      "expectations": [
+        "The addition mentions the pre-push hook",
+        "The addition mentions `pnpm verify`",
+        "The entry is concise",
+        "The assistant asks for approval before editing"
+      ]
+    }
+  ]
+}

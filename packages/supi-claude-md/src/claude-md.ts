@@ -118,7 +118,6 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
 
   pi.on("resources_discover", () => ({
     skillPaths: [join(baseDir, "skills")],
-    promptPaths: [join(baseDir, "prompts")],
   }));
 }
 
