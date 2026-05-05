@@ -25,6 +25,8 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
 
 - `pi.extensions` entries are package-relative paths.
 - Keep small local wrapper `.ts` files in this package so published installs do not depend on nested workspace `node_modules` layout.
+- All sub-packages must be listed in both `dependencies` and `bundledDependencies` — pi's [packages docs](https://github.com/mariozechner/pi-coding-agent/blob/main/docs/packages.md) require bundling because pi loads packages with separate module roots.
+- The workspace uses `nodeLinker: hoisted` (in `pnpm-workspace.yaml`) because pnpm's default isolated linker does not support `bundledDependencies`.
 
 ## Validation
 

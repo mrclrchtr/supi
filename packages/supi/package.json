@@ -40,6 +40,23 @@
     "@mrclrchtr/supi-insights": "workspace:*",
     "@mrclrchtr/supi-extras": "workspace:*"
   },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-ask-user",
+    "@mrclrchtr/supi-bash-timeout",
+    "@mrclrchtr/supi-claude-md",
+    "@mrclrchtr/supi-cache-monitor",
+    "@mrclrchtr/supi-core",
+    "@mrclrchtr/supi-debug",
+    "@mrclrchtr/supi-lsp",
+    "@mrclrchtr/supi-context",
+    "@mrclrchtr/supi-review",
+    "@mrclrchtr/supi-rtk",
+    "@mrclrchtr/supi-tree-sitter",
+    "@mrclrchtr/supi-code-intelligence",
+    "@mrclrchtr/supi-flow",
+    "@mrclrchtr/supi-insights",
+    "@mrclrchtr/supi-extras"
+  ],
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*"
   },

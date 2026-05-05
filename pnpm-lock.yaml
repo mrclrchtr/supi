@@ -8,18 +8,9 @@ importers:
 
   .:
     dependencies:
-      tree-sitter-javascript:
-        specifier: ^0.23.1
-        version: 0.23.1
-      tree-sitter-typescript:
-        specifier: ^0.23.2
-        version: 0.23.2
       typebox:
         specifier: '*'
         version: 1.1.34
-      web-tree-sitter:
-        specifier: ^0.26.8
-        version: 0.26.8
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.4.13
@@ -42,12 +33,21 @@ importers:
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
+      tree-sitter-javascript:
+        specifier: ^0.23.1
+        version: 0.23.1
+      tree-sitter-typescript:
+        specifier: ^0.23.2
+        version: 0.23.2
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
       vitest:
         specifier: ^4.1.5
         version: 4.1.5(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.6.1)(yaml@2.8.3))
+      web-tree-sitter:
+        specifier: ^0.26.8
+        version: 0.26.8
 
   packages/supi:
     dependencies:

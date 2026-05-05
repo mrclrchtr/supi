@@ -1,5 +1,6 @@
 packages:
   - "packages/*"
+nodeLinker: hoisted
 ignoredBuiltDependencies:
   - '@davisvaughan/tree-sitter-r'
   - '@derekstride/tree-sitter-sql'

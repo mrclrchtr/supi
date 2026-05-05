@@ -51,6 +51,13 @@ Current workspace packages:
 Other notable areas:
 - `openspec/changes/` and `openspec/specs/` — OpenSpec artifacts
 
+## Packaging conventions
+
+- The published meta-package `@mrclrchtr/supi` bundles all sub-packages via `bundledDependencies`. Per [pi packages docs](https://github.com/mariozechner/pi-coding-agent/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
+- Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`.
+- `pnpm-workspace.yaml` uses `nodeLinker: hoisted` — required because pnpm's default `isolated` linker does not support `bundledDependencies`.
+- Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
+
 ## Self-registering resources via `resources_discover`
 
 SuPi extensions self-register their prompts, skills, and themes using the `resources_discover` event rather than relying on static `pi.prompts` / `pi.skills` / `pi.themes` in `package.json`. This ensures resources are discovered regardless of whether the package is installed standalone or consumed through the meta-package (`@mrclrchtr/supi`).

@@ -26,6 +26,11 @@
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-tree-sitter": "workspace:*"
   },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core",
+    "@mrclrchtr/supi-lsp",
+    "@mrclrchtr/supi-tree-sitter"
+  ],
   "peerDependencies": {
     "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-coding-agent": "*",

@@ -25,6 +25,9 @@
     "@mrclrchtr/supi-core": "workspace:*",
     "diff": "^7.0.0"
   },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
   "peerDependencies": {
     "@mariozechner/pi-coding-agent": "*",
     "@mariozechner/pi-ai": "*",
