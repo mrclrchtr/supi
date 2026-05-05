@@ -1,5 +1,3 @@
-import { vi } from "vitest";
-
 export const DEFAULT_CONFIG = {
   rereadInterval: 3,
   contextThreshold: 80,
@@ -10,12 +8,10 @@ export const DEFAULT_CONFIG = {
 export function createPiMock() {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   const commands = new Map<string, unknown>();
-  const sendUserMessage = vi.fn();
 
   return {
     handlers,
     commands,
-    sendUserMessage,
     pi: {
       on(event: string, handler: (...args: unknown[]) => unknown) {
         handlers.set(event, handler);
@@ -23,7 +19,6 @@ export function createPiMock() {
       registerCommand(name: string, spec: unknown) {
         commands.set(name, spec);
       },
-      sendUserMessage,
     },
   };
 }

@@ -27,10 +27,10 @@ Inside `/supi-settings`, Claude-MD contributes:
 - `Context Threshold` — common percentage values from `0` to `100`
 - `Context File Names` — comma-separated text input; empty input restores the default filenames
 
-This package bundles a skill and a command:
+This package bundles a skill and a prompt template:
 
 - `claude-md-improver` — audit CLAUDE.md files, evaluate quality, and propose targeted updates
-- `/revise-claude-md` — capture session learnings into CLAUDE.md with user approval
+- `/revise-claude-md` — capture session learnings into CLAUDE.md with user approval (prompt template auto-discovered from `prompts/`)
 
 ## Configuration
 

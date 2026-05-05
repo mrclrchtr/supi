@@ -5,7 +5,6 @@
 // Root/ancestor context files are owned by pi's native system prompt and are
 // never re-injected by this extension.
 
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
@@ -28,13 +27,6 @@ import type { ContextUsage, InjectionCheckOptions } from "./subdirectory.ts";
 import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
 
 const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
-
-function loadRevisePrompt(): string {
-  const path = join(baseDir, "prompts", "revise-claude-md.md");
-  const text = readFileSync(path, "utf-8");
-  // Strip YAML frontmatter
-  return text.replace(/^---\n[\s\S]*?\n---\n*/, "").trim();
-}
 
 export default function claudeMdExtension(pi: ExtensionAPI) {
   registerClaudeMdSettings();
@@ -128,15 +120,6 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     skillPaths: [join(baseDir, "skills")],
     promptPaths: [join(baseDir, "prompts")],
   }));
-
-  // ── /revise-claude-md command ─────────────────────────────
-
-  pi.registerCommand("revise-claude-md", {
-    description: "Update CLAUDE.md with learnings from this session",
-    handler: async (_args, _ctx) => {
-      pi.sendUserMessage(loadRevisePrompt());
-    },
-  });
 }
 
 function captureNativePaths(
