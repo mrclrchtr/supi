@@ -34,7 +34,7 @@ For each unchecked task in order:
 5. If verification fails: stop, diagnose, fix, re-verify. Do not skip.
 6. Commit after each completed task.
 
-## TDD gate
+### TDD gate (inside each task)
 
 For any task that involves writing code:
 
@@ -49,9 +49,9 @@ NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
 
 If you wrote code before the test: delete the code. Start over with the test.
 
-## When blocked: use systematic debugging
+## Step 4: When blocked — load systematic debugging
 
-If a verification fails and you don't understand why, load `/skill:supi-flow-debug` and follow the 4-phase debugging protocol before guessing at fixes.
+If a verification fails and you don't understand why, load `/skill:supi-flow-debug` and follow the 4-phase debugging protocol before guessing at fixes. This is REQUIRED — do not attempt random fixes.
 
 ## When to stop
 

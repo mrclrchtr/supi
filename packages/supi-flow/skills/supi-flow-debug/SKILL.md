@@ -1,7 +1,6 @@
 ---
 name: supi-flow-debug
 description: Systematic debugging protocol — root cause before fixes. Load on demand when blocked during /supi-flow-apply (test failures, build errors, unexpected behavior).
-disable-model-invocation: true
 ---
 
 # Systematic Debugging

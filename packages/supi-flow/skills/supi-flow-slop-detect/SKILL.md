@@ -1,7 +1,6 @@
 ---
 name: supi-flow-slop-detect
 description: Detect and fix AI-generated prose markers in documentation. Load on demand during /supi-flow-archive when updating docs.
-disable-model-invocation: true
 ---
 
 # Slop Detection
