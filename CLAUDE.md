@@ -118,6 +118,8 @@ registerSettings({
 - `ctx.ui.theme` does not expose an `"info"` color; use existing colors like `"accent"` / `"dim"` for info-level UI.
 - PI sets the terminal title directly on `this.ui.terminal` during startup and on `/name` renames — it never flows through `ctx.ui.setTitle`. Intercepting `ctx.ui.setTitle` to capture PI's title won't work; recompute dynamically with `pi.getSessionName()` and `ctx.cwd` instead.
 - PI internal events like `session_info_changed` are consumed by the interactive mode only; they are **not** forwarded to extension handlers via `pi.on()`. The `pi.events` EventBus is strictly for extension-to-extension communication.
+- `createAgentSession()` child sessions do NOT bubble `agent_start`/`agent_end` to parent extension handlers; use `pi.events` to signal activity from programmatic sub-sessions.
+- `pi.events.emit("supi:working:start", { source: "supi-<pkg>" })` / `pi.events.emit("supi:working:end", { source: "supi-<pkg>" })` — generic SuPi convention for indicating long-running work across extensions; `tab-spinner` listens to these. Emitters must ensure `end` always fires (success, failure, cancel, timeout).
 - Keep runtime-imported packages in `peerDependencies`; after changing version ranges run `pnpm install` to refresh the lockfile.
 - Pi core peer deps (`@mariozechner/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
@@ -165,6 +167,7 @@ registerSettings({
 - `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` — required to trigger `setInterval` callbacks in vitest
 - In Vitest 4.x, constructor mocks inside `vi.mock` factories must use `class` — `vi.fn().mockImplementation(() => ({}))` silently returns `this` instead of the object
 - `vi.mock` hoisting errors propagate from the importing module (e.g. `runner.ts:2:1`), not the test file's `vi.mock` call site — check the Caused-by chain
+- When mocking `pi` in tests, include `events: { emit: vi.fn(), on: vi.fn() }` if the code under test uses the EventBus.
 - Adding a new runtime export to `supi-core/index.ts` breaks every downstream `vi.mock("@mrclrchtr/supi-core")` factory that omits it; audit all `vi.mock` blocks in consuming packages
 - The same applies to new runtime exports from local modules (e.g., `CLAUDE_MD_DEFAULTS` from `config.ts`) consumed by `vi.mock("../config.ts")` factories
 - **Deleting a source file breaks every test with `vi.mock("../<file>")` referencing it** — audit all test files for stale mock factories after module deletion

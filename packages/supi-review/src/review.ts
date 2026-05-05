@@ -83,7 +83,7 @@ async function handleInteractive(
   const target = await resolvePresetTarget(preset, ctx);
   if (!target) return;
 
-  const result = await runReviewWithLoader(target, maxDiffBytes, ctx);
+  const result = await runReviewWithLoader(target, maxDiffBytes, ctx, pi);
   injectReviewMessage(pi, result, autoFix);
 }
 
@@ -185,6 +185,7 @@ async function runReviewWithLoader(
   target: ReviewTarget,
   maxDiffBytes: number,
   ctx: CommandContext,
+  pi: ExtensionAPI,
 ): Promise<ReviewResult> {
   return ctx.ui.custom<ReviewResult>((tui, theme, _kb, done) => {
     const widget = new ReviewProgressWidget(tui, theme, "Running code review…");
@@ -193,10 +194,13 @@ async function runReviewWithLoader(
     const finish = (result: ReviewResult) => {
       if (finished) return;
       finished = true;
+      pi.events.emit("supi:working:end", { source: "supi-review" });
       done(result);
     };
 
     widget.onAbort = () => finish({ kind: "canceled", target });
+
+    pi.events.emit("supi:working:start", { source: "supi-review" });
 
     executeReview({
       target,

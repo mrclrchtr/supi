@@ -12,3 +12,4 @@
 - Cancellation: `signal.addEventListener("abort")` wires to `session.abort()`, returning `kind: "canceled"`.
 - `ReviewerInvocation` type uses `model: Model<any> | undefined` (resolved model object, not string). No `onSessionStart` callback.
 - `ReviewResult` types: no `warning`, `stdout`, or `stderr` fields. Timeout result has `partialOutput` for final assistant text on abort.
+- Emits `pi.events.emit("supi:working:start", { source: "supi-review" })` before the review begins and `supi:working:end` in the finish callback (covers success, failed, canceled, timeout) so the tab spinner stays active while the reviewer is running.

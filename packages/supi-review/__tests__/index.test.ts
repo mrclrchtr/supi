@@ -210,6 +210,7 @@ describe("/supi-review command", () => {
       on: vi.fn(),
       sendMessage: vi.fn(),
       sendUserMessage: vi.fn(),
+      events: { emit: vi.fn(), on: vi.fn() },
     } as unknown as ExtensionAPI;
 
     mockFns.runReviewer.mockResolvedValue({
@@ -266,6 +267,7 @@ describe("/supi-review command", () => {
       on: vi.fn(),
       sendMessage: vi.fn(),
       sendUserMessage: vi.fn(),
+      events: { emit: vi.fn(), on: vi.fn() },
     } as unknown as ExtensionAPI;
 
     mockFns.runReviewer.mockImplementation(
@@ -325,6 +327,7 @@ describe("/supi-review command", () => {
       on: vi.fn(),
       sendMessage: vi.fn(),
       sendUserMessage: vi.fn(),
+      events: { emit: vi.fn(), on: vi.fn() },
     } as unknown as ExtensionAPI;
 
     mockFns.selectAutoFix.mockResolvedValue(true);
@@ -391,6 +394,7 @@ describe("/supi-review command", () => {
       on: vi.fn(),
       sendMessage: vi.fn(),
       sendUserMessage: vi.fn(),
+      events: { emit: vi.fn(), on: vi.fn() },
     } as unknown as ExtensionAPI;
 
     mockFns.selectAutoFix.mockResolvedValue(false);
@@ -457,6 +461,7 @@ describe("/supi-review command", () => {
       on: vi.fn(),
       sendMessage: vi.fn(),
       sendUserMessage: vi.fn(),
+      events: { emit: vi.fn(), on: vi.fn() },
     } as unknown as ExtensionAPI;
 
     mockFns.selectAutoFix.mockResolvedValue(true);
@@ -512,6 +517,7 @@ describe("/supi-review command", () => {
       on: vi.fn(),
       sendMessage: vi.fn(),
       sendUserMessage: vi.fn(),
+      events: { emit: vi.fn(), on: vi.fn() },
     } as unknown as ExtensionAPI;
 
     mockFns.selectAutoFix.mockResolvedValue(true);
@@ -562,6 +568,7 @@ describe("/supi-review command", () => {
       on: vi.fn(),
       sendMessage: vi.fn(),
       sendUserMessage: vi.fn(),
+      events: { emit: vi.fn(), on: vi.fn() },
     } as unknown as ExtensionAPI;
 
     // Configure a review model that won't be found in the registry
