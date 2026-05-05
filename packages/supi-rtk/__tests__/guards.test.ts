@@ -63,4 +63,32 @@ describe("rtk rewrite guards", () => {
     expect(shouldBypassRtkRewrite("RTK_DISABLED=1 pnpm exec biome check .", cwd)).toBe(true);
     expect(shouldBypassRtkRewrite("env RTK_DISABLED=1 git status", cwd)).toBe(true);
   });
+
+  it("bypasses Biome commands wrapped in cd prefix", () => {
+    const cwd = makeProject();
+
+    expect(shouldBypassRtkRewrite("cd /Users/test/project && pnpm biome check src/", cwd)).toBe(
+      true,
+    );
+    expect(shouldBypassRtkRewrite("cd /Users/test/project && npx --no biome check .", cwd)).toBe(
+      true,
+    );
+    expect(shouldBypassRtkRewrite("cd /Users/test/project; pnpm exec biome check .", cwd)).toBe(
+      true,
+    );
+    expect(
+      shouldBypassRtkRewrite(
+        "cd /Users/test/project && pnpm biome check --max-diagnostics=5 packages/supi-claude-md/ 2>&1",
+        cwd,
+      ),
+    ).toBe(true);
+  });
+
+  it("does not bypass non-biome commands", () => {
+    const cwd = makeProject();
+
+    expect(shouldBypassRtkRewrite("cd /Users/test/project && pnpm lint", cwd)).toBe(false);
+    expect(shouldBypassRtkRewrite("cd /Users/test/project && echo hello", cwd)).toBe(false);
+    expect(shouldBypassRtkRewrite("cd /Users/test/project && git status", cwd)).toBe(false);
+  });
 });

@@ -1,14 +1,29 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const BIOME_CONFIG_FILES = ["biome.json", "biome.jsonc"];
-const PACKAGE_MANAGER_BIN_RE = /^(?:pnpm|npm|yarn|bun)\s+(?:exec|dlx|x)\s+(?:--\s+)?biome(?:\s|$)/;
-const PACKAGE_MANAGER_SCRIPT_RE = /^(?:pnpm|npm|yarn|bun)\s+(?:run\s+)?biome(?:\s|$)/;
-const PACKAGE_LINT_RE = /^(?:pnpm|npm|yarn|bun)\s+(?:run\s+)?lint(?:\s|$)/;
-const DIRECT_BIOME_RE =
-  /^(?:biome|\.\/node_modules\/\.bin\/biome|node_modules\/\.bin\/biome)(?:\s|$)/;
+// rtk-ai/rtk#665, rtk-ai/rtk#1489 — upstream biome → rtk lint routing gap
+const BIOME_RE = /biome(?:\s|$)/;
 // rtk-ai/rtk#1367, rtk-ai/rtk#1604 — rg → grep rewrite is lossy (grep has no -g, -U, --glob, etc.)
 const RG_RE = /^rg(?:\s|$)/;
+const PACKAGE_LINT_RE = /^(?:pnpm|npm|yarn|bun)\s+(?:run\s+)?lint(?:\s|$)/;
+const BIOME_CONFIG_FILES = ["biome.json", "biome.jsonc"];
+
+/**
+ * Normalize a command string by stripping leading shell wrappers that
+ * would interfere with `^`-anchored guard regexes:
+ * - `cd /path && command`
+ * - `rtk command`  (from a previous RTK rewrite pass)
+ */
+function stripShellWrappers(command: string): string {
+  let s = command.trimStart();
+  // Strip leading `cd /some/path && ` or `cd /some/path;`
+  while (/^cd\s+\S+(?:\s*[;&]\s*|\s+&&\s+)/.test(s)) {
+    s = s.replace(/^cd\s+\S+(?:\s*[;&]\s*|\s+&&\s+)/, "");
+  }
+  // Strip leading `rtk ` prefix from a prior rewrite attempt
+  s = s.replace(/^rtk\s+/, "");
+  return s.trimStart();
+}
 
 /**
  * Return whether SuPi should bypass RTK's rewrite registry for commands with
@@ -28,13 +43,12 @@ const RG_RE = /^rg(?:\s|$)/;
  * TODO: Remove this workaround after RTK properly handles rg-native flags.
  */
 export function shouldBypassRtkRewrite(command: string, cwd: string): boolean {
-  const normalized = command.trimStart();
+  const normalized = stripShellWrappers(command);
   if (hasRtkDisabledPrefix(normalized)) return true;
-  if (DIRECT_BIOME_RE.test(normalized)) return true;
+  if (BIOME_RE.test(normalized)) return true;
   if (RG_RE.test(normalized)) return true;
-  if (PACKAGE_MANAGER_BIN_RE.test(normalized)) return true;
-  if (PACKAGE_MANAGER_SCRIPT_RE.test(normalized)) return true;
-  return PACKAGE_LINT_RE.test(normalized) && projectUsesBiome(cwd);
+  if (PACKAGE_LINT_RE.test(normalized) && projectUsesBiome(cwd)) return true;
+  return false;
 }
 
 function hasRtkDisabledPrefix(command: string): boolean {
