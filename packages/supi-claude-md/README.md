@@ -27,7 +27,11 @@ Inside `/supi-settings`, Claude-MD contributes:
 - `Context Threshold` — common percentage values from `0` to `100`
 - `Context File Names` — comma-separated text input; empty input restores the default filenames
 
-This package bundles the `supi-claude-md-guide` skill.
+This package bundles two skills and a command:
+
+- `supi-claude-md-guide` — explains how subdirectory context injection works
+- `claude-md-improver` — audit CLAUDE.md files, evaluate quality, and propose targeted updates
+- `/revise-claude-md` — capture session learnings into CLAUDE.md with user approval
 
 ## Configuration
 
@@ -72,5 +76,6 @@ Options:
 
 ## Source
 
-- Entrypoint: `index.ts`
-- Skill resources: `resources/supi-claude-md-guide/`
+- Entrypoint: `src/claude-md.ts`
+- Skills: `skills/supi-claude-md-guide/`, `skills/claude-md-improver/`
+- Prompt templates: `prompts/`

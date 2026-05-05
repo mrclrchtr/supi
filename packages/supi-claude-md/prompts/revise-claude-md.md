@@ -1,5 +1,6 @@
 ---
 description: Update CLAUDE.md with learnings from this session
+allowed-tools: Read, Edit, Glob
 ---
 
 Review this session for learnings about working with PI Agent in this codebase. Update CLAUDE.md with context that would help future PI sessions be more effective.

@@ -64,6 +64,11 @@ const DEFAULT_CONFIG = {
   fileNames: ["CLAUDE.md", "AGENTS.md"],
 };
 
+type DiscoverResult = {
+  skillPaths?: string[];
+  promptPaths?: string[];
+};
+
 function setup(): Map<string, (...args: unknown[]) => unknown> {
   const handlers = new Map<string, (...args: unknown[]) => unknown>();
   const pi = {
@@ -71,7 +76,7 @@ function setup(): Map<string, (...args: unknown[]) => unknown> {
       handlers.set(event, handler);
     },
     registerCommand() {},
-    registerMessageRenderer() {},
+    sendUserMessage() {},
   };
   claudeMdExtension(pi as never);
   return handlers;
@@ -80,7 +85,7 @@ function setup(): Map<string, (...args: unknown[]) => unknown> {
 function getDiscoverHandler(handlers: Map<string, (...args: unknown[]) => unknown>) {
   const handler = handlers.get("resources_discover");
   expect(handler).toBeDefined();
-  return handler as (...args: unknown[]) => Promise<{ skillPaths: string[] }>;
+  return handler as (...args: unknown[]) => Promise<DiscoverResult>;
 }
 
 describe("supi-claude-md resources_discover", () => {
@@ -99,17 +104,17 @@ describe("supi-claude-md resources_discover", () => {
     const result = await handler({}, { cwd: "/tmp" });
 
     expect(result.skillPaths).toBeDefined();
-    expect(result.skillPaths.length).toBeGreaterThan(0);
-    for (const p of result.skillPaths) {
+    expect(result.skillPaths!.length).toBeGreaterThan(0);
+    for (const p of result.skillPaths!) {
       expect(p).toMatch(/^\//);
     }
   });
 
-  it("points at a resources directory that exists on disk", async () => {
+  it("points at a skills directory that exists on disk", async () => {
     const handler = getDiscoverHandler(setup());
     const result = await handler({}, { cwd: "/tmp" });
 
-    for (const p of result.skillPaths) {
+    for (const p of result.skillPaths ?? []) {
       expect(existsSync(p)).toBe(true);
     }
   });
@@ -118,8 +123,28 @@ describe("supi-claude-md resources_discover", () => {
     const handler = getDiscoverHandler(setup());
     const result = await handler({}, { cwd: "/tmp" });
 
-    for (const p of result.skillPaths) {
+    for (const p of result.skillPaths ?? []) {
       expect(findSkillFile(p)).toBeTruthy();
+    }
+  });
+
+  it("returns absolute prompt paths", async () => {
+    const handler = getDiscoverHandler(setup());
+    const result = await handler({}, { cwd: "/tmp" });
+
+    expect(result.promptPaths).toBeDefined();
+    expect(result.promptPaths!.length).toBeGreaterThan(0);
+    for (const p of result.promptPaths!) {
+      expect(p).toMatch(/^\//);
+    }
+  });
+
+  it("points at a prompts directory that exists on disk", async () => {
+    const handler = getDiscoverHandler(setup());
+    const result = await handler({}, { cwd: "/tmp" });
+
+    for (const p of result.promptPaths ?? []) {
+      expect(existsSync(p)).toBe(true);
     }
   });
 });

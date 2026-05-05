@@ -17,7 +17,6 @@
   ],
   "files": [
     "src/**/*.ts",
-    "prompts",
     "README.md",
     "LICENSE"
   ],
@@ -53,7 +52,6 @@
       "./src/ask-user.ts",
       "./src/bash-timeout.ts",
       "./src/claude-md.ts",
-      "./src/resources.ts",
       "./src/settings.ts",
       "./src/lsp.ts",
       "./src/review.ts",
@@ -65,9 +63,6 @@
       "./src/code-intelligence.ts",
       "./src/flow.ts",
       "./src/insights.ts"
-    ],
-    "prompts": [
-      "./prompts"
     ]
   }
 }

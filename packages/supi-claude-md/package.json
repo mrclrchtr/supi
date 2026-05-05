@@ -17,7 +17,8 @@
   ],
   "files": [
     "src/**/*.ts",
-    "resources",
+    "skills",
+    "prompts",
     "!__tests__"
   ],
   "dependencies": {
@@ -36,7 +37,10 @@
       "./src/claude-md.ts"
     ],
     "skills": [
-      "./resources"
+      "./skills"
+    ],
+    "prompts": [
+      "./prompts"
     ]
   },
   "main": "src/index.ts"

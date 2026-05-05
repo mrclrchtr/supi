@@ -26,7 +26,7 @@ When installed from a local path, pi loads the working tree directly. After edit
 
 ## What the meta-package bundles
 
-The `@mrclrchtr/supi` package exposes wrapper entrypoints for the main SuPi extensions and contributes prompt and skill resource directories.
+The `@mrclrchtr/supi` package exposes wrapper entrypoints for the main SuPi extensions.
 
 Included extension entrypoints:
 
@@ -37,11 +37,6 @@ Included extension entrypoints:
 - `lsp.ts`
 - `tree-sitter.ts`
 - `review.ts`
-- `resources.ts`
-
-Current bundled prompt templates:
-
-- `prompts/revise-claude-md.md`
 
 ## Packages
 
