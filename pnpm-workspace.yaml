@@ -1,16 +1,20 @@
 packages:
   - "packages/*"
 ignoredBuiltDependencies:
+  - '@davisvaughan/tree-sitter-r'
+  - '@derekstride/tree-sitter-sql'
   - tree-sitter
   - tree-sitter-kotlin
 
 onlyBuiltDependencies:
   - koffi
   - protobufjs
+  - tree-sitter-bash
   - tree-sitter-c
   - tree-sitter-cli
   - tree-sitter-cpp
   - tree-sitter-go
+  - tree-sitter-html
   - tree-sitter-java
   - tree-sitter-javascript
   - tree-sitter-python
