@@ -26,10 +26,10 @@ export interface ReviewOutputEvent {
 }
 
 export type ReviewTarget =
-  | { type: "base-branch"; branch: string; diff: string }
-  | { type: "uncommitted"; diff: string }
-  | { type: "commit"; sha: string; show: string }
-  | { type: "custom"; instructions: string };
+  | { type: "base-branch"; branch: string; diff: string; changedFiles?: string[] }
+  | { type: "uncommitted"; diff: string; changedFiles?: string[] }
+  | { type: "commit"; sha: string; show: string; changedFiles?: string[] }
+  | { type: "custom"; instructions: string; changedFiles?: string[] };
 
 export interface ReviewSettings {
   reviewModel: string;

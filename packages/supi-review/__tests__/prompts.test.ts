@@ -108,6 +108,32 @@ describe("buildReviewPrompt preamble with diff stats", () => {
     expect(result).not.toContain("**Changes:**");
   });
 
+  it("includes changed files when provided", () => {
+    const target: ReviewTarget = {
+      type: "custom",
+      instructions: "test",
+      changedFiles: ["src/a.ts", "src/b.ts"],
+    };
+    const result = buildReviewPrompt(target, "");
+    expect(result).toContain("**Changed files:** src/a.ts, src/b.ts");
+  });
+
+  it("omits changed files line when array is empty", () => {
+    const target: ReviewTarget = { type: "custom", instructions: "test", changedFiles: [] };
+    const result = buildReviewPrompt(target, "");
+    expect(result).not.toContain("**Changed files:**");
+  });
+
+  it("includes changed files for diff-based targets", () => {
+    const target: ReviewTarget = {
+      type: "uncommitted",
+      diff: sampleDiff,
+      changedFiles: ["src/file.ts"],
+    };
+    const result = buildReviewPrompt(target, sampleDiff);
+    expect(result).toContain("**Changed files:** src/file.ts");
+  });
+
   it("includes the diff block", () => {
     const target: ReviewTarget = { type: "uncommitted", diff: sampleDiff };
     const result = buildReviewPrompt(target, sampleDiff);

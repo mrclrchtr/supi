@@ -111,11 +111,11 @@ async function createReviewerSession(
   const resourceLoader = new DefaultResourceLoader({
     cwd,
     agentDir: process.env.PI_CODING_AGENT_DIR || "",
-    noExtensions: true,
+    noExtensions: false,
     noSkills: true,
     noPromptTemplates: true,
     noThemes: true,
-    noContextFiles: true,
+    noContextFiles: false,
     appendSystemPrompt: [buildReviewerSystemPrompt()],
   });
   await resourceLoader.reload();

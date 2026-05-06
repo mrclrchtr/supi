@@ -93,6 +93,67 @@ export async function getCommitShow(repoPath: string, sha: string): Promise<stri
   return stdout;
 }
 
+export async function getDiffFileNames(repoPath: string, baseSha: string): Promise<string[]> {
+  const { stdout } = await execFileAsync("git", ["diff", "--name-only", baseSha], {
+    cwd: repoPath,
+    timeout: GIT_TIMEOUT_MS,
+  });
+  return stdout
+    .trim()
+    .split("\n")
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0);
+}
+
+export async function getUncommittedFileNames(repoPath: string): Promise<string[]> {
+  const [unstaged, staged, untracked] = await Promise.all([
+    execFileAsync("git", ["diff", "--name-only"], { cwd: repoPath, timeout: GIT_TIMEOUT_MS }).then(
+      (r) => r.stdout,
+      () => "",
+    ),
+    execFileAsync("git", ["diff", "--cached", "--name-only"], {
+      cwd: repoPath,
+      timeout: GIT_TIMEOUT_MS,
+    }).then((r) => r.stdout, () => ""),
+    execFileAsync("git", ["ls-files", "--others", "--exclude-standard"], {
+      cwd: repoPath,
+      timeout: GIT_TIMEOUT_MS,
+    }).then((r) => r.stdout, () => ""),
+  ]);
+
+  const set = new Set([
+    ...unstaged
+      .trim()
+      .split("\n")
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0),
+    ...staged
+      .trim()
+      .split("\n")
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0),
+    ...untracked
+      .trim()
+      .split("\n")
+      .map((f) => f.trim())
+      .filter((f) => f.length > 0),
+  ]);
+  return Array.from(set).sort();
+}
+
+export async function getCommitFileNames(repoPath: string, sha: string): Promise<string[]> {
+  const { stdout } = await execFileAsync(
+    "git",
+    ["diff-tree", "--no-commit-id", "--name-only", "-r", sha],
+    { cwd: repoPath, timeout: GIT_TIMEOUT_MS },
+  );
+  return stdout
+    .trim()
+    .split("\n")
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0);
+}
+
 export async function getLocalBranches(repoPath: string): Promise<string[]> {
   const [{ stdout: local }, { stdout: current }] = await Promise.all([
     execFileAsync("git", ["branch", "--format=%(refname:short)"], {

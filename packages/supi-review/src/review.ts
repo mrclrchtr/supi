@@ -1,7 +1,15 @@
 import type { Model } from "@mariozechner/pi-ai";
 import type { ExtensionAPI, ModelRegistry } from "@mariozechner/pi-coding-agent";
 import { formatReviewContent } from "./format-content.ts";
-import { getCommitShow, getDiff, getMergeBase, getUncommittedDiff } from "./git.ts";
+import {
+  getCommitFileNames,
+  getCommitShow,
+  getDiff,
+  getDiffFileNames,
+  getMergeBase,
+  getUncommittedDiff,
+  getUncommittedFileNames,
+} from "./git.ts";
 import { ReviewProgressWidget } from "./progress-widget.ts";
 import { buildReviewPrompt } from "./prompts.ts";
 import { registerReviewRenderer } from "./renderer.ts";
@@ -100,22 +108,31 @@ async function resolvePresetTarget(
         ctx.ui.notify(`No merge base found for ${branch}`, "error");
         return undefined;
       }
-      const diff = await getDiff(ctx.cwd, baseSha);
-      return { type: "base-branch", branch, diff };
+      const [diff, changedFiles] = await Promise.all([
+        getDiff(ctx.cwd, baseSha),
+        getDiffFileNames(ctx.cwd, baseSha),
+      ]);
+      return { type: "base-branch", branch, diff, changedFiles };
     }
     case "uncommitted": {
-      const diff = await getUncommittedDiff(ctx.cwd);
+      const [diff, changedFiles] = await Promise.all([
+        getUncommittedDiff(ctx.cwd),
+        getUncommittedFileNames(ctx.cwd),
+      ]);
       if (!diff) {
         ctx.ui.notify("No uncommitted changes", "warning");
         return undefined;
       }
-      return { type: "uncommitted", diff };
+      return { type: "uncommitted", diff, changedFiles };
     }
     case "commit": {
       const sha = await selectCommit(ctx);
       if (!sha) return undefined;
-      const show = await getCommitShow(ctx.cwd, sha);
-      return { type: "commit", sha, show };
+      const [show, changedFiles] = await Promise.all([
+        getCommitShow(ctx.cwd, sha),
+        getCommitFileNames(ctx.cwd, sha),
+      ]);
+      return { type: "commit", sha, show, changedFiles };
     }
     case "custom": {
       const instructions = await ctx.ui.editor(
@@ -126,7 +143,8 @@ async function resolvePresetTarget(
         ctx.ui.notify("No instructions provided", "warning");
         return undefined;
       }
-      return { type: "custom", instructions: instructions.trim() };
+      const changedFiles = await getUncommittedFileNames(ctx.cwd);
+      return { type: "custom", instructions: instructions.trim(), changedFiles };
     }
   }
 }
@@ -154,25 +172,36 @@ async function resolveGitTarget(
       if (!baseSha) {
         return { kind: "failed", reason: `No merge base found for ${target.branch}`, target };
       }
-      return { kind: "success", target: { ...target, diff: await getDiff(ctx.cwd, baseSha) } };
+      const [diff, changedFiles] = await Promise.all([
+        getDiff(ctx.cwd, baseSha),
+        target.changedFiles ? Promise.resolve(target.changedFiles) : getDiffFileNames(ctx.cwd, baseSha),
+      ]);
+      return { kind: "success", target: { ...target, diff, changedFiles } };
     }
     case "uncommitted": {
       if (target.diff) {
         return { kind: "success", target };
       }
-      const diff = await getUncommittedDiff(ctx.cwd);
+      const [diff, changedFiles] = await Promise.all([
+        getUncommittedDiff(ctx.cwd),
+        target.changedFiles ? Promise.resolve(target.changedFiles) : getUncommittedFileNames(ctx.cwd),
+      ]);
       if (!diff) {
         return { kind: "failed", reason: "No uncommitted changes", target };
       }
-      return { kind: "success", target: { ...target, diff } };
+      return { kind: "success", target: { ...target, diff, changedFiles } };
     }
     case "commit": {
       if (target.show) {
         return { kind: "success", target };
       }
+      const [show, changedFiles] = await Promise.all([
+        getCommitShow(ctx.cwd, target.sha),
+        target.changedFiles ? Promise.resolve(target.changedFiles) : getCommitFileNames(ctx.cwd, target.sha),
+      ]);
       return {
         kind: "success",
-        target: { ...target, show: await getCommitShow(ctx.cwd, target.sha) },
+        target: { ...target, show, changedFiles },
       };
     }
     case "custom": {
@@ -247,7 +276,10 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
     diffOrBody = target.show;
   }
 
-  const truncated = maybeTruncateDiff(diffOrBody, maxDiffBytes);
+  const truncated =
+    target.type === "custom"
+      ? { text: "", wasTruncated: false, truncatedBytes: 0 }
+      : maybeTruncateDiff(diffOrBody, maxDiffBytes);
   const prompt = buildReviewPrompt(
     target,
     truncated.text,

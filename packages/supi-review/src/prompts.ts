@@ -13,7 +13,7 @@ export interface BuildPromptOptions {
 
 export function buildReviewPrompt(
   target: ReviewTarget,
-  diff: string,
+  diff: string = "",
   options: BuildPromptOptions = {},
 ): string {
   const parts: string[] = [];
@@ -67,6 +67,11 @@ export function parseDiffStats(text: string): DiffStats {
 }
 
 function buildPreamble(target: ReviewTarget): string {
+  const changedFilesLine =
+    target.changedFiles && target.changedFiles.length > 0
+      ? `**Changed files:** ${target.changedFiles.join(", ")}`
+      : undefined;
+
   switch (target.type) {
     case "base-branch": {
       const stats = parseDiffStats(target.diff);
@@ -76,6 +81,7 @@ function buildPreamble(target: ReviewTarget): string {
         `**Files changed:** ${stats.files}`,
         `**Changes:** +${stats.additions} / -${stats.deletions} lines`,
       ];
+      if (changedFilesLine) lines.push(changedFilesLine);
       return lines.join("\n");
     }
     case "uncommitted": {
@@ -86,6 +92,7 @@ function buildPreamble(target: ReviewTarget): string {
         `**Files changed:** ${stats.files}`,
         `**Changes:** +${stats.additions} / -${stats.deletions} lines`,
       ];
+      if (changedFilesLine) lines.push(changedFilesLine);
       return lines.join("\n");
     }
     case "commit": {
@@ -96,10 +103,17 @@ function buildPreamble(target: ReviewTarget): string {
         `**Files changed:** ${stats.files}`,
         `**Changes:** +${stats.additions} / -${stats.deletions} lines`,
       ];
+      if (changedFilesLine) lines.push(changedFilesLine);
       return lines.join("\n");
     }
     case "custom": {
-      return "# Review: custom instructions\n**Target:** user-provided review task";
+      const lines = [
+        "# Review: custom instructions",
+        "**Target:** user-provided review task",
+      ];
+      if (changedFilesLine) lines.push(changedFilesLine);
+      lines.push("No diff provided — follow the instructions below.");
+      return lines.join("\n");
     }
   }
 }
