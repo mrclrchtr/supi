@@ -43,9 +43,10 @@ describe("gatherGitContext", () => {
 
     const ctx = gatherGitContext(tmpDir);
     expect(ctx).not.toBeNull();
-    expect(ctx!.branch).toBe("main");
-    expect(ctx!.dirtyFiles).toEqual([]);
-    expect(ctx!.lastCommitMessage).toBe("initial");
+    if (!ctx) throw new Error("Expected git context for clean repo");
+    expect(ctx.branch).toBe("main");
+    expect(ctx.dirtyFiles).toEqual([]);
+    expect(ctx.lastCommitMessage).toBe("initial");
   });
 
   it("detects dirty files", () => {
@@ -56,7 +57,9 @@ describe("gatherGitContext", () => {
     writeFile(tmpDir, "new.ts", "export const x = 1;");
 
     const ctx = gatherGitContext(tmpDir);
-    expect(ctx!.dirtyFiles).toEqual(["new.ts"]);
+    expect(ctx).not.toBeNull();
+    if (!ctx) throw new Error("Expected git context for dirty repo");
+    expect(ctx.dirtyFiles).toEqual(["new.ts"]);
   });
 });
 
