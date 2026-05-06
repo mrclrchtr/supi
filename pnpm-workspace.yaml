@@ -1,13 +1,14 @@
 packages:
   - "packages/*"
-nodeLinker: hoisted
 ignoredBuiltDependencies:
   - '@davisvaughan/tree-sitter-r'
   - '@derekstride/tree-sitter-sql'
   - tree-sitter
   - tree-sitter-kotlin
+nodeLinker: hoisted
 
 onlyBuiltDependencies:
+  - '@google/genai'
   - koffi
   - protobufjs
   - tree-sitter-bash

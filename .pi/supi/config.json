@@ -1,8 +1,7 @@
 {
   "review": {
     "autoFix": true,
-    "reviewModel": "kimi-coding/k2p6",
-    "autoFix": true
+    "reviewModel": "github-copilot/gpt-5.4"
   },
   "debug": {
     "enabled": true,
