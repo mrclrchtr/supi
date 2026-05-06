@@ -107,10 +107,7 @@ function buildPreamble(target: ReviewTarget): string {
       return lines.join("\n");
     }
     case "custom": {
-      const lines = [
-        "# Review: custom instructions",
-        "**Target:** user-provided review task",
-      ];
+      const lines = ["# Review: custom instructions", "**Target:** user-provided review task"];
       if (changedFilesLine) lines.push(changedFilesLine);
       lines.push("No diff provided — follow the instructions below.");
       return lines.join("\n");

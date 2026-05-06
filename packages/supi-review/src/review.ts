@@ -22,6 +22,7 @@ import {
   registerReviewSettings,
   setReviewModelChoices,
 } from "./settings.ts";
+import { resolveGitTarget } from "./target-resolution.ts";
 import type { ReviewResult, ReviewTarget } from "./types.ts";
 import { selectAutoFix, selectBranch, selectCommit, selectPreset } from "./ui.ts";
 
@@ -157,57 +158,6 @@ async function executeReview(options: ReviewExecutionOptions): Promise<ReviewRes
     return { kind: "canceled", target: resolved.target };
   }
   return runReview({ ...options, target: resolved.target });
-}
-
-async function resolveGitTarget(
-  target: ReviewTarget,
-  ctx: CommandContext,
-): Promise<{ kind: "success"; target: ReviewTarget } | ReviewResult> {
-  switch (target.type) {
-    case "base-branch": {
-      if (target.diff) {
-        return { kind: "success", target };
-      }
-      const baseSha = await getMergeBase(ctx.cwd, target.branch);
-      if (!baseSha) {
-        return { kind: "failed", reason: `No merge base found for ${target.branch}`, target };
-      }
-      const [diff, changedFiles] = await Promise.all([
-        getDiff(ctx.cwd, baseSha),
-        target.changedFiles ? Promise.resolve(target.changedFiles) : getDiffFileNames(ctx.cwd, baseSha),
-      ]);
-      return { kind: "success", target: { ...target, diff, changedFiles } };
-    }
-    case "uncommitted": {
-      if (target.diff) {
-        return { kind: "success", target };
-      }
-      const [diff, changedFiles] = await Promise.all([
-        getUncommittedDiff(ctx.cwd),
-        target.changedFiles ? Promise.resolve(target.changedFiles) : getUncommittedFileNames(ctx.cwd),
-      ]);
-      if (!diff) {
-        return { kind: "failed", reason: "No uncommitted changes", target };
-      }
-      return { kind: "success", target: { ...target, diff, changedFiles } };
-    }
-    case "commit": {
-      if (target.show) {
-        return { kind: "success", target };
-      }
-      const [show, changedFiles] = await Promise.all([
-        getCommitShow(ctx.cwd, target.sha),
-        target.changedFiles ? Promise.resolve(target.changedFiles) : getCommitFileNames(ctx.cwd, target.sha),
-      ]);
-      return {
-        kind: "success",
-        target: { ...target, show, changedFiles },
-      };
-    }
-    case "custom": {
-      return { kind: "success", target };
-    }
-  }
 }
 
 async function runReviewWithLoader(

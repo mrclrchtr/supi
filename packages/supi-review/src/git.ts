@@ -114,11 +114,17 @@ export async function getUncommittedFileNames(repoPath: string): Promise<string[
     execFileAsync("git", ["diff", "--cached", "--name-only"], {
       cwd: repoPath,
       timeout: GIT_TIMEOUT_MS,
-    }).then((r) => r.stdout, () => ""),
+    }).then(
+      (r) => r.stdout,
+      () => "",
+    ),
     execFileAsync("git", ["ls-files", "--others", "--exclude-standard"], {
       cwd: repoPath,
       timeout: GIT_TIMEOUT_MS,
-    }).then((r) => r.stdout, () => ""),
+    }).then(
+      (r) => r.stdout,
+      () => "",
+    ),
   ]);
 
   const set = new Set([
