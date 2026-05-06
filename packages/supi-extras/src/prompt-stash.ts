@@ -5,11 +5,12 @@
  * it to the system clipboard, and `/stash`, `/stash-copy`, `/stash-clear`
  * commands for browsing and managing stashed drafts.
  *
- * Stashes are kept in-memory (session-scoped, not persisted).
+ * Stashes are persisted to ~/.pi/agent/supi/prompt-stash.json so they survive
+ * pi restarts. On I/O errors the stash falls back to in-memory-only operation.
  */
-import { unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 
 /** In-memory stash entry. */
@@ -20,12 +21,69 @@ interface Stash {
   createdAt: number;
 }
 
-/** Session-scoped stash store. Cleared on session shutdown or `/stash-clear`. */
-const STASHES = new Map<string, Stash>();
+/** Storage directory relative to the user's home directory. */
+const STORAGE_RELATIVE_DIR = ".pi/agent/supi";
+const STASH_FILE = "prompt-stash.json";
 
-/** Reset stashes — intended for tests only. */
+/** Resolve the absolute path to the stash persistence file. */
+function getStashFilePath(): string {
+  return join(homedir(), STORAGE_RELATIVE_DIR, STASH_FILE);
+}
+
+/**
+ * Load stashes from disk. Returns an empty map when the file does not exist
+ * or cannot be parsed — the stash degrades gracefully to in-memory-only.
+ */
+function loadStashesFromDisk(): Map<string, Stash> {
+  try {
+    const content = readFileSync(getStashFilePath(), "utf-8");
+    const parsed: unknown = JSON.parse(content);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const root = parsed as Record<string, unknown>;
+      const rawStashes = root.stashes;
+      if (rawStashes && typeof rawStashes === "object" && !Array.isArray(rawStashes)) {
+        const map = new Map<string, Stash>();
+        for (const [id, stash] of Object.entries(rawStashes)) {
+          if (stash && typeof stash === "object") {
+            map.set(id, stash as Stash);
+          }
+        }
+        return map;
+      }
+    }
+  } catch (err) {
+    console.warn("[supi-extras] Failed to load prompt stash from disk, starting fresh:", err);
+  }
+  return new Map();
+}
+
+/**
+ * Save stashes to disk. Silently ignores write errors so a read-only
+ * filesystem never breaks the stash in-memory.
+ */
+function saveStashesToDisk(stashes: Map<string, Stash>): void {
+  try {
+    const filePath = getStashFilePath();
+    mkdirSync(dirname(filePath), { recursive: true });
+
+    const data: Record<string, Stash> = {};
+    for (const [id, stash] of stashes) {
+      data[id] = stash;
+    }
+
+    writeFileSync(filePath, `${JSON.stringify({ stashes: data }, null, 2)}\n`, "utf-8");
+  } catch (err) {
+    console.warn("[supi-extras] Failed to persist prompt stash to disk, continuing in-memory:", err);
+  }
+}
+
+/** Persisted stash store. Loaded from disk at module init. */
+const STASHES = loadStashesFromDisk();
+
+/** Reset stashes — intended for tests only. Also clears the persisted file. */
 export function _resetStashes(): void {
   STASHES.clear();
+  saveStashesToDisk(STASHES);
 }
 
 /** Generate a unique stash id. */
@@ -129,6 +187,7 @@ export default function promptStash(pi: ExtensionAPI) {
         text,
         createdAt: Date.now(),
       });
+      saveStashesToDisk(STASHES);
       ctx.ui.setEditorText("");
       ctx.ui.notify(`Stashed: "${name || defaultName}"`, "info");
     },
@@ -219,7 +278,12 @@ export default function promptStash(pi: ExtensionAPI) {
       if (!ok) return;
 
       STASHES.clear();
+      saveStashesToDisk(STASHES);
       ctx.ui.notify("All stashes cleared", "info");
     },
+  });
+
+  pi.on("session_shutdown", () => {
+    saveStashesToDisk(STASHES);
   });
 }
