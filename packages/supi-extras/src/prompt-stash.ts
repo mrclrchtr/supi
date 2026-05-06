@@ -126,17 +126,42 @@ function generateName(text: string): string {
   return "Untitled";
 }
 
-/** Build selectable labels for the TUI `select` dialog, newest first. */
-function getStashLabels(): string[] {
-  return Array.from(STASHES.values())
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .map((s) => `[${s.id}] ${s.name}`);
+/**
+ * Build action-prefixed entries for the stash picker, newest first.
+ *
+ * Each stash appears three times — once per action — with a short prefix:
+ *   [R] My prompt
+ *   [C] My prompt
+ *   [D] My prompt
+ *
+ * Duplicate names get a counter appended for disambiguation.
+ */
+interface StashPickerEntry {
+  label: string;
+  stashId: string;
+  action: "restore" | "copy" | "delete";
 }
 
-/** Extract the stash id from a label formatted as `[id] name`. */
-function parseStashId(label: string): string | undefined {
-  const match = label.match(/^\[([^\]]+)\]/);
-  return match?.[1];
+function getStashPicker(): StashPickerEntry[] {
+  const sorted = Array.from(STASHES.values()).sort((a, b) => b.createdAt - a.createdAt);
+
+  // Track how many times each name has been used to handle duplicates
+  const nameCount = new Map<string, number>();
+  const entries: StashPickerEntry[] = [];
+
+  for (const stash of sorted) {
+    const count = (nameCount.get(stash.name) ?? 0) + 1;
+    nameCount.set(stash.name, count);
+
+    const baseName = count === 1 ? stash.name : `${stash.name} (${count})`;
+
+    for (const action of ["restore", "copy", "delete"] as const) {
+      const prefix = action === "restore" ? "R" : action === "copy" ? "C" : "D";
+      entries.push({ label: `[${prefix}] ${baseName}`, stashId: stash.id, action });
+    }
+  }
+
+  return entries;
 }
 
 /**
@@ -217,48 +242,6 @@ export default function promptStash(pi: ExtensionAPI) {
     },
   });
 
-  /** Look up a stash from a select label. Returns undefined and notifies on missing. */
-  function findStashByLabel(label: string): Stash | undefined {
-    const id = parseStashId(label);
-    if (!id) return undefined;
-    const stash = STASHES.get(id);
-    if (!stash) {
-      // notification handled by caller
-      return undefined;
-    }
-    return stash;
-  }
-
-  /** Show the action menu for a single stash. ESC cancels silently. */
-  async function showStashActions(
-    stash: Stash,
-    ctx: import("@mariozechner/pi-coding-agent").ExtensionCommandContext,
-  ): Promise<void> {
-    const action = await ctx.ui.select(`"${stash.name}":`, [
-      "[R] Restore into editor",
-      "[C] Copy to clipboard",
-      "[D] Delete",
-      "[X] Cancel",
-    ]);
-
-    if (!action || action.startsWith("[X]")) return;
-
-    if (action.startsWith("[R]")) {
-      ctx.ui.setEditorText(stash.text);
-      ctx.ui.notify(`Restored: "${stash.name}"`, "info");
-    } else if (action.startsWith("[C]")) {
-      const ok = await copyToClipboard(stash.text, ctx.cwd, pi);
-      ctx.ui.notify(
-        ok ? `Copied "${stash.name}" to clipboard` : "Failed to copy to clipboard",
-        ok ? "info" : "error",
-      );
-    } else if (action.startsWith("[D]")) {
-      STASHES.delete(stash.id);
-      saveStashesToDisk(STASHES);
-      ctx.ui.notify(`Deleted: "${stash.name}"`, "info");
-    }
-  }
-
   pi.registerShortcut("ctrl+shift+s", {
     description: "Copy current editor text to clipboard",
     handler: async (ctx) => {
@@ -276,35 +259,70 @@ export default function promptStash(pi: ExtensionAPI) {
     },
   });
 
+  async function confirmAndClearAll(
+    ctx: import("@mariozechner/pi-coding-agent").ExtensionCommandContext,
+  ): Promise<void> {
+    const stashCount = STASHES.size;
+    const ok = await ctx.ui.confirm("Clear all?", `Delete ${stashCount} stashed prompt(s)?`);
+    if (!ok) return;
+    STASHES.clear();
+    saveStashesToDisk(STASHES);
+    ctx.ui.notify("All stashes cleared", "info");
+  }
+
+  async function runStashAction(
+    stash: Stash,
+    action: "restore" | "copy" | "delete",
+    ctx: import("@mariozechner/pi-coding-agent").ExtensionCommandContext,
+  ): Promise<void> {
+    if (action === "restore") {
+      ctx.ui.setEditorText(stash.text);
+      ctx.ui.notify(`Restored: "${stash.name}"`, "info");
+    } else if (action === "copy") {
+      const ok = await copyToClipboard(stash.text, ctx.cwd, pi);
+      ctx.ui.notify(
+        ok ? `Copied "${stash.name}" to clipboard` : "Failed to copy to clipboard",
+        ok ? "info" : "error",
+      );
+    } else if (action === "delete") {
+      STASHES.delete(stash.id);
+      saveStashesToDisk(STASHES);
+      ctx.ui.notify(`Deleted: "${stash.name}"`, "info");
+    }
+  }
+
   pi.registerCommand("supi-stash", {
     description: "Browse, restore, copy, delete, or clear all stashed prompts",
     handler: async (_args, ctx) => {
-      const stashLabels = getStashLabels();
-      if (stashLabels.length === 0) {
+      const entries = getStashPicker();
+      if (entries.length === 0) {
         ctx.ui.notify("No stashed prompts", "info");
         return;
       }
 
-      const pickList = ["[clear-all] ✕ Clear all stashes", ...stashLabels];
+      const labelMap = new Map(entries.map((e) => [e.label, e] as const));
+      const pickList = ["[clear-all] ✕ Clear all stashes", ...entries.map((e) => e.label)];
       const label = await ctx.ui.select("Pick a stash:", pickList);
       if (!label) return;
 
       if (label.startsWith("[clear-all]")) {
-        const ok = await ctx.ui.confirm(
-          "Clear all?",
-          `Delete ${stashLabels.length} stashed prompt(s)?`,
-        );
-        if (!ok) return;
-        STASHES.clear();
-        saveStashesToDisk(STASHES);
-        ctx.ui.notify("All stashes cleared", "info");
+        await confirmAndClearAll(ctx);
         return;
       }
 
-      const stash = findStashByLabel(label);
-      if (!stash) return;
+      const entry = labelMap.get(label);
+      if (!entry) {
+        ctx.ui.notify("Stash not found", "error");
+        return;
+      }
 
-      await showStashActions(stash, ctx);
+      const stash = STASHES.get(entry.stashId);
+      if (!stash) {
+        ctx.ui.notify("Stash not found", "error");
+        return;
+      }
+
+      await runStashAction(stash, entry.action, ctx);
     },
   });
 
