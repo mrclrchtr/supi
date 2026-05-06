@@ -133,6 +133,10 @@ Use the `supi-cache` section. Upgrades from the old `cache-monitor` section are 
 }
 ```
 
+## Provider notes
+
+Some providers do not report cache write tokens in their usage metadata. For example, Anthropic's API returns `cache_read_input_tokens` and `input_tokens` but does not expose cache writes. When using such a provider, the `CacheW` column in `/supi-cache-history` will always show `0`. Providers that do report cache writes (e.g. Google Gemini) will populate the column normally.
+
 ## Agent safety
 
 The `supi_cache_forensics` tool returns shape fingerprints, not raw content:
