@@ -42,8 +42,7 @@ function createCtxMock() {
       setEditorText: vi.fn(),
       notify: vi.fn(),
       input: vi.fn(async () => undefined as string | undefined),
-      select: vi.fn(async () => undefined as string | undefined),
-      confirm: vi.fn(async () => false),
+      custom: vi.fn(async () => null as unknown),
       theme: { fg: (_color: string, text: string) => text } as unknown as Record<string, unknown>,
     },
     cwd: "/tmp",
@@ -70,13 +69,11 @@ describe("promptStash extension", () => {
     expect(pi.getShortcutHandlers("ctrl+shift+s")).toHaveLength(1);
   });
 
-  it("registers /stash, /stash-copy, /stash-clear commands", () => {
+  it("registers /supi-stash command", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    expect(pi.getCommandHandler("stash")).toBeDefined();
-    expect(pi.getCommandHandler("stash-copy")).toBeDefined();
-    expect(pi.getCommandHandler("stash-clear")).toBeDefined();
+    expect(pi.getCommandHandler("supi-stash")).toBeDefined();
   });
 
   it("stashes editor text on alt+s and clears editor", async () => {
@@ -145,40 +142,44 @@ describe("promptStash extension", () => {
     expect(pi.exec).not.toHaveBeenCalled();
   });
 
-  it("restores stash via /stash command", async () => {
+  it("restores stash via /supi-stash command", async () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    // Stash a prompt
     const stashCtx = createCtxMock();
     stashCtx.ui.getEditorText = vi.fn(() => "restore me");
     stashCtx.ui.input = vi.fn(async () => "restore test");
     await pi.getShortcutHandlers("alt+s")[0](stashCtx);
 
-    // Now restore it
     const restoreCtx = createCtxMock();
-    restoreCtx.ui.select = vi.fn(async () => "[stash-123] restore test");
+    restoreCtx.ui.custom = vi.fn(async () => ({
+      action: "restore",
+      stash: {
+        id: "stash-1",
+        name: "restore test",
+        text: "restore me",
+        createdAt: Date.now(),
+      },
+    }));
 
-    // Need the real stash id, so let's capture it from the actual select call
-    await pi.getCommandHandler("stash")?.("", restoreCtx);
+    await pi.getCommandHandler("supi-stash")?.("", restoreCtx);
 
-    expect(restoreCtx.ui.select).toHaveBeenCalledWith(
-      "Restore stash:",
-      expect.arrayContaining([expect.stringContaining("restore test")]),
-    );
+    expect(restoreCtx.ui.custom).toHaveBeenCalledWith(expect.any(Function), { overlay: true });
+    expect(restoreCtx.ui.setEditorText).toHaveBeenCalledWith("restore me");
+    expect(restoreCtx.ui.notify).toHaveBeenCalledWith('Restored: "restore test"', "info");
   });
 
-  it("notifies when no stashes exist for /stash", async () => {
+  it("notifies when no stashes exist for /supi-stash", async () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
     const ctx = createCtxMock();
-    await pi.getCommandHandler("stash")?.("", ctx);
+    await pi.getCommandHandler("supi-stash")?.("", ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("No stashed prompts", "info");
   });
 
-  it("clears all stashes via /stash-clear", async () => {
+  it("clears all stashes via /supi-stash", async () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
@@ -188,14 +189,9 @@ describe("promptStash extension", () => {
     await pi.getShortcutHandlers("alt+s")[0](ctx);
 
     const clearCtx = createCtxMock();
-    clearCtx.ui.confirm = vi.fn(async () => true);
-    await pi.getCommandHandler("stash-clear")?.("", clearCtx);
+    clearCtx.ui.custom = vi.fn(async () => ({ action: "cleared" }));
+    await pi.getCommandHandler("supi-stash")?.("", clearCtx);
 
     expect(clearCtx.ui.notify).toHaveBeenCalledWith("All stashes cleared", "info");
-
-    // Verify empty
-    const listCtx = createCtxMock();
-    await pi.getCommandHandler("stash")?.("", listCtx);
-    expect(listCtx.ui.notify).toHaveBeenCalledWith("No stashed prompts", "info");
   });
 });
