@@ -10,6 +10,7 @@
     "packages/supi-core": {},
     "packages/supi-debug": {},
     "packages/supi-extras": {},
+    "packages/supi-flow": {},
     "packages/supi-insights": {},
     "packages/supi-lsp": {},
     "packages/supi-review": {},

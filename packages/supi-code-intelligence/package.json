@@ -18,8 +18,7 @@
   "files": [
     "src/**/*.ts",
     "src/actions/*.ts",
-    "*.json",
-    "!__tests__"
+    "README.md"
   ],
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*",

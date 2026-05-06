@@ -17,9 +17,10 @@
   ],
   "files": [
     "src/**/*.ts",
+    "!src/__tests__/**",
     "src/report.css",
     "src/report.js",
-    "!__tests__"
+    "README.md"
   ],
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*",
