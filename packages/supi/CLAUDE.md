@@ -16,7 +16,7 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
   - `src/settings.ts`
   - `src/lsp.ts`
   - `src/tree-sitter.ts`
-  - `src/cache-monitor.ts`
+  - `src/cache.ts`
   - `src/code-intelligence.ts`
   - `src/flow.ts`
   - `src/insights.ts`
