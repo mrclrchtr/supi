@@ -4,6 +4,15 @@
 
 `@mrclrchtr/supi-cache` is a real-time prompt cache health monitor plus a cross-session forensics engine. It tracks per-turn cache hit rates, detects regressions with root-cause diagnosis (compaction, model change, prompt change), and provides two user commands and an agent-callable tool.
 
+## Commands
+
+```bash
+pnpm vitest run packages/supi-cache/
+pnpm exec biome check packages/supi-cache
+pnpm exec tsc --noEmit -p packages/supi-cache/tsconfig.json
+pnpm exec tsc --noEmit -p packages/supi-cache/__tests__/tsconfig.json
+```
+
 ## Architecture
 
 ```
@@ -12,7 +21,7 @@ src/
 │   ├── monitor.ts    Extension factory — event wiring, commands, tool registration
 │   ├── state.ts      Per-turn TurnRecord store + regression detection + cause tracking
 │   └── status.ts     Compact footer status line ("cache: 80% ↑")
-├── forensics/        Cross-session, query-driven investigation (NEW)
+├── forensics/        Cross-session, query-driven investigation
 │   ├── forensics.ts  Engine: SessionManager.listAll → parse → extract → query
 │   ├── extract.ts    Branch walking: cache turn extraction + timestamp-aligned tool windows
 │   ├── queries.ts    Pure query functions: hotspots, breakdown, correlate, idle
@@ -43,12 +52,3 @@ src/
 - Tool correlation windows align by turn timestamps, not by assistant message count, so no-usage assistant messages don't skew the window.
 - The forensics engine strips `_prefixed` fields (`_pathsInvolved`, `_commandSummaries`) before returning to the agent — these are human-only details shown in the TUI renderer.
 - `resolveTurnCause()` in `state.ts` handles note-to-cause fallback for legacy session records that only have `note` strings (e.g. `"⚠ compaction"`).
-
-## Validation
-
-```bash
-pnpm vitest run packages/supi-cache/
-pnpm exec biome check packages/supi-cache
-pnpm exec tsc --noEmit -p packages/supi-cache/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-cache/__tests__/tsconfig.json
-```

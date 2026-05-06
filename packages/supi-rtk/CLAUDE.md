@@ -4,16 +4,28 @@
 
 `@mrclrchtr/supi-rtk` registers a `bash` tool override that transparently rewrites commands through the [RTK](https://github.com/joshcho/RTK) CLI for token savings. It also exposes session statistics via a context provider.
 
+## Architecture
+
+Registers a `bash` tool override (`createBashTool`) with a `spawnHook` that intercepts commands before execution:
+1. `guards.ts` checks for known lossy RTK rewrite collisions (Biome, ripgrep) → passthrough
+2. `rewrite.ts` invokes `rtk rewrite <command>` to transform the command
+3. Rewritten command (or original on RTK failure) is passed to the real bash tool
+4. `tracking.ts` accumulates rewrite/fallback stats exposed as context
+
 ## Key files
 
 - `rtk.ts` — extension wiring, tool override, settings, `user_bash` interception
 - `rewrite.ts` — `rtk rewrite` CLI invocation with structured error classification
-- `guards.ts` — SuPi-side passthrough guard for RTK rewrite collisions (Biome commands rewritten to `rtk lint`, ripgrep commands rewritten to `grep` with untranslated flags)
+- `guards.ts` — SuPi-side passthrough guard for RTK rewrite collisions
 - `tracking.ts` — session-level rewrite/fallback stats
 
-## Validation
+## Commands
 
-- `pnpm vitest run packages/supi-rtk/ && pnpm exec biome check packages/supi-rtk`
+```bash
+pnpm vitest run packages/supi-rtk/
+pnpm exec tsc --noEmit -p packages/supi-rtk/tsconfig.json
+pnpm exec biome check packages/supi-rtk/
+```
 
 ## RTK CLI behavior
 

@@ -49,11 +49,19 @@ Global: `~/.pi/agent/supi/config.json` — Project: `.pi/supi/config.json`
 }
 ```
 
+## Commands
+
+```bash
+pnpm vitest run packages/supi-claude-md/
+pnpm exec tsc --noEmit -p packages/supi-claude-md/tsconfig.json
+pnpm exec tsc --noEmit -p packages/supi-claude-md/__tests__/tsconfig.json
+pnpm exec biome check packages/supi-claude-md/
+```
+
 ## Testing
 
 - Pure function unit tests in `__tests__/` — no pi mocks needed for discovery, subdirectory, state
 - Config tests use temp directories with `homeDir` parameter injection
-- Run: `pnpm vitest run packages/supi-claude-md/`
 
 ## Gotchas
 

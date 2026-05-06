@@ -1,5 +1,15 @@
 # supi-review
 
+Automated code review via an in-process managed child session.
+
+## Commands
+
+```bash
+pnpm vitest run packages/supi-review/
+pnpm exec tsc --noEmit -p packages/supi-review/tsconfig.json
+pnpm exec biome check packages/supi-review/
+```
+
 ## Reviewer in-process session design
 
 - The reviewer runs as an in-process managed child session via `createAgentSession()` with `SessionManager.inMemory()`.

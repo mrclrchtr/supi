@@ -82,69 +82,43 @@ LSP → Tree-sitter → ripgrep text search, with explicit confidence labeling o
 
 ## Key Gotchas
 
-### Param Validation (tool-actions.ts:validateParams)
+### Param Validation
 - `line`/`character` require `file`, **not** `path`. `path` is for scope/focus; `file` anchors a position.
 - `file` pointing to a directory is rejected — use `path` for directory scoping.
 - `line`/`character` without `file` is rejected.
-- Unknown action is rejected with a list of supported actions.
 
-### Git Context (git-context.ts)
-- `gatherGitContext()` uses `git branch --show-current`, `git status --porcelain`, and `git log -1`.
-- Returns `null` for non-git directories ( graceful fallback — brief output omits the section).
-- Git config in test environments should disable GPG signing and hooks (`commit.gpgsign=false`, `core.hooksPath=/dev/null`).
+### Pattern Search
+- `pattern` is treated as a **literal string by default** — set `regex: true` to opt into raw ripgrep regex.
+- Malformed regex returns an explicit error message, never a misleading "No matches found."
+- `summary: true` returns aggregate counts by directory instead of line-level matches.
 
-### Pattern Search (pattern-action.ts)
-- `pattern` is treated as a **literal string by default** — the action calls `escapeRegex()` on the input before passing to ripgrep.
-- Set `regex: true` to opt into raw ripgrep regex semantics.
-- Malformed regex input returns an explicit error message via `formatRegexError()` — never a misleading "No matches found."
-- Internally searches with `maxMatches: maxResults * 3` for dedup filtering.
-- `summary: true` returns aggregate counts by directory instead of line-level matches. Use for "how common is this pattern?" questions.
-
-### Target Resolution (resolve-target.ts, target-resolution.ts)
-- Symbol resolution goes through LSP `workspaceSymbol` first, then ripgrep fallback.
-- **Multiple candidates** return a disambiguation message with numbered options instead of picking automatically.
-- LSP candidates are filtered by `isWithinOrEqual` path scope, SymbolKind, and exported-only heuristic.
-- Binary files (`.png`, `.jpg`, `.wasm`, etc.) are explicitly rejected during anchored target resolution.
-- `filterOutDeclaration()` strips the source declaration from LSP reference results — the declaration is the symbol being changed, not a call site.
+### Target Resolution
+- Symbol resolution: LSP `workspaceSymbol` → ripgrep fallback. Multiple candidates return a disambiguation message.
+- `filterOutDeclaration()` strips the source declaration from LSP reference results.
+- Binary files (`.png`, `.jpg`, `.wasm`, etc.) are explicitly rejected.
 
 ### First-Turn Overview
-- Deduplicated via `hasInjectedOverview` flag reset in `session_start`.
-- On reload/resume, `session_start` scans the branch for an existing `code-intelligence-overview` custom message.
+- Injected via `before_agent_start` on the first turn; deduplicated via `hasInjectedOverview` flag.
 - Uses `display: false` so the overview is agent-visible but TUI-invisible.
-- `buildArchitectureModel` supports: pnpm-workspace.yaml, package.json workspaces, single-package, and minimal (no manifest but source files exist).
-- Now includes git context (branch, dirty files, last commit) when inside a git repository.
+- On reload/resume, scans the branch for an existing `code-intelligence-overview` custom message.
+- `buildArchitectureModel` supports: pnpm-workspace.yaml, package.json workspaces, single-package, and minimal.
 
-### Architecture Model (architecture.ts)
-- Project markers searched: `package.json`, `pnpm-workspace.yaml`, `deno.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`.
-- Workspace packages detected via pnpm-workspace.yaml `packages:` array or `package.json` `workspaces` field.
+### Architecture Model
 - Internal vs external dep separation uses `workspace:*` version prefix heuristic.
-- Glob expansion supports `packages/*` (single level) and `packages/**` (up to depth 5).
 - `findModuleForPath()` returns the deepest matching module for nested monorepo layouts.
 
 ### Confidence & Metadata
-- Every action handler returns formatted Markdown for the agent to read **plus** structured `details` metadata (`BriefDetails`, `SearchDetails`, `AffectedDetails`, or `DisambiguationCandidate[]`).
-- The metadata includes `nextQueries` — suggested follow-up `code_intel` calls for the agent.
-- Risk assessment in `affected-action.ts`:
-  - `high`: >10 refs || >3 modules || >1 downstream
-  - `medium`: >3 refs || >1 module || ≥1 downstream
-  - `low`: otherwise
+- Every action handler returns formatted Markdown **plus** structured `details` with `nextQueries` follow-ups.
+- Risk thresholds: `high` (>10 refs / >3 modules / >1 downstream), `medium` (>3 refs / >1 module / ≥1 downstream), `low` (otherwise).
 
-### rippgrep Wrapper (search-helpers.ts)
-- `runRipgrep()` — legacy behavior: any execution failure returns empty matches (error swallowed).
-- `runRipgrepDetailed()` — preserves non-no-match errors (used by pattern-action for regex validation).
-- Low-signal paths (`node_modules`, `.pnpm`, `dist`, `.next`, `__pycache__`, etc.) are filtered out unless `filterLowSignal: false`.
-- Context lines: trailing context from one match that overlaps with the next match's leading context is deduplicated.
+## Test Commands
 
-### Index Action (index-action.ts)
-- Factual, non-interpretive project map: file counts by extension, top-level directory tree, landmark config files.
-- Skips low-signal directories: `node_modules`, `dist`, `build`, `.git`, and dot-prefixed entries.
-- Landmark file list is a curated set of common config files (package.json, tsconfig.json, Makefile, etc.).
-- Not a replacement for `brief` — `index` answers "what's here?" while `brief` answers "how is it organized?"
-
-### Programmatic API (index.ts)
-- `buildArchitectureModel`, `generateOverview`, `generateProjectBrief`, `generateFocusedBrief` are exported for peer extensions.
-- Target resolution helpers (`normalizePath`, `resolveAnchoredTarget`, `resolveSymbolTarget`, `toZeroBased`) are exported.
-- All result types (`ArchitectureModel`, `BriefDetails`, `SearchDetails`, `AffectedDetails`, `CodeIntelResult`, `ConfidenceMode`, `DisambiguationCandidate`) are exported.
+```bash
+pnpm vitest run packages/supi-code-intelligence/
+pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json
+pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json
+pnpm exec biome check packages/supi-code-intelligence/
+```
 
 ## Testing Patterns
 

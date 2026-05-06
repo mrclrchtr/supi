@@ -38,18 +38,17 @@ This repo has two install surfaces:
 - repository root `package.json` exposes a `pi` manifest for local-path and git installs — supports `extensions`, `prompts`, `skills`, `themes` keys
 - `packages/supi/` is the published meta-package bundling the full stack
 
+A compact workspace overview is auto-injected on the first agent turn by `supi-code-intelligence` (`before_agent_start` → `generateOverview()`). The full package inventory is listed below for completeness; it extends beyond the 8-module compact overview.
+
 Current workspace packages:
 - `packages/supi` — meta-package wrapper entrypoints re-exporting all sub-extensions
 - `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
 - `packages/supi-bash-timeout` — default timeout injection for `bash`
 - `packages/supi-claude-md` — subdirectory CLAUDE.md injection
 - `packages/supi-core` — shared infrastructure: XML `<extension-context>` tag, config system
-- `packages/supi-extras` — command aliases, skill shorthand, tab spinner, prompt stash, and other small utilities
+- `packages/supi-extras` — command aliases, skill shorthand, tab spinner, prompt stash
 - `packages/supi-lsp` — Language Server Protocol integration + diagnostics guardrails
 - `packages/supi-tree-sitter` — Tree-sitter structural analysis tool + reusable parse/query service
-
-Other notable areas:
-- `openspec/changes/` and `openspec/specs/` — OpenSpec artifacts
 
 ## Packaging conventions
 
@@ -112,7 +111,7 @@ registerSettings({
 ## Shared gotchas
 
 - pi loads these extensions from the working tree directly; after edits, use `/reload` or restart pi.
-- `pi.on("tool_result")` can modify tool output; `pi.on("tool_call")` can only block.
+- `pi.on("tool_result")` can modify tool output after execution; `pi.on("tool_call")` runs before execution — it can mutate input parameters (e.g. inject defaults) or block the call, but cannot add result content.
 - Session cleanup event is `session_shutdown`, not `session_end`.
 - `ctx.ui.notify()` accepts `"info"` | `"warning"` | `"error"` severity — the gotcha about "info" is for `ctx.ui.theme` colors, not `notify`.
 - `ctx.ui.theme` does not expose an `"info"` color; use existing colors like `"accent"` / `"dim"` for info-level UI.

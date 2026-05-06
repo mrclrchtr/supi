@@ -56,6 +56,6 @@ Grammars are resolved via npm peer dependencies, except Kotlin and SQL which use
 
 1. `supi-tree-sitter` — parser-backed structural analysis (this package)
 2. `supi-lsp` — live semantic analysis through language servers
-3. `supi-code-intelligence` (future) — unified agent-facing layer above both
+3. `supi-code-intelligence` — unified agent-facing layer above both
 
 Keep this package independent of `supi-lsp` internals. Any shared utilities belong in `supi-core`.

@@ -44,6 +44,14 @@ src/
 - Uses `registerConfigSettings()` from `supi-core` for scoped `/supi-settings` integration.
 - Config section: `"insights"`, keys: `enabled` (boolean), `maxSessions` (number), `maxFacets` (number).
 
+## Commands
+
+```bash
+pnpm vitest run packages/supi-insights/
+pnpm exec tsc --noEmit -p packages/supi-insights/tsconfig.json
+pnpm exec biome check packages/supi-insights/
+```
+
 ## Validation
 
-- `pnpm exec biome check packages/supi-insights && pnpm exec tsc --noEmit -p packages/supi-insights/tsconfig.json`
+- `pnpm exec biome check packages/supi-insights && pnpm vitest run packages/supi-insights/ && pnpm exec tsc --noEmit -p packages/supi-insights/tsconfig.json`

@@ -61,19 +61,11 @@ Diagnostics are surfaced at four severity levels controlled via `/supi-settings`
 
 ## Diagnostic behavior gotchas
 
+- `before_agent_start` uses a **two-pass prune/refresh** pattern: prune → refresh → prune again. Late `publishDiagnostics` notifications can recreate stale entries after the first prune; `getAllDiagnostics()` must also filter by `existsSync` as a read-side guard.
+- Pull diagnostic sync should prefer pull when `diagnosticProvider` is advertised, fall back to push waits. Clear `resultId` cache after file creation so cross-file diagnostics are fully re-computed.
 - Diagnostic cleanup (`didClose`, prune, refresh deletion, shutdown) must release pending waiters, not just delete waiter maps.
-- `before_agent_start` uses a **two-pass prune/refresh** pattern: prune missing files → refresh open diagnostics → prune again. Late `publishDiagnostics` notifications (already in-flight) can recreate stale `diagnosticStore` entries for deleted files after the first prune.
-- `getAllDiagnostics()` should filter by `existsSync(uriToFile(uri))` as a read-side guard against the same race — late notifications recreate entries even after the second prune.
-- Push diagnostic refresh should settle after `quietMs` even when no publications arrive; avoid forcing every turn to wait `maxWaitMs`.
-- Pull diagnostics should use `JsonRpcClient.sendRequest(..., { timeoutMs })` so timed-out requests leave the pending map promptly.
-- Pull diagnostic reports can include `relatedDocuments` on `unchanged` top-level reports; apply related full reports regardless of top-level kind.
-- Track pull diagnostic `resultId` in the diagnostic cache and send it back as `previousResultId`.
-- Single-file diagnostic sync (`syncAndWaitForDiagnostics`) should prefer pull diagnostics when `diagnosticProvider` is advertised, then fall back to push waits.
-- `syncAndWaitForDiagnostics()` backs both `write`/`edit` inline diagnostics and the `lsp diagnostics` action; keep its pull/push behavior aligned with `refreshOpenDiagnostics()`.
-- `write`/`edit` inline diagnostics now surface cascade updates from other open files when pull diagnostics refresh their `receivedAt` timestamps via `relatedDocuments`; the cascade diffing logic lives in `manager/manager-diagnostics.ts`.
-- Stale suppression diagnostics (`biome` “Suppression comment has no effect”, unused `@ts-expect-error`) are split out in `diagnostics/suppression-diagnostics.ts` and shown even when normal inline diagnostics are error-only.
-- After `write`/`edit`, severity-1 diagnostics are augmented with LSP `hover` (3-line truncation) and `code_actions` titles at the first error position, each with a 500ms timeout.
-- After a file creation (`syncFileAndGetDiagnostics`), `LspManager` calls `client.clearPullResultIds()` to clear all `resultId` values from the diagnostic cache. This forces the next `before_agent_start` diagnostic refresh to send full pull requests (without `previousResultId`) so cross-file diagnostics (e.g., resolved `Cannot find module` errors in importing files) are fully re-computed instead of short-circuited by `unchanged` pull responses.
+- Stale suppression diagnostics ("Suppression comment has no effect", unused `@ts-expect-error`) are shown even when inline diagnostics are error-only.
+- `write`/`edit` inline diagnostics surface cascade updates from other files via `relatedDocuments`; after `write`/`edit`, augment severity-1 diagnostics with hover + code actions at the first error position.
 
 ## Tool action gotchas
 

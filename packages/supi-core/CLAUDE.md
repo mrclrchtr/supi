@@ -10,6 +10,16 @@ This file provides guidance to Claude Code when working in `packages/supi-core/`
 - the shared settings registry/UI behind `/supi-settings`
 - project-root/path helpers reused by `supi-lsp`
 
+Other SuPi packages depend on `supi-core` for shared infrastructure; it is imported at runtime, not wired as a pi extension itself.
+
+## Commands
+
+```bash
+pnpm vitest run packages/supi-core/
+pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json
+pnpm exec biome check packages/supi-core/
+```
+
 ## Key files
 
 - `index.ts` — public export surface; keep the shared API deliberate and small
