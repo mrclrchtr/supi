@@ -52,7 +52,10 @@ function loadStashesFromDisk(): Map<string, Stash> {
       }
     }
   } catch (err) {
-    console.warn("[supi-extras] Failed to load prompt stash from disk, starting fresh:", err);
+    // ENOENT on first run is expected — warn on all other errors
+    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      console.warn("[supi-extras] Failed to load prompt stash from disk, starting fresh:", err);
+    }
   }
   return new Map();
 }
