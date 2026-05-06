@@ -16,7 +16,7 @@ Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent)
 
 | Package | Extension | Description |
 |---------|-----------|-------------|
-| `@mrclrchtr/supi-extras` | **extras** | Command aliases (`/exit`, `/e`, `/clear`), `$skill-name` shorthand, tab spinner, prompt stash, and other small utilities |
+| `@mrclrchtr/supi-extras` | **extras** | Command aliases (`/exit`, `/e`, `/clear`), `$skill-name` shorthand, tab spinner, `/supi-stash` prompt stash with TUI overlay, and other small utilities |
 | `@mrclrchtr/supi-bash-timeout` | **bash-timeout** | Injects a default timeout on every bash tool call when the LLM omits one. Configurable via `PI_BASH_DEFAULT_TIMEOUT` (seconds, default 120). |
 | `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
 | `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, workspace symbol search, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. Also exports a reusable `SessionLspService` library surface for peer extensions. |
@@ -87,6 +87,18 @@ The `flow` extension adds a lightweight spec-driven workflow through skills and 
 - `/supi-flow-status` shows active tickets from session history; `/supi-flow` lists all commands
 - skills accessible via `/skill:supi-flow-*` or `$supi-flow-*` shorthand
 - distills the best parts of OpenSpec (artifact structure), Superpowers (verification discipline), and Claude Night Market (slop detection) — without CLI, config files, or multi-file ceremony
+
+## Extras extension
+
+The `extras` extension adds small quality-of-life utilities:
+
+- **`/supi-stash`** — keyboard-driven TUI overlay for managing stashed prompt drafts. Stashes persist to `~/.pi/agent/supi/prompt-stash.json` across pi restarts.
+  - `Alt+S` — stash current editor text
+  - `Ctrl+Shift+S` — copy editor text to system clipboard
+  - In the overlay: `↑↓` navigate, `Enter` restore, `c` copy, `d` delete, `D` clear all, `Esc` cancel
+- **Command aliases** — `/exit`, `/e`, `/clear`
+- **`$skill-name` shorthand** — quick skill invocation
+- **Tab spinner** — visual working indicator on the session tab
 
 ## LSP extension
 
