@@ -16,23 +16,94 @@ describe("formatForensicsReport", () => {
     expect(lines.some((l: string) => l.includes("No regressions found"))).toBe(true);
   });
 
-  it("renders breakdown with bar chart", () => {
+  it("renders breakdown sorted by count with pct, bars, and summary", () => {
     const lines = formatForensicsReport(
       {
         pattern: "breakdown",
         breakdown: { compaction: 2, model_change: 1, prompt_change: 0, unknown: 1, idle: 0 },
+        findings: [
+          {
+            sessionId: "a",
+            turnIndex: 1,
+            previousRate: 90,
+            currentRate: 30,
+            drop: 60,
+            cause: { type: "compaction" },
+            toolsBefore: [],
+          },
+          {
+            sessionId: "b",
+            turnIndex: 2,
+            previousRate: 80,
+            currentRate: 20,
+            drop: 60,
+            cause: { type: "compaction" },
+            toolsBefore: [],
+          },
+          {
+            sessionId: "c",
+            turnIndex: 3,
+            previousRate: 70,
+            currentRate: 40,
+            drop: 30,
+            cause: { type: "model_change", model: "x" },
+            toolsBefore: [],
+          },
+          {
+            sessionId: "d",
+            turnIndex: 4,
+            previousRate: 60,
+            currentRate: 10,
+            drop: 50,
+            cause: { type: "unknown" },
+            toolsBefore: [],
+          },
+        ],
         sessionsScanned: 3,
         turnsAnalyzed: 15,
       },
       mockTheme,
     );
 
-    expect(lines.some((l: string) => l.includes("breakdown"))).toBe(true);
-    expect(lines.some((l: string) => l.includes("compaction"))).toBe(true);
-    expect(lines.some((l: string) => l.includes("model_change"))).toBe(true);
-    expect(lines.some((l: string) => l.includes("unknown"))).toBe(true);
-    expect(lines.some((l: string) => l.includes("2"))).toBe(true);
-    expect(lines.some((l: string) => l.includes("1"))).toBe(true);
+    // Cardinality: compaction (2) should come before model_change (1) and unknown (1)
+    const compactionLine = lines.findIndex((l: string) => l.includes("compaction"));
+    const modelLine = lines.findIndex((l: string) => l.includes("model_change"));
+    const unknownLine = lines.findIndex((l: string) => l.includes("unknown"));
+    expect(compactionLine).toBeLessThan(modelLine);
+    expect(compactionLine).toBeLessThan(unknownLine);
+
+    // Percentages
+    expect(lines.some((l: string) => l.includes("50%"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("25%"))).toBe(true);
+
+    // Avg drops
+    expect(lines.some((l: string) => l.includes("avg 60pp drop"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("avg 30pp drop"))).toBe(true);
+
+    // Summary
+    expect(lines.some((l: string) => l.includes("total 4"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("26.7% of 15 turns"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("~1.3/session"))).toBe(true);
+
+    // Zero-count causes are skipped
+    expect(lines.some((l: string) => l.includes("[accent]█████"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("prompt_change"))).toBe(false);
+  });
+
+  it("shows idle/unknown clarification note when idle > 0", () => {
+    const lines = formatForensicsReport(
+      {
+        pattern: "breakdown",
+        breakdown: { compaction: 0, model_change: 0, prompt_change: 0, unknown: 5, idle: 3 },
+        findings: [],
+        sessionsScanned: 2,
+        turnsAnalyzed: 50,
+      },
+      mockTheme,
+    );
+
+    expect(lines.some((l: string) => l.includes("idle regressions"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("unknown drops with turn gaps"))).toBe(true);
   });
 
   it("renders hotspot findings with cause and drop", () => {
