@@ -193,25 +193,19 @@ function handleActionKey(
   data: string,
   doneFn: (r: StashPickerResult) => void,
 ): boolean {
-  if (item.value === "__clear-all__") {
-    if (data !== "d") return false;
-    doneFn({ action: "clear-all" });
-    return true;
-  }
-
   const stash = STASHES.get(item.value);
   if (!stash) return false;
 
-  if (data === "r") {
-    doneFn({ action: "restore", stash });
-    return true;
-  }
   if (data === "c") {
     doneFn({ action: "copy", stash });
     return true;
   }
   if (data === "d") {
     doneFn({ action: "delete", stash });
+    return true;
+  }
+  if (data === "D") {
+    doneFn({ action: "clear-all" });
     return true;
   }
   return false;
@@ -243,10 +237,6 @@ function showStashPickerOverlay(
       });
 
       selectList.onSelect = (item) => {
-        if (item.value === "__clear-all__") {
-          done({ action: "clear-all" });
-          return;
-        }
         const stash = STASHES.get(item.value);
         if (stash) done({ action: "restore", stash });
       };
@@ -256,7 +246,7 @@ function showStashPickerOverlay(
       container.addChild(selectList);
       container.addChild(new Spacer(1));
       container.addChild(
-        new Text(theme.fg("dim", "  r:restore  c:copy  d:delete  enter:restore  esc:cancel")),
+        new Text(theme.fg("dim", "  c:copy  d:delete  D:clear-all  enter:restore  esc:cancel")),
       );
       container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
 
@@ -358,10 +348,7 @@ export default function promptStash(pi: ExtensionAPI) {
         return;
       }
 
-      const items: SelectItem[] = [
-        { value: "__clear-all__", label: "✕ Clear all stashes" },
-        ...sorted.map((s) => ({ value: s.id, label: s.name })),
-      ];
+      const items: SelectItem[] = sorted.map((s) => ({ value: s.id, label: s.name }));
 
       const result = await showStashPickerOverlay(items, ctx);
       if (!result) return;
