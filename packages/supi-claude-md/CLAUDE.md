@@ -29,7 +29,7 @@ Root and ancestor instruction files are loaded natively by pi into the system pr
 
 Two skills are shipped under `skills/`:
 
-- `claude-md-improver` — bulk audit and scoring of CLAUDE.md files across the repo
+- `claude-md-improver` — bulk audit and scoring of CLAUDE.md files across the repo. Includes SuPi-aware redundancy detection: flags CLAUDE.md content that duplicates what `supi-code-intelligence` (workspace module graph) and `supi-claude-md` (subdirectory injection) already auto-deliver
 - `claude-md-revision` — targeted session-capture additions to CLAUDE.md
 
 Both skills share a set of reference files (`references/quality-criteria.md`, `references/templates.md`, `references/update-guidelines.md`). The revision skill duplicates these for self-containment. **When editing one copy, keep the other in sync** — `__tests__/skill-references-sync.test.ts` enforces this.
