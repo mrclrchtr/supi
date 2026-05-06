@@ -1,7 +1,7 @@
 // supi-cache — continuous prompt cache health monitoring extension.
 //
 // Tracks per-turn cache metrics, detects regressions with cause diagnosis,
-// shows a compact footer status, and provides a /supi-cache history command.
+// shows a compact footer status, and provides /supi-cache-history and /supi-cache-forensics commands.
 
 import { StringEnum } from "@mariozechner/pi-ai";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";

@@ -1,4 +1,4 @@
-// Report formatting for the /supi-cache history table.
+// Report formatting for the /supi-cache-history table.
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { diffFingerprints } from "../fingerprint.ts";
@@ -11,10 +11,10 @@ export interface CacheReportSnapshot {
 }
 
 /**
- * Format the per-turn cache history as themed lines for the `/supi-cache` command.
+ * Format the per-turn cache history as themed lines for the `/supi-cache-history` command.
  *
  * Accepts a snapshot of turn records so that rendered messages are stable —
- * they always reflect the data at the time `/supi-cache` was invoked, not the
+ * they always reflect the data at the time `/supi-cache-history` was invoked, not the
  * current live state.
  *
  * Columns: Turn, Input, CacheR, CacheW, Hit%, Note
