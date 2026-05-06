@@ -2,7 +2,7 @@
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { diffFingerprints } from "../fingerprint.ts";
-import type { TurnRecord } from "../monitor/state.ts";
+import { CAUSE_NOTE, type TurnRecord } from "../monitor/state.ts";
 
 /** Snapshot payload persisted in message.details for the report renderer. */
 export interface CacheReportSnapshot {
@@ -152,7 +152,7 @@ function getCauseLabel(turn: TurnRecord): string | undefined {
 /** Check if a turn's cause is prompt_change. */
 function isPromptChange(turn: TurnRecord): boolean {
   if (turn.cause?.type === "prompt_change") return true;
-  return turn.note === "⚠ prompt changed";
+  return turn.note === CAUSE_NOTE.prompt_change;
 }
 
 /**

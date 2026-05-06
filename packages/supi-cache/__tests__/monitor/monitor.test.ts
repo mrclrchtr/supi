@@ -4,12 +4,6 @@ const mockFns = vi.hoisted(() => ({
   loadCacheMonitorConfig: vi.fn(),
 }));
 
-vi.mock("@mrclrchtr/supi-core", () => ({
-  loadSupiConfig: vi.fn(),
-  registerConfigSettings: vi.fn(),
-  registerSettings: vi.fn(),
-}));
-
 vi.mock("../../src/config.ts", () => ({
   CACHE_MONITOR_DEFAULTS: {
     enabled: true,

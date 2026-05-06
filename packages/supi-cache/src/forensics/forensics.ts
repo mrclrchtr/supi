@@ -154,6 +154,14 @@ export function buildFindings(
   return findings;
 }
 
+/**
+ * Param keys on `write`/`edit` tools that are expected to hold file paths.
+ *
+ * Tracks PI's tool API surface. If PI changes these param names, update this
+ * constant to keep `_pathsInvolved` extraction working.
+ */
+const PATH_PARAM_KEYS = ["file_path", "path"];
+
 /** Extract file paths and command summaries from preceding tool calls. */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-tool-type extraction logic
 function extractHumanDetail(tools: import("./types.ts").ToolCallShape[]): {
@@ -165,7 +173,7 @@ function extractHumanDetail(tools: import("./types.ts").ToolCallShape[]): {
 
   for (const tool of tools) {
     if (tool.toolName === "write" || tool.toolName === "edit") {
-      const pathKey = tool.paramKeys.find((k) => k === "file_path" || k === "path");
+      const pathKey = tool.paramKeys.find((k) => PATH_PARAM_KEYS.includes(k));
       if (pathKey) {
         const shape = tool.paramShapes[pathKey];
         if (shape?.kind === "string" && shape.len > 0) {

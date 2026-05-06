@@ -257,31 +257,50 @@ export class CacheMonitorState {
   }
 }
 
+/**
+ * Shared note-label constants for cache regression causes.
+ *
+ * Used by `formatCauseNote` for producing the persisted note and by
+ * `resolveTurnCause` for reverse-mapping legacy records that only have
+ * the note string rather than a structured `cause` field.
+ */
+export const CAUSE_NOTE = {
+  compaction: "\u26a0 compaction",
+  model_change: "\u26a0 model changed",
+  prompt_change: "\u26a0 prompt changed",
+} as const;
+
 function formatCauseNote(cause: RegressionCause): string {
   switch (cause.type) {
     case "compaction":
-      return "⚠ compaction";
+      return CAUSE_NOTE.compaction;
     case "model_change":
-      return "⚠ model changed";
+      return CAUSE_NOTE.model_change;
     case "prompt_change":
-      return "⚠ prompt changed";
+      return CAUSE_NOTE.prompt_change;
     default:
       return "";
   }
 }
 
-/** Resolve a TurnRecord's regression cause, falling back to note-based inference for legacy records. */
+/**
+ * Resolve a TurnRecord's regression cause, falling back to note-based inference
+ * for legacy records that only have a `note` string (no structured `cause`).
+ *
+ * Legacy ``note: "⚠ model changed"`` records resolve to `model: "unknown"` because
+ * the note format does not preserve the model identifier.
+ */
 export function resolveTurnCause(turn: TurnRecord): RegressionCause | undefined {
   if (turn.cause) {
     return turn.cause;
   }
 
   switch (turn.note) {
-    case "⚠ compaction":
+    case CAUSE_NOTE.compaction:
       return { type: "compaction" };
-    case "⚠ model changed":
+    case CAUSE_NOTE.model_change:
       return { type: "model_change", model: "unknown" };
-    case "⚠ prompt changed":
+    case CAUSE_NOTE.prompt_change:
       return { type: "prompt_change" };
     default:
       return undefined;
