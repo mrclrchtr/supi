@@ -29,7 +29,7 @@ Inside `/supi-settings`, Claude-MD contributes:
 
 This package bundles a skill and a prompt template:
 
-- `claude-md-improver` — audit CLAUDE.md files, evaluate quality, and propose targeted updates
+- `claude-md-improver` — audit CLAUDE.md files, evaluate quality, and propose targeted updates. SuPi-aware: flags content that duplicates what `supi-code-intelligence` (workspace module graph) and `supi-claude-md` (subdirectory injection) already auto-deliver
 - `/revise-claude-md` — capture session learnings into CLAUDE.md with user approval (prompt template auto-discovered from `prompts/`)
 
 ## Configuration
