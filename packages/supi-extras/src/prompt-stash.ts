@@ -178,77 +178,81 @@ async function copyToClipboard(text: string, cwd: string, pi: ExtensionAPI): Pro
   }
 }
 
-/** A stash-specific action result from the picker. */
-type StashActionResult = { action: "restore" | "copy" | "delete"; stash: Stash };
-
 /** Result returned from the stash picker overlay. */
-type StashPickerResult = StashActionResult | { action: "clear-all" } | null;
-
-/**
- * Handle a single-key action shortcut for a selected stash item.
- * Returns true if the key was consumed, false to fall through to SelectList.
- */
-function handleActionKey(
-  item: SelectItem,
-  data: string,
-  doneFn: (r: StashPickerResult) => void,
-): boolean {
-  const stash = STASHES.get(item.value);
-  if (!stash) return false;
-
-  if (data === "c") {
-    doneFn({ action: "copy", stash });
-    return true;
-  }
-  if (data === "d") {
-    doneFn({ action: "delete", stash });
-    return true;
-  }
-  if (data === "D") {
-    doneFn({ action: "clear-all" });
-    return true;
-  }
-  return false;
-}
+type StashPickerResult =
+  | { action: "restore" | "copy"; stash: Stash }
+  | { action: "cleared" }
+  | null;
 
 /**
  * Build the custom overlay component for the stash picker.
  *
- * Returns a promise that resolves to the selected action + stash,
- * or null if cancelled.
+ * Returns a promise that resolves when the user picks an action
+ * (restore, copy, clear-all) or cancels (null).
+ *
+ * The overlay stays open on single-delete (`d`) and refreshes the list
+ * in-place. Close actions: Enter (restore), `c` (copy), `D` (clear-all),
+ * Escape (cancel).
  */
-function showStashPickerOverlay(
-  items: SelectItem[],
-  ctx: ExtensionContext,
-): Promise<StashPickerResult> {
+function showStashPickerOverlay(ctx: ExtensionContext): Promise<StashPickerResult> {
   return ctx.ui.custom<StashPickerResult>(
     (tui, theme, _kb, done) => {
       const container = new Container();
-      container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
-      container.addChild(new Text(theme.fg("accent", theme.bold("  Stashed Prompts"))));
-      container.addChild(new Spacer(1));
+      let selectList: SelectList;
 
-      const selectList = new SelectList(items, Math.min(items.length, 10), {
-        selectedPrefix: (text: string) => theme.fg("accent", text),
-        selectedText: (text: string) => theme.fg("accent", text),
-        description: (text: string) => theme.fg("muted", text),
-        scrollInfo: (text: string) => theme.fg("dim", text),
-        noMatch: (text: string) => theme.fg("warning", text),
-      });
+      function buildItems(): SelectItem[] {
+        return Array.from(STASHES.values())
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .map((s) => ({ value: s.id, label: s.name }));
+      }
 
-      selectList.onSelect = (item) => {
-        const stash = STASHES.get(item.value);
-        if (stash) done({ action: "restore", stash });
-      };
+      function createSelectList(items: SelectItem[], selectedIndex?: number): SelectList {
+        const list = new SelectList(items, Math.min(items.length, 10), {
+          selectedPrefix: (text: string) => theme.fg("accent", text),
+          selectedText: (text: string) => theme.fg("accent", text),
+          description: (text: string) => theme.fg("muted", text),
+          scrollInfo: (text: string) => theme.fg("dim", text),
+          noMatch: (text: string) => theme.fg("warning", text),
+        });
 
-      selectList.onCancel = () => done(null);
+        list.onSelect = (item) => {
+          const stash = STASHES.get(item.value);
+          if (stash) done({ action: "restore", stash });
+        };
+        list.onCancel = () => done(null);
 
-      container.addChild(selectList);
-      container.addChild(new Spacer(1));
-      container.addChild(
-        new Text(theme.fg("dim", "  c:copy  d:delete  D:clear-all  enter:restore  esc:cancel")),
-      );
-      container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
+        if (selectedIndex !== undefined) {
+          list.setSelectedIndex(selectedIndex);
+        }
+        return list;
+      }
+
+      function refresh(preferredIndex?: number) {
+        const items = buildItems();
+        if (items.length === 0) {
+          done(null);
+          return;
+        }
+
+        container.clear();
+        container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
+        container.addChild(new Text(theme.fg("accent", theme.bold("  Stashed Prompts"))));
+        container.addChild(new Spacer(1));
+
+        selectList = createSelectList(items, preferredIndex);
+        container.addChild(selectList);
+
+        container.addChild(new Spacer(1));
+        container.addChild(
+          new Text(theme.fg("dim", "  c:copy  d:delete  D:clear-all  enter:restore  esc:cancel")),
+        );
+        container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
+
+        tui.requestRender();
+      }
+
+      // Initial build
+      refresh();
 
       return {
         render(width: number) {
@@ -259,7 +263,40 @@ function showStashPickerOverlay(
         },
         handleInput(data: string) {
           const item = selectList.getSelectedItem();
-          if (item && handleActionKey(item, data, done)) return;
+          if (!item) {
+            selectList.handleInput(data);
+            tui.requestRender();
+            return;
+          }
+
+          const stash = STASHES.get(item.value);
+          if (!stash) {
+            selectList.handleInput(data);
+            tui.requestRender();
+            return;
+          }
+
+          if (data === "c") {
+            done({ action: "copy", stash });
+            return;
+          }
+
+          if (data === "d") {
+            const currentItems = buildItems();
+            const oldIndex = currentItems.findIndex((i) => i.value === item.value);
+            STASHES.delete(stash.id);
+            saveStashesToDisk(STASHES);
+            refresh(oldIndex);
+            return;
+          }
+
+          if (data === "D") {
+            STASHES.clear();
+            saveStashesToDisk(STASHES);
+            done({ action: "cleared" });
+            return;
+          }
+
           selectList.handleInput(data);
           tui.requestRender();
         },
@@ -314,55 +351,34 @@ export default function promptStash(pi: ExtensionAPI) {
     },
   });
 
-  async function executeStashResult(
-    result: StashActionResult,
-    ctx: ExtensionContext,
-  ): Promise<void> {
-    if (result.action === "restore") {
-      ctx.ui.setEditorText(result.stash.text);
-      ctx.ui.notify(`Restored: "${result.stash.name}"`, "info");
-      return;
-    }
+  pi.registerCommand("supi-stash", {
+    description: "Browse, restore, copy, delete, or clear all stashed prompts",
+    handler: async (_args, ctx) => {
+      if (STASHES.size === 0) {
+        ctx.ui.notify("No stashed prompts", "info");
+        return;
+      }
 
-    if (result.action === "copy") {
+      const result = await showStashPickerOverlay(ctx);
+      if (!result) return;
+
+      if (result.action === "cleared") {
+        ctx.ui.notify("All stashes cleared", "info");
+        return;
+      }
+
+      if (result.action === "restore") {
+        ctx.ui.setEditorText(result.stash.text);
+        ctx.ui.notify(`Restored: "${result.stash.name}"`, "info");
+        return;
+      }
+
+      // copy
       const ok = await copyToClipboard(result.stash.text, ctx.cwd, pi);
       ctx.ui.notify(
         ok ? `Copied "${result.stash.name}" to clipboard` : "Failed to copy to clipboard",
         ok ? "info" : "error",
       );
-      return;
-    }
-
-    // delete
-    STASHES.delete(result.stash.id);
-    saveStashesToDisk(STASHES);
-    ctx.ui.notify(`Deleted: "${result.stash.name}"`, "info");
-  }
-
-  pi.registerCommand("supi-stash", {
-    description: "Browse, restore, copy, delete, or clear all stashed prompts",
-    handler: async (_args, ctx) => {
-      const sorted = Array.from(STASHES.values()).sort((a, b) => b.createdAt - a.createdAt);
-      if (sorted.length === 0) {
-        ctx.ui.notify("No stashed prompts", "info");
-        return;
-      }
-
-      const items: SelectItem[] = sorted.map((s) => ({ value: s.id, label: s.name }));
-
-      const result = await showStashPickerOverlay(items, ctx);
-      if (!result) return;
-
-      if (result.action === "clear-all") {
-        const ok = await ctx.ui.confirm("Clear all?", `Delete ${sorted.length} stashed prompt(s)?`);
-        if (!ok) return;
-        STASHES.clear();
-        saveStashesToDisk(STASHES);
-        ctx.ui.notify("All stashes cleared", "info");
-        return;
-      }
-
-      await executeStashResult(result, ctx);
     },
   });
 
