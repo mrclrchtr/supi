@@ -16,10 +16,11 @@ const GIT_TEST_TIMEOUT_MS = 15_000;
 
 function makeTempRepo(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-review-git-test-"));
-  execSync("git init", { cwd: dir });
-  execSync("git config user.email test@test.com", { cwd: dir });
-  execSync("git config user.name Test", { cwd: dir });
-  execSync("git config commit.gpgsign false", { cwd: dir });
+  execSync("git init", { cwd: dir, stdio: "ignore" });
+  execSync("git config user.email test@test.com", { cwd: dir, stdio: "ignore" });
+  execSync("git config user.name Test", { cwd: dir, stdio: "ignore" });
+  execSync("git config commit.gpgsign false", { cwd: dir, stdio: "ignore" });
+  execSync("git config core.hooksPath /dev/null", { cwd: dir, stdio: "ignore" });
   return dir;
 }
 
@@ -98,11 +99,11 @@ describe("git functions", () => {
     "getDiff returns diff from base",
     async () => {
       fs.writeFileSync(path.join(repo, "a.txt"), "hello");
-      execSync("git add . && git commit -m 'init'", { cwd: repo });
-      execSync("git checkout -b feature", { cwd: repo });
+      execSync("git add . && git commit -m 'init'", { cwd: repo, stdio: "ignore" });
+      execSync("git checkout -b feature", { cwd: repo, stdio: "ignore" });
 
       fs.writeFileSync(path.join(repo, "b.txt"), "world");
-      execSync("git add . && git commit -m 'feature'", { cwd: repo });
+      execSync("git add . && git commit -m 'feature'", { cwd: repo, stdio: "ignore" });
 
       const baseSha = await getMergeBase(repo, "main");
       expect(baseSha).toBeTruthy();
@@ -116,10 +117,10 @@ describe("git functions", () => {
     "getMergeBase returns undefined for unrelated branch",
     async () => {
       fs.writeFileSync(path.join(repo, "a.txt"), "hello");
-      execSync("git add . && git commit -m 'init'", { cwd: repo });
-      execSync("git checkout --orphan orphan", { cwd: repo });
+      execSync("git add . && git commit -m 'init'", { cwd: repo, stdio: "ignore" });
+      execSync("git checkout --orphan orphan", { cwd: repo, stdio: "ignore" });
       fs.writeFileSync(path.join(repo, "b.txt"), "world");
-      execSync("git add . && git commit -m 'orphan'", { cwd: repo });
+      execSync("git add . && git commit -m 'orphan'", { cwd: repo, stdio: "ignore" });
 
       const base = await getMergeBase(repo, "main");
       expect(base).toBeUndefined();

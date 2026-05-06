@@ -1,5 +1,14 @@
 import { execFileSync } from "node:child_process";
 
+function execGit(cwd: string, args: string[]): string {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf-8",
+    stdio: ["ignore", "pipe", "ignore"],
+    timeout: 5000,
+  });
+}
+
 export interface GitContext {
   branch: string;
   dirtyFiles: string[];
@@ -8,17 +17,9 @@ export interface GitContext {
 
 export function gatherGitContext(cwd: string): GitContext | null {
   try {
-    const branch = execFileSync("git", ["branch", "--show-current"], {
-      cwd,
-      encoding: "utf-8",
-      timeout: 5000,
-    }).trim();
+    const branch = execGit(cwd, ["branch", "--show-current"]).trim();
 
-    const status = execFileSync("git", ["status", "--porcelain"], {
-      cwd,
-      encoding: "utf-8",
-      timeout: 5000,
-    }).trim();
+    const status = execGit(cwd, ["status", "--porcelain"]).trim();
 
     const dirtyFiles = status
       .split("\n")
@@ -27,11 +28,7 @@ export function gatherGitContext(cwd: string): GitContext | null {
 
     let lastCommitMessage: string | null = null;
     try {
-      lastCommitMessage = execFileSync("git", ["log", "-1", "--format=%s"], {
-        cwd,
-        encoding: "utf-8",
-        timeout: 5000,
-      }).trim();
+      lastCommitMessage = execGit(cwd, ["log", "-1", "--format=%s"]).trim();
     } catch {
       // No commits yet
     }
