@@ -1,7 +1,7 @@
 // Per-turn cache state management, regression detection, and session persistence.
 
 import type { SessionEntry } from "@mariozechner/pi-coding-agent";
-import { diffFingerprints, type PromptFingerprint } from "./fingerprint.ts";
+import { diffFingerprints, type PromptFingerprint } from "../fingerprint.ts";
 
 /** Persisted per-turn cache record. */
 export interface TurnRecord {
@@ -160,7 +160,7 @@ export class CacheMonitorState {
     return {
       previousRate,
       currentRate,
-      cause: getTurnCause(current) ?? { type: "unknown" },
+      cause: resolveTurnCause(current) ?? { type: "unknown" },
     };
   }
 
@@ -270,7 +270,8 @@ function formatCauseNote(cause: RegressionCause): string {
   }
 }
 
-function getTurnCause(turn: TurnRecord): RegressionCause | undefined {
+/** Resolve a TurnRecord's regression cause, falling back to note-based inference for legacy records. */
+export function resolveTurnCause(turn: TurnRecord): RegressionCause | undefined {
   if (turn.cause) {
     return turn.cause;
   }

@@ -3,7 +3,7 @@
     "packages/supi": {},
     "packages/supi-ask-user": {},
     "packages/supi-bash-timeout": {},
-    "packages/supi-cache-monitor": {},
+    "packages/supi-cache": {},
     "packages/supi-claude-md": {},
     "packages/supi-code-intelligence": {},
     "packages/supi-context": {},

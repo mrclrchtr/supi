@@ -9,6 +9,7 @@ import type {
 } from "@mariozechner/pi-ai";
 import type { FileEntry, SessionEntry, SessionHeader } from "@mariozechner/pi-coding-agent";
 import { migrateSessionEntries, parseSessionEntries } from "@mariozechner/pi-coding-agent";
+import { getActiveBranchEntries } from "@mrclrchtr/supi-core";
 import { diffLines } from "diff";
 import type { SessionMeta } from "./types.ts";
 import { countCharInString, getLanguageFromPath } from "./utils.ts";
@@ -369,23 +370,4 @@ export function hasValidDates(entries: FileEntry[]): boolean {
     if (!Number.isNaN(d.getTime())) return true;
   }
   return false;
-}
-
-/** Resolve the active branch path using PI's append-only tree semantics (last entry is current leaf). */
-function getActiveBranchEntries(entries: FileEntry[]): SessionEntry[] {
-  const sessionEntries = entries.filter((e): e is SessionEntry => e.type !== "session");
-  const byId = new Map(sessionEntries.map((entry) => [entry.id, entry]));
-  const leaf = sessionEntries.at(-1);
-  if (!leaf) return [];
-
-  const path: SessionEntry[] = [];
-  const visited = new Set<string>();
-  let current: SessionEntry | undefined = leaf;
-  while (current) {
-    if (visited.has(current.id)) break;
-    visited.add(current.id);
-    path.unshift(current);
-    current = current.parentId ? byId.get(current.parentId) : undefined;
-  }
-  return path;
 }

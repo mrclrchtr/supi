@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { PromptFingerprint } from "../src/fingerprint.ts";
-import { CacheMonitorState } from "../src/state.ts";
+import type { PromptFingerprint } from "../../src/fingerprint.ts";
+import { CacheMonitorState } from "../../src/monitor/state.ts";
 
 /** Build a minimal PromptFingerprint inline for tests. */
 function fp(overrides: Partial<PromptFingerprint> = {}): PromptFingerprint {

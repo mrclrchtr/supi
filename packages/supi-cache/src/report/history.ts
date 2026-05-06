@@ -1,8 +1,8 @@
 // Report formatting for the /supi-cache history table.
 
 import type { Theme } from "@mariozechner/pi-coding-agent";
-import { diffFingerprints } from "./fingerprint.ts";
-import type { TurnRecord } from "./state.ts";
+import { diffFingerprints } from "../fingerprint.ts";
+import type { TurnRecord } from "../monitor/state.ts";
 
 /** Snapshot payload persisted in message.details for the report renderer. */
 export interface CacheReportSnapshot {

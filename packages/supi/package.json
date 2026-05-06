@@ -24,7 +24,7 @@
     "@mrclrchtr/supi-ask-user": "workspace:*",
     "@mrclrchtr/supi-bash-timeout": "workspace:*",
     "@mrclrchtr/supi-claude-md": "workspace:*",
-    "@mrclrchtr/supi-cache-monitor": "workspace:*",
+    "@mrclrchtr/supi-cache": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-debug": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
@@ -76,7 +76,7 @@
       "./src/rtk.ts",
       "./src/context.ts",
       "./src/tree-sitter.ts",
-      "./src/cache-monitor.ts",
+      "./src/cache.ts",
       "./src/code-intelligence.ts",
       "./src/flow.ts",
       "./src/insights.ts"

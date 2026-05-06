@@ -63,6 +63,7 @@ export {
   sortRootsBySpecificity,
   walkProject,
 } from "./project-roots.ts";
+export { getActiveBranchEntries } from "./session-utils.ts";
 export { registerSettingsCommand } from "./settings-command.ts";
 export type { SettingsScope, SettingsSection } from "./settings-registry.ts";
 export {

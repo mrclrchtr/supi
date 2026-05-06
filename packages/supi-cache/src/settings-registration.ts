@@ -5,13 +5,14 @@ import { registerConfigSettings } from "@mrclrchtr/supi-core";
 import { CACHE_MONITOR_DEFAULTS } from "./config.ts";
 
 const THRESHOLD_VALUES = ["5", "10", "15", "20", "25", "30", "35", "40", "45", "50"];
+const IDLE_THRESHOLD_VALUES = ["1", "2", "3", "5", "10", "15", "20", "30", "45", "60"];
 
-/** Register cache-monitor settings with the supi settings registry. */
+/** Register supi-cache settings with the supi settings registry. */
 export function registerCacheMonitorSettings(homeDir?: string): void {
   registerConfigSettings({
-    id: "cache-monitor",
-    label: "Cache Monitor",
-    section: "cache-monitor",
+    id: "supi-cache",
+    label: "Cache",
+    section: "supi-cache",
     defaults: CACHE_MONITOR_DEFAULTS,
     buildItems: (settings) => [
       {
@@ -34,6 +35,13 @@ export function registerCacheMonitorSettings(homeDir?: string): void {
         description: "Percentage-point drop that triggers a regression warning",
         currentValue: String(settings.regressionThreshold),
         values: THRESHOLD_VALUES,
+      },
+      {
+        id: "idleThresholdMinutes",
+        label: "Idle Threshold",
+        description: "Minutes of inactivity to classify as idle-time regression",
+        currentValue: String(settings.idleThresholdMinutes),
+        values: IDLE_THRESHOLD_VALUES,
       },
     ],
     // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
@@ -61,6 +69,11 @@ function handleSettingChange(
     case "regressionThreshold": {
       const num = Number.parseInt(value, 10);
       helpers.set("regressionThreshold", Number.isNaN(num) ? 25 : num);
+      break;
+    }
+    case "idleThresholdMinutes": {
+      const num = Number.parseInt(value, 10);
+      helpers.set("idleThresholdMinutes", Number.isNaN(num) ? 5 : num);
       break;
     }
   }

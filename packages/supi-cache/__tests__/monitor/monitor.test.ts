@@ -10,26 +10,33 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   registerSettings: vi.fn(),
 }));
 
-vi.mock("../src/config.ts", () => ({
+vi.mock("../../src/config.ts", () => ({
   CACHE_MONITOR_DEFAULTS: {
     enabled: true,
     notifications: true,
     regressionThreshold: 25,
+    idleThresholdMinutes: 5,
   },
   loadCacheMonitorConfig: mockFns.loadCacheMonitorConfig,
 }));
 
-vi.mock("../src/settings-registration.ts", () => ({
+vi.mock("../../src/settings-registration.ts", () => ({
   registerCacheMonitorSettings: vi.fn(),
 }));
 
-import cacheMonitorExtension from "../src/cache-monitor.ts";
+vi.mock("../../src/forensics/forensics.ts", () => ({
+  runForensics: vi.fn(),
+}));
+
+import { runForensics } from "../../src/forensics/forensics.ts";
+import cacheMonitorExtension from "../../src/monitor/monitor.ts";
 
 type Handler = (event: unknown, ctx: unknown) => Promise<void>;
 
 function createPiMock() {
   const handlers = new Map<string, Handler>();
   const commands = new Map<string, { handler: Handler; description: string }>();
+  const tools: unknown[] = [];
   const renderers = new Map<string, unknown>();
   const entries: Array<{ type: string; data: unknown }> = [];
   const messages: Array<Record<string, unknown>> = [];
@@ -37,6 +44,7 @@ function createPiMock() {
   return {
     handlers,
     commands,
+    tools,
     renderers,
     entries,
     messages,
@@ -49,6 +57,9 @@ function createPiMock() {
       },
       registerMessageRenderer(type: string, renderer: unknown) {
         renderers.set(type, renderer);
+      },
+      registerTool(tool: { execute?: (...args: unknown[]) => Promise<unknown> }) {
+        tools.push(tool);
       },
       appendEntry(type: string, data: unknown) {
         entries.push({ type, data });
@@ -97,6 +108,7 @@ function resetMocks() {
     enabled: true,
     notifications: true,
     regressionThreshold: 25,
+    idleThresholdMinutes: 5,
   });
 }
 
@@ -123,8 +135,10 @@ describe("cacheMonitorExtension", () => {
     ]) {
       expect(handlers.has(event), `missing handler: ${event}`).toBe(true);
     }
-    expect(commands.has("supi-cache")).toBe(true);
-    expect(renderers.has("supi-cache-report")).toBe(true);
+    expect(commands.has("supi-cache-history")).toBe(true);
+    expect(commands.has("supi-cache-forensics")).toBe(true);
+    expect(renderers.has("supi-cache-history")).toBe(true);
+    expect(renderers.has("supi-cache-forensics-report")).toBe(true);
   });
 });
 
@@ -191,6 +205,7 @@ describe("message_end handler", () => {
       enabled: true,
       notifications: false,
       regressionThreshold: 25,
+      idleThresholdMinutes: 5,
     });
 
     const { handlers, pi } = createPiMock();
@@ -210,6 +225,7 @@ describe("message_end handler", () => {
       enabled: false,
       notifications: true,
       regressionThreshold: 25,
+      idleThresholdMinutes: 5,
     });
 
     const { handlers, entries, pi } = createPiMock();
@@ -262,6 +278,7 @@ describe("session lifecycle", () => {
       enabled: false,
       notifications: true,
       regressionThreshold: 25,
+      idleThresholdMinutes: 5,
     });
 
     const { handlers, pi } = createPiMock();
@@ -376,7 +393,7 @@ describe("cause tracking events", () => {
   });
 });
 
-describe("/supi-cache command", () => {
+describe("/supi-cache-history command", () => {
   beforeEach(resetMocks);
 
   it("sends a custom message with turn snapshot", async () => {
@@ -386,12 +403,12 @@ describe("/supi-cache command", () => {
     const ctx = makeCtx();
     await getHandler(handlers, "message_end")(assistantMessage(8000, 0, 2000), ctx);
 
-    const cmd = commands.get("supi-cache");
-    if (!cmd) throw new Error("supi-cache command not registered");
+    const cmd = commands.get("supi-cache-history");
+    if (!cmd) throw new Error("supi-cache-history command not registered");
     await cmd.handler("", ctx);
 
     expect(messages).toHaveLength(1);
-    expect(messages[0].customType).toBe("supi-cache-report");
+    expect(messages[0].customType).toBe("supi-cache-history");
     expect(messages[0].display).toBe(true);
     // Verify snapshot is persisted in details
     const details = messages[0].details as Record<string, unknown>;
@@ -406,8 +423,8 @@ describe("/supi-cache command", () => {
     const ctx = makeCtx();
     await getHandler(handlers, "message_end")(assistantMessage(8000, 0, 2000), ctx);
 
-    const cmd = commands.get("supi-cache");
-    if (!cmd) throw new Error("supi-cache command not registered");
+    const cmd = commands.get("supi-cache-history");
+    if (!cmd) throw new Error("supi-cache-history command not registered");
     await cmd.handler("", ctx);
 
     // Record more turns after the report was sent
@@ -416,6 +433,178 @@ describe("/supi-cache command", () => {
     // Snapshot should still have just 1 turn
     const details = messages[0].details as { turns: unknown[] };
     expect(details.turns).toHaveLength(1);
+  });
+});
+
+describe("supi_cache_forensics agent tool", () => {
+  beforeEach(() => {
+    resetMocks();
+    vi.mocked(runForensics).mockReset();
+  });
+
+  it("is registered with correct name and parameters", () => {
+    const { tools, pi } = createPiMock();
+    cacheMonitorExtension(pi as never);
+
+    expect(tools).toHaveLength(1);
+    const tool = tools[0] as { name: string; promptGuidelines?: string[] };
+    expect(tool.name).toBe("supi_cache_forensics");
+    expect(tool.promptGuidelines?.length).toBeGreaterThan(0);
+  });
+
+  it("calls runForensics with parsed params and strips human detail", async () => {
+    const { tools, pi } = createPiMock();
+    cacheMonitorExtension(pi as never);
+
+    vi.mocked(runForensics).mockResolvedValue({
+      pattern: "hotspots",
+      findings: [
+        {
+          sessionId: "abc",
+          turnIndex: 3,
+          previousRate: 90,
+          currentRate: 10,
+          drop: 80,
+          cause: { type: "unknown" },
+          toolsBefore: [{ toolName: "bash", paramKeys: ["command"], paramShapes: {} }],
+          _pathsInvolved: ["/secret/path"],
+          _commandSummaries: ["secret command"],
+        },
+      ],
+      sessionsScanned: 2,
+      turnsAnalyzed: 5,
+    });
+
+    const tool = tools[0] as {
+      execute: (
+        _toolCallId: string,
+        params: unknown,
+        _signal: unknown,
+        _onUpdate: unknown,
+        ctx: unknown,
+      ) => Promise<{ content: { type: string; text: string }[]; details: unknown }>;
+    };
+
+    const ctx = makeCtx();
+    const result = await tool.execute(
+      "tc-1",
+      { pattern: "hotspots", since: "3d", minDrop: 20, maxSessions: 50 },
+      undefined,
+      undefined,
+      ctx,
+    );
+
+    expect(runForensics).toHaveBeenCalledWith({
+      pattern: "hotspots",
+      since: "3d",
+      minDrop: 20,
+      maxSessions: 50,
+      idleThresholdMinutes: 5,
+      regressionThreshold: 25,
+    });
+
+    const text = result.content[0].text;
+    expect(text).toContain("abc");
+    expect(text).not.toContain("/secret/path");
+    expect(text).not.toContain("secret command");
+  });
+
+  it("uses defaults for optional params", async () => {
+    const { tools, pi } = createPiMock();
+    cacheMonitorExtension(pi as never);
+
+    vi.mocked(runForensics).mockResolvedValue({
+      pattern: "breakdown",
+      breakdown: { compaction: 1, model_change: 0, prompt_change: 0, unknown: 0, idle: 0 },
+      sessionsScanned: 1,
+      turnsAnalyzed: 3,
+    });
+
+    const tool = tools[0] as {
+      execute: (
+        _toolCallId: string,
+        params: unknown,
+        _signal: unknown,
+        _onUpdate: unknown,
+        ctx: unknown,
+      ) => Promise<{ content: { type: string; text: string }[]; details: unknown }>;
+    };
+
+    const ctx = makeCtx();
+    await tool.execute("tc-1", { pattern: "breakdown" }, undefined, undefined, ctx);
+
+    expect(runForensics).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pattern: "breakdown",
+        since: "7d",
+        minDrop: 0,
+        maxSessions: 100,
+        regressionThreshold: 25,
+      }),
+    );
+  });
+});
+
+describe("/supi-cache-forensics command", () => {
+  beforeEach(() => {
+    resetMocks();
+    vi.mocked(runForensics).mockReset();
+  });
+
+  it("calls runForensics and sends a message with the result", async () => {
+    const { commands, messages, pi } = createPiMock();
+    cacheMonitorExtension(pi as never);
+
+    vi.mocked(runForensics).mockResolvedValue({
+      pattern: "breakdown",
+      breakdown: { compaction: 2, model_change: 1, prompt_change: 0, unknown: 1, idle: 0 },
+      sessionsScanned: 5,
+      turnsAnalyzed: 20,
+    });
+
+    const cmd = commands.get("supi-cache-forensics");
+    if (!cmd) throw new Error("supi-cache-forensics command not registered");
+
+    const ctx = makeCtx();
+    await cmd.handler("--pattern breakdown --since 7d", ctx);
+
+    expect(runForensics).toHaveBeenCalledWith({
+      pattern: "breakdown",
+      since: "7d",
+      minDrop: 0,
+      idleThresholdMinutes: 5,
+      regressionThreshold: 25,
+    });
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0].customType).toBe("supi-cache-forensics-report");
+    expect(messages[0].display).toBe(true);
+  });
+
+  it("passes --since and --pattern args to runForensics", async () => {
+    const { commands, pi } = createPiMock();
+    cacheMonitorExtension(pi as never);
+
+    vi.mocked(runForensics).mockResolvedValue({
+      pattern: "hotspots",
+      findings: [],
+      sessionsScanned: 0,
+      turnsAnalyzed: 0,
+    });
+
+    const cmd = commands.get("supi-cache-forensics");
+    if (!cmd) throw new Error("supi-cache-forensics command not registered");
+
+    const ctx = makeCtx();
+    await cmd.handler("--pattern hotspots --since 3d --min-drop 15", ctx);
+
+    expect(runForensics).toHaveBeenCalledWith({
+      pattern: "hotspots",
+      since: "3d",
+      minDrop: 15,
+      idleThresholdMinutes: 5,
+      regressionThreshold: 25,
+    });
   });
 });
 
@@ -479,7 +668,7 @@ describe("no-data turns (zero cache counters)", () => {
 
     expect(ctx.ui.notify).not.toHaveBeenCalled();
     expect((entries[1].data as Record<string, unknown>).note).toBeUndefined();
-    expect((entries[2].data as Record<string, unknown>).note).toBe("⚠ model changed");
+    expect((entries[2].data as Record<string, unknown>).note).toBe("\u26a0 model changed");
     expect((entries[2].data as Record<string, unknown>).cause).toEqual({
       type: "model_change",
       model: "anthropic/claude-4",

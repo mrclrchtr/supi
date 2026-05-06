@@ -16,6 +16,7 @@ describe("CacheMonitorConfig defaults", () => {
       enabled: true,
       notifications: true,
       regressionThreshold: 25,
+      idleThresholdMinutes: 5,
     });
   });
 
@@ -41,8 +42,8 @@ describe("registerCacheMonitorSettings", () => {
     const sections = getRegisteredSettings();
     expect(sections).toHaveLength(1);
     expect(sections[0]).toMatchObject({
-      id: "cache-monitor",
-      label: "Cache Monitor",
+      id: "supi-cache",
+      label: "Cache",
     });
   });
 
@@ -51,10 +52,16 @@ describe("registerCacheMonitorSettings", () => {
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
 
-    expect(items.map((i) => i.id)).toEqual(["enabled", "notifications", "regressionThreshold"]);
+    expect(items.map((i) => i.id)).toEqual([
+      "enabled",
+      "notifications",
+      "regressionThreshold",
+      "idleThresholdMinutes",
+    ]);
     expect(items.find((i) => i.id === "enabled")?.currentValue).toBe("on");
     expect(items.find((i) => i.id === "notifications")?.currentValue).toBe("on");
     expect(items.find((i) => i.id === "regressionThreshold")?.currentValue).toBe("25");
+    expect(items.find((i) => i.id === "idleThresholdMinutes")?.currentValue).toBe("5");
   });
 
   it("reads selected scope config correctly", () => {
@@ -64,7 +71,7 @@ describe("registerCacheMonitorSettings", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".pi/agent/supi/config.json"),
       JSON.stringify({
-        "cache-monitor": { enabled: false, regressionThreshold: 15 },
+        "supi-cache": { enabled: false, regressionThreshold: 15 },
       }),
     );
 
@@ -72,7 +79,7 @@ describe("registerCacheMonitorSettings", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".pi/supi/config.json"),
       JSON.stringify({
-        "cache-monitor": { notifications: false, regressionThreshold: 40 },
+        "supi-cache": { notifications: false, regressionThreshold: 40 },
       }),
     );
 
@@ -99,7 +106,7 @@ describe("registerCacheMonitorSettings", () => {
 
     const configPath = path.join(tmpDir, ".pi/supi/config.json");
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    expect(raw["cache-monitor"].enabled).toBe(false);
+    expect(raw["supi-cache"].enabled).toBe(false);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -113,7 +120,7 @@ describe("registerCacheMonitorSettings", () => {
 
     const configPath = path.join(tmpDir, ".pi/agent/supi/config.json");
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    expect(raw["cache-monitor"].regressionThreshold).toBe(15);
+    expect(raw["supi-cache"].regressionThreshold).toBe(15);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

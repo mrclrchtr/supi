@@ -1,7 +1,7 @@
 {
-  "name": "@mrclrchtr/supi-cache-monitor",
+  "name": "@mrclrchtr/supi-cache",
   "version": "0.1.0",
-  "description": "SuPi Cache Monitor — continuous prompt cache health monitoring with regression detection",
+  "description": "SuPi Cache — prompt cache health monitoring and cross-session forensics",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -27,15 +27,17 @@
     "@mrclrchtr/supi-core"
   ],
   "peerDependencies": {
+    "@mariozechner/pi-ai": "*",
     "@mariozechner/pi-coding-agent": "*",
-    "@mariozechner/pi-tui": "*"
+    "@mariozechner/pi-tui": "*",
+    "typebox": "*"
   },
   "devDependencies": {
     "vitest": "^4.1.4"
   },
   "pi": {
     "extensions": [
-      "./src/cache-monitor.ts"
+      "./src/index.ts"
     ]
   },
   "main": "src/index.ts"

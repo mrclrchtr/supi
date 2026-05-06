@@ -1,8 +1,8 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import type { PromptFingerprint } from "../src/fingerprint.ts";
-import { type CacheReportSnapshot, formatCacheReport } from "../src/report.ts";
-import { CacheMonitorState } from "../src/state.ts";
+import type { PromptFingerprint } from "../../src/fingerprint.ts";
+import { CacheMonitorState } from "../../src/monitor/state.ts";
+import { type CacheReportSnapshot, formatCacheReport } from "../../src/report/history.ts";
 
 function fp(overrides: Partial<PromptFingerprint> = {}): PromptFingerprint {
   return {
@@ -144,7 +144,7 @@ describe("formatCacheReport", () => {
     state.recordTurn({ cacheRead: 500, cacheWrite: 0, input: 9500 }, 3000);
 
     const lines = formatCacheReport(snapshotFrom(state), mockTheme);
-    expect(lines.some((l) => l.includes("• tools"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("• tools"))).toBe(true);
   });
 
   it("shows fingerprint diff bullets for context file changes", () => {
@@ -166,7 +166,7 @@ describe("formatCacheReport", () => {
     state.recordTurn({ cacheRead: 500, cacheWrite: 0, input: 9500 }, 3000);
 
     const lines = formatCacheReport(snapshotFrom(state), mockTheme);
-    expect(lines.some((l) => l.includes("contextFiles (+1)"))).toBe(true);
+    expect(lines.some((l: string) => l.includes("contextFiles (+1)"))).toBe(true);
   });
 
   it("does not show regression details when no causes", () => {
@@ -175,6 +175,6 @@ describe("formatCacheReport", () => {
     state.recordTurn({ cacheRead: 7000, cacheWrite: 0, input: 3000 }, 2000);
 
     const lines = formatCacheReport(snapshotFrom(state), mockTheme);
-    expect(lines.some((l) => l.includes("Regression details"))).toBe(false);
+    expect(lines.some((l: string) => l.includes("Regression details"))).toBe(false);
   });
 });
