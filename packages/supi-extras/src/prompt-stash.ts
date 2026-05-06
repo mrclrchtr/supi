@@ -30,34 +30,51 @@ function getStashFilePath(): string {
   return join(homedir(), STORAGE_RELATIVE_DIR, STASH_FILE);
 }
 
+/** Attempt to parse stashes from a raw JSON value. Returns null on failure. */
+function parseStashEntries(raw: unknown): Map<string, Stash> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const map = new Map<string, Stash>();
+  for (const [id, entry] of Object.entries(raw)) {
+    if (entry && typeof entry === "object") {
+      map.set(id, entry as Stash);
+    }
+  }
+  return map.size > 0 ? map : null;
+}
+
 /**
  * Load stashes from disk. Returns an empty map when the file does not exist
  * or cannot be parsed — the stash degrades gracefully to in-memory-only.
  */
 function loadStashesFromDisk(): Map<string, Stash> {
+  let content: string;
   try {
-    const content = readFileSync(getStashFilePath(), "utf-8");
-    const parsed: unknown = JSON.parse(content);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const root = parsed as Record<string, unknown>;
-      const rawStashes = root.stashes;
-      if (rawStashes && typeof rawStashes === "object" && !Array.isArray(rawStashes)) {
-        const map = new Map<string, Stash>();
-        for (const [id, stash] of Object.entries(rawStashes)) {
-          if (stash && typeof stash === "object") {
-            map.set(id, stash as Stash);
-          }
-        }
-        return map;
-      }
-    }
+    content = readFileSync(getStashFilePath(), "utf-8");
   } catch (err) {
     // ENOENT on first run is expected — warn on all other errors
     if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
+      // biome-ignore lint/suspicious/noConsole: deliberate degradation warning
       console.warn("[supi-extras] Failed to load prompt stash from disk, starting fresh:", err);
     }
+    return new Map();
   }
-  return new Map();
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err) {
+    // biome-ignore lint/suspicious/noConsole: deliberate degradation warning
+    console.warn("[supi-extras] Failed to parse prompt stash file, starting fresh:", err);
+    return new Map();
+  }
+
+  const root =
+    parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  if (!root) return new Map();
+
+  return parseStashEntries(root.stashes) ?? new Map();
 }
 
 /**
@@ -76,7 +93,11 @@ function saveStashesToDisk(stashes: Map<string, Stash>): void {
 
     writeFileSync(filePath, `${JSON.stringify({ stashes: data }, null, 2)}\n`, "utf-8");
   } catch (err) {
-    console.warn("[supi-extras] Failed to persist prompt stash to disk, continuing in-memory:", err);
+    // biome-ignore lint/suspicious/noConsole: deliberate degradation warning
+    console.warn(
+      "[supi-extras] Failed to persist prompt stash to disk, continuing in-memory:",
+      err,
+    );
   }
 }
 
@@ -213,8 +234,8 @@ export default function promptStash(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("stash", {
-    description: "Browse and restore stashed prompts",
+  pi.registerCommand("supi-stash", {
+    description: "Browse, restore, or delete stashed prompts",
     handler: async (_args, ctx) => {
       const labels = getStashLabels();
       if (labels.length === 0) {
@@ -222,7 +243,7 @@ export default function promptStash(pi: ExtensionAPI) {
         return;
       }
 
-      const label = await ctx.ui.select("Restore stash:", labels);
+      const label = await ctx.ui.select("Pick a stash:", labels);
       if (!label) return;
 
       const id = parseStashId(label);
@@ -234,12 +255,24 @@ export default function promptStash(pi: ExtensionAPI) {
         return;
       }
 
-      ctx.ui.setEditorText(stash.text);
-      ctx.ui.notify(`Restored: "${stash.name}"`, "info");
+      const action = await ctx.ui.select(`"${stash.name}":`, [
+        "[R] Restore into editor",
+        "[D] Delete",
+        "[C] Cancel",
+      ]);
+
+      if (action?.startsWith("[R]")) {
+        ctx.ui.setEditorText(stash.text);
+        ctx.ui.notify(`Restored: "${stash.name}"`, "info");
+      } else if (action?.startsWith("[D]")) {
+        STASHES.delete(id);
+        saveStashesToDisk(STASHES);
+        ctx.ui.notify(`Deleted: "${stash.name}"`, "info");
+      }
     },
   });
 
-  pi.registerCommand("stash-copy", {
+  pi.registerCommand("supi-stash-copy", {
     description: "Copy a stashed prompt to clipboard",
     handler: async (_args, ctx) => {
       const labels = getStashLabels();
@@ -268,7 +301,7 @@ export default function promptStash(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("stash-clear", {
+  pi.registerCommand("supi-stash-clear", {
     description: "Clear all stashed prompts",
     handler: async (_args, ctx) => {
       const labels = getStashLabels();
