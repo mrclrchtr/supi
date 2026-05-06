@@ -163,9 +163,7 @@ describe.skipIf(!HAS_TS_LSP)("LspManager integration", () => {
     manager.setExcludePatterns(["broken.ts"]);
     try {
       const filtered = manager.getActiveCoverageSummary();
-      const brokenEntry = filtered.find((c) =>
-        c.openFiles.some((f) => f.includes("broken")),
-      );
+      const brokenEntry = filtered.find((c) => c.openFiles.some((f) => f.includes("broken")));
       expect(brokenEntry).toBeUndefined();
     } finally {
       manager.setExcludePatterns([]);

@@ -8,7 +8,7 @@ function updateHourHistogram(utcOffset) {
   ];
   const adjustedCounts = {};
   for (const [hour, count] of Object.entries(rawHourCounts)) {
-    const newHour = (parseInt(hour) + utcOffset + 24) % 24;
+    const newHour = (parseInt(hour, 10) + utcOffset + 24) % 24;
     adjustedCounts[newHour] = (adjustedCounts[newHour] || 0) + count;
   }
   const periodCounts = periods.map((p) => ({
@@ -31,5 +31,5 @@ function updateHourHistogram(utcOffset) {
     .join("");
 }
 document.getElementById("timezone-select")?.addEventListener("change", function () {
-  updateHourHistogram(parseInt(this.value));
+  updateHourHistogram(parseInt(this.value, 10));
 });
