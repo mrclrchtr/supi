@@ -217,6 +217,48 @@ export default function promptStash(pi: ExtensionAPI) {
     },
   });
 
+  /** Look up a stash from a select label. Returns undefined and notifies on missing. */
+  function findStashByLabel(label: string): Stash | undefined {
+    const id = parseStashId(label);
+    if (!id) return undefined;
+    const stash = STASHES.get(id);
+    if (!stash) {
+      // notification handled by caller
+      return undefined;
+    }
+    return stash;
+  }
+
+  /** Show the action menu for a single stash. ESC cancels silently. */
+  async function showStashActions(
+    stash: Stash,
+    ctx: import("@mariozechner/pi-coding-agent").ExtensionCommandContext,
+  ): Promise<void> {
+    const action = await ctx.ui.select(`"${stash.name}":`, [
+      "[R] Restore into editor",
+      "[C] Copy to clipboard",
+      "[D] Delete",
+      "[X] Cancel",
+    ]);
+
+    if (!action || action.startsWith("[X]")) return;
+
+    if (action.startsWith("[R]")) {
+      ctx.ui.setEditorText(stash.text);
+      ctx.ui.notify(`Restored: "${stash.name}"`, "info");
+    } else if (action.startsWith("[C]")) {
+      const ok = await copyToClipboard(stash.text, ctx.cwd, pi);
+      ctx.ui.notify(
+        ok ? `Copied "${stash.name}" to clipboard` : "Failed to copy to clipboard",
+        ok ? "info" : "error",
+      );
+    } else if (action.startsWith("[D]")) {
+      STASHES.delete(stash.id);
+      saveStashesToDisk(STASHES);
+      ctx.ui.notify(`Deleted: "${stash.name}"`, "info");
+    }
+  }
+
   pi.registerShortcut("ctrl+shift+s", {
     description: "Copy current editor text to clipboard",
     handler: async (ctx) => {
@@ -235,87 +277,34 @@ export default function promptStash(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("supi-stash", {
-    description: "Browse, restore, or delete stashed prompts",
+    description: "Browse, restore, copy, delete, or clear all stashed prompts",
     handler: async (_args, ctx) => {
-      const labels = getStashLabels();
-      if (labels.length === 0) {
+      const stashLabels = getStashLabels();
+      if (stashLabels.length === 0) {
         ctx.ui.notify("No stashed prompts", "info");
         return;
       }
 
-      const label = await ctx.ui.select("Pick a stash:", labels);
+      const pickList = ["[clear-all] ✕ Clear all stashes", ...stashLabels];
+      const label = await ctx.ui.select("Pick a stash:", pickList);
       if (!label) return;
 
-      const id = parseStashId(label);
-      if (!id) return;
-
-      const stash = STASHES.get(id);
-      if (!stash) {
-        ctx.ui.notify("Stash not found", "error");
-        return;
-      }
-
-      const action = await ctx.ui.select(`"${stash.name}":`, [
-        "[R] Restore into editor",
-        "[D] Delete",
-        "[C] Cancel",
-      ]);
-
-      if (action?.startsWith("[R]")) {
-        ctx.ui.setEditorText(stash.text);
-        ctx.ui.notify(`Restored: "${stash.name}"`, "info");
-      } else if (action?.startsWith("[D]")) {
-        STASHES.delete(id);
+      if (label.startsWith("[clear-all]")) {
+        const ok = await ctx.ui.confirm(
+          "Clear all?",
+          `Delete ${stashLabels.length} stashed prompt(s)?`,
+        );
+        if (!ok) return;
+        STASHES.clear();
         saveStashesToDisk(STASHES);
-        ctx.ui.notify(`Deleted: "${stash.name}"`, "info");
-      }
-    },
-  });
-
-  pi.registerCommand("supi-stash-copy", {
-    description: "Copy a stashed prompt to clipboard",
-    handler: async (_args, ctx) => {
-      const labels = getStashLabels();
-      if (labels.length === 0) {
-        ctx.ui.notify("No stashed prompts", "info");
+        ctx.ui.notify("All stashes cleared", "info");
         return;
       }
 
-      const label = await ctx.ui.select("Copy stash to clipboard:", labels);
-      if (!label) return;
+      const stash = findStashByLabel(label);
+      if (!stash) return;
 
-      const id = parseStashId(label);
-      if (!id) return;
-
-      const stash = STASHES.get(id);
-      if (!stash) {
-        ctx.ui.notify("Stash not found", "error");
-        return;
-      }
-
-      const ok = await copyToClipboard(stash.text, ctx.cwd, pi);
-      ctx.ui.notify(
-        ok ? `Copied "${stash.name}" to clipboard` : "Failed to copy to clipboard",
-        ok ? "info" : "error",
-      );
-    },
-  });
-
-  pi.registerCommand("supi-stash-clear", {
-    description: "Clear all stashed prompts",
-    handler: async (_args, ctx) => {
-      const labels = getStashLabels();
-      if (labels.length === 0) {
-        ctx.ui.notify("No stashed prompts", "info");
-        return;
-      }
-
-      const ok = await ctx.ui.confirm("Clear all?", `Delete ${labels.length} stashed prompt(s)?`);
-      if (!ok) return;
-
-      STASHES.clear();
-      saveStashesToDisk(STASHES);
-      ctx.ui.notify("All stashes cleared", "info");
+      await showStashActions(stash, ctx);
     },
   });
 
