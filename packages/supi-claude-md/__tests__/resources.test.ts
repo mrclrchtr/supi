@@ -103,8 +103,8 @@ describe("supi-claude-md resources_discover", () => {
     const result = await handler({}, { cwd: "/tmp" });
 
     expect(result.skillPaths).toBeDefined();
-    expect(result.skillPaths!.length).toBeGreaterThan(0);
-    for (const p of result.skillPaths!) {
+    expect(result.skillPaths?.length).toBeGreaterThan(0);
+    for (const p of result.skillPaths ?? []) {
       expect(p).toMatch(/^\//);
     }
   });
@@ -126,8 +126,6 @@ describe("supi-claude-md resources_discover", () => {
       expect(findSkillFile(p)).toBeTruthy();
     }
   });
-
-
 });
 
 function findSkillFile(dir: string): string | null {
