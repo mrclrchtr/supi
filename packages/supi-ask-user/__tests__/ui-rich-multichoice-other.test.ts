@@ -1,8 +1,7 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import type { Component, TUI } from "@mariozechner/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { NormalizedQuestion } from "../src/types.ts";
-import { type RichUiHost, runRichQuestionnaire } from "../src/ui/ui-rich.ts";
+import { runRichQuestionnaire } from "../src/ui/ui-rich.ts";
+import { makeRichFixture } from "./helpers.ts";
 
 const multichoiceWithOther: NormalizedQuestion = {
   id: "features",
@@ -18,37 +17,6 @@ const multichoiceWithOther: NormalizedQuestion = {
   allowDiscuss: true,
   recommendedIndexes: [0],
 };
-
-interface RichFixture<Outcome> {
-  captured: { value: Component | undefined };
-  host: RichUiHost;
-  outcomePromise: Promise<Outcome>;
-}
-
-function makeRichFixture<Outcome>(): RichFixture<Outcome> {
-  const tuiStub = { requestRender: () => {} } as unknown as TUI;
-  const themeStub = {
-    fg: (_color: string, text: string) => text,
-    bold: (text: string) => text,
-    bg: (_color: string, text: string) => text,
-  } as unknown as Theme;
-  const captured: { value: Component | undefined } = { value: undefined };
-  let resolveOutcome: ((value: Outcome) => void) | undefined;
-  const outcomePromise = new Promise<Outcome>((resolve) => {
-    resolveOutcome = resolve;
-  });
-  const host: RichUiHost = {
-    custom: ((
-      factory: (tui: TUI, theme: Theme, kb: unknown, done: (result: Outcome) => void) => Component,
-    ) => {
-      captured.value = factory(tuiStub, themeStub, undefined, (outcome) =>
-        resolveOutcome?.(outcome),
-      );
-      return outcomePromise;
-    }) as unknown as RichUiHost["custom"],
-  };
-  return { captured, host, outcomePromise };
-}
 
 describe("runRichQuestionnaire multichoice other path", () => {
   it("supports allowOther and clears staged multiselect state after switching away", async () => {

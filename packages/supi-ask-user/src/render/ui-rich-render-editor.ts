@@ -12,8 +12,14 @@ export function editorCaption(state: OverlayRenderState): string {
   return "Answer";
 }
 
+/** Whether the editor should render in a separate pane (split-view right side)
+ *  rather than inline within the option rows. */
 export function usesSeparateEditorPane(state: OverlayRenderState): boolean {
-  return state.subMode === "note-input";
+  return (
+    state.subMode === "note-input" ||
+    state.subMode === "other-input" ||
+    state.subMode === "discuss-input"
+  );
 }
 
 export function renderEditorPane(

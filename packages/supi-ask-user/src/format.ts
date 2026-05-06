@@ -15,6 +15,8 @@ export function decorateOption(label: string, recommended: boolean): string {
   return `${label} (recommended)`;
 }
 
+// formatSummaryBody and formatReviewLines must be kept in sync —
+// when adding a new answer source, update both functions.
 export function formatSummaryBody(question: NormalizedQuestion, answer: Answer): string {
   switch (answer.source) {
     case "option": {

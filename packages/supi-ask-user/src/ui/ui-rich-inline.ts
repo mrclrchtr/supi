@@ -3,8 +3,8 @@ import type { Editor } from "@mariozechner/pi-tui";
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
 import type { QuestionnaireFlow } from "../flow.ts";
 import { DISCUSS_LABEL, OTHER_LABEL } from "../format.ts";
-import type { NormalizedStructuredQuestion } from "../types.ts";
 import type { OverlayRenderState } from "../render/ui-rich-render-types.ts";
+import type { NormalizedStructuredQuestion } from "../types.ts";
 import type { InteractiveRow } from "./ui-rich-state.ts";
 
 export function structuredRowLabel(

@@ -5,9 +5,9 @@
 import type { Theme } from "@mariozechner/pi-coding-agent";
 import { type Component, Editor, type EditorTheme, type TUI } from "@mariozechner/pi-tui";
 import { QuestionnaireFlow } from "../flow.ts";
+import { renderOverlay } from "../render/ui-rich-render.ts";
 import type { NormalizedQuestionnaire, QuestionnaireOutcome } from "../types.ts";
 import { handleOverlayInput, onEditorSubmit } from "./ui-rich-handlers.ts";
-import { renderOverlay } from "../render/ui-rich-render.ts";
 import { initialSubMode, type OverlayState, selectedRowIndex } from "./ui-rich-state.ts";
 
 export interface RichCustomOptions {
@@ -44,6 +44,10 @@ export async function runRichQuestionnaire(
     flow.abort();
     return flow.outcome();
   }
+  // pi-tui's declarative keybinding system is not used here — the overlay
+  // implements its own dynamic input handling because footer hints change
+  // per mode and question type (e.g. Space toggle in multichoice vs Enter
+  // confirm in choice).
   const promise = opts.ui.custom<QuestionnaireOutcome>((tui, theme, _kb, done) =>
     buildOverlay({ tui, theme, flow, signal: opts.signal, done }),
   );

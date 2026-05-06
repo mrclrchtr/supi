@@ -7,6 +7,12 @@ import { decorateOption, formatReviewLines, NOTE_MARKER } from "../format.ts";
 import type { NormalizedStructuredQuestion } from "../types.ts";
 import { inlineStructuredRowLines, structuredRowLabel } from "../ui/ui-rich-inline.ts";
 import {
+  hasPreview,
+  type InteractiveRow,
+  interactiveRows,
+  selectedIndexesForQuestion,
+} from "../ui/ui-rich-state.ts";
+import {
   editorCaption,
   padRight,
   renderEditorBlock,
@@ -17,12 +23,6 @@ import type { RenderEnv } from "./ui-rich-render-env.ts";
 import { footerHelp } from "./ui-rich-render-footer.ts";
 import { renderMarkdown, renderMarkdownPreview } from "./ui-rich-render-markdown.ts";
 import { currentNote, renderNoteStatus, visibleNoteMarker } from "./ui-rich-render-notes.ts";
-import {
-  hasPreview,
-  type InteractiveRow,
-  interactiveRows,
-  selectedIndexesForQuestion,
-} from "../ui/ui-rich-state.ts";
 
 export function renderOverlay(env: RenderEnv): string[] {
   const lines: string[] = [];
@@ -114,6 +114,9 @@ function renderStructuredQuestion(
   question: NormalizedStructuredQuestion,
 ): void {
   const rows = interactiveRows(question);
+  // Split view at >=100 cols: left pane 42% (min 34 cols) for option rows,
+  // right pane (min 24 cols) for preview or editor. Below this threshold,
+  // previews render as an inline block below the options.
   if (hasPreview(question) && env.width >= 100) {
     renderSplitView(lines, env, question, rows);
   } else {
@@ -146,6 +149,31 @@ function renderPaneRows(
   return renderRows(env, question, rows);
 }
 
+/** Render a single interactive row, or its inline editor lines when the row
+ *  is an active other/discuss input and the editor is not rendered separately. */
+function renderInlineEditorLine(
+  env: RenderEnv,
+  prefix: string,
+  row: InteractiveRow,
+  out: string[],
+): boolean {
+  if (usesSeparateEditorPane(env.state)) return false;
+  const lines = inlineStructuredRowLines({
+    width: env.width,
+    theme: env.theme,
+    state: env.state,
+    editor: env.editor,
+    row,
+    prefix,
+  });
+  if (!lines) return false;
+  const continuation = " ".repeat(visibleWidth(prefix));
+  for (const [i, line] of lines.entries()) {
+    out.push(`${i === 0 ? prefix : continuation}${line}`);
+  }
+  return true;
+}
+
 function renderRows(
   env: RenderEnv,
   question: NormalizedStructuredQuestion,
@@ -155,21 +183,7 @@ function renderRows(
   for (const [index, row] of rows.entries()) {
     const active = env.state.selectedIndex === index;
     const prefix = active ? env.theme.fg("accent", "> ") : "  ";
-    const inlineEditorLines = inlineStructuredRowLines({
-      width: env.width,
-      theme: env.theme,
-      state: env.state,
-      editor: env.editor,
-      row,
-      prefix,
-    });
-    if (inlineEditorLines) {
-      const rowContinuation = " ".repeat(visibleWidth(prefix));
-      for (const [lineIndex, line] of inlineEditorLines.entries()) {
-        out.push(`${lineIndex === 0 ? prefix : rowContinuation}${line}`);
-      }
-      continue;
-    }
+    if (renderInlineEditorLine(env, prefix, row, out)) continue;
     addWrapped(out, env, prefix, rowLabel(env, question, row, active));
     const description = rowDescription(question, row);
     if (description) renderRowDescription(out, env, description);

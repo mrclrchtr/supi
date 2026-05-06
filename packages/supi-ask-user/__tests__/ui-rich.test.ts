@@ -1,5 +1,3 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import type { Component, TUI } from "@mariozechner/pi-tui";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { NormalizedQuestion } from "../src/types.ts";
 import {
@@ -7,6 +5,7 @@ import {
   type RichUiHost,
   runRichQuestionnaire,
 } from "../src/ui/ui-rich.ts";
+import { makeRichFixture } from "./helpers.ts";
 
 const mockRenderMarkdown = vi.hoisted(() =>
   vi.fn((text: string, _width: number, _theme: unknown, options?: { paddingX?: number }) => {
@@ -82,37 +81,6 @@ const textQuestion: NormalizedQuestion = {
   required: true,
   options: [],
 };
-
-interface RichFixture<Outcome> {
-  captured: { value: Component | undefined };
-  host: RichUiHost;
-  outcomePromise: Promise<Outcome>;
-}
-
-function makeRichFixture<Outcome>(): RichFixture<Outcome> {
-  const tuiStub = { requestRender: () => {}, terminal: { rows: 40 } } as unknown as TUI;
-  const themeStub = {
-    fg: (_color: string, text: string) => text,
-    bold: (text: string) => text,
-    bg: (_color: string, text: string) => text,
-  } as unknown as Theme;
-  const captured: { value: Component | undefined } = { value: undefined };
-  let resolveOutcome: ((value: Outcome) => void) | undefined;
-  const outcomePromise = new Promise<Outcome>((resolve) => {
-    resolveOutcome = resolve;
-  });
-  const host: RichUiHost = {
-    custom: ((
-      factory: (tui: TUI, theme: Theme, kb: unknown, done: (result: Outcome) => void) => Component,
-    ) => {
-      captured.value = factory(tuiStub, themeStub, undefined, (outcome) =>
-        resolveOutcome?.(outcome),
-      );
-      return outcomePromise;
-    }) as unknown as RichUiHost["custom"],
-  };
-  return { captured, host, outcomePromise };
-}
 
 describe("runRichQuestionnaire lifecycle", () => {
   it("returns an aborted outcome without opening the overlay when the signal is already aborted", async () => {

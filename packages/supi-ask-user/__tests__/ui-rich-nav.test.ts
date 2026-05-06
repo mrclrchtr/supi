@@ -3,6 +3,7 @@ import { type Component, type TUI, visibleWidth } from "@mariozechner/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { NormalizedQuestion } from "../src/types.ts";
 import { type RichUiHost, runRichQuestionnaire } from "../src/ui/ui-rich.ts";
+import { makeRichFixture } from "./helpers.ts";
 
 const choice: NormalizedQuestion = {
   id: "scope",
@@ -49,37 +50,6 @@ const yesNoGo: NormalizedQuestion = {
   allowDiscuss: true,
   recommendedIndexes: [0],
 };
-
-interface RichFixture<Outcome> {
-  captured: { value: Component | undefined };
-  host: RichUiHost;
-  outcomePromise: Promise<Outcome>;
-}
-
-function makeRichFixture<Outcome>(): RichFixture<Outcome> {
-  const tuiStub = { requestRender: () => {}, terminal: { rows: 40 } } as unknown as TUI;
-  const themeStub = {
-    fg: (_color: string, text: string) => text,
-    bold: (text: string) => text,
-    bg: (_color: string, text: string) => text,
-  } as unknown as Theme;
-  const captured: { value: Component | undefined } = { value: undefined };
-  let resolveOutcome: ((value: Outcome) => void) | undefined;
-  const outcomePromise = new Promise<Outcome>((resolve) => {
-    resolveOutcome = resolve;
-  });
-  const host: RichUiHost = {
-    custom: ((
-      factory: (tui: TUI, theme: Theme, kb: unknown, done: (result: Outcome) => void) => Component,
-    ) => {
-      captured.value = factory(tuiStub, themeStub, undefined, (outcome) =>
-        resolveOutcome?.(outcome),
-      );
-      return outcomePromise;
-    }) as unknown as RichUiHost["custom"],
-  };
-  return { captured, host, outcomePromise };
-}
 
 describe("runRichQuestionnaire revisit behavior", () => {
   it("restores discuss text when revisiting the discuss row", async () => {
@@ -257,8 +227,10 @@ describe("runRichQuestionnaire render state", () => {
     captured.value.handleInput?.("\u001b[B");
     captured.value.handleInput?.("\u001b[B");
     captured.value.handleInput?.("x");
+    // Editor renders in the right pane (split view); the left row shows the label.
     const inlineOther = captured.value.render(120).join("\n");
-    expect(inlineOther).toContain("Other answer: x");
+    expect(inlineOther).toContain("Other answer");
+    expect(inlineOther).toContain("x");
 
     captured.value.handleInput?.("\u001b");
   });
@@ -291,8 +263,10 @@ describe("runRichQuestionnaire render state", () => {
     captured.value.handleInput?.("\u001b[B");
     captured.value.handleInput?.("y");
 
+    // Editor renders in the right pane (split view); typed text is in the editor.
     const rendered = captured.value.render(120).join("\n");
-    expect(rendered).toContain("Discuss instead: y");
+    expect(rendered).toContain("y");
+    expect(rendered).toContain("Discuss instead");
   });
 
   it("renders multichoice footer guidance without a submit row", async () => {
@@ -440,23 +414,23 @@ describe("runRichQuestionnaire inline editor navigation", () => {
     await Promise.resolve();
     if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
-    // Navigate to discuss row — auto-enters discuss-input
+    // Navigate to discuss row — auto-enters discuss-input.
+    // Editor renders in right pane; left row shows active Discuss label.
     captured.value.handleInput?.("\u001b[B"); // B
     captured.value.handleInput?.("\u001b[B"); // Other (auto-enter)
     captured.value.handleInput?.("\u001b[B"); // Discuss (auto-enter via Up/Down handler)
     const inEditor = captured.value.render(120).join("\n");
-    expect(inEditor).toContain("Discuss instead:");
+    expect(inEditor).toContain("> Discuss instead");
 
-    // Press Up to move back to Other row — should exit editor without ESC
+    // Press Up to move back to Other row — should exit editor without ESC.
     captured.value.handleInput?.("\u001b[A");
     const backToOther = captured.value.render(120).join("\n");
     expect(backToOther).toContain("> Other answer");
-    expect(backToOther).not.toContain("Discuss instead:");
 
-    // Press Down to return to discuss — auto-enters discuss-input again
+    // Press Down to return to discuss — auto-enters discuss-input again.
     captured.value.handleInput?.("\u001b[B");
     const backToDiscuss = captured.value.render(120).join("\n");
-    expect(backToDiscuss).toContain("Discuss instead:");
+    expect(backToDiscuss).toContain("> Discuss instead");
   });
 
   it("navigates through multiple auto-activated rows with Up/Down keys", async () => {
@@ -470,18 +444,19 @@ describe("runRichQuestionnaire inline editor navigation", () => {
     let rendered = captured.value.render(120).join("\n");
     expect(rendered).toContain("> 2. B");
 
+    // Editor renders in right pane; left row shows active Other label.
     captured.value.handleInput?.("\u001b[B"); // Other (auto-enter)
     rendered = captured.value.render(120).join("\n");
-    expect(rendered).toContain("Other answer:");
+    expect(rendered).toContain("> Other answer");
 
     captured.value.handleInput?.("\u001b[B"); // Discuss (auto-enter via Up/Down handler)
     rendered = captured.value.render(120).join("\n");
-    expect(rendered).toContain("Discuss instead:");
+    expect(rendered).toContain("> Discuss instead");
 
     // Go back up through all rows
     captured.value.handleInput?.("\u001b[A"); // Other (auto-enter via Up/Down handler)
     rendered = captured.value.render(120).join("\n");
-    expect(rendered).toContain("Other answer:");
+    expect(rendered).toContain("> Other answer");
 
     captured.value.handleInput?.("\u001b[A"); // option B
     rendered = captured.value.render(120).join("\n");
@@ -506,9 +481,12 @@ describe("runRichQuestionnaire wrapping", () => {
       captured.value.handleInput?.(char);
     }
 
+    // Editor renders as a block below rows in non-split-view; check the
+    // editor caption and wrapped content.
     const lines = captured.value.render(32);
     const rendered = lines.join("\n");
-    expect(rendered).toContain("Other answer: this");
+    expect(rendered).toContain("Other answer");
+    expect(rendered).toContain("this");
     expect(rendered).toContain("should wrap onto");
     expect(rendered).toContain("the next line");
     for (const line of lines) {
