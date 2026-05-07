@@ -16,7 +16,7 @@ pnpm exec biome check packages/supi-extras/
 
 | Module | What it does |
 |---|---|
-| `clipboard.ts` | Shared clipboard utility — pipes text through `pbcopy`/`wl-copy`/`xclip`/`Set-Clipboard` |
+| `clipboard.ts` | Shared clipboard utility — wraps `clipboardy` for cross-platform copy |
 | `copy-prompt.ts` | `Alt+C` (Option+C) to copy the current editor text to clipboard |
 | `tab-spinner.ts` | Braille spinner in terminal tab title during agent work + `supi:working:*` events |
 | `prompt-stash.ts` | Persistent prompt stash with `Alt+S` shortcut and `/supi-stash` overlay |
@@ -28,6 +28,6 @@ pnpm exec biome check packages/supi-extras/
 
 - **Tab spinner**: PI sets the terminal title directly on `this.ui.terminal` during startup — it never flows through `ctx.ui.setTitle`. The spinner recomputes the base title dynamically with `pi.getSessionName()` + `ctx.cwd` on every tick so `/name` renames are reflected.
 - **Prompt stash**: Persists to `~/.pi/agent/supi/prompt-stash.json`. `/supi-stash` uses `ctx.ui.custom(..., { overlay: true })` with restore, copy, delete, and clear-all actions inside the overlay.
-- **Copy prompt**: `Alt+C` replaces the old `Ctrl+Shift+S` copy shortcut (removed from prompt-stash). Both `copy-prompt.ts` and stash overlay share the same `clipboard.ts` utility.
+- **Copy prompt**: `Alt+C` replaces the old `Ctrl+Shift+S` copy shortcut (removed from prompt-stash). Both `copy-prompt.ts` and stash overlay share the same `clipboard.ts` utility, which now delegates to `clipboardy`.
 - **Skill shortcut**: Installed skill names are snapshotted at `session_start`; use `/reload` after adding/removing skills. Outside `$...` tokens, autocomplete delegates to the current provider.
 - **Git editor**: Sets env vars unconditionally — pi runs headless and any editor invocation hangs.

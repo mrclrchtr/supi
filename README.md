@@ -94,7 +94,7 @@ The `extras` extension adds small quality-of-life utilities:
 
 - **`/supi-stash`** — keyboard-driven TUI overlay for managing stashed prompt drafts. Stashes persist to `~/.pi/agent/supi/prompt-stash.json` across pi restarts.
   - `Alt+S` — stash current editor text
-  - `Ctrl+Shift+S` — copy editor text to system clipboard
+  - `Alt+C` — copy editor text to system clipboard
   - In the overlay: `↑↓` navigate, `Enter` restore, `c` copy, `d` delete (refreshes list in-place), `D` clear all, `Esc` cancel
 - **Command aliases** — `/exit`, `/e`, `/clear`
 - **`$skill-name` shorthand** — quick skill invocation

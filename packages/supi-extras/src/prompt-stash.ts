@@ -1,9 +1,8 @@
 /**
  * Prompt stash extension for pi.
  *
- * Provides `Alt+S` to stash the current editor text, `Ctrl+Shift+S` to copy
- * it to the system clipboard, and `/supi-stash` for browsing and managing
- * stashed drafts with a keyboard-driven overlay picker.
+ * Provides `Alt+S` to stash the current editor text and `/supi-stash` for
+ * browsing and managing stashed drafts with a keyboard-driven overlay picker.
  *
  * Stashes are persisted to ~/.pi/agent/supi/prompt-stash.json so they survive
  * pi restarts. On I/O errors the stash falls back to in-memory-only operation.

@@ -31,14 +31,9 @@ The `/supi-stash` overlay supports restore, copy, delete, and clear-all actions.
 
 ## Clipboard
 
-Both `Alt+C` and the stash overlay's copy action use the shared clipboard utility
-(`clipboard.ts`) which pipes text through the platform clipboard tool:
-
-| Platform | Tool |
-|----------|------|
-| macOS    | `pbcopy` |
-| Linux    | `wl-copy` (Wayland) / `xclip` (X11) |
-| Windows  | `powershell Set-Clipboard` |
+Both `Alt+C` and the stash overlay's copy action use the shared `clipboard.ts`
+wrapper, which delegates to [`clipboardy`](https://github.com/sindresorhus/clipboardy)
+for cross-platform clipboard access.
 
 ## Architecture
 
