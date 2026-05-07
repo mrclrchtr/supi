@@ -40,7 +40,7 @@ for cross-platform clipboard access.
 ```text
 src/
 ├── index.ts          package entrypoint
-├── clipboard.ts      shared clipboard utility (pbcopy/wl-copy/xclip)
+├── clipboard.ts      shared clipboard utility (clipboardy wrapper)
 ├── copy-prompt.ts    Alt+C to copy editor text to clipboard
 ├── tab-spinner.ts    tab-title spinner + supi:working:* listeners
 ├── prompt-stash.ts   stash shortcuts, persistence, and overlay picker
