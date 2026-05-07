@@ -32,6 +32,7 @@
     "@mrclrchtr/supi-review": "workspace:*",
     "@mrclrchtr/supi-rtk": "workspace:*",
     "@mrclrchtr/supi-tree-sitter": "workspace:*",
+    "clipboardy": "^5.3.1",
     "tree-sitter-javascript": "^0.23.0",
     "tree-sitter-typescript": "^0.23.0",
     "web-tree-sitter": "^0.26.8",
