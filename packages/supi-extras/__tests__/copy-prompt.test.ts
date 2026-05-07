@@ -1,4 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { copyToClipboardMock } = vi.hoisted(() => ({
+  copyToClipboardMock: vi.fn(async () => true),
+}));
+
+vi.mock("../src/clipboard.ts", () => ({
+  copyToClipboard: copyToClipboardMock,
+}));
+
 import copyPrompt from "../src/copy-prompt.ts";
 
 function createPiMock() {
@@ -11,9 +20,6 @@ function createPiMock() {
       shortcuts.set(key, list);
     },
     getShortcutHandlers: (key: string) => shortcuts.get(key) ?? [],
-    exec: vi.fn(async (_command: string, _args: string[]) => {
-      return { code: 0, stdout: "", stderr: "" };
-    }),
   };
 }
 
@@ -48,7 +54,7 @@ describe("copyPrompt extension", () => {
 
     await pi.getShortcutHandlers("alt+c")[0](ctx);
 
-    expect(pi.exec).toHaveBeenCalled();
+    expect(copyToClipboardMock).toHaveBeenCalledWith("some prompt text", "/tmp", pi);
     expect(ctx.ui.notify).toHaveBeenCalledWith("Copied to clipboard", "info");
   });
 
@@ -62,7 +68,7 @@ describe("copyPrompt extension", () => {
     await pi.getShortcutHandlers("alt+c")[0](ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("Editor is empty — nothing to copy", "warning");
-    expect(pi.exec).not.toHaveBeenCalled();
+    expect(copyToClipboardMock).not.toHaveBeenCalled();
   });
 
   it("warns when editor has only whitespace on alt+c", async () => {
@@ -75,6 +81,6 @@ describe("copyPrompt extension", () => {
     await pi.getShortcutHandlers("alt+c")[0](ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("Editor is empty — nothing to copy", "warning");
-    expect(pi.exec).not.toHaveBeenCalled();
+    expect(copyToClipboardMock).not.toHaveBeenCalled();
   });
 });

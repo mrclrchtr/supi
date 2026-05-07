@@ -1,4 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { copyToClipboardMock } = vi.hoisted(() => ({
+  copyToClipboardMock: vi.fn(async () => true),
+}));
+
+vi.mock("../src/clipboard.ts", () => ({
+  copyToClipboard: copyToClipboardMock,
+}));
+
 import promptStash, { _resetStashes } from "../src/prompt-stash.ts";
 
 function createPiMock() {
@@ -160,5 +169,31 @@ describe("promptStash extension", () => {
     await pi.getCommandHandler("supi-stash")?.("", clearCtx);
 
     expect(clearCtx.ui.notify).toHaveBeenCalledWith("All stashes cleared", "info");
+  });
+
+  it("copies selected stash via /supi-stash", async () => {
+    const pi = createPiMock();
+    promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
+
+    const stashCtx = createCtxMock();
+    stashCtx.ui.getEditorText = vi.fn(() => "copy me");
+    stashCtx.ui.input = vi.fn(async () => "copy test");
+    await pi.getShortcutHandlers("alt+s")[0](stashCtx);
+
+    const copyCtx = createCtxMock();
+    copyCtx.ui.custom = vi.fn(async () => ({
+      action: "copy",
+      stash: {
+        id: "stash-1",
+        name: "copy test",
+        text: "copy me",
+        createdAt: Date.now(),
+      },
+    }));
+
+    await pi.getCommandHandler("supi-stash")?.("", copyCtx);
+
+    expect(copyToClipboardMock).toHaveBeenCalledWith("copy me", "/tmp", pi);
+    expect(copyCtx.ui.notify).toHaveBeenCalledWith('Copied "copy test" to clipboard', "info");
   });
 });
