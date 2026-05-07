@@ -8,12 +8,13 @@
  * Stashes are persisted to ~/.pi/agent/supi/prompt-stash.json so they survive
  * pi restarts. On I/O errors the stash falls back to in-memory-only operation.
  */
-import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { DynamicBorder } from "@mariozechner/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Spacer, Text } from "@mariozechner/pi-tui";
+import { copyToClipboard } from "./clipboard.ts";
 
 /** In-memory stash entry. */
 interface Stash {
@@ -126,56 +127,6 @@ function generateName(text: string): string {
   if (firstLine.length > 0 && firstLine.length <= 40) return firstLine;
   if (firstLine.length > 40) return `${firstLine.slice(0, 37)}...`;
   return "Untitled";
-}
-
-/**
- * Copy text to the system clipboard using the best available tool for the
- * current platform (macOS `pbcopy`, Linux `wl-copy`/`xclip`, Windows
- * `powershell Set-Clipboard`). Writes to a temp file and pipes it in.
- */
-async function copyToClipboard(text: string, cwd: string, pi: ExtensionAPI): Promise<boolean> {
-  const tmpFile = join(tmpdir(), `pi-stash-clipboard-${Date.now()}.txt`);
-
-  try {
-    writeFileSync(tmpFile, text, "utf8");
-
-    const platform = process.platform;
-    let result: { code: number; stdout: string; stderr: string };
-
-    if (platform === "darwin") {
-      result = await pi.exec("sh", ["-c", `pbcopy < "${tmpFile}"`], {
-        timeout: 2000,
-        cwd,
-      });
-    } else if (platform === "linux") {
-      result = await pi.exec(
-        "sh",
-        [
-          "-c",
-          `if command -v wl-copy >/dev/null 2>&1; then wl-copy < "${tmpFile}"; elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard < "${tmpFile}"; else exit 1; fi`,
-        ],
-        { timeout: 3000, cwd },
-      );
-    } else if (platform === "win32") {
-      result = await pi.exec(
-        "powershell",
-        ["-Command", `Get-Content -Path '${tmpFile.replace(/'/g, "''")}' -Raw | Set-Clipboard`],
-        { timeout: 5000, cwd },
-      );
-    } else {
-      return false;
-    }
-
-    return result.code === 0;
-  } catch {
-    return false;
-  } finally {
-    try {
-      unlinkSync(tmpFile);
-    } catch {
-      /* ignore temp file cleanup errors */
-    }
-  }
 }
 
 /** Result returned from the stash picker overlay. */
@@ -331,23 +282,6 @@ export default function promptStash(pi: ExtensionAPI) {
       saveStashesToDisk(STASHES);
       ctx.ui.setEditorText("");
       ctx.ui.notify(`Stashed: "${name || defaultName}"`, "info");
-    },
-  });
-
-  pi.registerShortcut("ctrl+shift+s", {
-    description: "Copy current editor text to clipboard",
-    handler: async (ctx) => {
-      const text = ctx.ui.getEditorText();
-      if (!text) {
-        ctx.ui.notify("Editor is empty — nothing to copy", "warning");
-        return;
-      }
-
-      const ok = await copyToClipboard(text, ctx.cwd, pi);
-      ctx.ui.notify(
-        ok ? "Copied to clipboard" : "Failed to copy to clipboard",
-        ok ? "info" : "error",
-      );
     },
   });
 

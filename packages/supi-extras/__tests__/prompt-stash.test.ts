@@ -62,13 +62,6 @@ describe("promptStash extension", () => {
     expect(pi.getShortcutHandlers("alt+s")).toHaveLength(1);
   });
 
-  it("registers ctrl+shift+s shortcut", () => {
-    const pi = createPiMock();
-    promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
-
-    expect(pi.getShortcutHandlers("ctrl+shift+s")).toHaveLength(1);
-  });
-
   it("registers /supi-stash command", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
@@ -114,32 +107,6 @@ describe("promptStash extension", () => {
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("Editor is empty — nothing to stash", "warning");
     expect(ctx.ui.input).not.toHaveBeenCalled();
-  });
-
-  it("copies editor text to clipboard on ctrl+shift+s", async () => {
-    const pi = createPiMock();
-    promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
-
-    const ctx = createCtxMock();
-    ctx.ui.getEditorText = vi.fn(() => "some prompt text");
-
-    await pi.getShortcutHandlers("ctrl+shift+s")[0](ctx);
-
-    expect(pi.exec).toHaveBeenCalled();
-    expect(ctx.ui.notify).toHaveBeenCalledWith("Copied to clipboard", "info");
-  });
-
-  it("warns when editor is empty on ctrl+shift+s", async () => {
-    const pi = createPiMock();
-    promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
-
-    const ctx = createCtxMock();
-    ctx.ui.getEditorText = vi.fn(() => "");
-
-    await pi.getShortcutHandlers("ctrl+shift+s")[0](ctx);
-
-    expect(ctx.ui.notify).toHaveBeenCalledWith("Editor is empty — nothing to copy", "warning");
-    expect(pi.exec).not.toHaveBeenCalled();
   });
 
   it("restores stash via /supi-stash command", async () => {
