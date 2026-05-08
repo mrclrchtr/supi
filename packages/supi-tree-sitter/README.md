@@ -10,6 +10,8 @@ This package registers a `tree_sitter` tool and also exports a small TypeScript 
 pi install npm:@mrclrchtr/supi-tree-sitter
 ```
 
+Standalone installs include the runtime grammar dependencies needed for the supported non-vendored languages. Kotlin and SQL use vendored WASM grammars bundled with this package.
+
 It is also bundled by the full SuPi meta-package:
 
 ```bash
@@ -18,22 +20,32 @@ pi install npm:@mrclrchtr/supi
 
 ## Supported files
 
-The v1 runtime supports the JavaScript and TypeScript file family:
+The runtime can parse these file families:
 
-- `.ts`, `.tsx`, `.mts`, `.cts`
-- `.js`, `.jsx`, `.mjs`, `.cjs`
+- **JavaScript / TypeScript** — `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`
+- **Python** — `.py`, `.pyi`
+- **Rust** — `.rs`
+- **Go** — `.go`, `.mod`
+- **C / C++** — `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, `.cxx`, `.hxx`, `.c++`, `.h++`
+- **Java** — `.java`
+- **Kotlin** — `.kt`, `.kts`
+- **Ruby** — `.rb`
+- **Bash / Shell** — `.sh`, `.bash`, `.zsh`
+- **HTML** — `.html`, `.htm`, `.xhtml`
+- **R** — `.r`
+- **SQL** — `.sql`
 
-It uses `web-tree-sitter` plus the npm grammar packages `tree-sitter-javascript` and `tree-sitter-typescript`. Grammar `.wasm` files are resolved from installed package metadata, not from repository-relative paths.
+Grammar `.wasm` files are resolved from installed package metadata for npm-shipped grammars, not from repository-relative paths.
 
 ## `tree_sitter` tool
 
 Actions:
 
-- `outline` — list structural declarations such as functions, classes, interfaces, methods, and variables
-- `imports` — list import statements and module specifiers
-- `exports` — list exported declarations, re-exports, and TypeScript `export =` assignments
-- `node_at` — return the smallest syntax node at a 1-based `line`/`character` position, plus ancestry
-- `query` — run a custom Tree-sitter query and return captures
+- `outline` — list structural declarations such as functions, classes, interfaces, methods, and variables (**currently JavaScript / TypeScript only**)
+- `imports` — list import statements and module specifiers (**currently JavaScript / TypeScript only**)
+- `exports` — list exported declarations, re-exports, and TypeScript `export =` assignments (**currently JavaScript / TypeScript only**)
+- `node_at` — return the smallest syntax node at a 1-based `line`/`character` position, plus ancestry (all supported grammars)
+- `query` — run a custom Tree-sitter query and return captures (all supported grammars)
 
 Coordinates are 1-based and compatible with the `lsp` tool. `character` is a UTF-16 code-unit column. Relative file paths resolve from the pi session working directory.
 
@@ -72,6 +84,6 @@ Always call `dispose()` when the session is no longer needed. The runtime lazily
 
 - `supi-tree-sitter` — parser-backed structural analysis (this package)
 - `supi-lsp` — live semantic analysis through language servers
-- `supi-code-intelligence` (future) — unified agent-facing layer above both substrates
+- `supi-code-intelligence` — higher-level agent-facing analysis built on top of both substrates
 
 Each substrate can be installed and used independently. `supi-tree-sitter` does not require `supi-lsp` to be present, and its prompt guidance is written so it remains correct in standalone installs.

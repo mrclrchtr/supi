@@ -1,12 +1,12 @@
 # @mrclrchtr/supi-insights
 
-> Usage insights and analytics for [pi](https://pi.dev) sessions. Inspired by Claude Code's `/insights` command, rebuilt for PI's extension architecture.
+> Usage insights and analytics for [pi](https://pi.dev) sessions. Inspired by Claude Code's `/insights` command, rebuilt for pi's extension architecture.
 
 Generate rich, shareable HTML reports analyzing your PI coding sessions — what you work on, how you interact with the agent, what works well, where friction happens, and what to try next.
 
 ## What you get
 
-Running `/insights` produces a report with:
+Running `/supi-insights` produces a report with:
 
 - **At a Glance** — high-level summary of what's working, what's hindering you, quick wins, and ambitious workflows for future models
 - **What You Work On** — project areas with session counts and descriptions
@@ -35,11 +35,11 @@ This bundles `supi-insights` along with the rest of the SuPi extension stack.
 pi install npm:@mrclrchtr/supi-insights
 ```
 
-Or add to your project's `.pi/extensions/` for local development.
+Or install from a local checkout with `pi install /path/to/packages/supi-insights`.
 
 ## Usage
 
-Type `/supi-insights` in the PI editor and press Enter.
+Type `/supi-insights` in the pi editor and press Enter.
 
 ```
 /supi-insights
@@ -47,7 +47,7 @@ Type `/supi-insights` in the PI editor and press Enter.
 
 The extension will:
 
-1. **Scan** all historical PI sessions across projects
+1. **Scan** all historical pi sessions across projects
 2. **Extract metadata** — tool counts, languages, git activity, lines changed, response times, errors (cached for future runs)
 3. **Extract qualitative facets** — goals, outcomes, satisfaction, friction via LLM analysis (cached)
 4. **Generate narrative insights** — coaching-style analysis in 7 parallel sections
@@ -66,7 +66,7 @@ Subsequent runs are fast — cached metadata and facets are reused.
 
 ## Configuration
 
-Configure via `/supi-settings` under the **Insights** section, or edit `~/.pi/agent/supi/config.json` directly:
+If your install surface includes `/supi-settings` (for example via `@mrclrchtr/supi`), this package contributes an **Insights** section there. You can also edit `~/.pi/agent/supi/config.json` directly:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
@@ -90,7 +90,7 @@ Example config:
 
 ```
 packages/supi-insights/
-├── insights.ts       # Extension factory — registers /insights command and settings
+├── insights.ts       # Extension factory — registers /supi-insights and settings
 ├── scanner.ts        # Session discovery via SessionManager.listAll()
 ├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
 ├── extractor.ts      # LLM facet extraction via @mariozechner/pi-ai/complete()
@@ -141,7 +141,7 @@ SessionManager.listAll()
 
 **Aggressive caching** — Session metadata and LLM-extracted facets are cached in `~/.pi/agent/supi/insights/`. Cache keys include the session file path and modified timestamp, so branch files do not collide and resumed sessions are reprocessed.
 
-**Branch deduplication** — PI session files are append-only trees. The extension analyzes the active branch path, then keeps only the branch/file with the most user messages per session ID to avoid double-counting.
+**Branch deduplication** — pi session files are append-only trees. The extension analyzes the active branch path, then keeps only the branch/file with the most user messages per session ID to avoid double-counting.
 
 **Substantive filtering** — Sessions with fewer than 2 user messages or lasting under 1 minute are skipped, as are sessions where the only goal is `warmup_minimal`.
 
@@ -173,7 +173,7 @@ rm -rf ~/.pi/agent/supi/insights/meta ~/.pi/agent/supi/insights/facets
 
 ## Multi-session detection
 
-The extension detects when you run multiple PI sessions simultaneously ("multi-clauding") using a sliding-window algorithm:
+The extension detects when you run multiple pi sessions simultaneously ("multi-clauding") using a sliding-window algorithm:
 
 - Collects all user message timestamps across sessions
 - Looks for the pattern `sessionA → sessionB → sessionA` within a 30-minute window

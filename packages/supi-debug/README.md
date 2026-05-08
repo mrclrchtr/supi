@@ -14,7 +14,7 @@ This extension provides three surfaces for inspecting recent SuPi debug events:
 
 - `supi_debug` tool — agent-callable query API
 - `/supi-debug` command — TUI report for humans
-- `/supi-settings` integration — enable/disable, access level, max events, notify level
+- shared settings integration — enable/disable, access level, max events, notify level when your install surface includes `/supi-settings` (for example via `@mrclrchtr/supi`)
 
 By default the agent sees sanitized event data. Raw event access requires explicit opt-in.
 

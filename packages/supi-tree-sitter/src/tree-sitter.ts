@@ -28,9 +28,9 @@ const TreeSitterActionEnum = StringEnum([
 const toolDescription = `Tree-sitter tool — provides structural AST analysis for supported files.
 
 Actions:
-- outline: Extract structural declarations (functions, classes, interfaces, etc.)
-- imports: List import statements with module specifiers
-- exports: List export declarations, re-exports, and export assignments with names and kinds
+- outline: Extract structural declarations (functions, classes, interfaces, etc.). JavaScript/TypeScript only.
+- imports: List import statements with module specifiers. JavaScript/TypeScript only.
+- exports: List export declarations, re-exports, and export assignments with names and kinds. JavaScript/TypeScript only.
 - node_at: Find the syntax node at a position. Params: file, line, character
 - query: Run a Tree-sitter query. Params: file, query
 

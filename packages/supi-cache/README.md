@@ -106,7 +106,7 @@ SessionManager.listAll()
 
 ## Configuration
 
-Settings are managed through `/supi-settings` under the **Cache** section, or via config files:
+If your install surface includes the shared `/supi-settings` command (for example via `@mrclrchtr/supi`), this package contributes a **Cache** section there. Otherwise, configure it via config files:
 
 | Setting | Description | Default |
 |---------|-------------|---------|

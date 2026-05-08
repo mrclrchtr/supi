@@ -16,10 +16,21 @@ That helps prevent long-running or hung shell commands from blocking a session i
 
 ## Configuration
 
-Set the timeout in seconds with `PI_BASH_DEFAULT_TIMEOUT`:
+Configure via the shared SuPi config file, or through `/supi-settings` when another package in your install surface registers that command (for example `@mrclrchtr/supi`).
 
-```bash
-export PI_BASH_DEFAULT_TIMEOUT=300
+Config file locations:
+
+- global: `~/.pi/agent/supi/config.json`
+- project: `.pi/supi/config.json`
+
+Use the `bash-timeout` section:
+
+```json
+{
+  "bash-timeout": {
+    "defaultTimeout": 300
+  }
+}
 ```
 
 Default:
@@ -35,7 +46,8 @@ Default:
 ## Requirements
 
 - `@mariozechner/pi-coding-agent`
+- `@mrclrchtr/supi-core`
 
 ## Source
 
-- Entrypoint: `index.ts`
+- Entrypoint: `src/bash-timeout.ts`

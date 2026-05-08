@@ -35,6 +35,10 @@ submit_review tool returns structured findings
 render supi-review message
 ```
 
+## Configuration
+
+If your install surface includes `/supi-settings` (for example via `@mrclrchtr/supi`), this package contributes review settings there.
+
 ## Architecture
 
 ```text

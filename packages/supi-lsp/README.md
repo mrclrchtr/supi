@@ -69,7 +69,7 @@ Example:
 
 ## Configuration
 
-Settings are managed through `/supi-settings` (registered by the `supi` meta-package). Use the LSP settings panel to:
+If your install surface includes `/supi-settings` (for example via `@mrclrchtr/supi`), this package contributes an LSP settings section there. Use that panel to:
 
 - enable or disable LSP globally
 - control the severity threshold

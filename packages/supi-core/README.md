@@ -10,15 +10,20 @@ Use it as a dependency in another extension package:
 pnpm add @mrclrchtr/supi-core
 ```
 
-## What it provides
+## Package role
 
-`@mrclrchtr/supi-core` is a library package. It does **not** register a pi extension by itself.
+`@mrclrchtr/supi-core` is a library package. It does **not** register a pi extension and is not meant to be installed as a standalone pi package.
+
+## What it provides
 
 Current exports cover:
 
-- shared config loading and writing
-- XML `<extension-context>` wrapping helpers
-- context-message utilities for pruning and reordering injected messages
+- shared config loading, scoped reads, writes, and key removal
+- config-backed settings registration helpers for `/supi-settings`
+- the shared settings registry, overlay UI, and `registerSettingsCommand()` helper
+- XML `<extension-context>` wrapping plus context-message utilities
+- context-provider and debug-event registries reused across SuPi packages
+- project root and path helpers reused by packages such as `supi-lsp`
 
 ## Config system
 
@@ -39,21 +44,34 @@ Main helpers:
 - `loadSupiConfigForScope()` — raw single-scope config for settings UIs (`defaults <- selected scope`)
 - `writeSupiConfig()`
 - `removeSupiConfigKey()`
+- `registerConfigSettings()`
 
-## Context helpers
+## Context and settings helpers
 
 - `wrapExtensionContext()`
 - `findLastUserMessageIndex()`
 - `getContextToken()`
 - `pruneAndReorderContextMessages()`
+- `registerSettings()`
+- `registerSettingsCommand()`
+- `openSettingsOverlay()`
 
 ## Example
 
 ```ts
-import { loadSupiConfig, wrapExtensionContext } from "@mrclrchtr/supi-core";
+import { loadSupiConfig, registerConfigSettings, wrapExtensionContext } from "@mrclrchtr/supi-core";
 
 const config = loadSupiConfig("my-extension", process.cwd(), {
   enabled: true,
+});
+
+registerConfigSettings({
+  id: "my-extension",
+  label: "My Extension",
+  section: "my-extension",
+  defaults: { enabled: true },
+  buildItems: () => [],
+  persistChange: () => {},
 });
 
 const message = wrapExtensionContext("my-extension", "hello", {
@@ -65,7 +83,8 @@ const message = wrapExtensionContext("my-extension", "hello", {
 ## Requirements
 
 - `@mariozechner/pi-coding-agent`
+- `@mariozechner/pi-tui`
 
 ## Source
 
-- Main exports: `index.ts`
+- Main exports: `src/index.ts`

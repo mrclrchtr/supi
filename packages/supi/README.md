@@ -1,6 +1,6 @@
 # @mrclrchtr/supi
 
-SuPi (**Super Pi**) is an opinionated bundle of extensions, prompts, and supporting packages for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+SuPi (**Super Pi**) is an opinionated bundle of extensions, skills, and supporting packages for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
 
 Install the full stack or pick individual packages.
 
@@ -26,42 +26,64 @@ When installed from a local path, pi loads the working tree directly. After edit
 
 ## What the meta-package bundles
 
-The `@mrclrchtr/supi` package exposes wrapper entrypoints for the main SuPi extensions.
+`@mrclrchtr/supi` exposes wrapper entrypoints for these extensions:
 
-Included extension entrypoints:
+- `extras.ts` — command aliases, skill shorthand, tab spinner, prompt stash, git editor guard
+- `ask-user.ts` — structured `ask_user` tool
+- `bash-timeout.ts` — default `bash` timeout injection
+- `claude-md.ts` — subdirectory `CLAUDE.md` / `AGENTS.md` injection
+- `settings.ts` — shared `/supi-settings` command
+- `lsp.ts` — Language Server Protocol tooling
+- `review.ts` — structured `/supi-review`
+- `debug.ts` — recent SuPi debug event inspection
+- `rtk.ts` — RTK-backed `bash` rewriting
+- `context.ts` — detailed context usage reporting
+- `tree-sitter.ts` — structural AST analysis
+- `cache.ts` — cache monitoring and forensics
+- `code-intelligence.ts` — architecture briefs and impact analysis
+- `flow.ts` — workflow commands plus bundled skills via `resources_discover`
+- `insights.ts` — historical session insights report generation
 
-- `extras.ts` — command aliases, skill shorthand, tab spinner, prompt stash, git editor
-- `ask-user.ts`
-- `bash-timeout.ts`
-- `claude-md.ts`
-- `lsp.ts`
-- `tree-sitter.ts`
-- `review.ts`
+Bundled sub-packages also contribute skills through `resources_discover`, notably `supi-flow` and `supi-claude-md`.
 
-## Packages
+## Bundled packages
 
 | Package | Type | Purpose |
 | --- | --- | --- |
 | [`@mrclrchtr/supi`](./README.md) | meta-package | Full SuPi bundle for pi installs |
-| [`@mrclrchtr/supi-extras`](../supi-extras/README.md) | extension | Command aliases, skill shorthand, tab spinner, prompt stash, and other small utilities |
 | [`@mrclrchtr/supi-ask-user`](../supi-ask-user/README.md) | extension | Structured `ask_user` tool and rich questionnaire UI |
 | [`@mrclrchtr/supi-bash-timeout`](../supi-bash-timeout/README.md) | extension | Injects default timeouts into `bash` tool calls |
-| [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | extension | Subdirectory context injection and root context refresh |
-| [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | extension | Language Server Protocol tool, diagnostics, and semantic guidance |
-| [`@mrclrchtr/supi-tree-sitter`](../supi-tree-sitter/README.md) | extension/library | Tree-sitter structural analysis tool and reusable parse/query services |
-| [`@mrclrchtr/supi-review`](../supi-review/package.json) | extension | Structured `/supi-review` command with configurable models, diff size, and review timeout |
-| [`@mrclrchtr/supi-core`](../supi-core/README.md) | library | Shared config and context utilities used by SuPi packages |
+| [`@mrclrchtr/supi-cache`](../supi-cache/README.md) | extension | Prompt cache monitoring and cross-session forensics |
+| [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | extension + skills | Subdirectory context injection plus CLAUDE.md maintenance skills |
+| [`@mrclrchtr/supi-code-intelligence`](../supi-code-intelligence/README.md) | extension + library | Architecture briefs, callers/callees, impact analysis, and project indexing |
+| [`@mrclrchtr/supi-context`](../supi-context/README.md) | extension | Detailed `/supi-context` usage reporting |
+| [`@mrclrchtr/supi-core`](../supi-core/README.md) | library | Shared config, settings, context, debug, and project-root helpers |
+| [`@mrclrchtr/supi-debug`](../supi-debug/README.md) | extension | Session-local debug event inspection |
+| [`@mrclrchtr/supi-extras`](../supi-extras/README.md) | extension | Command aliases, skill shorthand, tab spinner, prompt stash, and other small utilities |
+| [`@mrclrchtr/supi-flow`](../supi-flow/README.md) | extension + skills | Brainstorm → plan → apply → archive workflow |
+| [`@mrclrchtr/supi-insights`](../supi-insights/README.md) | extension | Historical session insights and HTML reports |
+| [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | extension + library | LSP tool, diagnostics, and reusable session-scoped LSP service |
+| [`@mrclrchtr/supi-review`](../supi-review/README.md) | extension | Structured `/supi-review` command with configurable reviewer behavior |
+| [`@mrclrchtr/supi-rtk`](../supi-rtk/README.md) | extension | Transparent RTK-backed `bash` rewriting |
+| [`@mrclrchtr/supi-tree-sitter`](../supi-tree-sitter/README.md) | extension + library | Tree-sitter structural analysis tool and reusable parse/query services |
 
 ## Install individual packages
 
 ```bash
-pi install npm:@mrclrchtr/supi-extras
 pi install npm:@mrclrchtr/supi-ask-user
 pi install npm:@mrclrchtr/supi-bash-timeout
+pi install npm:@mrclrchtr/supi-cache
 pi install npm:@mrclrchtr/supi-claude-md
+pi install npm:@mrclrchtr/supi-code-intelligence
+pi install npm:@mrclrchtr/supi-context
+pi install npm:@mrclrchtr/supi-debug
+pi install npm:@mrclrchtr/supi-extras
+pi install npm:@mrclrchtr/supi-flow
+pi install npm:@mrclrchtr/supi-insights
 pi install npm:@mrclrchtr/supi-lsp
-pi install npm:@mrclrchtr/supi-tree-sitter
 pi install npm:@mrclrchtr/supi-review
+pi install npm:@mrclrchtr/supi-rtk
+pi install npm:@mrclrchtr/supi-tree-sitter
 ```
 
 ## Notable included behavior
@@ -72,7 +94,11 @@ Adds a structured tool for narrow agent-user decisions with typed questions, rec
 
 ### `claude-md`
 
-Keeps directory-specific `CLAUDE.md` and `AGENTS.md` guidance flowing into sessions, including periodic refresh of root context.
+Keeps directory-specific `CLAUDE.md` and `AGENTS.md` guidance flowing into sessions for subdirectories below `cwd`. Root and ancestor context files remain pi-native.
+
+### `flow`
+
+Bundles the `supi-flow-*` skills plus `/supi-flow` and `/supi-flow-status` commands for the brainstorm → plan → apply → archive workflow.
 
 ### `lsp`
 
@@ -80,14 +106,14 @@ Adds semantic code navigation and diagnostics through a single `lsp` tool plus i
 
 ### `tree_sitter`
 
-Adds syntax-tree-level structure for JavaScript and TypeScript files through `outline`, `imports`, `exports`, `node_at`, and custom query actions. Results use 1-based coordinates compatible with `lsp` and are capped for agent-friendly output. Designed as a standalone structural-analysis substrate that remains correct when installed without `supi-lsp`.
+Adds parser-backed structural analysis for supported file families. `node_at` and `query` work across all supported grammars; `outline`, `imports`, and `exports` are currently JavaScript / TypeScript only.
 
 ### `review`
 
-Adds `/supi-review` for structured code review in a dedicated read-only subprocess. Configure fast/deep model overrides, max diff size, and review timeout in minutes through `/supi-settings`.
+Adds `/supi-review` for structured code review in an in-process managed child session. Configure reviewer model overrides, max diff size, and review timeout through `/supi-settings`.
 
 ### Small UX improvements
 
 - command aliases and `$skill-name` shorthand via `supi-extras`
 - default shell timeouts via `supi-bash-timeout`
-
+- cache and debug inspection tools via `supi-cache` and `supi-debug`

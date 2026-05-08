@@ -1,4 +1,4 @@
-# supi-flow
+# @mrclrchtr/supi-flow
 
 **Lightweight spec-driven workflow for pi.**
 
@@ -84,14 +84,16 @@ flowchart TD
 
 ## Skills
 
-| Skill | Loaded | When |
-|-------|--------|------|
-| `supi-flow-brainstorm` | System prompt | Start of any change — HARD-GATE before implementation |
-| `supi-flow-plan` | System prompt | After design approval — creates implementation plan |
-| `supi-flow-apply` | System prompt | After plan approval — executes tasks one by one |
-| `supi-flow-archive` | System prompt | After all tasks done — verifies, documents, closes |
-| `supi-flow-debug` | System prompt | On demand during apply — systematic debugging protocol |
-| `supi-flow-slop-detect` | System prompt | On demand during archive — AI-prose detection |
+Pi discovers these skills from the package and exposes them as `/skill:<name>` commands:
+
+| Skill | When |
+|-------|------|
+| `supi-flow-brainstorm` | Start of any change — HARD-GATE before implementation |
+| `supi-flow-plan` | After design approval — creates an implementation plan |
+| `supi-flow-apply` | After plan approval — executes tasks one by one |
+| `supi-flow-archive` | After all tasks are done — verifies, documents, closes |
+| `supi-flow-debug` | On demand during apply — systematic debugging protocol |
+| `supi-flow-slop-detect` | On demand during archive — AI-prose detection |
 
 ## Commands
 
@@ -119,7 +121,7 @@ Tickets are optional — small single-session changes skip tndm entirely. Plans 
 ## Dependencies
 
 - **tndm CLI** (optional) — ticket tracking for multi-session changes.
-- **pi** — skills are loaded automatically from the package.
+- **pi** — discovers the bundled skills automatically from the package.
 
 ## Inspiration
 

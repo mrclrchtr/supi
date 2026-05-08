@@ -173,12 +173,8 @@ These seven guidelines are injected into the system prompt:
 
 Included in the `@mrclrchtr/supi` meta-package, or install standalone:
 
-```json
-{
-  "pi": {
-    "packages": ["@mrclrchtr/supi-code-intelligence"]
-  }
-}
+```bash
+pi install npm:@mrclrchtr/supi-code-intelligence
 ```
 
 ## License

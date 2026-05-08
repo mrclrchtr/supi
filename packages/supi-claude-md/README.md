@@ -12,9 +12,9 @@ pi install npm:@mrclrchtr/supi-claude-md
 
 This extension adds **subdirectory context discovery** — injecting `CLAUDE.md` / `AGENTS.md` from subdirectories when the agent touches files there.
 
-Pi loads root and ancestor instruction files natively into the system prompt on every turn. To update root instruction files mid-session, use pi's `/reload` command or restart the session.
+Pi loads root and ancestor instruction files natively into the system prompt on every turn. This package only handles subdirectories below `cwd`. To pick up root instruction file edits mid-session, use pi's `/reload` command or restart the session.
 
-Settings are managed through the shared SuPi settings command:
+If your install surface includes the shared SuPi settings command (for example via `@mrclrchtr/supi`), this package contributes a Claude-MD section there:
 
 ```text
 /supi-settings
@@ -70,5 +70,4 @@ Options:
 ## Source
 
 - Entrypoint: `src/claude-md.ts`
-- Skills: `skills/claude-md-improver/`
 - Skills: `skills/claude-md-improver/`, `skills/claude-md-revision/`
