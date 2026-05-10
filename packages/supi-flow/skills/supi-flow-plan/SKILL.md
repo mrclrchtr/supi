@@ -35,7 +35,7 @@ Each task is one action (2-5 minutes):
 
 ## TDD by default
 
-Every code task follows red-green-refactor:
+Every code task follows red-green-refactor, unless the approved design explicitly opts out:
 
 ```
 RED → Write failing test → VERIFY it fails for the right reason
@@ -45,6 +45,12 @@ REFACTOR → Clean up, stay green → then commit
 
 Critical rule: **If you didn't watch the test fail, you don't know if it tests the right thing.** Every test step must include the expected failure message.
 
+### Test exemption
+
+Individual tasks may be marked test-exempt with a brief rationale (e.g., "test-exempt: standalone shell script"). Exempt tasks skip red-green steps and instead include a concrete manual verification step (exact command + expected output). The rule becomes: **No code before verification.**
+
+Use this sparingly — when there is no reasonable test harness or the change is trivial (config tweak, one-line script fix). Do not use it to avoid testing logic that could be tested.
+
 ## Rules
 
 - **No placeholders.** Never write: TBD, TODO, "implement later", "add error handling", "write tests for the above". Every step must contain the actual content.
@@ -52,7 +58,19 @@ Critical rule: **If you didn't watch the test fail, you don't know if it tests t
 - **Complete code** in every step — if a step changes code, show the code.
 - **Exact commands** with expected output, including expected failure output for test steps.
 - **Include doc updates** as tasks (from the design's "Docs to update" section).
-- **No code before test.** Every task that produces code starts with a failing test step.
+- **No code before test (or verification).** Every task that produces code starts with a failing test step, unless the task is test-exempt. For test-exempt tasks, start with the manual verification step.
+
+## Self-review
+
+After writing the complete plan, look at the brainstorm outcome with fresh eyes and check the plan against it. This is a checklist you run yourself — not a user review.
+
+**1. Spec coverage:** Skim each section/requirement from the brainstorm outcome. Can you point to a task that implements it? List any gaps.
+
+**2. Placeholder scan:** Search your plan for red flags — any TBD, TODO, "implement later", vague steps, or "similar to Task N" shortcuts. Fix them.
+
+**3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
+
+If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a requirement with no task, add the task.
 
 ## Output
 
