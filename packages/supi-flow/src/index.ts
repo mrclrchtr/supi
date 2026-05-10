@@ -14,6 +14,9 @@ const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
  *   /skill:supi-flow-archive [ID]
  *   /skill:supi-flow-slop-detect (hidden, loaded on demand)
  *
+ * Prompt templates (auto-discovered via resources_discover from prompts/):
+ *   /supi-coding-retro — retrospective on project setup, tooling, and workflow friction
+ *
  * Commands registered here:
  *   /supi-flow-status — show current flow state
  *   /supi-flow        — list available flow commands
@@ -21,6 +24,7 @@ const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 export default function (pi: ExtensionAPI) {
   pi.on("resources_discover", () => ({
     skillPaths: [join(baseDir, "skills")],
+    promptPaths: [join(baseDir, "prompts")],
   }));
   pi.registerCommand("supi-flow-status", {
     description: "Show current flow workflow state",

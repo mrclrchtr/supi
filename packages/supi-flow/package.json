@@ -18,6 +18,7 @@
   "files": [
     "src/**/*.ts",
     "skills",
+    "prompts",
     "!__tests__"
   ],
   "peerDependencies": {

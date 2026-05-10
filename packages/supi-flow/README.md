@@ -88,12 +88,20 @@ Pi discovers these skills from the package and exposes them as `/skill:<name>` c
 
 | Skill | When |
 |-------|------|
-| `supi-flow-brainstorm` | Start of any change — HARD-GATE before implementation |
-| `supi-flow-plan` | After design approval — creates an implementation plan |
-| `supi-flow-apply` | After plan approval — executes tasks one by one |
-| `supi-flow-archive` | After all tasks are done — verifies, documents, closes |
-| `supi-flow-debug` | On demand during apply — systematic debugging protocol |
-| `supi-flow-slop-detect` | On demand during archive — AI-prose detection |
+| `supi-flow-brainstorm` | Start of any change; HARD-GATE before implementation |
+| `supi-flow-plan` | After design approval; creates an implementation plan |
+| `supi-flow-apply` | After plan approval; executes tasks one by one |
+| `supi-flow-archive` | After all tasks are done; verifies, documents, closes |
+| `supi-flow-debug` | On demand during apply; systematic debugging protocol |
+| `supi-flow-slop-detect` | On demand during archive; AI-prose detection |
+
+## Prompt templates
+
+Pi also discovers bundled prompt templates from the package:
+
+| Prompt | Description |
+|--------|-------------|
+| `/supi-coding-retro` | Retrospective on project setup, architecture, tooling, workflows, and conventions |
 
 ## Commands
 
@@ -113,16 +121,17 @@ pi install npm:@mrclrchtr/supi-flow
 /skill:supi-flow-plan [TNDM-ID]
 /skill:supi-flow-apply [TNDM-ID]
 /skill:supi-flow-archive [TNDM-ID]
+/supi-coding-retro
 /supi-flow-status
 ```
 
-Tickets are optional — small single-session changes skip tndm entirely. Plans live in conversation context.
+Tickets are optional. Small single-session changes skip tndm entirely, and plans live in conversation context.
 
 ## Dependencies
 
-- **tndm CLI** (optional) — ticket tracking for multi-session changes.
-- **pi** — discovers the bundled skills automatically from the package.
+- **tndm CLI** (optional): ticket tracking for multi-session changes.
+- **pi**: discovers the bundled skills and prompt templates automatically from the package.
 
 ## Inspiration
 
-Distills the best parts of [OpenSpec](https://github.com/Fission-AI/OpenSpec) (artifact structure, checkbox tracking), [Superpowers](https://github.com/obra/superpowers) (HARD-GATE before implementation, verification iron law, bite-sized tasks, no placeholders, systematic debugging), and [Claude Night Market](https://github.com/athola/claude-night-market) (slop-detection vocabulary, documentation quality gates) — without the CLI, config files, or multi-file ceremony.
+Distills the best parts of [OpenSpec](https://github.com/Fission-AI/OpenSpec) (artifact structure, checkbox tracking), [Superpowers](https://github.com/obra/superpowers) (HARD-GATE before implementation, verification iron law, bite-sized tasks, no placeholders, systematic debugging), and [Claude Night Market](https://github.com/athola/claude-night-market) (slop-detection vocabulary, documentation quality gates), without the CLI, config files, or multi-file ceremony.
