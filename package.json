@@ -2,7 +2,7 @@
   "name": "@mrclrchtr/supi",
   "version": "0.1.0",
   "description": "SuPi (Super Pi) — The opinionated way to extend PI",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.33.4",
   "license": "MIT",
   "repository": {
     "type": "git",
