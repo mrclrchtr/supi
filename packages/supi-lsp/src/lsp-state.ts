@@ -18,6 +18,9 @@ export interface LspRuntimeState {
   currentContextToken: string | null;
   contextCounter: number;
   lspActive: boolean;
+  sentinelSnapshot: Map<string, number>;
+  staleSuspected: boolean;
+  lastWorkspaceChangeAt: number;
 }
 
 export function createRuntimeState(): LspRuntimeState {
@@ -31,6 +34,9 @@ export function createRuntimeState(): LspRuntimeState {
     currentContextToken: null,
     contextCounter: 0,
     lspActive: false,
+    sentinelSnapshot: new Map(),
+    staleSuspected: false,
+    lastWorkspaceChangeAt: 0,
   };
 }
 
@@ -55,13 +61,17 @@ export function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void 
   state.projectServers = [];
   state.lastDiagnosticsFingerprint = null;
   state.currentContextToken = null;
+  state.staleSuspected = false;
+  state.lastWorkspaceChangeAt = 0;
+  state.sentinelSnapshot = new Map();
   state.lspActive = false;
   removeLspTool(pi);
 }
 
 export function removeLspTool(pi: ExtensionAPI): void {
   const activeTools = pi.getActiveTools();
-  if (activeTools.includes("lsp")) pi.setActiveTools(activeTools.filter((t) => t !== "lsp"));
+  if (activeTools.includes("lsp"))
+    pi.setActiveTools(activeTools.filter((t: string) => t !== "lsp"));
 }
 
 export function ensureLspToolActive(pi: ExtensionAPI): void {

@@ -10,11 +10,12 @@ pi install npm:@mrclrchtr/supi-lsp
 
 ## What it adds
 
-- `lsp` tool with `hover`, `definition`, `references`, `diagnostics`, `symbols`, `rename`, `code_actions`, `workspace_symbol`, `search`, and `symbol_hover`
-- Stable system-prompt guidance that directs the agent to prefer LSP over grep/rg for code navigation
+- `lsp` tool with `hover`, `definition`, `references`, `diagnostics`, `symbols`, `rename`, `code_actions`, `workspace_symbol`, `search`, `symbol_hover`, and `recover`
+- Stable system-prompt guidance that tells the agent to prefer LSP over grep/rg for code navigation
 - Proactive project scanning and eager startup of detected language servers
+- Automatic stale-diagnostic recovery when workspace sentinels change (`package.json`, root lockfiles, `tsconfig*`, generated `*.d.ts` files`) before the next agent turn, plus immediate recovery after successful `write` or `edit` calls for those paths
 - Inline diagnostic surfacing around reads, writes, and edits
-- Compact diagnostic context injection when outstanding diagnostics change
+- Compact diagnostic context injection when outstanding diagnostics change, with stale-diagnostic warnings when needed
 - `/lsp-status` status overlay
 
 ## Public library API
@@ -43,16 +44,17 @@ Peer extensions can import from the package root without reaching into private f
 
 The `lsp` tool supports these actions:
 
-- `hover` — type info at a position
-- `definition` — go to definition
-- `references` — find all references
-- `diagnostics` — per-file or project-wide diagnostics
-- `symbols` — document symbols
-- `rename` — workspace-wide rename
-- `code_actions` — quick fixes at a position
-- `workspace_symbol` — fuzzy symbol search across the project
-- `search` — symbol search with text fallback
-- `symbol_hover` — hover by symbol name
+- `hover`: type info at a position
+- `definition`: go to definition
+- `references`: find all references
+- `diagnostics`: per-file or project-wide diagnostics
+- `symbols`: document symbols
+- `rename`: workspace-wide rename
+- `code_actions`: quick fixes at a position
+- `workspace_symbol`: fuzzy symbol search across the project
+- `search`: symbol search with text fallback
+- `symbol_hover`: hover by symbol name
+- `recover`: refresh diagnostics after workspace-wide dependency, config, or generated-type changes
 
 Line and character positions are **1-based**.
 

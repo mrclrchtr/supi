@@ -42,6 +42,19 @@ describe("formatDiagnosticsContext detailed diagnostics", () => {
     expect(content).toContain("</extension-context>");
   });
 
+  it("includes stale-diagnostics warnings in the injected context", () => {
+    const content = formatDiagnosticsContext(
+      [{ file: "src/app.ts", total: 1, errors: 1, warnings: 0, information: 0, hints: 0 }],
+      3,
+      undefined,
+      "⚠️ LSP diagnostics may be stale — 3 files report missing-module errors after a workspace change.",
+    );
+
+    expect(content).toContain("stale");
+    expect(content).toContain("3 files");
+    expect(content).toContain("src/app.ts: 1 error");
+  });
+
   it("omits diagnostic messages when total exceeds threshold", () => {
     const entries = Array.from({ length: 6 }, (_, i) => ({
       file: `src/file${i}.ts`,

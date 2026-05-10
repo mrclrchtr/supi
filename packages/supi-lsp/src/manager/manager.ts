@@ -1,4 +1,5 @@
 // LSP Manager — server pool with lazy spawning and diagnostic collection.
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: LspManager stays cohesive; recovery and sync helpers are split into manager-*.ts modules.
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as projectRoots from "@mrclrchtr/supi-core";
@@ -18,7 +19,13 @@ import {
   normalizeRelevantPaths,
   shouldIgnoreLspPath,
 } from "../summary.ts";
-import type { DetectedProjectServer, Diagnostic, LspConfig, ProjectServerInfo } from "../types.ts";
+import type {
+  DetectedProjectServer,
+  Diagnostic,
+  FileEvent,
+  LspConfig,
+  ProjectServerInfo,
+} from "../types.ts";
 import { commandExists } from "../utils.ts";
 import {
   closeFileAcrossClients,
@@ -45,6 +52,7 @@ import type {
   OutstandingDiagnosticSummaryEntry,
   ServerStatus,
 } from "./manager-types.ts";
+import { recoverWorkspaceDiagnostics as recoverWorkspaceDiagnosticsImpl } from "./manager-workspace-recovery.ts";
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
@@ -145,6 +153,77 @@ export class LspManager {
       return null;
     }
   }
+
+  /** Find an already-started client for a file without spawning a new server. */
+  private getExistingClientForFile(filePath: string): LspClient | null {
+    const match = getServerForFile(this.config, filePath);
+    if (!match) return null;
+    const [serverName, serverConfig] = match;
+    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, {
+      knownRoots: this.knownRoots,
+      cwd: this.cwd,
+    });
+    return this.clients.get(clientKey(serverName, root)) ?? null;
+  }
+
+  /** Restart the clients that own the supplied file paths, if any are active. */
+  async restartClientsForFiles(filePaths: string[]): Promise<string[]> {
+    const restarted: string[] = [];
+    const seen = new Set<string>();
+
+    for (const filePath of filePaths) {
+      const client = this.getExistingClientForFile(filePath);
+      if (!client) continue;
+
+      const key = clientKey(client.name, client.root);
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      if (await this.restartClient(client)) {
+        restarted.push(key);
+      }
+    }
+
+    return restarted;
+  }
+
+  private async restartClient(client: LspClient): Promise<boolean> {
+    const key = clientKey(client.name, client.root);
+    const serverConfig = this.config.servers[client.name];
+    if (!serverConfig) return false;
+
+    const openFiles = client.openFiles;
+    try {
+      await client.shutdown();
+    } catch {
+      // Ignore shutdown failures when forcing a restart.
+    }
+
+    this.clients.delete(key);
+    this.unavailable.delete(key);
+
+    const replacement = new LspClient(client.name, serverConfig, client.root);
+    this.clients.set(key, replacement);
+    rememberKnownRoot(this.knownRoots, client.name, client.root);
+
+    try {
+      await replacement.start();
+      for (const filePath of openFiles) {
+        if (!fs.existsSync(filePath)) continue;
+        try {
+          replacement.didOpen(filePath, fs.readFileSync(filePath, "utf-8"));
+        } catch {
+          // Skip unreadable files on restart.
+        }
+      }
+      return true;
+    } catch {
+      this.clients.delete(key);
+      this.unavailable.add(key);
+      return false;
+    }
+  }
+
   getProjectServerInfo(serverName: string, root: string, fileTypes: string[]): ProjectServerInfo {
     const key = clientKey(serverName, root);
     return buildProjectServerInfo(
@@ -225,6 +304,38 @@ export class LspManager {
   /** Re-sync all open documents across active clients and wait for diagnostics to settle. */
   async refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void> {
     await refreshOpenDiagnosticsForClients(this.clients.values(), options);
+  }
+
+  /** Clear cached pull-diagnostic result IDs across all clients. */
+  clearAllPullResultIds(): void {
+    for (const client of this.clients.values()) {
+      client.clearPullResultIds();
+    }
+  }
+
+  /** Notify running clients about watched workspace file changes. */
+  notifyWorkspaceFileChanges(changes: FileEvent[]): void {
+    for (const client of this.clients.values()) {
+      client.notifyWorkspaceFileChanges(changes);
+    }
+  }
+
+  /** Force a workspace-wide diagnostic recovery pass. */
+  async recoverWorkspaceDiagnostics(options?: {
+    changes?: FileEvent[];
+    restartIfStillStale?: boolean;
+    maxWaitMs?: number;
+    quietMs?: number;
+  }): Promise<{
+    refreshedClients: number;
+    restartedClients: number;
+    staleAssessment: {
+      suspected: boolean;
+      matchedFiles: Array<{ file: string; diagnostics: Diagnostic[] }>;
+      warning: string | null;
+    };
+  }> {
+    return recoverWorkspaceDiagnosticsImpl(this, options);
   }
 
   /** Shut down all running LSP servers. */

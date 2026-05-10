@@ -9,7 +9,9 @@ import type {
   CodeAction,
   CodeActionContext,
   Diagnostic,
+  DidChangeWatchedFilesParams,
   DocumentSymbol,
+  FileEvent,
   Hover,
   InitializeResult,
   Location,
@@ -333,6 +335,14 @@ export class LspClient {
       this.capabilities?.diagnosticProvider !== undefined &&
       this.capabilities.diagnosticProvider !== false
     );
+  }
+
+  /** Notify the server that watched workspace files changed. */
+  notifyWorkspaceFileChanges(changes: FileEvent[]): void {
+    if (!this.rpc || this._status !== "running" || changes.length === 0) return;
+    this.rpc.sendNotification("workspace/didChangeWatchedFiles", {
+      changes,
+    } satisfies DidChangeWatchedFilesParams);
   }
 
   /**

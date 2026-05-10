@@ -234,6 +234,20 @@ describe("lsp-context message renderer", () => {
     expect(output).toContain("[success]\u2713[/success]");
   });
 
+  it("renders a stale-diagnostics warning when present", () => {
+    const output = renderLspMessage({
+      contextToken: "lsp-context-5",
+      inlineSeverity: 1,
+      staleWarning:
+        "⚠️ LSP diagnostics may be stale — 3 files report missing-module errors after a workspace change.",
+      diagnostics: [{ file: "app.ts", errors: 3, warnings: 0, information: 0, hints: 0 }],
+    });
+
+    expect(output).toContain("LSP diagnostics injected");
+    expect(output).toContain("stale");
+    expect(output).toContain("3 files");
+  });
+
   it("renders expanded view with per-file breakdown and token", () => {
     const output = renderLspMessage(
       {

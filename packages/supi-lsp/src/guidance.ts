@@ -13,6 +13,7 @@ export const lspPromptGuidelines = [
   "Diagnostics are automatically delivered: inline after every write/edit tool result, and as context before each agent turn. You do not need to call the lsp tool to check them — they are already in your context.",
   "When delivered diagnostics show errors, decide: (a) expected temporary state from a planned multi-step change — continue your sequence, then verify at the end; (b) unexpected 'Cannot find module', unresolved imports, or type mismatches — stop and fix the root cause before editing more files.",
   "When the SAME error pattern appears across MULTIPLE files after you changed imports, dependencies, or shared types, it is a systemic root-cause issue (missing install, broken import path, wrong dependency version). Do not patch each file individually — find and fix the root cause first.",
+  "When diagnostics look stale after package.json, lockfile, tsconfig, or generated-type changes, use lsp recover before editing more files.",
   "After changing package.json dependencies, imports, or peer dependencies, run the package manager install command (e.g., pnpm install) before concluding that module resolution errors are real code bugs.",
 ];
 
@@ -52,6 +53,7 @@ export function formatDiagnosticsContext(
   diagnostics: OutstandingDiagnosticSummaryEntry[],
   maxFiles: number = 3,
   detailed?: DetailedDiagnostics[],
+  staleWarning?: string | null,
 ): string | null {
   if (diagnostics.length === 0) return null;
 
@@ -59,6 +61,7 @@ export function formatDiagnosticsContext(
   const detailMap = buildDetailMap(diagnostics, totalDiags, detailed);
 
   const lines: string[] = [];
+  if (staleWarning) lines.push(staleWarning);
   const visible = diagnostics.slice(0, maxFiles);
 
   for (const entry of visible) {

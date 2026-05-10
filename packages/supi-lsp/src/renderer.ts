@@ -4,6 +4,7 @@ import { Box, Text } from "@earendil-works/pi-tui";
 interface LspContextDetails {
   contextToken?: string;
   inlineSeverity?: number;
+  staleWarning?: string | null;
   diagnostics?: Array<{
     file: string;
     errors: number;
@@ -43,16 +44,21 @@ function hasDiagnosticCounts(totals: DiagnosticCounts): boolean {
 function buildLspContextCollapsed(
   diagnostics: LspContextDetails["diagnostics"],
   totals: DiagnosticCounts | undefined,
+  staleWarning: string | null | undefined,
   theme: { fg: (color: ThemeColor, text: string) => string },
 ): string {
   const icon = theme.fg("accent", "\u{1F527}");
+  let summary: string;
   if (!diagnostics || !totals) {
-    return `${icon} LSP diagnostics injected`;
+    summary = `${icon} LSP diagnostics injected`;
+  } else if (!hasDiagnosticCounts(totals)) {
+    summary = `${icon} LSP diagnostics injected ${theme.fg("success", "\u2713")}`;
+  } else {
+    summary = `${icon} LSP diagnostics injected (${formatDiagnosticCounts(totals, theme)})`;
   }
-  if (!hasDiagnosticCounts(totals)) {
-    return `${icon} LSP diagnostics injected ${theme.fg("success", "\u2713")}`;
-  }
-  return `${icon} LSP diagnostics injected (${formatDiagnosticCounts(totals, theme)})`;
+
+  if (!staleWarning) return summary;
+  return `${summary}\n${theme.fg("warning", staleWarning)}`;
 }
 
 function formatFileDiagnosticEntry(d: DiagnosticCounts): string {
@@ -62,9 +68,13 @@ function formatFileDiagnosticEntry(d: DiagnosticCounts): string {
 function formatExpandedDetails(
   diagnostics: LspContextDetails["diagnostics"],
   token: string | undefined,
+  staleWarning: string | null | undefined,
   theme: { fg: (color: ThemeColor, text: string) => string },
 ): string {
   const lines: string[] = [];
+  if (staleWarning) {
+    lines.push(theme.fg("warning", `  ${staleWarning}`));
+  }
   if (diagnostics && diagnostics.length > 0) {
     for (const d of diagnostics) {
       lines.push(theme.fg("dim", `  ${d.file}: ${formatFileDiagnosticEntry(d)}`));
@@ -96,8 +106,11 @@ export function registerLspMessageRenderer(
       { errors: 0, warnings: 0, information: 0, hints: 0 },
     );
 
-    const collapsed = buildLspContextCollapsed(diagnostics, totals, theme);
-    const expandedDetails = expanded ? formatExpandedDetails(diagnostics, token, theme) : "";
+    const staleWarning = details?.staleWarning;
+    const collapsed = buildLspContextCollapsed(diagnostics, totals, staleWarning, theme);
+    const expandedDetails = expanded
+      ? formatExpandedDetails(diagnostics, token, staleWarning, theme)
+      : "";
     const fullText = expandedDetails ? `${collapsed}\n${expandedDetails}` : collapsed;
 
     const box = new Box(1, 1, (t) => theme.bg("customMessageBg", t));

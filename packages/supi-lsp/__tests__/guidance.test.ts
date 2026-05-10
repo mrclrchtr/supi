@@ -17,6 +17,7 @@ describe("LSP prompt guidance", () => {
     expect(lspPromptSnippet).toContain("semantic code intelligence");
     expect(lspPromptGuidelines.join(" ")).toContain("Prefer the lsp tool");
     expect(lspPromptGuidelines.join(" ")).toContain("Fall back to bash/read");
+    expect(lspPromptGuidelines.join(" ")).toContain("use lsp recover");
   });
 
   it("builds project-specific guidelines with roots, file types, and actions", () => {

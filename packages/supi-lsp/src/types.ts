@@ -1,5 +1,6 @@
 // LSP protocol types — minimal subset needed for our client.
 // Based on the Language Server Protocol specification.
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: protocol types are intentionally centralized in one catalog file.
 
 // ── Positions & Ranges ────────────────────────────────────────────────
 
@@ -167,6 +168,22 @@ export interface PublishDiagnosticsParams {
   uri: string;
   version?: number;
   diagnostics: Diagnostic[];
+}
+
+export const FileChangeType = {
+  Created: 1,
+  Changed: 2,
+  Deleted: 3,
+} as const;
+export type FileChangeType = (typeof FileChangeType)[keyof typeof FileChangeType];
+
+export interface FileEvent {
+  uri: string;
+  type: FileChangeType;
+}
+
+export interface DidChangeWatchedFilesParams {
+  changes: FileEvent[];
 }
 
 // ── LSP 3.17 Pull Diagnostics ─────────────────────────────────────────

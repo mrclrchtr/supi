@@ -1,4 +1,5 @@
 // LSP tool action implementations — dispatches agent tool calls to LSP clients.
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: action dispatch remains cohesive; recovery helpers stay adjacent for readability.
 
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -32,7 +33,8 @@ export type LspAction =
   | "code_actions"
   | "workspace_symbol"
   | "search"
-  | "symbol_hover";
+  | "symbol_hover"
+  | "recover";
 
 export interface LspToolParams {
   action: LspAction;
@@ -59,6 +61,7 @@ Actions:
 - workspace_symbol: Fuzzy symbol search across the project. Params: query
 - search: Search for symbols (LSP first, then text fallback). Params: query
 - symbol_hover: Hover info by symbol name (zero coordinates). Params: symbol
+- recover: Refresh cached diagnostics after a workspace change. Params: none
 
 Line and character are 1-based. File paths are relative to cwd.`;
 
@@ -87,6 +90,8 @@ export async function executeAction(manager: LspManager, params: LspToolParams):
       return handleSearch(manager, params, cwd);
     case "symbol_hover":
       return handleSymbolHover(manager, params, cwd);
+    case "recover":
+      return handleRecover(manager);
     default:
       return `Unknown action: ${params.action}`;
   }
@@ -374,4 +379,50 @@ async function handleSymbolHover(
     result += `\n\n(${symbols.length - 1} other match${symbols.length === 2 ? "" : "es"} found — use workspace_symbol or search to disambiguate)`;
   }
   return result;
+}
+
+interface RecoveryAssessmentLike {
+  suspected: boolean;
+  matchedFiles: Array<{ file: string; diagnostics: unknown[] }>;
+  warning: string | null;
+}
+
+interface RecoveryResultLike {
+  refreshedClients: number;
+  restartedClients: number;
+  staleAssessment: RecoveryAssessmentLike;
+}
+
+async function handleRecover(manager: LspManager): Promise<string> {
+  const recovery = (
+    manager as unknown as {
+      recoverWorkspaceDiagnostics: (options?: {
+        restartIfStillStale?: boolean;
+        maxWaitMs?: number;
+        quietMs?: number;
+      }) => Promise<RecoveryResultLike>;
+    }
+  ).recoverWorkspaceDiagnostics;
+
+  if (typeof recovery !== "function") {
+    return "LSP recovery is unavailable.";
+  }
+
+  const result = await recovery({ restartIfStillStale: true });
+  return formatRecoveryResult(result);
+}
+
+function formatRecoveryResult(result: RecoveryResultLike): string {
+  const refreshed = pluralize(result.refreshedClients, "client");
+  const restarted = pluralize(result.restartedClients, "client");
+  const status = result.staleAssessment.suspected
+    ? "stale diagnostics still suspected"
+    : "stale diagnostics cleared";
+  const warning = result.staleAssessment.warning ? ` — ${result.staleAssessment.warning}` : "";
+
+  return `LSP recovery complete: refreshed ${refreshed}, restarted ${restarted}, ${status}${warning}.`;
+}
+
+function pluralize(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
 }

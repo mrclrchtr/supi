@@ -1,13 +1,16 @@
 // LSP Extension for pi — provides hover, definition, diagnostics, symbols, rename, code-actions
 // via a registered `lsp` tool. Keeps language servers warm, surfaces inline diagnostics,
 // and injects diagnostic context only when outstanding issues exist.
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: lsp.ts stays cohesive wiring; recovery and sentinel helpers live in focused modules.
 
+import * as path from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import { Type } from "typebox";
 import { loadConfig, resolveLanguageAlias } from "./config.ts";
 import { formatDiagnosticsDisplayContent } from "./diagnostics/diagnostic-display.ts";
+import { assessStaleDiagnostics } from "./diagnostics/stale-diagnostics.ts";
 import {
   buildProjectGuidelines,
   diagnosticsContextFingerprint,
@@ -45,7 +48,14 @@ import {
   persistLspInactiveState,
   registerTreePersistHandlers,
 } from "./tree-persist.ts";
+import { FileChangeType } from "./types.ts";
 import { toggleLspStatusOverlay, updateLspUi } from "./ui.ts";
+import { fileToUri } from "./utils.ts";
+import {
+  isWorkspaceRecoveryTrigger,
+  scanWorkspaceSentinels,
+  syncWorkspaceSentinelSnapshot,
+} from "./workspace-sentinels.ts";
 
 const LspActionEnum = StringEnum([
   "hover",
@@ -58,6 +68,7 @@ const LspActionEnum = StringEnum([
   "workspace_symbol",
   "search",
   "symbol_hover",
+  "recover",
 ] as const);
 
 export default function lspExtension(pi: ExtensionAPI) {
@@ -128,6 +139,9 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
       );
     }
 
+    state.sentinelSnapshot = scanWorkspaceSentinels(cwd);
+    state.lastWorkspaceChangeAt = 0;
+    state.staleSuspected = false;
     refreshProjectServers(state);
     state.lastDiagnosticsFingerprint = null;
     state.currentContextToken = null;
@@ -154,6 +168,9 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     state.projectServers = [];
     state.lastDiagnosticsFingerprint = null;
     state.currentContextToken = null;
+    state.staleSuspected = false;
+    state.lastWorkspaceChangeAt = 0;
+    state.sentinelSnapshot = new Map();
   });
 
   pi.on("agent_end", async (_event, ctx) => {
@@ -166,12 +183,65 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
   });
 }
 
+function markWorkspaceChange(state: LspRuntimeState): void {
+  state.lastWorkspaceChangeAt = Date.now();
+  state.staleSuspected = true;
+  state.lastDiagnosticsFingerprint = null;
+  state.currentContextToken = null;
+}
+
+function softRecoverWorkspaceChanges(
+  state: LspRuntimeState,
+  changes: import("./types.ts").FileEvent[],
+): boolean {
+  if (!state.manager || changes.length === 0) return false;
+
+  state.manager.clearAllPullResultIds();
+  state.manager.notifyWorkspaceFileChanges(changes);
+  markWorkspaceChange(state);
+  return true;
+}
+
+function refreshWorkspaceSentinels(state: LspRuntimeState, cwd: string): boolean {
+  const { snapshot, changes } = syncWorkspaceSentinelSnapshot(cwd, state.sentinelSnapshot);
+  state.sentinelSnapshot = snapshot;
+  return softRecoverWorkspaceChanges(state, changes);
+}
+
+function recoverWorkspaceChangesFromToolResult(
+  state: LspRuntimeState,
+  cwd: string,
+  event: { toolName: string; isError: boolean; input?: unknown },
+): boolean {
+  if (!state.manager || event.isError) return false;
+  if (event.toolName !== "write" && event.toolName !== "edit") return false;
+  if (!event.input || typeof event.input !== "object") return false;
+
+  const pathValue = (event.input as { path?: unknown }).path;
+  if (typeof pathValue !== "string" || !isWorkspaceRecoveryTrigger(pathValue, cwd)) {
+    return false;
+  }
+
+  const resolvedPath = path.resolve(cwd, pathValue);
+  const fileEvent = { uri: fileToUri(resolvedPath), type: FileChangeType.Changed };
+
+  if (resolvedPath.endsWith(".d.ts")) {
+    return softRecoverWorkspaceChanges(state, [fileEvent]);
+  }
+
+  const { snapshot, changes } = syncWorkspaceSentinelSnapshot(cwd, state.sentinelSnapshot);
+  state.sentinelSnapshot = snapshot;
+  return softRecoverWorkspaceChanges(state, changes.length > 0 ? changes : [fileEvent]);
+}
+
 /** Build the `lsp-context` custom message used to surface outstanding diagnostics. */
+// biome-ignore lint/complexity/useMaxParams: wrapper groups the prompt payload fields in one place.
 function buildDiagnosticResult(
   diagnostics: import("./manager/manager-types.ts").OutstandingDiagnosticSummaryEntry[],
   detailed: { file: string; diagnostics: import("./types.ts").Diagnostic[] }[] | undefined,
   severity: number,
   token: string,
+  staleWarning?: string | null,
 ): BeforeAgentStartEventResult {
   return {
     message: {
@@ -180,8 +250,9 @@ function buildDiagnosticResult(
       display: true,
       details: {
         contextToken: token,
-        promptContent: formatDiagnosticsContext(diagnostics, 3, detailed),
+        promptContent: formatDiagnosticsContext(diagnostics, 3, detailed, staleWarning),
         inlineSeverity: severity,
+        ...(staleWarning ? { staleWarning } : {}),
         diagnostics: diagnostics.map((d) => ({
           file: d.file,
           errors: d.errors,
@@ -195,6 +266,7 @@ function buildDiagnosticResult(
 }
 
 function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: before_agent_start coordinates sentinel recovery, pruning, refresh, and diagnostic injection.
   pi.on("before_agent_start", async (_event, ctx) => {
     if (!state.manager || !state.lspActive) {
       removeLspTool(pi);
@@ -205,6 +277,8 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
     }
 
     ensureLspToolActive(pi);
+
+    refreshWorkspaceSentinels(state, ctx.cwd);
 
     /**
      * Two-pass prune/refresh pattern:
@@ -232,7 +306,13 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
       totalDiags <= MAX_DETAILED_DIAGNOSTICS
         ? state.manager.getOutstandingDiagnostics(state.inlineSeverity)
         : undefined;
-    const content = formatDiagnosticsContext(diagnostics, 3, detailed);
+    const staleAssessment = state.staleSuspected
+      ? assessStaleDiagnostics(state.manager.getOutstandingDiagnostics(4))
+      : { suspected: false, matchedFiles: [], warning: null };
+    state.staleSuspected = staleAssessment.suspected;
+
+    const staleWarning = staleAssessment.suspected ? staleAssessment.warning : null;
+    const content = formatDiagnosticsContext(diagnostics, 3, detailed, staleWarning);
     const fingerprint = diagnosticsContextFingerprint(content);
 
     if (!content) {
@@ -254,6 +334,7 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
       detailed,
       state.inlineSeverity,
       state.currentContextToken,
+      staleWarning,
     );
 
     return result;
@@ -288,7 +369,13 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
   pi.on("tool_result", async (event, ctx) => {
     if (!state.manager) return;
 
-    if (isLspAwareTool(event.toolName)) {
+    const recoveryTriggered = recoverWorkspaceChangesFromToolResult(state, ctx.cwd, {
+      toolName: event.toolName,
+      isError: event.isError,
+      input: (event as { input?: unknown }).input,
+    });
+
+    if (recoveryTriggered || isLspAwareTool(event.toolName)) {
       refreshProjectServers(state);
       updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
     }
