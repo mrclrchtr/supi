@@ -172,7 +172,8 @@ export class LspManager {
     const seen = new Set<string>();
 
     for (const filePath of filePaths) {
-      const client = this.getExistingClientForFile(filePath);
+      const resolvedPath = path.resolve(this.cwd, filePath);
+      const client = this.getExistingClientForFile(resolvedPath);
       if (!client) continue;
 
       const key = clientKey(client.name, client.root);
