@@ -24,7 +24,8 @@
     "pi-upgrade": {
       "source": "mrclrchtr/skills",
       "sourceType": "github",
-      "computedHash": "922dc38cd7eb697a910a1800949ed2d120e718ffe89bbbf2bdf27f7081bb7fdd"
+      "skillPath": "skills/pi-upgrade/SKILL.md",
+      "computedHash": "f15c6a25d586fb91c2197214680d21b6064a64f89ffd72edb6627e9089d96305"
     },
     "skill-creator": {
       "source": "anthropics/skills",
@@ -41,7 +42,8 @@
     "web-fetch-to-markdown": {
       "source": "mrclrchtr/skills",
       "sourceType": "github",
-      "computedHash": "ba2d207dc9a3bd4d51d564dbcc5e60ccf884126559cf968f984c00274cc20d8a"
+      "skillPath": "skills/web-fetch-to-markdown/SKILL.md",
+      "computedHash": "5de24a33b8707e4deb9cc4f987b59729ba6b7e3fa3bec73c4fedc0fcec5c1289"
     }
   }
 }

@@ -1,0 +1,10 @@
+{
+  "name": "web-fetch-to-markdown",
+  "version": "1.0.0",
+  "description": "Fetches and normalizes http(s) web pages into clean Markdown for LLM ingestion.",
+  "author": {
+    "name": "Marcel Richter"
+  },
+  "keywords": ["web", "fetch", "markdown", "scraping"],
+  "skills": ["./"]
+}
