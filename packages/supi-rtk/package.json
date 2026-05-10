@@ -26,8 +26,7 @@
     "@mrclrchtr/supi-core"
   ],
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
     "vitest": "^4.1.4"
