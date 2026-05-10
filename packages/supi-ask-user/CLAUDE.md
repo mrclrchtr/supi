@@ -14,13 +14,15 @@ Entrypoint: `ask-user.ts`
 - `schema.ts`, `README.md`, and tool prompt guidance should stay aligned with runtime behavior; together they define the model-facing `ask_user` contract.
 - Normalization trims question ids and structured option values before they reach the shared internal model.
 - `multichoice` -> `other`/`discuss` must clear staged selections/notes so revisits reflect the stored answer.
+- `default` pre-selects a starting option/value; it takes precedence over `recommendation` for the initial selection but does not add a visual badge. Existing answers always win over both when revisiting.
+- `maxPromptLength` is 4000 characters; `maxHeaderLength` is 60.
 
 ## Questionnaire pipeline
 
 The `ask_user` tool processes questionnaires through a staged pipeline:
 
 1. **Schema validation** (`schema.ts`) — validates input against `QuestionnaireSchema` (TypeBox). Rejects malformed shapes before normalization.
-2. **Normalization** (`normalize.ts`) — trims question IDs and structured option values so they stay consistent across encoding layers.
+2. **Normalization** (`normalize.ts`) — trims question IDs and structured option values, resolves `recommendation` and `default` to numeric indexes, and validates that both point to valid options.
 3. **Execution flow** (`flow.ts`) — single-active-questionnaire lock, answer tracking, review + revise state machine.
 4. **Rich overlay** (`ui/ui-rich.ts`) — renders the interactive overlay via `ctx.ui.custom()` with inline editing, notes, previews, and keyboard handlers.
 5. **Result shaping** (`result.ts`, `render.ts`) — packages structured answers into the tool result format with custom call/result rendering.
@@ -29,6 +31,7 @@ The `ask_user` tool processes questionnaires through a staged pipeline:
 
 - `allowOther` on `multichoice` is a mutually exclusive freeform alternative — clears staged selections when selected.
 - `allowSkip` exposes a partial-submit path (sets `skip: true` on result, returns completed fields).
+- `default` on structured questions resolves to `defaultIndexes` (same validation rules as `recommendation`).
 - Cancellation calls `ctx.abort()` to stop the agent turn; the result is still recorded in the transcript.
 - Single-active-questionnaire lock — subsequent `ask_user` calls before the first resolves return an error.
 

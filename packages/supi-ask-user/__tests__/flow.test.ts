@@ -15,6 +15,7 @@ const choice = (id: string, header = id): NormalizedQuestion => ({
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 });
 
 const multichoice = (id: string, header = id): NormalizedQuestion => ({
@@ -31,6 +32,7 @@ const multichoice = (id: string, header = id): NormalizedQuestion => ({
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0, 2],
+  defaultIndexes: [],
 });
 
 const optional = (id: string, header = id): NormalizedQuestion => ({
@@ -46,6 +48,7 @@ const optional = (id: string, header = id): NormalizedQuestion => ({
   allowOther: false,
   allowDiscuss: false,
   recommendedIndexes: [],
+  defaultIndexes: [],
 });
 
 describe("QuestionnaireFlow", () => {

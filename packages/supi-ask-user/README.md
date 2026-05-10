@@ -23,6 +23,7 @@ Key features:
 
 - rich questionnaire UI with 1–4 grouped questions
 - recommendation highlighting for the preferred option
+- `default` pre-selection for text and structured questions
 - `allowOther` and `allowDiscuss` for flexibility
 - rich option `preview` content
 - automatic fallback to simpler prompts when the rich UI is unavailable
@@ -42,7 +43,15 @@ Key features:
         { "value": "biome", "label": "Biome" },
         { "value": "prettier", "label": "Prettier" }
       ],
-      "recommendation": "biome"
+      "recommendation": "biome",
+      "default": "biome"
+    },
+    {
+      "type": "text",
+      "id": "reason",
+      "header": "Reason",
+      "prompt": "Why this formatter?",
+      "default": "Faster linting"
     }
   ]
 }

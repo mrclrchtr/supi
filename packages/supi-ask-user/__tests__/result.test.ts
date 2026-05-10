@@ -15,6 +15,7 @@ const choiceQuestion: NormalizedQuestion = {
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 const multichoiceQuestion: NormalizedQuestion = {
@@ -31,6 +32,7 @@ const multichoiceQuestion: NormalizedQuestion = {
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 describe("buildResult", () => {

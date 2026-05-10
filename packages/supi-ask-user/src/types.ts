@@ -26,6 +26,7 @@ interface StructuredQuestionBase extends BaseQuestion {
   allowOther: boolean;
   allowDiscuss: boolean;
   recommendedIndexes: number[];
+  defaultIndexes: number[];
 }
 
 export interface NormalizedChoiceQuestion extends StructuredQuestionBase {
@@ -135,7 +136,7 @@ export const QUESTION_LIMITS = {
   minQuestions: 1,
   maxQuestions: 4,
   maxHeaderLength: 60,
-  maxPromptLength: 2000,
+  maxPromptLength: 4000,
   minChoiceOptions: 2,
   maxChoiceOptions: 12,
 } as const;

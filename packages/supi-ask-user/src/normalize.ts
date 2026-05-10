@@ -105,6 +105,7 @@ function normalizeChoice(q: ExternalChoiceQuestion): NormalizedQuestion {
     allowOther: q.allowOther ?? false,
     allowDiscuss: q.allowDiscuss ?? false,
     recommendedIndexes: resolveSingleRecommendation(id, options, q.recommendation),
+    defaultIndexes: resolveSingleDefault(id, options, q.default),
   };
 }
 
@@ -121,12 +122,17 @@ function normalizeMultiChoice(q: ExternalMultiChoiceQuestion): NormalizedQuestio
     allowOther: q.allowOther ?? false,
     allowDiscuss: q.allowDiscuss ?? false,
     recommendedIndexes: resolveMultiRecommendation(id, options, q.recommendation),
+    defaultIndexes: resolveMultiDefault(id, options, q.default),
   };
 }
 
 function normalizeYesNo(q: ExternalYesNoQuestion): NormalizedQuestion {
+  const id = q.id.trim();
+  if (q.default !== undefined && q.default !== "yes" && q.default !== "no") {
+    throw new AskUserValidationError(`yesno question "${id}" default must be "yes" or "no".`);
+  }
   return {
-    id: q.id.trim(),
+    id,
     header: q.header,
     type: "yesno",
     prompt: q.prompt,
@@ -135,6 +141,7 @@ function normalizeYesNo(q: ExternalYesNoQuestion): NormalizedQuestion {
     allowOther: q.allowOther ?? false,
     allowDiscuss: q.allowDiscuss ?? false,
     recommendedIndexes: q.recommendation === undefined ? [] : [q.recommendation === "yes" ? 0 : 1],
+    defaultIndexes: q.default === undefined ? [] : [q.default === "yes" ? 0 : 1],
   };
 }
 
@@ -227,6 +234,47 @@ function resolveMultiRecommendation(
     if (idx < 0) {
       throw new AskUserValidationError(
         `multichoice question "${questionId}" recommends "${value}", which is not one of its option values.`,
+      );
+    }
+    return idx;
+  });
+}
+
+function resolveSingleDefault(
+  questionId: string,
+  options: NormalizedOption[],
+  defaultValue: string | undefined,
+): number[] {
+  if (defaultValue === undefined) return [];
+  const value = defaultValue.trim();
+  const idx = options.findIndex((opt) => opt.value === value);
+  if (idx < 0) {
+    throw new AskUserValidationError(
+      `choice question "${questionId}" defaults to "${value}", which is not one of its option values.`,
+    );
+  }
+  return [idx];
+}
+
+function resolveMultiDefault(
+  questionId: string,
+  options: NormalizedOption[],
+  defaultValues: string[] | undefined,
+): number[] {
+  if (!defaultValues || defaultValues.length === 0) return [];
+  const seen = new Set<string>();
+  return defaultValues.map((defaultValue) => {
+    const value = defaultValue.trim();
+    if (seen.has(value)) {
+      throw new AskUserValidationError(
+        `multichoice question "${questionId}" has duplicate default value "${value}".`,
+      );
+    }
+    seen.add(value);
+    const idx = options.findIndex((opt) => opt.value === value);
+    if (idx < 0) {
+      throw new AskUserValidationError(
+        `multichoice question "${questionId}" defaults to "${value}", which is not one of its option values.`,
       );
     }
     return idx;

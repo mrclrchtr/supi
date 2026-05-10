@@ -40,6 +40,7 @@ const choice: NormalizedQuestion = {
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 const multichoice: NormalizedQuestion = {
@@ -56,6 +57,7 @@ const multichoice: NormalizedQuestion = {
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 const _yesNoGo: NormalizedQuestion = {
@@ -71,6 +73,7 @@ const _yesNoGo: NormalizedQuestion = {
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 const textQuestion: NormalizedQuestion = {
@@ -341,6 +344,7 @@ const choiceWithVaryingPreviews: NormalizedQuestion = {
   allowOther: false,
   allowDiscuss: false,
   recommendedIndexes: [1],
+  defaultIndexes: [],
 };
 
 describe("render height stability", () => {
@@ -401,6 +405,7 @@ describe("render height stability", () => {
         allowOther: false,
         allowDiscuss: false,
         recommendedIndexes: [0],
+        defaultIndexes: [],
       },
     ];
 
@@ -435,6 +440,7 @@ describe("markdown preview rendering", () => {
       allowOther: false,
       allowDiscuss: false,
       recommendedIndexes: [0],
+      defaultIndexes: [],
     };
     const { captured, host } = makeRichFixture<unknown>();
     void runRichQuestionnaire({ questions: [markdownQuestion], allowSkip: false }, { ui: host });
@@ -463,6 +469,7 @@ describe("markdown preview rendering", () => {
       allowOther: false,
       allowDiscuss: false,
       recommendedIndexes: [0],
+      defaultIndexes: [],
     };
     const { captured, host } = makeRichFixture<unknown>();
     void runRichQuestionnaire({ questions: [markdownQuestion], allowSkip: false }, { ui: host });

@@ -146,7 +146,10 @@ export function selectedIndexesForQuestion(
   if (answer?.source === "other" || answer?.source === "discuss") return [];
   const staged = state.stagedSelections.get(question.id);
   if (staged) return [...staged];
-  if (!answer) return [];
+  if (!answer) {
+    if (question.defaultIndexes.length > 0) return [...question.defaultIndexes];
+    return [];
+  }
   if (answer.source === "option" || answer.source === "yesno") return [answer.optionIndex];
   if (answer.source === "options") return [...answer.optionIndexes];
   return [];
@@ -160,6 +163,8 @@ export function selectedRowIndex(
   const rows = interactiveRows(question);
   const answer = flow.getAnswer(question.id);
   if (!answer) {
+    const defaultIdx = isStructuredQuestion(question) ? question.defaultIndexes[0] : undefined;
+    if (defaultIdx !== undefined) return defaultIdx;
     const recommended = primaryRecommendationIndex(question);
     return recommended ?? 0;
   }

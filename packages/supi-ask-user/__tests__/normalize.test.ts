@@ -125,6 +125,118 @@ describe("normalizeQuestionnaire", () => {
     expect((out.questions[0] as { default?: string }).default).toBeUndefined();
   });
 
+  it("resolves default on choice questions", () => {
+    const out = normalizeQuestionnaire({
+      questions: [choice({ default: "b" })],
+    });
+    expect(out.questions[0]).toMatchObject({ defaultIndexes: [1] });
+  });
+
+  it("trims choice default values", () => {
+    const out = normalizeQuestionnaire({
+      questions: [choice({ default: "  b  " })],
+    });
+    expect(out.questions[0]).toMatchObject({ defaultIndexes: [1] });
+  });
+
+  it("rejects choice default that does not match an option value", () => {
+    expect(() => normalizeQuestionnaire({ questions: [choice({ default: "missing" })] })).toThrow(
+      /not one of its option values/,
+    );
+  });
+
+  it("resolves default on multichoice questions", () => {
+    const out = normalizeQuestionnaire({
+      questions: [
+        {
+          type: "multichoice",
+          id: "features",
+          header: "Features",
+          prompt: "Pick",
+          options: [
+            { value: "a", label: "A" },
+            { value: "b", label: "B" },
+            { value: "c", label: "C" },
+          ],
+          default: ["a", "c"],
+        },
+      ],
+    });
+    expect(out.questions[0]).toMatchObject({ defaultIndexes: [0, 2] });
+  });
+
+  it("rejects duplicate multichoice default values", () => {
+    expect(() =>
+      normalizeQuestionnaire({
+        questions: [
+          {
+            type: "multichoice",
+            id: "features",
+            header: "Features",
+            prompt: "Pick",
+            options: [
+              { value: "a", label: "A" },
+              { value: "b", label: "B" },
+            ],
+            default: ["a", "a"],
+          },
+        ],
+      }),
+    ).toThrow(/duplicate default value/);
+  });
+
+  it("rejects multichoice default that does not match an option value", () => {
+    expect(() =>
+      normalizeQuestionnaire({
+        questions: [
+          {
+            type: "multichoice",
+            id: "features",
+            header: "Features",
+            prompt: "Pick",
+            options: [
+              { value: "a", label: "A" },
+              { value: "b", label: "B" },
+            ],
+            default: ["missing"],
+          },
+        ],
+      }),
+    ).toThrow(/not one of its option values/);
+  });
+
+  it("resolves default on yesno questions", () => {
+    const out = normalizeQuestionnaire({
+      questions: [{ type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", default: "no" }],
+    });
+    expect(out.questions[0]).toMatchObject({ defaultIndexes: [1] });
+  });
+
+  it("rejects yesno default that is not yes or no", () => {
+    expect(() =>
+      normalizeQuestionnaire({
+        questions: [
+          // @ts-expect-error — testing invalid runtime value
+          { type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", default: "maybe" },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it("accepts prompts up to 4000 characters", () => {
+    const longPrompt = "x".repeat(4000);
+    expect(() =>
+      normalizeQuestionnaire({ questions: [choice({ prompt: longPrompt })] }),
+    ).not.toThrow();
+  });
+
+  it("rejects prompts over 4000 characters", () => {
+    const tooLong = "x".repeat(4001);
+    expect(() => normalizeQuestionnaire({ questions: [choice({ prompt: tooLong })] })).toThrow(
+      /exceeds 4000/,
+    );
+  });
+
   it("rejects whitespace-only id, header, and prompt", () => {
     expect(() => normalizeQuestionnaire({ questions: [choice({ id: "   " })] })).toThrow(
       /non-empty/,

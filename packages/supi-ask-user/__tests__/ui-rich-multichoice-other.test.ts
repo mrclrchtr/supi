@@ -16,6 +16,7 @@ const multichoiceWithOther: NormalizedQuestion = {
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 describe("runRichQuestionnaire multichoice other path", () => {

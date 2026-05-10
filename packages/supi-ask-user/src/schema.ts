@@ -50,6 +50,9 @@ const ChoiceQuestionSchema = Type.Object({
   recommendation: Type.Optional(
     Type.String({ description: "Recommended option `value` (must match one of `options`)" }),
   ),
+  default: Type.Optional(
+    Type.String({ description: "Pre-selected option `value` (must match one of `options`)" }),
+  ),
 });
 
 const MultiChoiceQuestionSchema = Type.Object({
@@ -59,6 +62,12 @@ const MultiChoiceQuestionSchema = Type.Object({
     Type.Array(Type.String(), {
       description:
         "Recommended option `value`s for multi-select questions (each must match one of `options`)",
+    }),
+  ),
+  default: Type.Optional(
+    Type.Array(Type.String(), {
+      description:
+        "Pre-selected option `value`s for multi-select (each must match one of `options`)",
     }),
   ),
 });
@@ -99,6 +108,11 @@ const YesNoQuestionSchema = Type.Object({
   recommendation: Type.Optional(
     Type.Union([Type.Literal("yes"), Type.Literal("no")], {
       description: "Recommended answer (`yes` or `no`)",
+    }),
+  ),
+  default: Type.Optional(
+    Type.Union([Type.Literal("yes"), Type.Literal("no")], {
+      description: "Pre-selected answer (`yes` or `no`)",
     }),
   ),
 });

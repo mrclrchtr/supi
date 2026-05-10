@@ -152,6 +152,7 @@ describe("renderAskUserResult", () => {
               allowOther: false,
               allowDiscuss: true,
               recommendedIndexes: [0],
+              defaultIndexes: [],
             },
             {
               id: "scope",
@@ -165,6 +166,7 @@ describe("renderAskUserResult", () => {
               allowOther: true,
               allowDiscuss: true,
               recommendedIndexes: [0],
+              defaultIndexes: [],
             },
           ],
           answers: [

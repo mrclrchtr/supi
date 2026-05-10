@@ -18,6 +18,7 @@ const choice: NormalizedQuestion = {
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 const multichoice: NormalizedQuestion = {
@@ -34,6 +35,7 @@ const multichoice: NormalizedQuestion = {
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 const yesNoGo: NormalizedQuestion = {
@@ -49,6 +51,7 @@ const yesNoGo: NormalizedQuestion = {
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],
+  defaultIndexes: [],
 };
 
 describe("runRichQuestionnaire revisit behavior", () => {

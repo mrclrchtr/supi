@@ -44,6 +44,7 @@ describe("normalizeQuestionnaire identifier canonicalization", () => {
         { value: "b", label: "Beta" },
       ],
       recommendedIndexes: [0],
+      defaultIndexes: [],
     });
   });
 
