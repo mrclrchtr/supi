@@ -1,6 +1,16 @@
 export default [
   "packages/supi-ask-user",
-  "packages/supi-core",
+  "packages/supi-bash-timeout",
+  "packages/supi-cache",
   "packages/supi-claude-md",
+  "packages/supi-code-intelligence",
+  "packages/supi-context",
+  "packages/supi-core",
+  "packages/supi-debug",
+  "packages/supi-extras",
+  "packages/supi-insights",
   "packages/supi-lsp",
+  "packages/supi-review",
+  "packages/supi-rtk",
+  "packages/supi-tree-sitter",
 ];
