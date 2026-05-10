@@ -3,26 +3,39 @@ import type { LspManager } from "../src/manager/manager.ts";
 import { executeAction } from "../src/tool-actions.ts";
 
 describe("recover action", () => {
-  it("triggers workspace recovery and returns a summary", async () => {
+  it("preserves manager context when triggering workspace recovery", async () => {
+    const recoverSpy = vi.fn();
     const manager = {
-      getCwd: vi.fn().mockReturnValue("/project"),
-      recoverWorkspaceDiagnostics: vi.fn().mockResolvedValue({
-        refreshedClients: 2,
-        restartedClients: 1,
-        staleAssessment: {
-          suspected: false,
-          matchedFiles: [],
-          warning: null,
+      cwd: "/project",
+      getCwd(this: { cwd: string }) {
+        return this.cwd;
+      },
+      async recoverWorkspaceDiagnostics(
+        this: LspManager & { cwd: string },
+        options?: {
+          restartIfStillStale?: boolean;
         },
-      }),
-    } as unknown as LspManager;
+      ) {
+        recoverSpy(this, options);
+        if (this !== manager) {
+          throw new Error("recoverWorkspaceDiagnostics lost manager context");
+        }
+        return {
+          refreshedClients: 2,
+          restartedClients: 1,
+          staleAssessment: {
+            suspected: false,
+            matchedFiles: [],
+            warning: null,
+          },
+        };
+      },
+    } as unknown as LspManager & { cwd: string };
 
     const result = await executeAction(manager, { action: "recover" });
 
-    const recoveryManager = manager as unknown as {
-      recoverWorkspaceDiagnostics: ReturnType<typeof vi.fn>;
-    };
-    expect(recoveryManager.recoverWorkspaceDiagnostics).toHaveBeenCalledWith(
+    expect(recoverSpy).toHaveBeenCalledWith(
+      manager,
       expect.objectContaining({ restartIfStillStale: true }),
     );
     expect(result).toContain("recovery complete");

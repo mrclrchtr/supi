@@ -394,21 +394,7 @@ interface RecoveryResultLike {
 }
 
 async function handleRecover(manager: LspManager): Promise<string> {
-  const recovery = (
-    manager as unknown as {
-      recoverWorkspaceDiagnostics: (options?: {
-        restartIfStillStale?: boolean;
-        maxWaitMs?: number;
-        quietMs?: number;
-      }) => Promise<RecoveryResultLike>;
-    }
-  ).recoverWorkspaceDiagnostics;
-
-  if (typeof recovery !== "function") {
-    return "LSP recovery is unavailable.";
-  }
-
-  const result = await recovery({ restartIfStillStale: true });
+  const result = await manager.recoverWorkspaceDiagnostics({ restartIfStillStale: true });
   return formatRecoveryResult(result);
 }
 
