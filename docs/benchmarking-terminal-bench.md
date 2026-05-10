@@ -34,7 +34,7 @@ Harbor `0.5.0` includes a built-in `pi` installed agent at `harbor.agents.instal
 
 The built-in agent:
 
-- installs `@mariozechner/pi-coding-agent` into the task environment
+- installs `@earendil-works/pi-coding-agent` into the task environment
 - runs pi in JSON mode with a command equivalent to:
 
   ```bash

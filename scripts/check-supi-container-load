@@ -48,7 +48,7 @@ JSON
   "$PI_PREFLIGHT_IMAGE" \
   sh -lc '
     set -eu
-    npm install -g "@mariozechner/pi-coding-agent@${PI_PACKAGE_VERSION}" >/tmp/npm-install.log 2>&1
+    npm install -g "@earendil-works/pi-coding-agent@${PI_PACKAGE_VERSION}" >/tmp/npm-install.log 2>&1
     echo "pi-version=$(pi --version 2>&1)" >&2
     pi list >&2
     pi --print --mode json --no-session --offline "/supi-debug" \

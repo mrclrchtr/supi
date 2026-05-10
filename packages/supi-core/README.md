@@ -82,8 +82,8 @@ const message = wrapExtensionContext("my-extension", "hello", {
 
 ## Requirements
 
-- `@mariozechner/pi-coding-agent`
-- `@mariozechner/pi-tui`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
 
 ## Source
 

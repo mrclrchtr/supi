@@ -1,6 +1,6 @@
 // Per-turn cache state management, regression detection, and session persistence.
 
-import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { diffFingerprints, type PromptFingerprint } from "../fingerprint.ts";
 
 /** Persisted per-turn cache record. */

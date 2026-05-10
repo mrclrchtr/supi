@@ -6,9 +6,9 @@ import type {
   Message,
   ToolResultMessage,
   UserMessage,
-} from "@mariozechner/pi-ai";
-import type { FileEntry, SessionEntry, SessionHeader } from "@mariozechner/pi-coding-agent";
-import { migrateSessionEntries, parseSessionEntries } from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-ai";
+import type { FileEntry, SessionEntry, SessionHeader } from "@earendil-works/pi-coding-agent";
+import { migrateSessionEntries, parseSessionEntries } from "@earendil-works/pi-coding-agent";
 import { getActiveBranchEntries } from "@mrclrchtr/supi-core";
 import { diffLines } from "diff";
 import type { SessionMeta } from "./types.ts";

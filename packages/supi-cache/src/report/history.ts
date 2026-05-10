@@ -1,6 +1,6 @@
 // Report formatting for the /supi-cache-history table.
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { diffFingerprints } from "../fingerprint.ts";
 import { CAUSE_NOTE, type TurnRecord } from "../monitor/state.ts";
 

@@ -24,6 +24,6 @@ pnpm exec biome check packages/supi/
 
 - `pi.extensions` entries are package-relative paths.
 - Keep small local wrapper `.ts` files in this package so published installs do not depend on nested workspace `node_modules` layout.
-- All sub-packages must be listed in both `dependencies` and `bundledDependencies`. pi's [packages docs](https://github.com/mariozechner/pi-coding-agent/blob/main/docs/packages.md) require bundling because pi loads packages with separate module roots.
+- All sub-packages must be listed in both `dependencies` and `bundledDependencies`. pi's [packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md) require bundling because pi loads packages with separate module roots.
 - External runtime dependencies imported by a bundled sub-package must also be present in `packages/supi/package.json` `dependencies`; the published tarball includes the sub-package source, but Node resolves those imports from `@mrclrchtr/supi`'s own `node_modules`.
 - The workspace uses `nodeLinker: hoisted` (in `pnpm-workspace.yaml`) because pnpm's default isolated linker does not support `bundledDependencies`.

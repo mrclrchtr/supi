@@ -1,5 +1,5 @@
-import { DynamicBorder, type ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Container, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
+import { DynamicBorder, type ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 import { getLocalBranches, getRecentCommits } from "./git.ts";
 
 export type Preset = "base-branch" | "uncommitted" | "commit" | "custom";

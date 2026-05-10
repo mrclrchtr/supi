@@ -18,11 +18,11 @@ const mockGetMarkdownTheme = vi.hoisted(() =>
   })),
 );
 
-vi.mock("@mariozechner/pi-tui", () => ({
+vi.mock("@earendil-works/pi-tui", () => ({
   Markdown: MockMarkdown,
 }));
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
   getMarkdownTheme: mockGetMarkdownTheme,
   highlightCode: mockHighlightCode,
 }));
@@ -40,7 +40,7 @@ describe("renderMarkdownPreview", () => {
   it("renders preview through Markdown component with correct parameters", () => {
     const theme = {
       fg: (_color: string, text: string) => text,
-    } as unknown as import("@mariozechner/pi-coding-agent").Theme;
+    } as unknown as import("@earendil-works/pi-coding-agent").Theme;
     const result = renderMarkdownPreview("# Hello", 50, theme);
 
     expect(MockMarkdown).toHaveBeenCalledTimes(1);
@@ -61,7 +61,7 @@ describe("renderMarkdownPreview", () => {
   it("maps default text color through the provided theme", () => {
     const theme = {
       fg: (color: string, text: string) => `[${color}]${text}`,
-    } as unknown as import("@mariozechner/pi-coding-agent").Theme;
+    } as unknown as import("@earendil-works/pi-coding-agent").Theme;
     renderMarkdownPreview("plain", 40, theme);
     const passedDefaultStyle = (MockMarkdown.mock.calls[0] as unknown[])[4] as {
       color: (text: string) => string;
@@ -72,7 +72,7 @@ describe("renderMarkdownPreview", () => {
   it("injects highlightCode that delegates to pi-coding-agent", () => {
     const theme = {
       fg: (_color: string, text: string) => text,
-    } as unknown as import("@mariozechner/pi-coding-agent").Theme;
+    } as unknown as import("@earendil-works/pi-coding-agent").Theme;
     renderMarkdownPreview("code", 40, theme);
     const passedTheme = (MockMarkdown.mock.calls[0] as unknown[])[3] as {
       highlightCode: (code: string, lang?: string) => string[];
@@ -86,7 +86,7 @@ describe("renderMarkdownPreview", () => {
   it("falls back to codeBlock styling when highlightCode throws", () => {
     const theme = {
       fg: (_color: string, text: string) => text,
-    } as unknown as import("@mariozechner/pi-coding-agent").Theme;
+    } as unknown as import("@earendil-works/pi-coding-agent").Theme;
     mockHighlightCode.mockImplementationOnce(() => {
       throw new Error("bad lang");
     });
@@ -101,7 +101,7 @@ describe("renderMarkdownPreview", () => {
   it("passes custom paddingX and defaultColor through options", () => {
     const theme = {
       fg: (color: string, text: string) => `[${color}]${text}`,
-    } as unknown as import("@mariozechner/pi-coding-agent").Theme;
+    } as unknown as import("@earendil-works/pi-coding-agent").Theme;
     renderMarkdown("hello", 40, theme, { paddingX: 3, defaultColor: "muted" });
     expect(MockMarkdown).toHaveBeenCalledWith(
       "hello",

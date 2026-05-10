@@ -4,7 +4,7 @@
 AI utilities pi uses internally:
 
 ```typescript
-import {complete, stream, getModel} from "@mariozechner/pi-ai";
+import {complete, stream, getModel} from "@earendil-works/pi-ai";
 ```
 
 From the extension `ctx` you can get auth info for any registered model:
@@ -24,7 +24,7 @@ const response = await complete(
 );
 ```
 
-### What's available from `@mariozechner/pi-ai`
+### What's available from `@earendil-works/pi-ai`
 
 | Function                                  | Purpose                  |
 |-------------------------------------------|--------------------------|
@@ -39,4 +39,4 @@ const response = await complete(
 
 The built-in `summarize.ts` extension does exactly this:
 [
-`examples/extensions/summarize.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/summarize.ts)
+`examples/extensions/summarize.ts`](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/summarize.ts)

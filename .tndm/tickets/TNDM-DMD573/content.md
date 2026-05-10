@@ -44,7 +44,7 @@ This change therefore pivots from "secure install surface" to "package change de
 
 PI extensions execute arbitrary code with full system authority. The built-in `pi install` and `pi update` commands mutate settings and package contents directly, and users are likely to keep using those natural commands rather than separate wrapper commands.
 
-Pi does expose the APIs needed to observe the effective runtime package set after those mutations. Public exports include `DefaultPackageManager`, `SettingsManager`, and `getAgentDir()` from `@mariozechner/pi-coding-agent`. `DefaultPackageManager.resolve()` returns the effective enabled runtime resources after project-over-global precedence and per-resource enabled state are applied. `getInstalledPath(source, scope)` can recover the installed package root for an effective package group. Package discovery and filter semantics are documented in `docs/packages.md`, including the `pi` key in `package.json`, conventional directories, `!` exclusions, and exact-path `+path` / `-path` filters.
+Pi does expose the APIs needed to observe the effective runtime package set after those mutations. Public exports include `DefaultPackageManager`, `SettingsManager`, and `getAgentDir()` from `@earendil-works/pi-coding-agent`. `DefaultPackageManager.resolve()` returns the effective enabled runtime resources after project-over-global precedence and per-resource enabled state are applied. `getInstalledPath(source, scope)` can recover the installed package root for an effective package group. Package discovery and filter semantics are documented in `docs/packages.md`, including the `pi` key in `package.json`, conventional directories, `!` exclusions, and exact-path `+path` / `-path` filters.
 
 The SuPi ecosystem already provides the meta-package wrapper pattern needed for published installs: `packages/supi` exposes local `.ts` wrapper entrypoints such as `aliases.ts`, `ask-user.ts`, and `lsp.ts`, then registers those wrappers in its own `pi.extensions` array. `supi-security` needs the same treatment or published `@mrclrchtr/supi` installs will not load it.
 
@@ -121,7 +121,7 @@ The session guard and audit commands SHALL therefore:
 
 This keeps audit behavior aligned with what pi will actually load.
 
-Before implementation logic depends on specific `resolve()` fields, v1 work SHALL verify the pinned `@mariozechner/pi-coding-agent` version's resolved-resource shape for the fields used by this change, especially enabled state plus `metadata.source` and `metadata.scope`.
+Before implementation logic depends on specific `resolve()` fields, v1 work SHALL verify the pinned `@earendil-works/pi-coding-agent` version's resolved-resource shape for the fields used by this change, especially enabled state plus `metadata.source` and `metadata.scope`.
 
 **Alternative considered:** Reconstruct effective state from settings JSON. Rejected because it would duplicate pi logic and drift from actual runtime behavior.
 
@@ -317,7 +317,7 @@ None for v1. The scope questions are resolved as follows:
 - [ ] 1.1 Create `packages/supi-security/` with `package.json`, `index.ts`, `README.md`, `CLAUDE.md`, `.gitignore`, and `tsconfig.json`
 - [ ] 1.2 Create `packages/supi-security/__tests__/tsconfig.json` for test-only typechecking
 - [ ] 1.3 Add the package `pi` manifest in `packages/supi-security/package.json` pointing to the extension entrypoint
-- [ ] 1.4 Set `peerDependencies` for `@mariozechner/pi-coding-agent` and `@mariozechner/pi-tui`; add `@sinclair/typebox` only if runtime imports actually require it
+- [ ] 1.4 Set `peerDependencies` for `@earendil-works/pi-coding-agent` and `@earendil-works/pi-tui`; add `@sinclair/typebox` only if runtime imports actually require it
 - [ ] 1.5 Add `@mrclrchtr/supi-security` to `packages/supi/package.json` dependencies
 - [ ] 1.6 Add `packages/supi/security.ts` as a local wrapper re-export for the published meta-package and register it in `packages/supi/package.json` `pi.extensions`
 - [ ] 1.7 Add `packages/supi-security/index.ts` to the root `package.json` `pi.extensions` array for local workspace development
@@ -328,7 +328,7 @@ None for v1. The scope questions are resolved as follows:
 
 - [ ] 2.1 Implement a helper that creates shared pi integration state: `agentDir = getAgentDir()`, `settingsManager = SettingsManager.create(ctx.cwd, agentDir)`, and `packageManager = new DefaultPackageManager({ cwd: ctx.cwd, agentDir, settingsManager })`
 - [ ] 2.2 Implement helper(s) to drain or report settings I/O errors when relevant
-- [ ] 2.3 Verify the pinned `@mariozechner/pi-coding-agent` version's `resolve()` result shape for the fields used here, especially enabled state plus `metadata.source` and `metadata.scope`
+- [ ] 2.3 Verify the pinned `@earendil-works/pi-coding-agent` version's `resolve()` result shape for the fields used here, especially enabled state plus `metadata.source` and `metadata.scope`
 - [ ] 2.4 Write tests for effective package resolution through `resolve()`
 
 ## 3. Effective Installed Package Discovery
@@ -370,7 +370,7 @@ None for v1. The scope questions are resolved as follows:
 
 - [ ] 6.1 Define `ScanReport` and `AuditState` types combining `npq` results, capability findings, parse-fallback state, active vs inactive finding buckets, audit status, and cross-reference severity
 - [ ] 6.2 Implement report building and severity classification (`info`, `warning`, `error`), while labeling regex-derived findings as pattern matches or possible capabilities where appropriate
-- [ ] 6.3 Implement a rich TUI overlay using `ctx.ui.custom()` and `@mariozechner/pi-tui`
+- [ ] 6.3 Implement a rich TUI overlay using `ctx.ui.custom()` and `@earendil-works/pi-tui`
 - [ ] 6.4 Implement interactive plain-text fallback using `ctx.ui.confirm()`
 - [ ] 6.5 Implement headless-mode output behavior (`ctx.hasUI === false`): print the report without acknowledging the package automatically
 - [ ] 6.6 Implement explicit acknowledgment behavior that marks the current package version as acknowledged only after user confirmation

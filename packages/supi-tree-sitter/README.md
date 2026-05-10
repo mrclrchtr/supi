@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-tree-sitter
 
-Tree-sitter structural analysis for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Tree-sitter structural analysis for the [pi coding agent](https://github.com/earendil-works/pi).
 
 This package registers a `tree_sitter` tool and also exports a small TypeScript service API for other SuPi extensions. It is designed as a standalone structural-analysis substrate: it does not depend on `supi-lsp` or semantic language-server tooling, and it remains correct and useful when installed by itself.
 

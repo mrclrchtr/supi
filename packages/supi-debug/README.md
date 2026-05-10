@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-debug
 
-Session-local debug event inspection for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Session-local debug event inspection for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -39,8 +39,8 @@ src/
 
 ## Requirements
 
-- `@mariozechner/pi-coding-agent`
-- `@mariozechner/pi-tui`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
 - `typebox`
 - `@mrclrchtr/supi-core`
 

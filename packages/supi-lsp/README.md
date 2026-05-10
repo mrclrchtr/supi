@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-lsp
 
-Language Server Protocol integration for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Language Server Protocol integration for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -84,8 +84,8 @@ If your install surface includes `/supi-settings` (for example via `@mrclrchtr/s
 
 ## Requirements
 
-- `@mariozechner/pi-coding-agent`
-- `@mariozechner/pi-tui`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
 - `typebox`
 - relevant language servers installed and available on `PATH`
 - `@mrclrchtr/supi-core`

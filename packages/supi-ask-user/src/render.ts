@@ -2,8 +2,8 @@
 // session transcript readable: a one-line "asking N questions: …" header on
 // the call, and a compact ✓ / cancelled / aborted summary on the result.
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { formatSummaryBody } from "./format.ts";
 import { ASK_USER_ERROR_MARKER } from "./result.ts";
 import type { AskUserDetails, NormalizedQuestion } from "./types.ts";

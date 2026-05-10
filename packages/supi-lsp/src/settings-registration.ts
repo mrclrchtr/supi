@@ -1,8 +1,8 @@
 // LSP settings registration for the supi settings registry.
 
-import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
-import type { SettingItem } from "@mariozechner/pi-tui";
-import { Container, Key, matchesKey, SettingsList, Text } from "@mariozechner/pi-tui";
+import { getSettingsListTheme } from "@earendil-works/pi-coding-agent";
+import type { SettingItem } from "@earendil-works/pi-tui";
+import { Container, Key, matchesKey, SettingsList, Text } from "@earendil-works/pi-tui";
 import {
   loadSupiConfig,
   loadSupiConfigForScope,

@@ -1,7 +1,7 @@
 // Insight generator — produce narrative insights from aggregated data via LLM calls.
 
-import { complete } from "@mariozechner/pi-ai";
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { complete } from "@earendil-works/pi-ai";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { AggregatedData, InsightResults, SessionFacets } from "./types.ts";
 import { withRetry } from "./utils.ts";
 

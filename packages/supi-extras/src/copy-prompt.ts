@@ -4,7 +4,7 @@
  * Provides `Alt+C` (Option+C) to copy the current editor text to the system
  * clipboard, with a visual notification on success or failure.
  */
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { copyToClipboard } from "./clipboard.ts";
 
 /** Register the Alt+C copy-prompt shortcut. */

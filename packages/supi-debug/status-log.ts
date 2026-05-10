@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const STATUS_LOG_PREFIX = "SUPI_STATUS ";
 const STATUS_LOG_ENV = "SUPI_LOG_STATUS";

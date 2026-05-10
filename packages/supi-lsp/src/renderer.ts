@@ -1,5 +1,5 @@
-import type { ThemeColor } from "@mariozechner/pi-coding-agent";
-import { Box, Text } from "@mariozechner/pi-tui";
+import type { ThemeColor } from "@earendil-works/pi-coding-agent";
+import { Box, Text } from "@earendil-works/pi-tui";
 
 interface LspContextDetails {
   contextToken?: string;
@@ -79,7 +79,7 @@ function formatExpandedDetails(
 export type { LspContextDetails };
 
 export function registerLspMessageRenderer(
-  pi: import("@mariozechner/pi-coding-agent").ExtensionAPI,
+  pi: import("@earendil-works/pi-coding-agent").ExtensionAPI,
 ): void {
   pi.registerMessageRenderer("lsp-context", (message, { expanded }, theme) => {
     const details = message.details as LspContextDetails | undefined;

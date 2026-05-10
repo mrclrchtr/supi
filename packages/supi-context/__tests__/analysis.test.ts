@@ -11,7 +11,7 @@ const mockFns = vi.hoisted(() => ({
   getRegisteredContextProviders: vi.fn(),
 }));
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
   buildSessionContext: mockFns.buildSessionContext,
   estimateTokens: mockFns.estimateTokens,
   getLatestCompactionEntry: mockFns.getLatestCompactionEntry,
@@ -28,7 +28,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   getRegisteredContextProviders: mockFns.getRegisteredContextProviders,
 }));
 
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { analyzeContext } from "../src/analysis.ts";
 
 function createMockMessage(
@@ -127,7 +127,7 @@ describe("analyzeContext", () => {
         timestamp: "0",
         message: createMockMessage("user", "Hello"),
       },
-    ] as unknown as import("@mariozechner/pi-coding-agent").SessionEntry[];
+    ] as unknown as import("@earendil-works/pi-coding-agent").SessionEntry[];
     mockFns.buildSessionContext.mockReturnValue({ messages: [createMockMessage("user", "Hello")] });
 
     const ctx = createMockCtx({ branch });
@@ -205,7 +205,7 @@ describe("analyzeContext", () => {
       contextFiles: [{ path: "AGENTS.md", content: "A".repeat(120) }],
       skills: [
         { name: "test-skill", description: "A test skill", location: "/skill.md" },
-      ] as unknown as import("@mariozechner/pi-coding-agent").Skill[],
+      ] as unknown as import("@earendil-works/pi-coding-agent").Skill[],
       promptGuidelines: ["Be helpful"],
       toolSnippets: { read: "Read files" },
       appendSystemPrompt: "Append this",

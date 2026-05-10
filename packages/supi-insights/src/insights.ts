@@ -10,8 +10,8 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
   SessionInfo,
-} from "@mariozechner/pi-coding-agent";
-import { getAgentDir } from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core";
 import { aggregateData } from "./aggregator.ts";
 import {

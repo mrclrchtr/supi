@@ -1,6 +1,6 @@
 // Forensics engine — scan pipeline for cross-session cache investigation.
 
-import { SessionManager } from "@mariozechner/pi-coding-agent";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { getActiveBranchEntries } from "@mrclrchtr/supi-core";
 import { resolveTurnCause } from "../monitor/state.ts";
 import {

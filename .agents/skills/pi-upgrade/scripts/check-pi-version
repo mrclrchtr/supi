@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Detect @mariozechner/pi-* version drift against badlogic/pi-mono releases.
+# Detect @earendil-works/pi-* version drift against earendil-works/pi releases.
 # Default: bump + install. Use --dry-run to preview.
 # Requires: Bash >= 5.0 (uses modern arrays, namerefs, and shell quoting transforms).
 #
@@ -14,7 +14,7 @@ set -Eeuo pipefail
 shopt -s inherit_errexit
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly REPO="badlogic/pi-mono"
+readonly REPO="earendil-works/pi"
 
 # --- mutable state ---
 
@@ -119,8 +119,8 @@ parse_args() {
         cat <<-'EOF'
 Usage: check-pi-version [--dry-run] [path/to/package.json]
 
-  Detects @mariozechner/pi-* version in package.json, compares against
-  badlogic/pi-mono releases. Bumps versions and installs by default.
+  Detects @earendil-works/pi-* version in package.json, compares against
+  earendil-works/pi releases. Bumps versions and installs by default.
 
   --dry-run   Only report what would be changed without modifying files
 EOF
@@ -210,7 +210,7 @@ function findInstalledVersion(name) {
 
 for (const field of fields) {
   const deps = pkg[field] || {};
-  const key = Object.keys(deps).find((name) => name.startsWith("@mariozechner/pi-"));
+  const key = Object.keys(deps).find((name) => name.startsWith("@earendil-works/pi-"));
   if (!key) continue;
 
   const range = deps[key];
@@ -359,10 +359,10 @@ build_bump_preview() {
     const latest = '$LATEST_NO_V';
     const changes = [];
     const piProvidedPeers = new Set([
-      '@mariozechner/pi-ai',
-      '@mariozechner/pi-agent-core',
-      '@mariozechner/pi-coding-agent',
-      '@mariozechner/pi-tui',
+      '@earendil-works/pi-ai',
+      '@earendil-works/pi-agent-core',
+      '@earendil-works/pi-coding-agent',
+      '@earendil-works/pi-tui',
       'typebox',
     ]);
 
@@ -379,7 +379,7 @@ build_bump_preview() {
             let newVal;
             if (field === 'peerDependencies' && piProvidedPeers.has(key)) {
               newVal = '*';
-            } else if (key.startsWith('@mariozechner/pi-')) {
+            } else if (key.startsWith('@earendil-works/pi-')) {
               const m = old.match(/^([~^>=]*)([0-9]+\.[0-9]+\.[0-9]+)/);
               if (m) newVal = (m[1] || '') + latest;
             }
@@ -421,7 +421,7 @@ build_update_packages() {
         for (const field of ['dependencies', 'peerDependencies', 'devDependencies']) {
           const deps = pkg[field] || {};
           for (const name of Object.keys(deps)) {
-            if (name.startsWith('@mariozechner/pi-')) names.add(name);
+            if (name.startsWith('@earendil-works/pi-')) names.add(name);
           }
         }
       } catch {}
@@ -442,10 +442,10 @@ apply_bumps() {
       const pkg = JSON.parse(fs.readFileSync('${f//\'/\\\'}', 'utf8'));
       const fields = ['dependencies', 'peerDependencies', 'devDependencies'];
       const piProvidedPeers = new Set([
-        '@mariozechner/pi-ai',
-        '@mariozechner/pi-agent-core',
-        '@mariozechner/pi-coding-agent',
-        '@mariozechner/pi-tui',
+        '@earendil-works/pi-ai',
+        '@earendil-works/pi-agent-core',
+        '@earendil-works/pi-coding-agent',
+        '@earendil-works/pi-tui',
         'typebox',
       ]);
       for (const field of fields) {
@@ -454,7 +454,7 @@ apply_bumps() {
         for (const key of Object.keys(deps)) {
           if (field === 'peerDependencies' && piProvidedPeers.has(key)) {
             deps[key] = '*';
-          } else if (key.startsWith('@mariozechner/pi-')) {
+          } else if (key.startsWith('@earendil-works/pi-')) {
             const m = deps[key].match(/^([~^>=]*)([0-9]+\.[0-9]+\.[0-9]+)/);
             if (m) deps[key] = m[1] + '$LATEST_NO_V';
           }
@@ -584,7 +584,7 @@ main() {
   discover_workspace
 
   # Detect version
-  detect_current_version || die "No @mariozechner/pi-* dependency found in $PKG_JSON"
+  detect_current_version || die "No @earendil-works/pi-* dependency found in $PKG_JSON"
 
   # Fetch releases
   local releases_json

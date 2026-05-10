@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-code-intelligence
 
-SuPi Code Intelligence extension — the main agent-facing code understanding tool for [pi](https://github.com/mariozechner/pi-coding-agent).
+SuPi Code Intelligence extension — the main agent-facing code understanding tool for [pi](https://github.com/earendil-works/pi).
 
 Registers the `code_intel` tool with seven high-level actions and injects structural project context into the agent's first turn.
 

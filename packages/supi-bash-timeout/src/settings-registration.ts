@@ -1,4 +1,4 @@
-import type { SettingItem } from "@mariozechner/pi-tui";
+import type { SettingItem } from "@earendil-works/pi-tui";
 import { createInputSubmenu, registerConfigSettings } from "@mrclrchtr/supi-core";
 import { BASH_TIMEOUT_DEFAULTS, type BashTimeoutConfig } from "./config.ts";
 

@@ -1,6 +1,6 @@
 ---
 name: pi-tui-design
-description: "Create distinctive, crafted TUI components for pi using @mariozechner/pi-tui and @mariozechner/pi-coding-agent. Use when building interactive terminal UIs — custom components, overlays, dialogs, dashboards, widgets, data visualizations, animated elements, game-like interfaces, or any visual TUI work inside pi extensions or custom tools. Triggers on: 'build a TUI component', 'make a dashboard', 'create an overlay', 'interactive widget', 'terminal UI', 'custom component', 'pi-tui', or any request to create visual, interactive terminal interfaces. Also use when beautifying or redesigning existing TUI components."
+description: "Create distinctive, crafted TUI components for pi using @earendil-works/pi-tui and @earendil-works/pi-coding-agent. Use when building interactive terminal UIs — custom components, overlays, dialogs, dashboards, widgets, data visualizations, animated elements, game-like interfaces, or any visual TUI work inside pi extensions or custom tools. Triggers on: 'build a TUI component', 'make a dashboard', 'create an overlay', 'interactive widget', 'terminal UI', 'custom component', 'pi-tui', or any request to create visual, interactive terminal interfaces. Also use when beautifying or redesigning existing TUI components."
 ---
 
 # TUI Design for Pi
@@ -10,7 +10,7 @@ Build terminal interfaces that feel *crafted*, not generated.
 ## Reference Sources — Read These First
 
 ```bash
-PI=$(npm root -g)/@mariozechner/pi-coding-agent
+PI=$(npm root -g)/@earendil-works/pi-coding-agent
 
 # Full TUI API (component interfaces, key identifiers, rendering rules)
 cat "$PI/docs/tui.md"
@@ -154,9 +154,9 @@ override invalidate(): void {
 
 For full API (constructor signatures, options, examples) → read `tui.md`.
 
-**From `@mariozechner/pi-tui`**: `Text` · `TruncatedText` · `Box` · `Container` · `Spacer` · `Markdown` · `Image` · `SelectList` · `SettingsList` · `Loader` · `Input` · `Editor`
+**From `@earendil-works/pi-tui`**: `Text` · `TruncatedText` · `Box` · `Container` · `Spacer` · `Markdown` · `Image` · `SelectList` · `SettingsList` · `Loader` · `Input` · `Editor`
 
-**From `@mariozechner/pi-coding-agent`**: `DynamicBorder` · `BorderedLoader` · `CustomEditor`
+**From `@earendil-works/pi-coding-agent`**: `DynamicBorder` · `BorderedLoader` · `CustomEditor`
 
 **Utilities**: `visibleWidth` · `truncateToWidth` · `wrapTextWithAnsi` · `matchesKey` · `Key` · `getMarkdownTheme` · `getSettingsListTheme` · `getAgentDir`
 
@@ -194,7 +194,7 @@ Use `getAgentDir()` for `~/.pi/agent/` — the standard location:
 ```typescript
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { getAgentDir } from "@mariozechner/pi-coding-agent";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 
 const dir = join(getAgentDir(), "extensions", "my-ext");
 const file = join(dir, "settings.json");

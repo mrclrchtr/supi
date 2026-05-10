@@ -3,7 +3,7 @@
 // State is reconstructed from session history on session_start
 // and mutated in-place during the session lifecycle.
 
-import type { SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
 export interface InjectedDir {
   /** Turn number when this directory's context was last injected */

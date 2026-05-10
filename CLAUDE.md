@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-SuPi (**Super Pi**) is an opinionated extension repo for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent) (`@mariozechner/pi-coding-agent`).
+SuPi (**Super Pi**) is an opinionated extension repo for the [pi coding agent](https://github.com/earendil-works/pi) (`@earendil-works/pi-coding-agent`).
 
 It is a pnpm workspace monorepo of installable pi extensions. pi loads the extensions directly as TypeScript — there is no build step.
 
@@ -52,7 +52,7 @@ Current workspace packages:
 
 ## Packaging conventions
 
-- The published meta-package `@mrclrchtr/supi` bundles all sub-packages via `bundledDependencies`. Per [pi packages docs](https://github.com/mariozechner/pi-coding-agent/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
+- The published meta-package `@mrclrchtr/supi` bundles all sub-packages via `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
 - Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`.
 - `pnpm-workspace.yaml` uses `nodeLinker: hoisted` — required because pnpm's default `isolated` linker does not support `bundledDependencies`.
 - Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
@@ -119,7 +119,7 @@ registerSettings({
 - PI internal events like `session_info_changed` are consumed by the interactive mode only; they are **not** forwarded to extension handlers via `pi.on()`. The `pi.events` EventBus is strictly for extension-to-extension communication.
 - `createAgentSession()` child sessions do NOT bubble `agent_start`/`agent_end` to parent extension handlers; use `pi.events` to signal activity from programmatic sub-sessions.
 - `pi.events.emit("supi:working:start", { source: "supi-<pkg>" })` / `pi.events.emit("supi:working:end", { source: "supi-<pkg>" })` — generic SuPi convention for indicating long-running work across extensions; `tab-spinner` listens to these. Emitters must ensure `end` always fires (success, failure, cancel, timeout).
-- Pi core peer deps (`@mariozechner/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
+- Pi core peer deps (`@earendil-works/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
 - Other runtime imports belong in `dependencies`, not `peerDependencies`.
 - For `packages/supi`, external runtime deps imported by bundled sub-packages must also be present in the meta-package's own `dependencies`; verify with `npm pack` + temp `npm install`.
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.

@@ -1,5 +1,5 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { fuzzyFilter } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { fuzzyFilter } from "@earendil-works/pi-tui";
 
 /**
  * Extension: `$` as a shortcut prefix for skills.

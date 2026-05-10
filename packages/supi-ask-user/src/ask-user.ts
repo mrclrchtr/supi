@@ -11,8 +11,8 @@
 //   result.ts           — hybrid (content + details) result formatting
 //   render.ts           — custom renderCall / renderResult for the transcript
 
-import type { ExtensionAPI, Theme } from "@mariozechner/pi-coding-agent";
-import type { Component } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
 import { ActiveQuestionnaireLock } from "./flow.ts";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render.ts";

@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-ask-user
 
-Structured `ask_user` questionnaires and rich decision UI for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Structured `ask_user` questionnaires and rich decision UI for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -59,8 +59,8 @@ Key features:
 
 ## Requirements
 
-- `@mariozechner/pi-coding-agent`
-- `@mariozechner/pi-tui`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
 - `typebox`
 
 ## Source

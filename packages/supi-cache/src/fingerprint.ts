@@ -4,7 +4,7 @@
 // `before_agent_start` so that later regression diagnostics can describe
 // exactly which prompt component changed (context files, tools, skills, etc.).
 
-import type { BuildSystemPromptOptions } from "@mariozechner/pi-coding-agent";
+import type { BuildSystemPromptOptions } from "@earendil-works/pi-coding-agent";
 import { fastHash } from "./hash.ts";
 
 /** Per-component fingerprint of the structured system prompt options. */

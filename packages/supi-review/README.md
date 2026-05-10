@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-review
 
-Structured code review for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Structured code review for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -56,9 +56,9 @@ src/
 
 ## Requirements
 
-- `@mariozechner/pi-ai`
-- `@mariozechner/pi-coding-agent`
-- `@mariozechner/pi-tui`
+- `@earendil-works/pi-ai`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
 - `typebox`
 - `@mrclrchtr/supi-core`
 

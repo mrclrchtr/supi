@@ -1,7 +1,7 @@
 // Config-aware settings helper for SuPi config-backed settings sections.
 // Wraps registerSettings() and centralizes selected-scope loading + scoped persistence.
 
-import type { SettingItem } from "@mariozechner/pi-tui";
+import type { SettingItem } from "@earendil-works/pi-tui";
 import { loadSupiConfigForScope, removeSupiConfigKey, writeSupiConfig } from "./config.ts";
 import type { SettingsScope } from "./settings-registry.ts";
 import { registerSettings } from "./settings-registry.ts";

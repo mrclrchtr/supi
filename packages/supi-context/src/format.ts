@@ -1,4 +1,4 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ContextAnalysis } from "./analysis.ts";
 import { formatTokens, pluralize } from "./utils.ts";
 

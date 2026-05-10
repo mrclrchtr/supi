@@ -10,7 +10,7 @@ SuPi is an opinionated extension monorepo for PI with LSP, Skills, marketplace c
 - SuPi makes PI extensible, interoperable, and sane by default.
 - Install the full stack or pick individual extensions.
 
-Built for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Built for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Extensions
 

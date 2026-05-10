@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-rtk
 
-Transparent RTK-backed bash rewriting for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Transparent RTK-backed bash rewriting for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -34,8 +34,8 @@ Known lossy rewrites are passed through without RTK mediation, including current
 
 ## Requirements
 
-- `@mariozechner/pi-coding-agent`
-- `@mariozechner/pi-tui`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
 - `@mrclrchtr/supi-core`
 - RTK CLI available on `PATH`
 

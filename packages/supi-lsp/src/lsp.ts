@@ -2,8 +2,8 @@
 // via a registered `lsp` tool. Keeps language servers warm, surfaces inline diagnostics,
 // and injects diagnostic context only when outstanding issues exist.
 
-import { StringEnum } from "@mariozechner/pi-ai";
-import type { BeforeAgentStartEventResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
+import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
 import { Type } from "typebox";
 import { loadConfig, resolveLanguageAlias } from "./config.ts";

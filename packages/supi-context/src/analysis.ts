@@ -8,7 +8,7 @@ import {
   formatSkillsForPrompt,
   getLatestCompactionEntry,
   SettingsManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { getRegisteredContextProviders } from "@mrclrchtr/supi-core";
 import { deriveOptionsFromSystemPrompt, extractGuidelinesSection } from "./prompt-inference.ts";
 

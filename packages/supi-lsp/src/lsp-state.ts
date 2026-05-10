@@ -1,7 +1,7 @@
 // LSP extension runtime state and tool management helpers.
 // Extracted from lsp.ts to keep file sizes within Biome limits.
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { LspManager } from "./manager/manager.ts";
 import { introspectCapabilities } from "./scanner.ts";
 import { clearSessionLspService } from "./service-registry.ts";

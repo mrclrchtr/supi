@@ -1,6 +1,6 @@
 // Shared state types and pure helpers for the rich overlay.
 
-import type { Editor } from "@mariozechner/pi-tui";
+import type { Editor } from "@earendil-works/pi-tui";
 import type { QuestionnaireFlow } from "../flow.ts";
 import type { OverlayRenderState, SubMode } from "../render/ui-rich-render-types.ts";
 import type {

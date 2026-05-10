@@ -93,7 +93,7 @@ packages/supi-insights/
 ├── insights.ts       # Extension factory — registers /supi-insights and settings
 ├── scanner.ts        # Session discovery via SessionManager.listAll()
 ├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
-├── extractor.ts      # LLM facet extraction via @mariozechner/pi-ai/complete()
+├── extractor.ts      # LLM facet extraction via @earendil-works/pi-ai/complete()
 ├── aggregator.ts     # Pure data aggregation + multi-clauding detection
 ├── generator.ts      # Parallel narrative insight generation (7 sections)
 ├── html.ts           # HTML report renderer with CSS bar charts
@@ -137,7 +137,7 @@ SessionManager.listAll()
 
 ### Key design decisions
 
-**Direct LLM access** — Uses `@mariozechner/pi-ai/complete()` and `ctx.modelRegistry.getApiKeyAndHeaders()` to make API calls with the user's already-configured keys. No external SDK needed.
+**Direct LLM access** — Uses `@earendil-works/pi-ai/complete()` and `ctx.modelRegistry.getApiKeyAndHeaders()` to make API calls with the user's already-configured keys. No external SDK needed.
 
 **Aggressive caching** — Session metadata and LLM-extracted facets are cached in `~/.pi/agent/supi/insights/`. Cache keys include the session file path and modified timestamp, so branch files do not collide and resumed sessions are reprocessed.
 
@@ -209,7 +209,7 @@ The extension detects when you run multiple pi sessions simultaneously ("multi-c
 | Feature | Claude Code | /supi-insights |
 |---------|-------------|---------------|
 | Session discovery | Manual filesystem scan | `SessionManager.listAll()` |
-| LLM access | Internal `queryWithModel()` | `@mariozechner/pi-ai/complete()` |
+| LLM access | Internal `queryWithModel()` | `@earendil-works/pi-ai/complete()` |
 | Output | HTML report + browser | HTML report + browser |
 | Caching | Custom `~/.claude/usage-data/` | `~/.pi/agent/supi/insights/` |
 | Multi-clauding | ✅ | ✅ |

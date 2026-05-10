@@ -1,5 +1,5 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Component, type TUI, visibleWidth } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { type Component, type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { NormalizedQuestion } from "../src/types.ts";
 import { type RichUiHost, runRichQuestionnaire } from "../src/ui/ui-rich.ts";

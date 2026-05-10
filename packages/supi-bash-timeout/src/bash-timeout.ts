@@ -9,7 +9,7 @@
 // timeout when the LLM omits one.  The timeout is configurable via
 // /supi-settings or the SuPi config system (default 120s).
 
-import { type ExtensionAPI, isToolCallEventType } from "@mariozechner/pi-coding-agent";
+import { type ExtensionAPI, isToolCallEventType } from "@earendil-works/pi-coding-agent";
 import { loadBashTimeoutConfig } from "./config.ts";
 import { registerBashTimeoutSettings } from "./settings-registration.ts";
 

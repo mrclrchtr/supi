@@ -23,7 +23,7 @@ Root and ancestor instruction files are loaded natively by pi into the system pr
 
 - `@mrclrchtr/supi-core` — `wrapExtensionContext()`, `loadSupiConfig()`, `writeSupiConfig()`, `removeSupiConfigKey()`, `registerSettings()`
 
-> Note: `@mariozechner/pi-tui` remains in `peerDependencies` for historical installs but is no longer imported by this package.
+> Note: `@earendil-works/pi-tui` remains in `peerDependencies` for historical installs but is no longer imported by this package.
 
 ## Skills
 

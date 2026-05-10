@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-claude-md
 
-Automatic `CLAUDE.md` / `AGENTS.md` context management for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Automatic `CLAUDE.md` / `AGENTS.md` context management for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -63,8 +63,8 @@ Options:
 
 ## Requirements
 
-- `@mariozechner/pi-coding-agent`
-- `@mariozechner/pi-tui`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
 - `@mrclrchtr/supi-core`
 
 ## Source

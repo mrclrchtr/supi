@@ -1,6 +1,6 @@
 // Note-related rendering helpers for the rich overlay.
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { QuestionnaireFlow } from "../flow.ts";
 import type { MultiSelection, NormalizedQuestion, NormalizedStructuredQuestion } from "../types.ts";
 import { type InteractiveRow, interactiveRows } from "../ui/ui-rich-state.ts";

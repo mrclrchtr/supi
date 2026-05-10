@@ -487,11 +487,11 @@ Until then, a fork is likely unnecessary maintenance overhead.
 ### Pi docs and examples
 
 - Pi extensions docs:  
-  https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/extensions.md
+  https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md
 - Pi packages docs:  
-  https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/docs/packages.md
+  https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md
 - Pi subagent example README:  
-  https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/examples/extensions/subagent/README.md
+  https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/subagent/README.md
 
 ### Existing pi ecosystem references
 

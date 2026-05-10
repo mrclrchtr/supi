@@ -3,7 +3,7 @@ import type {
   BuildSystemPromptOptions,
   ExtensionCommandContext,
   Skill,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 
 function unescapeXml(text: string): string {
   return text

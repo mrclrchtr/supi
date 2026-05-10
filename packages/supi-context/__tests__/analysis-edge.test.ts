@@ -11,7 +11,7 @@ const mockFns = vi.hoisted(() => ({
   formatSkillsForPrompt: vi.fn(() => ""),
 }));
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
   buildSessionContext: mockFns.buildSessionContext,
   estimateTokens: mockFns.estimateTokens,
   getLatestCompactionEntry: mockFns.getLatestCompactionEntry,
@@ -23,7 +23,7 @@ vi.mock("@mariozechner/pi-coding-agent", () => ({
   formatSkillsForPrompt: mockFns.formatSkillsForPrompt,
 }));
 
-import type { ExtensionAPI, ExtensionCommandContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { analyzeContext } from "../src/analysis.ts";
 
 function createMockCtx(overrides?: {
@@ -212,7 +212,7 @@ describe("analyzeContext edge cases", () => {
         timestamp: "0",
         message: { role: "user" as const, content: "new", timestamp: 0 },
       },
-    ] as unknown as import("@mariozechner/pi-coding-agent").SessionEntry[];
+    ] as unknown as import("@earendil-works/pi-coding-agent").SessionEntry[];
 
     mockFns.buildSessionContext.mockReturnValue({ messages: [] });
     mockFns.getLatestCompactionEntry.mockReturnValue({

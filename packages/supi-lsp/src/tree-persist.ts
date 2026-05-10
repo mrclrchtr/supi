@@ -1,6 +1,6 @@
 // LSP tree navigation persistence — restores tool activation state across /tree navigation.
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /** Shape of the entry persisted via `pi.appendEntry()`. */
 export interface LspStateEntry {

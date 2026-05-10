@@ -14,7 +14,7 @@ const mockFns = vi.hoisted(() => ({
   selectAutoFix: vi.fn(async () => false),
 }));
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
   BorderedLoader: class MockBorderedLoader {
     onAbort: (() => void) | undefined;
     readonly controller = new AbortController();
@@ -78,7 +78,7 @@ vi.mock("../src/ui", () => ({
   selectCommit: vi.fn(),
 }));
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { formatReviewContent } from "../src/format-content.ts";
 import reviewExtension from "../src/review.ts";
 

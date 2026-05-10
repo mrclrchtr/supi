@@ -1,6 +1,6 @@
 // Forensics report formatting for the /supi-cache-forensics command.
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { CauseBreakdown, ForensicsFinding } from "../forensics/types.ts";
 
 export interface ForensicsReportSnapshot {

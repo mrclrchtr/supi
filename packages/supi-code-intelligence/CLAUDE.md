@@ -152,8 +152,8 @@ function writeJson(dir: string, file: string, data: unknown) {
 - **`@mrclrchtr/supi-core`** — `findProjectRoot`, `walkProject`, `isWithinOrEqual`
 - **`@mrclrchtr/supi-lsp`** — `getSessionLspService`, `SessionLspService`, `Position`
 - **`@mrclrchtr/supi-tree-sitter`** — `createTreeSitterSession` (for `callees` and anchored brief outline)
-- **`@mariozechner/pi-ai`** — `StringEnum` for TypeScript enum type generation
-- **`@mariozechner/pi-coding-agent`** — `ExtensionAPI`, `BeforeAgentStartEventResult`
+- **`@earendil-works/pi-ai`** — `StringEnum` for TypeScript enum type generation
+- **`@earendil-works/pi-coding-agent`** — `ExtensionAPI`, `BeforeAgentStartEventResult`
 - **`typebox`** — `Type.Object(...)` for tool parameter schema
 - **External runtime**: `rg` (ripgrep) via `child_process.execFileSync`
 

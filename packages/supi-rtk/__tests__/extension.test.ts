@@ -16,7 +16,7 @@ vi.mock("node:child_process", () => ({
   execFileSync: mockFns.execFileSync,
 }));
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
   createBashTool: mockFns.createBashTool,
   createLocalBashOperations: mockFns.createLocalBashOperations,
   SettingsManager: {

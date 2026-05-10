@@ -13,7 +13,7 @@ src/
 ├── insights.ts       # Extension factory — registers /supi-insights and settings
 ├── scanner.ts        # Session discovery via SessionManager.listAll()
 ├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
-├── extractor.ts      # LLM facet extraction via @mariozechner/pi-ai/complete()
+├── extractor.ts      # LLM facet extraction via @earendil-works/pi-ai/complete()
 ├── aggregator.ts     # Pure data aggregation + multi-clauding detection
 ├── generator.ts      # Parallel narrative insight generation (7 sections)
 ├── html.ts           # HTML report renderer with CSS bar charts
@@ -36,7 +36,7 @@ src/
 
 ## LLM facet extraction
 
-- Uses `@mariozechner/pi-ai/complete()` directly with `ctx.modelRegistry.getApiKeyAndHeaders()` — no external SDK needed.
+- Uses `@earendil-works/pi-ai/complete()` directly with `ctx.modelRegistry.getApiKeyAndHeaders()` — no external SDK needed.
 - Long transcripts should be chunked and summarized before facet extraction to stay within token limits.
 
 ## Settings

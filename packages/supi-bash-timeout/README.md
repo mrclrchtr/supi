@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-bash-timeout
 
-Default timeout injection for the `bash` tool in the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Default timeout injection for the `bash` tool in the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -45,7 +45,7 @@ Default:
 
 ## Requirements
 
-- `@mariozechner/pi-coding-agent`
+- `@earendil-works/pi-coding-agent`
 - `@mrclrchtr/supi-core`
 
 ## Source

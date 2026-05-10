@@ -1,5 +1,5 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { CancellableLoader, Container, Text, type TUI } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { CancellableLoader, Container, Text, type TUI } from "@earendil-works/pi-tui";
 import { formatTokens } from "./runner.ts";
 import type { ReviewProgress } from "./runner-types.ts";
 

@@ -3,8 +3,8 @@
 // Uses pi-tui's SettingsList with scope toggle (Tab), extension grouping,
 // and search. Each extension declares its settings via registerSettings().
 
-import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import {
   Container,
   Input,
@@ -13,7 +13,7 @@ import {
   type SettingItem,
   SettingsList,
   Text,
-} from "@mariozechner/pi-tui";
+} from "@earendil-works/pi-tui";
 import {
   getRegisteredSettings,
   type SettingsScope,

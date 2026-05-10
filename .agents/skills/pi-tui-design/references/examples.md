@@ -1,7 +1,7 @@
 # TUI Design Examples
 
 Complete, copy-paste component implementations. Every pattern is derived from the
-official pi extension examples at `$(npm root -g)/@mariozechner/pi-coding-agent/examples/extensions/`.
+official pi extension examples at `$(npm root -g)/@earendil-works/pi-coding-agent/examples/extensions/`.
 
 ## Table of Contents
 
@@ -21,9 +21,9 @@ Standard pattern. Uses `SelectList` + `DynamicBorder` + theme-aware styling.
 **Source**: `examples/extensions/preset.ts`
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
-import { Container, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { DynamicBorder } from "@earendil-works/pi-coding-agent";
+import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("pick-env", {
@@ -78,8 +78,8 @@ Persistent footer status and an above-editor widget. Both update reactively.
 **Source**: `examples/extensions/plan-mode/index.ts`
 
 ```typescript
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { Key } from "@mariozechner/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { Key } from "@earendil-works/pi-tui";
 
 interface TodoItem { text: string; completed: boolean; }
 
@@ -151,8 +151,8 @@ export default function (pi: ExtensionAPI) {
 **Source**: `examples/extensions/qna.ts`, `examples/extensions/handoff.ts`
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { BorderedLoader } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { BorderedLoader } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("fetch-data", {
@@ -197,9 +197,9 @@ async function fetchSomething(signal: AbortSignal): Promise<string> {
 **Source**: `examples/extensions/tools.ts`
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
-import { Container, type SettingItem, SettingsList, Text } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getSettingsListTheme } from "@earendil-works/pi-coding-agent";
+import { Container, type SettingItem, SettingsList, Text } from "@earendil-works/pi-tui";
 
 export default function (pi: ExtensionAPI) {
   const state: Record<string, string> = { verbose: "off", color: "on", compact: "off" };
@@ -249,9 +249,9 @@ export default function (pi: ExtensionAPI) {
 **Source**: `examples/extensions/todo.ts`
 
 ```typescript
-import { StringEnum } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+import { StringEnum } from "@earendil-works/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 const Params = Type.Object({
@@ -301,9 +301,9 @@ Replace the default footer with reactive content.
 **Source**: `examples/extensions/custom-footer.ts`
 
 ```typescript
-import type { AssistantMessage } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 
 export default function (pi: ExtensionAPI) {
   let active = false;
@@ -360,9 +360,9 @@ Extend `CustomEditor` to add vim-style normal/insert modes.
 **Source**: `examples/extensions/modal-editor.ts`
 
 ```typescript
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { CustomEditor } from "@mariozechner/pi-coding-agent";
-import { matchesKey, truncateToWidth } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { CustomEditor } from "@earendil-works/pi-coding-agent";
+import { matchesKey, truncateToWidth } from "@earendil-works/pi-tui";
 
 type Mode = "normal" | "insert";
 

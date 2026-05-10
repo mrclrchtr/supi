@@ -1,8 +1,8 @@
 // Session extraction utilities — pull cache turns and tool windows from branches.
 
 import { readFile } from "node:fs/promises";
-import type { FileEntry, SessionEntry } from "@mariozechner/pi-coding-agent";
-import { migrateSessionEntries, parseSessionEntries } from "@mariozechner/pi-coding-agent";
+import type { FileEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
+import { migrateSessionEntries, parseSessionEntries } from "@earendil-works/pi-coding-agent";
 import type { TurnRecord } from "../monitor/state.ts";
 import { computeToolCallShape } from "./redact.ts";
 import type { ToolCallShape } from "./types.ts";

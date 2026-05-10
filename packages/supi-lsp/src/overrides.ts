@@ -1,5 +1,5 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { createEditTool, createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
 import { augmentDiagnostics } from "./diagnostics/diagnostic-augmentation.ts";
 import { formatGroupedDiagnostics } from "./diagnostics/diagnostics.ts";
 import { splitSuppressionDiagnostics } from "./diagnostics/suppression-diagnostics.ts";

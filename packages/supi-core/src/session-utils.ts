@@ -1,6 +1,6 @@
 // Generic session-file tree-walking utilities.
 
-import type { FileEntry, SessionEntry } from "@mariozechner/pi-coding-agent";
+import type { FileEntry, SessionEntry } from "@earendil-works/pi-coding-agent";
 
 /**
  * Resolve the active branch path using PI's append-only tree semantics.

@@ -1,8 +1,8 @@
 // Code Intelligence extension entry point — registers the `code_intel` tool with pi.
 // Provides architecture briefs, caller/callee analysis, impact assessment, and pattern search.
 
-import { StringEnum } from "@mariozechner/pi-ai";
-import type { BeforeAgentStartEventResult, ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
+import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { buildArchitectureModel } from "./architecture.ts";
 import { generateOverview } from "./brief.ts";

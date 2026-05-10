@@ -1,4 +1,4 @@
-import type { Theme } from "@mariozechner/pi-coding-agent";
+import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import { renderAskUserCall, renderAskUserResult } from "../src/render.ts";
 import { ASK_USER_ERROR_MARKER, buildErrorResult } from "../src/result.ts";

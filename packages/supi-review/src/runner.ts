@@ -1,5 +1,5 @@
 // biome-ignore lint/nursery/noExcessiveLinesPerFile: pre-existing, needs refactoring
-import { clampThinkingLevel, type Model } from "@mariozechner/pi-ai";
+import { clampThinkingLevel, type Model } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
   type AgentSessionEvent,
@@ -8,7 +8,7 @@ import {
   defineTool,
   type ModelRegistry,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { ReviewerInvocation, ReviewProgress } from "./runner-types.ts";
 import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "./types.ts";

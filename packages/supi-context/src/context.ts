@@ -1,4 +1,4 @@
-import type { BuildSystemPromptOptions, ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { BuildSystemPromptOptions, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { analyzeContext } from "./analysis.ts";
 import { registerContextRenderer } from "./renderer.ts";
 import { formatTokens } from "./utils.ts";

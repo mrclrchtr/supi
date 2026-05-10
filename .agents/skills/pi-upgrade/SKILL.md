@@ -2,11 +2,11 @@
 name: pi-upgrade
 description: >
   Check for available upgrades to the pi coding agent framework by comparing the
-  current @mariozechner/pi-* version in package.json against releases on
-  badlogic/pi-mono. Use this skill whenever the user mentions upgrading pi,
+  current @earendil-works/pi-* version in package.json against releases on
+  earendil-works/pi. Use this skill whenever the user mentions upgrading pi,
   updating the pi framework, checking for new pi versions, migrating pi code,
   or wants to stay current with pi releases. Also use it when reviewing a repo
-  that depends on @mariozechner/pi-coding-agent or @mariozechner/pi-tui and
+  that depends on @earendil-works/pi-coding-agent or @earendil-works/pi-tui and
   the user wants to know if they're behind. Triggers on phrases like "upgrade
   pi", "update pi", "pi new version", "pi changelog", "pi migration", or any
   mention of keeping pi dependencies current.
@@ -20,16 +20,16 @@ practices from the freshly installed release.
 ## Prerequisites
 
 - GitHub CLI (`gh`) must be installed and authenticated.
-- A `package.json` containing `@mariozechner/pi-coding-agent` or
-  `@mariozechner/pi-tui` in `dependencies`, `peerDependencies`, or
+- A `package.json` containing `@earendil-works/pi-coding-agent` or
+  `@earendil-works/pi-tui` in `dependencies`, `peerDependencies`, or
   `devDependencies`.
 
 ## What the script does
 
 The bundled script (`scripts/check-pi-version`) handles all mechanical work:
 
-- Detects the current `@mariozechner/pi-*` version from `package.json`
-- Fetches release delta from `badlogic/pi-mono` via `gh`
+- Detects the current `@earendil-works/pi-*` version from `package.json`
+- Fetches release delta from `earendil-works/pi` via `gh`
 - Bumps version ranges across **all** workspace `package.json` files
 - Runs the detected package manager install (`pnpm`/`npm`/`yarn`/`bun`)
 - Returns structured JSON with: current version, latest version, all release
@@ -57,7 +57,7 @@ Your job starts **after** the script runs. You do **not** need to:
 
 The script gives you all of that. Your value-add is:
 
-1. **Analyze the installed docs** — Read `node_modules/@mariozechner/pi-coding-agent/README.md`, `docs/*.md`, and type definitions to find new features, APIs, patterns, and best practices introduced since the old version.
+1. **Analyze the installed docs** — Read `node_modules/@earendil-works/pi-coding-agent/README.md`, `docs/*.md`, and type definitions to find new features, APIs, patterns, and best practices introduced since the old version.
 2. **Map findings to the user's codebase** — Look at the project's existing pi extensions, skills, or config. Identify specific files that could benefit from new patterns.
 3. **Generate actionable recommendations** — Not just "there's a new feature", but "your extension in `packages/foo/index.ts` could replace its custom X with the new built-in Y available since v0.70.0".
 
@@ -142,7 +142,7 @@ ALWAYS use this exact template:
 
 ### {{Feature name}} (since {{version}})
 - **What it does:** ...
-- **Where to find it:** `node_modules/@mariozechner/pi-coding-agent/docs/...`
+- **Where to find it:** `node_modules/@earendil-works/pi-coding-agent/docs/...`
 - **Opportunity in your codebase:** {{specific file/line that could benefit}}
 
 ## Breaking changes that may affect you

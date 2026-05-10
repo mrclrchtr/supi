@@ -14,7 +14,7 @@ import type {
   SessionCompactEvent,
   SessionStartEvent,
   TurnEndEvent,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { loadClaudeMdConfig } from "./config.ts";
 import {
   extractPathFromToolEvent,

@@ -1,11 +1,11 @@
 # PI Upgrade (Skill)
 
-Check for available upgrades to the pi coding agent framework and generate actionable migration reports. Intended for **extension developers** who build on top of `@mariozechner/pi-coding-agent` or `@mariozechner/pi-tui` and want to keep their projects current with new releases.
+Check for available upgrades to the pi coding agent framework and generate actionable migration reports. Intended for **extension developers** who build on top of `@earendil-works/pi-coding-agent` or `@earendil-works/pi-tui` and want to keep their projects current with new releases.
 
 ## What it does
 
-1. **Detects** the current `@mariozechner/pi-*` version from `package.json` (resolves ranges, lockfiles, and `node_modules`)
-2. **Fetches** release delta from `badlogic/pi-mono` via `gh`
+1. **Detects** the current `@earendil-works/pi-*` version from `package.json` (resolves ranges, lockfiles, and `node_modules`)
+2. **Fetches** release delta from `earendil-works/pi` via `gh`
 3. **Bumps** version ranges across all workspace `package.json` files
 4. **Installs** using the detected package manager (`pnpm`/`npm`/`yarn`/`bun`)
 5. **Analyzes** newly installed docs & type definitions against the user's codebase
@@ -17,8 +17,8 @@ Check for available upgrades to the pi coding agent framework and generate actio
 
 ## Prerequisites
 
-- **GitHub CLI** (`gh`) installed and authenticated — the script uses `gh release list` and `gh release view` to fetch releases from `badlogic/pi-mono`
-- A **`package.json`** containing `@mariozechner/pi-coding-agent` or `@mariozechner/pi-tui` in `dependencies`, `peerDependencies`, or `devDependencies`
+- **GitHub CLI** (`gh`) installed and authenticated — the script uses `gh release list` and `gh release view` to fetch releases from `earendil-works/pi`
+- A **`package.json`** containing `@earendil-works/pi-coding-agent` or `@earendil-works/pi-tui` in `dependencies`, `peerDependencies`, or `devDependencies`
 - **Bash ≥ 5.0** for the helper script (uses namerefs, associative arrays, and `${var@Q}`)
 
 ## Usage
@@ -54,7 +54,7 @@ The script emits JSON with:
 | `newerReleases` | Array of releases between current and latest, each with `tagName`, `name`, `body`, `publishedAt` |
 | `bumpedFiles` | List of `package.json` files that were (or would be) changed |
 | `bumpChanges` | Per-file detail: field, package, old value, new value |
-| `updatePackages` | `@mariozechner/pi-*` packages targeted for update |
+| `updatePackages` | `@earendil-works/pi-*` packages targeted for update |
 | `installCommand` | The package manager command that was (or would be) run |
 | `installExitCode` | Exit code of the install step (0 on success) |
 | `installOutput` | Stdout+stderr from install |

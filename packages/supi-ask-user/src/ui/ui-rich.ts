@@ -2,8 +2,8 @@
 // multichoice, notes, other, discuss, preview, and review flows. Returns a
 // QuestionnaireOutcome whose terminal state is owned by the shared flow.
 
-import type { Theme } from "@mariozechner/pi-coding-agent";
-import { type Component, Editor, type EditorTheme, type TUI } from "@mariozechner/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { type Component, Editor, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
 import { QuestionnaireFlow } from "../flow.ts";
 import { renderOverlay } from "../render/ui-rich-render.ts";
 import type { NormalizedQuestionnaire, QuestionnaireOutcome } from "../types.ts";

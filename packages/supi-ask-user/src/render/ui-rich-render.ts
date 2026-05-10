@@ -2,7 +2,7 @@
 // ui-rich.ts to stay within Biome's per-file line limit and so the input
 // dispatch logic can be read without scrolling past a wall of theme strings.
 
-import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import { decorateOption, formatReviewLines, NOTE_MARKER } from "../format.ts";
 import type { NormalizedStructuredQuestion } from "../types.ts";
 import { inlineStructuredRowLines, structuredRowLabel } from "../ui/ui-rich-inline.ts";

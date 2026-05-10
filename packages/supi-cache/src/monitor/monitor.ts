@@ -3,9 +3,9 @@
 // Tracks per-turn cache metrics, detects regressions with cause diagnosis,
 // shows a compact footer status, and provides /supi-cache-history and /supi-cache-forensics commands.
 
-import { StringEnum } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { Container, Spacer, Text } from "@mariozechner/pi-tui";
+import { StringEnum } from "@earendil-works/pi-ai";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { loadCacheMonitorConfig } from "../config.ts";
 import { computePromptFingerprint, diffFingerprints, zeroFingerprint } from "../fingerprint.ts";

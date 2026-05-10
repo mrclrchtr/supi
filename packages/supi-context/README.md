@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-context
 
-Detailed context-usage reporting for the [pi coding agent](https://github.com/mariozechner/pi-coding-agent).
+Detailed context-usage reporting for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -33,8 +33,8 @@ src/
 
 ## Requirements
 
-- `@mariozechner/pi-coding-agent`
-- `@mariozechner/pi-tui`
+- `@earendil-works/pi-coding-agent`
+- `@earendil-works/pi-tui`
 
 ## Development
 

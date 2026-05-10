@@ -1,4 +1,4 @@
-import type { Model } from "@mariozechner/pi-ai";
+import type { Model } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReviewOutputEvent, ReviewTarget } from "../src/types.ts";
 
@@ -23,7 +23,7 @@ let capturedCustomTools: Array<{ execute: (...args: unknown[]) => Promise<unknow
 
 const mockCreateAgentSession = vi.hoisted(() => vi.fn());
 
-vi.mock("@mariozechner/pi-coding-agent", () => ({
+vi.mock("@earendil-works/pi-coding-agent", () => ({
   createAgentSession: mockCreateAgentSession,
   DefaultResourceLoader: class MockDefaultResourceLoader {
     reload = vi.fn().mockResolvedValue(undefined);
