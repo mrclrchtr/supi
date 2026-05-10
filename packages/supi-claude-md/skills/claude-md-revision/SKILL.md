@@ -1,26 +1,12 @@
 ---
 name: claude-md-revision
-description: "Update CLAUDE.md or .claude.local.md with learnings from the current session. Use this skill whenever the user wants to capture session insights, update project memory, revise CLAUDE.md, document codebase patterns, or preserve gotchas discovered during a coding session. Also trigger on phrases like 'add this to CLAUDE.md', 'remember this for next time', 'update project memory', 'document this pattern', or when wrapping up a session that revealed useful context."
+description: "Update CLAUDE.md, .claude.local.md, or AGENTS.md files with project-specific context for future agent sessions. Trigger ONLY when the user explicitly mentions CLAUDE.md, .claude.local.md, AGENTS.md, project memory, or agent context files. Also trigger on direct phrases like 'add this to CLAUDE.md', 'remember this for next time', 'update project memory', or 'document this pattern'. Do NOT trigger for general documentation requests, bug reports, session summaries, or user-facing docs — those are unrelated to agent instruction files."
 license: MIT
 ---
 
 # Revise CLAUDE.md with Session Learnings
 
 Review the current session for actionable learnings and update the project's CLAUDE.md or .claude.local.md files. The goal is concise, durable context that helps future sessions work more effectively in this codebase.
-
-## When to Use This Skill
-
-- The user explicitly asks to update CLAUDE.md or project memory
-- The user says things like "remember this," "add this to the docs," or "document this pattern"
-- A session revealed non-obvious gotchas, commands, or patterns worth preserving
-- You're wrapping up a session and the user wants to capture learnings
-- You discovered environment quirks, testing approaches, or style patterns that future sessions should know
-
-## When NOT to Use This Skill
-
-- The user wants to update README.md, API docs, or user-facing documentation (this skill is for agent context files only)
-- The session had no novel learnings (routine work needs no revision)
-- The user says "don't update CLAUDE.md" or similar
 
 ## Workflow
 
