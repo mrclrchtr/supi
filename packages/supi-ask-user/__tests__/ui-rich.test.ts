@@ -122,6 +122,25 @@ describe("runRichQuestionnaire lifecycle", () => {
     expect(optionsArg).toBeUndefined();
   });
 
+  it("pre-fills text input with default value when present", async () => {
+    const textWithDefault: NormalizedQuestion = {
+      id: "name",
+      header: "Name",
+      type: "text",
+      prompt: "Enter name",
+      required: true,
+      options: [],
+      default: "default-value",
+    };
+    const { captured, host } = makeRichFixture<unknown>();
+    void runRichQuestionnaire({ questions: [textWithDefault], allowSkip: false }, { ui: host });
+    await Promise.resolve();
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
+
+    const rendered = captured.value.render(100).join("\n");
+    expect(rendered).toContain("default-value");
+  });
+
   it("skips required text questions with Ctrl-S when skip is allowed", async () => {
     type Outcome = { terminalState: string; skipped?: true; answers: unknown[] };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();

@@ -74,6 +74,9 @@ const TextQuestionSchema = Type.Object({
       description: "Whether this question must be answered before submission (default true)",
     }),
   ),
+  default: Type.Optional(
+    Type.String({ description: "Pre-filled default value shown in the text input" }),
+  ),
 });
 
 const YesNoQuestionSchema = Type.Object({

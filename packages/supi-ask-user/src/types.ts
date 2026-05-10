@@ -43,6 +43,7 @@ export interface NormalizedYesNoQuestion extends StructuredQuestionBase {
 export interface NormalizedTextQuestion extends BaseQuestion {
   type: "text";
   options: [];
+  default?: string;
 }
 
 export type NormalizedStructuredQuestion =
@@ -133,7 +134,7 @@ export interface AskUserDetails {
 export const QUESTION_LIMITS = {
   minQuestions: 1,
   maxQuestions: 4,
-  maxHeaderLength: 40,
+  maxHeaderLength: 60,
   maxPromptLength: 2000,
   minChoiceOptions: 2,
   maxChoiceOptions: 12,

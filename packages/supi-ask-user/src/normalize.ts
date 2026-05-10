@@ -143,6 +143,7 @@ function normalizeText(q: {
   header: string;
   prompt: string;
   required?: boolean;
+  default?: string;
 }): NormalizedQuestion {
   return {
     id: q.id.trim(),
@@ -151,6 +152,7 @@ function normalizeText(q: {
     prompt: q.prompt,
     required: q.required ?? true,
     options: [],
+    ...(q.default !== undefined ? { default: q.default.trim() } : {}),
   };
 }
 

@@ -8,7 +8,12 @@ import { QuestionnaireFlow } from "../flow.ts";
 import { renderOverlay } from "../render/ui-rich-render.ts";
 import type { NormalizedQuestionnaire, QuestionnaireOutcome } from "../types.ts";
 import { handleOverlayInput, onEditorSubmit } from "./ui-rich-handlers.ts";
-import { initialSubMode, type OverlayState, selectedRowIndex } from "./ui-rich-state.ts";
+import {
+  initialSubMode,
+  type OverlayState,
+  selectedRowIndex,
+  textDefaultOrAnswer,
+} from "./ui-rich-state.ts";
 
 export interface RichCustomOptions {
   overlay?: boolean;
@@ -77,6 +82,10 @@ function buildOverlay(args: BuildOverlayArgs): Component {
     maxHeight: 0,
   };
   const editor = new Editor(tui, makeEditorTheme(theme));
+  const initialQuestion = flow.currentQuestion;
+  if (initialQuestion?.type === "text") {
+    editor.setText(textDefaultOrAnswer(flow, initialQuestion));
+  }
   const refresh = () => {
     state.cachedLines = undefined;
     tui.requestRender();

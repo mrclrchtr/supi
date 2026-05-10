@@ -109,6 +109,22 @@ describe("normalizeQuestionnaire", () => {
     expect(out.questions[0].options.map((option) => option.value)).toEqual(["yes", "no"]);
   });
 
+  it("passes through default on text questions", () => {
+    const out = normalizeQuestionnaire({
+      questions: [
+        { type: "text", id: "note", header: "Note", prompt: "Why?", default: "  because  " },
+      ],
+    });
+    expect(out.questions[0]).toMatchObject({ type: "text", default: "because" });
+  });
+
+  it("omits default when not provided on text questions", () => {
+    const out = normalizeQuestionnaire({
+      questions: [{ type: "text", id: "note", header: "Note", prompt: "Why?" }],
+    });
+    expect((out.questions[0] as { default?: string }).default).toBeUndefined();
+  });
+
   it("rejects whitespace-only id, header, and prompt", () => {
     expect(() => normalizeQuestionnaire({ questions: [choice({ id: "   " })] })).toThrow(
       /non-empty/,

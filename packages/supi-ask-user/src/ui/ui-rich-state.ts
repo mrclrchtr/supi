@@ -6,6 +6,7 @@ import type { OverlayRenderState, SubMode } from "../render/ui-rich-render-types
 import type {
   NormalizedQuestion,
   NormalizedStructuredQuestion,
+  NormalizedTextQuestion,
   QuestionnaireOutcome,
 } from "../types.ts";
 import { isStructuredQuestion, primaryRecommendationIndex } from "../types.ts";
@@ -66,13 +67,23 @@ export function initialSubMode(question: NormalizedQuestion | undefined): SubMod
   return question.type === "text" ? "text-input" : "select";
 }
 
+export function textDefaultOrAnswer(
+  flow: Pick<QuestionnaireFlow, "getAnswer">,
+  question: NormalizedTextQuestion,
+): string {
+  const answer = flow.getAnswer(question.id);
+  if (answer?.source === "text") return answer.value;
+  return question.default ?? "";
+}
+
 export function resetStateForCurrent(deps: OverlayDeps): void {
   const question = deps.flow.currentQuestion;
   deps.state.subMode = deps.flow.currentMode === "reviewing" ? "select" : initialSubMode(question);
   deps.state.selectedIndex = selectedRowIndex(deps.flow, question);
   deps.state.noteTarget = undefined;
   deps.state.maxHeight = 0;
-  deps.editor.setText("");
+  const editorText = question?.type === "text" ? textDefaultOrAnswer(deps.flow, question) : "";
+  deps.editor.setText(editorText);
 }
 
 export function existingStructuredInputValue(
