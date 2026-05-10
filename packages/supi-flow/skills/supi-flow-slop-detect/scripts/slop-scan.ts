@@ -12,7 +12,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { outputJSON } from "./slop-helpers.ts";
+import { type DocProfile, outputJSON } from "./slop-helpers.ts";
 
 interface VocabResult {
   file: string;
@@ -27,6 +27,8 @@ interface VocabResult {
 
 interface StructuralResult {
   file: string;
+  profile: DocProfile;
+  adjustments: string[];
   wordCount: number;
   metrics: {
     emDashDensity: number;
@@ -34,6 +36,8 @@ interface StructuralResult {
     participialTails: number;
     participialTailsPer500: number;
     arrowConnectors: number;
+    technicalArrowConnectors: number;
+    proseArrowConnectors: number;
     correlativePairs: number;
     plusSigns: number;
     colons: number;
@@ -51,6 +55,8 @@ interface StructuralResult {
 
 interface CombinedReport {
   file: string;
+  profile: DocProfile;
+  adjustments: string[];
   wordCount: number;
   vocabScore: number;
   structuralScore: number;
@@ -102,6 +108,8 @@ function scanFile(filePath: string): CombinedReport {
 
   return {
     file: filePath,
+    profile: structural.profile,
+    adjustments: structural.adjustments,
     wordCount: vocab.wordCount,
     vocabScore: vocab.normalizedScore,
     structuralScore: structural.structuralScore,
@@ -134,7 +142,11 @@ if (jsonOnly) {
 
   for (const r of results) {
     console.log(`File: ${r.file}`);
+    console.log(`Profile: ${r.profile}`);
     console.log(`Words: ${r.wordCount}`);
+    if (r.adjustments.length > 0) {
+      console.log(`Adjustments: ${r.adjustments.join(", ")}`);
+    }
     console.log("───");
     console.log(`  Vocab score:       ${r.vocabScore.toFixed(2)}  (per 100 words)`);
     console.log(`  Structural score:  ${r.structuralScore}  (penalty points)`);
@@ -182,6 +194,8 @@ if (jsonOnly) {
     console.log(`    Participial tails:      ${m.participialTailsPer500.toFixed(1)}/500 words`);
     console.log(`    Correlative pairs:      ${m.correlativePairs}`);
     console.log(`    Arrow connectors:       ${m.arrowConnectors}`);
+    console.log(`    Technical arrow chains: ${m.technicalArrowConnectors}`);
+    console.log(`    Prose arrow shorthand:  ${m.proseArrowConnectors}`);
     console.log(`    Plus-sign conjunctions: ${m.plusSigns}`);
     console.log(`    Emoji bullets:          ${m.emojiBullets}`);
     console.log(`    Colons vs semicolons:   ${m.colons} / ${m.semicolons}`);

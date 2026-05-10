@@ -7,6 +7,41 @@
 
 import { readFileSync } from "node:fs";
 
+export type DocProfile = "skill" | "technical" | "prose";
+
+interface ArrowConnectorStats {
+  total: number;
+  technical: number;
+  prose: number;
+}
+
+const ARROW_CONNECTOR_PATTERN = /->|→/g;
+const TECHNICAL_TOKEN_PATTERN = /[A-Za-z0-9_./-]+/g;
+const ARROW_PROSE_START_WORDS = new Set([
+  "a",
+  "an",
+  "are",
+  "can",
+  "does",
+  "helps",
+  "improves",
+  "is",
+  "it",
+  "lets",
+  "makes",
+  "means",
+  "shows",
+  "that",
+  "the",
+  "their",
+  "there",
+  "these",
+  "this",
+  "those",
+  "we",
+  "you",
+]);
+
 /** Read a file as UTF-8 string. */
 export function readFile(path: string): string {
   return readFileSync(path, "utf-8");
@@ -15,6 +50,20 @@ export function readFile(path: string): string {
 /** Strip fenced code blocks from markdown content. */
 export function stripCodeBlocks(content: string): string {
   return content.replace(/```[\s\S]*?```/g, "");
+}
+
+/** Strip inline code spans from markdown content. */
+export function stripInlineCode(content: string): string {
+  return content.replace(/`[^`]+`/g, "");
+}
+
+/** Detect the document profile used for structural scoring. */
+export function detectDocProfile(filePath: string): DocProfile {
+  if (/[\\/]skills[\\/].*[\\/]SKILL\.md$/i.test(filePath)) return "skill";
+  if (/(?:^|[\\/])README\.md$/i.test(filePath) || /[\\/]docs[\\/].*\.md$/i.test(filePath)) {
+    return "technical";
+  }
+  return "prose";
 }
 
 /** Count non-empty lines. */
@@ -52,15 +101,58 @@ export function countColons(text: string): number {
   return (text.match(/:/g) || []).length;
 }
 
-/** Count arrow connectors in prose (excluding code blocks). Returns count. */
-export function countArrowConnectors(content: string): number {
-  const prose = stripCodeBlocks(content);
-  return (prose.match(/\s->\s|→/g) || []).length;
+function isTechnicalArrowContext(leftTokens: string[], rightTokens: string[]): boolean {
+  if (leftTokens.length === 0 || rightTokens.length === 0) return false;
+
+  const leftFirst = leftTokens[0]?.toLowerCase() ?? "";
+  const rightFirst = rightTokens[0]?.toLowerCase() ?? "";
+
+  if (ARROW_PROSE_START_WORDS.has(leftFirst) || ARROW_PROSE_START_WORDS.has(rightFirst)) {
+    return false;
+  }
+
+  return leftTokens.length <= 3 && rightTokens.length <= 3;
+}
+
+/** Analyze arrow connectors in prose and split technical notation from prose shorthand. */
+export function analyzeArrowConnectors(content: string): ArrowConnectorStats {
+  const prose = stripInlineCode(stripCodeBlocks(content));
+  const lines = prose.split("\n");
+
+  let total = 0;
+  let technical = 0;
+
+  for (const line of lines) {
+    const matches = [...line.matchAll(ARROW_CONNECTOR_PATTERN)];
+    total += matches.length;
+
+    for (const match of matches) {
+      const index = match.index ?? -1;
+      if (index < 0) continue;
+
+      const leftTokens = [...line.slice(0, index).matchAll(TECHNICAL_TOKEN_PATTERN)]
+        .map((token) => token[0])
+        .slice(-3);
+      const rightTokens = [...line.slice(index + match[0].length).matchAll(TECHNICAL_TOKEN_PATTERN)]
+        .map((token) => token[0])
+        .slice(0, 3);
+
+      if (isTechnicalArrowContext(leftTokens, rightTokens)) {
+        technical++;
+      }
+    }
+  }
+
+  return {
+    total,
+    technical,
+    prose: Math.max(0, total - technical),
+  };
 }
 
 /** Count plus-sign conjunctions in prose (excluding code blocks). */
 export function countPlusSigns(content: string): number {
-  const prose = stripCodeBlocks(content);
+  const prose = stripInlineCode(stripCodeBlocks(content));
   return (prose.match(/\s\+\s/g) || []).length;
 }
 
@@ -101,6 +193,11 @@ export function getFirstAndLastParagraph(content: string): [string, string] {
     .split(/\n\s*\n/)
     .map((p) => p.trim())
     .filter((p) => p.length > 0 && !p.startsWith("---") && !p.startsWith("```"));
+
+  if (paragraphs.length < 2) {
+    return [paragraphs[0] || "", ""];
+  }
+
   return [paragraphs[0] || "", paragraphs[paragraphs.length - 1] || ""];
 }
 

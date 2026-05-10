@@ -10,7 +10,7 @@ Scan documentation for AI-prose markers and fix them. Use during the archive pha
 ## Scan workflow
 
 1. Read the edited documentation files
-2. Classify each file: technical doc, narrative prose, or code comment (affects scoring)
+2. Classify each file by profile: skill, technical, or prose
 3. Scan for vocabulary markers (Tiers 1-4) and structural patterns (below)
 4. For each hit: substitute with specific, grounded language
 5. Re-read the fixed text — does it still say the same thing with better words?
@@ -18,11 +18,27 @@ Scan documentation for AI-prose markers and fix them. Use during the archive pha
 
 **Principles:**
 - Preserve meaning — change how it's said, not what's said
-- Match context — technical docs need different fixes than narrative prose
+- Match context — skill docs and technical docs need different thresholds than narrative prose
 - Be specific — replace abstract adjectives with concrete claims (version numbers, file paths, measurements)
 - Prefer active voice — "it validates input" not "input is validated"
-- Short paragraphs over long ones
+- Keep useful technical shorthand when it improves clarity
 - Never change code — only edit prose/docstrings/comments
+
+## Document profiles
+
+The scanner should not treat every Markdown file the same.
+
+- **skill** — `**/skills/**/SKILL.md`; instructional, operational, list-heavy
+- **technical** — READMEs, architecture docs, setup docs, reference material
+- **prose** — narrative or essay-like documents
+
+Profiles mostly affect structural scoring:
+
+- **skill:** allow compact workflow notation, higher bullet density, and occasional clarifying em dashes
+- **technical:** allow architecture and data-flow notation, but keep tighter structure checks
+- **prose:** use the strictest structural thresholds
+
+Vocabulary, hype, and sycophantic phrasing stay strict across all profiles.
 
 ## Vocabulary markers
 
@@ -96,20 +112,26 @@ These phrases add no information and signal generated content.
 
 ### Em dash density
 
-Count em dashes (—) per 1000 words:
+Em dashes are a weak signal by themselves. What matters is repetitive, decorative use.
+
+Baseline guidance:
 
 | Density | Signal |
 |---------|--------|
 | 0-2 | Normal |
 | 3-5 | Elevated — review |
-| 6+ | Strong AI signal — replace with commas, periods, colons |
+| 6+ | Strong AI signal in most docs |
+
+Profile adjustments:
+- **skill:** higher tolerance for compact instructional labels
+- **technical/prose:** stricter review once density gets high
 
 ```bash
 # Count em dashes in a file
 grep -o '—' file.md | wc -l
 ```
 
-_Also detected by `scripts/slop-scan-structural.ts` (included in structural score)._
+_Also detected by `scripts/slop-scan-structural.ts` with profile-aware thresholds._
 
 ### Tricolon detection
 
@@ -138,10 +160,15 @@ _Detected by `scripts/slop-scan-structural.ts` as `paragraphUniformity` score (t
 |-------|--------|
 | 0-30% | Normal |
 | 30-50% | Elevated |
-| 50-70% | High — convert some to prose |
-| 70%+ | Very high AI signal — major rewrite needed |
+| 50-70% | High in technical/prose docs |
+| 70%+ | Very high AI signal in most docs |
 
-Emoji-led bullets (e.g., `✅`, `❌`, `🔴`) in technical documentation are a strong AI tell.
+Profile adjustments:
+- **skill:** allow a higher bullet ratio for checklists, procedures, and operator guidance
+- **technical:** medium threshold
+- **prose:** lowest threshold
+
+Emoji-led bullets (e.g., `✅`, `❌`, `🔴`) in technical documentation are still a strong AI tell.
 
 ### Intro-body-conclusion structure
 
@@ -195,19 +222,29 @@ AI uses colons to introduce explanations at 3-5x the human rate. Meanwhile, AI r
 
 Check: if em dashes > 5 and semicolons = 0 → strong AI signal.
 
-### ASCII arrow prose connectors
+### Arrow connectors
 
-AI uses `->` and `→` as prose shorthand instead of writing "to", "into", or "produces". Arrows are fine in code, type signatures, and diagrams but mark AI-generated prose.
+Arrow notation is context-sensitive.
 
-- "spec -> plan -> tasks" (slop) → "spec to plan to tasks" (human)
-- "returns `int -> str`" (fine, code context)
+**Allowed when used as compact technical notation:**
+- workflow chains: `brainstorm → plan → apply`
+- architecture or boundary descriptions: `CLI → tool → service`
+- single-step technical transitions: `request → response`, `parser → AST`, `draft → published`
+- data-flow or state-flow summaries
+- diagrams, breadcrumbs, and type signatures
+
+**Flag when used as vague prose shorthand:**
+- "this change -> improves productivity"
+- "the tool → makes things easier"
+
+Rule of thumb: keep arrows when they connect short technical phrases. Replace them when they stand in for normal sentence prose.
 
 ```bash
 # Detect arrows in prose (exclude code blocks)
 awk '/^```/{c=!c}!c' file.md | rg -o '\s->\s|→' | wc -l
-
-_Also detected by `scripts/slop-scan-structural.ts` (included in structural score)._
 ```
+
+_Also detected by `scripts/slop-scan-structural.ts`, which separates technical chains from prose shorthand._
 
 ### Plus-sign conjunction
 
@@ -243,17 +280,17 @@ Too-perfect grammar with no contractions, no fragments, uniform register → sus
 vocab_score = (tier1_count × 3 + tier2_count × 2 + tier4_count × 2 + phrase_count × avg_phrase_score) / word_count × 100
 
 structural_score:
-  +2 if em_dash_density > 5
+  +2 if em_dash_density exceeds the profile threshold
   +2 if sentence_cluster_ratio > 0.7
-  +2 if bullet_ratio > 0.5
+  +2 if bullet_ratio exceeds the profile threshold
   +2 if paragraph_uniformity > 0.7
   +1 if emoji_bullets present
   +2 if participial_tail_count > 3 per 500 words
-  +2 if intro-body-conclusion structure detected
+  +2 if intro-body-conclusion structure detected (except relaxed skill profile)
   +1 if correlative_pairs > 2
-  +1 if arrow_connectors > 0
-  +1 if plus_conjunctions > 1
-  +1 if em_dashes > 5 AND semicolons = 0
+  +1 if prose_arrow_connectors > 0
+  +1 if plus_conjunctions exceed the profile threshold
+  +1 if em_dashes exceed the profile threshold AND semicolons = 0
   +1 if conclusion_mirroring detected
 
 final_score = vocab_score + structural_score (cap at 10)
@@ -306,6 +343,8 @@ Output fields consumed by the agent:
 ```json
 {
   "file": "README.md",
+  "profile": "technical",
+  "adjustments": ["technical-doc thresholds", "workflow arrow chains relaxed"],
   "wordCount": 1612,
   "vocabScore": 11.10,
   "structuralScore": 7,
@@ -327,7 +366,7 @@ pnpm exec jiti scripts/slop-scan-vocab.ts README.md
 
 #### `slop-scan-structural.ts` — Structural-only scan
 
-Analyzes structural patterns: em dash density, bullet ratios, sentence clustering, participial tails, arrow connectors, correlative pairs, plus-sign conjunctions, five-paragraph essay structure, conclusion mirroring, and more.
+Analyzes structural patterns with profile-aware thresholds: em dash density, bullet ratios, sentence clustering, participial tails, arrow usage, correlative pairs, plus-sign conjunctions, five-paragraph essay structure, conclusion mirroring, and more.
 
 ```bash
 pnpm exec jiti scripts/slop-scan-structural.ts README.md

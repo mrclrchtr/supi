@@ -10,8 +10,8 @@
  */
 
 import {
+  analyzeArrowConnectors,
   computeBulletRatio,
-  countArrowConnectors,
   countColons,
   countCorrelativePairs,
   countEmDashes,
@@ -21,6 +21,8 @@ import {
   countPlusSigns,
   countSemicolons,
   countWords,
+  type DocProfile,
+  detectDocProfile,
   detectIntroBodyConclusion,
   getFirstAndLastParagraph,
   isNearParaphrase,
@@ -38,6 +40,8 @@ interface StructuralMetrics {
   /** Normalized participial tails per 500 words. */
   participialTailsPer500: number;
   arrowConnectors: number;
+  technicalArrowConnectors: number;
+  proseArrowConnectors: number;
   correlativePairs: number;
   plusSigns: number;
   colons: number;
@@ -53,39 +57,98 @@ interface StructuralMetrics {
 
 interface StructuralResult {
   file: string;
+  profile: DocProfile;
+  adjustments: string[];
   wordCount: number;
   metrics: StructuralMetrics;
   structuralScore: number;
   flags: string[];
 }
 
-function computeStructuralScore(metrics: StructuralMetrics): number {
+interface ProfileThresholds {
+  emDashWarn: number;
+  emDashPenalty: number;
+  bulletPenalty: number;
+  plusSignPenalty: number;
+  scoreIntroBodyConclusion: boolean;
+}
+
+function getThresholds(profile: DocProfile): ProfileThresholds {
+  if (profile === "skill") {
+    return {
+      emDashWarn: 6,
+      emDashPenalty: 8,
+      bulletPenalty: 0.65,
+      plusSignPenalty: 2,
+      scoreIntroBodyConclusion: false,
+    };
+  }
+
+  if (profile === "technical") {
+    return {
+      emDashWarn: 3,
+      emDashPenalty: 5,
+      bulletPenalty: 0.5,
+      plusSignPenalty: 1,
+      scoreIntroBodyConclusion: true,
+    };
+  }
+
+  return {
+    emDashWarn: 3,
+    emDashPenalty: 5,
+    bulletPenalty: 0.45,
+    plusSignPenalty: 1,
+    scoreIntroBodyConclusion: true,
+  };
+}
+
+function getProfileAdjustments(profile: DocProfile): string[] {
+  if (profile === "skill") {
+    return [
+      "workflow arrow chains relaxed",
+      "higher bullet-ratio threshold",
+      "higher em-dash threshold",
+      "intro-body-conclusion penalty disabled",
+    ];
+  }
+
+  if (profile === "technical") {
+    return ["technical-doc thresholds", "workflow arrow chains relaxed"];
+  }
+
+  return ["default prose thresholds"];
+}
+
+function computeStructuralScore(metrics: StructuralMetrics, profile: DocProfile): number {
+  const thresholds = getThresholds(profile);
   let score = 0;
-  if (metrics.emDashDensity > 5) score += 2;
+  if (metrics.emDashDensity > thresholds.emDashPenalty) score += 2;
   if (metrics.sentenceClusterRatio > 0.7) score += 2;
-  if (metrics.bulletRatio > 0.5) score += 2;
+  if (metrics.bulletRatio > thresholds.bulletPenalty) score += 2;
   if (metrics.paragraphUniformity > 0.7) score += 2;
   if (metrics.emojiBullets > 0) score += 1;
   if (metrics.participialTailsPer500 > 3) score += 2;
-  if (metrics.introBodyConclusion) score += 2;
+  if (thresholds.scoreIntroBodyConclusion && metrics.introBodyConclusion) score += 2;
   if (metrics.correlativePairs > 2) score += 1;
-  if (metrics.arrowConnectors > 0) score += 1;
-  if (metrics.plusSigns > 1) score += 1;
-  if (metrics.emDashDensity > 5 && metrics.semicolons === 0) score += 1;
+  if (metrics.proseArrowConnectors > 0) score += 1;
+  if (metrics.plusSigns > thresholds.plusSignPenalty) score += 1;
+  if (metrics.emDashDensity > thresholds.emDashPenalty && metrics.semicolons === 0) score += 1;
   if (metrics.conclusionMirroring) score += 1;
   return score;
 }
 
-function genFlags(metrics: StructuralMetrics): string[] {
+function genFlags(metrics: StructuralMetrics, profile: DocProfile): string[] {
+  const thresholds = getThresholds(profile);
   const flags: string[] = [];
 
-  if (metrics.emDashDensity > 5) {
+  if (metrics.emDashDensity > thresholds.emDashPenalty) {
     flags.push(
-      `Em dash density ${metrics.emDashDensity.toFixed(1)}/1000 words (threshold: 5) — review usage`,
+      `Em dash density ${metrics.emDashDensity.toFixed(1)}/1000 words (threshold: ${thresholds.emDashPenalty}) — review usage`,
     );
-  } else if (metrics.emDashDensity > 3) {
+  } else if (metrics.emDashDensity > thresholds.emDashWarn) {
     flags.push(
-      `Em dash density ${metrics.emDashDensity.toFixed(1)}/1000 words — elevated, spot-check`,
+      `Em dash density ${metrics.emDashDensity.toFixed(1)}/1000 words — elevated for ${profile} docs, spot-check`,
     );
   }
 
@@ -95,9 +158,9 @@ function genFlags(metrics: StructuralMetrics): string[] {
     );
   }
 
-  if (metrics.bulletRatio > 0.5) {
+  if (metrics.bulletRatio > thresholds.bulletPenalty) {
     flags.push(
-      `Bullet ratio ${(metrics.bulletRatio * 100).toFixed(0)}% (threshold: 50%) — convert some to prose`,
+      `Bullet ratio ${(metrics.bulletRatio * 100).toFixed(0)}% (threshold: ${(thresholds.bulletPenalty * 100).toFixed(0)}%) — convert some to prose`,
     );
   }
 
@@ -117,7 +180,7 @@ function genFlags(metrics: StructuralMetrics): string[] {
     );
   }
 
-  if (metrics.introBodyConclusion) {
+  if (getThresholds(profile).scoreIntroBodyConclusion && metrics.introBodyConclusion) {
     flags.push("Intro-body-conclusion structure — cut the intro and start with content");
   }
 
@@ -127,16 +190,20 @@ function genFlags(metrics: StructuralMetrics): string[] {
     );
   }
 
-  if (metrics.arrowConnectors > 0) {
-    flags.push(`Arrow connectors (->/→) in prose: ${metrics.arrowConnectors} — use "to" instead`);
+  if (metrics.proseArrowConnectors > 0) {
+    flags.push(
+      `Arrow connectors used as prose shorthand: ${metrics.proseArrowConnectors} — keep arrows for technical chains and use words in normal sentences`,
+    );
   }
 
-  if (metrics.plusSigns > 1) {
-    flags.push(`Plus-sign conjunctions: ${metrics.plusSigns} (threshold: 1) — use "and" instead`);
+  if (metrics.plusSigns > thresholds.plusSignPenalty) {
+    flags.push(
+      `Plus-sign conjunctions: ${metrics.plusSigns} (threshold: ${thresholds.plusSignPenalty}) — use "and" instead`,
+    );
   }
 
-  if (metrics.emDashDensity > 5 && metrics.semicolons === 0) {
-    flags.push("Em dashes > 5 with zero semicolons — strong AI signal");
+  if (metrics.emDashDensity > thresholds.emDashPenalty && metrics.semicolons === 0) {
+    flags.push("Em dashes above threshold with zero semicolons — strong AI signal");
   }
 
   if (metrics.conclusionMirroring) {
@@ -150,18 +217,22 @@ function scanFile(filePath: string): StructuralResult {
   const content = readFile(filePath);
   const prose = stripCodeBlocks(content);
   const wordCount = countWords(content);
+  const profile = detectDocProfile(filePath);
 
   const emDashCount = countEmDashes(prose);
   const emDashDensity = wordCount > 0 ? (emDashCount / wordCount) * 1000 : 0;
   const rawTails = countParticipialTails(prose);
   const tailsPer500 = wordCount > 0 ? (rawTails / wordCount) * 500 : 0;
+  const arrows = analyzeArrowConnectors(content);
 
   const metrics: StructuralMetrics = {
     emDashDensity: Math.round(emDashDensity * 100) / 100,
     bulletRatio: Math.round(computeBulletRatio(content) * 100) / 100,
     participialTails: rawTails,
     participialTailsPer500: Math.round(tailsPer500 * 10) / 10,
-    arrowConnectors: countArrowConnectors(content),
+    arrowConnectors: arrows.total,
+    technicalArrowConnectors: arrows.technical,
+    proseArrowConnectors: arrows.prose,
     correlativePairs: countCorrelativePairs(prose),
     plusSigns: countPlusSigns(content),
     colons: countColons(prose),
@@ -176,10 +247,12 @@ function scanFile(filePath: string): StructuralResult {
 
   return {
     file: filePath,
+    profile,
+    adjustments: getProfileAdjustments(profile),
     wordCount,
     metrics,
-    structuralScore: computeStructuralScore(metrics),
-    flags: genFlags(metrics),
+    structuralScore: computeStructuralScore(metrics, profile),
+    flags: genFlags(metrics, profile),
   };
 }
 
