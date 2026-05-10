@@ -1,6 +1,6 @@
 ---
 name: supi-flow-plan
-description: Create an implementation plan for an approved design — bite-sized tasks, exact file paths, no placeholders. Use after /supi-flow-brainstorm when the design is approved.
+description: Create an implementation plan for an approved design with exact file paths, ordered tasks, concrete verification, and no placeholders.
 ---
 
 # Create implementation plan
@@ -9,74 +9,97 @@ description: Create an implementation plan for an approved design — bite-sized
 
 - If a TNDM-ID was given as argument: `tndm ticket show <ID>`, read the Intent/Design sections.
 - Otherwise: scan recent conversation for the most recent `/supi-flow-brainstorm` outcome.
-- If no design found: ask which change to plan.
+- If no design is available: ask which change to plan.
 
 ## Step 2: Scope check
 
-If the design covers multiple independent subsystems, suggest splitting into separate plans. Each plan should produce working, testable software on its own.
+If the design covers multiple independent subsystems, suggest splitting it into separate plans. Each plan should produce a coherent, testable result.
 
-## Step 3: Map file structure
+## Step 3: Choose the right detail level
 
-Before defining tasks, list which files will be created or modified and what each is responsible for.
+Use **adaptive detail by complexity**:
 
-- Design units with clear boundaries. Each file should have one clear responsibility.
-- Prefer smaller, focused files over large ones that do too much.
-- In existing codebases, follow established patterns.
+- **Light plan** for small or familiar changes: clear tasks, files, verification, and constraints.
+- **Fuller executable plan** for risky, unfamiliar, multi-file, or high-impact changes: more explicit steps, commands, and snippets when they reduce ambiguity.
 
-## Step 4: Write bite-sized tasks
+Do not add ceremony for its own sake.
 
-Each task is one action (2-5 minutes):
+## Step 4: Map file structure
 
-- [ ] 1.1 Write the failing test — show actual test code
-- [ ] 1.2 Run test to verify it fails — show exact command + expected output
-- [ ] 1.3 Write minimal implementation — show actual code
-- [ ] 1.4 Run test to verify it passes — show exact command + expected output
-- [ ] 1.5 Commit — show exact commit message
+Before writing tasks, list which files will be created or modified and what each is responsible for.
+
+- Use exact file paths.
+- Prefer focused units with clear responsibilities.
+- Follow existing codebase patterns.
+- Include doc targets when the change affects user-facing or maintainer-facing behavior.
+
+## Step 5: Write ordered tasks
+
+A good plan is broken into small, verifiable tasks. For each task, include:
+
+- the goal
+- exact file paths
+- the change to make
+- how to verify it
+- whether it is test-driven or explicitly test-exempt
+
+Use enough detail that an agent can execute without guessing, but do not force huge code blocks into every step.
 
 ## TDD by default
 
-Every code task follows red-green-refactor, unless the approved design explicitly opts out:
+For testable code changes, prefer red-green-refactor:
 
+```text
+RED → write the failing test → verify it fails for the right reason
+GREEN → write the minimal code to pass → verify it passes
+REFACTOR → clean up while staying green
 ```
-RED → Write failing test → VERIFY it fails for the right reason
-GREEN → Minimal code to pass → VERIFY test passes + no regressions
-REFACTOR → Clean up, stay green → then commit
-```
 
-Critical rule: **If you didn't watch the test fail, you don't know if it tests the right thing.** Every test step must include the expected failure message.
+Critical rule: if you did not watch the test fail, you do not know whether it proves the behavior.
 
-### Test exemption
+### Test exemptions
 
-Individual tasks may be marked test-exempt with a brief rationale (e.g., "test-exempt: standalone shell script"). Exempt tasks skip red-green steps and instead include a concrete manual verification step (exact command + expected output). The rule becomes: **No code before verification.**
+TDD is the default, not an absolute rule.
 
-Use this sparingly — when there is no reasonable test harness or the change is trivial (config tweak, one-line script fix). Do not use it to avoid testing logic that could be tested.
+A task may be marked **test-exempt** when TDD is not practical, such as:
+
+- docs-only changes
+- config-only changes
+- trivial edits
+- shell or integration work with no reasonable harness
+
+Every test-exempt task MUST include:
+
+- a brief rationale
+- a concrete manual verification step
+- the exact command and expected result when possible
+
+Do not use test exemptions to avoid testing logic that could reasonably be tested.
 
 ## Rules
 
-- **No placeholders.** Never write: TBD, TODO, "implement later", "add error handling", "write tests for the above". Every step must contain the actual content.
+- **No placeholders.** Never write `TBD`, `TODO`, `implement later`, or vague instructions like `add error handling`.
 - **Exact file paths** always.
-- **Complete code** in every step — if a step changes code, show the code.
-- **Exact commands** with expected output, including expected failure output for test steps.
-- **Include doc updates** as tasks (from the design's "Docs to update" section).
-- **No code before test (or verification).** Every task that produces code starts with a failing test step, unless the task is test-exempt. For test-exempt tasks, start with the manual verification step.
+- **Verification is mandatory.** Every task needs a concrete check.
+- **No code before test or verification.** Testable code starts with a failing test. Test-exempt work starts with manual verification.
+- **Include doc updates** when the change affects docs, help text, architecture notes, or workflow guidance.
 
 ## Self-review
 
-After writing the complete plan, look at the brainstorm outcome with fresh eyes and check the plan against it. This is a checklist you run yourself — not a user review.
+After writing the plan, check it against the approved design:
 
-**1. Spec coverage:** Skim each section/requirement from the brainstorm outcome. Can you point to a task that implements it? List any gaps.
+1. **Coverage:** does every important requirement map to a task?
+2. **Placeholder scan:** remove vague or incomplete instructions.
+3. **Consistency:** do names, types, files, and steps line up across tasks?
+4. **Right-sized detail:** is the plan clear without being bloated?
 
-**2. Placeholder scan:** Search your plan for red flags — any TBD, TODO, "implement later", vague steps, or "similar to Task N" shortcuts. Fix them.
+Fix issues inline before handing off.
 
-**3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
+## Output and persistence
 
-If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a requirement with no task, add the task.
+Write the plan in the lightest form that will still survive execution:
 
-## Output
-
-Write the plan:
-
-- **If ticket exists:** append to ticket body under the `## Plan` section. Each task as `- [ ] X.Y Description`.
-- **If no ticket:** present the plan in the conversation. The plan lives in context for this session.
-
-After writing: "Plan ready. Review it and approve before we start. Then run `/supi-flow-apply [TNDM-XXXXXX]`."
+- **If a ticket exists:** append the plan there if that is the best shared source of truth.
+- **If no ticket exists:** default to conversation-first.
+- **If the work is larger or likely multi-session:** offer saving the plan to a file.
+- Close with: `Plan ready. Review it and approve before we start. Then run /supi-flow-apply [TNDM-XXXXXX].`

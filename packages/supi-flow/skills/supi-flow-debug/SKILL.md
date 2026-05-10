@@ -1,11 +1,11 @@
 ---
 name: supi-flow-debug
-description: Systematic debugging protocol — root cause before fixes. Load on demand when blocked during /supi-flow-apply (test failures, build errors, unexpected behavior).
+description: Systematic debugging protocol — find the root cause before proposing fixes.
 ---
 
 # Systematic Debugging
 
-Random fixes waste time and create new bugs. Symptom fixes mask underlying issues.
+Random fixes waste time and often create new bugs. Debug by understanding the cause first.
 
 ## The Iron Law
 
@@ -13,137 +13,139 @@ Random fixes waste time and create new bugs. Symptom fixes mask underlying issue
 NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST
 ```
 
-If you haven't completed Phase 1, you cannot propose fixes.
+If you have not completed Phase 1, you are not ready to propose a fix.
 
 ## When to use
 
-Load this skill when:
-- A test fails during `/supi-flow-apply` and you don't understand why
-- A build error blocks progress
-- Unexpected behavior surfaces during implementation
-- You've already tried a fix and it didn't work
-- You're about to say "let me just try changing X"
+Use this when:
 
-Use this ESPECIALLY when:
-- Under time pressure (emergencies make guessing tempting)
-- "Just one quick fix" seems obvious
-- You've already tried 2+ fixes
-- You don't fully understand the issue
+- a test fails during `/supi-flow-apply` and the cause is not obvious
+- a build error blocks progress
+- behavior does not match expectations
+- a previous fix did not work
+- you are tempted to "just try something"
+
+Use it especially when you are under pressure, already tried multiple fixes, or do not fully understand the issue.
 
 ## Phase 1: Root cause investigation
 
-**BEFORE attempting ANY fix:**
+Before changing anything:
 
-### 1.1 Read error messages carefully
-- Don't skip past errors or warnings
-- Read stack traces completely — note line numbers, file paths, error codes
-- They often contain the exact solution
+### 1.1 Read the evidence carefully
+
+- Read error messages, warnings, and stack traces fully.
+- Note exact file paths, line numbers, inputs, and error codes.
+- Do not summarize before you understand what the tools actually said.
 
 ### 1.2 Reproduce consistently
-- Can you trigger it reliably?
-- What are the exact steps?
-- Does it happen every time?
-- If not reproducible → gather more data, don't guess
+
+- Can you trigger it on demand?
+- What exact steps produce it?
+- Does it always happen, or only sometimes?
+
+If you cannot reproduce it reliably, gather more data before guessing.
 
 ### 1.3 Check recent changes
-- What changed that could cause this?
-- `git diff` — what did you just edit?
-- New dependencies, config changes, environmental differences?
 
-### 1.4 Trace data flow (for multi-component systems)
+- What changed just before the problem appeared?
+- Review `git diff`, recent edits, config changes, environment changes, and dependency changes.
 
-When the error is deep in a call stack, trace backward:
-- Where does the bad value originate?
-- What called this with the bad value?
-- Keep tracing up until you find the source
-- Fix at source, not at symptom
+### 1.4 Trace data flow
 
-For component boundaries (API → service → database etc.), add diagnostic instrumentation at each boundary to isolate the failing layer.
+When the symptom appears deep in the stack, trace backward:
+
+- where did the bad value or bad state come from?
+- what called this layer?
+- what assumptions were already broken before the visible error?
+
+Fix the source, not the symptom.
+
+### 1.5 Isolate multi-component failures
+
+For issues that cross boundaries like CLI to tool to service or UI to handler to storage:
+
+- inspect inputs at each boundary
+- inspect outputs at each boundary
+- verify config and environment propagation
+- narrow down which layer first becomes wrong
+
+Add minimal diagnostic logging or instrumentation if needed to find the failing layer.
 
 ## Phase 2: Pattern analysis
 
-Before fixing, understand the pattern:
+Before fixing, understand what "correct" looks like:
 
-1. **Find working examples** — locate similar working code in the same codebase
-2. **Compare against references** — if implementing a pattern, read the reference implementation completely. Don't skim.
-3. **Identify differences** — what's different between working and broken? List every difference, however small. Don't assume "that can't matter."
-4. **Understand dependencies** — what other components does this need? What settings, config, environment? What assumptions does it make?
+1. Find similar working code in the same codebase.
+2. Compare against the reference pattern completely.
+3. List every meaningful difference.
+4. Check dependencies, assumptions, settings, and required context.
+
+Do not assume a small difference is irrelevant.
 
 ## Phase 3: Hypothesis and testing
 
-Scientific method, one variable at a time:
+Use one hypothesis at a time:
 
-1. **Form a single hypothesis** — state clearly: "I think X is the root cause because Y." Be specific.
-2. **Test minimally** — make the SMALLEST possible change to test the hypothesis. One variable at a time. Don't fix multiple things at once.
-3. **Verify before continuing** — did it work? Yes → Phase 4. No → form a NEW hypothesis. Don't add more fixes on top.
-4. **When you don't know** — say "I don't understand X." Don't pretend. Ask for help.
+1. State the hypothesis clearly: `I think X is the root cause because Y.`
+2. Make the smallest change or probe that tests that idea.
+3. Verify the result.
+4. If it failed, form a new hypothesis instead of stacking more guesses on top.
+
+If you still do not understand the issue after investigation, say so and ask the user.
 
 ## Phase 4: Implementation
 
-Fix the root cause, not the symptom:
+Once the cause is understood:
 
-1. **Create a failing test case** — simplest possible reproduction. Must have before fixing.
-2. **Implement a single fix** — address the root cause identified. ONE change at a time. No "while I'm here" improvements.
-3. **Verify fix** — test passes now? No other tests broken? Issue actually resolved?
-4. **If fix doesn't work** — STOP. Count: how many fixes have you tried?
+1. Create the smallest failing reproduction you reasonably can.
+2. Implement one fix aimed at the root cause.
+3. Verify that the issue is fixed.
+4. Check for regressions.
 
 ## The 3-fix rule
 
+```text
+If 3 fixes have failed, stop and question the architecture.
+Do not attempt fix #4 without discussing it with the user.
 ```
-If ≥ 3 fixes have failed: STOP and question the architecture.
-Do NOT attempt fix #4 without discussing with the user.
-```
 
-**Pattern indicating architectural problem:**
-- Each fix reveals a new problem in a different place
-- Fixes require "massive refactoring" to implement
-- Each fix creates new symptoms elsewhere
+Signs this may be an architectural issue:
 
-This is not a failed hypothesis — this is a wrong architecture. Discuss fundamentals with the user.
+- each fix reveals a new problem elsewhere
+- the fix requires unexpectedly large restructuring
+- the same class of bug keeps appearing in different places
 
-## Red flags — STOP and return to Phase 1
+## Red flags
 
-If you catch yourself thinking:
+If you catch yourself thinking any of these, stop and go back to Phase 1:
+
 - "Quick fix for now, investigate later"
-- "Just try changing X and see if it works"
-- "Add multiple changes, run tests"
-- "Skip the test, I'll manually verify"
-- "It's probably X, let me fix that"
-- "I don't fully understand but this might work"
-- "One more fix attempt" (when already tried 2+)
-- Proposing solutions before understanding root cause
+- "Let me try changing X"
+- "I probably know what this is"
+- "I'll fix several things at once"
+- "I'll skip the failing test"
+- "One more fix attempt" after multiple failed tries
 
-**ALL of these mean: STOP. Return to Phase 1.**
+## When to hand off to the user
 
-## Rationalization prevention
+Ask the user when:
 
-| Excuse | Reality |
-|--------|---------|
-| "Issue is simple, don't need process" | Simple issues have root causes too. Process is fast for simple bugs. |
-| "Emergency, no time for process" | Systematic debugging is FASTER than guess-and-check thrashing. |
-| "Just try this first, then investigate" | First fix sets the pattern. Do it right from the start. |
-| "I'll write test after confirming fix works" | Untested fixes don't stick. Test first proves it. |
-| "Multiple fixes at once saves time" | Can't isolate what worked. Causes new bugs. |
-| "I see the problem, let me fix it" | Seeing symptoms ≠ understanding root cause. |
-| "One more fix attempt" (after 2+ failures) | 3+ failures = architectural problem. Question approach, don't fix again. |
+- the root cause is still unclear after real investigation
+- the likely fix expands beyond the approved scope
+- a required dependency or environment is missing
+- 3 fixes have already failed
+- you need a judgment call about trade-offs, risk, or test strategy
 
 ## Quick reference
 
-| Phase | Key Activities | Success Criteria |
-|-------|---------------|------------------|
-| 1. Root Cause | Read errors, reproduce, check changes, trace data flow | Understand WHAT and WHY |
-| 2. Pattern | Find working examples, compare, identify differences | Know what's different |
-| 3. Hypothesis | Form theory, test minimally | Confirmed or new hypothesis |
-| 4. Implementation | Create test, fix, verify | Bug resolved, tests pass |
-
-## When to hand off to user
-
-- 3+ fixes have failed → question architecture with user
-- Root cause is unclear after completing Phase 1 → present findings and ask
-- Fix requires changes outside the current change scope → ask before expanding
-- You need environment access you don't have → explain what you need
+| Phase | Focus | Success criteria |
+|---|---|---|
+| 1. Root cause | Evidence, reproduction, recent changes, data flow | You understand what failed and why |
+| 2. Pattern | Working examples and differences | You know what "correct" looks like |
+| 3. Hypothesis | One theory at a time | Hypothesis confirmed or replaced |
+| 4. Implementation | Minimal root-cause fix | Issue resolved without regressions |
 
 ## Related skills
 
-- After debugging: return to `/supi-flow-apply` to continue task execution
-- For TDD test creation: follow the plan's red-green-refactor steps
+- Return to `/supi-flow-apply` after debugging.
+- Use the plan's TDD or verification steps when implementing the fix.
