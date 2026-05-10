@@ -17,10 +17,10 @@ Built for the [pi coding agent](https://github.com/earendil-works/pi).
 | Package | Extension | Description |
 |---------|-----------|-------------|
 | `@mrclrchtr/supi-extras` | **extras** | Command aliases (`/exit`, `/e`, `/clear`), `$skill-name` shorthand, tab spinner, `/supi-stash` prompt stash with TUI overlay, and other small utilities |
-| `@mrclrchtr/supi-bash-timeout` | **bash-timeout** | Injects a default timeout on every bash tool call when the LLM omits one. Configurable via `PI_BASH_DEFAULT_TIMEOUT` (seconds, default 120). |
+| `@mrclrchtr/supi-bash-timeout` | **bash-timeout** | Injects a default timeout on every bash tool call when the LLM omits one. Configurable via SuPi config or `/supi-settings` (default 120s). |
 | `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
 | `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, workspace symbol search, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. Also exports a reusable `SessionLspService` library surface for peer extensions. |
-| `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis for JavaScript and TypeScript files: outline, imports, exports, node-at-position lookup, and custom queries. Designed as a standalone substrate independent of semantic LSP tooling. |
+| `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis across supported grammars. `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only; `node_at` and `query` work across all supported grammars. Designed as a standalone substrate independent of semantic LSP tooling. |
 | `@mrclrchtr/supi-review` | **review** | Adds `/supi-review` for structured code review with configurable fast/deep models, diff limits, and review timeout via `/supi-settings`. |
 | `@mrclrchtr/supi-flow` | **flow** | Lightweight spec-driven workflow: brainstorm → plan → apply → archive. Skills with HARD-GATE before implementation, bite-sized tasks, and slop-free doc updates. Optional tndm ticket tracking for multi-session changes. |
 
@@ -60,10 +60,11 @@ When installed from a local path, pi loads the working tree directly; after edit
 
 ## Tree-sitter extension
 
-The `tree_sitter` extension provides syntax-tree-level structural analysis for JavaScript and TypeScript files:
+The `tree_sitter` extension provides syntax-tree-level structural analysis across supported grammars:
 
-- supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, and `.cjs`
+- supports JavaScript/TypeScript, Python, Rust, Go, C/C++, Java, Kotlin, Ruby, Bash/Shell, HTML, R, and SQL file families
 - exposes actions for `outline`, `imports`, `exports`, `node_at`, and `query`
+- `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only; `node_at` and `query` work across all supported grammars
 - uses 1-based `line`/`character` coordinates; `character` is a UTF-16 code-unit column
 - caps tool responses at 100 emitted items, including nested outline children
 - exports `createTreeSitterSession(cwd)` for other SuPi packages that need reusable parse/query/structure services
@@ -73,7 +74,7 @@ The `tree_sitter` extension provides syntax-tree-level structural analysis for J
 
 The `review` extension adds structured code review through `/supi-review`.
 
-- runs reviews in a dedicated read-only subprocess
+- runs reviews in an in-process managed child session with a restricted tool set
 - supports interactive target/depth selection plus non-interactive `/supi-review ...` arguments
 - stores fast/deep model overrides, diff size limit, and review timeout in minutes in `/supi-settings`
 - preserves child review sessions for timeout/failure debugging
@@ -104,7 +105,7 @@ The `extras` extension adds small quality-of-life utilities:
 
 The `lsp` extension adds semantic code navigation and diagnostics:
 
-- exposes a single `lsp` tool with actions for hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, and symbol_hover
+- exposes a single `lsp` tool with actions for hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, symbol_hover, and recover
 - appends LSP diagnostics after `write`/`edit`
 - performs a proactive project scan at `session_start` to detect matching roots and available language servers, then eagerly starts them
 - builds project-specific semantic-first `promptSnippet` / `promptGuidelines` from detected servers, roots, file types, and supported actions so the agent prefers `lsp` for code navigation and diagnostics
@@ -115,4 +116,4 @@ The `lsp` extension adds semantic code navigation and diagnostics:
 Configuration:
 
 - Settings are managed through `/supi-settings` (LSP panel)
-- `.pi-lsp.json` in the project root — override/add/disable server definitions
+- SuPi config (`~/.pi/agent/supi/config.json` or `.pi/supi/config.json`) under `lsp.servers` — override/add/disable server definitions

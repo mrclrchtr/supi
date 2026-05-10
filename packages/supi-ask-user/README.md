@@ -26,7 +26,7 @@ Key features:
 - `default` pre-selection for text and structured questions
 - `allowOther` and `allowDiscuss` for flexibility
 - rich option `preview` content
-- automatic fallback to simpler prompts when the rich UI is unavailable
+- explicit error in non-interactive or degraded UI sessions that lack `ctx.ui.custom()` overlay support
 - abort on cancel to stop the current agent turn
 
 ## Example

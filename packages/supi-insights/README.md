@@ -89,7 +89,7 @@ Example config:
 ## Architecture
 
 ```
-packages/supi-insights/
+packages/supi-insights/src/
 ├── insights.ts       # Extension factory — registers /supi-insights and settings
 ├── scanner.ts        # Session discovery via SessionManager.listAll()
 ├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
@@ -224,7 +224,7 @@ The extension detects when you run multiple pi sessions simultaneously ("multi-c
 # Typecheck
 pnpm exec tsc --noEmit -p packages/supi-insights/tsconfig.json
 
-# Test (when tests are added)
+# Test
 pnpm vitest run packages/supi-insights/
 ```
 
