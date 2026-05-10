@@ -53,8 +53,9 @@ export function toggleLspStatusOverlay(
         overlay: true,
         overlayOptions: {
           anchor: "right-center",
-          width: 64,
-          maxHeight: "75%",
+          width: "60%",
+          minWidth: 72,
+          maxHeight: "90%",
           margin: { right: 1, top: 1, bottom: 1 },
           nonCapturing: true,
         },
@@ -77,20 +78,31 @@ function createLspInspectorComponent(
 ): { render: (width: number) => string[]; invalidate: () => void } {
   return {
     render: (width) =>
-      buildLspInspectorContainer(theme, manager, inlineSeverity, servers).render(width),
+      buildLspInspectorContainer({
+        theme,
+        manager,
+        inlineSeverity,
+        servers,
+        width,
+      }).render(width),
     invalidate: () => {},
   };
 }
 
-function buildLspInspectorContainer(
-  theme: ExtensionContext["ui"]["theme"],
-  manager: LspManager,
-  inlineSeverity: number,
-  servers: ProjectServerInfo[],
-): Container {
-  const diagnostics = manager.getOutstandingDiagnosticSummary(inlineSeverity);
-  const detailedDiagnostics = manager.getOutstandingDiagnostics(inlineSeverity);
+interface LspInspectorContainerInput {
+  theme: ExtensionContext["ui"]["theme"];
+  manager: LspManager;
+  inlineSeverity: number;
+  servers: ProjectServerInfo[];
+  width: number;
+}
+
+function buildLspInspectorContainer(input: LspInspectorContainerInput): Container {
+  const diagnostics = input.manager.getOutstandingDiagnosticSummary(input.inlineSeverity);
+  const detailedDiagnostics = input.manager.getOutstandingDiagnostics(input.inlineSeverity);
   const container = new Container();
+
+  const { theme, servers, width } = input;
 
   container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
   container.addChild(
@@ -119,7 +131,7 @@ function buildLspInspectorContainer(
     buildOverlaySection(
       theme,
       diagnostics.length > 0 ? "Problems" : "Diagnostics",
-      buildOverlayDiagnosticLines(theme, diagnostics, detailedDiagnostics),
+      buildOverlayDiagnosticLines(theme, diagnostics, detailedDiagnostics, width),
     ),
   );
   container.addChild(new Spacer(1));
@@ -257,8 +269,8 @@ function buildOverlayServerLines(
       server.supportedActions.length > 0 ? server.supportedActions.join(", ") : "none";
     const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(", ");
     const openFiles =
-      server.openFiles.length > 0 ? server.openFiles.slice(0, 2).join(", ") : "none";
-    const remaining = server.openFiles.length - Math.min(server.openFiles.length, 2);
+      server.openFiles.length > 0 ? server.openFiles.slice(0, 3).join(", ") : "none";
+    const remaining = server.openFiles.length - Math.min(server.openFiles.length, 3);
     const suffix = remaining > 0 ? theme.fg("dim", ` +${remaining} more`) : "";
 
     return [
@@ -274,14 +286,17 @@ function buildOverlayDiagnosticLines(
   theme: ExtensionContext["ui"]["theme"],
   diagnostics: OutstandingDiagnosticSummaryEntry[],
   detailedDiagnostics: Array<{ file: string; diagnostics: Diagnostic[] }>,
+  width: number,
 ): string[] {
   if (diagnostics.length === 0) {
     return [theme.fg("success", "✓ no outstanding diagnostics")];
   }
 
   const lines: string[] = [];
-  const maxFiles = 3;
-  const maxMessagesPerFile = 3;
+  const maxFiles = 5;
+  const maxMessagesPerFile = 5;
+  // Budget for prefix: 2 spaces + tree char + space + line:col + space + Text paddingX(2)*2
+  const maxMessageLen = Math.max(24, width - 18);
 
   for (const entry of detailedDiagnostics.slice(0, maxFiles)) {
     const summary = diagnostics.find((d) => d.file === entry.file);
@@ -292,7 +307,7 @@ function buildOverlayDiagnosticLines(
       const line = diag.range.start.line + 1;
       const col = diag.range.start.character + 1;
       const sevColor = diag.severity === DiagnosticSeverity.Error ? "error" : "warning";
-      const message = truncate(diag.message, 48);
+      const message = truncate(diag.message, maxMessageLen);
       lines.push(`  ${theme.fg(sevColor, "└")} ${line}:${col} ${theme.fg("dim", message)}`);
     }
 
