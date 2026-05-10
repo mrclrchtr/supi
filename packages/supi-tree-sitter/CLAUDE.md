@@ -21,7 +21,7 @@ The package is designed as a standalone structural-analysis substrate. It does n
 
 ## Supported languages
 
-Grammars are resolved via npm peer dependencies, except Kotlin and SQL which use vendored WASM files generated from `fwcd/tree-sitter-kotlin` and `@derekstride/tree-sitter-sql` respectively. Supported file families:
+Grammars are resolved via npm dependencies, except Kotlin and SQL which use vendored WASM files generated from `fwcd/tree-sitter-kotlin` and `@derekstride/tree-sitter-sql` respectively. Supported file families:
 - **JavaScript/TypeScript**: `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.tsx`
 - **Python**: `.py`, `.pyi`
 - **Rust**: `.rs`
@@ -48,6 +48,7 @@ Grammars are resolved via npm peer dependencies, except Kotlin and SQL which use
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
 - Outline should stay shallow: top-level declarations plus supported class/interface/enum members, not local function bodies.
+- `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only; `node_at` and `query` work across all supported grammars, so docs and tool text must describe that split explicitly.
 - Prompt guidance in `tree-sitter.ts` must be standalone-safe: describe structural analysis directly and do not name the `lsp` tool as an available sibling. Use generic terms like "semantic language-server tooling" if a distinction is needed.
 
 ## Layering

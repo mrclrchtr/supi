@@ -119,12 +119,14 @@ registerSettings({
 - PI internal events like `session_info_changed` are consumed by the interactive mode only; they are **not** forwarded to extension handlers via `pi.on()`. The `pi.events` EventBus is strictly for extension-to-extension communication.
 - `createAgentSession()` child sessions do NOT bubble `agent_start`/`agent_end` to parent extension handlers; use `pi.events` to signal activity from programmatic sub-sessions.
 - `pi.events.emit("supi:working:start", { source: "supi-<pkg>" })` / `pi.events.emit("supi:working:end", { source: "supi-<pkg>" })` — generic SuPi convention for indicating long-running work across extensions; `tab-spinner` listens to these. Emitters must ensure `end` always fires (success, failure, cancel, timeout).
-- Keep runtime-imported packages in `peerDependencies`; after changing version ranges run `pnpm install` to refresh the lockfile.
 - Pi core peer deps (`@mariozechner/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
+- Other runtime imports belong in `dependencies`, not `peerDependencies`.
+- For `packages/supi`, external runtime deps imported by bundled sub-packages must also be present in the meta-package's own `dependencies`; verify with `npm pack` + temp `npm install`.
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
 - Pi discovers package skills from `node_modules` scanning, not workspace packages' `package.json`. Workspace skills must be registered explicitly — SuPi uses `resources_discover` for this (see documentation section above).
+- Packages that only contribute settings sections should document `/supi-settings` as conditional on the install surface, not as a standalone command they ship.
 - Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
 - `pnpm exec jiti /tmp/script.mjs` — use this for ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - pi flattens tool `promptGuidelines` into the system prompt `Guidelines:` section; each bullet must name its tool explicitly.

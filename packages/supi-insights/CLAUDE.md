@@ -10,7 +10,7 @@ This file provides guidance to Claude Code when working in `packages/supi-insigh
 
 ```
 src/
-├── insights.ts       # Extension factory — registers /insights command and settings
+├── insights.ts       # Extension factory — registers /supi-insights and settings
 ├── scanner.ts        # Session discovery via SessionManager.listAll()
 ├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
 ├── extractor.ts      # LLM facet extraction via @mariozechner/pi-ai/complete()
@@ -45,6 +45,9 @@ src/
 - Config section: `"insights"`, keys: `enabled` (boolean), `maxSessions` (number), `maxFacets` (number).
 
 ## Commands
+
+- Command surface is `/supi-insights`, not `/insights`.
+
 
 ```bash
 pnpm vitest run packages/supi-insights/
