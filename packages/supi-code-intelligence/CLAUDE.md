@@ -47,15 +47,15 @@ src/
 | # | Hook | What It Does |
 |---|---|---|
 | 1 | `package.json` → `pi.extensions` | Manifest entry — pi loads the extension at startup |
-| 2 | `pi.registerTool({ name: "code_intel" })` | Registers 6 actions as agent-callable tool |
-| 3 | `promptGuidelines` (6 bullets) | Flattened into system prompt `Guidelines:` section |
+| 2 | `pi.registerTool({ name: "code_intel" })` | Registers 7 actions as agent-callable tool |
+| 3 | `promptGuidelines` (7 bullets) | Flattened into system prompt `Guidelines:` section |
 | 4 | `promptSnippet` (1 line) | Tool-context reminder to favor `code_intel` over raw reads |
 | 5 | `pi.on("session_start", ...)` | Resets dedup state, scans branch for existing overview |
 | 6 | `pi.on("before_agent_start", ...)` | Injects compact architecture overview on first agent turn |
 
 ### Action Dispatching
 
-`tool-actions.ts` validates params, then routes to one of six action handlers in `src/actions/`. Validation errors are returned as explicit Markdown strings, not thrown.
+`tool-actions.ts` validates params, then routes to one of seven action handlers in `src/actions/`. Validation errors are returned as explicit Markdown strings, not thrown.
 
 ```ts
 switch (params.action) {

@@ -35,7 +35,7 @@ pnpm exec biome check packages/supi-core/
 - `loadSupiConfigForScope()` is for settings UIs that need raw scope values; `loadSupiConfig()` is for effective merged runtime config.
 - Config merges are shallow per section; do not assume nested objects deep-merge.
 - In tests, pass `homeDir` instead of trying to mock `os.homedir()`.
-- `registerConfigSettings` does not currently pass `homeDir` through to `loadSupiConfigForScope`; global-scope tests must still set `process.env.HOME` to the temp dir (use a `withHomeDir` helper).
+- `registerConfigSettings()` forwards `homeDir` through to scoped config loads and writes; prefer passing `homeDir` in tests over mutating `process.env.HOME`.
 
 ## Shared behavior gotchas
 

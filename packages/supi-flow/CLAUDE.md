@@ -20,7 +20,7 @@ A single extension (`src/index.ts`) wires two non-skill pieces and delegates eve
 
 ### Skills
 
-Five skills shipped under `skills/`:
+Six skills ship under `skills/`:
 
 | Skill | Trigger | Purpose |
 |---|---|---|
@@ -43,5 +43,5 @@ One prompt template is shipped under `prompts/`:
 ## Gotchas
 
 - Skills reference each other by `/skill:supi-flow-*` names in their instructions. Keep these in sync when renaming.
-- `/supi-flow-status` discovers active tickets by regex-matching `TNDM-\w{6}` in user messages on the active branch. This only works when the ticket skill tags messages.
+- `/supi-flow-status` discovers active tickets by regex-matching `TNDM-\w{6}` in user messages on the active branch. It works for any matching user message, though the ticket skill makes those IDs more likely to be present consistently.
 - Extension is intentionally thin. Workflow logic lives in the skill markdown files under `skills/`, and reusable retrospective prompt text lives under `prompts/`.

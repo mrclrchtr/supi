@@ -26,7 +26,7 @@ Diagnostics are controlled by `/supi-settings`. The default threshold is `1`, so
 
 ## Validation
 
-Run `pnpm exec biome check packages/supi-lsp`, `pnpm vitest run packages/supi-lsp/`, `pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json`, and `pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json`.
+Run `pnpm exec biome check packages/supi-lsp && pnpm vitest run packages/supi-lsp/ && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json`.
 
 ## Architecture gotchas
 

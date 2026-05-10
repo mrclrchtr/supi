@@ -38,9 +38,9 @@ This repo has two install surfaces:
 - repository root `package.json` exposes a `pi` manifest for local-path and git installs — supports `extensions`, `prompts`, `skills`, `themes` keys
 - `packages/supi/` is the published meta-package bundling the full stack
 
-A compact workspace overview is auto-injected on the first agent turn by `supi-code-intelligence` (`before_agent_start` → `generateOverview()`). The full package inventory is listed below for completeness; it extends beyond the 8-module compact overview.
+A compact workspace overview is auto-injected on the first agent turn by `supi-code-intelligence` (`before_agent_start` → `generateOverview()`). The package list below highlights the modules most often touched in agent sessions; inspect `packages/` for the complete workspace inventory.
 
-Current workspace packages:
+Highlighted workspace packages:
 - `packages/supi` — meta-package wrapper entrypoints re-exporting all sub-extensions
 - `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
 - `packages/supi-bash-timeout` — default timeout injection for `bash`
@@ -77,8 +77,8 @@ export default function (pi: ExtensionAPI) {
 ```
 
 Extension packages with prompts/skills:
-- `packages/supi-claude-md` — skills + prompts via `resources_discover`
-- `packages/supi-flow` — skills via `resources_discover`
+- `packages/supi-claude-md` — skills via `resources_discover`
+- `packages/supi-flow` — skills + prompts via `resources_discover`
 - Root `package.json` and sub-package `package.json` files omit `pi.prompts` / `pi.skills` entries to avoid redundancy.
 
 ## Settings registry
