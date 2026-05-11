@@ -1,25 +1,24 @@
 packages:
   - "packages/*"
-ignoredBuiltDependencies:
-  - '@davisvaughan/tree-sitter-r'
-  - '@derekstride/tree-sitter-sql'
-  - tree-sitter
-  - tree-sitter-kotlin
 nodeLinker: hoisted
 
-onlyBuiltDependencies:
-  - '@google/genai'
-  - koffi
-  - protobufjs
-  - tree-sitter-bash
-  - tree-sitter-c
-  - tree-sitter-cli
-  - tree-sitter-cpp
-  - tree-sitter-go
-  - tree-sitter-html
-  - tree-sitter-java
-  - tree-sitter-javascript
-  - tree-sitter-python
-  - tree-sitter-ruby
-  - tree-sitter-rust
-  - tree-sitter-typescript
+allowBuilds:
+  tree-sitter: true
+  tree-sitter-kotlin: false
+  '@davisvaughan/tree-sitter-r': false
+  '@derekstride/tree-sitter-sql': false
+  '@google/genai': true
+  koffi: true
+  protobufjs: true
+  tree-sitter-bash: true
+  tree-sitter-c: true
+  tree-sitter-cli: true
+  tree-sitter-cpp: true
+  tree-sitter-go: true
+  tree-sitter-html: true
+  tree-sitter-java: true
+  tree-sitter-javascript: true
+  tree-sitter-python: true
+  tree-sitter-ruby: true
+  tree-sitter-rust: true
+  tree-sitter-typescript: true

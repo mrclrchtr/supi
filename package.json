@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "SuPi (Super Pi) — The opinionated way to extend PI. Workspace root.",
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@11.1.0",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -51,7 +51,6 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "dependencies": {},
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
