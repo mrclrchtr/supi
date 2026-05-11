@@ -95,6 +95,28 @@ Examples:
 { "action": "pattern", "pattern": "createServerFn", "summary": true }
 ```
 
+## Language & File Type Support
+
+| Feature / Language | JS/TS | Python | Rust | Go | Java/Kotlin | Ruby | PHP | Swift | C/C++ | Other text |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **`index`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **`brief` (project)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅¹ |
+| **`brief` (directory/file)** | ✅ | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² |
+| **`callers`** | ✅ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ⚠️⁴ |
+| **`callees`** | ✅ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ⚠️⁴ |
+| **`implementations`** | ✅ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ⚠️⁴ |
+| **`affected`** | ✅ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ⚠️⁴ |
+| **`pattern`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅⁵ |
+
+**Legend:**
+- **✅** Fully supported for that action.
+- **⚠️** Partial or best-effort support (see footnotes).
+- **¹** Project-level brief works for any project with a recognized manifest (`package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, etc.).
+- **²** Focused directory/file briefs only list **JavaScript/TypeScript** source files in the "Source Files" section. The rest of the brief (module context, git info, metadata) still works for any language.
+- **³** Requires an active LSP server or Tree-sitter grammar for that language. Falls back to heuristic text search if neither is available.
+- **⁴** Heuristic text-search fallback only; no semantic or structural resolution.
+- **⁵** `pattern` works on any text file. Binary files (`.png`, `.jpg`, `.zip`, `.pdf`, etc.) are explicitly rejected.
+
 ## Confidence Labeling
 
 Every result carries a `confidence` label from the result metadata:
