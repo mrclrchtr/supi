@@ -113,7 +113,7 @@ Examples:
 - **✅** Fully supported for that action.
 - **⚠️** Partial or best-effort support (see footnotes).
 - **¹** Project-level brief works for any project with a recognized manifest (`package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, etc.).
-- **²** Requires an active LSP server or Tree-sitter grammar for that language. Falls back to heuristic text search if neither is available.
+- **²** Requires an active LSP server for semantic resolution; falls back to heuristic text search otherwise.
 - **³** Heuristic text-search fallback only; no semantic or structural resolution.
 - **⁴** `pattern` works on any text file. Binary files (`.png`, `.jpg`, `.zip`, `.pdf`, etc.) are explicitly rejected.
 
@@ -146,11 +146,13 @@ The tool enforces these rules and returns explicit error messages:
 
 ## Architecture
 
-Composes lower-level services directly, with graceful fallback (LSP → tree-sitter → text search):
+Each action employs an appropriate fallback chain from the available services:
 
 - **`@mrclrchtr/supi-lsp`** — Semantic truth via LSP (references, symbols, implementations, diagnostics)
-- **`@mrclrchtr/supi-tree-sitter`** — Structural extraction (outlines, imports/exports, syntax context)
+- **`@mrclrchtr/supi-tree-sitter`** — Structural extraction (outlines, imports/exports, callees, syntax context)
 - **`@mrclrchtr/supi-core`** — Project/root utilities (root walking, known-root mapping, path containment)
+
+**Per-action fallback chains:** `callers`, `implementations`, and `affected` use LSP → ripgrep text search; `callees` uses tree-sitter AST analysis; `brief` uses the architecture model (plus tree-sitter outline for anchored briefs); `pattern` and `index` use filesystem and text-search primitives.
 
 ### Programmatic API
 
