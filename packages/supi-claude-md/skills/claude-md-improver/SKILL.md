@@ -63,8 +63,14 @@ For each CLAUDE.md file found, check for content that duplicates what SuPi exten
 2. **If SuPi is present**, scan for redundant sections:
    - `## Modules` / `## Packages` tables with name/description/path columns
    - Dependency graphs that don't add reasoning
-   - High-level architecture overviews without project-specific conventions
-3. **Flag for removal** in the quality report, with rationale
+   - Root `## Project structure` / `## Architecture` directory trees that mostly restate the workspace layout already visible from `code_intel brief`
+   - High-level architecture overviews without project-specific conventions, boundaries, or exceptions
+3. **Keep compact human guidance** when it adds value beyond the generated overview, such as:
+   - "start here" orientation
+   - dependency direction or ownership rules
+   - important boundaries, exceptions, or initialization order
+   - cross-package conventions that are not obvious from manifests
+4. **Flag for shrink/reframe** in the quality report, with rationale. Prefer replacing large structure trees with compact curated sections such as `## Start Here`, `## Cross-Package Patterns`, or `## Gotchas` instead of deleting useful orientation entirely.
 
 **Note:** This check is opinionated — it assumes SuPi extensions are active and delivering their standard content. If SuPi is not detected, skip this phase.
 

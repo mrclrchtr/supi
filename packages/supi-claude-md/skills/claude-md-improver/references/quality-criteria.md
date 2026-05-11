@@ -90,22 +90,24 @@
 
 **10 points**: No overlap with auto-delivered content. CLAUDE.md focuses on curated, non-obvious context only.
 
-**7 points**: Minor overlap (e.g., a brief package list that adds relationships beyond the auto-generated module graph)
+**7 points**: Minor overlap (e.g., a brief package list or compact structure note that still adds relationships or "start here" guidance beyond the auto-generated overview)
 
-**4 points**: Significant overlap — package tables, architecture overviews, or dependency graphs that duplicate `code_intel` output
+**4 points**: Significant overlap — package tables, root project-structure trees, architecture overviews, or dependency graphs that duplicate `code_intel` output
 
-**0 points**: Large sections that are purely auto-generated data (module lists with descriptions, dense dependency tables)
+**0 points**: Large sections that are purely auto-generated data (module lists with descriptions, dense dependency tables, long root directory trees)
 
 **What is NOT overlap:**
 - Gotchas specific to a package's behavior
 - Cross-package patterns that aren't discoverable from manifests
 - Commands and workflows
 - Human-curated "Start Here" guidance with reasoning
+- Concise structure notes that explain boundaries, ownership, initialization order, or important exceptions
 
 **What IS overlap:**
 - Monorepo package tables where every row is `{name, description, path}`
 - Root-level "Modules" or "Packages" sections with >5 entries
-- High-level architecture overviews that don't add relationships, gotchas, or conventions beyond what's in `package.json`
+- Root `## Project structure` / `## Architecture` trees that mostly restate folders, packages, or module layout already visible from `code_intel brief`
+- High-level architecture overviews that don't add relationships, gotchas, conventions, or exceptions beyond what's in `package.json`
 - Dependency graphs that could be generated from `pnpm-workspace.yaml`
 
 ## Assessment Process
@@ -129,4 +131,4 @@
 - Generic advice not specific to the project
 - "TODO" items never completed
 - Duplicate info across multiple CLAUDE.md files
-- Sections that duplicate `code_intel brief` output (package tables, module graphs, dependency lists)
+- Sections that duplicate `code_intel brief` output (package tables, module graphs, dependency lists, long root directory trees)
