@@ -16,20 +16,26 @@ interface MockTool {
   ) => Promise<{ content: { type: string; text: string }[]; details: unknown }>;
 }
 
-function fakePi(): { tool: MockTool; appendEntry: ReturnType<typeof vi.fn> } {
+function fakePi(): {
+  tool: MockTool;
+  appendEntry: ReturnType<typeof vi.fn>;
+  getSessionName: ReturnType<typeof vi.fn>;
+} {
   let captured: MockTool | null = null;
   const appendEntry = vi.fn();
+  const getSessionName = vi.fn(() => undefined);
   const api = {
     registerTool: (def: MockTool) => {
       captured = def;
     },
     on() {},
     appendEntry,
+    getSessionName,
   };
   // biome-ignore lint/suspicious/noExplicitAny: registering a partial ExtensionAPI is intentional in tests
   askUserExtension(api as any);
   if (!captured) throw new Error("askUserExtension did not register a tool");
-  return { tool: captured, appendEntry };
+  return { tool: captured, appendEntry, getSessionName };
 }
 
 const validParams = {

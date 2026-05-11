@@ -11,6 +11,7 @@
 //   result.ts           — hybrid (content + details) result formatting
 //   render.ts           — custom renderCall / renderResult for the transcript
 
+import { basename } from "node:path";
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import { ActiveQuestionnaireLock } from "./flow.ts";
@@ -41,11 +42,21 @@ const PROMPT_GUIDELINES = [
   "Do not call ask_user while another ask_user interaction is in flight — wait for the previous result before issuing another.",
 ];
 
+/** Minimal ui subset needed by executeAskUser — extended with setTitle/notify from ExtensionUIContext. */
 interface ExtensionUi {
   ui: {
     custom?: RichUiHost["custom"];
     setWorkingVisible?(visible: boolean): void;
+    /** Set the terminal window/tab title. */
+    setTitle?(title: string): void;
+    /** Show a notification to the user. */
+    notify?(message: string, type?: "info" | "warning" | "error"): void;
   };
+  /**
+   * Absolute path to the current working directory, available on the full
+   * ExtensionContext. Marked optional here to tolerate partial mocks.
+   */
+  cwd?: string;
   hasUI: boolean;
   abort(): void;
 }
@@ -104,6 +115,7 @@ async function executeAskUser(
       "Error: another ask_user interaction is already in flight. Wait for it to complete before calling ask_user again.",
     );
   }
+  signalAttention(ctx);
   try {
     // Hide the built-in working loader so it doesn't compete with the overlay.
     ctx.ui.setWorkingVisible?.(false);
@@ -123,8 +135,30 @@ async function executeAskUser(
   } finally {
     // Restore the working loader regardless of how the overlay closed.
     ctx.ui.setWorkingVisible?.(true);
+    restoreTerminalTitle(ctx, pi);
     lock.release();
   }
+}
+
+/** Set terminal title and play alert bell to signal the user needs to respond. */
+function signalAttention(ctx: ExtensionUi): void {
+  ctx.ui.setTitle?.("\u23F8  pi \u2014 waiting for your input");
+  process.stdout.write("\x07");
+}
+
+/** Restore the terminal title to pi's native format (session name + cwd). */
+function restoreTerminalTitle(ctx: ExtensionUi, pi: ExtensionAPI): void {
+  const sessionName = pi.getSessionName();
+  const cwdName = ctx.cwd ? basename(ctx.cwd) : undefined;
+  ctx.ui.setTitle?.(
+    sessionName && cwdName
+      ? `pi - ${sessionName} - ${cwdName}`
+      : cwdName
+        ? `pi - ${cwdName}`
+        : sessionName
+          ? `pi - ${sessionName}`
+          : "pi",
+  );
 }
 
 /** Build a concise custom-entry label readable in the /tree "all" filter. */
