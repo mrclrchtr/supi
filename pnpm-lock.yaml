@@ -54,9 +54,6 @@ importers:
 
   packages/supi:
     dependencies:
-      '@davisvaughan/tree-sitter-r':
-        specifier: ^1.2.0
-        version: 1.2.0
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.74.0(ws@8.20.0)(zod@4.4.3)
@@ -111,39 +108,6 @@ importers:
       diff:
         specifier: ^7.0.0
         version: 7.0.0
-      tree-sitter-bash:
-        specifier: ^0.23.0
-        version: 0.23.3
-      tree-sitter-c:
-        specifier: ^0.23.0
-        version: 0.23.6
-      tree-sitter-cpp:
-        specifier: ^0.23.0
-        version: 0.23.4
-      tree-sitter-go:
-        specifier: ^0.23.0
-        version: 0.23.4
-      tree-sitter-html:
-        specifier: ^0.23.0
-        version: 0.23.2
-      tree-sitter-java:
-        specifier: ^0.23.0
-        version: 0.23.5
-      tree-sitter-javascript:
-        specifier: ^0.23.0
-        version: 0.23.1
-      tree-sitter-python:
-        specifier: ^0.23.0
-        version: 0.23.6
-      tree-sitter-ruby:
-        specifier: ^0.23.0
-        version: 0.23.1
-      tree-sitter-rust:
-        specifier: ^0.23.0
-        version: 0.23.3
-      tree-sitter-typescript:
-        specifier: ^0.23.0
-        version: 0.23.2
       web-tree-sitter:
         specifier: ^0.26.8
         version: 0.26.8
@@ -433,21 +397,37 @@ importers:
 
   packages/supi-tree-sitter:
     dependencies:
-      '@davisvaughan/tree-sitter-r':
-        specifier: ^1.2.0
-        version: 1.2.0
       '@earendil-works/pi-ai':
         specifier: '*'
         version: 0.74.0(ws@8.20.0)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.74.0(ws@8.20.0)(zod@4.4.3)
+      typebox:
+        specifier: '*'
+        version: 1.1.31
+      web-tree-sitter:
+        specifier: ^0.26.8
+        version: 0.26.8
+    devDependencies:
+      '@davisvaughan/tree-sitter-r':
+        specifier: ^1.2.0
+        version: 1.2.0
+      '@derekstride/tree-sitter-sql':
+        specifier: ^0.3.11
+        version: 0.3.11
+      '@types/node':
+        specifier: ^25.6.0
+        version: 25.6.0
       tree-sitter-bash:
         specifier: ^0.23.0
         version: 0.23.3
       tree-sitter-c:
         specifier: ^0.23.0
         version: 0.23.6
+      tree-sitter-cli:
+        specifier: 0.22.6
+        version: 0.22.6
       tree-sitter-cpp:
         specifier: ^0.23.0
         version: 0.23.4
@@ -463,6 +443,9 @@ importers:
       tree-sitter-javascript:
         specifier: ^0.23.0
         version: 0.23.1
+      tree-sitter-kotlin:
+        specifier: ^0.3.8
+        version: 0.3.8
       tree-sitter-python:
         specifier: ^0.23.0
         version: 0.23.6
@@ -475,25 +458,6 @@ importers:
       tree-sitter-typescript:
         specifier: ^0.23.0
         version: 0.23.2
-      typebox:
-        specifier: '*'
-        version: 1.1.31
-      web-tree-sitter:
-        specifier: ^0.26.8
-        version: 0.26.8
-    devDependencies:
-      '@derekstride/tree-sitter-sql':
-        specifier: ^0.3.11
-        version: 0.3.11
-      '@types/node':
-        specifier: ^25.6.0
-        version: 25.6.0
-      tree-sitter-cli:
-        specifier: 0.22.6
-        version: 0.22.6
-      tree-sitter-kotlin:
-        specifier: ^0.3.8
-        version: 0.3.8
       vitest:
         specifier: ^4.1.4
         version: 4.1.4(@types/node@25.6.0)(vite@8.0.8(@types/node@25.6.0)(jiti@2.7.0)(yaml@2.8.4))

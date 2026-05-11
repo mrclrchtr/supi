@@ -149,7 +149,7 @@ describe("resolveGrammarWasmPath", () => {
 
   it("resolves tsx grammar WASM path", () => {
     const path = resolveGrammarWasmPath("tsx");
-    expect(path).toContain("tree-sitter-typescript");
+    expect(path).toMatch(/resources[/]grammars[/]tsx/);
     expect(path).toMatch(/tree-sitter-tsx\.wasm$/);
   });
 
@@ -186,7 +186,7 @@ describe("resolveGrammarWasmPath", () => {
 
   it("resolves r grammar WASM path", () => {
     const wasmPath = resolveGrammarWasmPath("r");
-    expect(wasmPath).toContain("@davisvaughan");
+    expect(wasmPath).toMatch(/resources[/]grammars[/]r/);
     expect(wasmPath).toMatch(/tree-sitter-r\.wasm$/);
   });
 

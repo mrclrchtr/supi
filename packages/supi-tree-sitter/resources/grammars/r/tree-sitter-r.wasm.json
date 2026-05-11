@@ -1,0 +1,7 @@
+{
+  "source": {
+    "npmPackage": "@davisvaughan/tree-sitter-r",
+    "version": "1.2.0"
+  },
+  "sha256": "2a8f5acd1c53d91e0ec5c01a6830d8ac7f5a7f96f0ac4b3768c016c8e9d07711"
+}

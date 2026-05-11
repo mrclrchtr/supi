@@ -1,0 +1,7 @@
+{
+  "source": {
+    "npmPackage": "tree-sitter-rust",
+    "version": "0.23.3"
+  },
+  "sha256": "f65f354215611fd94ad34134b3427eb3d58cbb745df7b6509ba722184db73d57"
+}

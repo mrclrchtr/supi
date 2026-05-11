@@ -1,0 +1,7 @@
+{
+  "source": {
+    "npmPackage": "tree-sitter-cpp",
+    "version": "0.23.4"
+  },
+  "sha256": "174eb0deb75b2ec7881bcacda9f995648d8e683956e5c2267e69ab6dc503fcbf"
+}

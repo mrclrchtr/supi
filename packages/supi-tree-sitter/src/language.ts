@@ -1,11 +1,14 @@
 // Language detection and grammar resolution for Tree-sitter.
+//
+// All grammar WASM files are vendored in resources/grammars/<id>/ and
+// shipped with the package. No runtime require.resolve() to third-party
+// npm packages is needed.
 
-import { createRequire } from "node:module";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { GrammarId, SupportedExtension } from "./types.ts";
 
-const require = createRequire(import.meta.url);
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 
 /** Mapping from file extension to grammar identifier. */
@@ -72,7 +75,7 @@ export function isJsTsGrammar(grammarId: GrammarId): boolean {
   return JS_TS_GRAMMARS.has(grammarId);
 }
 
-/** Grammar WASM file names within their respective npm packages. */
+/** Grammar WASM file names within the vendored resources directory. */
 const GRAMMAR_WASM: Record<GrammarId, string> = {
   javascript: "tree-sitter-javascript.wasm",
   typescript: "tree-sitter-typescript.wasm",
@@ -91,50 +94,23 @@ const GRAMMAR_WASM: Record<GrammarId, string> = {
   sql: "tree-sitter-sql.wasm",
 };
 
-type VendoredGrammarId = "kotlin" | "sql";
-
-/** Vendored grammar WASM files generated from trusted upstream packages. */
-const VENDORED_GRAMMAR_WASM: Record<VendoredGrammarId, string> = {
-  kotlin: path.resolve(sourceDir, "../resources/grammars/kotlin/tree-sitter-kotlin.wasm"),
-  sql: path.resolve(sourceDir, "../resources/grammars/sql/tree-sitter-sql.wasm"),
-};
-
-/** Grammar npm package names. */
-const GRAMMAR_PACKAGE: Record<Exclude<GrammarId, VendoredGrammarId>, string> = {
-  javascript: "tree-sitter-javascript",
-  typescript: "tree-sitter-typescript",
-  tsx: "tree-sitter-typescript",
-  python: "tree-sitter-python",
-  rust: "tree-sitter-rust",
-  go: "tree-sitter-go",
-  c: "tree-sitter-c",
-  cpp: "tree-sitter-cpp",
-  java: "tree-sitter-java",
-  ruby: "tree-sitter-ruby",
-  bash: "tree-sitter-bash",
-  html: "tree-sitter-html",
-  r: "@davisvaughan/tree-sitter-r",
-};
+const resourcesDir = path.resolve(sourceDir, "../resources/grammars");
 
 /**
  * Resolve the WASM grammar file path for a given grammar ID.
- * Vendored grammars return their bundled resource path. Other grammars use
- * `require.resolve(<grammar>/package.json)` to locate the installed package
- * directory, then append the WASM filename.
+ * All grammars use vendored WASM files under `resources/grammars/<id>/`.
  */
 export function resolveGrammarWasmPath(grammarId: GrammarId): string {
-  if (isVendoredGrammar(grammarId)) return VENDORED_GRAMMAR_WASM[grammarId];
-
-  const packageName = GRAMMAR_PACKAGE[grammarId];
   const wasmFile = GRAMMAR_WASM[grammarId];
+  const vendoredPath = path.join(resourcesDir, grammarId, wasmFile);
 
-  // Resolve the grammar package directory via its package.json
-  const packageJsonPath = require.resolve(`${packageName}/package.json`);
-  const packageDir = path.dirname(packageJsonPath);
+  // Verify the vendored file exists at init time — fail fast if missing
+  if (!fs.existsSync(vendoredPath)) {
+    throw new Error(
+      `Vendored WASM grammar not found for "${grammarId}": expected at ${vendoredPath}. ` +
+        "Run `node scripts/vendor-wasm.mjs` or reinstall the package.",
+    );
+  }
 
-  return path.join(packageDir, wasmFile);
-}
-
-function isVendoredGrammar(grammarId: GrammarId): grammarId is VendoredGrammarId {
-  return grammarId === "kotlin" || grammarId === "sql";
+  return vendoredPath;
 }

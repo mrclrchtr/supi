@@ -1,0 +1,7 @@
+{
+  "source": {
+    "npmPackage": "tree-sitter-ruby",
+    "version": "0.23.1"
+  },
+  "sha256": "09a96427d7c72f0613ed470cd9812223fc4a91d6a9c025c0235cc6bd59ff96f4"
+}

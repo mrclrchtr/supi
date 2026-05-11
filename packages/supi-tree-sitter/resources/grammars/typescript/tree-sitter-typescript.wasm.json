@@ -1,0 +1,7 @@
+{
+  "source": {
+    "npmPackage": "tree-sitter-typescript",
+    "version": "0.23.2"
+  },
+  "sha256": "778025db5a8be0e70f8ccc3671e486dfeddd048c25d9e8a70c26de2e1bf6f97d"
+}

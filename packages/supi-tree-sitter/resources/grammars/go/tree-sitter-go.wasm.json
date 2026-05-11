@@ -1,0 +1,7 @@
+{
+  "source": {
+    "npmPackage": "tree-sitter-go",
+    "version": "0.23.4"
+  },
+  "sha256": "6dfc8eacdad0a54d0cad0d888851bd19cdd14d82582f110f888bbf6f9e5e2d64"
+}

@@ -8,20 +8,34 @@
 
 The package is designed as a standalone structural-analysis substrate. It does not depend on `supi-lsp` and must remain correct when installed independently.
 
+## WASM vendoring strategy
+
+All grammar WASM files are **vendored** in `resources/grammars/<id>/` and shipped with the package. The native `tree-sitter-*` npm packages are `devDependencies` only — they are never resolved at runtime.
+
+- **12 grammars** (javascript, typescript, tsx, python, rust, go, c, cpp, java, ruby, bash, html, r) ship `.wasm` in their npm packages — copied by `scripts/vendor-wasm.mjs`
+- **Kotlin** (`tree-sitter-kotlin`) does not ship `.wasm` — built from source by `scripts/generate-kotlin-wasm.mjs` using `tree-sitter-cli`
+- **SQL** (`@derekstride/tree-sitter-sql`) does not ship `.wasm` — built from source by `scripts/generate-sql-wasm.mjs` using `tree-sitter-cli`
+
+### When to regnerate
+
+Run `node scripts/vendor-wasm.mjs` whenever `tree-sitter-*` devDependencies are bumped. Run `pnpm --filter @mrclrchtr/supi-tree-sitter check:wasm` in CI to verify checksums match.
+
+Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and SHA256 so stale WASM is detected on CI.
+
 ## Key files
 
 - `runtime.ts`, `session.ts` — grammar initialization, parser reuse, session lifecycle, and `dispose()`
 - `outline.ts`, `structure.ts`, `formatting.ts` — tool action extraction, formatting, and output caps
 - `coordinates.ts` — 1-based UTF-16 coordinate conversion shared with `node_at` and query results
-- `language.ts` — file extension → grammar ID detection and WASM path resolution
-- `resources/grammars/kotlin/` — vendored Kotlin WASM plus source/version/checksum metadata
-- `resources/grammars/sql/` — vendored SQL WASM plus source/version/checksum metadata
-- `scripts/generate-kotlin-wasm.mjs` — regenerates/checks the vendored Kotlin grammar from `tree-sitter-kotlin`
-- `scripts/generate-sql-wasm.mjs` — regenerates/checks the vendored SQL grammar from `@derekstride/tree-sitter-sql`
+- `language.ts` — file extension → grammar ID detection and vendored WASM path resolution
+- `resources/grammars/<id>/` — vendored WASM files for all 14 supported grammars
+- `scripts/vendor-wasm.mjs` — copies WASM from installed npm packages (13 grammars)
+- `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source
+- `scripts/generate-sql-wasm.mjs` — builds SQL WASM from source
 
 ## Supported languages
 
-Grammars are resolved via npm dependencies, except Kotlin and SQL which use vendored WASM files generated from `fwcd/tree-sitter-kotlin` and `@derekstride/tree-sitter-sql` respectively. Supported file families:
+All grammar WASM files are vendored and resolved at runtime from `resources/grammars/<id>/`. See `resources/grammars/` for the complete list. Supported file families:
 - **JavaScript/TypeScript**: `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.tsx`
 - **Python**: `.py`, `.pyi`
 - **Rust**: `.rs`
@@ -37,7 +51,15 @@ Grammars are resolved via npm dependencies, except Kotlin and SQL which use vend
 
 ## Validation
 
-- `pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && pnpm exec biome check packages/supi-tree-sitter && pnpm vitest run packages/supi-tree-sitter/ && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json`
+```bash
+node scripts/vendor-wasm.mjs --check && \
+pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && \
+pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && \
+pnpm exec biome check packages/supi-tree-sitter && \
+pnpm vitest run packages/supi-tree-sitter/ && \
+pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && \
+pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
+```
 
 ## Gotchas
 
@@ -50,6 +72,13 @@ Grammars are resolved via npm dependencies, except Kotlin and SQL which use vend
 - Outline should stay shallow: top-level declarations plus supported class/interface/enum members, not local function bodies.
 - `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only; `node_at` and `query` work across all supported grammars, so docs and tool text must describe that split explicitly.
 - Prompt guidance in `tree-sitter.ts` must be standalone-safe: describe structural analysis directly and do not name the `lsp` tool as an available sibling. Use generic terms like "semantic language-server tooling" if a distinction is needed.
+
+## Packaging
+
+- Native `tree-sitter-*` packages are `devDependencies` only — NOT bundled or resolved at runtime
+- Only `web-tree-sitter` is a runtime `dependency`
+- All grammar WASM files are vendored in `resources/` and shipped via the `files` field (`"resources"` entry in `package.json`)
+- This reduces `npm pack` size for consumers by ~89% compared to bundling native npm packages
 
 ## Layering
 
