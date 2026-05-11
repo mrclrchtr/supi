@@ -14,28 +14,68 @@ Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure PI has 
 
 **No file reads in this phase.** Use only what is already loaded in this session's context.
 
-Before opening any files, introspect the conversation context you already have:
+**Purpose:** This baseline review is the primary evidence for scoring Criterion 7 (Auto-Delivered Overlap) in Phase 3. Its goal is to identify which information categories are already delivered automatically by SuPi extensions or native pi, so you do NOT recommend adding that same content to CLAUDE.md. If you skip this step, you will inflate scores and propose redundant additions that already appear in every session.
 
-1. **Scan for auto-injected context** — look for `<extension-context>` blocks already present in this conversation (from `supi-code-intelligence`, `supi-claude-md`, or other SuPi extensions), workspace overview summaries, or any CLAUDE.md content that was injected via subdirectory discovery earlier in the session.
-2. **Infer SuPi presence** from whether SuPi-delivered content is visible in the conversation. If you see workspace module graphs, package lists, or `<extension-context source="supi-*">` blocks, SuPi is active.
-3. **Build the baseline** from what you already know:
-   - workspace package/module inventory visible in context
-   - dependency relationships already described
-   - directory structures or architecture overviews already shown
-   - subdirectory injection behavior if `supi-claude-md` context was injected
-4. **Classify what the baseline likely already covers**:
-   - package/module inventories — usually fully covered
-   - dependency graphs from manifests — usually fully covered
-   - directory trees and file structures — often covered
-   - high-level architecture without project-specific reasoning — often covered
-5. **Preserve categories that are likely unique** (not in the baseline):
-   - commands and workflows
-   - gotchas and non-obvious patterns
-   - cross-package conventions not obvious from manifests
-   - curated "start here" guidance with ownership or boundary reasoning
-   - project-specific exceptions to generic rules
+**Step 1 — Detect auto-injected sources.** Scan the conversation context for:
 
-Show an overview of this baseline review before proceeding.
+| Source identifier | What to look for | Typical content |
+|-------------------|------------------|---------------|
+| `supi-code-intelligence` | Workspace module graphs, package lists, dependency arrows, file counts | `## Modules` tables, architecture overviews, root directory trees |
+| `supi-claude-md` | `<extension-context source="supi-claude-md">` blocks | Subdirectory CLAUDE.md/AGENTS.md content already injected below cwd |
+| `native-pi` | Root CLAUDE.md or AGENTS.md loaded into the system prompt | Project-wide instructions from the repository root |
+| Other extensions | `<extension-context source="...">` blocks | Any other extension-injected context |
+
+**Step 2 — Build the baseline.** For each source found, record what it already covers:
+
+| Source | Content Category | Already Covers | Scope |
+|--------|------------------|----------------|-------|
+| `supi-code-intelligence` | Module graph | Package names, descriptions, dependency relationships | **Root-level** |
+| `supi-code-intelligence` | Workspace overview | File counts, root directory tree, top-level landmarks | **Root-level** |
+| `supi-claude-md` | Subdirectory instructions | `packages/*/CLAUDE.md` content injected during this session | **Package-specific** |
+| `native-pi` | Root instructions | `./CLAUDE.md`, `./AGENTS.md` in system prompt | **Root-level** |
+
+Add rows for any additional categories visible in context.
+
+**Step 3 — Classify redundancy risk by scope.** Use the table above to categorize:
+
+- **Root-level high risk** (already auto-delivered; do NOT recommend for root `./CLAUDE.md`):
+  - Package/module inventories (from `supi-code-intelligence`)
+  - Root directory trees and file counts (from `supi-code-intelligence`)
+  - Dependency graphs from manifests (from `supi-code-intelligence`)
+  - High-level architecture without project-specific reasoning (from `supi-code-intelligence`)
+
+- **Package-specific high risk** (already auto-delivered; do NOT recommend for that package's `CLAUDE.md`):
+  - Subdirectory CLAUDE.md/AGENTS.md already injected by `supi-claude-md` during this session
+
+- **Low risk** (not auto-delivered; safe to recommend in CLAUDE.md at any scope):
+  - Commands and workflows
+  - Gotchas and non-obvious patterns
+  - Cross-package conventions not obvious from manifests
+  - Curated "start here" guidance with ownership or boundary reasoning
+  - Project-specific exceptions to generic rules
+
+**Step 4 — Output the baseline.** Produce this structured overview before proceeding to Phase 2:
+
+```markdown
+## Phase 1 Baseline Review
+
+### SuPi Detected: yes / no
+
+### Auto-Injected Content by Source
+
+| Source | Content Category | Already Covers | Scope |
+|--------|------------------|----------------|-------|
+| ... | ... | ... | Root / Package-specific |
+
+### Redundancy Risk Assessment
+
+- **Root-level high risk** (do NOT recommend for root `./CLAUDE.md`):
+  - [List categories]
+- **Package-specific high risk** (do NOT recommend for matching package `CLAUDE.md`):
+  - [List categories]
+- **Low risk** (safe to recommend):
+  - [List categories]
+```
 
 **Note:** This review is intentionally approximate — it compares against the context already visible to you, not the literal hidden system prompt. If no SuPi-delivered context is visible in the conversation, the baseline is empty and this phase is a no-op.
 
@@ -73,7 +113,7 @@ For each CLAUDE.md file found in Phase 2, evaluate against quality criteria, inc
 | Conciseness | Medium | No verbose explanations or obvious info? |
 | Currency | High | Does it reflect current codebase state? |
 | Actionability | High | Are instructions executable, not vague? |
-| Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? (Use Phase 1 classifications) |
+| Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? **Use the Phase 1 Redundancy Risk Assessment as primary evidence.** |
 
 **Quality Scores:**
 - **A (90-100)**: Comprehensive, current, actionable
@@ -102,7 +142,8 @@ Format:
 **Score: XX/100 (Grade: X)**
 
 **Context Overlap Review:**
-- **Fully redundant:** [sections already covered by baseline context]
+- **Fully redundant (root-level):** [sections already covered by baseline context — applies to root `./CLAUDE.md`]
+- **Fully redundant (package-specific):** [sections already covered by baseline context — applies to that package's `CLAUDE.md`]
 - **Partially redundant:** [sections with overlap plus human-only value]
 - **Unique:** [sections that should stay]
 
