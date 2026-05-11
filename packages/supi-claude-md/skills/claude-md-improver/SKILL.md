@@ -12,9 +12,36 @@ Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure PI has 
 
 ## Workflow
 
-### Phase 1: Discovery
+### Phase 1: Context Baseline Review
 
-Find all CLAUDE.md files in the repository:
+**Do this before reading any CLAUDE.md files from disk.** Build the baseline purely from context the PI session already has.
+
+1. **Detect SuPi usage** — check if `@mrclrchtr/supi` or `@mrclrchtr/supi-code-intelligence` appears in `package.json` dependencies, or if `.pi/supi/config.json` exists. You may read `package.json` or check config existence, but **do not read CLAUDE.md files yet**.
+2. **Build the baseline** from what the session already knows:
+   - the workspace overview already present in context (from `supi-code-intelligence` auto-injection)
+   - any CLAUDE.md content already injected into this conversation by `supi-claude-md`
+   - known SuPi-delivered context categories (`supi-code-intelligence` workspace module graph, `supi-claude-md` subdirectory injection)
+3. **Classify what the baseline likely already covers**:
+   - workspace package/module inventory
+   - dependency relationships discoverable from manifests
+   - directory trees and file structures
+   - subdirectory CLAUDE.md injection rules
+4. **Flag categories that are likely redundant**:
+   - `## Modules` / `## Packages` tables
+   - root `## Project structure` / `## Architecture` trees that mostly restate workspace layout
+   - dependency graphs that don't add reasoning
+   - high-level architecture overviews without project-specific conventions, boundaries, or exceptions
+5. **Preserve categories that are likely unique**:
+   - commands and workflows
+   - gotchas and non-obvious patterns
+   - cross-package conventions not obvious from manifests
+   - curated "start here" guidance with ownership or boundary reasoning
+
+**Note:** This review is intentionally approximate — it compares against a synthesized baseline, not the literal hidden prompt. If SuPi is not detected, skip this phase.
+
+### Phase 2: Discovery
+
+Now read files from disk. Find all CLAUDE.md files in the repository:
 
 ```bash
 find . -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" 2>/dev/null | head -50
@@ -32,30 +59,9 @@ find . -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" 2>/de
 
 **Note:** PI auto-discovers CLAUDE.md files in parent directories, making monorepo setups work automatically.
 
-### Phase 2: Context Baseline Review
-
-Before assessing quality, synthesize the baseline context a SuPi-enabled PI session likely already has. Do **not** claim to inspect the hidden system prompt directly.
-
-1. **Detect SuPi usage** — check if `@mrclrchtr/supi` or `@mrclrchtr/supi-code-intelligence` appears in `package.json` dependencies, or if `.pi/supi/config.json` exists
-2. **Build the baseline** from:
-   - `code_intel brief` for the repo root (and package path when auditing a package-specific `CLAUDE.md`)
-   - the candidate `CLAUDE.md` files being audited
-   - known SuPi-delivered context categories (`supi-code-intelligence` workspace overview, `supi-claude-md` subdirectory injection)
-3. **Classify each major CLAUDE.md section** as one of:
-   - **Fully redundant** — already delivered well by the baseline context
-   - **Partially redundant** — overlaps with the baseline, but still contains human-only value
-   - **Unique** — not meaningfully delivered elsewhere
-4. **Use the classification to shape recommendations**:
-   - `## Modules` / `## Packages` tables are usually fully redundant
-   - root `## Project structure` / `## Architecture` trees are often partially redundant: tree/inventory content overlaps, while boundary/ownership guidance may be worth keeping
-   - commands, workflows, gotchas, and curated "start here" guidance are often unique
-5. **Flag for shrink/reframe** in the quality report when a section is fully or partially redundant. Prefer replacing large structure trees with compact curated sections such as `## Start Here`, `## Cross-Package Patterns`, or `## Gotchas` instead of deleting useful orientation entirely.
-
-**Note:** This review is intentionally approximate — it compares against a synthesized baseline, not the literal hidden prompt. If SuPi is not detected, skip this phase.
-
 ### Phase 3: Quality Assessment
 
-For each CLAUDE.md file, evaluate against quality criteria, incorporating the Phase 2 baseline review results. See [references/quality-criteria.md](references/quality-criteria.md) for detailed rubrics.
+For each CLAUDE.md file found in Phase 2, evaluate against quality criteria, incorporating the Phase 1 baseline review results. See [references/quality-criteria.md](references/quality-criteria.md) for detailed rubrics.
 
 **Quick Assessment Checklist:**
 
@@ -67,7 +73,7 @@ For each CLAUDE.md file, evaluate against quality criteria, incorporating the Ph
 | Conciseness | Medium | No verbose explanations or obvious info? |
 | Currency | High | Does it reflect current codebase state? |
 | Actionability | High | Are instructions executable, not vague? |
-| Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? (Use Phase 2 classifications) |
+| Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? (Use Phase 1 classifications) |
 
 **Quality Scores:**
 - **A (90-100)**: Comprehensive, current, actionable
