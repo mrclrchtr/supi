@@ -62,7 +62,13 @@ export default function askUserExtension(pi: ExtensionAPI): void {
     parameters: AskUserParamsSchema,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      return executeAskUser(params as AskUserParams, signal, ctx as unknown as ExtensionUi, lock);
+      return executeAskUser(
+        params as AskUserParams,
+        signal,
+        ctx as unknown as ExtensionUi,
+        lock,
+        pi,
+      );
     },
     renderCall: (args, theme) => renderAskUserCall(args, theme as Theme),
     renderResult: (result, _options, theme) =>
@@ -73,11 +79,13 @@ export default function askUserExtension(pi: ExtensionAPI): void {
   });
 }
 
+// biome-ignore lint/complexity/useMaxParams: pi context + pi reference for appendEntry
 async function executeAskUser(
   params: AskUserParams,
   signal: AbortSignal | undefined,
   ctx: ExtensionUi,
   lock: ActiveQuestionnaireLock,
+  pi: ExtensionAPI,
 ): Promise<HybridResult> {
   let normalized: NormalizedQuestionnaire;
   try {
@@ -106,12 +114,28 @@ async function executeAskUser(
     ) {
       ctx.abort();
     }
+    // Append a tree-friendly custom entry so /tree shows a readable
+    // summary (question headers) instead of raw JSON tool-call arguments.
+    // Custom entries are hidden in the default tree filter, visible in
+    // "all" mode (Ctrl+O).
+    pi.appendEntry(treeSummaryLabel(normalized));
     return result;
   } finally {
     // Restore the working loader regardless of how the overlay closed.
     ctx.ui.setWorkingVisible?.(true);
     lock.release();
   }
+}
+
+/** Build a concise custom-entry label readable in the /tree "all" filter. */
+function treeSummaryLabel(q: NormalizedQuestionnaire): string {
+  const count = q.questions.length;
+  const s = count === 1 ? "" : "s";
+  const headers = q.questions.map((q) => q.header).join(", ");
+  if (headers.length > 70) {
+    return `ask_user · ${count} question${s} · ${headers.slice(0, 67)}...`;
+  }
+  return `ask_user · ${count} question${s} · ${headers}`;
 }
 
 async function driveQuestionnaire(

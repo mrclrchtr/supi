@@ -16,18 +16,20 @@ interface MockTool {
   ) => Promise<{ content: { type: string; text: string }[]; details: unknown }>;
 }
 
-function fakePi(): { tool: MockTool } {
+function fakePi(): { tool: MockTool; appendEntry: ReturnType<typeof vi.fn> } {
   let captured: MockTool | null = null;
+  const appendEntry = vi.fn();
   const api = {
     registerTool: (def: MockTool) => {
       captured = def;
     },
     on() {},
+    appendEntry,
   };
   // biome-ignore lint/suspicious/noExplicitAny: registering a partial ExtensionAPI is intentional in tests
   askUserExtension(api as any);
   if (!captured) throw new Error("askUserExtension did not register a tool");
-  return { tool: captured };
+  return { tool: captured, appendEntry };
 }
 
 const validParams = {
@@ -139,5 +141,50 @@ describe("ask_user execute", () => {
     const result = await tool.execute("id", validParams, undefined, undefined, ctx);
     expect(result.details).toMatchObject({ terminalState: "submitted" });
     expect(ctx.abort).not.toHaveBeenCalled();
+  });
+
+  it("appends a tree-friendly custom entry with question headers for submitted questionnaires", async () => {
+    const { tool, appendEntry } = fakePi();
+    const ctx = richCtx({
+      terminalState: "submitted",
+      answers: [{ questionId: "scope", source: "option", value: "a", optionIndex: 0 }],
+    });
+    await tool.execute("id", validParams, undefined, undefined, ctx);
+    expect(appendEntry).toHaveBeenCalledOnce();
+    expect(appendEntry).toHaveBeenCalledWith("ask_user · 1 question · Scope");
+  });
+
+  it("appends a tree-friendly custom entry for skipped questionnaires too", async () => {
+    const { tool, appendEntry } = fakePi();
+    const ctx = richCtx({
+      terminalState: "skipped",
+      answers: [{ questionId: "scope", source: "option", value: "a", optionIndex: 0 }],
+      skipped: true,
+    });
+    await tool.execute("id", validParams, undefined, undefined, ctx);
+    expect(appendEntry).toHaveBeenCalledOnce();
+    expect(appendEntry).toHaveBeenCalledWith("ask_user · 1 question · Scope");
+  });
+
+  it("truncates long header lists in the tree summary label", async () => {
+    const { tool, appendEntry } = fakePi();
+    const longParams = {
+      questions: [
+        { type: "text", id: "a", header: "A".repeat(40), prompt: "A" },
+        { type: "text", id: "b", header: "B".repeat(40), prompt: "B" },
+      ],
+    };
+    const ctx = richCtx({
+      terminalState: "submitted",
+      answers: [
+        { questionId: "a", source: "text" as const, value: "x" },
+        { questionId: "b", source: "text" as const, value: "y" },
+      ],
+    });
+    await tool.execute("id", longParams, undefined, undefined, ctx);
+    expect(appendEntry).toHaveBeenCalledOnce();
+    const label = appendEntry.mock.calls[0][0];
+    expect(label).toMatch(/^ask_user/);
+    expect(label.endsWith("...")).toBe(true);
   });
 });
