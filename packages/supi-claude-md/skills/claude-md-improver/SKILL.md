@@ -1,6 +1,6 @@
 ---
 name: claude-md-improver
-description: Audit and improve CLAUDE.md files in repositories. Use when user asks to check, audit, update, improve, or fix CLAUDE.md files. Scans for all CLAUDE.md files, evaluates quality against templates, outputs quality report, then makes targeted updates. Also use when the user mentions "CLAUDE.md maintenance" or "project memory optimization".
+description: Use this skill to audit and improve CLAUDE.md files in repositories. Use when user asks to check, audit, update, improve, or fix CLAUDE.md files. Scans for all CLAUDE.md files, evaluates quality against templates, outputs quality report, then makes targeted updates.
 tools: Read, Glob, Grep, Bash, Edit
 ---
 
@@ -8,36 +8,36 @@ tools: Read, Glob, Grep, Bash, Edit
 
 Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure PI has optimal project context.
 
-**This skill can write to CLAUDE.md files.** After presenting a quality report and getting user approval, it updates CLAUDE.md files with targeted improvements.
-
 ## Workflow
 
 ### Phase 1: Context Baseline Review
 
-**Do this before reading any CLAUDE.md files from disk.** Build the baseline purely from context the PI session already has.
+**No file reads in this phase.** Use only what is already loaded in this session's context.
 
-1. **Detect SuPi usage** — check if `@mrclrchtr/supi` or `@mrclrchtr/supi-code-intelligence` appears in `package.json` dependencies, or if `.pi/supi/config.json` exists. You may read `package.json` or check config existence, but **do not read CLAUDE.md files yet**.
-2. **Build the baseline** from what the session already knows:
-   - the workspace overview already present in context (from `supi-code-intelligence` auto-injection)
-   - any CLAUDE.md content already injected into this conversation by `supi-claude-md`
-   - known SuPi-delivered context categories (`supi-code-intelligence` workspace module graph, `supi-claude-md` subdirectory injection)
-3. **Classify what the baseline likely already covers**:
-   - workspace package/module inventory
-   - dependency relationships discoverable from manifests
-   - directory trees and file structures
-   - subdirectory CLAUDE.md injection rules
-4. **Flag categories that are likely redundant**:
-   - `## Modules` / `## Packages` tables
-   - root `## Project structure` / `## Architecture` trees that mostly restate workspace layout
-   - dependency graphs that don't add reasoning
-   - high-level architecture overviews without project-specific conventions, boundaries, or exceptions
-5. **Preserve categories that are likely unique**:
+Before opening any files, introspect the conversation context you already have:
+
+1. **Scan for auto-injected context** — look for `<extension-context>` blocks already present in this conversation (from `supi-code-intelligence`, `supi-claude-md`, or other SuPi extensions), workspace overview summaries, or any CLAUDE.md content that was injected via subdirectory discovery earlier in the session.
+2. **Infer SuPi presence** from whether SuPi-delivered content is visible in the conversation. If you see workspace module graphs, package lists, or `<extension-context source="supi-*">` blocks, SuPi is active.
+3. **Build the baseline** from what you already know:
+   - workspace package/module inventory visible in context
+   - dependency relationships already described
+   - directory structures or architecture overviews already shown
+   - subdirectory injection behavior if `supi-claude-md` context was injected
+4. **Classify what the baseline likely already covers**:
+   - package/module inventories — usually fully covered
+   - dependency graphs from manifests — usually fully covered
+   - directory trees and file structures — often covered
+   - high-level architecture without project-specific reasoning — often covered
+5. **Preserve categories that are likely unique** (not in the baseline):
    - commands and workflows
    - gotchas and non-obvious patterns
    - cross-package conventions not obvious from manifests
    - curated "start here" guidance with ownership or boundary reasoning
+   - project-specific exceptions to generic rules
 
-**Note:** This review is intentionally approximate — it compares against a synthesized baseline, not the literal hidden prompt. If SuPi is not detected, skip this phase.
+Show an overview of this baseline review before proceeding.
+
+**Note:** This review is intentionally approximate — it compares against the context already visible to you, not the literal hidden system prompt. If no SuPi-delivered context is visible in the conversation, the baseline is empty and this phase is a no-op.
 
 ### Phase 2: Discovery
 
