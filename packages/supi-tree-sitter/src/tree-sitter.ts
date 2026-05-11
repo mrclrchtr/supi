@@ -15,7 +15,7 @@ import {
 import { detectGrammar, isJsTsGrammar } from "./language.ts";
 import { collectOutline } from "./outline.ts";
 import { TreeSitterRuntime } from "./runtime.ts";
-import { extractExports, extractImports, lookupNodeAt } from "./structure.ts";
+import { extractExports, extractImports, lookupCalleesAt, lookupNodeAt } from "./structure.ts";
 
 const TreeSitterActionEnum = StringEnum([
   "outline",
@@ -23,6 +23,7 @@ const TreeSitterActionEnum = StringEnum([
   "exports",
   "node_at",
   "query",
+  "callees",
 ] as const);
 
 const toolDescription = `Tree-sitter tool — provides structural AST analysis for supported files.
@@ -33,6 +34,7 @@ Actions:
 - exports: List export declarations, re-exports, and export assignments with names and kinds. JavaScript/TypeScript only.
 - node_at: Find the syntax node at a position. Params: file, line, character
 - query: Run a Tree-sitter query. Params: file, query
+- callees: Find outgoing function/method calls from a position. Params: file, line, character. Supported for most grammars.
 
 Coordinates are 1-based (line, character), compatible with the lsp tool convention.
 Character is a UTF-16 code-unit column.
@@ -94,7 +96,7 @@ export default function treeSitterExtension(pi: ExtensionAPI) {
   });
 }
 
-type TreeSitterAction = "outline" | "imports" | "exports" | "node_at" | "query";
+type TreeSitterAction = "outline" | "imports" | "exports" | "node_at" | "query" | "callees";
 
 type ToolParams = {
   action?: string;
@@ -107,14 +109,14 @@ type ToolParams = {
 async function executeToolAction(runtime: TreeSitterRuntime, params: ToolParams): Promise<string> {
   if (!params.action) {
     return validationError(
-      "`action` is required. Supported: outline, imports, exports, node_at, query.",
+      "`action` is required. Supported: outline, imports, exports, node_at, query, callees.",
     );
   }
 
   const action = toSupportedAction(params.action);
   if (!action) {
     return validationError(
-      `Unknown action: ${params.action}. Supported: outline, imports, exports, node_at, query`,
+      `Unknown action: ${params.action}. Supported: outline, imports, exports, node_at, query, callees`,
     );
   }
 
@@ -126,6 +128,7 @@ async function executeToolAction(runtime: TreeSitterRuntime, params: ToolParams)
   if (action === "imports") return handleImports(runtime, params.file);
   if (action === "exports") return handleExports(runtime, params.file);
   if (action === "node_at") return handleNodeAt(runtime, params);
+  if (action === "callees") return handleCallees(runtime, params);
   return handleQuery(runtime, params);
 }
 
@@ -258,8 +261,46 @@ async function handleQuery(runtime: TreeSitterRuntime, params: ToolParams): Prom
 }
 
 function toSupportedAction(action: string): TreeSitterAction | undefined {
-  if (["outline", "imports", "exports", "node_at", "query"].includes(action)) {
+  if (["outline", "imports", "exports", "node_at", "query", "callees"].includes(action)) {
     return action as TreeSitterAction;
   }
   return undefined;
+}
+
+async function handleCallees(runtime: TreeSitterRuntime, params: ToolParams): Promise<string> {
+  if (!Number.isInteger(params.line) || (params.line as number) < 1) {
+    return validationError("`line` must be a positive 1-based integer for callees action.");
+  }
+  if (!Number.isInteger(params.character) || (params.character as number) < 1) {
+    return validationError("`character` must be a positive 1-based integer for callees action.");
+  }
+
+  const file = params.file as string;
+  const line = params.line as number;
+  const character = params.character as number;
+
+  const result = await lookupCalleesAt(runtime, file, line, character);
+  if (result.kind !== "success") return formatNonSuccess(result);
+
+  const { enclosingScope, callees } = result.data;
+  if (callees.length === 0) {
+    return `No outgoing calls found in \`${enclosingScope.name}\` at ${file}:${line}:${character}`;
+  }
+
+  const lines: string[] = [];
+  lines.push(`## Callees: ${file}:${line}:${character}`);
+  lines.push("");
+  lines.push(
+    `**${callees.length} outgoing call${callees.length > 1 ? "s" : ""}** from \`${enclosingScope.name}\` at L${enclosingScope.range.startLine}-L${enclosingScope.range.endLine}`,
+  );
+  lines.push("");
+
+  for (const c of callees.slice(0, MAX_ITEMS)) {
+    lines.push(`- \`${c.name}\` (L${c.range.startLine})`);
+  }
+  if (callees.length > MAX_ITEMS) {
+    lines.push("", truncatedNotice(callees.length - MAX_ITEMS, "callees"));
+  }
+
+  return lines.join("\n");
 }

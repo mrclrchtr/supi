@@ -2,6 +2,7 @@
 
 export { createTreeSitterSession } from "./session.ts";
 export type {
+  CalleesAtResult,
   ExportRecord,
   GrammarId,
   ImportRecord,

@@ -1,4 +1,6 @@
-// Callees action — best-effort outgoing call map using Tree-sitter.
+// Callees action — structural outgoing call map via Tree-sitter.
+// Orchestrates target resolution and formatting; delegates grammar-aware
+// extraction to @mrclrchtr/supi-tree-sitter.
 
 import * as path from "node:path";
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
@@ -14,27 +16,19 @@ export async function executeCalleesAction(params: ActionParams, cwd: string): P
 
   try {
     tsSession = createTreeSitterSession(cwd);
-    const outlineResult = await tsSession.outline(relPath);
-    if (outlineResult.kind !== "success") {
+    const result = await tsSession.calleesAt(relPath, target.displayLine, target.displayCharacter);
+
+    if (result.kind !== "success") {
       return noCalleesMessage(relPath, target.displayLine, target.displayCharacter);
     }
 
-    const enclosing = outlineResult.data.find(
-      (item) =>
-        item.range.startLine - 1 <= target.position.line &&
-        item.range.endLine - 1 >= target.position.line,
-    );
+    const { enclosingScope, callees } = result.data;
 
-    if (!enclosing) {
-      return noCalleesMessage(relPath, target.displayLine, target.displayCharacter);
-    }
-
-    const callees = await findCallees(tsSession, relPath, enclosing);
     if (callees.length === 0) {
       return noCalleesMessage(relPath, target.displayLine, target.displayCharacter);
     }
 
-    return formatCallees(callees, enclosing.name, relPath, params.maxResults ?? 8);
+    return formatCallees(callees, enclosingScope.name, relPath, params.maxResults ?? 8);
   } catch {
     return noCalleesMessage(relPath, target.displayLine, target.displayCharacter);
   } finally {
@@ -42,42 +36,8 @@ export async function executeCalleesAction(params: ActionParams, cwd: string): P
   }
 }
 
-interface CalleeEntry {
-  name: string;
-  line: number;
-}
-
-async function findCallees(
-  ts: ReturnType<typeof createTreeSitterSession>,
-  relPath: string,
-  enclosing: { name: string; range: { startLine: number; endLine: number } },
-): Promise<CalleeEntry[]> {
-  const queryStr =
-    "(call_expression function: (_) @callee) (new_expression constructor: (_) @callee)";
-  const queryResult = await ts.query(relPath, queryStr);
-
-  if (queryResult.kind !== "success") return [];
-
-  const filtered = queryResult.data.filter(
-    (c) =>
-      c.range.startLine >= enclosing.range.startLine &&
-      c.range.startLine <= enclosing.range.endLine,
-  );
-
-  const seen = new Set<string>();
-  const callees: CalleeEntry[] = [];
-  for (const c of filtered) {
-    const name = c.text.replace(/\s+/g, "").slice(0, 60);
-    if (!seen.has(name)) {
-      seen.add(name);
-      callees.push({ name, line: c.range.startLine });
-    }
-  }
-  return callees;
-}
-
 function formatCallees(
-  callees: CalleeEntry[],
+  callees: Array<{ name: string; range: { startLine: number } }>,
   enclosingName: string,
   relPath: string,
   maxResults: number,
@@ -92,7 +52,7 @@ function formatCallees(
 
   const shown = callees.slice(0, maxResults);
   for (const c of shown) {
-    lines.push(`- \`${c.name}\` (L${c.line})`);
+    lines.push(`- \`${c.name}\` (L${c.range.startLine})`);
   }
   if (callees.length > maxResults) {
     lines.push(`- _+${callees.length - maxResults} more_`);
@@ -106,5 +66,5 @@ function formatCallees(
 }
 
 function noCalleesMessage(relPath: string, line: number, char: number): string {
-  return `No callee data available for ${relPath}:${line}:${char}.\n\nUse \`tree_sitter\` with \`action: "outline"\` or \`action: "node_at"\` for structural drill-down.`;
+  return `No callee data available for ${relPath}:${line}:${char}.\n\nUse \`tree_sitter\` with \`action: "callees"\` for structural drill-down.`;
 }

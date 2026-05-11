@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => {
     extractImports: vi.fn(),
     extractOutline: vi.fn(),
     lookupNodeAt: vi.fn(),
+    lookupCalleesAt: vi.fn(),
   };
 });
 
@@ -38,6 +39,7 @@ vi.mock("../src/structure.ts", () => ({
   extractImports: mocks.extractImports,
   extractOutline: mocks.extractOutline,
   lookupNodeAt: mocks.lookupNodeAt,
+  lookupCalleesAt: mocks.lookupCalleesAt,
 }));
 
 async function importSessionFactory() {
@@ -120,6 +122,28 @@ describe("createTreeSitterSession", () => {
     expect(result.kind).toBe("success");
     expect(mocks.extractOutline).toHaveBeenCalledWith(tree.rootNode, "source");
     expect(tree.delete).toHaveBeenCalledOnce();
+  });
+
+  it("delegates calleesAt", async () => {
+    const createTreeSitterSession = await importSessionFactory();
+    const session = createTreeSitterSession("/repo");
+    mocks.lookupCalleesAt.mockResolvedValue({
+      kind: "success",
+      data: {
+        enclosingScope: { name: "foo", startLine: 1, endLine: 5 },
+        callees: [{ name: "bar", line: 3 }],
+      },
+    });
+
+    const result = await session.calleesAt("sample.ts", 1, 2);
+
+    expect(result.kind).toBe("success");
+    expect(mocks.lookupCalleesAt).toHaveBeenCalledWith(
+      mocks.instances[0] as unknown as TreeSitterRuntime,
+      "sample.ts",
+      1,
+      2,
+    );
   });
 
   it("disposes the runtime", async () => {

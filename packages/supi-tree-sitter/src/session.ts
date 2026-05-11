@@ -2,8 +2,15 @@
 
 import { detectGrammar, isJsTsGrammar } from "./language.ts";
 import { TreeSitterRuntime } from "./runtime.ts";
-import { extractExports, extractImports, extractOutline, lookupNodeAt } from "./structure.ts";
+import {
+  extractExports,
+  extractImports,
+  extractOutline,
+  lookupCalleesAt,
+  lookupNodeAt,
+} from "./structure.ts";
 import type {
+  CalleesAtResult,
   ExportRecord,
   ImportRecord,
   NodeAtResult,
@@ -88,6 +95,14 @@ export function createTreeSitterSession(cwd: string): TreeSitterSession {
       character: number,
     ): Promise<TreeSitterResult<NodeAtResult>> {
       return lookupNodeAt(runtime, file, line, character);
+    },
+
+    async calleesAt(
+      file: string,
+      line: number,
+      character: number,
+    ): Promise<TreeSitterResult<CalleesAtResult>> {
+      return lookupCalleesAt(runtime, file, line, character);
     },
 
     dispose() {

@@ -42,10 +42,11 @@ Scopes: project (no params), package/directory (`path`), file (`file`), or ancho
 - Results grouped by file with ranked, contextual call sites
 - Confidence labeling: `semantic` (LSP), `structural` (tree-sitter), `heuristic` (text search)
 
-### `callees` — Best-effort outbound call map
+### `callees` — Structural outgoing call map
 
-- Semantic via LSP when possible, structural tree-sitter fallback
-- Lists outgoing function/method calls from a given symbol or position
+- Structural tree-sitter analysis for all grammars configured in `supi-tree-sitter`
+- Finds outgoing function/method calls from an anchored position
+- Supports JavaScript/TypeScript, Python, Rust, Go, C/C++, Java, Kotlin, Ruby, Bash, and R
 
 ### `implementations` — Find concrete implementations
 
@@ -103,7 +104,7 @@ Examples:
 | **`brief` (project)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅¹ |
 | **`brief` (directory/file)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **`callers`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
-| **`callees`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
+| **`callees`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️³ | ⚠️³ | ✅ | ⚠️³ |
 | **`implementations`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
 | **`affected`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
 | **`pattern`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅⁴ |

@@ -291,6 +291,70 @@ describe("tree_sitter tool actions", () => {
     }
   });
 
+  it("rejects callees action without file", async () => {
+    const pi = await setupWithSession();
+    const text = await executeTool(pi, { action: "callees" });
+    expect(text).toContain("Validation error");
+    expect(text).toContain("file");
+  });
+
+  it("rejects callees action without line", async () => {
+    const pi = await setupWithSession();
+    const text = await executeTool(pi, { action: "callees", file: "sample.ts", character: 1 });
+    expect(text).toContain("Validation error");
+    expect(text).toContain("line");
+  });
+
+  it("rejects callees action without character", async () => {
+    const pi = await setupWithSession();
+    const text = await executeTool(pi, { action: "callees", file: "sample.ts", line: 1 });
+    expect(text).toContain("Validation error");
+    expect(text).toContain("character");
+  });
+
+  it("handles callees action for a TypeScript file", async () => {
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), "tree-sitter-tool-"));
+    try {
+      writeFileSync(
+        path.join(tmpDir, "sample.ts"),
+        [
+          "export function myFunction() {",
+          "  doSomething();",
+          // biome-ignore lint/security/noSecrets: test fixture
+          "  doSomethingElse(42);",
+          "  return 0;",
+          "}",
+        ].join("\n"),
+      );
+      const pi = createPiMock();
+      treeSitterExtension(pi);
+      await startSession(pi, tmpDir);
+
+      const text = await executeTool(pi, {
+        action: "callees",
+        file: "sample.ts",
+        line: 1,
+        character: 22,
+      });
+      expect(text).toContain("Callees");
+      expect(text).toContain("doSomething");
+      expect(text).toContain("doSomethingElse");
+    } finally {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns unsupported-language for callees with HTML files", async () => {
+    const pi = await setupWithSession();
+    const text = await executeTool(pi, {
+      action: "callees",
+      file: "test.html",
+      line: 1,
+      character: 5,
+    });
+    expect(text).toContain("Unsupported language");
+  });
+
   it("disposes on session_shutdown", async () => {
     const pi = await setupWithSession();
     const shutdownHandler = pi.handlers.get("session_shutdown");

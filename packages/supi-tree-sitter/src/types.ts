@@ -46,6 +46,18 @@ export interface NodeAtResult {
   ancestry: Array<{ type: string; range: SourceRange }>;
 }
 
+/** Result from structural callee extraction. */
+export interface CalleesAtResult {
+  enclosingScope: {
+    name: string;
+    range: SourceRange;
+  };
+  callees: Array<{
+    name: string;
+    range: SourceRange;
+  }>;
+}
+
 /** Query capture result. */
 export interface QueryCapture {
   name: string;
@@ -68,6 +80,12 @@ export interface TreeSitterSession {
   exports(file: string): Promise<TreeSitterResult<ExportRecord[]>>;
   /** Return the smallest syntax node at a 1-based UTF-16 position. */
   nodeAt(file: string, line: number, character: number): Promise<TreeSitterResult<NodeAtResult>>;
+  /** Extract structural outgoing calls from the enclosing scope at a position. */
+  calleesAt(
+    file: string,
+    line: number,
+    character: number,
+  ): Promise<TreeSitterResult<CalleesAtResult>>;
   /** Release parser and grammar resources owned by this session. */
   dispose(): void;
 }

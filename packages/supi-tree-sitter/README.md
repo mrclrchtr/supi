@@ -46,6 +46,7 @@ Actions:
 - `exports` — list exported declarations, re-exports, and TypeScript `export =` assignments (**currently JavaScript / TypeScript only**)
 - `node_at` — return the smallest syntax node at a 1-based `line`/`character` position, plus ancestry (all supported grammars)
 - `query` — run a custom Tree-sitter query and return captures (all supported grammars)
+- `callees` — find outgoing function/method calls from a position; supports all grammars with a callee query configured
 
 Coordinates are 1-based and compatible with the `lsp` tool. `character` is a UTF-16 code-unit column. Relative file paths resolve from the pi session working directory.
 
@@ -67,14 +68,21 @@ try {
   if (outline.kind === "success") {
     console.log(outline.data);
   }
+
+  const callees = await session.calleesAt("src/index.ts", 1, 10);
+  if (callees.kind === "success") {
+    console.log(callees.data.enclosingScope.name, callees.data.callees);
+  }
 } finally {
   session.dispose();
 }
 ```
 
-`canParse(file)` validates that a supported file can be read and parsed, then returns the resolved file path and grammar id. It does not expose the raw Tree-sitter tree; use `outline`, `query`, `imports`, `exports`, or `nodeAt` for structured results.
+`canParse(file)` validates that a supported file can be read and parsed, then returns the resolved file path and grammar id. It does not expose the raw Tree-sitter tree; use `outline`, `query`, `imports`, `exports`, `nodeAt`, or `calleesAt` for structured results.
 
-Exported types include `TreeSitterResult`, `TreeSitterSession`, `OutlineItem`, `ImportRecord`, `ExportRecord`, `NodeAtResult`, `QueryCapture`, `SourceRange`, `GrammarId`, and `SupportedExtension`.
+`calleesAt(file, line, character)` extracts structural outgoing calls from the enclosing function/method scope at the given position. It returns the enclosing scope name and a deduplicated list of callees with their source ranges.
+
+Exported types include `TreeSitterResult`, `TreeSitterSession`, `OutlineItem`, `ImportRecord`, `ExportRecord`, `NodeAtResult`, `QueryCapture`, `CalleesAtResult`, `SourceRange`, `GrammarId`, and `SupportedExtension`.
 
 Always call `dispose()` when the session is no longer needed. The runtime lazily initializes grammars, reuses parser instances within a session, deduplicates concurrent first-use grammar initialization, and retries after initialization failures.
 
