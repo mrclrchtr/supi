@@ -4,7 +4,7 @@ export const toolDescription = `Code intelligence tool — architecture briefs, 
 
 Actions:
 - brief: Architecture overview or focused brief for a project, package, directory, file, or anchored symbol
-- callers: Find call sites for a symbol (LSP-first, structural/heuristic fallback)
+- callers: Find call sites for a symbol (LSP-first, heuristic text-search fallback)
 - callees: Best-effort outgoing calls from a symbol (structural tree-sitter analysis across supported grammars)
 - implementations: Find concrete implementations of an interface or abstract type
 - affected: Blast-radius analysis — direct references, downstream dependents, risk level, likely tests

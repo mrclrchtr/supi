@@ -84,7 +84,7 @@ describe("transitive downstream impact", () => {
 
     // The result should mention downstream impact beyond just api
     // The BFS traversal should find app through api
-    expect(result).toContain("Affected");
+    expect(result.content).toContain("Affected");
   });
 });
 
@@ -108,10 +108,10 @@ describe("contextLines in pattern results", () => {
     );
 
     // Should contain the match line
-    expect(result).toContain("TARGET");
+    expect(result.content).toContain("TARGET");
     // With contextLines=1, should also have surrounding content
     // The context lines appear as indented L<num> entries
-    expect(result).toContain("L3");
+    expect(result.content).toContain("L3");
   });
 
   it("works correctly with contextLines=0", async () => {
@@ -123,7 +123,7 @@ describe("contextLines in pattern results", () => {
       { cwd: tmpDir },
     );
 
-    expect(result).toContain("X");
+    expect(result.content).toContain("X");
   });
 
   it("deduplicates overlapping context lines without hiding distinct matches", async () => {
@@ -144,11 +144,11 @@ describe("contextLines in pattern results", () => {
       { cwd: tmpDir },
     );
 
-    expect(result.match(/L3:/g)).toHaveLength(1);
-    expect(result.match(/L2:/g)).toHaveLength(1);
-    expect(result.match(/L4:/g)).toHaveLength(1);
-    expect(result).toContain("TARGET_ONE");
-    expect(result).toContain("TARGET_TWO");
+    expect(result.content.match(/L3:/g)).toHaveLength(1);
+    expect(result.content.match(/L2:/g)).toHaveLength(1);
+    expect(result.content.match(/L4:/g)).toHaveLength(1);
+    expect(result.content).toContain("TARGET_ONE");
+    expect(result.content).toContain("TARGET_TWO");
   });
 });
 
@@ -175,7 +175,7 @@ describe("path scoping uses proper containment", () => {
       { cwd: tmpDir },
     );
 
-    expect(result).toContain("supiOnly");
-    expect(result).not.toContain("coreOnly");
+    expect(result.content).toContain("supiOnly");
+    expect(result.content).not.toContain("coreOnly");
   });
 });

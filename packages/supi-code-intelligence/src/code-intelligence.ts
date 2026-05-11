@@ -98,18 +98,24 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
       ),
       maxResults: Type.Optional(Type.Number({ description: "Maximum results to return" })),
       contextLines: Type.Optional(Type.Number({ description: "Context lines around matches" })),
+      summary: Type.Optional(
+        Type.Boolean({
+          description:
+            "Aggregate counts by directory instead of line-level matches (pattern action only)",
+        }),
+      ),
     }),
     promptSnippet,
     promptGuidelines,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
-      const result = await executeAction(
+      const { content, details } = await executeAction(
         params as unknown as { action: CodeIntelAction } & Record<string, unknown>,
         { cwd: ctx.cwd },
       );
       return {
-        content: [{ type: "text", text: result }],
-        details: undefined,
+        content: [{ type: "text", text: content }],
+        details,
       };
     },
   });

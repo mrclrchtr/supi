@@ -13,10 +13,14 @@ import {
   uriToFile,
 } from "../search-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
+import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
-export async function executeCallersAction(params: ActionParams, cwd: string): Promise<string> {
+export async function executeCallersAction(
+  params: ActionParams,
+  cwd: string,
+): Promise<CodeIntelResult> {
   const target = await resolveTarget(params, cwd);
-  if (typeof target === "string") return target;
+  if (typeof target === "string") return { content: target, details: undefined };
 
   const maxResults = params.maxResults ?? 5;
   const lspState = getSessionLspService(cwd);
@@ -27,17 +31,40 @@ export async function executeCallersAction(params: ActionParams, cwd: string): P
       // Filter out the declaration itself — LSP includes it with includeDeclaration
       const callerRefs = filterOutDeclaration(refs, target.file, target.position);
       if (callerRefs.length > 0) {
-        return formatSemanticCallers(callerRefs, target.name, cwd, maxResults);
+        const content = formatSemanticCallers(callerRefs, target.name, cwd, maxResults);
+        const { project: projectRefs, external: externalRefs } = partitionRefs(refs, cwd);
+        const details: SearchDetails = {
+          confidence: "semantic",
+          scope: params.path ?? null,
+          candidateCount: projectRefs.length,
+          omittedCount: externalRefs.length,
+          nextQueries: [
+            "`code_intel affected` for impact analysis",
+            "`code_intel pattern` with broader scope for additional matches",
+          ],
+        };
+        return { content, details: { type: "search" as const, data: details } };
       }
     }
   }
 
   if (target.name) {
-    return formatHeuristicCallers(target.name, params, cwd);
+    const content = formatHeuristicCallers(target.name, params, cwd);
+    const details: SearchDetails = {
+      confidence: "heuristic",
+      scope: params.path ?? null,
+      candidateCount: 0,
+      omittedCount: 0,
+      nextQueries: ["Enable LSP for `semantic` caller accuracy"],
+    };
+    return { content, details: { type: "search" as const, data: details } };
   }
 
   const relPath = path.relative(cwd, target.file);
-  return `No caller data available for ${relPath}:${target.displayLine}:${target.displayCharacter}. LSP may not be active.\n\nTry \`code_intel pattern\` with the symbol name for text-search matches.`;
+  return {
+    content: `No caller data available for ${relPath}:${target.displayLine}:${target.displayCharacter}. LSP may not be active.\n\nTry \`code_intel pattern\` with the symbol name for text-search matches.`,
+    details: undefined,
+  };
 }
 
 function partitionRefs(

@@ -24,8 +24,8 @@ describe("code_intel callees action", () => {
     const result = await executeAction({ action: "callees" } as unknown as ActionParams, {
       cwd: tmpDir,
     });
-    expect(result).toContain("Error");
-    expect(result).toContain("anchored coordinates");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("anchored coordinates");
   });
 
   it("rejects callees with file but no line/character", async () => {
@@ -34,8 +34,8 @@ describe("code_intel callees action", () => {
       { action: "callees", file: "test.ts" } as unknown as ActionParams,
       { cwd: tmpDir },
     );
-    expect(result).toContain("Error");
-    expect(result).toContain("line");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("line");
   });
 
   it("rejects non-existent file", async () => {
@@ -48,7 +48,7 @@ describe("code_intel callees action", () => {
       } as unknown as ActionParams,
       { cwd: tmpDir },
     );
-    expect(result).toContain("not found");
+    expect(result.content).toContain("not found");
   });
 
   it("returns callees for a TypeScript function", async () => {
@@ -69,10 +69,10 @@ describe("code_intel callees action", () => {
       { cwd: tmpDir },
     );
 
-    expect(result).toContain("Callees");
-    expect(result).toContain("myFunction");
-    expect(result).toContain("doSomething");
-    expect(result).toContain("doSomethingElse");
+    expect(result.content).toContain("Callees");
+    expect(result.content).toContain("myFunction");
+    expect(result.content).toContain("doSomething");
+    expect(result.content).toContain("doSomethingElse");
   });
 
   it("returns callees for a Python function", async () => {
@@ -86,9 +86,9 @@ describe("code_intel callees action", () => {
       { cwd: tmpDir },
     );
 
-    expect(result).toContain("Callees");
-    expect(result).toContain("process_data");
-    expect(result).toContain("save_result");
+    expect(result.content).toContain("Callees");
+    expect(result.content).toContain("process_data");
+    expect(result.content).toContain("save_result");
   });
 
   it("returns no-callees message for HTML files", async () => {
@@ -99,6 +99,6 @@ describe("code_intel callees action", () => {
       { cwd: tmpDir },
     );
 
-    expect(result).toContain("No callee data");
+    expect(result.content).toContain("No callee data");
   });
 });

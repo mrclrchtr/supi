@@ -11,13 +11,14 @@ import {
   uriToFile,
 } from "../search-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
+import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 export async function executeImplementationsAction(
   params: ActionParams,
   cwd: string,
-): Promise<string> {
+): Promise<CodeIntelResult> {
   const target = await resolveTarget(params, cwd);
-  if (typeof target === "string") return target;
+  if (typeof target === "string") return { content: target, details: undefined };
 
   const lspState = getSessionLspService(cwd);
   const relPath = path.relative(cwd, target.file);
@@ -27,16 +28,39 @@ export async function executeImplementationsAction(
     if (impls) {
       const locations = Array.isArray(impls) ? impls : [impls];
       if (locations.length > 0) {
-        return formatSemanticImpls(locations, cwd, params.maxResults ?? 8);
+        const content = formatSemanticImpls(locations, cwd, params.maxResults ?? 8);
+        const { project: projectLocs, external: externalLocs } = partitionImpls(locations, cwd);
+        const searchDetails: SearchDetails = {
+          confidence: "semantic",
+          scope: params.path ?? null,
+          candidateCount: projectLocs.length,
+          omittedCount: externalLocs.length,
+          nextQueries: [
+            "`code_intel affected` before changing implementations",
+            "`code_intel brief` on containing modules for deeper context",
+          ],
+        };
+        return { content, details: { type: "search" as const, data: searchDetails } };
       }
     }
   }
 
   if (target.name) {
-    return formatHeuristicImpls(target.name, params, cwd);
+    const content = formatHeuristicImpls(target.name, params, cwd);
+    const details: SearchDetails = {
+      confidence: "heuristic",
+      scope: params.path ?? null,
+      candidateCount: 0,
+      omittedCount: 0,
+      nextQueries: ["Enable LSP for semantic implementation resolution"],
+    };
+    return { content, details: { type: "search" as const, data: details } };
   }
 
-  return `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.\n\nLSP implementation lookup may not be available. Try \`code_intel pattern\` with the type name.`;
+  return {
+    content: `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.\n\nLSP implementation lookup may not be available. Try \`code_intel pattern\` with the type name.`,
+    details: undefined,
+  };
 }
 
 function partitionImpls(

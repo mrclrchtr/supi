@@ -9,6 +9,7 @@ import {
   runRipgrepDetailed,
 } from "../search-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
+import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 /**
  * Execute the bounded text-search action.
@@ -18,9 +19,15 @@ import type { ActionParams } from "../tool-actions.ts";
  * patterns are surfaced as explicit user-facing errors instead of being
  * collapsed into a misleading no-match response.
  */
-export async function executePatternAction(params: ActionParams, cwd: string): Promise<string> {
+export async function executePatternAction(
+  params: ActionParams,
+  cwd: string,
+): Promise<CodeIntelResult> {
   if (!params.pattern) {
-    return "**Error:** `pattern` action requires a `pattern` parameter.";
+    return {
+      content: "**Error:** `pattern` action requires a `pattern` parameter.",
+      details: undefined,
+    };
   }
 
   const maxResults = params.maxResults ?? 8;
@@ -43,18 +50,33 @@ export async function executePatternAction(params: ActionParams, cwd: string): P
       });
 
   if (typeof matches === "string") {
-    return matches;
+    return { content: matches, details: undefined };
   }
 
   if (matches.length === 0) {
-    return `No matches found for \`${params.pattern}\` in \`${relScope}\`.`;
+    return {
+      content: `No matches found for \`${params.pattern}\` in \`${relScope}\`.`,
+      details: undefined,
+    };
   }
 
+  let content: string;
   if (params.summary) {
-    return formatPatternSummary(params.pattern, relScope, matches, maxResults);
+    content = formatPatternSummary(params.pattern, relScope, matches, maxResults);
+  } else {
+    content = formatPatternResults(params.pattern, relScope, matches, maxResults);
   }
 
-  return formatPatternResults(params.pattern, relScope, matches, maxResults);
+  const details: SearchDetails = {
+    confidence: "heuristic",
+    scope: params.path ?? null,
+    candidateCount: matches.length,
+    omittedCount: 0,
+    nextQueries: params.regex
+      ? ["Set `regex: false` for literal matching"]
+      : ["Set `regex: true` for regex matching"],
+  };
+  return { content, details: { type: "search" as const, data: details } };
 }
 
 function getRegexMatches(options: {

@@ -30,19 +30,19 @@ describe("executeIndexAction", () => {
     writeFile(tmpDir, "scripts/build.sh", "#!/bin/sh\necho ok");
 
     const result = executeIndexAction(tmpDir);
-    expect(result).toContain("# Project Map:");
-    expect(result).toContain("TypeScript: 2");
-    expect(result).toContain("TSX: 1");
-    expect(result).toContain("src/ (3 files)");
-    expect(result).toContain("docs/ (1 file)");
-    expect(result).toContain("Landmark files");
-    expect(result).toContain("package.json");
+    expect(result.content).toContain("# Project Map:");
+    expect(result.content).toContain("TypeScript: 2");
+    expect(result.content).toContain("TSX: 1");
+    expect(result.content).toContain("src/ (3 files)");
+    expect(result.content).toContain("docs/ (1 file)");
+    expect(result.content).toContain("Landmark files");
+    expect(result.content).toContain("package.json");
   });
 
   it("handles empty source directories", () => {
     writeFile(tmpDir, "readme.md", "# Hello");
     const result = executeIndexAction(tmpDir);
-    expect(result).toContain("**Source files:** 1 total");
+    expect(result.content).toContain("**Source files:** 1 total");
   });
 
   it("includes all source language extensions", () => {
@@ -56,13 +56,13 @@ describe("executeIndexAction", () => {
     writeFile(tmpDir, "program.cs", "");
 
     const result = executeIndexAction(tmpDir);
-    expect(result).toContain("Python: 1");
-    expect(result).toContain("Rust: 1");
-    expect(result).toContain("Go: 1");
-    expect(result).toContain("Shell: 1");
-    expect(result).toContain("Kotlin: 1");
-    expect(result).toContain("R: 1");
-    expect(result).toContain("SQL: 1");
-    expect(result).toContain("C#: 1");
+    expect(result.content).toContain("Python: 1");
+    expect(result.content).toContain("Rust: 1");
+    expect(result.content).toContain("Go: 1");
+    expect(result.content).toContain("Shell: 1");
+    expect(result.content).toContain("Kotlin: 1");
+    expect(result.content).toContain("R: 1");
+    expect(result.content).toContain("SQL: 1");
+    expect(result.content).toContain("C#: 1");
   });
 });

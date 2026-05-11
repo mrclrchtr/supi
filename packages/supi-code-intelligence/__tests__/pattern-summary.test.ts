@@ -23,7 +23,7 @@ it("returns summary when summary=true", async () => {
     { action: "pattern", pattern: "foo", summary: true },
     tmpDir,
   );
-  expect(result).toContain("Pattern Summary");
-  expect(result).toContain("2 files");
-  expect(result).not.toContain("L1:");
+  expect(result.content).toContain("Pattern Summary");
+  expect(result.content).toContain("2 files");
+  expect(result.content).not.toContain("L1:");
 });

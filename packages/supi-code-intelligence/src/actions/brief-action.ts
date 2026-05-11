@@ -7,29 +7,38 @@ import { buildArchitectureModel, findModuleForPath } from "../architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
+import type { CodeIntelResult } from "../types.ts";
 
-export async function executeBriefAction(params: ActionParams, cwd: string): Promise<string> {
+export async function executeBriefAction(
+  params: ActionParams,
+  cwd: string,
+): Promise<CodeIntelResult> {
   const model = await buildArchitectureModel(cwd);
   if (!model) {
-    return "No project structure detected. This directory has no recognizable project metadata or source files.";
+    return {
+      content:
+        "No project structure detected. This directory has no recognizable project metadata or source files.",
+      details: undefined,
+    };
   }
 
   if (params.file && params.line != null && params.character != null) {
-    return executeAnchoredBrief(params, cwd, model);
+    const content = await executeAnchoredBrief(params, cwd, model);
+    return { content, details: undefined };
   }
 
   if (params.path) {
-    const { content } = generateFocusedBrief(model, normalizePath(params.path, cwd));
-    return content;
+    const result = generateFocusedBrief(model, normalizePath(params.path, cwd));
+    return { content: result.content, details: { type: "brief" as const, data: result.details } };
   }
 
   if (params.file) {
-    const { content } = generateFocusedBrief(model, normalizePath(params.file, cwd));
-    return content;
+    const result = generateFocusedBrief(model, normalizePath(params.file, cwd));
+    return { content: result.content, details: { type: "brief" as const, data: result.details } };
   }
 
-  const { content } = generateProjectBrief(model);
-  return content;
+  const result = generateProjectBrief(model);
+  return { content: result.content, details: { type: "brief" as const, data: result.details } };
 }
 
 async function executeAnchoredBrief(

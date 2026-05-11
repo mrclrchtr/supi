@@ -38,9 +38,9 @@ Scopes: project (no params), package/directory (`path`), file (`file`), or ancho
 
 ### `callers` — Find call sites for a symbol
 
-- LSP-first (references query), falls back to tree-sitter structure or heuristic text search
+- LSP-first (references query), falls back to heuristic text search (word-boundary ripgrep)
 - Results grouped by file with ranked, contextual call sites
-- Confidence labeling: `semantic` (LSP), `structural` (tree-sitter), `heuristic` (text search)
+- Confidence labeling: `semantic` (LSP), `heuristic` (text search)
 
 ### `callees` — Structural outgoing call map
 
@@ -51,7 +51,7 @@ Scopes: project (no params), package/directory (`path`), file (`file`), or ancho
 ### `implementations` — Find concrete implementations
 
 - Resolves interface/abstract method implementations via LSP
-- Falls back to structural class hierarchy analysis
+- Falls back to heuristic text search for `implements`/`extends` patterns
 
 ### `affected` — Blast-radius analysis
 

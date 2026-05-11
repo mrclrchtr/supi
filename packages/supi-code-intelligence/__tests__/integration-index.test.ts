@@ -25,7 +25,7 @@ it("executes index action through dispatcher", async () => {
   writeFile(tmpDir, "src/main.ts", "export const x = 1;");
 
   const result = await executeAction({ action: "index" }, { cwd: tmpDir });
-  expect(result).toContain("Project Map");
-  expect(result).toContain("TypeScript: 1");
-  expect(result).toContain("package.json");
+  expect(result.content).toContain("Project Map");
+  expect(result.content).toContain("TypeScript: 1");
+  expect(result.content).toContain("package.json");
 });

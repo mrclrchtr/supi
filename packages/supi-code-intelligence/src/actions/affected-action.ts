@@ -13,11 +13,14 @@ import {
   uriToFile,
 } from "../search-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
-import type { ConfidenceMode } from "../types.ts";
+import type { AffectedDetails, CodeIntelResult, ConfidenceMode } from "../types.ts";
 
-export async function executeAffectedAction(params: ActionParams, cwd: string): Promise<string> {
+export async function executeAffectedAction(
+  params: ActionParams,
+  cwd: string,
+): Promise<CodeIntelResult> {
   const target = await resolveTarget(params, cwd);
-  if (typeof target === "string") return target;
+  if (typeof target === "string") return { content: target, details: undefined };
 
   const relPath = path.relative(cwd, target.file);
   const symbolName = target.name ?? `symbol at ${relPath}:${target.displayLine}`;
@@ -26,7 +29,22 @@ export async function executeAffectedAction(params: ActionParams, cwd: string): 
   const model = await buildArchitectureModel(cwd);
   const analysis = analyzeImpact(refs, model, target.name, cwd);
 
-  return formatAffectedOutput(symbolName, refs, analysis, params);
+  const content = formatAffectedOutput(symbolName, refs, analysis, params);
+  const details: AffectedDetails = {
+    confidence: analysis.confidence,
+    directCount: refs.refs.length,
+    downstreamCount: analysis.downstreamCount,
+    riskLevel: analysis.riskLevel,
+    checkNext: analysis.checkNext,
+    likelyTests: analysis.likelyTests,
+    omittedCount:
+      analysis.externalRefs + (analysis.affectedFiles.size > (params.maxResults ?? 8) ? 1 : 0),
+    nextQueries: [
+      "`code_intel brief` on the most-affected module for deeper context",
+      `\`code_intel callers\` with \`symbol: "${symbolName}"\` for grouped call-site detail`,
+    ],
+  };
+  return { content, details: { type: "affected" as const, data: details } };
 }
 
 interface GatheredRef {
@@ -166,7 +184,6 @@ function formatAffectedOutput(
   analysis: ImpactAnalysis,
   params: ActionParams,
 ): string {
-  const _maxResults = params.maxResults ?? 8;
   const totalRefs = result.refs.length + analysis.externalRefs;
   const lines: string[] = [];
 

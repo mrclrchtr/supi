@@ -22,9 +22,9 @@ describe("executeAction validation", () => {
   it("rejects unknown action", async () => {
     // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     const result = await executeAction({ action: "unknown" as any }, { cwd: tmpDir });
-    expect(result).toContain("Error");
-    expect(result).toContain("Unknown action");
-    expect(result).toContain("brief");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("Unknown action");
+    expect(result.content).toContain("brief");
   });
 
   it("rejects line/character with path instead of file", async () => {
@@ -32,8 +32,8 @@ describe("executeAction validation", () => {
       { action: "callers", path: "src/", line: 1, character: 1 },
       { cwd: tmpDir },
     );
-    expect(result).toContain("Error");
-    expect(result).toContain("require `file`");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("require `file`");
   });
 
   it("rejects line/character without file", async () => {
@@ -41,35 +41,35 @@ describe("executeAction validation", () => {
       { action: "callers", line: 1, character: 1 },
       { cwd: tmpDir },
     );
-    expect(result).toContain("Error");
-    expect(result).toContain("require `file`");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("require `file`");
   });
 
   it("rejects file pointing to directory", async () => {
     const subDir = path.join(tmpDir, "sub");
     mkdirSync(subDir);
     const result = await executeAction({ action: "callers", file: "sub" }, { cwd: tmpDir });
-    expect(result).toContain("Error");
-    expect(result).toContain("directory");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("directory");
   });
 
   it("rejects semantic action without file or symbol", async () => {
     const result = await executeAction({ action: "callers" }, { cwd: tmpDir });
-    expect(result).toContain("Error");
-    expect(result).toContain("anchored coordinates");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("anchored coordinates");
   });
 
   it("rejects pattern action without pattern param", async () => {
     const result = await executeAction({ action: "pattern" }, { cwd: tmpDir });
-    expect(result).toContain("Error");
-    expect(result).toContain("pattern");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("pattern");
   });
 
   it("rejects semantic action with file but no line/character", async () => {
     writeFileSync(path.join(tmpDir, "test.ts"), "export const x = 1;");
     const result = await executeAction({ action: "callers", file: "test.ts" }, { cwd: tmpDir });
-    expect(result).toContain("Error");
-    expect(result).toContain("line");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("line");
   });
 });
 
@@ -77,20 +77,20 @@ describe("brief action", () => {
   it("returns project brief for no-path call", async () => {
     writeJson(tmpDir, "package.json", { name: "test-proj", description: "Test" });
     const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
-    expect(result).toContain("Project Brief");
-    expect(result).toContain("test-proj");
+    expect(result.content).toContain("Project Brief");
+    expect(result.content).toContain("test-proj");
   });
 
   it("returns error for non-existent path", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
     const result = await executeAction({ action: "brief", path: "nonexistent/" }, { cwd: tmpDir });
-    expect(result).toContain("Error");
-    expect(result).toContain("not found");
+    expect(result.content).toContain("Error");
+    expect(result.content).toContain("not found");
   });
 
   it("returns no-structure message for empty dir", async () => {
     const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
-    expect(result).toContain("No project structure");
+    expect(result.content).toContain("No project structure");
   });
 });
 
@@ -101,9 +101,9 @@ describe("pattern action", () => {
     writeFileSync(path.join(tmpDir, "other.ts"), "import { hello } from './index';");
 
     const result = await executeAction({ action: "pattern", pattern: "hello" }, { cwd: tmpDir });
-    expect(result).toContain("Pattern:");
-    expect(result).toContain("hello");
-    expect(result).toContain("match");
+    expect(result.content).toContain("Pattern:");
+    expect(result.content).toContain("hello");
+    expect(result.content).toContain("match");
   });
 
   it("returns no-matches message", async () => {
@@ -114,7 +114,7 @@ describe("pattern action", () => {
       { action: "pattern", pattern: "nonexistent_symbol_xyz" },
       { cwd: tmpDir },
     );
-    expect(result).toContain("No matches");
+    expect(result.content).toContain("No matches");
   });
 
   it("respects path scoping", async () => {
@@ -128,8 +128,8 @@ describe("pattern action", () => {
       { action: "pattern", pattern: "target", path: "src/" },
       { cwd: tmpDir },
     );
-    expect(result).toContain("src/");
-    expect(result).toContain("target");
+    expect(result.content).toContain("src/");
+    expect(result.content).toContain("target");
   });
 
   it("treats regex metacharacters literally by default", async () => {
@@ -141,8 +141,8 @@ describe("pattern action", () => {
       { cwd: tmpDir },
     );
 
-    expect(result).toContain("sendMessage({");
-    expect(result).not.toContain("No matches");
+    expect(result.content).toContain("sendMessage({");
+    expect(result.content).not.toContain("No matches");
   });
 
   it("supports opt-in regex pattern searches", async () => {
@@ -157,8 +157,8 @@ describe("pattern action", () => {
       { cwd: tmpDir },
     );
 
-    expect(result).toContain("registerSettings");
-    expect(result).toContain("registerConfig");
+    expect(result.content).toContain("registerSettings");
+    expect(result.content).toContain("registerConfig");
   });
 
   it("returns an explicit error for malformed regex patterns", async () => {
@@ -170,8 +170,8 @@ describe("pattern action", () => {
       { cwd: tmpDir },
     );
 
-    expect(result).toContain("**Error:** Invalid regex pattern");
-    expect(result).toContain("sendMessage(");
-    expect(result).not.toContain("No matches");
+    expect(result.content).toContain("**Error:** Invalid regex pattern");
+    expect(result.content).toContain("sendMessage(");
+    expect(result.content).not.toContain("No matches");
   });
 });

@@ -175,4 +175,10 @@ describe("session lifecycle", () => {
     const result2 = await beforeAgentStart?.({}, mockCtx);
     expect(result2).toBeUndefined();
   });
+
+  it("registers optional summary parameter for pattern searches", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi);
+    expect(pi.tools[0].parameters?.properties).toHaveProperty("summary");
+  });
 });

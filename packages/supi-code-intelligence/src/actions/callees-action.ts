@@ -6,10 +6,14 @@ import * as path from "node:path";
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
 import { resolveTarget } from "../resolve-target.ts";
 import type { ActionParams } from "../tool-actions.ts";
+import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
-export async function executeCalleesAction(params: ActionParams, cwd: string): Promise<string> {
+export async function executeCalleesAction(
+  params: ActionParams,
+  cwd: string,
+): Promise<CodeIntelResult> {
   const target = await resolveTarget(params, cwd);
-  if (typeof target === "string") return target;
+  if (typeof target === "string") return { content: target, details: undefined };
 
   const relPath = path.relative(cwd, target.file);
   let tsSession: ReturnType<typeof createTreeSitterSession> | null = null;
@@ -19,18 +23,35 @@ export async function executeCalleesAction(params: ActionParams, cwd: string): P
     const result = await tsSession.calleesAt(relPath, target.displayLine, target.displayCharacter);
 
     if (result.kind !== "success") {
-      return noCalleesMessage(relPath, target.displayLine, target.displayCharacter);
+      return {
+        content: noCalleesMessage(relPath, target.displayLine, target.displayCharacter),
+        details: undefined,
+      };
     }
 
     const { enclosingScope, callees } = result.data;
 
     if (callees.length === 0) {
-      return noCalleesMessage(relPath, target.displayLine, target.displayCharacter);
+      return {
+        content: noCalleesMessage(relPath, target.displayLine, target.displayCharacter),
+        details: undefined,
+      };
     }
 
-    return formatCallees(callees, enclosingScope.name, relPath, params.maxResults ?? 8);
+    const content = formatCallees(callees, enclosingScope.name, relPath, params.maxResults ?? 8);
+    const details: SearchDetails = {
+      confidence: "structural",
+      scope: null,
+      candidateCount: callees.length,
+      omittedCount: Math.max(0, callees.length - (params.maxResults ?? 8)),
+      nextQueries: ["Use `lsp` for precise type information on callees"],
+    };
+    return { content, details: { type: "search" as const, data: details } };
   } catch {
-    return noCalleesMessage(relPath, target.displayLine, target.displayCharacter);
+    return {
+      content: noCalleesMessage(relPath, target.displayLine, target.displayCharacter),
+      details: undefined,
+    };
   } finally {
     tsSession?.dispose();
   }

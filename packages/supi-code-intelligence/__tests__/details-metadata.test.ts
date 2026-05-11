@@ -2,8 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { executeIndexAction } from "../src/actions/index-action.ts";
+import { executePatternAction } from "../src/actions/pattern-action.ts";
 import { buildArchitectureModel } from "../src/architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../src/brief.ts";
+import { executeAction } from "../src/tool-actions.ts";
 
 let tmpDir: string;
 
@@ -135,5 +138,41 @@ describe("focused brief details metadata", () => {
     expect(details.nextQueries.length).toBeGreaterThan(0);
     const affectedHint = details.nextQueries.find((q) => q.includes("affected"));
     expect(affectedHint).toBeDefined();
+  });
+});
+
+describe("structured details via executeAction", () => {
+  it("returns brief details for project brief action", async () => {
+    setupWorkspace();
+    const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
+    expect(result.details).toBeDefined();
+    expect(result.details?.type).toBe("brief");
+    if (result.details?.type === "brief") {
+      expect(result.details.data.confidence).toBe("structural");
+    }
+  });
+
+  it("returns index search details", async () => {
+    const result = executeIndexAction(tmpDir);
+    expect(result.details).toBeDefined();
+    expect(result.details?.type).toBe("search");
+    if (result.details?.type === "search") {
+      expect(result.details.data.confidence).toBe("structural");
+      expect(result.details.data.candidateCount).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("returns pattern search details", async () => {
+    writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;");
+    const result = await executePatternAction({ action: "pattern", pattern: "foo" }, tmpDir);
+    expect(result.details).toBeDefined();
+    expect(result.details?.type).toBe("search");
+  });
+
+  it("returns undefined details for validation errors", async () => {
+    // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
+    const result = await executeAction({ action: "unknown" as any }, { cwd: tmpDir });
+    expect(result.details).toBeUndefined();
+    expect(result.content).toContain("Error");
   });
 });

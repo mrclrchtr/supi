@@ -9,6 +9,7 @@ import { executeImplementationsAction } from "./actions/implementations-action.t
 import { executeIndexAction } from "./actions/index-action.ts";
 import { executePatternAction } from "./actions/pattern-action.ts";
 import { normalizePath } from "./search-helpers.ts";
+import type { CodeIntelResult } from "./types.ts";
 
 export type CodeIntelAction =
   | "brief"
@@ -35,6 +36,7 @@ export interface ActionParams {
   exportedOnly?: boolean;
   maxResults?: number;
   contextLines?: number;
+  /** Aggregate counts by directory instead of line-level matches (pattern action only). */
   summary?: boolean;
 }
 
@@ -50,11 +52,15 @@ const SUPPORTED_ACTIONS = new Set<string>([
 
 /**
  * Main action dispatcher — validates params and routes to specific action handlers.
+ * Returns structured content with optional metadata details per action type.
  */
-export async function executeAction(params: ActionParams, ctx: { cwd: string }): Promise<string> {
+export async function executeAction(
+  params: ActionParams,
+  ctx: { cwd: string },
+): Promise<CodeIntelResult> {
   const cwd = ctx.cwd;
   const error = validateParams(params, cwd);
-  if (error) return error;
+  if (error) return { content: error, details: undefined };
 
   switch (params.action) {
     case "brief":
@@ -72,7 +78,10 @@ export async function executeAction(params: ActionParams, ctx: { cwd: string }):
     case "index":
       return executeIndexAction(cwd);
     default:
-      return `**Error:** Unknown action \`${params.action}\`.`;
+      return {
+        content: `**Error:** Unknown action \`${params.action}\`.`,
+        details: undefined,
+      };
   }
 }
 

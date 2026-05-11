@@ -71,12 +71,12 @@ switch (params.action) {
 
 ### Fallback Chain
 
-LSP → Tree-sitter → ripgrep text search, with explicit confidence labeling on every result:
+LSP → ripgrep text search (for callers/implementations/affected), with explicit confidence labeling on every result:
 
 | Label | Source |
 |---|---|
-| `semantic` | LSP (definitions, references, diagnostics) |
-| `structural` | Tree-sitter AST (outlines, imports/exports) |
+| `semantic` | LSP (definitions, references, diagnostics, implementations) |
+| `structural` | Tree-sitter AST (outlines, imports/exports, callees) |
 | `heuristic` | `rg` text search |
 | `unavailable` | No data produced |
 
@@ -108,7 +108,10 @@ LSP → Tree-sitter → ripgrep text search, with explicit confidence labeling o
 - `findModuleForPath()` returns the deepest matching module for nested monorepo layouts.
 
 ### Confidence & Metadata
-- Every action handler returns formatted Markdown **plus** structured `details` with `nextQueries` follow-ups.
+- Every action handler returns structured `details` alongside formatted Markdown:
+  - `brief` → `{ type: "brief", data: BriefDetails }` (confidence, focus target, start-here, public surfaces, dependency summary, next queries)
+  - `search` (callers, callees, implementations, pattern, index) → `{ type: "search", data: SearchDetails }` (confidence, scope, candidate count, omitted count)
+  - `affected` → `{ type: "affected", data: AffectedDetails }` (confidence, direct count, downstream count, risk level, check-next, likely tests)
 - Risk thresholds: `high` (>10 refs / >3 modules / >1 downstream), `medium` (>3 refs / >1 module / ≥1 downstream), `low` (otherwise).
 
 ## Test Commands

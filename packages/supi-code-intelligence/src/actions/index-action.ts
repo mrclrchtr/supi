@@ -1,5 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 const SOURCE_EXTENSIONS = new Map([
   [".ts", "TypeScript"],
@@ -76,9 +77,17 @@ const LANDMARK_FILES = new Set([
   ".env.local.example",
 ]);
 
-export function executeIndexAction(cwd: string): string {
+export function executeIndexAction(cwd: string): CodeIntelResult {
   const stats = gatherStats(cwd);
-  return formatIndex(stats, cwd);
+  const content = formatIndex(stats, cwd);
+  const details: SearchDetails = {
+    confidence: "structural",
+    scope: null,
+    candidateCount: stats.total,
+    omittedCount: 0,
+    nextQueries: ["`code_intel brief` for deeper context on a module"],
+  };
+  return { content, details: { type: "search" as const, data: details } };
 }
 
 interface FileStats {
