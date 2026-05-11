@@ -53,6 +53,5 @@ export interface CodeIntelResult {
   details?:
     | { type: "brief"; data: BriefDetails }
     | { type: "search"; data: SearchDetails }
-    | { type: "affected"; data: AffectedDetails }
-    | { type: "disambiguation"; candidates: DisambiguationCandidate[] };
+    | { type: "affected"; data: AffectedDetails };
 }

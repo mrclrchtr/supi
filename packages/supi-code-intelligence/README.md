@@ -135,7 +135,6 @@ All actions return structured metadata alongside formatted Markdown:
 - **`brief`** → `BriefDetails` (confidence, focus target, start-here suggestions, public surfaces, dependency summary, omitted count, next queries)
 - **`search`** → `SearchDetails` (callers/callees/implementations/pattern: confidence, scope, candidate count, omitted count)
 - **`affected`** → `AffectedDetails` (direct count, downstream count, risk level, likely tests, check-next list)
-- **`disambiguation`** → `DisambiguationCandidate[]` (when a symbol resolves to multiple locations)
 
 ## Parameter Validation
 
