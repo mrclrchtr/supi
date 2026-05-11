@@ -42,6 +42,7 @@ export async function executePatternAction(
         cwd,
         maxResults,
         contextLines,
+        summary: params.summary,
       })
     : runRipgrep(escapeRegex(params.pattern), scopePath, cwd, {
         maxMatches: params.summary ? undefined : maxResults * 3,
@@ -85,9 +86,10 @@ function getRegexMatches(options: {
   cwd: string;
   maxResults: number;
   contextLines: number;
+  summary?: boolean;
 }): RgMatch[] | string {
   const result = runRipgrepDetailed(options.pattern, options.scopePath, options.cwd, {
-    maxMatches: options.maxResults * 3,
+    maxMatches: options.summary ? undefined : options.maxResults * 3,
     contextLines: options.contextLines,
     filterLowSignal: true,
   });
