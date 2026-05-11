@@ -88,47 +88,27 @@
 
 ### 7. Auto-Delivered Overlap (10 points)
 
-**10 points**: No overlap with auto-delivered content. CLAUDE.md focuses on curated, non-obvious context only.
+Score this criterion after a **context baseline review**: compare the CLAUDE.md against what a SuPi-enabled PI session likely already has from `code_intel brief` and other known injected context.
 
-**7 points**: Minor overlap (e.g., a brief package list or compact structure note that still adds relationships or "start here" guidance beyond the auto-generated overview)
+**10 points**: Almost no overlap. Any overlap is tiny and clearly justified by human-only reasoning.
 
-**4 points**: Significant overlap — package tables, root project-structure trees, architecture overviews, or dependency graphs that duplicate `code_intel` output
+**7 points**: Some overlap, but the file still adds meaningful unique guidance (for example, a partially redundant structure section that keeps ownership rules or a concise "start here" note).
 
-**0 points**: Large sections that are purely auto-generated data (module lists with descriptions, dense dependency tables, long root directory trees)
+**4 points**: Significant overlap — package tables, root project-structure trees, architecture overviews, or dependency graphs duplicate the baseline context and should be compressed.
 
-**What is NOT overlap:**
-- Gotchas specific to a package's behavior
-- Cross-package patterns that aren't discoverable from manifests
-- Commands and workflows
-- Human-curated "Start Here" guidance with reasoning
-- Concise structure notes that explain boundaries, ownership, initialization order, or important exceptions
+**0 points**: Large sections are almost entirely duplicated generated context (module lists with descriptions, dense dependency tables, long root directory trees).
 
-**What IS overlap:**
-- Monorepo package tables where every row is `{name, description, path}`
-- Root-level "Modules" or "Packages" sections with >5 entries
-- Root `## Project structure` / `## Architecture` trees that mostly restate folders, packages, or module layout already visible from `code_intel brief`
-- High-level architecture overviews that don't add relationships, gotchas, conventions, or exceptions beyond what's in `package.json`
-- Dependency graphs that could be generated from `pnpm-workspace.yaml`
+**What is NOT overlap:** Gotchas specific to a package's behavior; cross-package patterns that aren't discoverable from manifests; commands and workflows; human-curated "Start Here" guidance with reasoning; concise structure notes that explain boundaries, ownership, initialization order, or important exceptions; and sections classified as **unique** during the baseline review.
+
+**What IS overlap:** Monorepo package tables where every row is `{name, description, path}`; root-level "Modules" or "Packages" sections with >5 entries; the **fully redundant** portion of a section during baseline review; root `## Project structure` / `## Architecture` trees that mostly restate folders, packages, or module layout already visible from `code_intel brief`; high-level architecture overviews that don't add relationships, gotchas, conventions, or exceptions beyond what's in `package.json`; and dependency graphs that could be generated from `pnpm-workspace.yaml`.
 
 ## Assessment Process
 
-1. Read the CLAUDE.md file completely
-2. Cross-reference with actual codebase:
-   - Run documented commands (mentally or actually)
-   - Check if referenced files exist
-   - Verify architecture descriptions
-3. Score each criterion
-4. Calculate total and assign grade
-5. List specific issues found
-6. Propose concrete improvements
+1. Read the CLAUDE.md file completely.
+2. If SuPi is active, perform a **context baseline review** first: compare against `code_intel brief` and other known injected context, then classify sections as **fully redundant**, **partially redundant**, or **unique**.
+3. Cross-reference with the actual codebase: run documented commands (mentally or actually), check that referenced files exist, and verify architecture descriptions.
+4. Score each criterion, calculate the total, assign the grade, list the specific issues, and propose concrete improvements.
 
 ## Red Flags
 
-- Commands that would fail (wrong paths, missing deps)
-- References to deleted files/folders
-- Outdated tech versions
-- Copy-paste from templates without customization
-- Generic advice not specific to the project
-- "TODO" items never completed
-- Duplicate info across multiple CLAUDE.md files
-- Sections that duplicate `code_intel brief` output (package tables, module graphs, dependency lists, long root directory trees)
+Watch for commands that would fail (wrong paths, missing deps), references to deleted files or folders, outdated tech versions, template copy without customization, generic advice, stale `TODO` items, duplicate info across multiple CLAUDE.md files, sections that duplicate `code_intel brief` output, and structure sections where the redundant tree/inventory portion should be separated from the unique guidance portion.

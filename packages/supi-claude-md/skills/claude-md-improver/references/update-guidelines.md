@@ -77,7 +77,7 @@ When auditing or updating CLAUDE.md in a project using SuPi extensions, these se
 - Gotchas that aren't in code
 - Human-curated guidance ("start here for X")
 
-If a root `## Project structure` / `## Architecture` section mostly restates the workspace tree, treat it as redundant. Shrink it to the few lines of orientation, boundary rules, or exceptions that a generated overview cannot supply.
+When SuPi is active, do a quick baseline review first: compare the CLAUDE.md against `code_intel brief` and other known injected context, then separate each section into overlap vs unique value. If a root `## Project structure` / `## Architecture` section mostly restates the workspace tree, treat that portion as redundant and keep only the orientation, boundary rules, or exceptions that the generated overview cannot supply.
 
 ## What NOT to Add
 
@@ -183,16 +183,20 @@ Bad:
 Better: Skip — `code_intel brief` shows this live.
 ```
 
-**Redundant: Root project structure tree that mostly repeats the workspace**
+**Partially redundant: Root project structure section with both overlap and unique value**
 ```markdown
-Bad:
+Overlap portion:
 ## Project structure
 - `apps/web` — frontend
 - `apps/api` — backend
 - `packages/db` — shared database code
 - `packages/ui` — shared components
 
-Better:
+Keep portion:
+- `packages/db` owns schema changes; app packages consume generated clients only
+- API request flow starts at `apps/api/src/routes/` and drops into `packages/db/`
+
+Better rewrite:
 ## Start Here
 - Web changes usually start in `apps/web/src/app/`
 - API request flow starts at `apps/api/src/routes/` and drops into `packages/db/`

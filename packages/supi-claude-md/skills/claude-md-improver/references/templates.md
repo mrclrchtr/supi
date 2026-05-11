@@ -247,7 +247,7 @@ For packages within a monorepo or distinct modules.
 
 ## Template: SuPi-Optimized Project Root
 
-For projects using SuPi extensions (`code-intelligence`, `claude-md`). Omits sections that extensions auto-deliver.
+For projects using SuPi extensions (`code-intelligence`, `claude-md`). Omits sections that extensions auto-deliver and favors compressed human-only guidance after a baseline overlap review.
 
 ```markdown
 # <Project Name>
@@ -286,7 +286,7 @@ For projects using SuPi extensions (`code-intelligence`, `claude-md`). Omits sec
 - Large root `## Project structure` / `## Architecture` directory trees that just restate the workspace layout
 - `## Dependencies` table — derivable from `package.json`
 
-If you keep any structure section in a SuPi-enabled root doc, make it short and opinionated: explain where to start, why boundaries exist, or which exception matters. Do not paste the tree unless the tree itself carries human-only meaning.
+If you keep any structure section in a SuPi-enabled root doc, make it short and opinionated: explain where to start, why boundaries exist, or which exception matters. After the baseline review, split the redundant tree/inventory portion from the unique guidance portion instead of keeping both together. Do not paste the tree unless the tree itself carries human-only meaning.
 
 ---
 

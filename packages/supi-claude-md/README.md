@@ -10,7 +10,7 @@ pi install npm:@mrclrchtr/supi-claude-md
 
 ## What it adds
 
-This extension adds **subdirectory context discovery** — injecting `CLAUDE.md` / `AGENTS.md` from subdirectories when the agent touches files there.
+This extension adds **subdirectory context discovery**: it injects `CLAUDE.md` / `AGENTS.md` from subdirectories when the agent touches files there.
 
 Pi loads root and ancestor instruction files natively into the system prompt on every turn. This package only handles subdirectories below `cwd`. To pick up root instruction file edits mid-session, use pi's `/reload` command or restart the session.
 
@@ -22,15 +22,15 @@ If your install surface includes the shared SuPi settings command (for example v
 
 Inside `/supi-settings`, Claude-MD contributes:
 
-- `Subdirectory Discovery` — on/off toggle
-- `Subdirectory Re-read Interval` — text input; enter a number of turns or `0` to disable subdirectory re-reads
-- `Context Threshold` — common percentage values from `0` to `100`
-- `Context File Names` — comma-separated text input; empty input restores the default filenames
+- `Subdirectory Discovery`: on/off toggle
+- `Subdirectory Re-read Interval`: text input; enter a number of turns or `0` to disable subdirectory re-reads
+- `Context Threshold`: common percentage values from `0` to `100`
+- `Context File Names`: comma-separated text input; empty input restores the default filenames
 
 This package bundles two skills:
 
-- `claude-md-improver` — audit CLAUDE.md files, evaluate quality, and propose targeted updates. SuPi-aware: flags content that duplicates what `supi-code-intelligence` (workspace module graph) and `supi-claude-md` (subdirectory injection) already auto-deliver
-- `claude-md-revision` — capture session learnings into CLAUDE.md with user approval
+- `claude-md-improver`: audit CLAUDE.md files, evaluate quality, and propose targeted updates. SuPi-aware: compares CLAUDE.md sections against a synthesized context baseline from `supi-code-intelligence` and `supi-claude-md`, then flags redundant content and suggests compression when only part of a section should stay
+- `claude-md-revision`: capture session learnings into CLAUDE.md with user approval
 
 ## Configuration
 
@@ -56,10 +56,10 @@ Use the `claude-md` section:
 
 Options:
 
-- `rereadInterval` — turns between re-reading previously injected subdirectory context; `0` disables subdirectory re-reads (first-time discovery is unaffected)
-- `contextThreshold` — skip subdirectory re-injection when context usage is at or above this percent; `100` disables context gating; first-time discovery is always allowed
-- `subdirs` — enable or disable subdirectory discovery
-- `fileNames` — ordered list of context filenames to search for
+- `rereadInterval`: turns between re-reading previously injected subdirectory context; `0` disables subdirectory re-reads (first-time discovery is unaffected)
+- `contextThreshold`: skip subdirectory re-injection when context usage is at or above this percent; `100` disables context gating; first-time discovery is always allowed
+- `subdirs`: enable or disable subdirectory discovery
+- `fileNames`: ordered list of context filenames to search for
 
 ## Requirements
 

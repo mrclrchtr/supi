@@ -55,24 +55,26 @@ For each CLAUDE.md file, evaluate against quality criteria. See [references/qual
 - **D (30-49)**: Sparse or outdated
 - **F (0-29)**: Missing or severely outdated
 
-### Phase 2.5: SuPi Overlap Check
+### Phase 2.5: Context Baseline Review
 
-For each CLAUDE.md file found, check for content that duplicates what SuPi extensions auto-deliver:
+Before broader project inspection, synthesize the baseline context a SuPi-enabled PI session likely already has. Do **not** claim to inspect the hidden system prompt directly.
 
 1. **Detect SuPi usage** — check if `@mrclrchtr/supi` or `@mrclrchtr/supi-code-intelligence` appears in `package.json` dependencies, or if `.pi/supi/config.json` exists
-2. **If SuPi is present**, scan for redundant sections:
-   - `## Modules` / `## Packages` tables with name/description/path columns
-   - Dependency graphs that don't add reasoning
-   - Root `## Project structure` / `## Architecture` directory trees that mostly restate the workspace layout already visible from `code_intel brief`
-   - High-level architecture overviews without project-specific conventions, boundaries, or exceptions
-3. **Keep compact human guidance** when it adds value beyond the generated overview, such as:
-   - "start here" orientation
-   - dependency direction or ownership rules
-   - important boundaries, exceptions, or initialization order
-   - cross-package conventions that are not obvious from manifests
-4. **Flag for shrink/reframe** in the quality report, with rationale. Prefer replacing large structure trees with compact curated sections such as `## Start Here`, `## Cross-Package Patterns`, or `## Gotchas` instead of deleting useful orientation entirely.
+2. **Build the baseline** from:
+   - `code_intel brief` for the repo root (and package path when auditing a package-specific `CLAUDE.md`)
+   - the candidate `CLAUDE.md` files being audited
+   - known SuPi-delivered context categories (`supi-code-intelligence` workspace overview, `supi-claude-md` subdirectory injection)
+3. **Classify each major CLAUDE.md section** as one of:
+   - **Fully redundant** — already delivered well by the baseline context
+   - **Partially redundant** — overlaps with the baseline, but still contains human-only value
+   - **Unique** — not meaningfully delivered elsewhere
+4. **Use the classification to shape recommendations**:
+   - `## Modules` / `## Packages` tables are usually fully redundant
+   - root `## Project structure` / `## Architecture` trees are often partially redundant: tree/inventory content overlaps, while boundary/ownership guidance may be worth keeping
+   - commands, workflows, gotchas, and curated "start here" guidance are often unique
+5. **Flag for shrink/reframe** in the quality report when a section is fully or partially redundant. Prefer replacing large structure trees with compact curated sections such as `## Start Here`, `## Cross-Package Patterns`, or `## Gotchas` instead of deleting useful orientation entirely.
 
-**Note:** This check is opinionated — it assumes SuPi extensions are active and delivering their standard content. If SuPi is not detected, skip this phase.
+**Note:** This review is intentionally approximate — it compares against a synthesized baseline, not the literal hidden prompt. If SuPi is not detected, skip this phase.
 
 ### Phase 3: Quality Report Output
 
@@ -92,6 +94,11 @@ Format:
 
 #### 1. ./CLAUDE.md (Project Root)
 **Score: XX/100 (Grade: X)**
+
+**Context Overlap Review:**
+- **Fully redundant:** [sections already covered by baseline context]
+- **Partially redundant:** [sections with overlap plus human-only value]
+- **Unique:** [sections that should stay]
 
 | Criterion | Score | Notes |
 |-----------|-------|-------|
