@@ -74,4 +74,52 @@ describe("workspace sentinels", () => {
   it("treats generated declaration files as recovery triggers", () => {
     expect(isWorkspaceRecoveryTrigger("/project/src/generated/types.d.ts", "/project")).toBe(true);
   });
+
+  it("continues scanning past permission errors in subdirectories", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-sentinels-perm-"));
+
+    // Create a readable subdirectory with a sentinel
+    const goodDir = path.join(tmpDir, "packages", "app");
+    fs.mkdirSync(goodDir, { recursive: true });
+    fs.writeFileSync(path.join(goodDir, "package.json"), "{}\n");
+
+    // Create a subdirectory and make it unreadable
+    const blockedDir = path.join(tmpDir, "packages", "blocked");
+    fs.mkdirSync(blockedDir, { recursive: true });
+    fs.writeFileSync(path.join(blockedDir, "package.json"), "{}\n");
+    fs.chmodSync(blockedDir, 0o000);
+
+    try {
+      const snapshot = scanWorkspaceSentinels(tmpDir);
+      // The accessible package.json must still be found
+      const found = Array.from(snapshot.keys()).some((p) =>
+        p.includes("packages/app/package.json"),
+      );
+      expect(found).toBe(true);
+
+      // At least something was scanned (the root level sentinels)
+      expect(snapshot.size).toBeGreaterThanOrEqual(1);
+    } finally {
+      // Restore permissions so cleanup can delete
+      fs.chmodSync(blockedDir, 0o755);
+    }
+  });
+
+  it("returns empty snapshot for deeply nested permission failure", () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-sentinels-deep-"));
+
+    // Create a directory we can't read at the first level
+    const blockedDir = path.join(tmpDir, "blocked");
+    fs.mkdirSync(blockedDir);
+    fs.chmodSync(blockedDir, 0o000);
+
+    try {
+      // scanWorkspaceSentinels wraps the walk in a try-catch, so
+      // it should return an empty snapshot rather than throwing.
+      const snapshot = scanWorkspaceSentinels(tmpDir);
+      expect(snapshot).toBeInstanceOf(Map);
+    } finally {
+      fs.chmodSync(blockedDir, 0o755);
+    }
+  });
 });

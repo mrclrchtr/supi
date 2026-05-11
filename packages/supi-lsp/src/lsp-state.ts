@@ -56,6 +56,7 @@ export function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void 
   if (state.manager) {
     clearSessionLspService(state.manager.getCwd());
   }
+  state.inspector.close?.();
   state.manager = null;
   state.detectedServers = [];
   state.projectServers = [];

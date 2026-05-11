@@ -61,6 +61,8 @@ export class LspManager {
   private unavailable = new Set<string>();
   /** Memoized per-command availability of LSP server binaries on PATH */
   private commandAvailability = new Map<string, boolean>();
+  /** Guards against concurrent client creation for the same server:root key */
+  private pendingStarts = new Map<string, Promise<LspClient | null>>();
   /** Preferred project roots discovered by proactive scan or lazy startup */
   private knownRoots = new Map<string, string[]>();
   /** User-configured gitignore-style exclude patterns */
@@ -126,20 +128,51 @@ export class LspManager {
     if (!serverConfig) return null;
     const key = clientKey(serverName, root);
     if (this.unavailable.has(key)) return null;
+
     // Return existing client
     const existing = this.clients.get(key);
     if (existing && existing.status === "running") return existing;
+
     // If existing client errored, remove it
     if (existing && existing.status === "error") {
       this.clients.delete(key);
       this.unavailable.add(key);
       return null;
     }
+
+    // Deduplicate concurrent starts for the same server:root pair.
+    // This prevents spawning duplicate server processes when two
+    // callers race through getClientForFile before either await yields.
+    const pending = this.pendingStarts.get(key);
+    if (pending) return pending;
+
+    const startPromise = this.performStart(serverName, serverConfig, root, key);
+    this.pendingStarts.set(key, startPromise);
+    try {
+      return await startPromise;
+    } finally {
+      if (this.pendingStarts.get(key) === startPromise) {
+        this.pendingStarts.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Perform the actual server start — extracted so the public method can
+   * deduplicate via pendingStarts without wrapping the entire body.
+   */
+  private async performStart(
+    serverName: string,
+    serverConfig: import("../types.ts").ServerConfig,
+    root: string,
+    key: string,
+  ): Promise<LspClient | null> {
     // Validate command exists
     if (!commandExists(serverConfig.command)) {
       this.unavailable.add(key);
       return null;
     }
+
     // Spawn new client
     const client = new LspClient(serverName, serverConfig, root);
     this.clients.set(key, client);

@@ -67,7 +67,17 @@ export function isWorkspaceRecoveryTrigger(filePath: string, cwd: string): boole
 }
 
 function walkWorkspace(root: string, directory: string, snapshot: Map<string, number>): void {
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(directory, { withFileTypes: true });
+  } catch {
+    // Permission error or deleted directory — skip it rather than
+    // failing the entire scan. A partial snapshot still detects
+    // changes in accessible subtrees.
+    return;
+  }
+
+  for (const entry of entries) {
     if (entry.isDirectory()) {
       if (IGNORED_DIRECTORIES.has(entry.name)) continue;
       walkWorkspace(root, path.join(directory, entry.name), snapshot);
@@ -78,7 +88,11 @@ function walkWorkspace(root: string, directory: string, snapshot: Map<string, nu
 
     const filePath = path.join(directory, entry.name);
     if (!isWorkspaceSentinelPath(filePath, root)) continue;
-    snapshot.set(filePath, fs.statSync(filePath).mtimeMs);
+    try {
+      snapshot.set(filePath, fs.statSync(filePath).mtimeMs);
+    } catch {
+      // File deleted between readdir and stat — skip.
+    }
   }
 }
 

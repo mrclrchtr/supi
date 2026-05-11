@@ -97,6 +97,24 @@ export async function executeAction(manager: LspManager, params: LspToolParams):
   }
 }
 
+/**
+ * Top-level error guard for unexpected throws in action handlers.
+ * Each handler aims to catch its own errors, but this ensures that
+ * an unforeseen runtime failure produces a descriptive string return
+ * instead of an unhandled tool error that pi would surface to the agent.
+ */
+export async function safeExecuteAction(
+  manager: LspManager,
+  params: LspToolParams,
+): Promise<string> {
+  try {
+    return await executeAction(manager, params);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return `LSP action failed: ${message}`;
+  }
+}
+
 // ── Validation helpers ────────────────────────────────────────────────
 
 function validateFilePosition(
@@ -230,15 +248,13 @@ async function handleDiagnostics(
     const client = await manager.ensureFileOpen(resolvedPath);
     if (!client) return noServerMessage(resolvedPath);
 
-    let content: string;
     try {
-      content = fs.readFileSync(resolvedPath, "utf-8");
+      const content = fs.readFileSync(resolvedPath, "utf-8");
+      const diags = await client.syncAndWaitForDiagnostics(resolvedPath, content);
+      return formatDiagnostics(resolvedPath, diags, cwd);
     } catch {
-      return `Error: cannot read file ${params.file}`;
+      return `Error: failed to read or query diagnostics for ${params.file}`;
     }
-
-    const diags = await client.syncAndWaitForDiagnostics(resolvedPath, content);
-    return formatDiagnostics(resolvedPath, diags, cwd);
   }
 
   const summary = manager.getDiagnosticSummary();

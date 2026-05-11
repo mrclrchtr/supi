@@ -204,7 +204,7 @@ describe("tool action missing file behavior", () => {
       file: "src/missing.ts",
     });
 
-    expect(result).toContain("Error: cannot read file");
+    expect(result).toContain("Error: failed to read");
   });
 
   it("diagnostics: formats relative file paths from the session cwd", async () => {

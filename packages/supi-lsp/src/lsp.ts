@@ -42,7 +42,7 @@ import {
   loadLspSettings,
   registerLspSettings,
 } from "./settings-registration.ts";
-import { executeAction, type LspAction, lspToolDescription } from "./tool-actions.ts";
+import { type LspAction, lspToolDescription, safeExecuteAction } from "./tool-actions.ts";
 import {
   persistLspActiveState,
   persistLspInactiveState,
@@ -413,7 +413,7 @@ function registerLspTool(
         };
       }
 
-      const text = await executeAction(
+      const text = await safeExecuteAction(
         state.manager,
         params as {
           action: LspAction;
