@@ -233,4 +233,20 @@ describe("generateFocusedBrief", () => {
     expect(content).toContain("Source Files");
     expect(content).toContain("index.ts");
   });
+
+  it("lists multi-language source files in directory", async () => {
+    setupWorkspace();
+    const langDir = path.join(tmpDir, "packages", "core", "lang");
+    mkdirSync(langDir, { recursive: true });
+    writeFileSync(path.join(langDir, "main.py"), "def hello(): pass");
+    writeFileSync(path.join(langDir, "lib.rs"), "pub fn hello() {}");
+    writeFileSync(path.join(langDir, "server.go"), "package main");
+
+    const model = await buildArchitectureModel(tmpDir);
+    const { content } = generateFocusedBrief(model as NonNullable<typeof model>, langDir);
+    expect(content).toContain("Source Files");
+    expect(content).toContain("main.py");
+    expect(content).toContain("lib.rs");
+    expect(content).toContain("server.go");
+  });
 });

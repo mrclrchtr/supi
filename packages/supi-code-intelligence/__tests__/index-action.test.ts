@@ -44,4 +44,25 @@ describe("executeIndexAction", () => {
     const result = executeIndexAction(tmpDir);
     expect(result).toContain("**Source files:** 1 total");
   });
+
+  it("includes all source language extensions", () => {
+    writeFile(tmpDir, "main.py", "");
+    writeFile(tmpDir, "main.rs", "");
+    writeFile(tmpDir, "main.go", "");
+    writeFile(tmpDir, "script.bash", "");
+    writeFile(tmpDir, "script.kts", "");
+    writeFile(tmpDir, "analysis.r", "");
+    writeFile(tmpDir, "query.sql", "");
+    writeFile(tmpDir, "program.cs", "");
+
+    const result = executeIndexAction(tmpDir);
+    expect(result).toContain("Python: 1");
+    expect(result).toContain("Rust: 1");
+    expect(result).toContain("Go: 1");
+    expect(result).toContain("Shell: 1");
+    expect(result).toContain("Kotlin: 1");
+    expect(result).toContain("R: 1");
+    expect(result).toContain("SQL: 1");
+    expect(result).toContain("C#: 1");
+  });
 });

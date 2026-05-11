@@ -306,7 +306,64 @@ function generateFileBrief(
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"]);
+const SOURCE_EXTENSIONS = new Set([
+  // JS/TS
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".mts",
+  ".cts",
+  ".mjs",
+  ".cjs",
+  // Python
+  ".py",
+  ".pyi",
+  // Rust
+  ".rs",
+  // Go
+  ".go",
+  ".mod",
+  // C/C++
+  ".c",
+  ".h",
+  ".cpp",
+  ".hpp",
+  ".cc",
+  ".cxx",
+  ".hxx",
+  ".c++",
+  ".h++",
+  // Java / Kotlin
+  ".java",
+  ".kt",
+  ".kts",
+  // Ruby
+  ".rb",
+  // Shell
+  ".sh",
+  ".bash",
+  ".zsh",
+  // Web
+  ".html",
+  ".htm",
+  ".xhtml",
+  ".css",
+  ".scss",
+  ".less",
+  // Data / Config
+  ".json",
+  ".yaml",
+  ".yml",
+  ".toml",
+  ".md",
+  // Other languages
+  ".php",
+  ".swift",
+  ".cs",
+  ".r",
+  ".sql",
+]);
 
 function listSourceFiles(dir: string): string[] {
   const files: string[] = [];

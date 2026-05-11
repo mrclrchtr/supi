@@ -22,14 +22,14 @@ The extension hooks into pi's lifecycle at six points:
 1. `session_start` fires → resets `hasInjectedOverview`, scans branch for existing `code-intelligence-overview` custom message
 2. First `before_agent_start` fires → calls `buildArchitectureModel(ctx.cwd)` to parse the project
 3. If modules are found, `generateOverview(model)` produces a dense Markdown summary (~500 tokens, max 8 modules) with git context when available
-4. Returns a `BeforeAgentStartEventResult` with a `customMessage` — pi places it in the agent's context
+4. Returns a `BeforeAgentStartEventResult` with a `customMessage`; pi places it in the agent's context
 5. Subsequent turns skip injection entirely
 
 ## Tool Actions
 
 ### `brief` — Architecture overviews and focused briefs
 
-Scopes: project (no params), package/directory (`path`), file (`file`), or anchored symbol (`file` + `line` + `character`).
+Scopes: project (no params), package/directory (`path`), file (`file`), or anchored symbol (`file`, `line`, and `character`).
 
 - Project-level brief: module listing, dependency graph, "start here" recommendations, suggested next queries
 - Focused brief (`path` or anchored symbol): stripped-down version with a single module or symbol focus
@@ -85,7 +85,7 @@ Optimized for common agent lookups:
 - Malformed regex input returns an explicit error instead of a misleading "No matches found"
 - Nearby matches in the same file deduplicate overlapping context lines to reduce token waste
 - Results grouped with file and context lines
-- `summary: true` returns aggregate counts by directory instead of line-level matches — use for "how common is this pattern?"
+- `summary: true` returns aggregate counts by directory instead of line-level matches (useful for "how common is this pattern?")
 
 Examples:
 
@@ -101,21 +101,20 @@ Examples:
 |---|---|---|---|---|---|---|---|---|---|---|
 | **`index`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **`brief` (project)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅¹ |
-| **`brief` (directory/file)** | ✅ | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² | ⚠️² |
-| **`callers`** | ✅ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ⚠️⁴ |
-| **`callees`** | ✅ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ⚠️⁴ |
-| **`implementations`** | ✅ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ⚠️⁴ |
-| **`affected`** | ✅ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ✅³ | ⚠️⁴ |
-| **`pattern`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅⁵ |
+| **`brief` (directory/file)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **`callers`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
+| **`callees`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
+| **`implementations`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
+| **`affected`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
+| **`pattern`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅⁴ |
 
 **Legend:**
 - **✅** Fully supported for that action.
 - **⚠️** Partial or best-effort support (see footnotes).
 - **¹** Project-level brief works for any project with a recognized manifest (`package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, etc.).
-- **²** Focused directory/file briefs only list **JavaScript/TypeScript** source files in the "Source Files" section. The rest of the brief (module context, git info, metadata) still works for any language.
-- **³** Requires an active LSP server or Tree-sitter grammar for that language. Falls back to heuristic text search if neither is available.
-- **⁴** Heuristic text-search fallback only; no semantic or structural resolution.
-- **⁵** `pattern` works on any text file. Binary files (`.png`, `.jpg`, `.zip`, `.pdf`, etc.) are explicitly rejected.
+- **²** Requires an active LSP server or Tree-sitter grammar for that language. Falls back to heuristic text search if neither is available.
+- **³** Heuristic text-search fallback only; no semantic or structural resolution.
+- **⁴** `pattern` works on any text file. Binary files (`.png`, `.jpg`, `.zip`, `.pdf`, etc.) are explicitly rejected.
 
 ## Confidence Labeling
 
@@ -176,7 +175,7 @@ export type { AffectedDetails, BriefDetails, CodeIntelResult, ConfidenceMode, Di
 ## Session Integration
 
 - The overview custom message type (`code-intelligence-overview`) uses `display: false` so it appears in the LLM context but not in the TUI message log
-- On `session_start`, the extension scans the session branch for an existing overview — this avoids re-injecting on `/reload` or session resume
+- On `session_start`, the extension scans the session branch for an existing overview to avoid re-injecting on `/reload` or session resume
 - The `hasInjectedOverview` flag is per-session, reset each `session_start`
 
 ## Prompt Guidelines (full text)
