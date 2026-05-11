@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildProjectGuidelines,
   diagnosticsContextFingerprint,
@@ -9,8 +9,13 @@ import {
   lspPromptSnippet,
 } from "../src/guidance.ts";
 import { LspManager } from "../src/manager/manager.ts";
+import { clearTsconfigCache } from "../src/tsconfig-scope.ts";
 import type { ProjectServerInfo } from "../src/types.ts";
 import { DiagnosticSeverity } from "../src/types.ts";
+
+beforeEach(() => {
+  clearTsconfigCache();
+});
 
 describe("LSP prompt guidance", () => {
   it("exports a semantic-first prompt snippet and fallback guidance", () => {
@@ -227,6 +232,7 @@ describe("LspManager relevant coverage summaries", () => {
             root: string;
             openFiles: string[];
             getAllDiagnostics(): Array<{ uri: string; diagnostics: unknown[] }>;
+            pruneMissingFiles(): string[];
           }
         >;
       }
@@ -236,13 +242,20 @@ describe("LspManager relevant coverage summaries", () => {
       name: "typescript",
       status: "running",
       root: "/tmp/project",
-      openFiles: [path.join(process.cwd(), "lsp/lsp.ts"), path.join(process.cwd(), "README.md")],
+      openFiles: [
+        path.join(process.cwd(), "src/lsp/coverage.ts"),
+        path.join(process.cwd(), "src/util.ts"),
+      ],
       getAllDiagnostics: () => [],
+      pruneMissingFiles: () => {
+        // Mock: files exist (don't prune them)
+        return [];
+      },
     });
 
     const summary = manager.getRelevantCoverageSummaryText(["lsp"]);
-    expect(summary).toContain("lsp/lsp.ts");
-    expect(summary).not.toContain("README.md");
+    expect(summary).toContain("src/lsp/coverage.ts");
+    expect(summary).not.toContain("src/util.ts");
   });
 });
 
@@ -258,6 +271,7 @@ describe("LspManager diagnostic summaries", () => {
               uri: string;
               diagnostics: Array<{ severity?: number; message: string }>;
             }>;
+            pruneMissingFiles(): string[];
           }
         >;
       }
@@ -266,19 +280,20 @@ describe("LspManager diagnostic summaries", () => {
     clients.set("fake", {
       getAllDiagnostics: () => [
         {
-          uri: `file://${path.join(process.cwd(), "lsp/manager.ts")}`,
+          uri: `file://${path.join(process.cwd(), "src/lsp/manager-sync.ts")}`,
           diagnostics: [{ severity: DiagnosticSeverity.Error, message: "type error" }],
         },
         {
-          uri: `file://${path.join(process.cwd(), "README.md")}`,
+          uri: `file://${path.join(process.cwd(), "src/util.ts")}`,
           diagnostics: [{ severity: DiagnosticSeverity.Error, message: "doc error" }],
         },
       ],
+      pruneMissingFiles: () => [],
     });
 
-    const summary = manager.getRelevantOutstandingDiagnosticsSummaryText(["manager.ts"], 1);
-    expect(summary).toContain("lsp/manager.ts");
-    expect(summary).not.toContain("README.md");
+    const summary = manager.getRelevantOutstandingDiagnosticsSummaryText(["lsp"], 1);
+    expect(summary).toContain("src/lsp/manager-sync.ts");
+    expect(summary).not.toContain("src/util.ts");
   });
 });
 

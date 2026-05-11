@@ -52,6 +52,23 @@ Keep summary and relevance formatting out of `manager.ts`; use focused helpers s
 
 User exclusion patterns live under `lsp.exclude` as gitignore-style glob strings. They are loaded in `session_start`, stored on `LspManager` through `setExcludePatterns()`, and applied only by diagnostic and coverage collection methods; explicit `lsp` tool actions are not filtered. `isGlobMatch()` in `pattern-matcher.ts` supports leading `/` for anchored matches, trailing `/` for directory-only matches, `**` for recursive wildcards, and `*` for single-segment wildcards.
 
+## Integration test coverage
+
+### Required vs optional
+
+- **Required (CI)**: TypeScript integration tests (`client.integration.test.ts`, `manager.integration.test.ts`, `tool-actions.integration.test.ts`, `tool-actions-workspace.integration.test.ts`) — these use `typescript-language-server` + `tsserver`, which must be available.
+- **Optional (local)**: Python (`client.integration.python.test.ts`) and Bash (`client.integration.bash.test.ts`) tests that skip gracefully when the corresponding server binary is not on `PATH`.
+
+All integration tests use `describe.skipIf(!HAS_COMMAND)` so they are transparently skipped when the server is unavailable. The missing-server test in `client.integration.bash.test.ts` always runs because it tests behavior when a nonexistent binary is configured.
+
+### Test coverage by language
+
+| Language | Server | Tests |
+|----------|--------|-------|
+| TypeScript | `typescript-language-server` | Client start/shutdown, hover, definition, document symbols, diagnostics (valid + broken), fix-and-verify, code actions, workspace symbols |
+| Python | `pyright-langserver` | Client start/shutdown, hover (function + parameter), definition, document symbols, diagnostics (valid + broken), fix-and-verify, workspace symbols, shutdown-after-error |
+| Bash | `bash-language-server` | Client start/shutdown, diagnostics, document symbols, missing-binary robustness |
+
 ## Focused test commands
 
 Use `pnpm exec vitest run packages/supi-lsp/__tests__/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/renderer.test.ts` for a small pull-diagnostic and custom-message regression pass. Use `pnpm exec vitest run packages/supi-lsp/__tests__/service-registry.test.ts` for the public API and registry lifecycle.
@@ -61,4 +78,15 @@ Use `pnpm exec vitest run packages/supi-lsp/__tests__/tool-actions.validation.te
 ```bash
 pnpm exec vitest run packages/supi-lsp/__tests__/client-refresh.test.ts packages/supi-lsp/__tests__/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/transport.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/system-prompt.test.ts packages/supi-lsp/__tests__/renderer.test.ts
+```
+
+### Running cross-language integration tests
+
+```bash
+# Full suite (will skip servers not on PATH)
+pnpm exec vitest run packages/supi-lsp/__tests__/*.integration.*.test.ts
+# Python only
+pnpm exec vitest run packages/supi-lsp/__tests__/client.integration.python.test.ts
+# Bash only
+pnpm exec vitest run packages/supi-lsp/__tests__/client.integration.bash.test.ts
 ```
