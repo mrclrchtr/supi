@@ -32,32 +32,9 @@ find . -name "CLAUDE.md" -o -name ".claude.md" -o -name ".claude.local.md" 2>/de
 
 **Note:** PI auto-discovers CLAUDE.md files in parent directories, making monorepo setups work automatically.
 
-### Phase 2: Quality Assessment
+### Phase 2: Context Baseline Review
 
-For each CLAUDE.md file, evaluate against quality criteria. See [references/quality-criteria.md](references/quality-criteria.md) for detailed rubrics.
-
-**Quick Assessment Checklist:**
-
-| Criterion | Weight | Check |
-|-----------|--------|-------|
-| Commands/workflows documented | High | Are build/test/deploy commands present? |
-| Architecture clarity | High | Can PI understand the codebase structure? |
-| Non-obvious patterns | Medium | Are gotchas and quirks documented? |
-| Conciseness | Medium | No verbose explanations or obvious info? |
-| Currency | High | Does it reflect current codebase state? |
-| Actionability | High | Are instructions executable, not vague? |
-| Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? |
-
-**Quality Scores:**
-- **A (90-100)**: Comprehensive, current, actionable
-- **B (70-89)**: Good coverage, minor gaps
-- **C (50-69)**: Basic info, missing key sections
-- **D (30-49)**: Sparse or outdated
-- **F (0-29)**: Missing or severely outdated
-
-### Phase 2.5: Context Baseline Review
-
-Before broader project inspection, synthesize the baseline context a SuPi-enabled PI session likely already has. Do **not** claim to inspect the hidden system prompt directly.
+Before assessing quality, synthesize the baseline context a SuPi-enabled PI session likely already has. Do **not** claim to inspect the hidden system prompt directly.
 
 1. **Detect SuPi usage** — check if `@mrclrchtr/supi` or `@mrclrchtr/supi-code-intelligence` appears in `package.json` dependencies, or if `.pi/supi/config.json` exists
 2. **Build the baseline** from:
@@ -76,7 +53,30 @@ Before broader project inspection, synthesize the baseline context a SuPi-enable
 
 **Note:** This review is intentionally approximate — it compares against a synthesized baseline, not the literal hidden prompt. If SuPi is not detected, skip this phase.
 
-### Phase 3: Quality Report Output
+### Phase 3: Quality Assessment
+
+For each CLAUDE.md file, evaluate against quality criteria, incorporating the Phase 2 baseline review results. See [references/quality-criteria.md](references/quality-criteria.md) for detailed rubrics.
+
+**Quick Assessment Checklist:**
+
+| Criterion | Weight | Check |
+|-----------|--------|-------|
+| Commands/workflows documented | High | Are build/test/deploy commands present? |
+| Architecture clarity | High | Can PI understand the codebase structure? |
+| Non-obvious patterns | Medium | Are gotchas and quirks documented? |
+| Conciseness | Medium | No verbose explanations or obvious info? |
+| Currency | High | Does it reflect current codebase state? |
+| Actionability | High | Are instructions executable, not vague? |
+| Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? (Use Phase 2 classifications) |
+
+**Quality Scores:**
+- **A (90-100)**: Comprehensive, current, actionable
+- **B (70-89)**: Good coverage, minor gaps
+- **C (50-69)**: Basic info, missing key sections
+- **D (30-49)**: Sparse or outdated
+- **F (0-29)**: Missing or severely outdated
+
+### Phase 4: Quality Report Output
 
 **ALWAYS output the quality report BEFORE making any updates.**
 
@@ -120,7 +120,7 @@ Format:
 ...
 ```
 
-### Phase 4: Targeted Updates
+### Phase 5: Targeted Updates
 
 After outputting the quality report, ask user for confirmation before updating.
 
@@ -161,7 +161,7 @@ After outputting the quality report, ask user for confirmation before updating.
 ```
 ```
 
-### Phase 5: Apply Updates
+### Phase 6: Apply Updates
 
 After user approval, apply changes using the Edit tool. Preserve existing content structure.
 
