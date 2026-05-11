@@ -72,3 +72,12 @@ export {
   registerSettings,
 } from "./settings-registry.ts";
 export { createInputSubmenu, openSettingsOverlay } from "./settings-ui.ts";
+export type { TitleTarget } from "./terminal.ts";
+export {
+  DONE_SYMBOL,
+  formatTitle,
+  signalBell,
+  signalDone,
+  signalWaiting,
+  WAITING_SYMBOL,
+} from "./terminal.ts";

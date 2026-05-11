@@ -6,18 +6,13 @@
  * and cwd changes are picked up automatically.
  *
  * Also activates during long-running extension tasks such as `supi-review`.
+ * When the agent turn ends, a ✓ symbol is shown persistently until the next
+ * agent starts or the session shuts down.
  */
-import path from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { formatTitle, signalDone } from "@mrclrchtr/supi-core";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-/** Compute PI's default terminal title using the current session name and cwd. */
-function getTitle(pi: ExtensionAPI, cwd: string): string {
-  const base = path.basename(cwd);
-  const session = pi.getSessionName();
-  return session ? `π - ${session} - ${base}` : `π - ${base}`;
-}
 
 export default function tabSpinner(pi: ExtensionAPI) {
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -25,6 +20,12 @@ export default function tabSpinner(pi: ExtensionAPI) {
   let activeCount = 0;
   let currentCtx: ExtensionContext | undefined;
 
+  /** Build the current base title from session name and cwd. */
+  function title() {
+    return formatTitle(pi.getSessionName(), currentCtx?.cwd);
+  }
+
+  /** Restore the base title immediately. */
   function stop() {
     if (timer) {
       clearInterval(timer);
@@ -32,16 +33,29 @@ export default function tabSpinner(pi: ExtensionAPI) {
     }
     frame = 0;
     if (currentCtx) {
-      currentCtx.ui.setTitle(getTitle(pi, currentCtx.cwd));
+      currentCtx.ui.setTitle(title());
     }
   }
 
+  /** Show the ✓ done symbol in the title and play the terminal bell. */
+  function showDone() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+    frame = 0;
+    if (currentCtx) {
+      signalDone(currentCtx, title());
+    }
+  }
+
+  /** Start the spinner interval. Overwrites any ✓ shown. */
   function start() {
     if (timer) return;
     if (!currentCtx) return;
     timer = setInterval(() => {
       const icon = SPINNER_FRAMES[frame % SPINNER_FRAMES.length];
-      currentCtx?.ui.setTitle(`${icon} ${getTitle(pi, currentCtx.cwd)}`);
+      currentCtx?.ui.setTitle(`${icon} ${title()}`);
       frame++;
     }, 80);
   }
@@ -52,9 +66,16 @@ export default function tabSpinner(pi: ExtensionAPI) {
     if (activeCount === 1) start();
   }
 
+  /** Decrement count for supi:working tasks — restores title when idle. */
   function decrement() {
     activeCount = Math.max(0, activeCount - 1);
     if (activeCount === 0) stop();
+  }
+
+  /** Decrement count for agent turns — shows ✓ when idle. */
+  function agentEnded() {
+    activeCount = Math.max(0, activeCount - 1);
+    if (activeCount === 0) showDone();
   }
 
   pi.on("agent_start", async (_event, ctx) => {
@@ -62,7 +83,7 @@ export default function tabSpinner(pi: ExtensionAPI) {
   });
 
   pi.on("agent_end", async (_event, _ctx) => {
-    decrement();
+    agentEnded();
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {

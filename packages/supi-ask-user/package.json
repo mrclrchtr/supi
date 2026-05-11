@@ -20,6 +20,12 @@
     "!__tests__"
   ],
   "main": "src/index.ts",
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*"
+  },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*",

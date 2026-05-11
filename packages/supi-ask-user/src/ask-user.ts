@@ -11,9 +11,9 @@
 //   result.ts           — hybrid (content + details) result formatting
 //   render.ts           — custom renderCall / renderResult for the transcript
 
-import { basename } from "node:path";
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
+import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core";
 import { ActiveQuestionnaireLock } from "./flow.ts";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render.ts";
@@ -142,23 +142,12 @@ async function executeAskUser(
 
 /** Set terminal title and play alert bell to signal the user needs to respond. */
 function signalAttention(ctx: ExtensionUi): void {
-  ctx.ui.setTitle?.("\u23F8  pi \u2014 waiting for your input");
-  process.stdout.write("\x07");
+  signalWaiting(ctx, `pi — waiting for your input`);
 }
 
 /** Restore the terminal title to pi's native format (session name + cwd). */
 function restoreTerminalTitle(ctx: ExtensionUi, pi: ExtensionAPI): void {
-  const sessionName = pi.getSessionName();
-  const cwdName = ctx.cwd ? basename(ctx.cwd) : undefined;
-  ctx.ui.setTitle?.(
-    sessionName && cwdName
-      ? `pi - ${sessionName} - ${cwdName}`
-      : cwdName
-        ? `pi - ${cwdName}`
-        : sessionName
-          ? `pi - ${sessionName}`
-          : "pi",
-  );
+  ctx.ui.setTitle?.(formatTitle(pi.getSessionName(), ctx.cwd));
 }
 
 /** Build a concise custom-entry label readable in the /tree "all" filter. */

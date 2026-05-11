@@ -121,6 +121,9 @@ importers:
       '@earendil-works/pi-tui':
         specifier: '*'
         version: 0.74.0
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
       typebox:
         specifier: '*'
         version: 1.1.37
@@ -276,6 +279,9 @@ importers:
       '@earendil-works/pi-tui':
         specifier: '*'
         version: 0.74.0
+      '@mrclrchtr/supi-core':
+        specifier: workspace:*
+        version: link:../supi-core
       clipboardy:
         specifier: ^5.3.1
         version: 5.3.1

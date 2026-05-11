@@ -56,7 +56,7 @@ describe("tabSpinner extension", () => {
     vi.useRealTimers();
   });
 
-  it("shows spinner during agent_start and restores on agent_end", async () => {
+  it("shows spinner during agent_start and ✓ on agent_end", async () => {
     const pi = createPiMock("my-project");
     tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
 
@@ -75,7 +75,7 @@ describe("tabSpinner extension", () => {
     expect(ctx.getTitles()[1]).toMatch(/^⠙ π - my-project - tmp$/);
 
     await endHandlers[0]({}, ctx);
-    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("π - my-project - tmp");
+    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("✓ π - my-project - tmp");
   });
 
   it("defaults to PI's computed title when no session name is set", async () => {
@@ -93,7 +93,7 @@ describe("tabSpinner extension", () => {
     expect(ctx.getTitles()[0]).toMatch(/^⠋ π - tmp$/);
 
     await endHandlers[0]({}, ctx);
-    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("π - tmp");
+    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("✓ π - tmp");
   });
 
   it("picks up session name changes between agent runs", async () => {
@@ -110,7 +110,7 @@ describe("tabSpinner extension", () => {
     expect(ctx.getTitles()[0]).toMatch(/^⠋ π - first-name - tmp$/);
 
     await endHandlers[0]({}, ctx);
-    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("π - first-name - tmp");
+    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("✓ π - first-name - tmp");
 
     // Simulate /name rename
     pi.getSessionName = () => "second-name";
@@ -175,8 +175,9 @@ describe("tabSpinner extension", () => {
     vi.advanceTimersByTime(80);
     expect(ctx.getTitles()[0]).toMatch(/^⠋ π - my-project - tmp$/);
 
+    // Agent end shows ✓, not plain restore
     await endHandlers[0]({}, ctx);
-    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("π - my-project - tmp");
+    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("✓ π - my-project - tmp");
     ctx.clearTitles();
 
     // Review starts without an active agent turn
@@ -184,6 +185,7 @@ describe("tabSpinner extension", () => {
     vi.advanceTimersByTime(80);
     expect(ctx.getTitles()[0]).toMatch(/^⠋ π - my-project - tmp$/);
 
+    // supi:working:end restores plain title (no ✓)
     pi.events.emit("supi:working:end", { source: "supi-review" });
     expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("π - my-project - tmp");
   });
@@ -210,9 +212,9 @@ describe("tabSpinner extension", () => {
     vi.advanceTimersByTime(80);
     expect(ctx.getTitles()[0]).toMatch(/^⠙ π - my-project - tmp$/);
 
-    // Only when agent ends should the spinner stop
+    // Only when agent ends should the spinner stop — shows ✓
     await endHandlers[0]({}, ctx);
-    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("π - my-project - tmp");
+    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("✓ π - my-project - tmp");
   });
 
   it("handles supi-review:start before any agent_start by using a prior ctx", async () => {
