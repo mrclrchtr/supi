@@ -34,7 +34,6 @@
     "@mrclrchtr/supi-tree-sitter": "workspace:*",
     "clipboardy": "^5.3.1",
     "@mrclrchtr/supi-code-intelligence": "workspace:*",
-    "@mrclrchtr/supi-flow": "workspace:*",
     "@mrclrchtr/supi-insights": "workspace:*",
     "@mrclrchtr/supi-extras": "workspace:*",
     "diff": "^7.0.0",
@@ -53,7 +52,6 @@
     "@mrclrchtr/supi-rtk",
     "@mrclrchtr/supi-tree-sitter",
     "@mrclrchtr/supi-code-intelligence",
-    "@mrclrchtr/supi-flow",
     "@mrclrchtr/supi-insights",
     "@mrclrchtr/supi-extras"
   ],
@@ -78,7 +76,6 @@
       "./src/tree-sitter.ts",
       "./src/cache.ts",
       "./src/code-intelligence.ts",
-      "./src/flow.ts",
       "./src/insights.ts"
     ]
   }

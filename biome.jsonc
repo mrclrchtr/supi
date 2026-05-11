@@ -118,19 +118,6 @@
           }
         }
       }
-    },
-    {
-      "includes": ["packages/supi-flow/skills/**/scripts/**"],
-      "linter": {
-        "rules": {
-          "suspicious": {
-            "noConsole": "off"
-          },
-          "style": {
-            "useTemplate": "off"
-          }
-        }
-      }
     }
   ]
 }

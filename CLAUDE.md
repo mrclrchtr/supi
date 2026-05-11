@@ -78,7 +78,6 @@ export default function (pi: ExtensionAPI) {
 
 Extension packages with prompts/skills:
 - `packages/supi-claude-md` — skills via `resources_discover`
-- `packages/supi-flow` — skills + prompts via `resources_discover`
 - Root `package.json` and sub-package `package.json` files omit `pi.prompts` / `pi.skills` entries to avoid redundancy.
 
 ## Settings registry
@@ -145,10 +144,6 @@ registerSettings({
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli)
 - RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward
 
-## Workflow
-
-- Before implementing any change: use `/supi-flow-brainstorm` to design first.
-- Close changes with `/supi-flow-archive` to verify, update docs, and commit.
 
 ## Testing patterns
 

@@ -41,10 +41,9 @@ When installed from a local path, pi loads the working tree directly. After edit
 - `tree-sitter.ts` — structural AST analysis
 - `cache.ts` — cache monitoring and forensics
 - `code-intelligence.ts` — architecture briefs and impact analysis
-- `flow.ts` — workflow commands plus bundled skills via `resources_discover`
 - `insights.ts` — historical session insights report generation
 
-Bundled sub-packages also contribute skills through `resources_discover`, notably `supi-flow` and `supi-claude-md`.
+Bundled sub-packages also contribute skills through `resources_discover`, notably `supi-claude-md`.
 
 ## Bundled packages
 
@@ -60,7 +59,6 @@ Bundled sub-packages also contribute skills through `resources_discover`, notabl
 | [`@mrclrchtr/supi-core`](../supi-core/README.md) | library | Shared config, settings, context, debug, and project-root helpers |
 | [`@mrclrchtr/supi-debug`](../supi-debug/README.md) | extension | Session-local debug event inspection |
 | [`@mrclrchtr/supi-extras`](../supi-extras/README.md) | extension | Command aliases, skill shorthand, tab spinner, prompt stash, and other small utilities |
-| [`@mrclrchtr/supi-flow`](../supi-flow/README.md) | extension + skills | Brainstorm → plan → apply → archive workflow |
 | [`@mrclrchtr/supi-insights`](../supi-insights/README.md) | extension | Historical session insights and HTML reports |
 | [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | extension + library | LSP tool, diagnostics, and reusable session-scoped LSP service |
 | [`@mrclrchtr/supi-review`](../supi-review/README.md) | extension | Structured `/supi-review` command with configurable reviewer behavior |
@@ -78,7 +76,6 @@ pi install npm:@mrclrchtr/supi-code-intelligence
 pi install npm:@mrclrchtr/supi-context
 pi install npm:@mrclrchtr/supi-debug
 pi install npm:@mrclrchtr/supi-extras
-pi install npm:@mrclrchtr/supi-flow
 pi install npm:@mrclrchtr/supi-insights
 pi install npm:@mrclrchtr/supi-lsp
 pi install npm:@mrclrchtr/supi-review
@@ -95,11 +92,6 @@ Adds a structured tool for narrow agent-user decisions with typed questions, rec
 ### `claude-md`
 
 Keeps directory-specific `CLAUDE.md` and `AGENTS.md` guidance flowing into sessions for subdirectories below `cwd`. Root and ancestor context files remain pi-native.
-
-### `flow`
-
-Bundles the `supi-flow-*` skills plus `/supi-flow` and `/supi-flow-status` commands for the brainstorm → plan → apply → archive workflow.
-
 ### `lsp`
 
 Adds semantic code navigation and diagnostics through a single `lsp` tool plus inline diagnostic surfacing and `/lsp-status`. Also exports a reusable `SessionLspService` library surface from the package root so peer extensions can reuse the active LSP runtime without starting duplicate servers.
