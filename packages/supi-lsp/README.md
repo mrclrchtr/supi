@@ -80,9 +80,23 @@ If your install surface includes `/supi-settings` (for example via `@mrclrchtr/s
 
 ## Commands
 
+`/lsp-status` toggles an overlay showing active language servers and outstanding diagnostics:
+
 ```text
-/lsp-status
+ λ LSP inspector  /lsp-status toggles
+ 3 servers running • 12 open files • 5 errors • 2 warnings
+
+ Servers
+   typescript  running    24 open files
+   python      running     8 open files
+   bash        running     0 open files
+
+ Problems
+   src/lsp.ts:42       Cannot find name 'foo'          ts(2304)
+   src/manager.ts:108  Property 'bar' does not exist   ts(2339)
 ```
+
+When no servers are available, the overlay shows `no LSP servers available for this project`. A compact status summary is always visible in the pi status bar.
 
 ## Requirements
 
