@@ -175,4 +175,130 @@ describe("structured details via executeAction", () => {
     expect(result.details).toBeUndefined();
     expect(result.content).toContain("Error");
   });
+
+  describe("semantic actions — target resolution error returns details", () => {
+    it("callers target error returns search details with unavailable confidence", async () => {
+      const result = await executeAction({ action: "callers" }, { cwd: tmpDir });
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type === "search") {
+        expect(result.details.data.confidence).toBe("unavailable");
+        expect(result.details.data.candidateCount).toBe(0);
+      }
+    });
+
+    it("implementations target error returns search details with unavailable confidence", async () => {
+      const result = await executeAction({ action: "implementations" }, { cwd: tmpDir });
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type === "search") {
+        expect(result.details.data.confidence).toBe("unavailable");
+      }
+    });
+  });
+
+  describe("brief action — no-result detail states", () => {
+    it("returns details for no project model", async () => {
+      const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("brief");
+      if (result.details?.type === "brief") {
+        expect(result.details.data.confidence).toBe("unavailable");
+      }
+    });
+
+    it("returns details for anchored brief", async () => {
+      setupWorkspace();
+      writeFileSync(path.join(tmpDir, "packages/core/index.ts"), "export const x = 1;\n");
+      const result = await executeAction(
+        { action: "brief", file: "packages/core/index.ts", line: 1, character: 1 },
+        { cwd: tmpDir },
+      );
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("brief");
+      if (result.details?.type === "brief") {
+        expect(result.details.data.confidence).toBe("structural");
+        expect(result.details.data.focusTarget).not.toBeNull();
+      }
+    });
+
+    it("affected target error returns affected details with unavailable confidence", async () => {
+      const result = await executeAction({ action: "affected" }, { cwd: tmpDir });
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("affected");
+      if (result.details?.type === "affected") {
+        expect(result.details.data.confidence).toBe("unavailable");
+        expect(result.details.data.directCount).toBe(0);
+        expect(result.details.data.downstreamCount).toBe(0);
+        expect(result.details.data.riskLevel).toBe("low");
+      }
+    });
+
+    describe("pattern action — no-result detail states", () => {
+      it("returns details for regex error", async () => {
+        const result = await executePatternAction(
+          { action: "pattern", pattern: "[invalid", regex: true },
+          tmpDir,
+        );
+        expect(result.details).toBeDefined();
+        expect(result.details?.type).toBe("search");
+        if (result.details?.type === "search") {
+          expect(result.details.data.confidence).toBe("unavailable");
+          expect(result.details.data.candidateCount).toBe(0);
+        }
+      });
+
+      it("returns details for zero matches", async () => {
+        writeFileSync(path.join(tmpDir, "a.ts"), "const x = 1;");
+        const result = await executePatternAction(
+          { action: "pattern", pattern: "nonexistent999" },
+          tmpDir,
+        );
+        expect(result.details).toBeDefined();
+        expect(result.details?.type).toBe("search");
+        if (result.details?.type === "search") {
+          expect(result.details.data.confidence).toBe("heuristic");
+          expect(result.details.data.candidateCount).toBe(0);
+        }
+      });
+    });
+
+    describe("callees action — no-result detail states", () => {
+      it("returns details for target resolution error", async () => {
+        const result = await executeAction({ action: "callees" }, { cwd: tmpDir });
+        expect(result.details).toBeDefined();
+        expect(result.details?.type).toBe("search");
+        if (result.details?.type === "search") {
+          expect(result.details.data.confidence).toBe("unavailable");
+        }
+      });
+
+      it("returns details for tree-sitter unsuccessful on unsupported file type", async () => {
+        writeFileSync(path.join(tmpDir, "notes.txt"), "some content\n");
+        const result = await executeAction(
+          { action: "callees", file: "notes.txt", line: 1, character: 1 },
+          { cwd: tmpDir },
+        );
+        expect(result.details).toBeDefined();
+        expect(result.details?.type).toBe("search");
+        if (result.details?.type === "search") {
+          expect(result.details.data.confidence).toBe("unavailable");
+        }
+      });
+
+      it("returns details for a function with zero outgoing calls", async () => {
+        writeFileSync(path.join(tmpDir, "empty.ts"), "function noCalls() { return 1; }\n");
+        const result = await executeAction(
+          { action: "callees", file: "empty.ts", line: 1, character: 1 },
+          { cwd: tmpDir },
+        );
+        expect(result.details).toBeDefined();
+        expect(result.details?.type).toBe("search");
+        if (result.details?.type === "search") {
+          expect(result.details.data.confidence).toBe("structural");
+          expect(result.details.data.candidateCount).toBe(0);
+        }
+      });
+    });
+  });
 });

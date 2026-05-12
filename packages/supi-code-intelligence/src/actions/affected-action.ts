@@ -20,7 +20,24 @@ export async function executeAffectedAction(
   cwd: string,
 ): Promise<CodeIntelResult> {
   const target = await resolveTarget(params, cwd);
-  if (typeof target === "string") return { content: target, details: undefined };
+  if (typeof target === "string") {
+    return {
+      content: target,
+      details: {
+        type: "affected" as const,
+        data: {
+          confidence: "unavailable",
+          directCount: 0,
+          downstreamCount: 0,
+          riskLevel: "low",
+          checkNext: [],
+          likelyTests: [],
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
 
   const relPath = path.relative(cwd, target.file);
   const symbolName = target.name ?? `symbol at ${relPath}:${target.displayLine}`;

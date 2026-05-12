@@ -18,7 +18,21 @@ export async function executeImplementationsAction(
   cwd: string,
 ): Promise<CodeIntelResult> {
   const target = await resolveTarget(params, cwd);
-  if (typeof target === "string") return { content: target, details: undefined };
+  if (typeof target === "string") {
+    return {
+      content: target,
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
 
   const lspState = getSessionLspService(cwd);
   const relPath = path.relative(cwd, target.file);
@@ -46,20 +60,31 @@ export async function executeImplementationsAction(
   }
 
   if (target.name) {
-    const content = formatHeuristicImpls(target.name, params, cwd);
+    const result = formatHeuristicImpls(target.name, params, cwd);
     const details: SearchDetails = {
       confidence: "heuristic",
       scope: params.path ?? null,
-      candidateCount: 0,
+      candidateCount: result.matchCount,
       omittedCount: 0,
       nextQueries: ["Enable LSP for semantic implementation resolution"],
     };
-    return { content, details: { type: "search" as const, data: details } };
+    return { content: result.content, details: { type: "search" as const, data: details } };
   }
 
   return {
     content: `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.\n\nLSP implementation lookup may not be available. Try \`code_intel pattern\` with the type name.`,
-    details: undefined,
+    details: {
+      type: "search" as const,
+      data: {
+        confidence: "unavailable",
+        scope: params.path ?? null,
+        candidateCount: 0,
+        omittedCount: 0,
+        nextQueries: [
+          "Enable LSP for semantic implementation resolution, or try `code_intel pattern`",
+        ],
+      },
+    },
   };
 }
 
@@ -130,13 +155,20 @@ function formatSemanticImpls(
   return lines.join("\n");
 }
 
-function formatHeuristicImpls(symbol: string, params: ActionParams, cwd: string): string {
+function formatHeuristicImpls(
+  symbol: string,
+  params: ActionParams,
+  cwd: string,
+): { content: string; matchCount: number } {
   const scopePath = params.path ? normalizePath(params.path, cwd) : cwd;
   const pattern = `(implements|extends)\\s+.*\\b${escapeRegex(symbol)}\\b`;
   const matches = runRipgrep(pattern, scopePath, cwd, { maxMatches: 10 });
 
   if (matches.length === 0) {
-    return `No implementations found for \`${symbol}\`.\n\nTry \`code_intel pattern\` with the type name.`;
+    return {
+      content: `No implementations found for \`${symbol}\`.\n\nTry \`code_intel pattern\` with the type name.`,
+      matchCount: 0,
+    };
   }
 
   const lines: string[] = [];
@@ -154,5 +186,5 @@ function formatHeuristicImpls(symbol: string, params: ActionParams, cwd: string)
     lines.push(`- _+${matches.length - 8} more omitted_`);
   }
   lines.push("");
-  return lines.join("\n");
+  return { content: lines.join("\n"), matchCount: matches.length };
 }

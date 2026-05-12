@@ -108,6 +108,8 @@ LSP → ripgrep text search (for callers/implementations/affected), with explici
 - `findModuleForPath()` returns the deepest matching module for nested monorepo layouts.
 
 ### Confidence & Metadata
+- `details` is always returned for action handler executions. It is `undefined` only when the request is rejected before any handler runs (parameter validation, unknown action, missing required `pattern`).
+- No-result and error states carry `confidence: "unavailable"` or `confidence: "heuristic"` with appropriately zeroed counts.
 - Every action handler returns structured `details` alongside formatted Markdown:
   - `brief` → `{ type: "brief", data: BriefDetails }` (confidence, focus target, start-here, public surfaces, dependency summary, next queries)
   - `search` (callers, callees, implementations, pattern, index) → `{ type: "search", data: SearchDetails }` (confidence, scope, candidate count, omitted count)

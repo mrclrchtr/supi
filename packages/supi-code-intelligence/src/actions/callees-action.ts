@@ -13,7 +13,21 @@ export async function executeCalleesAction(
   cwd: string,
 ): Promise<CodeIntelResult> {
   const target = await resolveTarget(params, cwd);
-  if (typeof target === "string") return { content: target, details: undefined };
+  if (typeof target === "string") {
+    return {
+      content: target,
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
 
   const relPath = path.relative(cwd, target.file);
   let tsSession: ReturnType<typeof createTreeSitterSession> | null = null;
@@ -25,7 +39,16 @@ export async function executeCalleesAction(
     if (result.kind !== "success") {
       return {
         content: noCalleesMessage(relPath, target.displayLine, target.displayCharacter),
-        details: undefined,
+        details: {
+          type: "search" as const,
+          data: {
+            confidence: "unavailable",
+            scope: null,
+            candidateCount: 0,
+            omittedCount: 0,
+            nextQueries: ["Use `lsp` for type-aware analysis on this file"],
+          },
+        },
       };
     }
 
@@ -34,7 +57,18 @@ export async function executeCalleesAction(
     if (callees.length === 0) {
       return {
         content: noCalleesMessage(relPath, target.displayLine, target.displayCharacter),
-        details: undefined,
+        details: {
+          type: "search" as const,
+          data: {
+            confidence: "structural",
+            scope: null,
+            candidateCount: 0,
+            omittedCount: 0,
+            nextQueries: [
+              'Use `tree_sitter` with `action: "outline"` to explore the enclosing function',
+            ],
+          },
+        },
       };
     }
 
@@ -50,7 +84,16 @@ export async function executeCalleesAction(
   } catch {
     return {
       content: noCalleesMessage(relPath, target.displayLine, target.displayCharacter),
-      details: undefined,
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Use `lsp` for type-aware analysis on this file"],
+        },
+      },
     };
   } finally {
     tsSession?.dispose();

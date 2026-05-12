@@ -20,7 +20,21 @@ export async function executeCallersAction(
   cwd: string,
 ): Promise<CodeIntelResult> {
   const target = await resolveTarget(params, cwd);
-  if (typeof target === "string") return { content: target, details: undefined };
+  if (typeof target === "string") {
+    return {
+      content: target,
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
 
   const maxResults = params.maxResults ?? 5;
   const lspState = getSessionLspService(cwd);
@@ -49,21 +63,30 @@ export async function executeCallersAction(
   }
 
   if (target.name) {
-    const content = formatHeuristicCallers(target.name, params, cwd);
+    const result = formatHeuristicCallers(target.name, params, cwd);
     const details: SearchDetails = {
       confidence: "heuristic",
       scope: params.path ?? null,
-      candidateCount: 0,
+      candidateCount: result.matchCount,
       omittedCount: 0,
       nextQueries: ["Enable LSP for `semantic` caller accuracy"],
     };
-    return { content, details: { type: "search" as const, data: details } };
+    return { content: result.content, details: { type: "search" as const, data: details } };
   }
 
   const relPath = path.relative(cwd, target.file);
   return {
     content: `No caller data available for ${relPath}:${target.displayLine}:${target.displayCharacter}. LSP may not be active.\n\nTry \`code_intel pattern\` with the symbol name for text-search matches.`,
-    details: undefined,
+    details: {
+      type: "search" as const,
+      data: {
+        confidence: "unavailable",
+        scope: params.path ?? null,
+        candidateCount: 0,
+        omittedCount: 0,
+        nextQueries: ["Enable LSP for semantic caller resolution, or try `code_intel pattern`"],
+      },
+    },
   };
 }
 
@@ -147,14 +170,18 @@ function formatSemanticCallers(
   return lines.join("\n");
 }
 
-function formatHeuristicCallers(symbol: string, params: ActionParams, cwd: string): string {
+function formatHeuristicCallers(
+  symbol: string,
+  params: ActionParams,
+  cwd: string,
+): { content: string; matchCount: number } {
   const maxResults = params.maxResults ?? 8;
   const scopePath = params.path ? normalizePath(params.path, cwd) : cwd;
   const pattern = `\\b${escapeRegex(symbol)}\\b`;
   const matches = runRipgrep(pattern, scopePath, cwd, { maxMatches: maxResults * 3 });
 
   if (matches.length === 0) {
-    return `No references found for \`${symbol}\` (heuristic).`;
+    return { content: `No references found for \`${symbol}\` (heuristic).`, matchCount: 0 };
   }
 
   const lines: string[] = [];
@@ -184,5 +211,5 @@ function formatHeuristicCallers(symbol: string, params: ActionParams, cwd: strin
     lines.push(`_+${byFile.size - maxResults} more files omitted._`);
   }
 
-  return lines.join("\n");
+  return { content: lines.join("\n"), matchCount: matches.length };
 }

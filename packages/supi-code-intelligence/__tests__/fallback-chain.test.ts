@@ -67,7 +67,13 @@ describe("callers action — LSP unavailable", () => {
     );
 
     expect(result.content).toContain("No caller data available");
-    expect(result.details).toBeUndefined();
+    expect(result.details).toBeDefined();
+    if (result.details) {
+      expect(result.details.type).toBe("search");
+      if (result.details.type === "search") {
+        expect(result.details.data.confidence).toBe("unavailable");
+      }
+    }
   });
 
   it("falls back to heuristic text search when symbol is provided", async () => {
@@ -81,8 +87,8 @@ describe("callers action — LSP unavailable", () => {
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
       expect(result.details.data.confidence).toBe("heuristic");
-      // heuristic path sets candidateCount to 0
-      expect(result.details.data.candidateCount).toBe(0);
+      // heuristic path now sets candidateCount to actual ripgrep match count
+      expect(result.details.data.candidateCount).toBeGreaterThan(0);
     }
   });
 
@@ -177,7 +183,13 @@ describe("callers action — LSP available", () => {
 
     // Anchored target has no symbol name → cannot do heuristic fallback
     expect(result.content).toContain("No caller data available");
-    expect(result.details).toBeUndefined();
+    expect(result.details).toBeDefined();
+    if (result.details) {
+      expect(result.details.type).toBe("search");
+      if (result.details.type === "search") {
+        expect(result.details.data.confidence).toBe("unavailable");
+      }
+    }
   });
 
   it("falls back to heuristic when LSP returns only the declaration with symbol name", async () => {
@@ -276,7 +288,13 @@ describe("implementations action — LSP unavailable", () => {
     );
 
     expect(result.content).toContain("No implementations found");
-    expect(result.details).toBeUndefined();
+    expect(result.details).toBeDefined();
+    if (result.details) {
+      expect(result.details.type).toBe("search");
+      if (result.details.type === "search") {
+        expect(result.details.data.confidence).toBe("unavailable");
+      }
+    }
   });
 
   it("falls back to heuristic text search when symbol is provided", async () => {
@@ -452,7 +470,13 @@ describe("implementations action — LSP available", () => {
 
     // Anchored target has no name → cannot do heuristic fallback
     expect(result.content).toContain("No implementations found");
-    expect(result.details).toBeUndefined();
+    expect(result.details).toBeDefined();
+    if (result.details) {
+      expect(result.details.type).toBe("search");
+      if (result.details.type === "search") {
+        expect(result.details.data.confidence).toBe("unavailable");
+      }
+    }
   });
 });
 

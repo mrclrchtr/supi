@@ -19,6 +19,7 @@ import type { CodeIntelResult, SearchDetails } from "../types.ts";
  * patterns are surfaced as explicit user-facing errors instead of being
  * collapsed into a misleading no-match response.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: function has multiple distinct paths (validation, regex vs literal, summary vs detailed, zero vs results) that are clearer when explicit than when split; 18 is acceptable for the use case
 export async function executePatternAction(
   params: ActionParams,
   cwd: string,
@@ -51,13 +52,29 @@ export async function executePatternAction(
       });
 
   if (typeof matches === "string") {
-    return { content: matches, details: undefined };
+    const errorDetails: SearchDetails = {
+      confidence: "unavailable",
+      scope: params.path ?? null,
+      candidateCount: 0,
+      omittedCount: 0,
+      nextQueries: ["Fix the regex pattern and retry"],
+    };
+    return { content: matches, details: { type: "search", data: errorDetails } };
   }
 
   if (matches.length === 0) {
+    const emptyDetails: SearchDetails = {
+      confidence: "heuristic",
+      scope: params.path ?? null,
+      candidateCount: 0,
+      omittedCount: 0,
+      nextQueries: params.regex
+        ? ["Set `regex: false` for literal matching"]
+        : ["Set `regex: true` for regex matching"],
+    };
     return {
       content: `No matches found for \`${params.pattern}\` in \`${relScope}\`.`,
-      details: undefined,
+      details: { type: "search", data: emptyDetails },
     };
   }
 

@@ -130,7 +130,13 @@ Every result carries a `confidence` label from the result metadata:
 
 ## Result Metadata
 
-All actions return structured metadata alongside formatted Markdown:
+**Contract:** `details` is returned for every action handler execution. It is
+`undefined` *only* when the request is rejected before any handler runs
+(parameter validation errors, unknown action, missing required `pattern`).
+
+For no-result and error states, `details` carries `confidence: "unavailable"` or
+`confidence: "heuristic"` with appropriately zeroed counts, so consumers always
+get structured metadata back.
 
 - **`brief`** → `BriefDetails` (confidence, focus target, start-here suggestions, public surfaces, dependency summary, omitted count, next queries)
 - **`search`** → `SearchDetails` (callers/callees/implementations/pattern: confidence, scope, candidate count, omitted count)

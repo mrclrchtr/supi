@@ -18,13 +18,45 @@ export async function executeBriefAction(
     return {
       content:
         "No project structure detected. This directory has no recognizable project metadata or source files.",
-      details: undefined,
+      details: {
+        type: "brief" as const,
+        data: {
+          confidence: "unavailable",
+          focusTarget: null,
+          startHere: [],
+          publicSurfaces: [],
+          dependencySummary: null,
+          omittedCount: 0,
+          nextQueries: [
+            "Add a package.json or pnpm-workspace.yaml to enable architecture analysis",
+          ],
+        },
+      },
     };
   }
 
   if (params.file && params.line != null && params.character != null) {
     const content = await executeAnchoredBrief(params, cwd, model);
-    return { content, details: undefined };
+    const relPath = path.relative(cwd, normalizePath(params.file ?? "", cwd));
+    const mod = findModuleForPath(model, path.resolve(cwd, relPath));
+    return {
+      content,
+      details: {
+        type: "brief" as const,
+        data: {
+          confidence: "structural",
+          focusTarget: `${relPath}:${params.line}:${params.character}`,
+          startHere: [],
+          publicSurfaces: [],
+          dependencySummary: mod && model ? { moduleCount: 1, edgeCount: 0 } : null,
+          omittedCount: 0,
+          nextQueries: [
+            `\`code_intel callers\` with \`file: "${relPath}", line: ${params.line}, character: ${params.character}\` for call sites`,
+            `\`code_intel affected\` with \`file: "${relPath}", line: ${params.line}, character: ${params.character}\` for impact analysis`,
+          ],
+        },
+      },
+    };
   }
 
   if (params.path) {
