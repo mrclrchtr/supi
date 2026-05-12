@@ -8,7 +8,10 @@ const StructuredOptionSchema = Type.Object({
   value: Type.String({ description: "Stable identifier returned in the answer" }),
   label: Type.String({ description: "Display label shown to the user" }),
   description: Type.Optional(
-    Type.String({ description: "Optional one-line clarification shown under the label" }),
+    Type.String({
+      description:
+        "Optional clarification shown under the label (wraps naturally, a short paragraph is fine)",
+    }),
   ),
   preview: Type.Optional(
     Type.String({

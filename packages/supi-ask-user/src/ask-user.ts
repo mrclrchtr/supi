@@ -38,7 +38,7 @@ const PROMPT_GUIDELINES = [
   "Set `recommendation` when one option or a small set of options is clearly preferable, so the UI can surface that guidance.",
   "Set `default` to pre-select a starting value or option; the user can accept it with a single keystroke. Use it for safe/common defaults, distinct from `recommendation` which highlights what you think is best.",
   "Enable `allowOther` only when a custom answer is genuinely useful, and `allowDiscuss` only when the user may need to talk through the choice instead of deciding immediately.",
-  "Use option `preview` content when the user would understand choices better from code, config, markdown, or ASCII mockups than from one-line descriptions alone.",
+  "Use `description` to explain what each option means — it wraps naturally and a few sentences is fine. Reserve `preview` for code, config, or diagrams that need dedicated rendering space in a side pane.",
   "Do not call ask_user while another ask_user interaction is in flight — wait for the previous result before issuing another.",
 ];
 

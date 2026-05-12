@@ -86,9 +86,10 @@ function renderSplitView(
   question: NormalizedStructuredQuestion,
   rows: InteractiveRow[],
 ): void {
-  const leftWidth = Math.max(34, Math.floor(env.width * 0.42));
+  const leftWidth = Math.max(36, Math.floor(env.width * 0.55));
   const rightWidth = Math.max(24, env.width - leftWidth - 3);
-  const leftLines = renderPaneRows(env, question, rows);
+  const leftEnv: RenderEnv = { ...env, width: leftWidth };
+  const leftLines = renderPaneRows(leftEnv, question, rows);
   const rightLines = usesSeparateEditorPane(env.state)
     ? renderEditorPane(rightWidth, env.theme, env.editor, editorCaption(env.state))
     : renderPreviewPane(
