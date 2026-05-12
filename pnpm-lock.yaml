@@ -63,9 +63,6 @@ importers:
       '@mrclrchtr/supi-bash-timeout':
         specifier: workspace:*
         version: link:../supi-bash-timeout
-      '@mrclrchtr/supi-cache':
-        specifier: workspace:*
-        version: link:../supi-cache
       '@mrclrchtr/supi-claude-md':
         specifier: workspace:*
         version: link:../supi-claude-md
@@ -84,18 +81,9 @@ importers:
       '@mrclrchtr/supi-extras':
         specifier: workspace:*
         version: link:../supi-extras
-      '@mrclrchtr/supi-insights':
-        specifier: workspace:*
-        version: link:../supi-insights
       '@mrclrchtr/supi-lsp':
         specifier: workspace:*
         version: link:../supi-lsp
-      '@mrclrchtr/supi-review':
-        specifier: workspace:*
-        version: link:../supi-review
-      '@mrclrchtr/supi-rtk':
-        specifier: workspace:*
-        version: link:../supi-rtk
       '@mrclrchtr/supi-tree-sitter':
         specifier: workspace:*
         version: link:../supi-tree-sitter
