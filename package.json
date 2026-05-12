@@ -43,7 +43,7 @@
     "format:check": "biome format .",
     "typecheck": "for p in packages/*/tsconfig.json; do tsc --noEmit -p \"$p\" || exit 1; done",
     "typecheck:tests": "for p in packages/*/__tests__/tsconfig.json; do [ -f \"$p\" ] && tsc --noEmit -p \"$p\" || exit 1; done",
-    "pack:check": "pnpm --filter \"./packages/supi*\" exec pnpm pack --dry-run",
+    "pack:check": "for p in packages/supi*; do [ -f \"$p/package.json\" ] || continue; node scripts/pack-staged.mjs \"$p\" --dry-run || exit 1; done",
     "check": "pnpm biome",
     "check:fix": "pnpm biome:fix",
     "verify": "pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && pnpm typecheck && pnpm typecheck:tests && pnpm biome:ai && pnpm test && pnpm pack:check",

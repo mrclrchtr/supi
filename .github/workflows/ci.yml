@@ -87,7 +87,7 @@ jobs:
             exit 1
           fi
 
-      - name: Verify package
+      - name: Verify workspace and staged package tarballs
         run: pnpm verify
 
   release-please:
@@ -125,7 +125,7 @@ jobs:
       - name: Set up workspace dependencies
         uses: ./.github/actions/setup-pnpm
 
-      - name: Publish released packages
+      - name: Publish released packages from staged tarballs
         env:
           PATHS_RELEASED: ${{ needs.release-please.outputs.paths_released }}
         run: node scripts/publish-released.mjs

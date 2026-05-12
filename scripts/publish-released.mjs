@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 /**
  * Publish packages that were released by Release Please.
  *
@@ -7,7 +10,7 @@ import { execSync } from "node:child_process";
  * Publishes in topological order of workspace dependencies, with the meta-package
  * (`packages/supi`) always last.
  */
-import { readFileSync } from "node:fs";
+import { packStaged } from "./pack-staged.mjs";
 
 const pathsReleasedJson = process.env.PATHS_RELEASED;
 if (!pathsReleasedJson) {
@@ -92,22 +95,30 @@ if (metaIndex !== -1 && metaIndex !== sorted.length - 1) {
   sorted.push(metaPath);
 }
 
-for (const path of sorted) {
-  const pkg = pkgMap.get(path);
-  const { name, version } = pkg;
+const tarballDir = mkdtempSync(join(tmpdir(), "supi-publish-"));
 
-  // Idempotent skip — handles retries without failing.
-  try {
-    execSync(`npm view "${name}@${version}" version`, { stdio: "pipe" });
-    console.log(`${name}@${version} already published — skipping`);
-    continue;
-  } catch {
-    // Not published yet; proceed.
+try {
+  for (const path of sorted) {
+    const pkg = pkgMap.get(path);
+    const { name, version } = pkg;
+
+    // Idempotent skip — handles retries without failing.
+    try {
+      execSync(`npm view "${name}@${version}" version`, { stdio: "pipe" });
+      console.log(`${name}@${version} already published — skipping`);
+      continue;
+    } catch {
+      // Not published yet; proceed.
+    }
+
+    console.log(`Packing ${name}@${version} from staged copy ...`);
+    const tarballPath = packStaged(resolve(path), { outDir: tarballDir });
+
+    console.log(`Publishing ${name}@${version} from ${tarballPath} ...`);
+    execSync(`npm publish "${tarballPath}" --access public --provenance`, {
+      stdio: "inherit",
+    });
   }
-
-  console.log(`Publishing ${name}@${version} ...`);
-  execSync("pnpm publish --no-git-checks --access public --provenance", {
-    cwd: path,
-    stdio: "inherit",
-  });
+} finally {
+  rmSync(tarballDir, { recursive: true, force: true });
 }
