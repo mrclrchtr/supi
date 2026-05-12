@@ -21,8 +21,8 @@ describe("ask_user prompt guidance", () => {
 
   it("guidelines explain when to use each question type", () => {
     const all = askUserPromptGuidelines.join("\n");
-    expect(all).toMatch(/yesno for binary/i);
-    expect(all).toMatch(/choice for one known option/i);
+    expect(all).toMatch(/yesno only for genuinely yes.no questions/i);
+    expect(all).toMatch(/choice for picking between named alternatives/i);
     expect(all).toMatch(/multichoice/i);
     expect(all).toMatch(/text only when freeform/i);
   });

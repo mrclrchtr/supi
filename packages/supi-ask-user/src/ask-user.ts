@@ -26,7 +26,7 @@ const TOOL_NAME = "ask_user";
 const TOOL_LABEL = "Ask User";
 
 const TOOL_DESCRIPTION =
-  "Ask the user a focused decision question (or up to 4 grouped questions) when explicit user input is required to proceed safely. Use for clarifying intent, picking between options, prioritizing a short set of features, or confirming a destructive action — not for surveys or open-ended discovery. Each question is `choice`, `multichoice`, `text`, or `yesno`; structured questions can add `recommendation`, `default`, `allowOther`, `allowDiscuss`, and option `preview` content.";
+  "Ask the user a focused decision question (or up to 4 grouped questions) when explicit user input is required to proceed safely. Use for clarifying intent, picking between options, prioritizing a short set of features, or confirming a destructive action — not for surveys or open-ended discovery. Each question is `choice`, `multichoice`, `text`, or `yesno`; use `yesno` only when the natural answer is 'yes' or 'no' (not for 'A or B?' alternatives — use `choice` for those). Structured questions can add `recommendation`, `default`, `allowOther`, `allowDiscuss`, and option `preview` content.";
 
 const PROMPT_SNIPPET =
   "ask_user — pause and request a focused decision (1-4 typed questions) when explicit user input is required to proceed, including rich choice, multichoice, and discuss flows";
@@ -34,7 +34,7 @@ const PROMPT_SNIPPET =
 const PROMPT_GUIDELINES = [
   "Use ask_user only for decisions that require explicit user input — never as a substitute for reading code or thinking through a problem.",
   "Keep questionnaires bounded: 1-4 focused questions with short headers; prefer one decision per call when possible.",
-  "Choose the narrowest type that fits: yesno for binary decisions, choice for one known option, multichoice for short pick-many lists, and text only when freeform input is genuinely needed.",
+  "Choose the narrowest type that fits: yesno only for genuinely yes/no questions where the answer IS 'yes' or 'no' (e.g., 'Should we add tests?'), choice for picking between named alternatives — including two-option 'A or B?' questions like 'Keep or remove?' — multichoice for short pick-many lists, and text only when freeform input is genuinely needed.",
   "Set `recommendation` when one option or a small set of options is clearly preferable, so the UI can surface that guidance.",
   "Set `default` to pre-select a starting value or option; the user can accept it with a single keystroke. Use it for safe/common defaults, distinct from `recommendation` which highlights what you think is best.",
   "Enable `allowOther` only when a custom answer is genuinely useful, and `allowDiscuss` only when the user may need to talk through the choice instead of deciding immediately.",
