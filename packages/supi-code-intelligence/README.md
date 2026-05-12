@@ -104,7 +104,7 @@ Examples:
 | **`brief` (project)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅¹ |
 | **`brief` (directory/file)** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **`callers`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
-| **`callees`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️³ | ⚠️³ | ✅ | ⚠️³ |
+| **`callees`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
 | **`implementations`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
 | **`affected`** | ✅ | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ✅² | ⚠️³ |
 | **`pattern`** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅⁴ |
@@ -112,6 +112,7 @@ Examples:
 **Legend:**
 - **✅** Fully supported for that action.
 - **⚠️** Partial or best-effort support (see footnotes).
+- **❌** Not supported for that action.
 - **¹** Project-level brief works for any project with a recognized manifest (`package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, etc.).
 - **²** Requires an active LSP server for semantic resolution; falls back to heuristic text search otherwise.
 - **³** Heuristic text-search fallback only; no semantic or structural resolution.

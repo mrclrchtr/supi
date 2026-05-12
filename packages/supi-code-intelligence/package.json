@@ -16,9 +16,7 @@
     "pi-coding-agent"
   ],
   "files": [
-    "src/**/*.ts",
-    "src/actions/*.ts",
-    "README.md"
+    "src/**/*.ts"
   ],
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*",
