@@ -1,0 +1,21 @@
+schema_version = 1
+id = "TNDM-T05EXB"
+title = "Fix production-readiness findings: pack verification, README docs, .npmignore"
+
+type = "task"
+priority = "p2"
+
+depends_on = []
+tags = ["flow:done", "flow:planned"]
+[[documents]]
+name = "archive"
+path = "archive.md"
+[[documents]]
+name = "brainstorm"
+path = "brainstorm.md"
+[[documents]]
+name = "content"
+path = "content.md"
+[[documents]]
+name = "plan"
+path = "plan.md"
