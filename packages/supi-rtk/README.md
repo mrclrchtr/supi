@@ -8,6 +8,9 @@ Transparent RTK-backed bash rewriting for the [pi coding agent](https://github.c
 pi install npm:@mrclrchtr/supi-rtk
 ```
 
+> **🧪 Beta package** — not included in the `@mrclrchtr/supi` meta-package.
+> Install directly when you want RTK-backed bash rewriting.
+
 ## What it adds
 
 This extension wraps the `bash` tool and tries to rewrite commands through the [RTK CLI](https://github.com/joshcho/RTK) before execution.

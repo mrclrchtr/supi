@@ -24,17 +24,13 @@
     "@mrclrchtr/supi-ask-user": "workspace:*",
     "@mrclrchtr/supi-bash-timeout": "workspace:*",
     "@mrclrchtr/supi-claude-md": "workspace:*",
-    "@mrclrchtr/supi-cache": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-debug": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-context": "workspace:*",
-    "@mrclrchtr/supi-review": "workspace:*",
-    "@mrclrchtr/supi-rtk": "workspace:*",
     "@mrclrchtr/supi-tree-sitter": "workspace:*",
     "clipboardy": "^5.3.1",
     "@mrclrchtr/supi-code-intelligence": "workspace:*",
-    "@mrclrchtr/supi-insights": "workspace:*",
     "@mrclrchtr/supi-extras": "workspace:*",
     "diff": "^7.0.0",
     "web-tree-sitter": "^0.26.8"
@@ -43,16 +39,12 @@
     "@mrclrchtr/supi-ask-user",
     "@mrclrchtr/supi-bash-timeout",
     "@mrclrchtr/supi-claude-md",
-    "@mrclrchtr/supi-cache",
     "@mrclrchtr/supi-core",
     "@mrclrchtr/supi-debug",
     "@mrclrchtr/supi-lsp",
     "@mrclrchtr/supi-context",
-    "@mrclrchtr/supi-review",
-    "@mrclrchtr/supi-rtk",
     "@mrclrchtr/supi-tree-sitter",
     "@mrclrchtr/supi-code-intelligence",
-    "@mrclrchtr/supi-insights",
     "@mrclrchtr/supi-extras"
   ],
   "peerDependencies": {
@@ -69,14 +61,10 @@
       "./src/claude-md.ts",
       "./src/settings.ts",
       "./src/lsp.ts",
-      "./src/review.ts",
       "./src/debug.ts",
-      "./src/rtk.ts",
       "./src/context.ts",
       "./src/tree-sitter.ts",
-      "./src/cache.ts",
-      "./src/code-intelligence.ts",
-      "./src/insights.ts"
+      "./src/code-intelligence.ts"
     ]
   }
 }

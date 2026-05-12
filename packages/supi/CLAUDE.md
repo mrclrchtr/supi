@@ -4,7 +4,22 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
 
 ## Scope
 
-`@mrclrchtr/supi` is the published meta-package bundling the full SuPi stack.
+`@mrclrchtr/supi` is the published meta-package bundling the Production SuPi packages.
+
+## Package tiers
+
+| Tier | Meets | Included in meta-package |
+|---|---|---|
+| **Production** | Stable, well-tested, core functionality | ✅ Bundled via `@mrclrchtr/supi` — users get these when they `npm install @mrclrchtr/supi` |
+| **Beta** | Experimental, less mature, niche | ❌ Direct-install only: `npm install @mrclrchtr/supi-<name>` |
+
+### Production packages
+
+`supi-core`, `supi-ask-user`, `supi-bash-timeout`, `supi-claude-md`, `supi-extras`, `supi-lsp`, `supi-tree-sitter`, `supi-code-intelligence`, `supi-debug`, `supi-context`
+
+### Beta packages
+
+`supi-cache`, `supi-insights`, `supi-review`, `supi-rtk`
 
 ## Key responsibilities
 

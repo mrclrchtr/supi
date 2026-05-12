@@ -8,7 +8,8 @@ Prompt cache health monitoring and cross-session forensics for the [pi coding ag
 pi install npm:@mrclrchtr/supi-cache
 ```
 
-Also included in the [SuPi meta-package](https://www.npmjs.com/package/@mrclrchtr/supi).
+> **🧪 Beta package** — not included in the `@mrclrchtr/supi` meta-package.
+> Install directly when you need cache forensics.
 
 For local development:
 
@@ -91,7 +92,7 @@ Config files (project overrides global):
 
 Upgrades from the old `cache-monitor` config section are handled automatically.
 
-If `/supi-settings` is available (registered by the `@mrclrchtr/supi` meta-package), the **Cache** section also appears there with editable fields.
+If you have `/supi-settings` available (for example when also installing the `@mrclrchtr/supi` meta-package), the **Cache** section also appears there with editable fields.
 
 ## Provider notes
 

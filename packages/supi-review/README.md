@@ -8,6 +8,9 @@ Structured code review for the [pi coding agent](https://github.com/earendil-wor
 pi install npm:@mrclrchtr/supi-review
 ```
 
+> **🧪 Beta package** — not included in the `@mrclrchtr/supi` meta-package.
+> Install directly when you need structured code reviews.
+
 ## What it adds
 
 This extension registers `/supi-review`, which launches an in-process managed child session to review:
@@ -37,7 +40,7 @@ render supi-review message
 
 ## Configuration
 
-If your install surface includes `/supi-settings` (for example via `@mrclrchtr/supi`), this package contributes review settings there.
+If your install surface includes `/supi-settings` (for example when also installing the `@mrclrchtr/supi` meta-package), this package contributes review settings there.
 
 ## Architecture
 

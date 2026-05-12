@@ -21,19 +21,12 @@ Reports are saved as self-contained HTML files you can open in any browser.
 
 ## Installation
 
-### As part of SuPi (recommended)
-
-```bash
-pi install npm:@mrclrchtr/supi
-```
-
-This bundles `supi-insights` along with the rest of the SuPi extension stack.
-
-### Standalone
-
 ```bash
 pi install npm:@mrclrchtr/supi-insights
 ```
+
+> **🧪 Beta package** — not included in the `@mrclrchtr/supi` meta-package.
+> Install directly when you need session analytics.
 
 Or install from a local checkout with `pi install /path/to/packages/supi-insights`.
 
@@ -66,7 +59,7 @@ Subsequent runs are fast — cached metadata and facets are reused.
 
 ## Configuration
 
-If your install surface includes `/supi-settings` (for example via `@mrclrchtr/supi`), this package contributes an **Insights** section there. You can also edit `~/.pi/agent/supi/config.json` directly:
+If your install surface includes `/supi-settings` (for example when also installing the `@mrclrchtr/supi` meta-package), this package contributes an **Insights** section there. You can also edit `~/.pi/agent/supi/config.json` directly:
 
 | Setting | Description | Default |
 |---------|-------------|---------|

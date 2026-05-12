@@ -19,11 +19,24 @@ Built for the [pi coding agent](https://github.com/earendil-works/pi).
 | `@mrclrchtr/supi-extras` | **extras** | Command aliases (`/exit`, `/e`, `/clear`), `$skill-name` shorthand, tab spinner, `/supi-stash` prompt stash with TUI overlay, and other small utilities |
 | `@mrclrchtr/supi-bash-timeout` | **bash-timeout** | Injects a default timeout on every bash tool call when the LLM omits one. Configurable via SuPi config or `/supi-settings` (default 120s). |
 | `@mrclrchtr/supi-ask-user` | **ask-user** | Rich questionnaire UI for structured agent–user decisions. |
-| `@mrclrchtr/supi-lsp` | **lsp** | Adds Language Server Protocol support for hover, definitions, references, symbols, rename, code actions, workspace symbol search, and diagnostics. It appends inline diagnostics after `write`/`edit`, advertises semantic-first tool guidance, and injects stateful pre-turn guidance that activates only after the session touches a supported source file. Also exports a reusable `SessionLspService` library surface for peer extensions. |
-| `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Adds structural Tree-sitter analysis across supported grammars. `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only; `node_at` and `query` work across all supported grammars. Designed as a standalone substrate independent of semantic LSP tooling. |
-| `@mrclrchtr/supi-review` | **review** | Adds `/supi-review` for structured code review with configurable fast/deep models, diff limits, and review timeout via `/supi-settings`. |
+| `@mrclrchtr/supi-claude-md` | **claude-md** | Automatic subdirectory CLAUDE.md/AGENTS.md injection and context management skills. |
+| `@mrclrchtr/supi-context` | **context** | Context-usage report via `/supi-context` — breaks down system prompt, conversation, tools, and extension overhead. |
+| `@mrclrchtr/supi-debug` | **debug** | Session-local debug event inspection with agent-callable `supi_debug` tool and `/supi-debug` command. |
+| `@mrclrchtr/supi-code-intelligence` | **code-intelligence** | Agent-facing `code_intel` tool — architecture briefs, callers/callees, impact analysis, pattern search, project indexing. |
+| `@mrclrchtr/supi-lsp` | **lsp** | Language Server Protocol — hover, definitions, diagnostics, symbols, rename, code actions, workspace search. |
+| `@mrclrchtr/supi-tree-sitter` | **tree_sitter** | Structural AST analysis across 14+ grammars — outline, imports, exports, node_at, query. |
+| `@mrclrchtr/supi-core` | **core** | Shared infrastructure — config, settings registry, XML context tags, project-root helpers. Not a standalone pi extension. |
 
-## Install
+### 🧪 Beta (direct-install only)
+
+| Package | Extension | Description |
+|---------|-----------|-------------|
+| `@mrclrchtr/supi-cache` | **cache** | Prompt cache health monitoring and cross-session forensics with four query patterns. |
+| `@mrclrchtr/supi-insights` | **insights** | Historical session insights — rich HTML reports analyzing usage, friction, and suggestions. |
+| `@mrclrchtr/supi-review` | **review** | Structured code review via `/supi-review` with configurable reviewer models. |
+| `@mrclrchtr/supi-rtk` | **rtk** | Transparent RTK-backed bash rewriting for token savings on repetitive commands. |
+
+## Installing
 
 ### Full stack (meta-package)
 
@@ -31,7 +44,7 @@ Built for the [pi coding agent](https://github.com/earendil-works/pi).
 pi install npm:@mrclrchtr/supi
 ```
 
-### Individual extensions
+### Production extensions
 
 ```bash
 pi install npm:@mrclrchtr/supi-lsp
@@ -39,7 +52,15 @@ pi install npm:@mrclrchtr/supi-tree-sitter
 pi install npm:@mrclrchtr/supi-ask-user
 pi install npm:@mrclrchtr/supi-extras
 pi install npm:@mrclrchtr/supi-bash-timeout
+```
+
+### Beta extensions (direct install only)
+
+```bash
+pi install npm:@mrclrchtr/supi-cache
+pi install npm:@mrclrchtr/supi-insights
 pi install npm:@mrclrchtr/supi-review
+pi install npm:@mrclrchtr/supi-rtk
 ```
 
 ### From git or local path
@@ -68,14 +89,6 @@ The `tree_sitter` extension provides syntax-tree-level structural analysis acros
 - exports `createTreeSitterSession(cwd)` for other SuPi packages that need reusable parse/query/structure services
 - remains correct and self-contained when installed without `supi-lsp`
 
-## Review extension
-
-The `review` extension adds structured code review through `/supi-review`.
-
-- runs reviews in an in-process managed child session with a restricted tool set
-- supports interactive target/depth selection plus non-interactive `/supi-review ...` arguments
-- stores fast/deep model overrides, diff size limit, and review timeout in minutes in `/supi-settings`
-- preserves child review sessions for timeout/failure debugging
 ## Extras extension
 
 The `extras` extension adds small quality-of-life utilities:
