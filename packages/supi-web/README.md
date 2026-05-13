@@ -1,16 +1,28 @@
 # @mrclrchtr/supi-web
 
-SuPi Web extension — fetch web pages as clean Markdown via the `web_fetch_md` pi tool.
+Fetch web pages as clean Markdown via the `web_fetch_md` tool for the [pi coding agent](https://github.com/earendil-works/pi).
 
-## Usage
+## Install
 
-The `web_fetch_md` tool is automatically available to the agent when this extension is installed.
+Included in `@mrclrchtr/supi`, or install standalone:
 
+```bash
+pi install npm:@mrclrchtr/supi-web
 ```
-web_fetch_md url="https://example.com/docs"
+
+For local development:
+
+```bash
+pi install ./packages/supi-web
 ```
 
-### Parameters
+After editing the source, run `/reload` to pick up changes.
+
+## What it adds
+
+Registers the `web_fetch_md` tool — callable by the agent to fetch an `http(s)` URL and return clean Markdown.
+
+## Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -28,19 +40,9 @@ The tool tries multiple strategies to get clean Markdown:
 3. **Sibling probing** — tries `.md` / `.markdown` variants (e.g. `page.md` for `page.html`)
 4. **HTML conversion** — full GET → JSDOM + Readability + Turndown → clean Markdown
 
-## Installation
+## Source
 
-Via the meta-package:
-
-```bash
-npm install @mrclrchtr/supi
-```
-
-Or standalone:
-
-```bash
-npm install @mrclrchtr/supi-web
-```
+- Entrypoint: `src/web.ts`
 
 ## Commands
 
