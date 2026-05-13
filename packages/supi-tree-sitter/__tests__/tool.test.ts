@@ -34,7 +34,7 @@ describe("tree_sitter tool registration", () => {
     const pi = createPiMock();
     treeSitterExtension(pi as never);
     expect(pi.tools.length).toBe(1);
-    expect(pi.tools[0].name).toBe("tree_sitter");
+    expect((pi.tools[0] as { name: string }).name).toBe("tree_sitter");
   });
 
   it("returns not initialized before session_start", async () => {
@@ -47,7 +47,7 @@ describe("tree_sitter tool registration", () => {
   it("has standalone-safe prompt guidance that does not name lsp as a sibling tool", () => {
     const pi = createPiMock();
     treeSitterExtension(pi as never);
-    const tool = pi.tools.find((t) => t.name === "tree_sitter");
+    const tool = pi.tools.find((t) => (t as { name: string }).name === "tree_sitter");
     expect(tool).toBeDefined();
     const guidelines = (tool as unknown as { promptGuidelines: string[] }).promptGuidelines;
     expect(guidelines).toBeDefined();

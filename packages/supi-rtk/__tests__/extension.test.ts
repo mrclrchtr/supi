@@ -120,10 +120,10 @@ describe("rtkExtension", () => {
   });
 
   it("registers the bash tool with RTK promptGuidelines", () => {
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock();
     rtkExtension(pi as never);
 
-    const bashTool = getRegisteredBashTool(tools);
+    const bashTool = getRegisteredBashTool(pi.tools);
     expect(bashTool).toBeDefined();
     expect(bashTool).toMatchObject({
       name: "bash",

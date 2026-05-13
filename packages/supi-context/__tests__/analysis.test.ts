@@ -180,7 +180,7 @@ describe("analyzeContext", () => {
       getSystemPrompt: () => "S".repeat(400),
     });
     const pi = createPiMock();
-    const result = analyzeContext(ctx, pi, cachedOptions);
+    const result = analyzeContext(ctx as never, pi as never, cachedOptions);
 
     expect(result.systemPromptBreakdown.contextFiles).toHaveLength(1);
     expect(result.systemPromptBreakdown.contextFiles[0].path).toBe("AGENTS.md");

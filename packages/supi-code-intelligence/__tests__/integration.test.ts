@@ -9,13 +9,13 @@ describe("code_intel tool registration", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     expect(pi.tools).toHaveLength(1);
-    expect(pi.tools[0].name).toBe("code_intel");
+    expect((pi.tools[0] as { name: string }).name).toBe("code_intel");
   });
 
   it("includes all six actions in description", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const desc = pi.tools[0].description;
+    const desc = (pi.tools[0] as { description: string }).description;
     expect(desc).toContain("brief");
     expect(desc).toContain("callers");
     expect(desc).toContain("callees");
@@ -27,7 +27,7 @@ describe("code_intel tool registration", () => {
   it("includes example calls in description", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const desc = pi.tools[0].description;
+    const desc = (pi.tools[0] as { description: string }).description;
     expect(desc).toContain('"action": "brief"');
     expect(desc).toContain('"action": "callers"');
     expect(desc).toContain('"action": "affected"');
@@ -38,19 +38,19 @@ describe("code_intel tool registration", () => {
   it("registers an optional regex parameter for pattern searches", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    expect(pi.tools[0].parameters?.properties).toHaveProperty("regex");
+    expect((pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters?.properties).toHaveProperty("regex");
   });
 
   it("has promptSnippet naming code_intel", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    expect(pi.tools[0].promptSnippet).toContain("code_intel");
+    expect((pi.tools[0] as { promptSnippet: string }).promptSnippet).toContain("code_intel");
   });
 
   it("has promptGuidelines that all name code_intel", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const guidelines = pi.tools[0].promptGuidelines ?? [];
+    const guidelines = (pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? [];
     expect(guidelines.length).toBeGreaterThanOrEqual(4);
     for (const g of guidelines) {
       expect(g).toContain("code_intel");
@@ -60,7 +60,7 @@ describe("code_intel tool registration", () => {
   it("guidance deconflicts with lsp and tree_sitter", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const guidelines = pi.tools[0].promptGuidelines ?? [];
+    const guidelines = (pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? [];
     const combined = guidelines.join(" ");
     expect(combined).toContain("lsp");
     expect(combined).toContain("tree_sitter");
@@ -70,7 +70,7 @@ describe("code_intel tool registration", () => {
   it("guidance explains literal-default pattern search and regex opt-in", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const combined = (pi.tools[0].promptGuidelines ?? []).join(" ");
+    const combined = ((pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? []).join(" ");
     expect(combined).toContain("literal strings by default");
     expect(combined).toContain("regex: true");
   });
@@ -78,7 +78,7 @@ describe("code_intel tool registration", () => {
   it("guidance discourages code_intel for trivial tasks", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const guidelines = pi.tools[0].promptGuidelines ?? [];
+    const guidelines = (pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? [];
     const combined = guidelines.join(" ");
     expect(combined).toContain("Do not prefer");
     expect(combined).toContain("trivial");
@@ -149,6 +149,6 @@ describe("session lifecycle", () => {
   it("registers optional summary parameter for pattern searches", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    expect(pi.tools[0].parameters?.properties).toHaveProperty("summary");
+    expect((pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters?.properties).toHaveProperty("summary");
   });
 });
