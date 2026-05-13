@@ -152,7 +152,7 @@ registerSettings({
 - `vi.hoisted()` callbacks execute before imports — must be inline arrow functions, cannot reference imported values; supports both single-value (`vi.hoisted(() => vi.fn())`) and object (`vi.hoisted(() => ({ fn: vi.fn() }))`) patterns
 - Each test file that mocks modules needs its own top-level `vi.hoisted` + `vi.mock` calls; can't share through helper functions
 - Biome enforces `noExcessiveLinesPerFunction` (120) and `noExcessiveLinesPerFile` (400, nursery) on test files too — split large describe blocks into separate test files
-- Test helpers can export utilities (`createPiMock`, `makeCtx`, constants) but must not call `vi.mock` or `vi.hoisted` internally
+- Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils` for pi mocks instead of defining local factories — includes `events`, `getActiveTools`, `sendMessage`, `registerShortcut`, `exec`, `emit`, and `getAllTools`
 - Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
 - `pnpm vitest run packages/supi-<pkg>/` — run tests for a single package
 - Global-scope tests for `registerConfigSettings` should pass `homeDir` in the options object rather than mutating `process.env.HOME`.
@@ -165,7 +165,8 @@ registerSettings({
 - `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` — required to trigger `setInterval` callbacks in vitest
 - In Vitest 4.x, constructor mocks inside `vi.mock` factories must use `class` — `vi.fn().mockImplementation(() => ({}))` silently returns `this` instead of the object
 - `vi.mock` hoisting errors propagate from the importing module (e.g. `runner.ts:2:1`), not the test file's `vi.mock` call site — check the Caused-by chain
-- When mocking `pi` in tests, include `events: { emit: vi.fn(), on: vi.fn() }` if the code under test uses the EventBus.
+- Shared `createPiMock` stores handlers as `Map<string, handler[]>` — access as `handlers.get(event)?.[0]`, not `handlers.get(event)!`
+- `pnpm vitest run` does not check types (esbuild strips them) — run `pnpm typecheck:tests` (or per-package `pnpm exec tsc --noEmit -p packages/<pkg>/__tests__/tsconfig.json`) alongside test runs to catch type errors
 - Adding a new runtime export to `supi-core/index.ts` breaks every downstream `vi.mock("@mrclrchtr/supi-core")` factory that omits it; audit all `vi.mock` blocks in consuming packages
 - The same applies to new runtime exports from local modules (e.g., `CLAUDE_MD_DEFAULTS` from `config.ts`) consumed by `vi.mock("../config.ts")` factories
 - **Deleting a source file breaks every test with `vi.mock("../<file>")` referencing it** — audit all test files for stale mock factories after module deletion
