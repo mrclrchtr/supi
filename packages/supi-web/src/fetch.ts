@@ -2,6 +2,7 @@
  * HTTP fetching with content negotiation and Markdown sniffing.
  */
 
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: expanded guessLanguage map pushes past the threshold; nursery rule, not stable
 const USER_AGENT = "supi-web/1.0";
 const ACCEPT_SIBLING = "text/markdown,text/plain;q=0.9,*/*;q=0.1";
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -287,8 +288,9 @@ function isHtmlContentType(ct: string): boolean {
   return lower.includes("text/html") || lower.includes("application/xhtml+xml");
 }
 
-function isPlainTextContentType(ct: string): boolean {
+export function isPlainTextContentType(ct: string): boolean {
   const lower = ct.toLowerCase();
+  if (isHtmlContentType(ct)) return false;
   return lower.startsWith("text/") || lower.includes("application/xml");
 }
 
@@ -355,12 +357,53 @@ export function guessLanguage(url: string): string {
     const ext = new URL(url).pathname.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] || "";
     const map: Record<string, string> = {
       bash: "bash",
+      c: "c",
+      cc: "cpp",
       conf: "conf",
+      cpp: "cpp",
+      css: "css",
+      cxx: "cpp",
+      dart: "dart",
+      dockerfile: "dockerfile",
+      elixir: "elixir",
+      ex: "elixir",
+      exs: "elixir",
+      go: "go",
+      graphql: "graphql",
+      gql: "graphql",
+      h: "c",
+      hpp: "cpp",
+      html: "html",
+      htm: "html",
       ini: "ini",
+      java: "java",
+      js: "javascript",
       json: "json",
+      jsx: "jsx",
+      kt: "kotlin",
+      kts: "kotlin",
+      less: "less",
+      lua: "lua",
+      mjs: "javascript",
+      cjs: "javascript",
+      md: "markdown",
+      php: "php",
+      pl: "perl",
+      ps: "powershell",
+      ps1: "powershell",
+      py: "python",
+      r: "r",
+      rb: "ruby",
+      rs: "rust",
+      scss: "scss",
       sh: "sh",
+      sql: "sql",
+      svelte: "svelte",
+      swift: "swift",
       toml: "toml",
       ts: "ts",
+      tsx: "tsx",
+      vue: "vue",
       yaml: "yaml",
       yml: "yaml",
       xml: "xml",
