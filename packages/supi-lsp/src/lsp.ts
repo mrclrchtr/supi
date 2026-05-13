@@ -218,20 +218,28 @@ function recoverWorkspaceChangesFromToolResult(
   if (!event.input || typeof event.input !== "object") return false;
 
   const pathValue = (event.input as { path?: unknown }).path;
-  if (typeof pathValue !== "string" || !isWorkspaceRecoveryTrigger(pathValue, cwd)) {
-    return false;
-  }
+  if (typeof pathValue !== "string") return false;
 
   const resolvedPath = path.resolve(cwd, pathValue);
   const fileEvent = { uri: fileToUri(resolvedPath), type: FileChangeType.Changed };
 
-  if (resolvedPath.endsWith(".d.ts")) {
+  // Sentinel files (package.json, tsconfig.json, lockfiles, .d.ts)
+  if (isWorkspaceRecoveryTrigger(pathValue, cwd)) {
+    if (resolvedPath.endsWith(".d.ts")) {
+      return softRecoverWorkspaceChanges(state, [fileEvent]);
+    }
+
+    const { snapshot, changes } = syncWorkspaceSentinelSnapshot(cwd, state.sentinelSnapshot);
+    state.sentinelSnapshot = snapshot;
+    return softRecoverWorkspaceChanges(state, changes.length > 0 ? changes : [fileEvent]);
+  }
+
+  // Source files matching an active language server's file types
+  if (state.manager.hasServerForExtension(pathValue)) {
     return softRecoverWorkspaceChanges(state, [fileEvent]);
   }
 
-  const { snapshot, changes } = syncWorkspaceSentinelSnapshot(cwd, state.sentinelSnapshot);
-  state.sentinelSnapshot = snapshot;
-  return softRecoverWorkspaceChanges(state, changes.length > 0 ? changes : [fileEvent]);
+  return false;
 }
 
 /** Build the `lsp-context` custom message used to surface outstanding diagnostics. */

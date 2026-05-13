@@ -7,7 +7,13 @@ priority = "p2"
 effort = "m"
 
 depends_on = []
-tags = ["bug", "diagnostics", "flow:brainstorm", "lsp"]
+tags = ["bug", "diagnostics", "flow:done", "lsp"]
+[[documents]]
+name = "archive"
+path = "archive.md"
 [[documents]]
 name = "content"
 path = "content.md"
+[[documents]]
+name = "plan"
+path = "plan.md"

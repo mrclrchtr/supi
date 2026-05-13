@@ -26,7 +26,7 @@ const mockFns = vi.hoisted(() => ({
     snapshot: new Map<string, number>([["/project/package.json", 100]]),
     changes: [{ uri: "file:///project/package.json", type: FileChangeType.Changed }],
   })),
-  isWorkspaceRecoveryTrigger: vi.fn(() => true),
+  isWorkspaceRecoveryTrigger: vi.fn(),
 }));
 
 vi.mock("../src/config.ts", () => ({ loadConfig: mockFns.loadConfig }));
@@ -94,6 +94,15 @@ function createManager() {
     setExcludePatterns: vi.fn(),
     clearAllPullResultIds: vi.fn(),
     notifyWorkspaceFileChanges: vi.fn(),
+    hasServerForExtension: vi.fn((filePath: string) => {
+      return (
+        filePath.endsWith(".ts") ||
+        filePath.endsWith(".tsx") ||
+        filePath.endsWith(".js") ||
+        filePath.endsWith(".mjs") ||
+        filePath.endsWith(".py")
+      );
+    }),
   };
 }
 
@@ -135,6 +144,13 @@ describe("workspace sentinel recovery", () => {
     mockFns.loadLspSettings.mockReturnValue({ enabled: true, severity: 1, active: [] });
     mockFns.diagnosticsContextFingerprint.mockReturnValue(null);
     mockFns.formatDiagnosticsContext.mockReturnValue(null);
+    mockFns.isWorkspaceRecoveryTrigger.mockImplementation((pathValue: string) => {
+      if (pathValue.endsWith(".d.ts")) return true;
+      if (pathValue.endsWith("package.json")) return true;
+      if (pathValue.endsWith("tsconfig.json")) return true;
+      if (pathValue.includes("/tsconfig.") && pathValue.endsWith(".json")) return true;
+      return false;
+    });
   });
 
   it("soft-recovers when workspace sentinels change before an agent turn", async () => {
@@ -193,6 +209,42 @@ describe("workspace sentinel recovery", () => {
         isError: true,
         toolName: "write",
         input: { path: "package.json" },
+        content: [],
+      },
+      ctx,
+    );
+
+    expect(manager.clearAllPullResultIds).not.toHaveBeenCalled();
+    expect(manager.notifyWorkspaceFileChanges).not.toHaveBeenCalled();
+  });
+
+  it("soft-recovers after writing a source file matching a server extension", async () => {
+    const { handlers, ctx, manager } = await setupExtension();
+
+    await handlers.get("tool_result")?.(
+      {
+        isError: false,
+        toolName: "write",
+        input: { path: "src/new-module.ts" },
+        content: [],
+      },
+      ctx,
+    );
+
+    expect(manager.clearAllPullResultIds).toHaveBeenCalled();
+    expect(manager.notifyWorkspaceFileChanges).toHaveBeenCalledWith([
+      { uri: "file:///project/src/new-module.ts", type: FileChangeType.Changed },
+    ]);
+  });
+
+  it("does not recover after writing a file with an unrecognized extension", async () => {
+    const { handlers, ctx, manager } = await setupExtension();
+
+    await handlers.get("tool_result")?.(
+      {
+        isError: false,
+        toolName: "write",
+        input: { path: "data/data.xyz" },
         content: [],
       },
       ctx,

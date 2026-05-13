@@ -75,6 +75,12 @@ describe("workspace sentinels", () => {
     expect(isWorkspaceRecoveryTrigger("/project/src/generated/types.d.ts", "/project")).toBe(true);
   });
 
+  it("does not treat plain source files as recovery triggers", () => {
+    expect(isWorkspaceRecoveryTrigger("/project/src/module.ts", "/project")).toBe(false);
+    expect(isWorkspaceRecoveryTrigger("/project/src/component.tsx", "/project")).toBe(false);
+    expect(isWorkspaceRecoveryTrigger("/project/lib/util.js", "/project")).toBe(false);
+  });
+
   it("continues scanning past permission errors in subdirectories", () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-sentinels-perm-"));
 

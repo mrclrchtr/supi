@@ -77,6 +77,11 @@ export class LspManager {
   setExcludePatterns(patterns: string[]): void {
     this.excludePatterns = patterns;
   }
+
+  /** Check whether any configured language server handles the given file's extension. */
+  hasServerForExtension(filePath: string): boolean {
+    return getServerForFile(this.config, filePath) !== null;
+  }
   // ── Public API ────────────────────────────────────────────────────
   registerDetectedServers(detected: DetectedProjectServer[]): void {
     this.knownRoots = projectRoots.buildKnownRootsMap(detected);
