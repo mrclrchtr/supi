@@ -52,9 +52,18 @@ Highlighted workspace packages:
 - `packages/supi-tree-sitter` — Tree-sitter structural analysis tool + reusable parse/query service
 - `packages/supi-web` — fetch web pages as clean Markdown via the `web_fetch_md` tool
 
+## Package tiers
+
+- **Production** — stable, bundled in `@mrclrchtr/supi` (`supi-core`, `supi-ask-user`, `supi-bash-timeout`, `supi-claude-md`, `supi-extras`, `supi-lsp`, `supi-tree-sitter`, `supi-code-intelligence`, `supi-debug`, `supi-context`)
+- **Beta** — experimental/niche, direct-install only (`supi-cache`, `supi-insights`, `supi-review`, `supi-rtk`, `supi-web`)
+
+**Promote to Production:** add to `dependencies`, `bundledDependencies`, `pi.extensions`, create wrapper `src/<name>.ts`, add external runtime deps, update lists above, `pnpm install`.
+
+**Demote to Beta:** remove from `dependencies`, `bundledDependencies`, `pi.extensions`, delete `src/<name>.ts`, prune unused external deps, update lists, `pnpm install`.
+
 ## Packaging conventions
 
-- The published meta-package `@mrclrchtr/supi` bundles all sub-packages via `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
+- The published meta-package `@mrclrchtr/supi` bundles all Production sub-packages via `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
 - Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`.
 - `pnpm-workspace.yaml` uses `nodeLinker: hoisted` — required because pnpm's default `isolated` linker does not support `bundledDependencies`.
 - Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.

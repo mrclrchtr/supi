@@ -15,11 +15,11 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
 
 ### Production packages
 
-`supi-core`, `supi-ask-user`, `supi-bash-timeout`, `supi-claude-md`, `supi-extras`, `supi-lsp`, `supi-tree-sitter`, `supi-code-intelligence`, `supi-debug`, `supi-context`, `supi-web`
+`supi-core`, `supi-ask-user`, `supi-bash-timeout`, `supi-claude-md`, `supi-extras`, `supi-lsp`, `supi-tree-sitter`, `supi-code-intelligence`, `supi-debug`, `supi-context`
 
 ### Beta packages
 
-`supi-cache`, `supi-insights`, `supi-review`, `supi-rtk`
+`supi-cache`, `supi-insights`, `supi-review`, `supi-rtk`, `supi-web`
 
 ## Key responsibilities
 

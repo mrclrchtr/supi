@@ -57,9 +57,6 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.74.0(ws@8.20.0)(zod@4.4.3)
-      '@mozilla/readability':
-        specifier: ^0.6.0
-        version: 0.6.0
       '@mrclrchtr/supi-ask-user':
         specifier: workspace:*
         version: link:../supi-ask-user
@@ -90,24 +87,12 @@ importers:
       '@mrclrchtr/supi-tree-sitter':
         specifier: workspace:*
         version: link:../supi-tree-sitter
-      '@mrclrchtr/supi-web':
-        specifier: workspace:*
-        version: link:../supi-web
       clipboardy:
         specifier: ^5.3.1
         version: 5.3.1
       diff:
         specifier: ^7.0.0
         version: 7.0.0
-      jsdom:
-        specifier: ^26.1.0
-        version: 26.1.0
-      turndown:
-        specifier: ^7.2.0
-        version: 7.2.4
-      turndown-plugin-gfm:
-        specifier: ^1.0.2
-        version: 1.0.2
       web-tree-sitter:
         specifier: ^0.26.8
         version: 0.26.8
