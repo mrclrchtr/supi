@@ -50,6 +50,7 @@ Highlighted workspace packages:
 - `packages/supi-extras` — command aliases, skill shorthand, tab spinner, prompt stash
 - `packages/supi-lsp` — Language Server Protocol integration + diagnostics guardrails
 - `packages/supi-tree-sitter` — Tree-sitter structural analysis tool + reusable parse/query service
+- `packages/supi-web` — fetch web pages as clean Markdown via the `web_fetch_md` tool
 
 ## Packaging conventions
 

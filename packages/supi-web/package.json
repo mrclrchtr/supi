@@ -1,0 +1,48 @@
+{
+  "name": "@mrclrchtr/supi-web",
+  "version": "0.1.0",
+  "description": "SuPi Web extension — fetch web pages as clean Markdown via the web_fetch_md tool",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "src/**/*.ts",
+    "README.md"
+  ],
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*",
+    "jsdom": "^26.1.0",
+    "@mozilla/readability": "^0.6.0",
+    "turndown": "^7.2.0",
+    "turndown-plugin-gfm": "^1.0.2"
+  },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.5",
+    "@types/jsdom": "^21.1.7",
+    "@types/turndown": "^5.0.6",
+    "@mrclrchtr/supi-test-utils": "workspace:*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/web.ts"
+    ]
+  },
+  "main": "src/index.ts"
+}

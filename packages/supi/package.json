@@ -32,7 +32,12 @@
     "clipboardy": "^5.3.1",
     "@mrclrchtr/supi-code-intelligence": "workspace:*",
     "@mrclrchtr/supi-extras": "workspace:*",
+    "@mrclrchtr/supi-web": "workspace:*",
     "diff": "^7.0.0",
+    "jsdom": "^26.1.0",
+    "@mozilla/readability": "^0.6.0",
+    "turndown": "^7.2.0",
+    "turndown-plugin-gfm": "^1.0.2",
     "web-tree-sitter": "^0.26.8"
   },
   "bundledDependencies": [
@@ -45,7 +50,8 @@
     "@mrclrchtr/supi-context",
     "@mrclrchtr/supi-tree-sitter",
     "@mrclrchtr/supi-code-intelligence",
-    "@mrclrchtr/supi-extras"
+    "@mrclrchtr/supi-extras",
+    "@mrclrchtr/supi-web"
   ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
@@ -64,7 +70,8 @@
       "./src/debug.ts",
       "./src/context.ts",
       "./src/tree-sitter.ts",
-      "./src/code-intelligence.ts"
+      "./src/code-intelligence.ts",
+      "./src/web.ts"
     ]
   }
 }

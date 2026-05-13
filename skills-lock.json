@@ -38,12 +38,6 @@
       "sourceType": "github",
       "skillPath": "skills/ticket/SKILL.md",
       "computedHash": "ad266f63755169cdb6e1914859d10bb3f16f76a7079a01a9b49508d7a9e5123c"
-    },
-    "web-fetch-to-markdown": {
-      "source": "mrclrchtr/skills",
-      "sourceType": "github",
-      "skillPath": "skills/web-fetch-to-markdown/SKILL.md",
-      "computedHash": "5de24a33b8707e4deb9cc4f987b59729ba6b7e3fa3bec73c4fedc0fcec5c1289"
     }
   }
 }

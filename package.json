@@ -27,6 +27,7 @@
       "./packages/supi-cache/src/index.ts",
       "./packages/supi-code-intelligence/src/code-intelligence.ts",
       "./packages/supi-debug/src/index.ts",
+      "./packages/supi-web/src/web.ts",
       "./packages/supi-rtk/src/index.ts",
       "./packages/supi-extras/src/index.ts",
       "./packages/supi-insights/src/insights.ts"

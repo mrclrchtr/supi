@@ -1,4 +1,0 @@
-interface:
-  display_name: "Web Fetch to Markdown"
-  short_description: "Fetch pages as clean Markdown"
-  default_prompt: "Use $web-fetch-to-markdown to fetch a URL and convert it to clean Markdown suitable for LLM ingestion."
