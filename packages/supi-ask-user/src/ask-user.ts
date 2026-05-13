@@ -116,6 +116,7 @@ async function executeAskUser(
     );
   }
   signalAttention(ctx);
+  pi.events.emit("supi:ask-user:start", { source: "supi-ask-user" });
   try {
     // Hide the built-in working loader so it doesn't compete with the overlay.
     ctx.ui.setWorkingVisible?.(false);
@@ -135,6 +136,7 @@ async function executeAskUser(
   } finally {
     // Restore the working loader regardless of how the overlay closed.
     ctx.ui.setWorkingVisible?.(true);
+    pi.events.emit("supi:ask-user:end", { source: "supi-ask-user" });
     restoreTerminalTitle(ctx, pi);
     lock.release();
   }

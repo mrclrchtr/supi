@@ -20,10 +20,12 @@ function fakePi(): {
   tool: MockTool;
   appendEntry: ReturnType<typeof vi.fn>;
   getSessionName: ReturnType<typeof vi.fn>;
+  events: { emit: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn> };
 } {
   let captured: MockTool | null = null;
   const appendEntry = vi.fn();
   const getSessionName = vi.fn(() => undefined);
+  const events = { emit: vi.fn(), on: vi.fn() };
   const api = {
     registerTool: (def: MockTool) => {
       captured = def;
@@ -31,11 +33,12 @@ function fakePi(): {
     on() {},
     appendEntry,
     getSessionName,
+    events,
   };
   // biome-ignore lint/suspicious/noExplicitAny: registering a partial ExtensionAPI is intentional in tests
   askUserExtension(api as any);
   if (!captured) throw new Error("askUserExtension did not register a tool");
-  return { tool: captured, appendEntry, getSessionName };
+  return { tool: captured, appendEntry, getSessionName, events };
 }
 
 const validParams = {
@@ -204,5 +207,26 @@ describe("ask_user execute", () => {
     const label = appendEntry.mock.calls[0][0];
     expect(label).toMatch(/^ask_user/);
     expect(label.endsWith("...")).toBe(true);
+  });
+
+  it("emits supi:ask-user:start before the overlay and supi:ask-user:end after it resolves", async () => {
+    const { tool, events } = fakePi();
+    const ctx = richCtx({
+      terminalState: "submitted",
+      answers: [
+        { questionId: "scope", source: "choice", selections: [{ value: "a", optionIndex: 0 }] },
+      ],
+    });
+    await tool.execute("id", validParams, undefined, undefined, ctx);
+
+    expect(events.emit).toHaveBeenCalledWith("supi:ask-user:start", { source: "supi-ask-user" });
+    expect(events.emit).toHaveBeenCalledWith("supi:ask-user:end", { source: "supi-ask-user" });
+
+    // start must appear before end in the call order
+    const calls = events.emit.mock.calls as [[string, unknown]];
+    const startIdx = calls.findIndex(([name]) => name === "supi:ask-user:start");
+    const endIdx = calls.findIndex(([name]) => name === "supi:ask-user:end");
+    expect(startIdx).toBeGreaterThanOrEqual(0);
+    expect(endIdx).toBeGreaterThan(startIdx);
   });
 });

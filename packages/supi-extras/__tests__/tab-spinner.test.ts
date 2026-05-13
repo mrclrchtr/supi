@@ -65,7 +65,6 @@ describe("tabSpinner extension", () => {
 
     const ctx = createCtxMock();
     await startHandlers[0]({}, ctx);
-    // start() calls stop() first, which sets the base title
     ctx.clearTitles();
 
     vi.advanceTimersByTime(80);
@@ -236,5 +235,53 @@ describe("tabSpinner extension", () => {
 
     pi.events.emit("supi:working:end", { source: "supi-review" });
     expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("π - my-project - tmp");
+  });
+
+  it("pauses spinner on supi:ask-user:start and resumes on supi:ask-user:end", async () => {
+    const pi = createPiMock("my-project");
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const startHandlers = pi.getHandlers("agent_start");
+    const ctx = createCtxMock();
+    await startHandlers[0]({}, ctx);
+    ctx.clearTitles();
+    vi.advanceTimersByTime(80);
+    expect(ctx.getTitles()).toHaveLength(1); // one tick before pause
+
+    // Pause: no titles should appear after this
+    pi.events.emit("supi:ask-user:start", { source: "supi-ask-user" });
+    ctx.clearTitles();
+    vi.advanceTimersByTime(200);
+    expect(ctx.getTitles()).toHaveLength(0);
+
+    // Resume: spinner should start ticking again (continues from stored frame)
+    pi.events.emit("supi:ask-user:end", { source: "supi-ask-user" });
+    vi.advanceTimersByTime(80);
+    expect(ctx.getTitles()).toHaveLength(1);
+    expect(ctx.getTitles()[0]).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - my-project - tmp$/);
+  });
+
+  it("unbalanced supi:working:end does not stop spinner while agent is active", async () => {
+    const pi = createPiMock("my-project");
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const startHandlers = pi.getHandlers("agent_start");
+    const endHandlers = pi.getHandlers("agent_end");
+
+    const ctx = createCtxMock();
+    await startHandlers[0]({}, ctx);
+    ctx.clearTitles();
+    vi.advanceTimersByTime(80);
+    expect(ctx.getTitles()[0]).toMatch(/^⠋ π - my-project - tmp$/);
+
+    // An unbalanced end (no matching start) should not drop below the agent's floor
+    pi.events.emit("supi:working:end", { source: "supi-review" });
+    ctx.clearTitles();
+    vi.advanceTimersByTime(80);
+    expect(ctx.getTitles()[0]).toMatch(/^⠙ π - my-project - tmp$/);
+
+    // agent_end still shows ✓ when agent finishes
+    await endHandlers[0]({}, ctx);
+    expect(ctx.getTitles()[ctx.getTitles().length - 1]).toBe("✓ π - my-project - tmp");
   });
 });

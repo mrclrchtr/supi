@@ -18,6 +18,8 @@ export default function tabSpinner(pi: ExtensionAPI) {
   let timer: ReturnType<typeof setInterval> | null = null;
   let frame = 0;
   let activeCount = 0;
+  let hasActiveAgent = false;
+  let askUserActive = 0;
   let currentCtx: ExtensionContext | undefined;
 
   /** Build the current base title from session name and cwd. */
@@ -68,7 +70,8 @@ export default function tabSpinner(pi: ExtensionAPI) {
 
   /** Decrement count for supi:working tasks — restores title when idle. */
   function decrement() {
-    activeCount = Math.max(0, activeCount - 1);
+    const floor = hasActiveAgent ? 1 : 0;
+    activeCount = Math.max(floor, activeCount - 1);
     if (activeCount === 0) stop();
   }
 
@@ -79,10 +82,12 @@ export default function tabSpinner(pi: ExtensionAPI) {
   }
 
   pi.on("agent_start", async (_event, ctx) => {
+    hasActiveAgent = true;
     increment(ctx);
   });
 
   pi.on("agent_end", async (_event, _ctx) => {
+    hasActiveAgent = false;
     agentEnded();
   });
 
@@ -98,5 +103,23 @@ export default function tabSpinner(pi: ExtensionAPI) {
 
   pi.events.on("supi:working:end", () => {
     decrement();
+  });
+
+  pi.events.on("supi:ask-user:start", () => {
+    askUserActive++;
+    // Pause the spinner so ask_user's attention title (set via signalWaiting)
+    // is visible to the user instead of being overwritten on the next tick.
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+  });
+
+  pi.events.on("supi:ask-user:end", () => {
+    askUserActive = Math.max(0, askUserActive - 1);
+    if (askUserActive === 0 && activeCount > 0) {
+      // Resume the spinner if the agent (or background work) is still running.
+      start();
+    }
   });
 }
