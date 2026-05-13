@@ -21,10 +21,10 @@ describe("ask_user prompt guidance", () => {
 
   it("guidelines explain when to use each question type", () => {
     const all = askUserPromptGuidelines.join("\n");
-    expect(all).toMatch(/yesno only for genuinely yes.no questions/i);
-    expect(all).toMatch(/choice for picking between named alternatives/i);
-    expect(all).toMatch(/multichoice/i);
-    expect(all).toMatch(/text only when freeform/i);
+    expect(all).toMatch(/two question types/);
+    expect(all).toMatch(/`multi: true`/);
+    expect(all).toMatch(/`text` for freeform/);
+    expect(all).toMatch(/yes\/no/);
   });
 
   it("guidelines describe previews and explicit discuss/other controls", () => {

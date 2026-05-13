@@ -166,20 +166,10 @@ export class QuestionnaireFlow {
 
 function normalizeAnswer(answer: Answer): Answer {
   switch (answer.source) {
-    case "option":
+    case "choice":
       return {
         questionId: answer.questionId,
-        source: "option",
-        value: answer.value.trim(),
-        optionIndex: answer.optionIndex,
-        note: trimOptional(answer.note),
-      };
-    case "options":
-      return {
-        questionId: answer.questionId,
-        source: "options",
-        values: answer.values.map((value) => value.trim()),
-        optionIndexes: [...answer.optionIndexes],
+        source: "choice",
         selections: answer.selections.map((selection) => ({
           value: selection.value.trim(),
           optionIndex: selection.optionIndex,
@@ -203,14 +193,6 @@ function normalizeAnswer(answer: Answer): Answer {
         questionId: answer.questionId,
         source: "text",
         value: answer.value.trim(),
-      };
-    case "yesno":
-      return {
-        questionId: answer.questionId,
-        source: "yesno",
-        value: answer.value,
-        optionIndex: answer.optionIndex,
-        note: trimOptional(answer.note),
       };
   }
 }

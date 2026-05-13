@@ -1,6 +1,8 @@
 // External (model-facing) parameter schema for the `ask_user` tool.
-// Rich-TUI-first redesign: explicit question kinds, explicit escape hatches,
-// and first-class option previews for structured comparisons.
+// Two question types: choice (structured pick-one-or-many with options)
+// and text (freeform input). Yes/no and multichoice have been unified
+// into choice — yes/no is just choice with two options, multi-select
+// is choice with `multi: true`.
 
 import { type Static, Type } from "typebox";
 
@@ -21,7 +23,8 @@ const StructuredOptionSchema = Type.Object({
   ),
 });
 
-const StructuredQuestionBaseSchema = {
+const ChoiceQuestionSchema = Type.Object({
+  type: Type.Literal("choice"),
   id: Type.String({ description: "Unique question id within this questionnaire" }),
   header: Type.String({ description: "Short label (chip) describing the decision" }),
   prompt: Type.String({ description: "Full question text shown to the user" }),
@@ -45,32 +48,23 @@ const StructuredQuestionBaseSchema = {
         "Allow the user to choose discussion instead of committing to a decision right now",
     }),
   ),
-} as const;
-
-const ChoiceQuestionSchema = Type.Object({
-  type: Type.Literal("choice"),
-  ...StructuredQuestionBaseSchema,
-  recommendation: Type.Optional(
-    Type.String({ description: "Recommended option `value` (must match one of `options`)" }),
-  ),
-  default: Type.Optional(
-    Type.String({ description: "Pre-selected option `value` (must match one of `options`)" }),
-  ),
-});
-
-const MultiChoiceQuestionSchema = Type.Object({
-  type: Type.Literal("multichoice"),
-  ...StructuredQuestionBaseSchema,
-  recommendation: Type.Optional(
-    Type.Array(Type.String(), {
+  multi: Type.Optional(
+    Type.Boolean({
+      default: false,
       description:
-        "Recommended option `value`s for multi-select questions (each must match one of `options`)",
+        "Allow selecting multiple options (multi-select). Default false (single-select).",
+    }),
+  ),
+  recommendation: Type.Optional(
+    Type.Union([Type.String(), Type.Array(Type.String())], {
+      description:
+        "Recommended option value(s). String for single-select, array for multi-select. Each must match an option value.",
     }),
   ),
   default: Type.Optional(
-    Type.Array(Type.String(), {
+    Type.Union([Type.String(), Type.Array(Type.String())], {
       description:
-        "Pre-selected option `value`s for multi-select (each must match one of `options`)",
+        "Pre-selected option value(s). String for single-select, array for multi-select. Each must match an option value.",
     }),
   ),
 });
@@ -91,41 +85,7 @@ const TextQuestionSchema = Type.Object({
   ),
 });
 
-const YesNoQuestionSchema = Type.Object({
-  type: Type.Literal("yesno"),
-  id: Type.String({ description: "Unique question id within this questionnaire" }),
-  header: Type.String({ description: "Short label (chip) describing the decision" }),
-  prompt: Type.String({ description: "Full yes/no question shown to the user" }),
-  required: Type.Optional(
-    Type.Boolean({
-      default: true,
-      description: "Whether this question must be answered before submission (default true)",
-    }),
-  ),
-  allowOther: Type.Optional(
-    Type.Boolean({ description: "Allow an explicit custom answer path besides yes/no" }),
-  ),
-  allowDiscuss: Type.Optional(
-    Type.Boolean({ description: "Allow discussion instead of choosing yes or no" }),
-  ),
-  recommendation: Type.Optional(
-    Type.Union([Type.Literal("yes"), Type.Literal("no")], {
-      description: "Recommended answer (`yes` or `no`)",
-    }),
-  ),
-  default: Type.Optional(
-    Type.Union([Type.Literal("yes"), Type.Literal("no")], {
-      description: "Pre-selected answer (`yes` or `no`)",
-    }),
-  ),
-});
-
-const QuestionSchema = Type.Union([
-  ChoiceQuestionSchema,
-  MultiChoiceQuestionSchema,
-  TextQuestionSchema,
-  YesNoQuestionSchema,
-]);
+const QuestionSchema = Type.Union([ChoiceQuestionSchema, TextQuestionSchema]);
 
 export const AskUserParamsSchema = Type.Object({
   questions: Type.Array(QuestionSchema, {
@@ -142,6 +102,4 @@ export const AskUserParamsSchema = Type.Object({
 export type AskUserParams = Static<typeof AskUserParamsSchema>;
 export type ExternalQuestion = Static<typeof QuestionSchema>;
 export type ExternalChoiceQuestion = Static<typeof ChoiceQuestionSchema>;
-export type ExternalMultiChoiceQuestion = Static<typeof MultiChoiceQuestionSchema>;
 export type ExternalTextQuestion = Static<typeof TextQuestionSchema>;
-export type ExternalYesNoQuestion = Static<typeof YesNoQuestionSchema>;

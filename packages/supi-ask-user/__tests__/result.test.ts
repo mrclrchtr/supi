@@ -12,6 +12,7 @@ const choiceQuestion: NormalizedQuestion = {
     { value: "api_only", label: "API only" },
     { value: "full_rewrite", label: "Full rewrite" },
   ],
+  multi: false,
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
@@ -21,7 +22,7 @@ const choiceQuestion: NormalizedQuestion = {
 const multichoiceQuestion: NormalizedQuestion = {
   id: "features",
   header: "Features",
-  type: "multichoice",
+  type: "choice",
   prompt: "Features?",
   required: true,
   options: [
@@ -29,6 +30,7 @@ const multichoiceQuestion: NormalizedQuestion = {
     { value: "multi", label: "Multi-select" },
     { value: "discuss", label: "Discuss" },
   ],
+  multi: true,
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],
@@ -38,12 +40,14 @@ const multichoiceQuestion: NormalizedQuestion = {
 describe("buildResult", () => {
   it("formats submitted answers as one line per question with header prefix", () => {
     const answers: Answer[] = [
-      { questionId: "scope", source: "option", value: "api_only", optionIndex: 0, note: "safer" },
+      {
+        questionId: "scope",
+        source: "choice",
+        selections: [{ value: "api_only", optionIndex: 0, note: "safer" }],
+      },
       {
         questionId: "features",
-        source: "options",
-        values: ["preview", "multi"],
-        optionIndexes: [0, 1],
+        source: "choice",
         selections: [
           { value: "preview", optionIndex: 0, note: "best demo" },
           { value: "multi", optionIndex: 1, note: "core capability" },
@@ -57,7 +61,7 @@ describe("buildResult", () => {
     const text = result.content[0].text;
     expect(text).toContain("Scope: API only — safer");
     expect(text).toContain("Features: Preview — best demo; Multi-select — core capability");
-    expect(result.details.answersById.scope).toMatchObject({ value: "api_only" });
+    expect(result.details.answersById.scope).toMatchObject({ selections: [{ value: "api_only" }] });
   });
 
   it("includes discuss outcomes explicitly", () => {
@@ -96,13 +100,21 @@ describe("buildResult", () => {
     };
     const result = buildResult([choiceQuestion, optionalQuestion], {
       terminalState: "skipped",
-      answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],
+      answers: [
+        {
+          questionId: "scope",
+          source: "choice",
+          selections: [{ value: "api_only", optionIndex: 0 }],
+        },
+      ],
       skipped: true,
     });
     expect(result.skip).toBe(true);
     expect(result.content[0].text).toContain("User skipped the questionnaire");
     expect(result.content[0].text).toContain("Note: (skipped)");
-    expect(result.details.answersById.scope).toMatchObject({ value: "api_only" });
+    expect(result.details.answersById.scope).toMatchObject({
+      selections: [{ value: "api_only" }],
+    });
     expect(result.details.answersById.note).toBeUndefined();
   });
 
@@ -117,9 +129,17 @@ describe("buildResult", () => {
     };
     const result = buildResult([choiceQuestion, optionalQuestion], {
       terminalState: "submitted",
-      answers: [{ questionId: "scope", source: "option", value: "api_only", optionIndex: 0 }],
+      answers: [
+        {
+          questionId: "scope",
+          source: "choice",
+          selections: [{ value: "api_only", optionIndex: 0 }],
+        },
+      ],
     });
-    expect(result.details.answersById.scope).toMatchObject({ value: "api_only" });
+    expect(result.details.answersById.scope).toMatchObject({
+      selections: [{ value: "api_only" }],
+    });
     expect(result.details.answersById.note).toBeUndefined();
     expect(Object.keys(result.details.answersById)).toContain("note");
   });

@@ -13,7 +13,7 @@ Entrypoint: `ask-user.ts`
 - `ask_user` requires a TUI with custom overlay support (`ctx.ui.custom()`). In non-interactive or degraded UI sessions, it returns an error — there is no fallback dialog.
 - `schema.ts`, `README.md`, and tool prompt guidance should stay aligned with runtime behavior; together they define the model-facing `ask_user` contract.
 - Normalization trims question ids and structured option values before they reach the shared internal model.
-- `multichoice` -> `other`/`discuss` must clear staged selections/notes so revisits reflect the stored answer.
+- Switching from a `multi: true` (multi-select) question to `other` or `discuss` must clear staged selections/notes so revisits reflect the stored answer.
 - `default` pre-selects a starting option/value; it takes precedence over `recommendation` for the initial selection but does not add a visual badge. Existing answers always win over both when revisiting.
 - `maxPromptLength` is 4000 characters; `maxHeaderLength` is 60.
 
@@ -29,7 +29,7 @@ The `ask_user` tool processes questionnaires through a staged pipeline:
 
 ## Tool contract
 
-- `allowOther` on `multichoice` is a mutually exclusive freeform alternative — clears staged selections when selected.
+- `allowOther` on `multi: true` choices is a mutually exclusive freeform alternative — clears staged selections when selected.
 - `allowSkip` exposes a partial-submit path (sets `skip: true` on result, returns completed fields).
 - `default` on structured questions resolves to `defaultIndexes` (same validation rules as `recommendation`).
 - Cancellation calls `ctx.abort()` to stop the agent turn; the result is still recorded in the transcript.

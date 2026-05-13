@@ -2,7 +2,7 @@
 // The external (model-facing) schema lives in `schema.ts`; everything beyond
 // parsing passes through normalization into the shapes defined here.
 
-export type QuestionType = "choice" | "multichoice" | "text" | "yesno";
+export type QuestionType = "choice" | "text";
 
 export type TerminalState = "submitted" | "cancelled" | "aborted" | "skipped";
 
@@ -27,18 +27,11 @@ interface StructuredQuestionBase extends BaseQuestion {
   allowDiscuss: boolean;
   recommendedIndexes: number[];
   defaultIndexes: number[];
+  multi: boolean;
 }
 
 export interface NormalizedChoiceQuestion extends StructuredQuestionBase {
   type: "choice";
-}
-
-export interface NormalizedMultiChoiceQuestion extends StructuredQuestionBase {
-  type: "multichoice";
-}
-
-export interface NormalizedYesNoQuestion extends StructuredQuestionBase {
-  type: "yesno";
 }
 
 export interface NormalizedTextQuestion extends BaseQuestion {
@@ -47,42 +40,25 @@ export interface NormalizedTextQuestion extends BaseQuestion {
   default?: string;
 }
 
-export type NormalizedStructuredQuestion =
-  | NormalizedChoiceQuestion
-  | NormalizedMultiChoiceQuestion
-  | NormalizedYesNoQuestion;
+export type NormalizedStructuredQuestion = NormalizedChoiceQuestion;
 
-export type NormalizedQuestion =
-  | NormalizedChoiceQuestion
-  | NormalizedMultiChoiceQuestion
-  | NormalizedTextQuestion
-  | NormalizedYesNoQuestion;
+export type NormalizedQuestion = NormalizedChoiceQuestion | NormalizedTextQuestion;
 
 export interface NormalizedQuestionnaire {
   questions: NormalizedQuestion[];
   allowSkip: boolean;
 }
 
-export interface OptionAnswer {
-  questionId: string;
-  source: "option";
+export interface Selection {
   value: string;
   optionIndex: number;
   note?: string;
 }
 
-export interface MultiSelection {
-  value: string;
-  optionIndex: number;
-  note?: string;
-}
-
-export interface OptionsAnswer {
+export interface ChoiceAnswer {
   questionId: string;
-  source: "options";
-  values: string[];
-  optionIndexes: number[];
-  selections: MultiSelection[];
+  source: "choice";
+  selections: Selection[];
 }
 
 export interface OtherAnswer {
@@ -103,21 +79,7 @@ export interface TextAnswer {
   value: string;
 }
 
-export interface YesNoAnswer {
-  questionId: string;
-  source: "yesno";
-  value: "yes" | "no";
-  optionIndex: 0 | 1;
-  note?: string;
-}
-
-export type Answer =
-  | OptionAnswer
-  | OptionsAnswer
-  | OtherAnswer
-  | DiscussAnswer
-  | TextAnswer
-  | YesNoAnswer;
+export type Answer = ChoiceAnswer | OtherAnswer | DiscussAnswer | TextAnswer;
 
 export interface QuestionnaireOutcome {
   terminalState: TerminalState;
@@ -148,7 +110,7 @@ export function isStructuredQuestion(
 }
 
 export function needsReview(questions: NormalizedQuestion[]): boolean {
-  return questions.length > 1 || questions.some((q) => q.type === "multichoice");
+  return questions.length > 1 || questions.some((q) => q.type !== "text" && q.multi);
 }
 
 export function primaryRecommendationIndex(question: NormalizedQuestion): number | undefined {

@@ -92,7 +92,11 @@ describe("ask_user execute", () => {
     const ctx = richCtx({ terminalState: "cancelled", answers: [] });
     const result = await tool.execute(
       "id",
-      { questions: [{ type: "multichoice", id: "x", header: "X", prompt: "X", options: [] }] },
+      {
+        questions: [
+          { type: "choice", id: "x", header: "X", prompt: "X", multi: true, options: [] },
+        ],
+      },
       undefined,
       undefined,
       ctx,
@@ -124,7 +128,9 @@ describe("ask_user execute", () => {
 
     const submitCtx = richCtx({
       terminalState: "submitted",
-      answers: [{ questionId: "scope", source: "option", value: "a", optionIndex: 0 }],
+      answers: [
+        { questionId: "scope", source: "choice", selections: [{ value: "a", optionIndex: 0 }] },
+      ],
     });
     const result = await tool.execute("b", validParams, undefined, undefined, submitCtx);
     expect(result.details).toMatchObject({ terminalState: "submitted" });
@@ -142,7 +148,9 @@ describe("ask_user execute", () => {
     const { tool } = fakePi();
     const ctx = richCtx({
       terminalState: "submitted",
-      answers: [{ questionId: "scope", source: "option", value: "a", optionIndex: 0 }],
+      answers: [
+        { questionId: "scope", source: "choice", selections: [{ value: "a", optionIndex: 0 }] },
+      ],
     });
     const result = await tool.execute("id", validParams, undefined, undefined, ctx);
     expect(result.details).toMatchObject({ terminalState: "submitted" });
@@ -153,7 +161,9 @@ describe("ask_user execute", () => {
     const { tool, appendEntry } = fakePi();
     const ctx = richCtx({
       terminalState: "submitted",
-      answers: [{ questionId: "scope", source: "option", value: "a", optionIndex: 0 }],
+      answers: [
+        { questionId: "scope", source: "choice", selections: [{ value: "a", optionIndex: 0 }] },
+      ],
     });
     await tool.execute("id", validParams, undefined, undefined, ctx);
     expect(appendEntry).toHaveBeenCalledOnce();
@@ -164,7 +174,9 @@ describe("ask_user execute", () => {
     const { tool, appendEntry } = fakePi();
     const ctx = richCtx({
       terminalState: "skipped",
-      answers: [{ questionId: "scope", source: "option", value: "a", optionIndex: 0 }],
+      answers: [
+        { questionId: "scope", source: "choice", selections: [{ value: "a", optionIndex: 0 }] },
+      ],
       skipped: true,
     });
     await tool.execute("id", validParams, undefined, undefined, ctx);

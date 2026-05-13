@@ -6,13 +6,14 @@ import { makeRichFixture } from "./helpers.ts";
 const multichoiceWithOther: NormalizedQuestion = {
   id: "features",
   header: "Features",
-  type: "multichoice",
+  type: "choice",
   prompt: "Pick features",
   required: true,
   options: [
     { value: "preview", label: "Preview" },
     { value: "multi", label: "Multi-select" },
   ],
+  multi: true,
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],

@@ -2,6 +2,7 @@
 // Extracted from ui-rich-render.ts to stay within Biome's per-file line limit.
 
 import type { QuestionnaireFlow } from "../flow.ts";
+import type { NormalizedChoiceQuestion } from "../types.ts";
 import { isEditorMode, selectedIndexesForQuestion } from "../ui/ui-rich-state.ts";
 import { currentNote, currentRowSupportsNotes } from "./ui-rich-render-notes.ts";
 import type { OverlayRenderState } from "./ui-rich-render-types.ts";
@@ -31,13 +32,13 @@ export function footerHelp(flow: QuestionnaireFlow, state: OverlayRenderState): 
 function structuredFooterHelp(
   flow: QuestionnaireFlow,
   state: OverlayRenderState,
-  question: NonNullable<QuestionnaireFlow["currentQuestion"]>,
+  question: NormalizedChoiceQuestion,
 ): string {
   const canGoBack = flow.currentIndex > 0;
   const canAdvance =
     flow.allRequiredAnswered() || (!question.required && !flow.hasAnswer(question.id));
   const parts = ["↑↓ navigate"];
-  if (question.type === "multichoice") {
+  if (question.multi) {
     parts.push("Space toggle");
     if (selectedIndexesForQuestion(flow, state, question).length > 0) parts.push("Enter submit");
   } else {

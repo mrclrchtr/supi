@@ -210,7 +210,7 @@ function rowLabel(
       active,
     });
     const baseLabel = `${decorateOption(option.label, recommended)}${noteMarker ? ` ${NOTE_MARKER}` : ""}`;
-    if (question.type === "multichoice") {
+    if (question.multi) {
       const checked = selected.includes(row.optionIndex) ? "[x]" : "[ ]";
       return env.theme.fg("text", `${checked} ${baseLabel}`);
     }

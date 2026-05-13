@@ -2,24 +2,13 @@
 // questionnaire model. Both UI paths and result formatting consume only this
 // normalized model, so the overlay and dialog flows cannot drift apart.
 
-import type {
-  AskUserParams,
-  ExternalChoiceQuestion,
-  ExternalMultiChoiceQuestion,
-  ExternalQuestion,
-  ExternalYesNoQuestion,
-} from "./schema.ts";
+import type { AskUserParams, ExternalQuestion } from "./schema.ts";
 import {
   type NormalizedOption,
   type NormalizedQuestion,
   type NormalizedQuestionnaire,
   QUESTION_LIMITS,
 } from "./types.ts";
-
-const YES_NO_OPTIONS: readonly NormalizedOption[] = [
-  { value: "yes", label: "Yes" },
-  { value: "no", label: "No" },
-] as const;
 
 export class AskUserValidationError extends Error {
   constructor(message: string) {
@@ -61,10 +50,6 @@ function normalizeQuestion(q: ExternalQuestion): NormalizedQuestion {
   switch (q.type) {
     case "choice":
       return normalizeChoice(q);
-    case "multichoice":
-      return normalizeMultiChoice(q);
-    case "yesno":
-      return normalizeYesNo(q);
     case "text":
       return normalizeText(q);
   }
@@ -92,57 +77,60 @@ function validateCommonFields(q: ExternalQuestion): void {
   }
 }
 
-function normalizeChoice(q: ExternalChoiceQuestion): NormalizedQuestion {
+function normalizeChoice(q: {
+  type: "choice";
+  id: string;
+  header: string;
+  prompt: string;
+  required?: boolean;
+  multi?: boolean;
+  options: { value: string; label: string; description?: string; preview?: string }[];
+  allowOther?: boolean;
+  allowDiscuss?: boolean;
+  recommendation?: string | string[];
+  default?: string | string[];
+}): NormalizedQuestion {
   const id = q.id.trim();
   const options = normalizeStructuredOptions(id, q.options);
+  const multi = q.multi ?? false;
+  const recommendation = q.recommendation;
+  const defaultValue = q.default;
+
+  validateRecDefaultShape(id, recommendation, multi, "recommendation");
+  validateRecDefaultShape(id, defaultValue, multi, "default");
+
   return {
     id,
     header: q.header,
     type: "choice",
     prompt: q.prompt,
     required: q.required ?? true,
+    multi,
     options,
     allowOther: q.allowOther ?? false,
     allowDiscuss: q.allowDiscuss ?? false,
-    recommendedIndexes: resolveSingleRecommendation(id, options, q.recommendation),
-    defaultIndexes: resolveSingleDefault(id, options, q.default),
+    recommendedIndexes: resolveRecDefault(id, options, recommendation, multi, "recommendation"),
+    defaultIndexes: resolveRecDefault(id, options, defaultValue, multi, "default"),
   };
 }
 
-function normalizeMultiChoice(q: ExternalMultiChoiceQuestion): NormalizedQuestion {
-  const id = q.id.trim();
-  const options = normalizeStructuredOptions(id, q.options);
-  return {
-    id,
-    header: q.header,
-    type: "multichoice",
-    prompt: q.prompt,
-    required: q.required ?? true,
-    options,
-    allowOther: q.allowOther ?? false,
-    allowDiscuss: q.allowDiscuss ?? false,
-    recommendedIndexes: resolveMultiRecommendation(id, options, q.recommendation),
-    defaultIndexes: resolveMultiDefault(id, options, q.default),
-  };
-}
-
-function normalizeYesNo(q: ExternalYesNoQuestion): NormalizedQuestion {
-  const id = q.id.trim();
-  if (q.default !== undefined && q.default !== "yes" && q.default !== "no") {
-    throw new AskUserValidationError(`yesno question "${id}" default must be "yes" or "no".`);
+function validateRecDefaultShape(
+  questionId: string,
+  value: string | string[] | undefined,
+  multi: boolean,
+  kind: string,
+): void {
+  if (value === undefined) return;
+  if (!multi && Array.isArray(value)) {
+    throw new AskUserValidationError(
+      `single-select question "${questionId}" ${kind} must be a string, not an array.`,
+    );
   }
-  return {
-    id,
-    header: q.header,
-    type: "yesno",
-    prompt: q.prompt,
-    required: q.required ?? true,
-    options: YES_NO_OPTIONS.map((option) => ({ ...option })),
-    allowOther: q.allowOther ?? false,
-    allowDiscuss: q.allowDiscuss ?? false,
-    recommendedIndexes: q.recommendation === undefined ? [] : [q.recommendation === "yes" ? 0 : 1],
-    defaultIndexes: q.default === undefined ? [] : [q.default === "yes" ? 0 : 1],
-  };
+  if (multi && !Array.isArray(value)) {
+    throw new AskUserValidationError(
+      `multi-select question "${questionId}" ${kind} must be an array, not a string.`,
+    );
+  }
 }
 
 function normalizeText(q: {
@@ -165,7 +153,7 @@ function normalizeText(q: {
 
 function normalizeStructuredOptions(
   questionId: string,
-  options: ExternalChoiceQuestion["options"] | ExternalMultiChoiceQuestion["options"],
+  options: { value: string; label: string; description?: string; preview?: string }[],
 ): NormalizedOption[] {
   const optionCount = options.length;
   if (
@@ -173,7 +161,7 @@ function normalizeStructuredOptions(
     optionCount > QUESTION_LIMITS.maxChoiceOptions
   ) {
     throw new AskUserValidationError(
-      `structured question "${questionId}" must have ${QUESTION_LIMITS.minChoiceOptions}-${QUESTION_LIMITS.maxChoiceOptions} options (got ${optionCount}).`,
+      `choice question "${questionId}" must have ${QUESTION_LIMITS.minChoiceOptions}-${QUESTION_LIMITS.maxChoiceOptions} options (got ${optionCount}).`,
     );
   }
   const seenValues = new Set<string>();
@@ -181,12 +169,12 @@ function normalizeStructuredOptions(
     const value = opt.value.trim();
     if (value.length === 0 || opt.label.trim().length === 0) {
       throw new AskUserValidationError(
-        `structured question "${questionId}" has an option with empty value or label.`,
+        `choice question "${questionId}" has an option with empty value or label.`,
       );
     }
     if (seenValues.has(value)) {
       throw new AskUserValidationError(
-        `structured question "${questionId}" has duplicate option value "${value}".`,
+        `choice question "${questionId}" has duplicate option value "${value}".`,
       );
     }
     seenValues.add(value);
@@ -199,82 +187,41 @@ function normalizeStructuredOptions(
   });
 }
 
-function resolveSingleRecommendation(
+// biome-ignore lint/complexity/useMaxParams: five distinct positional params are cleaner than a non-reusable options object for this internal helper
+function resolveRecDefault(
   questionId: string,
   options: NormalizedOption[],
-  recommendation: string | undefined,
+  value: string | string[] | undefined,
+  multi: boolean,
+  kind: "recommendation" | "default",
 ): number[] {
-  if (recommendation === undefined) return [];
-  const value = recommendation.trim();
-  const idx = options.findIndex((opt) => opt.value === value);
-  if (idx < 0) {
-    throw new AskUserValidationError(
-      `choice question "${questionId}" recommends "${value}", which is not one of its option values.`,
-    );
-  }
-  return [idx];
-}
-
-function resolveMultiRecommendation(
-  questionId: string,
-  options: NormalizedOption[],
-  recommendation: string[] | undefined,
-): number[] {
-  if (!recommendation || recommendation.length === 0) return [];
-  const seen = new Set<string>();
-  return recommendation.map((recommendationValue) => {
-    const value = recommendationValue.trim();
-    if (seen.has(value)) {
-      throw new AskUserValidationError(
-        `multichoice question "${questionId}" has duplicate recommended value "${value}".`,
-      );
-    }
-    seen.add(value);
-    const idx = options.findIndex((opt) => opt.value === value);
+  if (value === undefined) return [];
+  const verb = kind === "recommendation" ? "recommends" : "defaults to";
+  if (!multi) {
+    const trimmed = (value as string).trim();
+    const idx = options.findIndex((opt) => opt.value === trimmed);
     if (idx < 0) {
       throw new AskUserValidationError(
-        `multichoice question "${questionId}" recommends "${value}", which is not one of its option values.`,
+        `choice question "${questionId}" ${verb} "${trimmed}", which is not one of its option values.`,
       );
     }
-    return idx;
-  });
-}
-
-function resolveSingleDefault(
-  questionId: string,
-  options: NormalizedOption[],
-  defaultValue: string | undefined,
-): number[] {
-  if (defaultValue === undefined) return [];
-  const value = defaultValue.trim();
-  const idx = options.findIndex((opt) => opt.value === value);
-  if (idx < 0) {
-    throw new AskUserValidationError(
-      `choice question "${questionId}" defaults to "${value}", which is not one of its option values.`,
-    );
+    return [idx];
   }
-  return [idx];
-}
-
-function resolveMultiDefault(
-  questionId: string,
-  options: NormalizedOption[],
-  defaultValues: string[] | undefined,
-): number[] {
-  if (!defaultValues || defaultValues.length === 0) return [];
+  const values = value as string[];
+  if (values.length === 0) return [];
   const seen = new Set<string>();
-  return defaultValues.map((defaultValue) => {
-    const value = defaultValue.trim();
-    if (seen.has(value)) {
+  return values.map((v) => {
+    const trimmed = v.trim();
+    if (seen.has(trimmed)) {
       throw new AskUserValidationError(
-        `multichoice question "${questionId}" has duplicate default value "${value}".`,
+        `choice question "${questionId}" has duplicate ${kind === "recommendation" ? "recommended" : "default"} value "${trimmed}".`,
       );
     }
-    seen.add(value);
-    const idx = options.findIndex((opt) => opt.value === value);
+    seen.add(trimmed);
+    const idx = options.findIndex((opt) => opt.value === trimmed);
     if (idx < 0) {
       throw new AskUserValidationError(
-        `multichoice question "${questionId}" defaults to "${value}", which is not one of its option values.`,
+        `choice question "${questionId}" ${verb} "${trimmed}", which is not one of its option values.`,
       );
     }
     return idx;

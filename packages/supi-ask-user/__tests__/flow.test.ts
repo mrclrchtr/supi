@@ -12,6 +12,7 @@ const choice = (id: string, header = id): NormalizedQuestion => ({
     { value: "a", label: "A" },
     { value: "b", label: "B" },
   ],
+  multi: false,
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
@@ -21,7 +22,7 @@ const choice = (id: string, header = id): NormalizedQuestion => ({
 const multichoice = (id: string, header = id): NormalizedQuestion => ({
   id,
   header,
-  type: "multichoice",
+  type: "choice",
   prompt: `${id}?`,
   required: true,
   options: [
@@ -29,6 +30,7 @@ const multichoice = (id: string, header = id): NormalizedQuestion => ({
     { value: "b", label: "B" },
     { value: "c", label: "C" },
   ],
+  multi: true,
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0, 2],
@@ -45,6 +47,7 @@ const optional = (id: string, header = id): NormalizedQuestion => ({
     { value: "a", label: "A" },
     { value: "b", label: "B" },
   ],
+  multi: false,
   allowOther: false,
   allowDiscuss: false,
   recommendedIndexes: [],
@@ -54,7 +57,11 @@ const optional = (id: string, header = id): NormalizedQuestion => ({
 describe("QuestionnaireFlow", () => {
   it("submits immediately for a single non-review question", () => {
     const flow = new QuestionnaireFlow([choice("only")]);
-    flow.setAnswer({ questionId: "only", source: "option", value: "a", optionIndex: 0 });
+    flow.setAnswer({
+      questionId: "only",
+      source: "choice",
+      selections: [{ value: "a", optionIndex: 0 }],
+    });
     flow.advance();
     expect(flow.isTerminal()).toBe(true);
     expect(flow.outcome().terminalState).toBe("submitted");
@@ -64,9 +71,7 @@ describe("QuestionnaireFlow", () => {
     const flow = new QuestionnaireFlow([multichoice("features")]);
     flow.setAnswer({
       questionId: "features",
-      source: "options",
-      values: ["a", "c"],
-      optionIndexes: [0, 2],
+      source: "choice",
       selections: [
         { value: "a", optionIndex: 0, note: "best" },
         { value: "c", optionIndex: 2 },
@@ -80,7 +85,7 @@ describe("QuestionnaireFlow", () => {
       answers: [
         {
           questionId: "features",
-          source: "options",
+          source: "choice",
           selections: [
             { value: "a", optionIndex: 0, note: "best" },
             { value: "c", optionIndex: 2 },
@@ -92,9 +97,17 @@ describe("QuestionnaireFlow", () => {
 
   it("supports back-navigation and revision across review", () => {
     const flow = new QuestionnaireFlow([choice("one"), choice("two")]);
-    flow.setAnswer({ questionId: "one", source: "option", value: "a", optionIndex: 0 });
+    flow.setAnswer({
+      questionId: "one",
+      source: "choice",
+      selections: [{ value: "a", optionIndex: 0 }],
+    });
     flow.advance();
-    flow.setAnswer({ questionId: "two", source: "yesno", value: "no", optionIndex: 1 });
+    flow.setAnswer({
+      questionId: "two",
+      source: "choice",
+      selections: [{ value: "no", optionIndex: 1 }],
+    });
     flow.advance();
     expect(flow.currentMode).toBe("reviewing");
     expect(flow.goBack()).toBe(true);
@@ -125,19 +138,17 @@ describe("QuestionnaireFlow", () => {
     const flow = new QuestionnaireFlow([choice("only"), multichoice("features")]);
     flow.setAnswer({
       questionId: "only",
-      source: "option",
-      value: "a",
-      optionIndex: 0,
-      note: "  rationale  ",
+      source: "choice",
+      selections: [{ value: "a", optionIndex: 0, note: "  rationale  " }],
     });
     flow.setAnswer({
       questionId: "features",
-      source: "options",
-      values: ["a"],
-      optionIndexes: [0],
+      source: "choice",
       selections: [{ value: "a", optionIndex: 0, note: "  best first  " }],
     });
-    expect(flow.getAnswer("only")).toMatchObject({ note: "rationale" });
+    expect(flow.getAnswer("only")).toMatchObject({
+      selections: [{ value: "a", optionIndex: 0, note: "rationale" }],
+    });
     expect(flow.getAnswer("features")).toMatchObject({
       selections: [{ value: "a", optionIndex: 0, note: "best first" }],
     });
@@ -145,7 +156,11 @@ describe("QuestionnaireFlow", () => {
 
   it("blocks submit until every question is answered", () => {
     const flow = new QuestionnaireFlow([choice("one"), choice("two")]);
-    flow.setAnswer({ questionId: "one", source: "option", value: "a", optionIndex: 0 });
+    flow.setAnswer({
+      questionId: "one",
+      source: "choice",
+      selections: [{ value: "a", optionIndex: 0 }],
+    });
     expect(flow.submit()).toBe(false);
   });
 
@@ -166,7 +181,11 @@ describe("QuestionnaireFlow optional questions", () => {
     const flow = new QuestionnaireFlow([optional("one"), choice("two")]);
     expect(flow.advance()).toBe(true);
     expect(flow.currentIndex).toBe(1);
-    flow.setAnswer({ questionId: "two", source: "option", value: "a", optionIndex: 0 });
+    flow.setAnswer({
+      questionId: "two",
+      source: "choice",
+      selections: [{ value: "a", optionIndex: 0 }],
+    });
     flow.advance();
     expect(flow.currentMode).toBe("reviewing");
     flow.submit();
@@ -176,12 +195,20 @@ describe("QuestionnaireFlow optional questions", () => {
 
   it("skip sets terminal state to skipped and includes prior answers", () => {
     const flow = new QuestionnaireFlow([optional("one"), choice("two")]);
-    flow.setAnswer({ questionId: "one", source: "option", value: "a", optionIndex: 0 });
+    flow.setAnswer({
+      questionId: "one",
+      source: "choice",
+      selections: [{ value: "a", optionIndex: 0 }],
+    });
     flow.skip();
     expect(flow.outcome().terminalState).toBe("skipped");
     expect(flow.outcome().skipped).toBe(true);
     expect(flow.outcome().answers).toEqual([
-      { questionId: "one", source: "option", value: "a", optionIndex: 0 },
+      {
+        questionId: "one",
+        source: "choice",
+        selections: [{ value: "a", optionIndex: 0 }],
+      },
     ]);
   });
 

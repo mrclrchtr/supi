@@ -32,10 +32,11 @@ describe("normalizeQuestionnaire", () => {
           recommendation: "a",
         }),
         {
-          type: "multichoice",
+          type: "choice",
           id: "features",
           header: "Features",
           prompt: "Pick features",
+          multi: true,
           options: [
             { value: "preview", label: "Preview" },
             { value: "discuss", label: "Discuss" },
@@ -44,7 +45,17 @@ describe("normalizeQuestionnaire", () => {
           allowOther: true,
           allowDiscuss: true,
         },
-        { type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", allowDiscuss: true },
+        {
+          type: "choice",
+          id: "go",
+          header: "Go?",
+          prompt: "Proceed?",
+          allowDiscuss: true,
+          options: [
+            { value: "yes", label: "Yes" },
+            { value: "no", label: "No" },
+          ],
+        },
         { type: "text", id: "note", header: "Note", prompt: "Why?" },
       ],
     };
@@ -52,13 +63,18 @@ describe("normalizeQuestionnaire", () => {
     const out = normalizeQuestionnaire(params);
     expect(out.questions.map((question) => question.type)).toEqual([
       "choice",
-      "multichoice",
-      "yesno",
+      "choice",
+      "choice",
       "text",
     ]);
     expect(out.questions[0]).toMatchObject({ allowOther: true, allowDiscuss: true });
     expect(out.questions[0].options[0].preview).toBe("const a = 1;");
-    expect(out.questions[1]).toMatchObject({ allowOther: true, recommendedIndexes: [0] });
+    expect(out.questions[1]).toMatchObject({
+      multi: true,
+      allowOther: true,
+      recommendedIndexes: [0],
+    });
+    expect(out.questions[2]).toMatchObject({ multi: false });
   });
 
   it("rejects 0 questions", () => {
@@ -87,10 +103,11 @@ describe("normalizeQuestionnaire", () => {
       normalizeQuestionnaire({
         questions: [
           {
-            type: "multichoice",
+            type: "choice",
             id: "features",
             header: "Features",
             prompt: "Pick",
+            multi: true,
             options: [
               { value: "a", label: "A" },
               { value: "b", label: "B" },
@@ -100,13 +117,6 @@ describe("normalizeQuestionnaire", () => {
         ],
       }),
     ).toThrow(/duplicate recommended value/);
-  });
-
-  it("synthesizes yes/no options for yesno questions", () => {
-    const out = normalizeQuestionnaire({
-      questions: [{ type: "yesno", id: "y", header: "Y?", prompt: "Yes?" }],
-    });
-    expect(out.questions[0].options.map((option) => option.value)).toEqual(["yes", "no"]);
   });
 
   it("passes through default on text questions", () => {
@@ -145,14 +155,15 @@ describe("normalizeQuestionnaire", () => {
     );
   });
 
-  it("resolves default on multichoice questions", () => {
+  it("resolves default on multi-select choice questions", () => {
     const out = normalizeQuestionnaire({
       questions: [
         {
-          type: "multichoice",
+          type: "choice",
           id: "features",
           header: "Features",
           prompt: "Pick",
+          multi: true,
           options: [
             { value: "a", label: "A" },
             { value: "b", label: "B" },
@@ -165,15 +176,16 @@ describe("normalizeQuestionnaire", () => {
     expect(out.questions[0]).toMatchObject({ defaultIndexes: [0, 2] });
   });
 
-  it("rejects duplicate multichoice default values", () => {
+  it("rejects duplicate multi-select default values", () => {
     expect(() =>
       normalizeQuestionnaire({
         questions: [
           {
-            type: "multichoice",
+            type: "choice",
             id: "features",
             header: "Features",
             prompt: "Pick",
+            multi: true,
             options: [
               { value: "a", label: "A" },
               { value: "b", label: "B" },
@@ -185,15 +197,16 @@ describe("normalizeQuestionnaire", () => {
     ).toThrow(/duplicate default value/);
   });
 
-  it("rejects multichoice default that does not match an option value", () => {
+  it("rejects multi-select default that does not match an option value", () => {
     expect(() =>
       normalizeQuestionnaire({
         questions: [
           {
-            type: "multichoice",
+            type: "choice",
             id: "features",
             header: "Features",
             prompt: "Pick",
+            multi: true,
             options: [
               { value: "a", label: "A" },
               { value: "b", label: "B" },
@@ -205,22 +218,45 @@ describe("normalizeQuestionnaire", () => {
     ).toThrow(/not one of its option values/);
   });
 
-  it("resolves default on yesno questions", () => {
-    const out = normalizeQuestionnaire({
-      questions: [{ type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", default: "no" }],
-    });
-    expect(out.questions[0]).toMatchObject({ defaultIndexes: [1] });
-  });
-
-  it("rejects yesno default that is not yes or no", () => {
+  it("rejects single-select array recommendation", () => {
     expect(() =>
       normalizeQuestionnaire({
         questions: [
-          // @ts-expect-error — testing invalid runtime value
-          { type: "yesno", id: "go", header: "Go?", prompt: "Proceed?", default: "maybe" },
+          {
+            type: "choice",
+            id: "q1",
+            header: "Pick",
+            prompt: "Pick one",
+            options: [
+              { value: "a", label: "A" },
+              { value: "b", label: "B" },
+            ],
+            recommendation: ["a"],
+          },
         ],
       }),
-    ).toThrow();
+    ).toThrow(/recommendation must be a string/);
+  });
+
+  it("rejects multi-select string recommendation", () => {
+    expect(() =>
+      normalizeQuestionnaire({
+        questions: [
+          {
+            type: "choice",
+            id: "q1",
+            header: "Pick",
+            prompt: "Pick many",
+            multi: true,
+            options: [
+              { value: "a", label: "A" },
+              { value: "b", label: "B" },
+            ],
+            recommendation: "a",
+          },
+        ],
+      }),
+    ).toThrow(/recommendation must be an array/);
   });
 
   it("accepts prompts up to 4000 characters", () => {

@@ -16,7 +16,7 @@ describe("renderAskUserCall", () => {
       {
         questions: [
           { type: "choice", id: "scope", header: "Scope" },
-          { type: "multichoice", id: "features", header: "Features" },
+          { type: "choice", id: "features", header: "Features" },
         ],
       },
       theme,
@@ -143,8 +143,9 @@ describe("renderAskUserResult", () => {
             {
               id: "features",
               header: "Features",
-              type: "multichoice",
+              type: "choice",
               prompt: "Pick",
+              multi: true,
               options: [
                 { value: "preview", label: "Preview" },
                 { value: "multi", label: "Multi-select" },
@@ -159,6 +160,7 @@ describe("renderAskUserResult", () => {
               header: "Scope",
               type: "choice",
               prompt: "Pick",
+              multi: false,
               options: [
                 { value: "api_only", label: "API only" },
                 { value: "full_rewrite", label: "Full rewrite" },
@@ -172,9 +174,7 @@ describe("renderAskUserResult", () => {
           answers: [
             {
               questionId: "features",
-              source: "options",
-              values: ["preview", "multi"],
-              optionIndexes: [0, 1],
+              source: "choice",
               selections: [
                 { value: "preview", optionIndex: 0, note: "best demo" },
                 { value: "multi", optionIndex: 1 },
@@ -182,18 +182,14 @@ describe("renderAskUserResult", () => {
             },
             {
               questionId: "scope",
-              source: "option",
-              value: "api_only",
-              optionIndex: 0,
-              note: "safer",
+              source: "choice",
+              selections: [{ value: "api_only", optionIndex: 0, note: "safer" }],
             },
           ],
           answersById: {
             features: {
               questionId: "features",
-              source: "options",
-              values: ["preview", "multi"],
-              optionIndexes: [0, 1],
+              source: "choice",
               selections: [
                 { value: "preview", optionIndex: 0, note: "best demo" },
                 { value: "multi", optionIndex: 1 },
@@ -201,10 +197,8 @@ describe("renderAskUserResult", () => {
             },
             scope: {
               questionId: "scope",
-              source: "option",
-              value: "api_only",
-              optionIndex: 0,
-              note: "safer",
+              source: "choice",
+              selections: [{ value: "api_only", optionIndex: 0, note: "safer" }],
             },
           },
           terminalState: "submitted",

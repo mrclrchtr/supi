@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-ask-user
 
-Structured `ask_user` tool and rich questionnaire overlay for the [pi coding agent](https://github.com/earendil-works/pi). Lets the agent pause and ask you focused, typed decisions — picking from lists, multi-selecting, confirming yes/no, or entering freeform text.
+Structured `ask_user` tool and rich questionnaire overlay for the [pi coding agent](https://github.com/earendil-works/pi). Lets the agent pause and ask you focused, typed decisions — picking from lists, multi-selecting, or entering freeform text.
 
 ## Install
 
@@ -24,10 +24,10 @@ Registers the `ask_user` tool — callable by the model during an agent run. Whe
 
 | Type | Use |
 |------|-----|
-| `choice` | Pick exactly one option from a known list |
-| `multichoice` | Select multiple options from a short list |
+| `choice` | Pick one option (default) or multiple options (`multi: true`) from a list |
 | `text` | Freeform text input |
-| `yesno` | Binary yes/no confirmation |
+
+For yes/no questions, use `choice` with options `{value: "yes", label: "Yes"}` and `{value: "no", label: "No"}` — there is no separate `yesno` type.
 
 **Key behaviors:**
 
@@ -66,10 +66,29 @@ The agent decides when to call `ask_user`. You control how it's used through the
 }
 ```
 
+**Multi-select example:**
+
+```json
+{
+  "type": "choice",
+  "multi": true,
+  "id": "features",
+  "header": "Features",
+  "prompt": "Which features to include?",
+  "options": [
+    { "value": "auth", "label": "Authentication" },
+    { "value": "caching", "label": "Caching" },
+    { "value": "logging", "label": "Logging" }
+  ],
+  "recommendation": ["auth", "caching"]
+}
+```
+
 **Per-question features:**
 
-- `recommendation` — highlights the preferred option with a visual badge. For `multichoice`, accepts an array.
-- `default` — pre-selects a starting value the user can accept with a single keystroke. For `multichoice`, accepts an array.
+- `multi` — set to `true` to enable multi-select (replaces the former `multichoice` type). Default `false`.
+- `recommendation` — highlights the preferred option with a visual badge. String for single-select, array for multi-select.
+- `default` — pre-selects a starting value the user can accept with a single keystroke. String for single-select, array for multi-select.
 - `allowOther` — lets the user type a custom answer instead of picking from options.
 - `allowDiscuss` — lets the user opt into a discussion instead of deciding immediately.
 - `preview` — rich content (markdown, code, or ASCII mockups) shown alongside the option.
@@ -81,7 +100,7 @@ The agent decides when to call `ask_user`. You control how it's used through the
 ## Limits
 
 - **1–4 questions** per questionnaire. Use one decision per call; chain multiple calls when you need more questions.
-- **2–12 options** per structured question (`choice`, `multichoice`, `yesno`).
+- **2–12 options** per `choice` question (single or multi-select).
 - **60 characters** max per question header.
 - **4000 characters** max per question prompt.
 

@@ -101,9 +101,8 @@ export function singleNoteFromAnswer(
   questionId: string,
 ): string | undefined {
   const answer = flow.getAnswer(questionId);
-  if (!answer) return undefined;
-  if (answer.source === "option" || answer.source === "yesno") return answer.note;
-  return undefined;
+  if (!answer || answer.source !== "choice") return undefined;
+  return answer.selections[0]?.note;
 }
 
 export function multiNoteMapFromAnswer(
@@ -112,7 +111,7 @@ export function multiNoteMapFromAnswer(
 ): Map<number, string> {
   const answer = flow.getAnswer(questionId);
   const map = new Map<number, string>();
-  if (!answer || answer.source !== "options") return map;
+  if (!answer || answer.source !== "choice") return map;
   for (const selection of answer.selections) {
     if (selection.note) map.set(selection.optionIndex, selection.note);
   }
@@ -150,8 +149,7 @@ export function selectedIndexesForQuestion(
     if (question.defaultIndexes.length > 0) return [...question.defaultIndexes];
     return [];
   }
-  if (answer.source === "option" || answer.source === "yesno") return [answer.optionIndex];
-  if (answer.source === "options") return [...answer.optionIndexes];
+  if (answer.source === "choice") return answer.selections.map((s) => s.optionIndex);
   return [];
 }
 
@@ -169,11 +167,8 @@ export function selectedRowIndex(
     return recommended ?? 0;
   }
   switch (answer.source) {
-    case "option":
-    case "yesno":
-      return answer.optionIndex;
-    case "options":
-      return answer.optionIndexes[0] ?? 0;
+    case "choice":
+      return answer.selections[0]?.optionIndex ?? 0;
     case "other":
       return rows.findIndex((row) => row.kind === "other");
     case "discuss":

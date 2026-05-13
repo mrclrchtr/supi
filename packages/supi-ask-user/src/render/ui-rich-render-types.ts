@@ -8,10 +8,10 @@ export interface OverlayRenderState {
   selectedIndex: number;
   /** Active input mode: select, text-input, other-input, discuss-input, note-input. */
   subMode: SubMode;
-  /** Uncommitted multichoice checkbox state (questionId → sorted optionIndexes). */
+  /** Uncommitted multi-select checkbox state (questionId → sorted optionIndexes). */
   stagedSelections: Map<string, number[]>;
   /** Draft note text for single-select questions (questionId → note). */
   stagedSingleNotes: Map<string, string>;
-  /** Draft note text per-option for multichoice questions (questionId → Map<optionIndex, note>). */
+  /** Draft note text per-option for multi-select questions (questionId → Map<optionIndex, note>). */
   stagedMultiNotes: Map<string, Map<number, string>>;
 }

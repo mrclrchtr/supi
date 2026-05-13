@@ -1,5 +1,5 @@
-// Rich questionnaire UI built on `ctx.ui.custom()`. Supports explicit choice,
-// multichoice, notes, other, discuss, preview, and review flows. Returns a
+// Rich questionnaire UI built on `ctx.ui.custom()`. Supports explicit choice
+// (single and multi-select), notes, other, discuss, preview, and review flows. Returns a
 // QuestionnaireOutcome whose terminal state is owned by the shared flow.
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
@@ -51,7 +51,7 @@ export async function runRichQuestionnaire(
   }
   // pi-tui's declarative keybinding system is not used here — the overlay
   // implements its own dynamic input handling because footer hints change
-  // per mode and question type (e.g. Space toggle in multichoice vs Enter
+  // per mode and question type (e.g. Space toggle in multi-select vs Enter
   // confirm in choice).
   const promise = opts.ui.custom<QuestionnaireOutcome>((tui, theme, _kb, done) =>
     buildOverlay({ tui, theme, flow, signal: opts.signal, done }),

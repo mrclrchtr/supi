@@ -6,10 +6,11 @@ describe("normalizeQuestionnaire identifier canonicalization", () => {
     const out = normalizeQuestionnaire({
       questions: [
         {
-          type: "multichoice",
+          type: "choice",
           id: "features",
           header: "Features",
           prompt: "Pick",
+          multi: true,
           options: [
             { value: "a", label: "A" },
             { value: "b", label: "B" },
@@ -18,7 +19,7 @@ describe("normalizeQuestionnaire identifier canonicalization", () => {
         },
       ],
     });
-    expect(out.questions[0]).toMatchObject({ type: "multichoice", allowOther: true });
+    expect(out.questions[0]).toMatchObject({ type: "choice", multi: true, allowOther: true });
   });
 
   it("canonicalizes question ids, option values, and recommendations by trimming", () => {

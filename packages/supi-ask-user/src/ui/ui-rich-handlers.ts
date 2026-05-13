@@ -78,7 +78,7 @@ function applyNoteEdit(note: string, deps: OverlayDeps): void {
 }
 
 function clearStructuredDrafts(question: NormalizedQuestion, deps: OverlayDeps): void {
-  if (question.type !== "multichoice") return;
+  if (question.type === "text" || !question.multi) return;
   deps.state.stagedSelections.delete(question.id);
   deps.state.stagedMultiNotes.delete(question.id);
 }
@@ -158,7 +158,7 @@ function handleEditorEscape(deps: OverlayDeps): void {
 function handleSelectInput(data: string, deps: OverlayDeps): void {
   const { flow, state } = deps;
   const question = flow.currentQuestion;
-  if (!question) return;
+  if (!question || question.type === "text") return;
   const maxIndex = Math.max(0, rowCount(question) - 1);
   if (matchesKey(data, Key.up)) {
     moveSelection(question, Math.max(0, state.selectedIndex - 1), deps);
@@ -169,7 +169,7 @@ function handleSelectInput(data: string, deps: OverlayDeps): void {
     return;
   }
   if (handleSelectNav(data, deps)) return;
-  if (question.type === "multichoice" && matchesKey(data, Key.space)) {
+  if (question.multi && matchesKey(data, Key.space)) {
     toggleCurrentSelection(question, deps);
     return;
   }
@@ -207,13 +207,13 @@ function handleSkipAction(deps: OverlayDeps): void {
 
 function openNoteEditor(question: NormalizedQuestion, deps: OverlayDeps): void {
   if (question.type === "text") return;
-  const row = interactiveRows(question)[deps.state.selectedIndex];
+  const rows = interactiveRows(question);
+  const row = rows[deps.state.selectedIndex];
   if (!row || row.kind !== "option") return;
   deps.state.subMode = "note-input";
-  deps.state.noteTarget =
-    question.type === "multichoice"
-      ? { mode: "multi", questionId: question.id, optionIndex: row.optionIndex }
-      : { mode: "single", questionId: question.id };
+  deps.state.noteTarget = question.multi
+    ? { mode: "multi", questionId: question.id, optionIndex: row.optionIndex }
+    : { mode: "single", questionId: question.id };
   deps.editor.setText(currentNote(deps.flow, deps.state, question) ?? "");
   deps.refresh();
 }
@@ -245,7 +245,7 @@ function handleSelectEnter(question: NormalizedQuestion, deps: OverlayDeps): voi
   const row = interactiveRows(question)[deps.state.selectedIndex];
   if (!row) return;
   if (row.kind === "option") {
-    if (question.type === "multichoice") {
+    if (question.multi) {
       handleSubmitSelections(question, deps);
       return;
     }
@@ -260,38 +260,18 @@ function handleOptionRow(
   optionIndex: number,
   deps: OverlayDeps,
 ): void {
-  if (question.type === "multichoice") {
-    toggleSelection(question, optionIndex, deps);
-    deps.refresh();
-    return;
-  }
   const option = question.options[optionIndex];
   const note =
     deps.state.stagedSingleNotes.get(question.id) ?? singleNoteFromAnswer(deps.flow, question.id);
-  deps.flow.setAnswer(
-    question.type === "yesno"
-      ? {
-          questionId: question.id,
-          source: "yesno",
-          value: option.value as "yes" | "no",
-          optionIndex: optionIndex as 0 | 1,
-          note,
-        }
-      : {
-          questionId: question.id,
-          source: "option",
-          value: option.value,
-          optionIndex,
-          note,
-        },
-  );
+  deps.flow.setAnswer({
+    questionId: question.id,
+    source: "choice",
+    selections: [{ value: option.value, optionIndex, note }],
+  });
   moveAfterAnswer(deps);
 }
 
-function toggleCurrentSelection(
-  question: Extract<NormalizedStructuredQuestion, { type: "multichoice" }>,
-  deps: OverlayDeps,
-): void {
+function toggleCurrentSelection(question: NormalizedStructuredQuestion, deps: OverlayDeps): void {
   const row = interactiveRows(question)[deps.state.selectedIndex];
   if (!row || row.kind !== "option") return;
   toggleSelection(question, row.optionIndex, deps);
@@ -342,7 +322,7 @@ function toggleSelection(
 }
 
 function handleSubmitSelections(question: NormalizedStructuredQuestion, deps: OverlayDeps): void {
-  if (question.type !== "multichoice") return;
+  if (!question.multi) return;
   const indexes = selectedIndexesForQuestion(deps.flow, deps.state, question);
   if (indexes.length === 0) return;
   const noteMap = mergedMultiNoteMap(deps, question.id);
@@ -353,9 +333,7 @@ function handleSubmitSelections(question: NormalizedStructuredQuestion, deps: Ov
   }));
   deps.flow.setAnswer({
     questionId: question.id,
-    source: "options",
-    values: selections.map((s) => s.value),
-    optionIndexes: selections.map((s) => s.optionIndex),
+    source: "choice",
     selections,
   });
   moveAfterAnswer(deps);

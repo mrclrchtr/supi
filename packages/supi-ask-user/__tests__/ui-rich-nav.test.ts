@@ -15,6 +15,7 @@ const choice: NormalizedQuestion = {
     { value: "a", label: "A", preview: "preview A" },
     { value: "b", label: "B", preview: "preview B" },
   ],
+  multi: false,
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
@@ -24,7 +25,7 @@ const choice: NormalizedQuestion = {
 const multichoice: NormalizedQuestion = {
   id: "features",
   header: "Features",
-  type: "multichoice",
+  type: "choice",
   prompt: "Pick features",
   required: true,
   options: [
@@ -32,6 +33,7 @@ const multichoice: NormalizedQuestion = {
     { value: "multi", label: "Multi-select" },
     { value: "discuss", label: "Discuss" },
   ],
+  multi: true,
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],
@@ -41,13 +43,14 @@ const multichoice: NormalizedQuestion = {
 const yesNoGo: NormalizedQuestion = {
   id: "go",
   header: "Go?",
-  type: "yesno",
+  type: "choice",
   prompt: "Proceed?",
   required: true,
   options: [
     { value: "yes", label: "Yes" },
     { value: "no", label: "No" },
   ],
+  multi: false,
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],

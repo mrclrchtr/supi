@@ -37,6 +37,7 @@ const choice: NormalizedQuestion = {
     { value: "a", label: "A", preview: "preview A" },
     { value: "b", label: "B", preview: "preview B" },
   ],
+  multi: false,
   allowOther: true,
   allowDiscuss: true,
   recommendedIndexes: [0],
@@ -46,7 +47,7 @@ const choice: NormalizedQuestion = {
 const multichoice: NormalizedQuestion = {
   id: "features",
   header: "Features",
-  type: "multichoice",
+  type: "choice",
   prompt: "Pick features",
   required: true,
   options: [
@@ -54,22 +55,7 @@ const multichoice: NormalizedQuestion = {
     { value: "multi", label: "Multi-select" },
     { value: "discuss", label: "Discuss" },
   ],
-  allowOther: false,
-  allowDiscuss: true,
-  recommendedIndexes: [0],
-  defaultIndexes: [],
-};
-
-const _yesNoGo: NormalizedQuestion = {
-  id: "go",
-  header: "Go?",
-  type: "yesno",
-  prompt: "Proceed?",
-  required: true,
-  options: [
-    { value: "yes", label: "Yes" },
-    { value: "no", label: "No" },
-  ],
+  multi: true,
   allowOther: false,
   allowDiscuss: true,
   recommendedIndexes: [0],
@@ -193,7 +179,7 @@ describe("runRichQuestionnaire lifecycle", () => {
   it("supports multichoice selection, notes, review, and submission", async () => {
     type Outcome = {
       terminalState: string;
-      answers: { questionId: string; source: string; values?: string[]; selections?: unknown[] }[];
+      answers: { questionId: string; source: string; selections?: unknown[] }[];
     };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
     const runPromise = runRichQuestionnaire(
@@ -232,8 +218,7 @@ describe("runRichQuestionnaire lifecycle", () => {
       answers: [
         {
           questionId: "features",
-          source: "options",
-          values: ["preview", "multi"],
+          source: "choice",
           selections: [
             { value: "preview", optionIndex: 0, note: "best" },
             { value: "multi", optionIndex: 1, note: "must" },
@@ -261,7 +246,7 @@ describe("runRichQuestionnaire notes", () => {
   it("single-select notes follow the active answer before submission", async () => {
     type Outcome = {
       terminalState: string;
-      answers: { questionId: string; source: string; optionIndex?: number; note?: string }[];
+      answers: { questionId: string; source: string; selections?: { note?: string }[] }[];
     };
     const { captured, host, outcomePromise } = makeRichFixture<Outcome>();
     const runPromise = runRichQuestionnaire(
@@ -281,7 +266,13 @@ describe("runRichQuestionnaire notes", () => {
     await expect(runPromise).resolves.toEqual(outcome);
     expect(outcome).toMatchObject({
       terminalState: "submitted",
-      answers: [{ questionId: "scope", source: "option", optionIndex: 1, note: "because" }],
+      answers: [
+        {
+          questionId: "scope",
+          source: "choice",
+          selections: [{ optionIndex: 1, note: "because" }],
+        },
+      ],
     });
   });
 
@@ -341,6 +332,7 @@ const choiceWithVaryingPreviews: NormalizedQuestion = {
     },
     { value: "three", label: "Three commits" },
   ],
+  multi: false,
   allowOther: false,
   allowDiscuss: false,
   recommendedIndexes: [1],
@@ -395,13 +387,14 @@ describe("render height stability", () => {
       {
         id: "confirm",
         header: "Confirm",
-        type: "yesno",
+        type: "choice",
         prompt: "Sure?",
         required: true,
         options: [
           { value: "yes", label: "Yes" },
           { value: "no", label: "No" },
         ],
+        multi: false,
         allowOther: false,
         allowDiscuss: false,
         recommendedIndexes: [0],
@@ -421,7 +414,7 @@ describe("render height stability", () => {
     captured.value.handleInput?.("\u001b[A"); // up to option 1
     captured.value.handleInput?.("\r"); // submit
 
-    // Render second question — yesno, much shorter, should NOT carry q1's height
+    // Render second question — shorter, should NOT carry q1's height
     const q2Lines = captured.value.render(80);
     expect(q2Lines.length).toBeLessThan(q1Lines.length);
   });
@@ -437,6 +430,7 @@ describe("markdown preview rendering", () => {
       prompt: "Pick",
       required: true,
       options: [{ value: "a", label: "A", preview: "# Hello\nWorld" }],
+      multi: false,
       allowOther: false,
       allowDiscuss: false,
       recommendedIndexes: [0],
@@ -445,7 +439,7 @@ describe("markdown preview rendering", () => {
     const { captured, host } = makeRichFixture<unknown>();
     void runRichQuestionnaire({ questions: [markdownQuestion], allowSkip: false }, { ui: host });
     await Promise.resolve();
-    if (!captured.value) throw new Error("custom() was not invoked");
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
     const rendered = captured.value.render(120).join("\n");
     expect(rendered).toContain("md line 1");
@@ -466,6 +460,7 @@ describe("markdown preview rendering", () => {
       prompt: "Pick",
       required: true,
       options: [{ value: "a", label: "A", preview: "`code`" }],
+      multi: false,
       allowOther: false,
       allowDiscuss: false,
       recommendedIndexes: [0],
@@ -474,7 +469,7 @@ describe("markdown preview rendering", () => {
     const { captured, host } = makeRichFixture<unknown>();
     void runRichQuestionnaire({ questions: [markdownQuestion], allowSkip: false }, { ui: host });
     await Promise.resolve();
-    if (!captured.value) throw new Error("custom() was not invoked");
+    if (!captured.value) throw new Error("custom() was not invoked with a factory");
 
     // Render at 80 cols — split view requires >= 100, so this falls back to block
     const rendered = captured.value.render(80).join("\n");
