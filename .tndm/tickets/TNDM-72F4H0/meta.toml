@@ -1,0 +1,13 @@
+schema_version = 1
+id = "TNDM-72F4H0"
+title = "supi-lsp: Stale diagnostics when agent creates new source files — workspace recovery misses non-sentinel writes"
+
+type = "bug"
+priority = "p2"
+effort = "m"
+
+depends_on = []
+tags = ["bug", "diagnostics", "flow:brainstorm", "lsp"]
+[[documents]]
+name = "content"
+path = "content.md"
