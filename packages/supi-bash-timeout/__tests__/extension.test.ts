@@ -2,27 +2,12 @@ import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import bashTimeout from "../src/bash-timeout.ts";
 import { loadBashTimeoutConfig } from "../src/config.ts";
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 
 vi.mock("../src/config.ts", () => ({
   loadBashTimeoutConfig: vi.fn(),
   BASH_TIMEOUT_DEFAULTS: { defaultTimeout: 120 },
 }));
-
-function createPiMock() {
-  const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => Promise<unknown>>>();
-  return {
-    on: (event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
-      const list = handlers.get(event) ?? [];
-      list.push(handler);
-      handlers.set(event, list);
-    },
-    getHandlers: (event: string) => handlers.get(event) ?? [],
-  };
-}
-
-function createCtxMock(cwd: string) {
-  return { cwd };
-}
 
 describe("bashTimeout extension", () => {
   beforeEach(() => {
@@ -56,7 +41,7 @@ describe("bashTimeout extension", () => {
     const handlers = pi.getHandlers("tool_call");
     expect(handlers).toHaveLength(1);
 
-    await handlers[0](event, createCtxMock("/tmp"));
+    await handlers[0](event, makeCtx({ cwd: "/tmp" }));
     expect(event.input.timeout).toBe(120);
   });
 
@@ -70,7 +55,7 @@ describe("bashTimeout extension", () => {
     };
 
     const handlers = pi.getHandlers("tool_call");
-    await handlers[0](event, createCtxMock("/tmp"));
+    await handlers[0](event, makeCtx({ cwd: "/tmp" }));
     expect(event.input.timeout).toBe(30);
   });
 
@@ -84,7 +69,7 @@ describe("bashTimeout extension", () => {
     };
 
     const handlers = pi.getHandlers("tool_call");
-    await handlers[0](event, createCtxMock("/tmp"));
+    await handlers[0](event, makeCtx({ cwd: "/tmp" }));
     expect(event.input.timeout).toBeUndefined();
   });
 
@@ -101,7 +86,7 @@ describe("bashTimeout extension", () => {
     };
 
     const handlers = pi.getHandlers("tool_call");
-    await handlers[0](event, createCtxMock("/tmp"));
+    await handlers[0](event, makeCtx({ cwd: "/tmp" }));
     expect(event.input.timeout).toBe(300);
   });
 });

@@ -1,9 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import gitEditor from "../src/git-editor.ts";
-
-function createPiMock() {
-  return { on: () => {} };
-}
 
 describe("gitEditor extension", () => {
   let originalGitEditor: string | undefined;

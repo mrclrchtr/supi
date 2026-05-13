@@ -23,38 +23,9 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   formatSkillsForPrompt: mockFns.formatSkillsForPrompt,
 }));
 
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
+import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { analyzeContext } from "../src/analysis.ts";
-
-function createMockCtx(overrides?: {
-  branch?: ReturnType<ExtensionCommandContext["sessionManager"]["getBranch"]>;
-  contextUsage?:
-    | { tokens: number | null; contextWindow: number; percent: number | null }
-    | undefined;
-  systemPrompt?: string;
-}): ExtensionCommandContext {
-  return {
-    cwd: "/project",
-    model: { provider: "openai", id: "gpt-4", name: "GPT-4" },
-    sessionManager: {
-      getBranch: () => overrides?.branch ?? [],
-    } as unknown as ExtensionCommandContext["sessionManager"],
-    getContextUsage: () => overrides?.contextUsage,
-    getSystemPrompt: () => overrides?.systemPrompt ?? "System",
-    ui: {
-      theme: {
-        fg: (_c: string, t: string) => t,
-      } as unknown as ExtensionCommandContext["ui"]["theme"],
-    } as unknown as ExtensionCommandContext["ui"],
-  } as ExtensionCommandContext;
-}
-
-function createMockPi(): ExtensionAPI {
-  return {
-    getActiveTools: () => [],
-    getAllTools: () => [],
-  } as unknown as ExtensionAPI;
-}
 
 describe("analyzeContext edge cases", () => {
   beforeEach(() => {
@@ -64,12 +35,12 @@ describe("analyzeContext edge cases", () => {
   });
 
   it("shows pending note when tokens is null", () => {
-    const ctx = createMockCtx({
-      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
-      systemPrompt: "",
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
+      getSystemPrompt: () => "",
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.approximationNote).toBe("Token count pending — send a message to refresh");
     expect(result.scaled).toBe(false);
@@ -77,22 +48,25 @@ describe("analyzeContext edge cases", () => {
   });
 
   it("shows approximate note when getContextUsage returns undefined", () => {
-    const ctx = createMockCtx({ contextUsage: undefined, systemPrompt: "" });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const ctx = makeCtx({
+      getContextUsage: () => undefined,
+      getSystemPrompt: () => "",
+    });
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.approximationNote).toBe("Approximate (no usage data available)");
     expect(result.scaled).toBe(false);
   });
 
   it("handles empty branch", () => {
-    const ctx = createMockCtx({
-      branch: [],
-      contextUsage: { tokens: 0, contextWindow: 8192, percent: 0 },
-      systemPrompt: "",
+    const ctx = makeCtx({
+      sessionManager: { getBranch: vi.fn(() => []) },
+      getContextUsage: () => ({ tokens: 0, contextWindow: 8192, percent: 0 }),
+      getSystemPrompt: () => "",
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.categories.userMessages).toBe(0);
     expect(result.categories.assistantMessages).toBe(0);
@@ -101,12 +75,12 @@ describe("analyzeContext edge cases", () => {
   });
 
   it("keeps raw estimates when usage tokens is zero", () => {
-    const ctx = createMockCtx({
-      contextUsage: { tokens: 0, contextWindow: 8192, percent: 0 },
-      systemPrompt: "S".repeat(400),
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: 0, contextWindow: 8192, percent: 0 }),
+      getSystemPrompt: () => "S".repeat(400),
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.scaled).toBe(false);
     expect(result.approximationNote).toBe("Token count pending — send a message to refresh");
@@ -120,40 +94,41 @@ describe("analyzeContext edge cases", () => {
     writeFileSync(agentsPath, "A".repeat(120));
 
     try {
-      const ctx = createMockCtx({
-        contextUsage: { tokens: 0, contextWindow: 8192, percent: 0 },
-        systemPrompt: [
-          "Base prompt",
-          "",
-          "Guidelines:",
-          "- Use bash for file operations like ls, rg, find",
-          "- Be concise in your responses",
-          "",
-          "# Project Context",
-          "",
-          "Project-specific instructions and guidelines:",
-          "",
-          `## ${agentsPath}`,
-          "",
-          "placeholder",
-          "",
-          "The following skills provide specialized instructions for specific tasks.",
-          "Use the read tool to load a skill's file when the task matches its description.",
-          "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
-          "",
-          "<available_skills>",
-          "  <skill>",
-          "    <name>find-docs</name>",
-          "    <description>Find docs</description>",
-          "    <location>/tmp/find-docs/SKILL.md</location>",
-          "  </skill>",
-          "</available_skills>",
-          "Current date: 2026-04-27",
-          `Current working directory: ${dir}`,
-        ].join("\n"),
+      const ctx = makeCtx({
+        getContextUsage: () => ({ tokens: 0, contextWindow: 8192, percent: 0 }),
+        getSystemPrompt: () =>
+          [
+            "Base prompt",
+            "",
+            "Guidelines:",
+            "- Use bash for file operations like ls, rg, find",
+            "- Be concise in your responses",
+            "",
+            "# Project Context",
+            "",
+            "Project-specific instructions and guidelines:",
+            "",
+            `## ${agentsPath}`,
+            "",
+            "placeholder",
+            "",
+            "The following skills provide specialized instructions for specific tasks.",
+            "Use the read tool to load a skill's file when the task matches its description.",
+            "When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
+            "",
+            "<available_skills>",
+            "  <skill>",
+            "    <name>find-docs</name>",
+            "    <description>Find docs</description>",
+            "    <location>/tmp/find-docs/SKILL.md</location>",
+            "  </skill>",
+            "</available_skills>",
+            "Current date: 2026-04-27",
+            `Current working directory: ${dir}`,
+          ].join("\n"),
       });
-      const pi = createMockPi();
-      const result = analyzeContext(ctx, pi, undefined);
+      const pi = createPiMock();
+      const result = analyzeContext(ctx as never, pi as never, undefined);
 
       expect(result.skills).toHaveLength(1);
       expect(result.skills[0].name).toBe("find-docs");
@@ -225,12 +200,12 @@ describe("analyzeContext edge cases", () => {
       tokensBefore: 100,
     });
 
-    const ctx = createMockCtx({
-      branch,
-      contextUsage: { tokens: 0, contextWindow: 8192, percent: 0 },
+    const ctx = makeCtx({
+      sessionManager: { getBranch: vi.fn(() => branch) },
+      getContextUsage: () => ({ tokens: 0, contextWindow: 8192, percent: 0 }),
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.compaction).not.toBeNull();
     expect(result.compaction?.summarizedTurns).toBe(2); // 4 messages before compaction = 2 turns
@@ -238,11 +213,11 @@ describe("analyzeContext edge cases", () => {
 
   it("handles no model selected", () => {
     const ctx = {
-      ...createMockCtx({ contextUsage: undefined }),
+      ...makeCtx({ getContextUsage: () => undefined }),
       model: undefined,
-    } as ExtensionCommandContext;
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    } as unknown as ExtensionCommandContext;
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.modelName).toBe("No model selected");
     expect(result.contextWindow).toBe(0);

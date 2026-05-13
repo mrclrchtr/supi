@@ -26,32 +26,8 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   registerContextProvider: mockFns.registerContextProvider,
 }));
 
+import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import debugExtension from "../src/debug.ts";
-
-interface PiMock {
-  handlers: Map<string, (...args: unknown[]) => unknown>;
-  commands: Map<string, { handler: (args: string, ctx: { cwd: string }) => Promise<void> }>;
-  tools: Array<{ name: string; execute: (...args: unknown[]) => Promise<unknown> }>;
-  messages: Array<{ customType: string; content: string; display: boolean }>;
-  pi: {
-    on: (event: string, handler: (...args: unknown[]) => unknown) => void;
-    registerCommand: (
-      name: string,
-      spec: { handler: (args: string, ctx: { cwd: string }) => Promise<void> },
-    ) => void;
-    registerMessageRenderer: (customType: string, renderer: unknown) => void;
-    registerTool: (tool: {
-      name: string;
-      execute: (...args: unknown[]) => Promise<unknown>;
-    }) => void;
-    sendMessage: (message: {
-      customType: string;
-      content: string;
-      display: boolean;
-      details?: unknown;
-    }) => void;
-  };
-}
 
 const ENABLED_CONFIG = {
   enabled: true,
@@ -67,45 +43,14 @@ type MockDebugConfig = {
   notifyLevel: unknown;
 };
 
-function createPiMock(): PiMock {
-  const handlers = new Map<string, (...args: unknown[]) => unknown>();
-  const commands = new Map<
-    string,
-    { handler: (args: string, ctx: { cwd: string }) => Promise<void> }
-  >();
-  const tools: PiMock["tools"] = [];
-  const messages: PiMock["messages"] = [];
-  return {
-    handlers,
-    commands,
-    tools,
-    messages,
-    pi: {
-      on(event, handler) {
-        handlers.set(event, handler);
-      },
-      registerCommand(name, spec) {
-        commands.set(name, spec);
-      },
-      registerMessageRenderer() {},
-      registerTool(tool) {
-        tools.push(tool);
-      },
-      sendMessage(message) {
-        messages.push(message);
-      },
-    },
-  };
-}
-
-function setup(config: MockDebugConfig = ENABLED_CONFIG): PiMock {
+function setup(config: MockDebugConfig = ENABLED_CONFIG) {
   mockFns.loadSupiConfig.mockReturnValue(config);
   mockFns.configureDebugRegistry.mockImplementation((value) => value);
   mockFns.getDebugEvents.mockReturnValue({ events: [], rawAccessDenied: false });
   mockFns.getDebugSummary.mockReturnValue(null);
-  const mock = createPiMock();
-  debugExtension(mock.pi as never);
-  return mock;
+  const pi = createPiMock();
+  debugExtension(pi as never);
+  return pi;
 }
 
 describe("supi-debug extension setup", () => {
@@ -114,13 +59,13 @@ describe("supi-debug extension setup", () => {
   });
 
   it("registers settings, context provider, command, tool, and session handler", () => {
-    const mock = setup();
+    const pi = setup();
 
     expect(mockFns.registerConfigSettings).toHaveBeenCalledOnce();
     expect(mockFns.registerContextProvider).toHaveBeenCalledOnce();
-    expect(mock.handlers.has("session_start")).toBe(true);
-    expect(mock.commands.has("supi-debug")).toBe(true);
-    expect(mock.tools.map((tool) => tool.name)).toEqual(["supi_debug"]);
+    expect(pi.handlers.has("session_start")).toBe(true);
+    expect(pi.commands.has("supi-debug")).toBe(true);
+    expect(pi.tools.map((tool) => (tool as { name: string }).name)).toEqual(["supi_debug"]);
   });
 
   it("configures the debug registry from merged config on load", () => {
@@ -146,9 +91,9 @@ describe("supi-debug extension setup", () => {
   });
 
   it("clears events and reapplies config on session_start", () => {
-    const mock = setup();
+    const pi = setup();
 
-    mock.handlers.get("session_start")?.({}, { cwd: "/repo" });
+    pi.handlers.get("session_start")?.[0]?.({}, { cwd: "/repo" });
 
     expect(mockFns.clearDebugEvents).toHaveBeenCalledOnce();
     expect(mockFns.loadSupiConfig).toHaveBeenCalledWith("debug", "/repo", expect.any(Object));
@@ -256,21 +201,24 @@ describe("supi-debug command and tool", () => {
   });
 
   it("command reports disabled debugging", async () => {
-    const mock = setup({
+    const pi = setup({
       enabled: false,
       agentAccess: "sanitized",
       maxEvents: 100,
       notifyLevel: "off",
     });
 
-    await mock.commands.get("supi-debug")?.handler("", { cwd: "/repo" });
+    const cmd = pi.commands.get("supi-debug") as {
+      handler: (args: string, ctx: { cwd: string }) => Promise<void>;
+    };
+    await cmd?.handler("", { cwd: "/repo" });
 
-    expect(mock.messages[0]?.content).toContain("disabled");
+    expect(pi.messages[0]?.content).toContain("disabled");
     expect(mockFns.getDebugEvents).not.toHaveBeenCalled();
   });
 
   it("command renders sanitized recent events", async () => {
-    const mock = setup();
+    const pi = setup();
     mockFns.getDebugEvents.mockReturnValue({
       rawAccessDenied: false,
       events: [
@@ -287,21 +235,22 @@ describe("supi-debug command and tool", () => {
       ],
     });
 
-    await mock.commands
-      .get("supi-debug")
-      ?.handler("source=rtk level=warning limit=5", { cwd: "/repo" });
+    const cmd = pi.commands.get("supi-debug") as {
+      handler: (args: string, ctx: { cwd: string }) => Promise<void>;
+    };
+    await cmd?.handler("source=rtk level=warning limit=5", { cwd: "/repo" });
 
     expect(mockFns.getDebugEvents).toHaveBeenCalledWith({
       source: "rtk",
       level: "warning",
       limit: 5,
     });
-    expect(mock.messages[0]?.content).toContain("rtk");
-    expect(mock.messages[0]?.content).toContain("git status");
+    expect(pi.messages[0]?.content).toContain("rtk");
+    expect(pi.messages[0]?.content).toContain("git status");
   });
 
   it("command handles circular and bigint payloads without crashing", async () => {
-    const mock = setup();
+    const pi = setup();
     const circular: Record<string, unknown> = { count: 1n };
     circular.self = circular;
     mockFns.getDebugEvents.mockReturnValue({
@@ -319,16 +268,18 @@ describe("supi-debug command and tool", () => {
       ],
     });
 
-    await expect(
-      mock.commands.get("supi-debug")?.handler("source=rtk", { cwd: "/repo" }),
-    ).resolves.toBeUndefined();
-    expect(mock.messages[0]?.content).toContain('"[Circular]"');
-    expect(mock.messages[0]?.content).toContain("1n");
+    const cmd = pi.commands.get("supi-debug") as {
+      handler: (args: string, ctx: { cwd: string }) => Promise<void>;
+    };
+
+    await expect(cmd?.handler("source=rtk", { cwd: "/repo" })).resolves.toBeUndefined();
+    expect(pi.messages[0]?.content).toContain('"[Circular]"');
+    expect(pi.messages[0]?.content).toContain("1n");
   });
 
   it("tool denies access when agent access is off", async () => {
-    const mock = setup({ enabled: true, agentAccess: "off", maxEvents: 100, notifyLevel: "off" });
-    const tool = mock.tools[0];
+    const pi = setup({ enabled: true, agentAccess: "off", maxEvents: 100, notifyLevel: "off" });
+    const tool = pi.tools[0] as { name: string; execute: (...args: unknown[]) => Promise<unknown> };
 
     const result = (await tool?.execute("id", {}, undefined, undefined, { cwd: "/repo" })) as {
       isError?: boolean;
@@ -340,7 +291,7 @@ describe("supi-debug command and tool", () => {
   });
 
   it("tool returns sanitized events and reports raw denial", async () => {
-    const mock = setup();
+    const pi = setup();
     mockFns.getDebugEvents.mockReturnValue({
       rawAccessDenied: true,
       events: [
@@ -354,7 +305,7 @@ describe("supi-debug command and tool", () => {
         },
       ],
     });
-    const tool = mock.tools[0];
+    const tool = pi.tools[0] as { name: string; execute: (...args: unknown[]) => Promise<unknown> };
 
     const result = (await tool?.execute(
       "id",
@@ -380,8 +331,8 @@ describe("supi-debug command and tool", () => {
   });
 
   it("tool requests raw events when raw access is enabled", async () => {
-    const mock = setup({ enabled: true, agentAccess: "raw", maxEvents: 100, notifyLevel: "off" });
-    const tool = mock.tools[0];
+    const pi = setup({ enabled: true, agentAccess: "raw", maxEvents: 100, notifyLevel: "off" });
+    const tool = pi.tools[0] as { name: string; execute: (...args: unknown[]) => Promise<unknown> };
 
     await tool?.execute("id", { includeRaw: true }, undefined, undefined, { cwd: "/repo" });
 
@@ -396,7 +347,7 @@ describe("supi-debug command and tool", () => {
   });
 
   it("tool renders resilient payload formatting for raw events", async () => {
-    const mock = setup({ enabled: true, agentAccess: "raw", maxEvents: 100, notifyLevel: "off" });
+    const pi = setup({ enabled: true, agentAccess: "raw", maxEvents: 100, notifyLevel: "off" });
     const circular: Record<string, unknown> = { count: 2n };
     circular.self = circular;
     mockFns.getDebugEvents.mockReturnValue({
@@ -413,7 +364,7 @@ describe("supi-debug command and tool", () => {
         },
       ],
     });
-    const tool = mock.tools[0];
+    const tool = pi.tools[0] as { name: string; execute: (...args: unknown[]) => Promise<unknown> };
 
     const result = (await tool?.execute("id", { includeRaw: true }, undefined, undefined, {
       cwd: "/repo",

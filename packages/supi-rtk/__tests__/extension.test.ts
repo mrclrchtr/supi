@@ -39,15 +39,7 @@ import { registerConfigSettings, registerContextProvider } from "@mrclrchtr/supi
 import rtkExtension from "../src/rtk.ts";
 import { resetTracking } from "../src/tracking.ts";
 
-interface PiMock {
-  handlers: Map<string, (...args: unknown[]) => unknown>;
-  tools: unknown[];
-  pi: {
-    on: (event: string, handler: (...args: unknown[]) => unknown) => void;
-    registerTool: (tool: unknown) => void;
-    registerCommand: (name: string, spec: unknown) => void;
-  };
-}
+import { createPiMock } from "@mrclrchtr/supi-test-utils";
 
 interface BashTool {
   name: string;
@@ -59,24 +51,6 @@ interface UiCtx {
   hasUI: boolean;
   ui: {
     notify: ReturnType<typeof vi.fn>;
-  };
-}
-
-function createPiMock(): PiMock {
-  const handlers = new Map<string, (...args: unknown[]) => unknown>();
-  const tools: unknown[] = [];
-  return {
-    handlers,
-    tools,
-    pi: {
-      on(event: string, handler: (...args: unknown[]) => unknown) {
-        handlers.set(event, handler);
-      },
-      registerTool(tool: unknown) {
-        tools.push(tool);
-      },
-      registerCommand(_name: string, _spec: unknown) {},
-    },
   };
 }
 
@@ -130,12 +104,12 @@ describe("rtkExtension", () => {
       throw new Error("ENOENT");
     });
 
-    const { pi } = createPiMock();
+    const pi = createPiMock();
     expect(() => rtkExtension(pi as never)).not.toThrow();
   });
 
   it("registers settings, context provider, and event handlers", () => {
-    const { pi, handlers, tools } = createPiMock();
+    const pi = createPiMock(); const handlers = pi.handlers; const tools = pi.tools;
     rtkExtension(pi as never);
 
     expect(registerConfigSettings).toHaveBeenCalled();
@@ -160,7 +134,7 @@ describe("rtkExtension", () => {
   });
 
   it("execute creates the bash tool with the current ctx.cwd and shell settings", async () => {
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock(); const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -183,7 +157,7 @@ describe("rtkExtension", () => {
   });
 
   it("spawnHook strips commandPrefix before RTK and re-applies it after", async () => {
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock(); const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -209,7 +183,7 @@ describe("rtkExtension", () => {
   });
 
   it("spawnHook rewrites commands when enabled", async () => {
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock(); const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -238,7 +212,7 @@ describe("rtkExtension", () => {
   });
 
   it("spawnHook passes guarded Biome commands through without calling rtk", async () => {
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock(); const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -283,7 +257,7 @@ describe("rtkExtension", () => {
       throw new Error(`Unexpected call: ${cmd} ${JSON.stringify(argv)}`);
     });
 
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock(); const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -318,7 +292,7 @@ describe("rtkExtension", () => {
       throw new Error("ENOENT");
     });
 
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock(); const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -362,7 +336,7 @@ describe("rtkExtension", () => {
   it("spawnHook passes through when disabled", async () => {
     mockFns.loadSupiConfig.mockReturnValue({ enabled: false, rewriteTimeout: 5000 });
 
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock(); const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -382,7 +356,7 @@ describe("rtkExtension", () => {
   it("keeps normal behavior when debug registry declines to retain an event", async () => {
     mockFns.recordDebugEvent.mockReturnValue(null);
 
-    const { pi, tools } = createPiMock();
+    const pi = createPiMock(); const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -400,10 +374,10 @@ describe("rtkExtension", () => {
   it("user_bash rewrites commands and uses the shellPath for the event cwd", () => {
     mockFns.getShellPath.mockReturnValue("/bin/fish");
 
-    const { pi, handlers } = createPiMock();
+    const pi = createPiMock(); const handlers = pi.handlers;
     rtkExtension(pi as never);
 
-    const result = handlers.get("user_bash")?.(
+    const result = handlers.get("user_bash")?.[0]?.(
       {
         command: "!git status",
         excludeFromContext: false,
@@ -422,11 +396,11 @@ describe("rtkExtension", () => {
       throw new Error("ENOENT");
     });
 
-    const { pi, handlers } = createPiMock();
+    const pi = createPiMock(); const handlers = pi.handlers;
     rtkExtension(pi as never);
 
     const uiCtx = createUiCtx();
-    const result = handlers.get("user_bash")?.(
+    const result = handlers.get("user_bash")?.[0]?.(
       {
         command: "!echo hello",
         excludeFromContext: false,
@@ -447,7 +421,7 @@ describe("rtkExtension", () => {
       throw new Error("ENOENT");
     });
 
-    const { pi, handlers, tools } = createPiMock();
+    const pi = createPiMock(); const handlers = pi.handlers; const tools = pi.tools;
     rtkExtension(pi as never);
 
     const bashTool = getRegisteredBashTool(tools);
@@ -463,7 +437,7 @@ describe("rtkExtension", () => {
     expect(firstCtx.ui.notify).toHaveBeenCalledTimes(1);
     expect(mockFns.execFileSync).toHaveBeenCalledTimes(1);
 
-    handlers.get("session_start")?.({});
+    handlers.get("session_start")?.[0]?.({});
 
     const secondCtx = createUiCtx();
     await bashTool.execute("id", { command: "git diff" }, undefined, () => {}, secondCtx);

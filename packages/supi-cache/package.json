@@ -32,7 +32,8 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "@mrclrchtr/supi-test-utils": "workspace:*"
   },
   "pi": {
     "extensions": [

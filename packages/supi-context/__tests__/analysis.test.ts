@@ -28,7 +28,7 @@ vi.mock("@mrclrchtr/supi-core", () => ({
   getRegisteredContextProviders: mockFns.getRegisteredContextProviders,
 }));
 
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { analyzeContext } from "../src/analysis.ts";
 
 function createMockMessage(
@@ -70,42 +70,6 @@ function createMockMessage(
   return { role, content: [{ type: "text", text: content }], timestamp: 0 } as unknown;
 }
 
-function createMockCtx(overrides?: {
-  branch?: ReturnType<ExtensionCommandContext["sessionManager"]["getBranch"]>;
-  contextUsage?: { tokens: number | null; contextWindow: number; percent: number | null };
-  systemPrompt?: string;
-}): ExtensionCommandContext {
-  return {
-    cwd: "/project",
-    model: { provider: "openai", id: "gpt-4", name: "GPT-4" },
-    sessionManager: {
-      getBranch: () => overrides?.branch ?? [],
-    } as unknown as ExtensionCommandContext["sessionManager"],
-    getContextUsage: () =>
-      overrides?.contextUsage ?? { tokens: 400, contextWindow: 8192, percent: 4.9 },
-    getSystemPrompt: () => overrides?.systemPrompt ?? "System prompt text",
-    ui: {
-      theme: {
-        fg: (_c: string, t: string) => t,
-      } as unknown as ExtensionCommandContext["ui"]["theme"],
-    } as unknown as ExtensionCommandContext["ui"],
-  } as ExtensionCommandContext;
-}
-
-function createMockPi(overrides?: {
-  activeTools?: string[];
-  allTools?: Array<{ name: string; description: string; parameters: unknown }>;
-}): ExtensionAPI {
-  return {
-    getActiveTools: () => overrides?.activeTools ?? ["read", "bash"],
-    getAllTools: () =>
-      overrides?.allTools ?? [
-        { name: "read", description: "Read file", parameters: {} },
-        { name: "bash", description: "Run bash", parameters: {} },
-      ],
-  } as unknown as ExtensionAPI;
-}
-
 describe("analyzeContext", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -130,9 +94,9 @@ describe("analyzeContext", () => {
     ] as unknown as import("@earendil-works/pi-coding-agent").SessionEntry[];
     mockFns.buildSessionContext.mockReturnValue({ messages: [createMockMessage("user", "Hello")] });
 
-    const ctx = createMockCtx({ branch });
-    const pi = createMockPi();
-    analyzeContext(ctx, pi, undefined);
+    const ctx = makeCtx({ sessionManager: { getBranch: vi.fn(() => branch) } });
+    const pi = createPiMock();
+    analyzeContext(ctx as never, pi as never, undefined);
 
     expect(mockFns.buildSessionContext).toHaveBeenCalledWith(branch);
   });
@@ -145,11 +109,11 @@ describe("analyzeContext", () => {
     ];
     mockFns.buildSessionContext.mockReturnValue({ messages });
 
-    const ctx = createMockCtx({
-      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.categories.userMessages).toBeGreaterThan(0);
     expect(result.categories.assistantMessages).toBeGreaterThan(0);
@@ -164,11 +128,11 @@ describe("analyzeContext", () => {
     ];
     mockFns.buildSessionContext.mockReturnValue({ messages });
 
-    const ctx = createMockCtx({
-      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.categories.assistantMessages).toBeGreaterThan(0);
     expect(result.categories.toolCalls).toBeGreaterThan(0);
@@ -183,12 +147,12 @@ describe("analyzeContext", () => {
     // estimateTokens will return ~100 each = 200 raw total
     // actual tokens = 400, so scale factor = 2
 
-    const ctx = createMockCtx({
-      contextUsage: { tokens: 400, contextWindow: 8192, percent: 4.9 },
-      systemPrompt: "",
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: 400, contextWindow: 8192, percent: 4.9 }),
+      getSystemPrompt: () => "",
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.scaled).toBe(true);
     expect(result.categories.userMessages).toBe(200);
@@ -211,11 +175,11 @@ describe("analyzeContext", () => {
       appendSystemPrompt: "Append this",
     };
 
-    const ctx = createMockCtx({
-      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
-      systemPrompt: "S".repeat(400),
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
+      getSystemPrompt: () => "S".repeat(400),
     });
-    const pi = createMockPi();
+    const pi = createPiMock();
     const result = analyzeContext(ctx, pi, cachedOptions);
 
     expect(result.systemPromptBreakdown.contextFiles).toHaveLength(1);
@@ -231,17 +195,14 @@ describe("analyzeContext", () => {
   it("counts active tool definitions", () => {
     mockFns.buildSessionContext.mockReturnValue({ messages: [] });
 
-    const ctx = createMockCtx({
-      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
     });
-    const pi = createMockPi({
-      activeTools: ["read"],
-      allTools: [
-        { name: "read", description: "Read", parameters: { type: "object" } },
-        { name: "bash", description: "Bash", parameters: { type: "object" } },
-      ],
-    });
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    pi.registerTool({ name: "read", description: "Read", parameters: { type: "object" } });
+    pi.registerTool({ name: "bash", description: "Bash", parameters: { type: "object" } });
+    pi.setActiveTools(["read"]);
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.toolDefinitions.count).toBe(1);
     expect(result.toolDefinitions.tokens).toBeGreaterThan(0);
@@ -257,11 +218,11 @@ describe("analyzeContext", () => {
       },
     ]);
 
-    const ctx = createMockCtx({
-      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.providerSections).toHaveLength(1);
     expect(result.providerSections[0]).toMatchObject({
@@ -281,11 +242,11 @@ describe("analyzeContext", () => {
       },
     ]);
 
-    const ctx = createMockCtx({
-      contextUsage: { tokens: null, contextWindow: 8192, percent: null },
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
     });
-    const pi = createMockPi();
-    const result = analyzeContext(ctx, pi, undefined);
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
 
     expect(result.providerSections).toHaveLength(0);
   });

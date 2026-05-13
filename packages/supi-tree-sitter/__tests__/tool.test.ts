@@ -7,66 +7,46 @@ import treeSitterExtension from "../src/tree-sitter.ts";
 
 const FIXTURE_DIR = path.resolve(__dirname, "fixtures");
 
-// biome-ignore lint/suspicious/noExplicitAny: test mock
-type AnyFunction = (...args: any[]) => any;
+import { createPiMock } from "@mrclrchtr/supi-test-utils";
 
-interface MockInternals {
-  tools: Array<{ name: string; execute: AnyFunction }>;
-  handlers: Map<string, AnyFunction>;
-}
-
-function createPiMock(): ExtensionAPI & MockInternals {
-  const handlers = new Map<string, AnyFunction>();
-  const tools: Array<{ name: string; execute: AnyFunction }> = [];
-
-  return {
-    on(event: string, handler: AnyFunction) {
-      handlers.set(event, handler);
-    },
-    registerTool(tool: { name: string; execute: AnyFunction }) {
-      tools.push(tool);
-    },
-    handlers,
-    tools,
-  } as ExtensionAPI & MockInternals;
-}
-
-async function executeTool(pi: ExtensionAPI & MockInternals, params: Record<string, unknown>) {
-  const tool = pi.tools.find((t) => t.name === "tree_sitter");
+async function executeTool(pi: ReturnType<typeof createPiMock>, params: Record<string, unknown>) {
+  const tool = pi.tools.find((t) => (t as { name: string }).name === "tree_sitter") as
+    | { execute: (...args: unknown[]) => Promise<unknown> }
+    | undefined;
   expect(tool).toBeDefined();
   const result = await tool?.execute("test-id", params, undefined, vi.fn(), { cwd: FIXTURE_DIR });
-  return (result.content as Array<{ type: string; text: string }>)[0].text;
+  return (result as { content: Array<{ type: string; text: string }> }).content[0].text;
 }
 
-async function startSession(pi: ExtensionAPI & MockInternals, cwd: string) {
-  const handler = pi.handlers.get("session_start");
+async function startSession(pi: ReturnType<typeof createPiMock>, cwd: string) {
+  const handler = pi.handlers.get("session_start")?.[0];
   if (handler) await handler({}, { cwd });
 }
 
 function setupWithSession() {
   const pi = createPiMock();
-  treeSitterExtension(pi);
+  treeSitterExtension(pi as never);
   return startSession(pi, FIXTURE_DIR).then(() => pi);
 }
 
 describe("tree_sitter tool registration", () => {
   it("registers the tree_sitter tool", () => {
     const pi = createPiMock();
-    treeSitterExtension(pi);
+    treeSitterExtension(pi as never);
     expect(pi.tools.length).toBe(1);
     expect(pi.tools[0].name).toBe("tree_sitter");
   });
 
   it("returns not initialized before session_start", async () => {
     const pi = createPiMock();
-    treeSitterExtension(pi);
+    treeSitterExtension(pi as never);
     const text = await executeTool(pi, { action: "outline", file: "sample.ts" });
     expect(text).toContain("not initialized");
   });
 
   it("has standalone-safe prompt guidance that does not name lsp as a sibling tool", () => {
     const pi = createPiMock();
-    treeSitterExtension(pi);
+    treeSitterExtension(pi as never);
     const tool = pi.tools.find((t) => t.name === "tree_sitter");
     expect(tool).toBeDefined();
     const guidelines = (tool as unknown as { promptGuidelines: string[] }).promptGuidelines;
@@ -262,7 +242,7 @@ describe("tree_sitter tool actions", () => {
       ).join("\n");
       writeFileSync(path.join(tmpDir, "large.ts"), source);
       const pi = createPiMock();
-      treeSitterExtension(pi);
+      treeSitterExtension(pi as never);
       await startSession(pi, tmpDir);
 
       const text = await executeTool(pi, { action: "outline", file: "large.ts" });
@@ -279,7 +259,7 @@ describe("tree_sitter tool actions", () => {
       const source = ["export class ManyMethods {", ...methods, "}"].join("\n");
       writeFileSync(path.join(tmpDir, "nested.ts"), source);
       const pi = createPiMock();
-      treeSitterExtension(pi);
+      treeSitterExtension(pi as never);
       await startSession(pi, tmpDir);
 
       const text = await executeTool(pi, { action: "outline", file: "nested.ts" });
@@ -327,7 +307,7 @@ describe("tree_sitter tool actions", () => {
         ].join("\n"),
       );
       const pi = createPiMock();
-      treeSitterExtension(pi);
+      treeSitterExtension(pi as never);
       await startSession(pi, tmpDir);
 
       const text = await executeTool(pi, {
@@ -357,7 +337,7 @@ describe("tree_sitter tool actions", () => {
 
   it("disposes on session_shutdown", async () => {
     const pi = await setupWithSession();
-    const shutdownHandler = pi.handlers.get("session_shutdown");
+    const shutdownHandler = pi.handlers.get("session_shutdown")?.[0];
     expect(shutdownHandler).toBeDefined();
     await shutdownHandler?.();
     const text = await executeTool(pi, { action: "outline", file: "sample.ts" });

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPiMock, DEFAULT_CONFIG, makeCtx } from "./extension-helpers.ts";
+import { DEFAULT_CONFIG } from "./extension-helpers.ts";
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 
 const mockFns = vi.hoisted(() => ({
   loadClaudeMdConfig: vi.fn(),
@@ -68,7 +69,7 @@ describe("claudeMdExtension: tool_result (injection)", () => {
   beforeEach(resetMocks);
 
   it("injects context into tool result for supported tools", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     mockFns.extractPathFromToolEvent.mockReturnValue("packages/foo/src/bar.ts");
@@ -86,14 +87,14 @@ describe("claudeMdExtension: tool_result (injection)", () => {
 
     const usage = { tokens: 50_000, contextWindow: 128_000, percent: 50 };
 
-    const result = await handlers.get("tool_result")?.(
+    const result = await pi.handlers.get("tool_result")?.[0]?.(
       {
         isError: false,
         toolName: "read",
         input: { path: "packages/foo/src/bar.ts" },
         content: [{ type: "text", text: "file content" }],
       },
-      makeCtx("/project", usage),
+      makeCtx({ cwd: "/project", getContextUsage: () => usage }),
     );
 
     expect(mockFns.shouldInjectSubdir).toHaveBeenCalledWith(
@@ -118,7 +119,7 @@ describe("claudeMdExtension: tool_result (injection)", () => {
   });
 
   it("skips injection when formatSubdirContext returns empty", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     mockFns.extractPathFromToolEvent.mockReturnValue("packages/foo/bar.ts");
@@ -132,7 +133,7 @@ describe("claudeMdExtension: tool_result (injection)", () => {
     mockFns.shouldInjectSubdir.mockReturnValue(true);
     mockFns.formatSubdirContext.mockReturnValue("");
 
-    const result = await handlers.get("tool_result")?.(
+    const result = await pi.handlers.get("tool_result")?.[0]?.(
       {
         isError: false,
         toolName: "read",
@@ -150,12 +151,12 @@ describe("claudeMdExtension: tool_result (skip conditions)", () => {
   beforeEach(resetMocks);
 
   it("skips injection when subdirs is disabled", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     mockFns.loadClaudeMdConfig.mockReturnValue({ ...DEFAULT_CONFIG, subdirs: false });
 
-    const result = await handlers.get("tool_result")?.(
+    const result = await pi.handlers.get("tool_result")?.[0]?.(
       {
         isError: false,
         toolName: "read",
@@ -170,10 +171,10 @@ describe("claudeMdExtension: tool_result (skip conditions)", () => {
   });
 
   it("ignores errored tool results", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
-    const result = await handlers.get("tool_result")?.(
+    const result = await pi.handlers.get("tool_result")?.[0]?.(
       { isError: true, toolName: "read", input: { path: "x" }, content: [] },
       makeCtx(),
     );
@@ -183,12 +184,12 @@ describe("claudeMdExtension: tool_result (skip conditions)", () => {
   });
 
   it("skips when path extraction returns null", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     mockFns.extractPathFromToolEvent.mockReturnValue(null);
 
-    const result = await handlers.get("tool_result")?.(
+    const result = await pi.handlers.get("tool_result")?.[0]?.(
       { isError: false, toolName: "bash", input: { command: "ls" }, content: [] },
       makeCtx(),
     );
@@ -198,12 +199,12 @@ describe("claudeMdExtension: tool_result (skip conditions)", () => {
   });
 
   it("skips when no context files found", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     mockFns.extractPathFromToolEvent.mockReturnValue("packages/foo/bar.ts");
 
-    const result = await handlers.get("tool_result")?.(
+    const result = await pi.handlers.get("tool_result")?.[0]?.(
       { isError: false, toolName: "read", input: { path: "packages/foo/bar.ts" }, content: [] },
       makeCtx(),
     );
@@ -212,7 +213,7 @@ describe("claudeMdExtension: tool_result (skip conditions)", () => {
   });
 
   it("skips when all dirs are already fresh", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     mockFns.extractPathFromToolEvent.mockReturnValue("packages/foo/bar.ts");
@@ -225,7 +226,7 @@ describe("claudeMdExtension: tool_result (skip conditions)", () => {
     ]);
     mockFns.shouldInjectSubdir.mockReturnValue(false);
 
-    const result = await handlers.get("tool_result")?.(
+    const result = await pi.handlers.get("tool_result")?.[0]?.(
       { isError: false, toolName: "read", input: { path: "packages/foo/bar.ts" }, content: [] },
       makeCtx(),
     );
@@ -238,10 +239,10 @@ describe("claudeMdExtension: native path deduplication", () => {
   beforeEach(resetMocks);
 
   it("captures native paths on first before_agent_start only", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
-    const bas = handlers.get("before_agent_start") as (...args: unknown[]) => unknown;
+    const bas = pi.handlers.get("before_agent_start")?.[0] as (...args: unknown[]) => unknown;
     await bas(
       {
         systemPromptOptions: {
@@ -269,7 +270,7 @@ describe("claudeMdExtension: native path deduplication", () => {
         files.filter((f) => !nativePaths.has(f.absolutePath)),
     );
 
-    await handlers.get("tool_result")?.(
+    await pi.handlers.get("tool_result")?.[0]?.(
       { isError: false, toolName: "read", input: { path: "src/foo.ts" }, content: [] },
       makeCtx(),
     );
@@ -278,10 +279,10 @@ describe("claudeMdExtension: native path deduplication", () => {
   });
 
   it("calls filterAlreadyLoaded with native paths set", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
-    await handlers.get("before_agent_start")?.(
+    await pi.handlers.get("before_agent_start")?.[0]?.(
       { systemPromptOptions: { contextFiles: [{ path: "/project/CLAUDE.md", content: "root" }] } },
       makeCtx(),
     );
@@ -297,7 +298,7 @@ describe("claudeMdExtension: native path deduplication", () => {
     mockFns.shouldInjectSubdir.mockReturnValue(true);
     mockFns.formatSubdirContext.mockReturnValue("context");
 
-    await handlers.get("tool_result")?.(
+    await pi.handlers.get("tool_result")?.[0]?.(
       { isError: false, toolName: "read", input: { path: "src/bar.ts" }, content: [] },
       makeCtx(),
     );

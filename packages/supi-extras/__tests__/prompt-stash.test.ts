@@ -8,55 +8,8 @@ vi.mock("../src/clipboard.ts", () => ({
   copyToClipboard: copyToClipboardMock,
 }));
 
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import promptStash, { _resetStashes } from "../src/prompt-stash.ts";
-
-function createPiMock() {
-  const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => Promise<unknown>>>();
-  const shortcuts = new Map<string, Array<(ctx: unknown) => Promise<unknown>>>();
-  const commands = new Map<string, (args: string, ctx: unknown) => Promise<unknown>>();
-  const execCalls: Array<{ command: string; args: string[] }> = [];
-
-  return {
-    on: (event: string, handler: (event: unknown, ctx: unknown) => Promise<unknown>) => {
-      const list = handlers.get(event) ?? [];
-      list.push(handler);
-      handlers.set(event, list);
-    },
-    getHandlers: (event: string) => handlers.get(event) ?? [],
-    registerShortcut: (key: string, opts: { handler: (ctx: unknown) => Promise<unknown> }) => {
-      const list = shortcuts.get(key) ?? [];
-      list.push(opts.handler);
-      shortcuts.set(key, list);
-    },
-    getShortcutHandlers: (key: string) => shortcuts.get(key) ?? [],
-    registerCommand: (
-      name: string,
-      opts: { handler: (args: string, ctx: unknown) => Promise<unknown> },
-    ) => {
-      commands.set(name, opts.handler);
-    },
-    getCommandHandler: (name: string) => commands.get(name),
-    exec: vi.fn(async (command: string, args: string[]) => {
-      execCalls.push({ command, args });
-      return { code: 0, stdout: "", stderr: "" };
-    }),
-    getExecCalls: () => execCalls,
-  };
-}
-
-function createCtxMock() {
-  return {
-    ui: {
-      getEditorText: vi.fn(() => ""),
-      setEditorText: vi.fn(),
-      notify: vi.fn(),
-      input: vi.fn(async () => undefined as string | undefined),
-      custom: vi.fn(async () => null as unknown),
-      theme: { fg: (_color: string, text: string) => text } as unknown as Record<string, unknown>,
-    },
-    cwd: "/tmp",
-  };
-}
 
 describe("promptStash extension", () => {
   beforeEach(() => {
@@ -82,7 +35,7 @@ describe("promptStash extension", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    const ctx = createCtxMock();
+    const ctx = makeCtx({ cwd: "/tmp" });
     ctx.ui.getEditorText = vi.fn(() => "Fix the auth bug in login.ts");
     ctx.ui.input = vi.fn(async () => "auth bug");
 
@@ -96,20 +49,23 @@ describe("promptStash extension", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    const ctx = createCtxMock();
+    const ctx = makeCtx({ cwd: "/tmp" });
     ctx.ui.getEditorText = vi.fn(() => "Refactor the database layer");
     ctx.ui.input = vi.fn(async () => "");
 
     await pi.getShortcutHandlers("alt+s")[0](ctx);
 
-    expect(ctx.ui.notify).toHaveBeenCalledWith('Stashed: "Refactor the database layer"', "info");
+    expect(ctx.ui.notify).toHaveBeenCalledWith(
+      'Stashed: "Refactor the database layer"',
+      "info",
+    );
   });
 
   it("warns when editor is empty on alt+s", async () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    const ctx = createCtxMock();
+    const ctx = makeCtx({ cwd: "/tmp" });
     ctx.ui.getEditorText = vi.fn(() => "   ");
 
     await pi.getShortcutHandlers("alt+s")[0](ctx);
@@ -122,12 +78,12 @@ describe("promptStash extension", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    const stashCtx = createCtxMock();
+    const stashCtx = makeCtx({ cwd: "/tmp" });
     stashCtx.ui.getEditorText = vi.fn(() => "restore me");
     stashCtx.ui.input = vi.fn(async () => "restore test");
     await pi.getShortcutHandlers("alt+s")[0](stashCtx);
 
-    const restoreCtx = createCtxMock();
+    const restoreCtx = makeCtx({ cwd: "/tmp" });
     restoreCtx.ui.custom = vi.fn(async () => ({
       action: "restore",
       stash: {
@@ -138,7 +94,8 @@ describe("promptStash extension", () => {
       },
     }));
 
-    await pi.getCommandHandler("supi-stash")?.("", restoreCtx);
+    const cmd = pi.getCommandHandler("supi-stash") as (args: string, ctx: unknown) => Promise<unknown>;
+    await cmd("", restoreCtx);
 
     expect(restoreCtx.ui.custom).toHaveBeenCalledWith(expect.any(Function), { overlay: true });
     expect(restoreCtx.ui.setEditorText).toHaveBeenCalledWith("restore me");
@@ -149,8 +106,9 @@ describe("promptStash extension", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    const ctx = createCtxMock();
-    await pi.getCommandHandler("supi-stash")?.("", ctx);
+    const ctx = makeCtx({ cwd: "/tmp" });
+    const cmd = pi.getCommandHandler("supi-stash") as (args: string, ctx: unknown) => Promise<unknown>;
+    await cmd("", ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("No stashed prompts", "info");
   });
@@ -159,14 +117,15 @@ describe("promptStash extension", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    const ctx = createCtxMock();
+    const ctx = makeCtx({ cwd: "/tmp" });
     ctx.ui.getEditorText = vi.fn(() => "text to clear");
     ctx.ui.input = vi.fn(async () => "clear me");
     await pi.getShortcutHandlers("alt+s")[0](ctx);
 
-    const clearCtx = createCtxMock();
+    const clearCtx = makeCtx({ cwd: "/tmp" });
     clearCtx.ui.custom = vi.fn(async () => ({ action: "cleared" }));
-    await pi.getCommandHandler("supi-stash")?.("", clearCtx);
+    const cmd = pi.getCommandHandler("supi-stash") as (args: string, ctx: unknown) => Promise<unknown>;
+    await cmd("", clearCtx);
 
     expect(clearCtx.ui.notify).toHaveBeenCalledWith("All stashes cleared", "info");
   });
@@ -175,12 +134,12 @@ describe("promptStash extension", () => {
     const pi = createPiMock();
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
-    const stashCtx = createCtxMock();
+    const stashCtx = makeCtx({ cwd: "/tmp" });
     stashCtx.ui.getEditorText = vi.fn(() => "copy me");
     stashCtx.ui.input = vi.fn(async () => "copy test");
     await pi.getShortcutHandlers("alt+s")[0](stashCtx);
 
-    const copyCtx = createCtxMock();
+    const copyCtx = makeCtx({ cwd: "/tmp" });
     copyCtx.ui.custom = vi.fn(async () => ({
       action: "copy",
       stash: {
@@ -190,8 +149,8 @@ describe("promptStash extension", () => {
         createdAt: Date.now(),
       },
     }));
-
-    await pi.getCommandHandler("supi-stash")?.("", copyCtx);
+    const cmd = pi.getCommandHandler("supi-stash") as (args: string, ctx: unknown) => Promise<unknown>;
+    await cmd("", copyCtx);
 
     expect(copyToClipboardMock).toHaveBeenCalledWith("copy me", "/tmp", pi);
     expect(copyCtx.ui.notify).toHaveBeenCalledWith('Copied "copy test" to clipboard', "info");

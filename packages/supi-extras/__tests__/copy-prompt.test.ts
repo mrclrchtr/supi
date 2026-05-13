@@ -8,30 +8,8 @@ vi.mock("../src/clipboard.ts", () => ({
   copyToClipboard: copyToClipboardMock,
 }));
 
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import copyPrompt from "../src/copy-prompt.ts";
-
-function createPiMock() {
-  const shortcuts = new Map<string, Array<(ctx: unknown) => Promise<unknown>>>();
-
-  return {
-    registerShortcut: (key: string, opts: { handler: (ctx: unknown) => Promise<unknown> }) => {
-      const list = shortcuts.get(key) ?? [];
-      list.push(opts.handler);
-      shortcuts.set(key, list);
-    },
-    getShortcutHandlers: (key: string) => shortcuts.get(key) ?? [],
-  };
-}
-
-function createCtxMock() {
-  return {
-    ui: {
-      getEditorText: vi.fn(() => ""),
-      notify: vi.fn(),
-    },
-    cwd: "/tmp",
-  };
-}
 
 describe("copyPrompt extension", () => {
   beforeEach(() => {
@@ -49,7 +27,7 @@ describe("copyPrompt extension", () => {
     const pi = createPiMock();
     copyPrompt(pi as unknown as Parameters<typeof copyPrompt>[0]);
 
-    const ctx = createCtxMock();
+    const ctx = makeCtx({ cwd: "/tmp" });
     ctx.ui.getEditorText = vi.fn(() => "some prompt text");
 
     await pi.getShortcutHandlers("alt+c")[0](ctx);
@@ -62,7 +40,7 @@ describe("copyPrompt extension", () => {
     const pi = createPiMock();
     copyPrompt(pi as unknown as Parameters<typeof copyPrompt>[0]);
 
-    const ctx = createCtxMock();
+    const ctx = makeCtx({ cwd: "/tmp" });
     ctx.ui.getEditorText = vi.fn(() => "");
 
     await pi.getShortcutHandlers("alt+c")[0](ctx);
@@ -75,7 +53,7 @@ describe("copyPrompt extension", () => {
     const pi = createPiMock();
     copyPrompt(pi as unknown as Parameters<typeof copyPrompt>[0]);
 
-    const ctx = createCtxMock();
+    const ctx = makeCtx({ cwd: "/tmp" });
     ctx.ui.getEditorText = vi.fn(() => "   ");
 
     await pi.getShortcutHandlers("alt+c")[0](ctx);

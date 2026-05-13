@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createPiMock, DEFAULT_CONFIG, makeCtx } from "./extension-helpers.ts";
+import { DEFAULT_CONFIG } from "./extension-helpers.ts";
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 
 const mockFns = vi.hoisted(() => ({
   loadClaudeMdConfig: vi.fn(),
@@ -66,7 +67,7 @@ describe("claudeMdExtension: registration", () => {
   beforeEach(resetMocks);
 
   it("registers all event handlers", () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     for (const event of [
@@ -76,7 +77,7 @@ describe("claudeMdExtension: registration", () => {
       "before_agent_start",
       "tool_result",
     ]) {
-      expect(handlers.has(event), `missing handler for ${event}`).toBe(true);
+      expect(pi.handlers.has(event), `missing handler for ${event}`).toBe(true);
     }
   });
 });
@@ -85,7 +86,7 @@ describe("claudeMdExtension: session_start", () => {
   beforeEach(resetMocks);
 
   it("reconstructs state from session history", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     mockFns.reconstructState.mockReturnValue({
@@ -93,7 +94,7 @@ describe("claudeMdExtension: session_start", () => {
       injectedDirs: new Map([["packages/foo", { turn: 5, file: "packages/foo/CLAUDE.md" }]]),
     });
 
-    await handlers.get("session_start")?.(
+    await pi.handlers.get("session_start")?.[0]?.(
       {},
       { cwd: "/project", sessionManager: { getBranch: () => [{ type: "assistant" }] } },
     );
@@ -102,11 +103,11 @@ describe("claudeMdExtension: session_start", () => {
   });
 
   it("starts fresh when reconstruction fails", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     await expect(
-      handlers.get("session_start")?.(
+      pi.handlers.get("session_start")?.[0]?.(
         {},
         {
           cwd: "/project",
@@ -125,16 +126,16 @@ describe("claudeMdExtension: turn_end", () => {
   beforeEach(resetMocks);
 
   it("increments completedTurns on stopReason stop", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
-    const turnEnd = handlers.get("turn_end") as (...args: unknown[]) => unknown;
+    const turnEnd = pi.handlers.get("turn_end")?.[0] as (...args: unknown[]) => unknown;
     await turnEnd({ message: { stopReason: "stop" } }, makeCtx());
     await turnEnd({ message: { stopReason: "stop" } }, makeCtx());
     await turnEnd({ message: { stopReason: "tool_use" } }, makeCtx());
 
     // Verify turn counting without relying on refresh emission
-    const bas = handlers.get("before_agent_start") as (...args: unknown[]) => unknown;
+    const bas = pi.handlers.get("before_agent_start")?.[0] as (...args: unknown[]) => unknown;
     await bas(
       { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "c" }] } },
       makeCtx(),
@@ -148,7 +149,7 @@ describe("claudeMdExtension: session_compact", () => {
   beforeEach(resetMocks);
 
   it("clears injectedDirs on compact", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     claudeMdExtension(pi as never);
 
     mockFns.extractPathFromToolEvent.mockReturnValue("packages/foo/bar.ts");
@@ -163,7 +164,7 @@ describe("claudeMdExtension: session_compact", () => {
     mockFns.shouldInjectSubdir.mockReturnValue(true);
     mockFns.formatSubdirContext.mockReturnValue("<extension-context>content</extension-context>");
 
-    await handlers.get("tool_result")?.(
+    await pi.handlers.get("tool_result")?.[0]?.(
       {
         isError: false,
         toolName: "read",
@@ -174,9 +175,9 @@ describe("claudeMdExtension: session_compact", () => {
     );
 
     // Compact should clear injectedDirs
-    await handlers.get("session_compact")?.({}, makeCtx());
+    await pi.handlers.get("session_compact")?.[0]?.({}, makeCtx());
 
-    const result = await handlers.get("before_agent_start")?.(
+    const result = await pi.handlers.get("before_agent_start")?.[0]?.(
       { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "root" }] } },
       makeCtx(),
     );

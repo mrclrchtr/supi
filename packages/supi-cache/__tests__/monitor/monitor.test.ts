@@ -24,60 +24,7 @@ vi.mock("../../src/forensics/forensics.ts", () => ({
 
 import { runForensics } from "../../src/forensics/forensics.ts";
 import cacheMonitorExtension from "../../src/monitor/monitor.ts";
-
-type Handler = (event: unknown, ctx: unknown) => Promise<void>;
-
-function createPiMock() {
-  const handlers = new Map<string, Handler>();
-  const commands = new Map<string, { handler: Handler; description: string }>();
-  const tools: unknown[] = [];
-  const renderers = new Map<string, unknown>();
-  const entries: Array<{ type: string; data: unknown }> = [];
-  const messages: Array<Record<string, unknown>> = [];
-
-  return {
-    handlers,
-    commands,
-    tools,
-    renderers,
-    entries,
-    messages,
-    pi: {
-      on(event: string, handler: Handler) {
-        handlers.set(event, handler);
-      },
-      registerCommand(name: string, spec: { handler: Handler; description: string }) {
-        commands.set(name, spec);
-      },
-      registerMessageRenderer(type: string, renderer: unknown) {
-        renderers.set(type, renderer);
-      },
-      registerTool(tool: { execute?: (...args: unknown[]) => Promise<unknown> }) {
-        tools.push(tool);
-      },
-      appendEntry(type: string, data: unknown) {
-        entries.push({ type, data });
-      },
-      sendMessage(msg: Record<string, unknown>) {
-        messages.push(msg);
-      },
-    },
-  };
-}
-
-function makeCtx(overrides: Record<string, unknown> = {}) {
-  return {
-    cwd: "/project",
-    ui: {
-      setStatus: vi.fn(),
-      notify: vi.fn(),
-    },
-    sessionManager: {
-      getBranch: vi.fn().mockReturnValue([]),
-    },
-    ...overrides,
-  };
-}
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 
 function assistantMessage(cacheRead: number, cacheWrite: number, input: number) {
   return {
@@ -106,17 +53,11 @@ function resetMocks() {
   });
 }
 
-function getHandler(handlers: Map<string, Handler>, event: string): Handler {
-  const h = handlers.get(event);
-  if (!h) throw new Error(`No handler registered for ${event}`);
-  return h;
-}
-
 describe("cacheMonitorExtension", () => {
   beforeEach(resetMocks);
 
   it("registers all event handlers and commands", () => {
-    const { handlers, commands, renderers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     for (const event of [
@@ -127,12 +68,12 @@ describe("cacheMonitorExtension", () => {
       "session_start",
       "session_shutdown",
     ]) {
-      expect(handlers.has(event), `missing handler: ${event}`).toBe(true);
+      expect(pi.handlers.has(event), `missing handler: ${event}`).toBe(true);
     }
-    expect(commands.has("supi-cache-history")).toBe(true);
-    expect(commands.has("supi-cache-forensics")).toBe(true);
-    expect(renderers.has("supi-cache-history")).toBe(true);
-    expect(renderers.has("supi-cache-forensics-report")).toBe(true);
+    expect(pi.commands.has("supi-cache-history")).toBe(true);
+    expect(pi.commands.has("supi-cache-forensics")).toBe(true);
+    expect(pi.renderers.has("supi-cache-history")).toBe(true);
+    expect(pi.renderers.has("supi-cache-forensics-report")).toBe(true);
   });
 });
 
@@ -140,48 +81,48 @@ describe("message_end handler", () => {
   beforeEach(resetMocks);
 
   it("records turn and updates status", async () => {
-    const { handlers, entries, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const handler = getHandler(handlers, "message_end");
+    const handler = pi.handlers.get("message_end")?.[0];
     await handler(assistantMessage(8000, 2000, 2000), ctx);
 
-    expect(entries).toHaveLength(1);
-    expect(entries[0].type).toBe("supi-cache-turn");
-    expect((entries[0].data as Record<string, unknown>).hitRate).toBe(80);
+    expect(pi.entries).toHaveLength(1);
+    expect(pi.entries[0].type).toBe("supi-cache-turn");
+    expect((pi.entries[0].data as Record<string, unknown>).hitRate).toBe(80);
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("supi-cache", "cache: 80%");
   });
 
   it("skips non-assistant messages", async () => {
-    const { handlers, entries, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const handler = getHandler(handlers, "message_end");
+    const handler = pi.handlers.get("message_end")?.[0];
     await handler({ type: "message_end", message: { role: "user" } }, ctx);
 
-    expect(entries).toHaveLength(0);
+    expect(pi.entries).toHaveLength(0);
     expect(ctx.ui.setStatus).not.toHaveBeenCalled();
   });
 
   it("skips assistant messages without usage", async () => {
-    const { handlers, entries, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const handler = getHandler(handlers, "message_end");
+    const handler = pi.handlers.get("message_end")?.[0];
     await handler({ type: "message_end", message: { role: "assistant" } }, ctx);
 
-    expect(entries).toHaveLength(0);
+    expect(pi.entries).toHaveLength(0);
   });
 
   it("detects regression and notifies", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const handler = getHandler(handlers, "message_end");
+    const handler = pi.handlers.get("message_end")?.[0];
 
     // First turn: 90% hit rate
     await handler(assistantMessage(9000, 0, 1000), ctx);
@@ -202,11 +143,11 @@ describe("message_end handler", () => {
       idleThresholdMinutes: 5,
     });
 
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const handler = getHandler(handlers, "message_end");
+    const handler = pi.handlers.get("message_end")?.[0];
 
     await handler(assistantMessage(9000, 0, 1000), ctx);
     await handler(assistantMessage(1000, 0, 9000), ctx);
@@ -222,13 +163,13 @@ describe("message_end handler", () => {
       idleThresholdMinutes: 5,
     });
 
-    const { handlers, entries, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    await getHandler(handlers, "message_end")(assistantMessage(8000, 0, 2000), ctx);
+    await pi.handlers.get("message_end")?.[0](assistantMessage(8000, 0, 2000), ctx);
 
-    expect(entries).toHaveLength(0);
+    expect(pi.entries).toHaveLength(0);
     expect(ctx.ui.setStatus).not.toHaveBeenCalled();
   });
 });
@@ -237,7 +178,7 @@ describe("session lifecycle", () => {
   beforeEach(resetMocks);
 
   it("restores state on session_start", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const sessionEntries = [
@@ -262,7 +203,7 @@ describe("session lifecycle", () => {
       sessionManager: { getBranch: vi.fn().mockReturnValue(sessionEntries) },
     });
 
-    await getHandler(handlers, "session_start")({ type: "session_start", reason: "startup" }, ctx);
+    await pi.handlers.get("session_start")?.[0]({ type: "session_start", reason: "startup" }, ctx);
 
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("supi-cache", "cache: 80%");
   });
@@ -275,24 +216,24 @@ describe("session lifecycle", () => {
       idleThresholdMinutes: 5,
     });
 
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    await getHandler(handlers, "session_start")({ type: "session_start", reason: "startup" }, ctx);
+    await pi.handlers.get("session_start")?.[0]({ type: "session_start", reason: "startup" }, ctx);
 
     expect(ctx.ui.setStatus).toHaveBeenCalledWith("supi-cache", undefined);
   });
 
   it("clears state on session_shutdown", async () => {
-    const { handlers, entries, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    await getHandler(handlers, "message_end")(assistantMessage(8000, 0, 2000), ctx);
-    expect(entries).toHaveLength(1);
+    await pi.handlers.get("message_end")?.[0](assistantMessage(8000, 0, 2000), ctx);
+    expect(pi.entries).toHaveLength(1);
 
-    await getHandler(handlers, "session_shutdown")(
+    await pi.handlers.get("session_shutdown")?.[0](
       { type: "session_shutdown", reason: "quit" },
       ctx,
     );
@@ -305,14 +246,14 @@ describe("cause tracking events", () => {
   beforeEach(resetMocks);
 
   it("flags compaction on session_compact", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const msgHandler = getHandler(handlers, "message_end");
+    const msgHandler = pi.handlers.get("message_end")?.[0];
 
     await msgHandler(assistantMessage(9000, 0, 1000), ctx);
-    await getHandler(handlers, "session_compact")(
+    await pi.handlers.get("session_compact")?.[0](
       { type: "session_compact", compactionEntry: {}, fromExtension: false },
       ctx,
     );
@@ -322,14 +263,14 @@ describe("cause tracking events", () => {
   });
 
   it("flags model change on model_select", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const msgHandler = getHandler(handlers, "message_end");
+    const msgHandler = pi.handlers.get("message_end")?.[0];
 
     await msgHandler(assistantMessage(9000, 0, 1000), ctx);
-    await getHandler(handlers, "model_select")(
+    await pi.handlers.get("model_select")?.[0](
       {
         type: "model_select",
         model: { provider: "anthropic", id: "claude-4" },
@@ -347,12 +288,12 @@ describe("cause tracking events", () => {
   });
 
   it("flags prompt change on before_agent_start fingerprint diff", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const msgHandler = getHandler(handlers, "message_end");
-    const baHandler = getHandler(handlers, "before_agent_start");
+    const msgHandler = pi.handlers.get("message_end")?.[0];
+    const baHandler = pi.handlers.get("before_agent_start")?.[0];
 
     await baHandler(
       {
@@ -391,41 +332,41 @@ describe("/supi-cache-history command", () => {
   beforeEach(resetMocks);
 
   it("sends a custom message with turn snapshot", async () => {
-    const { handlers, commands, messages, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    await getHandler(handlers, "message_end")(assistantMessage(8000, 0, 2000), ctx);
+    await pi.handlers.get("message_end")?.[0](assistantMessage(8000, 0, 2000), ctx);
 
-    const cmd = commands.get("supi-cache-history");
+    const cmd = pi.commands.get("supi-cache-history");
     if (!cmd) throw new Error("supi-cache-history command not registered");
     await cmd.handler("", ctx);
 
-    expect(messages).toHaveLength(1);
-    expect(messages[0].customType).toBe("supi-cache-history");
-    expect(messages[0].display).toBe(true);
+    expect(pi.messages).toHaveLength(1);
+    expect(pi.messages[0].customType).toBe("supi-cache-history");
+    expect(pi.messages[0].display).toBe(true);
     // Verify snapshot is persisted in details
-    const details = messages[0].details as Record<string, unknown>;
+    const details = pi.messages[0].details as Record<string, unknown>;
     expect(details.turns).toHaveLength(1);
     expect(details.cacheSupported).toBe(true);
   });
 
   it("snapshot is independent of later state changes", async () => {
-    const { handlers, commands, messages, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    await getHandler(handlers, "message_end")(assistantMessage(8000, 0, 2000), ctx);
+    await pi.handlers.get("message_end")?.[0](assistantMessage(8000, 0, 2000), ctx);
 
-    const cmd = commands.get("supi-cache-history");
+    const cmd = pi.commands.get("supi-cache-history");
     if (!cmd) throw new Error("supi-cache-history command not registered");
     await cmd.handler("", ctx);
 
     // Record more turns after the report was sent
-    await getHandler(handlers, "message_end")(assistantMessage(5000, 0, 5000), ctx);
+    await pi.handlers.get("message_end")?.[0](assistantMessage(5000, 0, 5000), ctx);
 
     // Snapshot should still have just 1 turn
-    const details = messages[0].details as { turns: unknown[] };
+    const details = pi.messages[0].details as { turns: unknown[] };
     expect(details.turns).toHaveLength(1);
   });
 });
@@ -437,17 +378,17 @@ describe("supi_cache_forensics agent tool", () => {
   });
 
   it("is registered with correct name and parameters", () => {
-    const { tools, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
-    expect(tools).toHaveLength(1);
-    const tool = tools[0] as { name: string; promptGuidelines?: string[] };
+    expect(pi.tools).toHaveLength(1);
+    const tool = pi.tools[0] as { name: string; promptGuidelines?: string[] };
     expect(tool.name).toBe("supi_cache_forensics");
     expect(tool.promptGuidelines?.length).toBeGreaterThan(0);
   });
 
   it("calls runForensics with parsed params and strips human detail", async () => {
-    const { tools, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     vi.mocked(runForensics).mockResolvedValue({
@@ -469,7 +410,7 @@ describe("supi_cache_forensics agent tool", () => {
       turnsAnalyzed: 5,
     });
 
-    const tool = tools[0] as {
+    const tool = pi.tools[0] as {
       execute: (
         _toolCallId: string,
         params: unknown,
@@ -504,7 +445,7 @@ describe("supi_cache_forensics agent tool", () => {
   });
 
   it("uses defaults for optional params", async () => {
-    const { tools, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     vi.mocked(runForensics).mockResolvedValue({
@@ -514,7 +455,7 @@ describe("supi_cache_forensics agent tool", () => {
       turnsAnalyzed: 3,
     });
 
-    const tool = tools[0] as {
+    const tool = pi.tools[0] as {
       execute: (
         _toolCallId: string,
         params: unknown,
@@ -546,7 +487,7 @@ describe("/supi-cache-forensics command", () => {
   });
 
   it("calls runForensics and sends a message with the result", async () => {
-    const { commands, messages, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     vi.mocked(runForensics).mockResolvedValue({
@@ -556,7 +497,7 @@ describe("/supi-cache-forensics command", () => {
       turnsAnalyzed: 20,
     });
 
-    const cmd = commands.get("supi-cache-forensics");
+    const cmd = pi.commands.get("supi-cache-forensics");
     if (!cmd) throw new Error("supi-cache-forensics command not registered");
 
     const ctx = makeCtx();
@@ -570,13 +511,13 @@ describe("/supi-cache-forensics command", () => {
       regressionThreshold: 25,
     });
 
-    expect(messages).toHaveLength(1);
-    expect(messages[0].customType).toBe("supi-cache-forensics-report");
-    expect(messages[0].display).toBe(true);
+    expect(pi.messages).toHaveLength(1);
+    expect(pi.messages[0].customType).toBe("supi-cache-forensics-report");
+    expect(pi.messages[0].display).toBe(true);
   });
 
   it("passes --since and --pattern args to runForensics", async () => {
-    const { commands, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     vi.mocked(runForensics).mockResolvedValue({
@@ -586,7 +527,7 @@ describe("/supi-cache-forensics command", () => {
       turnsAnalyzed: 0,
     });
 
-    const cmd = commands.get("supi-cache-forensics");
+    const cmd = pi.commands.get("supi-cache-forensics");
     if (!cmd) throw new Error("supi-cache-forensics command not registered");
 
     const ctx = makeCtx();
@@ -606,11 +547,11 @@ describe("no-data turns (zero cache counters)", () => {
   beforeEach(resetMocks);
 
   it("does not trigger false regression from a no-cache-metrics turn", async () => {
-    const { handlers, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const handler = getHandler(handlers, "message_end");
+    const handler = pi.handlers.get("message_end")?.[0];
 
     // Turn 1: 90% cache hit
     await handler(assistantMessage(9000, 0, 1000), ctx);
@@ -624,31 +565,31 @@ describe("no-data turns (zero cache counters)", () => {
   });
 
   it("does not compare across a no-data gap", async () => {
-    const { handlers, entries, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const handler = getHandler(handlers, "message_end");
+    const handler = pi.handlers.get("message_end")?.[0];
 
     await handler(assistantMessage(9000, 0, 1000), ctx);
     await handler(assistantMessage(0, 0, 10000), ctx);
     await handler(assistantMessage(1000, 0, 9000), ctx);
 
     expect(ctx.ui.notify).not.toHaveBeenCalled();
-    expect(entries).toHaveLength(3);
-    expect((entries[2].data as Record<string, unknown>).note).toBeUndefined();
+    expect(pi.entries).toHaveLength(3);
+    expect((pi.entries[2].data as Record<string, unknown>).note).toBeUndefined();
     expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-cache", "cache: 10%");
   });
 
   it("carries model-change attribution across a no-data gap", async () => {
-    const { handlers, entries, pi } = createPiMock();
+    const pi = createPiMock();
     cacheMonitorExtension(pi as never);
 
     const ctx = makeCtx();
-    const handler = getHandler(handlers, "message_end");
+    const handler = pi.handlers.get("message_end")?.[0];
 
     await handler(assistantMessage(9000, 0, 1000), ctx);
-    await getHandler(handlers, "model_select")(
+    await pi.handlers.get("model_select")?.[0](
       {
         type: "model_select",
         model: { provider: "anthropic", id: "claude-4" },
@@ -661,9 +602,9 @@ describe("no-data turns (zero cache counters)", () => {
     await handler(assistantMessage(1000, 0, 9000), ctx);
 
     expect(ctx.ui.notify).not.toHaveBeenCalled();
-    expect((entries[1].data as Record<string, unknown>).note).toBeUndefined();
-    expect((entries[2].data as Record<string, unknown>).note).toBe("\u26a0 model changed");
-    expect((entries[2].data as Record<string, unknown>).cause).toEqual({
+    expect((pi.entries[1].data as Record<string, unknown>).note).toBeUndefined();
+    expect((pi.entries[2].data as Record<string, unknown>).note).toBe("\u26a0 model changed");
+    expect((pi.entries[2].data as Record<string, unknown>).cause).toEqual({
       type: "model_change",
       model: "anthropic/claude-4",
     });
