@@ -1,4 +1,4 @@
-import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockSearchLibrary, mockGetContext, MockContext7Error } = vi.hoisted(() => ({
@@ -20,28 +20,12 @@ vi.mock("../src/context7-client.ts", () => ({
 
 import docsExtension from "../src/docs.ts";
 
-type ToolDef = {
-  name: string;
-  label?: string;
-  parameters: unknown;
-  execute: (...args: unknown[]) => Promise<{
-    content: { type: "text"; text: string }[];
-    isError?: boolean;
-    details?: Record<string, unknown>;
-  }>;
-  promptSnippet?: string;
-  promptGuidelines?: string[];
+/** Result shape returned by both web_docs tools. */
+type ToolResult = {
+  content: { type: "text"; text: string }[];
+  isError?: boolean;
+  details?: Record<string, unknown>;
 };
-
-function getTools(pi: ReturnType<typeof createPiMock>): ToolDef[] {
-  return pi.tools as unknown as ToolDef[];
-}
-
-function getTool(pi: ReturnType<typeof createPiMock>, name: string): ToolDef {
-  const tool = getTools(pi).find((t) => t.name === name);
-  if (!tool) throw new Error(`Tool "${name}" not found`);
-  return tool;
-}
 
 describe("docsExtension", () => {
   let pi: ReturnType<typeof createPiMock>;
@@ -62,26 +46,26 @@ describe("docsExtension", () => {
   describe("web_docs_search", () => {
     it("rejects missing library_name", async () => {
       const tool = getTool(pi, "web_docs_search");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         { query: "how to do X" },
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("library_name");
     });
 
     it("rejects missing query", async () => {
       const tool = getTool(pi, "web_docs_search");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         { library_name: "react" },
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("query");
     });
@@ -100,13 +84,13 @@ describe("docsExtension", () => {
       ]);
 
       const tool = getTool(pi, "web_docs_search");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         { library_name: "react", query: "how to use hooks" },
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
 
       expect(result.isError).toBeUndefined();
       expect(mockSearchLibrary).toHaveBeenCalledWith("how to use hooks", "react");
@@ -120,13 +104,13 @@ describe("docsExtension", () => {
       mockSearchLibrary.mockResolvedValue([]);
 
       const tool = getTool(pi, "web_docs_search");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         { library_name: "nonexistent-lib", query: "something" },
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
 
       expect(result.isError).toBeUndefined();
       expect(result.content[0].text).toContain("No libraries found");
@@ -136,26 +120,26 @@ describe("docsExtension", () => {
   describe("web_docs_fetch", () => {
     it("rejects missing library_id", async () => {
       const tool = getTool(pi, "web_docs_fetch");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         { query: "how to do X" },
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("library_id");
     });
 
     it("rejects missing query", async () => {
       const tool = getTool(pi, "web_docs_fetch");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         { library_id: "/facebook/react" },
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("query");
     });
@@ -164,13 +148,13 @@ describe("docsExtension", () => {
       mockGetContext.mockResolvedValue("### React Hooks\n\nContent here");
 
       const tool = getTool(pi, "web_docs_fetch");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         { library_id: "/facebook/react", query: "how to use hooks" },
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
 
       expect(result.isError).toBeUndefined();
       expect(mockGetContext).toHaveBeenCalledWith("how to use hooks", "/facebook/react", false);
@@ -184,7 +168,7 @@ describe("docsExtension", () => {
       mockGetContext.mockResolvedValue(snippets);
 
       const tool = getTool(pi, "web_docs_fetch");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         {
           library_id: "/facebook/react",
@@ -194,7 +178,7 @@ describe("docsExtension", () => {
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
 
       expect(result.isError).toBeUndefined();
       expect(mockGetContext).toHaveBeenCalledWith("useState", "/facebook/react", true);
@@ -205,13 +189,13 @@ describe("docsExtension", () => {
       mockGetContext.mockRejectedValue(new MockContext7Error("Library not found"));
 
       const tool = getTool(pi, "web_docs_fetch");
-      const result = await tool.execute(
+      const result = (await tool.execute(
         "tc-1",
         { library_id: "/invalid/lib", query: "test" },
         undefined,
         undefined,
         makeCtx(),
-      );
+      )) as ToolResult;
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain("Library not found");

@@ -6,6 +6,9 @@ Shared test utilities for SuPi extension tests. Not a pi extension — imported 
 
 - `createPiMock(options?)` — returns a configurable mock `ExtensionAPI` with `Map`-captured handlers, commands, tools, renderers, entries, messages, shortcuts, and execCalls. Accepts `{ sessionName? }` options.
 - `makeCtx(overrides?)` — returns a mock handler context (`ctx`) with stubbed `ui` (notify, setStatus, setTitle, setWidget, setEditorText, getEditorText, input, custom, theme), `sessionManager`, `model`, `getContextUsage`, `getSystemPrompt`, and `cwd`.
+- `getTools(pi)` — returns all registered tools typed as `ToolDef[]`
+- `getTool(pi, name)` — finds a tool by name, throws if not found (avoids `!` assertions that Biome prohibits)
+- `ToolDef` — type for registered tools with `name`, `label`, `execute`, etc.
 
 ## Additional mock surfaces
 
@@ -49,11 +52,39 @@ await handler?.(mockEvent, makeCtx({ cwd: "/test" }));
 await pi.emit("session_start", {}, makeCtx());
 ```
 
+### Tool assertions
+
+```ts
+import { getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock } from "@mrclrchtr/supi-test-utils";
+
+const pi = createPiMock();
+myExtension(pi);
+
+// Assert on registration (typed, no casts needed)
+const tools = getTools(pi);
+expect(tools).toHaveLength(2);
+
+// Get a specific tool (throws if not found — avoids `!` assertions)
+const tool = getTool(pi, "web_docs_search");
+
+// Execute with typed result via local cast
+const result = (await tool.execute(
+  "tc-1",
+  { library_name: "react", query: "hooks" },
+  undefined,
+  undefined,
+  makeCtx(),
+)) as { content: { type: "text"; text: string }[]; isError?: boolean };
+
+expect(result.isError).toBe(true);
+```
+
 ## Gotchas
 
 - `handlers` stores handler **arrays** (`Map<string, handler[]>`). Access as `handlers.get(event)?.[0]` to get the first handler, not `handlers.get(event)!`.
 - `commands` stores the full spec object `{ handler, description }`. Use `(commands.get(name) as { handler }).handler` or `getCommandHandler(name)` to get just the handler.
-- `tools` is `unknown[]` — cast elements when accessing properties: `(pi.tools[0] as { name: string }).name`.
+- `tools` is `unknown[]` — use `getTools(pi)` / `getTool(pi, name)` for typed access instead of manual casts
 - `makeCtx()` uses `...overrides` spread — passing `ui` replaces the entire `ui` object. For single-property overrides, mutate after creation: `const ctx = makeCtx(); ctx.ui.getEditorText = vi.fn(() => "text");`.
 - When the code under test uses `pi.events`, the shared mock already provides it — no need to add it manually.
 - `vi.mock` hoisting errors propagate from the importing module, not the test's `vi.mock` call site — check the Caused-by chain.

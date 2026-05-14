@@ -184,3 +184,5 @@ registerSettings({
 - **Changing state shape requires updating every `createInitialState` mock in test files** — keep mock shapes in sync with real types
 - New workspace package: add `package.json` + `tsconfig.json` + `__tests__/tsconfig.json`, wire into root `pi.extensions` array, run `pnpm install`
 - Package-scoped test tsconfig: `{"extends": "../../../tsconfig.json", "include": ["*.ts"], "exclude": []}`
+- Module-level `let`/`const` state (e.g., lazy-init singleton client) persists across Vitest tests because ES modules are cached — use behavioral verification (what the function returns or calls) instead of counting constructor invocations
+- Prefer `import { x } from "../src/module.ts"` over `const { x } = await import("../src/module.ts")` in test files — dynamic imports interact inconsistently with `vi.mock` hoisting in some Vitest 4.x edge cases

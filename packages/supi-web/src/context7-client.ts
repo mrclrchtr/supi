@@ -1,7 +1,6 @@
 /**
  * Context7 API client — thin wrapper around @upstash/context7-sdk.
  *
- * Lazily initializes the SDK client on first use.
  * API key is read automatically from CONTEXT7_API_KEY env var by the SDK.
  */
 
@@ -25,17 +24,10 @@ export interface DocSnippet {
   source: string;
 }
 
-let client: Context7 | null = null;
-
-function getClient(): Context7 {
-  if (!client) {
-    client = new Context7();
-  }
-  return client;
-}
+const client = new Context7();
 
 export async function searchLibrary(query: string, libraryName: string): Promise<SearchResult[]> {
-  const results = await getClient().searchLibrary(query, libraryName);
+  const results = await client.searchLibrary(query, libraryName);
   return results as unknown as SearchResult[];
 }
 
@@ -45,5 +37,5 @@ export async function getContext(
   raw?: boolean,
 ): Promise<string | DocSnippet[]> {
   const options = raw ? ({ type: "json" } as const) : ({ type: "txt" } as const);
-  return getClient().getContext(query, libraryId, options) as Promise<string | DocSnippet[]>;
+  return client.getContext(query, libraryId, options) as Promise<string | DocSnippet[]>;
 }

@@ -97,17 +97,4 @@ describe("context7-client", () => {
       await expect(getContext("query", "/invalid/lib")).rejects.toThrow("Library not found");
     });
   });
-
-  describe("lazy client init", () => {
-    it("uses a single client instance across multiple calls", async () => {
-      mockSearchLibrary.mockResolvedValue([]);
-
-      await searchLibrary("test1", "lib1");
-      await searchLibrary("test2", "lib2");
-
-      expect(mockSearchLibrary).toHaveBeenCalledTimes(2);
-      expect(mockSearchLibrary).toHaveBeenNthCalledWith(1, "test1", "lib1");
-      expect(mockSearchLibrary).toHaveBeenNthCalledWith(2, "test2", "lib2");
-    });
-  });
 });
