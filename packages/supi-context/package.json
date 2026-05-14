@@ -30,7 +30,7 @@
     "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
-    "vitest": "4.1.5",
+    "vitest": "4.1.6",
     "@mrclrchtr/supi-test-utils": "workspace:*"
   },
   "pi": {
