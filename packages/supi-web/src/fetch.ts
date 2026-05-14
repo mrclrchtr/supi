@@ -3,7 +3,7 @@
  */
 
 // biome-ignore lint/nursery/noExcessiveLinesPerFile: expanded guessLanguage map pushes past the threshold; nursery rule, not stable
-const USER_AGENT = "supi-web/1.0";
+const USER_AGENT = "Mozilla/5.0 (compatible; supi-web/1.0; +https://github.com/mrclrchtr/supi)";
 const ACCEPT_SIBLING = "text/markdown,text/plain;q=0.9,*/*;q=0.1";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const SNIFF_BYTES = 8192;
