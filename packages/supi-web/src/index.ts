@@ -3,6 +3,7 @@
  */
 
 export { htmlToMarkdown, wrapAsCodeBlock } from "./convert.ts";
+export { default as docsExtension } from "./docs.ts";
 export {
   FetchError,
   type FetchOptions,
