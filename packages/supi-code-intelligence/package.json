@@ -34,7 +34,7 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "@types/node": "25.6.2",
+    "@types/node": "25.7.0",
     "vitest": "4.1.6",
     "@mrclrchtr/supi-test-utils": "workspace:*"
   },
