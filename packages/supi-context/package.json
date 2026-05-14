@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-context",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SuPi Context extension — detailed context usage report via /supi-context command",
   "license": "MIT",
   "repository": {
