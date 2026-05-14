@@ -96,6 +96,7 @@ describe("generateOverview", () => {
     execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
     execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: tmpDir });
     execFileSync("git", ["config", "core.hooksPath", "/dev/null"], { cwd: tmpDir });
+    execFileSync("git", ["branch", "-m", "main"], { cwd: tmpDir });
     execFileSync("git", ["add", "."], { cwd: tmpDir });
     execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
 

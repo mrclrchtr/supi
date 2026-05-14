@@ -138,9 +138,10 @@ pnpm exec biome check packages/supi-code-intelligence/
   ```ts
   execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
   execFileSync("git", ["config", "core.hooksPath", "/dev/null"], { cwd: dir });
+  execFileSync("git", ["branch", "-m", "main"], { cwd: dir });
   ```
 
-  **Why**: `commit.gpgsign` fails with `fatal: either user.signingkey or gpg.ssh.defaultKeyCommand needs to be configured` when a global signingkey is set. `core.hooksPath` skips pre-commit hooks (e.g., pre-commit) that may error on missing config.
+  **Why**: `commit.gpgsign` fails with `fatal: either user.signingkey or gpg.ssh.defaultKeyCommand needs to be configured` when a global signingkey is set. `core.hooksPath` skips pre-commit hooks (e.g., pre-commit) that may error on missing config. `git init` default branch varies by git version; rename forces a known name for assertions.
 
 ```ts
 // Standard pattern
