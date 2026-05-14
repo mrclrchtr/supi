@@ -32,7 +32,7 @@
     "clipboardy": "^5.3.1",
     "@mrclrchtr/supi-code-intelligence": "workspace:*",
     "@mrclrchtr/supi-extras": "workspace:*",
-    "diff": "^8.0.3",
+    "diff": "^9.0.0",
     "web-tree-sitter": "^0.26.8"
   },
   "bundledDependencies": [
