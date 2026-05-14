@@ -149,6 +149,7 @@ registerSettings({
 - `pi.registerMessageRenderer(customType, renderer)` — `message.content` is what the LLM sees in conversation context; `message.details` is renderer-only data. Pass structured events in `details` and plain text in `content` so agents see JSON while users see styled, themed output.
 - Custom `registerMessageRenderer` handlers must explicitly display `warning` for all result states (including `success` and `canceled`), not just `failed`/`timeout`.
 - Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.
+- Biome's import organizer sorts `export type { X }` before `export { Y }` from the same module — use `--write` to apply the canonical order automatically
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
 - OpenSpec `PostHogFetchNetworkError` output is harmless when offline.
 - `npm pack <pkg>@<ver> --silent && tar -tzf` — inspect actual npm tarball contents; `npm view` only shows registry metadata which may not match shipped files
