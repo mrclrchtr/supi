@@ -42,7 +42,7 @@
     "@davisvaughan/tree-sitter-r": "1.2.0",
     "@derekstride/tree-sitter-sql": "0.3.11",
     "@types/node": "25.6.2",
-    "tree-sitter-bash": "0.23.3",
+    "tree-sitter-bash": "0.25.1",
     "tree-sitter-c": "0.24.1",
     "tree-sitter-cli": "0.22.6",
     "tree-sitter-cpp": "0.23.4",
