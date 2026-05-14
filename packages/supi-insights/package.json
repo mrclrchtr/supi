@@ -34,7 +34,7 @@
     "@earendil-works/pi-ai": "*"
   },
   "devDependencies": {
-    "@types/diff": "7.0.2",
+    "@types/diff": "8.0.0",
     "@types/node": "25.6.2",
     "vitest": "4.1.5"
   },
