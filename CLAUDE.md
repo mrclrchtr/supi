@@ -177,6 +177,7 @@ registerSettings({
 - In Vitest 4.x, constructor mocks inside `vi.mock` factories must use `class` — `vi.fn().mockImplementation(() => ({}))` silently returns `this` instead of the object
 - `vi.mock` hoisting errors propagate from the importing module (e.g. `runner.ts:2:1`), not the test file's `vi.mock` call site — check the Caused-by chain
 - Shared `createPiMock` stores handlers as `Map<string, handler[]>` — access as `handlers.get(event)?.[0]`, not `handlers.get(event)!`
+- `pi.handlers.get("event")?.[0]!` triggers Biome `noNonNullAssertedOptionalChain` (blocks CI); use `getHandlerOrThrow(pi, event)` from `@mrclrchtr/supi-test-utils` instead
 - `pnpm vitest run` does not check types (esbuild strips them) — run `pnpm typecheck:tests` (or per-package `pnpm exec tsc --noEmit -p packages/<pkg>/__tests__/tsconfig.json`) alongside test runs to catch type errors
 - Adding a new runtime export to `supi-core/index.ts` breaks every downstream `vi.mock("@mrclrchtr/supi-core")` factory that omits it; audit all `vi.mock` blocks in consuming packages
 - The same applies to new runtime exports from local modules (e.g., `CLAUDE_MD_DEFAULTS` from `config.ts`) consumed by `vi.mock("../config.ts")` factories

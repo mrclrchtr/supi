@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import gitEditor from "../src/git-editor.ts";
 
 describe("gitEditor extension", () => {

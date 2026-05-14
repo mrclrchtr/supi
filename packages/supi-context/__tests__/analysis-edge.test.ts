@@ -23,8 +23,8 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   formatSkillsForPrompt: mockFns.formatSkillsForPrompt,
 }));
 
-import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { analyzeContext } from "../src/analysis.ts";
 
 describe("analyzeContext edge cases", () => {

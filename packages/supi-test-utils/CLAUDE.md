@@ -9,6 +9,8 @@ Shared test utilities for SuPi extension tests. Not a pi extension — imported 
 - `getTools(pi)` — returns all registered tools typed as `ToolDef[]`
 - `getTool(pi, name)` — finds a tool by name, throws if not found (avoids `!` assertions that Biome prohibits)
 - `ToolDef` — type for registered tools with `name`, `label`, `execute`, etc.
+- `getHandler(pi, event)` — returns first handler or `undefined` (avoids `!` assertions)
+- `getHandlerOrThrow(pi, event)` — returns first handler or throws if not found (avoids `!` assertions)
 
 ## Additional mock surfaces
 
@@ -35,7 +37,7 @@ The `createPiMock()` return value (`PiMock`) includes these captured data struct
 ## Usage
 
 ```ts
-import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { vi } from "vitest";
 
 const pi = createPiMock({ sessionName: "my-session" });
@@ -44,9 +46,13 @@ myExtension(pi);
 // Assert handlers were registered (handlers are arrays)
 expect(pi.handlers.has("session_start")).toBe(true);
 
-// Call a handler
-const handler = pi.handlers.get("tool_call")?.[0];
-await handler?.(mockEvent, makeCtx({ cwd: "/test" }));
+// Call a handler (no ! assertion — throws if handler not registered)
+const handler = getHandlerOrThrow(pi, "tool_call");
+await handler(mockEvent, makeCtx({ cwd: "/test" }));
+
+// Or if the handler may not exist:
+const maybeHandler = getHandler(pi, "tool_call");
+await maybeHandler?.(mockEvent, makeCtx({ cwd: "/test" }));
 
 // Fire all handlers for an event
 await pi.emit("session_start", {}, makeCtx());
@@ -82,7 +88,7 @@ expect(result.isError).toBe(true);
 
 ## Gotchas
 
-- `handlers` stores handler **arrays** (`Map<string, handler[]>`). Access as `handlers.get(event)?.[0]` to get the first handler, not `handlers.get(event)!`.
+- `handlers` stores handler **arrays** (`Map<string, handler[]>`). Prefer `getHandlerOrThrow(pi, event)` / `getHandler(pi, event)` over direct access to avoid Biome non-null assertion lint issues.
 - `commands` stores the full spec object `{ handler, description }`. Use `(commands.get(name) as { handler }).handler` or `getCommandHandler(name)` to get just the handler.
 - `tools` is `unknown[]` — use `getTools(pi)` / `getTool(pi, name)` for typed access instead of manual casts
 - `makeCtx()` uses `...overrides` spread — passing `ui` replaces the entire `ui` object. For single-property overrides, mutate after creation: `const ctx = makeCtx(); ctx.ui.getEditorText = vi.fn(() => "text");`.

@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import tabSpinner from "../src/tab-spinner.ts";
 
 describe("tabSpinner extension", () => {
@@ -104,11 +104,11 @@ describe("tabSpinner extension", () => {
     // Establish currentCtx by starting and stopping the agent first
     const startHandler = pi.handlers.get("agent_start")?.[0] as (
       event: unknown,
-      context: unknown
+      context: unknown,
     ) => Promise<unknown>;
     const endHandler = pi.handlers.get("agent_end")?.[0] as (
       event: unknown,
-      context: unknown
+      context: unknown,
     ) => Promise<unknown>;
     await startHandler({}, ctx);
     await endHandler({}, ctx);

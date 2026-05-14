@@ -55,10 +55,7 @@ describe("promptStash extension", () => {
 
     await pi.getShortcutHandlers("alt+s")[0](ctx);
 
-    expect(ctx.ui.notify).toHaveBeenCalledWith(
-      'Stashed: "Refactor the database layer"',
-      "info",
-    );
+    expect(ctx.ui.notify).toHaveBeenCalledWith('Stashed: "Refactor the database layer"', "info");
   });
 
   it("warns when editor is empty on alt+s", async () => {
@@ -94,7 +91,10 @@ describe("promptStash extension", () => {
       },
     }));
 
-    const cmd = pi.getCommandHandler("supi-stash") as (args: string, ctx: unknown) => Promise<unknown>;
+    const cmd = pi.getCommandHandler("supi-stash") as (
+      args: string,
+      ctx: unknown,
+    ) => Promise<unknown>;
     await cmd("", restoreCtx);
 
     expect(restoreCtx.ui.custom).toHaveBeenCalledWith(expect.any(Function), { overlay: true });
@@ -107,7 +107,10 @@ describe("promptStash extension", () => {
     promptStash(pi as unknown as Parameters<typeof promptStash>[0]);
 
     const ctx = makeCtx({ cwd: "/tmp" });
-    const cmd = pi.getCommandHandler("supi-stash") as (args: string, ctx: unknown) => Promise<unknown>;
+    const cmd = pi.getCommandHandler("supi-stash") as (
+      args: string,
+      ctx: unknown,
+    ) => Promise<unknown>;
     await cmd("", ctx);
 
     expect(ctx.ui.notify).toHaveBeenCalledWith("No stashed prompts", "info");
@@ -124,7 +127,10 @@ describe("promptStash extension", () => {
 
     const clearCtx = makeCtx({ cwd: "/tmp" });
     clearCtx.ui.custom = vi.fn(async () => ({ action: "cleared" }));
-    const cmd = pi.getCommandHandler("supi-stash") as (args: string, ctx: unknown) => Promise<unknown>;
+    const cmd = pi.getCommandHandler("supi-stash") as (
+      args: string,
+      ctx: unknown,
+    ) => Promise<unknown>;
     await cmd("", clearCtx);
 
     expect(clearCtx.ui.notify).toHaveBeenCalledWith("All stashes cleared", "info");
@@ -149,7 +155,10 @@ describe("promptStash extension", () => {
         createdAt: Date.now(),
       },
     }));
-    const cmd = pi.getCommandHandler("supi-stash") as (args: string, ctx: unknown) => Promise<unknown>;
+    const cmd = pi.getCommandHandler("supi-stash") as (
+      args: string,
+      ctx: unknown,
+    ) => Promise<unknown>;
     await cmd("", copyCtx);
 
     expect(copyToClipboardMock).toHaveBeenCalledWith("copy me", "/tmp", pi);

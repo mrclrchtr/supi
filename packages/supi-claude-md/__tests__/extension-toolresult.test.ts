@@ -1,6 +1,6 @@
+import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_CONFIG } from "./extension-helpers.ts";
-import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 
 const mockFns = vi.hoisted(() => ({
   loadClaudeMdConfig: vi.fn(),

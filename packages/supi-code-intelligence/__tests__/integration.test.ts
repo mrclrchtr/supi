@@ -1,8 +1,6 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../src/code-intelligence.ts";
-
-import { createPiMock } from "@mrclrchtr/supi-test-utils";
 
 describe("code_intel tool registration", () => {
   it("registers the code_intel tool", () => {
@@ -38,7 +36,10 @@ describe("code_intel tool registration", () => {
   it("registers an optional regex parameter for pattern searches", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    expect((pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters?.properties).toHaveProperty("regex");
+    expect(
+      (pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters
+        ?.properties,
+    ).toHaveProperty("regex");
   });
 
   it("has promptSnippet naming code_intel", () => {
@@ -70,7 +71,9 @@ describe("code_intel tool registration", () => {
   it("guidance explains literal-default pattern search and regex opt-in", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const combined = ((pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? []).join(" ");
+    const combined = ((pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? []).join(
+      " ",
+    );
     expect(combined).toContain("literal strings by default");
     expect(combined).toContain("regex: true");
   });
@@ -149,6 +152,9 @@ describe("session lifecycle", () => {
   it("registers optional summary parameter for pattern searches", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    expect((pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters?.properties).toHaveProperty("summary");
+    expect(
+      (pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters
+        ?.properties,
+    ).toHaveProperty("summary");
   });
 });
