@@ -41,7 +41,7 @@
   "devDependencies": {
     "@davisvaughan/tree-sitter-r": "1.2.0",
     "@derekstride/tree-sitter-sql": "0.3.11",
-    "@types/node": "25.6.0",
+    "@types/node": "25.6.2",
     "tree-sitter-bash": "0.23.3",
     "tree-sitter-c": "0.23.6",
     "tree-sitter-cli": "0.22.6",
