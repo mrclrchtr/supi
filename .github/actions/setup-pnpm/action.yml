@@ -5,7 +5,7 @@ runs:
   using: composite
   steps:
     - name: Setup pnpm
-      uses: pnpm/action-setup@7088e561eb65bb68695d245aa206f005ef30921d # v4.1.0
+      uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
       # version omitted — reads from package.json's packageManager field
 
     - name: Setup Node.js
