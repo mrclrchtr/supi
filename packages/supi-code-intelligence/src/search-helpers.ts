@@ -136,6 +136,15 @@ function buildRipgrepArgs(
 }
 
 function handleRipgrepError(err: unknown, filterLowSignal: boolean): RipgrepRunResult {
+  // ENOENT means rg is not installed — surface a clear error instead of silent empty results
+  if (isCodeError(err, "ENOENT")) {
+    return {
+      matches: [],
+      error:
+        "ripgrep (rg) is not available. Install it (e.g., `apt install ripgrep` or `brew install ripgrep`).",
+    };
+  }
+
   if (!isExecError(err)) {
     return { matches: [] };
   }
@@ -156,6 +165,15 @@ function handleRipgrepError(err: unknown, filterLowSignal: boolean): RipgrepRunR
 
 function isExecError(err: unknown): err is { status: number; stdout?: unknown; stderr?: unknown } {
   return typeof err === "object" && err !== null && "status" in err;
+}
+
+function isCodeError(err: unknown, code: string): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: unknown }).code === code
+  );
 }
 
 interface RawRgEvent {

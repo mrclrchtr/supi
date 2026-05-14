@@ -21,6 +21,7 @@ function makeTempRepo(): string {
   execSync("git config user.name Test", { cwd: dir, stdio: "ignore" });
   execSync("git config commit.gpgsign false", { cwd: dir, stdio: "ignore" });
   execSync("git config core.hooksPath /dev/null", { cwd: dir, stdio: "ignore" });
+  execSync("git branch -m main", { cwd: dir, stdio: "ignore" });
   return dir;
 }
 

@@ -87,6 +87,9 @@ jobs:
             exit 1
           fi
 
+      - name: Install ripgrep
+        run: sudo apt-get install -y ripgrep
+
       - name: Verify workspace and staged package tarballs
         run: pnpm verify
 

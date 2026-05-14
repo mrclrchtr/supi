@@ -21,6 +21,7 @@ function initGit(dir: string) {
   execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
   execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
   execFileSync("git", ["config", "core.hooksPath", "/dev/null"], { cwd: dir });
+  execFileSync("git", ["branch", "-m", "main"], { cwd: dir });
 }
 
 function writeFile(dir: string, file: string, content: string) {

@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-RVHXYF"
+title = "Fix CI test failures: missing rg and git default branch mismatch"
+type = "chore"
+priority = "p1"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"
