@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-insights",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SuPi Insights extension — generate usage reports analyzing your PI sessions",
   "license": "MIT",
   "repository": {
@@ -23,7 +23,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*",
+    "@mrclrchtr/supi-core": "0.2.0",
     "diff": "^7.0.0"
   },
   "bundledDependencies": [

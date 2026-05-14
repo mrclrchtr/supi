@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi",
-  "version": "0.1.1",
-  "description": "SuPi (Super Pi) \u2014 The opinionated way to extend PI. Meta-package bundling the full SuPi extension stack.",
+  "version": "0.2.0",
+  "description": "SuPi (Super Pi) — The opinionated way to extend PI. Meta-package bundling the full SuPi extension stack.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -21,17 +21,17 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-ask-user": "workspace:*",
-    "@mrclrchtr/supi-bash-timeout": "workspace:*",
-    "@mrclrchtr/supi-claude-md": "workspace:*",
-    "@mrclrchtr/supi-core": "workspace:*",
-    "@mrclrchtr/supi-debug": "workspace:*",
-    "@mrclrchtr/supi-lsp": "workspace:*",
-    "@mrclrchtr/supi-context": "workspace:*",
-    "@mrclrchtr/supi-tree-sitter": "workspace:*",
+    "@mrclrchtr/supi-ask-user": "0.2.0",
+    "@mrclrchtr/supi-bash-timeout": "0.2.0",
+    "@mrclrchtr/supi-claude-md": "0.2.0",
+    "@mrclrchtr/supi-core": "0.2.0",
+    "@mrclrchtr/supi-debug": "0.2.0",
+    "@mrclrchtr/supi-lsp": "1.0.0",
+    "@mrclrchtr/supi-context": "0.2.0",
+    "@mrclrchtr/supi-tree-sitter": "1.0.0",
     "clipboardy": "^5.3.1",
-    "@mrclrchtr/supi-code-intelligence": "workspace:*",
-    "@mrclrchtr/supi-extras": "workspace:*",
+    "@mrclrchtr/supi-code-intelligence": "0.2.0",
+    "@mrclrchtr/supi-extras": "0.2.0",
     "diff": "^7.0.0",
     "web-tree-sitter": "^0.26.8"
   },

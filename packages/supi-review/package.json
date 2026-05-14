@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-review",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SuPi Review extension — structured code review via /supi-review command",
   "license": "MIT",
   "repository": {
@@ -20,7 +20,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*"
+    "@mrclrchtr/supi-core": "0.2.0"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"

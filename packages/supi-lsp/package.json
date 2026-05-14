@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-lsp",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "SuPi LSP extension — Language Server Protocol integration for pi",
   "license": "MIT",
   "repository": {
@@ -21,7 +21,7 @@
     "!__tests__"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*"
+    "@mrclrchtr/supi-core": "0.2.0"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"
