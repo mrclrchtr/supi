@@ -461,8 +461,8 @@ importers:
         specifier: 0.23.1
         version: 0.23.1
       tree-sitter-rust:
-        specifier: 0.23.3
-        version: 0.23.3
+        specifier: 0.24.0
+        version: 0.24.0
       tree-sitter-typescript:
         specifier: 0.23.2
         version: 0.23.2
@@ -2540,8 +2540,8 @@ packages:
       tree-sitter:
         optional: true
 
-  tree-sitter-rust@0.23.3:
-    resolution: {integrity: sha512-uLdZJ1K26EuJTBMJlz1ltTlg7nJyAYThfouXgigf5ixKOasOL5wNrRCpuWTsl6rDcKlZK9UX+annFLqP/kchwQ==}
+  tree-sitter-rust@0.24.0:
+    resolution: {integrity: sha512-NWemUDf629Tfc90Y0Z55zuwPCAHkLxWnMf2RznYu4iBkkrQl2o/CHGB7Cr52TyN5F1DAx8FmUnDtCy9iUkXZEQ==}
     peerDependencies:
       tree-sitter: ^0.22.1
     peerDependenciesMeta:
@@ -5138,7 +5138,7 @@ snapshots:
       node-addon-api: 8.7.0
       node-gyp-build: 4.8.4
 
-  tree-sitter-rust@0.23.3:
+  tree-sitter-rust@0.24.0:
     dependencies:
       node-addon-api: 8.7.0
       node-gyp-build: 4.8.4
