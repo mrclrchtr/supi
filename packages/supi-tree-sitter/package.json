@@ -46,7 +46,7 @@
     "tree-sitter-c": "0.23.6",
     "tree-sitter-cli": "0.22.6",
     "tree-sitter-cpp": "0.23.4",
-    "tree-sitter-go": "0.23.4",
+    "tree-sitter-go": "0.25.0",
     "tree-sitter-html": "0.23.2",
     "tree-sitter-java": "0.23.5",
     "tree-sitter-javascript": "0.23.1",
