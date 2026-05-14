@@ -1,5 +1,5 @@
 {
-  "packages/supi": "0.1.0",
+  "packages/supi": "0.1.1",
   "packages/supi-ask-user": "0.1.0",
   "packages/supi-bash-timeout": "0.1.0",
   "packages/supi-cache": "0.1.0",

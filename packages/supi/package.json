@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "SuPi (Super Pi) \u2014 The opinionated way to extend PI. Meta-package bundling the full SuPi extension stack.",
   "license": "MIT",
   "repository": {
