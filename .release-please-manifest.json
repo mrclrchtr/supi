@@ -13,5 +13,6 @@
   "packages/supi-lsp": "0.1.0",
   "packages/supi-review": "0.1.0",
   "packages/supi-rtk": "0.1.0",
-  "packages/supi-tree-sitter": "0.1.0"
+  "packages/supi-tree-sitter": "0.1.0",
+  "packages/supi-web": "0.1.0"
 }
