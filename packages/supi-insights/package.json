@@ -24,7 +24,7 @@
   ],
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*",
-    "diff": "^7.0.0"
+    "diff": "^8.0.0"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"
