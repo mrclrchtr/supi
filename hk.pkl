@@ -45,7 +45,9 @@ local precommit = new Mapping<String, Step> {
 }
 
 local commitmsg = new Mapping<String, Step> {
-  ["check-conventional-commit"] = Builtins.check_conventional_commit
+  ["commitlint"] = new Step {
+    check = "commitlint --edit {{commit_msg_file}}"
+  }
 }
 
 local prepush = new Mapping<String, Step> {
