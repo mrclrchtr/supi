@@ -1,0 +1,18 @@
+schema_version = 1
+id = "TNDM-7GW5YJ"
+title = "Defensive improvements to supi-web: isPlainTextContentType + guessLanguage"
+
+type = "chore"
+priority = "p3"
+
+depends_on = []
+tags = ["flow:done"]
+[[documents]]
+name = "archive"
+path = "archive.md"
+[[documents]]
+name = "content"
+path = "content.md"
+[[documents]]
+name = "plan"
+path = "plan.md"

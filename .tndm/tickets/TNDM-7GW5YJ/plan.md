@@ -1,0 +1,9 @@
+- [x] **Task 1**: Fix `isPlainTextContentType` to exclude HTML content types
+  - File: `packages/supi-web/src/fetch.ts`
+  - Verification: tests pass, type check clean
+- [x] **Task 2**: Expand `guessLanguage` map with more file extensions
+  - File: `packages/supi-web/src/fetch.ts`
+  - Verification: tests pass, type check clean
+- [x] **Task 3**: Add tests for `isPlainTextContentType` and `guessLanguage`
+  - File: `packages/supi-web/__tests__/fetch.test.ts`
+  - Verification: `pnpm vitest run packages/supi-web/` passes

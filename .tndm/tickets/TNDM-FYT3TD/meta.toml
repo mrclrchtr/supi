@@ -1,0 +1,18 @@
+schema_version = 1
+id = "TNDM-FYT3TD"
+title = "Create supi-web-fetch-md extension — pi tool for web→Markdown fetching"
+
+type = "feature"
+priority = "p2"
+
+depends_on = []
+tags = ["feature", "flow:done"]
+[[documents]]
+name = "archive"
+path = "archive.md"
+[[documents]]
+name = "content"
+path = "content.md"
+[[documents]]
+name = "plan"
+path = "plan.md"
