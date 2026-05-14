@@ -35,6 +35,7 @@ Built for the [pi coding agent](https://github.com/earendil-works/pi).
 | `@mrclrchtr/supi-insights` | **insights** | Historical session insights — rich HTML reports analyzing usage, friction, and suggestions. |
 | `@mrclrchtr/supi-review` | **review** | Structured code review via `/supi-review` with configurable reviewer models. |
 | `@mrclrchtr/supi-rtk` | **rtk** | Transparent RTK-backed bash rewriting for token savings on repetitive commands. |
+| `@mrclrchtr/supi-web` | **web** | Fetch web pages as clean Markdown and query library documentation via Context7 (`web_fetch_md`, `web_docs_search`, `web_docs_fetch`). |
 
 ## Installing
 
@@ -61,6 +62,7 @@ pi install npm:@mrclrchtr/supi-cache
 pi install npm:@mrclrchtr/supi-insights
 pi install npm:@mrclrchtr/supi-review
 pi install npm:@mrclrchtr/supi-rtk
+pi install npm:@mrclrchtr/supi-web
 ```
 
 ### From git or local path
