@@ -61,18 +61,18 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.15",
-    "@commitlint/cli": "^20.5.3",
-    "@commitlint/config-conventional": "^20.5.3",
+    "@biomejs/biome": "2.4.15",
+    "@commitlint/cli": "20.5.3",
+    "@commitlint/config-conventional": "20.5.3",
     "@earendil-works/pi-ai": "0.74.0",
     "@earendil-works/pi-coding-agent": "0.74.0",
     "@earendil-works/pi-tui": "0.74.0",
-    "@types/node": "^25.7.0",
-    "clipboardy": "^5.3.1",
-    "tree-sitter-javascript": "^0.23.1",
-    "tree-sitter-typescript": "^0.23.2",
-    "typescript": "^6.0.3",
-    "vitest": "^4.1.6",
-    "web-tree-sitter": "^0.26.8"
+    "@types/node": "25.7.0",
+    "clipboardy": "5.3.1",
+    "tree-sitter-javascript": "0.23.1",
+    "tree-sitter-typescript": "0.23.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.6",
+    "web-tree-sitter": "0.26.8"
   }
 }

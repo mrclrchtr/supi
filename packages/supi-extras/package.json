@@ -27,7 +27,7 @@
     "@mrclrchtr/supi-core"
   ],
   "devDependencies": {
-    "vitest": "^4.1.5",
+    "vitest": "4.1.5",
     "@mrclrchtr/supi-test-utils": "workspace:*"
   },
   "main": "src/index.ts",

@@ -51,7 +51,7 @@
     "@earendil-works/pi-coding-agent": "*"
   },
   "devDependencies": {
-    "vitest": "^4.1.5"
+    "vitest": "4.1.5"
   },
   "pi": {
     "extensions": [

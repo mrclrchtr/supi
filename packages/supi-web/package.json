@@ -35,9 +35,9 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "vitest": "^4.1.5",
-    "@types/jsdom": "^21.1.7",
-    "@types/turndown": "^5.0.6",
+    "vitest": "4.1.5",
+    "@types/jsdom": "21.1.7",
+    "@types/turndown": "5.0.6",
     "@mrclrchtr/supi-test-utils": "workspace:*"
   },
   "pi": {
