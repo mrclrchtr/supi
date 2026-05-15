@@ -1,25 +1,11 @@
 {
   "version": 1,
   "skills": {
-    "brave-search": {
-      "source": "badlogic/pi-skills",
-      "sourceType": "github",
-      "computedHash": "f65c8b9679272d3de03b0850ebed158d65d81642c9e208eec663764dc6575525"
-    },
     "bx": {
       "source": "brave/brave-search-skills",
       "sourceType": "github",
+      "skillPath": "skills/bx/SKILL.md",
       "computedHash": "b846bd21e3476a10f262d40a765e65149e339e85b37d7dfa8f128317e7cbf090"
-    },
-    "claude-md-improver": {
-      "source": "anthropics/claude-plugins-official",
-      "sourceType": "github",
-      "computedHash": "d6707ed0467d9664d0f9d2c44724c8fb1814475ec6d3c62a5d54bbbe807e0775"
-    },
-    "openspec-brainstorm": {
-      "source": "mrclrchtr/skills",
-      "sourceType": "github",
-      "computedHash": "c69ae2d49615cd0bd8f61debc76cadab909e5d5f3ecd6ca92f727f3715c83baa"
     },
     "pi-upgrade": {
       "source": "mrclrchtr/skills",
@@ -32,12 +18,6 @@
       "sourceType": "github",
       "skillPath": "skills/skill-creator/SKILL.md",
       "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
-    },
-    "ticket": {
-      "source": "mrclrchtr/tandem",
-      "sourceType": "github",
-      "skillPath": "skills/ticket/SKILL.md",
-      "computedHash": "ad266f63755169cdb6e1914859d10bb3f16f76a7079a01a9b49508d7a9e5123c"
     }
   }
 }
