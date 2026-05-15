@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/mrclrchtr/supi/compare/supi-v0.2.0...supi-v0.2.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* **deps:** update dependency diff to v9 ([bcadaf3](https://github.com/mrclrchtr/supi/commit/bcadaf3df9b1c9a6cb10cc684b738009ff304372))
+
 ## [0.2.0](https://github.com/mrclrchtr/supi/compare/supi-v0.1.1...supi-v0.2.0) (2026-05-14)
 
 

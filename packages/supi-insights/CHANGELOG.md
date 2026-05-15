@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/mrclrchtr/supi/compare/supi-insights-v0.2.0...supi-insights-v0.2.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* **deps:** update dependency diff to v9 ([bcadaf3](https://github.com/mrclrchtr/supi/commit/bcadaf3df9b1c9a6cb10cc684b738009ff304372))
+
 ## [0.2.0](https://github.com/mrclrchtr/supi/compare/supi-insights-v0.1.0...supi-insights-v0.2.0) (2026-05-14)
 
 
