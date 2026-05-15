@@ -1,5 +1,5 @@
 {
-  "packages/supi": "0.2.0",
+  "packages/supi": "0.2.1",
   "packages/supi-ask-user": "0.2.0",
   "packages/supi-bash-timeout": "0.2.0",
   "packages/supi-cache": "0.2.0",
@@ -9,10 +9,10 @@
   "packages/supi-core": "0.2.0",
   "packages/supi-debug": "0.2.0",
   "packages/supi-extras": "0.2.0",
-  "packages/supi-insights": "0.2.0",
+  "packages/supi-insights": "0.2.1",
   "packages/supi-lsp": "1.0.0",
   "packages/supi-review": "0.2.0",
   "packages/supi-rtk": "0.2.0",
   "packages/supi-tree-sitter": "1.0.0",
-  "packages/supi-web": "0.2.0"
+  "packages/supi-web": "0.2.1"
 }

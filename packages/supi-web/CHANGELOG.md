@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/mrclrchtr/supi/compare/supi-web-v0.2.0...supi-web-v0.2.1) (2026-05-15)
+
+
+### Bug Fixes
+
+* **deps:** update dependency jsdom to v29 ([097d6ec](https://github.com/mrclrchtr/supi/commit/097d6ec269d943ab1c0c6536b0dd5bbb8049c6a6))
+
 ## [0.2.0](https://github.com/mrclrchtr/supi/compare/supi-web-v0.1.0...supi-web-v0.2.0) (2026-05-14)
 
 
