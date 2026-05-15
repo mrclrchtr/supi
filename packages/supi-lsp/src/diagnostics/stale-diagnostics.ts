@@ -31,7 +31,7 @@ export function assessStaleDiagnostics(
   };
 }
 
-function isLikelyStaleDiagnostic(diagnostic: Diagnostic): boolean {
+export function isLikelyStaleDiagnostic(diagnostic: Diagnostic): boolean {
   if (diagnostic.severity === undefined) return false;
   if (diagnostic.code !== undefined) {
     if (typeof diagnostic.code === "number" && MODULE_RESOLUTION_CODES.has(diagnostic.code)) {

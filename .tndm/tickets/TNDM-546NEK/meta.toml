@@ -1,0 +1,11 @@
+schema_version = 1
+id = "TNDM-546NEK"
+title = "LSP stale diagnostic for newly created files not cleared by lsp recover"
+type = "bug"
+priority = "p2"
+depends_on = []
+tags = ["diagnostics", "lsp"]
+
+[[documents]]
+name = "content"
+path = "content.md"

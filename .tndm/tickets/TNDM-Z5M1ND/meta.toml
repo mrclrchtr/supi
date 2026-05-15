@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-Z5M1ND"
+title = "Fix LSP stale diagnostic for newly created files not cleared by lsp recover"
+type = "bug"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"

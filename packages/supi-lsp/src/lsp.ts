@@ -29,6 +29,7 @@ import {
   removeLspTool,
 } from "./lsp-state.ts";
 import { LspManager } from "./manager/manager.ts";
+import { forceResyncStaleModuleFiles } from "./manager/manager-stale-resync.ts";
 import { registerLspAwareToolOverrides } from "./overrides.ts";
 import { registerLspMessageRenderer } from "./renderer.ts";
 import { scanMissingServers, scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
@@ -305,6 +306,16 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
       // Refresh failures must not prevent agent startup
     }
     state.manager.pruneMissingFiles();
+
+    // Force re-open files with module-resolution errors to clear stale
+    // diagnostics that persist when the TS server caches by content hash.
+    // Must run before the diagnostic summary so fresh results are captured.
+    try {
+      await forceResyncStaleModuleFiles(state.manager, ctx.cwd);
+    } catch {
+      // Best-effort: don't fail the agent turn
+    }
+
     refreshProjectServers(state);
     updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
 
