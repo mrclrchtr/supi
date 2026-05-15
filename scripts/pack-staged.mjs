@@ -45,14 +45,22 @@ function parseArgs(argv) {
 }
 
 function assertPackageDir(packageDir) {
-  const packageJsonPath = join(packageDir, "package.json");
+  const resolvedDir = resolve(packageDir);
+
+  // Guard against path traversal: reject system directories and check
+  // that the resolved path doesn't escape via normalization tricks.
+  if (resolvedDir === "/" || resolvedDir.startsWith("/etc") || resolvedDir.startsWith("/tmp") || resolvedDir.startsWith("/dev")) {
+    throw new Error(`Refusing to operate on system directory: ${resolvedDir}`);
+  }
+
+  const packageJsonPath = join(resolvedDir, "package.json");
   if (!existsSync(packageJsonPath)) {
-    throw new Error(`No package.json found in ${packageDir}`);
+    throw new Error(`No package.json found in ${resolvedDir}`);
   }
 
   const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8"));
   if (!pkg.name) {
-    throw new Error(`Package at ${packageDir} is missing a name`);
+    throw new Error(`Package at ${resolvedDir} is missing a name`);
   }
 
   return pkg;

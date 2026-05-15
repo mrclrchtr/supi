@@ -110,6 +110,22 @@ function absolutizeLinks(root: Element, baseUrl: string): void {
   }
 }
 
+/** Dangerous URI schemes that must never be used in href/src attributes. */
+const DANGEROUS_SCHEMES = [
+  "javascript:",
+  "data:",
+  "vbscript:",
+  "file:",
+];
+
+function hasDangerousScheme(value: string): boolean {
+  // Case-insensitive scheme check: split on first ':' and compare lowercased
+  const colonIndex = value.indexOf(":");
+  if (colonIndex === -1) return false;
+  const scheme = value.slice(0, colonIndex + 1).toLowerCase();
+  return DANGEROUS_SCHEMES.includes(scheme);
+}
+
 function resolveUrl(href: string, baseUrl: string): string {
   const trimmed = String(href || "").trim();
   if (
@@ -120,14 +136,16 @@ function resolveUrl(href: string, baseUrl: string): string {
   ) {
     return trimmed;
   }
-  if (trimmed.startsWith("javascript:")) {
+  if (hasDangerousScheme(trimmed)) {
     return "";
   }
   try {
     const resolved = new URL(trimmed, baseUrl);
-    return resolved.protocol === "http:" || resolved.protocol === "https:"
-      ? resolved.toString()
-      : trimmed;
+    // Even after URL resolution, reject any non-http/https protocols
+    if (resolved.protocol !== "http:" && resolved.protocol !== "https:") {
+      return "";
+    }
+    return resolved.toString();
   } catch {
     return trimmed;
   }

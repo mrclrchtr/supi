@@ -35,12 +35,27 @@ function parseArgs(argv) {
   return args;
 }
 
+/**
+ * Validate a resolved package directory path:
+ * - Must exist
+ * - Must contain a package.json
+ * - Must not be a system or temporary directory
+ */
+function validatePackageDir(packageDir) {
+  const packageJsonPath = join(packageDir, "package.json");
+  if (!existsSync(packageJsonPath)) {
+    throw new Error(`No package.json found in ${packageDir}`);
+  }
+  // Guard against path traversal: reject system directories
+  // to prevent operating on unexpected locations.
+  if (packageDir === "/" || packageDir.startsWith("/etc") || packageDir.startsWith("/tmp") || packageDir.startsWith("/dev")) {
+    throw new Error(`Refusing to operate on system directory: ${packageDir}`);
+  }
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
-
-  if (!existsSync(join(args.packageDir, "package.json"))) {
-    throw new Error(`No package.json found in ${args.packageDir}`);
-  }
+  validatePackageDir(args.packageDir);
 
   // Ensure output dir exists (packStaged requires it)
   const outDir = join(tmpdir(), "supi-publish");

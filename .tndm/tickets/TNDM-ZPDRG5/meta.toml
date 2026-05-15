@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-ZPDRG5"
+title = "Fix Snyk findings from project 12eb6d43"
+type = "chore"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"

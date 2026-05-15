@@ -1,0 +1,1 @@
+Fix 20 Snyk Code (SAST) findings from Snyk project 12eb6d43 (org mrclrchtr): 1 HIGH (ReDoS), 1 MEDIUM (XSS - Improper URI Scheme Sanitization), 18 LOW (Path Traversal).

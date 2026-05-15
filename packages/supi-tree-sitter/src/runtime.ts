@@ -158,6 +158,12 @@ export class TreeSitterRuntime {
     if (!queryString || queryString.trim().length === 0) {
       return { kind: "validation-error", message: "query is required and must be non-empty" };
     }
+    if (queryString.length > MAX_QUERY_LENGTH) {
+      return {
+        kind: "validation-error",
+        message: `query exceeds maximum length of ${MAX_QUERY_LENGTH} characters`,
+      };
+    }
 
     const parseResult = await this.parseFile(filePath);
     if (parseResult.kind !== "success") return parseResult;
@@ -228,6 +234,9 @@ export class TreeSitterRuntime {
     }
   }
 }
+
+/** Max query string length to prevent ReDoS via overly complex Tree-sitter patterns. */
+const MAX_QUERY_LENGTH = 10_000;
 
 /** Format errors with their cause chain's first message for user-facing tool output. */
 function formatError(err: unknown, fallback = "Operation failed"): string {
