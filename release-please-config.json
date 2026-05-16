@@ -1,21 +1,28 @@
 {
   "packages": {
-    "packages/supi": {},
-    "packages/supi-ask-user": {},
-    "packages/supi-bash-timeout": {},
-    "packages/supi-cache": {},
-    "packages/supi-claude-md": {},
-    "packages/supi-code-intelligence": {},
-    "packages/supi-context": {},
-    "packages/supi-core": {},
-    "packages/supi-debug": {},
-    "packages/supi-extras": {},
-    "packages/supi-insights": {},
-    "packages/supi-lsp": {},
-    "packages/supi-review": {},
-    "packages/supi-rtk": {},
-    "packages/supi-tree-sitter": {},
-    "packages/supi-web": {}
+    ".": {
+      "release-type": "node",
+      "include-component-in-tag": false,
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        "packages/supi/package.json",
+        "packages/supi-ask-user/package.json",
+        "packages/supi-bash-timeout/package.json",
+        "packages/supi-cache/package.json",
+        "packages/supi-claude-md/package.json",
+        "packages/supi-code-intelligence/package.json",
+        "packages/supi-context/package.json",
+        "packages/supi-core/package.json",
+        "packages/supi-debug/package.json",
+        "packages/supi-extras/package.json",
+        "packages/supi-insights/package.json",
+        "packages/supi-lsp/package.json",
+        "packages/supi-review/package.json",
+        "packages/supi-rtk/package.json",
+        "packages/supi-tree-sitter/package.json",
+        "packages/supi-web/package.json"
+      ]
+    }
   },
-  "plugins": ["node-workspace"]
+  "pull-request-title-pattern": "chore: release ${version}"
 }

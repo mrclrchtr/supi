@@ -177,18 +177,20 @@ Root cause for the staging pipeline: direct `pnpm pack` on the meta-package (`pa
 
 ## Release & tagging convention
 
-- **Single tag per release**: Use one `vX.Y.Z` git tag (not per-package tags). Push it with:
+- **Single tag per release**: `vX.Y.Z` (not per-package tags), driven by release-please configured at the repo root with `include-component-in-tag: false`.
+- **Single GitHub release**: One release matching the tag — release-please creates it when the release PR is merged.
+- **Unified versioning**: All `packages/*/package.json` versions are synced in lockstep by release-please via `extra-files` in `release-please-config.json`. If any package triggers a breaking change, every package bumps major.
+- **Config files**:
+  - `release-please-config.json` — single root (`.`) package with `release-type: node`, `include-component-in-tag: false`, and all framework package.jsons listed in `extra-files`
+  - `.release-please-manifest.json` — single entry `{".": "<version>"}`
+- Per-package npm publish uses the matching version from the workspace.
+- Release-please manages the `.release-please-manifest.json` automatically — do not edit it manually.
+- To trigger a manual release outside the automated cycle:
   ```bash
   git tag -m "vX.Y.Z" "vX.Y.Z"
   git push origin "vX.Y.Z"
-  ```
-- **Single GitHub release**: Create one GitHub release matching the tag, not per-package releases.
-  ```bash
   gh release create "vX.Y.Z" --title "vX.Y.Z" --notes "..." --latest
   ```
-- All packages in the monorepo are versioned together at the same version.
-- Per-package npm publish should use the matching version from the workspace.
-- The `.release-please-manifest.json` must always be updated alongside version bumps.
 
 ## Testing patterns
 

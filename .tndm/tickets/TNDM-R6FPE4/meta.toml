@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-R6FPE4"
+title = "Unified monorepo versioning for SuPi"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"

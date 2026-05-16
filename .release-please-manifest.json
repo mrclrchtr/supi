@@ -1,18 +1,3 @@
 {
-  "packages/supi": "1.0.0",
-  "packages/supi-ask-user": "1.0.0",
-  "packages/supi-bash-timeout": "1.0.0",
-  "packages/supi-cache": "1.0.0",
-  "packages/supi-claude-md": "1.0.0",
-  "packages/supi-code-intelligence": "1.0.0",
-  "packages/supi-context": "1.0.0",
-  "packages/supi-core": "1.0.0",
-  "packages/supi-debug": "1.0.0",
-  "packages/supi-extras": "1.0.0",
-  "packages/supi-insights": "1.0.0",
-  "packages/supi-lsp": "1.0.0",
-  "packages/supi-review": "1.0.0",
-  "packages/supi-rtk": "1.0.0",
-  "packages/supi-tree-sitter": "1.0.0",
-  "packages/supi-web": "1.0.0"
+  ".": "1.0.0"
 }

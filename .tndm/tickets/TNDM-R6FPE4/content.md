@@ -1,0 +1,1 @@
+Reconfigure release-please to produce a single unified version across all SuPi packages instead of independent per-package versions. PR #34 currently generates 16 separate changelogs and divergent versions (1.1.0 vs 2.0.0). The repo's CLAUDE.md already documents a "single tag per release" convention. We need to align the tooling with that convention.
