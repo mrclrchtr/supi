@@ -175,6 +175,20 @@ Root cause for the staging pipeline: direct `pnpm pack` on the meta-package (`pa
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli)
 - RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward
 
+## Release & tagging convention
+
+- **Single tag per release**: Use one `vX.Y.Z` git tag (not per-package tags). Push it with:
+  ```bash
+  git tag -m "vX.Y.Z" "vX.Y.Z"
+  git push origin "vX.Y.Z"
+  ```
+- **Single GitHub release**: Create one GitHub release matching the tag, not per-package releases.
+  ```bash
+  gh release create "vX.Y.Z" --title "vX.Y.Z" --notes "..." --latest
+  ```
+- All packages in the monorepo are versioned together at the same version.
+- Per-package npm publish should use the matching version from the workspace.
+- The `.release-please-manifest.json` must always be updated alongside version bumps.
 
 ## Testing patterns
 
