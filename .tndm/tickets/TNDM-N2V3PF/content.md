@@ -1,0 +1,1 @@
+Fix two pre-existing test failures in pnpm verify: (1) pack-staged.test.mjs fails with cp -RL errors because vitest binary isn't nested in package node_modules (hoisted linker), (2) manager-concurrency-guard.test.ts has a flaky concurrency test returning null instead of existing client.

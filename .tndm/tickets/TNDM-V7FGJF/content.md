@@ -1,0 +1,1 @@
+Unify all SuPi workspace packages from 0.2.0 to 1.0.0 (matching supi-lsp and supi-tree-sitter which are already at 1.0.0). Deprecate orphan 0.1.x npm versions. Update root package.json version. Fix GitHub Latest release tag. Update git tags accordingly.

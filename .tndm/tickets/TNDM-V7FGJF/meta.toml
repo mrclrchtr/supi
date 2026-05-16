@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-V7FGJF"
+title = "Unify all SuPi packages to v1.0.0"
+type = "chore"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"

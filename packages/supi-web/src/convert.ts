@@ -111,12 +111,7 @@ function absolutizeLinks(root: Element, baseUrl: string): void {
 }
 
 /** Dangerous URI schemes that must never be used in href/src attributes. */
-const DANGEROUS_SCHEMES = [
-  "javascript:",
-  "data:",
-  "vbscript:",
-  "file:",
-];
+const DANGEROUS_SCHEMES = ["javascript:", "data:", "vbscript:", "file:"];
 
 function hasDangerousScheme(value: string): boolean {
   // Case-insensitive scheme check: split on first ':' and compare lowercased

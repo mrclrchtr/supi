@@ -1,0 +1,11 @@
+schema_version = 1
+id = "TNDM-N2V3PF"
+title = "Fix pre-existing test failures: pack-staged and lsp concurrency guard"
+type = "chore"
+priority = "p2"
+depends_on = []
+tags = ["flow:brainstorm"]
+
+[[documents]]
+name = "content"
+path = "content.md"

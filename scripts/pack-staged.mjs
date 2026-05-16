@@ -73,6 +73,39 @@ function assertPackageDir(packageDir) {
   return pkg;
 }
 
+/**
+ * Remove broken symlinks that would cause cp -RL to fail.
+ * pnpm's hoisted linker creates dangling .bin entries (e.g.,
+ * node_modules/.bin/vitest). Use find -L to follow workspace
+ * symlinks and remove any broken symlinks before the copy.
+ */
+function removeKnownBrokenSymlinks(packageDir) {
+  try {
+    execFileSync(
+      "find",
+      [
+        "-L",
+        packageDir,
+        "-type",
+        "l",
+        "!",
+        "-exec",
+        "test",
+        "-e",
+        "{}",
+        ";",
+        "-exec",
+        "rm",
+        "{}",
+        ";",
+      ],
+      { stdio: "ignore" },
+    );
+  } catch {
+    // find exits non-zero when any directory is inaccessible (harmless)
+  }
+}
+
 export async function packStaged(packageDir, options = {}) {
   const dryRun = options.dryRun ?? false;
   const outDir = resolve(options.outDir ?? process.cwd());
@@ -82,6 +115,11 @@ export async function packStaged(packageDir, options = {}) {
 
   try {
     mkdirSync(stageDir, { recursive: true });
+
+    // cp -RL dereferences symlinks (needed for pnpm workspace symlinks) but
+    // fails on broken symlinks created by pnpm's hoisted linker. Remove
+    // broken symlinks before the copy so cp -RL succeeds.
+    removeKnownBrokenSymlinks(packageDir);
     execFileSync("cp", ["-RL", `${packageDir}/.`, stageDir]);
 
     // Rewrite staged manifests to npm-compatible publish manifests
