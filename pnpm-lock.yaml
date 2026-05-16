@@ -504,8 +504,8 @@ importers:
         specifier: workspace:*
         version: link:../supi-test-utils
       '@types/jsdom':
-        specifier: 28.0.2
-        version: 28.0.2
+        specifier: 28.0.3
+        version: 28.0.3
       '@types/turndown':
         specifier: 5.0.6
         version: 5.0.6
@@ -1444,8 +1444,8 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
-  '@types/jsdom@28.0.2':
-    resolution: {integrity: sha512-zZYItekplnGirFhVDrcB0+103TMakXfKfIp7uECxaFzFG3Ws5kYQSwVb1d4pQfJMMjQda6pfuZxueAv9CMiJbw==}
+  '@types/jsdom@28.0.3':
+    resolution: {integrity: sha512-/HQ2uFoetFTXuye8vzIcHw2z6Fwi7Hi/qcgC+RoS9NCyewiqxhVGqlG+ViGB6lkax481R6dmhf1I7lIGlzJStQ==}
 
   '@types/mime-types@2.1.4':
     resolution: {integrity: sha512-lfU4b34HOri+kAY5UheuFMWPDOI+OPceBSHZKp69gEyTL/mmJ4cnU6Y/rlme3UL3GyOn6Y42hyIEw0/q8sWx5w==}
@@ -4233,7 +4233,7 @@ snapshots:
 
   '@types/estree@1.0.8': {}
 
-  '@types/jsdom@28.0.2':
+  '@types/jsdom@28.0.3':
     dependencies:
       '@types/node': 25.7.0
       '@types/tough-cookie': 4.0.5
