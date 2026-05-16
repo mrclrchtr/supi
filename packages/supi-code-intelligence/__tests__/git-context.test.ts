@@ -15,13 +15,25 @@ afterEach(() => {
   execFileSync("rm", ["-rf", tmpDir]);
 });
 
+function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const next = { ...env };
+  for (const key of Object.keys(next)) {
+    if (key.startsWith("GIT_")) delete next[key];
+  }
+  return next;
+}
+
+function execGit(dir: string, args: string[]): void {
+  execFileSync("git", args, { cwd: dir, env: scrubGitEnv(process.env) });
+}
+
 function initGit(dir: string) {
-  execFileSync("git", ["init"], { cwd: dir });
-  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir });
-  execFileSync("git", ["config", "user.name", "Test"], { cwd: dir });
-  execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
-  execFileSync("git", ["config", "core.hooksPath", "/dev/null"], { cwd: dir });
-  execFileSync("git", ["branch", "-m", "main"], { cwd: dir });
+  execGit(dir, ["init"]);
+  execGit(dir, ["config", "user.email", "test@example.com"]);
+  execGit(dir, ["config", "user.name", "Test"]);
+  execGit(dir, ["config", "commit.gpgsign", "false"]);
+  execGit(dir, ["config", "core.hooksPath", "/dev/null"]);
+  execGit(dir, ["branch", "-m", "main"]);
 }
 
 function writeFile(dir: string, file: string, content: string) {
@@ -39,8 +51,8 @@ describe("gatherGitContext", () => {
   it("returns branch name and no dirty files for clean repo", () => {
     initGit(tmpDir);
     writeFile(tmpDir, "readme.md", "# Hello");
-    execFileSync("git", ["add", "."], { cwd: tmpDir });
-    execFileSync("git", ["commit", "-m", "initial"], { cwd: tmpDir });
+    execGit(tmpDir, ["add", "."]);
+    execGit(tmpDir, ["commit", "-m", "initial"]);
 
     const ctx = gatherGitContext(tmpDir);
     expect(ctx).not.toBeNull();
@@ -53,8 +65,8 @@ describe("gatherGitContext", () => {
   it("detects dirty files", () => {
     initGit(tmpDir);
     writeFile(tmpDir, "readme.md", "# Hello");
-    execFileSync("git", ["add", "."], { cwd: tmpDir });
-    execFileSync("git", ["commit", "-m", "initial"], { cwd: tmpDir });
+    execGit(tmpDir, ["add", "."]);
+    execGit(tmpDir, ["commit", "-m", "initial"]);
     writeFile(tmpDir, "new.ts", "export const x = 1;");
 
     const ctx = gatherGitContext(tmpDir);

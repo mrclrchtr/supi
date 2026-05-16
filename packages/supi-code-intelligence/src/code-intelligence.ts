@@ -73,7 +73,10 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
         Type.String({ description: "Scope or focus path (package, directory, or file)" }),
       ),
       file: Type.Optional(
-        Type.String({ description: "Anchored target file (use with line/character)" }),
+        Type.String({
+          description:
+            "Anchored target file (use with line/character) or a file-level semantic target for brief/callers/affected",
+        }),
       ),
       line: Type.Optional(Type.Number({ description: "1-based line number for anchored target" })),
       character: Type.Optional(
@@ -92,7 +95,12 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
           description: "Use regex semantics for pattern action (default: false, literal search)",
         }),
       ),
-      kind: Type.Optional(Type.String({ description: "Symbol kind filter for discovery" })),
+      kind: Type.Optional(
+        Type.String({
+          description:
+            "Symbol kind filter for discovery, or pattern kind (`definition` | `export` | `import`) for structured searches",
+        }),
+      ),
       exportedOnly: Type.Optional(
         Type.Boolean({ description: "Limit discovery to exported symbols" }),
       ),

@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-GFNN3W"
+title = "Verify reported improvement opportunities for code_intel"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"

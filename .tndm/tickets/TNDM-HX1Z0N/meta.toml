@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-HX1Z0N"
+title = "Fix hook failures blocking commit and rebase branch onto local main"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:applying"]
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"

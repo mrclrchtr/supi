@@ -1,11 +1,14 @@
 // Target resolution — resolve symbol references to concrete file positions
 // for semantic actions (callers, callees, implementations, affected).
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: anchored, symbol, and file-surface target resolution intentionally live together to share resolution helpers
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core";
 import { getSessionLspService, type Position, type SessionLspService } from "@mrclrchtr/supi-lsp";
+import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
 import { escapeRegex, normalizePath } from "./search-helpers.ts";
+import { highestConfidence } from "./semantic-action-helpers.ts";
 import type { ConfidenceMode, DisambiguationCandidate } from "./types.ts";
 
 export interface ResolvedTarget {
@@ -17,6 +20,13 @@ export interface ResolvedTarget {
   displayCharacter: number;
   name: string | null;
   kind: string | null;
+  confidence: ConfidenceMode;
+}
+
+export interface ResolvedTargetGroup {
+  file: string;
+  displayName: string;
+  targets: ResolvedTarget[];
   confidence: ConfidenceMode;
 }
 
@@ -69,6 +79,52 @@ export function resolveAnchoredTarget(
       name: null,
       kind: null,
       confidence: "semantic",
+    },
+  };
+}
+
+/**
+ * Resolve a file-only request into a group of actionable targets.
+ * Prefers LSP document symbols when available and falls back to Tree-sitter export discovery.
+ */
+export async function resolveFileTargetGroup(
+  file: string,
+  cwd: string,
+): Promise<{ kind: "resolved"; group: ResolvedTargetGroup } | { kind: "error"; message: string }> {
+  const resolvedFile = normalizePath(file, cwd);
+
+  if (!fs.existsSync(resolvedFile)) {
+    return { kind: "error", message: `File not found: \`${file}\`` };
+  }
+
+  if (isBinaryFile(resolvedFile)) {
+    return {
+      kind: "error",
+      message: `File type not supported for semantic analysis: \`${file}\`. Try \`code_intel pattern\` for text search.`,
+    };
+  }
+
+  const relPath = path.relative(cwd, resolvedFile);
+  const structuralTargets = await resolveFileTargetsViaTreeSitter(relPath, resolvedFile, cwd);
+  const lspTargets = await resolveFileTargetsViaLsp(resolvedFile, cwd, structuralTargets);
+  const targets = lspTargets ?? structuralTargets;
+
+  if (!targets || targets.length === 0) {
+    return {
+      kind: "error",
+      message:
+        `**Error:** File-level semantic exploration is not available for \`${file}\`. ` +
+        "Provide `line` and `character`, or a `symbol` for discovery.",
+    };
+  }
+
+  return {
+    kind: "resolved",
+    group: {
+      file: resolvedFile,
+      displayName: relPath,
+      targets,
+      confidence: highestConfidence(targets.map((target) => target.confidence)),
     },
   };
 }
@@ -269,6 +325,165 @@ async function resolveSymbolViaSearch(
   } catch {
     return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
   }
+}
+
+async function resolveFileTargetsViaLsp(
+  resolvedFile: string,
+  cwd: string,
+  structuralTargets: ResolvedTarget[] | null,
+): Promise<ResolvedTarget[] | null> {
+  const lspState = getSessionLspService(cwd);
+  if (lspState.kind !== "ready") return null;
+
+  const symbols = await lspState.service.documentSymbols(resolvedFile);
+  if (!symbols || symbols.length === 0) {
+    return structuralTargets;
+  }
+
+  const topLevel = flattenDocumentSymbols(symbols)
+    .filter((symbol) => !symbol.container)
+    .map((symbol) =>
+      createResolvedTarget({
+        file: resolvedFile,
+        line: symbol.line,
+        character: symbol.character,
+        name: symbol.name,
+        kind: symbol.kind,
+        confidence: "semantic",
+      }),
+    );
+
+  if (topLevel.length === 0) {
+    return structuralTargets;
+  }
+
+  if (!structuralTargets || structuralTargets.length === 0) {
+    return dedupeTargets(topLevel);
+  }
+
+  const matched = structuralTargets.map((target) => {
+    const byName = topLevel.find((candidate) => candidate.name === target.name);
+    return byName ?? target;
+  });
+
+  return dedupeTargets(matched);
+}
+
+async function resolveFileTargetsViaTreeSitter(
+  relPath: string,
+  resolvedFile: string,
+  cwd: string,
+): Promise<ResolvedTarget[] | null> {
+  let tsSession: ReturnType<typeof createTreeSitterSession> | null = null;
+  try {
+    tsSession = createTreeSitterSession(cwd);
+    const exportsResult = await tsSession.exports(relPath);
+    if (exportsResult.kind !== "success" || exportsResult.data.length === 0) {
+      return null;
+    }
+
+    return dedupeTargets(
+      exportsResult.data.map((record) =>
+        createResolvedTarget({
+          file: resolvedFile,
+          line: record.range.startLine,
+          character: record.range.startCharacter,
+          name: record.name,
+          kind: record.kind,
+          confidence: "structural",
+        }),
+      ),
+    );
+  } catch {
+    return null;
+  } finally {
+    tsSession?.dispose();
+  }
+}
+
+function flattenDocumentSymbols(
+  symbols: Array<{
+    name: string;
+    kind: number;
+    selectionRange?: { start: { line: number; character: number } };
+    location?: { range: { start: { line: number; character: number } } };
+    children?: Array<unknown>;
+  }>,
+  container: string | null = null,
+): Array<{
+  name: string;
+  kind: string;
+  line: number;
+  character: number;
+  container: string | null;
+}> {
+  const flattened: Array<{
+    name: string;
+    kind: string;
+    line: number;
+    character: number;
+    container: string | null;
+  }> = [];
+
+  for (const symbol of symbols) {
+    const start = symbol.selectionRange?.start ?? symbol.location?.range.start;
+    if (!start) continue;
+
+    flattened.push({
+      name: symbol.name,
+      kind: symbolKindName(symbol.kind),
+      line: start.line + 1,
+      character: start.character + 1,
+      container,
+    });
+
+    if (Array.isArray(symbol.children) && symbol.children.length > 0) {
+      flattened.push(
+        ...flattenDocumentSymbols(
+          symbol.children as Array<{
+            name: string;
+            kind: number;
+            selectionRange?: { start: { line: number; character: number } };
+            location?: { range: { start: { line: number; character: number } } };
+            children?: Array<unknown>;
+          }>,
+          symbol.name,
+        ),
+      );
+    }
+  }
+
+  return flattened;
+}
+
+function createResolvedTarget(input: {
+  file: string;
+  line: number;
+  character: number;
+  name: string;
+  kind: string | null;
+  confidence: ConfidenceMode;
+}): ResolvedTarget {
+  return {
+    file: input.file,
+    position: toZeroBased(input.line, input.character),
+    displayLine: input.line,
+    displayCharacter: input.character,
+    name: input.name,
+    kind: input.kind,
+    confidence: input.confidence,
+  };
+}
+
+function dedupeTargets(targets: ResolvedTarget[]): ResolvedTarget[] {
+  const deduped = new Map<string, ResolvedTarget>();
+  for (const target of targets) {
+    const key = `${target.name ?? ""}:${target.displayLine}:${target.displayCharacter}`;
+    if (!deduped.has(key)) {
+      deduped.set(key, target);
+    }
+  }
+  return [...deduped.values()];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────

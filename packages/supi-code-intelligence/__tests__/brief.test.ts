@@ -20,6 +20,18 @@ function writeJson(dir: string, file: string, data: unknown) {
   writeFileSync(path.join(dir, file), JSON.stringify(data, null, 2));
 }
 
+function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const next = { ...env };
+  for (const key of Object.keys(next)) {
+    if (key.startsWith("GIT_")) delete next[key];
+  }
+  return next;
+}
+
+function execGit(dir: string, args: string[]) {
+  return execFileSync("git", args, { cwd: dir, env: scrubGitEnv(process.env) });
+}
+
 function setupWorkspace() {
   writeJson(tmpDir, "package.json", { name: "test-ws", description: "A workspace" });
   writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
@@ -91,14 +103,14 @@ describe("generateOverview", () => {
 
   it("includes git context when in a git repo", async () => {
     setupWorkspace();
-    execFileSync("git", ["init"], { cwd: tmpDir });
-    execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: tmpDir });
-    execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir });
-    execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: tmpDir });
-    execFileSync("git", ["config", "core.hooksPath", "/dev/null"], { cwd: tmpDir });
-    execFileSync("git", ["branch", "-m", "main"], { cwd: tmpDir });
-    execFileSync("git", ["add", "."], { cwd: tmpDir });
-    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir });
+    execGit(tmpDir, ["init"]);
+    execGit(tmpDir, ["config", "user.email", "test@example.com"]);
+    execGit(tmpDir, ["config", "user.name", "Test"]);
+    execGit(tmpDir, ["config", "commit.gpgsign", "false"]);
+    execGit(tmpDir, ["config", "core.hooksPath", "/dev/null"]);
+    execGit(tmpDir, ["branch", "-m", "main"]);
+    execGit(tmpDir, ["add", "."]);
+    execGit(tmpDir, ["commit", "-m", "init"]);
 
     const model = await buildArchitectureModel(tmpDir);
     const overview = generateOverview(model as NonNullable<typeof model>);

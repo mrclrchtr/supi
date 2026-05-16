@@ -65,11 +65,11 @@ describe("executeAction validation", () => {
     expect(result.content).toContain("pattern");
   });
 
-  it("rejects semantic action with file but no line/character", async () => {
+  it("supports file-only callers for exported file surfaces", async () => {
     writeFileSync(path.join(tmpDir, "test.ts"), "export const x = 1;");
     const result = await executeAction({ action: "callers", file: "test.ts" }, { cwd: tmpDir });
-    expect(result.content).toContain("Error");
-    expect(result.content).toContain("line");
+    expect(result.content).toContain("Callers in `test.ts`");
+    expect(result.content).not.toContain("Error");
   });
 });
 

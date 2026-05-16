@@ -1,5 +1,7 @@
 // Shared types for code intelligence tool results and metadata.
 
+import type { PrioritySignalsSummary } from "./prioritization-signals.ts";
+
 /** Confidence vocabulary for result labeling. */
 export type ConfidenceMode = "semantic" | "structural" | "heuristic" | "unavailable";
 
@@ -12,6 +14,7 @@ export interface BriefDetails {
   dependencySummary: { moduleCount: number; edgeCount: number } | null;
   omittedCount: number;
   nextQueries: string[];
+  prioritySignals?: PrioritySignalsSummary | null;
 }
 
 /** Structured details metadata for relationship and pattern results. */
@@ -33,6 +36,7 @@ export interface AffectedDetails {
   likelyTests: string[];
   omittedCount: number;
   nextQueries: string[];
+  prioritySignals?: PrioritySignalsSummary | null;
 }
 
 /** Disambiguation candidate for ambiguous symbol resolution. */

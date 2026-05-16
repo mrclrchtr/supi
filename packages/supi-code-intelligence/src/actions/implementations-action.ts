@@ -10,9 +10,11 @@ import {
   runRipgrep,
   uriToFile,
 } from "../search-helpers.ts";
+import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: implementation lookup has distinct semantic, unsupported-file, and heuristic branches
 export async function executeImplementationsAction(
   params: ActionParams,
   cwd: string,
@@ -29,6 +31,22 @@ export async function executeImplementationsAction(
           candidateCount: 0,
           omittedCount: 0,
           nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
+
+  if (isResolvedTargetGroup(target)) {
+    return {
+      content: `**Error:** File-level implementation discovery is not available for \`${path.relative(cwd, target.file)}\`.\n\nProvide \`line\` and \`character\`, or a \`symbol\` for discovery.`,
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: params.path ?? null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Use `file` + coordinates or `symbol` for implementation lookup"],
         },
       },
     };

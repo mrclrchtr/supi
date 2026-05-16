@@ -33,12 +33,15 @@ Scopes: project (no params), package/directory (`path`), file (`file`), or ancho
 
 - Project-level brief: module listing, dependency graph, "start here" recommendations, suggested next queries
 - Focused brief (`path` or anchored symbol): stripped-down version with a single module or symbol focus
+- Non-module directory briefs now recurse into descendant structure, summarize nested source files, and include lightweight public-surface / import-export summaries for JS/TS trees
 - Now includes git context (branch, dirty files, last commit) when inside a git repository
+- Can surface optional priority signals such as diagnostics, low coverage, and unused-code hints when available
 - Metadata returned: `BriefDetails` with confidence, focus target, public surfaces, dependency summary
 
 ### `callers` — Find call sites for a symbol
 
 - LSP-first (references query), falls back to heuristic text search (word-boundary ripgrep)
+- File-only requests now expand across discovered exported targets when possible, so you can ask for callers of a module surface without coordinates
 - Results grouped by file with ranked, contextual call sites
 - Confidence labeling: `semantic` (LSP), `heuristic` (text search)
 
@@ -60,6 +63,8 @@ Before changing exported APIs, shared helpers, config surfaces, or cross-package
 - Downstream dependents (transitive)
 - Risk level: `low` | `medium` | `high`
 - Likely test files
+- File-only requests now expand across discovered exported targets when possible
+- Optional priority signals highlight diagnostics, low coverage, and unused-code hints when available
 - Returns `AffectedDetails` metadata
 
 ### `index` — Factual project map
@@ -83,6 +88,9 @@ Optimized for common agent lookups:
 
 - `pattern` is treated as a **literal string by default**
 - Set `regex: true` to opt into raw ripgrep regex semantics
+- Structured JS/TS searches support `kind: "definition" | "export" | "import"` to avoid regex look-around hacks when you care about declarations instead of raw text lines
+- Definition/export searches include duplicate-definition summaries when the same symbol appears in multiple files
+- Structured scans are capped and may return a partial-result warning when the scope is too large or times out; narrow `path` or `pattern` for complete coverage
 - Malformed regex input returns an explicit error instead of a misleading "No matches found"
 - Nearby matches in the same file deduplicate overlapping context lines to reduce token waste
 - Results grouped with file and context lines
@@ -93,6 +101,7 @@ Examples:
 ```json
 { "action": "pattern", "pattern": "sendMessage({", "path": "packages/" }
 { "action": "pattern", "pattern": "register(Settings|Config)", "path": "packages/", "regex": true }
+{ "action": "pattern", "pattern": "payment", "kind": "definition", "path": "src/" }
 { "action": "pattern", "pattern": "createServerFn", "summary": true }
 ```
 
@@ -139,9 +148,9 @@ For no-result and error states, `details` carries `confidence: "unavailable"` or
 `confidence: "heuristic"` with appropriately zeroed counts, so consumers always
 get structured metadata back.
 
-- **`brief`** → `BriefDetails` (confidence, focus target, start-here suggestions, public surfaces, dependency summary, omitted count, next queries)
+- **`brief`** → `BriefDetails` (confidence, focus target, start-here suggestions, public surfaces, dependency summary, omitted count, next queries, optional priority signals)
 - **`search`** → `SearchDetails` (callers/callees/implementations/pattern: confidence, scope, candidate count, omitted count)
-- **`affected`** → `AffectedDetails` (direct count, downstream count, risk level, likely tests, check-next list)
+- **`affected`** → `AffectedDetails` (direct count, downstream count, risk level, likely tests, check-next list, optional priority signals)
 
 ## Parameter Validation
 
@@ -149,6 +158,7 @@ The tool enforces these rules and returns explicit error messages:
 
 - `line`/`character` require `file`, not `path` — `path` is for scope/focus, `file` anchors a position
 - `file` that points to a directory is rejected — use `path` for directory scoping
+- `pattern.kind` must be one of `definition`, `export`, or `import`
 - Unknown actions are rejected with a list of supported actions
 
 ## Architecture
@@ -192,9 +202,10 @@ export type { AffectedDetails, BriefDetails, CodeIntelResult, ConfidenceMode, Di
 These seven guidelines are injected into the system prompt:
 
 > - Use `code_intel brief` before editing an unfamiliar package, directory, or file to get architecture context and reduce blind reads.
-> - Use `code_intel affected` before changing exported APIs, shared helpers, config surfaces, or cross-package contracts to check blast radius and risk.
-> - Use `code_intel callers` before modifying a function to verify all call sites; use `callees` and `implementations` for dependency and interface analysis.
-> - Use `code_intel pattern` for bounded, scope-aware text search when the question is textual rather than semantic; it treats patterns as literal strings by default and supports `regex: true` when needed.
+> - Use `code_intel affected` before changing exported APIs, shared helpers, config surfaces, or cross-package contracts to check blast radius and risk; file-only requests now expand across exported targets when possible.
+> - Use `code_intel callers` before modifying a function to verify all call sites; use `callees` and `implementations` for dependency and interface analysis, and use file-only `callers` when you need the export surface of a module.
+> - Use `code_intel pattern` for bounded, scope-aware text search when the question is textual rather than semantic; it treats patterns as literal strings by default, supports `regex: true`, and supports `kind: "definition" | "export" | "import"` for structured searches.
+> - Use `code_intel brief` and `code_intel affected` priority signals to notice diagnostics, low coverage, or unused-code hints before editing risky files.
 > - Use `code_intel index` for a factual project map (file counts, directory structure, landmark files) when you need to orient yourself in a new codebase.
 > - After `code_intel` narrows the target, use raw `lsp` and `tree_sitter` tools for precise drill-down on exact symbols, types, or AST nodes.
 > - Do not prefer `code_intel` over direct file reads or lower-level tools for trivial, already-localized edits or exact symbol/AST drill-down tasks.

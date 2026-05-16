@@ -1,9 +1,20 @@
 import { execFileSync } from "node:child_process";
 
+function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const next = { ...env };
+  for (const key of Object.keys(next)) {
+    if (key.startsWith("GIT_")) {
+      delete next[key];
+    }
+  }
+  return next;
+}
+
 function execGit(cwd: string, args: string[]): string {
   return execFileSync("git", args, {
     cwd,
     encoding: "utf-8",
+    env: scrubGitEnv(process.env),
     stdio: ["ignore", "pipe", "ignore"],
     timeout: 5000,
   });

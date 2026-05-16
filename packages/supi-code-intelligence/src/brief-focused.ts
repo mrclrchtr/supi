@@ -1,10 +1,15 @@
 // Focused brief generation — directory and file briefs.
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: focused brief formatting and recursive directory summarization are kept together to share local helpers
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ArchitectureModel } from "./architecture.ts";
 import { findModuleForPath, getDependencies, getDependents } from "./architecture.ts";
 import { formatGitContext, gatherGitContext } from "./git-context.ts";
+import {
+  appendPrioritySignalsSection,
+  summarizePrioritySignalsForFiles,
+} from "./prioritization-signals.ts";
 import type { BriefDetails, ConfidenceMode } from "./types.ts";
 
 /**
@@ -55,7 +60,15 @@ function generateDirectoryBrief(
   if (mod && mod.root === resolvedPath) {
     formatModuleBrief({ mod, model, lines, startHere, publicSurfaces, nextQueries, resolvedPath });
   } else {
-    formatNonModuleDir({ model, mod, resolvedPath, originalPath, lines });
+    formatNonModuleDir({
+      model,
+      mod,
+      resolvedPath,
+      originalPath,
+      lines,
+      publicSurfaces,
+      nextQueries,
+    });
   }
 
   if (nextQueries.length > 0) {
@@ -65,6 +78,12 @@ function generateDirectoryBrief(
       lines.push(`- ${q}`);
     }
   }
+
+  const prioritySignals = summarizePrioritySignalsForFiles(
+    model.root,
+    summarizeDirectoryRecursively(resolvedPath).allFiles,
+  );
+  appendPrioritySignalsSection(lines, prioritySignals);
 
   const gitCtx = gatherGitContext(model.root);
   if (gitCtx) {
@@ -83,6 +102,7 @@ function generateDirectoryBrief(
       dependencySummary: mod ? { moduleCount: 1, edgeCount: mod.internalDeps.length } : null,
       omittedCount: 0,
       nextQueries,
+      prioritySignals,
     },
   };
 }
@@ -195,10 +215,13 @@ interface NonModuleDirContext {
   resolvedPath: string;
   originalPath: string;
   lines: string[];
+  publicSurfaces: string[];
+  nextQueries: string[];
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: nested-directory brief formatting is clearer as one staged formatter than as many tiny helpers
 function formatNonModuleDir(ctx: NonModuleDirContext): void {
-  const { model, mod, resolvedPath, originalPath, lines } = ctx;
+  const { model, mod, resolvedPath, originalPath, lines, publicSurfaces, nextQueries } = ctx;
   const relPath = path.relative(model.root, resolvedPath);
   lines.push(`# Directory: ${relPath || originalPath}`);
   lines.push("");
@@ -209,17 +232,55 @@ function formatNonModuleDir(ctx: NonModuleDirContext): void {
     lines.push("");
   }
 
-  const files = listSourceFiles(resolvedPath);
-  if (files.length > 0) {
-    const shown = files.slice(0, 10);
+  const summary = summarizeDirectoryRecursively(resolvedPath);
+  if (summary.directFiles.length > 0) {
     lines.push("## Source Files");
-    for (const f of shown) {
+    for (const f of summary.directFiles.slice(0, 10)) {
       lines.push(`- \`${f}\``);
     }
-    if (files.length > 10) {
-      lines.push(`- _+${files.length - 10} more files_`);
+    if (summary.directFiles.length > 10) {
+      lines.push(`- _+${summary.directFiles.length - 10} more files_`);
     }
-  } else {
+    lines.push("");
+  }
+
+  if (summary.totalSourceFiles > 0) {
+    lines.push("## Descendant Source Files");
+    lines.push(`- Total: ${summary.totalSourceFiles}`);
+    for (const subdir of summary.subdirs.slice(0, 8)) {
+      lines.push(
+        `- \`${subdir.name}/\` — ${subdir.fileCount} file${subdir.fileCount !== 1 ? "s" : ""}`,
+      );
+    }
+    if (summary.subdirs.length > 8) {
+      lines.push(`- _+${summary.subdirs.length - 8} more subdirectories_`);
+    }
+    lines.push("");
+  }
+
+  if (summary.publicSurfaces.length > 0) {
+    lines.push("## Public Surfaces");
+    for (const surface of summary.publicSurfaces.slice(0, 8)) {
+      lines.push(`- ${surface}`);
+      publicSurfaces.push(surface);
+    }
+    if (summary.publicSurfaces.length > 8) {
+      lines.push(`- _+${summary.publicSurfaces.length - 8} more exports_`);
+    }
+    lines.push("");
+  }
+
+  if (summary.totalSourceFiles > 0) {
+    lines.push("## Import / Export Summary");
+    lines.push(`- Imports: ${summary.importCount}`);
+    lines.push(`- Exports: ${summary.exportCount}`);
+    lines.push("");
+    nextQueries.push(
+      `\`code_intel pattern\` with \`path: "${relPath || originalPath}"\` to inspect a specific nested symbol`,
+    );
+  }
+
+  if (summary.totalSourceFiles === 0) {
     lines.push("No recognized source files in this directory.");
   }
 }
@@ -266,6 +327,12 @@ function generateFileBrief(
     lines.push("_Could not read file contents._");
   }
 
+  const prioritySignals = summarizePrioritySignalsForFiles(model.root, [resolvedPath]);
+  if (prioritySignals) {
+    lines.push("");
+    appendPrioritySignalsSection(lines, prioritySignals);
+  }
+
   nextQueries.push(
     `\`code_intel callers\` with \`file: "${relPath}"\` and a line/character for call-site analysis`,
   );
@@ -300,6 +367,7 @@ function generateFileBrief(
       dependencySummary: null,
       omittedCount: 0,
       nextQueries,
+      prioritySignals,
     },
   };
 }
@@ -365,6 +433,16 @@ const SOURCE_EXTENSIONS = new Set([
   ".sql",
 ]);
 
+interface RecursiveDirectorySummary {
+  directFiles: string[];
+  allFiles: string[];
+  totalSourceFiles: number;
+  subdirs: Array<{ name: string; fileCount: number }>;
+  publicSurfaces: string[];
+  importCount: number;
+  exportCount: number;
+}
+
 function listSourceFiles(dir: string): string[] {
   const files: string[] = [];
   try {
@@ -380,4 +458,106 @@ function listSourceFiles(dir: string): string[] {
     // Directory not readable
   }
   return files.sort((a, b) => a.localeCompare(b));
+}
+
+function summarizeDirectoryRecursively(dir: string): RecursiveDirectorySummary {
+  const directFiles = listSourceFiles(dir);
+  const summary: RecursiveDirectorySummary = {
+    directFiles,
+    allFiles: directFiles.map((file) => path.join(dir, file)),
+    totalSourceFiles: directFiles.length,
+    subdirs: [],
+    publicSurfaces: [],
+    importCount: 0,
+    exportCount: 0,
+  };
+
+  accumulateJsTsSignals(summary, dir, directFiles, "");
+
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+      const childDir = path.join(dir, entry.name);
+      const childSummary = summarizeDirectoryRecursively(childDir);
+      if (childSummary.totalSourceFiles === 0) continue;
+      summary.totalSourceFiles += childSummary.totalSourceFiles;
+      summary.allFiles.push(...childSummary.allFiles);
+      summary.subdirs.push({ name: entry.name, fileCount: childSummary.totalSourceFiles });
+      summary.publicSurfaces.push(
+        ...childSummary.publicSurfaces.map((surface) => `${entry.name}/${surface}`),
+      );
+      summary.importCount += childSummary.importCount;
+      summary.exportCount += childSummary.exportCount;
+    }
+  } catch {
+    // Directory not readable
+  }
+
+  summary.subdirs.sort((a, b) => a.name.localeCompare(b.name));
+  return summary;
+}
+
+function accumulateJsTsSignals(
+  summary: RecursiveDirectorySummary,
+  dir: string,
+  files: string[],
+  prefix: string,
+): void {
+  for (const file of files) {
+    if (!isJsTsFile(file)) continue;
+    try {
+      const relFile = prefix ? `${prefix}/${file}` : file;
+      const content = fs.readFileSync(path.join(dir, file), "utf-8");
+      summary.importCount += countMatches(content, /^import\s/gm);
+      const exports = extractNamedExports(content);
+      summary.exportCount += exports.length;
+      for (const exportedName of exports) {
+        summary.publicSurfaces.push(`\`${exportedName}\` — \`${relFile}\``);
+      }
+    } catch {
+      // File not readable
+    }
+  }
+}
+
+function isJsTsFile(file: string): boolean {
+  return [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"].includes(
+    path.extname(file),
+  );
+}
+
+/**
+ * Lightweight exported-name extraction for recursive directory briefs.
+ *
+ * Best-effort only: handles exported declarations and simple named export lists,
+ * but intentionally does not try to cover default exports, export-all forms,
+ * re-exported defaults, or every multiline formatting variant.
+ */
+function extractNamedExports(content: string): string[] {
+  const names = new Set<string>();
+  const declarationRegex =
+    /export\s+(?:async\s+)?(?:function|class|interface|type|const|let|var|enum)\s+([A-Za-z_$][\w$]*)/g;
+  const namedExportRegex = /export\s*\{\s*([^}]+)\s*\}/g;
+
+  for (const match of content.matchAll(declarationRegex)) {
+    if (match[1]) names.add(match[1]);
+  }
+
+  for (const match of content.matchAll(namedExportRegex)) {
+    const parts = match[1]?.split(",") ?? [];
+    for (const part of parts) {
+      const candidate = part
+        .trim()
+        .split(/\s+as\s+/i)[0]
+        ?.trim();
+      if (candidate) names.add(candidate);
+    }
+  }
+
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+function countMatches(content: string, regex: RegExp): number {
+  return [...content.matchAll(regex)].length;
 }

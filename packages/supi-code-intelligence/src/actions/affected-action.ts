@@ -1,8 +1,13 @@
 // Affected action — blast-radius analysis for a symbol change.
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: file-level and single-target affected flows share helpers to keep the blast-radius logic in one place
 
 import * as path from "node:path";
 import { getSessionLspService } from "@mrclrchtr/supi-lsp";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../architecture.ts";
+import {
+  appendPrioritySignalsSection,
+  summarizePrioritySignalsForFiles,
+} from "../prioritization-signals.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import {
   escapeRegex,
@@ -12,6 +17,12 @@ import {
   runRipgrep,
   uriToFile,
 } from "../search-helpers.ts";
+import {
+  dedupeFileLineRefs,
+  highestConfidence,
+  isResolvedTargetGroup,
+} from "../semantic-action-helpers.ts";
+import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
 import type { ActionParams } from "../tool-actions.ts";
 import type { AffectedDetails, CodeIntelResult, ConfidenceMode } from "../types.ts";
 
@@ -39,29 +50,13 @@ export async function executeAffectedAction(
     };
   }
 
-  const relPath = path.relative(cwd, target.file);
-  const symbolName = target.name ?? `symbol at ${relPath}:${target.displayLine}`;
+  if (isResolvedTargetGroup(target)) {
+    return executeFileLevelAffected(target, params, cwd);
+  }
 
-  const refs = await gatherReferences(target, params, cwd);
-  const model = await buildArchitectureModel(cwd);
-  const analysis = analyzeImpact(refs, model, target.name, cwd);
-
-  const content = formatAffectedOutput(symbolName, refs, analysis, params);
-  const details: AffectedDetails = {
-    confidence: analysis.confidence,
-    directCount: refs.refs.length,
-    downstreamCount: analysis.downstreamCount,
-    riskLevel: analysis.riskLevel,
-    checkNext: analysis.checkNext,
-    likelyTests: analysis.likelyTests,
-    omittedCount:
-      analysis.externalRefs + (analysis.affectedFiles.size > (params.maxResults ?? 8) ? 1 : 0),
-    nextQueries: [
-      "`code_intel brief` on the most-affected module for deeper context",
-      `\`code_intel callers\` with \`symbol: "${symbolName}"\` for grouped call-site detail`,
-    ],
-  };
-  return { content, details: { type: "affected" as const, data: details } };
+  const symbolName =
+    target.name ?? `symbol at ${path.relative(cwd, target.file)}:${target.displayLine}`;
+  return executeSingleAffected(target, symbolName, params, cwd);
 }
 
 interface GatheredRef {
@@ -80,9 +75,116 @@ interface ImpactAnalysis {
   externalRefs: number;
 }
 
+async function executeSingleAffected(
+  target: ResolvedTarget,
+  symbolName: string,
+  params: ActionParams,
+  cwd: string,
+): Promise<CodeIntelResult> {
+  const refs = await gatherReferences(target, params, cwd);
+  const model = await buildArchitectureModel(cwd);
+  const analysis = analyzeImpact(refs, model, target.name, cwd);
+
+  const prioritySignals = summarizePrioritySignalsForFiles(
+    cwd,
+    analysis.affectedFiles.size > 0 ? [...analysis.affectedFiles] : [target.file],
+  );
+  const content = formatAffectedOutput(symbolName, refs, analysis, params, prioritySignals);
+  const details: AffectedDetails = {
+    confidence: analysis.confidence,
+    directCount: refs.refs.length,
+    downstreamCount: analysis.downstreamCount,
+    riskLevel: analysis.riskLevel,
+    checkNext: analysis.checkNext,
+    likelyTests: analysis.likelyTests,
+    omittedCount: computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, params),
+    nextQueries: [
+      "`code_intel brief` on the most-affected module for deeper context",
+      `\`code_intel callers\` with \`symbol: "${symbolName}"\` for grouped call-site detail`,
+    ],
+    prioritySignals,
+  };
+  return { content, details: { type: "affected" as const, data: details } };
+}
+
+async function executeFileLevelAffected(
+  targetGroup: ResolvedTargetGroup,
+  params: ActionParams,
+  cwd: string,
+): Promise<CodeIntelResult> {
+  const perTarget = await Promise.all(
+    targetGroup.targets.map(async (target) => ({
+      target,
+      refs: await gatherReferences(target, params, cwd),
+    })),
+  );
+
+  const combinedRefs = dedupeFileLineRefs(perTarget.flatMap((entry) => entry.refs.refs));
+  const combinedExternal = perTarget.reduce((sum, entry) => sum + entry.refs.externalCount, 0);
+  const combinedConfidence = highestConfidence(perTarget.map((entry) => entry.refs.confidence));
+  const model = await buildArchitectureModel(cwd);
+  const analysis = analyzeImpact(
+    { refs: combinedRefs, confidence: combinedConfidence, externalCount: combinedExternal },
+    model,
+    null,
+    cwd,
+  );
+
+  const prioritySignals = summarizePrioritySignalsForFiles(
+    cwd,
+    analysis.affectedFiles.size > 0 ? [...analysis.affectedFiles] : [targetGroup.file],
+  );
+
+  const lines: string[] = [];
+  lines.push(`# Affected: \`${targetGroup.displayName}\``);
+  lines.push("");
+  const totalRefs = combinedRefs.length + combinedExternal;
+  const refSummary =
+    combinedExternal > 0
+      ? `${totalRefs} refs (${combinedRefs.length} direct + ${combinedExternal} external)`
+      : `${totalRefs} ref${totalRefs !== 1 ? "s" : ""}`;
+  lines.push(formatFileLevelAffectedHeader(targetGroup.targets.length, refSummary, analysis));
+  lines.push("");
+
+  lines.push("## Exported Targets");
+  for (const entry of perTarget) {
+    lines.push(
+      `- \`${entry.target.name ?? "symbol"}\` — ${entry.refs.refs.length} ref${entry.refs.refs.length !== 1 ? "s" : ""}`,
+    );
+  }
+  lines.push("");
+
+  addRiskSection(lines, analysis, totalRefs);
+  addReferencesSection(lines, combinedRefs, params.maxResults ?? 8);
+  appendPrioritySignalsSection(lines, prioritySignals);
+  addCheckNextSection(lines, analysis.checkNext);
+  addTestsSection(lines, analysis.likelyTests);
+  lines.push("## Next");
+  lines.push("- `code_intel brief` on the most-affected module for deeper context");
+  lines.push("- Use `file` + coordinates to inspect one exported target precisely");
+  lines.push("");
+
+  const details: AffectedDetails = {
+    confidence: analysis.confidence,
+    directCount: combinedRefs.length,
+    downstreamCount: analysis.downstreamCount,
+    riskLevel: analysis.riskLevel,
+    checkNext: analysis.checkNext,
+    likelyTests: analysis.likelyTests,
+    omittedCount: computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, params),
+    nextQueries: [
+      "`code_intel brief` on the most-affected module for deeper context",
+      "Use `file` + coordinates to inspect one exported target precisely",
+    ],
+    prioritySignals,
+  };
+
+  return { content: lines.join("\n"), details: { type: "affected" as const, data: details } };
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-source reference gathering with fallback logic
 async function gatherReferences(
-  target: { file: string; position: { line: number; character: number }; name: string | null },
+  target: ResolvedTarget,
   params: ActionParams,
   cwd: string,
 ): Promise<{ refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number }> {
@@ -93,8 +195,6 @@ async function gatherReferences(
   if (lspState.kind === "ready") {
     const lspRefs = await lspState.service.references(target.file, target.position);
     if (lspRefs && lspRefs.length > 0) {
-      // Filter out the declaration itself — LSP includes it with includeDeclaration.
-      // The declaration is the symbol being changed, not something affected by the change.
       const filtered = filterOutDeclaration(lspRefs, target.file, target.position);
       for (const ref of filtered) {
         const filePath = uriToFile(ref.uri);
@@ -113,7 +213,9 @@ async function gatherReferences(
     const pattern = `\\b${escapeRegex(target.name)}\\b`;
     const matches = runRipgrep(pattern, scopePath, cwd, { maxMatches: 30 });
     for (const m of matches) {
-      refs.push({ file: m.file, line: m.line });
+      if (!isDeclarationMatch(m.file, m.line, target, cwd)) {
+        refs.push({ file: path.relative(cwd, path.resolve(cwd, m.file)), line: m.line });
+      }
     }
     return { refs, confidence: "heuristic", externalCount: 0 };
   }
@@ -139,7 +241,6 @@ function analyzeImpact(
       if (mod) affectedModules.add(mod.name);
     }
 
-    // Transitive downstream: BFS to find all modules reachable through dependents
     const downstreamModules = new Set<string>();
     const queue = [...affectedModules];
     while (queue.length > 0) {
@@ -195,11 +296,13 @@ function assessRisk(
   return "low";
 }
 
+// biome-ignore lint/complexity/useMaxParams: affected formatting keeps related inputs explicit for readability
 function formatAffectedOutput(
   symbolName: string,
   result: { refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number },
   analysis: ImpactAnalysis,
   params: ActionParams,
+  prioritySignals: import("../prioritization-signals.ts").PrioritySignalsSummary | null,
 ): string {
   const totalRefs = result.refs.length + analysis.externalRefs;
   const lines: string[] = [];
@@ -215,13 +318,14 @@ function formatAffectedOutput(
   );
   if (analysis.externalRefs > 0) {
     lines.push(
-      `_External references are not listed individually (node_modules, .pnpm, or out-of-tree)_`,
+      "_External references are not listed individually (node_modules, .pnpm, or out-of-tree)_",
     );
   }
   lines.push("");
 
   addRiskSection(lines, analysis, totalRefs);
   addReferencesSection(lines, result.refs, params.maxResults ?? 8);
+  appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
   addAffectedNextQueries(lines, symbolName, analysis);
@@ -294,6 +398,22 @@ function addTestsSection(lines: string[], tests: string[]): void {
   lines.push("");
 }
 
+function computeOmittedCount(
+  externalRefs: number,
+  affectedFileCount: number,
+  params: ActionParams,
+): number {
+  return externalRefs + Math.max(0, affectedFileCount - (params.maxResults ?? 8));
+}
+
+function formatFileLevelAffectedHeader(
+  targetCount: number,
+  refSummary: string,
+  analysis: ImpactAnalysis,
+): string {
+  return `**Risk: ${analysis.riskLevel.toUpperCase()}** | ${targetCount} exported target${targetCount !== 1 ? "s" : ""} | ${refSummary} | ${analysis.affectedFiles.size} file${analysis.affectedFiles.size !== 1 ? "s" : ""} | ${analysis.affectedModules.size} module${analysis.affectedModules.size !== 1 ? "s" : ""} | ${analysis.downstreamCount} downstream (${analysis.confidence})`;
+}
+
 function addAffectedNextQueries(
   lines: string[],
   symbolName: string,
@@ -307,4 +427,13 @@ function addAffectedNextQueries(
     `- \`code_intel callers\` with \`symbol: "${symbolName}"\` for grouped call-site detail`,
   );
   lines.push("");
+}
+
+function isDeclarationMatch(
+  file: string,
+  line: number,
+  target: ResolvedTarget,
+  cwd: string,
+): boolean {
+  return path.resolve(cwd, file) === target.file && line === target.displayLine;
 }

@@ -31,6 +31,8 @@ describe("code_intel tool registration", () => {
     expect(desc).toContain('"action": "affected"');
     expect(desc).toContain('"action": "pattern"');
     expect(desc).toContain('"regex": true');
+    expect(desc).toContain('"kind": "definition"');
+    expect(desc).toContain('"file": "packages/supi-core/index.ts"');
   });
 
   it("registers an optional regex parameter for pattern searches", () => {
@@ -40,6 +42,15 @@ describe("code_intel tool registration", () => {
       (pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters
         ?.properties,
     ).toHaveProperty("regex");
+  });
+
+  it("registers an optional kind parameter for structured pattern searches", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    expect(
+      (pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters
+        ?.properties,
+    ).toHaveProperty("kind");
   });
 
   it("has promptSnippet naming code_intel", () => {
@@ -68,7 +79,7 @@ describe("code_intel tool registration", () => {
     expect(combined).toContain("drill-down");
   });
 
-  it("guidance explains literal-default pattern search and regex opt-in", () => {
+  it("guidance explains structured pattern search and priority signals", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     const combined = ((pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? []).join(
@@ -76,6 +87,8 @@ describe("code_intel tool registration", () => {
     );
     expect(combined).toContain("literal strings by default");
     expect(combined).toContain("regex: true");
+    expect(combined).toContain("definition");
+    expect(combined).toContain("diagnostics");
   });
 
   it("guidance discourages code_intel for trivial tasks", () => {

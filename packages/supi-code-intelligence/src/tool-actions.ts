@@ -105,5 +105,13 @@ function validateParams(params: ActionParams, cwd: string): string | null {
     return "**Error:** `line` and `character` require `file`.";
   }
 
+  if (
+    params.action === "pattern" &&
+    params.kind &&
+    !new Set(["definition", "export", "import"]).has(params.kind)
+  ) {
+    return "**Error:** `pattern` action `kind` must be one of `definition`, `export`, or `import`.";
+  }
+
   return null;
 }

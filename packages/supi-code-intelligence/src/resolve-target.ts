@@ -1,18 +1,20 @@
 import {
   type ResolvedTarget,
+  type ResolvedTargetGroup,
   resolveAnchoredTarget,
+  resolveFileTargetGroup,
   resolveSymbolTarget,
 } from "./target-resolution.ts";
 import type { ActionParams } from "./tool-actions.ts";
 
 /**
- * Resolve a target from action params. Returns either a ResolvedTarget
+ * Resolve a target from action params. Returns either a target, a file-level target group,
  * or a string error/disambiguation message to return directly.
  */
 export async function resolveTarget(
   params: ActionParams,
   cwd: string,
-): Promise<ResolvedTarget | string> {
+): Promise<ResolvedTarget | ResolvedTargetGroup | string> {
   if (!params.file && !params.symbol) {
     return "**Error:** Semantic actions require either anchored coordinates (`file`, `line`, `character`) or a `symbol` for discovery.";
   }
@@ -22,7 +24,7 @@ export async function resolveTarget(
   }
 
   if (params.file && !params.symbol) {
-    return "**Error:** Semantic actions with `file` require `line` and `character`, or provide `symbol` for discovery.";
+    return resolveByFile(params.file, cwd);
   }
 
   if (params.symbol) {
@@ -42,6 +44,12 @@ function resolveAnchored(
   if (result.kind === "error") return result.message;
   if (result.kind === "resolved") return result.target;
   return "**Error:** Unexpected disambiguation for anchored target.";
+}
+
+async function resolveByFile(file: string, cwd: string): Promise<ResolvedTargetGroup | string> {
+  const result = await resolveFileTargetGroup(file, cwd);
+  if (result.kind === "error") return result.message;
+  return result.group;
 }
 
 async function resolveBySymbol(

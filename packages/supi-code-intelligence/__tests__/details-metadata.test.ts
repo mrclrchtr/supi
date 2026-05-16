@@ -139,6 +139,34 @@ describe("focused brief details metadata", () => {
     const affectedHint = details.nextQueries.find((q) => q.includes("affected"));
     expect(affectedHint).toBeDefined();
   });
+
+  it("includes optional priority signals when artifacts exist", async () => {
+    setupWorkspace();
+    mkdirSync(path.join(tmpDir, "coverage"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "coverage", "coverage-summary.json"),
+      JSON.stringify(
+        {
+          total: { lines: { pct: 95 }, statements: { pct: 95 } },
+          "packages/core/index.ts": { lines: { pct: 10 }, statements: { pct: 10 } },
+        },
+        null,
+        2,
+      ),
+    );
+    writeFileSync(
+      path.join(tmpDir, "knip.json"),
+      JSON.stringify({ exports: [{ file: "packages/core/index.ts", name: "x" }] }, null, 2),
+    );
+
+    const model = await buildArchitectureModel(tmpDir);
+    const coreFile = path.join(tmpDir, "packages", "core", "index.ts");
+    const { details } = generateFocusedBrief(model as NonNullable<typeof model>, coreFile);
+
+    expect(details.prioritySignals).not.toBeNull();
+    expect(details.prioritySignals?.lowCoverageCount).toBe(1);
+    expect(details.prioritySignals?.unusedCount).toBe(1);
+  });
 });
 
 describe("structured details via executeAction", () => {

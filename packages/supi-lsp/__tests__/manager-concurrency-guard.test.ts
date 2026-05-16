@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,9 +58,6 @@ describe("LspManager concurrency guard", () => {
       sessionCwd,
     );
 
-    // Spy on the private performStart via the prototype *before* any
-    // instance is created, so the spy is active when the test runs.
-    // We'll clean up in afterEach/restoreAllMocks.
     const performStartSpy = vi
       .spyOn(
         LspManager.prototype as unknown as { performStart: () => Promise<null> },
@@ -69,24 +66,17 @@ describe("LspManager concurrency guard", () => {
       .mockImplementation(() => Promise.resolve(null));
 
     try {
-      // Kick off two concurrent starts. The second should find the
-      // pending promise from the first and return it without calling
-      // performStart a second time.
       const [result1, result2] = await Promise.all([
         manager.startServerForRoot("typescript", sessionCwd),
         manager.startServerForRoot("typescript", sessionCwd),
       ]);
 
-      // Both return the same value (null from the mock)
       expect(result1).toBe(result2);
-
-      // Only one performStart invocation should have happened
       expect(performStartSpy).toHaveBeenCalledTimes(1);
-
-      // pendingStarts should be cleaned up after resolution
       expect(getPendingStarts(manager).has(`typescript:${sessionCwd}`)).toBe(false);
     } finally {
       performStartSpy.mockRestore();
+      rmSync(sessionCwd, { recursive: true, force: true });
     }
   });
 
@@ -94,18 +84,20 @@ describe("LspManager concurrency guard", () => {
     const sessionCwd = makeTempRoot();
     const manager = new LspManager(MINIMAL_CONFIG, sessionCwd);
 
-    // Inject a fake running client
-    const fakeClient = {
-      name: "typescript",
-      root: sessionCwd,
-      status: "running",
-    };
-    getClients(manager).set(`typescript:${sessionCwd}`, fakeClient);
+    try {
+      const fakeClient = {
+        name: "typescript",
+        root: sessionCwd,
+        status: "running",
+      };
+      getClients(manager).set(`typescript:${sessionCwd}`, fakeClient);
 
-    const client = await manager.getClientForFile(`${sessionCwd}/src/index.ts`);
+      const client = await manager.getClientForFile(`${sessionCwd}/src/index.ts`);
 
-    // Should return the existing client
-    expect(client).toBe(fakeClient);
+      expect(client).toBe(fakeClient);
+    } finally {
+      rmSync(sessionCwd, { recursive: true, force: true });
+    }
   });
 
   it("does not start duplicate servers after a failed start is marked unavailable", async () => {
@@ -124,40 +116,37 @@ describe("LspManager concurrency guard", () => {
       sessionCwd,
     );
 
-    // First attempt should fail (binary doesn't exist) and mark as unavailable
     const first = await manager.startServerForRoot("typescript", sessionCwd);
     expect(first).toBeNull();
     expect(getUnavailable(manager).has(`typescript:${sessionCwd}`)).toBe(true);
 
-    // Second attempt should return null immediately
     const second = await manager.startServerForRoot("typescript", sessionCwd);
     expect(second).toBeNull();
-
-    // No clients should exist (the failed attempt is cleaned up)
     expect(getClients(manager).size).toBe(0);
+
+    rmSync(sessionCwd, { recursive: true, force: true });
   });
 
   it("returns null immediately for an already-unavailable server:root", async () => {
     const sessionCwd = makeTempRoot();
     const manager = new LspManager(MINIMAL_CONFIG, sessionCwd);
 
-    // Pre-mark as unavailable
     getUnavailable(manager).add(`typescript:${sessionCwd}`);
 
     const result = await manager.startServerForRoot("typescript", sessionCwd);
     expect(result).toBeNull();
+
+    rmSync(sessionCwd, { recursive: true, force: true });
   });
 
   it("does not add to pendingStarts if client exists or is unavailable", async () => {
     const sessionCwd = makeTempRoot();
     const manager = new LspManager(MINIMAL_CONFIG, sessionCwd);
 
-    // Call with unavailable server:root — should not touch pendingStarts
     getUnavailable(manager).add(`typescript:${sessionCwd}`);
     await manager.startServerForRoot("typescript", sessionCwd);
     expect(getPendingStarts(manager).has(`typescript:${sessionCwd}`)).toBe(false);
 
-    // Now clear unavailable and inject a running client
     getUnavailable(manager).delete(`typescript:${sessionCwd}`);
 
     const fakeClient = {
@@ -169,5 +158,7 @@ describe("LspManager concurrency guard", () => {
 
     await manager.startServerForRoot("typescript", sessionCwd);
     expect(getPendingStarts(manager).has(`typescript:${sessionCwd}`)).toBe(false);
+
+    rmSync(sessionCwd, { recursive: true, force: true });
   });
 });

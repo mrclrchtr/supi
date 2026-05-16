@@ -149,9 +149,8 @@ describe("callers action — LSP available", () => {
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
       expect(result.details.data.confidence).toBe("semantic");
-      // candidateCount uses the full refs before filterOutDeclaration
-      // (both declaration and caller.ts are within cwd)
-      expect(result.details.data.candidateCount).toBe(2);
+      // candidateCount should match the rendered, non-declaration caller refs
+      expect(result.details.data.candidateCount).toBe(1);
     }
     // Verify LSP was called
     expect(mockService.references).toHaveBeenCalledTimes(1);

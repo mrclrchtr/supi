@@ -5,6 +5,7 @@
 import * as path from "node:path";
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
 import { resolveTarget } from "../resolve-target.ts";
+import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
@@ -24,6 +25,22 @@ export async function executeCalleesAction(
           candidateCount: 0,
           omittedCount: 0,
           nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
+
+  if (isResolvedTargetGroup(target)) {
+    return {
+      content: `**Error:** File-level callee discovery is not available for \`${path.relative(cwd, target.file)}\`.\n\nProvide \`line\` and \`character\`, or a \`symbol\` for discovery.`,
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: params.path ?? null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Use `file` + coordinates or `symbol` for callee lookup"],
         },
       },
     };

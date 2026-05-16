@@ -5,12 +5,31 @@ const execFileAsync = promisify(execFile);
 
 const GIT_TIMEOUT_MS = 30_000;
 
+function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const next = { ...env };
+  for (const key of Object.keys(next)) {
+    if (key.startsWith("GIT_")) {
+      delete next[key];
+    }
+  }
+  return next;
+}
+
+function gitExecOptions(repoPath: string) {
+  return {
+    cwd: repoPath,
+    env: scrubGitEnv(process.env),
+    timeout: GIT_TIMEOUT_MS,
+  };
+}
+
 export async function getMergeBase(repoPath: string, branch: string): Promise<string | undefined> {
   try {
-    const { stdout } = await execFileAsync("git", ["merge-base", "HEAD", branch], {
-      cwd: repoPath,
-      timeout: GIT_TIMEOUT_MS,
-    });
+    const { stdout } = await execFileAsync(
+      "git",
+      ["merge-base", "HEAD", branch],
+      gitExecOptions(repoPath),
+    );
     return stdout.trim() || undefined;
   } catch {
     return undefined;
@@ -18,27 +37,25 @@ export async function getMergeBase(repoPath: string, branch: string): Promise<st
 }
 
 export async function getDiff(repoPath: string, baseSha: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["diff", baseSha], {
-    cwd: repoPath,
-    timeout: GIT_TIMEOUT_MS,
-  });
+  const { stdout } = await execFileAsync("git", ["diff", baseSha], gitExecOptions(repoPath));
   return stdout;
 }
 
 export async function getUncommittedDiff(repoPath: string): Promise<string> {
   const [staged, unstaged, untracked] = await Promise.all([
-    execFileAsync("git", ["diff", "--cached"], { cwd: repoPath, timeout: GIT_TIMEOUT_MS }).then(
+    execFileAsync("git", ["diff", "--cached"], gitExecOptions(repoPath)).then(
       (r) => r.stdout,
       () => "",
     ),
-    execFileAsync("git", ["diff"], { cwd: repoPath, timeout: GIT_TIMEOUT_MS }).then(
+    execFileAsync("git", ["diff"], gitExecOptions(repoPath)).then(
       (r) => r.stdout,
       () => "",
     ),
-    execFileAsync("git", ["ls-files", "--others", "--exclude-standard"], {
-      cwd: repoPath,
-      timeout: GIT_TIMEOUT_MS,
-    }).then(
+    execFileAsync(
+      "git",
+      ["ls-files", "--others", "--exclude-standard"],
+      gitExecOptions(repoPath),
+    ).then(
       (r) => r.stdout,
       () => "",
     ),
@@ -73,7 +90,7 @@ export async function getRecentCommits(repoPath: string, limit = 20): Promise<Co
   const { stdout } = await execFileAsync(
     "git",
     ["log", `--max-count=${limit}`, "--pretty=format:%H %s"],
-    { cwd: repoPath, timeout: GIT_TIMEOUT_MS },
+    gitExecOptions(repoPath),
   );
   return stdout
     .split("\n")
@@ -86,18 +103,16 @@ export async function getRecentCommits(repoPath: string, limit = 20): Promise<Co
 }
 
 export async function getCommitShow(repoPath: string, sha: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", ["show", sha], {
-    cwd: repoPath,
-    timeout: GIT_TIMEOUT_MS,
-  });
+  const { stdout } = await execFileAsync("git", ["show", sha], gitExecOptions(repoPath));
   return stdout;
 }
 
 export async function getDiffFileNames(repoPath: string, baseSha: string): Promise<string[]> {
-  const { stdout } = await execFileAsync("git", ["diff", "--name-only", baseSha], {
-    cwd: repoPath,
-    timeout: GIT_TIMEOUT_MS,
-  });
+  const { stdout } = await execFileAsync(
+    "git",
+    ["diff", "--name-only", baseSha],
+    gitExecOptions(repoPath),
+  );
   return stdout
     .trim()
     .split("\n")
@@ -107,21 +122,19 @@ export async function getDiffFileNames(repoPath: string, baseSha: string): Promi
 
 export async function getUncommittedFileNames(repoPath: string): Promise<string[]> {
   const [unstaged, staged, untracked] = await Promise.all([
-    execFileAsync("git", ["diff", "--name-only"], { cwd: repoPath, timeout: GIT_TIMEOUT_MS }).then(
+    execFileAsync("git", ["diff", "--name-only"], gitExecOptions(repoPath)).then(
       (r) => r.stdout,
       () => "",
     ),
-    execFileAsync("git", ["diff", "--cached", "--name-only"], {
-      cwd: repoPath,
-      timeout: GIT_TIMEOUT_MS,
-    }).then(
+    execFileAsync("git", ["diff", "--cached", "--name-only"], gitExecOptions(repoPath)).then(
       (r) => r.stdout,
       () => "",
     ),
-    execFileAsync("git", ["ls-files", "--others", "--exclude-standard"], {
-      cwd: repoPath,
-      timeout: GIT_TIMEOUT_MS,
-    }).then(
+    execFileAsync(
+      "git",
+      ["ls-files", "--others", "--exclude-standard"],
+      gitExecOptions(repoPath),
+    ).then(
       (r) => r.stdout,
       () => "",
     ),
@@ -151,7 +164,7 @@ export async function getCommitFileNames(repoPath: string, sha: string): Promise
   const { stdout } = await execFileAsync(
     "git",
     ["diff-tree", "--no-commit-id", "--name-only", "-r", sha],
-    { cwd: repoPath, timeout: GIT_TIMEOUT_MS },
+    gitExecOptions(repoPath),
   );
   return stdout
     .trim()
@@ -162,14 +175,8 @@ export async function getCommitFileNames(repoPath: string, sha: string): Promise
 
 export async function getLocalBranches(repoPath: string): Promise<string[]> {
   const [{ stdout: local }, { stdout: current }] = await Promise.all([
-    execFileAsync("git", ["branch", "--format=%(refname:short)"], {
-      cwd: repoPath,
-      timeout: GIT_TIMEOUT_MS,
-    }),
-    execFileAsync("git", ["branch", "--show-current"], {
-      cwd: repoPath,
-      timeout: GIT_TIMEOUT_MS,
-    }),
+    execFileAsync("git", ["branch", "--format=%(refname:short)"], gitExecOptions(repoPath)),
+    execFileAsync("git", ["branch", "--show-current"], gitExecOptions(repoPath)),
   ]);
 
   const names = local
@@ -182,7 +189,6 @@ export async function getLocalBranches(repoPath: string): Promise<string[]> {
   const set = new Set(names);
   const sorted: string[] = [];
 
-  // Put default candidates first
   for (const candidate of ["main", "master", currentBranch]) {
     if (candidate && set.has(candidate)) {
       sorted.push(candidate);
@@ -190,7 +196,6 @@ export async function getLocalBranches(repoPath: string): Promise<string[]> {
     }
   }
 
-  // Then remaining alphabetically
   const remaining = Array.from(set).sort((a, b) => a.localeCompare(b));
   sorted.push(...remaining);
   return sorted;
