@@ -31,6 +31,7 @@ const PROMPT_GUIDELINES = [
   "Only accept real `http://` or `https://` URLs; stop and ask the user for an allowed source if the page is access-controlled.",
   "Prefer `output_mode: auto` (default) so large pages are written to temp files instead of flooding the context window.",
   "Set `abs_links: false` only when relative links are intentional (e.g., local documentation).",
+  "For GitHub URLs (e.g., repos, issues, PRs, releases), prefer the `gh` CLI via `bash` over this tool.",
 ];
 
 const OutputModeEnum = Type.Union(
