@@ -2,6 +2,7 @@
  * SuPi Web extension entry point — registers the `web_fetch_md` tool with pi.
  */
 
+import { spawnSync } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { htmlToMarkdown, wrapAsCodeBlock } from "./convert.ts";
@@ -26,13 +27,29 @@ Links and images are absolutized by default. Use \`abs_links: false\` to keep th
 const PROMPT_SNIPPET =
   "web_fetch_md — fetch a URL and convert it to clean Markdown suitable for LLM ingestion.";
 
-const PROMPT_GUIDELINES = [
-  "Use web_fetch_md to fetch web pages and convert them to clean Markdown for LLM ingestion.",
-  "Only accept real `http://` or `https://` URLs; stop and ask the user for an allowed source if the page is access-controlled.",
-  "Prefer `output_mode: auto` (default) so large pages are written to temp files instead of flooding the context window.",
-  "Set `abs_links: false` only when relative links are intentional (e.g., local documentation).",
-  "For GitHub URLs (e.g., repos, issues, PRs, releases), prefer the `gh` CLI via `bash` over this tool.",
-];
+function isGhAvailable(): boolean {
+  try {
+    const result = spawnSync("gh", ["--version"], { stdio: "ignore" });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function buildPromptGuidelines(): string[] {
+  const guidelines = [
+    "Use web_fetch_md to fetch web pages and convert them to clean Markdown for LLM ingestion.",
+    "Only accept real `http://` or `https://` URLs; stop and ask the user for an allowed source if the page is access-controlled.",
+    "Prefer `output_mode: auto` (default) so large pages are written to temp files instead of flooding the context window.",
+    "Set `abs_links: false` only when relative links are intentional (e.g., local documentation).",
+  ];
+  if (isGhAvailable()) {
+    guidelines.push(
+      "For GitHub URLs (e.g., repos, issues, PRs, releases), prefer the `gh` CLI via `bash` over this tool.",
+    );
+  }
+  return guidelines;
+}
 
 const OutputModeEnum = Type.Union(
   [Type.Literal("auto"), Type.Literal("inline"), Type.Literal("file")],
@@ -45,7 +62,7 @@ export default function webExtension(pi: ExtensionAPI): void {
     label: TOOL_LABEL,
     description: TOOL_DESCRIPTION,
     promptSnippet: PROMPT_SNIPPET,
-    promptGuidelines: PROMPT_GUIDELINES,
+    promptGuidelines: buildPromptGuidelines(),
     parameters: Type.Object({
       url: Type.String({ description: "http(s) URL to fetch" }),
       output_mode: Type.Optional(OutputModeEnum),
