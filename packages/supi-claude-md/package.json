@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-claude-md",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "description": "SuPi claude-md extension — automatic subdirectory context injection for pi",
   "license": "MIT",
   "repository": {
