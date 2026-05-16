@@ -151,7 +151,7 @@ function buildLspSettingItems(
       id: "exclude",
       label: "Exclude Patterns",
       description:
-        "Gitignore patterns to suppress LSP diagnostics (e.g. __tests__/, *.generated.ts)",
+        "Gitignore patterns to suppress LSP diagnostics. Edit .pi/supi/config.json → lsp.exclude (or ~/.pi/agent/supi/config.json for global). Patterns like __tests__/ exclude a directory, *.test.ts wildcards match at any depth, /dist anchors to root.",
       currentValue: settings.exclude.length > 0 ? settings.exclude.join(", ") : "none",
       submenu: (_currentValue, done) => createExcludeSubmenu(scope, cwd, settings, done),
     },
