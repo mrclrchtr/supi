@@ -48,12 +48,17 @@ function validatePackageDir(packageDir) {
   }
   // Guard against path traversal: reject system directories
   // to prevent operating on unexpected locations.
-  if (packageDir === "/" || packageDir.startsWith("/etc") || packageDir.startsWith("/tmp") || packageDir.startsWith("/dev")) {
+  if (
+    packageDir === "/" ||
+    packageDir.startsWith("/etc") ||
+    packageDir.startsWith("/tmp") ||
+    packageDir.startsWith("/dev")
+  ) {
     throw new Error(`Refusing to operate on system directory: ${packageDir}`);
   }
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2));
   validatePackageDir(args.packageDir);
 
@@ -61,7 +66,7 @@ function main() {
   const outDir = join(tmpdir(), "supi-publish");
   mkdirSync(outDir, { recursive: true });
 
-  const tarballPath = packStaged(args.packageDir, { outDir });
+  const tarballPath = await packStaged(args.packageDir, { outDir });
   console.log(`Packed: ${tarballPath}`);
 
   verifyTarball(tarballPath);
@@ -77,10 +82,8 @@ function main() {
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isMain) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
-  }
+  });
 }

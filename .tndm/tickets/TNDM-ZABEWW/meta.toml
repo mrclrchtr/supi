@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-ZABEWW"
+title = "Fix SuPi publish pipeline manifests for npm-compatible Pi packages"
+type = "bug"
+priority = "p1"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"

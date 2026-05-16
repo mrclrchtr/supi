@@ -26,7 +26,28 @@ export function verifyTarball(tarballPath) {
     throw new Error(msg);
   }
 
-  // 2. Check extraction succeeds
+  // 3. Check for workspace: protocol in any packed package.json
+  const manifestEntries = entries.filter((e) => e.endsWith("/package.json"));
+  const dirtyEntries = [];
+
+  for (const entry of manifestEntries) {
+    const content = execFileSync("tar", ["-xOf", tarballPath, entry], {
+      encoding: "utf8",
+    });
+    if (content.includes("workspace:")) {
+      dirtyEntries.push(entry);
+    }
+  }
+
+  if (dirtyEntries.length > 0) {
+    const msg = [
+      `Tarball contains ${dirtyEntries.length} package.json with 'workspace:' protocol:`,
+      ...dirtyEntries.map((e) => `  ${e}`),
+    ].join("\n");
+    throw new Error(msg);
+  }
+
+  // 4. Check extraction succeeds
   const extractDir = mkdtempSync(join(tmpdir(), "supi-verify-"));
   try {
     execFileSync("tar", ["-xzf", tarballPath, "-C", extractDir]);

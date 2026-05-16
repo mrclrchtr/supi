@@ -67,6 +67,7 @@ Highlighted workspace packages:
 - Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`.
 - `pnpm-workspace.yaml` uses `nodeLinker: hoisted` — required because pnpm's default `isolated` linker does not support `bundledDependencies`.
 - Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
+- For the publish pipeline (staging, manifest export, npm pack, verification), see the **Publish pipeline** section.
 
 ## Self-registering resources via `resources_discover`
 
@@ -153,7 +154,24 @@ registerSettings({
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
 - OpenSpec `PostHogFetchNetworkError` output is harmless when offline.
 - `npm pack <pkg>@<ver> --silent && tar -tzf` — inspect actual npm tarball contents; `npm view` only shows registry metadata which may not match shipped files
-- Publish packages with `node scripts/publish.mjs <package-dir>` (or `--publish` to also run `npm publish`). It uses `pack-staged.mjs` (`cp -RL` to resolve pnpm symlinks) + `verify-tarball.mjs` (checks for broken `../` paths) so nested `bundledDependencies` always produce clean tarballs.
+## Publish pipeline
+
+Published npm tarballs must produce npm-compatible manifests because PI installs packages via `npm install`. The pipeline has four stages:
+
+1. **cp -RL staging** — `scripts/pack-staged.mjs` copies the package directory with symlink dereferencing (`cp -RL`) to resolve pnpm workspace symlinks into real directories with real versions.
+2. **Manifest export** — `scripts/staged-manifests.mjs` uses pnpm's `@pnpm/exportable-manifest` to rewrite every workspace-owned `package.json` in the staged copy: `workspace:*` → exact version (`1.5.0`), `workspace:~` → `~1.5.0`, `workspace:^` → `^1.5.0`. It also strips `devDependencies` from publish manifests so private workspace-only test utilities never leak, and preserves `bundledDependencies`.
+3. **npm pack** — The cleaned staged directory is packed with `npm pack`, producing a real npm-compatible tarball with bundled content.
+4. **Tarball verification** — `scripts/verify-tarball.mjs` rejects `../` paths and `workspace:` protocol in every packed `package.json`, then checks extraction succeeds.
+
+Run:
+```bash
+node scripts/publish.mjs packages/supi-lsp     # pack + verify
+node scripts/publish.mjs packages/supi --publish  # pack + verify + publish
+```
+
+The `pack:check` and `pack:verify` commands in `pnpm verify` run this pipeline for all publishable packages.
+
+Root cause for the staging pipeline: direct `pnpm pack` on the meta-package (`packages/supi`) produces tarball entries with `../` paths to the root `node_modules`. The staged `cp -RL` + `npm pack` approach avoids this because npm produces correct bundled tarballs from a flat, dereferenced `node_modules`.
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli)
 - RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward
 

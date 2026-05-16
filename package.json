@@ -73,6 +73,7 @@
     "tree-sitter-typescript": "0.23.2",
     "typescript": "6.0.3",
     "vitest": "4.1.6",
-    "web-tree-sitter": "0.26.8"
+    "web-tree-sitter": "0.26.8",
+    "@pnpm/exportable-manifest": "1000.4.2"
   }
 }

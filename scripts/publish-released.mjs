@@ -97,7 +97,7 @@ if (metaIndex !== -1 && metaIndex !== sorted.length - 1) {
 
 const tarballDir = mkdtempSync(join(tmpdir(), "supi-publish-"));
 
-try {
+async function publishAll() {
   for (const path of sorted) {
     const pkg = pkgMap.get(path);
     const { name, version } = pkg;
@@ -112,13 +112,17 @@ try {
     }
 
     console.log(`Packing ${name}@${version} from staged copy ...`);
-    const tarballPath = packStaged(resolve(path), { outDir: tarballDir });
+    const tarballPath = await packStaged(resolve(path), { outDir: tarballDir });
 
     console.log(`Publishing ${name}@${version} from ${tarballPath} ...`);
     execSync(`npm publish "${tarballPath}" --access public --provenance`, {
       stdio: "inherit",
     });
   }
+}
+
+try {
+  await publishAll();
 } finally {
   rmSync(tarballDir, { recursive: true, force: true });
 }

@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { rewriteStagedManifests } from "./staged-manifests.mjs";
+
 function parseArgs(argv) {
   const args = {
     dryRun: false,
@@ -49,7 +51,12 @@ function assertPackageDir(packageDir) {
 
   // Guard against path traversal: reject system directories and check
   // that the resolved path doesn't escape via normalization tricks.
-  if (resolvedDir === "/" || resolvedDir.startsWith("/etc") || resolvedDir.startsWith("/tmp") || resolvedDir.startsWith("/dev")) {
+  if (
+    resolvedDir === "/" ||
+    resolvedDir.startsWith("/etc") ||
+    resolvedDir.startsWith("/tmp") ||
+    resolvedDir.startsWith("/dev")
+  ) {
     throw new Error(`Refusing to operate on system directory: ${resolvedDir}`);
   }
 
@@ -66,7 +73,7 @@ function assertPackageDir(packageDir) {
   return pkg;
 }
 
-export function packStaged(packageDir, options = {}) {
+export async function packStaged(packageDir, options = {}) {
   const dryRun = options.dryRun ?? false;
   const outDir = resolve(options.outDir ?? process.cwd());
   const pkg = assertPackageDir(packageDir);
@@ -76,6 +83,9 @@ export function packStaged(packageDir, options = {}) {
   try {
     mkdirSync(stageDir, { recursive: true });
     execFileSync("cp", ["-RL", `${packageDir}/.`, stageDir]);
+
+    // Rewrite staged manifests to npm-compatible publish manifests
+    await rewriteStagedManifests(stageDir);
 
     if (dryRun) {
       console.log(`Staged pack dry-run: ${pkg.name} (${packageDir})`);
@@ -98,9 +108,9 @@ export function packStaged(packageDir, options = {}) {
   }
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const tarballPath = packStaged(args.packageDir, {
+  const tarballPath = await packStaged(args.packageDir, {
     dryRun: args.dryRun,
     outDir: args.outDir,
   });
@@ -112,10 +122,8 @@ function main() {
 
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
 if (isMain) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
-  }
+  });
 }
