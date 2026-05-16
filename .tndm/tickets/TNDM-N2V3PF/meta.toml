@@ -4,7 +4,11 @@ title = "Fix pre-existing test failures: pack-staged and lsp concurrency guard"
 type = "chore"
 priority = "p2"
 depends_on = []
-tags = ["flow:brainstorm"]
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
 
 [[documents]]
 name = "content"
