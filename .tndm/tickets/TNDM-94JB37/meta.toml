@@ -1,0 +1,11 @@
+schema_version = 1
+id = "TNDM-94JB37"
+title = "supi-model-effort-colors: PI-theme-native footer extension for model/effort coloring"
+type = "feature"
+priority = "p3"
+depends_on = []
+tags = ["flow:brainstorm"]
+
+[[documents]]
+name = "content"
+path = "content.md"

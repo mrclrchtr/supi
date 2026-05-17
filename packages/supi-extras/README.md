@@ -22,6 +22,10 @@ A braille spinner in the terminal tab title while work is in progress. Glance at
 
 Sets `GIT_EDITOR=true` so git never blocks on an interactive editor. Pi runs headless — editor invocations hang. This prevents that.
 
+### See what model and effort level you're on
+
+The footer shows your active model colored by provider (OpenAI green, Anthropic teal, Gemini yellow, etc.) and thinking level colored by intensity — all using your current PI theme. No hardcoded colors.
+
 ## Install
 
 ```bash

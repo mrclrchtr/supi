@@ -23,6 +23,8 @@ pnpm exec biome check packages/supi-extras/
 | `git-editor.ts` | Sets `GIT_EDITOR=true` to prevent git from blocking on interactive editors |
 | `aliases.ts` | `/exit`, `/clear` (→ `/new`), `/e` (→ `/exit`) command aliases |
 | `skill-shortcut.ts` | `$skill-name` → `/skill:skill-name` expansion + fuzzy autocomplete |
+| `model-effort-colors.ts` | PI-theme-native footer coloring — model name colored by provider, thinking level colored by intensity |
+| `model-effort-colors-helpers.ts` | Pure helpers (color mapping, stats, layout) for the footer extension |
 
 ## Gotchas
 
