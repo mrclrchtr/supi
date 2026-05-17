@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-extras",
-  "version": "1.2.0",
-  "description": "SuPi extras \u2014 command aliases, skill shorthand, tab spinner, /supi-stash prompt stash with TUI overlay, and other small utilities",
+  "version": "1.3.0",
+  "description": "SuPi extras — command aliases, skill shorthand, tab spinner, /supi-stash prompt stash with TUI overlay, and other small utilities",
   "license": "MIT",
   "repository": {
     "type": "git",
