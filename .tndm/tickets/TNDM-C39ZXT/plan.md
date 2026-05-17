@@ -58,3 +58,35 @@ Incidental "opinionated" uses in `packages/supi-claude-md/skills/*/references/te
   - Old: `SuPi (**Super Pi**) is an opinionated extension repo for the [pi coding agent]...`
   - New: `SuPi (**Super Pi**) is a curated extension repo for the [pi coding agent]...`
   - Verification: `head -3 CLAUDE.md` shows the updated text.
+
+
+## Scope
+
+Rewrite root `README.md` for a discovery audience — someone who found the repo and is deciding whether to install.
+
+**What changes:**
+- Replace the current 120-line README with a ~60-line discovery page
+- Remove deep dives for Tree-sitter, Extras, LSP (they'll be addressed when we get to those package READMEs)
+- Remove redundant hero bullets
+- Restructure: Hero → Value categories → Quick install → Extension tables → Git/local install
+
+**What stays:**
+- The new "curated" tagline from the previous change (Task 1 of TNDM-C39ZXT)
+- Git/local install instructions
+
+## Tasks
+
+- [x] **Task 1**: Rewrite root `README.md` with the approved discovery-focused draft
+  - File: `README.md`
+  - Change: Full replacement with the approved draft.
+  - Verification:
+    1. `head -1 README.md` shows `# SuPi`
+    2. `grep -c "opinionated" README.md` returns 0 (no regression)
+    3. `grep "My curated extension stack" README.md` returns the tagline
+    4. The three value sections are present: `Code navigation that works`, `Smarter agent interaction`, `Everyday friction, removed`
+    5. Install commands include `pi install npm:@mrclrchtr/supi`
+    6. Extension table includes all 9 production extensions + core
+    7. Beta section includes all 5 beta extensions
+    8. Old deep-dive headers (`Tree-sitter extension`, `Extras extension`, `LSP extension`) are gone
+    9. File is shorter than the current ~120 lines (discovery page, ~60 lines)
+  - Test-exempt: documentation-only change
