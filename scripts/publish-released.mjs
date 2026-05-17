@@ -34,7 +34,19 @@ if (!Array.isArray(pathsReleased) || pathsReleased.length === 0) {
 const pkgMap = new Map();
 for (const path of pathsReleased) {
   const pkgJson = JSON.parse(readFileSync(`${path}/package.json`, "utf-8"));
+  // Skip private packages (e.g. the root workspace package).
+  // release-please always includes "." for the single-root config,
+  // but the workspace root is not publishable.
+  if (pkgJson.private) {
+    console.log(`Skipping private package: ${pkgJson.name} (${path})`);
+    continue;
+  }
   pkgMap.set(path, pkgJson);
+}
+
+if (pkgMap.size === 0) {
+  console.log("All released packages are private; nothing to publish.");
+  process.exit(0);
 }
 
 // Build reverse-dependency graph and in-degree map.
