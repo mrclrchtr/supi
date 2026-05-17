@@ -1,16 +1,43 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-/**
- * Publish packages that were released by Release Please.
- *
- * Reads the `PATHS_RELEASED` env var (JSON array of paths like `"packages/foo"`).
- * Publishes in topological order of workspace dependencies, with the meta-package
- * (`packages/supi`) always last.
- */
+// Publish packages that were released by Release Please.
+//
+// Reads the PATHS_RELEASED env var (JSON array of paths like "packages/foo").
+// Publishes in topological order of workspace dependencies, with the meta-package
+// (packages/supi) always last.
+//
+// When PATHS_RELEASED includes "." (the single-root release-please config),
+// it is expanded to all non-private workspace packages under packages.
 import { packStaged } from "./pack-staged.mjs";
+
+// Discover all non-private publishable packages under packages.
+function discoverPublishablePackages() {
+  const pkgs = [];
+  let entries;
+  try {
+    entries = readdirSync("packages");
+  } catch {
+    return pkgs;
+  }
+  for (const entry of entries) {
+    const pkgPath = join("packages", entry);
+    const manifestPath = join(pkgPath, "package.json");
+    if (!existsSync(manifestPath)) continue;
+    let pkgJson;
+    try {
+      pkgJson = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    } catch {
+      continue;
+    }
+    if (!pkgJson.private && pkgJson.name) {
+      pkgs.push(pkgPath);
+    }
+  }
+  return pkgs;
+}
 
 const pathsReleasedJson = process.env.PATHS_RELEASED;
 if (!pathsReleasedJson) {
@@ -29,6 +56,16 @@ try {
 if (!Array.isArray(pathsReleased) || pathsReleased.length === 0) {
   console.log("No packages to publish.");
   process.exit(0);
+}
+
+// With a single-root release-please config ("."), PATHS_RELEASED only
+// contains the workspace root. Expand it to all non-private packages.
+if (pathsReleased.includes(".")) {
+  const discovered = discoverPublishablePackages();
+  console.log("Expanding '.' to publishable workspace packages:", discovered);
+  // Replace "." with the discovered packages, preserving any other entries.
+  const dotIndex = pathsReleased.indexOf(".");
+  pathsReleased.splice(dotIndex, 1, ...discovered);
 }
 
 const pkgMap = new Map();
