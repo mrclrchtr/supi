@@ -1,6 +1,34 @@
 # @mrclrchtr/supi-context
 
-Detailed context-usage reporting for the [pi coding agent](https://github.com/earendil-works/pi).
+Context diagnostics for PI — see exactly what's eating your context window, down to the file.
+
+Run `/supi-context` in any session. You get a visual dashboard, not just a number: a color-coded grid of your context budget, per-category breakdowns, per-file token counts for every injected context file, skill token usage, and compaction info.
+
+## What you get
+
+### Visual budget
+
+A 20-column grid shows your context window at a glance — which categories fill it, how much free space remains, and where the autocompact buffer sits. Color-coded: system prompt, conversation, tools, free space.
+
+### Per-category breakdown
+
+System prompt, user messages, assistant messages, tool calls, tool results — each with token counts and percentage of the total.
+
+### System prompt deep dive
+
+What's inside the system prompt: context files (per-file tokens), skills (per-skill tokens), guidelines, tool definitions, and custom append text. Find the exact file or skill that's bloating your context.
+
+### Injected context tracking
+
+Every file injected by supi-claude-md, with turn number and token cost. See what subdirectory context is costing you.
+
+### Compaction awareness
+
+How many older turns were summarized. Know when your conversation history was compacted.
+
+### Extension data
+
+Registered context providers (like supi-cache) contribute their own sections — see cache hit rates, forensics data, or whatever other extensions want to surface.
 
 ## Install
 
@@ -8,42 +36,8 @@ Detailed context-usage reporting for the [pi coding agent](https://github.com/ea
 pi install npm:@mrclrchtr/supi-context
 ```
 
-## What it adds
-
-This extension registers `/supi-context`, which analyzes the current session prompt and reports how context is being spent across:
-
-- system prompt
-- conversation messages
-- tools
-- extension-injected context
-
-The result is rendered as a custom `supi-context` message with a concise visible summary and structured details for the renderer.
-
-## Architecture
-
-```text
-src/
-├── context.ts          /supi-context command registration
-├── analysis.ts         token breakdown calculations
-├── format.ts           formatting and bar-chart helpers
-├── prompt-inference.ts model-specific context-window detection
-├── renderer.ts         custom message renderer
-└── utils.ts            shared formatting helpers
-```
-
-## Requirements
-
-- `@earendil-works/pi-coding-agent`
-- `@earendil-works/pi-tui`
-
-## Development
+## Usage
 
 ```bash
-pnpm vitest run packages/supi-context/
-pnpm exec tsc --noEmit -p packages/supi-context/tsconfig.json
-pnpm exec biome check packages/supi-context/
+/supi-context
 ```
-
-## License
-
-MIT

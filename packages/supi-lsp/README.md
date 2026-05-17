@@ -1,6 +1,22 @@
 # @mrclrchtr/supi-lsp
 
-Language Server Protocol integration for the [pi coding agent](https://github.com/earendil-works/pi).
+Language Server Protocol for PI — your agent navigates code like an IDE.
+
+Without LSP, agents grep and guess. With it, they jump to definitions, find every reference, rename across files, and catch type errors inline. The same precision you get from an editor, available to your agent.
+
+## What you get
+
+### Navigate with precision
+
+Go-to-definition, find-references, rename, hover types. The agent stops guessing and starts navigating your codebase with IDE-level accuracy.
+
+### Catch problems immediately
+
+Type errors, warnings, and hints surface inline after every edit. The agent sees mistakes as it makes them — not 10 turns later when tests fail.
+
+### Always ready
+
+Servers start automatically for your project. The agent gets language-aware guidance at session start and stale diagnostics are refreshed when dependencies change.
 
 ## Install
 
@@ -8,105 +24,43 @@ Language Server Protocol integration for the [pi coding agent](https://github.co
 pi install npm:@mrclrchtr/supi-lsp
 ```
 
-## What it adds
+## Quick look
 
-- `lsp` tool with `hover`, `definition`, `references`, `diagnostics`, `symbols`, `rename`, `code_actions`, `workspace_symbol`, `search`, `symbol_hover`, and `recover`
-- Stable system-prompt guidance that tells the agent to prefer LSP over grep/rg for code navigation
-- Proactive project scanning and eager startup of detected language servers
-- Automatic stale-diagnostic recovery when workspace sentinels change (`package.json`, root lockfiles, `tsconfig*`, generated `*.d.ts` files`) before the next agent turn, plus immediate recovery after successful `write` or `edit` calls for those paths
-- Inline diagnostic surfacing around reads, writes, and edits
-- Compact diagnostic context injection when outstanding diagnostics change, with stale-diagnostic warnings when needed
-- `/lsp-status` status overlay
+The agent gets an `lsp` tool. The most-used actions:
 
-## Public library API
+| Action | What the agent can do |
+|--------|----------------------|
+| `hover` | See the type of any symbol |
+| `definition` | Jump to where something is defined |
+| `references` | Find every usage across the project |
+| `diagnostics` | See errors, warnings, and hints |
+| `rename` | Rename across the entire project |
 
-In addition to the extension entrypoint, `@mrclrchtr/supi-lsp` exports a reusable session-scoped service API for peer extensions:
+Full action reference: the agent's system prompt includes complete guidelines for all 11 actions (hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, symbol_hover, recover). All positions are 1-based.
+
+## Settings
+
+Configure via `/supi-settings` (LSP panel):
+
+- Enable or disable LSP per project
+- Set diagnostic severity threshold (errors only, or include warnings/hints)
+- Choose which language servers to activate
+- Add file exclusion patterns (gitignore-style globs)
+
+Settings are stored in `~/.pi/agent/supi/config.json` (global) or `.pi/supi/config.json` (project). The `/lsp-status` command shows active servers and outstanding diagnostics.
+
+## For extension developers
+
+This package exports a reusable session-scoped LSP service. Peer extensions can query the same LSP runtime without starting duplicate servers:
 
 ```ts
 import { getSessionLspService, SessionLspService } from "@mrclrchtr/supi-lsp";
 
 const state = getSessionLspService("/project");
-
 if (state.kind === "ready") {
-  const service = state.service;
-  const hover = await service.hover("src/index.ts", { line: 5, character: 10 });
-  const defs = await service.definition("src/index.ts", { line: 5, character: 10 });
-  const refs = await service.references("src/index.ts", { line: 5, character: 10 });
-  const impls = await service.implementation("src/index.ts", { line: 5, character: 10 });
-  const symbols = await service.documentSymbols("src/index.ts");
-  const projectServers = service.getProjectServers();
+  const defs = await state.service.definition("src/index.ts", { line: 5, character: 10 });
+  const refs = await state.service.references("src/index.ts", { line: 5, character: 10 });
 }
 ```
 
-Peer extensions can import from the package root without reaching into private files.
-
-## Tool actions
-
-The `lsp` tool supports these actions:
-
-- `hover`: type info at a position
-- `definition`: go to definition
-- `references`: find all references
-- `diagnostics`: per-file or project-wide diagnostics
-- `symbols`: document symbols
-- `rename`: workspace-wide rename
-- `code_actions`: quick fixes at a position
-- `workspace_symbol`: fuzzy symbol search across the project
-- `search`: symbol search with text fallback
-- `symbol_hover`: hover by symbol name
-- `recover`: refresh diagnostics after workspace-wide dependency, config, or generated-type changes
-
-Line and character positions are **1-based**.
-
-Example:
-
-```json
-{
-  "action": "definition",
-  "file": "src/index.ts",
-  "line": 12,
-  "character": 8
-}
-```
-
-## Configuration
-
-If your install surface includes `/supi-settings` (for example via `@mrclrchtr/supi`), this package contributes an LSP settings section there. Use that panel to:
-
-- enable or disable LSP globally
-- control the severity threshold
-- select active language servers
-- configure file exclusion patterns
-
-## Commands
-
-`/lsp-status` toggles an overlay showing active language servers and outstanding diagnostics:
-
-```text
- λ LSP inspector  /lsp-status toggles
- 3 servers running • 12 open files • 5 errors • 2 warnings
-
- Servers
-   typescript  running    24 open files
-   python      running     8 open files
-   bash        running     0 open files
-
- Problems
-   src/lsp.ts:42       Cannot find name 'foo'          ts(2304)
-   src/manager.ts:108  Property 'bar' does not exist   ts(2339)
-```
-
-When no servers are available, the overlay shows `no LSP servers available for this project`. A compact status summary is always visible in the pi status bar.
-
-## Requirements
-
-- `@earendil-works/pi-coding-agent`
-- `@earendil-works/pi-tui`
-- `typebox`
-- relevant language servers installed and available on `PATH`
-- `@mrclrchtr/supi-core`
-
-## Source
-
-- Extension entrypoint: `lsp.ts`
-- Public library surface: `index.ts`
+Import from the package root — no need to reach into internal files.
