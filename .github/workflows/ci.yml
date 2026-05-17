@@ -76,11 +76,12 @@ jobs:
           publishable=$(mktemp)
           configured=$(mktemp)
           for dir in packages/*/; do
-            if [ "$(jq -r '.private // false' "$dir/package.json")" = "false" ]; then
+            if [ -f "$dir/package.json" ] && [ "$(jq -r '.private // false' "$dir/package.json")" = "false" ]; then
               echo "${dir%/}"
             fi
           done | sort > "$publishable"
-          jq -r '.packages | keys[]' release-please-config.json | sort > "$configured"
+          # Single-root release-please config manages versions via extra-files
+          jq -r '.packages["."]["extra-files"][] // empty' release-please-config.json | sed 's|/package\.json$||' | sort > "$configured"
           if ! diff -q "$publishable" "$configured"; then
             echo "::error::Mismatch between publishable packages and release-please config"
             diff "$publishable" "$configured" || true
