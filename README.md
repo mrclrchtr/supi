@@ -1,14 +1,10 @@
-# SuPi
+# SuPi (Super Pi)
 
-**Super Pi**
-
-*My curated extension stack for PI.*
-
-PI is a great coding agent. SuPi makes it better — these are the extensions I use in every project, shared in case they help you too.
+*Is my curated extension stack for PI, I use in every project, shared in case they help you too.*
 
 ## What you get
 
-### Code navigation that works
+### Code navigation
 
 Go-to-definition, find-references, rename, hover types — your agent navigates your codebase with IDE precision. Combined with AST-level structural analysis and architecture-aware code intelligence, the agent understands your code instead of just grepping it.
 
