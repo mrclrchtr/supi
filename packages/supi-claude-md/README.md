@@ -10,11 +10,7 @@ Then it helps you keep those files in shape — audit quality, flag stale sectio
 
 ### Context that travels
 
-Reads, writes, edits, LSP operations — any time the agent touches a file, it picks up the nearest `CLAUDE.md` or `AGENTS.md` in that directory. Conventions arrive exactly when they're needed, not dumped upfront.
-
-### Smart about when to refresh
-
-First-time discovery always injects. Re-reads wait a configurable number of turns and skip when the context window is too full. No flooding.
+Reads, writes, edits, LSP operations — any time the agent touches a file, it picks up the nearest `CLAUDE.md` or `AGENTS.md` in that directory. Each subdirectory's context is injected once (on first discovery) and available for the rest of the session.
 
 ### CLAUDE.md maintenance
 
@@ -37,14 +33,10 @@ Configure via `/supi-settings` or directly in config:
 {
   "claude-md": {
     "subdirs": true,
-    "rereadInterval": 3,
-    "contextThreshold": 80,
     "fileNames": ["CLAUDE.md", "AGENTS.md"]
   }
 }
 ```
 
 - `subdirs` — toggle subdirectory discovery on/off
-- `rereadInterval` — turns between re-reading a directory's context (0 = never re-read)
-- `contextThreshold` — skip re-reads when context usage is above this percent
 - `fileNames` — which filenames to look for (comma-separated)

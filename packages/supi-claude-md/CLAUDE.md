@@ -41,8 +41,6 @@ Global: `~/.pi/agent/supi/config.json`; project: `.pi/supi/config.json`
 ```json
 {
   "claude-md": {
-    "rereadInterval": 3,
-    "contextThreshold": 80,
     "subdirs": true,
     "fileNames": ["CLAUDE.md", "AGENTS.md"]
   }
@@ -65,15 +63,14 @@ pnpm exec biome check packages/supi-claude-md/
 
 ## Gotchas
 
-- Settings are managed via `/supi-settings` (unified SuPi settings command): claude-md registers its section via `registerClaudeMdSettings()` in the supi-core registry, with `rereadInterval` and `fileNames` edited through `SettingItem.submenu` text inputs
+- Settings are managed via `/supi-settings` (unified SuPi settings command): claude-md registers its section via `registerClaudeMdSettings()` in the supi-core registry, with `fileNames` edited through `SettingItem.submenu` text inputs
 - `reconstructState()` must parse real Pi `SessionEntry[]` branch entries (`message` + nested `message.role`, `custom_message`) and restore subdirectory injection state from tool-result `<extension-context>` tags
 - Path-aware tool discovery should treat `tree_sitter` like `lsp` (`input.file`) so AST-first workflows still inject subdirectory context
 - `systemPromptOptions` is accessed via a typed intersection (`BeforeAgentStartEvent & { systemPromptOptions?: ... }`) for forward-compatibility with pi >= 0.68.0
 - `os.homedir()` cannot be mocked in ESM: config functions accept optional `homeDir` parameter for testability
 - Root/native context files are never re-injected by this extension; they live in pi's system prompt. Use `/reload` or restart the session to pick up changes to root instruction files
 - Subdirectory context is injected from path-aware tool activity such as reads, writes, edits, LSP operations, and Tree-sitter operations
-- Each directory is injected at most once per session (by default). After the configured `rereadInterval` turns, the content is re-read in case it changed
-- Re-injection of already-seen directories is skipped when context usage is at or above `contextThreshold`. First-time directory discovery is still injected even under context pressure
+- Each directory is injected at most once per session. After a session compact, previously seen directories can be re-discovered
 
 ## Injection pipeline
 
@@ -84,5 +81,3 @@ The extension operates through three stages on `tool_result` events:
 3. **Context formatting** (`subdirectory.ts`): wraps discovered file content in `<extension-context source="supi-claude-md">` blocks and appends them to the tool result.
 
 Root and ancestor files are handled natively by pi's system prompt. This extension never re-injects them. Use `/reload` to refresh native root context.
-
-Reread and threshold gating (`shouldInjectSubDir()` in `subdirectory.ts`): first-time discovery always passes; re-injection is controlled by `rereadInterval` turns and gated by context-usage percentage.

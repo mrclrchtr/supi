@@ -13,17 +13,17 @@ import type {
   ExtensionContext,
   SessionCompactEvent,
   SessionStartEvent,
-  TurnEndEvent,
 } from "@earendil-works/pi-coding-agent";
 import { loadClaudeMdConfig } from "./config.ts";
+import type { DiscoveredContextFile } from "./discovery.ts";
 import {
   extractPathFromToolEvent,
   filterAlreadyLoaded,
   findSubdirContextFiles,
 } from "./discovery.ts";
 import { registerClaudeMdSettings } from "./settings-registration.ts";
-import { type ClaudeMdState, createInitialState, reconstructState } from "./state.ts";
-import type { ContextUsage, InjectionCheckOptions } from "./subdirectory.ts";
+import type { ClaudeMdState } from "./state.ts";
+import { createInitialState, reconstructState } from "./state.ts";
 import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
 
 const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -39,23 +39,12 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
 
     try {
       const branch = ctx.sessionManager.getBranch();
-
       if (branch.length > 0) {
         const reconstructed = reconstructState(branch);
-        state.completedTurns = reconstructed.completedTurns;
         state.injectedDirs = reconstructed.injectedDirs;
       }
     } catch {
       // Reconstruction failed — start fresh
-    }
-  });
-
-  // ── Turn tracking ──────────────────────────────────────────
-
-  pi.on("turn_end", async (event: TurnEndEvent, _ctx: ExtensionContext) => {
-    const msg = event.message as { stopReason?: string };
-    if (msg?.stopReason === "stop") {
-      state.completedTurns++;
     }
   });
 
@@ -96,17 +85,11 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
     );
     if (found.length === 0) return;
 
-    const dirsToInject = collectStaleDirs(found, {
-      injectedDirs: state.injectedDirs,
-      currentTurn: state.completedTurns,
-      rereadInterval: config.rereadInterval,
-      contextThreshold: config.contextThreshold,
-      contextUsage: _ctx.getContextUsage() as ContextUsage | undefined,
-    });
+    const dirsToInject = collectFreshDirs(found, state.injectedDirs);
     if (dirsToInject.size === 0) return;
 
     const filesToInject = Array.from(dirsToInject.values()).flat();
-    const contextText = formatSubdirContext(filesToInject, state.completedTurns);
+    const contextText = formatSubdirContext(filesToInject);
     if (!contextText) return;
 
     updateInjectedDirTracking(state, dirsToInject);
@@ -135,13 +118,13 @@ function captureNativePaths(
   }
 }
 
-function collectStaleDirs(
-  found: ReturnType<typeof findSubdirContextFiles>,
-  injectionOpts: InjectionCheckOptions,
-): Map<string, typeof found> {
-  const dirsToInject = new Map<string, typeof found>();
+function collectFreshDirs(
+  found: DiscoveredContextFile[],
+  injectedDirs: Set<string>,
+): Map<string, DiscoveredContextFile[]> {
+  const dirsToInject = new Map<string, DiscoveredContextFile[]>();
   for (const file of found) {
-    if (shouldInjectSubdir(file.dir, injectionOpts)) {
+    if (shouldInjectSubdir(file.dir, injectedDirs)) {
       const existing = dirsToInject.get(file.dir) ?? [];
       existing.push(file);
       dirsToInject.set(file.dir, existing);
@@ -152,12 +135,9 @@ function collectStaleDirs(
 
 function updateInjectedDirTracking(
   state: ClaudeMdState,
-  dirsToInject: Map<string, Array<{ dir: string; relativePath: string }>>,
+  dirsToInject: Map<string, DiscoveredContextFile[]>,
 ): void {
-  for (const [dir, files] of dirsToInject) {
-    const firstFile = files[0];
-    if (firstFile) {
-      state.injectedDirs.set(dir, { turn: state.completedTurns, file: firstFile.relativePath });
-    }
+  for (const dir of dirsToInject.keys()) {
+    state.injectedDirs.add(dir);
   }
 }

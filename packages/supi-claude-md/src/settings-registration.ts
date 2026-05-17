@@ -8,30 +8,6 @@ import {
 } from "@mrclrchtr/supi-core";
 import { CLAUDE_MD_DEFAULTS, type ClaudeMdConfig } from "./config.ts";
 
-const THRESHOLD_VALUES = [
-  "0",
-  "5",
-  "10",
-  "15",
-  "20",
-  "25",
-  "30",
-  "35",
-  "40",
-  "45",
-  "50",
-  "55",
-  "60",
-  "65",
-  "70",
-  "75",
-  "80",
-  "85",
-  "90",
-  "95",
-  "100",
-];
-
 // ── Settings registration ────────────────────────────────────
 
 export function registerClaudeMdSettings(): void {
@@ -58,16 +34,6 @@ function handleSettingChange(
       helpers.set("subdirs", value === "on");
       break;
     }
-    case "rereadInterval": {
-      const num = Number.parseInt(value, 10);
-      helpers.set("rereadInterval", Number.isNaN(num) ? 0 : num);
-      break;
-    }
-    case "contextThreshold": {
-      const num = Number.parseInt(value, 10);
-      helpers.set("contextThreshold", Number.isNaN(num) ? 80 : num);
-      break;
-    }
     case "fileNames": {
       const names = value
         .split(",")
@@ -91,21 +57,6 @@ function buildClaudeMdSettingItems(settings: ClaudeMdConfig): SettingItem[] {
       description: "Inject CLAUDE.md/AGENTS.md from subdirectories when browsing files",
       currentValue: settings.subdirs ? "on" : "off",
       values: ["on", "off"],
-    },
-    {
-      id: "rereadInterval",
-      label: "Subdirectory Re-read Interval",
-      description: "Turns between re-reading previously injected subdirectory context (0 = off)",
-      currentValue: String(settings.rereadInterval),
-      submenu: (currentValue, done) =>
-        createInputSubmenu(currentValue, "Interval (0 = off):", done),
-    },
-    {
-      id: "contextThreshold",
-      label: "Context Threshold",
-      description: "Skip injection when context window usage % ≥ threshold (100 = never skip)",
-      currentValue: String(settings.contextThreshold),
-      values: THRESHOLD_VALUES,
     },
     {
       id: "fileNames",

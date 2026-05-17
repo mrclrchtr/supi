@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-3P57ST"
+title = "Remove re-injection feature from supi-claude-md"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"

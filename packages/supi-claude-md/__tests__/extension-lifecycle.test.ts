@@ -27,8 +27,6 @@ vi.mock("@mrclrchtr/supi-core", () => ({
 
 vi.mock("../src/config.ts", () => ({
   CLAUDE_MD_DEFAULTS: {
-    rereadInterval: 3,
-    contextThreshold: 80,
     subdirs: true,
     fileNames: ["CLAUDE.md", "AGENTS.md"],
   },
@@ -48,8 +46,7 @@ vi.mock("../src/subdirectory.ts", () => ({
 
 vi.mock("../src/state.ts", () => ({
   createInitialState: () => ({
-    completedTurns: 0,
-    injectedDirs: new Map(),
+    injectedDirs: new Set(),
     nativeContextPaths: new Set(),
     firstAgentStart: true,
   }),
@@ -70,13 +67,7 @@ describe("claudeMdExtension: registration", () => {
     const pi = createPiMock();
     claudeMdExtension(pi as never);
 
-    for (const event of [
-      "session_start",
-      "turn_end",
-      "session_compact",
-      "before_agent_start",
-      "tool_result",
-    ]) {
+    for (const event of ["session_start", "session_compact", "before_agent_start", "tool_result"]) {
       expect(pi.handlers.has(event), `missing handler for ${event}`).toBe(true);
     }
   });
@@ -90,8 +81,7 @@ describe("claudeMdExtension: session_start", () => {
     claudeMdExtension(pi as never);
 
     mockFns.reconstructState.mockReturnValue({
-      completedTurns: 12,
-      injectedDirs: new Map([["packages/foo", { turn: 5, file: "packages/foo/CLAUDE.md" }]]),
+      injectedDirs: new Set(["packages/foo"]),
     });
 
     await pi.handlers.get("session_start")?.[0]?.(
@@ -119,29 +109,6 @@ describe("claudeMdExtension: session_start", () => {
         },
       ),
     ).resolves.toBeUndefined();
-  });
-});
-
-describe("claudeMdExtension: turn_end", () => {
-  beforeEach(resetMocks);
-
-  it("increments completedTurns on stopReason stop", async () => {
-    const pi = createPiMock();
-    claudeMdExtension(pi as never);
-
-    const turnEnd = pi.handlers.get("turn_end")?.[0] as (...args: unknown[]) => unknown;
-    await turnEnd({ message: { stopReason: "stop" } }, makeCtx());
-    await turnEnd({ message: { stopReason: "stop" } }, makeCtx());
-    await turnEnd({ message: { stopReason: "tool_use" } }, makeCtx());
-
-    // Verify turn counting without relying on refresh emission
-    const bas = pi.handlers.get("before_agent_start")?.[0] as (...args: unknown[]) => unknown;
-    await bas(
-      { systemPromptOptions: { contextFiles: [{ path: "CLAUDE.md", content: "c" }] } },
-      makeCtx(),
-    );
-
-    expect(mockFns.extractPathFromToolEvent).not.toHaveBeenCalled();
   });
 });
 

@@ -26,8 +26,6 @@ vi.mock("@mrclrchtr/supi-core", () => ({
 
 vi.mock("../src/config.ts", () => ({
   CLAUDE_MD_DEFAULTS: {
-    rereadInterval: 3,
-    contextThreshold: 80,
     subdirs: true,
     fileNames: ["CLAUDE.md", "AGENTS.md"],
   },
@@ -47,8 +45,7 @@ vi.mock("../src/subdirectory.ts", () => ({
 
 vi.mock("../src/state.ts", () => ({
   createInitialState: () => ({
-    completedTurns: 0,
-    injectedDirs: new Map(),
+    injectedDirs: new Set(),
     nativeContextPaths: new Set(),
     firstAgentStart: true,
   }),
@@ -82,10 +79,8 @@ describe("claudeMdExtension: tool_result (injection)", () => {
     ]);
     mockFns.shouldInjectSubdir.mockReturnValue(true);
     mockFns.formatSubdirContext.mockReturnValue(
-      '<extension-context source="supi-claude-md" file="packages/foo/CLAUDE.md" turn="0">\n# Foo\n</extension-context>',
+      '<extension-context source="supi-claude-md" file="packages/foo/CLAUDE.md">\n# Foo\n</extension-context>',
     );
-
-    const usage = { tokens: 50_000, contextWindow: 128_000, percent: 50 };
 
     const result = await pi.handlers.get("tool_result")?.[0]?.(
       {
@@ -94,25 +89,19 @@ describe("claudeMdExtension: tool_result (injection)", () => {
         input: { path: "packages/foo/src/bar.ts" },
         content: [{ type: "text", text: "file content" }],
       },
-      makeCtx({ cwd: "/project", getContextUsage: () => usage }),
+      makeCtx({ cwd: "/project" }),
     );
 
     expect(mockFns.shouldInjectSubdir).toHaveBeenCalledWith(
       "/project/packages/foo",
-      expect.objectContaining({
-        contextThreshold: 80,
-        contextUsage: usage,
-        currentTurn: 0,
-        injectedDirs: expect.any(Map),
-        rereadInterval: 3,
-      }),
+      expect.any(Set),
     );
     expect(result).toEqual({
       content: [
         { type: "text", text: "file content" },
         {
           type: "text",
-          text: '<extension-context source="supi-claude-md" file="packages/foo/CLAUDE.md" turn="0">\n# Foo\n</extension-context>',
+          text: '<extension-context source="supi-claude-md" file="packages/foo/CLAUDE.md">\n# Foo\n</extension-context>',
         },
       ],
     });
@@ -212,7 +201,7 @@ describe("claudeMdExtension: tool_result (skip conditions)", () => {
     expect(result).toBeUndefined();
   });
 
-  it("skips when all dirs are already fresh", async () => {
+  it("skips when all dirs are already injected", async () => {
     const pi = createPiMock();
     claudeMdExtension(pi as never);
 

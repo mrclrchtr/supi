@@ -2,8 +2,6 @@
 //
 // Config shape (in supi shared config, "claude-md" section):
 // {
-//   "rereadInterval": 3,      // turns between subdirectory re-reads (0 = off)
-//   "contextThreshold": 80,    // skip injection when context % >= threshold
 //   "subdirs": true,           // enable subdirectory context discovery
 //   "fileNames": ["CLAUDE.md", "AGENTS.md"]  // context file names to look for
 // }
@@ -11,10 +9,6 @@
 import { loadSupiConfig } from "@mrclrchtr/supi-core";
 
 export interface ClaudeMdConfig {
-  /** Turns between re-reading previously injected subdirectory context. 0 = disabled. Default: 3 */
-  rereadInterval: number;
-  /** Skip injection when context window usage % >= threshold. 0 = always skip, 100 = never skip. Default: 80 */
-  contextThreshold: number;
   /** Enable subdirectory context discovery. Default: true */
   subdirs: boolean;
   /** Context file names to look for (first match per directory). Default: ["CLAUDE.md", "AGENTS.md"] */
@@ -22,8 +16,6 @@ export interface ClaudeMdConfig {
 }
 
 export const CLAUDE_MD_DEFAULTS: ClaudeMdConfig = {
-  rereadInterval: 3,
-  contextThreshold: 80,
   subdirs: true,
   fileNames: ["CLAUDE.md", "AGENTS.md"],
 };

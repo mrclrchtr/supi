@@ -65,22 +65,7 @@ function makeToolResultEntry(text: string): SessionEntry {
 describe("reconstructState", () => {
   it("returns defaults for empty branch", () => {
     const result = reconstructState([]);
-    expect(result.completedTurns).toBe(0);
     expect(result.injectedDirs.size).toBe(0);
-  });
-
-  it("counts completed assistant turns from session message entries", () => {
-    const branch = [
-      makeUserEntry(),
-      makeAssistantEntry("stop"),
-      makeUserEntry(),
-      makeAssistantEntry("toolUse"),
-      makeToolResultEntry("ignored"),
-      makeAssistantEntry("stop"),
-    ];
-
-    const result = reconstructState(branch);
-    expect(result.completedTurns).toBe(2);
   });
 
   it("extracts injected dirs from tool result tags", () => {
@@ -93,10 +78,7 @@ describe("reconstructState", () => {
 
     const result = reconstructState(branch);
     expect(result.injectedDirs.size).toBe(1);
-    expect(result.injectedDirs.get("packages/foo")).toEqual({
-      turn: 5,
-      file: "packages/foo/CLAUDE.md",
-    });
+    expect(result.injectedDirs.has("packages/foo")).toBe(true);
   });
 
   it("handles multiple injected dirs in a single tool result", () => {
@@ -131,13 +113,11 @@ describe("reconstructState", () => {
       makeToolResultEntry(
         '<extension-context source="supi-claude-md" file="pkg/a/CLAUDE.md" turn="1">\na\n</extension-context>',
       ),
-      makeAssistantEntry("stop"),
-      makeAssistantEntry("stop"),
     ];
 
     const result = reconstructState(branch);
-    expect(result.completedTurns).toBe(3);
     expect(result.injectedDirs.size).toBe(1);
+    expect(result.injectedDirs.has("pkg/a")).toBe(true);
   });
 
   it("handles missing or non-text tool result content gracefully", () => {

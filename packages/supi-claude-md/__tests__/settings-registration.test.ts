@@ -40,17 +40,12 @@ describe("registerClaudeMdSettings", () => {
     expect(sections[0]).toMatchObject({ id: "claude-md", label: "Claude-MD" });
   });
 
-  it("loadValues returns four setting items", () => {
+  it("loadValues returns two setting items", () => {
     registerClaudeMdSettings();
     const section = getRegisteredSettings()[0];
     const items = section.loadValues("project", "/tmp");
 
-    expect(items.map((item) => item.id)).toEqual([
-      "subdirs",
-      "rereadInterval",
-      "contextThreshold",
-      "fileNames",
-    ]);
+    expect(items.map((item) => item.id)).toEqual(["subdirs", "fileNames"]);
   });
 
   it("loadValues reads the selected scope instead of merged effective config", () => {
@@ -62,8 +57,6 @@ describe("registerClaudeMdSettings", () => {
       JSON.stringify({
         "claude-md": {
           subdirs: false,
-          rereadInterval: 7,
-          contextThreshold: 90,
           fileNames: ["GLOBAL.md"],
         },
       }),
@@ -75,8 +68,6 @@ describe("registerClaudeMdSettings", () => {
       JSON.stringify({
         "claude-md": {
           subdirs: true,
-          rereadInterval: 2,
-          contextThreshold: 70,
           fileNames: ["PROJECT.md"],
         },
       }),
@@ -90,13 +81,9 @@ describe("registerClaudeMdSettings", () => {
       const projectItems = section.loadValues("project", tmpDir);
 
       expect(globalItems.find((item) => item.id === "subdirs")?.currentValue).toBe("off");
-      expect(globalItems.find((item) => item.id === "rereadInterval")?.currentValue).toBe("7");
-      expect(globalItems.find((item) => item.id === "contextThreshold")?.currentValue).toBe("90");
       expect(globalItems.find((item) => item.id === "fileNames")?.currentValue).toBe("GLOBAL.md");
 
       expect(projectItems.find((item) => item.id === "subdirs")?.currentValue).toBe("on");
-      expect(projectItems.find((item) => item.id === "rereadInterval")?.currentValue).toBe("2");
-      expect(projectItems.find((item) => item.id === "contextThreshold")?.currentValue).toBe("70");
       expect(projectItems.find((item) => item.id === "fileNames")?.currentValue).toBe("PROJECT.md");
     });
 
@@ -111,8 +98,6 @@ describe("registerClaudeMdSettings", () => {
       path.join(tmpDir, ".pi/agent/supi/config.json"),
       JSON.stringify({
         "claude-md": {
-          rereadInterval: 9,
-          contextThreshold: 95,
           fileNames: ["GLOBAL.md"],
         },
       }),
@@ -124,8 +109,6 @@ describe("registerClaudeMdSettings", () => {
       const projectItems = section.loadValues("project", tmpDir);
 
       expect(projectItems.find((item) => item.id === "subdirs")?.currentValue).toBe("on");
-      expect(projectItems.find((item) => item.id === "rereadInterval")?.currentValue).toBe("3");
-      expect(projectItems.find((item) => item.id === "contextThreshold")?.currentValue).toBe("80");
       expect(projectItems.find((item) => item.id === "fileNames")?.currentValue).toBe(
         "CLAUDE.md, AGENTS.md",
       );

@@ -27,8 +27,6 @@ vi.mock("@mrclrchtr/supi-core", () => ({
 
 vi.mock("../src/config.ts", () => ({
   CLAUDE_MD_DEFAULTS: {
-    rereadInterval: 3,
-    contextThreshold: 80,
     subdirs: true,
     fileNames: ["CLAUDE.md", "AGENTS.md"],
   },
@@ -48,8 +46,7 @@ vi.mock("../src/subdirectory.ts", () => ({
 
 vi.mock("../src/state.ts", () => ({
   createInitialState: () => ({
-    completedTurns: 0,
-    injectedDirs: new Map(),
+    injectedDirs: new Set(),
     nativeContextPaths: new Set(),
     firstAgentStart: true,
   }),
@@ -59,7 +56,6 @@ vi.mock("../src/state.ts", () => ({
 import claudeMdExtension from "../src/claude-md.ts";
 
 const DEFAULT_CONFIG = {
-  rereadInterval: 3,
   subdirs: true,
   fileNames: ["CLAUDE.md", "AGENTS.md"],
 };

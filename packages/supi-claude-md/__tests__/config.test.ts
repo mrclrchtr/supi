@@ -29,25 +29,24 @@ describe("loadClaudeMdConfig", () => {
     fs.mkdirSync(globalDir, { recursive: true });
     fs.writeFileSync(
       path.join(globalDir, "config.json"),
-      JSON.stringify({ "claude-md": { rereadInterval: 10 } }),
+      JSON.stringify({ "claude-md": { subdirs: false } }),
     );
 
     const config = loadClaudeMdConfig(tmpDir, tmpDir);
-    expect(config.rereadInterval).toBe(10);
-    expect(config.contextThreshold).toBe(80); // default
-    expect(config.subdirs).toBe(true); // default
+    expect(config.subdirs).toBe(false);
+    expect(config.fileNames).toEqual(["CLAUDE.md", "AGENTS.md"]); // default
   });
 
-  it("loads configured contextThreshold", () => {
+  it("loads configured fileNames", () => {
     const projectDir = path.join(tmpDir, ".pi/supi");
     fs.mkdirSync(projectDir, { recursive: true });
     fs.writeFileSync(
       path.join(projectDir, "config.json"),
-      JSON.stringify({ "claude-md": { contextThreshold: 90 } }),
+      JSON.stringify({ "claude-md": { fileNames: ["README.md"] } }),
     );
 
     const config = loadClaudeMdConfig(tmpDir, tmpDir);
-    expect(config.contextThreshold).toBe(90);
+    expect(config.fileNames).toEqual(["README.md"]);
   });
 
   it("merges project config overriding global", () => {
@@ -55,7 +54,7 @@ describe("loadClaudeMdConfig", () => {
     fs.mkdirSync(globalDir, { recursive: true });
     fs.writeFileSync(
       path.join(globalDir, "config.json"),
-      JSON.stringify({ "claude-md": { rereadInterval: 5 } }),
+      JSON.stringify({ "claude-md": { fileNames: ["GLOBAL.md"] } }),
     );
 
     const projectDir = path.join(tmpDir, ".pi/supi");
@@ -66,7 +65,7 @@ describe("loadClaudeMdConfig", () => {
     );
 
     const config = loadClaudeMdConfig(tmpDir, tmpDir);
-    expect(config.rereadInterval).toBe(5); // from global
+    expect(config.fileNames).toEqual(["GLOBAL.md"]); // from global
     expect(config.subdirs).toBe(false); // from project
   });
 });
