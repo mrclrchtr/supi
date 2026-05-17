@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-rtk",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "SuPi RTK extension — transparent bash command rewriting via RTK for token savings",
   "license": "MIT",
   "repository": {

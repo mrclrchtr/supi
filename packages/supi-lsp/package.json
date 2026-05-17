@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-lsp",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "SuPi LSP extension — Language Server Protocol integration for pi",
   "license": "MIT",
   "repository": {
