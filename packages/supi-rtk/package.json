@@ -39,7 +39,8 @@
   },
   "pi": {
     "extensions": [
-      "./src/extension.ts"
+      "./src/extension.ts",
+      "node_modules/@mrclrchtr/supi-core/src/extension.ts"
     ]
   },
   "main": "src/api.ts",

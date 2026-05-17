@@ -30,7 +30,7 @@ function expectExplicitSurface(pkg, entries) {
     "./extension": "./src/extension.ts",
     "./package.json": "./package.json",
   });
-  expect(pkg.pi?.extensions).toEqual(["./src/extension.ts"]);
+  expect(pkg.pi?.extensions).toContain("./src/extension.ts");
   expect(entries).toContain("package/src/api.ts");
   expect(entries).toContain("package/src/extension.ts");
 }
