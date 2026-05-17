@@ -1,6 +1,7 @@
 // Note-related rendering helpers for the rich overlay.
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { QuestionnaireFlow } from "../flow.ts";
 import type { NormalizedQuestion, NormalizedStructuredQuestion, Selection } from "../types.ts";
 import { type InteractiveRow, interactiveRows } from "../ui/ui-rich-state.ts";
@@ -75,6 +76,19 @@ function storedMultiSelections(
   return answer.selections;
 }
 
-export function renderNoteStatus(theme: Theme, note: string): string[] {
-  return ["", theme.fg("muted", ` Notes: ${note}`)];
+export function renderNoteStatus(theme: Theme, note: string, width: number): string[] {
+  const prefix = " Notes: ";
+  const prefixWidth = visibleWidth(prefix);
+  const contentWidth = Math.max(1, width - prefixWidth);
+  const wrapped = wrapTextWithAnsi(note, contentWidth);
+  const lines: string[] = [""];
+  const continuationPrefix = " ".repeat(prefixWidth);
+  for (const [i, line] of wrapped.entries()) {
+    lines.push(
+      i === 0
+        ? theme.fg("muted", `${prefix}${line}`)
+        : theme.fg("muted", `${continuationPrefix}${line}`),
+    );
+  }
+  return lines;
 }

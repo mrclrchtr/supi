@@ -124,7 +124,7 @@ function renderStructuredQuestion(
     renderStandardStructuredQuestion(lines, env, question, rows);
   }
   const note = currentNote(env.flow, env.state, question);
-  if (note) lines.push(...renderNoteStatus(env.theme, note));
+  if (note) lines.push(...renderNoteStatus(env.theme, note, env.width));
 }
 
 function renderStandardStructuredQuestion(
