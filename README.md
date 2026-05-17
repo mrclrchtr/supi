@@ -22,60 +22,57 @@ Command aliases for muscle memory (`/exit`, `/e`). Default bash timeouts so hung
 
 **Extensions**: extras, bash-timeout
 
-## Quick install
+## Packages
+
+### Production
+
+Included in `@mrclrchtr/supi`. Install the full stack or pick individual packages from the table below.
+
+| Package | Description |
+|---|---|
+| `@mrclrchtr/supi-lsp` | Go-to-definition, references, rename, hover types, inline diagnostics |
+| `@mrclrchtr/supi-tree-sitter` | AST-level structural analysis — outline, imports, exports, queries |
+| `@mrclrchtr/supi-code-intelligence` | Architecture briefs, caller/callee analysis, impact assessment |
+| `@mrclrchtr/supi-ask-user` | Structured questionnaires for agent-user decisions |
+| `@mrclrchtr/supi-claude-md` | Subdirectory context injection + CLAUDE.md maintenance skills |
+| `@mrclrchtr/supi-context` | Context window transparency — see what's eating tokens |
+| `@mrclrchtr/supi-debug` | Diagnostics guardrails + debug event inspection |
+| `@mrclrchtr/supi-extras` | Command aliases, skill shorthand, tab spinner, prompt stash |
+| `@mrclrchtr/supi-bash-timeout` | Default timeouts on bash tool calls |
+
+### Beta
+
+Not bundled in the meta-package. Install individually.
+
+| Package | Description |
+|---|---|
+| `@mrclrchtr/supi-web` | Fetch web pages as clean Markdown + Context7 library docs |
+| `@mrclrchtr/supi-cache` | Prompt cache health monitoring and cross-session forensics |
+| `@mrclrchtr/supi-insights` | Usage reports and session analytics |
+| `@mrclrchtr/supi-review` | Structured code reviews via `/supi-review` |
+| `@mrclrchtr/supi-rtk` | Transparent bash command rewriting for token savings |
+
+Each package has its own README with full details, configuration, and API docs.
+
+## Install
+
+### Full stack
 
 ```bash
 pi install npm:@mrclrchtr/supi
 ```
 
-That's it. All production extensions, working together.
+All production packages, working together.
 
-Or pick what you need:
-
-```bash
-pi install npm:@mrclrchtr/supi-lsp          # code navigation
-pi install npm:@mrclrchtr/supi-tree-sitter   # AST analysis
-pi install npm:@mrclrchtr/supi-ask-user      # structured decisions
-pi install npm:@mrclrchtr/supi-extras        # aliases, stash, spinner
-pi install npm:@mrclrchtr/supi-bash-timeout  # default timeouts
-```
-
-## Extensions
-
-| Extension | Package |
-|-----------|---------|
-| **lsp** | `@mrclrchtr/supi-lsp` |
-| **tree_sitter** | `@mrclrchtr/supi-tree-sitter` |
-| **code_intel** | `@mrclrchtr/supi-code-intelligence` |
-| **ask_user** | `@mrclrchtr/supi-ask-user` |
-| **claude-md** | `@mrclrchtr/supi-claude-md` |
-| **context** | `@mrclrchtr/supi-context` |
-| **debug** | `@mrclrchtr/supi-debug` |
-| **extras** | `@mrclrchtr/supi-extras` |
-| **bash-timeout** | `@mrclrchtr/supi-bash-timeout` |
-| *(core)* | `@mrclrchtr/supi-core` |
-
-Each extension has its own README with full details, configuration, and API docs.
-
-### Beta extensions
-
-Not bundled in the meta-package. Install directly if you need them:
-
-| Extension | Package |
-|-----------|---------|
-| **web** | `@mrclrchtr/supi-web` |
-| **cache** | `@mrclrchtr/supi-cache` |
-| **rtk** | `@mrclrchtr/supi-rtk` |
-| **review** | `@mrclrchtr/supi-review` |
-| **insights** | `@mrclrchtr/supi-insights` |
+### Individual packages
 
 ```bash
+pi install npm:@mrclrchtr/supi-lsp
 pi install npm:@mrclrchtr/supi-web
-pi install npm:@mrclrchtr/supi-cache
-# ...
+# ... any package from the tables above
 ```
 
-## From git or local path
+### From git or local path
 
 ```bash
 pi install git:github.com/mrclrchtr/supi
