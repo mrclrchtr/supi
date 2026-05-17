@@ -28,6 +28,11 @@
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "vitest": "4.1.6",
     "@mrclrchtr/supi-test-utils": "workspace:*"

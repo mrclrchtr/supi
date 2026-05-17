@@ -131,6 +131,7 @@ registerSettings({
 - `createAgentSession()` child sessions do NOT bubble `agent_start`/`agent_end` to parent extension handlers; use `pi.events` to signal activity from programmatic sub-sessions.
 - `pi.events.emit("supi:working:start", { source: "supi-<pkg>" })` / `pi.events.emit("supi:working:end", { source: "supi-<pkg>" })` — generic SuPi convention for indicating long-running work across extensions; `tab-spinner` listens to these. Emitters must ensure `end` always fires (success, failure, cancel, timeout).
 - Pi core peer deps (`@earendil-works/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
+- Mark pi-provided peer deps (`@earendil-works/pi-*`, `typebox`) as optional via `peerDependenciesMeta` to prevent `npm install -g` from auto-installing them (which can pull in native addons like koffi that fail on newer Node.js versions).
 - Other runtime imports belong in `dependencies`, not `peerDependencies`.
 - For `packages/supi`, external runtime deps imported by bundled sub-packages must also be present in the meta-package's own `dependencies`; verify with `npm pack` + temp `npm install`.
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.

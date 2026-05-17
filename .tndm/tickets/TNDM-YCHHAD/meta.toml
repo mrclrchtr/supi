@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-YCHHAD"
+title = "Fix npm peer dependency resolution for pi install — mark pi-provided peer deps as optional"
+type = "bug"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "plan"
+path = "plan.md"
