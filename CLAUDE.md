@@ -67,6 +67,16 @@ Highlighted workspace packages:
 - `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` manifest entries must remain **real package-relative file paths**. Do not replace them with `exports` aliases.
 - The published meta-package `@mrclrchtr/supi` bundles all Production sub-packages via `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
 - Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`.
+- When a package bundles another `@mrclrchtr/supi-*` package, reference that
+  package's extension in `pi.extensions` via `node_modules/<pkg>/src/extension.ts`.
+  Otherwise, standalone `pi install npm:@mrclrchtr/supi-<name>` won't load the
+  bundled extension — pi only reads the top-level installed package's `pi.extensions`.
+- The meta-package (`@mrclrchtr/supi`) is exempt — it uses its own aggregated
+  extension (`packages/supi/src/extension.ts`) that imports and invokes all
+  sub-package extensions manually rather than relying on pi manifest discovery.
+- Adding bundled extension references breaks `expectExplicitSurface` in
+  `scripts/__tests__/pack-staged.test.mjs` — use `.toContain("./src/extension.ts")`,
+  not `.toEqual(["./src/extension.ts"])`.
 - Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
 - For the publish pipeline (staging, manifest export, npm pack, verification), see the **Publish pipeline** section.
 
