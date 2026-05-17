@@ -1,0 +1,11 @@
+schema_version = 1
+id = "TNDM-WASNR8"
+title = "Improve LSP stale-diagnostic recovery in packages/supi-lsp after new file creation"
+type = "feature"
+priority = "p2"
+depends_on = []
+tags = ["flow:brainstorm"]
+
+[[documents]]
+name = "content"
+path = "content.md"

@@ -1,0 +1,43 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-17T13:46:45.715207Z"
+revision = 14
+
+[document_fingerprints]
+archive = "sha256:c86b29e27e9e5698f4d80cf7368686d9bc141dd4e6578e58bf40cb30467b2097"
+content = "sha256:7977aef14d1d9a6e399ebdeb7badbf213598d2706986af06fdc9ae386f39ff1f"
+
+[[tasks]]
+number = 1
+title = "Add the review-brief domain model, starter standard profiles, and prompt builders"
+status = "done"
+file = "packages/supi-review/__tests__/prompts.test.ts"
+verification = "pnpm vitest run packages/supi-review/__tests__/briefs.test.ts packages/supi-review/__tests__/prompts.test.ts"
+
+[[tasks]]
+number = 2
+title = "Rebuild `/supi-review` orchestration around mode → target → brief → approval"
+status = "done"
+file = "packages/supi-review/__tests__/index.test.ts"
+verification = "pnpm vitest run packages/supi-review/__tests__/review-command.test.ts packages/supi-review/__tests__/index.test.ts"
+
+[[tasks]]
+number = 3
+title = "Thread the approved brief through the reviewer runner and result payload"
+status = "done"
+file = "packages/supi-review/__tests__/system-prompt.test.ts"
+verification = "pnpm vitest run packages/supi-review/__tests__/runner.test.ts packages/supi-review/__tests__/system-prompt.test.ts"
+
+[[tasks]]
+number = 4
+title = "Make review output feel connected by rendering the request context with the findings"
+status = "done"
+file = "packages/supi-review/__tests__/index.test.ts"
+verification = "pnpm vitest run packages/supi-review/__tests__/renderer.test.ts packages/supi-review/__tests__/index.test.ts"
+
+[[tasks]]
+number = 5
+title = "Update package docs and run full package verification"
+status = "done"
+file = "packages/supi-review/CLAUDE.md"
+verification = "pnpm vitest run packages/supi-review/ && pnpm exec tsc --noEmit -p packages/supi-review/tsconfig.json && pnpm exec biome check packages/supi-review"

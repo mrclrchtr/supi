@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-0DGSCD"
+title = "Rethink packages/supi-review review architecture"
+type = "feature"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
