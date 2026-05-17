@@ -9,6 +9,7 @@ export const lspPromptSnippet =
 export const lspPromptGuidelines = [
   "Prefer the lsp tool over bash text search for supported source files when the task is semantic code navigation or diagnostics.",
   "Use lsp for hover, definitions, references, document symbols, rename planning, code actions, and diagnostics before falling back to grep-style shell search.",
+  "To inspect a known symbol's type, signature, or docs when you don't have coordinates: use \`workspace_symbol\` to find the file and position, then \`hover\` on it; or use \`symbol_hover\` (symbol name only, zero coordinates) for a one-shot type query.",
   "Fall back to bash/read when LSP is unavailable, the file type is unsupported, or the task is plain-text search across docs, config files, or string literals.",
   "Diagnostics are automatically delivered: inline after every write/edit tool result, and as context before each agent turn. You do not need to call the lsp tool to check them — they are already in your context.",
   "When delivered diagnostics show errors, decide: (a) expected temporary state from a planned multi-step change — continue your sequence, then verify at the end; (b) unexpected 'Cannot find module', unresolved imports, or type mismatches — stop and fix the root cause before editing more files.",

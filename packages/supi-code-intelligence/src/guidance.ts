@@ -37,6 +37,7 @@ export const promptGuidelines = [
   'Use `code_intel pattern` for bounded, scope-aware text search when the question is textual rather than semantic; it treats patterns as literal strings by default, supports `regex: true`, supports `kind: "definition" | "export" | "import"` for structured searches, and may return a partial-result warning when a structured scan is too broad.',
   "Use `code_intel brief` and `code_intel affected` priority signals to notice diagnostics, low coverage, or unused-code hints before editing risky files.",
   "Use `code_intel index` for a factual project map (file counts, directory structure, landmark files) when you need to orient yourself in a new codebase.",
+  "When you only need the type, signature, or docs of a known symbol, go straight to \`lsp workspace_symbol\` or \`lsp symbol_hover\` — don't route through \`code_intel\`.",
   "After `code_intel` narrows the target, use raw `lsp` and `tree_sitter` tools for precise drill-down on exact symbols, types, or AST nodes.",
   "Do not prefer `code_intel` over direct file reads or lower-level tools for trivial, already-localized edits or exact symbol/AST drill-down tasks.",
 ];
