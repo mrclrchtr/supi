@@ -106,4 +106,54 @@ describe("supi-review renderer", () => {
     expect(output).toContain("[warning]◆ Review Canceled[/warning]");
     expect(output).not.toContain("tmux");
   });
+
+  it("includes review brief context when present", () => {
+    const output = renderReview({
+      kind: "success",
+      target: { type: "custom", instructions: "Review auth middleware" },
+      brief: {
+        mode: "dynamic",
+        title: "Review: auth middleware",
+        summary: "Added JWT authentication",
+        intent: "Secure the API endpoints",
+        focus: "Token validation, error handling",
+        finalPrompt: "review this",
+      },
+      output: {
+        findings: [],
+        overall_correctness: "patch is correct",
+        overall_explanation: "Looks good",
+        overall_confidence_score: 0.9,
+      },
+    });
+
+    expect(output).toContain("Review mode: Dynamic");
+    expect(output).toContain("Added JWT authentication");
+    expect(output).toContain("Token validation, error handling");
+  });
+
+  it("includes standard profile info when brief has a profile", () => {
+    const output = renderReview({
+      kind: "success",
+      target: { type: "custom", instructions: "Security review" },
+      brief: {
+        mode: "standard",
+        title: "Security Review",
+        summary: "Focused security review",
+        intent: "Check for security issues",
+        focus: "Security",
+        profileId: "security",
+        finalPrompt: "review this",
+      },
+      output: {
+        findings: [],
+        overall_correctness: "patch is correct",
+        overall_explanation: "No issues found",
+        overall_confidence_score: 0.95,
+      },
+    });
+
+    expect(output).toContain("Review mode: Standard");
+    expect(output).toContain("[muted]Summary: Focused security review[/muted]");
+  });
 });

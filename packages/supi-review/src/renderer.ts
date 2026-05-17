@@ -35,6 +35,18 @@ function renderSuccess(
   container.addChild(new Text(theme.fg("accent", "◆ Code Review Results"), 1, 0));
   container.addChild(new Spacer(1));
 
+  // Brief context
+  if (result.brief) {
+    const modeLabel =
+      result.brief.mode === "standard" && result.brief.profileId
+        ? `Standard (${result.brief.profileId})`
+        : "Dynamic";
+    container.addChild(new Text(theme.fg("muted", `Review mode: ${modeLabel}`), 1, 0));
+    container.addChild(new Text(theme.fg("muted", `Summary: ${result.brief.summary}`), 1, 0));
+    container.addChild(new Text(theme.fg("muted", `Focus: ${result.brief.focus}`), 1, 0));
+    container.addChild(new Spacer(1));
+  }
+
   const normalizedVerdict = output.overall_correctness.toLowerCase();
   const verdictColor = normalizedVerdict.includes("incorrect")
     ? "warning"

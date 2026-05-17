@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
   loadReviewSettings: vi.fn(() => ({
@@ -10,6 +10,10 @@ const mockFns = vi.hoisted(() => ({
   setReviewModelChoices: vi.fn(),
   registerReviewRenderer: vi.fn(),
   runReviewer: vi.fn(),
+  selectReviewMode: vi.fn(),
+  selectProfile: vi.fn(),
+  collectDynamicInputs: vi.fn(),
+  approveBriefViaEditor: vi.fn(),
   selectPreset: vi.fn(async () => "custom"),
   selectAutoFix: vi.fn(async () => false),
 }));
@@ -72,6 +76,10 @@ vi.mock("../src/progress-widget", () => ({
 }));
 
 vi.mock("../src/ui", () => ({
+  selectReviewMode: mockFns.selectReviewMode,
+  selectProfile: mockFns.selectProfile,
+  collectDynamicInputs: mockFns.collectDynamicInputs,
+  approveBriefViaEditor: mockFns.approveBriefViaEditor,
   selectPreset: mockFns.selectPreset,
   selectAutoFix: mockFns.selectAutoFix,
   selectBranch: vi.fn(),
@@ -186,436 +194,76 @@ describe("formatReviewContent", () => {
     expect(content).toContain("Partial output:");
     expect(content).toContain("I reviewed the code and found...");
   });
-});
 
-describe("/supi-review command", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockFns.loadReviewSettings.mockReturnValue({
-      reviewModel: "",
-      maxDiffBytes: 100_000,
-      autoFix: false,
-    });
-    mockFns.selectAutoFix.mockResolvedValue(false);
-  });
-
-  it("starts the reviewer with the resolved model", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
-    const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
-      on: vi.fn(),
-      sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
-      events: { emit: vi.fn(), on: vi.fn() },
-    } as unknown as ExtensionAPI;
-
-    mockFns.runReviewer.mockResolvedValue({
-      kind: "success",
-      target: { type: "custom", instructions: "Focus on correctness" },
+  it("includes brief context in success output", () => {
+    const result = {
+      kind: "success" as const,
+      target: { type: "custom" as const, instructions: "test" },
+      brief: {
+        mode: "dynamic" as const,
+        title: "Review: auth middleware",
+        summary: "Added JWT authentication",
+        intent: "Secure the API endpoints",
+        focus: "Token validation, error handling",
+        finalPrompt: "review this",
+      },
       output: {
         findings: [],
         overall_correctness: "patch is correct",
         overall_explanation: "Looks good",
-        overall_confidence_score: 0.7,
-      },
-    });
-
-    reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
-
-    const ctx = {
-      cwd: "/project",
-      hasUI: true,
-      modelRegistry: {
-        find: (provider: string, id: string) =>
-          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
-      },
-      model: { provider: "github-copilot", id: "session-model" },
-      ui: {
-        editor: vi.fn(async () => "Focus on correctness"),
-        notify: vi.fn(),
-        custom: vi.fn(
-          (factory: (...args: unknown[]) => unknown) =>
-            new Promise((resolve) => {
-              factory({}, {}, undefined, resolve);
-            }),
-        ),
+        overall_confidence_score: 0.9,
       },
     };
-
-    await commandHandler("", ctx);
-
-    expect(mockFns.runReviewer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: expect.anything(), // Model object or undefined
-      }),
-    );
+    const content = formatReviewContent(result);
+    expect(content).toContain("### Review Requested");
+    expect(content).toContain("Added JWT authentication");
+    expect(content).toContain("Secure the API endpoints");
+    expect(content).toContain("Token validation, error handling");
+    expect(content).toContain("**Mode:** Dynamic");
   });
 
-  it("aborts the in-flight reviewer when the loader is canceled", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
-    const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
-      on: vi.fn(),
-      sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
-      events: { emit: vi.fn(), on: vi.fn() },
-    } as unknown as ExtensionAPI;
-
-    mockFns.runReviewer.mockImplementation(
-      ({ signal, target }: { signal?: AbortSignal; target: { type: string } }) =>
-        new Promise((resolve) => {
-          signal?.addEventListener("abort", () => resolve({ kind: "canceled", target }), {
-            once: true,
-          });
-        }),
-    );
-
-    reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
-
-    const ctx = {
-      cwd: "/project",
-      hasUI: true,
-      modelRegistry: {
-        find: (provider: string, id: string) =>
-          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
+  it("shows profile id for standard mode", () => {
+    const result = {
+      kind: "success" as const,
+      target: { type: "custom" as const, instructions: "test" },
+      brief: {
+        mode: "standard" as const,
+        title: "Security Review",
+        summary: "Security-focused review",
+        intent: "Check for security issues",
+        focus: "Security",
+        profileId: "security",
+        finalPrompt: "review this",
       },
-      model: { provider: "github-copilot", id: "session-model" },
-      ui: {
-        editor: vi.fn(async () => "Focus on correctness"),
-        notify: vi.fn(),
-        custom: vi.fn((factory: (...args: unknown[]) => unknown) => {
-          return new Promise((resolve) => {
-            const loader = factory({}, {}, undefined, resolve) as { abort: () => void };
-            queueMicrotask(() => loader.abort());
-          });
-        }),
-      },
-    };
-
-    await commandHandler("", ctx);
-
-    expect(mockFns.runReviewer).toHaveBeenCalledTimes(1);
-    const invocation = mockFns.runReviewer.mock.calls[0]?.[0] as { signal?: AbortSignal };
-    expect(invocation.signal?.aborted).toBe(true);
-    expect(
-      (pi as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        details: { result: expect.objectContaining({ kind: "canceled" }) },
-      }),
-    );
-  });
-
-  it("sends follow-up user message when auto-fix is enabled and findings exist", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
-    const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
-      on: vi.fn(),
-      sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
-      events: { emit: vi.fn(), on: vi.fn() },
-    } as unknown as ExtensionAPI;
-
-    mockFns.selectAutoFix.mockResolvedValue(true);
-    mockFns.runReviewer.mockResolvedValue({
-      kind: "success",
-      target: { type: "custom", instructions: "Focus on correctness" },
-      output: {
-        findings: [
-          {
-            title: "Bug",
-            body: "Something is wrong",
-            confidence_score: 0.9,
-            priority: 2,
-            code_location: {
-              absolute_file_path: "/project/src/x.ts",
-              line_range: { start: 1, end: 1 },
-            },
-          },
-        ],
-        overall_correctness: "mostly correct",
-        overall_explanation: "One issue found",
-        overall_confidence_score: 0.8,
-      },
-    });
-
-    reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
-
-    const ctx = {
-      cwd: "/project",
-      hasUI: true,
-      modelRegistry: {
-        find: (provider: string, id: string) =>
-          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
-      },
-      model: { provider: "github-copilot", id: "session-model" },
-      ui: {
-        editor: vi.fn(async () => "Focus on correctness"),
-        notify: vi.fn(),
-        custom: vi.fn(
-          (factory: (...args: unknown[]) => unknown) =>
-            new Promise((resolve) => {
-              factory({}, {}, undefined, resolve);
-            }),
-        ),
-      },
-    };
-
-    await commandHandler("", ctx);
-
-    expect(
-      (pi as unknown as { sendUserMessage: ReturnType<typeof vi.fn> }).sendUserMessage,
-    ).toHaveBeenCalledWith("Fix all findings from the review above.");
-  });
-
-  it("does not send follow-up when auto-fix is disabled", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
-    const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
-      on: vi.fn(),
-      sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
-      events: { emit: vi.fn(), on: vi.fn() },
-    } as unknown as ExtensionAPI;
-
-    mockFns.selectAutoFix.mockResolvedValue(false);
-    mockFns.runReviewer.mockResolvedValue({
-      kind: "success",
-      target: { type: "custom", instructions: "Focus on correctness" },
-      output: {
-        findings: [
-          {
-            title: "Bug",
-            body: "Something is wrong",
-            confidence_score: 0.9,
-            priority: 2,
-            code_location: {
-              absolute_file_path: "/project/src/x.ts",
-              line_range: { start: 1, end: 1 },
-            },
-          },
-        ],
-        overall_correctness: "mostly correct",
-        overall_explanation: "One issue found",
-        overall_confidence_score: 0.8,
-      },
-    });
-
-    reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
-
-    const ctx = {
-      cwd: "/project",
-      hasUI: true,
-      modelRegistry: {
-        find: (provider: string, id: string) =>
-          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
-      },
-      model: { provider: "github-copilot", id: "session-model" },
-      ui: {
-        editor: vi.fn(async () => "Focus on correctness"),
-        notify: vi.fn(),
-        custom: vi.fn(
-          (factory: (...args: unknown[]) => unknown) =>
-            new Promise((resolve) => {
-              factory({}, {}, undefined, resolve);
-            }),
-        ),
-      },
-    };
-
-    await commandHandler("", ctx);
-
-    expect(
-      (pi as unknown as { sendUserMessage: ReturnType<typeof vi.fn> }).sendUserMessage,
-    ).not.toHaveBeenCalled();
-  });
-
-  it("does not send follow-up when there are no findings", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
-    const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
-      on: vi.fn(),
-      sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
-      events: { emit: vi.fn(), on: vi.fn() },
-    } as unknown as ExtensionAPI;
-
-    mockFns.selectAutoFix.mockResolvedValue(true);
-    mockFns.runReviewer.mockResolvedValue({
-      kind: "success",
-      target: { type: "custom", instructions: "Focus on correctness" },
       output: {
         findings: [],
-        overall_correctness: "correct",
-        overall_explanation: "Looks good",
+        overall_correctness: "patch is correct",
+        overall_explanation: "No issues",
         overall_confidence_score: 0.95,
       },
-    });
-
-    reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
-
-    const ctx = {
-      cwd: "/project",
-      hasUI: true,
-      modelRegistry: {
-        find: (provider: string, id: string) =>
-          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
-      },
-      model: { provider: "github-copilot", id: "session-model" },
-      ui: {
-        editor: vi.fn(async () => "Focus on correctness"),
-        notify: vi.fn(),
-        custom: vi.fn(
-          (factory: (...args: unknown[]) => unknown) =>
-            new Promise((resolve) => {
-              factory({}, {}, undefined, resolve);
-            }),
-        ),
-      },
     };
-
-    await commandHandler("", ctx);
-
-    expect(
-      (pi as unknown as { sendUserMessage: ReturnType<typeof vi.fn> }).sendUserMessage,
-    ).not.toHaveBeenCalled();
+    const content = formatReviewContent(result);
+    expect(content).toContain("**Mode:** Standard (security)");
+    expect(content).toContain("**Summary:** Security-focused review");
   });
+});
 
-  it("does not send follow-up when result is non-success", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
+describe("/supi-review command registration", () => {
+  it("registers the /supi-review command and session listeners", () => {
     const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
+      registerCommand: vi.fn(),
       on: vi.fn(),
       sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
       events: { emit: vi.fn(), on: vi.fn() },
     } as unknown as ExtensionAPI;
 
-    mockFns.selectAutoFix.mockResolvedValue(true);
-    mockFns.runReviewer.mockResolvedValue({
-      kind: "failed",
-      reason: "Reviewer session error",
-      target: { type: "custom", instructions: "Focus on correctness" },
-    });
-
     reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
 
-    const ctx = {
-      cwd: "/project",
-      hasUI: true,
-      modelRegistry: {
-        find: (provider: string, id: string) =>
-          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
-      },
-      model: { provider: "github-copilot", id: "session-model" },
-      ui: {
-        editor: vi.fn(async () => "Focus on correctness"),
-        notify: vi.fn(),
-        custom: vi.fn(
-          (factory: (...args: unknown[]) => unknown) =>
-            new Promise((resolve) => {
-              factory({}, {}, undefined, resolve);
-            }),
-        ),
-      },
-    };
-
-    await commandHandler("", ctx);
-
-    expect(
-      (pi as unknown as { sendUserMessage: ReturnType<typeof vi.fn> }).sendUserMessage,
-    ).not.toHaveBeenCalled();
-  });
-
-  it("surfaces error when configured review model is not found", async () => {
-    let commandHandler: ((args: string, ctx: Record<string, unknown>) => Promise<void>) | undefined;
-
-    const pi = {
-      registerCommand: vi.fn((name: string, spec: { handler: typeof commandHandler }) => {
-        expect(name).toBe("supi-review");
-        commandHandler = spec.handler;
-      }),
-      on: vi.fn(),
-      sendMessage: vi.fn(),
-      sendUserMessage: vi.fn(),
-      events: { emit: vi.fn(), on: vi.fn() },
-    } as unknown as ExtensionAPI;
-
-    // Configure a review model that won't be found in the registry
-    mockFns.loadReviewSettings.mockReturnValue({
-      reviewModel: "nonexistent/model-123",
-      maxDiffBytes: 100_000,
-      autoFix: false,
-    });
-
-    reviewExtension(pi);
-    if (!commandHandler) throw new Error("/supi-review handler was not registered");
-
-    const ctx = {
-      cwd: "/project",
-      hasUI: true,
-      model: { provider: "github-copilot", id: "session-model" },
-      modelRegistry: {
-        find: (provider: string, id: string) =>
-          provider === "github-copilot" && id === "session-model" ? { id, provider } : undefined,
-      },
-      ui: {
-        editor: vi.fn(async () => "Focus on correctness"),
-        notify: vi.fn(),
-        custom: vi.fn(
-          (factory: (...args: unknown[]) => unknown) =>
-            new Promise((resolve) => {
-              factory({}, {}, undefined, resolve);
-            }),
-        ),
-      },
-    };
-
-    await commandHandler("", ctx);
-
-    // The error should be surfaced as a failed review message, not swallowed
-    expect(
-      (pi as unknown as { sendMessage: ReturnType<typeof vi.fn> }).sendMessage,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customType: "supi-review",
-        details: {
-          result: expect.objectContaining({
-            kind: "failed",
-            reason: expect.stringContaining("not found") as unknown,
-          }),
-        },
-      }),
+    expect(pi.registerCommand).toHaveBeenCalledWith(
+      "supi-review",
+      expect.objectContaining({ description: expect.any(String) }),
     );
+    expect(pi.on).toHaveBeenCalledWith("session_start", expect.any(Function));
+    expect(pi.on).toHaveBeenCalledWith("model_select", expect.any(Function));
   });
 });

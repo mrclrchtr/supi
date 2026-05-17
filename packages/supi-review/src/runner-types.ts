@@ -1,6 +1,6 @@
 import type { Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type { ReviewTarget } from "./types.ts";
+import type { ReviewBrief, ReviewTarget } from "./types.ts";
 
 /** Progress state exposed by the runner for widget integration. */
 export interface ReviewProgress {
@@ -24,6 +24,8 @@ export interface ReviewerInvocation {
   cwd: string;
   signal?: AbortSignal;
   target: ReviewTarget;
+  /** The approved review brief used to generate the prompt. */
+  brief?: ReviewBrief;
   timeoutMs?: number;
   /** Callback for tool activity events (starts/ends) for widget integration. */
   onToolActivity?: (event: { toolName: string; phase: "start" | "end" }) => void;

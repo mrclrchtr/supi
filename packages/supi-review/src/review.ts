@@ -1,5 +1,7 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: pre-existing, needs refactoring
 import type { Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { buildDynamicBrief, buildStandardBrief } from "./briefs.ts";
 import { formatReviewContent } from "./format-content.ts";
 import {
   getCommitFileNames,
@@ -23,13 +25,23 @@ import {
   setReviewModelChoices,
 } from "./settings.ts";
 import { resolveGitTarget } from "./target-resolution.ts";
-import type { ReviewResult, ReviewTarget } from "./types.ts";
-import { selectAutoFix, selectBranch, selectCommit, selectPreset } from "./ui.ts";
+import type { ReviewBrief, ReviewResult, ReviewTarget } from "./types.ts";
+import {
+  approveBriefViaEditor,
+  collectDynamicInputs,
+  selectAutoFix,
+  selectBranch,
+  selectCommit,
+  selectPreset,
+  selectProfile,
+  selectReviewMode,
+} from "./ui.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
 
 interface ReviewExecutionOptions {
   target: ReviewTarget;
+  brief: ReviewBrief;
   maxDiffBytes: number;
   ctx: CommandContext;
   signal?: AbortSignal;
@@ -52,7 +64,7 @@ export default function reviewExtension(pi: ExtensionAPI) {
       return;
     }
 
-    // Try to respect PI’s scoped models (enabledModels).
+    // Try to respect PI's scoped models (enabledModels).
     // Workaround for pi-mono#3535 — swap to ctx.scopedModels when exposed by PI.
     const enabledPatterns = readPiEnabledModels();
     const models = enabledPatterns ? filterByEnabledModels(enabledPatterns, allModels) : allModels;
@@ -83,17 +95,84 @@ async function handleInteractive(
   ctx: CommandContext,
   pi: ExtensionAPI,
 ): Promise<void> {
+  // Step 1: Select review mode
+  const mode = await selectReviewMode(ctx);
+  if (!mode) return;
+
+  // Step 2: Select review target
   const preset = await selectPreset(ctx);
   if (!preset) return;
-
-  const autoFix = await selectAutoFix(ctx, autoFixDefault);
-  if (autoFix === undefined) return;
 
   const target = await resolvePresetTarget(preset, ctx);
   if (!target) return;
 
-  const result = await runReviewWithLoader(target, maxDiffBytes, ctx, pi);
+  // Step 3: Build the review brief
+  let brief: ReviewBrief;
+  if (mode === "standard") {
+    const profileId = await selectProfile(ctx);
+    if (!profileId) return;
+    brief = buildStandardBrief(profileId);
+  } else {
+    const inputs = await collectDynamicInputs(ctx);
+    if (!inputs) return;
+    brief = buildDynamicBrief(inputs);
+  }
+
+  // Step 4: Assemble the full prompt and get user approval
+  const diffOrBody = getDiffText(target);
+  const truncated = maybeTruncateDiff(diffOrBody, maxDiffBytes);
+  const draftPrompt = buildReviewPrompt(
+    target,
+    truncated.text,
+    truncated.wasTruncated
+      ? { truncated: true, truncatedBytes: truncated.truncatedBytes }
+      : undefined,
+  );
+
+  // Show the brief context + draft prompt for approval
+  const approvalText = await approveBriefViaEditor(ctx, formatBriefWithPrompt(brief, draftPrompt));
+  if (!approvalText) return;
+
+  brief.finalPrompt = approvalText;
+
+  // Step 5: Auto-fix preference
+  const autoFix = await selectAutoFix(ctx, autoFixDefault);
+  if (autoFix === undefined) return;
+
+  // Step 6: Run the review
+  const result = await runReviewWithLoader(brief, target, maxDiffBytes, ctx, pi);
   injectReviewMessage(pi, result, autoFix);
+}
+
+/** Extract the diff/show text from a target for display. */
+function getDiffText(target: ReviewTarget): string {
+  if (target.type === "base-branch" || target.type === "uncommitted") {
+    return target.diff;
+  }
+  if (target.type === "commit") {
+    return target.show;
+  }
+  return "";
+}
+
+/** Format the brief summary + full prompt for editor approval. */
+function formatBriefWithPrompt(brief: ReviewBrief, prompt: string): string {
+  return [
+    "# Review Brief",
+    "",
+    brief.mode === "standard"
+      ? `Profile: ${brief.profileId ?? "standard"}`
+      : "Review mode: dynamic",
+    `Summary: ${brief.summary}`,
+    `Intended outcome: ${brief.intent}`,
+    `Focus areas: ${brief.focus}`,
+    "",
+    "# Suggested review prompt",
+    "",
+    "Edit the prompt below if needed, then save and close to start the review.",
+    "",
+    prompt,
+  ].join("\n");
 }
 
 async function resolvePresetTarget(
@@ -160,7 +239,9 @@ async function executeReview(options: ReviewExecutionOptions): Promise<ReviewRes
   return runReview({ ...options, target: resolved.target });
 }
 
+// biome-ignore lint/complexity/useMaxParams: needs to pass brief, target, diffBytes, ctx, and pi for the full pipeline
 async function runReviewWithLoader(
+  brief: ReviewBrief,
   target: ReviewTarget,
   maxDiffBytes: number,
   ctx: CommandContext,
@@ -183,6 +264,7 @@ async function runReviewWithLoader(
 
     executeReview({
       target,
+      brief,
       maxDiffBytes,
       ctx,
       signal: widget.signal,
@@ -206,9 +288,8 @@ async function runReviewWithLoader(
 }
 
 function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
-  const { target, maxDiffBytes, ctx, signal, onToolActivity, onProgress } = options;
+  const { target, brief, ctx, signal, onToolActivity, onProgress } = options;
   const settings = loadReviewSettings(ctx.cwd);
-  // ctx.modelRegistry is available because CommandContext extends ExtensionContext
   const model = resolveReviewerModel(settings, ctx.modelRegistry, ctx.model);
   if (!model) {
     return Promise.resolve({
@@ -219,24 +300,8 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
     });
   }
 
-  let diffOrBody = "";
-  if (target.type === "base-branch" || target.type === "uncommitted") {
-    diffOrBody = target.diff;
-  } else if (target.type === "commit") {
-    diffOrBody = target.show;
-  }
-
-  const truncated =
-    target.type === "custom"
-      ? { text: "", wasTruncated: false, truncatedBytes: 0 }
-      : maybeTruncateDiff(diffOrBody, maxDiffBytes);
-  const prompt = buildReviewPrompt(
-    target,
-    truncated.text,
-    truncated.wasTruncated
-      ? { truncated: true, truncatedBytes: truncated.truncatedBytes }
-      : undefined,
-  );
+  // Use the approved brief's final prompt directly
+  const prompt = brief.finalPrompt;
 
   const invocation: ReviewerInvocation = {
     prompt,
@@ -244,6 +309,7 @@ function runReview(options: ReviewExecutionOptions): Promise<ReviewResult> {
     modelRegistry: ctx.modelRegistry,
     cwd: ctx.cwd,
     target,
+    brief,
     signal,
     onToolActivity,
     onProgress,

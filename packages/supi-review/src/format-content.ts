@@ -39,11 +39,22 @@ function formatTimeoutContent(result: Extract<ReviewResult, { kind: "timeout" }>
 function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>): string {
   const output = result.output;
   const confidencePercent = Math.round(output.overall_confidence_score * 100);
-  const lines = [
-    "## Code Review Result",
-    "",
-    `Verdict: ${output.overall_correctness} (confidence: ${confidencePercent}%)`,
-  ];
+  const lines: string[] = ["## Code Review Result"];
+
+  // Show the review request context (if brief is available)
+  if (result.brief) {
+    lines.push("", "### Review Requested", "");
+    if (result.brief.mode === "standard" && result.brief.profileId) {
+      lines.push(`**Mode:** Standard (${result.brief.profileId})`);
+    } else {
+      lines.push("**Mode:** Dynamic");
+    }
+    lines.push(`**Summary:** ${result.brief.summary}`);
+    lines.push(`**Intended outcome:** ${result.brief.intent}`);
+    lines.push(`**Focus areas:** ${result.brief.focus}`);
+  }
+
+  lines.push("", `Verdict: ${output.overall_correctness} (confidence: ${confidencePercent}%)`);
 
   if (output.findings.length > 0) {
     lines.push("", "### Findings", "", ...formatFindings(output.findings));

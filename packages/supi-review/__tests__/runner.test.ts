@@ -464,4 +464,85 @@ describe("runReviewer", () => {
       expect(result.reason).toContain("did not call submit_review");
     }
   });
+
+  it("preserves brief metadata in the result when provided", async () => {
+    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
+      setTimeout(() => {
+        listener({ type: "agent_end", messages: [] });
+      }, 10);
+      return vi.fn();
+    });
+
+    const brief = {
+      mode: "dynamic" as const,
+      title: "Review: auth middleware",
+      summary: "Added auth middleware",
+      intent: "Secure the API",
+      focus: "Security",
+      finalPrompt: "review this",
+    };
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model: mockModel,
+      cwd: "/tmp",
+      target: defaultTarget,
+      brief,
+    });
+
+    await vi.advanceTimersByTimeAsync(5);
+
+    const submitReviewTool = capturedCustomTools[0];
+    expect(submitReviewTool).toBeDefined();
+
+    const reviewOutput = defaultReviewOutput();
+    await submitReviewTool.execute("toolcall-1", reviewOutput);
+
+    await vi.advanceTimersByTimeAsync(50);
+    const result = await resultPromise;
+
+    expect(result.kind).toBe("success");
+    if (result.kind === "success") {
+      expect(result.brief).toBeDefined();
+      expect(result.brief?.title).toBe("Review: auth middleware");
+    }
+  });
+
+  it("includes brief on failed result when provided", async () => {
+    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
+      setTimeout(() => {
+        listener({ type: "agent_end", messages: [] });
+      }, 10);
+      return vi.fn();
+    });
+
+    mockSession.messages = [];
+
+    const brief = {
+      mode: "standard" as const,
+      title: "Security Review",
+      summary: "Security-focused review",
+      intent: "Check for security issues",
+      focus: "Security",
+      profileId: "security",
+      finalPrompt: "review this",
+    };
+
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model: mockModel,
+      cwd: "/tmp",
+      target: defaultTarget,
+      brief,
+    });
+
+    await vi.advanceTimersByTimeAsync(50);
+    const result = await resultPromise;
+
+    expect(result.kind).toBe("failed");
+    if (result.kind === "failed") {
+      expect(result.brief).toBeDefined();
+      expect(result.brief?.title).toBe("Security Review");
+    }
+  });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { assembleReviewerPrompt } from "../src/briefs.ts";
 import { buildReviewPrompt } from "../src/prompts.ts";
 import type { ReviewTarget } from "../src/types.ts";
 
@@ -148,5 +149,55 @@ describe("buildReviewPrompt preamble with diff stats", () => {
       truncatedBytes: 42,
     });
     expect(result).toContain("42 bytes omitted");
+  });
+});
+
+describe("assembleReviewerPrompt (brief + target)", () => {
+  const target: ReviewTarget = { type: "uncommitted", diff: sampleDiff };
+
+  it("includes the summary from the brief in the prompt", () => {
+    const brief = {
+      mode: "dynamic" as const,
+      title: "Review: login fix",
+      summary: "Fixed login validation",
+      intent: "Prevent empty credentials",
+      focus: "Edge cases, error messages",
+      finalPrompt: "",
+    };
+    const prompt = assembleReviewerPrompt(brief, target, sampleDiff);
+    expect(prompt).toContain("Fixed login validation");
+    expect(prompt).toContain("Prevent empty credentials");
+    expect(prompt).toContain("Edge cases, error messages");
+  });
+
+  it("includes the diff block after the brief", () => {
+    const brief = {
+      mode: "dynamic" as const,
+      title: "Test",
+      summary: "Test",
+      intent: "Test",
+      focus: "Test",
+      finalPrompt: "",
+    };
+    const prompt = assembleReviewerPrompt(brief, target, sampleDiff);
+    expect(prompt).toContain("```diff");
+    expect(prompt).toContain(sampleDiff);
+  });
+
+  it("includes custom instructions for custom targets", () => {
+    const customTarget: ReviewTarget = {
+      type: "custom",
+      instructions: "Review the overall architecture",
+    };
+    const brief = {
+      mode: "dynamic" as const,
+      title: "Architecture review",
+      summary: "Architecture review",
+      intent: "Check design patterns",
+      focus: "Architecture",
+      finalPrompt: "",
+    };
+    const prompt = assembleReviewerPrompt(brief, customTarget, "");
+    expect(prompt).toContain("Review the overall architecture");
   });
 });

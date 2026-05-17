@@ -299,12 +299,13 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
     cwd,
     signal,
     target,
+    brief,
     onToolActivity,
     onProgress,
     timeoutMs = DEFAULT_TIMEOUT_MS,
   } = inv;
   if (signal?.aborted) {
-    return { kind: "canceled", target };
+    return { kind: "canceled", target, brief };
   }
   // Holder for the submit_review tool result
   const resultHolder: { value: ReviewOutputEvent | undefined } = { value: undefined };
@@ -314,7 +315,7 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
     session = await createReviewerSession(model, cwd, submitReviewTool, modelRegistry);
   } catch (err) {
     const reason = `Failed to create reviewer session: ${err instanceof Error ? err.message : String(err)}`;
-    return { kind: "failed" as const, reason, target };
+    return { kind: "failed" as const, reason, target, brief };
   }
   const progress: ReviewProgress = { turns: 0, toolUses: 0, activities: [], tokens: undefined };
   const state = { settled: false };
@@ -324,7 +325,7 @@ export async function runReviewer(inv: ReviewerInvocation): Promise<ReviewResult
     state.settled = true;
     cancelTeardown?.();
     session.dispose();
-    return result;
+    return brief ? { ...result, brief } : result;
   };
   return new Promise<ReviewResult>((resolve) => {
     const timeoutRef = {
