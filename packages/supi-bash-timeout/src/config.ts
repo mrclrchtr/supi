@@ -1,4 +1,4 @@
-import { loadSupiConfig } from "@mrclrchtr/supi-core";
+import { loadSupiConfig } from "@mrclrchtr/supi-core/api";
 
 export interface BashTimeoutConfig {
   defaultTimeout: number;

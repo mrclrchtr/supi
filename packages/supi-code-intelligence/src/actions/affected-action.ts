@@ -2,7 +2,7 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: file-level and single-target affected flows share helpers to keep the blast-radius logic in one place
 
 import * as path from "node:path";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp";
+import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../architecture.ts";
 import {
   appendPrioritySignalsSection,

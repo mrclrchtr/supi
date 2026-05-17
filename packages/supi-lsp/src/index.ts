@@ -1,4 +1,4 @@
-// Public library entrypoint for @mrclrchtr/supi-lsp.
+// Public library entrypoint for @mrclrchtr/supi-lsp/api.
 // Import from the package root to reuse session-scoped LSP services
 // without reaching into private implementation files.
 

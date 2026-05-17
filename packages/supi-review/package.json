@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-review",
   "version": "1.2.0",
-  "description": "SuPi Review extension — structured code review via /supi-review command",
+  "description": "SuPi Review extension \u2014 structured code review via /supi-review command",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -50,8 +50,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/review.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }

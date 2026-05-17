@@ -2,7 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
+import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import { buildArchitectureModel, findModuleForPath } from "../architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import { normalizePath } from "../search-helpers.ts";

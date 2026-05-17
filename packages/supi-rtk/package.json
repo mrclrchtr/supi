@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-rtk",
   "version": "1.2.0",
-  "description": "SuPi RTK extension — transparent bash command rewriting via RTK for token savings",
+  "description": "SuPi RTK extension \u2014 transparent bash command rewriting via RTK for token savings",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -39,8 +39,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/rtk.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }

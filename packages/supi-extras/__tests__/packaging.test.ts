@@ -17,8 +17,8 @@ describe("clipboard packaging", () => {
     expect((extrasPackage.dependencies as Record<string, string>).clipboardy).toBeTruthy();
   });
 
-  it("declares clipboardy for bundled @mrclrchtr/supi installs", () => {
-    expect((supiPackage.dependencies as Record<string, string>).clipboardy).toBeTruthy();
+  it("does not duplicate clipboardy in the @mrclrchtr/supi meta-package", () => {
+    expect((supiPackage.dependencies as Record<string, string>).clipboardy).toBeUndefined();
   });
 
   it("declares clipboardy on the root install surface", () => {

@@ -1,9 +1,9 @@
 // Callees action — structural outgoing call map via Tree-sitter.
 // Orchestrates target resolution and formatting; delegates grammar-aware
-// extraction to @mrclrchtr/supi-tree-sitter.
+// extraction to @mrclrchtr/supi-tree-sitter/api.
 
 import * as path from "node:path";
-import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
+import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import { resolveTarget } from "../resolve-target.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";

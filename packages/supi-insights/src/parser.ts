@@ -9,7 +9,7 @@ import type {
 } from "@earendil-works/pi-ai";
 import type { FileEntry, SessionEntry, SessionHeader } from "@earendil-works/pi-coding-agent";
 import { migrateSessionEntries, parseSessionEntries } from "@earendil-works/pi-coding-agent";
-import { getActiveBranchEntries } from "@mrclrchtr/supi-core";
+import { getActiveBranchEntries } from "@mrclrchtr/supi-core/api";
 import { diffLines } from "diff";
 import type { SessionMeta } from "./types.ts";
 import { countCharInString, getLanguageFromPath } from "./utils.ts";

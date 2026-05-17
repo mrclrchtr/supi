@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-tree-sitter",
   "version": "1.2.0",
-  "description": "SuPi Tree-sitter extension — structural AST analysis for pi",
+  "description": "SuPi Tree-sitter extension \u2014 structural AST analysis for pi",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -71,8 +71,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/tree-sitter.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }

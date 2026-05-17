@@ -6,7 +6,7 @@
 //   "fileNames": ["CLAUDE.md", "AGENTS.md"]  // context file names to look for
 // }
 
-import { loadSupiConfig } from "@mrclrchtr/supi-core";
+import { loadSupiConfig } from "@mrclrchtr/supi-core/api";
 
 export interface ClaudeMdConfig {
   /** Enable subdirectory context discovery. Default: true */

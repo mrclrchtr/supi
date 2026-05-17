@@ -13,11 +13,11 @@ import {
   loadSupiConfig,
   registerConfigSettings,
   registerContextProvider,
-} from "@mrclrchtr/supi-core";
+} from "@mrclrchtr/supi-core/api";
 import { Type } from "typebox";
-import { maybeLogLoadStatus } from "../status-log.ts";
 import { formatDataLines } from "./format.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
+import { maybeLogLoadStatus } from "./status-log.ts";
 
 const DEBUG_SECTION = "debug";
 const DEBUG_REPORT_TYPE = "supi-debug-report";

@@ -1,0 +1,28 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-17T03:00:32.878081Z"
+revision = 10
+
+[document_fingerprints]
+archive = "sha256:62500385438e7d5e591e854cfd80956e3f1171b2b178499a42255f6fa9aa5896"
+content = "sha256:2df1387bea63fa3a32d757333fc68221525c9fb99f31e05432bd541c4c11d4d7"
+
+[[tasks]]
+number = 1
+title = "Move `status-log.ts` to `src/` and update import path"
+status = "done"
+file = "packages/supi-debug/status-log.ts → packages/supi-debug/src/status-log.ts"
+verification = "pnpm vitest run packages/supi-debug/ && tar -tzf package.tgz | grep status-log"
+
+[[tasks]]
+number = 2
+title = "Make clipboardy import dynamic/lazy so extension loads gracefully"
+status = "done"
+file = "packages/supi-extras/src/clipboard.ts"
+verification = "pnpm vitest run packages/supi-extras/ && pnpm exec biome check packages/supi-extras/src/clipboard.ts"
+
+[[tasks]]
+number = 3
+title = "Verify tarball packaging pipeline produces correct artifacts"
+status = "done"
+verification = "node scripts/pack-staged.mjs packages/supi --out-dir /tmp/verify && node scripts/verify-tarball.mjs tarball"

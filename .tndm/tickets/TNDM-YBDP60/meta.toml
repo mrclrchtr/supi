@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-YBDP60"
+title = "Fix v1.2.0 packaging bugs — missing status-log.ts and clipboardy causing extension load failures"
+type = "bug"
+priority = "p1"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"

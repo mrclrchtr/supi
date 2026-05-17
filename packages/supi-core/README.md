@@ -12,7 +12,12 @@ pnpm add @mrclrchtr/supi-core
 
 ## Package role
 
-`@mrclrchtr/supi-core` is a library package. It does **not** register a pi extension and is not meant to be installed as a standalone pi package.
+`@mrclrchtr/supi-core` now has two explicit surfaces:
+
+- `@mrclrchtr/supi-core/api` — shared library helpers for other SuPi packages
+- `@mrclrchtr/supi-core/extension` — a minimal pi extension that registers `/supi-settings`
+
+`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
 
 ## What it provides
 
@@ -59,7 +64,7 @@ Main helpers:
 ## Example
 
 ```ts
-import { loadSupiConfig, registerConfigSettings, wrapExtensionContext } from "@mrclrchtr/supi-core";
+import { loadSupiConfig, registerConfigSettings, wrapExtensionContext } from "@mrclrchtr/supi-core/api";
 
 const config = loadSupiConfig("my-extension", process.cwd(), {
   enabled: true,
@@ -87,4 +92,5 @@ const message = wrapExtensionContext("my-extension", "hello", {
 
 ## Source
 
-- Main exports: `src/index.ts`
+- Library surface: `src/api.ts`
+- Extension surface: `src/extension.ts`

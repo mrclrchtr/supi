@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp";
+import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 
 export interface PrioritySignalsSummary {
   diagnosticsCount: number;

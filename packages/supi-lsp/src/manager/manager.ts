@@ -2,7 +2,7 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: LspManager stays cohesive; recovery and sync helpers are split into manager-*.ts modules.
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as projectRoots from "@mrclrchtr/supi-core";
+import * as projectRoots from "@mrclrchtr/supi-core/api";
 import { LspClient } from "../client/client.ts";
 import { getServerForFile } from "../config.ts";
 import {

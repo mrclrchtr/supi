@@ -1,4 +1,4 @@
-import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core";
+import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core/api";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import bashTimeout from "../src/bash-timeout.ts";

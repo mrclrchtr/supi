@@ -42,7 +42,7 @@ This repo has two install surfaces:
 A compact workspace overview is auto-injected on the first agent turn by `supi-code-intelligence` (`before_agent_start` → `generateOverview()`). The package list below highlights the modules most often touched in agent sessions; inspect `packages/` for the complete workspace inventory.
 
 Highlighted workspace packages:
-- `packages/supi` — meta-package wrapper entrypoints re-exporting all sub-extensions
+- `packages/supi` — meta-package with explicit `src/api.ts` + aggregated `src/extension.ts`
 - `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
 - `packages/supi-bash-timeout` — default timeout injection for `bash`
 - `packages/supi-claude-md` — subdirectory CLAUDE.md injection
@@ -57,15 +57,16 @@ Highlighted workspace packages:
 - **Production** — stable, bundled in `@mrclrchtr/supi` (`supi-core`, `supi-ask-user`, `supi-bash-timeout`, `supi-claude-md`, `supi-extras`, `supi-lsp`, `supi-tree-sitter`, `supi-code-intelligence`, `supi-debug`, `supi-context`)
 - **Beta** — experimental/niche, direct-install only (`supi-cache`, `supi-insights`, `supi-review`, `supi-rtk`, `supi-web`)
 
-**Promote to Production:** add to `dependencies`, `bundledDependencies`, `pi.extensions`, create wrapper `src/<name>.ts`, add external runtime deps, update lists above, `pnpm install`.
+**Promote to Production:** add to `dependencies`, `bundledDependencies`, and the aggregated `packages/supi/src/extension.ts` + `packages/supi/src/api.ts` surfaces, update `package.json` `pi.extensions` if needed, update lists above, `pnpm install`.
 
 **Demote to Beta:** remove from `dependencies`, `bundledDependencies`, `pi.extensions`, delete `src/<name>.ts`, prune unused external deps, update lists, `pnpm install`.
 
 ## Packaging conventions
 
+- Every published SuPi package exposes explicit `./api` and `./extension` exports. Do not rely on package-root (`.`) imports or cross-package `src/...` deep imports.
+- `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` manifest entries must remain **real package-relative file paths**. Do not replace them with `exports` aliases.
 - The published meta-package `@mrclrchtr/supi` bundles all Production sub-packages via `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
 - Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`.
-- `pnpm-workspace.yaml` uses `nodeLinker: hoisted` — required because pnpm's default `isolated` linker does not support `bundledDependencies`.
 - Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
 - For the publish pipeline (staging, manifest export, npm pack, verification), see the **Publish pipeline** section.
 
@@ -97,7 +98,7 @@ Extension packages with prompts/skills:
 SuPi extensions can register their settings with the shared registry in `supi-core`:
 
 ```ts
-import { registerSettings } from "@mrclrchtr/supi-core";
+import { registerSettings } from "@mrclrchtr/supi-core/api";
 
 registerSettings({
   id: "my-ext",
@@ -113,7 +114,7 @@ registerSettings({
 
 - Call `registerSettings()` during the extension factory function (not in async handlers)
 - The registry stores `SettingItem[]` compatible with pi-tui's `SettingsList`
-- `/supi-settings` (registered by `packages/supi/settings.ts`) renders all registered sections
+- `/supi-settings` (registered by `packages/supi-core/src/extension.ts`, or indirectly by the meta-package aggregated extension) renders all registered sections
 - Scope toggle (Tab) switches between project/global config; values are strings — extensions handle string↔typed conversion
 - `loadValues(scope, cwd)` should use raw scope reads (`loadSupiConfigForScope()`), while `loadSupiConfig()` is for merged runtime config
 - For config-backed sections, prefer `registerConfigSettings()` in `supi-core` over manual `registerSettings()` + `loadSupiConfigForScope()` + `writeSupiConfig()` wiring
@@ -133,7 +134,7 @@ registerSettings({
 - Pi core peer deps (`@earendil-works/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
 - Mark pi-provided peer deps (`@earendil-works/pi-*`, `typebox`) as optional via `peerDependenciesMeta` to prevent `npm install -g` from auto-installing them (which can pull in native addons like koffi that fail on newer Node.js versions).
 - Other runtime imports belong in `dependencies`, not `peerDependencies`.
-- For `packages/supi`, external runtime deps imported by bundled sub-packages must also be present in the meta-package's own `dependencies`; verify with `npm pack` + temp `npm install`.
+- External runtime deps belong to the standalone package that imports them. The meta-package is assembled from packed standalone tarballs, so avoid re-declaring third-party runtime deps in `packages/supi` unless the meta-package imports them directly.
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
@@ -159,10 +160,10 @@ registerSettings({
 
 Published npm tarballs must produce npm-compatible manifests because PI installs packages via `npm install`. The pipeline has four stages:
 
-1. **cp -RL staging** — `scripts/pack-staged.mjs` copies the package directory with symlink dereferencing (`cp -RL`) to resolve pnpm workspace symlinks into real directories with real versions.
-2. **Manifest export** — `scripts/staged-manifests.mjs` uses pnpm's `@pnpm/exportable-manifest` to rewrite every workspace-owned `package.json` in the staged copy: `workspace:*` → exact version (`1.5.0`), `workspace:~` → `~1.5.0`, `workspace:^` → `^1.5.0`. It also strips `devDependencies` from publish manifests so private workspace-only test utilities never leak, and preserves `bundledDependencies`.
-3. **npm pack** — The cleaned staged directory is packed with `npm pack`, producing a real npm-compatible tarball with bundled content.
-4. **Tarball verification** — `scripts/verify-tarball.mjs` rejects `../` paths and `workspace:` protocol in every packed `package.json`, then checks extraction succeeds.
+1. **Standalone staging** — `scripts/pack-staged.mjs` copies a workspace package into a clean staging directory. For ordinary packages this still dereferences workspace symlinks; for `packages/supi` it stages only the meta-package's own files.
+2. **Manifest export** — `scripts/staged-manifests.mjs` uses pnpm's `@pnpm/exportable-manifest` to rewrite staged workspace `package.json` files: `workspace:*` → exact version (`1.5.0`), `workspace:~` → `~1.5.0`, `workspace:^` → `^1.5.0`. It also strips `devDependencies` from publish manifests so private workspace-only test utilities never leak, and preserves `bundledDependencies`.
+3. **Meta-package assembly from real artifacts** — `packages/supi` is assembled from already-packed standalone Production tarballs extracted into `node_modules/`. This makes standalone tarballs the source of truth instead of raw workspace layout.
+4. **npm pack + tarball verification** — The cleaned staged directory is packed with `npm pack`, then `scripts/verify-tarball.mjs` rejects `../` paths and `workspace:` protocol in every packed `package.json` and checks extraction succeeds.
 
 Run:
 ```bash

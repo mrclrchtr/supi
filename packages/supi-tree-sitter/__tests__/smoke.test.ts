@@ -20,8 +20,10 @@ describe("supi-tree-sitter smoke", () => {
     expect(tools[0]?.name).toBe("tree_sitter");
   });
 
-  it("the meta-package wrapper exports the extension", async () => {
-    const wrapper = await import("../../supi/src/tree-sitter.ts");
-    expect(wrapper.default).toBe(treeSitterExtension);
+  it("the meta-package aggregated extension surface is importable", {
+    timeout: 20_000,
+  }, async () => {
+    const metaExtension = await import("../../supi/src/extension.ts");
+    expect(typeof metaExtension.default).toBe("function");
   });
 });

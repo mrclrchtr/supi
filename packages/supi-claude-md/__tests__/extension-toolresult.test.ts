@@ -11,7 +11,7 @@ const mockFns = vi.hoisted(() => ({
   shouldInjectSubdir: vi.fn(),
 }));
 
-vi.mock("@mrclrchtr/supi-core", () => ({
+vi.mock("@mrclrchtr/supi-core/api", () => ({
   createInputSubmenu: vi.fn(),
   getContextToken: (details: unknown) =>
     details && typeof details === "object"

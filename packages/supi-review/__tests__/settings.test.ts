@@ -5,7 +5,7 @@ import {
   clearRegisteredSettings,
   getRegisteredSettings,
   loadSupiConfig,
-} from "@mrclrchtr/supi-core";
+} from "@mrclrchtr/supi-core/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { REVIEW_DEFAULTS, registerReviewSettings, setReviewModelChoices } from "../src/settings.ts";
 

@@ -6,7 +6,7 @@ import {
   type ConfigSettingsHelpers,
   loadSupiConfig,
   registerConfigSettings,
-} from "@mrclrchtr/supi-core";
+} from "@mrclrchtr/supi-core/api";
 import type { ReviewSettings } from "./types.ts";
 
 export const REVIEW_DEFAULTS: ReviewSettings = {

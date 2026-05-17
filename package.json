@@ -2,7 +2,7 @@
   "name": "@mrclrchtr/supi-workspace",
   "version": "1.2.0",
   "private": true,
-  "description": "SuPi (Super Pi) — A curated extension stack for PI. Workspace root.",
+  "description": "SuPi (Super Pi) \u2014 A curated extension stack for PI. Workspace root.",
   "packageManager": "pnpm@11.1.1",
   "license": "MIT",
   "repository": {
@@ -16,22 +16,21 @@
   ],
   "pi": {
     "extensions": [
-      "./packages/supi-ask-user/src/ask-user.ts",
-      "./packages/supi-bash-timeout/src/index.ts",
-      "./packages/supi-claude-md/src/index.ts",
-      "./packages/supi-context/src/index.ts",
-      "./packages/supi/src/settings.ts",
-      "./packages/supi-review/src/index.ts",
-      "./packages/supi-lsp/src/lsp.ts",
-      "./packages/supi-tree-sitter/src/tree-sitter.ts",
-      "./packages/supi-cache/src/index.ts",
-      "./packages/supi-code-intelligence/src/code-intelligence.ts",
-      "./packages/supi-debug/src/index.ts",
-      "./packages/supi-web/src/web.ts",
-      "./packages/supi-web/src/docs.ts",
-      "./packages/supi-rtk/src/index.ts",
-      "./packages/supi-extras/src/index.ts",
-      "./packages/supi-insights/src/insights.ts"
+      "./packages/supi-ask-user/src/extension.ts",
+      "./packages/supi-bash-timeout/src/extension.ts",
+      "./packages/supi-claude-md/src/extension.ts",
+      "./packages/supi-context/src/extension.ts",
+      "./packages/supi-core/src/extension.ts",
+      "./packages/supi-review/src/extension.ts",
+      "./packages/supi-lsp/src/extension.ts",
+      "./packages/supi-tree-sitter/src/extension.ts",
+      "./packages/supi-cache/src/extension.ts",
+      "./packages/supi-code-intelligence/src/extension.ts",
+      "./packages/supi-debug/src/extension.ts",
+      "./packages/supi-web/src/extension.ts",
+      "./packages/supi-rtk/src/extension.ts",
+      "./packages/supi-extras/src/extension.ts",
+      "./packages/supi-insights/src/extension.ts"
     ]
   },
   "scripts": {

@@ -43,20 +43,12 @@ When installed from a local path, pi loads the working tree directly. After edit
 
 ## What the meta-package bundles
 
-`@mrclrchtr/supi` exposes wrapper entrypoints for these Production extensions:
+`@mrclrchtr/supi` now exposes two explicit surfaces:
 
-- `extras.ts` — command aliases, skill shorthand, tab spinner, prompt stash, git editor guard
-- `ask-user.ts` — structured `ask_user` tool
-- `bash-timeout.ts` — default `bash` timeout injection
-- `claude-md.ts` — subdirectory `CLAUDE.md` / `AGENTS.md` injection
-- `settings.ts` — shared `/supi-settings` command
-- `lsp.ts` — Language Server Protocol tooling
-- `debug.ts` — recent SuPi debug event inspection
-- `context.ts` — detailed context usage reporting
-- `tree-sitter.ts` — structural AST analysis
-- `code-intelligence.ts` — architecture briefs and impact analysis
+- `@mrclrchtr/supi/extension` — one aggregated extension entrypoint for the Production stack
+- `@mrclrchtr/supi/api` — a namespaced umbrella API re-exporting Production package `/api` surfaces
 
-Bundled sub-packages also contribute skills through `resources_discover`, notably `supi-claude-md`.
+Bundled sub-packages still contribute skills through `resources_discover`, notably `supi-claude-md`.
 
 ### Beta packages
 
@@ -77,7 +69,7 @@ The following packages are available as direct installs and are **not** bundled 
 | [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | extension + skills | Subdirectory context injection plus CLAUDE.md maintenance skills |
 | [`@mrclrchtr/supi-code-intelligence`](../supi-code-intelligence/README.md) | extension + library | Architecture briefs, callers/callees, impact analysis, and project indexing |
 | [`@mrclrchtr/supi-context`](../supi-context/README.md) | extension | Detailed `/supi-context` usage reporting |
-| [`@mrclrchtr/supi-core`](../supi-core/README.md) | library | Shared config, settings, context, debug, and project-root helpers |
+| [`@mrclrchtr/supi-core`](../supi-core/README.md) | library + extension | Shared config, settings, context, debug, project-root helpers, and the minimal `/supi-settings` extension |
 | [`@mrclrchtr/supi-debug`](../supi-debug/README.md) | extension | Session-local debug event inspection |
 | [`@mrclrchtr/supi-extras`](../supi-extras/README.md) | extension | Command aliases, skill shorthand, tab spinner, prompt stash, and other small utilities |
 | [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | extension + library | LSP tool, diagnostics, and reusable session-scoped LSP service |
@@ -93,6 +85,7 @@ pi install npm:@mrclrchtr/supi-bash-timeout
 pi install npm:@mrclrchtr/supi-claude-md
 pi install npm:@mrclrchtr/supi-code-intelligence
 pi install npm:@mrclrchtr/supi-context
+pi install npm:@mrclrchtr/supi-core
 pi install npm:@mrclrchtr/supi-debug
 pi install npm:@mrclrchtr/supi-extras
 pi install npm:@mrclrchtr/supi-lsp
@@ -119,11 +112,20 @@ Adds a structured tool for narrow agent-user decisions with typed questions, rec
 Keeps directory-specific `CLAUDE.md` and `AGENTS.md` guidance flowing into sessions for subdirectories below `cwd`. Root and ancestor context files remain pi-native.
 ### `lsp`
 
-Adds semantic code navigation and diagnostics through a single `lsp` tool plus inline diagnostic surfacing and `/lsp-status`. Also exports a reusable `SessionLspService` library surface from the package root so peer extensions can reuse the active LSP runtime without starting duplicate servers.
+Adds semantic code navigation and diagnostics through a single `lsp` tool plus inline diagnostic surfacing and `/lsp-status`. Peer extensions should import the reusable `SessionLspService` surface from `@mrclrchtr/supi-lsp/api`.
 
 ### `tree_sitter`
 
 Adds parser-backed structural analysis for supported file families. `node_at` and `query` work across all supported grammars; `outline`, `imports`, and `exports` are currently JavaScript / TypeScript only.
+
+## Import surfaces
+
+Published SuPi packages use explicit subpaths:
+
+- `/extension` — pi extension entrypoint
+- `/api` — programmatic package API
+
+`pi.extensions` in each package manifest still uses real file paths such as `./src/extension.ts`; the `exports` subpaths are for package consumers, not for PI manifest discovery.
 
 ### Small UX improvements
 

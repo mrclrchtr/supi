@@ -1,0 +1,57 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-17T04:40:56.790424Z"
+revision = 16
+
+[document_fingerprints]
+archive = "sha256:cd1d13e856dcc54e515bdb1564b9bf5b2e2d2d6f67ac30105591f8f1bc149187"
+content = "sha256:79fb580ddfc274d57555e738f7d943b26d99394e178f70d42d84ac918610bd51"
+
+[[tasks]]
+number = 1
+title = "Add failing packaging smoke tests for explicit `/api` and `/extension` boundaries"
+status = "done"
+file = "scripts/__tests__/package-import-smoke.test.mjs"
+verification = "`pnpm vitest run scripts/__tests__/pack-staged.test.mjs scripts/__tests__/package-import-smoke.test.mjs -v` (first run should fail for the new expectations, final run should pass)"
+
+[[tasks]]
+number = 2
+title = "Standardize the single-extension published packages on `src/api.ts` + `src/extension.ts`"
+status = "done"
+file = "packages/supi-rtk/package.json"
+verification = "pnpm vitest run packages/supi-ask-user/ packages/supi-bash-timeout/ packages/supi-cache/ packages/supi-claude-md/ packages/supi-context/ packages/supi-debug/ packages/supi-extras/ packages/supi-insights/ packages/supi-review/ packages/supi-rtk/ -v && pnpm exec tsc --noEmit -p packages/supi-ask-user/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-bash-timeout/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-cache/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-claude-md/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-context/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-debug/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-extras/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-insights/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-review/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-rtk/tsconfig.json"
+
+[[tasks]]
+number = 3
+title = "Standardize the library-bearing and multi-entry packages, including one aggregated `src/extension.ts` per package"
+status = "done"
+file = "package.json"
+verification = "pnpm vitest run packages/supi-core/ packages/supi-lsp/ packages/supi-tree-sitter/ packages/supi-code-intelligence/ packages/supi-web/ packages/supi/ -v && pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-web/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi/tsconfig.json"
+
+[[tasks]]
+number = 4
+title = "Migrate all internal source imports, test imports, and mocks to explicit `/api` or `/extension` subpaths and remove remaining deep-import wrappers"
+status = "done"
+file = "packages/supi-rtk/__tests__/extension.test.ts"
+verification = """rg -n '@mrclrchtr/supi-(core|lsp|tree-sitter|code-intelligence)(["'"'"']|$)' packages scripts --glob '!**/README.md' --glob '!**/CLAUDE.md' --glob '!**/package.json' && exit 1 || true; rg -n '@mrclrchtr/supi-[^/[:space:]"'"'"']+/src/' packages scripts && exit 1 || true; pnpm vitest run packages/supi-bash-timeout/ packages/supi-cache/ packages/supi-claude-md/ packages/supi-context/ packages/supi-debug/ packages/supi-extras/ packages/supi-insights/ packages/supi-lsp/ packages/supi-code-intelligence/ packages/supi-review/ packages/supi-rtk/ -v"""
+
+[[tasks]]
+number = 5
+title = "Rework the meta-package pack/publish pipeline so `packages/supi` is assembled from standalone tarballs instead of a raw workspace copy"
+status = "done"
+file = "scripts/__tests__/verify-tarball.test.mjs"
+verification = "pnpm vitest run scripts/__tests__/pack-staged.test.mjs scripts/__tests__/verify-tarball.test.mjs scripts/__tests__/package-import-smoke.test.mjs -v && pnpm pack:check && pnpm pack:verify"
+
+[[tasks]]
+number = 6
+title = "Update user-facing and maintainer-facing docs to describe the explicit `/api` + `/extension` model and the PI-discovery guardrail"
+status = "done"
+file = "packages/supi-web/CLAUDE.md"
+verification = """test-exempt (docs-only). `rg -n 'from "@mrclrchtr/supi-(lsp|tree-sitter|code-intelligence|core)"|from ''@mrclrchtr/supi-(lsp|tree-sitter|code-intelligence|core)''' CLAUDE.md packages/*/README.md packages/*/CLAUDE.md && exit 1 || true; rg -n '@mrclrchtr/supi-(lsp|tree-sitter|code-intelligence|core)/(api|extension)' CLAUDE.md packages/*/README.md packages/*/CLAUDE.md`"""
+
+[[tasks]]
+number = 7
+title = "Run the full release-surface verification sweep from source, tarballs, and workspace install surfaces"
+status = "done"
+file = "package.json"
+verification = "pnpm verify && pnpm vitest run scripts/__tests__/package-import-smoke.test.mjs -v && node scripts/publish.mjs packages/supi && node scripts/publish.mjs packages/supi-lsp && node scripts/publish.mjs packages/supi-tree-sitter && node scripts/publish.mjs packages/supi-code-intelligence"

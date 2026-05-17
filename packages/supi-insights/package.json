@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-insights",
   "version": "1.2.0",
-  "description": "SuPi Insights extension — generate usage reports analyzing your PI sessions",
+  "description": "SuPi Insights extension \u2014 generate usage reports analyzing your PI sessions",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -48,8 +48,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/insights.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }

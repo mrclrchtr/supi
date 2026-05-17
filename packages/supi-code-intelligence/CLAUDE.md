@@ -1,6 +1,10 @@
 # @mrclrchtr/supi-code-intelligence
 
-Architecture briefs, caller/callee analysis, impact assessment, and pattern search for pi. Registers the `code_intel` tool.
+Architecture briefs, caller/callee analysis, impact assessment, and pattern search for pi.
+
+Surfaces:
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the `code_intel` tool
+- `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
 
 ## Commands
 
@@ -155,9 +159,9 @@ function writeJson(dir: string, file: string, data: unknown) {
 
 ## Dependencies
 
-- **`@mrclrchtr/supi-core`** — `findProjectRoot`, `walkProject`, `isWithinOrEqual`
-- **`@mrclrchtr/supi-lsp`** — `getSessionLspService`, `SessionLspService`, `Position`
-- **`@mrclrchtr/supi-tree-sitter`** — `createTreeSitterSession` (for `callees` and anchored brief outline)
+- **`@mrclrchtr/supi-core/api`** — `findProjectRoot`, `walkProject`, `isWithinOrEqual`
+- **`@mrclrchtr/supi-lsp/api`** — `getSessionLspService`, `SessionLspService`, `Position`
+- **`@mrclrchtr/supi-tree-sitter/api`** — `createTreeSitterSession` (for `callees` and anchored brief outline)
 - **`@earendil-works/pi-ai`** — `StringEnum` for TypeScript enum type generation
 - **`@earendil-works/pi-coding-agent`** — `ExtensionAPI`, `BeforeAgentStartEventResult`
 - **`typebox`** — `Type.Object(...)` for tool parameter schema

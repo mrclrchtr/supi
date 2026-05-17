@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-extras",
   "version": "1.2.0",
-  "description": "SuPi extras — command aliases, skill shorthand, tab spinner, /supi-stash prompt stash with TUI overlay, and other small utilities",
+  "description": "SuPi extras \u2014 command aliases, skill shorthand, tab spinner, /supi-stash prompt stash with TUI overlay, and other small utilities",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -30,7 +30,7 @@
     "vitest": "4.1.6",
     "@mrclrchtr/supi-test-utils": "workspace:*"
   },
-  "main": "src/index.ts",
+  "main": "src/api.ts",
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
@@ -45,7 +45,12 @@
   },
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./src/extension.ts"
     ]
+  },
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
   }
 }

@@ -1,5 +1,5 @@
 import type { SettingItem } from "@earendil-works/pi-tui";
-import { createInputSubmenu, registerConfigSettings } from "@mrclrchtr/supi-core";
+import { createInputSubmenu, registerConfigSettings } from "@mrclrchtr/supi-core/api";
 import { BASH_TIMEOUT_DEFAULTS, type BashTimeoutConfig } from "./config.ts";
 
 export function registerBashTimeoutSettings(): void {

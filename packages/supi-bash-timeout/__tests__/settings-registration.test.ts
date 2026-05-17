@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core";
+import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { registerBashTimeoutSettings } from "../src/settings-registration.ts";
 

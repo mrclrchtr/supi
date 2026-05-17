@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core";
+import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core/api";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   buildProjectGuidelines,

@@ -20,8 +20,8 @@ const mockLspFns = vi.hoisted(() => ({
   getSessionLspService: vi.fn<(cwd: string) => unknown>(),
 }));
 
-vi.mock("@mrclrchtr/supi-lsp", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp")>();
+vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
   return {
     ...actual,
     getSessionLspService: mockLspFns.getSessionLspService,

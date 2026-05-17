@@ -5,7 +5,11 @@ query library documentation via Context7 using `web_docs_search` + `web_docs_fet
 
 ## Scope
 
-`@mrclrchtr/supi-web` registers three agent-callable tools:
+`@mrclrchtr/supi-web` now has two explicit surfaces:
+- `@mrclrchtr/supi-web/extension` → `src/extension.ts` registers all three tools
+- `@mrclrchtr/supi-web/api` → `src/api.ts` / `src/index.ts` exposes the programmatic helpers
+
+The package registers three agent-callable tools:
 
 - `web_fetch_md` — fetches an `http(s)` URL and returns clean Markdown
 - `web_docs_search` — searches Context7 for libraries by name, returns metadata table
@@ -15,13 +19,15 @@ query library documentation via Context7 using `web_docs_search` + `web_docs_fet
 
 ```
 src/
+├── api.ts             # Public package exports
+├── extension.ts       # Aggregated extension entrypoint — registers all tools
 ├── web.ts             # Extension factory — registers web_fetch_md tool
 ├── fetch.ts           # HTTP logic: HEAD negotiation, range sniff, sibling probe, full GET
 ├── convert.ts         # HTML → Markdown: JSDOM + Readability + Turndown + link absolutization
 ├── temp-file.ts       # Temporary file helper for large content
 ├── context7-client.ts # Thin wrapper around @upstash/context7-sdk (lazy init, error mapping)
 ├── docs.ts            # Extension factory — registers web_docs_search + web_docs_fetch tools
-└── index.ts           # Public API exports
+└── index.ts           # Programmatic API exports reused by src/api.ts
 ```
 
 ## Content negotiation pipeline (web_fetch_md)

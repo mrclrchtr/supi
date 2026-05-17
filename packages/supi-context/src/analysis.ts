@@ -9,7 +9,7 @@ import {
   getLatestCompactionEntry,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { getRegisteredContextProviders } from "@mrclrchtr/supi-core";
+import { getRegisteredContextProviders } from "@mrclrchtr/supi-core/api";
 import { deriveOptionsFromSystemPrompt, extractGuidelinesSection } from "./prompt-inference.ts";
 
 type AgentMessage = Parameters<typeof estimateTokens>[0];

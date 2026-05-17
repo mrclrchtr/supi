@@ -1,4 +1,4 @@
-import { findProjectRoot } from "@mrclrchtr/supi-core";
+import { findProjectRoot } from "@mrclrchtr/supi-core/api";
 import { describe, expect, it } from "vitest";
 import {
   commandExists,

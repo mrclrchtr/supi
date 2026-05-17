@@ -2,7 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { loadSupiConfigForScope } from "@mrclrchtr/supi-core";
+import { loadSupiConfigForScope } from "@mrclrchtr/supi-core/api";
 import type { LspConfig, ServerConfig } from "./types.ts";
 
 // Load defaults at module level — resolve relative to this file.

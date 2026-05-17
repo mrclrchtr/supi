@@ -2,9 +2,9 @@
 
 ## Scope
 
-`@mrclrchtr/supi-tree-sitter` has two surfaces:
-- `tree-sitter.ts` — registers the `tree_sitter` tool for pi
-- `index.ts` — exports `createTreeSitterSession()` and shared types for other SuPi packages
+`@mrclrchtr/supi-tree-sitter` has two explicit surfaces:
+- `@mrclrchtr/supi-tree-sitter/extension` → `src/extension.ts` → registers the `tree_sitter` tool for pi
+- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports `createTreeSitterSession()` and shared types for other SuPi packages
 
 The package is designed as a standalone structural-analysis substrate. It does not depend on `supi-lsp` and must remain correct when installed independently.
 

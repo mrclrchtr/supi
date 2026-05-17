@@ -5,7 +5,7 @@ import {
   clearRegisteredSettings,
   getRegisteredSettings,
   loadSupiConfig,
-} from "@mrclrchtr/supi-core";
+} from "@mrclrchtr/supi-core/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getLspDisabledMessage,

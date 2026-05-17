@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-lsp",
   "version": "1.2.0",
-  "description": "SuPi LSP extension — Language Server Protocol integration for pi",
+  "description": "SuPi LSP extension \u2014 Language Server Protocol integration for pi",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -52,8 +52,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/lsp.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }

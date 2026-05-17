@@ -23,7 +23,7 @@ This file provides guidance to Claude Code when working in `packages/supi/`.
 
 ## Key responsibilities
 
-Each `src/*.ts` is a thin wrapper that imports and re-exports the corresponding sub-package's default export. pi's `package.json` `extensions` array points to these wrappers so the published tarball resolves dependencies from its own `node_modules` rather than relying on workspace layout.
+`src/extension.ts` is the single aggregated extension entrypoint for the Production stack. `src/api.ts` is the explicit umbrella API surface, re-exporting Production package `/api` surfaces under namespaced exports.
 
 Sub-packages self-register prompts, skills, and themes via `resources_discover`. The meta-package does not need static `pi.prompts` or `pi.skills` entries.
 
@@ -37,9 +37,8 @@ pnpm exec biome check packages/supi/
 
 ## Packaging gotchas
 
-- `pi.extensions` entries are package-relative paths.
-- Keep small local wrapper `.ts` files in this package so published installs do not depend on nested workspace `node_modules` layout.
-- All sub-packages must be listed in both `dependencies` and `bundledDependencies`. pi's [packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md) require bundling because pi loads packages with separate module roots.
-- External runtime dependencies imported by a bundled sub-package must also be present in `packages/supi/package.json` `dependencies`; the published tarball includes the sub-package source, but Node resolves those imports from `@mrclrchtr/supi`'s own `node_modules`.
-- The workspace uses `nodeLinker: hoisted` (in `pnpm-workspace.yaml`) because pnpm's default isolated linker does not support `bundledDependencies`.
-- `@mrclrchtr/supi-tree-sitter` venders all grammar WASM files in `resources/`. Its native `tree-sitter-*` deps are `devDependencies` only — do NOT add them to the meta-package's `dependencies`. Only `web-tree-sitter` is a runtime dep of `supi-tree-sitter` and must remain in the meta-package's `dependencies`.
+- `pi.extensions` entries are package-relative **file paths**. Do not point them at `exports` aliases like `./extension`.
+- Consumers import explicit subpaths only: `/extension` for extension entrypoints and `/api` for programmatic APIs. Do not use package-root (`.`) imports or `src/...` deep imports.
+- All Production sub-packages must be listed in both `dependencies` and `bundledDependencies`. pi's [packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md) require bundling because pi loads packages with separate module roots.
+- The meta-package is assembled from packed standalone tarballs extracted into `node_modules/`. Treat standalone tarballs as the source of truth; do not depend on raw workspace `node_modules` layout.
+- External runtime deps belong in the standalone package that imports them. `packages/supi/package.json` should only list third-party runtime deps that the meta-package itself imports directly.

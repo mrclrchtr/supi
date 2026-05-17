@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-cache",
   "version": "1.2.0",
-  "description": "SuPi Cache — prompt cache health monitoring and cross-session forensics",
+  "description": "SuPi Cache \u2014 prompt cache health monitoring and cross-session forensics",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -51,8 +51,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/index.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }

@@ -1,7 +1,7 @@
 // Cache-monitor settings registration for the supi settings registry.
 
-import type { ConfigSettingsHelpers } from "@mrclrchtr/supi-core";
-import { registerConfigSettings } from "@mrclrchtr/supi-core";
+import type { ConfigSettingsHelpers } from "@mrclrchtr/supi-core/api";
+import { registerConfigSettings } from "@mrclrchtr/supi-core/api";
 import { CACHE_MONITOR_DEFAULTS } from "./config.ts";
 
 const THRESHOLD_VALUES = ["5", "10", "15", "20", "25", "30", "35", "40", "45", "50"];

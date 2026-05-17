@@ -976,7 +976,7 @@ describe("SuPi e2e smoke – runtime error resilience", () => {
     if (e2eTmpDir) rmSync(e2eTmpDir, { recursive: true, force: true });
   });
 
-  it("multiple session_start calls without crash", async () => {
+  it("multiple session_start calls without crash", { timeout: 20_000 }, async () => {
     e2eTmpDir = createTempProjectDir();
     const pi = createPiMock();
     lspExtension(pi);

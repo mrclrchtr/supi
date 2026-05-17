@@ -5,7 +5,7 @@ import {
   type ConfigSettingsHelpers,
   createInputSubmenu,
   registerConfigSettings,
-} from "@mrclrchtr/supi-core";
+} from "@mrclrchtr/supi-core/api";
 import { CLAUDE_MD_DEFAULTS, type ClaudeMdConfig } from "./config.ts";
 
 // ── Settings registration ────────────────────────────────────

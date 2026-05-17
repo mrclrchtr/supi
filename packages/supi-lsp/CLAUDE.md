@@ -4,7 +4,9 @@ This file contains non-obvious guidance for future work in `packages/supi-lsp/`.
 
 ## Scope
 
-`@mrclrchtr/supi-lsp` registers the `lsp` tool, LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer. It also exposes a public reusable library surface from the package root. The main entrypoints are `lsp.ts` for extension wiring, lifecycle, commands, and resources, and `index.ts` for the public API (`getSessionLspService`, `SessionLspService`, exported types, and session-scoped implementation lookup).
+`@mrclrchtr/supi-lsp` has two explicit surfaces:
+- `@mrclrchtr/supi-lsp/extension` → `src/extension.ts` → registers the `lsp` tool, LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer
+- `@mrclrchtr/supi-lsp/api` → `src/api.ts` → reusable library surface (`getSessionLspService`, `SessionLspService`, exported types, and session-scoped implementation lookup)
 
 ## Tool actions overview
 
@@ -32,7 +34,7 @@ Run `pnpm exec biome check packages/supi-lsp && pnpm vitest run packages/supi-ls
 
 Stable LSP guidance belongs in tool `promptGuidelines`. `before_agent_start` should inject only dynamic XML-framed diagnostic messages and should not mutate `systemPrompt`. `lsp-context` messages keep the renderer summary in `content` and stash raw XML in `details.promptContent`; the `context` hook restores `promptContent` before the model sees it. `buildProjectGuidelines()` is applied by re-registering the `lsp` tool at `session_start`, so `/reload` is required before newly scanned server guidance appears.
 
-`/lsp-status` must merge proactive scan roots with lazily started clients because the session-start scan snapshot is incomplete. Tool activation state is persisted with `pi.appendEntry()` as `lsp-active` entries and restored by inspecting the active branch during `session_tree`. The public library surface in `index.ts` must not import extension-only modules such as `lsp.ts`, `renderer.ts`, or `ui.ts`. Keep that root API limited to `service-registry.ts`, `client.ts`, `manager.ts`, and `types.ts`. `SessionLspService` is the stable wrapper and should not leak `LspManager` internals. The session registry is process-global through `Symbol.for("@mrclrchtr/supi-lsp/session-registry")`, keyed by normalized `cwd`, updated synchronously in `session_start` and `session_shutdown`, and read synchronously by `getSessionLspService(cwd)`.
+`/lsp-status` must merge proactive scan roots with lazily started clients because the session-start scan snapshot is incomplete. Tool activation state is persisted with `pi.appendEntry()` as `lsp-active` entries and restored by inspecting the active branch during `session_tree`. The library surface behind `src/api.ts` / `src/index.ts` must not import extension-only modules such as `lsp.ts`, `renderer.ts`, or `ui.ts`. Keep the `/api` surface limited to `service-registry.ts`, `client.ts`, `manager.ts`, and `types.ts`. `SessionLspService` is the stable wrapper and should not leak `LspManager` internals. The session registry is process-global through `Symbol.for("@mrclrchtr/supi-lsp/session-registry")`, keyed by normalized `cwd`, updated synchronously in `session_start` and `session_shutdown`, and read synchronously by `getSessionLspService(cwd)`.
 
 ## Diagnostic behavior gotchas
 

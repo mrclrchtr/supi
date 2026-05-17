@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi",
   "version": "1.2.0",
-  "description": "SuPi (Super Pi) — A curated extension stack for PI. Meta-package bundling the full SuPi collection.",
+  "description": "SuPi (Super Pi) \u2014 A curated extension stack for PI. Meta-package bundling the full SuPi collection.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -29,11 +29,8 @@
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-context": "workspace:*",
     "@mrclrchtr/supi-tree-sitter": "workspace:*",
-    "clipboardy": "^5.3.1",
     "@mrclrchtr/supi-code-intelligence": "workspace:*",
-    "@mrclrchtr/supi-extras": "workspace:*",
-    "diff": "^9.0.0",
-    "web-tree-sitter": "^0.26.8"
+    "@mrclrchtr/supi-extras": "workspace:*"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-ask-user",
@@ -60,16 +57,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/extras.ts",
-      "./src/ask-user.ts",
-      "./src/bash-timeout.ts",
-      "./src/claude-md.ts",
-      "./src/settings.ts",
-      "./src/lsp.ts",
-      "./src/debug.ts",
-      "./src/context.ts",
-      "./src/tree-sitter.ts",
-      "./src/code-intelligence.ts"
+      "./src/extension.ts"
     ]
+  },
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
   }
 }

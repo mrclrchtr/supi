@@ -18,6 +18,13 @@ pi install ./packages/supi-web
 
 After editing the source, run `/reload` to pick up changes.
 
+## Package surfaces
+
+- `@mrclrchtr/supi-web/api` — programmatic exports (conversion helpers, fetch utilities, tool factories)
+- `@mrclrchtr/supi-web/extension` — aggregated pi extension entrypoint that registers all three tools
+
+`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
+
 ## What it adds
 
 Registers three agent-callable tools:
@@ -81,6 +88,8 @@ The tool reads the `CONTEXT7_API_KEY` environment variable automatically when se
 
 ### Source files
 
+- `src/api.ts` — public package exports
+- `src/extension.ts` — aggregated extension entrypoint
 - `src/web.ts` — `web_fetch_md` tool registration
 - `src/docs.ts` — `web_docs_search` + `web_docs_fetch` tool registration
 - `src/context7-client.ts` — thin wrapper around `@upstash/context7-sdk`

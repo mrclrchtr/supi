@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import * as projectRoots from "@mrclrchtr/supi-core";
+import * as projectRoots from "@mrclrchtr/supi-core/api";
 import { isGlobMatch } from "../pattern-matcher.ts";
 
 /** Unique key for a client identified by server name and root. */

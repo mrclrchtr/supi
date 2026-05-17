@@ -10,7 +10,7 @@ const mockFns = vi.hoisted(() => ({
   registerContextProvider: vi.fn(),
 }));
 
-vi.mock("@mrclrchtr/supi-core", () => ({
+vi.mock("@mrclrchtr/supi-core/api", () => ({
   clearDebugEvents: mockFns.clearDebugEvents,
   configureDebugRegistry: mockFns.configureDebugRegistry,
   DEBUG_REGISTRY_DEFAULTS: {

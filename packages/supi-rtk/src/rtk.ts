@@ -10,7 +10,7 @@ import {
   recordDebugEvent,
   registerConfigSettings,
   registerContextProvider,
-} from "@mrclrchtr/supi-core";
+} from "@mrclrchtr/supi-core/api";
 import { shouldBypassRtkRewrite } from "./guards.ts";
 import { type RtkRewriteFailureReason, rtkRewriteDetailed } from "./rewrite.ts";
 import { getStats, recordFallback, recordRewrite, resetTracking } from "./tracking.ts";

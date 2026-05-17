@@ -13,7 +13,7 @@
 
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core";
+import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/api";
 import { ActiveQuestionnaireLock } from "./flow.ts";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render.ts";

@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-ask-user",
   "version": "1.2.0",
-  "description": "SuPi ask-user extension — rich questionnaire UI for structured agent-user decisions",
+  "description": "SuPi ask-user extension \u2014 rich questionnaire UI for structured agent-user decisions",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -19,7 +19,7 @@
     "src/**/*.ts",
     "!__tests__"
   ],
-  "main": "src/index.ts",
+  "main": "src/api.ts",
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*"
   },
@@ -47,7 +47,12 @@
   },
   "pi": {
     "extensions": [
-      "./src/ask-user.ts"
+      "./src/extension.ts"
     ]
+  },
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
   }
 }

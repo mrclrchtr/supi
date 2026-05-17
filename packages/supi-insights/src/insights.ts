@@ -12,7 +12,7 @@ import type {
   SessionInfo,
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core";
+import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core/api";
 import { aggregateData } from "./aggregator.ts";
 import {
   loadCachedFacets,

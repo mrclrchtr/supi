@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
+import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import type { ActionParams } from "./tool-actions.ts";
 
 export const STRUCTURED_PATTERN_FILE_CAP = 200;

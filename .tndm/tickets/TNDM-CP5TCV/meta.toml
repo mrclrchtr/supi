@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-CP5TCV"
+title = "Design a more robust packaging strategy for SuPi meta-package runtime dependencies"
+type = "task"
+priority = "p1"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"

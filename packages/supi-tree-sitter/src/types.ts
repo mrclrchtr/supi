@@ -1,4 +1,4 @@
-// Public types for @mrclrchtr/supi-tree-sitter
+// Public tree-sitter package types.
 
 /** 1-based source range compatible with LSP position convention. */
 export interface SourceRange {

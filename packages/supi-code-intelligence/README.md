@@ -44,12 +44,19 @@ pi install npm:@mrclrchtr/supi-code-intelligence
 
 Every result includes a confidence label (semantic / structural / heuristic) so the agent knows how much to trust the answer.
 
+## Package surfaces
+
+- `@mrclrchtr/supi-code-intelligence/api` — reusable architecture/brief helpers
+- `@mrclrchtr/supi-code-intelligence/extension` — pi extension entrypoint
+
+`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
+
 ## For extension developers
 
 The architecture model and brief generator are exported for reuse:
 
 ```ts
-import { buildArchitectureModel, generateOverview } from "@mrclrchtr/supi-code-intelligence";
+import { buildArchitectureModel, generateOverview } from "@mrclrchtr/supi-code-intelligence/api";
 
 const model = await buildArchitectureModel("/project");
 const overview = generateOverview(model);

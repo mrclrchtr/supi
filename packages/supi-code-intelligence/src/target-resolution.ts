@@ -4,9 +4,13 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { isWithinOrEqual } from "@mrclrchtr/supi-core";
-import { getSessionLspService, type Position, type SessionLspService } from "@mrclrchtr/supi-lsp";
-import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
+import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
+import {
+  getSessionLspService,
+  type Position,
+  type SessionLspService,
+} from "@mrclrchtr/supi-lsp/api";
+import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 import { escapeRegex, normalizePath } from "./search-helpers.ts";
 import { highestConfidence } from "./semantic-action-helpers.ts";
 import type { ConfidenceMode, DisambiguationCandidate } from "./types.ts";

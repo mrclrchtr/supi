@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-context",
   "version": "1.2.0",
-  "description": "SuPi Context extension — detailed context usage report via /supi-context command",
+  "description": "SuPi Context extension \u2014 detailed context usage report via /supi-context command",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -43,8 +43,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/context.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }

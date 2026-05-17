@@ -6,7 +6,7 @@
 import * as path from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core";
+import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/api";
 import { Type } from "typebox";
 import { loadConfig, resolveLanguageAlias } from "./config.ts";
 import { formatDiagnosticsDisplayContent } from "./diagnostics/diagnostic-display.ts";

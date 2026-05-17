@@ -4,13 +4,11 @@ This file provides guidance to Claude Code when working in `packages/supi-core/`
 
 ## Scope
 
-`@mrclrchtr/supi-core` is a shared library package, not a standalone pi extension. It provides:
-- shared config read/write helpers
-- XML `<extension-context>` wrapping and managed context-message helpers
-- the shared settings registry/UI behind `/supi-settings`
-- project-root/path helpers reused by `supi-lsp`
+`@mrclrchtr/supi-core` now has two explicit surfaces:
+- `src/api.ts` — shared config/context/settings/project-root library helpers
+- `src/extension.ts` — minimal pi extension registering `/supi-settings`
 
-Other SuPi packages depend on `supi-core` for shared infrastructure; it is imported at runtime, not wired as a pi extension itself.
+Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/api`. PI discovery still uses the real file path `./src/extension.ts` from `package.json`.
 
 ## Commands
 
@@ -22,7 +20,7 @@ pnpm exec biome check packages/supi-core/
 
 ## Key files
 
-- `index.ts` — public export surface; keep the shared API deliberate and small
+- `api.ts`, `index.ts` — public export surface; keep the shared API deliberate and small
 - `config.ts` — `loadSupiConfig*()`, `writeSupiConfig()`, `removeSupiConfigKey()`
 - `context-tag.ts`, `context-messages.ts` — extension-context wrapping plus context token/prompt-content helpers used by `supi-claude-md` and `supi-lsp`
 - `settings-registry.ts`, `settings-ui.ts`, `settings-command.ts` — global settings registry, overlay, and `/supi-settings` command wiring
@@ -39,7 +37,7 @@ pnpm exec biome check packages/supi-core/
 
 ## Shared behavior gotchas
 
-- `@mrclrchtr/supi-core` does not register a pi extension by itself; `packages/supi/settings.ts` re-exports `registerSettingsCommand()` for the meta-package.
+- `@mrclrchtr/supi-core/extension` registers only `/supi-settings`; the meta-package aggregated extension invokes it as part of the Production bundle.
 - The settings registry lives on `globalThis` with `Symbol.for("@mrclrchtr/supi-core/settings-registry")` so registrations survive jiti/symlinked duplicate module instances.
 - Call `registerSettings()` during the extension factory function, not async handlers.
 - `settings-ui.ts` prefixes flat item ids with `section.id` to avoid collisions, then strips the prefix before calling `persistChange()`.

@@ -16,18 +16,23 @@ function extractJson(tarballPath, manifestPath) {
   return JSON.parse(out);
 }
 
-/**
- * Walk the tarball listing to find all entries ending in package.json.
- */
-function _listManifestPaths(tarballPath) {
+function listTarballEntries(tarballPath) {
   const listing = execFileSync("tar", ["-tzf", tarballPath], {
     encoding: "utf8",
   });
-  return listing
-    .trim()
-    .split("\n")
-    .filter((e) => e.endsWith("/package.json"))
-    .map((e) => e.replace(/^package\//, ""));
+  return listing.trim().split("\n").filter(Boolean);
+}
+
+function expectExplicitSurface(pkg, entries) {
+  expect(pkg.main).toBe("src/api.ts");
+  expect(pkg.exports).toEqual({
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json",
+  });
+  expect(pkg.pi?.extensions).toEqual(["./src/extension.ts"]);
+  expect(entries).toContain("package/src/api.ts");
+  expect(entries).toContain("package/src/extension.ts");
 }
 
 describe("packStaged clean manifest", () => {
@@ -110,12 +115,52 @@ describe("packStaged clean manifest", () => {
     tarball = await packStaged("packages/supi-lsp", { outDir });
 
     const pkg = extractJson(tarball, "package/package.json");
-    expect(pkg.bundledDependencies).toEqual(["@mrclrchtr/supi-core"]);
+    expect(pkg.bundledDependencies).toEqual(["@mrclrchtr/" + "supi-core"]);
 
     // The bundled sub-package may or may not have its own bundledDependencies,
     // but if it does they should be preserved
     const corePkg = extractJson(tarball, "package/node_modules/@mrclrchtr/supi-core/package.json");
     // supi-core doesn't have bundledDeps in source, so it should stay absent
     expect(corePkg.bundledDependencies).toBeUndefined();
+  });
+
+  it("publishes explicit api and extension subpaths for packages/supi-ask-user", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi-ask-user", { outDir });
+
+    const pkg = extractJson(tarball, "package/package.json");
+    const entries = listTarballEntries(tarball);
+    expectExplicitSurface(pkg, entries);
+  });
+
+  it("publishes explicit api and extension subpaths for packages/supi-core", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi-core", { outDir });
+
+    const pkg = extractJson(tarball, "package/package.json");
+    const entries = listTarballEntries(tarball);
+    expectExplicitSurface(pkg, entries);
+  });
+
+  it("publishes explicit api and extension subpaths for packages/supi-web", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi-web", { outDir });
+
+    const pkg = extractJson(tarball, "package/package.json");
+    const entries = listTarballEntries(tarball);
+    expectExplicitSurface(pkg, entries);
+  });
+
+  it("publishes explicit api and extension subpaths for packages/supi", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi", { outDir });
+
+    const pkg = extractJson(tarball, "package/package.json");
+    const entries = listTarballEntries(tarball);
+    expectExplicitSurface(pkg, entries);
   });
 });

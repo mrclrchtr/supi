@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-web",
   "version": "1.2.0",
-  "description": "SuPi Web extension — fetch web pages as clean Markdown (web_fetch_md) and library docs via Context7 (web_docs_search, web_docs_fetch)",
+  "description": "SuPi Web extension \u2014 fetch web pages as clean Markdown (web_fetch_md) and library docs via Context7 (web_docs_search, web_docs_fetch)",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -50,9 +50,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/web.ts",
-      "./src/docs.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }

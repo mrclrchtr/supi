@@ -200,10 +200,14 @@ describe.skipIf(!HAS_PYRIGHT)("LspClient python shutdown-after-error", () => {
 
     const shutdownClient = new LspClient("pyright", PY_SERVER_CONFIG, tmpDir2);
     await shutdownClient.start();
-    await shutdownClient.syncAndWaitForDiagnostics(errorFile, fs.readFileSync(errorFile, "utf-8"));
+    const content = fs.readFileSync(errorFile, "utf-8");
+    const diags = await waitFor(
+      () => shutdownClient.syncAndWaitForDiagnostics(errorFile, content),
+      (items: Diagnostic[]) => items.length > 0,
+      { timeoutMs: 10_000, retryDelayMs: 200, label: "shutdown diagnostics for err.py" },
+    );
 
     // Verify diagnostics were collected and shutdown works
-    const diags = shutdownClient.getDiagnostics(errorFile);
     expect(diags.length).toBeGreaterThan(0);
 
     await shutdownClient.shutdown();

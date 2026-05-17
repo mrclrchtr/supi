@@ -1,7 +1,7 @@
 // Implementations action — find concrete implementations via LSP or heuristic.
 
 import * as path from "node:path";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp";
+import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 import { resolveTarget } from "../resolve-target.ts";
 import {
   escapeRegex,

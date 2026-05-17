@@ -12,7 +12,7 @@ const mockFns = vi.hoisted(() => ({
   reconstructState: vi.fn(),
 }));
 
-vi.mock("@mrclrchtr/supi-core", () => ({
+vi.mock("@mrclrchtr/supi-core/api", () => ({
   createInputSubmenu: vi.fn(),
   getContextToken: (details: unknown) =>
     details && typeof details === "object"

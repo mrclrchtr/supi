@@ -38,7 +38,7 @@ vi.mock("../src/guidance.ts", () => ({
   lspPromptSnippet: mockFns.lspPromptSnippet,
   MAX_DETAILED_DIAGNOSTICS: 5,
 }));
-vi.mock("@mrclrchtr/supi-core", () => ({
+vi.mock("@mrclrchtr/supi-core/api", () => ({
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
   restorePromptContent: mockFns.restorePromptContent,
 }));

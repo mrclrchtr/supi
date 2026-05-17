@@ -40,12 +40,19 @@ The agent gets a `tree_sitter` tool with these actions:
 
 `outline`, `imports`, and `exports` are currently JavaScript/TypeScript only. `node_at`, `query`, and `callees` work across all 14 supported languages. Coordinates are 1-based, matching the `lsp` tool convention.
 
+## Package surfaces
+
+- `@mrclrchtr/supi-tree-sitter/api` — reusable parsing/session API
+- `@mrclrchtr/supi-tree-sitter/extension` — pi extension entrypoint
+
+`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
+
 ## For extension developers
 
 This package exports a reusable session-scoped parsing service:
 
 ```ts
-import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter";
+import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 
 const session = createTreeSitterSession("/project");
 
@@ -62,4 +69,4 @@ const callees = await session.calleesAt("src/index.ts", 42, 10);
 session.dispose();
 ```
 
-Import from the package root. No internal imports needed. Call `dispose()` when done.
+Call `dispose()` when done.

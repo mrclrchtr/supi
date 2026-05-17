@@ -7,7 +7,7 @@ import {
   loadSupiConfig,
   loadSupiConfigForScope,
   registerConfigSettings,
-} from "@mrclrchtr/supi-core";
+} from "@mrclrchtr/supi-core/api";
 import { loadConfig } from "./config.ts";
 
 // ── Types ────────────────────────────────────────────────────

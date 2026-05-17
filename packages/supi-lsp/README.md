@@ -49,12 +49,19 @@ Configure via `/supi-settings` (LSP panel):
 
 Settings are stored in `~/.pi/agent/supi/config.json` (global) or `.pi/supi/config.json` (project). The `/lsp-status` command shows active servers and outstanding diagnostics.
 
+## Package surfaces
+
+- `@mrclrchtr/supi-lsp/api` — reusable library surface for peer extensions
+- `@mrclrchtr/supi-lsp/extension` — pi extension entrypoint
+
+`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
+
 ## For extension developers
 
 This package exports a reusable session-scoped LSP service. Peer extensions can query the same LSP runtime without starting duplicate servers:
 
 ```ts
-import { getSessionLspService, SessionLspService } from "@mrclrchtr/supi-lsp";
+import { getSessionLspService, SessionLspService } from "@mrclrchtr/supi-lsp/api";
 
 const state = getSessionLspService("/project");
 if (state.kind === "ready") {
@@ -62,5 +69,3 @@ if (state.kind === "ready") {
   const refs = await state.service.references("src/index.ts", { line: 5, character: 10 });
 }
 ```
-
-Import from the package root — no need to reach into internal files.

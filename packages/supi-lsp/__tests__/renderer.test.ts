@@ -34,7 +34,7 @@ vi.mock("../src/guidance.ts", () => ({
   MAX_DETAILED_DIAGNOSTICS: 5,
 }));
 
-vi.mock("@mrclrchtr/supi-core", () => ({
+vi.mock("@mrclrchtr/supi-core/api", () => ({
   getContextToken: (details: unknown) =>
     details && typeof details === "object"
       ? ((details as { contextToken?: string }).contextToken ?? null)

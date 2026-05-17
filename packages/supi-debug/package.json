@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-debug",
   "version": "1.2.0",
-  "description": "SuPi Debug extension — shared debug event inspection for SuPi extensions",
+  "description": "SuPi Debug extension \u2014 shared debug event inspection for SuPi extensions",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -47,8 +47,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/debug.ts"
+      "./src/extension.ts"
     ]
   },
-  "main": "src/index.ts"
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./extension": "./src/extension.ts",
+    "./package.json": "./package.json"
+  }
 }
