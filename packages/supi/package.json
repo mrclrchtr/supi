@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi",
   "version": "1.1.2",
-  "description": "SuPi (Super Pi) — The opinionated way to extend PI. Meta-package bundling the full SuPi extension stack.",
+  "description": "SuPi (Super Pi) — A curated extension stack for PI. Meta-package bundling the full SuPi collection.",
   "license": "MIT",
   "repository": {
     "type": "git",

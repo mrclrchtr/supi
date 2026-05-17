@@ -1,6 +1,6 @@
 # @mrclrchtr/supi
 
-SuPi (**Super Pi**) is an opinionated bundle of production-ready extensions, skills, and supporting packages for the [pi coding agent](https://github.com/earendil-works/pi).
+SuPi (**Super Pi**) is my curated extension stack for the [pi coding agent](https://github.com/earendil-works/pi) — a collection of extensions I use daily and am happy to share.
 
 Install the full stack or pick individual packages.
 

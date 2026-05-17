@@ -2,9 +2,9 @@
 
 **Super Pi**
 
-*The opinionated way to extend PI.*
+*My curated extension stack for PI — shared in case they help you too.*
 
-SuPi is an opinionated extension monorepo for PI with LSP, Skills, marketplace compatibility, and personal best practices built in.
+SuPi is my personal collection of extensions for PI: LSP, code intelligence, structural analysis, and practical utilities. Built for my own workflow and shared freely.
 
 - SuPi is my curated extension stack for PI.
 - SuPi makes PI extensible, interoperable, and sane by default.
