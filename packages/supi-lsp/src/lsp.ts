@@ -43,7 +43,7 @@ import {
   loadLspSettings,
   registerLspSettings,
 } from "./settings-registration.ts";
-import { type LspAction, lspToolDescription, safeExecuteAction } from "./tool-actions.ts";
+import { type LspToolParams, lspToolDescription, safeExecuteAction } from "./tool-actions.ts";
 import {
   persistLspActiveState,
   persistLspInactiveState,
@@ -71,6 +71,35 @@ const LspActionEnum = StringEnum([
   "symbol_hover",
   "recover",
 ] as const);
+
+const FileParam = Type.String({ description: "File path (relative or absolute)" });
+const LineParam = Type.Number({ description: "1-based line number" });
+const CharacterParam = Type.Number({ description: "1-based column number" });
+const NewNameParam = Type.String({ description: "New name (for rename action)" });
+const QueryParam = Type.String({
+  description: "Search query (for workspace_symbol and search actions)",
+});
+const SymbolParam = Type.String({ description: "Symbol name (for symbol_hover action)" });
+
+const LspToolParameters = Type.Object(
+  {
+    action: LspActionEnum,
+    args: Type.Optional(
+      Type.Object(
+        {
+          file: Type.Optional(FileParam),
+          line: Type.Optional(LineParam),
+          character: Type.Optional(CharacterParam),
+          newName: Type.Optional(NewNameParam),
+          query: Type.Optional(QueryParam),
+          symbol: Type.Optional(SymbolParam),
+        },
+        { additionalProperties: false },
+      ),
+    ),
+  },
+  { additionalProperties: false },
+);
 
 export default function lspExtension(pi: ExtensionAPI) {
   registerLspSettings();
@@ -412,17 +441,7 @@ function registerLspTool(
     description: lspToolDescription,
     promptSnippet: lspPromptSnippet,
     promptGuidelines,
-    parameters: Type.Object({
-      action: LspActionEnum,
-      file: Type.Optional(Type.String({ description: "File path (relative or absolute)" })),
-      line: Type.Optional(Type.Number({ description: "1-based line number" })),
-      character: Type.Optional(Type.Number({ description: "1-based column number" })),
-      newName: Type.Optional(Type.String({ description: "New name (for rename action)" })),
-      query: Type.Optional(
-        Type.String({ description: "Search query (for workspace_symbol and search actions)" }),
-      ),
-      symbol: Type.Optional(Type.String({ description: "Symbol name (for symbol_hover action)" })),
-    }),
+    parameters: LspToolParameters,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
       if (!state.manager) {
@@ -432,18 +451,7 @@ function registerLspTool(
         };
       }
 
-      const text = await safeExecuteAction(
-        state.manager,
-        params as {
-          action: LspAction;
-          file?: string;
-          line?: number;
-          character?: number;
-          newName?: string;
-          query?: string;
-          symbol?: string;
-        },
-      );
+      const text = await safeExecuteAction(state.manager, params as LspToolParams);
 
       return {
         content: [{ type: "text", text }],

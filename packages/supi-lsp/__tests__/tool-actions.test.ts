@@ -11,7 +11,7 @@ describe("workspace_symbol action", () => {
 
     const result = await executeAction(manager, {
       action: "workspace_symbol",
-      query: "test",
+      args: { query: "test" },
     });
     expect(result).toContain("not supported");
   });
@@ -24,7 +24,7 @@ describe("workspace_symbol action", () => {
 
     const result = await executeAction(manager, {
       action: "workspace_symbol",
-      query: "nonexistent",
+      args: { query: "nonexistent" },
     });
     expect(result).toContain("No symbols found");
   });
@@ -40,9 +40,11 @@ describe("safeExecuteAction", () => {
 
     const result = await safeExecuteAction(manager, {
       action: "hover",
-      file: "src/index.ts",
-      line: 1,
-      character: 1,
+      args: {
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+      },
     });
 
     expect(result).toBe("LSP action failed: unexpected internal error");
@@ -60,9 +62,11 @@ describe("safeExecuteAction", () => {
 
     const result = await safeExecuteAction(manager, {
       action: "hover",
-      file: "src/index.ts",
-      line: 1,
-      character: 1,
+      args: {
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+      },
     });
 
     expect(result).toContain("Info:");
@@ -78,9 +82,11 @@ describe("safeExecuteAction", () => {
 
     const result = await safeExecuteAction(manager, {
       action: "hover",
-      file: "src/index.ts",
-      line: 1,
-      character: 1,
+      args: {
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+      },
     });
 
     expect(result).toBe("LSP action failed: string error");

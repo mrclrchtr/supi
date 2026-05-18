@@ -18,7 +18,8 @@
   "files": [
     "src/**/*.ts",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "docs/screenshots/"
   ],
   "dependencies": {
     "@mrclrchtr/supi-ask-user": "workspace:*",
@@ -58,7 +59,8 @@
   "pi": {
     "extensions": [
       "./src/extension.ts"
-    ]
+    ],
+    "image": "./docs/screenshots/hero.png"
   },
   "main": "src/api.ts",
   "exports": {

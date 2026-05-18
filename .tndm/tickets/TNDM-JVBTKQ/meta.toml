@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-JVBTKQ"
+title = "Reshape lsp tool schema to top-level action+args object"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"

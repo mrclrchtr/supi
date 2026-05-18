@@ -17,14 +17,20 @@ function makeManager(): LspManager {
 describe("tool action validation", () => {
   it("hover: returns validation error when line is missing", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "hover", file: "src/index.ts" });
+    const result = await executeAction(manager, {
+      action: "hover",
+      args: { file: "src/index.ts" },
+    });
     expect(result).toContain("Validation error");
     expect(result).toContain("'line' is required");
   });
 
   it("hover: returns validation error when character is missing", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "hover", file: "src/index.ts", line: 1 });
+    const result = await executeAction(manager, {
+      action: "hover",
+      args: { file: "src/index.ts", line: 1 },
+    });
     expect(result).toContain("Validation error");
     expect(result).toContain("'character' is required");
   });
@@ -33,9 +39,11 @@ describe("tool action validation", () => {
     const manager = makeManager();
     const result = await executeAction(manager, {
       action: "hover",
-      file: "src/index.ts",
-      line: 0,
-      character: 1,
+      args: {
+        file: "src/index.ts",
+        line: 0,
+        character: 1,
+      },
     });
     expect(result).toContain("Validation error");
     expect(result).toContain("'line' must be a positive 1-based integer");
@@ -45,9 +53,11 @@ describe("tool action validation", () => {
     const manager = makeManager();
     const result = await executeAction(manager, {
       action: "hover",
-      file: "src/index.ts",
-      line: 1,
-      character: -1,
+      args: {
+        file: "src/index.ts",
+        line: 1,
+        character: -1,
+      },
     });
     expect(result).toContain("Validation error");
     expect(result).toContain("'character' must be a positive 1-based integer");
@@ -55,20 +65,26 @@ describe("tool action validation", () => {
 
   it("definition: returns validation error when file is missing", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "definition", line: 1, character: 1 });
+    const result = await executeAction(manager, {
+      action: "definition",
+      args: { line: 1, character: 1 },
+    });
     expect(result).toContain("Validation error");
     expect(result).toContain("'file' is required");
   });
 
   it("references: returns validation error for missing parameters", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "references", file: "src/index.ts" });
+    const result = await executeAction(manager, {
+      action: "references",
+      args: { file: "src/index.ts" },
+    });
     expect(result).toContain("Validation error");
   });
 
   it("symbols: returns validation error when file is missing", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "symbols" });
+    const result = await executeAction(manager, { action: "symbols", args: {} });
     expect(result).toContain("Validation error");
     expect(result).toContain("'file' is required");
   });
@@ -77,9 +93,11 @@ describe("tool action validation", () => {
     const manager = makeManager();
     const result = await executeAction(manager, {
       action: "rename",
-      file: "src/index.ts",
-      line: 1,
-      character: 1,
+      args: {
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+      },
     });
     expect(result).toContain("Validation error");
     expect(result).toContain("'newName' is required");
@@ -89,10 +107,12 @@ describe("tool action validation", () => {
     const manager = makeManager();
     const result = await executeAction(manager, {
       action: "rename",
-      file: "src/index.ts",
-      line: 1,
-      character: 1,
-      newName: "   ",
+      args: {
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "   ",
+      },
     });
     expect(result).toContain("Validation error");
     expect(result).toContain("'newName' is required");
@@ -100,13 +120,16 @@ describe("tool action validation", () => {
 
   it("code_actions: returns validation error for missing parameters", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "code_actions", file: "src/index.ts" });
+    const result = await executeAction(manager, {
+      action: "code_actions",
+      args: { file: "src/index.ts" },
+    });
     expect(result).toContain("Validation error");
   });
 
   it("workspace_symbol: returns validation error when query is missing", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "workspace_symbol" });
+    const result = await executeAction(manager, { action: "workspace_symbol", args: {} });
     expect(result).toContain("Validation error");
     expect(result).toContain("'query' is required");
   });
@@ -115,7 +138,7 @@ describe("tool action validation", () => {
     const manager = makeManager();
     const result = await executeAction(manager, {
       action: "workspace_symbol",
-      query: "   ",
+      args: { query: "   " },
     });
     expect(result).toContain("Validation error");
     expect(result).toContain("'query' is required");
@@ -123,21 +146,24 @@ describe("tool action validation", () => {
 
   it("search: returns validation error when query is missing", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "search" });
+    const result = await executeAction(manager, { action: "search", args: {} });
     expect(result).toContain("Validation error");
     expect(result).toContain("'query' is required");
   });
 
   it("symbol_hover: returns validation error when symbol is missing", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "symbol_hover" });
+    const result = await executeAction(manager, { action: "symbol_hover", args: {} });
     expect(result).toContain("Validation error");
     expect(result).toContain("'symbol' is required");
   });
 
   it("symbol_hover: returns validation error when symbol is empty", async () => {
     const manager = makeManager();
-    const result = await executeAction(manager, { action: "symbol_hover", symbol: "" });
+    const result = await executeAction(manager, {
+      action: "symbol_hover",
+      args: { symbol: "" },
+    });
     expect(result).toContain("Validation error");
     expect(result).toContain("'symbol' is required");
   });
@@ -158,9 +184,11 @@ describe("tool action relative path resolution", () => {
 
     await executeAction(manager, {
       action: "hover",
-      file: "src/index.ts",
-      line: 1,
-      character: 1,
+      args: {
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+      },
     });
 
     expect(manager.ensureFileOpen).toHaveBeenCalledWith("/repo/src/index.ts");
@@ -181,9 +209,11 @@ describe("tool action relative path resolution", () => {
 
     await executeAction(manager, {
       action: "hover",
-      file: "/other/src/index.ts",
-      line: 1,
-      character: 1,
+      args: {
+        file: "/other/src/index.ts",
+        line: 1,
+        character: 1,
+      },
     });
 
     expect(manager.ensureFileOpen).toHaveBeenCalledWith("/other/src/index.ts");
@@ -201,7 +231,7 @@ describe("tool action missing file behavior", () => {
 
     const result = await executeAction(manager, {
       action: "diagnostics",
-      file: "src/missing.ts",
+      args: { file: "src/missing.ts" },
     });
 
     expect(result).toContain("Error: failed to read");
@@ -230,7 +260,7 @@ describe("tool action missing file behavior", () => {
 
       const result = await executeAction(manager, {
         action: "diagnostics",
-        file: "src/index.ts",
+        args: { file: "src/index.ts" },
       });
 
       expect(result).toContain("**src/index.ts**:");

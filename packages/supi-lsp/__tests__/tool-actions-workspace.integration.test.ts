@@ -50,9 +50,11 @@ async function warmUpToolActionManager(manager: LspManager): Promise<void> {
     () =>
       executeAction(manager, {
         action: "hover",
-        file: goodFile,
-        line: 1,
-        character: 17,
+        args: {
+          file: goodFile,
+          line: 1,
+          character: 17,
+        },
       }),
     (result) => result.includes("add"),
     { timeoutMs: 5_000, retryDelayMs: 100, label: "hover on 'add' symbol during warm-up" },
@@ -75,7 +77,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions workspace integration", () => {
   it("workspace_symbol: finds symbols by query", async () => {
     const result = await executeAction(manager, {
       action: "workspace_symbol",
-      query: "add",
+      args: { query: "add" },
     });
     expect(result).toContain("add");
     expect(result).toContain("Workspace symbols");
@@ -84,7 +86,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions workspace integration", () => {
   it("workspace_symbol: reports empty query", async () => {
     const result = await executeAction(manager, {
       action: "workspace_symbol",
-      query: "",
+      args: { query: "" },
     });
     expect(result).toContain("query");
   });
@@ -92,7 +94,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions workspace integration", () => {
   it("search: finds symbols via LSP", async () => {
     const result = await executeAction(manager, {
       action: "search",
-      query: "add",
+      args: { query: "add" },
     });
     expect(result).toContain("add");
   }, 10_000);
@@ -100,7 +102,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions workspace integration", () => {
   it("search: falls back to text search for unknown symbol", async () => {
     const result = await executeAction(manager, {
       action: "search",
-      query: "nonexistent_symbol",
+      args: { query: "nonexistent_symbol" },
     });
     expect(result).toContain("No symbols or text matches found");
   }, 10_000);
@@ -108,7 +110,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions workspace integration", () => {
   it("symbol_hover: returns hover for symbol by name", async () => {
     const result = await executeAction(manager, {
       action: "symbol_hover",
-      symbol: "add",
+      args: { symbol: "add" },
     });
     expect(result).toContain("add");
   }, 10_000);
@@ -116,7 +118,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions workspace integration", () => {
   it("symbol_hover: reports missing symbol", async () => {
     const result = await executeAction(manager, {
       action: "symbol_hover",
-      symbol: "nonexistent_symbol",
+      args: { symbol: "nonexistent_symbol" },
     });
     expect(result).toContain("not found");
   }, 10_000);

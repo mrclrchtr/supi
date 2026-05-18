@@ -36,8 +36,7 @@ export type LspAction =
   | "symbol_hover"
   | "recover";
 
-export interface LspToolParams {
-  action: LspAction;
+export interface LspToolArgs {
   file?: string;
   line?: number;
   character?: number;
@@ -46,22 +45,29 @@ export interface LspToolParams {
   symbol?: string;
 }
 
+export interface LspToolParams {
+  action: LspAction;
+  args?: LspToolArgs;
+}
+
 // ── Tool Description ──────────────────────────────────────────────────
 
 export const lspToolDescription = `Language Server Protocol tool — provides type-aware code intelligence.
 
+Call shape: { action, args } where args is action-specific.
+
 Actions:
-- hover: Get type info and docs at a position. Params: file, line, character
-- definition: Go to definition of a symbol. Params: file, line, character
-- references: Find all references to a symbol. Params: file, line, character
-- diagnostics: Get type errors and warnings. Params: file (optional — omit for all files)
-- symbols: List all symbols in a file. Params: file
-- rename: Rename a symbol across the project. Params: file, line, character, newName
-- code_actions: Get available fixes/refactors at a position. Params: file, line, character
-- workspace_symbol: Fuzzy symbol search across the project. Params: query
-- search: Search for symbols (LSP first, then text fallback). Params: query
-- symbol_hover: Hover info by symbol name (zero coordinates). Params: symbol
-- recover: Refresh cached diagnostics after a workspace change. Params: none
+- hover: Get type info and docs at a position. Args: { file, line, character }
+- definition: Go to definition of a symbol. Args: { file, line, character }
+- references: Find all references to a symbol. Args: { file, line, character }
+- diagnostics: Get type errors and warnings. Args: { file } (optional — omit args or file for all files)
+- symbols: List all symbols in a file. Args: { file }
+- rename: Rename a symbol across the project. Args: { file, line, character, newName }
+- code_actions: Get available fixes/refactors at a position. Args: { file, line, character }
+- workspace_symbol: Fuzzy symbol search across the project. Args: { query }
+- search: Search for symbols (LSP first, then text fallback). Args: { query }
+- symbol_hover: Hover info by symbol name (zero coordinates). Args: { symbol }
+- recover: Refresh cached diagnostics after a workspace change. Args: none
 
 Line and character are 1-based. File paths are relative to cwd.`;
 
@@ -121,16 +127,16 @@ function validateFilePosition(
   params: LspToolParams,
   action: string,
 ): { file: string; line: number; character: number } | string {
-  if (!params.file) return `Validation error: 'file' is required for ${action} action.`;
-  if (params.line === undefined)
-    return `Validation error: 'line' is required for ${action} action.`;
-  if (params.character === undefined)
+  const args = params.args;
+  if (!args?.file) return `Validation error: 'file' is required for ${action} action.`;
+  if (args.line === undefined) return `Validation error: 'line' is required for ${action} action.`;
+  if (args.character === undefined)
     return `Validation error: 'character' is required for ${action} action.`;
-  if (!Number.isInteger(params.line) || params.line < 1)
+  if (!Number.isInteger(args.line) || args.line < 1)
     return `Validation error: 'line' must be a positive 1-based integer for ${action} action.`;
-  if (!Number.isInteger(params.character) || params.character < 1)
+  if (!Number.isInteger(args.character) || args.character < 1)
     return `Validation error: 'character' must be a positive 1-based integer for ${action} action.`;
-  return { file: params.file, line: params.line, character: params.character };
+  return { file: args.file, line: args.line, character: args.character };
 }
 
 function validateNonEmptyString(
@@ -243,8 +249,8 @@ async function handleDiagnostics(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  if (params.file) {
-    const resolvedPath = resolveFilePath(params.file, cwd);
+  if (params.args?.file) {
+    const resolvedPath = resolveFilePath(params.args.file, cwd);
     const client = await manager.ensureFileOpen(resolvedPath);
     if (!client) return noServerMessage(resolvedPath);
 
@@ -253,7 +259,7 @@ async function handleDiagnostics(
       const diags = await client.syncAndWaitForDiagnostics(resolvedPath, content);
       return formatDiagnostics(resolvedPath, diags, cwd);
     } catch {
-      return `Error: failed to read or query diagnostics for ${params.file}`;
+      return `Error: failed to read or query diagnostics for ${params.args.file}`;
     }
   }
 
@@ -272,8 +278,8 @@ async function handleSymbols(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  if (!params.file) return "Validation error: 'file' is required for symbols action.";
-  const resolvedPath = resolveFilePath(params.file, cwd);
+  if (!params.args?.file) return "Validation error: 'file' is required for symbols action.";
+  const resolvedPath = resolveFilePath(params.args.file, cwd);
 
   const client = await manager.ensureFileOpen(resolvedPath);
   if (!client) return noServerMessage(resolvedPath);
@@ -292,7 +298,7 @@ async function handleRename(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const nameValidation = validateNonEmptyString(params.newName, "newName", "rename");
+  const nameValidation = validateNonEmptyString(params.args?.newName, "newName", "rename");
   if (typeof nameValidation === "string") return nameValidation;
   const newName = nameValidation.value;
 
@@ -338,7 +344,7 @@ async function handleWorkspaceSymbol(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const validation = validateNonEmptyString(params.query, "query", "workspace_symbol");
+  const validation = validateNonEmptyString(params.args?.query, "query", "workspace_symbol");
   if (typeof validation === "string") return validation;
   const query = validation.value;
 
@@ -354,7 +360,7 @@ async function handleSearch(
   params: LspToolParams,
   cwd: string,
 ): Promise<string> {
-  const validation = validateNonEmptyString(params.query, "query", "search");
+  const validation = validateNonEmptyString(params.args?.query, "query", "search");
   if (typeof validation === "string") return validation;
   const query = validation.value;
 
@@ -371,7 +377,7 @@ async function handleSymbolHover(
   params: LspToolParams,
   _cwd: string,
 ): Promise<string> {
-  const validation = validateNonEmptyString(params.symbol, "symbol", "symbol_hover");
+  const validation = validateNonEmptyString(params.args?.symbol, "symbol", "symbol_hover");
   if (typeof validation === "string") return validation;
   const symbol = validation.value;
 

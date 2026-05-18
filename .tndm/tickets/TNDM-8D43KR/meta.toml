@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-8D43KR"
+title = "Make supi-lsp tool parameters action-discriminated"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"

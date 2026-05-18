@@ -43,12 +43,18 @@ Relative file paths resolve from the session working directory.
 Supported extensions: .ts, .tsx, .js, .jsx, .mts, .cts, .mjs, .cjs, .py, .pyi, .rs, .go, .mod, .c, .h, .cpp, .hpp, .cc, .cxx, .hxx, .c++, .h++, .java, .kt, .kts, .rb, .sh, .bash, .zsh, .html, .htm, .xhtml, .r, .sql`;
 
 const promptGuidelines = [
-  "Use tree_sitter for structural syntax-tree analysis: extracting declarations, imports, exports, node-at-position lookup, and custom queries.",
-  "Prefer tree_sitter when you need AST node types, exact source ranges, or parser-level structure that semantic language-server tooling does not expose.",
-  "tree_sitter is a standalone structural analysis tool; use semantic language-server features separately when they are available for hover, definitions, references, or diagnostics.",
+  `Use tree_sitter for structural syntax questions, for example:
+  - declarations/outline of file (JS/TS) → tree_sitter.outline(file)
+  - import statements in file (JS/TS) → tree_sitter.imports(file)
+  - export names/kinds in file (JS/TS) → tree_sitter.exports(file)
+  - outgoing calls from position → tree_sitter.callees(file, line, char)
+  - syntax node at position → tree_sitter.node_at(file, line, char)
+  - custom AST query on file → tree_sitter.query(file, pattern)`,
+  "Prefer 'tree_sitter' when you need AST node types, exact source ranges, or parser-level structure.",
+  "'tree_sitter' is a standalone structural analysis tool for outline, imports, exports, node-at-position lookup, and custom queries.",
 ];
 
-const promptSnippet = `Use the tree_sitter tool for structural code analysis — outline, imports, exports, node-at-position lookup, and custom queries.`;
+const promptSnippet = `Use the 'tree_sitter' tool for structural code analysis — outline, imports, exports, node-at-position lookup, and custom queries.`;
 
 export default function treeSitterExtension(pi: ExtensionAPI) {
   let runtime: TreeSitterRuntime | undefined;

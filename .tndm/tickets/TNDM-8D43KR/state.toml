@@ -1,0 +1,29 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-17T16:32:17.740419Z"
+revision = 12
+
+[document_fingerprints]
+archive = "sha256:343325fefb022d005cae4b893ac386448ef4b490871b8e5a7ffb03994fd8cb95"
+content = "sha256:9f6236ea5ecc74128f1d5c31a42548724436dd569727ece9861c7cb8995127a2"
+
+[[tasks]]
+number = 1
+title = "Replace the flat `lsp` tool parameter schema with an action-discriminated union in `packages/supi-lsp/src/lsp.ts`, matching each action to only its supported fields and keeping action names unchanged."
+status = "done"
+file = "packages/supi-lsp/src/lsp.ts"
+verification = "pnpm exec vitest run packages/supi-lsp/__tests__/e2e-smoke.test.ts"
+
+[[tasks]]
+number = 2
+title = "Add validation coverage proving unsupported per-action parameters are rejected at the schema layer, including `symbol_hover` with `path`-style extra input and a representative file-position action shape."
+status = "done"
+file = "packages/supi-lsp/__tests__/e2e-smoke.test.ts"
+verification = "pnpm exec vitest run packages/supi-lsp/__tests__/e2e-smoke.test.ts"
+
+[[tasks]]
+number = 3
+title = "Run targeted package verification for the changed schema surface and validation behavior."
+status = "done"
+file = "packages/supi-lsp/__tests__/e2e-smoke.test.ts"
+verification = "pnpm exec vitest run packages/supi-lsp/__tests__/e2e-smoke.test.ts packages/supi-lsp/__tests__/tool-actions.validation.test.ts && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json"

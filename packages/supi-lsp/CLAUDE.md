@@ -10,7 +10,7 @@ This file contains non-obvious guidance for future work in `packages/supi-lsp/`.
 
 ## Tool actions overview
 
-The `lsp` tool uses 1-based position coordinates. `tool-actions.ts` validates inputs and formats results. Language-level actions are `hover`, `definition`, `references`, `symbols`, `rename`, and `code_actions`. Workspace search actions are `workspace_symbol`, `search`, and `symbol_hover`. The `recover` action forces a workspace-wide diagnostic refresh and can restart clients that still look stale. Diagnostics can be requested per file or project-wide, and the same diagnostic data is also surfaced inline after `write` and `edit`.
+The `lsp` tool uses a top-level `{ action, args }` input shape, with 1-based position coordinates inside `args` when applicable. `tool-actions.ts` validates inputs and formats results. Language-level actions are `hover`, `definition`, `references`, `symbols`, `rename`, and `code_actions`. Workspace search actions are `workspace_symbol`, `search`, and `symbol_hover`. The `recover` action is the no-args case and forces a workspace-wide diagnostic refresh; it can restart clients that still look stale. Diagnostics can be requested per file or project-wide, and the same diagnostic data is also surfaced inline after `write` and `edit`.
 
 ### Guidance layering
 
@@ -44,7 +44,7 @@ Pull diagnostic sync should use pull when `diagnosticProvider` is available and 
 
 ## Tool action gotchas
 
-Standalone `lsp` actions validate parameters explicitly and return `Validation error: ...` strings instead of throwing. Relative `file` inputs resolve from `manager.getCwd()`, not `process.cwd()`. `line` and `character` must be positive 1-based integers before conversion to zero-based coordinates. Missing-file diagnostics return a clear file-access message instead of relying on a thrown exception.
+Standalone `lsp` actions validate nested `args` explicitly and return `Validation error: ...` strings instead of throwing. Relative `file` inputs resolve from `manager.getCwd()`, not `process.cwd()`. `line` and `character` must be positive 1-based integers before conversion to zero-based coordinates. Missing-file diagnostics return a clear file-access message instead of relying on a thrown exception.
 
 ## Package-specific conventions
 

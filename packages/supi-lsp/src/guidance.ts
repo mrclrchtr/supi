@@ -4,13 +4,20 @@ import type { OutstandingDiagnosticSummaryEntry } from "./manager/manager-types.
 import type { Diagnostic, ProjectServerInfo } from "./types.ts";
 
 export const lspPromptSnippet =
-  "Use semantic code intelligence for hover, definitions, references, symbols, rename planning, code actions, and diagnostics in supported languages.";
+  "Use 'lsp' for hover, definitions, references, symbols, rename planning, code actions, and diagnostics in supported languages.";
 
 export const lspPromptGuidelines = [
-  "Prefer the lsp tool over bash text search for supported source files when the task is semantic code navigation or diagnostics.",
-  "Use lsp for hover, definitions, references, document symbols, rename planning, code actions, and diagnostics before falling back to grep-style shell search.",
-  "To inspect a known symbol's type, signature, or docs when you don't have coordinates: use \`workspace_symbol\` to find the file and position, then \`hover\` on it; or use \`symbol_hover\` (symbol name only, zero coordinates) for a one-shot type query.",
-  "Fall back to bash/read when LSP is unavailable, the file type is unsupported, or the task is plain-text search across docs, config files, or string literals.",
+  `Use lsp with the shape { action, args } where args is action-specific, for example:
+  - type/signature/docs of X → { action: "hover", args: { file, line, character } }
+  - what fields does type X have? → { action: "workspace_symbol", args: { query } } then { action: "hover", args: { file, line, character } }
+  - where is X defined? → { action: "definition", args: { file, line, character } }
+  - who references X? → { action: "references", args: { file, line, character } }
+  - rename X to Y → { action: "rename", args: { file, line, character, newName } }
+  - structure of file → { action: "symbols", args: { file } }
+  - find symbol across project → { action: "workspace_symbol", args: { query } } or { action: "search", args: { query } }
+  - fix error at position → { action: "code_actions", args: { file, line, character } }
+  - refresh diagnostics → { action: "recover" }`,
+  "Prefer lsp over bash/read for semantic code navigation and diagnostics in supported languages; fall back to bash/read for unsupported file types.",
   "Diagnostics are automatically delivered: inline after every write/edit tool result, and as context before each agent turn. You do not need to call the lsp tool to check them — they are already in your context.",
   "When delivered diagnostics show errors, decide: (a) expected temporary state from a planned multi-step change — continue your sequence, then verify at the end; (b) unexpected 'Cannot find module', unresolved imports, or type mismatches — stop and fix the root cause before editing more files.",
   "When the SAME error pattern appears across MULTIPLE files after you changed imports, dependencies, or shared types, it is a systemic root-cause issue (missing install, broken import path, wrong dependency version). Do not patch each file individually — find and fix the root cause first.",

@@ -16,6 +16,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Check } from "typebox/value";
 import { afterEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../supi-code-intelligence/src/code-intelligence.ts";
 import treeSitterExtension from "../../supi-tree-sitter/src/tree-sitter.ts";
@@ -29,7 +30,11 @@ type AnyFunction = (...args: any[]) => any;
 interface RegisteredTool {
   name: string;
   description: string;
-  parameters?: { properties?: Record<string, unknown> };
+  parameters?: {
+    type?: string;
+    properties?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
   execute: AnyFunction;
   promptGuidelines?: string[];
   promptSnippet?: string;
@@ -219,7 +224,7 @@ describe("SuPi e2e smoke – tool registration", () => {
       expect(typeof tool.execute).toBe("function");
       expect(tool.description).toBeDefined();
       expect(tool.description.length).toBeGreaterThan(0);
-      expect(tool.parameters?.properties).toBeDefined();
+      expect(tool.parameters).toBeDefined();
     }
   });
 
@@ -959,13 +964,72 @@ describe("SuPi e2e smoke – lsp extension behavior", () => {
     expect(combined).toContain("stop and fix the root cause");
     expect(combined).toContain("lsp recover");
     expect(combined).toContain("pnpm install");
+    expect(combined).toContain("semantic code navigation");
+    expect(combined).toContain(
+      'what fields does type X have? → { action: "workspace_symbol", args: { query } } then { action: "hover", args: { file, line, character } }',
+    );
   });
 
   it("has promptSnippet that encourages LSP use", () => {
     const pi = createPiMock();
     lspExtension(pi);
     const lspTool = pi.tools.find((t) => t.name === "lsp")!;
-    expect(lspTool.promptSnippet).toContain("semantic code intelligence");
+    expect(lspTool.promptSnippet).toContain("hover, definitions, references");
+  });
+
+  it("uses a top-level action-plus-args parameter schema", () => {
+    const pi = createPiMock();
+    lspExtension(pi);
+    const lspTool = pi.tools.find((t) => t.name === "lsp")!;
+
+    expect((lspTool.parameters as { type?: string }).type).toBe("object");
+    expect(
+      Check(lspTool.parameters as object, {
+        action: "symbol_hover",
+        args: {
+          symbol: "buildArchitectureModel",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      Check(lspTool.parameters as object, {
+        action: "hover",
+        args: {
+          file: "src/index.ts",
+          line: 1,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      Check(lspTool.parameters as object, {
+        action: "symbol_hover",
+        args: {
+          symbol: "buildArchitectureModel",
+          path: "packages/supi-code-intelligence/",
+        },
+      }),
+    ).toBe(false);
+    expect(
+      Check(lspTool.parameters as object, {
+        action: "hover",
+        args: {
+          file: "src/index.ts",
+          line: 1,
+          character: 1,
+        },
+      }),
+    ).toBe(true);
+    expect(
+      Check(lspTool.parameters as object, {
+        action: "hover",
+        args: {
+          file: "src/index.ts",
+          line: 1,
+          character: 1,
+          path: "extra",
+        },
+      }),
+    ).toBe(false);
   });
 });
 

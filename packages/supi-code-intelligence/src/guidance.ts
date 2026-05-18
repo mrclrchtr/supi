@@ -31,13 +31,24 @@ export const promptSnippet =
   "Use the code_intel tool for architecture orientation, semantic relationships, impact analysis, and structured search before broad file reads.";
 
 export const promptGuidelines = [
-  "Use `code_intel brief` before editing an unfamiliar package, directory, or file to get architecture context and reduce blind reads.",
-  "Use `code_intel affected` before changing exported APIs, shared helpers, config surfaces, or cross-package contracts to check blast radius and risk; file-only requests now expand across exported targets when possible.",
-  "Use `code_intel callers` before modifying a function to verify all call sites; use `callees` and `implementations` for dependency and interface analysis, and use file-only `callers` when you need the export surface of a module.",
+  `switch (question) {
+  case "type/signature/docs of X?":       return lsp.hover(file, line, char)
+  case "what fields does type X have?":    return lsp.symbol_hover(X)
+  case "where is X defined?":             return lsp.definition(file, line, char)
+  case "what does pkg/dir/file do?":      return code_intel.brief(path)
+  case "project layout?":                 return code_intel.index()
+  case "who calls X?":                    return code_intel.callers(symbol)
+  case "what does X call?":               return code_intel.callees(symbol)
+  case "what breaks if I change X?":      return code_intel.affected(symbol | file)
+  case "what implements X?":              return code_intel.implementations(symbol)
+  case "imports/exports of file?":        return tree_sitter.imports(file) | tree_sitter.exports(file)
+  case "outline/declarations of file?":   return tree_sitter.outline(file)
+  case "syntax node at position?":        return tree_sitter.node_at(file, line, char)
+  case "run AST query on file?":          return tree_sitter.query(file, pattern)
+  case "find text X in files":            return code_intel.pattern(text)
+  default:                                return bash/read
+}`,
   'Use `code_intel pattern` for bounded, scope-aware text search when the question is textual rather than semantic; it treats patterns as literal strings by default, supports `regex: true`, supports `kind: "definition" | "export" | "import"` for structured searches, and may return a partial-result warning when a structured scan is too broad.',
   "Use `code_intel brief` and `code_intel affected` priority signals to notice diagnostics, low coverage, or unused-code hints before editing risky files.",
-  "Use `code_intel index` for a factual project map (file counts, directory structure, landmark files) when you need to orient yourself in a new codebase.",
-  "When you only need the type, signature, or docs of a known symbol, go straight to \`lsp workspace_symbol\` or \`lsp symbol_hover\` — don't route through \`code_intel\`.",
-  "After `code_intel` narrows the target, use raw `lsp` and `tree_sitter` tools for precise drill-down on exact symbols, types, or AST nodes.",
   "Do not prefer `code_intel` over direct file reads or lower-level tools for trivial, already-localized edits or exact symbol/AST drill-down tasks.",
 ];

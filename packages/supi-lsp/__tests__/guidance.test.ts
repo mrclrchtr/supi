@@ -19,9 +19,11 @@ beforeEach(() => {
 
 describe("LSP prompt guidance", () => {
   it("exports a semantic-first prompt snippet and fallback guidance", () => {
-    expect(lspPromptSnippet).toContain("semantic code intelligence");
-    expect(lspPromptGuidelines.join(" ")).toContain("Prefer the lsp tool");
-    expect(lspPromptGuidelines.join(" ")).toContain("Fall back to bash/read");
+    expect(lspPromptSnippet).toContain(
+      "Use 'lsp' for hover, definitions, references, symbols, rename planning, code actions, and diagnostics in supported languages.",
+    );
+    expect(lspPromptGuidelines.join(" ")).toContain("Prefer lsp over bash/read");
+    expect(lspPromptGuidelines.join(" ")).toContain("fall back to bash/read");
     expect(lspPromptGuidelines.join(" ")).toContain("use lsp recover");
   });
 

@@ -60,9 +60,11 @@ async function warmUpToolActionManager(manager: LspManager): Promise<void> {
     () =>
       executeAction(manager, {
         action: "hover",
-        file: goodFile,
-        line: 1,
-        character: 17,
+        args: {
+          file: goodFile,
+          line: 1,
+          character: 17,
+        },
       }),
     (result) => result.includes("add"),
     { timeoutMs: 5_000, retryDelayMs: 100, label: "hover on 'add' symbol during warm-up" },
@@ -85,9 +87,11 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
   it("hover: returns type info for a function", async () => {
     const result = await executeAction(manager, {
       action: "hover",
-      file: goodFile,
-      line: 1,
-      character: 17,
+      args: {
+        file: goodFile,
+        line: 1,
+        character: 17,
+      },
     });
     expect(result).toContain("add");
   }, 10_000);
@@ -95,9 +99,11 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
   it("hover: reports no info for empty position", async () => {
     const result = await executeAction(manager, {
       action: "hover",
-      file: goodFile,
-      line: 4,
-      character: 1,
+      args: {
+        file: goodFile,
+        line: 4,
+        character: 1,
+      },
     });
     expect(result.toLowerCase()).toContain("no hover");
   }, 10_000);
@@ -106,9 +112,11 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
     // "add" is called on line 9 (1-based), character ~12
     const result = await executeAction(manager, {
       action: "definition",
-      file: goodFile,
-      line: 9,
-      character: 12,
+      args: {
+        file: goodFile,
+        line: 9,
+        character: 12,
+      },
     });
     expect(result).toContain("Definition");
     // Should point back to line 1 where add is defined
@@ -118,9 +126,11 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
   it("references: finds all references to a symbol", async () => {
     const result = await executeAction(manager, {
       action: "references",
-      file: goodFile,
-      line: 1,
-      character: 17,
+      args: {
+        file: goodFile,
+        line: 1,
+        character: 17,
+      },
     });
     expect(result).toContain("References");
     // "add" is defined on line 1 and used on line 9
@@ -130,7 +140,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
   it("symbols: lists document symbols", async () => {
     const result = await executeAction(manager, {
       action: "symbols",
-      file: goodFile,
+      args: { file: goodFile },
     });
     expect(result).toContain("add");
     expect(result).toContain("PI");
@@ -142,7 +152,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
       () =>
         executeAction(manager, {
           action: "diagnostics",
-          file: badFile,
+          args: { file: badFile },
         }),
       (text) => text.toLowerCase().includes("error"),
       { timeoutMs: 10_000, retryDelayMs: 200, label: "diagnostics action for broken file" },
@@ -153,7 +163,7 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
   it("diagnostics: no errors for valid file", async () => {
     const result = await executeAction(manager, {
       action: "diagnostics",
-      file: goodFile,
+      args: { file: goodFile },
     });
     // Should be "No diagnostics." or have no errors
     const hasError = result.toLowerCase().includes("error") && !result.includes("No diagnostics");
@@ -178,10 +188,12 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
   it("rename: computes workspace-wide rename", async () => {
     const result = await executeAction(manager, {
       action: "rename",
-      file: goodFile,
-      line: 1,
-      character: 17,
-      newName: "addNumbers",
+      args: {
+        file: goodFile,
+        line: 1,
+        character: 17,
+        newName: "addNumbers",
+      },
     });
     // Should show rename edits
     expect(result).toContain("addNumbers");
@@ -193,9 +205,11 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
 
     const result = await executeAction(manager, {
       action: "code_actions",
-      file: badFile,
-      line: 1,
-      character: 1,
+      args: {
+        file: badFile,
+        line: 1,
+        character: 1,
+      },
     });
     // May or may not have actions, just verify structured output
     expect(typeof result).toBe("string");
@@ -207,15 +221,20 @@ describe.skipIf(!HAS_TS_LSP)("tool-actions integration", () => {
 
     const result = await executeAction(manager, {
       action: "hover",
-      file: txtFile,
-      line: 1,
-      character: 1,
+      args: {
+        file: txtFile,
+        line: 1,
+        character: 1,
+      },
     });
     expect(result).toContain("No LSP server available");
   });
 
   it("returns validation error for missing parameters", async () => {
-    const result = await executeAction(manager, { action: "hover", file: goodFile });
+    const result = await executeAction(manager, {
+      action: "hover",
+      args: { file: goodFile },
+    });
     expect(result).toContain("Validation error");
     expect(result).toContain("'line' is required");
   });
