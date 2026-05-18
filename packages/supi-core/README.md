@@ -1,65 +1,78 @@
 # @mrclrchtr/supi-core
 
-Shared infrastructure for SuPi packages.
+Shared infrastructure for SuPi extensions.
+
+This package is mainly for extension authors. It gives you a common config system, settings plumbing, context helpers, registries, and a small extension surface that registers `/supi-settings`.
 
 ## Install
 
-Use it as a dependency in another extension package:
+### As a dependency for another extension
 
 ```bash
 pnpm add @mrclrchtr/supi-core
 ```
 
-## Package role
+### As a pi package
 
-`@mrclrchtr/supi-core` now has two explicit surfaces:
-
-- `@mrclrchtr/supi-core/api` — shared library helpers for other SuPi packages
-- `@mrclrchtr/supi-core/extension` — a minimal pi extension that registers `/supi-settings`
-
-`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
-
-## What it provides
-
-Current exports cover:
-
-- shared config loading, scoped reads, writes, and key removal
-- config-backed settings registration helpers for `/supi-settings`
-- the shared settings registry, overlay UI, and `registerSettingsCommand()` helper
-- XML `<extension-context>` wrapping plus context-message utilities
-- context-provider and debug-event registries reused across SuPi packages
-- project root and path helpers reused by packages such as `supi-lsp`
-
-## Config system
-
-Config resolution order:
-
-```text
-defaults <- global <- project
+```bash
+pi install npm:@mrclrchtr/supi-core
 ```
+
+Installing it as a pi package adds the minimal `/supi-settings` extension surface.
+
+## Package surfaces
+
+- `@mrclrchtr/supi-core/api` — reusable helpers for other packages and extensions
+- `@mrclrchtr/supi-core/extension` — minimal pi extension that registers `/supi-settings`
+
+## What you get from the API
+
+### Config helpers
+
+- `loadSupiConfig()` — merged config with resolution order `defaults <- global <- project`
+- `loadSupiConfigForScope()` — load one scope at a time for settings UIs
+- `writeSupiConfig()` — persist values
+- `removeSupiConfigKey()` — remove a key or override
 
 Config file locations:
 
 - global: `~/.pi/agent/supi/config.json`
 - project: `.pi/supi/config.json`
 
-Main helpers:
+### Settings helpers
 
-- `loadSupiConfig()` — effective merged config (`defaults <- global <- project`)
-- `loadSupiConfigForScope()` — raw single-scope config for settings UIs (`defaults <- selected scope`)
-- `writeSupiConfig()`
-- `removeSupiConfigKey()`
-- `registerConfigSettings()`
+- `registerSettings()` — register an arbitrary settings section
+- `registerConfigSettings()` — register a config-backed settings section with scoped persistence helpers
+- `registerSettingsCommand()` — register `/supi-settings`
+- `openSettingsOverlay()` — open the shared settings UI directly
+- `createInputSubmenu()` — helper for simple text-entry submenus
 
-## Context and settings helpers
+The built-in settings UI supports:
 
-- `wrapExtensionContext()`
+- project/global scope toggle
+- grouped extension sections
+- searchable setting lists
+
+### Context helpers
+
+- `wrapExtensionContext()` — wrap injected text in SuPi's `<extension-context>` tag
 - `findLastUserMessageIndex()`
 - `getContextToken()`
+- `getPromptContent()`
 - `pruneAndReorderContextMessages()`
-- `registerSettings()`
-- `registerSettingsCommand()`
-- `openSettingsOverlay()`
+- `restorePromptContent()`
+
+### Shared registries
+
+- context-provider registry for `/supi-context`
+- debug-event registry for producers that want shared debug capture
+- settings registry used by `/supi-settings`
+
+### Project and session helpers
+
+- project-root detection and directory walking helpers such as `findProjectRoot()` and `walkProject()`
+- active-branch session helper: `getActiveBranchEntries()`
+- terminal helpers such as `formatTitle()`, `signalWaiting()`, and `signalDone()`
 
 ## Example
 
@@ -80,17 +93,15 @@ registerConfigSettings({
 });
 
 const message = wrapExtensionContext("my-extension", "hello", {
-  turn: 1,
   file: "CLAUDE.md",
+  turn: 1,
 });
 ```
 
-## Requirements
-
-- `@earendil-works/pi-coding-agent`
-- `@earendil-works/pi-tui`
-
 ## Source
 
-- Library surface: `src/api.ts`
-- Extension surface: `src/extension.ts`
+- `src/api.ts` — exported library surface
+- `src/extension.ts` — minimal `/supi-settings` entrypoint
+- `src/config.ts` — shared config loading and writing
+- `src/config-settings.ts` — config-backed settings registration helper
+- `src/settings-ui.ts` — shared settings overlay

@@ -1,0 +1,127 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-17T23:29:49.097525Z"
+revision = 26
+
+[document_fingerprints]
+archive = "sha256:4a1e79ebf9ef48812043294c5cbaf370495139cb653cc4e33c4433e9bde8f890"
+content = "sha256:fb64476eca5da10960c93bdbdf52f3c337e7491280b1654ae104ed123b2832f5"
+
+[[tasks]]
+number = 1
+title = "Rewrite the `supi-ask-user` README around the install surface and questionnaire behavior"
+status = "done"
+file = "packages/supi-ask-user/README.md"
+verification = "Compare the rewritten README against `packages/supi-ask-user/package.json`, `packages/supi-ask-user/src/extension.ts`, and `packages/supi-ask-user/src/ask-user.ts`; expected result: the install instructions, `ask_user` tool behavior, question types, limits, and cancellation rules all match the code."
+
+[[tasks]]
+number = 2
+title = "Rewrite the `supi-bash-timeout` README around what it changes on `bash` calls"
+status = "done"
+file = "packages/supi-bash-timeout/README.md"
+verification = "Compare the rewritten README against those source files; expected result: the timeout injection behavior, config/settings surface, and install instructions all match the implementation."
+
+[[tasks]]
+number = 3
+title = "Rewrite the `supi-cache` README around monitoring, history, and forensics"
+status = "done"
+file = "packages/supi-cache/README.md"
+verification = "Compare the rewritten README against those files; expected result: command/tool names, monitoring scope, settings, and forensics/history behavior all match the code."
+
+[[tasks]]
+number = 4
+title = "Rewrite the `supi-claude-md` README around subdirectory context injection"
+status = "done"
+file = "packages/supi-claude-md/README.md"
+verification = "Compare the rewritten README against those files; expected result: the README accurately describes subdirectory context behavior, settings, and any resource-discovery additions."
+
+[[tasks]]
+number = 5
+title = "Rewrite the `supi-code-intelligence` README around the `code_intel` tool actions"
+status = "done"
+file = "packages/supi-code-intelligence/README.md"
+verification = "Compare the rewritten README against those files; expected result: the `code_intel` entrypoint, action names, and described workflows match the current source."
+
+[[tasks]]
+number = 6
+title = "Rewrite the `supi-context` README around `/supi-context` and context reporting"
+status = "done"
+file = "packages/supi-context/README.md"
+verification = "Compare the rewritten README against those files; expected result: the command name, report contents, and any automatic context-related behavior all match the code."
+
+[[tasks]]
+number = 7
+title = "Rewrite the `supi-core` README for package authors who want the shared infrastructure"
+status = "done"
+file = "packages/supi-core/README.md"
+verification = "Compare the rewritten README against those files; expected result: exported helper categories, `/supi-settings`, and config/settings behavior match the current package surface."
+
+[[tasks]]
+number = 8
+title = "Rewrite the `supi-debug` README around session-local debug inspection"
+status = "done"
+file = "packages/supi-debug/README.md"
+verification = "Compare the rewritten README against those files; expected result: command/tool names, debug log behavior, and output description all match the implementation."
+
+[[tasks]]
+number = 9
+title = "Rewrite the `supi-extras` README around its concrete utilities"
+status = "done"
+file = "packages/supi-extras/README.md"
+verification = "Compare the rewritten README against those files; expected result: every named utility exists in source and the command names/behaviors are documented accurately."
+
+[[tasks]]
+number = 10
+title = "Rewrite the `supi-insights` README around report generation and session analysis"
+status = "done"
+file = "packages/supi-insights/README.md"
+verification = "Compare the rewritten README against those files; expected result: the command entrypoint, report/output behavior, and scope/caveats all match the code."
+
+[[tasks]]
+number = 11
+title = "Rewrite the `supi-lsp` README around the install surface and LSP workflow"
+status = "done"
+file = "packages/supi-lsp/README.md"
+verification = "Compare the rewritten README against those files; expected result: tool actions, command name, settings, diagnostics behavior, and exported service surface all match the implementation."
+
+[[tasks]]
+number = 12
+title = "Rewrite the `supi-review` README around the review flow and settings"
+status = "done"
+file = "packages/supi-review/README.md"
+verification = "Compare the rewritten README against those files; expected result: command/tool names, review flow, and settings/profile descriptions all match source."
+
+[[tasks]]
+number = 13
+title = "Rewrite the `supi-rtk` README around transparent bash rewriting"
+status = "done"
+file = "packages/supi-rtk/README.md"
+verification = "Compare the rewritten README against those files; expected result: activation conditions, benefits, and limits all match the code."
+
+[[tasks]]
+number = 14
+title = "Rewrite the `supi-test-utils` README for extension authors adding tests"
+status = "done"
+file = "packages/supi-test-utils/README.md"
+verification = "Compare the rewritten README against those files; expected result: all helpers and example imports mentioned in the README are present in the current export surface."
+
+[[tasks]]
+number = 15
+title = "Rewrite the `supi-tree-sitter` README around structural analysis and tool actions"
+status = "done"
+file = "packages/supi-tree-sitter/README.md"
+verification = "Compare the rewritten README against those files; expected result: tool/action names, language support notes, and current limits all match the code."
+
+[[tasks]]
+number = 16
+title = "Rewrite the `supi-web` README around web fetch and docs lookup tools"
+status = "done"
+file = "packages/supi-web/README.md"
+verification = "Compare the rewritten README against those files; expected result: tool names, output format, and docs-lookup behavior all match source."
+
+[[tasks]]
+number = 17
+title = "Rewrite the `supi` meta-package README last and use it for the final consistency pass"
+status = "done"
+file = "packages/supi/README.md"
+verification = "Compare the rewritten README against `packages/supi/package.json`, `packages/supi/src/api.ts`, `packages/supi/src/extension.ts`, and the workspace package list; expected result: bundled packages, beta/direct-install packages, exports, install commands, and package links are all correct and consistent with the package READMEs."

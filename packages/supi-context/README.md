@@ -1,34 +1,6 @@
 # @mrclrchtr/supi-context
 
-Context diagnostics for PI — see exactly what's eating your context window, down to the file.
-
-Run `/supi-context` in any session. You get a visual dashboard, not just a number: a color-coded grid of your context budget, per-category breakdowns, per-file token counts for every injected context file, skill token usage, and compaction info.
-
-## What you get
-
-### Visual budget
-
-A 20-column grid shows your context window at a glance — which categories fill it, how much free space remains, and where the autocompact buffer sits. Color-coded: system prompt, conversation, tools, free space.
-
-### Per-category breakdown
-
-System prompt, user messages, assistant messages, tool calls, tool results — each with token counts and percentage of the total.
-
-### System prompt deep dive
-
-What's inside the system prompt: context files (per-file tokens), skills (per-skill tokens), guidelines, tool definitions, and custom append text. Find the exact file or skill that's bloating your context.
-
-### Injected context tracking
-
-Every file injected by supi-claude-md, with turn number and token cost. See what subdirectory context is costing you.
-
-### Compaction awareness
-
-How many older turns were summarized. Know when your conversation history was compacted.
-
-### Extension data
-
-Registered context providers (like supi-cache) contribute their own sections — see cache hit rates, forensics data, or whatever other extensions want to surface.
+Adds a `/supi-context` command to the [pi coding agent](https://github.com/earendil-works/pi) so you can see where your context window is going.
 
 ## Install
 
@@ -36,8 +8,42 @@ Registered context providers (like supi-cache) contribute their own sections —
 pi install npm:@mrclrchtr/supi-context
 ```
 
-## Usage
+For local development:
 
 ```bash
-/supi-context
+pi install ./packages/supi-context
 ```
+
+After editing the source, run `/reload`.
+
+## What you get
+
+After install, pi gets one command:
+
+- `/supi-context` — render a detailed context-usage report for the current session
+
+The report includes:
+
+- model name and context-window size
+- estimated or scaled total token usage
+- a visual grid of used space, free space, and autocompact buffer
+- token usage by category: system prompt, user messages, assistant messages, tool calls, tool results, and other
+- system-prompt breakdown for context files, skills, guidelines, tool snippets, and append text
+- injected subdirectory context files from `supi-claude-md`, including turn number and token cost
+- active skills and their token cost
+- tool-definition count and token cost
+- compaction summary when older turns were summarized
+- extra provider sections from extensions registered through the shared context-provider registry
+
+## Notes
+
+- The command uses the latest cached `systemPromptOptions` captured before an agent run.
+- When exact usage data is not available yet, the report falls back to estimated token counts and shows an approximation note.
+- The command does not add a model-callable tool; it is a user command only.
+
+## Source
+
+- `src/context.ts` — command registration and cached prompt-option handling
+- `src/analysis.ts` — token accounting and report data
+- `src/format.ts` — formatted report output
+- `src/renderer.ts` — custom message renderer for the report

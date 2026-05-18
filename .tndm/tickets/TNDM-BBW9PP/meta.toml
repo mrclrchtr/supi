@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-BBW9PP"
+title = "Inspect each workspace package and improve package README files based on discovered capabilities/features"
+type = "chore"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"

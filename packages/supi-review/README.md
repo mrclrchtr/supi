@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-review
 
-Structured code review for the [pi coding agent](https://github.com/earendil-works/pi).
+Adds a guided `/supi-review` command to the [pi coding agent](https://github.com/earendil-works/pi) for structured code review.
 
 ## Install
 
@@ -8,83 +8,111 @@ Structured code review for the [pi coding agent](https://github.com/earendil-wor
 pi install npm:@mrclrchtr/supi-review
 ```
 
-> **🧪 Beta package** — not included in the `@mrclrchtr/supi` meta-package.
-> Install directly when you need structured code reviews.
+This is a **beta** package. It is not bundled in `@mrclrchtr/supi`.
 
-## What it adds
+For local development:
 
-This extension registers `/supi-review`, which launches an in-process managed child session to review code.
+```bash
+pi install ./packages/supi-review
+```
 
-Reviews are driven by a **review brief** — a structured description of what changed, why, and what the reviewer should focus on. Two modes are available:
+After editing the source, run `/reload`.
 
-- **Dynamic review** — you provide a summary of what changed, the intended outcome, and focus areas. The system assembles a review brief and shows you the full prompt for editing and approval before running.
-- **Standard review** — pick a predefined review profile (general, security, or API & maintainability). The system generates a brief from the profile and shows the full prompt for editing and approval before running.
+## What you get
 
-Review results are emitted as a `supi-review` custom message that includes the review brief context alongside the verdict and findings. Optional auto-fix mode can send a follow-up user message to fix the findings.
+After install, pi gets one command:
+
+- `/supi-review` — launch an interactive review flow and render a structured review result
+
+The reviewer runs in a managed child agent session with read-only review tools:
+
+- `read`
+- `grep`
+- `find`
+- `ls`
+- `submit_review` (internal result-submission tool)
 
 ## Review flow
 
-```text
-/supi-review
-    ↓
-select review mode (dynamic / standard)
-    ↓
-select review target (uncommitted / base-branch / commit / custom)
-    ↓
-build review brief
-    (dynamic: from summary + intent + focus)
-    (standard: from profile)
-    ↓
-edit and approve the full review prompt
-    ↓
-create child reviewer session
-    ↓
-submit_review tool returns structured findings
-    ↓
-render supi-review message with brief + findings
+`/supi-review` walks you through:
+
+1. choose a review mode
+2. choose a review target
+3. build a review brief
+4. edit and approve the final review prompt
+5. run the review with a live progress widget
+6. show the result as a structured custom message
+7. optionally trigger an auto-fix follow-up turn
+
+## Review modes
+
+### Dynamic review
+
+You provide:
+
+- what changed
+- the intended outcome
+- what the reviewer should focus on
+
+The package turns that into a review brief and lets you edit the final prompt before the review starts.
+
+### Standard review
+
+You choose one of the built-in profiles:
+
+- `general`
+- `security`
+- `api-maintainability`
+
+The package builds the review brief from the selected profile and again lets you edit the final prompt before running.
+
+## Review targets
+
+Current target presets:
+
+- base branch diff
+- uncommitted changes
+- one commit
+- custom review instructions
+
+## Result shape
+
+A successful review includes:
+
+- overall correctness verdict
+- overall explanation
+- overall confidence score
+- structured findings with title, body, priority, confidence score, and code location
+
+The renderer also handles failed, canceled, and timed-out reviews.
+
+## Settings
+
+This package registers a **Review** section in `/supi-settings`.
+
+Available settings:
+
+- `reviewModel` — preselect the model used by `/supi-review`; empty means inherit the active session model
+- `maxDiffBytes` — maximum diff size before the prompt builder truncates the diff
+- `autoFix` — automatically send a follow-up user message to fix findings after a successful review with findings
+
+Defaults:
+
+```json
+{
+  "review": {
+    "reviewModel": "",
+    "maxDiffBytes": 100000,
+    "autoFix": false
+  }
+}
 ```
 
-## Configuration
+## Source
 
-If your install surface includes `/supi-settings` (for example when also installing the `@mrclrchtr/supi` meta-package), this package contributes review settings there.
-
-## Architecture
-
-```text
-src/
-├── briefs.ts              review brief construction and prompt assembly
-├── profiles.ts            starter standard review profiles (general, security, api-maintainability)
-├── review.ts              command registration and orchestration
-├── runner.ts              managed child-session execution
-├── runner-types.ts        reviewer invocation and progress types
-├── target-resolution.ts   git-backed target hydration
-├── prompts.ts             target preamble and diff formatting
-├── git.ts                 git helpers for diffs, commits, and branches
-├── progress-widget.ts     live TUI progress overlay
-├── renderer.ts            custom message renderer
-├── settings.ts            review model + behavior settings
-├── types.ts               shared result, brief, and target types
-├── format-content.ts      plain-text review content formatting
-├── ui.ts                  TUI selection, input, and approval steps
-└── extension.ts           package entrypoint
-```
-
-## Requirements
-
-- `@earendil-works/pi-ai`
-- `@earendil-works/pi-coding-agent`
-- `@earendil-works/pi-tui`
-- `typebox`
-- `@mrclrchtr/supi-core`
-
-## Development
-
-```bash
-pnpm vitest run packages/supi-review/
-pnpm exec tsc --noEmit -p packages/supi-review/tsconfig.json
-pnpm exec biome check packages/supi-review/
-```
-
-## License
-
-MIT
+- `src/review.ts` — command orchestration and interactive flow
+- `src/ui.ts` — TUI selection and approval steps
+- `src/profiles.ts` — built-in review profiles
+- `src/runner.ts` — managed reviewer session
+- `src/settings.ts` — `/supi-settings` integration
+- `src/renderer.ts` — structured result rendering

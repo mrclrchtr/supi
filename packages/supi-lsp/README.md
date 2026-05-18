@@ -1,22 +1,6 @@
 # @mrclrchtr/supi-lsp
 
-Language Server Protocol for PI — your agent navigates code like an IDE.
-
-Without LSP, agents grep and guess. With it, they jump to definitions, find every reference, rename across files, and catch type errors inline. The same precision you get from an editor, available to your agent.
-
-## What you get
-
-### Navigate with precision
-
-Go-to-definition, find-references, rename, hover types. The agent stops guessing and starts navigating your codebase with IDE-level accuracy.
-
-### Catch problems immediately
-
-Type errors, warnings, and hints surface inline after every edit. The agent sees mistakes as it makes them — not 10 turns later when tests fail.
-
-### Always ready
-
-Servers start automatically for your project. The agent gets language-aware guidance at session start and stale diagnostics are refreshed when dependencies change.
+Adds Language Server Protocol support to the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -24,48 +8,87 @@ Servers start automatically for your project. The agent gets language-aware guid
 pi install npm:@mrclrchtr/supi-lsp
 ```
 
-## Quick look
+For local development:
 
-The agent gets an `lsp` tool. The most-used actions:
+```bash
+pi install ./packages/supi-lsp
+```
 
-| Action | What the agent can do |
-|--------|----------------------|
-| `hover` | See the type of any symbol |
-| `definition` | Jump to where something is defined |
-| `references` | Find every usage across the project |
-| `diagnostics` | See errors, warnings, and hints |
-| `rename` | Rename across the entire project |
+After editing the source, run `/reload`.
 
-Full action reference: the agent's system prompt includes complete guidelines for all 11 actions (hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, symbol_hover, recover). All positions are 1-based.
+## What you get
+
+After install, pi gets:
+
+- `lsp` — one model-callable tool for semantic code navigation and diagnostics
+- `/lsp-status` — inspect detected servers, roots, open files, and diagnostics
+- automatic LSP-aware diagnostic surfacing around edits and agent turns
+
+## `lsp` actions
+
+| Action | What it is for |
+| --- | --- |
+| `hover` | Show type or symbol information at a position |
+| `definition` | Jump to where a symbol is defined |
+| `references` | Find usages of a symbol |
+| `diagnostics` | Show outstanding diagnostics for one file or the workspace |
+| `symbols` | List document symbols |
+| `rename` | Plan or perform a rename |
+| `code_actions` | Show fixes or refactors at a position |
+| `workspace_symbol` | Search symbols across the project |
+| `search` | Search symbols with LSP first, then text fallback |
+| `symbol_hover` | Hover by symbol name without coordinates |
+| `recover` | Refresh diagnostics after workspace changes |
+
+Positions use **1-based** line and character coordinates.
+
+## Automatic behavior
+
+This package does more than register a tool:
+
+- starts detected language servers for the current project
+- rebuilds project-specific prompt guidance based on active servers
+- injects outstanding diagnostics into context before agent turns when issues exist
+- adds inline diagnostics after `write` and `edit` results
+- watches for workspace changes such as `package.json`, lockfile, `tsconfig`, generated types, and source-file edits so recovery can happen when diagnostics go stale
+- warns when configured language-server commands are missing
 
 ## Settings
 
-Configure via `/supi-settings` (LSP panel):
+This package registers an **LSP** section in `/supi-settings`.
 
-- Enable or disable LSP per project
-- Set diagnostic severity threshold (errors only, or include warnings/hints)
-- Choose which language servers to activate
-- Add file exclusion patterns (gitignore-style globs)
+Available settings:
 
-Settings are stored in `~/.pi/agent/supi/config.json` (global) or `.pi/supi/config.json` (project). The `/lsp-status` command shows active servers and outstanding diagnostics.
+- `enabled` — turn all LSP behavior on or off
+- `severity` — inline diagnostic threshold: `1` errors, `2` warnings, `3` info, `4` hints
+- `active` — choose which configured language servers are active; empty means all
+- `exclude` — gitignore-style patterns that suppress diagnostics for matching files
+
+Config lives in the standard SuPi config files:
+
+- global: `~/.pi/agent/supi/config.json`
+- project: `.pi/supi/config.json`
 
 ## Package surfaces
 
-- `@mrclrchtr/supi-lsp/api` — reusable library surface for peer extensions
+- `@mrclrchtr/supi-lsp/api` — reusable session-scoped LSP service and related types
 - `@mrclrchtr/supi-lsp/extension` — pi extension entrypoint
 
-`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
-
-## For extension developers
-
-This package exports a reusable session-scoped LSP service. Peer extensions can query the same LSP runtime without starting duplicate servers:
+Example:
 
 ```ts
-import { getSessionLspService, SessionLspService } from "@mrclrchtr/supi-lsp/api";
+import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 
 const state = getSessionLspService("/project");
 if (state.kind === "ready") {
   const defs = await state.service.definition("src/index.ts", { line: 5, character: 10 });
-  const refs = await state.service.references("src/index.ts", { line: 5, character: 10 });
 }
 ```
+
+## Source
+
+- `src/lsp.ts` — extension wiring, tool registration, session lifecycle, and `/lsp-status`
+- `src/settings-registration.ts` — `/supi-settings` integration
+- `src/guidance.ts` — prompt guidance and diagnostic-context formatting
+- `src/config.ts` — server config loading and per-language overrides
+- `src/api.ts` — reusable developer-facing surface

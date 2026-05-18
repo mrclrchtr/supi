@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-debug
 
-Session-local debug event inspection for the [pi coding agent](https://github.com/earendil-works/pi).
+Adds shared debug-event capture and inspection for SuPi extensions in the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -8,50 +8,85 @@ Session-local debug event inspection for the [pi coding agent](https://github.co
 pi install npm:@mrclrchtr/supi-debug
 ```
 
-## What it adds
+For local development:
 
-This extension provides three surfaces for inspecting recent SuPi debug events:
+```bash
+pi install ./packages/supi-debug
+```
 
-- `supi_debug` tool — agent-callable query API
-- `/supi-debug` command — TUI report for humans
-- shared settings integration — enable/disable, access level, max events, notify level when your install surface includes `/supi-settings` (for example via `@mrclrchtr/supi`)
+After editing the source, run `/reload`.
 
-By default the agent sees sanitized event data. Raw event access requires explicit opt-in.
+## What you get
 
-## Query filters
+After install, this package wires the shared debug registry into three user-facing surfaces:
 
-Both the command and the tool support filtering by:
+- `/supi-debug` — show recent debug events in a readable TUI report
+- `supi_debug` — let the model query recent debug events during troubleshooting
+- `/supi-settings` integration — configure whether events are captured and how much data is exposed
+
+It also registers a **Debug** provider section for `/supi-context`.
+
+## Event behavior
+
+- events are session-local
+- the event buffer is cleared on `session_start`
+- if debug capture is disabled, no events are retained
+- agent-facing access is blocked, sanitized, or raw depending on settings
+
+Rendered events include:
+
+- timestamp
+- level
+- `source/category`
+- message
+- optional `cwd`
+- optional `data`
+- optional `rawData`
+
+## Filters
+
+Both `/supi-debug` and `supi_debug` support the same basic filters:
 
 - `source`
 - `level`
 - `category`
 - `limit`
 
-## Architecture
+The tool also accepts:
 
-```text
-src/
-├── debug.ts     extension wiring, settings, tool, and command registration
-├── format.ts    event formatting and serialization
-├── renderer.ts  custom message renderer for debug reports
-└── index.ts     package entrypoint
+- `includeRaw` — request raw event data when settings allow it
+
+## Settings
+
+This package registers a **Debug** section in `/supi-settings`.
+
+Available settings:
+
+- `enabled` — turn session-local event capture on or off
+- `agentAccess` — `off`, `sanitized`, or `raw`
+- `maxEvents` — maximum retained events in memory
+- `notifyLevel` — minimum severity that may notify the user: `off`, `warning`, or `error`
+
+Defaults come from the shared debug registry:
+
+```json
+{
+  "debug": {
+    "enabled": false,
+    "agentAccess": "sanitized",
+    "maxEvents": 100,
+    "notifyLevel": "off"
+  }
+}
 ```
 
-## Requirements
+## Extra status logging
 
-- `@earendil-works/pi-coding-agent`
-- `@earendil-works/pi-tui`
-- `typebox`
-- `@mrclrchtr/supi-core`
+If `SUPI_LOG_STATUS` is enabled in the environment, the package emits a SuPi load-status marker to stderr on `session_start` and appends the same payload as a session entry.
 
-## Development
+## Source
 
-```bash
-pnpm vitest run packages/supi-debug/
-pnpm exec tsc --noEmit -p packages/supi-debug/tsconfig.json
-pnpm exec biome check packages/supi-debug/
-```
-
-## License
-
-MIT
+- `src/debug.ts` — settings, command, tool, and registry wiring
+- `src/renderer.ts` — custom report renderer
+- `src/format.ts` — debug payload formatting
+- `src/status-log.ts` — optional load-status logging

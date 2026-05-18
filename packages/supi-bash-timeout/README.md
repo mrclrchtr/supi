@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-bash-timeout
 
-Injects a default timeout on `bash` tool calls when the LLM omits one, preventing hung commands from blocking the [pi coding agent](https://github.com/earendil-works/pi) indefinitely.
+Adds one small safety feature to the [pi coding agent](https://github.com/earendil-works/pi): if the model calls `bash` without a timeout, this package fills one in.
 
 ## Install
 
@@ -8,32 +8,40 @@ Injects a default timeout on `bash` tool calls when the LLM omits one, preventin
 pi install npm:@mrclrchtr/supi-bash-timeout
 ```
 
-Also included in the [SuPi meta-package](https://www.npmjs.com/package/@mrclrchtr/supi).
-
 For local development:
 
 ```bash
 pi install ./packages/supi-bash-timeout
 ```
 
-Edit the source and `/reload` to pick up changes.
+After editing the source, run `/reload`.
 
-## What it adds
+## What you get
 
-Intercepts every `bash` tool call and injects a configurable default timeout when the model didn't specify one.
+After install, every `bash` tool call is checked before execution:
 
-- Only affects the `bash` tool — other tools are untouched
-- Leaves explicit timeouts unchanged
-- Default timeout: **120 seconds**
+- if the model already set `timeout`, that value is kept
+- if `timeout` is missing, this package injects a default value
+- other tools are untouched
 
-## Configuration
+Default timeout: **120 seconds**
 
-Config files (project overrides global):
+This is useful when you want a guardrail against hung commands in long or unattended sessions.
 
-| Scope | Path |
-|-------|------|
-| Global | `~/.pi/agent/supi/config.json` |
-| Project | `.pi/supi/config.json` |
+## Settings
+
+This package registers a **Bash Timeout** section in `/supi-settings`.
+
+Available setting:
+
+- `defaultTimeout` — default timeout for `bash` tool calls, in seconds
+
+Config is stored in the standard SuPi config files:
+
+- global: `~/.pi/agent/supi/config.json`
+- project: `.pi/supi/config.json`
+
+Example:
 
 ```json
 {
@@ -43,15 +51,10 @@ Config files (project overrides global):
 }
 ```
 
-`defaultTimeout` must be a positive integer. Non-numeric, zero, and negative values fall back to the 120-second default.
-
-If `/supi-settings` is available (registered by the `@mrclrchtr/supi` meta-package), the **Bash Timeout** section also appears there with an editable field.
-
-## Requirements
-
-- `@earendil-works/pi-coding-agent` (peer)
-- `@mrclrchtr/supi-core`
+Invalid values are ignored and fall back to the built-in default of `120`.
 
 ## Source
 
-Extension entrypoint: `src/bash-timeout.ts`
+- `src/bash-timeout.ts` — intercepts `bash` tool calls and injects missing timeouts
+- `src/config.ts` — config loading and default values
+- `src/settings-registration.ts` — `/supi-settings` registration

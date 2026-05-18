@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-cache
 
-Prompt cache health monitoring and cross-session forensics for the [pi coding agent](https://github.com/earendil-works/pi).
+Adds prompt-cache monitoring and cache-regression forensics to the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -8,8 +8,7 @@ Prompt cache health monitoring and cross-session forensics for the [pi coding ag
 pi install npm:@mrclrchtr/supi-cache
 ```
 
-> **🧪 Beta package** — not included in the `@mrclrchtr/supi` meta-package.
-> Install directly when you need cache forensics.
+This is a **beta** package. It is not bundled in `@mrclrchtr/supi`.
 
 For local development:
 
@@ -17,60 +16,72 @@ For local development:
 pi install ./packages/supi-cache
 ```
 
-Edit the source and `/reload` to pick up changes.
+After editing the source, run `/reload`.
 
-## What it adds
+## What you get
 
-**Real-time monitoring** — tracks per-turn cache hit rates and shows a compact footer status (`cache: 80% ↑`). When the hit rate drops below the configured threshold, a warning notification includes the likely cause (compaction, model change, system prompt change, or idle).
+After install, the package does two things:
 
-**Cross-session forensics** — scans past session files to answer investigative questions across sessions with four query patterns:
+1. **Monitor the current session**
+   - records per-turn cache usage from assistant messages
+   - updates a footer status for cache health
+   - warns when the cache hit rate drops enough to count as a regression
+   - tries to explain the drop as compaction, model change, prompt change, or unknown
 
-- **Hotspots** — worst hit-rate drops across all sessions, ranked by magnitude
-- **Breakdown** — tally of regression causes (compaction, model change, prompt change, unknown, idle)
-- **Tool correlation** — which tool calls preceded each regression drop
-- **Idle-time detection** — gaps between turns that correlate with cache expiry
+2. **Investigate past sessions**
+   - scans session files for cache regressions across time
+   - groups findings into a few built-in query patterns
+   - keeps agent-facing results redacted to structural fingerprints instead of raw command text or file paths
 
 ## Commands and tool
 
-| Surface  | Name | Description |
-|----------|------|-------------|
-| Command  | `/supi-cache-history` | Per-turn cache metrics table for the current session, with annotated regression details and fingerprint diffs |
-| Command  | `/supi-cache-forensics` | Cross-session investigation with themed TUI report. Accepts `--pattern`, `--since`, `--min-drop` filters |
-| Tool     | `supi_cache_forensics` | Agent-callable — returns structured JSON with shape fingerprints (param types and lengths, no raw content) |
+### `/supi-cache-history`
 
-### Command examples
+Shows cache history for the current session.
 
-```text
-# Show per-turn history for the current session
-/supi-cache-history
+The report includes per-turn values for:
 
-# Cause breakdown for the last 7 days
-/supi-cache-forensics
+- input tokens
+- cache read tokens
+- cache write tokens
+- hit rate
+- notes about detected regressions
 
-# Worst drops from the last 3 days
-/supi-cache-forensics --pattern hotspots --since 3d --min-drop 20
+### `/supi-cache-forensics`
 
-# Idle-time detection
-/supi-cache-forensics --pattern idle
-```
+Runs a cross-session investigation.
 
-### Agent tool example
+Supported patterns:
 
-```json
-{ "pattern": "hotspots", "since": "7d", "minDrop": 20 }
-{ "pattern": "breakdown" }
-{ "pattern": "correlate", "since": "24h" }
-{ "pattern": "idle", "since": "30d" }
-```
+- `breakdown` — count regressions by cause
+- `hotspots` — show the largest drops
+- `correlate` — show which preceding tool calls correlate with drops
+- `idle` — show drops after long gaps between turns
 
-## Configuration
+Useful flags:
 
-Config files (project overrides global):
+- `--since 7d`
+- `--pattern breakdown`
+- `--min-drop 20`
 
-| Scope | Path |
-|-------|------|
-| Global | `~/.pi/agent/supi/config.json` |
-| Project | `.pi/supi/config.json` |
+### `supi_cache_forensics`
+
+Adds one model-callable tool with the same four patterns: `hotspots`, `breakdown`, `correlate`, and `idle`.
+
+The tool returns JSON text. Before results are returned to the model, human-only details such as `_pathsInvolved` and `_commandSummaries` are stripped out.
+
+## Settings
+
+This package registers a **Cache** section in `/supi-settings`.
+
+Available settings:
+
+- `enabled` — turn monitoring on or off
+- `notifications` — show warning notifications for regressions
+- `regressionThreshold` — percentage-point drop that counts as a regression warning
+- `idleThresholdMinutes` — inactivity gap used to classify idle-time regressions
+
+Defaults:
 
 ```json
 {
@@ -83,37 +94,11 @@ Config files (project overrides global):
 }
 ```
 
-| Setting | Description | Default |
-|---------|-------------|---------|
-| `enabled` | Enable/disable monitoring | `true` |
-| `notifications` | Show regression warning notifications | `true` |
-| `regressionThreshold` | Percentage-point drop that triggers a warning and gates forensics findings | `25` |
-| `idleThresholdMinutes` | Minutes of inactivity to classify as idle-time regression | `5` |
-
-Upgrades from the old `cache-monitor` config section are handled automatically.
-
-If you have `/supi-settings` available (for example when also installing the `@mrclrchtr/supi` meta-package), the **Cache** section also appears there with editable fields.
-
-## Provider notes
-
-Some providers do not report cache write tokens in their usage metadata. For example, Anthropic's API returns `cache_read_input_tokens` and `input_tokens` but does not expose cache writes. When using such a provider, the `CacheW` column in `/supi-cache-history` will always show `0`. Providers that do report cache writes (e.g. Google Gemini) will populate the column normally.
-
-## Agent safety
-
-The `supi_cache_forensics` tool returns shape fingerprints, not raw content:
-
-| If the agent sees | It does NOT see |
-|---|---|
-| `{ "toolName": "bash", "paramKeys": ["command"], "paramShapes": { "command": { "kind": "string", "len": 340, "multiline": true } } }` | The 340-char command text |
-| `{ "toolName": "write", "paramKeys": ["file_path", "content"] }` | The file content or exact path |
-
-Human-only detail (`_pathsInvolved`, `_commandSummaries`) is stripped before returning to the agent — the TUI renderer shows richer information.
-
-## Requirements
-
-- `@earendil-works/pi-coding-agent`
-- `@mrclrchtr/supi-core`
+The config loader also reads the legacy `cache-monitor` section for upgrades, but `supi-cache` is the current config section.
 
 ## Source
 
-Extension entrypoint: `src/index.ts` → `src/monitor/monitor.ts`
+- `src/monitor/monitor.ts` — live monitoring, commands, and tool registration
+- `src/forensics/forensics.ts` — cross-session scan pipeline
+- `src/report/history.ts` — current-session history report
+- `src/report/forensics.ts` — cross-session forensics report

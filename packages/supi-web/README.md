@@ -1,10 +1,8 @@
 # @mrclrchtr/supi-web
 
-Fetch web pages as clean Markdown and query library documentation via [Context7](https://context7.com) for the [pi coding agent](https://github.com/earendil-works/pi).
+Adds web-page fetching and library-documentation lookup tools to the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
-
-Included in `@mrclrchtr/supi`, or install standalone:
 
 ```bash
 pi install npm:@mrclrchtr/supi-web
@@ -16,90 +14,76 @@ For local development:
 pi install ./packages/supi-web
 ```
 
-After editing the source, run `/reload` to pick up changes.
+After editing the source, run `/reload`.
+
+## What you get
+
+After install, pi gets three tools:
+
+- `web_fetch_md` — fetch a web page and convert it to Markdown
+- `web_docs_search` — search Context7 for a library ID
+- `web_docs_fetch` — fetch up-to-date documentation for a specific Context7 library
+
+## Choose the right tool
+
+### `web_fetch_md`
+
+Use this for general web pages.
+
+Important behavior:
+
+- accepts only real `http://` or `https://` URLs
+- defaults to `output_mode: auto`
+- returns Markdown inline when the result is at most **15,000 characters**
+- otherwise writes the Markdown to a temporary `.md` file and returns the file path
+- absolutizes links and image URLs by default
+- wraps plain-text responses as fenced code blocks instead of pretending they are prose
+
+The fetch pipeline tries several strategies in order:
+
+1. Markdown-aware content negotiation
+2. content sniffing
+3. sibling `.md` / `.markdown` probing
+4. HTML fetch followed by Readability + Turndown conversion
+
+### `web_docs_search`
+
+Use this when you need a Context7 library ID first.
+
+It returns a Markdown table of matching libraries with fields such as:
+
+- ID
+- name
+- description
+- trust score
+- benchmark score
+- snippet count
+- versions
+
+### `web_docs_fetch`
+
+Use this when you already know the Context7 library ID and want current docs or snippets for a specific question.
+
+- `library_id` is required
+- `query` is required
+- `raw: true` returns JSON-serialized snippet objects instead of plain text Markdown
+
+## Context7 notes
+
+`web_docs_search` and `web_docs_fetch` use Context7 through `@upstash/context7-sdk`.
+
+If `CONTEXT7_API_KEY` is set, the SDK will use it automatically.
 
 ## Package surfaces
 
-- `@mrclrchtr/supi-web/api` — programmatic exports (conversion helpers, fetch utilities, tool factories)
-- `@mrclrchtr/supi-web/extension` — aggregated pi extension entrypoint that registers all three tools
+- `@mrclrchtr/supi-web/api` — conversion helpers, fetch helpers, and extension exports
+- `@mrclrchtr/supi-web/extension` — extension entrypoint that registers all three tools
 
-`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
+## Source
 
-## What it adds
-
-Registers three agent-callable tools:
-
-| Tool | Purpose |
-|------|---------|
-| `web_fetch_md` | Fetch an `http(s)` URL and return clean Markdown |
-| `web_docs_search` | Search Context7 for libraries by name |
-| `web_docs_fetch` | Retrieve up-to-date documentation for a specific library via Context7 |
-
-## web_fetch_md — Web Page to Markdown
-
-### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `url` | `string` | **required** | `http://` or `https://` URL to fetch |
-| `output_mode` | `"auto" \| "inline" \| "file"` | `"auto"` | `auto` returns inline if ≤15,000 chars, else writes to temp file |
-| `abs_links` | `boolean` | `true` | Absolutize relative links and image sources |
-| `timeout_ms` | `number` | `30000` | Fetch timeout in milliseconds |
-
-### Content negotiation
-
-The tool tries multiple strategies to get clean Markdown:
-
-1. **HEAD negotiation** — checks `content-type` for Markdown
-2. **Sniffing** — range GET of first 8KB to detect Markdown/plain text vs HTML
-3. **Sibling probing** — tries `.md` / `.markdown` variants (e.g. `page.md` for `page.html`)
-4. **HTML conversion** — full GET → JSDOM + Readability + Turndown → clean Markdown
-
-## web_docs_search — Library Lookup
-
-Searches Context7's library index and returns a Markdown table of matching libraries with metadata.
-
-### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `library_name` | `string` | **required** | Library name to search for (e.g. `"react"`, `"next.js"`, `"fastapi"`) |
-| `query` | `string` | **required** | What the agent is trying to do — used for relevance ranking |
-
-### Output
-
-Returns a Markdown table with columns: Name, ID, Description, Trust Score, Benchmark Score, Snippet Count, Versions. The agent picks a library ID from these results to pass to `web_docs_fetch`.
-
-## web_docs_fetch — Documentation Retrieval
-
-Fetches up-to-date documentation context for a specific library via Context7's API.
-
-### Parameters
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `library_id` | `string` | **required** | Context7 library ID (e.g. `/facebook/react`, `/vercel/next.js/v15.1.8`) |
-| `query` | `string` | **required** | Specific question about the library |
-| `raw` | `boolean` | `false` | When `true`, returns JSON-serialized snippet objects instead of plain text Markdown |
-
-### API Key (optional)
-
-The tool reads the `CONTEXT7_API_KEY` environment variable automatically when set. Without a key, it works with lower rate limits. Get a key at [context7.com/dashboard](https://context7.com/dashboard).
-
-### Source files
-
-- `src/api.ts` — public package exports
-- `src/extension.ts` — aggregated extension entrypoint
-- `src/web.ts` — `web_fetch_md` tool registration
-- `src/docs.ts` — `web_docs_search` + `web_docs_fetch` tool registration
-- `src/context7-client.ts` — thin wrapper around `@upstash/context7-sdk`
-- `src/fetch.ts` — HTTP fetch logic
-- `src/convert.ts` — HTML to Markdown conversion
-
-## Commands
-
-```bash
-pnpm vitest run packages/supi-web/
-pnpm exec tsc --noEmit -p packages/supi-web/tsconfig.json
-pnpm exec biome check packages/supi-web/
-```
+- `src/web.ts` — `web_fetch_md`
+- `src/docs.ts` — `web_docs_search` and `web_docs_fetch`
+- `src/fetch.ts` — HTTP fetching and negotiation
+- `src/convert.ts` — HTML-to-Markdown conversion
+- `src/context7-client.ts` — Context7 client wrapper
+- `src/temp-file.ts` — temp-file output helper

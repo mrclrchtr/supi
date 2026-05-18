@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-ask-user
 
-Structured `ask_user` tool and rich questionnaire overlay for the [pi coding agent](https://github.com/earendil-works/pi). Lets the agent pause and ask you focused, typed decisions — picking from lists, multi-selecting, or entering freeform text.
+Adds a structured `ask_user` tool to the [pi coding agent](https://github.com/earendil-works/pi). It lets the model pause and ask a small, focused questionnaire instead of guessing.
 
 ## Install
 
@@ -14,31 +14,60 @@ For local development:
 pi install ./packages/supi-ask-user
 ```
 
-After editing the source, run `/reload` to pick up changes.
+After editing the source, run `/reload`.
 
-## What it adds
+## What you get
 
-Registers the `ask_user` tool — callable by the model during an agent run. When the agent needs explicit user input to proceed, it invokes `ask_user` with a questionnaire, and the extension opens an interactive overlay.
+After install, pi gets one new tool:
 
-**Question types:**
+- `ask_user` — open an interactive questionnaire overlay during a run
 
-| Type | Use |
-|------|-----|
-| `choice` | Pick one option (default) or multiple options (`multi: true`) from a list |
-| `text` | Freeform text input |
+Use cases it is built for:
 
-For yes/no questions, use `choice` with options `{value: "yes", label: "Yes"}` and `{value: "no", label: "No"}` — there is no separate `yesno` type.
+- clarify a narrow requirement before editing code
+- choose between a few implementation options
+- confirm a risky or destructive action
+- collect a short list of feature priorities
 
-**Key behaviors:**
+It is not meant for open-ended interviews or long surveys.
 
-- Returns an error in non-interactive or print-mode sessions (no fallback dialog).
-- Only one questionnaire runs at a time — concurrent `ask_user` calls return an error.
-- Cancelling or closing the overlay aborts the current agent turn.
-- Completed answers appear as a readable summary entry in the `/tree` view.
+## Question types
 
-## Usage
+`ask_user` supports two question types:
 
-The agent decides when to call `ask_user`. You control how it's used through the system prompt guidelines the extension injects. A minimal example the agent might construct:
+| Type | What it does |
+| --- | --- |
+| `choice` | Pick from a list of options; single-select by default, multi-select with `multi: true` |
+| `text` | Enter freeform text |
+
+There is no separate yes/no type. Use `choice` with `yes` and `no` options.
+
+## Per-question features
+
+Choice questions can include:
+
+- `recommendation` — highlight the preferred option
+- `default` — preselect a starting value
+- `allowOther` — allow a custom answer instead of the listed options
+- `allowDiscuss` — let the user switch into a discussion instead of choosing immediately
+- `preview` — show richer content for an option, such as Markdown, code, or ASCII mockups
+
+At the questionnaire level:
+
+- `allowSkip` — let the user submit partial results instead of answering every required question
+
+## Behavior and limits
+
+- interactive UI required; non-interactive or degraded sessions return an error
+- only one `ask_user` interaction can run at a time
+- if the user cancels or closes the overlay, the current agent turn is aborted
+- completed questionnaires are added to the session tree as a readable summary entry
+- each questionnaire supports **1-4 questions**
+- each `choice` question supports **2-12 options**
+- question headers are limited to **60 characters**
+- question prompts are limited to **4000 characters**
+
+## Example shape
 
 ```json
 {
@@ -66,44 +95,6 @@ The agent decides when to call `ask_user`. You control how it's used through the
 }
 ```
 
-**Multi-select example:**
-
-```json
-{
-  "type": "choice",
-  "multi": true,
-  "id": "features",
-  "header": "Features",
-  "prompt": "Which features to include?",
-  "options": [
-    { "value": "auth", "label": "Authentication" },
-    { "value": "caching", "label": "Caching" },
-    { "value": "logging", "label": "Logging" }
-  ],
-  "recommendation": ["auth", "caching"]
-}
-```
-
-**Per-question features:**
-
-- `multi` — set to `true` to enable multi-select (replaces the former `multichoice` type). Default `false`.
-- `recommendation` — highlights the preferred option with a visual badge. String for single-select, array for multi-select.
-- `default` — pre-selects a starting value the user can accept with a single keystroke. String for single-select, array for multi-select.
-- `allowOther` — lets the user type a custom answer instead of picking from options.
-- `allowDiscuss` — lets the user opt into a discussion instead of deciding immediately.
-- `preview` — rich content (markdown, code, or ASCII mockups) shown alongside the option.
-
-**Questionnaire-level controls:**
-
-- `allowSkip` — exposes a Skip action so the user can submit partial results without answering all required questions.
-
-## Limits
-
-- **1–4 questions** per questionnaire. Use one decision per call; chain multiple calls when you need more questions.
-- **2–12 options** per `choice` question (single or multi-select).
-- **60 characters** max per question header.
-- **4000 characters** max per question prompt.
-
 ## Requirements
 
 - `@earendil-works/pi-coding-agent`
@@ -112,4 +103,6 @@ The agent decides when to call `ask_user`. You control how it's used through the
 
 ## Source
 
-Entrypoint: `src/ask-user.ts` — registers the `ask_user` tool, drives the questionnaire overlay, and manages the concurrency lock.
+- `src/ask-user.ts` — tool registration and run flow
+- `src/schema.ts` — model-facing parameter schema
+- `src/normalize.ts` — validation and limits

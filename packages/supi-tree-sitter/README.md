@@ -1,24 +1,6 @@
 # @mrclrchtr/supi-tree-sitter
 
-Structural code analysis for PI — your agent parses code, not just text.
-
-Grep matches strings. Tree-sitter parses structure — functions, classes, imports, call chains. The agent stops pattern-matching and starts understanding your code.
-
-## What you get
-
-### See code structure
-
-Extract functions, classes, interfaces, and methods from any file. The agent knows what lives where without reading every line.
-
-### Trace call chains
-
-Find every function call from a given location. The agent follows the code's actual shape instead of guessing from text proximity.
-
-### 14 languages
-
-JavaScript, TypeScript, Python, Rust, Go, C, C++, Java, Kotlin, Ruby, Bash, HTML, R, SQL — get structural analysis for every project you touch.
-
-Works standalone or alongside LSP. Grammar files are vendored — no native toolchain required at install time.
+Adds a `tree_sitter` tool to the [pi coding agent](https://github.com/earendil-works/pi) for parser-based structural code analysis.
 
 ## Install
 
@@ -26,47 +8,72 @@ Works standalone or alongside LSP. Grammar files are vendored — no native tool
 pi install npm:@mrclrchtr/supi-tree-sitter
 ```
 
-## Quick look
+For local development:
 
-The agent gets a `tree_sitter` tool with these actions:
+```bash
+pi install ./packages/supi-tree-sitter
+```
 
-| Action | What it does |
-|--------|-------------|
-| `outline` | List functions, classes, interfaces in a file |
-| `callees` | Find all function calls from a position |
-| `imports` / `exports` | See what a file imports and exports |
-| `node_at` | Inspect the AST node at any line/column |
-| `query` | Run a custom Tree-sitter query |
+After editing the source, run `/reload`.
 
-`outline`, `imports`, and `exports` are currently JavaScript/TypeScript only. `node_at`, `query`, and `callees` work across all 14 supported languages. Coordinates are 1-based, matching the `lsp` tool convention.
+## What you get
+
+After install, pi gets one tool:
+
+- `tree_sitter` — inspect code structure through Tree-sitter parsers instead of plain text search
+
+## `tree_sitter` actions
+
+| Action | What it is for | Current language coverage |
+| --- | --- | --- |
+| `outline` | List structural declarations such as functions, classes, interfaces, and methods | JavaScript / TypeScript only |
+| `imports` | List import statements | JavaScript / TypeScript only |
+| `exports` | List export declarations, re-exports, and export assignments | JavaScript / TypeScript only |
+| `node_at` | Show the syntax node at a position, including ancestry | Any supported grammar |
+| `query` | Run a custom Tree-sitter query against a file | Any supported grammar |
+| `callees` | Find outgoing calls from the enclosing function or method at a position | Supported for most grammars, but not all |
+
+Coordinates use **1-based** line and character columns. Character positions use UTF-16 code units.
+
+## Supported file families
+
+The current tool description covers:
+
+- JavaScript / TypeScript (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`)
+- Python (`.py`, `.pyi`)
+- Rust (`.rs`)
+- Go (`.go`, `.mod`)
+- C / C++ (`.c`, `.h`, `.cpp`, `.hpp`, `.cc`, `.cxx`, `.hxx`, `.c++`, `.h++`)
+- Java (`.java`)
+- Kotlin (`.kt`, `.kts`)
+- Ruby (`.rb`)
+- Bash / shell (`.sh`, `.bash`, `.zsh`)
+- HTML (`.html`, `.htm`, `.xhtml`)
+- R (`.r`)
+- SQL (`.sql`)
 
 ## Package surfaces
 
-- `@mrclrchtr/supi-tree-sitter/api` — reusable parsing/session API
+- `@mrclrchtr/supi-tree-sitter/api` — reusable parsing session factory and shared result types
 - `@mrclrchtr/supi-tree-sitter/extension` — pi extension entrypoint
 
-`pi.extensions` still points at the real file path `./src/extension.ts` inside the package. The `/api` and `/extension` paths are consumer-facing package exports, not manifest aliases.
-
-## For extension developers
-
-This package exports a reusable session-scoped parsing service:
+Example:
 
 ```ts
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
 
 const session = createTreeSitterSession("/project");
 
-// Check if a file is parseable
-const result = await session.canParse("src/index.ts");
-
-// Get structural outline
+const parseable = await session.canParse("src/index.ts");
 const outline = await session.outline("src/index.ts");
-
-// Trace outgoing calls from a position
 const callees = await session.calleesAt("src/index.ts", 42, 10);
 
-// Always clean up
 session.dispose();
 ```
 
-Call `dispose()` when done.
+## Source
+
+- `src/tree-sitter.ts` — tool registration and action handling
+- `src/runtime.ts` — parser and query runtime
+- `src/session.ts` — reusable session API
+- `src/outline.ts`, `src/imports.ts`, `src/exports.ts`, `src/node-at.ts`, `src/callees.ts` — structural analyses
