@@ -4,25 +4,18 @@ import type { OutstandingDiagnosticSummaryEntry } from "./manager/manager-types.
 import type { Diagnostic, ProjectServerInfo } from "./types.ts";
 
 export const lspPromptSnippet =
-  "Use 'lsp' for hover, definitions, references, symbols, rename planning, code actions, and diagnostics in supported languages.";
+  "Use `lsp` for semantic navigation, type information, references, renames, and code actions in supported languages.";
 
 export const lspPromptGuidelines = [
-  `Use lsp with the shape { action, args } where args is action-specific, for example:
-  - type/signature/docs of X → { action: "hover", args: { file, line, character } }
-  - what fields does type X have? → { action: "workspace_symbol", args: { query } } then { action: "hover", args: { file, line, character } }
-  - where is X defined? → { action: "definition", args: { file, line, character } }
-  - who references X? → { action: "references", args: { file, line, character } }
-  - rename X to Y → { action: "rename", args: { file, line, character, newName } }
-  - structure of file → { action: "symbols", args: { file } }
-  - find symbol across project → { action: "workspace_symbol", args: { query } } or { action: "search", args: { query } }
-  - fix error at position → { action: "code_actions", args: { file, line, character } }
-  - refresh diagnostics → { action: "recover" }`,
-  "Prefer lsp over bash/read for semantic code navigation and diagnostics in supported languages; fall back to bash/read for unsupported file types.",
-  "Diagnostics are automatically delivered: inline after every write/edit tool result, and as context before each agent turn. You do not need to call the lsp tool to check them — they are already in your context.",
-  "When delivered diagnostics show errors, decide: (a) expected temporary state from a planned multi-step change — continue your sequence, then verify at the end; (b) unexpected 'Cannot find module', unresolved imports, or type mismatches — stop and fix the root cause before editing more files.",
-  "When the SAME error pattern appears across MULTIPLE files after you changed imports, dependencies, or shared types, it is a systemic root-cause issue (missing install, broken import path, wrong dependency version). Do not patch each file individually — find and fix the root cause first.",
-  "When diagnostics look stale after package.json, lockfile, tsconfig, or generated-type changes, use lsp recover before editing more files.",
-  "After changing package.json dependencies, imports, or peer dependencies, run the package manager install command (e.g., pnpm install) before concluding that module resolution errors are real code bugs.",
+  `Use lsp with { action, args }.
+  if you need type/signature/docs → hover(file, line, character)
+  if you need definition of a symbol → definition(file, line, character)
+  if you need references/usages of a symbol → references(file, line, character)
+  if you need top-level symbols in one file → symbols(file)
+  if you need to find a symbol by name → workspace_symbol(query) or search(query)
+  if you need a rename or available fix → rename(...) or code_actions(...)
+  if diagnostics look stale after config/import/type changes → recover()`,
+  "Use lsp first for semantic questions in supported files. Diagnostics are already delivered automatically; call lsp when you need a specific lookup, code action, or recovery.",
 ];
 
 /**
@@ -41,11 +34,10 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
   });
 
   return [
-    ...lspPromptGuidelines.slice(0, 2),
-    "Use lsp before grep/rg/find for understanding code, finding usages, diagnostics, symbol lookup, and refactors in supported languages.",
+    lspPromptGuidelines[0],
+    "Use lsp first for semantic questions in supported files.",
     ...dynamic,
-    "Use lsp actions by task: hover/definition/references/symbols for understanding code, references/workspace_symbol/search for usages, diagnostics/hover/code_actions for issues, and rename/code_actions for refactors.",
-    ...lspPromptGuidelines.slice(2),
+    lspPromptGuidelines[1],
   ].filter(Boolean);
 }
 

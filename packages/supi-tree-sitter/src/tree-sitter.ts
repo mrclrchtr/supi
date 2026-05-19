@@ -12,6 +12,7 @@ import {
   truncateText,
   validationError,
 } from "./formatting.ts";
+import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
 import { detectGrammar, isJsTsGrammar } from "./language.ts";
 import { collectOutline } from "./outline.ts";
 import { TreeSitterRuntime } from "./runtime.ts";
@@ -25,36 +26,6 @@ const TreeSitterActionEnum = StringEnum([
   "query",
   "callees",
 ] as const);
-
-const toolDescription = `Tree-sitter tool — provides structural AST analysis for supported files.
-
-Actions:
-- outline: Extract structural declarations (functions, classes, interfaces, etc.). JavaScript/TypeScript only.
-- imports: List import statements with module specifiers. JavaScript/TypeScript only.
-- exports: List export declarations, re-exports, and export assignments with names and kinds. JavaScript/TypeScript only.
-- node_at: Find the syntax node at a position. Params: file, line, character
-- query: Run a Tree-sitter query. Params: file, query
-- callees: Find outgoing function/method calls from a position. Params: file, line, character. Supported for most grammars.
-
-Coordinates are 1-based (line, character), compatible with the lsp tool convention.
-Character is a UTF-16 code-unit column.
-Relative file paths resolve from the session working directory.
-
-Supported extensions: .ts, .tsx, .js, .jsx, .mts, .cts, .mjs, .cjs, .py, .pyi, .rs, .go, .mod, .c, .h, .cpp, .hpp, .cc, .cxx, .hxx, .c++, .h++, .java, .kt, .kts, .rb, .sh, .bash, .zsh, .html, .htm, .xhtml, .r, .sql`;
-
-const promptGuidelines = [
-  `Use tree_sitter for structural syntax questions, for example:
-  - declarations/outline of file (JS/TS) → tree_sitter.outline(file)
-  - import statements in file (JS/TS) → tree_sitter.imports(file)
-  - export names/kinds in file (JS/TS) → tree_sitter.exports(file)
-  - outgoing calls from position → tree_sitter.callees(file, line, char)
-  - syntax node at position → tree_sitter.node_at(file, line, char)
-  - custom AST query on file → tree_sitter.query(file, pattern)`,
-  "Prefer 'tree_sitter' when you need AST node types, exact source ranges, or parser-level structure.",
-  "'tree_sitter' is a standalone structural analysis tool for outline, imports, exports, node-at-position lookup, and custom queries.",
-];
-
-const promptSnippet = `Use the 'tree_sitter' tool for structural code analysis — outline, imports, exports, node-at-position lookup, and custom queries.`;
 
 export default function treeSitterExtension(pi: ExtensionAPI) {
   let runtime: TreeSitterRuntime | undefined;

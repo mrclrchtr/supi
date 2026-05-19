@@ -1,16 +1,9 @@
 import * as path from "node:path";
 import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core/api";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  buildProjectGuidelines,
-  diagnosticsContextFingerprint,
-  formatDiagnosticsContext,
-  lspPromptGuidelines,
-  lspPromptSnippet,
-} from "../src/guidance.ts";
+import { diagnosticsContextFingerprint, formatDiagnosticsContext } from "../src/guidance.ts";
 import { LspManager } from "../src/manager/manager.ts";
 import { clearTsconfigCache } from "../src/tsconfig-scope.ts";
-import type { ProjectServerInfo } from "../src/types.ts";
 import { DiagnosticSeverity } from "../src/types.ts";
 
 beforeEach(() => {
@@ -18,54 +11,6 @@ beforeEach(() => {
 });
 
 describe("LSP prompt guidance", () => {
-  it("exports a semantic-first prompt snippet and fallback guidance", () => {
-    expect(lspPromptSnippet).toContain(
-      "Use 'lsp' for hover, definitions, references, symbols, rename planning, code actions, and diagnostics in supported languages.",
-    );
-    expect(lspPromptGuidelines.join(" ")).toContain("Prefer lsp over bash/read");
-    expect(lspPromptGuidelines.join(" ")).toContain("fall back to bash/read");
-    expect(lspPromptGuidelines.join(" ")).toContain("use lsp recover");
-  });
-
-  it("builds project-specific guidelines with roots, file types, and actions", () => {
-    const guidelines = buildProjectGuidelines(
-      [
-        {
-          name: "typescript",
-          root: process.cwd(),
-          fileTypes: ["ts", "tsx"],
-          status: "running",
-          supportedActions: ["hover(file,line,char)", "diagnostics [optional file]"],
-          openFiles: [],
-        } satisfies ProjectServerInfo,
-        {
-          name: "rust",
-          root: `${process.cwd()}/crates/core`,
-          fileTypes: ["rs"],
-          status: "unavailable",
-          supportedActions: [],
-          openFiles: [],
-        } satisfies ProjectServerInfo,
-      ],
-      process.cwd(),
-    );
-
-    expect(guidelines.join(" ")).toContain("LSP active: typescript");
-    expect(guidelines.join(" ")).toContain("root: .");
-    expect(guidelines.join(" ")).toContain(".ts, .tsx");
-    expect(guidelines.join(" ")).toContain("hover(file,line,char)");
-    expect(guidelines.join(" ")).toContain("LSP unavailable: rust");
-  });
-
-  it("falls back to generic stable system-prompt guidance when no servers are detected", () => {
-    const guidelines = buildProjectGuidelines([], process.cwd());
-
-    expect(guidelines).toContain(lspPromptGuidelines[0]);
-    expect(guidelines).toContain(lspPromptGuidelines[2]);
-    expect(guidelines.join(" ")).toContain("Use lsp before grep/rg/find");
-    expect(guidelines.join(" ")).toContain("Use lsp actions by task");
-  });
-
   it("formats diagnostics as xml extension context", () => {
     const content = formatDiagnosticsContext([
       {

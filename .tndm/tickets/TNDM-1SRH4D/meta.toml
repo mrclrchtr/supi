@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-1SRH4D"
+title = "Reduce and refactor tool guidance for supi-lsp, supi-tree-sitter, and supi-code-intelligence"
+type = "chore"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"

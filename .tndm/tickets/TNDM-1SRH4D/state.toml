@@ -1,0 +1,36 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-18T12:19:34.747962Z"
+revision = 13
+
+[document_fingerprints]
+archive = "sha256:b3cfe44f7a089102a6c661900ccea2e9a61c47695c0a7a04b87d579a0f182999"
+content = "sha256:56eacffcefd4d004f7d17f88838953059070e5061323060b95218968af0e51a3"
+
+[[tasks]]
+number = 1
+title = "Rewrite the LSP guidance contract to the minimal standalone-safe form"
+status = "done"
+file = "packages/supi-lsp/src/guidance.ts"
+verification = "pnpm vitest -v run packages/supi-lsp/__tests__/guidance.test.ts"
+
+[[tasks]]
+number = 2
+title = "Rewrite Tree-sitter guidance and description for standalone structural routing"
+status = "done"
+file = "packages/supi-tree-sitter/src/tree-sitter.ts"
+verification = "pnpm vitest -v run packages/supi-tree-sitter/__tests__/tool.test.ts"
+
+[[tasks]]
+number = 3
+title = "Make Code Intelligence the concise cross-tool router"
+status = "done"
+file = "packages/supi-code-intelligence/src/guidance.ts"
+verification = "pnpm vitest -v run packages/supi-code-intelligence/__tests__/integration.test.ts"
+
+[[tasks]]
+number = 4
+title = "Run final formatting and targeted regression checks across all three guidance surfaces"
+status = "done"
+file = "packages/supi-code-intelligence/__tests__/integration.test.ts"
+verification = "pnpm exec biome check packages/supi-lsp/src/guidance.ts packages/supi-lsp/__tests__/guidance.test.ts packages/supi-tree-sitter/src/tree-sitter.ts packages/supi-tree-sitter/__tests__/tool.test.ts packages/supi-code-intelligence/src/guidance.ts packages/supi-code-intelligence/__tests__/integration.test.ts && pnpm vitest -v run packages/supi-lsp/__tests__/guidance.test.ts packages/supi-tree-sitter/__tests__/tool.test.ts packages/supi-code-intelligence/__tests__/integration.test.ts"

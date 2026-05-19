@@ -377,15 +377,13 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
     state.lastDiagnosticsFingerprint = fingerprint;
     state.currentContextToken = `lsp-context-${++state.contextCounter}`;
 
-    const result = buildDiagnosticResult(
+    return buildDiagnosticResult(
       diagnostics,
       detailed,
       state.inlineSeverity,
       state.currentContextToken,
       staleWarning,
     );
-
-    return result;
   });
 
   pi.on("context", (event) => {

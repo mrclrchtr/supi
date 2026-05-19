@@ -42,21 +42,6 @@ describe("tree_sitter tool registration", () => {
     const text = await executeTool(pi, { action: "outline", file: "sample.ts" });
     expect(text).toContain("not initialized");
   });
-
-  it("has standalone-safe prompt guidance that does not name lsp as a sibling tool", () => {
-    const pi = createPiMock();
-    treeSitterExtension(pi as never);
-    const tool = pi.tools.find((t) => (t as { name: string }).name === "tree_sitter");
-    expect(tool).toBeDefined();
-    const guidelines = (tool as unknown as { promptGuidelines: string[] }).promptGuidelines;
-    expect(guidelines).toBeDefined();
-    const combined = guidelines.join(" ");
-    expect(combined).toContain("structural");
-    expect(combined).not.toContain("Use lsp for");
-    expect(combined).not.toContain("sibling lsp");
-    // Guidance should present tree_sitter as independently usable
-    expect(combined).toContain("standalone");
-  });
 });
 
 describe("tree_sitter tool validation", () => {

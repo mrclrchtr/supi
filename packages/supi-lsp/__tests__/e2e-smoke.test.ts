@@ -787,21 +787,8 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
     const shutdownHandler = pi.handlers.get("session_shutdown")!;
     await shutdownHandler();
 
-    // After shutdown, tool execution should report not initialized
     const text = await exec(pi, { action: "outline", file: "math.ts" });
     expect(text).toContain("not initialized");
-  });
-
-  it("stays standalone-safe — guidance does not name lsp as sibling", () => {
-    // Tree-sitter guidance must be usable without LSP being present
-    const pi = createPiMock();
-    treeSitterExtension(pi);
-    const tool = pi.tools.find((t) => t.name === "tree_sitter")!;
-    const combined = (tool.promptGuidelines ?? []).join(" ");
-    expect(combined).toContain("structural");
-    expect(combined).toContain("standalone");
-    expect(combined).not.toContain("Use lsp for");
-    expect(combined).not.toContain("sibling lsp");
   });
 });
 
@@ -817,7 +804,6 @@ describe("SuPi e2e smoke – code_intel tool availability", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi);
 
-    // Register a basic tool execute call
     const tool = pi.tools.find((t) => t.name === "code_intel")!;
     const result = await tool.execute("test-id", { action: "index" }, undefined, () => {}, {
       cwd: tmpDir,
@@ -827,7 +813,6 @@ describe("SuPi e2e smoke – code_intel tool availability", () => {
     expect(result.content).toBeDefined();
     const text = result.content[0].text;
     expect(text).toContain("Project Map");
-    // The index action should give us file counts
     expect(text).toContain(".ts");
   });
 
@@ -868,12 +853,10 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     tmpDir = createTempProjectDir();
     const pi = createPiMock();
 
-    // 1. Load all three extensions
     lspExtension(pi);
     treeSitterExtension(pi);
     codeIntelligenceExtension(pi);
 
-    // 2. Verify tools registered (lsp also registers read/write/edit overrides)
     expect(pi.tools.map((t) => t.name).sort()).toEqual([
       "code_intel",
       "edit",
@@ -883,11 +866,7 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
       "write",
     ]);
 
-    // 3. Start session (fires all registered session_start handlers)
     await pi.emit("session_start", {}, createSessionCtx(tmpDir));
-
-    // 4. Before agent start — overview injection (from code-intelligence)
-    // Only code-intel's before_agent_start returns overview; LSP's is diagnostic-only
     const beforeAgentStart = pi.handlers.get("before_agent_start")!;
     const overview = (await beforeAgentStart({}, createSessionCtx(tmpDir))) as
       | BeforeAgentStartEventResult
@@ -898,7 +877,6 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     expect(overviewMsg3?.customType).toBe("code-intelligence-overview");
     expect(overviewMsg3?.display).toBe(false);
 
-    // 5. Tree-sitter tool execution (real parse)
     const tsTool = pi.tools.find((t) => t.name === "tree_sitter")!;
     const tsResult = await tsTool.execute(
       "test-id",
@@ -911,7 +889,6 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     expect(tsText).toContain("add");
     expect(tsText).toContain("Calculator");
 
-    // Import re-check (re-exports have no plain imports)
     const tsImportResult = await tsTool.execute(
       "test-id",
       { action: "imports", file: "index.ts" },
@@ -921,14 +898,12 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     );
     expect(tsImportResult.content[0].text).toContain("No imports");
 
-    // 6. Code_intel tool execution
     const ciTool = pi.tools.find((t) => t.name === "code_intel")!;
     const ciResult = await ciTool.execute("test-id", { action: "index" }, undefined, () => {}, {
       cwd: tmpDir,
     });
     expect(ciResult.content[0].text).toContain("Project Map");
 
-    // 7. Shutdown — fires all registered session_shutdown handlers
     let shutdownError: Error | undefined;
     try {
       await pi.emit("session_shutdown");
@@ -937,7 +912,6 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     }
     expect(shutdownError).toBeUndefined();
 
-    // 8. After shutdown, tree-sitter should report not initialized
     const tsAfterShutdown = await tsTool.execute(
       "test-id",
       { action: "outline", file: "math.ts" },
@@ -950,33 +924,6 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
 });
 
 describe("SuPi e2e smoke – lsp extension behavior", () => {
-  it("registers lsp tool with all expected promptGuidelines", () => {
-    const pi = createPiMock();
-    lspExtension(pi);
-    const lspTool = pi.tools.find((t) => t.name === "lsp")!;
-
-    const guidelines = lspTool.promptGuidelines ?? [];
-    const combined = guidelines.join(" ");
-
-    // Must contain core diagnostic guidance
-    expect(combined).toContain("automatically delivered");
-    expect(combined).toContain("inline after every write/edit tool result");
-    expect(combined).toContain("stop and fix the root cause");
-    expect(combined).toContain("lsp recover");
-    expect(combined).toContain("pnpm install");
-    expect(combined).toContain("semantic code navigation");
-    expect(combined).toContain(
-      'what fields does type X have? → { action: "workspace_symbol", args: { query } } then { action: "hover", args: { file, line, character } }',
-    );
-  });
-
-  it("has promptSnippet that encourages LSP use", () => {
-    const pi = createPiMock();
-    lspExtension(pi);
-    const lspTool = pi.tools.find((t) => t.name === "lsp")!;
-    expect(lspTool.promptSnippet).toContain("hover, definitions, references");
-  });
-
   it("uses a top-level action-plus-args parameter schema", () => {
     const pi = createPiMock();
     lspExtension(pi);

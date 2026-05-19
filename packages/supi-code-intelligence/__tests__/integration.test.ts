@@ -10,7 +10,7 @@ describe("code_intel tool registration", () => {
     expect((pi.tools[0] as { name: string }).name).toBe("code_intel");
   });
 
-  it("includes all six actions in description", () => {
+  it("keeps the description focused on the available actions", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     const desc = (pi.tools[0] as { description: string }).description;
@@ -20,19 +20,7 @@ describe("code_intel tool registration", () => {
     expect(desc).toContain("implementations");
     expect(desc).toContain("affected");
     expect(desc).toContain("pattern");
-  });
-
-  it("includes example calls in description", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const desc = (pi.tools[0] as { description: string }).description;
-    expect(desc).toContain('"action": "brief"');
-    expect(desc).toContain('"action": "callers"');
-    expect(desc).toContain('"action": "affected"');
-    expect(desc).toContain('"action": "pattern"');
-    expect(desc).toContain('"regex": true');
-    expect(desc).toContain('"kind": "definition"');
-    expect(desc).toContain('"file": "packages/supi-core/index.ts"');
+    expect(desc).not.toContain('"action": "brief"');
   });
 
   it("registers an optional regex parameter for pattern searches", () => {
@@ -51,53 +39,6 @@ describe("code_intel tool registration", () => {
       (pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters
         ?.properties,
     ).toHaveProperty("kind");
-  });
-
-  it("has promptSnippet naming code_intel", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    expect((pi.tools[0] as { promptSnippet: string }).promptSnippet).toContain("code_intel");
-  });
-
-  it("has promptGuidelines that all name code_intel", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const guidelines = (pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? [];
-    expect(guidelines.length).toBeGreaterThanOrEqual(4);
-    for (const g of guidelines) {
-      expect(g).toContain("code_intel");
-    }
-  });
-
-  it("guidance deconflicts with lsp and tree_sitter", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const guidelines = (pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? [];
-    const combined = guidelines.join(" ");
-    expect(combined).toContain("lsp");
-    expect(combined).toContain("tree_sitter");
-    expect(combined).toContain("drill-down");
-  });
-
-  it("guidance explains structured pattern search and priority signals", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const combined = ((pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? []).join(
-      " ",
-    );
-    expect(combined).toContain("literal strings by default");
-    expect(combined).toContain("regex: true");
-    expect(combined).toContain("definition");
-    expect(combined).toContain("diagnostics");
-  });
-
-  it("guidance discourages code_intel for trivial tasks", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const guidelines = (pi.tools[0] as { promptGuidelines?: string[] }).promptGuidelines ?? [];
-    const combined = guidelines.join(" ");
-    expect(combined).toContain("Do not prefer");
-    expect(combined).toContain("trivial");
   });
 });
 

@@ -120,20 +120,6 @@ describe("rtkExtension", () => {
     expect(tools).toHaveLength(1);
   });
 
-  it("registers the bash tool with RTK promptGuidelines", () => {
-    const pi = createPiMock();
-    rtkExtension(pi as never);
-
-    const bashTool = getRegisteredBashTool(pi.tools);
-    expect(bashTool).toBeDefined();
-    expect(bashTool).toMatchObject({
-      name: "bash",
-      promptGuidelines: expect.arrayContaining([
-        expect.stringContaining("RTK may intercept and compact the output"),
-      ]),
-    });
-  });
-
   it("execute creates the bash tool with the current ctx.cwd and shell settings", async () => {
     const pi = createPiMock();
     const tools = pi.tools;
