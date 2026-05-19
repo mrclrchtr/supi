@@ -52,14 +52,26 @@ export const promptGuidelines = [...actionGuidelines, fallbackGuideline];
  * tool registration, avoiding per-turn `before_agent_start` prompt overrides.
  */
 export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string): string[] {
-  const dynamic = servers.map((server) => {
-    const root = displayRoot(server.root, cwd);
-    const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(", ");
-    const actions = server.supportedActions.join(", ");
-    const status = server.status === "running" ? "active" : "unavailable";
-    const actionText = actions.length > 0 ? ` | actions: ${actions}` : "";
-    return `LSP ${status}: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
-  });
+  const active = servers
+    .filter((server) => server.status === "running")
+    .map((server) => {
+      const root = displayRoot(server.root, cwd);
+      const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(", ");
+      const actions = server.supportedActions.join(", ");
+      const actionText = actions.length > 0 ? ` | actions: ${actions}` : "";
+      return `LSP active: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
+    });
+
+  const unavailable = servers
+    .filter((server) => server.status !== "running")
+    .map((server) => server.name);
+
+  const dynamic: string[] = [...active];
+  if (unavailable.length > 0) {
+    dynamic.push(
+      `LSP unavailable: ${unavailable.join(", ")} — install servers to enable language intelligence`,
+    );
+  }
 
   return [...actionGuidelines, ...dynamic, fallbackGuideline].filter(Boolean);
 }
