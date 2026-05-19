@@ -1,5 +1,9 @@
 // Prompt guidance and tool description for the lsp tool.
 // Dynamic guidelines are built per-project to reflect active LSP servers.
+//
+// Note: We intentionally do NOT include cross-tool routing (e.g., "use code_intel
+// for architecture overviews") because this package can be installed standalone
+// without supi-code-intelligence.
 
 import * as path from "node:path";
 import type { ProjectServerInfo } from "./types.ts";
@@ -27,14 +31,13 @@ export const promptSnippet =
   "Use `lsp` for semantic navigation, type information, references, renames, and code actions in supported languages.";
 
 export const promptGuidelines = [
-  `Use lsp with { action, args }.
-  if you need type/signature/docs → hover(file, line, character)
-  if you need definition of a symbol → definition(file, line, character)
-  if you need references/usages of a symbol → references(file, line, character)
-  if you need top-level symbols in one file → symbols(file)
-  if you need to find a symbol by name → workspace_symbol(query) or search(query)
-  if you need a rename or available fix → rename(...) or code_actions(...)
-  if diagnostics look stale after config/import/type changes → recover()`,
+  "Use lsp.hover(file, line, character) for type info, signatures, and documentation at a position.",
+  "Use lsp.definition(file, line, character) to go to the definition of a symbol.",
+  "Use lsp.references(file, line, character) to find all usages of a symbol.",
+  "Use lsp.symbols(file) to list all top-level symbols in a single file.",
+  "Use lsp.workspace_symbol(query) or lsp.search(query) to find a symbol by name across the project.",
+  "Use lsp.rename(file, line, character, newName) or lsp.code_actions(file, line, character) for renames and available fixes.",
+  "Use lsp.recover() to refresh cached diagnostics after workspace changes.",
   "Use lsp first for semantic questions in supported files. Diagnostics are already delivered automatically; call lsp when you need a specific lookup, code action, or recovery.",
 ];
 
@@ -53,7 +56,9 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
     return `LSP ${status}: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
   });
 
-  return [promptGuidelines[0], ...dynamic, promptGuidelines[1]].filter(Boolean);
+  const actionGuidelines = promptGuidelines.slice(0, -1);
+  const fallbackGuideline = promptGuidelines[promptGuidelines.length - 1];
+  return [...actionGuidelines, ...dynamic, fallbackGuideline].filter(Boolean);
 }
 
 function displayRoot(root: string, cwd: string): string {
