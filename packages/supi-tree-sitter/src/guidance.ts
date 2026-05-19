@@ -23,6 +23,7 @@ export const promptGuidelines = [
   "Use tree_sitter.callees(file, line, character) for outgoing calls from a position.",
   "Use tree_sitter.query(file, query) for custom syntax matches.",
   "Use tree_sitter when the question is about syntax, node types, source ranges, or parser-level structure.",
+  "Do not use tree_sitter for type information, cross-file references, or semantic renames — prefer language-server tooling when available.",
 ];
 
 export const promptSnippet =

@@ -30,16 +30,21 @@ Line and character are 1-based. File paths are relative to cwd.`;
 export const promptSnippet =
   "Use `lsp` for semantic navigation, type information, references, renames, and code actions in supported languages.";
 
-export const promptGuidelines = [
+export const actionGuidelines = [
   "Use lsp.hover(file, line, character) for type info, signatures, and documentation at a position.",
   "Use lsp.definition(file, line, character) to go to the definition of a symbol.",
   "Use lsp.references(file, line, character) to find all usages of a symbol.",
   "Use lsp.symbols(file) to list all top-level symbols in a single file.",
-  "Use lsp.workspace_symbol(query) or lsp.search(query) to find a symbol by name across the project.",
+  "Use lsp.workspace_symbol(query) for pure LSP fuzzy symbol search across the project.",
+  "Use lsp.search(query) when you need a symbol search that falls back to text search if LSP has no results.",
   "Use lsp.rename(file, line, character, newName) or lsp.code_actions(file, line, character) for renames and available fixes.",
   "Use lsp.recover() to refresh cached diagnostics after workspace changes.",
-  "Use lsp first for semantic questions in supported files. Diagnostics are already delivered automatically; call lsp when you need a specific lookup, code action, or recovery.",
 ];
+
+export const fallbackGuideline =
+  "Use lsp first for semantic questions in supported files. Diagnostics are already delivered automatically; call lsp when you need a specific lookup, code action, or recovery.";
+
+export const promptGuidelines = [...actionGuidelines, fallbackGuideline];
 
 /**
  * Build per-project `promptGuidelines` for the `lsp` tool registration.
@@ -56,8 +61,6 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
     return `LSP ${status}: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
   });
 
-  const actionGuidelines = promptGuidelines.slice(0, -1);
-  const fallbackGuideline = promptGuidelines[promptGuidelines.length - 1];
   return [...actionGuidelines, ...dynamic, fallbackGuideline].filter(Boolean);
 }
 
