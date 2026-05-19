@@ -7,8 +7,8 @@ const mockFns = vi.hoisted(() => ({
   buildProjectGuidelines: vi.fn(() => []),
   diagnosticsContextFingerprint: vi.fn(),
   formatDiagnosticsContext: vi.fn(),
-  lspPromptGuidelines: [],
-  lspPromptSnippet: "",
+  promptGuidelines: [],
+  promptSnippet: "",
   LspManager: vi.fn(),
   registerLspAwareToolOverrides: vi.fn(),
   registerLspSettings: vi.fn(),
@@ -25,10 +25,14 @@ vi.mock("../src/config.ts", () => ({ loadConfig: mockFns.loadConfig }));
 
 vi.mock("../src/guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
+  toolDescription: "test",
+  promptGuidelines: mockFns.promptGuidelines,
+  promptSnippet: mockFns.promptSnippet,
+}));
+
+vi.mock("../src/diagnostics/diagnostic-context.ts", () => ({
   diagnosticsContextFingerprint: mockFns.diagnosticsContextFingerprint,
   formatDiagnosticsContext: mockFns.formatDiagnosticsContext,
-  lspPromptGuidelines: mockFns.lspPromptGuidelines,
-  lspPromptSnippet: mockFns.lspPromptSnippet,
   MAX_DETAILED_DIAGNOSTICS: 5,
 }));
 
@@ -62,8 +66,7 @@ vi.mock("../src/ui.ts", () => ({
 }));
 
 vi.mock("../src/tool-actions.ts", () => ({
-  executeAction: mockFns.executeAction,
-  lspToolDescription: "test",
+  safeExecuteAction: mockFns.executeAction,
 }));
 
 vi.mock("../src/renderer.ts", () => ({ registerLspMessageRenderer: vi.fn() }));

@@ -27,4 +27,4 @@ export const promptGuidelines = [
 ];
 
 export const promptSnippet =
-  "Use code_intel to orient yourself in the codebase before drilling into exact symbols, syntax nodes, or raw file text.";
+  "Use `code_intel` to orient yourself in the codebase before drilling into exact symbols, syntax nodes, or raw file text.";

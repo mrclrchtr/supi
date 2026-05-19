@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDiagnosticsContext } from "../src/guidance.ts";
+import { formatDiagnosticsContext } from "../src/diagnostics/diagnostic-context.ts";
 
 describe("formatDiagnosticsContext detailed diagnostics", () => {
   it("includes diagnostic messages when detailed diagnostics are provided and total is small", () => {

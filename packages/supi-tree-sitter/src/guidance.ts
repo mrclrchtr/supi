@@ -24,4 +24,5 @@ export const promptGuidelines = [
   "Use tree_sitter when the question is about syntax, node types, source ranges, or parser-level structure.",
 ];
 
-export const promptSnippet = `Use 'tree_sitter' for syntax trees, parsed imports/exports, node lookup, and custom queries.`;
+export const promptSnippet =
+  "Use `tree_sitter` for syntax trees, parsed imports/exports, node lookup, and custom queries.";

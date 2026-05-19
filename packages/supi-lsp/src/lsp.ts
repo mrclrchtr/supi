@@ -9,15 +9,18 @@ import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/api";
 import { Type } from "typebox";
 import { loadConfig, resolveLanguageAlias } from "./config.ts";
+import {
+  diagnosticsContextFingerprint,
+  formatDiagnosticsContext,
+  MAX_DETAILED_DIAGNOSTICS,
+} from "./diagnostics/diagnostic-context.ts";
 import { formatDiagnosticsDisplayContent } from "./diagnostics/diagnostic-display.ts";
 import { assessStaleDiagnostics } from "./diagnostics/stale-diagnostics.ts";
 import {
   buildProjectGuidelines,
-  diagnosticsContextFingerprint,
-  formatDiagnosticsContext,
-  lspPromptGuidelines,
-  lspPromptSnippet,
-  MAX_DETAILED_DIAGNOSTICS,
+  promptGuidelines,
+  promptSnippet,
+  toolDescription,
 } from "./guidance.ts";
 import {
   createRuntimeState,
@@ -43,7 +46,7 @@ import {
   loadLspSettings,
   registerLspSettings,
 } from "./settings-registration.ts";
-import { type LspToolParams, lspToolDescription, safeExecuteAction } from "./tool-actions.ts";
+import { type LspToolParams, safeExecuteAction } from "./tool-actions.ts";
 import {
   persistLspActiveState,
   persistLspInactiveState,
@@ -111,7 +114,7 @@ export default function lspExtension(pi: ExtensionAPI) {
     getCwd: () => state.manager?.getCwd() ?? process.cwd(),
   });
 
-  registerLspTool(pi, state, lspPromptGuidelines);
+  registerLspTool(pi, state, promptGuidelines);
   registerSessionLifecycleHandlers(pi, state);
   registerBehaviorHandlers(pi, state);
   registerTreePersistHandlers(pi, state);
@@ -436,8 +439,8 @@ function registerLspTool(
   pi.registerTool({
     name: "lsp",
     label: "LSP",
-    description: lspToolDescription,
-    promptSnippet: lspPromptSnippet,
+    description: toolDescription,
+    promptSnippet: promptSnippet,
     promptGuidelines,
     parameters: LspToolParameters,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
