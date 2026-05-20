@@ -1,6 +1,7 @@
 ---
 name: claude-md-improver
 description: Use this skill to audit and improve CLAUDE.md files in repositories. Use when user asks to check, audit, update, improve, or fix CLAUDE.md files. Scans for all CLAUDE.md files, evaluates quality against templates, outputs quality report, then makes targeted updates.
+disable-model-invocation: true
 tools: Read, Glob, Grep, Bash, Edit
 ---
 
