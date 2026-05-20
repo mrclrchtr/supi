@@ -1,14 +1,13 @@
 // Session factory — creates a TreeSitterSession bound to a working directory.
 
-import { detectGrammar, isJsTsGrammar } from "./language.ts";
-import { TreeSitterRuntime } from "./runtime.ts";
+import { detectGrammar, isJsTsGrammar } from "../language.ts";
 import {
   extractExports,
   extractImports,
   extractOutline,
   lookupCalleesAt,
   lookupNodeAt,
-} from "./structure.ts";
+} from "../tool/structure.ts";
 import type {
   CalleesAtResult,
   ExportRecord,
@@ -18,7 +17,8 @@ import type {
   QueryCapture,
   TreeSitterResult,
   TreeSitterSession,
-} from "./types.ts";
+} from "../types.ts";
+import { TreeSitterRuntime } from "./runtime.ts";
 
 /**
  * Create a new Tree-sitter session bound to the given working directory.

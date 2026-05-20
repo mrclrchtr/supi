@@ -3,6 +3,8 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { detectGrammar, isJsTsGrammar } from "./language.ts";
+import { TreeSitterRuntime } from "./session/runtime.ts";
 import {
   formatNonSuccess,
   formatOutlineItemsCapped,
@@ -11,12 +13,10 @@ import {
   truncatedNotice,
   truncateText,
   validationError,
-} from "./formatting.ts";
-import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
-import { detectGrammar, isJsTsGrammar } from "./language.ts";
-import { collectOutline } from "./outline.ts";
-import { TreeSitterRuntime } from "./runtime.ts";
-import { extractExports, extractImports, lookupCalleesAt, lookupNodeAt } from "./structure.ts";
+} from "./tool/formatting.ts";
+import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
+import { collectOutline } from "./tool/outline.ts";
+import { extractExports, extractImports, lookupCalleesAt, lookupNodeAt } from "./tool/structure.ts";
 
 const TreeSitterActionEnum = StringEnum([
   "outline",

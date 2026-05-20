@@ -1,6 +1,6 @@
 // Public tree-sitter session factory and shared types.
 
-export { createTreeSitterSession } from "./session.ts";
+export { createTreeSitterSession } from "./session/session.ts";
 export type {
   CalleesAtResult,
   ExportRecord,

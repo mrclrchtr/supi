@@ -3,9 +3,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { Language, Parser, Tree } from "web-tree-sitter";
-import { nodeToRange } from "./coordinates.ts";
-import { detectGrammar, resolveGrammarWasmPath } from "./language.ts";
-import type { GrammarId, QueryCapture, TreeSitterResult } from "./types.ts";
+import { nodeToRange } from "../coordinates.ts";
+import { detectGrammar, resolveGrammarWasmPath } from "../language.ts";
+import type { GrammarId, QueryCapture, TreeSitterResult } from "../types.ts";
 
 interface ParserEntry {
   parser: Parser;

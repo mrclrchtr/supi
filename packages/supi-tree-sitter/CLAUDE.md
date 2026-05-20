@@ -22,12 +22,34 @@ Run `node scripts/vendor-wasm.mjs` whenever `tree-sitter-*` devDependencies are 
 
 Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and SHA256 so stale WASM is detected on CI.
 
+## Source layout
+
+```text
+src/
+  api.ts              # public API surface
+  index.ts            # re-export surface
+  extension.ts        # pi extension entry (re-exports tree-sitter.ts)
+  tree-sitter.ts      # main tool definition and action dispatch
+  types.ts            # shared type definitions
+  coordinates.ts      # 1-based UTF-16 coordinate conversion
+  language.ts         # file extension → grammar ID detection and WASM path resolution
+  syntax-node.ts      # syntax node interface
+  session/
+    runtime.ts        # grammar initialization, parser reuse, parse/query services
+    session.ts        # session lifecycle factory and dispose()
+  tool/
+    callees.ts        # callee extraction
+    exports.ts        # export extraction
+    formatting.ts     # tool output formatting and caps
+    guidance.ts       # prompt guidance and tool description
+    imports.ts        # import extraction
+    node-at.ts        # node_at action
+    outline.ts        # outline extraction
+    structure.ts      # re-exports from tool sub-modules
+```
+
 ## Key files
 
-- `runtime.ts`, `session.ts` — grammar initialization, parser reuse, session lifecycle, and `dispose()`
-- `outline.ts`, `structure.ts`, `formatting.ts` — tool action extraction, formatting, and output caps
-- `coordinates.ts` — 1-based UTF-16 coordinate conversion shared with `node_at` and query results
-- `language.ts` — file extension → grammar ID detection and vendored WASM path resolution
 - `resources/grammars/<id>/` — vendored WASM files for all 14 supported grammars
 - `scripts/vendor-wasm.mjs` — copies WASM from installed npm packages (13 grammars)
 - `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source

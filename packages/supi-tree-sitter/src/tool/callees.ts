@@ -1,8 +1,8 @@
 // Structural callee extraction — enclosing-scope lookup with per-language queries.
 
-import { detectGrammar } from "./language.ts";
-import type { TreeSitterRuntime } from "./runtime.ts";
-import type { GrammarId, SourceRange, TreeSitterResult } from "./types.ts";
+import { detectGrammar } from "../language.ts";
+import type { TreeSitterRuntime } from "../session/runtime.ts";
+import type { GrammarId, SourceRange, TreeSitterResult } from "../types.ts";
 
 /** Result shape returned by lookupCalleesAt. */
 export interface CalleesAtResult {

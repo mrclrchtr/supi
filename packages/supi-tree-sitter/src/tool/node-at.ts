@@ -1,8 +1,8 @@
 // Node-at-position lookup.
 
-import { nodeToRange, publicToTreeSitter, splitSourceLines } from "./coordinates.ts";
-import type { TreeSitterRuntime } from "./runtime.ts";
-import type { NodeAtResult, SourceRange, TreeSitterResult } from "./types.ts";
+import { nodeToRange, publicToTreeSitter, splitSourceLines } from "../coordinates.ts";
+import type { TreeSitterRuntime } from "../session/runtime.ts";
+import type { NodeAtResult, SourceRange, TreeSitterResult } from "../types.ts";
 
 const MAX_ANCESTRY = 10;
 

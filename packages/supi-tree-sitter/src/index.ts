@@ -1,6 +1,6 @@
 // Public session factory and re-exports for @mrclrchtr/supi-tree-sitter.
 
-export { createTreeSitterSession } from "./session.ts";
+export { createTreeSitterSession } from "./session/session.ts";
 export type {
   CalleesAtResult,
   ExportRecord,

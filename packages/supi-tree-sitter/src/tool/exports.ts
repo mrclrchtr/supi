@@ -1,9 +1,9 @@
 // Export extraction for supported files.
 
-import { nodeToRange } from "./coordinates.ts";
-import type { TreeSitterRuntime } from "./runtime.ts";
-import type { SyntaxNodeLike } from "./syntax-node.ts";
-import type { ExportRecord, TreeSitterResult } from "./types.ts";
+import { nodeToRange } from "../coordinates.ts";
+import type { TreeSitterRuntime } from "../session/runtime.ts";
+import type { SyntaxNodeLike } from "../syntax-node.ts";
+import type { ExportRecord, TreeSitterResult } from "../types.ts";
 
 /** Extract export records from a supported file. */
 export async function extractExports(

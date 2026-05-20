@@ -1,8 +1,8 @@
 // Outline extraction for supported files.
 
-import { nodeToRange } from "./coordinates.ts";
-import type { SyntaxNodeLike } from "./syntax-node.ts";
-import type { OutlineItem } from "./types.ts";
+import { nodeToRange } from "../coordinates.ts";
+import type { SyntaxNodeLike } from "../syntax-node.ts";
+import type { OutlineItem } from "../types.ts";
 
 /** Node types that can be extracted directly as outline items. */
 const OUTLINE_DECLARATION_NODE_TYPES = new Set([

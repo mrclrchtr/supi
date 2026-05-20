@@ -1,6 +1,6 @@
 // Formatting helpers for tree_sitter tool output.
 
-import type { OutlineItem, TreeSitterResult } from "./types.ts";
+import type { OutlineItem, TreeSitterResult } from "../types.ts";
 
 export const MAX_ITEMS = 100;
 
