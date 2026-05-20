@@ -3,8 +3,8 @@ import {
   breakdownCauses,
   detectIdleRegressions,
   findHotspots,
-} from "../../src/forensics/queries.ts";
-import type { ForensicsFinding } from "../../src/forensics/types.ts";
+} from "../../../src/forensics/queries.ts";
+import type { ForensicsFinding } from "../../../src/forensics/types.ts";
 
 function makeFinding(overrides: Partial<ForensicsFinding> = {}): ForensicsFinding {
   return {

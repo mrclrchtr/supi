@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { computeToolCallShape, stripHumanDetail } from "../../src/forensics/redact.ts";
-import type { ForensicsFinding } from "../../src/forensics/types.ts";
+import { computeToolCallShape, stripHumanDetail } from "../../../src/forensics/redact.ts";
+import type { ForensicsFinding } from "../../../src/forensics/types.ts";
 
 function makeFinding(overrides: Partial<ForensicsFinding> = {}): ForensicsFinding {
   return {

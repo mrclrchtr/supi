@@ -34,6 +34,10 @@ src/
 ├── config.ts         Shared config (supi-cache section, legacy fallback for cache-monitor)
 ├── settings-registration.ts  /supi-settings wiring
 └── hash.ts           FNV-1a fast string hashing
+
+Tests live in `__tests__/unit/`, mirroring the source domain structure:
+`unit/monitor/`, `unit/forensics/`, `unit/report/`, plus flat `unit/config.test.ts`
+and `unit/fingerprint.test.ts`.
 ```
 
 ## Commands and tools

@@ -4,7 +4,7 @@ const mockFns = vi.hoisted(() => ({
   loadCacheMonitorConfig: vi.fn(),
 }));
 
-vi.mock("../../src/config.ts", () => ({
+vi.mock("../../../src/config.ts", () => ({
   CACHE_MONITOR_DEFAULTS: {
     enabled: true,
     notifications: true,
@@ -14,17 +14,17 @@ vi.mock("../../src/config.ts", () => ({
   loadCacheMonitorConfig: mockFns.loadCacheMonitorConfig,
 }));
 
-vi.mock("../../src/settings-registration.ts", () => ({
+vi.mock("../../../src/settings-registration.ts", () => ({
   registerCacheMonitorSettings: vi.fn(),
 }));
 
-vi.mock("../../src/forensics/forensics.ts", () => ({
+vi.mock("../../../src/forensics/forensics.ts", () => ({
   runForensics: vi.fn(),
 }));
 
 import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { runForensics } from "../../src/forensics/forensics.ts";
-import cacheMonitorExtension from "../../src/monitor/monitor.ts";
+import { runForensics } from "../../../src/forensics/forensics.ts";
+import cacheMonitorExtension from "../../../src/monitor/monitor.ts";
 
 function assistantMessage(cacheRead: number, cacheWrite: number, input: number) {
   return {

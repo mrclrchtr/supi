@@ -3,7 +3,7 @@ import {
   computePromptFingerprint,
   diffFingerprints,
   type PromptFingerprint,
-} from "../src/fingerprint.ts";
+} from "../../src/fingerprint.ts";
 
 // ── Fixtures ──────────────────────────────────────────────────
 

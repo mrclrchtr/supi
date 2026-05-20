@@ -1,8 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import type { PromptFingerprint } from "../../src/fingerprint.ts";
-import { CacheMonitorState } from "../../src/monitor/state.ts";
-import { type CacheReportSnapshot, formatCacheReport } from "../../src/report/history.ts";
+import type { PromptFingerprint } from "../../../src/fingerprint.ts";
+import { CacheMonitorState } from "../../../src/monitor/state.ts";
+import { type CacheReportSnapshot, formatCacheReport } from "../../../src/report/history.ts";
 
 function fp(overrides: Partial<PromptFingerprint> = {}): PromptFingerprint {
   return {

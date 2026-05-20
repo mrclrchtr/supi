@@ -3,8 +3,8 @@ import {
   extractCacheTurnEntries,
   extractToolCallWindows,
   findPreviousComparableTurn,
-} from "../../src/forensics/extract.ts";
-import type { TurnRecord } from "../../src/monitor/state.ts";
+} from "../../../src/forensics/extract.ts";
+import type { TurnRecord } from "../../../src/monitor/state.ts";
 
 /** Return an ISO string for the given epoch milliseconds. */
 function iso(epochMs: number): string {

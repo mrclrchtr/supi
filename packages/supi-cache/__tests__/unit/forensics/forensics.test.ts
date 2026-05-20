@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildFindings, parseDuration } from "../../src/forensics/forensics.ts";
-import type { ToolCallShape } from "../../src/forensics/types.ts";
-import type { TurnRecord } from "../../src/monitor/state.ts";
+import { buildFindings, parseDuration } from "../../../src/forensics/forensics.ts";
+import type { ToolCallShape } from "../../../src/forensics/types.ts";
+import type { TurnRecord } from "../../../src/monitor/state.ts";
 
 function makeTurn(overrides: Partial<TurnRecord> = {}): TurnRecord {
   return {

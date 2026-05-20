@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { formatForensicsReport } from "../../src/report/forensics.ts";
+import { formatForensicsReport } from "../../../src/report/forensics.ts";
 
 const mockTheme: Theme = {
   fg: (color: string, text: string) => `[${color}]${text}[/${color}]`,
