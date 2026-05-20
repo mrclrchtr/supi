@@ -6,8 +6,8 @@ import {
   getMergeBase,
   getUncommittedDiff,
   getUncommittedFileNames,
-} from "./git.ts";
-import type { ReviewResult, ReviewTarget } from "./types.ts";
+} from "../git.ts";
+import type { ReviewResult, ReviewTarget } from "../types.ts";
 
 interface TargetResolutionContext {
   cwd: string;

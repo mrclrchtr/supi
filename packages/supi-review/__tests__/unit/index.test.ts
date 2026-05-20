@@ -36,7 +36,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   },
 }));
 
-vi.mock("../src/settings", () => ({
+vi.mock("../../src/settings", () => ({
   filterByEnabledModels: vi.fn((_patterns, available) => available),
   loadReviewSettings: mockFns.loadReviewSettings,
   readPiEnabledModels: vi.fn(() => undefined),
@@ -44,15 +44,15 @@ vi.mock("../src/settings", () => ({
   setReviewModelChoices: mockFns.setReviewModelChoices,
 }));
 
-vi.mock("../src/renderer", () => ({
+vi.mock("../../src/ui/renderer", () => ({
   registerReviewRenderer: mockFns.registerReviewRenderer,
 }));
 
-vi.mock("../src/runner", () => ({
+vi.mock("../../src/tool/runner", () => ({
   runReviewer: mockFns.runReviewer,
 }));
 
-vi.mock("../src/progress-widget", () => ({
+vi.mock("../../src/ui/progress-widget", () => ({
   ReviewProgressWidget: class MockReviewProgressWidget {
     private _controller = new AbortController();
     onAbort: (() => void) | undefined;
@@ -75,7 +75,7 @@ vi.mock("../src/progress-widget", () => ({
   },
 }));
 
-vi.mock("../src/ui", () => ({
+vi.mock("../../src/ui/ui", () => ({
   selectReviewMode: mockFns.selectReviewMode,
   selectProfile: mockFns.selectProfile,
   collectDynamicInputs: mockFns.collectDynamicInputs,
@@ -87,8 +87,8 @@ vi.mock("../src/ui", () => ({
 }));
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { formatReviewContent } from "../src/format-content.ts";
-import reviewExtension from "../src/review.ts";
+import reviewExtension from "../../src/review.ts";
+import { formatReviewContent } from "../../src/ui/format-content.ts";
 
 describe("formatReviewContent", () => {
   it("formats success with findings", () => {

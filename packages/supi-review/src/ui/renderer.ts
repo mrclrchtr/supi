@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
-import type { ReviewFinding, ReviewResult } from "./types.ts";
+import type { ReviewFinding, ReviewResult } from "../types.ts";
 
 export function registerReviewRenderer(pi: ExtensionAPI): void {
   pi.registerMessageRenderer("supi-review", (message, { expanded }, theme) => {

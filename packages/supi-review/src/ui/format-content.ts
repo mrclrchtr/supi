@@ -1,4 +1,4 @@
-import type { ReviewResult } from "./types.ts";
+import type { ReviewResult } from "../types.ts";
 
 function priorityLabel(priority: number): string {
   switch (priority) {

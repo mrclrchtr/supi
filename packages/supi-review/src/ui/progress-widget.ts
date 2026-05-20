@@ -1,7 +1,7 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { CancellableLoader, Container, Text, type TUI } from "@earendil-works/pi-tui";
-import { formatTokens } from "./runner.ts";
-import type { ReviewProgress } from "./runner-types.ts";
+import { formatTokens } from "../tool/runner.ts";
+import type { ReviewProgress } from "../tool/runner-types.ts";
 
 /**
  * Live progress widget for code review.

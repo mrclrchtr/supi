@@ -1,6 +1,6 @@
 import type { Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type { ReviewBrief, ReviewTarget } from "./types.ts";
+import type { ReviewBrief, ReviewTarget } from "../types.ts";
 
 /** Progress state exposed by the runner for widget integration. */
 export interface ReviewProgress {

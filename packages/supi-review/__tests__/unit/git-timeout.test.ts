@@ -18,7 +18,7 @@ import {
   getMergeBase,
   getRecentCommits,
   getUncommittedDiff,
-} from "../src/git.ts";
+} from "../../src/git.ts";
 
 describe("git timeout propagation", () => {
   beforeEach(() => {

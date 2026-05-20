@@ -1,8 +1,8 @@
 import { DynamicBorder, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
-import { getLocalBranches, getRecentCommits } from "./git.ts";
-import { getProfiles } from "./profiles.ts";
-import type { ReviewMode } from "./types.ts";
+import { getLocalBranches, getRecentCommits } from "../git.ts";
+import { getProfiles } from "../profiles.ts";
+import type { ReviewMode } from "../types.ts";
 
 export type Preset = "base-branch" | "uncommitted" | "commit" | "custom";
 

@@ -35,23 +35,32 @@ Three starter profiles are defined in `profiles.ts`:
 
 Each profile has optional system-prompt guidance injected into the reviewer child session.
 
-### Source module map
+### Package structure
 
-| Module | Purpose |
-|--------|---------|
-| `types.ts` | ReviewResult, ReviewTarget, ReviewBrief, ReviewMode, ReviewProfile |
-| `profiles.ts` | Fixed starter set of standard review profiles |
-| `briefs.ts` | Dynamic/standard brief construction and prompt assembly |
-| `prompts.ts` | Target preamble and diff formatting |
-| `review.ts` | Command registration, orchestration, model resolution |
-| `ui.ts` | TUI selection lists, input collection, brief editing |
-| `runner.ts` | Child-session creation, progress tracking, timeout handling |
-| `runner-types.ts` | ReviewerInvocation and ReviewProgress interfaces |
-| `renderer.ts` | Custom message rendering with brief context |
-| `format-content.ts` | Plain-text format for LLM content of review messages |
-| `settings.ts` | Review model, diff size, and auto-fix settings |
-| `git.ts` | Git diff/commit/branch helpers |
-| `target-resolution.ts` | Lazy target hydration from git |
+```text
+src/
+  review.ts          Command registration, orchestration, model resolution
+  types.ts           ReviewResult, ReviewTarget, ReviewBrief, ReviewMode, ReviewProfile
+  profiles.ts        Fixed starter set of standard review profiles
+  briefs.ts          Dynamic/standard brief construction and prompt assembly
+  prompts.ts         Target preamble and diff formatting
+  settings.ts        Review model, diff size, and auto-fix settings
+  git.ts             Git diff/commit/branch helpers
+  api.ts             Package root re-export
+  index.ts           Package root re-export
+  extension.ts       Extension entrypoint re-export
+  ui/
+    ui.ts            TUI selection lists, input collection, brief editing
+    renderer.ts      Custom message rendering with brief context
+    format-content.ts Plain-text format for LLM content of review messages
+    progress-widget.ts Live progress widget (CancellableLoader + stats)
+  tool/
+    runner.ts        Child-session creation, progress tracking, timeout handling
+    runner-types.ts  ReviewerInvocation and ReviewProgress interfaces
+    target-resolution.ts Lazy target hydration from git
+__tests__/
+  unit/              Unit tests
+```
 
 ### Reviewer in-process session design
 

@@ -2,7 +2,6 @@
 import type { Model } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { buildDynamicBrief, buildStandardBrief } from "./briefs.ts";
-import { formatReviewContent } from "./format-content.ts";
 import {
   getCommitFileNames,
   getCommitShow,
@@ -12,11 +11,7 @@ import {
   getUncommittedDiff,
   getUncommittedFileNames,
 } from "./git.ts";
-import { ReviewProgressWidget } from "./progress-widget.ts";
 import { buildReviewPrompt } from "./prompts.ts";
-import { registerReviewRenderer } from "./renderer.ts";
-import { runReviewer } from "./runner.ts";
-import type { ReviewerInvocation } from "./runner-types.ts";
 import {
   filterByEnabledModels,
   loadReviewSettings,
@@ -24,8 +19,13 @@ import {
   registerReviewSettings,
   setReviewModelChoices,
 } from "./settings.ts";
-import { resolveGitTarget } from "./target-resolution.ts";
+import { runReviewer } from "./tool/runner.ts";
+import type { ReviewerInvocation } from "./tool/runner-types.ts";
+import { resolveGitTarget } from "./tool/target-resolution.ts";
 import type { ReviewBrief, ReviewResult, ReviewTarget } from "./types.ts";
+import { formatReviewContent } from "./ui/format-content.ts";
+import { ReviewProgressWidget } from "./ui/progress-widget.ts";
+import { registerReviewRenderer } from "./ui/renderer.ts";
 import {
   approveBriefViaEditor,
   collectDynamicInputs,
@@ -35,7 +35,7 @@ import {
   selectPreset,
   selectProfile,
   selectReviewMode,
-} from "./ui.ts";
+} from "./ui/ui.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
 
@@ -176,7 +176,7 @@ function formatBriefWithPrompt(brief: ReviewBrief, prompt: string): string {
 }
 
 async function resolvePresetTarget(
-  preset: import("./ui.ts").Preset,
+  preset: import("./ui/ui.ts").Preset,
   ctx: CommandContext,
 ): Promise<ReviewTarget | undefined> {
   switch (preset) {

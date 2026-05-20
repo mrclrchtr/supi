@@ -10,8 +10,8 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "../types.ts";
 import type { ReviewerInvocation, ReviewProgress } from "./runner-types.ts";
-import type { ReviewOutputEvent, ReviewResult, ReviewTarget } from "./types.ts";
 
 export type { ReviewerInvocation } from "./runner-types.ts";
 

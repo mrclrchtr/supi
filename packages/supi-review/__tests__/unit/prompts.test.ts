@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { assembleReviewerPrompt } from "../src/briefs.ts";
-import { buildReviewPrompt } from "../src/prompts.ts";
-import type { ReviewTarget } from "../src/types.ts";
+import { assembleReviewerPrompt } from "../../src/briefs.ts";
+import { buildReviewPrompt } from "../../src/prompts.ts";
+import type { ReviewTarget } from "../../src/types.ts";
 
 // parseDiffStats is an export we're about to add — the import will fail until then.
 // We use vi.fn() to capture it dynamically so we can test both the failed-import RED phase
 // and the working GREEN phase from the same test structure.
 const importParseDiffStats = async () => {
-  const mod = await import("../src/prompts.ts");
+  const mod = await import("../../src/prompts.ts");
   return mod.parseDiffStats;
 };
 

@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { registerReviewRenderer } from "../src/renderer.ts";
-import type { ReviewResult } from "../src/types.ts";
+import type { ReviewResult } from "../../src/types.ts";
+import { registerReviewRenderer } from "../../src/ui/renderer.ts";
 
 function createPiWithRenderer() {
   const renderers = new Map<string, (...args: unknown[]) => unknown>();

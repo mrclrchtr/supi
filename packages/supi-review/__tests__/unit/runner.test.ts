@@ -1,6 +1,6 @@
 import type { Model } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReviewOutputEvent, ReviewTarget } from "../src/types.ts";
+import type { ReviewOutputEvent, ReviewTarget } from "../../src/types.ts";
 
 // Minimal model stub — the reviewer tests don't exercise the actual
 // model path (they were passing `undefined` before tightening the type).
@@ -45,7 +45,7 @@ vi.mock("typebox", () => ({
 }));
 
 // Import after mocks are set up
-import { runReviewer } from "../src/runner.ts";
+import { runReviewer } from "../../src/tool/runner.ts";
 
 function resetMockSession(): void {
   mockSession.prompt.mockReset();

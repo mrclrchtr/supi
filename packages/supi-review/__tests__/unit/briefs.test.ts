@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { assembleReviewerPrompt, buildDynamicBrief, buildStandardBrief } from "../src/briefs.ts";
-import { getProfile, getProfiles } from "../src/profiles.ts";
-import type { ReviewTarget } from "../src/types.ts";
+import { assembleReviewerPrompt, buildDynamicBrief, buildStandardBrief } from "../../src/briefs.ts";
+import { getProfile, getProfiles } from "../../src/profiles.ts";
+import type { ReviewTarget } from "../../src/types.ts";
 
 describe("profiles", () => {
   it("exports the three starter profiles", () => {
