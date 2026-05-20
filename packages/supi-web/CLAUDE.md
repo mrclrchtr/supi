@@ -78,6 +78,10 @@ src/
 - `Context7Error` is re-exported from `context7-client.ts` for test mocking purposes
 - The `noSecrets` Biome rule false-positives on test `describe()` names — suppress inline when needed
 
+## Test layout
+
+Tests live in `__tests__/unit/` following the package layout convention.
+
 ## Commands
 
 ```bash

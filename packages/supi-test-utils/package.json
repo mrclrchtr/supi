@@ -6,6 +6,7 @@
   "license": "MIT",
   "main": "src/api.ts",
   "exports": {
+    ".": "./src/api.ts",
     "./api": "./src/api.ts",
     "./package.json": "./package.json"
   },

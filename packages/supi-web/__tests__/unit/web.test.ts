@@ -1,6 +1,6 @@
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
-import webExtension from "../src/web.ts";
+import webExtension from "../../src/web.ts";
 
 describe("webExtension", () => {
   it("registers the web_fetch_md tool", () => {

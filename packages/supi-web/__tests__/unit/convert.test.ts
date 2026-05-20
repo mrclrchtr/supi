@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { htmlToMarkdown, wrapAsCodeBlock } from "../src/convert.ts";
+import { htmlToMarkdown, wrapAsCodeBlock } from "../../src/convert.ts";
 
 // biome-ignore lint/security/noSecrets: false positive on test describe name
 describe("wrapAsCodeBlock", () => {

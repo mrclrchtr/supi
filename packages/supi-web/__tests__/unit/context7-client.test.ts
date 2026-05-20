@@ -19,7 +19,7 @@ vi.mock("@upstash/context7-sdk", () => ({
   Context7Error: MockContext7Error,
 }));
 
-import { getContext, searchLibrary } from "../src/context7-client.ts";
+import { getContext, searchLibrary } from "../../src/context7-client.ts";
 
 describe("context7-client", () => {
   beforeEach(() => {

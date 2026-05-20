@@ -12,13 +12,13 @@ const { mockSearchLibrary, mockGetContext, MockContext7Error } = vi.hoisted(() =
   },
 }));
 
-vi.mock("../src/context7-client.ts", () => ({
+vi.mock("../../src/context7-client.ts", () => ({
   searchLibrary: mockSearchLibrary,
   getContext: mockGetContext,
   Context7Error: MockContext7Error,
 }));
 
-import docsExtension from "../src/docs.ts";
+import docsExtension from "../../src/docs.ts";
 
 /** Result shape returned by both web_docs tools. */
 type ToolResult = {

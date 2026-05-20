@@ -7,7 +7,7 @@ import {
   isPlainTextContentType,
   isValidHttpUrl,
   looksLikeMarkdown,
-} from "../src/fetch.ts";
+} from "../../src/fetch.ts";
 
 // biome-ignore lint/security/noSecrets: test describe name
 describe("isValidHttpUrl", () => {
