@@ -64,8 +64,10 @@ describe("tabSpinner extension", () => {
     const spinnerTitle = titles[titles.length - 1];
     expect(spinnerTitle).toBe("⠋ π - my-project - foo");
 
-    // End the agent
+    // End the agent — done state is deferred briefly to avoid retry flicker
     await agEnd({}, ctx);
+    expect(titles[titles.length - 1]).toBe("⠋ π - my-project - foo");
+    vi.advanceTimersByTime(200);
     expect(titles[titles.length - 1]).toBe("✓ π - my-project - foo");
   });
 
@@ -112,6 +114,7 @@ describe("tabSpinner extension", () => {
     ) => Promise<unknown>;
     await startHandler({}, ctx);
     await endHandler({}, ctx);
+    vi.advanceTimersByTime(200);
     titles.length = 0;
 
     // Emit working start — spinner should resume because currentCtx is set
@@ -233,6 +236,61 @@ describe("tabSpinner extension", () => {
 
     // agent_end still shows ✓ when agent finishes
     await endHandlers[0]({}, ctx);
+    vi.advanceTimersByTime(200);
     expect(titles[titles.length - 1]).toBe("✓ π - my-project - tmp");
+  });
+
+  it("keeps the spinner active when agent work resumes during the settle window", async () => {
+    const pi = createPiMock({ sessionName: "my-project" });
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const startHandlers = pi.getHandlers("agent_start");
+    const endHandlers = pi.getHandlers("agent_end");
+    const turnStartHandlers = pi.getHandlers("turn_start");
+
+    const titles: string[] = [];
+    const ctx = makeCtx({
+      cwd: "/tmp",
+      ui: { setTitle: (t: string) => titles.push(t) },
+    });
+
+    await startHandlers[0]({}, ctx);
+    vi.advanceTimersByTime(80);
+    titles.length = 0;
+
+    await endHandlers[0]({}, ctx);
+    vi.advanceTimersByTime(100);
+    expect(titles).toHaveLength(1);
+    expect(titles[0]).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - my-project - tmp$/);
+
+    await turnStartHandlers[0]({}, ctx);
+    vi.advanceTimersByTime(120);
+    expect(titles.length).toBeGreaterThanOrEqual(2);
+    expect(titles.at(-1)).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - my-project - tmp$/);
+    expect(titles).not.toContain("✓ π - my-project - tmp");
+  });
+
+  it("skips the settle window when agent_end exposes willRetry", async () => {
+    const pi = createPiMock({ sessionName: "my-project" });
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const startHandlers = pi.getHandlers("agent_start");
+    const endHandlers = pi.getHandlers("agent_end");
+
+    const titles: string[] = [];
+    const ctx = makeCtx({
+      cwd: "/tmp",
+      ui: { setTitle: (t: string) => titles.push(t) },
+    });
+
+    await startHandlers[0]({}, ctx);
+    vi.advanceTimersByTime(80);
+    titles.length = 0;
+
+    await endHandlers[0]({ willRetry: true }, ctx);
+    vi.advanceTimersByTime(240);
+    expect(titles).toHaveLength(3);
+    expect(titles.at(-1)).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - my-project - tmp$/);
+    expect(titles).not.toContain("✓ π - my-project - tmp");
   });
 });

@@ -11,8 +11,7 @@
 //   result.ts           — hybrid (content + details) result formatting
 //   render.ts           — custom renderCall / renderResult for the transcript
 
-import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
-import type { Component } from "@earendil-works/pi-tui";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/api";
 import { ActiveQuestionnaireLock } from "./flow.ts";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
@@ -20,35 +19,25 @@ import { renderAskUserCall, renderAskUserResult } from "./render.ts";
 import { buildErrorResult, buildResult, type HybridResult } from "./result.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
-import type { NormalizedQuestionnaire } from "./types.ts";
+import type { AskUserDetails, NormalizedQuestionnaire } from "./types.ts";
 import { type RichUiHost, runRichQuestionnaire } from "./ui/ui-rich.ts";
 
 const TOOL_NAME = "ask_user";
 const TOOL_LABEL = "Ask User";
 
-/** Minimal ui subset needed by executeAskUser — extended with setTitle/notify from ExtensionUIContext. */
-interface ExtensionUi {
+type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "abort"> & {
   ui: {
-    custom?: RichUiHost["custom"];
+    custom?: unknown;
     setWorkingVisible?(visible: boolean): void;
-    /** Set the terminal window/tab title. */
     setTitle?(title: string): void;
-    /** Show a notification to the user. */
     notify?(message: string, type?: "info" | "warning" | "error"): void;
   };
-  /**
-   * Absolute path to the current working directory, available on the full
-   * ExtensionContext. Marked optional here to tolerate partial mocks.
-   */
-  cwd?: string;
-  hasUI: boolean;
-  abort(): void;
-}
+};
 
 export default function askUserExtension(pi: ExtensionAPI): void {
   const lock = new ActiveQuestionnaireLock();
 
-  pi.registerTool({
+  pi.registerTool<typeof AskUserParamsSchema, AskUserDetails>({
     name: TOOL_NAME,
     label: TOOL_LABEL,
     description: toolDescription,
@@ -57,20 +46,10 @@ export default function askUserExtension(pi: ExtensionAPI): void {
     parameters: AskUserParamsSchema,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      return executeAskUser(
-        params as AskUserParams,
-        signal,
-        ctx as unknown as ExtensionUi,
-        lock,
-        pi,
-      );
+      return executeAskUser(params, signal, ctx, lock, pi);
     },
-    renderCall: (args, theme) => renderAskUserCall(args, theme as Theme),
-    renderResult: (result, _options, theme) =>
-      renderAskUserResult(
-        result as { details?: unknown; content: { type: string; text?: string }[] },
-        theme as Theme,
-      ) as unknown as Component,
+    renderCall: (args, theme) => renderAskUserCall(args, theme),
+    renderResult: (result, _options, theme) => renderAskUserResult(result, theme),
   });
 }
 
@@ -78,7 +57,7 @@ export default function askUserExtension(pi: ExtensionAPI): void {
 async function executeAskUser(
   params: AskUserParams,
   signal: AbortSignal | undefined,
-  ctx: ExtensionUi,
+  ctx: AskUserExecutionContext,
   lock: ActiveQuestionnaireLock,
   pi: ExtensionAPI,
 ): Promise<HybridResult> {
@@ -127,12 +106,12 @@ async function executeAskUser(
 }
 
 /** Set terminal title and play alert bell to signal the user needs to respond. */
-function signalAttention(ctx: ExtensionUi): void {
+function signalAttention(ctx: AskUserExecutionContext): void {
   signalWaiting(ctx, `pi — waiting for your input`);
 }
 
 /** Restore the terminal title to pi's native format (session name + cwd). */
-function restoreTerminalTitle(ctx: ExtensionUi, pi: ExtensionAPI): void {
+function restoreTerminalTitle(ctx: AskUserExecutionContext, pi: ExtensionAPI): void {
   ctx.ui.setTitle?.(formatTitle(pi.getSessionName(), ctx.cwd));
 }
 
@@ -150,7 +129,7 @@ function treeSummaryLabel(q: NormalizedQuestionnaire): string {
 async function driveQuestionnaire(
   questionnaire: NormalizedQuestionnaire,
   signal: AbortSignal | undefined,
-  ctx: ExtensionUi,
+  ctx: AskUserExecutionContext,
 ): Promise<HybridResult> {
   const questions = questionnaire.questions;
   if (typeof ctx.ui.custom !== "function") {
@@ -158,7 +137,7 @@ async function driveQuestionnaire(
       "Error: ask_user requires a TUI with custom overlay support. Do not use ask_user in non-interactive or degraded UI sessions.",
     );
   }
-  const richHost: RichUiHost = { custom: ctx.ui.custom.bind(ctx.ui) };
+  const richHost: RichUiHost = { custom: ctx.ui.custom as RichUiHost["custom"] };
   const outcome = await runRichQuestionnaire(questionnaire, { ui: richHost, signal });
   if (outcome === "unsupported") {
     return buildErrorResult(

@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
   BeforeAgentStartEvent,
+  BuildSystemPromptOptions,
   ExtensionAPI,
   ExtensionContext,
   SessionCompactEvent,
@@ -57,11 +58,7 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
   // ── Native context path capture (before_agent_start) ───────
 
   pi.on("before_agent_start", async (event: BeforeAgentStartEvent, _ctx: ExtensionContext) => {
-    const eventWithOpts = event as BeforeAgentStartEvent & {
-      systemPromptOptions?: { contextFiles?: Array<{ path?: string; content?: string }> };
-    };
-
-    captureNativePaths(state, eventWithOpts);
+    captureNativePaths(state, event.systemPromptOptions);
     // Root/ancestor context files are owned by pi's system prompt.
     // SuPi never re-injects them; subdirectory injection handles directories below cwd.
   });
@@ -106,15 +103,13 @@ export default function claudeMdExtension(pi: ExtensionAPI) {
 
 function captureNativePaths(
   state: ClaudeMdState,
-  opts: { systemPromptOptions?: { contextFiles?: Array<{ path?: string; content?: string }> } },
+  systemPromptOptions: BuildSystemPromptOptions,
 ): void {
   if (!state.firstAgentStart) return;
   state.firstAgentStart = false;
-  const contextFiles = opts.systemPromptOptions?.contextFiles ?? [];
+  const contextFiles = systemPromptOptions.contextFiles ?? [];
   for (const file of contextFiles) {
-    if (file.path) {
-      state.nativeContextPaths.add(file.path);
-    }
+    state.nativeContextPaths.add(file.path);
   }
 }
 

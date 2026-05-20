@@ -15,8 +15,26 @@ describe("renderAskUserCall", () => {
     const text = renderAskUserCall(
       {
         questions: [
-          { type: "choice", id: "scope", header: "Scope" },
-          { type: "choice", id: "features", header: "Features" },
+          {
+            type: "choice",
+            id: "scope",
+            header: "Scope",
+            prompt: "Pick",
+            options: [
+              { value: "project", label: "Project" },
+              { value: "feature", label: "Feature" },
+            ],
+          },
+          {
+            type: "choice",
+            id: "features",
+            header: "Features",
+            prompt: "Pick",
+            options: [
+              { value: "preview", label: "Preview" },
+              { value: "multi", label: "Multi-select" },
+            ],
+          },
         ],
       },
       theme,
@@ -33,8 +51,8 @@ describe("renderAskUserCall", () => {
     const text = renderAskUserCall(
       {
         questions: [
-          { type: "text", id: "q1", header: longHeader },
-          { type: "text", id: "q2", header: secondHeader },
+          { type: "text", id: "q1", header: longHeader, prompt: "First" },
+          { type: "text", id: "q2", header: secondHeader, prompt: "Second" },
         ],
       },
       theme,
@@ -55,7 +73,18 @@ describe("renderAskUserCall", () => {
   it("renders single question without parentheses", () => {
     const text = renderAskUserCall(
       {
-        questions: [{ type: "yesno", id: "confirm", header: "Confirm" }],
+        questions: [
+          {
+            type: "choice",
+            id: "confirm",
+            header: "Confirm",
+            prompt: "Proceed?",
+            options: [
+              { value: "yes", label: "Yes" },
+              { value: "no", label: "No" },
+            ],
+          },
+        ],
       },
       theme,
     );
@@ -75,7 +104,7 @@ describe("renderAskUserResult", () => {
   it("renders cancelled state with a warning label", () => {
     const text = renderAskUserResult(
       {
-        details: { questions: [], answers: [], terminalState: "cancelled" },
+        details: { questions: [], answers: [], answersById: {}, terminalState: "cancelled" },
         content: [{ type: "text", text: "User cancelled the questionnaire." }],
       },
       theme,
@@ -112,6 +141,7 @@ describe("renderAskUserResult", () => {
               type: "text",
               prompt: "Tell us more",
               options: [],
+              required: true,
             },
           ],
           answers: [{ questionId: "feedback", source: "text", value: longAnswer }],
@@ -154,6 +184,7 @@ describe("renderAskUserResult", () => {
               allowDiscuss: true,
               recommendedIndexes: [0],
               defaultIndexes: [],
+              required: true,
             },
             {
               id: "scope",
@@ -169,6 +200,7 @@ describe("renderAskUserResult", () => {
               allowDiscuss: true,
               recommendedIndexes: [0],
               defaultIndexes: [],
+              required: true,
             },
           ],
           answers: [

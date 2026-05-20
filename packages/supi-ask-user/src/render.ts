@@ -2,13 +2,14 @@
 // session transcript readable: a one-line "asking N questions: …" header on
 // the call, and a compact ✓ / cancelled / aborted summary on the result.
 
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { AgentToolResult, Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import { formatSummaryBody } from "./format.ts";
 import { ASK_USER_ERROR_MARKER } from "./result.ts";
+import type { AskUserParams } from "./schema.ts";
 import type { AskUserDetails, NormalizedQuestion } from "./types.ts";
 
-export function renderAskUserCall(args: unknown, theme: Theme): Text {
+export function renderAskUserCall(args: AskUserParams, theme: Theme): Text {
   const headers = extractHeadersFromArgs(args);
   const count = headers.length;
   let text = theme.fg("toolTitle", theme.bold("ask_user "));
@@ -20,16 +21,15 @@ export function renderAskUserCall(args: unknown, theme: Theme): Text {
 }
 
 export function renderAskUserResult(
-  result: { details?: unknown; content: { type: string; text?: string }[] },
+  result: Pick<AgentToolResult<AskUserDetails>, "content" | "details">,
   theme: Theme,
 ): Text {
   if (isErrorDetails(result.details)) {
-    return new Text(theme.fg("error", result.content[0]?.text ?? "Error"), 0, 0);
+    return new Text(theme.fg("error", firstTextBlock(result.content) ?? "Error"), 0, 0);
   }
   const details = coerceDetails(result.details);
   if (!details) {
-    const fallback = result.content[0];
-    return new Text(fallback?.type === "text" ? (fallback.text ?? "") : "", 0, 0);
+    return new Text(firstTextBlock(result.content) ?? "", 0, 0);
   }
   if (details.terminalState === "skipped") {
     return new Text(
@@ -47,6 +47,10 @@ export function renderAskUserResult(
   return new Text(formatSubmittedSummary(details, theme), 0, 0);
 }
 
+function firstTextBlock(content: AgentToolResult<AskUserDetails>["content"]): string | undefined {
+  return content.find((block) => block.type === "text")?.text;
+}
+
 function isErrorDetails(details: unknown): boolean {
   return (
     !!details &&
@@ -55,17 +59,8 @@ function isErrorDetails(details: unknown): boolean {
   );
 }
 
-function extractHeadersFromArgs(args: unknown): string[] {
-  if (!args || typeof args !== "object") return [];
-  const questions = (args as { questions?: unknown }).questions;
-  if (!Array.isArray(questions)) return [];
-  return questions
-    .map((question) =>
-      question && typeof question === "object"
-        ? (question as { header?: unknown }).header
-        : undefined,
-    )
-    .filter((header): header is string => typeof header === "string" && header.length > 0);
+function extractHeadersFromArgs(args: AskUserParams): string[] {
+  return args.questions.map((question) => question.header).filter((header) => header.length > 0);
 }
 
 function coerceDetails(details: unknown): AskUserDetails | null {

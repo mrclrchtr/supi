@@ -249,8 +249,15 @@ function handleToolEnd(
   ctx.onToolActivity?.({ toolName: event.toolName, phase: "end" });
   ctx.onProgress?.({ ...ctx.progress, activities: [...ctx.progress.activities] });
 }
-function handleAgentEnd(ctx: RunnerContext): void {
+function handleAgentEnd(
+  event: Extract<AgentSessionEvent, { type: "agent_end" }>,
+  ctx: RunnerContext,
+): void {
   if (ctx.state.settled || ctx.signal?.aborted || ctx.timeout.aborting) return;
+  const retryAwareEvent = event as Extract<AgentSessionEvent, { type: "agent_end" }> & {
+    willRetry?: boolean;
+  };
+  if (retryAwareEvent.willRetry) return;
   if (ctx.resultHolder.value) {
     ctx.resolve(
       ctx.cleanup({ kind: "success", output: ctx.resultHolder.value, target: ctx.target }),
@@ -284,7 +291,7 @@ function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext): void 
       handleToolEnd(event, ctx);
       break;
     case "agent_end":
-      handleAgentEnd(ctx);
+      handleAgentEnd(event, ctx);
       break;
     // Ignore other events (queue_update, compaction, auto_retry, etc.)
     default:

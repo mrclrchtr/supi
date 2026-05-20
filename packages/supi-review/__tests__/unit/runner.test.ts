@@ -186,6 +186,44 @@ describe("runReviewer", () => {
     }
   });
 
+  it("waits for the final agent_end when the session will retry", async () => {
+    let listener: ((event: unknown) => void) | undefined;
+    mockSession.subscribe.mockImplementation((sessionListener: (event: unknown) => void) => {
+      listener = sessionListener;
+      return vi.fn();
+    });
+
+    let settled = false;
+    const resultPromise = runReviewer({
+      prompt: "review this",
+      model: mockModel,
+      cwd: "/tmp",
+      target: defaultTarget,
+    }).then((result) => {
+      settled = true;
+      return result;
+    });
+
+    await vi.advanceTimersByTimeAsync(5);
+
+    listener?.({ type: "agent_end", messages: [], willRetry: true });
+    await vi.advanceTimersByTimeAsync(20);
+    expect(settled).toBe(false);
+
+    const submitReviewTool = capturedCustomTools[0];
+    expect(submitReviewTool).toBeDefined();
+    const reviewOutput = defaultReviewOutput();
+    await submitReviewTool.execute("toolcall-1", reviewOutput);
+
+    listener?.({ type: "agent_end", messages: [], willRetry: false });
+    const result = await resultPromise;
+
+    expect(result.kind).toBe("success");
+    if (result.kind === "success") {
+      expect(result.output).toEqual(reviewOutput);
+    }
+  });
+
   it("returns failed when reviewer does not call submit_review", async () => {
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
       setTimeout(() => {
