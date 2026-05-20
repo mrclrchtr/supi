@@ -46,4 +46,8 @@ The report includes:
 - `src/context.ts` — command registration and cached prompt-option handling
 - `src/analysis.ts` — token accounting and report data
 - `src/format.ts` — formatted report output
+- `src/prompt-inference.ts` — model-specific context window detection
 - `src/renderer.ts` — custom message renderer for the report
+- `src/utils.ts` — token formatting helpers
+
+Tests live under `__tests__/unit/`.

@@ -26,6 +26,13 @@ src/
 ├── prompt-inference.ts # Model-specific context window detection
 ├── renderer.ts         # Custom message renderer for TUI display
 └── utils.ts            # Token formatting helpers
+__tests__/
+├── tsconfig.json
+└── unit/
+    ├── analysis.test.ts
+    ├── analysis-edge.test.ts
+    ├── format.test.ts
+    └── utils.test.ts
 ```
 
 On `/supi-context`, analyzes the current system prompt and calculates token usage breakdowns. Results are sent as a `supi-context` custom message with a TUI-visible summary in `content` and detailed analysis in `details`.

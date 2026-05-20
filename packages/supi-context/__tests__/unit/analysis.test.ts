@@ -29,7 +29,7 @@ vi.mock("@mrclrchtr/supi-core/api", () => ({
 }));
 
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { analyzeContext } from "../src/analysis.ts";
+import { analyzeContext } from "../../src/analysis.ts";
 
 function createMockMessage(
   role: "user" | "assistant" | "toolResult",
