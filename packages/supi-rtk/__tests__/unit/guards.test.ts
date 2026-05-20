@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { shouldBypassRtkRewrite } from "../src/guards.ts";
+import { shouldBypassRtkRewrite } from "../../src/guards.ts";
 
 let tempDirs: string[] = [];
 

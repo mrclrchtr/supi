@@ -26,6 +26,7 @@ pnpm vitest run packages/supi-rtk/
 pnpm exec tsc --noEmit -p packages/supi-rtk/tsconfig.json
 pnpm exec tsc --noEmit -p packages/supi-rtk/__tests__/tsconfig.json
 pnpm exec biome check packages/supi-rtk/
+
 ```
 
 ## RTK CLI behavior

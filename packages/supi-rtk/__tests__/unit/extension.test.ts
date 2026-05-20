@@ -37,8 +37,8 @@ vi.mock("@mrclrchtr/supi-core/api", () => ({
 
 import { registerConfigSettings, registerContextProvider } from "@mrclrchtr/supi-core/api";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
-import rtkExtension from "../src/rtk.ts";
-import { resetTracking } from "../src/tracking.ts";
+import rtkExtension from "../../src/rtk.ts";
+import { resetTracking } from "../../src/tracking.ts";
 
 interface BashTool {
   name: string;
