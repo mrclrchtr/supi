@@ -1,6 +1,7 @@
 # @mrclrchtr/supi-ask-user
 
-Adds a structured `ask_user` tool to the [pi coding agent](https://github.com/earendil-works/pi). It lets the model pause and ask a small, focused questionnaire instead of guessing.
+Adds a redesigned `ask_user` tool to the [pi coding agent](https://github.com/earendil-works/pi).
+It lets the model pause and request a small decision form when explicit human input is required.
 
 ## Install
 
@@ -20,57 +21,81 @@ After editing the source, run `/reload`.
 
 After install, pi gets one new tool:
 
-- `ask_user` — open an interactive questionnaire overlay during a run
+- `ask_user` — open a blocking decision form during a run
 
-Use cases it is built for:
+Use cases:
 
-- clarify a narrow requirement before editing code
-- choose between a few implementation options
+- clarify a narrow implementation choice
 - confirm a risky or destructive action
-- collect a short list of feature priorities
+- ask for a preference the repo cannot answer
+- gather one short cluster of related decisions before proceeding
 
-It is not meant for open-ended interviews or long surveys.
+It is **not** meant for long surveys or open-ended discovery.
+
+## Request shape
+
+`ask_user` accepts a small form with optional framing text:
+
+- `title` — short overall title
+- `intro` — why the agent is asking
+- `questions` — 1-4 related questions
+- `allowPartialSubmit` — let the user submit partial progress
+- `allowDiscuss` — let the user switch back into discussion instead of giving a final decision
 
 ## Question types
 
-`ask_user` supports two question types:
+### `choice`
 
-| Type | What it does |
-| --- | --- |
-| `choice` | Pick from a list of options; single-select by default, multi-select with `multi: true` |
-| `text` | Enter freeform text |
+Use for fixed options.
 
-There is no separate yes/no type. Use `choice` with `yes` and `no` options.
+Supported fields:
 
-## Per-question features
+- `options`
+- `required`
+- `multi`
+- `allowOther` — single-select only
+- `recommendation`
+- `initial`
+- option `description`
+- option `preview`
 
-Choice questions can include:
+### `text`
 
-- `recommendation` — highlight the preferred option
-- `default` — preselect a starting value
-- `allowOther` — allow a custom answer instead of the listed options
-- `allowDiscuss` — let the user switch into a discussion instead of choosing immediately
-- `preview` — show richer content for an option, such as Markdown, code, or ASCII mockups
+Use for freeform input.
 
-At the questionnaire level:
+Supported fields:
 
-- `allowSkip` — let the user submit partial results instead of answering every required question
+- `required`
+- `initial`
+- `placeholder`
 
-## Behavior and limits
+## Result statuses
 
-- interactive UI required; non-interactive or degraded sessions return an error
-- only one `ask_user` interaction can run at a time
-- if the user cancels or closes the overlay, the current agent turn is aborted
-- completed questionnaires are added to the session tree as a readable summary entry
-- each questionnaire supports **1-4 questions**
-- each `choice` question supports **2-12 options**
-- question headers are limited to **60 characters**
-- question prompts are limited to **4000 characters**
+A completed form returns one of these statuses in `details.status`:
 
-## Example shape
+- `submitted` — full submit
+- `partial` — partial submit with missing required answers
+- `discuss` — user wants to continue the conversation instead of deciding
+- `cancelled` — user explicitly cancelled
+- `aborted` — the interaction was aborted externally
+
+`details.answersById` contains structured answers keyed by question id.
+
+## Behavior
+
+- interactive UI required
+- prefers a rich custom UI when available
+- falls back to basic dialog-based interaction when custom UI is unavailable
+- only one `ask_user` interaction may be active at a time
+- cancellation or abort stops the current agent turn
+- completed forms are summarized in the session tree
+
+## Example
 
 ```json
 {
+  "title": "Formatter decision",
+  "intro": "I need one explicit choice before I update the repo config.",
   "questions": [
     {
       "type": "choice",
@@ -82,27 +107,28 @@ At the questionnaire level:
         { "value": "prettier", "label": "Prettier" }
       ],
       "recommendation": "biome",
-      "default": "biome"
+      "initial": "biome"
     },
     {
       "type": "text",
       "id": "reason",
       "header": "Reason",
-      "prompt": "Why this formatter?",
-      "default": "Faster linting"
+      "prompt": "Anything I should optimize for?",
+      "required": false,
+      "placeholder": "optional"
     }
-  ]
+  ],
+  "allowDiscuss": true
 }
 ```
 
-## Requirements
+## Source layout
 
-- `@earendil-works/pi-coding-agent`
-- `@earendil-works/pi-tui`
-- `typebox`
-
-## Source
-
-- `src/ask-user.ts` — tool registration and run flow
-- `src/schema.ts` — model-facing parameter schema
-- `src/normalize.ts` — validation and limits
+- `src/ask-user.ts` — tool registration and execution boundary
+- `src/schema.ts` — tool-call schema
+- `src/normalize.ts` — validation and lowering into internal types
+- `src/session/controller.ts` — headless decision-form state
+- `src/ui/dialog.ts` — basic dialog fallback
+- `src/ui/overlay.ts` — rich custom renderer
+- `src/render/result.ts` — tool result shaping
+- `src/render/transcript.ts` — transcript rendering

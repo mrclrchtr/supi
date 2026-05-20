@@ -1,51 +1,69 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working in `packages/supi-ask-user/`.
+This file provides guidance when working in `packages/supi-ask-user/`.
 
 ## Scope
 
-`@mrclrchtr/supi-ask-user` provides the structured `ask_user` tool and rich questionnaire UI for agent-user decisions.
+`@mrclrchtr/supi-ask-user` provides the redesigned `ask_user` tool: a small decision-form workflow for agent-user handoff.
 
-Entrypoint: `ask-user.ts`
+Entrypoint: `src/ask-user.ts`
 
-## Behavior notes
+## Design rules
 
-- `ask_user` requires a TUI with custom overlay support (`ctx.ui.custom()`). In non-interactive or degraded UI sessions, it returns an error — there is no fallback dialog.
-- `schema.ts`, `README.md`, and tool prompt guidance should stay aligned with runtime behavior; together they define the model-facing `ask_user` contract.
-- Keep `pi.registerTool<typeof AskUserParamsSchema, AskUserDetails>(...)` typed and confine the `ctx.ui.custom()` bridge to a narrow `RichUiHost["custom"]` cast — broad `ctx as unknown as ...` casts hide cross-package `pi-tui` type drift.
-- Normalization trims question ids and structured option values before they reach the shared internal model.
-- Switching from a `multi: true` (multi-select) question to `other` or `discuss` must clear staged selections/notes so revisits reflect the stored answer.
-- `default` pre-selects a starting option/value; it takes precedence over `recommendation` for the initial selection but does not add a visual badge. Existing answers always win over both when revisiting.
-- `maxPromptLength` is 4000 characters; `maxHeaderLength` is 60.
+- Treat `ask_user` as a **decision form**, not a survey engine.
+- Keep the public contract aligned across `schema.ts`, `README.md`, and `tool/guidance.ts`.
+- The controller in `src/session/controller.ts` is the source of truth for form state and terminal outcomes.
+- UI renderers are adapters. They should not invent extra answer semantics.
+- Prefer simple explicit outcomes: `submitted`, `partial`, `discuss`, `cancelled`, `aborted`.
 
-## Questionnaire pipeline
+## Current architecture
 
-The `ask_user` tool processes questionnaires through a staged pipeline:
+1. **Schema** — `src/schema.ts`
+2. **Normalization** — `src/normalize.ts`
+3. **Headless state** — `src/session/controller.ts`
+4. **Renderer selection** — `src/ui/choose-renderer.ts`
+5. **UI renderers**
+   - `src/ui/overlay.ts`
+   - `src/ui/dialog.ts`
+6. **Result + transcript rendering**
+   - `src/render/result.ts`
+   - `src/render/transcript.ts`
+   - `src/render/tree-summary.ts`
 
-1. **Schema validation** (`schema.ts`) — validates input against `QuestionnaireSchema` (TypeBox). Rejects malformed shapes before normalization.
-2. **Normalization** (`normalize.ts`) — trims question IDs and structured option values, resolves `recommendation` and `default` to numeric indexes, and validates that both point to valid options.
-3. **Execution flow** (`flow.ts`) — single-active-questionnaire lock, answer tracking, review + revise state machine.
-4. **Rich overlay** (`ui/ui-rich.ts`) — renders the interactive overlay via `ctx.ui.custom()` with inline editing, notes, previews, and keyboard handlers.
-5. **Result shaping** (`result.ts`, `render.ts`) — packages structured answers into the tool result format with custom call/result rendering.
+## Tool contract notes
 
-## Tool contract
+- `allowOther` is only valid on single-select choice questions.
+- `allowDiscuss` is form-level, not per-question.
+- `allowPartialSubmit` is form-level and only meaningful when partial progress is actionable.
+- Cancellation and abort call `ctx.abort()` from `ask-user.ts`.
+- A session-scoped lock prevents concurrent `ask_user` interactions.
 
-- `allowOther` on `multi: true` choices is a mutually exclusive freeform alternative — clears staged selections when selected.
-- `allowSkip` exposes a partial-submit path (sets `skip: true` on result, returns completed fields).
-- `default` on structured questions resolves to `defaultIndexes` (same validation rules as `recommendation`).
-- Cancellation calls `ctx.abort()` to stop the agent turn; the result is still recorded in the transcript.
-- Single-active-questionnaire lock — subsequent `ask_user` calls before the first resolves return an error.
+## Package layout
 
-## Key files
-
-- `ask-user.ts` — tool registration + execution dispatch
-- `schema.ts`, `types.ts`, `normalize.ts` — input model and normalization
-- `flow.ts` — shared questionnaire flow + concurrency lock
-- `result.ts`, `render.ts`, `format.ts` — result shaping + custom rendering
-- `ui/ui-rich.ts` — overlay rendering via `ctx.ui.custom()`
-- `ui/ui-rich-state.ts` — overlay state management
-- `ui/ui-rich-handlers.ts` — keyboard + interaction handlers
-- `ui/ui-rich-inline.ts` — inline editing support
+```text
+src/
+  api.ts
+  index.ts
+  extension.ts
+  ask-user.ts
+  schema.ts
+  types.ts
+  normalize.ts
+  session/
+    controller.ts
+    lock.ts
+  ui/
+    choose-renderer.ts
+    dialog.ts
+    overlay.ts
+    types.ts
+  render/
+    result.ts
+    transcript.ts
+    tree-summary.ts
+  tool/
+    guidance.ts
+```
 
 ## Commands
 
@@ -55,10 +73,3 @@ pnpm exec tsc --noEmit -p packages/supi-ask-user/tsconfig.json
 pnpm exec tsc --noEmit -p packages/supi-ask-user/__tests__/tsconfig.json
 pnpm exec biome check packages/supi-ask-user/
 ```
-
-## Testing
-
-- Tests live in `__tests__/unit/` for focused fast tests.
-- Shared test utilities are in `__tests__/helpers/`.
-- `captured.value.handleInput?.(...)` + `captured.value.render(width)` — simplest rich-UI regression test pattern in this package.
-- When changing rich UI behavior, run the full suite: `pnpm vitest run packages/supi-ask-user/`

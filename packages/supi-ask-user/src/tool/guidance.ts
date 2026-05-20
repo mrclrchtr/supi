@@ -1,18 +1,18 @@
-// Prompt guidance and tool description for the ask_user tool.
+// Prompt guidance and tool description for the redesigned ask_user tool.
 
 export const toolDescription =
-  "Ask the user a focused decision question (or up to 4 grouped questions) and pause for their answer when explicit user input is required to proceed safely. Use ask_user to clarify intent, choose between options, prioritize a short list, or confirm destructive actions — not for surveys, open-ended discovery, or information you can obtain by reading code yourself. Questions are `choice` (fixed options; set `multi: true` for multi-select) or `text` (freeform input). Structured questions can also use `recommendation`, `default`, `allowOther`, `allowDiscuss`, and option `preview` content.";
+  "Ask the user for a focused blocking decision when explicit human input is required to proceed safely. Use ask_user for short decision forms, not open-ended interviews or information you can obtain from the repo yourself. Each form can include 1-4 related questions. Questions are `choice` or `text`. Forms may optionally allow partial submit and discussion handoff instead of a final decision.";
 
 export const promptSnippet =
-  "ask_user — pause and request a focused user decision with 1-4 typed questions, including rich choice and discuss flows";
+  "ask_user — pause and request a focused user decision with a small decision form";
 
 export const promptGuidelines = [
   "Use ask_user only when explicit user input is required to proceed safely; do not use ask_user instead of reading code or reasoning from the existing context.",
-  "Keep ask_user questionnaires bounded to 1-4 focused questions with short headers, and prefer one decision per ask_user call when possible.",
-  "Use ask_user `choice` questions for fixed options and ask_user `text` questions for freeform input; set `multi: true` for multi-select instead of the removed `multichoice` field.",
+  "Keep ask_user forms small and cohesive: 1-4 related questions that belong to the same decision, and prefer a single question when that is enough.",
+  "Use ask_user `choice` questions for fixed options and ask_user `text` questions for freeform input.",
   'Model yes/no prompts in ask_user as a `choice` question with `{ value: "yes", label: "Yes" }` and `{ value: "no", label: "No" }` options.',
-  "Set ask_user `recommendation` when one option or a small set of options is clearly preferable so the UI can surface that guidance.",
-  "Set ask_user `default` for a safe or common starting value; ask_user `default` controls the initial selection, while ask_user `recommendation` highlights what you think is best.",
-  "Enable ask_user `allowOther` only when a custom answer is genuinely useful, use ask_user `allowDiscuss` only when the user may need to talk through the choice, and use ask_user option `description` or `preview` to explain options clearly.",
-  "Do not call ask_user while another ask_user questionnaire is in flight; wait for the current ask_user result before issuing another one.",
+  "Use ask_user `recommendation` to highlight the preferred option and ask_user `initial` to set the starting selection or prefilled value.",
+  "Enable ask_user `allowOther` only when a custom answer is genuinely useful, and only for single-select choice questions.",
+  "Enable ask_user `allowDiscuss` when the user may need to switch back into conversation instead of committing to a final answer, and enable ask_user `allowPartialSubmit` only when partial progress is still actionable.",
+  "Do not call ask_user while another ask_user form is already in flight.",
 ];

@@ -1,13 +1,18 @@
-// Validates raw `ask_user` parameters and lowers them into the shared internal
-// questionnaire model. Both UI paths and result formatting consume only this
-// normalized model, so the overlay and dialog flows cannot drift apart.
+// Validation and normalization for ask_user tool calls.
 
-import type { AskUserParams, ExternalQuestion } from "./schema.ts";
+import type {
+  AskUserParams,
+  ExternalChoiceQuestion,
+  ExternalQuestion,
+  ExternalTextQuestion,
+} from "./schema.ts";
 import {
+  ASK_USER_LIMITS,
+  type NormalizedChoiceQuestion,
   type NormalizedOption,
   type NormalizedQuestion,
   type NormalizedQuestionnaire,
-  QUESTION_LIMITS,
+  type NormalizedTextQuestion,
 } from "./types.ts";
 
 export class AskUserValidationError extends Error {
@@ -18,212 +23,218 @@ export class AskUserValidationError extends Error {
 }
 
 export function normalizeQuestionnaire(params: AskUserParams): NormalizedQuestionnaire {
-  validateQuestionnaireShape(params);
-  return {
-    questions: params.questions.map((q) => normalizeQuestion(q)),
-    allowSkip: params.allowSkip ?? false,
-  };
-}
-
-function validateQuestionnaireShape(params: AskUserParams): void {
-  const count = params.questions.length;
-  if (count < QUESTION_LIMITS.minQuestions || count > QUESTION_LIMITS.maxQuestions) {
-    throw new AskUserValidationError(
-      `ask_user supports ${QUESTION_LIMITS.minQuestions}-${QUESTION_LIMITS.maxQuestions} questions only (got ${count}).`,
-    );
+  validateQuestionCount(params.questions.length);
+  const title = trimOptional(params.title);
+  const intro = trimOptional(params.intro);
+  if (title && title.length > ASK_USER_LIMITS.maxTitleLength) {
+    throw new AskUserValidationError(`title exceeds ${ASK_USER_LIMITS.maxTitleLength} characters.`);
   }
+  if (intro && intro.length > ASK_USER_LIMITS.maxIntroLength) {
+    throw new AskUserValidationError(`intro exceeds ${ASK_USER_LIMITS.maxIntroLength} characters.`);
+  }
+
   const seen = new Set<string>();
-  for (const q of params.questions) {
-    const questionId = q.id.trim();
-    if (questionId.length === 0) continue;
-    if (seen.has(questionId)) {
+  const questions = params.questions.map((question) => {
+    const normalized = normalizeQuestion(question);
+    if (seen.has(normalized.id)) {
       throw new AskUserValidationError(
-        `Duplicate question id "${questionId}" — question ids must be unique within a questionnaire.`,
+        `Duplicate question id "${normalized.id}" — ids must be unique within one form.`,
       );
     }
-    seen.add(questionId);
-  }
-}
-
-function normalizeQuestion(q: ExternalQuestion): NormalizedQuestion {
-  validateCommonFields(q);
-  switch (q.type) {
-    case "choice":
-      return normalizeChoice(q);
-    case "text":
-      return normalizeText(q);
-  }
-}
-
-function validateCommonFields(q: ExternalQuestion): void {
-  if (q.id.trim().length === 0) {
-    throw new AskUserValidationError("Question id must be a non-empty string.");
-  }
-  if (q.header.trim().length === 0) {
-    throw new AskUserValidationError(`Question "${q.id}" must include a non-empty header.`);
-  }
-  if (q.header.length > QUESTION_LIMITS.maxHeaderLength) {
-    throw new AskUserValidationError(
-      `Question "${q.id}" header exceeds ${QUESTION_LIMITS.maxHeaderLength} characters.`,
-    );
-  }
-  if (q.prompt.trim().length === 0) {
-    throw new AskUserValidationError(`Question "${q.id}" must include a non-empty prompt.`);
-  }
-  if (q.prompt.length > QUESTION_LIMITS.maxPromptLength) {
-    throw new AskUserValidationError(
-      `Question "${q.id}" prompt exceeds ${QUESTION_LIMITS.maxPromptLength} characters.`,
-    );
-  }
-}
-
-function normalizeChoice(q: {
-  type: "choice";
-  id: string;
-  header: string;
-  prompt: string;
-  required?: boolean;
-  multi?: boolean;
-  options: { value: string; label: string; description?: string; preview?: string }[];
-  allowOther?: boolean;
-  allowDiscuss?: boolean;
-  recommendation?: string | string[];
-  default?: string | string[];
-}): NormalizedQuestion {
-  const id = q.id.trim();
-  const options = normalizeStructuredOptions(id, q.options);
-  const multi = q.multi ?? false;
-  const recommendation = q.recommendation;
-  const defaultValue = q.default;
-
-  validateRecDefaultShape(id, recommendation, multi, "recommendation");
-  validateRecDefaultShape(id, defaultValue, multi, "default");
+    seen.add(normalized.id);
+    return normalized;
+  });
 
   return {
-    id,
-    header: q.header,
-    type: "choice",
-    prompt: q.prompt,
-    required: q.required ?? true,
-    multi,
-    options,
-    allowOther: q.allowOther ?? false,
-    allowDiscuss: q.allowDiscuss ?? false,
-    recommendedIndexes: resolveRecDefault(id, options, recommendation, multi, "recommendation"),
-    defaultIndexes: resolveRecDefault(id, options, defaultValue, multi, "default"),
+    ...(title ? { title } : {}),
+    ...(intro ? { intro } : {}),
+    questions,
+    allowPartialSubmit: params.allowPartialSubmit ?? false,
+    allowDiscuss: params.allowDiscuss ?? false,
   };
 }
 
-function validateRecDefaultShape(
+function normalizeQuestion(question: ExternalQuestion): NormalizedQuestion {
+  validateCommonFields(question);
+  return question.type === "choice" ? normalizeChoice(question) : normalizeText(question);
+}
+
+function validateQuestionCount(count: number): void {
+  if (count < ASK_USER_LIMITS.minQuestions || count > ASK_USER_LIMITS.maxQuestions) {
+    throw new AskUserValidationError(
+      `ask_user supports ${ASK_USER_LIMITS.minQuestions}-${ASK_USER_LIMITS.maxQuestions} questions only (got ${count}).`,
+    );
+  }
+}
+
+function validateCommonFields(question: ExternalQuestion): void {
+  const id = question.id.trim();
+  const header = question.header.trim();
+  const prompt = question.prompt.trim();
+
+  if (!id) throw new AskUserValidationError("Question id must be a non-empty string.");
+  if (!header) {
+    throw new AskUserValidationError(`Question "${question.id}" must include a non-empty header.`);
+  }
+  if (header.length > ASK_USER_LIMITS.maxHeaderLength) {
+    throw new AskUserValidationError(
+      `Question "${question.id}" header exceeds ${ASK_USER_LIMITS.maxHeaderLength} characters.`,
+    );
+  }
+  if (!prompt) {
+    throw new AskUserValidationError(`Question "${question.id}" must include a non-empty prompt.`);
+  }
+  if (prompt.length > ASK_USER_LIMITS.maxPromptLength) {
+    throw new AskUserValidationError(
+      `Question "${question.id}" prompt exceeds ${ASK_USER_LIMITS.maxPromptLength} characters.`,
+    );
+  }
+}
+
+function normalizeChoice(question: ExternalChoiceQuestion): NormalizedChoiceQuestion {
+  const options = normalizeOptions(question.id.trim(), question.options);
+  const multi = question.multi ?? false;
+  const allowOther = question.allowOther ?? false;
+  if (multi && allowOther) {
+    throw new AskUserValidationError(
+      `choice question "${question.id}" cannot use allowOther together with multi-select.`,
+    );
+  }
+
+  validateSelectionShape(question.id, question.recommendation, multi, "recommendation");
+  validateSelectionShape(question.id, question.initial, multi, "initial");
+
+  return {
+    id: question.id.trim(),
+    header: question.header.trim(),
+    prompt: question.prompt.trim(),
+    required: question.required ?? true,
+    type: "choice",
+    options,
+    multi,
+    allowOther,
+    recommendedIndexes: resolveIndexes({
+      questionId: question.id,
+      options,
+      value: question.recommendation,
+      multi,
+      kind: "recommendation",
+    }),
+    initialIndexes: resolveIndexes({
+      questionId: question.id,
+      options,
+      value: question.initial,
+      multi,
+      kind: "initial",
+    }),
+  };
+}
+
+function normalizeText(question: ExternalTextQuestion): NormalizedTextQuestion {
+  const placeholder = trimOptional(question.placeholder);
+  if (placeholder && placeholder.length > ASK_USER_LIMITS.maxPlaceholderLength) {
+    throw new AskUserValidationError(
+      `Question "${question.id}" placeholder exceeds ${ASK_USER_LIMITS.maxPlaceholderLength} characters.`,
+    );
+  }
+
+  return {
+    id: question.id.trim(),
+    header: question.header.trim(),
+    prompt: question.prompt.trim(),
+    required: question.required ?? true,
+    type: "text",
+    ...(question.initial !== undefined ? { initial: question.initial } : {}),
+    ...(placeholder ? { placeholder } : {}),
+  };
+}
+
+function normalizeOptions(
+  questionId: string,
+  options: ExternalChoiceQuestion["options"],
+): NormalizedOption[] {
+  if (
+    options.length < ASK_USER_LIMITS.minChoiceOptions ||
+    options.length > ASK_USER_LIMITS.maxChoiceOptions
+  ) {
+    throw new AskUserValidationError(
+      `choice question "${questionId}" must have ${ASK_USER_LIMITS.minChoiceOptions}-${ASK_USER_LIMITS.maxChoiceOptions} options (got ${options.length}).`,
+    );
+  }
+
+  const seen = new Set<string>();
+  return options.map((option) => {
+    const value = option.value.trim();
+    const label = option.label.trim();
+    if (!value || !label) {
+      throw new AskUserValidationError(
+        `choice question "${questionId}" has an option with empty value or label.`,
+      );
+    }
+    if (seen.has(value)) {
+      throw new AskUserValidationError(
+        `choice question "${questionId}" has duplicate option value "${value}".`,
+      );
+    }
+    seen.add(value);
+    return {
+      value,
+      label,
+      description: trimOptional(option.description),
+      preview: trimOptional(option.preview),
+    };
+  });
+}
+
+function validateSelectionShape(
   questionId: string,
   value: string | string[] | undefined,
   multi: boolean,
-  kind: string,
+  kind: "recommendation" | "initial",
 ): void {
   if (value === undefined) return;
-  if (!multi && Array.isArray(value)) {
-    throw new AskUserValidationError(
-      `single-select question "${questionId}" ${kind} must be a string, not an array.`,
-    );
-  }
   if (multi && !Array.isArray(value)) {
     throw new AskUserValidationError(
       `multi-select question "${questionId}" ${kind} must be an array, not a string.`,
     );
   }
-}
-
-function normalizeText(q: {
-  id: string;
-  header: string;
-  prompt: string;
-  required?: boolean;
-  default?: string;
-}): NormalizedQuestion {
-  return {
-    id: q.id.trim(),
-    header: q.header,
-    type: "text",
-    prompt: q.prompt,
-    required: q.required ?? true,
-    options: [],
-    ...(q.default !== undefined ? { default: q.default.trim() } : {}),
-  };
-}
-
-function normalizeStructuredOptions(
-  questionId: string,
-  options: { value: string; label: string; description?: string; preview?: string }[],
-): NormalizedOption[] {
-  const optionCount = options.length;
-  if (
-    optionCount < QUESTION_LIMITS.minChoiceOptions ||
-    optionCount > QUESTION_LIMITS.maxChoiceOptions
-  ) {
+  if (!multi && Array.isArray(value)) {
     throw new AskUserValidationError(
-      `choice question "${questionId}" must have ${QUESTION_LIMITS.minChoiceOptions}-${QUESTION_LIMITS.maxChoiceOptions} options (got ${optionCount}).`,
+      `single-select question "${questionId}" ${kind} must be a string, not an array.`,
     );
   }
-  const seenValues = new Set<string>();
-  return options.map((opt) => {
-    const value = opt.value.trim();
-    if (value.length === 0 || opt.label.trim().length === 0) {
-      throw new AskUserValidationError(
-        `choice question "${questionId}" has an option with empty value or label.`,
-      );
-    }
-    if (seenValues.has(value)) {
-      throw new AskUserValidationError(
-        `choice question "${questionId}" has duplicate option value "${value}".`,
-      );
-    }
-    seenValues.add(value);
-    return {
-      value,
-      label: opt.label,
-      description: opt.description,
-      preview: opt.preview,
-    };
-  });
 }
 
-// biome-ignore lint/complexity/useMaxParams: five distinct positional params are cleaner than a non-reusable options object for this internal helper
-function resolveRecDefault(
-  questionId: string,
-  options: NormalizedOption[],
-  value: string | string[] | undefined,
-  multi: boolean,
-  kind: "recommendation" | "default",
-): number[] {
+function resolveIndexes(args: {
+  questionId: string;
+  options: NormalizedOption[];
+  value: string | string[] | undefined;
+  multi: boolean;
+  kind: "recommendation" | "initial";
+}): number[] {
+  const { questionId, options, value, multi, kind } = args;
   if (value === undefined) return [];
-  const verb = kind === "recommendation" ? "recommends" : "defaults to";
-  if (!multi) {
-    const trimmed = (value as string).trim();
-    const idx = options.findIndex((opt) => opt.value === trimmed);
-    if (idx < 0) {
-      throw new AskUserValidationError(
-        `choice question "${questionId}" ${verb} "${trimmed}", which is not one of its option values.`,
-      );
-    }
-    return [idx];
-  }
-  const values = value as string[];
-  if (values.length === 0) return [];
+  const values = multi ? (value as string[]) : [value as string];
   const seen = new Set<string>();
-  return values.map((v) => {
-    const trimmed = v.trim();
+  return values.map((entry: string) => {
+    const trimmed = entry.trim();
     if (seen.has(trimmed)) {
       throw new AskUserValidationError(
-        `choice question "${questionId}" has duplicate ${kind === "recommendation" ? "recommended" : "default"} value "${trimmed}".`,
+        `choice question "${questionId}" has duplicate ${kind} value "${trimmed}".`,
       );
     }
     seen.add(trimmed);
-    const idx = options.findIndex((opt) => opt.value === trimmed);
-    if (idx < 0) {
+    const index = options.findIndex((option) => option.value === trimmed);
+    if (index < 0) {
       throw new AskUserValidationError(
-        `choice question "${questionId}" ${verb} "${trimmed}", which is not one of its option values.`,
+        `choice question "${questionId}" ${kind} value "${trimmed}" does not match any option value.`,
       );
     }
-    return idx;
+    return index;
   });
+}
+
+function trimOptional(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }

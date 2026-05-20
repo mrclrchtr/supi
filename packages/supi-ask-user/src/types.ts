@@ -1,10 +1,8 @@
-// Internal data model used by both UI paths and result formatting.
-// The external (model-facing) schema lives in `schema.ts`; everything beyond
-// parsing passes through normalization into the shapes defined here.
+// Shared internal and public data model for the redesigned ask_user tool.
+// The external tool-call schema lives in schema.ts; everything past validation
+// works with the normalized shapes defined here.
 
-export type QuestionType = "choice" | "text";
-
-export type TerminalState = "submitted" | "cancelled" | "aborted" | "skipped";
+export type AskUserStatus = "submitted" | "partial" | "discuss" | "cancelled" | "aborted";
 
 export interface NormalizedOption {
   value: string;
@@ -17,102 +15,98 @@ interface BaseQuestion {
   id: string;
   header: string;
   prompt: string;
-  type: QuestionType;
   required: boolean;
 }
 
-interface StructuredQuestionBase extends BaseQuestion {
-  options: NormalizedOption[];
-  allowOther: boolean;
-  allowDiscuss: boolean;
-  recommendedIndexes: number[];
-  defaultIndexes: number[];
-  multi: boolean;
-}
-
-export interface NormalizedChoiceQuestion extends StructuredQuestionBase {
+export interface NormalizedChoiceQuestion extends BaseQuestion {
   type: "choice";
+  options: NormalizedOption[];
+  multi: boolean;
+  allowOther: boolean;
+  recommendedIndexes: number[];
+  initialIndexes: number[];
 }
 
 export interface NormalizedTextQuestion extends BaseQuestion {
   type: "text";
-  options: [];
-  default?: string;
+  initial?: string;
+  placeholder?: string;
 }
-
-export type NormalizedStructuredQuestion = NormalizedChoiceQuestion;
 
 export type NormalizedQuestion = NormalizedChoiceQuestion | NormalizedTextQuestion;
 
 export interface NormalizedQuestionnaire {
+  title?: string;
+  intro?: string;
   questions: NormalizedQuestion[];
-  allowSkip: boolean;
+  allowPartialSubmit: boolean;
+  allowDiscuss: boolean;
 }
 
-export interface Selection {
+export interface AnswerSelection {
   value: string;
-  optionIndex: number;
-  note?: string;
+  label: string;
 }
 
 export interface ChoiceAnswer {
-  questionId: string;
-  source: "choice";
-  selections: Selection[];
+  kind: "choice";
+  selections: AnswerSelection[];
 }
 
-export interface OtherAnswer {
-  questionId: string;
-  source: "other";
+export interface CustomAnswer {
+  kind: "custom";
   value: string;
-}
-
-export interface DiscussAnswer {
-  questionId: string;
-  source: "discuss";
-  value?: string;
 }
 
 export interface TextAnswer {
-  questionId: string;
-  source: "text";
+  kind: "text";
   value: string;
 }
 
-export type Answer = ChoiceAnswer | OtherAnswer | DiscussAnswer | TextAnswer;
+export type Answer = ChoiceAnswer | CustomAnswer | TextAnswer;
 
-export interface QuestionnaireOutcome {
-  terminalState: TerminalState;
-  answers: Answer[];
-  skipped?: true;
+export interface AskUserOutcome {
+  status: AskUserStatus;
+  answersById: Record<string, Answer>;
+  missingQuestionIds: string[];
+  discussMessage?: string;
 }
 
-export interface AskUserDetails {
+export interface AskUserDetails extends AskUserOutcome {
+  title?: string;
+  intro?: string;
   questions: NormalizedQuestion[];
-  answers: Answer[];
-  answersById: Record<string, Answer | undefined>;
-  terminalState: TerminalState;
 }
 
-export const QUESTION_LIMITS = {
+export interface AskUserErrorDetails {
+  kind: "error";
+  message: string;
+}
+
+export type AskUserToolDetails = AskUserDetails | AskUserErrorDetails;
+
+export const ASK_USER_LIMITS = {
   minQuestions: 1,
   maxQuestions: 4,
-  maxHeaderLength: 60,
-  maxPromptLength: 4000,
   minChoiceOptions: 2,
   maxChoiceOptions: 12,
+  maxHeaderLength: 60,
+  maxPromptLength: 4000,
+  maxTitleLength: 120,
+  maxIntroLength: 4000,
+  maxPlaceholderLength: 200,
 } as const;
 
-export function isStructuredQuestion(
+export function isChoiceQuestion(
   question: NormalizedQuestion,
-): question is NormalizedStructuredQuestion {
-  return question.type !== "text";
+): question is NormalizedChoiceQuestion {
+  return question.type === "choice";
 }
 
-export function needsReview(questions: NormalizedQuestion[]): boolean {
-  return questions.length > 1 || questions.some((q) => q.type !== "text" && q.multi);
+export function isTextQuestion(question: NormalizedQuestion): question is NormalizedTextQuestion {
+  return question.type === "text";
 }
 
-export function primaryRecommendationIndex(question: NormalizedQuestion): number | undefined {
-  return isStructuredQuestion(question) ? question.recommendedIndexes[0] : undefined;
+export function isErrorDetails(details: AskUserToolDetails): details is AskUserErrorDetails {
+  return "kind" in details && details.kind === "error";
 }
