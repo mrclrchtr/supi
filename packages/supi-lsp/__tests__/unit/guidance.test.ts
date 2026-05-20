@@ -22,8 +22,15 @@ beforeEach(() => {
 describe("LSP prompt guidance", () => {
   it("exports prompt surfaces that name lsp explicitly", () => {
     expect(toolDescription).toContain("Language Server Protocol tool");
+    expect(toolDescription).toContain(
+      "Use lsp for semantic lookups in files covered by an active server",
+    );
     expect(promptSnippet).toContain("lsp");
+    expect(promptSnippet).toContain("semantic lookup");
     expect(promptGuidelines.every((guideline) => guideline.includes("lsp"))).toBe(true);
+    expect(promptGuidelines.some((guideline) => guideline.includes("lsp.symbol_hover"))).toBe(true);
+    expect(promptGuidelines.some((guideline) => guideline.includes("lsp.rename"))).toBe(true);
+    expect(promptGuidelines.some((guideline) => guideline.includes("lsp.code_actions"))).toBe(true);
   });
 
   it("builds project guidelines with explicit lsp prefixes", () => {

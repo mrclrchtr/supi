@@ -8,29 +8,30 @@
 import * as path from "node:path";
 import type { ProjectServerInfo } from "../config/types.ts";
 
+const actionList =
+  "hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, symbol_hover, recover";
+
 export const toolDescription = `Language Server Protocol tool — semantic code intelligence for supported languages.
 
-Actions: hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, symbol_hover, recover.
+Actions: ${actionList}.
 
-Use lsp for type-driven navigation, definitions, references, diagnostics, workspace symbol search, renames, and code actions in files covered by an active server. Line and character are 1-based. File paths are relative to cwd.`;
+Use lsp for semantic lookups in files covered by an active server: hover/type info, definitions, references, file symbols, diagnostics, rename, and code actions. Use lsp.search(query) for workspace symbol lookup with text-search fallback, lsp.symbol_hover(symbol) for hover by symbol name, and lsp.recover() when diagnostics look stale. Line and character are 1-based. File paths are relative to cwd.`;
 
 export const promptSnippet =
-  "lsp — semantic navigation, type information, diagnostics, references, renames, and code actions in supported files";
+  "lsp — semantic lookup, diagnostics, rename, and code actions in supported files";
 
 export const actionGuidelines = [
-  "Use lsp.diagnostics(file?) to inspect current diagnostics for one file or the whole project when you need them on demand.",
-  "Use lsp.hover(file, line, character) for type info, signatures, and documentation at a position.",
-  "Use lsp.definition(file, line, character) to go to the definition of a symbol.",
-  "Use lsp.references(file, line, character) to find all usages of a symbol.",
-  "Use lsp.symbols(file) to list all top-level symbols in a single file.",
-  "Use lsp.workspace_symbol(query) for pure LSP fuzzy symbol search across the project.",
-  "Use lsp.search(query) when you need a symbol search that falls back to text search if lsp has no semantic results.",
-  "Use lsp.rename(file, line, character, newName) or lsp.code_actions(file, line, character) for renames and available fixes.",
-  "Use lsp.recover() to refresh cached diagnostics after workspace changes or suspicious stale results.",
+  "Use lsp.diagnostics(file?) when you need current diagnostics for one file or the whole project.",
+  "Use lsp.hover(file, line, character), lsp.definition(file, line, character), or lsp.references(file, line, character) when you know a file position and need semantic info there.",
+  "Use lsp.symbols(file) when you need top-level declarations in one file.",
+  "Use lsp.workspace_symbol(query) for semantic symbol-name lookup, lsp.search(query) for symbol lookup with text-search fallback, and lsp.symbol_hover(symbol) for hover from the first workspace match.",
+  "Use lsp.rename(file, line, character, newName) for semantic renames at a known position.",
+  "Use lsp.code_actions(file, line, character) for quick fixes or refactor suggestions at a specific position.",
+  "Use lsp.recover() when diagnostics look stale after workspace-level changes.",
 ];
 
 export const fallbackGuideline =
-  "Use lsp first for semantic questions in supported files. lsp diagnostics are also surfaced automatically after relevant edits, so call lsp when you need a specific lookup, explicit diagnostic snapshot, code action, rename, or recovery.";
+  "Use lsp first for semantic questions in supported files. lsp diagnostics also appear automatically after relevant edits, so call lsp when you need an explicit lookup, diagnostics snapshot, rename, code action, or recovery.";
 
 export const promptGuidelines = [...actionGuidelines, fallbackGuideline];
 
@@ -44,8 +45,8 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
     .filter((server) => server.status === "running")
     .map((server) => {
       const root = displayRoot(server.root, cwd);
-      const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(", ");
-      const actions = server.supportedActions.join(", ");
+      const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(",");
+      const actions = server.supportedActions.join(",");
       const actionText = actions.length > 0 ? ` | actions: ${actions}` : "";
       return `lsp active: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
     });
@@ -57,7 +58,7 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
   const dynamic: string[] = [...active];
   if (unavailable.length > 0) {
     dynamic.push(
-      `lsp unavailable: ${unavailable.join(", ")} — install or enable those servers to extend lsp language coverage`,
+      `lsp unavailable: ${unavailable.join(",")} — install or enable to extend coverage`,
     );
   }
 
