@@ -4,20 +4,32 @@
 
 `@mrclrchtr/supi-insights` is a PI extension that scans historical sessions, extracts metadata and LLM facets, and generates HTML reports.
 
-## Architecture
+## Package layout
+
+Source stays flat per convention. Tests are organized into `__tests__/unit/`.
 
 ```
 src/
+├── api.ts            # Re-export surface
+├── index.ts          # Package-root re-exports
+├── extension.ts      # PI extension entrypoint
 ├── insights.ts       # Extension factory — registers /supi-insights and settings
-├── scanner.ts        # Session discovery via SessionManager.listAll()
-├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
-├── extractor.ts      # LLM facet extraction via @earendil-works/pi-ai/complete()
 ├── aggregator.ts     # Pure data aggregation + multi-clauding detection
+├── cache.ts          # Facet and metadata caching
+├── extractor.ts      # LLM facet extraction via @earendil-works/pi-ai/complete()
 ├── generator.ts      # Parallel narrative insight generation (7 sections)
 ├── html.ts           # HTML report renderer with CSS bar charts
-├── cache.ts          # Facet and metadata caching
+├── parser.ts         # JSONL parsing, transcript extraction, tool stat aggregation
+├── scanner.ts        # Session discovery via SessionManager.listAll()
+├── types.ts          # Shared TypeScript types
 ├── utils.ts          # Chart helpers, label mappings, text utilities
-└── types.ts          # Shared TypeScript types
+├── report.css        # HTML report styling
+└── report.js         # HTML report interactivity
+__tests__/
+├── tsconfig.json
+└── unit/
+    ├── aggregator.test.ts
+    └── utils.test.ts
 ```
 
 ## Session file parsing
