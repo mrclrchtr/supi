@@ -1,11 +1,9 @@
-// biome-ignore lint/nursery/noExcessiveLinesPerFile: format file is inherently large
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: format file is inherently large
+
 import type { Theme } from "@earendil-works/pi-coding-agent";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { ContextAnalysis } from "./analysis.ts";
 import { formatTokens, pluralize } from "./utils.ts";
-
-const GRID_COLS = 20;
-const GRID_ROWS = 5;
-const GRID_BLOCKS = GRID_COLS * GRID_ROWS;
 
 type CategoryKey =
   | "systemPrompt"
@@ -55,389 +53,502 @@ function padRight(text: string, width: number): string {
   return text.padEnd(width, " ");
 }
 
-function allocateGridBlocks(segments: number[]): number[] {
-  const total = segments.reduce((sum, value) => sum + value, 0);
-  if (total <= 0) {
-    return segments.map(() => 0);
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function allocateBlocks(values: number[], totalBlocks: number): number[] {
+  const total = sum(values);
+  if (total <= 0 || totalBlocks <= 0) {
+    return values.map(() => 0);
   }
 
-  const exact = segments.map((value) => (value / total) * GRID_BLOCKS);
+  const exact = values.map((value) => (value / total) * totalBlocks);
   const counts = exact.map((value) => Math.floor(value));
-  const remaining = GRID_BLOCKS - counts.reduce((sum, value) => sum + value, 0);
+  const remaining = totalBlocks - sum(counts);
 
   const byRemainder = exact
     .map((value, index) => ({ index, remainder: value - counts[index] }))
     .sort((a, b) => b.remainder - a.remainder);
 
-  for (let i = 0; i < remaining; i++) {
+  for (let i = 0; i < remaining; i += 1) {
     counts[byRemainder[i]?.index ?? 0] += 1;
   }
 
   return counts;
 }
 
-function renderGrid(analysis: ContextAnalysis, theme: Theme): string[] {
-  const { contextWindow, categories } = analysis;
-  if (contextWindow <= 0) {
-    return [theme.fg("dim", "No model selected — grid unavailable")];
-  }
+function healthColor(analysis: ContextAnalysis): Parameters<Theme["fg"]>["0"] {
+  if (analysis.contextWindow <= 0) return "dim";
+  const reserved = analysis.totalTokens ?? 0;
+  const pressure =
+    ((reserved + analysis.categories.autocompactBuffer) / analysis.contextWindow) * 100;
+  if (pressure >= 90) return "error";
+  if (pressure >= 70) return "warning";
+  return "success";
+}
 
-  const segments = [
-    ...CATEGORY_ORDER.map((key) => ({
-      color: CATEGORY_COLORS[key],
-      tokens: categories[key],
-      block: "█",
-    })),
-    { color: "dim" as Parameters<Theme["fg"]>["0"], tokens: categories.freeSpace, block: "░" },
-    {
-      color: "warning" as Parameters<Theme["fg"]>["0"],
-      tokens: categories.autocompactBuffer,
-      block: "░",
-    },
-  ];
+function sectionHeader(title: string, meta: string | null, theme: Theme, width: number): string {
+  const left = theme.fg("text", title);
+  const content = meta ? `${left}${theme.fg("dim", `  ${meta}`)}` : left;
+  return truncateToWidth(content, width);
+}
 
-  const counts = allocateGridBlocks(segments.map((segment) => segment.tokens));
-  const blocks: string[] = [];
-  for (const [index, segment] of segments.entries()) {
-    for (let i = 0; i < (counts[index] ?? 0); i++) {
-      blocks.push(theme.fg(segment.color, segment.block));
-    }
-  }
+function renderSummary(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
+  const used = analysis.totalTokens ?? 0;
+  const health = theme.fg(healthColor(analysis), "●");
+  const usage =
+    analysis.contextWindow > 0
+      ? `${formatTokens(used)} / ${formatTokens(analysis.contextWindow)} tokens (${pct(used, analysis.contextWindow)})`
+      : `${formatTokens(used)} tokens`;
 
-  const gridLines: string[] = [];
-  for (let row = 0; row < GRID_ROWS; row++) {
-    const start = row * GRID_COLS;
-    const line = blocks.slice(start, start + GRID_COLS).join("");
-    gridLines.push(line);
-  }
-
-  // Model info on the right
-  const infoLines = [
-    theme.fg("text", analysis.modelName),
-    theme.fg("dim", `${formatTokens(contextWindow)} context window`),
-    theme.fg(
-      "text",
-      `${formatTokens(analysis.totalTokens ?? 0)} used (${pct(analysis.totalTokens ?? 0, contextWindow)})`,
+  const lines = [
+    truncateToWidth(
+      `${health} ${theme.fg("text", analysis.modelName)}${theme.fg("dim", `  ·  ${usage}`)}`,
+      width,
     ),
   ];
 
   if (analysis.approximationNote) {
-    infoLines.push(theme.fg("warning", analysis.approximationNote));
+    lines.push(...wrapTextWithAnsi(theme.fg("warning", analysis.approximationNote), width));
   }
 
-  const combined: string[] = [];
-  for (let i = 0; i < GRID_ROWS; i++) {
-    const left = gridLines[i] ?? "";
-    const right = infoLines[i] ?? "";
-    combined.push(`${left}  ${right}`);
-  }
-  // Append any remaining info lines if grid is shorter (shouldn't happen with 5 rows)
-  for (let i = GRID_ROWS; i < infoLines.length; i++) {
-    combined.push(`${" ".repeat(GRID_COLS + 2)}${infoLines[i]}`);
-  }
-
-  return combined;
+  return lines;
 }
 
-function renderCategoryBreakdown(analysis: ContextAnalysis, theme: Theme): string[] {
-  const lines: string[] = [];
-  lines.push(theme.fg("accent", "Usage by category"));
+function renderUsageBar(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
+  if (analysis.contextWindow <= 0) {
+    return [theme.fg("dim", "No model selected — usage bar unavailable")];
+  }
 
-  const { contextWindow, categories } = analysis;
-  const allCategories: Array<{
-    key: CategoryKey | "autocompactBuffer" | "freeSpace";
+  const percentLabel = pct(analysis.totalTokens ?? 0, analysis.contextWindow);
+  const barWidth = Math.max(12, Math.min(48, width - visibleWidth(percentLabel) - 3));
+  const values = [
+    ...CATEGORY_ORDER.map((key) => analysis.categories[key]),
+    analysis.categories.autocompactBuffer,
+    analysis.categories.freeSpace,
+  ];
+  const counts = allocateBlocks(values, barWidth);
+
+  const segments = [
+    ...CATEGORY_ORDER.map((key, index) => ({
+      color: CATEGORY_COLORS[key],
+      block: "█",
+      count: counts[index] ?? 0,
+    })),
+    {
+      color: "warning" as Parameters<Theme["fg"]>["0"],
+      block: "▒",
+      count: counts[CATEGORY_ORDER.length] ?? 0,
+    },
+    {
+      color: "dim" as Parameters<Theme["fg"]>["0"],
+      block: "░",
+      count: counts[CATEGORY_ORDER.length + 1] ?? 0,
+    },
+  ];
+
+  const bar = segments
+    .map((segment) =>
+      segment.count > 0 ? theme.fg(segment.color, segment.block.repeat(segment.count)) : "",
+    )
+    .join("");
+
+  const barLine = truncateToWidth(
+    `${theme.fg("dim", "[")}${bar}${theme.fg("dim", "]")} ${theme.fg("text", percentLabel)}`,
+    width,
+  );
+
+  const legendParts: string[] = [];
+  for (const key of CATEGORY_ORDER) {
+    if (analysis.categories[key] <= 0) continue;
+    legendParts.push(`${theme.fg(CATEGORY_COLORS[key], "●")} ${CATEGORY_LABELS[key]}`);
+  }
+  if (analysis.categories.autocompactBuffer > 0) {
+    legendParts.push(`${theme.fg("warning", "▒")} Autocompact buffer`);
+  }
+  if (analysis.categories.freeSpace > 0) {
+    legendParts.push(`${theme.fg("dim", "░")} Free space`);
+  }
+
+  return [barLine, ...wrapTextWithAnsi(legendParts.join(theme.fg("dim", "  •  ")), width)];
+}
+
+function renderCategoryBreakdown(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
+  const lines: string[] = [];
+  lines.push(sectionHeader("Usage by category", null, theme, width));
+
+  const rows: Array<{
     label: string;
     color: Parameters<Theme["fg"]>["0"];
     tokens: number;
   }> = [
     ...CATEGORY_ORDER.map((key) => ({
-      key,
       label: CATEGORY_LABELS[key],
       color: CATEGORY_COLORS[key],
-      tokens: categories[key],
+      tokens: analysis.categories[key],
     })),
     {
-      key: "autocompactBuffer",
       label: "Autocompact buffer",
       color: "warning" as Parameters<Theme["fg"]>["0"],
-      tokens: categories.autocompactBuffer,
+      tokens: analysis.categories.autocompactBuffer,
     },
     {
-      key: "freeSpace",
       label: "Free space",
       color: "dim" as Parameters<Theme["fg"]>["0"],
-      tokens: categories.freeSpace,
+      tokens: analysis.categories.freeSpace,
     },
   ];
 
-  for (const cat of allCategories) {
-    if (cat.tokens <= 0 && cat.key !== "freeSpace") continue;
-    const label = padRight(cat.label, 20);
-    const tokens = padLeft(formatTokens(cat.tokens), 8);
-    const percentage = padLeft(pct(cat.tokens, contextWindow), 7);
-    lines.push(`${theme.fg(cat.color, "●")} ${label} ${tokens} ${percentage}`);
+  const labelWidth = Math.max(18, Math.min(22, width - 22));
+  for (const row of rows) {
+    if (row.tokens <= 0 && row.label !== "Free space") continue;
+    const bullet = theme.fg(row.color, "●");
+    const label = padRight(row.label, labelWidth);
+    const tokens = padLeft(formatTokens(row.tokens), 8);
+    const percentage = padLeft(pct(row.tokens, analysis.contextWindow), 7);
+    lines.push(truncateToWidth(`  ${bullet} ${label} ${tokens} ${percentage}`, width));
   }
 
   return lines;
 }
 
-interface FileListSectionOptions {
-  title: string;
-  files: Array<{ path: string; tokens: number; lines: number; origin?: "global" | "project" }>;
-  systemTotal: number;
-  theme: Theme;
-  extraCol?: (f: {
-    path: string;
+function renderSystemPromptComposition(
+  analysis: ContextAnalysis,
+  theme: Theme,
+  width: number,
+): string[] {
+  const breakdown = analysis.systemPromptBreakdown;
+  const instructionFileTokens = sum(breakdown.instructionFiles.map((file) => file.tokens));
+  const contextFileTokens = sum(breakdown.contextFiles.map((file) => file.tokens));
+  const skillTokens = sum(breakdown.skills.map((skill) => skill.tokens));
+  const total = analysis.categories.systemPrompt;
+
+  const lines: string[] = [];
+  lines.push(
+    sectionHeader(
+      "System prompt composition",
+      total > 0 ? `${formatTokens(total)} tokens` : null,
+      theme,
+      width,
+    ),
+  );
+
+  const rows: Array<{
+    label: string;
+    color: Parameters<Theme["fg"]>["0"];
     tokens: number;
-    lines: number;
-    origin?: "global" | "project";
-  }) => string;
+  }> = [
+    { label: "Base", color: "accent", tokens: breakdown.base },
+    { label: "Instruction files", color: "text", tokens: instructionFileTokens },
+    { label: "Context files", color: "text", tokens: contextFileTokens },
+    { label: "Skills", color: "text", tokens: skillTokens },
+    { label: "Guidelines", color: "text", tokens: breakdown.guidelines },
+    { label: "Tool snippets", color: "text", tokens: breakdown.toolSnippets },
+    { label: "Append text", color: "text", tokens: breakdown.appendText },
+  ];
+
+  const labelWidth = Math.max(18, Math.min(22, width - 22));
+  for (const row of rows) {
+    if (row.tokens <= 0) continue;
+    const bullet = theme.fg(row.color, "●");
+    const label = padRight(row.label, labelWidth);
+    const tokens = padLeft(formatTokens(row.tokens), 8);
+    const percentage = padLeft(pct(row.tokens, total), 7);
+    lines.push(truncateToWidth(`  ${bullet} ${label} ${tokens} ${percentage}`, width));
+  }
+
+  return lines;
 }
 
-function renderFileListSection(options: FileListSectionOptions): string[] {
-  const { title, files, systemTotal, theme, extraCol } = options;
+interface FileSectionOptions {
+  title: string;
+  subtitle: string;
+  files: Array<{ path: string; tokens: number; lines: number; extra?: string }>;
+  total: number;
+  theme: Theme;
+  width: number;
+}
+
+function renderFileSection(options: FileSectionOptions): string[] {
+  const { title, subtitle, files, total, theme, width } = options;
   if (files.length === 0) return [];
 
   const sorted = [...files].sort((a, b) => b.tokens - a.tokens);
-  const totalTokens = sorted.reduce((s, f) => s + f.tokens, 0);
-  const totalLines = sorted.reduce((s, f) => s + f.lines, 0);
-
-  const lines: string[] = [];
-  lines.push("");
-  lines.push(
-    `${theme.fg("accent", title)}  ${theme.fg("dim", `${pluralize(sorted.length, "file", "files")}, ${formatTokens(totalTokens)} tokens (${pct(totalTokens, systemTotal)} of system prompt)`)}`,
+  const totalTokens = sum(sorted.map((file) => file.tokens));
+  const header = sectionHeader(
+    title,
+    `${pluralize(sorted.length, "file", "files")}, ${formatTokens(totalTokens)} tokens${subtitle ? ` · ${subtitle}` : ""}`,
+    theme,
+    width,
   );
 
-  const pathWidth = Math.max(30, ...sorted.map((f) => f.path.length));
-  const extraWidth = extraCol ? 10 : 0;
-  for (const f of sorted) {
-    const pathCol = padRight(f.path, pathWidth);
-    const lineCol = padLeft(`${f.lines} lines`, 10);
-    const tokenCol = padLeft(formatTokens(f.tokens), 8);
-    const pctCol = padLeft(pct(f.tokens, systemTotal), 7);
-    const extra = extraCol ? `  ${theme.fg("dim", extraCol(f))}` : "";
-    lines.push(
-      `  ${theme.fg("text", pathCol)}  ${theme.fg("dim", lineCol)}  ${theme.fg("dim", tokenCol)}${extra}  ${theme.fg("dim", pctCol)}`,
-    );
-  }
+  const tokenWidth = 8;
+  const lineWidth = 10;
+  const pctWidth = 7;
+  const extraWidth = sorted.some((file) => file.extra) ? 10 : 0;
+  const reserved =
+    2 + 2 + lineWidth + 2 + tokenWidth + 2 + pctWidth + (extraWidth ? 2 + extraWidth : 0);
+  const pathWidth = Math.max(16, width - reserved);
 
-  if (sorted.length > 1) {
-    const totalPath = padRight("Total", pathWidth);
-    const totalLineCol = padLeft(`${totalLines} lines`, 10);
-    const totalTokenCol = padLeft(formatTokens(totalTokens), 8);
-    const totalExtra = extraCol ? `  ${theme.fg("dim", "        ")}` : "";
-    const totalPctCol = padLeft(pct(totalTokens, systemTotal), 7);
-    lines.push(`  ${theme.fg("dim", "─".repeat(pathWidth + 26 + extraWidth))}`);
+  const lines = [header];
+  for (const file of sorted) {
+    const path = padRight(truncateToWidth(file.path, pathWidth), pathWidth);
+    const lineCol = padLeft(`${file.lines} lines`, lineWidth);
+    const tokenCol = padLeft(formatTokens(file.tokens), tokenWidth);
+    const pctCol = padLeft(pct(file.tokens, total), pctWidth);
+    const extra = extraWidth ? `  ${theme.fg("dim", padRight(file.extra ?? "", extraWidth))}` : "";
     lines.push(
-      `  ${theme.fg("text", totalPath)}  ${theme.fg("dim", totalLineCol)}  ${theme.fg("dim", totalTokenCol)}${totalExtra}  ${theme.fg("dim", totalPctCol)}`,
+      `  ${theme.fg("text", path)}  ${theme.fg("dim", lineCol)}  ${theme.fg("dim", tokenCol)}${extra}  ${theme.fg("dim", pctCol)}`,
     );
   }
 
   return lines;
 }
 
-function renderInstructionFilesSection(analysis: ContextAnalysis, theme: Theme): string[] {
-  return renderFileListSection({
+function renderInstructionFilesSection(
+  analysis: ContextAnalysis,
+  theme: Theme,
+  width: number,
+): string[] {
+  return renderFileSection({
     title: "Instruction Files (AGENTS.md / CLAUDE.md)",
-    files: analysis.systemPromptBreakdown.instructionFiles,
-    systemTotal: analysis.categories.systemPrompt,
+    subtitle: "share of system prompt",
+    files: analysis.systemPromptBreakdown.instructionFiles.map((file) => ({
+      path: file.path,
+      tokens: file.tokens,
+      lines: file.lines,
+      extra: file.origin,
+    })),
+    total: analysis.categories.systemPrompt,
     theme,
-    extraCol: (f) => f.origin ?? "",
+    width,
   });
 }
 
-function renderContextFilesSection(analysis: ContextAnalysis, theme: Theme): string[] {
-  return renderFileListSection({
+function renderContextFilesSection(
+  analysis: ContextAnalysis,
+  theme: Theme,
+  width: number,
+): string[] {
+  return renderFileSection({
     title: "Context Files (system prompt)",
-    files: analysis.systemPromptBreakdown.contextFiles,
-    systemTotal: analysis.categories.systemPrompt,
+    subtitle: "share of system prompt",
+    files: analysis.systemPromptBreakdown.contextFiles.map((file) => ({
+      path: file.path,
+      tokens: file.tokens,
+      lines: file.lines,
+    })),
+    total: analysis.categories.systemPrompt,
     theme,
+    width,
   });
 }
 
-function renderInjectedFilesSection(analysis: ContextAnalysis, theme: Theme): string[] {
-  const files = analysis.injectedFiles;
-  if (files.length === 0) return [];
-
-  const sorted = [...files].sort((a, b) => b.tokens - a.tokens);
-  const totalTokens = sorted.reduce((s, f) => s + f.tokens, 0);
-  const totalLines = sorted.reduce((s, f) => s + f.lines, 0);
-  const grandTotal = analysis.totalTokens ?? 1;
-
-  const lines: string[] = [];
-  lines.push("");
-  lines.push(
-    `${theme.fg("accent", "Context Files (injected · supi-claude-md)")}  ${theme.fg("dim", `${pluralize(sorted.length, "file", "files")}, ${formatTokens(totalTokens)} tokens`)}`,
-  );
-
-  const pathWidth = Math.max(30, ...sorted.map((f) => f.file.length));
-  for (const f of sorted) {
-    const pathCol = padRight(f.file, pathWidth);
-    const lineCol = padLeft(`${f.lines} lines`, 10);
-    const tokenCol = padLeft(formatTokens(f.tokens), 8);
-    const turnCol = padLeft(`turn ${f.turn}`, 8);
-    const pctCol = padLeft(pct(f.tokens, grandTotal), 7);
-    lines.push(
-      `  ${theme.fg("text", pathCol)}  ${theme.fg("dim", lineCol)}  ${theme.fg("dim", tokenCol)}  ${theme.fg("dim", turnCol)}  ${theme.fg("dim", pctCol)}`,
-    );
-  }
-
-  if (sorted.length > 1) {
-    const totalPath = padRight("Total", pathWidth);
-    const totalLineCol = padLeft(`${totalLines} lines`, 10);
-    const totalTokenCol = padLeft(formatTokens(totalTokens), 8);
-    const totalPctCol = padLeft(pct(totalTokens, grandTotal), 7);
-    lines.push(`  ${theme.fg("dim", "─".repeat(pathWidth + 36))}`);
-    lines.push(
-      `  ${theme.fg("text", totalPath)}  ${theme.fg("dim", totalLineCol)}  ${theme.fg("dim", totalTokenCol)}  ${theme.fg("dim", "        ")}  ${theme.fg("dim", totalPctCol)}`,
-    );
-  }
-
-  return lines;
+function renderInjectedFilesSection(
+  analysis: ContextAnalysis,
+  theme: Theme,
+  width: number,
+): string[] {
+  return renderFileSection({
+    title: "Context Files (injected · supi-claude-md)",
+    subtitle: "share of full context",
+    files: analysis.injectedFiles.map((file) => ({
+      path: file.file,
+      tokens: file.tokens,
+      lines: file.lines,
+      extra: `turn ${file.turn}`,
+    })),
+    total: analysis.totalTokens ?? 0,
+    theme,
+    width,
+  });
 }
 
-function renderSkillsSection(analysis: ContextAnalysis, theme: Theme): string[] {
+function renderSkillsSection(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
   const lines: string[] = [];
-  lines.push("");
-  lines.push(theme.fg("accent", `Skills (${analysis.skills.length})`));
+  const total = sum(analysis.skills.map((skill) => skill.tokens));
+  lines.push(
+    sectionHeader(
+      `Skills (${analysis.skills.length})`,
+      total > 0 ? `${formatTokens(total)} tokens` : null,
+      theme,
+      width,
+    ),
+  );
 
   if (analysis.skills.length === 0) {
-    lines.push(theme.fg("dim", "  Send a message to see skill details"));
+    lines.push(truncateToWidth(theme.fg("dim", "  Send a message to see skill details"), width));
     return lines;
   }
 
-  for (const s of analysis.skills) {
-    lines.push(`  ${theme.fg("text", s.name)}  ${theme.fg("dim", formatTokens(s.tokens))}`);
+  for (const skill of analysis.skills) {
+    lines.push(
+      truncateToWidth(
+        `  ${theme.fg("text", skill.name)}  ${theme.fg("dim", padLeft(formatTokens(skill.tokens), 8))}`,
+        width,
+      ),
+    );
   }
+
   return lines;
 }
 
-function renderGuidelinesAndTools(analysis: ContextAnalysis, theme: Theme): string[] {
-  const lines: string[] = [];
-  lines.push("");
-  const bulletCount = analysis.guidelineBullets.length;
-  lines.push(
-    `${theme.fg("text", `Guidelines (${pluralize(bulletCount, "bullet", "bullets")})`)}  ${theme.fg("dim", formatTokens(analysis.guidelines))}`,
-  );
+function renderGuidelinesSection(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
+  const lines = [
+    sectionHeader(
+      `Guidelines (${pluralize(analysis.guidelineBullets.length, "bullet", "bullets")})`,
+      `${formatTokens(analysis.guidelines)} tokens`,
+      theme,
+      width,
+    ),
+  ];
+
+  const bullets = analysis.guidelineBullets;
+  if (bullets.length === 0) {
+    return lines;
+  }
+
+  const previewLimit = analysis.full ? bullets.length : Math.min(6, bullets.length);
+  for (let i = 0; i < previewLimit; i += 1) {
+    const rawText = bullets[i] ?? "";
+    const previewText =
+      analysis.full || rawText.length <= 90 ? rawText : `${rawText.slice(0, 90)}…`;
+    const bullet = `${theme.fg("dim", "•")} ${theme.fg("text", previewText)}`;
+    if (analysis.full) {
+      lines.push(...wrapTextWithAnsi(bullet, Math.max(1, width - 2)).map((line) => `  ${line}`));
+      continue;
+    }
+    lines.push(truncateToWidth(`  ${bullet}`, width));
+  }
+
+  if (!analysis.full && bullets.length > previewLimit) {
+    lines.push(
+      truncateToWidth(
+        `  ${theme.fg("dim", `… and ${bullets.length - previewLimit} more — run /supi-context full`)}`,
+        width,
+      ),
+    );
+  }
+
   return lines;
 }
 
-function renderToolDefinitionsSection(analysis: ContextAnalysis, theme: Theme): string[] {
-  const tools = analysis.toolDefinitions.tools;
+function renderToolDefinitionsSection(
+  analysis: ContextAnalysis,
+  theme: Theme,
+  width: number,
+): string[] {
+  const tools = [...analysis.toolDefinitions.tools].sort((a, b) => b.tokens - a.tokens);
   if (tools.length === 0) return [];
 
   const lines: string[] = [];
-  lines.push("");
-  lines.push(theme.fg("accent", `Tool Definitions (${tools.length} active)`));
+  lines.push(
+    sectionHeader(
+      `Tool Definitions (${tools.length} active)`,
+      `${formatTokens(analysis.toolDefinitions.tokens)} tokens`,
+      theme,
+      width,
+    ),
+  );
 
-  const sorted = [...tools].sort((a, b) => b.tokens - a.tokens);
-  const nameWidth = Math.max(15, ...sorted.map((t) => t.name.length));
+  const previewLimit = analysis.full ? tools.length : Math.min(5, tools.length);
+  const nameWidth = Math.max(12, Math.min(18, Math.max(...tools.map((tool) => tool.name.length))));
+  const tokenWidth = 8;
+  const reserved = 2 + nameWidth + 2 + tokenWidth + 2;
+  const descWidth = Math.max(12, width - reserved);
 
-  if (analysis.full) {
-    for (const t of sorted) {
-      const nameCol = padRight(t.name, nameWidth);
-      const descCol = t.description;
-      const tokenCol = padLeft(formatTokens(t.tokens), 8);
-      lines.push(
-        `  ${theme.fg("text", nameCol)}  ${theme.fg("dim", descCol)}  ${theme.fg("dim", tokenCol)}`,
-      );
-    }
-    return lines;
-  }
-
-  const previewLimit = 5;
-  for (let i = 0; i < Math.min(sorted.length, previewLimit); i++) {
-    const t = sorted[i];
-    const nameCol = padRight(t.name, nameWidth);
-    const desc = t.description.length > 50 ? `${t.description.slice(0, 50)}…` : t.description;
-    const tokenCol = padLeft(formatTokens(t.tokens), 8);
+  for (let i = 0; i < previewLimit; i += 1) {
+    const tool = tools[i];
+    const name = padRight(tool.name, nameWidth);
+    const previewDescription =
+      analysis.full || tool.description.length <= 50
+        ? tool.description
+        : `${tool.description.slice(0, 50)}…`;
+    const description = truncateToWidth(previewDescription, descWidth);
+    const tokens = padLeft(formatTokens(tool.tokens), tokenWidth);
     lines.push(
-      `  ${theme.fg("text", nameCol)}  ${theme.fg("dim", desc)}  ${theme.fg("dim", tokenCol)}`,
+      truncateToWidth(
+        `  ${theme.fg("text", name)}  ${theme.fg("dim", description)}  ${theme.fg("dim", tokens)}`,
+        width,
+      ),
     );
   }
 
-  if (sorted.length > previewLimit) {
+  if (!analysis.full && tools.length > previewLimit) {
     lines.push(
-      `  ${theme.fg("dim", `… and ${sorted.length - previewLimit} more — run /supi-context full`)}`,
-    );
-  }
-
-  return lines;
-}
-
-function renderGuidelineDetails(analysis: ContextAnalysis, theme: Theme): string[] {
-  const bullets = analysis.guidelineBullets;
-  if (bullets.length === 0) return [];
-
-  const lines: string[] = [];
-  lines.push("");
-  lines.push(theme.fg("accent", "Guideline Details"));
-
-  if (analysis.full) {
-    for (const text of bullets) {
-      lines.push(`  ${theme.fg("dim", "•")} ${theme.fg("text", text)}`);
-    }
-    return lines;
-  }
-
-  const previewLimit = 6;
-  for (let i = 0; i < Math.min(bullets.length, previewLimit); i++) {
-    const text = bullets[i] ?? "";
-    const truncated = text.length > 90 ? `${text.slice(0, 90)}…` : text;
-    lines.push(`  ${theme.fg("dim", "•")} ${theme.fg("text", truncated)}`);
-  }
-
-  if (bullets.length > previewLimit) {
-    lines.push(
-      `  ${theme.fg("dim", `… and ${bullets.length - previewLimit} more — run /supi-context full`)}`,
+      truncateToWidth(
+        `  ${theme.fg("dim", `… and ${tools.length - previewLimit} more — run /supi-context full`)}`,
+        width,
+      ),
     );
   }
 
   return lines;
 }
 
-function renderCompactionNote(analysis: ContextAnalysis, theme: Theme): string[] {
+function renderCompactionNote(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
   if (!analysis.compaction) return [];
   return [
-    "",
-    theme.fg(
-      "dim",
-      `↳ ${pluralize(analysis.compaction.summarizedTurns, "older turn", "older turns")} summarized (compaction)`,
+    truncateToWidth(
+      theme.fg(
+        "dim",
+        `↳ ${pluralize(analysis.compaction.summarizedTurns, "older turn", "older turns")} summarized (compaction)`,
+      ),
+      width,
     ),
   ];
 }
 
-function renderProviderSections(analysis: ContextAnalysis, theme: Theme): string[] {
+function renderProviderSections(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
   if (analysis.providerSections.length === 0) return [];
 
   const lines: string[] = [];
   for (const section of analysis.providerSections) {
-    lines.push("");
-    lines.push(theme.fg("accent", section.label));
+    lines.push(sectionHeader(section.label, null, theme, width));
     for (const [key, value] of Object.entries(section.data)) {
-      lines.push(`  ${theme.fg("text", key)}: ${theme.fg("dim", String(value))}`);
+      const label = theme.fg("text", key);
+      const content = theme.fg("dim", String(value));
+      lines.push(truncateToWidth(`  ${label}: ${content}`, width));
     }
   }
+
   return lines;
 }
 
-export function formatContextReport(analysis: ContextAnalysis, theme: Theme): string[] {
+export function formatContextReport(
+  analysis: ContextAnalysis,
+  theme: Theme,
+  width = 200,
+): string[] {
+  const safeWidth = Math.max(24, width);
   const lines: string[] = [];
 
-  lines.push(theme.fg("accent", "◆ Context Usage"));
+  lines.push(truncateToWidth(theme.fg("accent", "◆ Context Usage"), safeWidth));
   lines.push("");
-  lines.push(...renderGrid(analysis, theme));
+  lines.push(...renderSummary(analysis, theme, safeWidth));
   lines.push("");
-  lines.push(...renderCategoryBreakdown(analysis, theme));
-  lines.push(...renderInstructionFilesSection(analysis, theme));
-  lines.push(...renderContextFilesSection(analysis, theme));
-  lines.push(...renderInjectedFilesSection(analysis, theme));
-  lines.push(...renderSkillsSection(analysis, theme));
-  lines.push(...renderGuidelinesAndTools(analysis, theme));
-  lines.push(...renderToolDefinitionsSection(analysis, theme));
-  lines.push(...renderGuidelineDetails(analysis, theme));
-  lines.push(...renderCompactionNote(analysis, theme));
-  lines.push(...renderProviderSections(analysis, theme));
+  lines.push(...renderUsageBar(analysis, theme, safeWidth));
+  lines.push("");
+  lines.push(...renderCategoryBreakdown(analysis, theme, safeWidth));
+  lines.push("");
+  lines.push(...renderSystemPromptComposition(analysis, theme, safeWidth));
+
+  const sections = [
+    renderInstructionFilesSection(analysis, theme, safeWidth),
+    renderContextFilesSection(analysis, theme, safeWidth),
+    renderInjectedFilesSection(analysis, theme, safeWidth),
+    renderSkillsSection(analysis, theme, safeWidth),
+    renderGuidelinesSection(analysis, theme, safeWidth),
+    renderToolDefinitionsSection(analysis, theme, safeWidth),
+    renderCompactionNote(analysis, theme, safeWidth),
+    renderProviderSections(analysis, theme, safeWidth),
+  ].filter((section) => section.length > 0);
+
+  for (const section of sections) {
+    lines.push("");
+    lines.push(...section);
+  }
 
   return lines;
 }

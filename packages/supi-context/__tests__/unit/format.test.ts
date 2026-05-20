@@ -82,14 +82,18 @@ describe("formatContextReport", () => {
     expect(lines.some((l) => l.includes("[warning]●[/warning] Autocompact buffer"))).toBe(true);
   });
 
-  it("renders the autocompact buffer at the end of the grid", () => {
+  it("renders a compact usage bar with free space and autocompact buffer", () => {
     const analysis = makeAnalysis();
     const lines = formatContextReport(analysis, mockTheme);
-    const gridLines = lines.filter((line) => line.includes("█") || line.includes("░")).slice(0, 5);
+    const barLine = lines.find(
+      (line) => line.includes("█") || line.includes("▒") || line.includes("░"),
+    );
 
-    expect(gridLines).toHaveLength(5);
-    expect(gridLines[4]).toContain("[dim]░[/dim][dim]░[/dim][dim]░[/dim][dim]░[/dim]");
-    expect(gridLines[4]).toContain("[warning]░[/warning]");
+    expect(barLine).toBeDefined();
+    expect(lines.some((line) => line.includes("[warning]▒[/warning] Autocompact buffer"))).toBe(
+      true,
+    );
+    expect(lines.some((line) => line.includes("[dim]░[/dim] Free space"))).toBe(true);
   });
 
   it("omits context files section when empty", () => {
@@ -251,18 +255,18 @@ describe("formatContextReport", () => {
     expect(lines.some((l) => l.includes("Guidelines (2 bullets)"))).toBe(true);
   });
 
-  it("shows guideline details when bullets are present", () => {
+  it("shows guideline bullets inline in the guidelines section", () => {
     const analysis = makeAnalysis({
       guidelineBullets: ["Be helpful", "Use read for files", "Avoid rm -rf"],
     });
     const lines = formatContextReport(analysis, mockTheme);
 
-    expect(lines.some((l) => l.includes("Guideline Details"))).toBe(true);
+    expect(lines.some((l) => l.includes("Guideline Details"))).toBe(false);
     expect(lines.some((l) => l.includes("Be helpful"))).toBe(true);
     expect(lines.some((l) => l.includes("Use read for files"))).toBe(true);
   });
 
-  it("omits guideline details when no bullets", () => {
+  it("omits a separate guideline details header when no bullets", () => {
     const analysis = makeAnalysis({ guidelineBullets: [] });
     const lines = formatContextReport(analysis, mockTheme);
 
