@@ -5,7 +5,17 @@
 
 import * as path from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
-import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentEndEvent,
+  AgentToolUpdateCallback,
+  BeforeAgentStartEvent,
+  BeforeAgentStartEventResult,
+  ContextEvent,
+  ExtensionAPI,
+  ExtensionContext,
+  SessionStartEvent,
+  ToolResultEvent,
+} from "@earendil-works/pi-coding-agent";
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/api";
 import { Type } from "typebox";
 import { loadConfig, resolveLanguageAlias } from "./config/config.ts";
@@ -128,7 +138,7 @@ export default function lspExtension(pi: ExtensionAPI) {
 
 function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: session_start orchestrates setup, server detection, settings, and persistence.
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (_event: SessionStartEvent, ctx: ExtensionContext) => {
     if (state.manager) {
       clearSessionLspService(state.manager.getCwd());
       await state.manager.shutdownAll();
@@ -210,7 +220,7 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     state.sentinelSnapshot = new Map();
   });
 
-  pi.on("agent_end", async (_event, ctx) => {
+  pi.on("agent_end", async (_event: AgentEndEvent, ctx: ExtensionContext) => {
     state.currentContextToken = null;
     refreshProjectServers(state);
 
@@ -312,7 +322,7 @@ function buildDiagnosticResult(
 
 function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: before_agent_start coordinates sentinel recovery, pruning, refresh, and diagnostic injection.
-  pi.on("before_agent_start", async (_event, ctx) => {
+  pi.on("before_agent_start", async (_event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
     if (!state.manager || !state.lspActive) {
       removeLspTool(pi);
       if (!state.manager && state.lspActive) {
@@ -393,7 +403,7 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
     );
   });
 
-  pi.on("context", (event) => {
+  pi.on("context", (event: ContextEvent) => {
     const messages = pruneAndReorderContextMessages(
       event.messages as Array<{
         role?: string;
@@ -412,14 +422,14 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
 
     if (
       contextMessages.length === event.messages.length &&
-      contextMessages.every((m, i) => m === event.messages[i])
+      contextMessages.every((message, index) => message === event.messages[index])
     ) {
       return;
     }
     return { messages: contextMessages };
   });
 
-  pi.on("tool_result", async (event, ctx) => {
+  pi.on("tool_result", async (event: ToolResultEvent, ctx: ExtensionContext) => {
     if (!state.manager) return;
 
     const recoveryTriggered = recoverWorkspaceChangesFromToolResult(state, ctx.cwd, {
@@ -448,7 +458,13 @@ function registerLspTool(
     promptGuidelines,
     parameters: LspToolParameters,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-    async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
+    async execute(
+      _toolCallId: string,
+      params: LspToolParams,
+      _signal: AbortSignal | undefined,
+      _onUpdate: AgentToolUpdateCallback | undefined,
+      _ctx: ExtensionContext,
+    ) {
       if (!state.manager) {
         return {
           content: [{ type: "text", text: "LSP not initialized. Start a new session first." }],
@@ -469,7 +485,7 @@ function registerLspTool(
 function registerLspStatusCommand(pi: ExtensionAPI, state: LspRuntimeState): void {
   pi.registerCommand("lsp-status", {
     description: "Show detected LSP servers, roots, open files, and diagnostics",
-    handler: async (_args, ctx) => {
+    handler: async (_args: string, ctx: ExtensionContext) => {
       const lspSettings = loadLspSettings(ctx.cwd);
       if (!lspSettings.enabled) {
         ctx.ui.notify(getLspDisabledMessage(ctx.cwd), "warning");

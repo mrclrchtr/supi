@@ -1,4 +1,11 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  AgentToolUpdateCallback,
+  EditToolInput,
+  ExtensionAPI,
+  ExtensionContext,
+  ReadToolInput,
+  WriteToolInput,
+} from "@earendil-works/pi-coding-agent";
 import { createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
 import type { Diagnostic } from "../config/types.ts";
 import { augmentDiagnostics } from "../diagnostics/diagnostic-augmentation.ts";
@@ -20,7 +27,13 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
   pi.registerTool({
     ...readMeta,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-    async execute(toolCallId, params, signal, onUpdate, _ctx) {
+    async execute(
+      toolCallId: string,
+      params: ReadToolInput,
+      signal: AbortSignal | undefined,
+      onUpdate: AgentToolUpdateCallback | undefined,
+      _ctx: ExtensionContext,
+    ) {
       const cwd = state.getCwd();
       const originalRead = createReadTool(cwd);
       const result = await originalRead.execute(toolCallId, params, signal, onUpdate);
@@ -32,7 +45,13 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
   pi.registerTool({
     ...writeMeta,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-    async execute(toolCallId, params, signal, onUpdate, _ctx) {
+    async execute(
+      toolCallId: string,
+      params: WriteToolInput,
+      signal: AbortSignal | undefined,
+      onUpdate: AgentToolUpdateCallback | undefined,
+      _ctx: ExtensionContext,
+    ) {
       const cwd = state.getCwd();
       const originalWrite = createWriteTool(cwd);
       const result = await originalWrite.execute(toolCallId, params, signal, onUpdate);
@@ -49,7 +68,13 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
   pi.registerTool({
     ...editMeta,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-    async execute(toolCallId, params, signal, onUpdate, _ctx) {
+    async execute(
+      toolCallId: string,
+      params: EditToolInput,
+      signal: AbortSignal | undefined,
+      onUpdate: AgentToolUpdateCallback | undefined,
+      _ctx: ExtensionContext,
+    ) {
       const cwd = state.getCwd();
       const originalEdit = createEditTool(cwd);
       const result = await originalEdit.execute(toolCallId, params, signal, onUpdate);

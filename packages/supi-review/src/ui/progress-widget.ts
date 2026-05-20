@@ -1,7 +1,11 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { CancellableLoader, Container, Text, type TUI } from "@earendil-works/pi-tui";
+import { CancellableLoader, Container, Text } from "@earendil-works/pi-tui";
 import { formatTokens } from "../tool/runner.ts";
 import type { ReviewProgress } from "../tool/runner-types.ts";
+
+interface ReviewProgressTui {
+  requestRender(): void;
+}
 
 /**
  * Live progress widget for code review.
@@ -13,16 +17,16 @@ export class ReviewProgressWidget extends Container {
   private _message: string;
   private _progress: ReviewProgress = { turns: 0, toolUses: 0, activities: [] };
   private _loader: CancellableLoader;
-  private _tui: TUI;
+  private _tui: ReviewProgressTui;
   private _theme: Theme;
 
-  constructor(tui: TUI, theme: Theme, message: string) {
+  constructor(tui: ReviewProgressTui, theme: Theme, message: string) {
     super();
     this._tui = tui;
     this._theme = theme;
     this._message = message;
     this._loader = new CancellableLoader(
-      tui,
+      tui as ConstructorParameters<typeof CancellableLoader>[0],
       (s: string) => theme.fg("accent", s),
       (s: string) => theme.fg("muted", s),
       message,
