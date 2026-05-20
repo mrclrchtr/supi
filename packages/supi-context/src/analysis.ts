@@ -44,6 +44,12 @@ export interface SkillInfo {
   tokens: number;
 }
 
+export interface ToolInfo {
+  name: string;
+  description: string;
+  tokens: number;
+}
+
 export interface ContextProviderSection {
   id: string;
   label: string;
@@ -56,6 +62,7 @@ export interface ContextAnalysis {
   totalTokens: number | null;
   scaled: boolean;
   approximationNote: string | null;
+  full: boolean;
   categories: CategoryTokens & {
     autocompactBuffer: number;
     freeSpace: number;
@@ -73,7 +80,7 @@ export interface ContextAnalysis {
   skills: SkillInfo[];
   guidelines: number;
   guidelineBullets: string[];
-  toolDefinitions: { count: number; tokens: number };
+  toolDefinitions: { count: number; tokens: number; tools: ToolInfo[] };
   compaction: { summarizedTurns: number } | null;
   providerSections: ContextProviderSection[];
 }
@@ -352,20 +359,25 @@ function computeSystemPromptBreakdown(
   return { base, instructionFiles, contextFiles, skills, guidelines, toolSnippets, appendText };
 }
 
-function computeToolDefinitions(pi: ExtensionAPI): { count: number; tokens: number } {
+function computeToolDefinitions(pi: ExtensionAPI): {
+  count: number;
+  tokens: number;
+  tools: ToolInfo[];
+} {
   const activeToolNames = new Set(pi.getActiveTools());
   const allTools = pi.getAllTools();
   const activeTools = allTools.filter((t) => activeToolNames.has(t.name));
+  const tools = activeTools.map((t) => ({
+    name: t.name,
+    description: t.description,
+    tokens: estimateTextTokens(
+      JSON.stringify({ name: t.name, description: t.description, parameters: t.parameters }),
+    ),
+  }));
   return {
     count: activeTools.length,
-    tokens: activeTools.reduce(
-      (sum, t) =>
-        sum +
-        estimateTextTokens(
-          JSON.stringify({ name: t.name, description: t.description, parameters: t.parameters }),
-        ),
-      0,
-    ),
+    tokens: tools.reduce((sum, t) => sum + t.tokens, 0),
+    tools,
   };
 }
 
@@ -423,6 +435,7 @@ export function analyzeContext(
   ctx: ExtensionCommandContext,
   pi: ExtensionAPI,
   cachedOptions: BuildSystemPromptOptions | undefined,
+  full = false,
 ): ContextAnalysis {
   const branch = ctx.sessionManager.getBranch();
   const apiView = buildSessionContext(branch);
@@ -474,6 +487,7 @@ export function analyzeContext(
     totalTokens: scaling.totalTokens,
     scaled: scaling.scaled,
     approximationNote: scaling.approximationNote,
+    full,
     categories: {
       ...scaling.categories,
       autocompactBuffer,

@@ -15,9 +15,10 @@ export default function contextExtension(pi: ExtensionAPI) {
   });
 
   pi.registerCommand("supi-context", {
-    description: "Show detailed context usage",
-    handler: async (_args, ctx) => {
-      const analysis = analyzeContext(ctx, pi, cachedOptions);
+    description: "Show detailed context usage. Pass 'full' to show all guideline bullets.",
+    handler: async (args, ctx) => {
+      const full = args.trim() === "full";
+      const analysis = analyzeContext(ctx, pi, cachedOptions, full);
       const shortContent = `${formatTokens(analysis.totalTokens ?? 0)} / ${formatTokens(analysis.contextWindow)} tokens`;
 
       pi.sendMessage({

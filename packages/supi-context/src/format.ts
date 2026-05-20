@@ -1,3 +1,4 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: format file is inherently large
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ContextAnalysis } from "./analysis.ts";
 import { formatTokens, pluralize } from "./utils.ts";
@@ -318,9 +319,49 @@ function renderGuidelinesAndTools(analysis: ContextAnalysis, theme: Theme): stri
   lines.push(
     `${theme.fg("text", `Guidelines (${pluralize(bulletCount, "bullet", "bullets")})`)}  ${theme.fg("dim", formatTokens(analysis.guidelines))}`,
   );
-  lines.push(
-    `${theme.fg("text", `Tool Definitions (${analysis.toolDefinitions.count} active)`)}  ${theme.fg("dim", formatTokens(analysis.toolDefinitions.tokens))}`,
-  );
+  return lines;
+}
+
+function renderToolDefinitionsSection(analysis: ContextAnalysis, theme: Theme): string[] {
+  const tools = analysis.toolDefinitions.tools;
+  if (tools.length === 0) return [];
+
+  const lines: string[] = [];
+  lines.push("");
+  lines.push(theme.fg("accent", `Tool Definitions (${tools.length} active)`));
+
+  const sorted = [...tools].sort((a, b) => b.tokens - a.tokens);
+  const nameWidth = Math.max(15, ...sorted.map((t) => t.name.length));
+
+  if (analysis.full) {
+    for (const t of sorted) {
+      const nameCol = padRight(t.name, nameWidth);
+      const descCol = t.description;
+      const tokenCol = padLeft(formatTokens(t.tokens), 8);
+      lines.push(
+        `  ${theme.fg("text", nameCol)}  ${theme.fg("dim", descCol)}  ${theme.fg("dim", tokenCol)}`,
+      );
+    }
+    return lines;
+  }
+
+  const previewLimit = 5;
+  for (let i = 0; i < Math.min(sorted.length, previewLimit); i++) {
+    const t = sorted[i];
+    const nameCol = padRight(t.name, nameWidth);
+    const desc = t.description.length > 50 ? `${t.description.slice(0, 50)}…` : t.description;
+    const tokenCol = padLeft(formatTokens(t.tokens), 8);
+    lines.push(
+      `  ${theme.fg("text", nameCol)}  ${theme.fg("dim", desc)}  ${theme.fg("dim", tokenCol)}`,
+    );
+  }
+
+  if (sorted.length > previewLimit) {
+    lines.push(
+      `  ${theme.fg("dim", `… and ${sorted.length - previewLimit} more — run /supi-context full`)}`,
+    );
+  }
+
   return lines;
 }
 
@@ -332,8 +373,24 @@ function renderGuidelineDetails(analysis: ContextAnalysis, theme: Theme): string
   lines.push("");
   lines.push(theme.fg("accent", "Guideline Details"));
 
-  for (const text of bullets) {
-    lines.push(`  ${theme.fg("dim", "•")} ${theme.fg("text", text)}`);
+  if (analysis.full) {
+    for (const text of bullets) {
+      lines.push(`  ${theme.fg("dim", "•")} ${theme.fg("text", text)}`);
+    }
+    return lines;
+  }
+
+  const previewLimit = 6;
+  for (let i = 0; i < Math.min(bullets.length, previewLimit); i++) {
+    const text = bullets[i] ?? "";
+    const truncated = text.length > 90 ? `${text.slice(0, 90)}…` : text;
+    lines.push(`  ${theme.fg("dim", "•")} ${theme.fg("text", truncated)}`);
+  }
+
+  if (bullets.length > previewLimit) {
+    lines.push(
+      `  ${theme.fg("dim", `… and ${bullets.length - previewLimit} more — run /supi-context full`)}`,
+    );
   }
 
   return lines;
@@ -377,6 +434,7 @@ export function formatContextReport(analysis: ContextAnalysis, theme: Theme): st
   lines.push(...renderInjectedFilesSection(analysis, theme));
   lines.push(...renderSkillsSection(analysis, theme));
   lines.push(...renderGuidelinesAndTools(analysis, theme));
+  lines.push(...renderToolDefinitionsSection(analysis, theme));
   lines.push(...renderGuidelineDetails(analysis, theme));
   lines.push(...renderCompactionNote(analysis, theme));
   lines.push(...renderProviderSections(analysis, theme));

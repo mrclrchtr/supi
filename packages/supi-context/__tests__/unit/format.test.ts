@@ -37,7 +37,18 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
     skills: [{ name: "test-skill", tokens: 1_000 }],
     guidelines: 500,
     guidelineBullets: [],
-    toolDefinitions: { count: 5, tokens: 2_500 },
+    toolDefinitions: {
+      count: 5,
+      tokens: 2_500,
+      tools: [
+        { name: "read", description: "Read files", tokens: 500 },
+        { name: "bash", description: "Run commands", tokens: 600 },
+        { name: "edit", description: "Edit files", tokens: 700 },
+        { name: "write", description: "Write files", tokens: 400 },
+        { name: "search", description: "Search code", tokens: 300 },
+      ],
+    },
+    full: false,
     compaction: null,
     providerSections: [],
     ...overrides,
@@ -178,6 +189,61 @@ describe("formatContextReport", () => {
     expect(lines.some((l) => l.includes("Tool Definitions (5 active)"))).toBe(true);
   });
 
+  it("shows all tools when count is within preview limit", () => {
+    const analysis = makeAnalysis();
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("read"))).toBe(true);
+    expect(lines.some((l) => l.includes("bash"))).toBe(true);
+    expect(lines.some((l) => l.includes("… and"))).toBe(false);
+  });
+
+  it("truncates tool descriptions in preview mode", () => {
+    const tools = [
+      { name: "read", description: "a".repeat(60), tokens: 500 },
+      { name: "bash", description: "Run commands", tokens: 600 },
+    ];
+    const analysis = makeAnalysis({ toolDefinitions: { count: 2, tokens: 1_100, tools } });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    const toolHeaderIdx = lines.findIndex((l) => l.includes("Tool Definitions"));
+    const toolLines = lines.slice(toolHeaderIdx + 1, toolHeaderIdx + 3);
+    const readLine = toolLines.find((l) => l.includes("read"));
+    expect(readLine).toBeDefined();
+    expect(readLine).toContain("…");
+  });
+
+  it("shows 'and N more' hint for tools in preview mode", () => {
+    const tools = Array.from({ length: 8 }, (_, i) => ({
+      name: `tool-${i + 1}`,
+      description: `Description ${i + 1}`,
+      tokens: 100,
+    }));
+    const analysis = makeAnalysis({ toolDefinitions: { count: 8, tokens: 800, tools } });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("… and 3 more"))).toBe(true);
+    expect(lines.some((l) => l.includes("/supi-context full"))).toBe(true);
+  });
+
+  it("shows all tools in full mode", () => {
+    const tools = Array.from({ length: 8 }, (_, i) => ({
+      name: `tool-${i + 1}`,
+      description: `Description ${i + 1}`,
+      tokens: 100,
+    }));
+    const analysis = makeAnalysis({
+      full: true,
+      toolDefinitions: { count: 8, tokens: 800, tools },
+    });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    for (const tool of tools) {
+      expect(lines.some((l) => l.includes(tool.name))).toBe(true);
+    }
+    expect(lines.some((l) => l.includes("… and"))).toBe(false);
+  });
+
   it("shows guideline bullet count", () => {
     const analysis = makeAnalysis({ guidelineBullets: ["Be helpful", "Use read for files"] });
     const lines = formatContextReport(analysis, mockTheme);
@@ -203,9 +269,28 @@ describe("formatContextReport", () => {
     expect(lines.some((l) => l.includes("Guideline Details"))).toBe(false);
   });
 
-  it("shows all guideline bullets without truncation", () => {
+  it("truncates guideline bullets in preview mode", () => {
+    const longBullet = "a".repeat(120);
+    const analysis = makeAnalysis({ guidelineBullets: [longBullet] });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    const detailLine = lines.find((l) => l.includes("a".repeat(80)));
+    expect(detailLine).toBeDefined();
+    expect(detailLine).toContain("…");
+  });
+
+  it("shows 'and N more' hint in preview mode", () => {
     const bullets = Array.from({ length: 10 }, (_, i) => `Bullet ${i + 1}`);
     const analysis = makeAnalysis({ guidelineBullets: bullets });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("… and 4 more"))).toBe(true);
+    expect(lines.some((l) => l.includes("/supi-context full"))).toBe(true);
+  });
+
+  it("shows all guideline bullets in full mode", () => {
+    const bullets = Array.from({ length: 10 }, (_, i) => `Bullet ${i + 1}`);
+    const analysis = makeAnalysis({ full: true, guidelineBullets: bullets });
     const lines = formatContextReport(analysis, mockTheme);
 
     for (const bullet of bullets) {
