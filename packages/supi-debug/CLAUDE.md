@@ -21,12 +21,24 @@ Registers three surfaces:
 
 Uses `supi-core`'s shared debug registry (`configureDebugRegistry`, `getDebugEvents`, `getDebugSummary`) and `registerContextProvider` for the TUI context summary.
 
+## Package layout
+
+Stays flat per convention — no domain folders until responsibilities grow.
+
 ## Key files
 
-- `debug.ts` — extension factory, settings, tool + command registration
-- `format.ts` — event formatting + data serialization
-- `renderer.ts` — custom message renderer for `supi-debug-report` type
-- `status-log.ts` — session status/log formatting helpers
+| File | Role |
+|------|------|
+| `src/debug.ts` | Extension factory, settings, tool + command registration |
+| `src/format.ts` | Event formatting + data serialization |
+| `src/renderer.ts` | Custom message renderer for `supi-debug-report` type |
+| `src/status-log.ts` | Optional load-status logging (`$SUPI_LOG_STATUS`) |
+| `src/api.ts` | Entry point re-exporting `src/debug.ts` default |
+| `src/index.ts` | Package-root re-export surface |
+| `src/extension.ts` | Pi extension entry, re-exports `src/debug.ts` default |
+| `__tests__/unit/` | Unit tests |
+| `__tests__/helpers/` | Shared test utilities |
+| `__tests__/fixtures/` | Shared test data, when added |
 
 ## Gotchas
 

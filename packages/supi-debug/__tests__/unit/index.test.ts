@@ -27,7 +27,7 @@ vi.mock("@mrclrchtr/supi-core/api", () => ({
 }));
 
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
-import debugExtension from "../src/debug.ts";
+import debugExtension from "../../src/debug.ts";
 
 const ENABLED_CONFIG = {
   enabled: true,

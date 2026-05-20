@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registerDebugMessageRenderer } from "../src/renderer.ts";
+import { registerDebugMessageRenderer } from "../../src/renderer.ts";
 
 function createMockTheme() {
   return {
