@@ -9,7 +9,7 @@ vi.mock("clipboardy", () => ({
   default: { write: writeMock },
 }));
 
-import { copyToClipboard } from "../src/clipboard.ts";
+import { copyToClipboard } from "../../src/clipboard.ts";
 
 describe("copyToClipboard", () => {
   beforeEach(() => {

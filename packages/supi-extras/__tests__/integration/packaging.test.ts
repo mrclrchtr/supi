@@ -7,7 +7,7 @@ function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
 }
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const extrasPackage = readJson(join(repoRoot, "packages/supi-extras/package.json"));
 const supiPackage = readJson(join(repoRoot, "packages/supi/package.json"));
 const rootPackage = readJson(join(repoRoot, "package.json"));

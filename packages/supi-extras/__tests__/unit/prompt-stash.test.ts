@@ -4,12 +4,12 @@ const { copyToClipboardMock } = vi.hoisted(() => ({
   copyToClipboardMock: vi.fn(async () => true),
 }));
 
-vi.mock("../src/clipboard.ts", () => ({
+vi.mock("../../src/clipboard.ts", () => ({
   copyToClipboard: copyToClipboardMock,
 }));
 
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
-import promptStash, { _resetStashes } from "../src/prompt-stash.ts";
+import promptStash, { _resetStashes } from "../../src/prompt-stash.ts";
 
 describe("promptStash extension", () => {
   beforeEach(() => {

@@ -11,6 +11,37 @@ pnpm exec tsc --noEmit -p packages/supi-extras/__tests__/tsconfig.json
 pnpm exec biome check packages/supi-extras/
 ```
 
+## Package layout
+
+Source stays flat per convention. Tests are organized into `unit/` and `integration/` subdirectories.
+
+```
+src/
+├── api.ts
+├── index.ts
+├── extension.ts
+├── aliases.ts
+├── clipboard.ts
+├── copy-prompt.ts
+├── git-editor.ts
+├── model-effort-colors.ts
+├── model-effort-colors-helpers.ts
+├── prompt-stash.ts
+├── skill-shortcut.ts
+└── tab-spinner.ts
+__tests__/
+├── tsconfig.json
+├── unit/
+│   ├── clipboard.test.ts
+│   ├── copy-prompt.test.ts
+│   ├── git-editor.test.ts
+│   ├── model-effort-colors.test.ts
+│   ├── prompt-stash.test.ts
+│   └── tab-spinner.test.ts
+└── integration/
+    └── packaging.test.ts
+```
+
 ## Modules
 
 `src/index.ts` composes six independent extensions and one shared utility:

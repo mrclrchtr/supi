@@ -1,6 +1,6 @@
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import modelEffortColors from "../src/model-effort-colors.ts";
+import modelEffortColors from "../../src/model-effort-colors.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

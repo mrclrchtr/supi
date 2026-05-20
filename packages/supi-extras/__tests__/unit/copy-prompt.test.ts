@@ -4,12 +4,12 @@ const { copyToClipboardMock } = vi.hoisted(() => ({
   copyToClipboardMock: vi.fn(async () => true),
 }));
 
-vi.mock("../src/clipboard.ts", () => ({
+vi.mock("../../src/clipboard.ts", () => ({
   copyToClipboard: copyToClipboardMock,
 }));
 
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
-import copyPrompt from "../src/copy-prompt.ts";
+import copyPrompt from "../../src/copy-prompt.ts";
 
 describe("copyPrompt extension", () => {
   beforeEach(() => {

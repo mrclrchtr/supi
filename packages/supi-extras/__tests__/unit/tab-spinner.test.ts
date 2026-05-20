@@ -1,6 +1,6 @@
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import tabSpinner from "../src/tab-spinner.ts";
+import tabSpinner from "../../src/tab-spinner.ts";
 
 describe("tabSpinner extension", () => {
   beforeEach(() => {
