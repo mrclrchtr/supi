@@ -1,9 +1,9 @@
-// Shared test utilities for SuPi extensions.
+// Package-root re-export surface.
+// Re-exports the full API surface from api.ts so that both the package root
+// and the "/api" subpath resolve to the same exports.
 //
-// Usage in a test file:
-//   import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
+//   import { createPiMock } from "@mrclrchtr/supi-test-utils";
+//   import { createPiMock } from "@mrclrchtr/supi-test-utils/api";
 
-export { getHandler, getHandlerOrThrow } from "./handler-utils.ts";
-export { createPiMock, makeCtx } from "./pi-mock.ts";
-export type { ToolDef } from "./tool-utils.ts";
-export { getTool, getTools } from "./tool-utils.ts";
+export type { ToolDef } from "./api.ts";
+export { createPiMock, getHandler, getHandlerOrThrow, getTool, getTools, makeCtx } from "./api.ts";

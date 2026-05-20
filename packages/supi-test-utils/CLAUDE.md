@@ -2,6 +2,30 @@
 
 Shared test utilities for SuPi extension tests. Not a pi extension — imported directly in test files.
 
+## Package layout
+
+See `docs/package-layout.md` for the standard convention. This package follows the **stay flat utility package** layout:
+
+```text
+packages/supi-test-utils/
+  package.json
+  README.md
+  CLAUDE.md
+  tsconfig.json
+  src/
+    api.ts           # Public API surface — re-exports from internal modules
+    index.ts         # Package-root re-export surface — re-exports from api.ts
+    pi-mock.ts       # Main file — createPiMock(), makeCtx(), PiMock types
+    handler-utils.ts # Handler lookup helpers
+    tool-utils.ts    # Tool lookup helpers and ToolDef type
+  __tests__/
+    tsconfig.json
+    helpers/         # Shared test utilities
+    fixtures/        # Test data
+    unit/            # Focused fast tests
+    integration/     # Integration tests
+```
+
 ## Exports
 
 - `createPiMock(options?)` — returns a configurable mock `ExtensionAPI` with `Map`-captured handlers, commands, tools, renderers, entries, messages, shortcuts, and execCalls. Accepts `{ sessionName? }` options.

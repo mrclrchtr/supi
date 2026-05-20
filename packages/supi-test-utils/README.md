@@ -92,8 +92,28 @@ vi.mock("@mrclrchtr/supi-core", async (importOriginal) => {
 });
 ```
 
+## Package layout
+
+This package follows the **stay flat utility package** convention from `docs/package-layout.md`:
+
+```text
+src/
+  api.ts           # Public API surface
+  index.ts         # Package-root re-export surface
+  pi-mock.ts       # createPiMock(), makeCtx()
+  handler-utils.ts # getHandler(), getHandlerOrThrow()
+  tool-utils.ts    # getTools(), getTool(), ToolDef
+__tests__/
+  helpers/         # Shared test utilities
+  fixtures/        # Test data
+  unit/            # Focused fast tests
+  integration/     # Integration tests
+```
+
 ## Source
 
+- `src/api.ts` — public API surface, re-exports all public functions
+- `src/index.ts` — package-root re-export surface, re-exports from `api.ts`
 - `src/pi-mock.ts` — `createPiMock()` and `makeCtx()`
 - `src/handler-utils.ts` — handler lookup helpers
 - `src/tool-utils.ts` — tool lookup helpers
