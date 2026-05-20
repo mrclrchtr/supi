@@ -12,6 +12,7 @@ Entrypoint: `ask-user.ts`
 
 - `ask_user` requires a TUI with custom overlay support (`ctx.ui.custom()`). In non-interactive or degraded UI sessions, it returns an error — there is no fallback dialog.
 - `schema.ts`, `README.md`, and tool prompt guidance should stay aligned with runtime behavior; together they define the model-facing `ask_user` contract.
+- Keep `pi.registerTool<typeof AskUserParamsSchema, AskUserDetails>(...)` typed and confine the `ctx.ui.custom()` bridge to a narrow `RichUiHost["custom"]` cast — broad `ctx as unknown as ...` casts hide cross-package `pi-tui` type drift.
 - Normalization trims question ids and structured option values before they reach the shared internal model.
 - Switching from a `multi: true` (multi-select) question to `other` or `discuss` must clear staged selections/notes so revisits reflect the stored answer.
 - `default` pre-selects a starting option/value; it takes precedence over `recommendation` for the initial selection but does not add a visual badge. Existing answers always win over both when revisiting.

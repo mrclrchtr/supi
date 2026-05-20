@@ -147,6 +147,7 @@ registerSettings({
 - External runtime deps belong to the standalone package that imports them. The meta-package is assembled from packed standalone tarballs, so avoid re-declaring third-party runtime deps in `packages/supi` unless the meta-package imports them directly.
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
+- Package-local `node_modules/@earendil-works/pi-*` copies can pin older PI typings after an upgrade — if one package “loses” a new PI field, run that package's scoped `tsc` and inspect `packages/<pkg>/node_modules/@earendil-works/pi-*` before assuming the docs are wrong.
 - Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
 - Pi discovers package skills from `node_modules` scanning, not workspace packages' `package.json`. Workspace skills must be registered explicitly — SuPi uses `resources_discover` for this (see documentation section above).
 - Packages that only contribute settings sections should document `/supi-settings` as conditional on the install surface, not as a standalone command they ship.

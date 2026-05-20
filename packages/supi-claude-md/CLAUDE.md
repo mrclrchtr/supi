@@ -68,7 +68,7 @@ pnpm exec biome check packages/supi-claude-md/
 - Settings are managed via `/supi-settings` (unified SuPi settings command): claude-md registers its section via `registerClaudeMdSettings()` in the supi-core registry, with `fileNames` edited through `SettingItem.submenu` text inputs
 - `reconstructState()` must parse real Pi `SessionEntry[]` branch entries (`message` + nested `message.role`, `custom_message`) and restore subdirectory injection state from tool-result `<extension-context>` tags
 - Path-aware tool discovery should treat `tree_sitter` like `lsp` (`input.file`) so AST-first workflows still inject subdirectory context
-- `systemPromptOptions` is accessed via a typed intersection (`BeforeAgentStartEvent & { systemPromptOptions?: ... }`) for forward-compatibility with pi >= 0.68.0
+- `systemPromptOptions` now uses pi's upstream `BuildSystemPromptOptions` typing directly; `contextFiles` entries have required `path` and `content` fields in current pi releases
 - `os.homedir()` cannot be mocked in ESM: config functions accept optional `homeDir` parameter for testability
 - Root/native context files are never re-injected by this extension; they live in pi's system prompt. Use `/reload` or restart the session to pick up changes to root instruction files
 - Subdirectory context is injected from path-aware tool activity such as reads, writes, edits, LSP operations, and Tree-sitter operations

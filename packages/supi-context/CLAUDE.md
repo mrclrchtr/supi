@@ -39,5 +39,6 @@ On `/supi-context`, analyzes the current system prompt and calculates token usag
 
 ## Gotchas
 
+- `supi-context` caches `event.systemPromptOptions` from `before_agent_start`; when those options are missing or incomplete, `prompt-inference.ts` backfills `contextFiles` and `skills` from the current system prompt.
+- System-prompt breakdown separates native instruction files (`AGENTS.md`, `CLAUDE.md`, etc.) from other `contextFiles`, so changes to pi's context-file loading directly affect the report.
 - Custom message renderers must explicitly display `warning` for all result states, not just `failed`/`timeout`.
-- `display: false` suppresses TUI rendering — `content` holds the visible summary for the agent.

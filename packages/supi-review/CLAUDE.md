@@ -73,6 +73,7 @@ __tests__/
 - Live progress is shown via `ReviewProgressWidget` (extends `Container` with `CancellableLoader`). The widget updates in real-time from `session.subscribe()` events — tool starts/ends, turn counts, and token stats.
 - Graceful timeout: soft limit triggers `session.steer("Time limit reached…")`, then 3 grace turns before `session.abort()`.
 - Cancellation: `signal.addEventListener("abort")` wires to `session.abort()`, returning `kind: "canceled"`.
+- `AgentSessionEvent` typings may omit `agent_end.willRetry` in some package-local PI installs; `tool/runner.ts` should treat `willRetry` as an optional runtime field and ignore retrying end events.
 - `ReviewerInvocation` type uses `model: Model<any> | undefined` (resolved model object, not string). No `onSessionStart` callback.
 - `ReviewResult` types: no `warning`, `stdout`, or `stderr` fields. Timeout result has `partialOutput` for final assistant text on abort. Success and failure results carry the optional `brief` field with the review brief metadata.
 - Emits `pi.events.emit("supi:working:start", { source: "supi-review" })` before the review begins and `supi:working:end` in the finish callback (covers success, failed, canceled, timeout) so the tab spinner stays active while the reviewer is running.
