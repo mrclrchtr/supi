@@ -59,8 +59,7 @@
   "pi": {
     "extensions": [
       "./src/extension.ts"
-    ],
-    "image": "./docs/screenshots/hero.png"
+    ]
   },
   "main": "src/api.ts",
   "exports": {
