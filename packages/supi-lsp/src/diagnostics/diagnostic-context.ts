@@ -1,8 +1,8 @@
 // Diagnostic context formatting for the LSP extension.
 // Extracted from guidance.ts to keep prompt surfaces separate from formatting logic.
 
+import type { Diagnostic } from "../config/types.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "../manager/manager-types.ts";
-import type { Diagnostic } from "../types.ts";
 import { splitSuppressionDiagnostics } from "./suppression-diagnostics.ts";
 
 export const MAX_DETAILED_DIAGNOSTICS = 5;

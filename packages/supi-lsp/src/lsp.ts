@@ -8,7 +8,8 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/api";
 import { Type } from "typebox";
-import { loadConfig, resolveLanguageAlias } from "./config.ts";
+import { loadConfig, resolveLanguageAlias } from "./config/config.ts";
+import { FileChangeType } from "./config/types.ts";
 import {
   diagnosticsContextFingerprint,
   formatDiagnosticsContext,
@@ -16,12 +17,8 @@ import {
 } from "./diagnostics/diagnostic-context.ts";
 import { formatDiagnosticsDisplayContent } from "./diagnostics/diagnostic-display.ts";
 import { assessStaleDiagnostics } from "./diagnostics/stale-diagnostics.ts";
-import {
-  buildProjectGuidelines,
-  promptGuidelines,
-  promptSnippet,
-  toolDescription,
-} from "./guidance.ts";
+import { LspManager } from "./manager/manager.ts";
+import { forceResyncStaleModuleFiles } from "./manager/manager-stale-resync.ts";
 import {
   createRuntimeState,
   disableLspState,
@@ -30,30 +27,37 @@ import {
   type LspRuntimeState,
   refreshProjectServers,
   removeLspTool,
-} from "./lsp-state.ts";
-import { LspManager } from "./manager/manager.ts";
-import { forceResyncStaleModuleFiles } from "./manager/manager-stale-resync.ts";
-import { registerLspAwareToolOverrides } from "./overrides.ts";
-import { registerLspMessageRenderer } from "./renderer.ts";
-import { scanMissingServers, scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
+} from "./session/lsp-state.ts";
+import {
+  scanMissingServers,
+  scanProjectCapabilities,
+  startDetectedServers,
+} from "./session/scanner.ts";
 import {
   clearSessionLspService,
   SessionLspService,
   setSessionLspServiceState,
-} from "./service-registry.ts";
+} from "./session/service-registry.ts";
 import {
   getLspDisabledMessage,
   loadLspSettings,
   registerLspSettings,
-} from "./settings-registration.ts";
-import { type LspToolParams, safeExecuteAction } from "./tool-actions.ts";
+} from "./session/settings-registration.ts";
 import {
   persistLspActiveState,
   persistLspInactiveState,
   registerTreePersistHandlers,
-} from "./tree-persist.ts";
-import { FileChangeType } from "./types.ts";
-import { toggleLspStatusOverlay, updateLspUi } from "./ui.ts";
+} from "./session/tree-persist.ts";
+import {
+  buildProjectGuidelines,
+  promptGuidelines,
+  promptSnippet,
+  toolDescription,
+} from "./tool/guidance.ts";
+import { registerLspAwareToolOverrides } from "./tool/overrides.ts";
+import { type LspToolParams, safeExecuteAction } from "./tool/tool-actions.ts";
+import { registerLspMessageRenderer } from "./ui/renderer.ts";
+import { toggleLspStatusOverlay, updateLspUi } from "./ui/ui.ts";
 import { fileToUri } from "./utils.ts";
 import {
   isWorkspaceRecoveryTrigger,
@@ -225,7 +229,7 @@ function markWorkspaceChange(state: LspRuntimeState): void {
 
 function softRecoverWorkspaceChanges(
   state: LspRuntimeState,
-  changes: import("./types.ts").FileEvent[],
+  changes: import("./config/types.ts").FileEvent[],
 ): boolean {
   if (!state.manager || changes.length === 0) return false;
 
@@ -279,7 +283,7 @@ function recoverWorkspaceChangesFromToolResult(
 // biome-ignore lint/complexity/useMaxParams: wrapper groups the prompt payload fields in one place.
 function buildDiagnosticResult(
   diagnostics: import("./manager/manager-types.ts").OutstandingDiagnosticSummaryEntry[],
-  detailed: { file: string; diagnostics: import("./types.ts").Diagnostic[] }[] | undefined,
+  detailed: { file: string; diagnostics: import("./config/types.ts").Diagnostic[] }[] | undefined,
   severity: number,
   token: string,
   staleWarning?: string | null,

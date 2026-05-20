@@ -1,8 +1,6 @@
 // LSP result formatting — converts LSP response types into readable text.
 
 import * as path from "node:path";
-import type { GrepMatch } from "./search-fallback.ts";
-import { isProjectSource } from "./summary.ts";
 import type {
   CodeAction,
   DocumentSymbol,
@@ -13,7 +11,9 @@ import type {
   MarkupContent,
   SymbolInformation,
   WorkspaceEdit,
-} from "./types.ts";
+} from "./config/types.ts";
+import type { GrepMatch } from "./search-fallback.ts";
+import { isProjectSource } from "./summary.ts";
 import { uriToFile } from "./utils.ts";
 
 // ── Hover ─────────────────────────────────────────────────────────────

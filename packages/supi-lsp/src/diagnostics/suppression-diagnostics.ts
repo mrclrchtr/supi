@@ -1,4 +1,4 @@
-import type { Diagnostic } from "../types.ts";
+import type { Diagnostic } from "../config/types.ts";
 
 const SUPPRESSION_WARNING_SEVERITY = 2;
 

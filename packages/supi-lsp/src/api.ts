@@ -1,7 +1,5 @@
 // Public API surface for the LSP session-scoped service.
 
-export type { SessionLspServiceState } from "./service-registry.ts";
-export { getSessionLspService, SessionLspService } from "./service-registry.ts";
 export type {
   Diagnostic,
   DocumentSymbol,
@@ -12,4 +10,6 @@ export type {
   ProjectServerInfo,
   SymbolInformation,
   WorkspaceSymbol,
-} from "./types.ts";
+} from "./config/types.ts";
+export type { SessionLspServiceState } from "./session/service-registry.ts";
+export { getSessionLspService, SessionLspService } from "./session/service-registry.ts";

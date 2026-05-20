@@ -88,7 +88,9 @@ if (state.kind === "ready") {
 ## Source
 
 - `src/lsp.ts` — extension wiring, tool registration, session lifecycle, and `/lsp-status`
-- `src/settings-registration.ts` — `/supi-settings` integration
-- `src/guidance.ts` — prompt guidance and diagnostic-context formatting
-- `src/config.ts` — server config loading and per-language overrides
+- `src/config/` — server config, defaults, capabilities, and exported LSP protocol types
+- `src/session/` — session state, scanning, settings registration, tree persistence, and shared service registry
+- `src/tool/` — prompt guidance, action execution, and tool-result overrides
+- `src/ui/` — custom diagnostic message rendering and the status overlay
+- `src/client/`, `src/manager/`, `src/diagnostics/` — runtime engine subsystems
 - `src/api.ts` — reusable developer-facing surface

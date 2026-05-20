@@ -1,8 +1,8 @@
+import type { Diagnostic, FileEvent } from "../config/types.ts";
 import {
   assessStaleDiagnostics,
   type StaleDiagnosticAssessment,
 } from "../diagnostics/stale-diagnostics.ts";
-import type { Diagnostic, FileEvent } from "../types.ts";
 
 export interface WorkspaceRecoveryResult {
   refreshedClients: number;

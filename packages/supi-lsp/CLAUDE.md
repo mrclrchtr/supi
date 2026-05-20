@@ -10,7 +10,7 @@ This file contains non-obvious guidance for future work in `packages/supi-lsp/`.
 
 ## Tool actions overview
 
-The `lsp` tool uses a top-level `{ action, args }` input shape, with 1-based position coordinates inside `args` when applicable. `tool-actions.ts` validates inputs and formats results. Language-level actions are `hover`, `definition`, `references`, `symbols`, `rename`, and `code_actions`. Workspace search actions are `workspace_symbol`, `search`, and `symbol_hover`. The `recover` action is the no-args case and forces a workspace-wide diagnostic refresh; it can restart clients that still look stale. Diagnostics can be requested per file or project-wide, and the same diagnostic data is also surfaced inline after `write` and `edit`.
+The `lsp` tool uses a top-level `{ action, args }` input shape, with 1-based position coordinates inside `args` when applicable. `tool/tool-actions.ts` validates inputs and formats results. Language-level actions are `hover`, `definition`, `references`, `symbols`, `rename`, and `code_actions`. Workspace search actions are `workspace_symbol`, `search`, and `symbol_hover`. The `recover` action is the no-args case and forces a workspace-wide diagnostic refresh; it can restart clients that still look stale. Diagnostics can be requested per file or project-wide, and the same diagnostic data is also surfaced inline after `write` and `edit`.
 
 ### Guidance layering
 
@@ -22,9 +22,9 @@ Diagnostics are controlled by `/supi-settings`. The default threshold is `1`, so
 
 ## Key files
 
-`lsp.ts` owns extension wiring, lifecycle, commands, and resource registration. `tool-actions.ts` handles tool action execution and formatting. `manager.ts` and the `manager-*.ts` helpers own client lifecycle, root resolution, diagnostic state, and workspace recovery. `manager-helpers.ts` holds smaller private helpers such as `clientKey`, `resolveRootForFile`, and `isExcludedByPattern`. `client.ts` wraps initialization, document sync, and requests.
+`lsp.ts` owns extension wiring, lifecycle, commands, and resource registration. `tool/tool-actions.ts` handles tool action execution and formatting. `manager.ts` and the `manager-*.ts` helpers own client lifecycle, root resolution, diagnostic state, and workspace recovery. `manager-helpers.ts` holds smaller private helpers such as `clientKey`, `resolveRootForFile`, and `isExcludedByPattern`. `client.ts` wraps initialization, document sync, and requests.
 
-`service-registry.ts` exposes the shared session-scoped API for peer extensions. `guidance.ts` formats prompt guidelines and diagnostic-context text. `diagnostics/stale-diagnostics.ts` detects suspicious missing-module clusters for stale-warning output, while `diagnostics/suppression-diagnostics.ts` handles stale suppression diagnostics for inline and pre-turn output. `manager/manager-diagnostics.ts` keeps file-sync and cascade-diagnostic helpers out of `manager.ts`, and `manager/manager-workspace-recovery.ts` owns soft recovery and targeted client restarts. `overrides.ts`, `renderer.ts`, and `ui.ts` handle tool-result augmentation, custom messages, and the status overlay. `pattern-matcher.ts` implements gitignore-style exclusion matching. `settings-registration.ts` registers enable, severity, active-server, and exclude-pattern settings.
+`session/service-registry.ts` exposes the shared session-scoped API for peer extensions. `tool/guidance.ts` formats prompt guidelines and diagnostic-context text. `diagnostics/stale-diagnostics.ts` detects suspicious missing-module clusters for stale-warning output, while `diagnostics/suppression-diagnostics.ts` handles stale suppression diagnostics for inline and pre-turn output. `manager/manager-diagnostics.ts` keeps file-sync and cascade-diagnostic helpers out of `manager.ts`, and `manager/manager-workspace-recovery.ts` owns soft recovery and targeted client restarts. `tool/overrides.ts`, `ui/renderer.ts`, and `ui/ui.ts` handle tool-result augmentation, custom messages, and the status overlay. `pattern-matcher.ts` implements gitignore-style exclusion matching. `session/settings-registration.ts` registers enable, severity, active-server, and exclude-pattern settings.
 
 ## Validation
 
@@ -34,7 +34,7 @@ Run `pnpm exec biome check packages/supi-lsp && pnpm vitest run packages/supi-ls
 
 Stable LSP guidance belongs in tool `promptGuidelines`. `before_agent_start` should inject only dynamic XML-framed diagnostic messages and should not mutate `systemPrompt`. `lsp-context` messages keep the renderer summary in `content` and stash raw XML in `details.promptContent`; the `context` hook restores `promptContent` before the model sees it. `buildProjectGuidelines()` is applied by re-registering the `lsp` tool at `session_start`, so `/reload` is required before newly scanned server guidance appears.
 
-`/lsp-status` must merge proactive scan roots with lazily started clients because the session-start scan snapshot is incomplete. Tool activation state is persisted with `pi.appendEntry()` as `lsp-active` entries and restored by inspecting the active branch during `session_tree`. The library surface behind `src/api.ts` / `src/index.ts` must not import extension-only modules such as `lsp.ts`, `renderer.ts`, or `ui.ts`. Keep the `/api` surface limited to `service-registry.ts`, `client.ts`, `manager.ts`, and `types.ts`. `SessionLspService` is the stable wrapper and should not leak `LspManager` internals. The session registry is process-global through `Symbol.for("@mrclrchtr/supi-lsp/session-registry")`, keyed by normalized `cwd`, updated synchronously in `session_start` and `session_shutdown`, and read synchronously by `getSessionLspService(cwd)`.
+`/lsp-status` must merge proactive scan roots with lazily started clients because the session-start scan snapshot is incomplete. Tool activation state is persisted with `pi.appendEntry()` as `lsp-active` entries and restored by inspecting the active branch during `session_tree`. The library surface behind `src/api.ts` / `src/index.ts` must not import extension-only modules such as `lsp.ts`, `ui/renderer.ts`, or `ui/ui.ts`. Keep the `/api` surface limited to `session/service-registry.ts`, `client.ts`, `manager.ts`, and `config/types.ts`. `SessionLspService` is the stable wrapper and should not leak `LspManager` internals. The session registry is process-global through `Symbol.for("@mrclrchtr/supi-lsp/session-registry")`, keyed by normalized `cwd`, updated synchronously in `session_start` and `session_shutdown`, and read synchronously by `getSessionLspService(cwd)`.
 
 ## Diagnostic behavior gotchas
 
@@ -73,22 +73,22 @@ All integration tests use `describe.skipIf(!HAS_COMMAND)` so they are transparen
 
 ## Focused test commands
 
-Use `pnpm exec vitest run packages/supi-lsp/__tests__/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/renderer.test.ts` for a small pull-diagnostic and custom-message regression pass. Use `pnpm exec vitest run packages/supi-lsp/__tests__/service-registry.test.ts` for the public API and registry lifecycle.
+Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/unit/renderer.test.ts` for a small pull-diagnostic and custom-message regression pass. Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/service-registry.test.ts` for the public API and registry lifecycle.
 
-Use `pnpm exec vitest run packages/supi-lsp/__tests__/tool-actions.validation.test.ts packages/supi-lsp/__tests__/tool-actions.recover.test.ts` for parameter validation, the recovery action contract, and path resolution. Use `pnpm exec vitest run packages/supi-lsp/__tests__/diagnostic-cascade.test.ts packages/supi-lsp/__tests__/overrides-cascade.test.ts packages/supi-lsp/__tests__/suppression-diagnostics.test.ts packages/supi-lsp/__tests__/stale-diagnostics.test.ts` for cascade detection, inline output, stale-module clustering, and suppression coverage.
+Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/tool-actions.validation.test.ts packages/supi-lsp/__tests__/unit/tool-actions.recover.test.ts` for parameter validation, the recovery action contract, and path resolution. Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-cascade.test.ts packages/supi-lsp/__tests__/unit/overrides-cascade.test.ts packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts` for cascade detection, inline output, stale-module clustering, and suppression coverage.
 
 ```bash
-pnpm exec vitest run packages/supi-lsp/__tests__/client-refresh.test.ts packages/supi-lsp/__tests__/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/transport.test.ts
-pnpm exec vitest run packages/supi-lsp/__tests__/system-prompt.test.ts packages/supi-lsp/__tests__/renderer.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-refresh.test.ts packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/unit/transport.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/unit/system-prompt.test.ts packages/supi-lsp/__tests__/unit/renderer.test.ts
 ```
 
 ### Running cross-language integration tests
 
 ```bash
 # Full suite (will skip servers not on PATH)
-pnpm exec vitest run packages/supi-lsp/__tests__/*.integration.*.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/integration/*.integration.*.test.ts
 # Python only
-pnpm exec vitest run packages/supi-lsp/__tests__/client.integration.python.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/integration/client.integration.python.test.ts
 # Bash only
-pnpm exec vitest run packages/supi-lsp/__tests__/client.integration.bash.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/integration/client.integration.bash.test.ts
 ```

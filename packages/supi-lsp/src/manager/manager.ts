@@ -4,7 +4,14 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as projectRoots from "@mrclrchtr/supi-core/api";
 import { LspClient } from "../client/client.ts";
-import { getServerForFile } from "../config.ts";
+import { getServerForFile } from "../config/config.ts";
+import type {
+  DetectedProjectServer,
+  Diagnostic,
+  FileEvent,
+  LspConfig,
+  ProjectServerInfo,
+} from "../config/types.ts";
 import {
   accumulateOutstandingDiagnostics,
   collectDiagnosticSummaryCounts,
@@ -19,13 +26,6 @@ import {
   normalizeRelevantPaths,
   shouldIgnoreLspPath,
 } from "../summary.ts";
-import type {
-  DetectedProjectServer,
-  Diagnostic,
-  FileEvent,
-  LspConfig,
-  ProjectServerInfo,
-} from "../types.ts";
 import { commandExists } from "../utils.ts";
 import {
   closeFileAcrossClients,
@@ -168,7 +168,7 @@ export class LspManager {
    */
   private async performStart(
     serverName: string,
-    serverConfig: import("../types.ts").ServerConfig,
+    serverConfig: import("../config/types.ts").ServerConfig,
     root: string,
     key: string,
   ): Promise<LspClient | null> {

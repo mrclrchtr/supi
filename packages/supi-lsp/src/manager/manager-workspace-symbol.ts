@@ -1,5 +1,5 @@
 import type { LspClient } from "../client/client.ts";
-import type { SymbolInformation, WorkspaceSymbol } from "../types.ts";
+import type { SymbolInformation, WorkspaceSymbol } from "../config/types.ts";
 
 export async function managerWorkspaceSymbol(
   clients: Iterable<LspClient>,

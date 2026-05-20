@@ -1,0 +1,40 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-20T00:04:34.574496Z"
+revision = 13
+
+[document_fingerprints]
+archive = "sha256:291b065c000d058b48e19ac0ec75a5b1c56ccbe74b1a4478e4aee2ccb954e1b2"
+content = "sha256:b39ed0a902cd263bccb51bdd520cb7866eb5d4598fa26080aeeaf997e37ffa8f"
+
+[[tasks]]
+number = 1
+title = "Codify the repo-wide package layout convention and package matrix"
+status = "done"
+file = "CLAUDE.md"
+verification = 'rg -n "package layout|__tests__/unit|domain folders|supi-lsp|supi-insights" docs/package-layout.md README.md CLAUDE.md'
+notes = "Test-exempt because this is docs-only policy work; verification is presence/consistency of the documented convention."
+
+[[tasks]]
+number = 2
+title = "Normalize `supi-insights` to the standard package-level test layout"
+status = "done"
+file = "packages/supi-insights/CLAUDE.md"
+verification = "pnpm vitest run packages/supi-insights/ && pnpm exec tsc --noEmit -p packages/supi-insights/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-insights/__tests__/tsconfig.json && pnpm exec biome check packages/supi-insights/"
+notes = "Test-exempt structural refactor — preserve behavior and verify with the existing package suite."
+
+[[tasks]]
+number = 3
+title = "Pilot the hybrid large-package layout in `supi-lsp`"
+status = "done"
+file = "packages/supi-lsp/CLAUDE.md"
+verification = "pnpm exec biome check packages/supi-lsp && pnpm vitest run packages/supi-lsp/ && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json"
+notes = "Test-exempt structural refactor — do not add new behavior; rely on the full package regression suite after the move."
+
+[[tasks]]
+number = 4
+title = "Close the rollout loop by making the convention the default for future package work"
+status = "done"
+file = "CLAUDE.md"
+verification = 'rg -n "default for new packages|stay flat unless they grow|supi-bash-timeout|supi-web" docs/package-layout.md CLAUDE.md'
+notes = "Test-exempt docs update that locks in the phased rollout policy after the pilot packages validate it."

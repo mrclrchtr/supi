@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import type { LspClient } from "../client/client.ts";
+import type { Diagnostic } from "../config/types.ts";
 import { relativeFilePathFromUri } from "../diagnostics/diagnostic-summary.ts";
 import { shouldIgnoreLspPath } from "../summary.ts";
-import type { Diagnostic } from "../types.ts";
 import { fileToUri, uriToFile } from "../utils.ts";
 import { isExcludedByPattern } from "./manager-helpers.ts";
 

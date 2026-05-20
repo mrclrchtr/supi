@@ -1,7 +1,7 @@
+import { type Diagnostic, DiagnosticSeverity } from "../config/types.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "../manager/manager-types.ts";
 import { isGlobMatch } from "../pattern-matcher.ts";
 import { displayRelativeFilePath, shouldIgnoreLspPath } from "../summary.ts";
-import { type Diagnostic, DiagnosticSeverity } from "../types.ts";
 
 export function collectDiagnosticSummaryCounts(
   fileDiags: Map<string, { errors: number; warnings: number }>,

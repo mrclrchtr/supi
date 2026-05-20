@@ -1,5 +1,5 @@
+import type { Diagnostic } from "../config/types.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "../manager/manager-types.ts";
-import type { Diagnostic } from "../types.ts";
 
 export function formatDiagnosticsDisplayContent(
   diagnostics: OutstandingDiagnosticSummaryEntry[],

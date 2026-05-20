@@ -20,6 +20,17 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 - Add inline JSDoc for complex internal logic when a short explanatory block will make the code easier to maintain.
 - Keep JSDoc concise and useful: explain purpose, important parameters/returns, side effects, and pi-specific constraints; skip boilerplate comments for trivial private code.
 
+## Package layout convention
+
+- Follow `docs/package-layout.md` for repo-wide package structure.
+- Standardize package boundaries with `src/api.ts`, `src/index.ts`, and `src/extension.ts` when the package role requires them.
+- Prefer package-level tests in `__tests__/unit/` and `__tests__/integration/`, with `__tests__/helpers/` and `__tests__/fixtures/` as needed.
+- Prefer domain folders over catch-all names like `core/`, `shared/`, or `misc/`.
+- Keep small packages flat; add `config/`, `tool/`, `ui/`, `session/`, or other domain folders only when the package size and responsibilities clearly justify them.
+- Current anchor examples: `supi-lsp` uses the hybrid large-package model; `supi-insights` uses the standard package-level test layout.
+- This convention is the default for new packages and for existing packages when they receive structural work.
+- Packages that should stay flat unless they grow: `supi`, `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-rtk`, `supi-test-utils`, `supi-web`.
+
 ## Commands
 
 ```bash

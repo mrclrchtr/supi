@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-P14K07"
+title = "Review proposed supi-lsp source and test restructuring"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"

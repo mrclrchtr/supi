@@ -80,3 +80,9 @@ pi install /path/to/SuPi/packages/supi-lsp
 ```
 
 When installed from a local path, pi loads the working tree directly; after edits, use `/reload` or restart pi.
+
+## Maintainer notes
+
+- Repo-wide package layout convention: `docs/package-layout.md`
+- Standard test buckets: `__tests__/unit/` and `__tests__/integration/`
+- Prefer domain folders over catch-all names like `core/` or `shared/`

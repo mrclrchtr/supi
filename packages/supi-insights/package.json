@@ -17,7 +17,7 @@
   ],
   "files": [
     "src/**/*.ts",
-    "!src/__tests__/**",
+    "!__tests__/**",
     "src/report.css",
     "src/report.js",
     "README.md"
