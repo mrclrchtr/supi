@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file contains non-obvious guidance for future work in `packages/supi-lsp/`.
-
 ## Scope
 
 `@mrclrchtr/supi-lsp` has two explicit surfaces:
@@ -26,9 +24,6 @@ Diagnostics are controlled by `/supi-settings`. The default threshold is `1`, so
 
 `session/service-registry.ts` exposes the shared session-scoped API for peer extensions. `tool/guidance.ts` formats prompt guidelines and diagnostic-context text. `diagnostics/stale-diagnostics.ts` detects suspicious missing-module clusters for stale-warning output, while `diagnostics/suppression-diagnostics.ts` handles stale suppression diagnostics for inline and pre-turn output. `manager/manager-diagnostics.ts` keeps file-sync and cascade-diagnostic helpers out of `manager.ts`, and `manager/manager-workspace-recovery.ts` owns soft recovery and targeted client restarts. `tool/overrides.ts`, `ui/renderer.ts`, and `ui/ui.ts` handle tool-result augmentation, custom messages, and the status overlay. `pattern-matcher.ts` implements gitignore-style exclusion matching. `session/settings-registration.ts` registers enable, severity, active-server, and exclude-pattern settings.
 
-## Validation
-
-Run `pnpm exec biome check packages/supi-lsp && pnpm vitest run packages/supi-lsp/ && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json`.
 
 ## Architecture gotchas
 

@@ -7,6 +7,7 @@ Session-local debug event capture, querying, and reporting for SuPi extensions.
 ```bash
 pnpm vitest run packages/supi-debug/
 pnpm exec tsc --noEmit -p packages/supi-debug/tsconfig.json
+pnpm exec tsc --noEmit -p packages/supi-debug/__tests__/tsconfig.json
 pnpm exec biome check packages/supi-debug/
 ```
 
@@ -25,6 +26,7 @@ Uses `supi-core`'s shared debug registry (`configureDebugRegistry`, `getDebugEve
 - `debug.ts` — extension factory, settings, tool + command registration
 - `format.ts` — event formatting + data serialization
 - `renderer.ts` — custom message renderer for `supi-debug-report` type
+- `status-log.ts` — session status/log formatting helpers
 
 ## Gotchas
 

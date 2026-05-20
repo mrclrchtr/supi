@@ -2,11 +2,17 @@
 
 Detailed context usage report for pi via `/supi-context`.
 
+## Scope
+
+- `@mrclrchtr/supi-context/extension` → `src/extension.ts`
+- `@mrclrchtr/supi-context/api` → `src/api.ts`
+
 ## Commands
 
 ```bash
 pnpm vitest run packages/supi-context/
 pnpm exec tsc --noEmit -p packages/supi-context/tsconfig.json
+pnpm exec tsc --noEmit -p packages/supi-context/__tests__/tsconfig.json
 pnpm exec biome check packages/supi-context/
 ```
 

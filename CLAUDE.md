@@ -46,31 +46,19 @@ Toolchain versions are pinned in `.mise.toml`.
 
 ## Architecture
 
-This repo has two install surfaces:
+This repo has three install surfaces:
 - repository root `package.json` exposes a `pi` manifest for local-path and git installs — supports `extensions`, `prompts`, `skills`, `themes` keys
+- each `packages/supi-*` which privides features is installable independently
 - `packages/supi/` is the published meta-package bundling the full stack
-
-A compact workspace overview is auto-injected on the first agent turn by `supi-code-intelligence` (`before_agent_start` → `generateOverview()`). The package list below highlights the modules most often touched in agent sessions; inspect `packages/` for the complete workspace inventory.
-
-Highlighted workspace packages:
-- `packages/supi` — meta-package with explicit `src/api.ts` + aggregated `src/extension.ts`
-- `packages/supi-ask-user` — structured questionnaire UI + `ask_user` tool
-- `packages/supi-bash-timeout` — default timeout injection for `bash`
-- `packages/supi-claude-md` — subdirectory CLAUDE.md injection
-- `packages/supi-core` — shared infrastructure: XML `<extension-context>` tag, config system
-- `packages/supi-extras` — command aliases, skill shorthand, tab spinner, prompt stash
-- `packages/supi-lsp` — Language Server Protocol integration + diagnostics guardrails
-- `packages/supi-tree-sitter` — Tree-sitter structural analysis tool + reusable parse/query service
-- `packages/supi-web` — fetch web pages as clean Markdown via the `web_fetch_md` tool
 
 ## Package tiers
 
-- **Production** — stable, bundled in `@mrclrchtr/supi` (`supi-core`, `supi-ask-user`, `supi-bash-timeout`, `supi-claude-md`, `supi-extras`, `supi-lsp`, `supi-tree-sitter`, `supi-code-intelligence`, `supi-debug`, `supi-context`)
-- **Beta** — experimental/niche, direct-install only (`supi-cache`, `supi-insights`, `supi-review`, `supi-rtk`, `supi-web`)
+- **Production** packages are bundled in `@mrclrchtr/supi`.
+- **Beta** packages are experimental or niche and stay direct-install only.
 
-**Promote to Production:** add to `dependencies`, `bundledDependencies`, and the aggregated `packages/supi/src/extension.ts` + `packages/supi/src/api.ts` surfaces, update `package.json` `pi.extensions` if needed, update lists above, `pnpm install`.
+**Promote to Production:** add the package to `dependencies` + `bundledDependencies`, wire it into `packages/supi/src/extension.ts` and `packages/supi/src/api.ts`, update root `package.json` `pi.extensions` if needed, then `pnpm install`.
 
-**Demote to Beta:** remove from `dependencies`, `bundledDependencies`, `pi.extensions`, delete `src/<name>.ts`, prune unused external deps, update lists, `pnpm install`.
+**Demote to Beta:** remove it from bundled surfaces and root `pi.extensions` as needed, delete `src/<name>.ts` if present, prune unused external deps, then `pnpm install`.
 
 ## Packaging conventions
 

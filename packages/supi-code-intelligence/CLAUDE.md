@@ -120,15 +120,6 @@ LSP → ripgrep text search (for callers/implementations/affected), with explici
   - `affected` → `{ type: "affected", data: AffectedDetails }` (confidence, direct count, downstream count, risk level, check-next, likely tests)
 - Risk thresholds: `high` (>10 refs / >3 modules / >1 downstream), `medium` (>3 refs / >1 module / ≥1 downstream), `low` (otherwise).
 
-## Test Commands
-
-```bash
-pnpm vitest run packages/supi-code-intelligence/
-pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-code-intelligence/
-```
-
 ## Testing Patterns
 
 - Tests use `mkdtempSync` + `writeJson` helpers to build temporary project structures.

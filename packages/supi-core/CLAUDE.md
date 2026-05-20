@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working in `packages/supi-core/`.
-
 ## Scope
 
 `@mrclrchtr/supi-core` now has two explicit surfaces:
@@ -15,6 +13,7 @@ Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/
 ```bash
 pnpm vitest run packages/supi-core/
 pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json
+pnpm exec tsc --noEmit -p packages/supi-core/__tests__/tsconfig.json
 pnpm exec biome check packages/supi-core/
 ```
 
@@ -47,6 +46,3 @@ pnpm exec biome check packages/supi-core/
 - `pruneAndReorderContextMessages()` keeps only the active token for a `customType` and moves the live context message before the last user message.
 - `walkProject()` intentionally skips `node_modules`, `.git`, and `.pnpm`.
 
-## Validation
-
-- `pnpm exec biome check packages/supi-core && pnpm vitest run packages/supi-core/ && pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json`

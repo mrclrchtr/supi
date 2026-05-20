@@ -7,6 +7,7 @@ Automated code review via an in-process managed child session. Reviews are drive
 ```bash
 pnpm vitest run packages/supi-review/
 pnpm exec tsc --noEmit -p packages/supi-review/tsconfig.json
+pnpm exec tsc --noEmit -p packages/supi-review/__tests__/tsconfig.json
 pnpm exec biome check packages/supi-review/
 ```
 

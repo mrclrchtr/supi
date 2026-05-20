@@ -1,25 +1,13 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working in `packages/supi/`.
-
 ## Scope
 
 `@mrclrchtr/supi` is the published meta-package bundling the Production SuPi packages.
 
 ## Package tiers
 
-| Tier | Meets | Included in meta-package |
-|---|---|---|
-| **Production** | Stable, well-tested, core functionality | ✅ Bundled via `@mrclrchtr/supi` — users get these when they `npm install @mrclrchtr/supi` |
-| **Beta** | Experimental, less mature, niche | ❌ Direct-install only: `npm install @mrclrchtr/supi-<name>` |
-
-### Production packages
-
-`supi-core`, `supi-ask-user`, `supi-bash-timeout`, `supi-claude-md`, `supi-extras`, `supi-lsp`, `supi-tree-sitter`, `supi-code-intelligence`, `supi-debug`, `supi-context`
-
-### Beta packages
-
-`supi-cache`, `supi-insights`, `supi-review`, `supi-rtk`, `supi-web`
+- **Production** packages are bundled via `@mrclrchtr/supi`.
+- **Beta** packages stay direct-install only as `@mrclrchtr/supi-<name>`.
 
 ## Key responsibilities
 
@@ -33,6 +21,9 @@ Sub-packages self-register prompts, skills, and themes via `resources_discover`.
 pnpm vitest run packages/supi/
 pnpm exec tsc --noEmit -p packages/supi/tsconfig.json
 pnpm exec biome check packages/supi/
+node scripts/publish.mjs packages/supi
+# real tarball verification + publish path
+node scripts/publish.mjs packages/supi --publish
 ```
 
 ## Packaging gotchas
