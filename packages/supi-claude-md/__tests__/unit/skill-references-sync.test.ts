@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SKILLS_DIR = join(__dirname, "../skills");
+const SKILLS_DIR = join(__dirname, "../../skills");
 const IMPROVER_REFS = join(SKILLS_DIR, "claude-md-improver/references");
 const REVISION_REFS = join(SKILLS_DIR, "claude-md-revision/references");
 

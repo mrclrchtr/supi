@@ -32,7 +32,7 @@ Two skills are shipped under `skills/`:
 - `claude-md-improver`: bulk audit and scoring of CLAUDE.md files across the repo. Includes SuPi-aware baseline review: compares CLAUDE.md sections against the context already delivered by `supi-code-intelligence` (workspace module graph) and `supi-claude-md` (subdirectory injection), then flags redundant sections or compressible overlap
 - `claude-md-revision`: targeted session-capture additions to CLAUDE.md
 
-Both skills share a set of reference files (`references/quality-criteria.md`, `references/templates.md`, `references/update-guidelines.md`). The revision skill duplicates these for self-containment. **When editing one copy, keep the other in sync**; `__tests__/skill-references-sync.test.ts` enforces this.
+Both skills share a set of reference files (`references/quality-criteria.md`, `references/templates.md`, `references/update-guidelines.md`). The revision skill duplicates these for self-containment. **When editing one copy, keep the other in sync**; `__tests__/unit/skill-references-sync.test.ts` enforces this.
 
 ## Config
 
@@ -58,7 +58,9 @@ pnpm exec biome check packages/supi-claude-md/
 
 ## Testing
 
-- Pure function unit tests in `__tests__/`: no pi mocks needed for discovery, subdirectory, state
+- Unit tests in `__tests__/unit/`: pure function tests for config, discovery, subdirectory, state, settings-registration, and skill-reference sync
+- Integration tests in `__tests__/integration/`: pi lifecycle, tool result handling, and resource discovery with mocked pi
+- Shared test helpers in `__tests__/helpers/`
 - Config tests use temp directories with `homeDir` parameter injection
 
 ## Gotchas

@@ -1,6 +1,6 @@
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_CONFIG } from "./extension-helpers.ts";
+import { DEFAULT_CONFIG } from "../helpers/extension-helpers.ts";
 
 const mockFns = vi.hoisted(() => ({
   loadClaudeMdConfig: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock("@mrclrchtr/supi-core/api", () => ({
   writeSupiConfig: vi.fn(),
 }));
 
-vi.mock("../src/config.ts", () => ({
+vi.mock("../../src/config.ts", () => ({
   CLAUDE_MD_DEFAULTS: {
     subdirs: true,
     fileNames: ["CLAUDE.md", "AGENTS.md"],
@@ -32,18 +32,18 @@ vi.mock("../src/config.ts", () => ({
   loadClaudeMdConfig: mockFns.loadClaudeMdConfig,
 }));
 
-vi.mock("../src/discovery.ts", () => ({
+vi.mock("../../src/discovery.ts", () => ({
   extractPathFromToolEvent: mockFns.extractPathFromToolEvent,
   filterAlreadyLoaded: mockFns.filterAlreadyLoaded,
   findSubdirContextFiles: mockFns.findSubdirContextFiles,
 }));
 
-vi.mock("../src/subdirectory.ts", () => ({
+vi.mock("../../src/subdirectory.ts", () => ({
   formatSubdirContext: mockFns.formatSubdirContext,
   shouldInjectSubdir: mockFns.shouldInjectSubdir,
 }));
 
-vi.mock("../src/state.ts", () => ({
+vi.mock("../../src/state.ts", () => ({
   createInitialState: () => ({
     injectedDirs: new Set(),
     nativeContextPaths: new Set(),
@@ -52,7 +52,7 @@ vi.mock("../src/state.ts", () => ({
   reconstructState: vi.fn(),
 }));
 
-import claudeMdExtension from "../src/claude-md.ts";
+import claudeMdExtension from "../../src/claude-md.ts";
 
 function resetMocks() {
   vi.clearAllMocks();

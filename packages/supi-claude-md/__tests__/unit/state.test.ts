@@ -1,6 +1,6 @@
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
-import { reconstructState } from "../src/state.ts";
+import { reconstructState } from "../../src/state.ts";
 
 function makeAssistantEntry(
   stopReason: "stop" | "toolUse" = "stop",
