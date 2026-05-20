@@ -1,6 +1,6 @@
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
-import codeIntelligenceExtension from "../src/code-intelligence.ts";
+import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 
 describe("code_intel tool registration", () => {
   it("registers the code_intel tool", () => {

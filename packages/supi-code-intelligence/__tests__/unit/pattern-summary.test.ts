@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executePatternAction } from "../src/actions/pattern-action.ts";
-import { executeAction } from "../src/tool-actions.ts";
+import { executePatternAction } from "../../src/actions/pattern-action.ts";
+import { executeAction } from "../../src/tool-actions.ts";
 
 let tmpDir: string;
 

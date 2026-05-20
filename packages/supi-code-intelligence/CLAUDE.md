@@ -36,6 +36,9 @@ src/
 ├── target-resolution.ts    # Symbol → file:position resolution (LSP / ripgrep)
 ├── resolve-target.ts       # Action params → resolved target or disambiguation
 ├── search-helpers.ts       # ripgrep wrapper, path normalization, URI helpers
+├── pattern-structured.ts   # Tree-sitter-based structured pattern search
+├── prioritization-signals.ts # Diagnostics, coverage, knip unused signals
+├── semantic-action-helpers.ts # Shared confidence/resolution helpers
 └── actions/
     ├── brief-action.ts         # Architecture overviews + anchored briefs
     ├── callers-action.ts       # Find call sites (LSP → ripgrep)
@@ -44,6 +47,14 @@ src/
     ├── affected-action.ts      # Blast-radius + risk assessment
     ├── pattern-action.ts       # Bounded text search (literal or regex)
     └── index-action.ts         # Factual project map (file counts, directories, landmarks)
+
+__tests__/
+├── helpers/
+│   └── test-utils.ts          # createTempDir() — shared temp-dir/cleanup/writeJson utility
+├── fixtures/                  # Sample data and test projects (available for future use)
+├── unit/                      # Focused, fast tests (16 files testing individual modules)
+├── integration/               # End-to-end and cross-module tests (3 files)
+└── tsconfig.json
 ```
 
 ### Injection Points (6 hooks into pi)
@@ -122,13 +133,23 @@ LSP → ripgrep text search (for callers/implementations/affected), with explici
 
 ## Testing Patterns
 
-- Tests use `mkdtempSync` + `writeJson` helpers to build temporary project structures.
+### Test layout
+
+- **Unit tests** live in `__tests__/unit/` — focused, fast tests that test individual modules with temporary filesystem fixtures.
+- **Integration tests** live in `__tests__/integration/` — end-to-end and cross-module tests that exercise the full action pipeline or require real system tools (git, ripgrep).
+- **Shared helpers** in `__tests__/helpers/test-utils.ts` provide `createTempDir()` for consistent temp-directory setup/teardown.
+- **Fixtures** in `__tests__/fixtures/` are available for sample data (currently empty).
+- Package test tsconfig (`__tests__/tsconfig.json`) extends root with `include: ["**/*.ts", "../src/**/*.ts"].`
+
+### Patterns
+
+- Many tests use `mkdtempSync` + `writeJson` helpers to build temporary project structures.
 - `graphql-test-v2`-style: create minimal `package.json`, `pnpm-workspace.yaml`, and source files in a temp dir, then call functions directly.
 - Architecture tests verify model shape (name, modules, edges, leaf marking).
 - Action tests verify validation, error messages, and output formatting.
-- No `vi.mock` needed — tests operate on real filesystem in temp dirs.
-- Package test tsconfig extends root `tsconfig.json` with `include: ["*.ts"].`
-- Tests that operate on real git repos (e.g., `git-context.ts` tests) must disable GPG signing and pre-commit hooks to avoid failures in environments with global git config:
+- No `vi.mock` needed for most tests — they operate on the real filesystem in temp dirs.
+- Fallback-chain and prioritization-signals tests use `vi.mock` to control LSP state.
+- Tests that operate on real git repos (e.g., `integration/git-context.test.ts`) must disable GPG signing and pre-commit hooks:
 
   ```ts
   execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
@@ -138,14 +159,15 @@ LSP → ripgrep text search (for callers/implementations/affected), with explici
 
   **Why**: `commit.gpgsign` fails with `fatal: either user.signingkey or gpg.ssh.defaultKeyCommand needs to be configured` when a global signingkey is set. `core.hooksPath` skips pre-commit hooks (e.g., pre-commit) that may error on missing config. `git init` default branch varies by git version; rename forces a known name for assertions.
 
+### Helper
+
 ```ts
-// Standard pattern
-let tmpDir: string;
-beforeEach(() => { tmpDir = mkdtempSync(path.join(os.tmpdir(), "prefix-")); });
-afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }); });
-function writeJson(dir: string, file: string, data: unknown) {
-  writeFileSync(path.join(dir, file), JSON.stringify(data, null, 2));
-}
+import { createTempDir } from "../helpers/test-utils.ts";
+
+const t = createTempDir("prefix-");
+afterEach(() => t.cleanup());
+t.writeJson("package.json", { name: "test" });
+t.writeFile("index.ts", "export const x = 1;\n");
 ```
 
 ## Dependencies

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeIndexAction } from "../src/actions/index-action.ts";
+import { executeIndexAction } from "../../src/actions/index-action.ts";
 
 let tmpDir: string;
 

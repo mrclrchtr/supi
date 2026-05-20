@@ -7,7 +7,7 @@ import {
   findModuleForPath,
   getDependencies,
   getDependents,
-} from "../src/architecture.ts";
+} from "../../src/architecture.ts";
 
 let tmpDir: string;
 

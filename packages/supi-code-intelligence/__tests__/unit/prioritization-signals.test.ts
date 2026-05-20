@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { summarizePrioritySignalsForFiles } from "../src/prioritization-signals.ts";
+import { summarizePrioritySignalsForFiles } from "../../src/prioritization-signals.ts";
 
 const mockLspFns = vi.hoisted(() => ({
   getSessionLspService: vi.fn<(cwd: string) => unknown>(),

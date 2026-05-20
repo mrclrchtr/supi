@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { ActionParams } from "../src/tool-actions.ts";
-import { executeAction } from "../src/tool-actions.ts";
+import type { ActionParams } from "../../src/tool-actions.ts";
+import { executeAction } from "../../src/tool-actions.ts";
 
 let tmpDir: string;
 

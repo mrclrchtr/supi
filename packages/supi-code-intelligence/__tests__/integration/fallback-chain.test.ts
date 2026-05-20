@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { executeAction } from "../src/tool-actions.ts";
+import { executeAction } from "../../src/tool-actions.ts";
 
 // ── LSP mock ──────────────────────────────────────────────────────────
 
