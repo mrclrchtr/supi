@@ -2,15 +2,15 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadSupiConfig } from "../src/config.ts";
-import { registerConfigSettings } from "../src/config-settings.ts";
-import { clearRegisteredSettings, getRegisteredSettings } from "../src/settings-registry.ts";
+import { registerConfigSettings } from "../../../src/config/config-settings.ts";
+import {
+  clearRegisteredSettings,
+  getRegisteredSettings,
+} from "../../../src/settings/settings-registry.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-core-config-settings-test-"));
 }
-
-const opts = (dir: string) => ({ homeDir: dir });
 
 interface TestConfig {
   enabled: boolean;
@@ -78,7 +78,7 @@ function registerTestSettings(homeDir?: string): void {
   });
 }
 
-describe("registerConfigSettings persistence", () => {
+describe("registerConfigSettings", () => {
   beforeEach(() => {
     clearRegisteredSettings();
   });
@@ -87,74 +87,74 @@ describe("registerConfigSettings persistence", () => {
     clearRegisteredSettings();
   });
 
-  it("persistChange set writes to the selected scope's config", () => {
-    const tmpDir = makeTempDir();
+  it("registers a config-backed settings section", () => {
+    registerTestSettings();
+    const sections = getRegisteredSettings();
 
+    expect(sections).toHaveLength(1);
+    expect(sections[0]).toMatchObject({ id: "test", label: "Test" });
+  });
+
+  it("loadValues returns items built from scoped config", () => {
     registerTestSettings();
     const section = getRegisteredSettings()[0];
-    section.persistChange("project", tmpDir, "severity", "3");
+    const items = section.loadValues("project", "/tmp");
 
-    const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
-    expect(config.severity).toBe(3);
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    expect(items).toHaveLength(3);
+    expect(items.map((i) => i.id)).toEqual(["enabled", "severity", "tags"]);
+    expect(items.find((i) => i.id === "enabled")?.currentValue).toBe("on");
+    expect(items.find((i) => i.id === "severity")?.currentValue).toBe("1");
+    expect(items.find((i) => i.id === "tags")?.currentValue).toBe("none");
   });
 
-  it("persistChange set writes to global scope when selected", () => {
-    const tmpDir = makeTempDir();
-
-    registerTestSettings(tmpDir);
-    const section = getRegisteredSettings()[0];
-    section.persistChange("global", tmpDir, "severity", "3");
-
-    const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
-    expect(config.severity).toBe(3);
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it("persistChange unset removes the key from the selected scope's config", () => {
-    const tmpDir = makeTempDir();
-
-    fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, ".pi/supi/config.json"),
-      JSON.stringify({ test: { severity: 3, tags: ["a", "b"] } }),
-    );
-
-    registerTestSettings();
-    const section = getRegisteredSettings()[0];
-    section.persistChange("project", tmpDir, "tags", "");
-
-    const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
-    expect(config.severity).toBe(3);
-    expect(config.tags).toEqual([]);
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
-  });
-
-  it("persistChange unset on global scope does not affect project scope", () => {
+  it("loadValues reads the selected scope instead of merged effective config", () => {
     const tmpDir = makeTempDir();
 
     fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, ".pi/agent/supi/config.json"),
-      JSON.stringify({ test: { severity: 2, tags: ["global"] } }),
+      JSON.stringify({ test: { enabled: false, severity: 2, tags: ["global"] } }),
     );
 
     fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
     fs.writeFileSync(
       path.join(tmpDir, ".pi/supi/config.json"),
-      JSON.stringify({ test: { severity: 4, tags: ["project"] } }),
+      JSON.stringify({ test: { enabled: true, severity: 4, tags: ["project"] } }),
     );
 
     registerTestSettings(tmpDir);
     const section = getRegisteredSettings()[0];
-    section.persistChange("global", tmpDir, "tags", "");
 
-    const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
-    expect(config.severity).toBe(4);
-    expect(config.tags).toEqual(["project"]);
+    const globalItems = section.loadValues("global", tmpDir);
+    const projectItems = section.loadValues("project", tmpDir);
+
+    expect(globalItems.find((i) => i.id === "enabled")?.currentValue).toBe("off");
+    expect(globalItems.find((i) => i.id === "severity")?.currentValue).toBe("2");
+    expect(globalItems.find((i) => i.id === "tags")?.currentValue).toBe("global");
+
+    expect(projectItems.find((i) => i.id === "enabled")?.currentValue).toBe("on");
+    expect(projectItems.find((i) => i.id === "severity")?.currentValue).toBe("4");
+    expect(projectItems.find((i) => i.id === "tags")?.currentValue).toBe("project");
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("project scope falls back to defaults when only global config exists", () => {
+    const tmpDir = makeTempDir();
+
+    fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi/agent/supi/config.json"),
+      JSON.stringify({ test: { severity: 3 } }),
+    );
+
+    registerTestSettings();
+    const section = getRegisteredSettings()[0];
+    const projectItems = section.loadValues("project", tmpDir);
+
+    expect(projectItems.find((i) => i.id === "enabled")?.currentValue).toBe("on");
+    expect(projectItems.find((i) => i.id === "severity")?.currentValue).toBe("1");
+    expect(projectItems.find((i) => i.id === "tags")?.currentValue).toBe("none");
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

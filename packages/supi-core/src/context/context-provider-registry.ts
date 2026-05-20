@@ -3,7 +3,7 @@
 // Extensions declare context data providers via `registerContextProvider()` during their
 // factory function. The `/supi-context` command reads them via `getRegisteredContextProviders()`.
 
-import { createRegistry } from "./registry-utils.ts";
+import { createRegistry } from "../registry-utils.ts";
 
 export interface ContextProvider {
   /** Unique identifier — e.g. "rtk" */

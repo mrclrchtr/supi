@@ -14,8 +14,8 @@ import {
   clearRegisteredSettings,
   getRegisteredSettings,
   registerSettings,
-} from "../src/settings-registry.ts";
-import { createInputSubmenu, openSettingsOverlay } from "../src/settings-ui.ts";
+} from "../../../src/settings/settings-registry.ts";
+import { createInputSubmenu, openSettingsOverlay } from "../../../src/settings/settings-ui.ts";
 
 afterEach(() => {
   clearRegisteredSettings();

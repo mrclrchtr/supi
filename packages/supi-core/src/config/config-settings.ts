@@ -2,9 +2,9 @@
 // Wraps registerSettings() and centralizes selected-scope loading + scoped persistence.
 
 import type { SettingItem } from "@earendil-works/pi-tui";
+import type { SettingsScope } from "../settings/settings-registry.ts";
+import { registerSettings } from "../settings/settings-registry.ts";
 import { loadSupiConfigForScope, removeSupiConfigKey, writeSupiConfig } from "./config.ts";
-import type { SettingsScope } from "./settings-registry.ts";
-import { registerSettings } from "./settings-registry.ts";
 
 export interface ConfigSettingsHelpers {
   /** Write a key to the selected scope's config section. */

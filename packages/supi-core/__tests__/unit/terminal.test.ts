@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { TitleTarget } from "../src/terminal.ts";
+import type { TitleTarget } from "../../src/terminal.ts";
 import {
   DONE_SYMBOL,
   formatTitle,
@@ -7,7 +7,7 @@ import {
   signalDone,
   signalWaiting,
   WAITING_SYMBOL,
-} from "../src/terminal.ts";
+} from "../../src/terminal.ts";
 
 function makeCtx(): TitleTarget & { getTitles(): string[] } {
   const titles: string[] = [];

@@ -4,7 +4,7 @@
 // factory function. The generic settings UI reads them via `getRegisteredSettings()`.
 
 import type { SettingItem } from "@earendil-works/pi-tui";
-import { createRegistry } from "./registry-utils.ts";
+import { createRegistry } from "../registry-utils.ts";
 
 export type SettingsScope = "project" | "global";
 

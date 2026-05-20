@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getActiveBranchEntries } from "../src/session-utils.ts";
+import { getActiveBranchEntries } from "../../src/session-utils.ts";
 
 function makeEntry(
   id: string,
