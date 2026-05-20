@@ -19,28 +19,12 @@ import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render.ts";
 import { buildErrorResult, buildResult, type HybridResult } from "./result.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
+import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
 import type { NormalizedQuestionnaire } from "./types.ts";
 import { type RichUiHost, runRichQuestionnaire } from "./ui/ui-rich.ts";
 
 const TOOL_NAME = "ask_user";
 const TOOL_LABEL = "Ask User";
-
-const TOOL_DESCRIPTION =
-  "Ask the user a focused decision question (or up to 4 grouped questions) when explicit user input is required to proceed safely. Use for clarifying intent, picking between options, prioritizing a short set of features, or confirming a destructive action — not for surveys or open-ended discovery. Questions are `choice` (with options; set `multi: true` for multi-select) or `text` (freeform input). Structured questions can add `recommendation`, `default`, `allowOther`, `allowDiscuss`, and option `preview` content.";
-
-const PROMPT_SNIPPET =
-  "ask_user — pause and request a focused decision (1-4 typed questions) when explicit user input is required to proceed, including rich choice and discuss flows";
-
-const PROMPT_GUIDELINES = [
-  "Use ask_user only for decisions that require explicit user input — never as a substitute for reading code or thinking through a problem.",
-  "Keep questionnaires bounded: 1-4 focused questions with short headers; prefer one decision per call when possible.",
-  'There are two question types: `choice` for picking from options (single-select by default; set `multi: true` for multi-select — use this instead of the now-removed `multichoice`) and `text` for freeform input. For yes/no questions, use `choice` with options `{value: "yes", label: "Yes"}` and `{value: "no", label: "No"}`.',
-  "Set `recommendation` when one option or a small set of options is clearly preferable, so the UI can surface that guidance.",
-  "Set `default` to pre-select a starting value or option; the user can accept it with a single keystroke. Use it for safe/common defaults, distinct from `recommendation` which highlights what you think is best.",
-  "Enable `allowOther` only when a custom answer is genuinely useful, and `allowDiscuss` only when the user may need to talk through the choice instead of deciding immediately.",
-  "Use `description` to explain what each option means — it wraps naturally and a few sentences is fine. Reserve `preview` for code, config, or diagrams that need dedicated rendering space in a side pane.",
-  "Do not call ask_user while another ask_user interaction is in flight — wait for the previous result before issuing another.",
-];
 
 /** Minimal ui subset needed by executeAskUser — extended with setTitle/notify from ExtensionUIContext. */
 interface ExtensionUi {
@@ -67,9 +51,9 @@ export default function askUserExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: TOOL_NAME,
     label: TOOL_LABEL,
-    description: TOOL_DESCRIPTION,
-    promptSnippet: PROMPT_SNIPPET,
-    promptGuidelines: PROMPT_GUIDELINES,
+    description: toolDescription,
+    promptSnippet,
+    promptGuidelines,
     parameters: AskUserParamsSchema,
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
@@ -188,4 +172,7 @@ export { ActiveQuestionnaireLock, QuestionnaireFlow } from "./flow.ts";
 // Re-exports used by tests.
 export { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 export { buildResult } from "./result.ts";
-export { PROMPT_GUIDELINES as askUserPromptGuidelines, PROMPT_SNIPPET as askUserPromptSnippet };
+export {
+  promptGuidelines as askUserPromptGuidelines,
+  promptSnippet as askUserPromptSnippet,
+} from "./tool/guidance.ts";

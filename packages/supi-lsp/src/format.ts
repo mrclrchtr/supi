@@ -12,8 +12,8 @@ import type {
   SymbolInformation,
   WorkspaceEdit,
 } from "./config/types.ts";
-import type { GrepMatch } from "./tool/search-fallback.ts";
 import { isProjectSource } from "./summary.ts";
+import type { GrepMatch } from "./tool/search-fallback.ts";
 import { uriToFile } from "./utils.ts";
 
 // ── Hover ─────────────────────────────────────────────────────────────

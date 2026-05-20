@@ -1,13 +1,13 @@
 import * as path from "node:path";
 import { pruneAndReorderContextMessages } from "@mrclrchtr/supi-core/api";
 import { beforeEach, describe, expect, it } from "vitest";
+import { clearTsconfigCache } from "../../src/config/tsconfig-scope.ts";
 import { DiagnosticSeverity } from "../../src/config/types.ts";
 import {
   diagnosticsContextFingerprint,
   formatDiagnosticsContext,
 } from "../../src/diagnostics/diagnostic-context.ts";
 import { LspManager } from "../../src/manager/manager.ts";
-import { clearTsconfigCache } from "../../src/config/tsconfig-scope.ts";
 
 beforeEach(() => {
   clearTsconfigCache();

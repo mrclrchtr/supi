@@ -2,14 +2,7 @@
 
 export const toolDescription = `Code intelligence tool — codebase orientation, semantic relationships, impact analysis, and scoped search.
 
-Actions:
-- brief: summarize a project, package, directory, file, or anchored symbol
-- callers: find call sites for a symbol or analyze a file export surface
-- callees: find outgoing calls from a symbol or anchored position
-- implementations: find concrete implementations of an interface or abstract type
-- affected: estimate blast radius for a symbol or exported file surface
-- pattern: bounded text search with optional regex and kind filters
-- index: summarize project layout
+Actions: brief, callers, callees, implementations, affected, pattern, index.
 
 Coordinates are 1-based (line, character). Relative paths resolve from the session working directory. A leading @ on path/file is stripped automatically.`;
 

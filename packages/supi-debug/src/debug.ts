@@ -18,6 +18,7 @@ import { Type } from "typebox";
 import { formatDataLines } from "./format.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
 import { maybeLogLoadStatus } from "./status-log.ts";
+import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
 
 const DEBUG_SECTION = "debug";
 const DEBUG_REPORT_TYPE = "supi-debug-report";
@@ -319,13 +320,9 @@ export default function debugExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "supi_debug",
     label: "SuPi Debug",
-    description: "Fetch recent session-local SuPi extension debug events for troubleshooting.",
-    promptSnippet:
-      "Fetch recent SuPi extension debug events when troubleshooting extension behavior.",
-    promptGuidelines: [
-      "Use supi_debug when the user asks to inspect SuPi extension failures, fallback reasons, or recent debug events.",
-      "supi_debug returns sanitized events by default; request raw data only when the user explicitly wants raw diagnostics and settings allow it.",
-    ],
+    description: toolDescription,
+    promptSnippet,
+    promptGuidelines,
     parameters: Type.Object({
       source: Type.Optional(Type.String({ description: "Filter by extension source, e.g. rtk" })),
       level: Type.Optional(

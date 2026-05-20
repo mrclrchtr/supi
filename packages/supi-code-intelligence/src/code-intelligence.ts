@@ -6,7 +6,7 @@ import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/
 import { Type } from "typebox";
 import { buildArchitectureModel } from "./architecture.ts";
 import { generateOverview } from "./brief.ts";
-import { promptGuidelines, promptSnippet, toolDescription } from "./guidance.ts";
+import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
 import { type CodeIntelAction, executeAction } from "./tool-actions.ts";
 
 const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";

@@ -3,15 +3,9 @@
 // Note: We intentionally do NOT include cross-tool routing (e.g., "use lsp for
 // type info") because this package can be installed standalone without supi-lsp.
 
-export const toolDescription = `Tree-sitter tool — parser-level structure for supported files.
+export const toolDescription = `Tree-sitter tool — parser-level structure and syntax queries for supported files.
 
-Actions:
-- outline: declarations in one JavaScript/TypeScript file
-- imports: parsed import statements in one JavaScript/TypeScript file
-- exports: parsed export declarations in one JavaScript/TypeScript file
-- node_at: exact syntax node at file/line/character
-- query: custom Tree-sitter query on one file
-- callees: outgoing calls from a position
+Actions: outline, imports, exports, node_at, query, callees.
 
 Use 1-based line/character coordinates. Relative paths resolve from the session working directory.
 

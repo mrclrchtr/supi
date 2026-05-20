@@ -27,6 +27,11 @@ import {
 } from "./diagnostics/diagnostic-context.ts";
 import { formatDiagnosticsDisplayContent } from "./diagnostics/diagnostic-display.ts";
 import { assessStaleDiagnostics } from "./diagnostics/stale-diagnostics.ts";
+import {
+  isWorkspaceRecoveryTrigger,
+  scanWorkspaceSentinels,
+  syncWorkspaceSentinelSnapshot,
+} from "./diagnostics/workspace-sentinels.ts";
 import { LspManager } from "./manager/manager.ts";
 import { forceResyncStaleModuleFiles } from "./manager/manager-stale-resync.ts";
 import {
@@ -69,11 +74,6 @@ import { type LspToolParams, safeExecuteAction } from "./tool/tool-actions.ts";
 import { registerLspMessageRenderer } from "./ui/renderer.ts";
 import { toggleLspStatusOverlay, updateLspUi } from "./ui/ui.ts";
 import { fileToUri } from "./utils.ts";
-import {
-  isWorkspaceRecoveryTrigger,
-  scanWorkspaceSentinels,
-  syncWorkspaceSentinelSnapshot,
-} from "./diagnostics/workspace-sentinels.ts";
 
 const LspActionEnum = StringEnum([
   "hover",

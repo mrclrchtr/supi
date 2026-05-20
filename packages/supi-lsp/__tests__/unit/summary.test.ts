@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { isInProjectTree, isProjectSource, shouldIgnoreLspPath } from "../../src/summary.ts";
 import { clearTsconfigCache } from "../../src/config/tsconfig-scope.ts";
+import { isInProjectTree, isProjectSource, shouldIgnoreLspPath } from "../../src/summary.ts";
 
 let tmpDir: string;
 

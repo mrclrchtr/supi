@@ -2,54 +2,16 @@
  * SuPi Web extension entry point — registers the `web_fetch_md` tool with pi.
  */
 
-import { spawnSync } from "node:child_process";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { htmlToMarkdown, wrapAsCodeBlock } from "./convert.ts";
 import { FetchError, fetchWithNegotiation, isValidHttpUrl } from "./fetch.ts";
 import { writeTempFile } from "./temp-file.ts";
+import { buildPromptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
 
 const TOOL_NAME = "web_fetch_md";
 const TOOL_LABEL = "Web Fetch";
 const INLINE_MAX_CHARS = 15_000;
-
-const TOOL_DESCRIPTION = `Fetch a web page and convert it to clean Markdown for LLM ingestion.
-
-Only accepts real \`http://\` or \`https://\` URLs. If the page is access-controlled (login, paywall, private content), stop and ask the user for an allowed source or exported content.
-
-Output modes:
-- \`auto\` (default): returns Markdown inline if ≤${INLINE_MAX_CHARS.toLocaleString()} characters; otherwise writes to a temporary file and returns the path.
-- \`inline\`: always returns Markdown inline.
-- \`file\`: always writes to a temporary file and returns the path.
-
-Links and images are absolutized by default. Use \`abs_links: false\` to keep them as-is.`;
-
-const PROMPT_SNIPPET =
-  "web_fetch_md — fetch a URL and convert it to clean Markdown suitable for LLM ingestion.";
-
-function isGhAvailable(): boolean {
-  try {
-    const result = spawnSync("gh", ["--version"], { stdio: "ignore" });
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-}
-
-function buildPromptGuidelines(): string[] {
-  const guidelines = [
-    "Use web_fetch_md to fetch web pages and convert them to clean Markdown for LLM ingestion.",
-    "Only accept real `http://` or `https://` URLs; stop and ask the user for an allowed source if the page is access-controlled.",
-    "Prefer `output_mode: auto` (default) so large pages are written to temp files instead of flooding the context window.",
-    "Set `abs_links: false` only when relative links are intentional (e.g., local documentation).",
-  ];
-  if (isGhAvailable()) {
-    guidelines.push(
-      "For GitHub URLs (e.g., repos, issues, PRs, releases), prefer the `gh` CLI via `bash` over this tool.",
-    );
-  }
-  return guidelines;
-}
 
 const OutputModeEnum = Type.Union(
   [Type.Literal("auto"), Type.Literal("inline"), Type.Literal("file")],
@@ -60,8 +22,8 @@ export default function webExtension(pi: ExtensionAPI): void {
   pi.registerTool({
     name: TOOL_NAME,
     label: TOOL_LABEL,
-    description: TOOL_DESCRIPTION,
-    promptSnippet: PROMPT_SNIPPET,
+    description: toolDescription,
+    promptSnippet,
     promptGuidelines: buildPromptGuidelines(),
     parameters: Type.Object({
       url: Type.String({ description: "http(s) URL to fetch" }),

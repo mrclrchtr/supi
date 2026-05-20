@@ -8,22 +8,9 @@
 import * as path from "node:path";
 import type { ProjectServerInfo } from "../config/types.ts";
 
-export const toolDescription = `Language Server Protocol tool — provides type-aware code intelligence.
+export const toolDescription = `Language Server Protocol tool — semantic code intelligence for supported languages.
 
-Call shape: { action, args } where args is action-specific.
-
-Actions:
-- hover: Get type info and docs at a position. Args: { file, line, character }
-- definition: Go to definition of a symbol. Args: { file, line, character }
-- references: Find all references to a symbol. Args: { file, line, character }
-- diagnostics: Get type errors and warnings. Args: { file } (optional — omit args or file for all files)
-- symbols: List all symbols in a file. Args: { file }
-- rename: Rename a symbol across the project. Args: { file, line, character, newName }
-- code_actions: Get available fixes/refactors at a position. Args: { file, line, character }
-- workspace_symbol: Fuzzy symbol search across the project. Args: { query }
-- search: Search for symbols (LSP first, then text fallback). Args: { query }
-- symbol_hover: Hover info by symbol name (zero coordinates). Args: { symbol }
-- recover: Refresh cached diagnostics after a workspace change. Args: none
+Actions: hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, symbol_hover, recover.
 
 Line and character are 1-based. File paths are relative to cwd.`;
 
