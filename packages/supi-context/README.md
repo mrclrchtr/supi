@@ -29,9 +29,14 @@ The report includes:
 - a visual grid of used space, free space, and autocompact buffer
 - token usage by category: system prompt, user messages, assistant messages, tool calls, tool results, and other
 - system-prompt breakdown for context files, skills, guidelines, tool snippets, and append text
+
+  - **Guidelines attribution** — breaks down guideline bullets by source: PI built-in defaults, known built-in tools (`read`, `write`, `edit`), and other (extensions/custom tools). Each source shows its token count and bullet count.
+  - **Tool snippet breakdown** — shows per-tool one-line snippet tokens alongside definition tokens in the tool definitions section.
+
 - injected subdirectory context files from `supi-claude-md`, including turn number and token cost
 - active skills and their token cost
-- tool-definition count and token cost
+- tool-definition count and token cost, with per-tool snippet token column
+- guideline source summary (e.g., "2 bullets from default · 1 bullet from read · 3 bullets from edit")
 - compaction summary when older turns were summarized
 - extra provider sections from extensions registered through the shared context-provider registry
 

@@ -213,16 +213,63 @@ function renderCategoryBreakdown(analysis: ContextAnalysis, theme: Theme, width:
   return lines;
 }
 
+function renderCompositionGuidelineSubRows(
+  sources: Array<{ source: string; tokens: number }>,
+  opts: { subLabelWidth: number; total: number; theme: Theme; width: number },
+): string[] {
+  const lines: string[] = [];
+  for (const item of sources) {
+    const label =
+      item.source === "default" ? "default" : item.source === "other" ? "extensions" : item.source;
+    lines.push(
+      truncateToWidth(
+        `    ${opts.theme.fg("dim", padRight(label, opts.subLabelWidth))} ${padLeft(formatTokens(item.tokens), 8)} ${padLeft(pct(item.tokens, opts.total), 7)}`,
+        opts.width,
+      ),
+    );
+  }
+  return lines;
+}
+
+function renderCompositionSnippetSubRows(
+  details: Array<{ name: string; tokens: number }>,
+  subLabelWidth: number,
+  theme: Theme,
+  width: number,
+): string[] {
+  const lines: string[] = [];
+  for (const item of details) {
+    lines.push(
+      truncateToWidth(
+        `    ${theme.fg("dim", padRight(item.name, subLabelWidth))} ${padLeft(formatTokens(item.tokens), 8)}`,
+        width,
+      ),
+    );
+  }
+  return lines;
+}
+
 function renderSystemPromptComposition(
   analysis: ContextAnalysis,
   theme: Theme,
   width: number,
 ): string[] {
   const breakdown = analysis.systemPromptBreakdown;
-  const instructionFileTokens = sum(breakdown.instructionFiles.map((file) => file.tokens));
-  const contextFileTokens = sum(breakdown.contextFiles.map((file) => file.tokens));
-  const skillTokens = sum(breakdown.skills.map((skill) => skill.tokens));
-  const total = analysis.categories.systemPrompt;
+  const instructionFileTokens = sum(breakdown.instructionFiles.map((f) => f.tokens));
+  const contextFileTokens = sum(breakdown.contextFiles.map((f) => f.tokens));
+  const skillTokens = sum(breakdown.skills.map((s) => s.tokens));
+
+  // Use sum of all breakdown components as the denominator so percentages
+  // stay internally consistent even when the system prompt token count has
+  // been scaled to actual model usage.
+  const total =
+    breakdown.base +
+    instructionFileTokens +
+    contextFileTokens +
+    skillTokens +
+    breakdown.guidelines +
+    breakdown.toolSnippets +
+    breakdown.appendText;
 
   const lines: string[] = [];
   lines.push(
@@ -234,21 +281,39 @@ function renderSystemPromptComposition(
     ),
   );
 
-  const rows: Array<{
-    label: string;
-    color: Parameters<Theme["fg"]>["0"];
-    tokens: number;
-  }> = [
-    { label: "Base", color: "accent", tokens: breakdown.base },
-    { label: "Instruction files", color: "text", tokens: instructionFileTokens },
-    { label: "Context files", color: "text", tokens: contextFileTokens },
-    { label: "Skills", color: "text", tokens: skillTokens },
-    { label: "Guidelines", color: "text", tokens: breakdown.guidelines },
-    { label: "Tool snippets", color: "text", tokens: breakdown.toolSnippets },
-    { label: "Append text", color: "text", tokens: breakdown.appendText },
+  const labelWidth = Math.max(18, Math.min(22, width - 22));
+  const subLabelWidth = labelWidth;
+
+  const rows = [
+    { label: "Base", color: "accent" as Parameters<Theme["fg"]>["0"], tokens: breakdown.base },
+    {
+      label: "Instruction files",
+      color: "text" as Parameters<Theme["fg"]>["0"],
+      tokens: instructionFileTokens,
+    },
+    {
+      label: "Context files",
+      color: "text" as Parameters<Theme["fg"]>["0"],
+      tokens: contextFileTokens,
+    },
+    { label: "Skills", color: "text" as Parameters<Theme["fg"]>["0"], tokens: skillTokens },
+    {
+      label: "Guidelines",
+      color: "text" as Parameters<Theme["fg"]>["0"],
+      tokens: breakdown.guidelines,
+    },
+    {
+      label: "Tool snippets",
+      color: "text" as Parameters<Theme["fg"]>["0"],
+      tokens: breakdown.toolSnippets,
+    },
+    {
+      label: "Append text",
+      color: "text" as Parameters<Theme["fg"]>["0"],
+      tokens: breakdown.appendText,
+    },
   ];
 
-  const labelWidth = Math.max(18, Math.min(22, width - 22));
   for (const row of rows) {
     if (row.tokens <= 0) continue;
     const bullet = theme.fg(row.color, "●");
@@ -256,6 +321,28 @@ function renderSystemPromptComposition(
     const tokens = padLeft(formatTokens(row.tokens), 8);
     const percentage = padLeft(pct(row.tokens, total), 7);
     lines.push(truncateToWidth(`  ${bullet} ${label} ${tokens} ${percentage}`, width));
+
+    if (row.label === "Guidelines" && breakdown.guidelineSources.length > 0) {
+      lines.push(
+        ...renderCompositionGuidelineSubRows(breakdown.guidelineSources, {
+          subLabelWidth,
+          total,
+          theme,
+          width,
+        }),
+      );
+    }
+
+    if (row.label === "Tool snippets" && breakdown.toolSnippetDetails.length > 0) {
+      lines.push(
+        ...renderCompositionSnippetSubRows(
+          breakdown.toolSnippetDetails,
+          subLabelWidth,
+          theme,
+          width,
+        ),
+      );
+    }
   }
 
   return lines;
@@ -382,10 +469,12 @@ function renderSkillsSection(analysis: ContextAnalysis, theme: Theme, width: num
     return lines;
   }
 
+  const skillNameWidth =
+    analysis.skills.length > 0 ? Math.max(...analysis.skills.map((s) => s.name.length)) : 0;
   for (const skill of analysis.skills) {
     lines.push(
       truncateToWidth(
-        `  ${theme.fg("text", skill.name)}  ${theme.fg("dim", padLeft(formatTokens(skill.tokens), 8))}`,
+        `  ${theme.fg("text", padRight(skill.name, skillNameWidth))}  ${theme.fg("dim", padLeft(formatTokens(skill.tokens), 8))}`,
         width,
       ),
     );
@@ -394,7 +483,53 @@ function renderSkillsSection(analysis: ContextAnalysis, theme: Theme, width: num
   return lines;
 }
 
+function renderSourceSummaryBar(
+  gs: Array<{ source: string; bulletCount: number }>,
+  _theme: Theme,
+  _width: number,
+): string | null {
+  if (gs.length === 0) return null;
+  const parts: string[] = [];
+  for (const s of gs) {
+    const label =
+      s.source === "default" ? "default" : s.source === "other" ? "extensions" : s.source;
+    parts.push(`${pluralize(s.bulletCount, "bullet", "bullets")} from ${label}`);
+  }
+  return parts.join(" · ");
+}
+
+function renderBulletLines(
+  bullets: string[],
+  full: boolean,
+  theme: Theme,
+  width: number,
+): string[] {
+  const previewLimit = full ? bullets.length : Math.min(6, bullets.length);
+  const lines: string[] = [];
+  for (let i = 0; i < previewLimit; i += 1) {
+    const rawText = bullets[i] ?? "";
+    const previewText = full || rawText.length <= 90 ? rawText : `${rawText.slice(0, 90)}…`;
+    const bullet = `${theme.fg("dim", "•")} ${theme.fg("text", previewText)}`;
+    if (full) {
+      lines.push(...wrapTextWithAnsi(bullet, Math.max(1, width - 2)).map((line) => `  ${line}`));
+    } else {
+      lines.push(truncateToWidth(`  ${bullet}`, width));
+    }
+  }
+  if (!full && bullets.length > previewLimit) {
+    lines.push(
+      truncateToWidth(
+        `  ${theme.fg("dim", `… and ${bullets.length - previewLimit} more — run /supi-context full`)}`,
+        width,
+      ),
+    );
+  }
+  return lines;
+}
+
 function renderGuidelinesSection(analysis: ContextAnalysis, theme: Theme, width: number): string[] {
+  const sourceSummary = renderSourceSummaryBar(analysis.guidelineSources, theme, width);
+
   const lines = [
     sectionHeader(
       `Guidelines (${pluralize(analysis.guidelineBullets.length, "bullet", "bullets")})`,
@@ -404,33 +539,16 @@ function renderGuidelinesSection(analysis: ContextAnalysis, theme: Theme, width:
     ),
   ];
 
+  if (sourceSummary) {
+    lines.push(truncateToWidth(`  ${theme.fg("dim", sourceSummary)}`, width));
+  }
+
   const bullets = analysis.guidelineBullets;
   if (bullets.length === 0) {
     return lines;
   }
 
-  const previewLimit = analysis.full ? bullets.length : Math.min(6, bullets.length);
-  for (let i = 0; i < previewLimit; i += 1) {
-    const rawText = bullets[i] ?? "";
-    const previewText =
-      analysis.full || rawText.length <= 90 ? rawText : `${rawText.slice(0, 90)}…`;
-    const bullet = `${theme.fg("dim", "•")} ${theme.fg("text", previewText)}`;
-    if (analysis.full) {
-      lines.push(...wrapTextWithAnsi(bullet, Math.max(1, width - 2)).map((line) => `  ${line}`));
-      continue;
-    }
-    lines.push(truncateToWidth(`  ${bullet}`, width));
-  }
-
-  if (!analysis.full && bullets.length > previewLimit) {
-    lines.push(
-      truncateToWidth(
-        `  ${theme.fg("dim", `… and ${bullets.length - previewLimit} more — run /supi-context full`)}`,
-        width,
-      ),
-    );
-  }
-
+  lines.push(...renderBulletLines(bullets, analysis.full, theme, width));
   return lines;
 }
 
@@ -442,11 +560,13 @@ function renderToolDefinitionsSection(
   const tools = [...analysis.toolDefinitions.tools].sort((a, b) => b.tokens - a.tokens);
   if (tools.length === 0) return [];
 
+  const hasSnippetDetails = analysis.toolSnippetDetails.length > 0;
+
   const lines: string[] = [];
   lines.push(
     sectionHeader(
       `Tool Definitions (${tools.length} active)`,
-      `${formatTokens(analysis.toolDefinitions.tokens)} tokens`,
+      `${formatTokens(analysis.toolDefinitions.tokens)} def tokens${hasSnippetDetails ? ` + ${formatTokens(sum(analysis.toolSnippetDetails.map((s) => s.tokens)))} snippet` : ""}`,
       theme,
       width,
     ),
@@ -454,8 +574,10 @@ function renderToolDefinitionsSection(
 
   const previewLimit = analysis.full ? tools.length : Math.min(5, tools.length);
   const nameWidth = Math.max(12, Math.min(18, Math.max(...tools.map((tool) => tool.name.length))));
-  const tokenWidth = 8;
-  const reserved = 2 + nameWidth + 2 + tokenWidth + 2;
+  const defTokenWidth = 8;
+  const snippetTokenWidth = hasSnippetDetails ? 10 : 0;
+  const reserved =
+    2 + nameWidth + 2 + defTokenWidth + 2 + (snippetTokenWidth ? snippetTokenWidth + 2 : 0);
   const descWidth = Math.max(12, width - reserved);
 
   for (let i = 0; i < previewLimit; i += 1) {
@@ -466,10 +588,14 @@ function renderToolDefinitionsSection(
         ? tool.description
         : `${tool.description.slice(0, 50)}…`;
     const description = truncateToWidth(previewDescription, descWidth);
-    const tokens = padLeft(formatTokens(tool.tokens), tokenWidth);
+    const defTokens = padLeft(formatTokens(tool.tokens), defTokenWidth);
+    const snippet = analysis.toolSnippetDetails.find((s) => s.name === tool.name);
+    const snippetCol = snippet
+      ? ` ${theme.fg("dim", padLeft(`+${formatTokens(snippet.tokens)}snip`, snippetTokenWidth))}`
+      : "";
     lines.push(
       truncateToWidth(
-        `  ${theme.fg("text", name)}  ${theme.fg("dim", description)}  ${theme.fg("dim", tokens)}`,
+        `  ${theme.fg("text", name)}  ${theme.fg("dim", description)}  ${theme.fg("dim", defTokens)}${snippetCol}`,
         width,
       ),
     );
@@ -479,6 +605,17 @@ function renderToolDefinitionsSection(
     lines.push(
       truncateToWidth(
         `  ${theme.fg("dim", `… and ${tools.length - previewLimit} more — run /supi-context full`)}`,
+        width,
+      ),
+    );
+  }
+
+  // Add a legend row for snippet column if any tools had snippets
+  if (hasSnippetDetails) {
+    const snippetTotal = sum(analysis.toolSnippetDetails.map((s) => s.tokens));
+    lines.push(
+      truncateToWidth(
+        `  ${theme.fg("dim", `→ total tool snippet tokens: ${formatTokens(snippetTotal)}`)}`,
         width,
       ),
     );

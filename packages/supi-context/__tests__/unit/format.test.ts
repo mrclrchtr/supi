@@ -31,12 +31,32 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
       skills: [{ name: "test-skill", tokens: 1_000 }],
       guidelines: 500,
       toolSnippets: 300,
+      toolSnippetDetails: [
+        { name: "read", tokens: 50 },
+        { name: "bash", tokens: 80 },
+      ],
+      guidelineSources: [
+        { source: "default", tokens: 200, bulletCount: 2 },
+        { source: "read", tokens: 100, bulletCount: 1 },
+        { source: "edit", tokens: 150, bulletCount: 3 },
+        { source: "other", tokens: 50, bulletCount: 1 },
+      ],
       appendText: 200,
     },
     injectedFiles: [{ file: "packages/foo/CLAUDE.md", turn: 3, tokens: 1_200, lines: 60 }],
     skills: [{ name: "test-skill", tokens: 1_000 }],
     guidelines: 500,
     guidelineBullets: [],
+    guidelineSources: [
+      { source: "default", tokens: 200, bulletCount: 2 },
+      { source: "read", tokens: 100, bulletCount: 1 },
+      { source: "edit", tokens: 150, bulletCount: 3 },
+      { source: "other", tokens: 50, bulletCount: 1 },
+    ],
+    toolSnippetDetails: [
+      { name: "read", tokens: 50 },
+      { name: "bash", tokens: 80 },
+    ],
     toolDefinitions: {
       count: 5,
       tokens: 2_500,

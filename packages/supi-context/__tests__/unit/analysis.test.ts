@@ -251,4 +251,89 @@ describe("analyzeContext", () => {
 
     expect(result.providerSections).toHaveLength(0);
   });
+
+  it("populates toolSnippetDetails from cached toolsnippets", () => {
+    mockFns.buildSessionContext.mockReturnValue({ messages: [] });
+
+    const cachedOptions = {
+      cwd: "/project",
+      toolSnippets: { read: "Read files", bash: "Run commands" },
+      promptGuidelines: [],
+    };
+
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
+      getSystemPrompt: () => "Guidelines:\n- Be concise\n",
+    });
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, cachedOptions);
+
+    expect(result.toolSnippetDetails).toHaveLength(2);
+    expect(result.toolSnippetDetails).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "read", tokens: expect.any(Number) }),
+        expect.objectContaining({ name: "bash", tokens: expect.any(Number) }),
+      ]),
+    );
+  });
+
+  it("classifies guidelines into source buckets from system prompt", () => {
+    mockFns.buildSessionContext.mockReturnValue({ messages: [] });
+
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
+      getSystemPrompt: () =>
+        [
+          "Base prompt",
+          "",
+          "Guidelines:",
+          "- Be concise in your responses",
+          "- Use read to examine files instead of cat or sed.",
+          "- Show file paths clearly when working with files",
+          "- Some custom guideline from an extension",
+        ].join("\n"),
+    });
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
+
+    expect(result.guidelineSources).toHaveLength(3);
+
+    const defaultSource = result.guidelineSources.find((s) => s.source === "default");
+    expect(defaultSource).toBeDefined();
+    expect(defaultSource?.bulletCount).toBe(2);
+
+    const readSource = result.guidelineSources.find((s) => s.source === "read");
+    expect(readSource).toBeDefined();
+    expect(readSource?.bulletCount).toBe(1);
+
+    const otherSource = result.guidelineSources.find((s) => s.source === "other");
+    expect(otherSource).toBeDefined();
+    expect(otherSource?.bulletCount).toBe(1);
+  });
+
+  it("returns empty guidelineSources when no guidelines in system prompt", () => {
+    mockFns.buildSessionContext.mockReturnValue({ messages: [] });
+
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
+      getSystemPrompt: () => "Just a base prompt without guidelines section",
+    });
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
+
+    expect(result.guidelineSources).toEqual([]);
+  });
+
+  it("returns empty toolSnippetDetails when no toolsnippets in cached options", () => {
+    mockFns.buildSessionContext.mockReturnValue({ messages: [] });
+
+    const ctx = makeCtx({
+      getContextUsage: () => ({ tokens: null, contextWindow: 8192, percent: null }),
+      getSystemPrompt: () => "",
+    });
+    const pi = createPiMock();
+    const result = analyzeContext(ctx as never, pi as never, undefined);
+
+    expect(result.toolSnippetDetails).toEqual([]);
+  });
 });
