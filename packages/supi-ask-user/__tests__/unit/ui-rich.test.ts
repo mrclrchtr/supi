@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { NormalizedQuestion } from "../src/types.ts";
+import type { NormalizedQuestion } from "../../src/types.ts";
 import {
   type RichCustomOptions,
   type RichUiHost,
   runRichQuestionnaire,
-} from "../src/ui/ui-rich.ts";
-import { makeRichFixture } from "./helpers.ts";
+} from "../../src/ui/ui-rich.ts";
+import { makeRichFixture } from "../helpers/index.ts";
 
 const mockRenderMarkdown = vi.hoisted(() =>
   vi.fn((text: string, _width: number, _theme: unknown, options?: { paddingX?: number }) => {
@@ -18,7 +18,7 @@ const mockRenderMarkdown = vi.hoisted(() =>
   }),
 );
 
-vi.mock("../src/render/ui-rich-render-markdown", () => ({
+vi.mock("../../src/render/ui-rich-render-markdown", () => ({
   renderMarkdown: mockRenderMarkdown,
   renderMarkdownPreview: mockRenderMarkdown,
 }));

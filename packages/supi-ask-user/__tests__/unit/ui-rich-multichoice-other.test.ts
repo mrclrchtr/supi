@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedQuestion } from "../src/types.ts";
-import { runRichQuestionnaire } from "../src/ui/ui-rich.ts";
-import { makeRichFixture } from "./helpers.ts";
+import type { NormalizedQuestion } from "../../src/types.ts";
+import { runRichQuestionnaire } from "../../src/ui/ui-rich.ts";
+import { makeRichFixture } from "../helpers/index.ts";
 
 const multichoiceWithOther: NormalizedQuestion = {
   id: "features",

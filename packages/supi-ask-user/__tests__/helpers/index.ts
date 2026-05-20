@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import type { RichUiHost } from "../src/ui/ui-rich.ts";
+import type { RichUiHost } from "../../src/ui/ui-rich.ts";
 
 export interface RichFixture<Outcome> {
   captured: { value: Component | undefined };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ActiveQuestionnaireLock, QuestionnaireFlow } from "../src/flow.ts";
-import type { NormalizedQuestion } from "../src/types.ts";
+import { ActiveQuestionnaireLock, QuestionnaireFlow } from "../../src/flow.ts";
+import type { NormalizedQuestion } from "../../src/types.ts";
 
 const choice = (id: string, header = id): NormalizedQuestion => ({
   id,

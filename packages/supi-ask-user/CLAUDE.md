@@ -57,5 +57,7 @@ pnpm exec biome check packages/supi-ask-user/
 
 ## Testing
 
+- Tests live in `__tests__/unit/` for focused fast tests.
+- Shared test utilities are in `__tests__/helpers/`.
 - `captured.value.handleInput?.(...)` + `captured.value.render(width)` — simplest rich-UI regression test pattern in this package.
 - When changing rich UI behavior, run the full suite: `pnpm vitest run packages/supi-ask-user/`
