@@ -7,7 +7,7 @@ describe("ask_user guidance", () => {
     expect(toolDescription).toContain("focused decision question");
     expect(promptSnippet).toContain("ask_user");
     expect(promptGuidelines.length).toBeGreaterThan(0);
-    expect(promptGuidelines[0]).toContain("ask_user");
+    expect(promptGuidelines.every((guideline) => guideline.includes("ask_user"))).toBe(true);
   });
 
   it("preserves compatibility re-exports from ask-user.ts", () => {

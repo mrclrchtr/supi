@@ -6,6 +6,8 @@ describe("supi_cache_forensics guidance", () => {
     expect(toolDescription).toContain("prompt cache regressions");
     expect(promptSnippet).toContain("supi_cache_forensics");
     expect(promptGuidelines.length).toBe(6);
-    expect(promptGuidelines[0]).toContain("supi_cache_forensics");
+    expect(promptGuidelines.every((guideline) => guideline.includes("supi_cache_forensics"))).toBe(
+      true,
+    );
   });
 });

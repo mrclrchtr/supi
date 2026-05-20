@@ -21,16 +21,27 @@ describe("supi-web guidance", () => {
     expect(promptSnippet).toContain("web_fetch_md");
 
     const guidelines = buildPromptGuidelines();
-    expect(guidelines.length).toBeGreaterThanOrEqual(4);
-    expect(guidelines[0]).toContain("web_fetch_md");
+    expect(guidelines.length).toBeGreaterThanOrEqual(5);
+    expect(
+      guidelines.every(
+        (guideline) => guideline.includes("web_fetch_md") || guideline.includes("bash"),
+      ),
+    ).toBe(true);
   });
 
   it("exports Context7 prompt surfaces", () => {
     expect(searchToolDescription).toContain("Context7");
     expect(searchPromptSnippet).toContain("web_docs_search");
-    expect(searchPromptGuidelines[0]).toContain("web_docs_search");
+    expect(searchPromptGuidelines.every((guideline) => guideline.includes("web_docs_search"))).toBe(
+      true,
+    );
     expect(fetchToolDescription).toContain("Context7");
     expect(fetchPromptSnippet).toContain("web_docs_fetch");
-    expect(fetchPromptGuidelines[0]).toContain("web_docs_fetch");
+    expect(
+      fetchPromptGuidelines.every(
+        (guideline) =>
+          guideline.includes("web_docs_fetch") || guideline.includes("web_docs_search"),
+      ),
+    ).toBe(true);
   });
 });

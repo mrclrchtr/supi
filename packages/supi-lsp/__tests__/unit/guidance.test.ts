@@ -8,12 +8,55 @@ import {
   formatDiagnosticsContext,
 } from "../../src/diagnostics/diagnostic-context.ts";
 import { LspManager } from "../../src/manager/manager.ts";
+import {
+  buildProjectGuidelines,
+  promptGuidelines,
+  promptSnippet,
+  toolDescription,
+} from "../../src/tool/guidance.ts";
 
 beforeEach(() => {
   clearTsconfigCache();
 });
 
 describe("LSP prompt guidance", () => {
+  it("exports prompt surfaces that name lsp explicitly", () => {
+    expect(toolDescription).toContain("Language Server Protocol tool");
+    expect(promptSnippet).toContain("lsp");
+    expect(promptGuidelines.every((guideline) => guideline.includes("lsp"))).toBe(true);
+  });
+
+  it("builds project guidelines with explicit lsp prefixes", () => {
+    const guidelines = buildProjectGuidelines(
+      [
+        {
+          name: "typescript",
+          status: "running",
+          root: process.cwd(),
+          fileTypes: ["ts", "tsx"],
+          supportedActions: ["diagnostics", "hover", "definition"],
+          openFiles: [],
+        },
+        {
+          name: "python",
+          status: "unavailable",
+          root: process.cwd(),
+          fileTypes: ["py"],
+          supportedActions: ["diagnostics"],
+          openFiles: [],
+        },
+      ],
+      process.cwd(),
+    );
+
+    expect(guidelines.some((guideline) => guideline.startsWith("lsp active: typescript"))).toBe(
+      true,
+    );
+    expect(guidelines.some((guideline) => guideline.startsWith("lsp unavailable: python"))).toBe(
+      true,
+    );
+  });
+
   it("formats diagnostics as xml extension context", () => {
     const content = formatDiagnosticsContext([
       {

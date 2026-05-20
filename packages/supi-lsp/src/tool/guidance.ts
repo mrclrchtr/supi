@@ -12,24 +12,25 @@ export const toolDescription = `Language Server Protocol tool — semantic code 
 
 Actions: hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, symbol_hover, recover.
 
-Line and character are 1-based. File paths are relative to cwd.`;
+Use lsp for type-driven navigation, definitions, references, diagnostics, workspace symbol search, renames, and code actions in files covered by an active server. Line and character are 1-based. File paths are relative to cwd.`;
 
 export const promptSnippet =
-  "Use `lsp` for semantic navigation, type information, references, renames, and code actions in supported languages.";
+  "lsp — semantic navigation, type information, diagnostics, references, renames, and code actions in supported files";
 
 export const actionGuidelines = [
+  "Use lsp.diagnostics(file?) to inspect current diagnostics for one file or the whole project when you need them on demand.",
   "Use lsp.hover(file, line, character) for type info, signatures, and documentation at a position.",
   "Use lsp.definition(file, line, character) to go to the definition of a symbol.",
   "Use lsp.references(file, line, character) to find all usages of a symbol.",
   "Use lsp.symbols(file) to list all top-level symbols in a single file.",
   "Use lsp.workspace_symbol(query) for pure LSP fuzzy symbol search across the project.",
-  "Use lsp.search(query) when you need a symbol search that falls back to text search if LSP has no results.",
+  "Use lsp.search(query) when you need a symbol search that falls back to text search if lsp has no semantic results.",
   "Use lsp.rename(file, line, character, newName) or lsp.code_actions(file, line, character) for renames and available fixes.",
-  "Use lsp.recover() to refresh cached diagnostics after workspace changes.",
+  "Use lsp.recover() to refresh cached diagnostics after workspace changes or suspicious stale results.",
 ];
 
 export const fallbackGuideline =
-  "Use lsp first for semantic questions in supported files. Diagnostics are already delivered automatically; call lsp when you need a specific lookup, code action, or recovery.";
+  "Use lsp first for semantic questions in supported files. lsp diagnostics are also surfaced automatically after relevant edits, so call lsp when you need a specific lookup, explicit diagnostic snapshot, code action, rename, or recovery.";
 
 export const promptGuidelines = [...actionGuidelines, fallbackGuideline];
 
@@ -46,7 +47,7 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
       const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(", ");
       const actions = server.supportedActions.join(", ");
       const actionText = actions.length > 0 ? ` | actions: ${actions}` : "";
-      return `LSP active: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
+      return `lsp active: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
     });
 
   const unavailable = servers
@@ -56,7 +57,7 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
   const dynamic: string[] = [...active];
   if (unavailable.length > 0) {
     dynamic.push(
-      `LSP unavailable: ${unavailable.join(", ")} — install servers to enable language intelligence`,
+      `lsp unavailable: ${unavailable.join(", ")} — install or enable those servers to extend lsp language coverage`,
     );
   }
 
