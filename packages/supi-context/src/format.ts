@@ -180,31 +180,118 @@ function renderCategoryBreakdown(analysis: ContextAnalysis, theme: Theme): strin
   return lines;
 }
 
-function renderContextFilesSection(analysis: ContextAnalysis, theme: Theme): string[] {
-  const files = analysis.systemPromptBreakdown.contextFiles;
+interface FileListSectionOptions {
+  title: string;
+  files: Array<{ path: string; tokens: number; lines: number; origin?: "global" | "project" }>;
+  systemTotal: number;
+  theme: Theme;
+  extraCol?: (f: {
+    path: string;
+    tokens: number;
+    lines: number;
+    origin?: "global" | "project";
+  }) => string;
+}
+
+function renderFileListSection(options: FileListSectionOptions): string[] {
+  const { title, files, systemTotal, theme, extraCol } = options;
   if (files.length === 0) return [];
+
+  const sorted = [...files].sort((a, b) => b.tokens - a.tokens);
+  const totalTokens = sorted.reduce((s, f) => s + f.tokens, 0);
+  const totalLines = sorted.reduce((s, f) => s + f.lines, 0);
 
   const lines: string[] = [];
   lines.push("");
-  lines.push(theme.fg("accent", "Context Files (system prompt)"));
-  for (const f of files) {
-    lines.push(`  ${theme.fg("text", f.path)}  ${theme.fg("dim", formatTokens(f.tokens))}`);
+  lines.push(
+    `${theme.fg("accent", title)}  ${theme.fg("dim", `${pluralize(sorted.length, "file", "files")}, ${formatTokens(totalTokens)} tokens (${pct(totalTokens, systemTotal)} of system prompt)`)}`,
+  );
+
+  const pathWidth = Math.max(30, ...sorted.map((f) => f.path.length));
+  const extraWidth = extraCol ? 10 : 0;
+  for (const f of sorted) {
+    const pathCol = padRight(f.path, pathWidth);
+    const lineCol = padLeft(`${f.lines} lines`, 10);
+    const tokenCol = padLeft(formatTokens(f.tokens), 8);
+    const pctCol = padLeft(pct(f.tokens, systemTotal), 7);
+    const extra = extraCol ? `  ${theme.fg("dim", extraCol(f))}` : "";
+    lines.push(
+      `  ${theme.fg("text", pathCol)}  ${theme.fg("dim", lineCol)}  ${theme.fg("dim", tokenCol)}${extra}  ${theme.fg("dim", pctCol)}`,
+    );
   }
+
+  if (sorted.length > 1) {
+    const totalPath = padRight("Total", pathWidth);
+    const totalLineCol = padLeft(`${totalLines} lines`, 10);
+    const totalTokenCol = padLeft(formatTokens(totalTokens), 8);
+    const totalExtra = extraCol ? `  ${theme.fg("dim", "        ")}` : "";
+    const totalPctCol = padLeft(pct(totalTokens, systemTotal), 7);
+    lines.push(`  ${theme.fg("dim", "─".repeat(pathWidth + 26 + extraWidth))}`);
+    lines.push(
+      `  ${theme.fg("text", totalPath)}  ${theme.fg("dim", totalLineCol)}  ${theme.fg("dim", totalTokenCol)}${totalExtra}  ${theme.fg("dim", totalPctCol)}`,
+    );
+  }
+
   return lines;
+}
+
+function renderInstructionFilesSection(analysis: ContextAnalysis, theme: Theme): string[] {
+  return renderFileListSection({
+    title: "Instruction Files (AGENTS.md / CLAUDE.md)",
+    files: analysis.systemPromptBreakdown.instructionFiles,
+    systemTotal: analysis.categories.systemPrompt,
+    theme,
+    extraCol: (f) => f.origin ?? "",
+  });
+}
+
+function renderContextFilesSection(analysis: ContextAnalysis, theme: Theme): string[] {
+  return renderFileListSection({
+    title: "Context Files (system prompt)",
+    files: analysis.systemPromptBreakdown.contextFiles,
+    systemTotal: analysis.categories.systemPrompt,
+    theme,
+  });
 }
 
 function renderInjectedFilesSection(analysis: ContextAnalysis, theme: Theme): string[] {
   const files = analysis.injectedFiles;
   if (files.length === 0) return [];
 
+  const sorted = [...files].sort((a, b) => b.tokens - a.tokens);
+  const totalTokens = sorted.reduce((s, f) => s + f.tokens, 0);
+  const totalLines = sorted.reduce((s, f) => s + f.lines, 0);
+  const grandTotal = analysis.totalTokens ?? 1;
+
   const lines: string[] = [];
   lines.push("");
-  lines.push(theme.fg("accent", "Context Files (injected · supi-claude-md)"));
-  for (const f of files) {
+  lines.push(
+    `${theme.fg("accent", "Context Files (injected · supi-claude-md)")}  ${theme.fg("dim", `${pluralize(sorted.length, "file", "files")}, ${formatTokens(totalTokens)} tokens`)}`,
+  );
+
+  const pathWidth = Math.max(30, ...sorted.map((f) => f.file.length));
+  for (const f of sorted) {
+    const pathCol = padRight(f.file, pathWidth);
+    const lineCol = padLeft(`${f.lines} lines`, 10);
+    const tokenCol = padLeft(formatTokens(f.tokens), 8);
+    const turnCol = padLeft(`turn ${f.turn}`, 8);
+    const pctCol = padLeft(pct(f.tokens, grandTotal), 7);
     lines.push(
-      `  ${theme.fg("text", f.file)}  ${theme.fg("dim", formatTokens(f.tokens))}  ${theme.fg("dim", `turn ${f.turn}`)}`,
+      `  ${theme.fg("text", pathCol)}  ${theme.fg("dim", lineCol)}  ${theme.fg("dim", tokenCol)}  ${theme.fg("dim", turnCol)}  ${theme.fg("dim", pctCol)}`,
     );
   }
+
+  if (sorted.length > 1) {
+    const totalPath = padRight("Total", pathWidth);
+    const totalLineCol = padLeft(`${totalLines} lines`, 10);
+    const totalTokenCol = padLeft(formatTokens(totalTokens), 8);
+    const totalPctCol = padLeft(pct(totalTokens, grandTotal), 7);
+    lines.push(`  ${theme.fg("dim", "─".repeat(pathWidth + 36))}`);
+    lines.push(
+      `  ${theme.fg("text", totalPath)}  ${theme.fg("dim", totalLineCol)}  ${theme.fg("dim", totalTokenCol)}  ${theme.fg("dim", "        ")}  ${theme.fg("dim", totalPctCol)}`,
+    );
+  }
+
   return lines;
 }
 
@@ -227,12 +314,28 @@ function renderSkillsSection(analysis: ContextAnalysis, theme: Theme): string[] 
 function renderGuidelinesAndTools(analysis: ContextAnalysis, theme: Theme): string[] {
   const lines: string[] = [];
   lines.push("");
+  const bulletCount = analysis.guidelineBullets.length;
   lines.push(
-    `${theme.fg("text", "Guidelines")}  ${theme.fg("dim", formatTokens(analysis.guidelines))}`,
+    `${theme.fg("text", `Guidelines (${pluralize(bulletCount, "bullet", "bullets")})`)}  ${theme.fg("dim", formatTokens(analysis.guidelines))}`,
   );
   lines.push(
     `${theme.fg("text", `Tool Definitions (${analysis.toolDefinitions.count} active)`)}  ${theme.fg("dim", formatTokens(analysis.toolDefinitions.tokens))}`,
   );
+  return lines;
+}
+
+function renderGuidelineDetails(analysis: ContextAnalysis, theme: Theme): string[] {
+  const bullets = analysis.guidelineBullets;
+  if (bullets.length === 0) return [];
+
+  const lines: string[] = [];
+  lines.push("");
+  lines.push(theme.fg("accent", "Guideline Details"));
+
+  for (const text of bullets) {
+    lines.push(`  ${theme.fg("dim", "•")} ${theme.fg("text", text)}`);
+  }
+
   return lines;
 }
 
@@ -269,10 +372,12 @@ export function formatContextReport(analysis: ContextAnalysis, theme: Theme): st
   lines.push(...renderGrid(analysis, theme));
   lines.push("");
   lines.push(...renderCategoryBreakdown(analysis, theme));
+  lines.push(...renderInstructionFilesSection(analysis, theme));
   lines.push(...renderContextFilesSection(analysis, theme));
   lines.push(...renderInjectedFilesSection(analysis, theme));
   lines.push(...renderSkillsSection(analysis, theme));
   lines.push(...renderGuidelinesAndTools(analysis, theme));
+  lines.push(...renderGuidelineDetails(analysis, theme));
   lines.push(...renderCompactionNote(analysis, theme));
   lines.push(...renderProviderSections(analysis, theme));
 

@@ -26,15 +26,17 @@ function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
     },
     systemPromptBreakdown: {
       base: 5_000,
-      contextFiles: [{ path: "CLAUDE.md", tokens: 3_000 }],
+      instructionFiles: [],
+      contextFiles: [{ path: "docs/readme.md", tokens: 3_000, lines: 120, origin: "project" }],
       skills: [{ name: "test-skill", tokens: 1_000 }],
       guidelines: 500,
       toolSnippets: 300,
       appendText: 200,
     },
-    injectedFiles: [{ file: "packages/foo/CLAUDE.md", turn: 3, tokens: 1_200 }],
+    injectedFiles: [{ file: "packages/foo/CLAUDE.md", turn: 3, tokens: 1_200, lines: 60 }],
     skills: [{ name: "test-skill", tokens: 1_000 }],
     guidelines: 500,
+    guidelineBullets: [],
     toolDefinitions: { count: 5, tokens: 2_500 },
     compaction: null,
     providerSections: [],
@@ -93,6 +95,46 @@ describe("formatContextReport", () => {
     const lines = formatContextReport(analysis, mockTheme);
 
     expect(lines.some((l) => l.includes("Context Files (system prompt)"))).toBe(true);
+    expect(lines.some((l) => l.includes("docs/readme.md"))).toBe(true);
+  });
+
+  it("omits instruction files section when empty", () => {
+    const analysis = makeAnalysis();
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("Instruction Files"))).toBe(false);
+  });
+
+  it("shows instruction files section when present", () => {
+    const analysis = makeAnalysis({
+      systemPromptBreakdown: {
+        ...makeAnalysis().systemPromptBreakdown,
+        instructionFiles: [
+          { path: "/project/AGENTS.md", tokens: 2_000, lines: 80, origin: "project" },
+          { path: "/project/CLAUDE.md", tokens: 1_500, lines: 60, origin: "project" },
+        ],
+      },
+    });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("Instruction Files"))).toBe(true);
+    expect(lines.some((l) => l.includes("AGENTS.md"))).toBe(true);
+    expect(lines.some((l) => l.includes("CLAUDE.md"))).toBe(true);
+  });
+
+  it("moves CLAUDE.md from context files to instruction files", () => {
+    const analysis = makeAnalysis({
+      systemPromptBreakdown: {
+        ...makeAnalysis().systemPromptBreakdown,
+        contextFiles: [{ path: "docs/readme.md", tokens: 500, lines: 20, origin: "project" }],
+        instructionFiles: [{ path: "CLAUDE.md", tokens: 1_000, lines: 40, origin: "global" }],
+      },
+    });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("Context Files (system prompt)"))).toBe(true);
+    expect(lines.some((l) => l.includes("Instruction Files"))).toBe(true);
+    expect(lines.some((l) => l.includes("docs/readme.md"))).toBe(true);
     expect(lines.some((l) => l.includes("CLAUDE.md"))).toBe(true);
   });
 
@@ -134,6 +176,42 @@ describe("formatContextReport", () => {
 
     expect(lines.some((l) => l.includes("Guidelines"))).toBe(true);
     expect(lines.some((l) => l.includes("Tool Definitions (5 active)"))).toBe(true);
+  });
+
+  it("shows guideline bullet count", () => {
+    const analysis = makeAnalysis({ guidelineBullets: ["Be helpful", "Use read for files"] });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("Guidelines (2 bullets)"))).toBe(true);
+  });
+
+  it("shows guideline details when bullets are present", () => {
+    const analysis = makeAnalysis({
+      guidelineBullets: ["Be helpful", "Use read for files", "Avoid rm -rf"],
+    });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("Guideline Details"))).toBe(true);
+    expect(lines.some((l) => l.includes("Be helpful"))).toBe(true);
+    expect(lines.some((l) => l.includes("Use read for files"))).toBe(true);
+  });
+
+  it("omits guideline details when no bullets", () => {
+    const analysis = makeAnalysis({ guidelineBullets: [] });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    expect(lines.some((l) => l.includes("Guideline Details"))).toBe(false);
+  });
+
+  it("shows all guideline bullets without truncation", () => {
+    const bullets = Array.from({ length: 10 }, (_, i) => `Bullet ${i + 1}`);
+    const analysis = makeAnalysis({ guidelineBullets: bullets });
+    const lines = formatContextReport(analysis, mockTheme);
+
+    for (const bullet of bullets) {
+      expect(lines.some((l) => l.includes(bullet))).toBe(true);
+    }
+    expect(lines.some((l) => l.includes("… and"))).toBe(false);
   });
 
   it("shows compaction note when applicable", () => {

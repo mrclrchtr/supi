@@ -182,8 +182,9 @@ describe("analyzeContext", () => {
     const pi = createPiMock();
     const result = analyzeContext(ctx as never, pi as never, cachedOptions);
 
-    expect(result.systemPromptBreakdown.contextFiles).toHaveLength(1);
-    expect(result.systemPromptBreakdown.contextFiles[0].path).toBe("AGENTS.md");
+    expect(result.systemPromptBreakdown.instructionFiles).toHaveLength(1);
+    expect(result.systemPromptBreakdown.instructionFiles[0].path).toBe("AGENTS.md");
+    expect(result.systemPromptBreakdown.contextFiles).toHaveLength(0);
     expect(result.systemPromptBreakdown.skills).toHaveLength(1);
     expect(result.systemPromptBreakdown.skills[0].name).toBe("test-skill");
     expect(result.systemPromptBreakdown.guidelines).toBeGreaterThan(0);

@@ -1,4 +1,5 @@
 // biome-ignore lint/nursery/noExcessiveLinesPerFile: analysis file is inherently large
+import { dirname, resolve } from "node:path";
 import {
   type BuildSystemPromptOptions,
   buildSessionContext,
@@ -10,6 +11,7 @@ import {
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
 import { getRegisteredContextProviders } from "@mrclrchtr/supi-core/api";
+
 import { deriveOptionsFromSystemPrompt, extractGuidelinesSection } from "./prompt-inference.ts";
 
 type AgentMessage = Parameters<typeof estimateTokens>[0];
@@ -26,12 +28,15 @@ export interface CategoryTokens {
 export interface ContextFileInfo {
   path: string;
   tokens: number;
+  lines: number;
+  origin: "global" | "project";
 }
 
 export interface InjectedFileInfo {
   file: string;
   turn: number;
   tokens: number;
+  lines: number;
 }
 
 export interface SkillInfo {
@@ -57,6 +62,7 @@ export interface ContextAnalysis {
   };
   systemPromptBreakdown: {
     base: number;
+    instructionFiles: ContextFileInfo[];
     contextFiles: ContextFileInfo[];
     skills: SkillInfo[];
     guidelines: number;
@@ -66,6 +72,7 @@ export interface ContextAnalysis {
   injectedFiles: InjectedFileInfo[];
   skills: SkillInfo[];
   guidelines: number;
+  guidelineBullets: string[];
   toolDefinitions: { count: number; tokens: number };
   compaction: { summarizedTurns: number } | null;
   providerSections: ContextProviderSection[];
@@ -239,16 +246,50 @@ function collectProviderData(): ContextProviderSection[] {
   return sections;
 }
 
+const INSTRUCTION_FILE_PATTERN = /^(AGENTS|CLAUDE|\.claude\.local)\.md$/i;
+
+function isInstructionFile(path: string): boolean {
+  const basename = path.replace(/\\/g, "/").split("/").pop() ?? "";
+  return INSTRUCTION_FILE_PATTERN.test(basename);
+}
+
+function determineOrigin(filePath: string, cwd: string): "global" | "project" {
+  const resolvedPath = resolve(cwd, filePath);
+  const fileDir = dirname(resolvedPath);
+  let current = cwd;
+  const root = resolve("/");
+  while (true) {
+    if (fileDir === current) return "project";
+    if (current === root) break;
+    const parent = resolve(current, "..");
+    if (parent === current) break;
+    current = parent;
+  }
+  return "global";
+}
+
 function computeContextFiles(
   promptOptions: BuildSystemPromptOptions | undefined,
-): ContextFileInfo[] {
-  const files: ContextFileInfo[] = [];
+  cwd: string,
+): { contextFiles: ContextFileInfo[]; instructionFiles: ContextFileInfo[] } {
+  const contextFiles: ContextFileInfo[] = [];
+  const instructionFiles: ContextFileInfo[] = [];
   if (promptOptions?.contextFiles) {
     for (const cf of promptOptions.contextFiles) {
-      files.push({ path: cf.path, tokens: estimateTextTokens(cf.content) });
+      const info: ContextFileInfo = {
+        path: cf.path,
+        tokens: estimateTextTokens(cf.content),
+        lines: cf.content.split("\n").length,
+        origin: determineOrigin(cf.path, cwd),
+      };
+      if (isInstructionFile(cf.path)) {
+        instructionFiles.push(info);
+      } else {
+        contextFiles.push(info);
+      }
     }
   }
-  return files;
+  return { contextFiles, instructionFiles };
 }
 
 function computeSkills(promptOptions: BuildSystemPromptOptions | undefined): SkillInfo[] {
@@ -262,12 +303,22 @@ function computeSkills(promptOptions: BuildSystemPromptOptions | undefined): Ski
   return skills;
 }
 
+function extractGuidelineBullets(guidelinesText: string | null): string[] {
+  if (!guidelinesText) return [];
+  return guidelinesText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("- "))
+    .map((line) => line.slice(2).trim());
+}
+
 function computeSystemPromptBreakdown(
   promptOptions: BuildSystemPromptOptions | undefined,
   systemPromptText: string,
   systemPromptTokens: number,
+  cwd: string,
 ): ContextAnalysis["systemPromptBreakdown"] {
-  const contextFiles = computeContextFiles(promptOptions);
+  const { contextFiles, instructionFiles } = computeContextFiles(promptOptions, cwd);
   const skills = computeSkills(promptOptions);
 
   const skillsTotal = skills.reduce((s, c) => s + c.tokens, 0);
@@ -289,6 +340,7 @@ function computeSystemPromptBreakdown(
 
   const knownSubtotal =
     contextFiles.reduce((s, c) => s + c.tokens, 0) +
+    instructionFiles.reduce((s, c) => s + c.tokens, 0) +
     skillsTotal +
     guidelines +
     toolSnippets +
@@ -297,7 +349,7 @@ function computeSystemPromptBreakdown(
 
   const base = Math.max(0, systemPromptTokens - knownSubtotal);
 
-  return { base, contextFiles, skills, guidelines, toolSnippets, appendText };
+  return { base, instructionFiles, contextFiles, skills, guidelines, toolSnippets, appendText };
 }
 
 function computeToolDefinitions(pi: ExtensionAPI): { count: number; tokens: number } {
@@ -353,7 +405,12 @@ export function extractInjectedContextFiles(messages: AgentMessage[]): InjectedF
       const innerContent = match[3];
       const key = `${file}::${turn}`;
       if (!seen.has(key)) {
-        seen.set(key, { file, turn, tokens: estimateTextTokens(innerContent) });
+        seen.set(key, {
+          file,
+          turn,
+          tokens: estimateTextTokens(innerContent),
+          lines: innerContent.split("\n").length,
+        });
       }
       match = regex.exec(content);
     }
@@ -403,10 +460,13 @@ export function analyzeContext(
     promptOptions,
     systemPromptText,
     scaling.categories.systemPrompt,
+    ctx.cwd,
   );
   const injectedFiles = extractInjectedContextFiles(apiView.messages);
   const toolDefinitions = computeToolDefinitions(pi);
   const compaction = detectCompaction(branch);
+
+  const guidelineBullets = extractGuidelineBullets(extractGuidelinesSection(systemPromptText));
 
   return {
     modelName: ctx.model?.name ?? ctx.model?.id ?? "No model selected",
@@ -423,6 +483,7 @@ export function analyzeContext(
     injectedFiles,
     skills: breakdown.skills,
     guidelines: breakdown.guidelines,
+    guidelineBullets,
     toolDefinitions,
     compaction,
     providerSections: collectProviderData(),

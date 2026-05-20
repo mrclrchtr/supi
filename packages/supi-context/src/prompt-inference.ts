@@ -1,4 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
 import type {
   BuildSystemPromptOptions,
   ExtensionCommandContext,
@@ -75,12 +74,28 @@ function deriveContextFiles(systemPrompt: string): Array<{ path: string; content
 
   const contextFiles: Array<{ path: string; content: string }> = [];
   const headingRegex = /^##\s+(.+)$/gm;
-  for (const match of projectContext.matchAll(headingRegex)) {
+
+  let match = headingRegex.exec(projectContext);
+  while (match !== null) {
     const filePath = match[1].trim();
-    if (!isLikelyContextFileHeading(filePath) || !existsSync(filePath)) {
-      continue;
+    const contentStart = match.index + match[0].length;
+
+    const nextMatch = headingRegex.exec(projectContext);
+    const contentEnd = nextMatch ? nextMatch.index : projectContext.length;
+
+    let content = projectContext.slice(contentStart, contentEnd);
+    if (content.startsWith("\n\n")) {
+      content = content.slice(2);
     }
-    contextFiles.push({ path: filePath, content: readFileSync(filePath, "utf-8") });
+    if (content.endsWith("\n\n")) {
+      content = content.slice(0, -2);
+    }
+
+    if (isLikelyContextFileHeading(filePath)) {
+      contextFiles.push({ path: filePath, content });
+    }
+
+    match = nextMatch;
   }
 
   return contextFiles;
@@ -111,21 +126,30 @@ export function deriveOptionsFromSystemPrompt(
   ctx: ExtensionCommandContext,
   cachedOptions: BuildSystemPromptOptions | undefined,
 ): BuildSystemPromptOptions | undefined {
+  const systemPrompt = ctx.getSystemPrompt();
+  const derivedFiles = deriveContextFiles(systemPrompt);
+  const derivedSkills = deriveSkills(systemPrompt);
+
   if (cachedOptions) {
-    return cachedOptions;
+    const hasFiles = cachedOptions.contextFiles && cachedOptions.contextFiles.length > 0;
+    const hasSkills = cachedOptions.skills && cachedOptions.skills.length > 0;
+    if (hasFiles && hasSkills) {
+      return cachedOptions;
+    }
+    return {
+      ...cachedOptions,
+      contextFiles: hasFiles ? cachedOptions.contextFiles : derivedFiles,
+      skills: hasSkills ? cachedOptions.skills : derivedSkills,
+    };
   }
 
-  const systemPrompt = ctx.getSystemPrompt();
-  const contextFiles = deriveContextFiles(systemPrompt);
-  const skills = deriveSkills(systemPrompt);
-
-  if (contextFiles.length === 0 && skills.length === 0) {
+  if (derivedFiles.length === 0 && derivedSkills.length === 0) {
     return undefined;
   }
 
   return {
     cwd: ctx.cwd,
-    contextFiles,
-    skills,
+    contextFiles: derivedFiles,
+    skills: derivedSkills,
   };
 }

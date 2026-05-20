@@ -133,9 +133,10 @@ describe("analyzeContext edge cases", () => {
       expect(result.skills).toHaveLength(1);
       expect(result.skills[0].name).toBe("find-docs");
       expect(result.guidelines).toBeGreaterThan(0);
-      expect(result.systemPromptBreakdown.contextFiles).toHaveLength(1);
-      expect(result.systemPromptBreakdown.contextFiles[0].path).toBe(agentsPath);
-      expect(result.systemPromptBreakdown.contextFiles[0].tokens).toBe(30);
+      expect(result.systemPromptBreakdown.instructionFiles).toHaveLength(1);
+      expect(result.systemPromptBreakdown.instructionFiles[0].path).toBe(agentsPath);
+      expect(result.systemPromptBreakdown.instructionFiles[0].tokens).toBe(3); // "placeholder" = 9 chars ≈ 3 tokens extracted from prompt text
+      expect(result.systemPromptBreakdown.contextFiles).toHaveLength(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
