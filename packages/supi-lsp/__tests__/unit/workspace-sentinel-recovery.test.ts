@@ -77,7 +77,7 @@ vi.mock("../../src/ui/renderer.ts", () => ({ registerLspMessageRenderer: vi.fn()
 vi.mock("../../src/diagnostics/diagnostic-display.ts", () => ({
   formatDiagnosticsDisplayContent: vi.fn(() => "display content"),
 }));
-vi.mock("../../src/workspace-sentinels.ts", () => ({
+vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({
   scanWorkspaceSentinels: mockFns.scanWorkspaceSentinels,
   syncWorkspaceSentinelSnapshot: mockFns.syncWorkspaceSentinelSnapshot,
   isWorkspaceRecoveryTrigger: mockFns.isWorkspaceRecoveryTrigger,

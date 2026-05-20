@@ -84,7 +84,7 @@ export function isPathRelevant(filePath: string, relevantPaths: string[], cwd: s
   });
 }
 
-import { isFileExcludedByTsconfig } from "./tsconfig-scope.ts";
+import { isFileExcludedByTsconfig } from "./config/tsconfig-scope.ts";
 
 /** Check whether a file path is inside the project tree (within cwd, not node_modules/.pnpm/out-of-tree).
  *  Does NOT check tsconfig exclusion — use `shouldIgnoreLspPath` for diagnostics/guidance filtering. */

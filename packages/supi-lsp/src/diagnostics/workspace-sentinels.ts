@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { FileChangeType, type FileEvent } from "./config/types.ts";
-import { fileToUri } from "./utils.ts";
+import { FileChangeType, type FileEvent } from "../config/types.ts";
+import { fileToUri } from "../utils.ts";
 
 const IGNORED_DIRECTORIES = new Set(["node_modules", ".pnpm", ".git", "dist", "coverage"]);
 const ROOT_LOCKFILES = ["pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb"];

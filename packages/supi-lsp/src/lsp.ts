@@ -63,7 +63,7 @@ import {
   isWorkspaceRecoveryTrigger,
   scanWorkspaceSentinels,
   syncWorkspaceSentinelSnapshot,
-} from "./workspace-sentinels.ts";
+} from "./diagnostics/workspace-sentinels.ts";
 
 const LspActionEnum = StringEnum([
   "hover",

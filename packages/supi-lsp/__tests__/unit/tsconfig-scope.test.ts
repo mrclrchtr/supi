@@ -2,7 +2,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { clearTsconfigCache, isFileExcludedByTsconfig } from "../../src/tsconfig-scope.ts";
+import { clearTsconfigCache, isFileExcludedByTsconfig } from "../../src/config/tsconfig-scope.ts";
 
 // Use the repo root as cwd — this matches how LspManager passes this.cwd
 const CWD = path.resolve(__dirname, "../../../../");

@@ -7,7 +7,7 @@ import {
   diffWorkspaceSentinelSnapshot,
   isWorkspaceRecoveryTrigger,
   scanWorkspaceSentinels,
-} from "../../src/workspace-sentinels.ts";
+} from "../../src/diagnostics/workspace-sentinels.ts";
 
 let tmpDir = "";
 

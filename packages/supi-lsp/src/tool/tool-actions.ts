@@ -18,7 +18,7 @@ import {
   normalizeLocations,
 } from "../format.ts";
 import type { LspManager } from "../manager/manager.ts";
-import { fallbackGrep } from "../search-fallback.ts";
+import { fallbackGrep } from "./search-fallback.ts";
 import { uriToFile } from "../utils.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ import type {
   SymbolInformation,
   WorkspaceEdit,
 } from "./config/types.ts";
-import type { GrepMatch } from "./search-fallback.ts";
+import type { GrepMatch } from "./tool/search-fallback.ts";
 import { isProjectSource } from "./summary.ts";
 import { uriToFile } from "./utils.ts";
 

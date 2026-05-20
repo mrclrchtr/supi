@@ -7,7 +7,7 @@ import {
   formatDiagnosticsContext,
 } from "../../src/diagnostics/diagnostic-context.ts";
 import { LspManager } from "../../src/manager/manager.ts";
-import { clearTsconfigCache } from "../../src/tsconfig-scope.ts";
+import { clearTsconfigCache } from "../../src/config/tsconfig-scope.ts";
 
 beforeEach(() => {
   clearTsconfigCache();
