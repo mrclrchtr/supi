@@ -6,7 +6,7 @@ describe("code_intel guidance", () => {
     expect(toolDescription).toContain("Code intelligence tool");
     expect(promptSnippet).toContain("code_intel");
     expect(promptGuidelines.length).toBeGreaterThan(0);
-    expect(promptGuidelines[0]).toContain("code_intel.brief");
+    expect(promptGuidelines[0]).toContain('action: "brief"');
     expect(
       promptGuidelines.every((guideline) =>
         /(code_intel|lsp|tree_sitter|read\/rg)/.test(guideline),

@@ -4,20 +4,18 @@ export const toolDescription = `Code intelligence tool — codebase orientation,
 
 Actions: brief, callers, callees, implementations, affected, pattern, index.
 
-Use code_intel before precise file-level drill-down when you need architecture overviews, project landmarks, call relationships, downstream impact, or bounded search. Coordinates are 1-based (line, character). Relative paths resolve from the session working directory. A leading @ on path/file is stripped automatically.`;
+Use code_intel to localize relevant files before precise drill-down: summarize a project/package/file, find callers/callees/implementations, estimate blast radius, or search within a scope. Prefer lsp for semantic info, tree_sitter for exact syntax, and read/rg once you know the file. line and character are 1-based and require file. pattern is literal unless regex is true; kind supports definition, export, or import. Relative paths resolve from cwd, and leading @ on path/file is stripped.`;
 
 export const promptGuidelines = [
-  "Use code_intel.brief(...) when you need architecture, ownership, or file/package intent before opening specific files.",
-  "Use code_intel.index() when you need a project layout, module map, or high-level landmarks.",
-  "Use code_intel.callers(...) when you need to know who invokes a symbol, and use code_intel.implementations(...) when you need concrete implementations of an interface or declaration.",
-  "Use code_intel.callees(...) when you need outgoing call relationships from a function or anchored position.",
-  "Use code_intel.affected(...) before edits when you need blast radius, downstream impact, or likely follow-up checks.",
-  "Use code_intel.pattern(...) for bounded text search within a path; code_intel.pattern treats `pattern` as literal by default, uses `regex: true` for regex, and accepts `kind` for definition/export/import filtering.",
-  "Use code_intel first when the relevant area of the codebase is not yet localized; switch to lsp, tree_sitter, or read/rg after code_intel narrows the target.",
-  "Use lsp instead of code_intel when you need type information, a symbol definition, references, renames, or a code action.",
-  "Use tree_sitter instead of code_intel when you need exact syntax nodes, parsed imports/exports, or AST queries.",
-  "Use read/rg instead of code_intel when you already know the exact file and just need raw text.",
+  'Use code_intel with `action: "brief"` for a project, package, directory, file, or anchored-position brief before opening more files.',
+  'Use code_intel with `action: "index"` for a project map, top-level directories, language mix, or landmark files.',
+  'Use code_intel with `action: "callers"` or `action: "implementations"` to find who invokes a symbol or which concrete types implement a declaration.',
+  'Use code_intel with `action: "callees"` for outgoing calls from a function or method at a known `file`, `line`, and `character`.',
+  'Use code_intel with `action: "affected"` before edits for blast radius, downstream modules, risk, and likely follow-up checks or tests.',
+  'Use code_intel with `action: "pattern"` for bounded search within a path; `pattern` is literal by default, set `regex: true` for regex, and use `kind: "definition" | "export" | "import"` for structured search.',
+  "Use code_intel with `file`, `line`, and `character` for anchored positions; do not pair `line` or `character` with `path`.",
+  "Use code_intel first when the area is not yet localized; switch to lsp for semantic info, tree_sitter for exact syntax, and read/rg for raw text once code_intel narrows the target.",
 ];
 
 export const promptSnippet =
-  "code_intel — orient yourself in the codebase before drilling into exact symbols, syntax nodes, or raw file text";
+  "code_intel — codebase orientation, callers/callees, blast radius, and scoped search before file drill-down";
