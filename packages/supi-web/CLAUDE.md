@@ -27,6 +27,10 @@ src/
 ├── temp-file.ts       # Temporary file helper for large content
 ├── context7-client.ts # Thin wrapper around @upstash/context7-sdk (lazy init, error mapping)
 ├── docs.ts            # Extension factory — registers web_docs_search + web_docs_fetch tools
+├── tool/
+│   ├── web-fetch-md-guidance.ts   # prompt surfaces for web_fetch_md
+│   ├── web-docs-search-guidance.ts # prompt surfaces for web_docs_search
+│   └── web-docs-fetch-guidance.ts  # prompt surfaces for web_docs_fetch
 └── index.ts           # Programmatic API exports reused by src/api.ts
 ```
 

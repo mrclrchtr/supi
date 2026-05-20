@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
-  fetchPromptGuidelines,
-  fetchPromptSnippet,
-  fetchToolDescription,
-  searchPromptGuidelines,
-  searchPromptSnippet,
-  searchToolDescription,
-} from "../../src/tool/docs-guidance.ts";
-import { buildPromptGuidelines, promptSnippet, toolDescription } from "../../src/tool/guidance.ts";
+  promptGuidelines as fetchPromptGuidelines,
+  promptSnippet as fetchPromptSnippet,
+  toolDescription as fetchToolDescription,
+} from "../../src/tool/web-docs-fetch-guidance.ts";
+import {
+  promptGuidelines as searchPromptGuidelines,
+  promptSnippet as searchPromptSnippet,
+  toolDescription as searchToolDescription,
+} from "../../src/tool/web-docs-search-guidance.ts";
+import {
+  buildPromptGuidelines,
+  promptSnippet,
+  toolDescription,
+} from "../../src/tool/web-fetch-md-guidance.ts";
 
 describe("supi-web guidance", () => {
   it("exports web_fetch_md prompt surfaces", () => {

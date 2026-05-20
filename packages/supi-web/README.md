@@ -87,3 +87,6 @@ If `CONTEXT7_API_KEY` is set, the SDK will use it automatically.
 - `src/convert.ts` — HTML-to-Markdown conversion
 - `src/context7-client.ts` — Context7 client wrapper
 - `src/temp-file.ts` — temp-file output helper
+- `src/tool/web-fetch-md-guidance.ts` — model-facing prompt surfaces for `web_fetch_md`
+- `src/tool/web-docs-search-guidance.ts` — model-facing prompt surfaces for `web_docs_search`
+- `src/tool/web-docs-fetch-guidance.ts` — model-facing prompt surfaces for `web_docs_fetch`

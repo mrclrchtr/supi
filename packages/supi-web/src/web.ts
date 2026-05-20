@@ -7,7 +7,11 @@ import { Type } from "typebox";
 import { htmlToMarkdown, wrapAsCodeBlock } from "./convert.ts";
 import { FetchError, fetchWithNegotiation, isValidHttpUrl } from "./fetch.ts";
 import { writeTempFile } from "./temp-file.ts";
-import { buildPromptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
+import {
+  buildPromptGuidelines,
+  promptSnippet,
+  toolDescription,
+} from "./tool/web-fetch-md-guidance.ts";
 
 const TOOL_NAME = "web_fetch_md";
 const TOOL_LABEL = "Web Fetch";

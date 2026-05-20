@@ -54,6 +54,22 @@ Preferred optional folders:
 - `session/` — per-session state, registries, persistence, runtime wiring
 - domain folders such as `actions/`, `client/`, `manager/`, `forensics/`, `monitor/`, `report/`
 
+### Tool guidance convention
+
+When a package registers model-callable tools with pi, keep model-facing tool guidance under `src/tool/`.
+
+Preferred pattern:
+- single custom tool → `src/tool/guidance.ts`
+- multiple custom tools → one guidance file per logical tool, such as `src/tool/<tool-name>-guidance.ts`
+- built-in tool overrides may export only the extra `promptGuidelines` they add on top of pi-owned metadata
+- packages with no registered tools should not add empty guidance modules
+
+Guidance modules should export the relevant prompt surfaces for that tool:
+- `toolDescription`
+- `promptSnippet`
+- `promptGuidelines`
+- optional dynamic builders such as `buildPromptGuidelines()` when the guidance depends on runtime or project state
+
 ### Prefer domain folders over generic buckets
 
 Prefer domain folders over `core/`, `shared/`, `misc/`, or other catch-all names. Use domain folders when files already share a prefix or responsibility boundary.
@@ -87,7 +103,7 @@ Prefer domain folders over `core/`, `shared/`, `misc/`, or other catch-all names
 | `supi-rtk` | stay flat unless it grows |
 | `supi-test-utils` | stay flat utility package |
 | `supi-tree-sitter` | hybrid: root surfaces + possible `tool/` / `session/` |
-| `supi-web` | stay flat unless it grows |
+| `supi-web` | mostly flat; use `tool/` for per-tool guidance files when multiple tools are present |
 
 ## Package-specific examples
 
@@ -127,4 +143,6 @@ Stay flat unless they grow:
 - `supi-debug`
 - `supi-rtk`
 - `supi-test-utils`
+
+Lightweight packages that may stay mostly flat while still using a focused `tool/` folder for guidance or tool-specific wiring:
 - `supi-web`

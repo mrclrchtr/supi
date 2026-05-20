@@ -29,7 +29,8 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 - Keep small packages flat; add `config/`, `tool/`, `ui/`, `session/`, or other domain folders only when the package size and responsibilities clearly justify them.
 - Current anchor examples: `supi-lsp` uses the hybrid large-package model; `supi-insights` uses the standard package-level test layout.
 - This convention is the default for new packages and for existing packages when they receive structural work.
-- Packages that should stay flat unless they grow: `supi`, `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-rtk`, `supi-test-utils`, `supi-web`.
+- Packages that should stay flat unless they grow: `supi`, `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-rtk`, `supi-test-utils`.
+- `supi-web` should stay mostly flat, but may use `src/tool/` for per-tool guidance files and other narrowly scoped tool-specific wiring.
 
 ## Commands
 

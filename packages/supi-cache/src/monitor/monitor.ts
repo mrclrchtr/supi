@@ -14,6 +14,7 @@ import { stripHumanDetail } from "../forensics/redact.ts";
 import { formatForensicsReport } from "../report/forensics.ts";
 import { type CacheReportSnapshot, formatCacheReport } from "../report/history.ts";
 import { registerCacheMonitorSettings } from "../settings-registration.ts";
+import { promptGuidelines, promptSnippet, toolDescription } from "../tool/guidance.ts";
 import { CacheMonitorState, type RegressionResult } from "./state.ts";
 import { formatCacheStatus } from "./status.ts";
 
@@ -226,11 +227,8 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
   pi.registerTool({
     name: "supi_cache_forensics",
     label: "Cache Forensics",
-    description:
-      "Investigate prompt cache regressions across historical PI sessions. " +
-      "Provides four query patterns: hotspots (worst drops), breakdown (cause tally), " +
-      "correlate (tools before regressions), and idle (long-gap regressions). " +
-      'Example: {"pattern": "hotspots", "since": "7d", "minDrop": 20}',
+    description: toolDescription,
+    promptSnippet,
     parameters: Type.Object({
       pattern: StringEnum(["hotspots", "breakdown", "correlate", "idle"], {
         description: "Query pattern",
@@ -254,14 +252,7 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
         }),
       ),
     }),
-    promptGuidelines: [
-      "Use `supi_cache_forensics` when the user asks about cache performance patterns, suspects idle-time cache expiry, or wants to understand what preceded a cache drop.",
-      "Prefer `pattern: 'breakdown'` for a quick overview of regression causes.",
-      "Use `pattern: 'hotspots'` with `minDrop: 20` or higher to surface the worst regressions.",
-      "Use `pattern: 'idle'` to detect cache drops caused by long gaps between turns.",
-      "Use `pattern: 'correlate'` to see which tool calls preceded regressions.",
-      "The tool returns shape fingerprints (param types and lengths), not raw file paths or command text.",
-    ],
+    promptGuidelines,
     // biome-ignore lint/complexity/useMaxParams: pi tool execute signature
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const config = loadCacheMonitorConfig(ctx.cwd);

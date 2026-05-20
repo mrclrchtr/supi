@@ -9,13 +9,15 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { Context7Error, getContext, searchLibrary } from "./context7-client.ts";
 import {
-  fetchPromptGuidelines,
-  fetchPromptSnippet,
-  fetchToolDescription,
-  searchPromptGuidelines,
-  searchPromptSnippet,
-  searchToolDescription,
-} from "./tool/docs-guidance.ts";
+  promptGuidelines as fetchPromptGuidelines,
+  promptSnippet as fetchPromptSnippet,
+  toolDescription as fetchToolDescription,
+} from "./tool/web-docs-fetch-guidance.ts";
+import {
+  promptGuidelines as searchPromptGuidelines,
+  promptSnippet as searchPromptSnippet,
+  toolDescription as searchToolDescription,
+} from "./tool/web-docs-search-guidance.ts";
 
 const SEARCH_TOOL_NAME = "web_docs_search";
 const SEARCH_TOOL_LABEL = "Web Docs Search";

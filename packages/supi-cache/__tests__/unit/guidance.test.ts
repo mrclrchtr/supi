@@ -1,0 +1,11 @@
+import { describe, expect, it } from "vitest";
+import { promptGuidelines, promptSnippet, toolDescription } from "../../src/tool/guidance.ts";
+
+describe("supi_cache_forensics guidance", () => {
+  it("exports non-empty prompt surfaces", () => {
+    expect(toolDescription).toContain("prompt cache regressions");
+    expect(promptSnippet).toContain("supi_cache_forensics");
+    expect(promptGuidelines.length).toBe(6);
+    expect(promptGuidelines[0]).toContain("supi_cache_forensics");
+  });
+});
