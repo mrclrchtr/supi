@@ -357,9 +357,6 @@ importers:
       '@earendil-works/pi-tui':
         specifier: '*'
         version: 0.74.0
-      '@mrclrchtr/supi-core':
-        specifier: workspace:*
-        version: link:../supi-core
       typebox:
         specifier: '*'
         version: 1.1.38

@@ -71,7 +71,7 @@ describe("tabSpinner extension", () => {
     expect(titles[titles.length - 1]).toBe("✓ π - my-project - foo");
   });
 
-  it("reacts to supi:working:start and supi:working:end events", async () => {
+  it("reacts to supi:working:start and supi:working:end events after session_start", async () => {
     const pi = createPiMock({ sessionName: "ws" });
     tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
 
@@ -103,30 +103,18 @@ describe("tabSpinner extension", () => {
       },
     });
 
-    // Establish currentCtx by starting and stopping the agent first
-    const startHandler = pi.handlers.get("agent_start")?.[0] as (
+    const sessionStart = pi.handlers.get("session_start")?.[0] as (
       event: unknown,
       context: unknown,
     ) => Promise<unknown>;
-    const endHandler = pi.handlers.get("agent_end")?.[0] as (
-      event: unknown,
-      context: unknown,
-    ) => Promise<unknown>;
-    await startHandler({}, ctx);
-    await endHandler({}, ctx);
-    vi.advanceTimersByTime(200);
-    titles.length = 0;
+    await sessionStart({}, ctx);
 
-    // Emit working start — spinner should resume because currentCtx is set
     pi.events.emit("supi:working:start", { source: "supi-review" });
-
-    // Advance timers for one tick
     vi.advanceTimersByTime(80);
     expect(titles.length).toBeGreaterThanOrEqual(1);
     const spinnerTitle = titles[titles.length - 1];
     expect(spinnerTitle).toBe("⠋ π - ws - tmp");
 
-    // Emit working end — decrement calls stop() which shows base title
     pi.events.emit("supi:working:end", { source: "supi-review" });
     expect(titles[titles.length - 1]).toBe("π - ws - tmp");
   });
@@ -181,6 +169,67 @@ describe("tabSpinner extension", () => {
     await shutdown({}, ctx);
     const lastTitle = titles[titles.length - 1];
     expect(lastTitle).toBe("π - tmp");
+  });
+
+  it("unregisters event-bus listeners on session_shutdown", async () => {
+    const pi = createPiMock({ sessionName: "after-reload" });
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const titles: string[] = [];
+    const ctx = makeCtx({
+      cwd: "/tmp",
+      ui: { setTitle: (title: string) => titles.push(title) },
+    });
+
+    const sessionStart = pi.handlers.get("session_start")?.[0] as (
+      event: unknown,
+      context: unknown,
+    ) => Promise<unknown>;
+    const shutdown = pi.handlers.get("session_shutdown")?.[0] as (
+      event: unknown,
+      context: unknown,
+    ) => Promise<unknown>;
+
+    await sessionStart({}, ctx);
+    await shutdown({}, ctx);
+    titles.length = 0;
+
+    pi.events.emit("supi:working:start", { source: "supi-review" });
+    vi.advanceTimersByTime(80);
+    expect(titles).toHaveLength(0);
+  });
+
+  it("does not crash when getSessionName becomes stale before shutdown cleanup runs", async () => {
+    const pi = createPiMock({ sessionName: "stale-test" });
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const titles: string[] = [];
+    const ctx = makeCtx({
+      cwd: "/tmp",
+      ui: { setTitle: (title: string) => titles.push(title) },
+    });
+
+    const sessionStart = pi.handlers.get("session_start")?.[0] as (
+      event: unknown,
+      context: unknown,
+    ) => Promise<unknown>;
+    const agentStart = pi.handlers.get("agent_start")?.[0] as (
+      event: unknown,
+      context: unknown,
+    ) => Promise<unknown>;
+
+    await sessionStart({}, ctx);
+    await agentStart({}, ctx);
+    vi.advanceTimersByTime(80);
+    expect(titles.at(-1)).toBe("⠋ π - stale-test - tmp");
+
+    (pi.getSessionName as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error("stale extension");
+    });
+
+    expect(() => {
+      vi.advanceTimersByTime(80);
+    }).not.toThrow();
   });
 
   it("pauses spinner on supi:ask-user:start and resumes on supi:ask-user:end", async () => {

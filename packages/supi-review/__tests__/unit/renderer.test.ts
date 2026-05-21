@@ -3,6 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { ReviewResult } from "../../src/types.ts";
 import { registerReviewRenderer } from "../../src/ui/renderer.ts";
 
+const snapshot = {
+  target: { kind: "working-tree" as const },
+  title: "Working tree changes",
+  changedFiles: ["src/auth.ts"],
+  diffText: "",
+  stats: { files: 1, additions: 1, deletions: 0 },
+};
+
 function createPiWithRenderer() {
   const renderers = new Map<string, (...args: unknown[]) => unknown>();
   const pi = {
@@ -44,10 +52,38 @@ function renderReview(result: ReviewResult, expanded = false): string {
 }
 
 describe("supi-review renderer", () => {
+  it("shows success output with synthesized-brief metadata", () => {
+    const output = renderReview({
+      kind: "success",
+      snapshot,
+      modelId: "anthropic/claude-sonnet-4",
+      brief: {
+        summary: "Refactor auth flow",
+        intendedOutcome: "Preserve auth semantics",
+        constraints: ["Keep the public API stable"],
+        focusAreas: ["Authentication", "Error handling"],
+        riskyFiles: ["src/auth.ts"],
+        unresolvedQuestions: [],
+        evidenceCount: 2,
+      },
+      output: {
+        findings: [],
+        overall_correctness: "patch is correct",
+        overall_explanation: "Looks good",
+        overall_confidence_score: 0.9,
+      },
+    });
+
+    expect(output).toContain("Model: anthropic/claude-sonnet-4");
+    expect(output).toContain("Summary: Refactor auth flow");
+    expect(output).toContain("Outcome: Preserve auth semantics");
+  });
+
   it("shows incorrect verdicts as warnings instead of success", () => {
     const output = renderReview({
       kind: "success",
-      target: { type: "custom", instructions: "Focus on correctness" },
+      snapshot,
+      modelId: "anthropic/claude-sonnet-4",
       output: {
         findings: [],
         overall_correctness: "patch is incorrect",
@@ -58,102 +94,40 @@ describe("supi-review renderer", () => {
 
     expect(output).toContain("[warning]●[/warning]");
     expect(output).toContain("[warning]patch is incorrect[/warning]");
-    expect(output).not.toContain("[success]patch is incorrect[/success]");
-  });
-
-  it("shows timeout without tmux-specific warnings", () => {
-    const output = renderReview({
-      kind: "timeout",
-      target: { type: "custom", instructions: "Focus on correctness" },
-      timeoutMs: 900_000,
-    });
-
-    expect(output).toContain("[warning]◆ Review Timed Out[/warning]");
-    expect(output).not.toContain("tmux");
   });
 
   it("shows timeout with partial output", () => {
     const output = renderReview({
       kind: "timeout",
-      target: { type: "custom", instructions: "Focus on correctness" },
+      snapshot,
+      modelId: "anthropic/claude-sonnet-4",
       timeoutMs: 900_000,
       partialOutput: "I reviewed the code and found issues with...",
     });
 
     expect(output).toContain("[warning]◆ Review Timed Out[/warning]");
     expect(output).toContain("Partial output:");
-    expect(output).toContain("I reviewed the code and found issues with...");
   });
 
-  it("shows failed result without tmux warnings", () => {
+  it("shows failed result details", () => {
     const output = renderReview({
       kind: "failed",
       reason: "Reviewer session error: API rate limit",
-      target: { type: "custom", instructions: "Focus on correctness" },
+      snapshot,
+      modelId: "anthropic/claude-sonnet-4",
     });
 
     expect(output).toContain("[error]◆ Review Failed[/error]");
     expect(output).toContain("API rate limit");
-    expect(output).not.toContain("tmux");
   });
 
-  it("shows canceled result without tmux warnings", () => {
+  it("shows canceled result", () => {
     const output = renderReview({
       kind: "canceled",
-      target: { type: "custom", instructions: "Focus on correctness" },
+      snapshot,
+      modelId: "anthropic/claude-sonnet-4",
     });
 
     expect(output).toContain("[warning]◆ Review Canceled[/warning]");
-    expect(output).not.toContain("tmux");
-  });
-
-  it("includes review brief context when present", () => {
-    const output = renderReview({
-      kind: "success",
-      target: { type: "custom", instructions: "Review auth middleware" },
-      brief: {
-        mode: "dynamic",
-        title: "Review: auth middleware",
-        summary: "Added JWT authentication",
-        intent: "Secure the API endpoints",
-        focus: "Token validation, error handling",
-        finalPrompt: "review this",
-      },
-      output: {
-        findings: [],
-        overall_correctness: "patch is correct",
-        overall_explanation: "Looks good",
-        overall_confidence_score: 0.9,
-      },
-    });
-
-    expect(output).toContain("Review mode: Dynamic");
-    expect(output).toContain("Added JWT authentication");
-    expect(output).toContain("Token validation, error handling");
-  });
-
-  it("includes standard profile info when brief has a profile", () => {
-    const output = renderReview({
-      kind: "success",
-      target: { type: "custom", instructions: "Security review" },
-      brief: {
-        mode: "standard",
-        title: "Security Review",
-        summary: "Focused security review",
-        intent: "Check for security issues",
-        focus: "Security",
-        profileId: "security",
-        finalPrompt: "review this",
-      },
-      output: {
-        findings: [],
-        overall_correctness: "patch is correct",
-        overall_explanation: "No issues found",
-        overall_confidence_score: 0.95,
-      },
-    });
-
-    expect(output).toContain("Review mode: Standard");
-    expect(output).toContain("[muted]Summary: Focused security review[/muted]");
   });
 });

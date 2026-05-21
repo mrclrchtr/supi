@@ -1,34 +1,51 @@
 import type { Model } from "@earendil-works/pi-ai";
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import type { ReviewBrief, ReviewTarget } from "../types.ts";
+import type { ReviewModelSelection, ReviewSnapshot, SynthesizedReviewBrief } from "../types.ts";
 
-/** Progress state exposed by the runner for widget integration. */
+/** Progress state exposed by review/synthesis runners for widget integration. */
 export interface ReviewProgress {
-  /** Number of agentic turns completed. */
+  /** Number of agent turns completed. */
   turns: number;
   /** Number of tool executions started. */
   toolUses: number;
-  /** Human-readable activity descriptions for active tools. */
+  /** Human-readable active tool descriptions. */
   activities: string[];
   /** Token usage stats, if available. */
   tokens?: { input: number; output: number; total: number };
 }
 
-export interface ReviewerInvocation {
+export type BriefSynthesisRunResult =
+  | { kind: "success"; brief: SynthesizedReviewBrief }
+  | { kind: "failed"; reason: string }
+  | { kind: "canceled" }
+  | { kind: "timeout"; timeoutMs: number };
+
+export interface BriefSynthesisInput {
+  snapshot: ReviewSnapshot;
+  evidence: Array<{ kind: string; reason: string; text: string }>;
+  note?: string;
+}
+
+export interface BriefSynthesisInvocation {
   prompt: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: Model<any>;
-  /** Model registry from the parent session — passed to createAgentSession
-   *  so that provider registrations, auth, and streaming work correctly. */
   modelRegistry?: ModelRegistry;
   cwd: string;
   signal?: AbortSignal;
-  target: ReviewTarget;
-  /** The approved review brief used to generate the prompt. */
-  brief?: ReviewBrief;
   timeoutMs?: number;
-  /** Callback for tool activity events (starts/ends) for widget integration. */
+  onProgress?: (progress: ReviewProgress) => void;
+}
+
+export interface ReviewInvocation {
+  prompt: string;
+  model: ReviewModelSelection;
+  modelRegistry?: ModelRegistry;
+  cwd: string;
+  signal?: AbortSignal;
+  snapshot: ReviewSnapshot;
+  brief: SynthesizedReviewBrief;
+  timeoutMs?: number;
   onToolActivity?: (event: { toolName: string; phase: "start" | "end" }) => void;
-  /** Callback for progress state updates (turn count, tool uses, tokens). */
   onProgress?: (progress: ReviewProgress) => void;
 }

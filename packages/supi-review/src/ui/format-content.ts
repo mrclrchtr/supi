@@ -15,6 +15,7 @@ function priorityLabel(priority: number): string {
   }
 }
 
+/** Format review results for the LLM-visible custom message content. */
 export function formatReviewContent(result: ReviewResult): string {
   switch (result.kind) {
     case "success":
@@ -37,21 +38,26 @@ function formatTimeoutContent(result: Extract<ReviewResult, { kind: "timeout" }>
 }
 
 function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>): string {
-  const output = result.output;
+  const { output } = result;
   const confidencePercent = Math.round(output.overall_confidence_score * 100);
-  const lines: string[] = ["## Code Review Result"];
+  const lines: string[] = ["## Code Review Result", "", `**Model:** ${result.modelId}`];
 
-  // Show the review request context (if brief is available)
   if (result.brief) {
-    lines.push("", "### Review Requested", "");
-    if (result.brief.mode === "standard" && result.brief.profileId) {
-      lines.push(`**Mode:** Standard (${result.brief.profileId})`);
-    } else {
-      lines.push("**Mode:** Dynamic");
-    }
+    lines.push("", "### Session-derived Brief", "");
     lines.push(`**Summary:** ${result.brief.summary}`);
-    lines.push(`**Intended outcome:** ${result.brief.intent}`);
-    lines.push(`**Focus areas:** ${result.brief.focus}`);
+    lines.push(`**Intended outcome:** ${result.brief.intendedOutcome}`);
+    if (result.brief.constraints.length > 0) {
+      lines.push("**Constraints:**");
+      lines.push(...result.brief.constraints.map((item) => `- ${item}`));
+    }
+    if (result.brief.focusAreas.length > 0) {
+      lines.push("**Focus areas:**");
+      lines.push(...result.brief.focusAreas.map((item) => `- ${item}`));
+    }
+    if (result.brief.riskyFiles.length > 0) {
+      lines.push("**Risky files:**");
+      lines.push(...result.brief.riskyFiles.map((item) => `- ${item}`));
+    }
   }
 
   lines.push("", `Verdict: ${output.overall_correctness} (confidence: ${confidencePercent}%)`);
@@ -68,14 +74,14 @@ function formatFindings(
   findings: Extract<ReviewResult, { kind: "success" }>["output"]["findings"],
 ): string[] {
   return findings.flatMap((finding, index) => {
-    const loc = finding.code_location;
+    const location = finding.code_location;
     const lineRange =
-      loc.line_range.start === loc.line_range.end
-        ? String(loc.line_range.start)
-        : `${loc.line_range.start}-${loc.line_range.end}`;
+      location.line_range.start === location.line_range.end
+        ? String(location.line_range.start)
+        : `${location.line_range.start}-${location.line_range.end}`;
     return [
       `#${index + 1} [${priorityLabel(finding.priority)}] ${finding.title}`,
-      `   ${loc.absolute_file_path}:${lineRange}`,
+      `   ${location.absolute_file_path}:${lineRange}`,
       `   ${finding.body}`,
     ];
   });

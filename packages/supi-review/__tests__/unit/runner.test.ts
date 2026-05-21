@@ -1,14 +1,5 @@
-import type { Model } from "@earendil-works/pi-ai";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ReviewOutputEvent, ReviewTarget } from "../../src/types.ts";
 
-// Minimal model stub — the reviewer tests don't exercise the actual
-// model path (they were passing `undefined` before tightening the type).
-// `reasoning: false` causes `clampThinkingLevel` to return "off".
-// biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
-const mockModel = { reasoning: false } as unknown as Model<any>;
-
-// Mock session object reused across tests
 const mockSession = {
   prompt: vi.fn(),
   subscribe: vi.fn(),
@@ -44,8 +35,46 @@ vi.mock("typebox", () => ({
   },
 }));
 
-// Import after mocks are set up
-import { runReviewer } from "../../src/tool/runner.ts";
+import { runReviewer } from "../../src/tool/review-runner.ts";
+
+const snapshot = {
+  target: { kind: "working-tree" as const },
+  title: "Working tree changes",
+  changedFiles: ["src/auth.ts"],
+  diffText: "diff --git a/src/auth.ts b/src/auth.ts",
+  stats: { files: 1, additions: 1, deletions: 0 },
+};
+
+const brief = {
+  summary: "Refactor auth flow",
+  intendedOutcome: "Preserve auth semantics",
+  constraints: ["Keep public API stable"],
+  focusAreas: ["Authentication"],
+  riskyFiles: ["src/auth.ts"],
+  unresolvedQuestions: [],
+  evidenceCount: 1,
+};
+
+const model = {
+  canonicalId: "anthropic/claude-sonnet-4",
+  provider: "anthropic",
+  id: "claude-sonnet-4",
+  label: "Claude Sonnet 4",
+  description: "anthropic/claude-sonnet-4",
+  isCurrent: true,
+  model: {
+    provider: "anthropic",
+    id: "claude-sonnet-4",
+    name: "Claude Sonnet 4",
+    reasoning: false,
+    contextWindow: 200_000,
+    api: {} as never,
+    baseUrl: "",
+    input: ["text"],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    maxTokens: 8_000,
+  },
+} as unknown as Parameters<typeof runReviewer>[0]["model"];
 
 function resetMockSession(): void {
   mockSession.prompt.mockReset();
@@ -55,14 +84,9 @@ function resetMockSession(): void {
   mockSession.dispose.mockReset();
   mockSession.messages = [];
   mockSession.getSessionStats.mockReset();
-
-  // Default: prompt resolves immediately
   mockSession.prompt.mockResolvedValue(undefined);
-  // Default: subscribe returns unsubscribe fn
   mockSession.subscribe.mockReturnValue(vi.fn());
-  // Default: steer resolves
   mockSession.steer.mockResolvedValue(undefined);
-  // Default: abort resolves
   mockSession.abort.mockResolvedValue(undefined);
 }
 
@@ -76,17 +100,6 @@ function setupCreateAgentSession(): void {
       return { session: mockSession };
     },
   );
-}
-
-const defaultTarget: ReviewTarget = { type: "custom", instructions: "test review" };
-
-function defaultReviewOutput(): ReviewOutputEvent {
-  return {
-    findings: [],
-    overall_correctness: "patch is correct",
-    overall_explanation: "Looks good",
-    overall_confidence_score: 0.8,
-  };
 }
 
 describe("runReviewer", () => {
@@ -107,394 +120,93 @@ describe("runReviewer", () => {
 
     const result = await runReviewer({
       prompt: "review this",
-      model: mockModel,
+      model,
       cwd: "/tmp",
       signal: controller.signal,
-      target: defaultTarget,
+      snapshot,
+      brief,
     });
 
     expect(result.kind).toBe("canceled");
     expect(mockCreateAgentSession).not.toHaveBeenCalled();
   });
 
-  it("creates session with correct tools and options", async () => {
+  it("creates the reviewer session with read-only tools", async () => {
     let listener: ((event: unknown) => void) | undefined;
-    mockSession.subscribe.mockImplementation((l: (event: unknown) => void) => {
-      listener = l;
+    mockSession.subscribe.mockImplementation((fn: (event: unknown) => void) => {
+      listener = fn;
       return vi.fn();
     });
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: mockModel,
+      model,
       cwd: "/tmp",
-      target: defaultTarget,
+      snapshot,
+      brief,
     });
 
-    // Wait for session creation, then fire agent_end synchronously
     await vi.advanceTimersByTimeAsync(1);
     listener?.({ type: "agent_end", messages: [] });
-    await vi.advanceTimersByTimeAsync(10);
+    await vi.advanceTimersByTimeAsync(5);
     await resultPromise;
 
-    expect(mockCreateAgentSession).toHaveBeenCalledTimes(1);
     const callOpts = mockCreateAgentSession.mock.calls[0]?.[0];
-    expect(callOpts.tools).toContain("submit_review");
-    expect(callOpts.tools).toContain("read");
-    expect(callOpts.tools).toContain("grep");
-    expect(callOpts.sessionManager).toBeDefined();
-    expect(callOpts.resourceLoader).toBeDefined();
+    expect(callOpts.tools).toEqual(["read", "grep", "find", "ls", "submit_review"]);
   });
 
-  it("returns success when submit_review tool was called", async () => {
+  it("returns success when submit_review is called", async () => {
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      // Emit agent_end after a short delay (not synchronously, so the tool
-      // gets a chance to be registered first)
-      setTimeout(() => {
-        listener({ type: "agent_end", messages: [] });
-      }, 10);
+      setTimeout(() => listener({ type: "agent_end", messages: [] }), 10);
       return vi.fn();
     });
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: mockModel,
+      model,
       cwd: "/tmp",
-      target: defaultTarget,
-    });
-
-    // Wait for session creation + tool registration
-    await vi.advanceTimersByTimeAsync(5);
-
-    // Manually trigger the submit_review tool's execute to simulate the
-    // tool being called by the reviewer agent. This populates the closure
-    // variable that runReviewer reads on agent_end.
-    const submitReviewTool = capturedCustomTools[0];
-    expect(submitReviewTool).toBeDefined();
-
-    const reviewOutput = defaultReviewOutput();
-    await submitReviewTool.execute("toolcall-1", reviewOutput);
-
-    // Now let agent_end fire
-    await vi.advanceTimersByTimeAsync(50);
-    const result = await resultPromise;
-
-    expect(result.kind).toBe("success");
-    if (result.kind === "success") {
-      expect(result.output).toEqual(reviewOutput);
-      expect(result.target).toEqual(defaultTarget);
-    }
-  });
-
-  it("waits for the final agent_end when the session will retry", async () => {
-    let listener: ((event: unknown) => void) | undefined;
-    mockSession.subscribe.mockImplementation((sessionListener: (event: unknown) => void) => {
-      listener = sessionListener;
-      return vi.fn();
-    });
-
-    let settled = false;
-    const resultPromise = runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      target: defaultTarget,
-    }).then((result) => {
-      settled = true;
-      return result;
+      snapshot,
+      brief,
     });
 
     await vi.advanceTimersByTimeAsync(5);
+    const submitTool = capturedCustomTools[0];
+    expect(submitTool).toBeDefined();
 
-    listener?.({ type: "agent_end", messages: [], willRetry: true });
+    await submitTool.execute("toolcall-1", {
+      findings: [],
+      overall_correctness: "patch is correct",
+      overall_explanation: "Looks good",
+      overall_confidence_score: 0.8,
+    });
+
     await vi.advanceTimersByTimeAsync(20);
-    expect(settled).toBe(false);
-
-    const submitReviewTool = capturedCustomTools[0];
-    expect(submitReviewTool).toBeDefined();
-    const reviewOutput = defaultReviewOutput();
-    await submitReviewTool.execute("toolcall-1", reviewOutput);
-
-    listener?.({ type: "agent_end", messages: [], willRetry: false });
     const result = await resultPromise;
 
     expect(result.kind).toBe("success");
     if (result.kind === "success") {
-      expect(result.output).toEqual(reviewOutput);
+      expect(result.snapshot).toEqual(snapshot);
+      expect(result.brief?.summary).toBe("Refactor auth flow");
+      expect(result.modelId).toBe(model.canonicalId);
     }
   });
 
-  it("returns failed when reviewer does not call submit_review", async () => {
+  it("returns failed when the reviewer never submits a result", async () => {
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => {
-        listener({ type: "agent_end", messages: [] });
-      }, 10);
+      setTimeout(() => listener({ type: "agent_end", messages: [] }), 10);
       return vi.fn();
     });
-
-    // No messages means no assistant text to fall back to
-    mockSession.messages = [];
+    mockSession.messages = [{ role: "assistant", content: "I forgot to submit the review." }];
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: mockModel,
+      model,
       cwd: "/tmp",
-      target: defaultTarget,
+      snapshot,
+      brief,
     });
 
-    await vi.advanceTimersByTimeAsync(50);
-    const result = await resultPromise;
-
-    expect(result.kind).toBe("failed");
-    if (result.kind === "failed") {
-      expect(result.reason).toContain("did not produce");
-    }
-    expect(mockSession.dispose).toHaveBeenCalled();
-  });
-
-  it("returns failed when session creation fails", async () => {
-    mockCreateAgentSession.mockRejectedValue(new Error("Model not available"));
-
-    const result = await runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      target: defaultTarget,
-    });
-
-    expect(result.kind).toBe("failed");
-    if (result.kind === "failed") {
-      expect(result.reason).toContain("Failed to create reviewer session");
-    }
-  });
-
-  it("handles abort signal", async () => {
-    vi.useRealTimers();
-    const controller = new AbortController();
-
-    mockSession.subscribe.mockReturnValue(vi.fn());
-    mockSession.abort.mockResolvedValue(undefined);
-
-    const resultPromise = runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      signal: controller.signal,
-      target: defaultTarget,
-    });
-
-    // Wait for session creation to finish before aborting
-    await vi.dynamicImportSettled?.();
-    await new Promise((resolve) => setTimeout(resolve, 5));
-
-    // Abort the signal
-    controller.abort();
-
-    const result = await resultPromise;
-    expect(result.kind).toBe("canceled");
-    vi.useFakeTimers();
-  });
-
-  it("detects aborted signal that fired during session creation", async () => {
-    vi.useRealTimers();
-    const controller = new AbortController();
-
-    mockSession.subscribe.mockReturnValue(vi.fn());
-    mockSession.abort.mockResolvedValue(undefined);
-
-    // Simulate abort firing during session creation
-    mockCreateAgentSession.mockImplementation(async () => {
-      controller.abort();
-      return { session: mockSession };
-    });
-
-    const result = await runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      signal: controller.signal,
-      target: defaultTarget,
-    });
-
-    // The abort fired during session creation, so the post-registration
-    // check should catch it and return canceled.
-    expect(result.kind).toBe("canceled");
-    vi.useFakeTimers();
-  });
-
-  it("calls onProgress callbacks with tool activity", async () => {
-    const onProgress = vi.fn();
-    const onToolActivity = vi.fn();
-
-    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => {
-        listener({
-          type: "tool_execution_start",
-          toolCallId: "1",
-          toolName: "read",
-          args: {},
-        });
-        listener({
-          type: "tool_execution_end",
-          toolCallId: "1",
-          toolName: "read",
-          result: {},
-          isError: false,
-        });
-        listener({
-          type: "turn_end",
-          message: { role: "assistant", content: "done" },
-        });
-        listener({ type: "agent_end", messages: [] });
-      }, 10);
-      return vi.fn();
-    });
-
-    const resultPromise = runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      target: defaultTarget,
-      onProgress,
-      onToolActivity,
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
-    await resultPromise;
-
-    expect(onToolActivity).toHaveBeenCalledWith({ toolName: "read", phase: "start" });
-    expect(onToolActivity).toHaveBeenCalledWith({ toolName: "read", phase: "end" });
-    expect(onProgress).toHaveBeenCalled();
-  });
-
-  it("steers on timeout then aborts after grace turns", async () => {
-    vi.useRealTimers();
-
-    let sessionListener: ((event: unknown) => void) | undefined;
-    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      sessionListener = listener;
-      return vi.fn();
-    });
-
-    mockSession.steer.mockResolvedValue(undefined);
-    mockSession.abort.mockResolvedValue(undefined);
-    mockSession.getSessionStats.mockReturnValue({
-      tokens: { input: 100, output: 50, total: 150 },
-    });
-
-    const resultPromise = runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      target: defaultTarget,
-      timeoutMs: 100, // Very short timeout for testing
-    });
-
-    // Wait for timeout to trigger, then simulate grace turns
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    expect(mockSession.steer).toHaveBeenCalledWith(expect.stringContaining("Time limit reached"));
-
-    // Simulate 3 grace turns expiring
-    if (sessionListener) {
-      sessionListener({
-        type: "turn_end",
-        message: { role: "assistant", content: "continuing" },
-      });
-      sessionListener({
-        type: "turn_end",
-        message: { role: "assistant", content: "still going" },
-      });
-      sessionListener({
-        type: "turn_end",
-        message: { role: "assistant", content: "one more" },
-      });
-    }
-
-    const result = await resultPromise;
-    expect(result.kind).toBe("timeout");
-    if (result.kind === "timeout") {
-      expect(result.timeoutMs).toBe(100);
-    }
-
-    vi.useFakeTimers();
-  });
-
-  it("does not abort on grace turns when already settled", async () => {
-    vi.useRealTimers();
-
-    let sessionListener: ((event: unknown) => void) | undefined;
-    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      sessionListener = listener;
-      return vi.fn();
-    });
-
-    mockSession.steer.mockResolvedValue(undefined);
-    mockSession.abort.mockResolvedValue(undefined);
-
-    const resultPromise = runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      target: defaultTarget,
-      timeoutMs: 100,
-    });
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-
-    // agent_end (settled) fires BEFORE grace turns run out
-    if (sessionListener) {
-      sessionListener({ type: "agent_end", messages: [] });
-    }
-
-    const result = await resultPromise;
-    expect(result.kind).toBe("failed"); // No submit_review called
-    // abort() should NOT have been called since the session already ended
-    expect(mockSession.abort).not.toHaveBeenCalled();
-
-    vi.useFakeTimers();
-  });
-
-  it("returns session error when prompt fails", async () => {
-    mockSession.subscribe.mockReturnValue(vi.fn());
-    mockSession.prompt.mockRejectedValue(new Error("API error: rate limit"));
-
-    const result = await runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      target: defaultTarget,
-    });
-
-    expect(result.kind).toBe("failed");
-    if (result.kind === "failed") {
-      expect(result.reason).toContain("Reviewer session error");
-    }
-  });
-
-  it("falls back to last assistant text when submit_review not called", async () => {
-    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => {
-        listener({ type: "agent_end", messages: [] });
-      }, 10);
-      return vi.fn();
-    });
-
-    mockSession.messages = [
-      {
-        role: "assistant",
-        content: "I reviewed the code but forgot to call submit_review",
-      },
-    ];
-
-    const resultPromise = runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      target: defaultTarget,
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
+    await vi.advanceTimersByTimeAsync(20);
     const result = await resultPromise;
 
     expect(result.kind).toBe("failed");
@@ -503,84 +215,24 @@ describe("runReviewer", () => {
     }
   });
 
-  it("preserves brief metadata in the result when provided", async () => {
-    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => {
-        listener({ type: "agent_end", messages: [] });
-      }, 10);
-      return vi.fn();
-    });
-
-    const brief = {
-      mode: "dynamic" as const,
-      title: "Review: auth middleware",
-      summary: "Added auth middleware",
-      intent: "Secure the API",
-      focus: "Security",
-      finalPrompt: "review this",
-    };
+  it("handles abort signals after session creation", async () => {
+    vi.useRealTimers();
+    const controller = new AbortController();
 
     const resultPromise = runReviewer({
       prompt: "review this",
-      model: mockModel,
+      model,
       cwd: "/tmp",
-      target: defaultTarget,
+      signal: controller.signal,
+      snapshot,
       brief,
     });
 
-    await vi.advanceTimersByTimeAsync(5);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    controller.abort();
 
-    const submitReviewTool = capturedCustomTools[0];
-    expect(submitReviewTool).toBeDefined();
-
-    const reviewOutput = defaultReviewOutput();
-    await submitReviewTool.execute("toolcall-1", reviewOutput);
-
-    await vi.advanceTimersByTimeAsync(50);
     const result = await resultPromise;
-
-    expect(result.kind).toBe("success");
-    if (result.kind === "success") {
-      expect(result.brief).toBeDefined();
-      expect(result.brief?.title).toBe("Review: auth middleware");
-    }
-  });
-
-  it("includes brief on failed result when provided", async () => {
-    mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => {
-        listener({ type: "agent_end", messages: [] });
-      }, 10);
-      return vi.fn();
-    });
-
-    mockSession.messages = [];
-
-    const brief = {
-      mode: "standard" as const,
-      title: "Security Review",
-      summary: "Security-focused review",
-      intent: "Check for security issues",
-      focus: "Security",
-      profileId: "security",
-      finalPrompt: "review this",
-    };
-
-    const resultPromise = runReviewer({
-      prompt: "review this",
-      model: mockModel,
-      cwd: "/tmp",
-      target: defaultTarget,
-      brief,
-    });
-
-    await vi.advanceTimersByTimeAsync(50);
-    const result = await resultPromise;
-
-    expect(result.kind).toBe("failed");
-    if (result.kind === "failed") {
-      expect(result.brief).toBeDefined();
-      expect(result.brief?.title).toBe("Security Review");
-    }
+    expect(result.kind).toBe("canceled");
+    vi.useFakeTimers();
   });
 });

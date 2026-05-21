@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-review
 
-Adds a guided `/supi-review` command to the [pi coding agent](https://github.com/earendil-works/pi) for structured code review.
+Adds an interactive `/supi-review` command to the [pi coding agent](https://github.com/earendil-works/pi) for session-aware code review.
 
 ## Install
 
@@ -22,58 +22,63 @@ After editing the source, run `/reload`.
 
 After install, pi gets one command:
 
-- `/supi-review` — launch an interactive review flow and render a structured review result
+- `/supi-review` — launch a guided review flow over a concrete git snapshot
 
-The reviewer runs in a managed child agent session with read-only review tools:
+The reviewer runs in managed child agent sessions:
 
-- `read`
-- `grep`
-- `find`
-- `ls`
-- `submit_review` (internal result-submission tool)
+- a **brief synthesizer** creates a structured review brief from the active session branch
+- a **read-only reviewer** inspects the selected snapshot and submits structured findings
 
 ## Review flow
 
 `/supi-review` walks you through:
 
-1. choose a review mode
-2. choose a review target
-3. build a review brief
-4. edit and approve the final review prompt
-5. run the review with a live progress widget
-6. show the result as a structured custom message
-7. optionally trigger an auto-fix follow-up turn
-
-## Review modes
-
-### Dynamic review
-
-You provide:
-
-- what changed
-- the intended outcome
-- what the reviewer should focus on
-
-The package turns that into a review brief and lets you edit the final prompt before the review starts.
-
-### Standard review
-
-You choose one of the built-in profiles:
-
-- `general`
-- `security`
-- `api-maintainability`
-
-The package builds the review brief from the selected profile and again lets you edit the final prompt before running.
+1. choose a review target
+2. choose the reviewer model
+3. optionally add a short note
+4. resolve the snapshot
+5. synthesize a review brief from the current session history
+6. preview the synthesized brief + prompt coverage
+7. run the review with a live progress widget
+8. show the structured result as a custom message
+9. if findings exist, hand off to the main agent so it can ask what to do next
 
 ## Review targets
 
-Current target presets:
+Current targets:
 
-- base branch diff
-- uncommitted changes
-- one commit
-- custom review instructions
+- working tree
+- branch diff vs a selected local base branch
+- one recent commit
+
+## Session-aware brief synthesis
+
+The generated review prompt is **not** just a static diff wrapper.
+
+Before the actual review starts, the package:
+
+- resolves the **active session branch into the current LLM-visible context**
+- extracts high-signal user/assistant/custom/compaction context from that resolved view
+- synthesizes a structured brief with:
+  - summary
+  - intended outcome
+  - constraints to preserve
+  - focus areas
+  - risky files
+  - unresolved questions
+
+The synthesizer also receives a bounded diff excerpt from the snapshot so it can reason about actual code changes, not just filenames.
+
+That synthesized brief is then combined with the git snapshot into the final reviewer prompt.
+
+## Model selection
+
+Every `/supi-review` run asks you to choose the reviewer model.
+
+- the picker only shows **scoped models** from Pi's `enabledModels` configuration
+- the current session model is preselected only when it is inside that scoped set
+- the selected model is used for both brief synthesis and the final review
+- no review model is persisted in settings
 
 ## Result shape
 
@@ -83,36 +88,25 @@ A successful review includes:
 - overall explanation
 - overall confidence score
 - structured findings with title, body, priority, confidence score, and code location
+- the synthesized brief that drove the review
 
 The renderer also handles failed, canceled, and timed-out reviews.
 
-## Settings
+When a successful review contains findings, `supi-review` also injects an agent-visible hidden follow-up message that asks the main agent to decide the next step with the user. If `ask_user` is available, the main agent is instructed to use it and offer:
 
-This package registers a **Review** section in `/supi-settings`.
-
-Available settings:
-
-- `reviewModel` — preselect the model used by `/supi-review`; empty means inherit the active session model
-- `maxDiffBytes` — maximum diff size before the prompt builder truncates the diff
-- `autoFix` — automatically send a follow-up user message to fix findings after a successful review with findings
-
-Defaults:
-
-```json
-{
-  "review": {
-    "reviewModel": "",
-    "maxDiffBytes": 100000,
-    "autoFix": false
-  }
-}
-```
+- Done
+- Fix all
+- Fix selected
+- Verify findings
 
 ## Source
 
 - `src/review.ts` — command orchestration and interactive flow
-- `src/ui.ts` — TUI selection and approval steps
-- `src/profiles.ts` — built-in review profiles
-- `src/runner.ts` — managed reviewer session
-- `src/settings.ts` — `/supi-settings` integration
-- `src/renderer.ts` — structured result rendering
+- `src/model.ts` — explicit model selection helpers
+- `src/git.ts` — git snapshot resolution
+- `src/history/collect.ts` — active-branch evidence extraction
+- `src/history/synthesize.ts` — brief synthesis orchestration
+- `src/target/packet.ts` — final reviewer packet builder
+- `src/tool/brief-runner.ts` — brief synthesis child session
+- `src/tool/review-runner.ts` — read-only reviewer child session
+- `src/ui/renderer.ts` — structured result rendering

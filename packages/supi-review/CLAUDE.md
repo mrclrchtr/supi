@@ -1,6 +1,6 @@
 # supi-review
 
-Automated code review via an in-process managed child session. Reviews are driven by a **review brief** assembled from user-provided inputs or a predefined profile.
+Session-aware code review via managed in-process child sessions.
 
 ## Commands
 
@@ -13,67 +13,93 @@ pnpm exec biome check packages/supi-review/
 
 ## Architecture
 
-The `/supi-review` command follows a **brief-driven** pipeline:
+The `/supi-review` command follows a **history-aware** pipeline:
 
-1. **Select mode** (dynamic or standard)
-2. **Select target** (uncommitted, base-branch, commit, custom)
-3. **Build brief** — from dynamic inputs (summary/intent/focus) or a profile
-4. **Approve brief** — the full prompt is shown via editor for editing and confirmation
-5. **Run reviewer** — child session executes with the approved prompt
-6. **Render results** — brief context + verdict + findings
+1. **Select target** — working tree, branch diff, or commit
+2. **Select model** — explicit every run from Pi's scoped model set; current session model is preselected only when it is scoped
+3. **Collect optional note** — user can steer the generated brief
+4. **Resolve snapshot** — concrete changed files + diff/show text
+5. **Collect session evidence** — from the active branch's resolved LLM-visible context
+6. **Synthesize brief** — child session turns history + snapshot metadata into a structured brief
+7. **Build review packet** — combine brief + snapshot into the final reviewer prompt
+8. **Preview and confirm** — show the synthesized brief and prompt coverage
+9. **Run reviewer** — read-only child session inspects the code and submits findings
+10. **Render results** — synthesized brief context + verdict + findings
+11. **Main-agent handoff** — if findings exist, inject a hidden follow-up instruction so the main agent asks the user what to do next
 
-### Review brief
+### Core types
 
-The `ReviewBrief` type (in `types.ts`) captures the review request independently from the git target. It includes the mode, title, summary, intent, focus, optional profile ID, and the final assembled prompt. The brief flows through the runner and is attached to the result for rendering.
-
-### Profiles
-
-Three starter profiles are defined in `profiles.ts`:
-- `general` — standard correctness, security, performance, maintainability
-- `security` — focused on injection risks, auth, secrets, data validation
-- `api-maintainability` — focused on API design, breaking changes, consistency
-
-Each profile has optional system-prompt guidance injected into the reviewer child session.
+- `ReviewTargetSpec` — selected git target (`working-tree` | `branch` | `commit`)
+- `ReviewSnapshot` — fully resolved git snapshot (title, changed files, diff text, stats)
+- `HistoryEvidence` — scored evidence extracted from the active session branch
+- `SynthesizedReviewBrief` — structured intent inferred from the current session
+- `ReviewPacket` — final reviewer prompt plus included/omitted file coverage
+- `ReviewPlan` — model + snapshot + synthesized brief + reviewer packet
+- `ReviewResult` — success / failed / canceled / timeout result for the review run
 
 ### Package structure
 
 ```text
 src/
-  review.ts          Command registration, orchestration, model resolution
-  types.ts           ReviewResult, ReviewTarget, ReviewBrief, ReviewMode, ReviewProfile
-  profiles.ts        Fixed starter set of standard review profiles
-  briefs.ts          Dynamic/standard brief construction and prompt assembly
-  prompts.ts         Target preamble and diff formatting
-  settings.ts        Review model, diff size, and auto-fix settings
-  git.ts             Git diff/commit/branch helpers
-  api.ts             Package root re-export
-  index.ts           Package root re-export
-  extension.ts       Extension entrypoint re-export
-  ui/
-    ui.ts            TUI selection lists, input collection, brief editing
-    renderer.ts      Custom message rendering with brief context
-    format-content.ts Plain-text format for LLM content of review messages
-    progress-widget.ts Live progress widget (CancellableLoader + stats)
+  review.ts             Command registration + orchestration
+  types.ts              ReviewSnapshot, SynthesizedReviewBrief, ReviewResult, etc.
+  model.ts              Explicit model-selection helpers
+  git.ts                Git diff/commit/branch helpers + snapshot resolution
+  history/
+    collect.ts          Active-branch evidence extraction and scoring
+    synthesize.ts       Brief synthesis prompt builder + runner orchestration
+  target/
+    packet.ts           Reviewer prompt packet builder with file-aware diff packing
   tool/
-    runner.ts        Child-session creation, progress tracking, timeout handling
-    runner-types.ts  ReviewerInvocation and ReviewProgress interfaces
-    target-resolution.ts Lazy target hydration from git
+    brief-runner.ts     Brief synthesis child session
+    review-runner.ts    Read-only reviewer child session
+    runner-types.ts     Shared runner progress/result types
+    schemas.ts          TypeBox schemas for submit_review[_brief]
+  ui/
+    flow.ts             TUI selection + preview steps
+    progress-widget.ts  Live progress widget for child sessions
+    renderer.ts         Custom message rendering with brief context
+    format-content.ts   Plain-text message content for LLM context
 __tests__/
-  unit/              Unit tests
+  unit/
 ```
 
-### Reviewer in-process session design
+## Key design decisions
 
-- The reviewer runs as an in-process managed child session via `createAgentSession()` with `SessionManager.inMemory()`.
-- The `submit_review` custom tool is registered via `customTools` on the session, storing the validated result in a closure variable. The tool uses TypeBox schema matching `ReviewOutputEvent` and sets `terminate: true`.
-- Session tools are restricted to `read, grep, find, ls, submit_review`. Skills, themes, and prompt templates are disabled, but **extensions and context files (e.g. CLAUDE.md) are enabled** so the reviewer inherits the same project guidance as the main agent.
-- The reviewer session uses `DefaultResourceLoader` with `appendSystemPrompt` containing the review instructions (from `buildReviewerSystemPrompt()` plus any profile-specific guidance). No `--print` or CLI args are used.
-- All review targets carry an optional `changedFiles` list (git filenames) rendered in the preamble. This gives the reviewer immediate scope context even for custom reviews where no diff is present.
-- Model resolution: `resolveReviewerModel()` splits the canonical model ID (`provider/model-id`) and calls `ModelRegistry.find(provider, modelId)` to obtain a `Model<any>` object for the session.
-- Live progress is shown via `ReviewProgressWidget` (extends `Container` with `CancellableLoader`). The widget updates in real-time from `session.subscribe()` events — tool starts/ends, turn counts, and token stats.
-- Graceful timeout: soft limit triggers `session.steer("Time limit reached…")`, then 3 grace turns before `session.abort()`.
-- Cancellation: `signal.addEventListener("abort")` wires to `session.abort()`, returning `kind: "canceled"`.
-- `AgentSessionEvent` typings may omit `agent_end.willRetry` in some package-local PI installs; `tool/runner.ts` should treat `willRetry` as an optional runtime field and ignore retrying end events.
-- `ReviewerInvocation` type uses `model: Model<any> | undefined` (resolved model object, not string). No `onSessionStart` callback.
-- `ReviewResult` types: no `warning`, `stdout`, or `stderr` fields. Timeout result has `partialOutput` for final assistant text on abort. Success and failure results carry the optional `brief` field with the review brief metadata.
-- Emits `pi.events.emit("supi:working:start", { source: "supi-review" })` before the review begins and `supi:working:end` in the finish callback (covers success, failed, canceled, timeout) so the tab spinner stays active while the reviewer is running.
+- **No review settings surface** — no `/supi-settings` integration, no persisted review model
+- **Model selection is mandatory per run** — the user chooses the model every time from Pi's scoped `enabledModels` set
+- **No presets/depth UI** — the important input is the current session history, not a generic canned mode
+- **No editable raw prompt step** — the user previews the synthesized brief, not a hand-edited prompt blob
+- **Snapshot first** — review targets are fully resolved before synthesis/review starts; no lazy target hydration
+- **Active branch only** — evidence extraction uses `buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId())` so compaction and branch-summary semantics match the actual LLM-visible context
+- **Read-only review session** — reviewer tools are restricted to `read`, `grep`, `find`, `ls`, and `submit_review`
+- **Minimal synthesis session** — brief synthesis uses only `submit_review_brief` and no context files/extensions/skills/themes
+
+## Child-session design
+
+### Brief synthesis session
+
+- created with `createAgentSession()` + `SessionManager.inMemory()`
+- tools: `submit_review_brief` only
+- resource loader disables extensions, skills, prompt templates, themes, and context files
+- output schema: summary, intendedOutcome, constraints, focusAreas, riskyFiles, unresolvedQuestions
+- timeout returns `kind: "timeout"`; no graceful wrap-up phase
+
+### Review session
+
+- created with `createAgentSession()` + `SessionManager.inMemory()`
+- tools: `read`, `grep`, `find`, `ls`, `submit_review`
+- resource loader keeps project context files enabled so the reviewer inherits repo guidance
+- live progress comes from `session.subscribe()` events (turns, tool activity, token stats)
+- soft timeout steers the model to finish, then aborts after grace turns if needed
+
+## Gotchas
+
+- `ctx.sessionManager` in extension contexts is read-only; use `getBranch()` and derive any extra views yourself
+- `custom_message` entries remain high-signal session evidence because they survive in the resolved session context as `custom` messages
+- Compaction and branch summaries must be respected through the resolved session context; do not score raw pre-compaction entries directly
+- `buildBriefSynthesisPrompt()` must include a bounded diff excerpt so the synthesizer can see actual code changes, not just filenames/stats
+- `buildReviewPacket()` is file-aware and explicitly lists omitted files; avoid reintroducing whole-diff middle truncation
+- Review results carry `snapshot`, `brief`, and `modelId`; renderers and plain-text formatting should use those instead of older prompt-centric metadata
+- The visible `supi-review` custom message is followed by a hidden `supi-review-followup` custom message when findings exist; its content instructs the main agent to ask the user what to do next, preferably via `ask_user`
+- Keep the final custom message content concise and structured: plain text in `content`, richer data in `details`

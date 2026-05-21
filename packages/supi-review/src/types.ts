@@ -1,15 +1,18 @@
-// TypeScript interfaces for structured review output.
+import type { Model } from "@earendil-works/pi-ai";
 
+/** Inclusive 1-based line range reported by the reviewer. */
 export interface ReviewLineRange {
   start: number;
   end: number;
 }
 
+/** File location reported by the reviewer. */
 export interface ReviewCodeLocation {
   absolute_file_path: string;
   line_range: ReviewLineRange;
 }
 
+/** Structured finding returned by the reviewer session. */
 export interface ReviewFinding {
   title: string;
   body: string;
@@ -18,6 +21,7 @@ export interface ReviewFinding {
   code_location: ReviewCodeLocation;
 }
 
+/** Final review payload submitted by the reviewer child session. */
 export interface ReviewOutputEvent {
   findings: ReviewFinding[];
   overall_correctness: string;
@@ -25,68 +29,103 @@ export interface ReviewOutputEvent {
   overall_confidence_score: number;
 }
 
-export type ReviewTarget =
-  | { type: "base-branch"; branch: string; diff: string; changedFiles?: string[] }
-  | { type: "uncommitted"; diff: string; changedFiles?: string[] }
-  | { type: "commit"; sha: string; show: string; changedFiles?: string[] }
-  | { type: "custom"; instructions: string; changedFiles?: string[] };
+/** User-selected review target. */
+export type ReviewTargetSpec =
+  | { kind: "working-tree" }
+  | { kind: "branch"; base: string }
+  | { kind: "commit"; sha: string };
 
-// ── Review modes and profiles ───────────────────────────────
-
-/** Standard vs dynamic review mode. */
-export type ReviewMode = "standard" | "dynamic";
-
-/**
- * A review profile definition for standard reviews.
- * Each profile provides a named set of review focus areas
- * and optional system prompt guidance for the reviewer session.
- */
-export interface ReviewProfile {
-  id: string;
-  label: string;
-  description: string;
-  /**
-   * Additional system-prompt guidance injected into the
-   * reviewer child session for this type of review.
-   */
-  systemPrompt: string;
+/** Diff statistics for a resolved snapshot. */
+export interface DiffStats {
+  files: number;
+  additions: number;
+  deletions: number;
 }
 
-/**
- * A review brief captures what the user wants the reviewer to examine.
- * It is assembled before the child reviewer session starts and
- * influences both the prompt and the final result rendering.
- */
-export interface ReviewBrief {
-  mode: ReviewMode;
-  /** Human-readable title for the review (e.g. "Review: auth middleware"). */
+/** Concrete git snapshot resolved before synthesis/review starts. */
+export interface ReviewSnapshot {
+  target: ReviewTargetSpec;
   title: string;
-  /** Summary of what changed (dynamic) or profile description (standard). */
+  changedFiles: string[];
+  diffText: string;
+  stats: DiffStats;
+}
+
+/** One evidence item extracted from the active session branch. */
+export interface HistoryEvidence {
+  kind: "user" | "assistant" | "custom" | "compaction" | "branch-summary";
+  text: string;
+  score: number;
+  reason: string;
+}
+
+/** Model picked explicitly for the current review run. */
+export interface ReviewModelSelection {
+  canonicalId: string;
+  provider: string;
+  id: string;
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
+  model: Model<any>;
+  label: string;
+  description?: string;
+  isCurrent: boolean;
+}
+
+/** Structured brief synthesized from the current session history. */
+export interface SynthesizedReviewBrief {
   summary: string;
-  /** Intended outcome of the change being reviewed. */
-  intent: string;
-  /** Focus areas or risk areas for the reviewer to examine. */
-  focus: string;
-  /** Profile id when mode === "standard", undefined otherwise. */
-  profileId?: string;
-  /** The assembled final prompt text sent to the reviewer. */
-  finalPrompt: string;
+  intendedOutcome: string;
+  constraints: string[];
+  focusAreas: string[];
+  riskyFiles: string[];
+  unresolvedQuestions: string[];
+  note?: string;
+  evidenceCount: number;
 }
 
-export interface ReviewSettings {
-  reviewModel: string;
-  maxDiffBytes: number;
-  autoFix: boolean;
+/** Final prompt packet passed to the reviewer child session. */
+export interface ReviewPacket {
+  prompt: string;
+  includedFiles: string[];
+  omittedFiles: string[];
+  charBudget: number;
 }
 
+/** Fully prepared review run. */
+export interface ReviewPlan {
+  model: ReviewModelSelection;
+  snapshot: ReviewSnapshot;
+  brief: SynthesizedReviewBrief;
+  packet: ReviewPacket;
+}
+
+/** Result of the review child session. */
 export type ReviewResult =
-  | { kind: "success"; output: ReviewOutputEvent; target: ReviewTarget; brief?: ReviewBrief }
-  | { kind: "failed"; reason: string; target: ReviewTarget; brief?: ReviewBrief }
-  | { kind: "canceled"; target: ReviewTarget; brief?: ReviewBrief }
+  | {
+      kind: "success";
+      output: ReviewOutputEvent;
+      snapshot: ReviewSnapshot;
+      brief?: SynthesizedReviewBrief;
+      modelId: string;
+    }
+  | {
+      kind: "failed";
+      reason: string;
+      snapshot: ReviewSnapshot;
+      brief?: SynthesizedReviewBrief;
+      modelId: string;
+    }
+  | {
+      kind: "canceled";
+      snapshot: ReviewSnapshot;
+      brief?: SynthesizedReviewBrief;
+      modelId: string;
+    }
   | {
       kind: "timeout";
-      target: ReviewTarget;
+      snapshot: ReviewSnapshot;
       timeoutMs: number;
       partialOutput?: string;
-      brief?: ReviewBrief;
+      brief?: SynthesizedReviewBrief;
+      modelId: string;
     };

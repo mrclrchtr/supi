@@ -1,6 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { CancellableLoader, Container, Text } from "@earendil-works/pi-tui";
-import { formatTokens } from "../tool/runner.ts";
 import type { ReviewProgress } from "../tool/runner-types.ts";
 
 interface ReviewProgressTui {
@@ -8,79 +7,80 @@ interface ReviewProgressTui {
 }
 
 /**
- * Live progress widget for code review.
+ * Live progress widget for review-related child sessions.
  *
- * Shows an animated loader, turn count, tool uses, token count,
- * and human-readable activity description.
+ * Shows an animated loader, turn count, tool uses, token count, and any active
+ * tool descriptions while the synthesis or review child session is running.
  */
 export class ReviewProgressWidget extends Container {
-  private _message: string;
-  private _progress: ReviewProgress = { turns: 0, toolUses: 0, activities: [] };
-  private _loader: CancellableLoader;
-  private _tui: ReviewProgressTui;
-  private _theme: Theme;
+  private message: string;
+  private progress: ReviewProgress = { turns: 0, toolUses: 0, activities: [] };
+  private loader: CancellableLoader;
+  private tui: ReviewProgressTui;
+  private theme: Theme;
 
   constructor(tui: ReviewProgressTui, theme: Theme, message: string) {
     super();
-    this._tui = tui;
-    this._theme = theme;
-    this._message = message;
-    this._loader = new CancellableLoader(
+    this.tui = tui;
+    this.theme = theme;
+    this.message = message;
+    this.loader = new CancellableLoader(
       tui as ConstructorParameters<typeof CancellableLoader>[0],
-      (s: string) => theme.fg("accent", s),
-      (s: string) => theme.fg("muted", s),
+      (text: string) => theme.fg("accent", text),
+      (text: string) => theme.fg("muted", text),
       message,
     );
 
-    this._renderContent();
+    this.renderContent();
   }
 
   get signal(): AbortSignal {
-    return this._loader.signal;
+    return this.loader.signal;
   }
 
   set onAbort(fn: (() => void) | undefined) {
-    this._loader.onAbort = fn;
+    this.loader.onAbort = fn;
   }
 
   handleInput(data: string): void {
-    this._loader.handleInput(data);
+    this.loader.handleInput(data);
   }
 
-  /** Update progress state and re-render. */
+  /** Update progress state and request a re-render. */
   updateProgress(progress: ReviewProgress): void {
-    this._progress = progress;
-    this._renderContent();
-    this._tui.requestRender();
+    this.progress = progress;
+    this.renderContent();
+    this.tui.requestRender();
   }
 
   dispose(): void {
-    this._loader.dispose();
+    this.loader.dispose();
   }
 
-  private _renderContent(): void {
+  private renderContent(): void {
     this.clear();
 
-    const { turns, toolUses, activities, tokens } = this._progress;
-
-    // Build the loader message with stats
     const stats: string[] = [];
-    if (turns > 0) stats.push(`⟳${turns}`);
-    if (toolUses > 0) stats.push(`${toolUses} tool uses`);
-    if (tokens) {
-      stats.push(`${formatTokens(tokens.total)} tokens`);
-    }
+    if (this.progress.turns > 0) stats.push(`⟳${this.progress.turns}`);
+    if (this.progress.toolUses > 0) stats.push(`${this.progress.toolUses} tool uses`);
+    if (this.progress.tokens) stats.push(`${formatTokens(this.progress.tokens.total)} tokens`);
 
     const loaderMessage =
-      stats.length > 0 ? `${this._message} · ${stats.join(" · ")}` : this._message;
+      stats.length > 0 ? `${this.message} · ${stats.join(" · ")}` : this.message;
 
-    this._loader.setMessage(loaderMessage);
-    this.addChild(this._loader);
+    this.loader.setMessage(loaderMessage);
+    this.addChild(this.loader);
 
-    // Activity line
-    if (activities.length > 0) {
-      const activityText = activities.join(", ");
-      this.addChild(new Text(this._theme.fg("dim", `  ⎿  ${activityText}…`), 1, 0));
+    if (this.progress.activities.length > 0) {
+      this.addChild(
+        new Text(this.theme.fg("dim", `  ⎿  ${this.progress.activities.join(", ")}…`), 1, 0),
+      );
     }
   }
+}
+
+function formatTokens(count: number): string {
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
+  return String(count);
 }

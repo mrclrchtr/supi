@@ -1,5 +1,7 @@
 import { execFile } from "node:child_process";
+import { basename } from "node:path";
 import { promisify } from "node:util";
+import type { DiffStats, ReviewSnapshot } from "./types.ts";
 
 const execFileAsync = promisify(execFile);
 
@@ -21,6 +23,32 @@ function gitExecOptions(repoPath: string) {
     env: scrubGitEnv(process.env),
     timeout: GIT_TIMEOUT_MS,
   };
+}
+
+/** Parse simple git diff statistics from diff/show text. */
+export function parseDiffStats(text: string): DiffStats {
+  let files = 0;
+  let additions = 0;
+  let deletions = 0;
+  let inDiff = false;
+
+  for (const line of text.split("\n")) {
+    if (line.startsWith("diff --git ")) {
+      files++;
+      inDiff = true;
+      continue;
+    }
+
+    if (!inDiff) continue;
+
+    if (line.startsWith("+") && !line.startsWith("+++")) {
+      additions++;
+    } else if (line.startsWith("-") && !line.startsWith("---")) {
+      deletions++;
+    }
+  }
+
+  return { files, additions, deletions };
 }
 
 export async function getMergeBase(repoPath: string, branch: string): Promise<string | undefined> {
@@ -99,7 +127,7 @@ export async function getRecentCommits(repoPath: string, limit = 20): Promise<Co
       if (idx <= 0) return undefined;
       return { sha: line.slice(0, idx), subject: line.slice(idx + 1) };
     })
-    .filter((e): e is CommitEntry => e !== undefined);
+    .filter((entry): entry is CommitEntry => entry !== undefined);
 }
 
 export async function getCommitShow(repoPath: string, sha: string): Promise<string> {
@@ -199,4 +227,82 @@ export async function getLocalBranches(repoPath: string): Promise<string[]> {
   const remaining = Array.from(set).sort((a, b) => a.localeCompare(b));
   sorted.push(...remaining);
   return sorted;
+}
+
+/** Resolve the current working tree into a concrete review snapshot. */
+export async function resolveWorkingTreeSnapshot(
+  repoPath: string,
+): Promise<ReviewSnapshot | undefined> {
+  const [diffText, changedFiles] = await Promise.all([
+    getUncommittedDiff(repoPath),
+    getUncommittedFileNames(repoPath),
+  ]);
+
+  if (!diffText.trim() && changedFiles.length === 0) {
+    return undefined;
+  }
+
+  return {
+    target: { kind: "working-tree" },
+    title: "Working tree changes",
+    changedFiles,
+    diffText,
+    stats: parseDiffStats(diffText),
+  };
+}
+
+/** Resolve a branch-vs-base diff into a concrete review snapshot. */
+export async function resolveBranchSnapshot(
+  repoPath: string,
+  base: string,
+): Promise<ReviewSnapshot | undefined> {
+  const baseSha = await getMergeBase(repoPath, base);
+  if (!baseSha) {
+    return undefined;
+  }
+
+  const [diffText, changedFiles] = await Promise.all([
+    getDiff(repoPath, baseSha),
+    getDiffFileNames(repoPath, baseSha),
+  ]);
+
+  if (!diffText.trim() && changedFiles.length === 0) {
+    return undefined;
+  }
+
+  return {
+    target: { kind: "branch", base },
+    title: `Changes vs ${base}`,
+    changedFiles,
+    diffText,
+    stats: parseDiffStats(diffText),
+  };
+}
+
+/** Resolve one commit into a concrete review snapshot. */
+export async function resolveCommitSnapshot(
+  repoPath: string,
+  sha: string,
+): Promise<ReviewSnapshot | undefined> {
+  const [diffText, changedFiles] = await Promise.all([
+    getCommitShow(repoPath, sha),
+    getCommitFileNames(repoPath, sha),
+  ]);
+
+  if (!diffText.trim() && changedFiles.length === 0) {
+    return undefined;
+  }
+
+  return {
+    target: { kind: "commit", sha },
+    title: `Commit ${sha.slice(0, 7)}`,
+    changedFiles,
+    diffText,
+    stats: parseDiffStats(diffText),
+  };
+}
+
+/** Convenience label for one changed file, used in synthesized prompts/UI. */
+export function formatChangedFileLabel(file: string): string {
+  return basename(file) === file ? file : `${basename(file)} (${file})`;
 }
