@@ -19,6 +19,8 @@ export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "
     notify?(message: string, type?: "info" | "warning" | "error"): void;
     setWorkingVisible?(visible: boolean): void;
     setTitle?(title: string): void;
+    getToolsExpanded?(): boolean;
+    setToolsExpanded?(expanded: boolean): void;
   };
 };
 
@@ -81,6 +83,10 @@ export async function executeAskUser(
         notify: ctx.ui.notify,
       },
       signal,
+      onToggleToolsExpanded:
+        ctx.ui.getToolsExpanded && ctx.ui.setToolsExpanded
+          ? () => ctx.ui.setToolsExpanded?.(!ctx.ui.getToolsExpanded?.())
+          : undefined,
     });
 
     if (outcome === "unsupported") {

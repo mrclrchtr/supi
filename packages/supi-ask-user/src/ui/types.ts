@@ -1,4 +1,4 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { KeybindingsManager, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { AskUserController } from "../session/controller.ts";
 import type { AskUserOutcome, NormalizedQuestionnaire } from "../types.ts";
@@ -9,8 +9,7 @@ export interface AskUserUiContext {
     factory: (
       tui: TUI,
       theme: Theme,
-      // biome-ignore lint/suspicious/noExplicitAny: keybindings are passed through by pi but unused here
-      keybindings: any,
+      keybindings: KeybindingsManager,
       done: (result: T) => void,
     ) => Component & { dispose?(): void },
   ): Promise<T>;
@@ -19,6 +18,8 @@ export interface AskUserUiContext {
 export interface RunQuestionnaireOptions {
   ui: AskUserUiContext;
   signal?: AbortSignal;
+  /** Callback to toggle tool output expansion (Ctrl+O passthrough). */
+  onToggleToolsExpanded?: () => void;
 }
 
 export interface RenderContext {
@@ -32,4 +33,6 @@ export interface OverlayArgs {
   controller: AskUserController;
   done: (result: AskUserOutcome) => void;
   signal?: AbortSignal;
+  keybindings: KeybindingsManager;
+  onToggleToolsExpanded?: () => void;
 }

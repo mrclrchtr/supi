@@ -26,7 +26,9 @@ export function makeOverlayCtx<Outcome>(): OverlayFixture<Outcome> {
   ctx.ui.custom = ((factory: unknown) => {
     captured.value = (
       factory as (tui: TUI, theme: Theme, kb: unknown, done: (result: Outcome) => void) => Component
-    )(tuiStub, themeStub, undefined, (value) => resolveOutcome?.(value));
+    )(tuiStub, themeStub, { matches: (_data: string, _binding: string) => false }, (value) =>
+      resolveOutcome?.(value),
+    );
     return outcomePromise;
   }) as typeof ctx.ui.custom;
 

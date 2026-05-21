@@ -47,8 +47,16 @@ export async function runOverlayQuestionnaire(
   }
 
   return opts.ui.custom?.<AskUserOutcome>(
-    (tui, theme, _kb, done) =>
-      new AskUserOverlay({ tui, theme, controller, done, signal: opts.signal }),
+    (tui, theme, kb, done) =>
+      new AskUserOverlay({
+        tui,
+        theme,
+        controller,
+        done,
+        signal: opts.signal,
+        keybindings: kb,
+        onToggleToolsExpanded: opts.onToggleToolsExpanded,
+      }),
   ) as Promise<AskUserOutcome>;
 }
 
@@ -67,7 +75,6 @@ class AskUserOverlay implements Component, Focusable {
   private choiceRowIndex = 0;
   private previewOptionIndex = 0;
   private choiceList: SelectList | undefined;
-
   private textActions: Array<{ action: OverlayAction; label: string }> = [];
   private actionIndex = 0;
   private actionList: SelectList | undefined;
@@ -86,7 +93,6 @@ class AskUserOverlay implements Component, Focusable {
   render(width: number): string[] {
     this.editor.focused = this.focus === "editor";
     if (this.cachedWidth === width && this.cachedLines) return this.cachedLines;
-
     this.cachedWidth = width;
     this.cachedLines = renderOverlayFrame({
       width,
@@ -109,6 +115,11 @@ class AskUserOverlay implements Component, Focusable {
 
   handleInput(data: string): void {
     if (this.closed || this.args.controller.isTerminal) return;
+
+    if (this.args.keybindings.matches(data, "app.tools.expand")) {
+      this.args.onToggleToolsExpanded?.();
+      return;
+    }
 
     if (matchesKey(data, Key.escape)) {
       this.args.controller.cancel();
