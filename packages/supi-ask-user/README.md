@@ -1,7 +1,6 @@
 # @mrclrchtr/supi-ask-user
 
-Adds a redesigned `ask_user` tool to the [pi coding agent](https://github.com/earendil-works/pi).
-It lets the model pause and request a small decision form when explicit human input is required.
+Adds a redesigned `ask_user` tool to the [pi coding agent](https://github.com/earendil-works/pi). It lets the model pause and request a small decision form when explicit human input is required.
 
 ## Install
 
@@ -21,108 +20,137 @@ After editing the source, run `/reload`.
 
 After install, pi gets one new tool:
 
-- `ask_user` — open a blocking decision form during a run
+- **`ask_user`** — open a blocking decision form during a run
 
-Use cases:
+The tool presents a structured questionnaire in the TUI overlay and blocks the agent turn until the user responds. It is designed for focused decisions, **not** long surveys or open-ended discovery.
 
-- clarify a narrow implementation choice
-- confirm a risky or destructive action
-- ask for a preference the repo cannot answer
-- gather one short cluster of related decisions before proceeding
+Typical use cases:
 
-It is **not** meant for long surveys or open-ended discovery.
+- Clarify a narrow implementation choice
+- Confirm a risky or destructive action
+- Ask for a preference the repo cannot answer
+- Gather one short cluster of related decisions before proceeding
+
+## Package surfaces
+
+- `@mrclrchtr/supi-ask-user/extension` — pi extension entrypoint, registers the `ask_user` tool
+- `@mrclrchtr/supi-ask-user/api` — reusable types and utilities
+
+Example:
+
+```ts
+import { normalizeQuestionnaire, AskUserController } from "@mrclrchtr/supi-ask-user/api";
+
+const questionnaire = normalizeQuestionnaire(params);
+const controller = new AskUserController(questionnaire);
+```
 
 ## Request shape
 
 `ask_user` accepts a small form with optional framing text:
 
-- `title` — short overall title
-- `intro` — why the agent is asking
-- `questions` — 1-4 related questions
-- `allowPartialSubmit` — let the user submit partial progress
-- `allowDiscuss` — let the user switch back into discussion instead of giving a final decision
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string (optional) | Short overall title for the form |
+| `intro` | string (optional) | Why the agent is asking |
+| `questions` | array (1–4) | Choice or text questions |
+| `allowPartialSubmit` | boolean (optional) | Let the user submit partial progress |
+| `allowDiscuss` | boolean (optional) | Let the user switch back into discussion instead of giving a final decision |
 
-## Question types
+## Questions
 
-### `choice`
+Each question has a `type`, `id`, `header`, and `prompt`. Two question types are supported:
 
-Use for fixed options.
+### `choice` — fixed options
 
-Supported fields:
+| Field | Type | Description |
+|-------|------|-------------|
+| `options` | array (2–12) | Allowed answers with `value`, `label`, and optional `description`/`preview` |
+| `required` | boolean (default: `true`) | Whether this question must be answered |
+| `multi` | boolean (default: `false`) | Allow selecting multiple options |
+| `allowOther` | boolean | Allow a freeform answer instead of listed options. Single-select only. |
+| `recommendation` | string \| string[] | Recommended option value(s) |
+| `initial` | string \| string[] | Initially selected option value(s) |
 
-- `options`
-- `required`
-- `multi`
-- `allowOther` — single-select only
-- `recommendation`
-- `initial`
-- option `description`
-- option `preview`
+Model yes/no questions as a `choice` with `{ value: "yes", label: "Yes" }` and `{ value: "no", label: "No" }`.
 
-### `text`
+### `text` — freeform input
 
-Use for freeform input.
+| Field | Type | Description |
+|-------|------|-------------|
+| `required` | boolean (default: `true`) | Whether this question must be answered |
+| `initial` | string | Initial value shown in the editor |
+| `placeholder` | string | Placeholder shown before the user types |
 
-Supported fields:
+## Result
 
-- `required`
-- `initial`
-- `placeholder`
+A completed form returns a result with `details.status` set to one of:
 
-## Result statuses
+| Status | Meaning |
+|--------|---------|
+| `submitted` | Full submit, all required questions answered |
+| `partial` | Partial submit with some required questions unanswered |
+| `discuss` | User wants to continue the conversation instead of deciding |
+| `cancelled` | User explicitly cancelled (aborts the current agent turn) |
+| `aborted` | The interaction was aborted externally (aborts the current agent turn) |
 
-A completed form returns one of these statuses in `details.status`:
+`details.answersById` maps question IDs to their answers. Each answer has a `kind` and type-specific data:
 
-- `submitted` — full submit
-- `partial` — partial submit with missing required answers
-- `discuss` — user wants to continue the conversation instead of deciding
-- `cancelled` — user explicitly cancelled
-- `aborted` — the interaction was aborted externally
+- `{ kind: "choice", selections: [{ value, label }] }` — single or multi-select choice
+- `{ kind: "custom", value: "..." }` — freeform `allowOther` answer
+- `{ kind: "text", value: "..." }` — freeform text answer
 
-`details.answersById` contains structured answers keyed by question id.
+`details.missingQuestionIds` lists any required questions that were left unanswered on a partial submit.
 
 ## Behavior
 
-- interactive UI with custom overlay support required
-- `ask_user` does not provide a degraded dialog fallback
-- only one `ask_user` interaction may be active at a time
-- cancellation or abort stops the current agent turn
-- completed forms are summarized in the session tree
+- Requires pi in interactive (TUI) mode with custom overlay support — no degraded fallback
+- Only one `ask_user` form may be active at a time; calling `ask_user` while another form is in flight returns an error
+- Cancellation or abort stops the current agent turn
+- Completed forms are summarized in the session tree
+- Do not use `ask_user` for open-ended interviews or repo facts the agent can discover on its own
 
-## Rich overlay controls
+## Tool guidance
 
-`ask_user` requires the rich overlay renderer. The current interaction model is:
+The tool registers the following prompt guidance that the model sees:
+
+- Use ask_user only when explicit user input is required to proceed safely; do not use ask_user for open-ended interviews or repo facts.
+- Use ask_user with 1-4 related questions; prefer one when possible.
+- Use ask_user `choice` for fixed options and ask_user `text` for freeform input; model yes/no as `choice` with `{ value: "yes", label: "Yes" }` and `{ value: "no", label: "No" }`.
+- Use ask_user `allowOther` only on single-select `choice` questions.
+- Use ask_user `allowDiscuss` or `allowPartialSubmit` only when that outcome is actionable.
+- Do not call ask_user while another ask_user form is already in flight.
+
+## UI controls
 
 ### Choice questions
 
-- `↑↓` move between rows
-- `Space` selects the focused option in single-select mode
-- `Space` toggles the focused option in multi-select mode
-- `Enter` submits the current choice answer
-- `←` goes back to the previous question
-- `Esc` cancels the whole form
+- `↑↓` — move between options
+- `Space` — select the focused option (single-select) or toggle (multi-select)
+- `Enter` — submit the current answer
+- `←` — go back to the previous question
+- `Esc` — cancel the whole form
 
-On wide terminals, choice previews render side-by-side with the option list. On narrow terminals, previews stack below.
+On wide terminals, option previews render side-by-side with the option list. On narrow terminals, previews stack below.
 
-Visible rows are kept for exceptional paths only:
+Only exceptional action rows are visible:
 
-- `Other…`
-- `Discuss instead…`
-- `Submit partial answers`
-- `Skip question` for optional questions
+- `Other…` — when `allowOther` is enabled
+- `Discuss instead…` — when `allowDiscuss` is enabled
+- `Submit partial answers` — when `allowPartialSubmit` is enabled
+- `Skip question` — for optional questions
 
-There is no visible Back row or Cancel row in the overlay.
+Back and cancel are keyboard-only (`←`, `Esc`) — no visible rows.
 
 ### Text questions
 
-- the text editor is visible immediately
-- there is no separate `Enter response…` row
-- `Enter` submits the current text answer
-- `↓` moves from the editor into any visible exceptional action rows
-- `↑` from the first action row returns focus to the editor
-- `Esc` cancels the whole form
+- The editor is visible immediately (no separate entry row)
+- `Enter` — submit the current text
+- `↓` — move from the editor into visible exceptional action rows
+- `↑` — from the first action row, return focus to the editor
+- `Esc` — cancel the whole form
 
-Text questions may still show exceptional action rows such as `Discuss instead…` or `Submit partial answers` below the editor when those paths are enabled.
+Exceptional action rows (`Discuss instead…`, `Submit partial answers`) may appear below the editor when those paths are enabled.
 
 ## Example
 
@@ -158,10 +186,16 @@ Text questions may still show exceptional action rows such as `Discuss instead�
 
 ## Source layout
 
+- `src/extension.ts` — pi extension entrypoint
+- `src/api.ts` — reusable public surface
+- `src/index.ts` — package barrel
 - `src/ask-user.ts` — tool registration and execution boundary
-- `src/schema.ts` — tool-call schema
+- `src/schema.ts` — tool-call parameter schema (TypeBox)
+- `src/types.ts` — internal normalized types and answer shapes
 - `src/normalize.ts` — validation and lowering into internal types
-- `src/session/controller.ts` — headless decision-form state
+- `src/tool/guidance.ts` — prompt guidance and tool description
+- `src/session/controller.ts` — headless decision-form state machine
+- `src/session/lock.ts` — session-scoped concurrency lock
 - `src/ui/choose-renderer.ts` — custom-overlay capability gate
 - `src/ui/overlay.ts` — rich custom interaction orchestration
 - `src/ui/overlay-view.ts` — choice/action row modeling and split-layout helpers
