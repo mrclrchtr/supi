@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-21T12:37:32.642623Z"
+revision = 20
+
+[document_fingerprints]
+archive = "sha256:4a297b4c9aee57cd1ab9ede5ca91a45c0b0bc74b0a7e2df58706c0ac3a5b7d4b"
+content = "sha256:69ca52933becccb50641baf9b3df74472c7175c9483f464ec42f93ef32be670a"
+task-01 = "sha256:572fc419fc45085d35b5e01904cdf7a0237b0405603c4fa5d6a9d29c85881aad"
+task-02 = "sha256:128508e411c203003e5da2b374860d7be1c20f216456055bff36e8847161c673"
+task-03 = "sha256:383dbec71b0778e070e0c52deb647524d2360045397365100b57b28a82984650"
+
+[[tasks]]
+number = 1
+title = "Add a regression test proving packed @mrclrchtr/supi installs expose bundled packages' external runtime deps"
+status = "done"
+files = ["scripts/__tests__/pack-staged.test.mjs"]
+verification = """pnpm vitest run scripts/__tests__/pack-staged.test.mjs -t "exposes bundled packages' external runtime deps""""
+notes = "TDD task. Start by adding a targeted failing packaging test that packs packages/supi, installs the tarball into a fresh temp project, and asserts resolution of known bundled-package runtime deps such as typescript, web-tree-sitter, and clipboardy from the installed meta-package surface."
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "Update meta-package staging to include external runtime deps required by bundled workspace packages"
+status = "done"
+files = ["scripts/pack-staged.mjs"]
+verification = """pnpm vitest run scripts/__tests__/pack-staged.test.mjs -t "exposes bundled packages' external runtime deps""""
+notes = "TDD task. Make the minimal packaging change needed to turn the new regression test green. Keep workspace-package bundling behavior intact and only promote non-@mrclrchtr runtime dependencies into the staged meta-package manifest."
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "Run targeted packaging verification for the meta-package fix"
+status = "done"
+files = ["scripts/__tests__/pack-staged.test.mjs", "scripts/pack-staged.mjs"]
+verification = "pnpm vitest run scripts/__tests__/pack-staged.test.mjs && node scripts/publish.mjs packages/supi"
+notes = "Test-exempt beyond automated verification because this is packaging/integration validation rather than new application logic. Confirm both the focused regression and the broader pack/publish verification path succeed."
+detail_path = "tasks/task-03.md"

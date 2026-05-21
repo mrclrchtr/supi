@@ -157,22 +157,93 @@ function resolveWorkspaceSpec(spec, version) {
   return spec;
 }
 
-function rewriteMetaRootManifest(stageDir, workspacePackages) {
-  const manifestPath = join(stageDir, "package.json");
-  const pkg = JSON.parse(readFileSync(manifestPath, "utf8"));
+function getWorkspacePackageOrThrow(workspacePackages, packageName, context) {
+  const workspacePkg = workspacePackages.get(packageName);
+  if (!workspacePkg) {
+    throw new Error(`Unable to resolve ${context}: ${packageName}`);
+  }
+  return workspacePkg;
+}
 
+function addExternalDependency(collected, depName, depSpec, sourceName) {
+  const existing = collected[depName];
+  if (!existing) {
+    collected[depName] = depSpec;
+    return;
+  }
+  if (existing !== depSpec) {
+    throw new Error(
+      `Conflicting external dependency specs for ${depName}: ${existing} vs ${depSpec} (from ${sourceName})`,
+    );
+  }
+}
+
+function collectManifestExternalDependencies(manifest, collected, sourceName) {
+  for (const [depName, depSpec] of Object.entries(manifest.dependencies ?? {})) {
+    if (typeof depSpec !== "string" || depName.startsWith("@mrclrchtr/")) continue;
+    addExternalDependency(collected, depName, depSpec, sourceName);
+  }
+}
+
+function collectBundledWorkspaceNames(bundledDependencies) {
+  return (bundledDependencies ?? []).filter((packageName) => packageName.startsWith("@mrclrchtr/"));
+}
+
+function collectBundledExternalRuntimeDependencies(workspacePackages, bundledDependencies) {
+  const collected = {};
+  const visited = new Set();
+
+  function visitWorkspacePackage(packageName) {
+    if (visited.has(packageName)) return;
+    visited.add(packageName);
+
+    const workspacePkg = getWorkspacePackageOrThrow(
+      workspacePackages,
+      packageName,
+      "bundled workspace package",
+    );
+    collectManifestExternalDependencies(workspacePkg.manifest, collected, packageName);
+
+    for (const bundledName of collectBundledWorkspaceNames(
+      workspacePkg.manifest.bundledDependencies,
+    )) {
+      visitWorkspacePackage(bundledName);
+    }
+  }
+
+  for (const packageName of collectBundledWorkspaceNames(bundledDependencies)) {
+    visitWorkspacePackage(packageName);
+  }
+
+  return collected;
+}
+
+function resolveMetaWorkspaceDependencies(pkg, workspacePackages) {
   for (const field of ["dependencies", "peerDependencies", "optionalDependencies"]) {
     const deps = pkg[field];
     if (!deps || typeof deps !== "object") continue;
+
     for (const [depName, depSpec] of Object.entries(deps)) {
       if (typeof depSpec !== "string" || !depSpec.startsWith("workspace:")) continue;
-      const workspacePkg = workspacePackages.get(depName);
-      if (!workspacePkg) {
-        throw new Error(`Unable to resolve workspace dependency for meta-package: ${depName}`);
-      }
+      const workspacePkg = getWorkspacePackageOrThrow(
+        workspacePackages,
+        depName,
+        "workspace dependency for meta-package",
+      );
       deps[depName] = resolveWorkspaceSpec(depSpec, workspacePkg.manifest.version);
     }
   }
+}
+
+function rewriteMetaRootManifest(stageDir, workspacePackages, bundledDependencies) {
+  const manifestPath = join(stageDir, "package.json");
+  const pkg = JSON.parse(readFileSync(manifestPath, "utf8"));
+
+  resolveMetaWorkspaceDependencies(pkg, workspacePackages);
+  pkg.dependencies = {
+    ...(pkg.dependencies ?? {}),
+    ...collectBundledExternalRuntimeDependencies(workspacePackages, bundledDependencies),
+  };
 
   delete pkg.devDependencies;
   if (pkg.bundledDependencies && !pkg.bundleDependencies) {
@@ -229,7 +300,7 @@ export async function packStaged(packageDir, options = {}) {
     if (pkg.name === "@mrclrchtr/supi") {
       const workspacePackages = collectWorkspacePackages(packageDir);
       stageMetaPackageSource(packageDir, stageDir);
-      rewriteMetaRootManifest(stageDir, workspacePackages);
+      rewriteMetaRootManifest(stageDir, workspacePackages, pkg.bundledDependencies);
       await installMetaPackageBundles(stageDir, workspacePackages, pkg.bundledDependencies);
     } else {
       // cp -RL dereferences symlinks (needed for pnpm workspace symlinks) but
