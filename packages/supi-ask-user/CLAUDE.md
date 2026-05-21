@@ -23,9 +23,11 @@ Entrypoint: `src/ask-user.ts`
 3. **Headless state** — `src/session/controller.ts`
 4. **Renderer selection** — `src/ui/choose-renderer.ts`
 5. **UI renderers**
+   - `src/ui/choose-renderer.ts`
    - `src/ui/overlay.ts`
    - `src/ui/overlay-view.ts`
-   - `src/ui/dialog.ts`
+   - `src/ui/overlay-render.ts`
+   - `src/ui/overlay-actions.ts`
 6. **Result + transcript rendering**
    - `src/render/result.ts`
    - `src/render/transcript.ts`
@@ -41,7 +43,9 @@ Entrypoint: `src/ask-user.ts`
 - In the rich overlay, choice questions use `Space` to select or toggle and `Enter` to submit.
 - In the rich overlay, text questions open with the editor visible immediately — there is no `Enter response…` row.
 - The rich overlay keeps only exceptional rows visible (`Other…`, `Discuss instead…`, `Submit partial answers`, optional `Skip question`). Back and cancel stay keyboard-only (`←`, `Esc`).
-- The dialog fallback is simpler and may present actions differently from the rich overlay.
+- Wide terminals render choice previews in a side-by-side split; narrow terminals stack the preview below.
+- The rich overlay is now built primarily on PI/TUI primitives (`SelectList`, `Editor`, `Markdown`) rather than manual row rendering.
+- `ask_user` now requires `ctx.ui.custom()`; there is no basic dialog fallback.
 
 ## Package layout
 
@@ -59,9 +63,10 @@ src/
     lock.ts
   ui/
     choose-renderer.ts
-    dialog.ts
     overlay.ts
     overlay-view.ts
+    overlay-render.ts
+    overlay-actions.ts
     types.ts
   render/
     result.ts

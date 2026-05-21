@@ -7,13 +7,10 @@ type PiApi = ReturnType<typeof createPiMock> & ExtensionAPI;
 
 type BaseUi = Omit<ReturnType<typeof makeCtx>["ui"], "custom">;
 
-type DialogCtx = Omit<ReturnType<typeof makeCtx>, "ui"> & {
+type UnsupportedCtx = Omit<ReturnType<typeof makeCtx>, "ui"> & {
   abort: ReturnType<typeof vi.fn>;
   ui: BaseUi & {
     custom?: undefined;
-    select: ReturnType<typeof vi.fn>;
-    input: ReturnType<typeof vi.fn>;
-    editor: ReturnType<typeof vi.fn>;
     setWorkingVisible: ReturnType<typeof vi.fn>;
   };
 };
@@ -50,13 +47,38 @@ const request = {
   ],
 };
 
-function makeDialogCtx(): DialogCtx {
-  const ctx = makeCtx({ hasUI: true, abort: vi.fn() }) as unknown as DialogCtx;
+function makeUnsupportedCtx(): UnsupportedCtx {
+  const ctx = makeCtx({ hasUI: true, abort: vi.fn() }) as unknown as UnsupportedCtx;
   ctx.ui.custom = undefined;
-  ctx.ui.select = vi.fn(async () => "1. Biome");
-  ctx.ui.input = vi.fn(async () => undefined);
-  ctx.ui.editor = vi.fn(async () => undefined);
   ctx.ui.setWorkingVisible = vi.fn();
+  return ctx;
+}
+
+function makeOverlayCtx(result: unknown): OverlayCtx {
+  const ctx = makeCtx({ hasUI: true, abort: vi.fn() }) as unknown as OverlayCtx;
+  ctx.ui.setWorkingVisible = vi.fn();
+  ctx.ui.custom = vi.fn(
+    async (
+      factory: (
+        tui: unknown,
+        theme: unknown,
+        kb: unknown,
+        done: (value: unknown) => void,
+      ) => unknown,
+    ) => {
+      factory(
+        { requestRender: () => {} },
+        {
+          fg: (_color: string, text: string) => text,
+          bg: (_color: string, text: string) => text,
+          bold: (text: string) => text,
+        },
+        undefined,
+        () => {},
+      );
+      return result;
+    },
+  ) as OverlayCtx["ui"]["custom"];
   return ctx;
 }
 
@@ -78,20 +100,44 @@ describe("ask_user tool", () => {
       { questions: [] },
       undefined,
       undefined,
-      makeDialogCtx(),
+      makeUnsupportedCtx(),
     )) as { content: { type: string; text: string }[]; details: { kind?: string } };
 
     expect(result.content[0]?.text).toContain("supports 1-4 questions only");
     expect(result.details.kind).toBe("error");
   });
 
-  it("uses dialog fallback when custom UI is unavailable", async () => {
+  it("returns an error when custom overlay support is unavailable", async () => {
     const pi = createPiMock({ sessionName: "My Session" }) as unknown as PiApi;
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
-    const ctx = makeDialogCtx();
+    const ctx = makeUnsupportedCtx();
 
     const result = (await tool.execute("tc-2", request, undefined, undefined, ctx)) as {
+      content: { type: string; text: string }[];
+      details: { kind?: string };
+    };
+
+    expect(result.details.kind).toBe("error");
+    expect(result.content[0]?.text).toContain("requires a TUI with custom overlay support");
+  });
+
+  it("records successful overlay submissions without aborting", async () => {
+    const pi = createPiMock({ sessionName: "My Session" }) as unknown as PiApi;
+    askUserExtension(pi);
+    const tool = getTool(pi, "ask_user");
+    const ctx = makeOverlayCtx({
+      status: "submitted",
+      answersById: {
+        formatter: {
+          kind: "choice",
+          selections: [{ value: "biome", label: "Biome" }],
+        },
+      },
+      missingQuestionIds: [],
+    });
+
+    const result = (await tool.execute("tc-3", request, undefined, undefined, ctx)) as {
       content: { type: string; text: string }[];
       details: { status: string; answersById: Record<string, unknown> };
     };
@@ -108,14 +154,17 @@ describe("ask_user tool", () => {
     expect(pi.entries[0]?.type).toContain("ask_user");
   });
 
-  it("aborts the turn when the user cancels", async () => {
+  it("aborts the turn when the overlay result is cancelled", async () => {
     const pi = createPiMock() as unknown as PiApi;
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
-    const ctx = makeDialogCtx();
-    ctx.ui.select = vi.fn(async () => undefined);
+    const ctx = makeOverlayCtx({
+      status: "cancelled",
+      answersById: {},
+      missingQuestionIds: ["formatter"],
+    });
 
-    const result = (await tool.execute("tc-3", request, undefined, undefined, ctx)) as {
+    const result = (await tool.execute("tc-4", request, undefined, undefined, ctx)) as {
       details: { status: string };
     };
 
@@ -148,7 +197,7 @@ describe("ask_user tool", () => {
             bold: (text: string) => text,
           },
           undefined,
-          (value) => resolveFirst?.(value),
+          () => {},
         );
         return await new Promise((resolve) => {
           resolveFirst = resolve;
@@ -156,10 +205,10 @@ describe("ask_user tool", () => {
       },
     ) as OverlayCtx["ui"]["custom"];
 
-    const secondCtx = makeDialogCtx();
+    const secondCtx = makeUnsupportedCtx();
 
-    const pending = tool.execute("tc-4", request, undefined, undefined, firstCtx);
-    const second = (await tool.execute("tc-5", request, undefined, undefined, secondCtx)) as {
+    const pending = tool.execute("tc-5", request, undefined, undefined, firstCtx);
+    const second = (await tool.execute("tc-6", request, undefined, undefined, secondCtx)) as {
       details: { kind?: string };
       content: { type: string; text: string }[];
     };
@@ -180,12 +229,18 @@ describe("ask_user tool", () => {
     await pending;
   });
 
-  it("emits start and end events around the interaction", async () => {
+  it("emits start and end events around successful overlay interaction", async () => {
     const pi = createPiMock() as unknown as PiApi;
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
 
-    await tool.execute("tc-6", request, undefined, undefined, makeDialogCtx());
+    await tool.execute(
+      "tc-7",
+      request,
+      undefined,
+      undefined,
+      makeOverlayCtx({ status: "submitted", answersById: {}, missingQuestionIds: [] }),
+    );
 
     expect(pi.events.emit).toHaveBeenCalledWith("supi:ask-user:start", {
       source: "supi-ask-user",

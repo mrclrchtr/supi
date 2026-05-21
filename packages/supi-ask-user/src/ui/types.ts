@@ -1,11 +1,9 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import type { NormalizedQuestionnaire } from "../types.ts";
+import type { AskUserController } from "../session/controller.ts";
+import type { AskUserOutcome, NormalizedQuestionnaire } from "../types.ts";
 
 export interface AskUserUiContext {
-  select?(title: string, options: string[]): Promise<string | undefined>;
-  input?(title: string, placeholder?: string): Promise<string | undefined>;
-  editor?(title: string, prefill?: string): Promise<string | undefined>;
   notify?(message: string, type?: "info" | "warning" | "error"): void;
   custom?<T>(
     factory: (
@@ -26,4 +24,12 @@ export interface RunQuestionnaireOptions {
 export interface RenderContext {
   questionnaire: NormalizedQuestionnaire;
   options: RunQuestionnaireOptions;
+}
+
+export interface OverlayArgs {
+  tui: TUI;
+  theme: Theme;
+  controller: AskUserController;
+  done: (result: AskUserOutcome) => void;
+  signal?: AbortSignal;
 }

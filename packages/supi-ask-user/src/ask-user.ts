@@ -15,9 +15,6 @@ const TOOL_LABEL = "Ask User";
 
 export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "abort"> & {
   ui: {
-    select?: unknown;
-    input?: unknown;
-    editor?: unknown;
     custom?: unknown;
     notify?(message: string, type?: "info" | "warning" | "error"): void;
     setWorkingVisible?(visible: boolean): void;
@@ -80,9 +77,6 @@ export async function executeAskUser(
     ctx.ui.setWorkingVisible?.(false);
     const outcome = await runQuestionnaire(questionnaire, {
       ui: {
-        select: asFunction(ctx.ui.select),
-        input: asFunction(ctx.ui.input),
-        editor: asFunction(ctx.ui.editor),
         custom: asFunction(ctx.ui.custom),
         notify: ctx.ui.notify,
       },
@@ -91,7 +85,7 @@ export async function executeAskUser(
 
     if (outcome === "unsupported") {
       return buildErrorResult(
-        "Error: ask_user requires an interactive UI with either custom component support or basic dialog support.",
+        "Error: ask_user requires a TUI with custom overlay support. Do not use ask_user in non-interactive or degraded UI sessions.",
       );
     }
 

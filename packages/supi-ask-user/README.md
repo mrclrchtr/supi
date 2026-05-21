@@ -83,16 +83,15 @@ A completed form returns one of these statuses in `details.status`:
 
 ## Behavior
 
-- interactive UI required
-- prefers a rich custom UI when available
-- falls back to basic dialog-based interaction when custom UI is unavailable
+- interactive UI with custom overlay support required
+- `ask_user` does not provide a degraded dialog fallback
 - only one `ask_user` interaction may be active at a time
 - cancellation or abort stops the current agent turn
 - completed forms are summarized in the session tree
 
 ## Rich overlay controls
 
-When the rich overlay renderer is available, the current interaction model is:
+`ask_user` requires the rich overlay renderer. The current interaction model is:
 
 ### Choice questions
 
@@ -102,6 +101,8 @@ When the rich overlay renderer is available, the current interaction model is:
 - `Enter` submits the current choice answer
 - `←` goes back to the previous question
 - `Esc` cancels the whole form
+
+On wide terminals, choice previews render side-by-side with the option list. On narrow terminals, previews stack below.
 
 Visible rows are kept for exceptional paths only:
 
@@ -161,9 +162,11 @@ Text questions may still show exceptional action rows such as `Discuss instead�
 - `src/schema.ts` — tool-call schema
 - `src/normalize.ts` — validation and lowering into internal types
 - `src/session/controller.ts` — headless decision-form state
-- `src/ui/dialog.ts` — basic dialog fallback
-- `src/ui/overlay.ts` — rich custom interaction logic
-- `src/ui/overlay-view.ts` — rich overlay rendering helpers
+- `src/ui/choose-renderer.ts` — custom-overlay capability gate
+- `src/ui/overlay.ts` — rich custom interaction orchestration
+- `src/ui/overlay-view.ts` — choice/action row modeling and split-layout helpers
+- `src/ui/overlay-render.ts` — rich overlay rendering built on `Markdown`, `Editor`, and `SelectList`
+- `src/ui/overlay-actions.ts` — exceptional-action list wiring for text questions
 - `src/ui/types.ts` — shared UI runner types
 - `src/render/result.ts` — tool result shaping
 - `src/render/transcript.ts` — transcript rendering

@@ -1,195 +1,205 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import {
-  type Editor,
-  truncateToWidth,
-  visibleWidth,
-  wrapTextWithAnsi,
-} from "@earendil-works/pi-tui";
+import type { SelectItem } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { AskUserController } from "../session/controller.ts";
 import type { NormalizedChoiceQuestion } from "../types.ts";
 
 export type OverlayAction = "other" | "skip" | "discuss" | "partial";
+export type FocusTarget = "choices" | "editor" | "actions";
+export type OverlayMode = "choice" | "text" | "custom-input" | "discuss-input";
 
-export type OverlayRow =
+export type ChoiceRow =
   | { kind: "option"; optionIndex: number }
   | { kind: "action"; action: OverlayAction };
 
-export type OverlayMode = "choice" | "text" | "text-input" | "custom-input" | "discuss-input";
-
-export interface RenderOverlayArgs {
-  width: number;
-  theme: Theme;
-  controller: AskUserController;
-  mode: OverlayMode;
-  selectedIndex: number;
-  editor: Editor;
+export function buildChoiceRows(
+  controller: AskUserController,
+  question: NormalizedChoiceQuestion,
+): ChoiceRow[] {
+  const rows: ChoiceRow[] = question.options.map((_option, optionIndex) => ({
+    kind: "option",
+    optionIndex,
+  }));
+  if (question.allowOther) rows.push({ kind: "action", action: "other" });
+  rows.push(
+    ...buildExceptionalActions(controller, question.required).map((action) => ({
+      kind: "action" as const,
+      action,
+    })),
+  );
+  return rows;
 }
 
-export function renderOverlay(args: RenderOverlayArgs): string[] {
-  const lines: string[] = [];
-  pushLine(lines, args.theme.fg("accent", "─".repeat(args.width)));
-  renderHeader(lines, args);
-  renderBody(lines, args);
-  pushLine(lines, args.theme.fg("dim", footerText(args.controller, args.mode)));
-  pushLine(lines, args.theme.fg("accent", "─".repeat(args.width)));
-  return lines;
+export function buildChoiceItems(
+  controller: AskUserController,
+  question: NormalizedChoiceQuestion,
+  rows: ChoiceRow[],
+): SelectItem[] {
+  const selectedIndexes = new Set(controller.getSelectedIndexes(question));
+  return rows.flatMap((row) => {
+    if (row.kind === "option") {
+      const option = question.options[row.optionIndex];
+      return option
+        ? [
+            buildOptionItem({
+              question,
+              optionIndex: row.optionIndex,
+              label: option.label,
+              description: option.description,
+              selectedIndexes,
+            }),
+          ]
+        : [];
+    }
+    return [buildActionItem(controller, question.id, row.action)];
+  });
 }
 
-export function rowsForCurrentQuestion(controller: AskUserController): OverlayRow[] {
-  const question = controller.currentQuestion;
-  return question.type === "choice"
-    ? rowsForChoiceQuestion(controller, question)
-    : rowsForTextQuestion(controller);
+export function buildTextActionItems(
+  controller: AskUserController,
+): Array<{ action: OverlayAction; item: SelectItem }> {
+  return buildExceptionalActions(controller, controller.currentQuestion.required).map((action) => ({
+    action,
+    item: {
+      value: action,
+      label: actionLabel(action),
+    },
+  }));
 }
 
-export function defaultSelectedIndex(controller: AskUserController): number {
-  const question = controller.currentQuestion;
-  if (question.type === "text") return 0;
-
+export function defaultChoiceRowIndex(
+  controller: AskUserController,
+  question: NormalizedChoiceQuestion,
+  rows: ChoiceRow[],
+): number {
   const current = controller.getAnswer(question.id);
   if (current?.kind === "custom") {
-    return findActionRowIndex(rowsForChoiceQuestion(controller, question), "other") ?? 0;
+    return rows.findIndex((row) => row.kind === "action" && row.action === "other");
   }
   if (current?.kind === "choice") {
     const first = current.selections[0];
     if (!first) return 0;
-    const index = question.options.findIndex((option) => option.value === first.value);
-    return index >= 0 ? index : 0;
+    const optionIndex = question.options.findIndex((option) => option.value === first.value);
+    return optionIndex >= 0 ? optionIndex : 0;
   }
   return question.initialIndexes[0] ?? question.recommendedIndexes[0] ?? 0;
 }
 
-export function isEditorMode(mode: OverlayMode): boolean {
-  return mode === "text-input" || mode === "custom-input" || mode === "discuss-input";
+export function previewOptionIndexForRows(
+  rows: ChoiceRow[],
+  rowIndex: number,
+  fallbackOptionIndex: number,
+): number | undefined {
+  const row = rows[rowIndex];
+  if (row?.kind === "option") return row.optionIndex;
+  return fallbackOptionIndex >= 0 ? fallbackOptionIndex : undefined;
 }
 
-export function footerText(controller: AskUserController, mode: OverlayMode): string {
+export function footerText(args: {
+  controller: AskUserController;
+  mode: OverlayMode;
+  focus: FocusTarget;
+  hasTextActions: boolean;
+}): string {
+  const { controller, mode, focus, hasTextActions } = args;
   const question = controller.currentQuestion;
+
   if (question.type === "text") {
-    if (mode === "text-input") {
-      return rowsForTextQuestion(controller).length > 0
-        ? "Enter submit • ↓ actions • Esc cancel"
-        : "Enter submit • Esc cancel";
+    if (mode === "discuss-input") return "Enter submit • Esc cancel";
+    if (focus === "editor") {
+      return hasTextActions
+        ? "Enter submit • ↓ actions • ← back • Esc cancel"
+        : "Enter submit • ← back • Esc cancel";
     }
     return "↑↓ move • Enter select • ↑ editor • ← back • Esc cancel";
+  }
+
+  if (mode === "custom-input" || mode === "discuss-input") {
+    return "Enter submit • Esc cancel";
   }
   return question.multi
     ? "↑↓ move • Space toggle • Enter submit • ← back • Esc cancel"
     : "↑↓ move • Space select • Enter submit • ← back • Esc cancel";
 }
 
-function renderHeader(lines: string[], args: RenderOverlayArgs): void {
-  const { title, intro } = args.controller.questionnaire;
-  if (title) pushWrapped(lines, args.width, args.theme.fg("accent", args.theme.bold(title)));
-  const progress = `${args.controller.currentIndex + 1}/${args.controller.questions.length} · ${args.controller.currentQuestion.header}`;
-  pushWrapped(lines, args.width, args.theme.fg("muted", progress));
-  if (intro) {
-    pushLine(lines, "");
-    pushWrapped(lines, args.width, args.theme.fg("text", intro));
+export function splitColumns(args: {
+  width: number;
+  theme: Theme;
+  leftLines: string[];
+  rightLines: string[];
+  leftRatio?: number;
+}): string[] {
+  const { width, theme, leftLines, rightLines, leftRatio = 0.55 } = args;
+  const leftWidth = Math.max(36, Math.floor(width * leftRatio));
+  const rightWidth = Math.max(24, width - leftWidth - 3);
+  const total = Math.max(leftLines.length, rightLines.length);
+  const lines: string[] = [];
+
+  for (let index = 0; index < total; index += 1) {
+    const left = padRight(leftLines[index] ?? "", leftWidth);
+    const right = padRight(rightLines[index] ?? "", rightWidth);
+    lines.push(`${left} ${theme.fg("accent", "│")} ${right}`);
   }
-  pushLine(lines, "");
+  return lines;
 }
 
-function renderBody(lines: string[], args: RenderOverlayArgs): void {
-  const question = args.controller.currentQuestion;
-  pushWrapped(lines, args.width, args.theme.fg("text", question.prompt));
-  pushLine(lines, "");
-
-  if (question.type === "text") {
-    renderTextQuestion(lines, args);
-  } else if (isEditorMode(args.mode)) {
-    renderEditorSection(lines, args);
-  } else {
-    renderRows(lines, args);
-  }
-
-  const preview = previewForSelected(args);
-  if (!preview) return;
-  pushLine(lines, "");
-  pushWrapped(lines, args.width, args.theme.fg("accent", "Preview"));
-  pushWrapped(lines, args.width, args.theme.fg("text", preview));
+export function choiceRowValue(row: ChoiceRow): string {
+  return row.kind === "option" ? `option:${row.optionIndex}` : `action:${row.action}`;
 }
 
-function renderTextQuestion(lines: string[], args: RenderOverlayArgs): void {
-  renderEditorSection(lines, args);
-  const rows = rowsForTextQuestion(args.controller);
-  if (rows.length === 0) return;
-  pushLine(lines, "");
-  renderRows(lines, args);
-}
-
-function renderEditorSection(lines: string[], args: RenderOverlayArgs): void {
-  const label =
-    args.mode === "discuss-input"
-      ? "Discuss instead"
-      : args.mode === "custom-input"
-        ? "Other answer"
-        : "Your answer";
-
-  pushWrapped(lines, args.width, args.theme.fg("accent", label));
-  for (const line of args.editor.render(Math.max(20, args.width - 2))) {
-    pushLine(lines, ` ${truncateToWidth(line, Math.max(1, args.width - 1))}`);
-  }
-
-  const question = args.controller.currentQuestion;
-  if (question.type === "text" && !args.editor.getText()) {
-    if (question.initial) {
-      pushWrapped(lines, args.width, args.theme.fg("dim", `Initial: ${question.initial}`));
-    } else if (question.placeholder) {
-      pushWrapped(lines, args.width, args.theme.fg("dim", `Placeholder: ${question.placeholder}`));
-    }
-  }
-}
-
-function renderRows(lines: string[], args: RenderOverlayArgs): void {
-  const rows = rowsForCurrentQuestion(args.controller);
-  const question = args.controller.currentQuestion;
-  const textActionMode = question.type === "text" && args.mode === "text";
-
-  for (const [index, row] of rows.entries()) {
-    const active =
-      question.type === "text"
-        ? textActionMode && index === args.selectedIndex
-        : index === args.selectedIndex;
-    const prefix = active ? args.theme.fg("accent", "> ") : "  ";
-    addPrefixed(lines, args.width, prefix, args.theme.fg("text", rowLabel(args, row)));
-
-    if (row.kind !== "option" || question.type !== "choice") continue;
-    const description = question.options[row.optionIndex]?.description;
-    if (description) {
-      addPrefixed(lines, args.width, "    ", args.theme.fg("muted", description));
-    }
-  }
-}
-
-function rowLabel(args: RenderOverlayArgs, row: OverlayRow): string {
-  const question = args.controller.currentQuestion;
-  if (row.kind === "action") return actionLabel(args.controller, row.action);
-  if (question.type !== "choice") return "";
-
-  const option = question.options[row.optionIndex];
-  if (!option) return "";
-  const recommended = question.recommendedIndexes.includes(row.optionIndex) ? " (recommended)" : "";
-
-  if (question.multi) {
-    const checked = args.controller.getSelectedIndexes(question).includes(row.optionIndex)
+function buildOptionItem(args: {
+  question: NormalizedChoiceQuestion;
+  optionIndex: number;
+  label: string;
+  description: string | undefined;
+  selectedIndexes: Set<number>;
+}): SelectItem {
+  const { question, optionIndex, label, description, selectedIndexes } = args;
+  const recommended = question.recommendedIndexes.includes(optionIndex) ? " (recommended)" : "";
+  const marker = question.multi
+    ? selectedIndexes.has(optionIndex)
       ? "[x]"
-      : "[ ]";
-    return `${checked} ${option.label}${recommended}`;
-  }
-
-  const selected = args.controller.getSelectedIndexes(question).includes(row.optionIndex);
-  const marker = selected ? "(*)" : "( )";
-  return `${marker} ${option.label}${recommended}`;
+      : "[ ]"
+    : selectedIndexes.has(optionIndex)
+      ? "(*)"
+      : "( )";
+  return {
+    value: choiceRowValue({ kind: "option", optionIndex }),
+    label: `${marker} ${label}${recommended}`,
+    description,
+  };
 }
 
-function actionLabel(controller: AskUserController, action: OverlayAction): string {
-  const question = controller.currentQuestion;
-  const answer = controller.getAnswer(question.id);
+function buildActionItem(
+  controller: AskUserController,
+  questionId: string,
+  action: OverlayAction,
+): SelectItem {
+  const answer = controller.getAnswer(questionId);
+  return {
+    value: choiceRowValue({ kind: "action", action }),
+    label:
+      action === "other" && answer?.kind === "custom"
+        ? `Other — ${answer.value}`
+        : actionLabel(action),
+  };
+}
 
+function buildExceptionalActions(
+  controller: AskUserController,
+  required: boolean,
+): OverlayAction[] {
+  const actions: OverlayAction[] = [];
+  if (!required) actions.push("skip");
+  if (controller.questionnaire.allowDiscuss) actions.push("discuss");
+  if (controller.canPartialSubmit()) actions.push("partial");
+  return actions;
+}
+
+function actionLabel(action: OverlayAction): string {
   switch (action) {
     case "other":
-      return answer?.kind === "custom" ? `Other — ${answer.value}` : "Other…";
+      return "Other…";
     case "skip":
       return "Skip question";
     case "discuss":
@@ -199,61 +209,8 @@ function actionLabel(controller: AskUserController, action: OverlayAction): stri
   }
 }
 
-function previewForSelected(args: RenderOverlayArgs): string | undefined {
-  const question = args.controller.currentQuestion;
-  if (question.type !== "choice") return undefined;
-  const row = rowsForCurrentQuestion(args.controller)[args.selectedIndex];
-  return row?.kind === "option" ? question.options[row.optionIndex]?.preview : undefined;
-}
-
-function rowsForChoiceQuestion(
-  controller: AskUserController,
-  question: NormalizedChoiceQuestion,
-): OverlayRow[] {
-  const rows: OverlayRow[] = question.options.map((_option, optionIndex) => ({
-    kind: "option",
-    optionIndex,
-  }));
-  if (question.allowOther) rows.push({ kind: "action", action: "other" });
-  appendExceptionalActions(rows, controller, question.required);
-  return rows;
-}
-
-function rowsForTextQuestion(controller: AskUserController): OverlayRow[] {
-  const rows: OverlayRow[] = [];
-  appendExceptionalActions(rows, controller, controller.currentQuestion.required);
-  return rows;
-}
-
-function appendExceptionalActions(
-  rows: OverlayRow[],
-  controller: AskUserController,
-  required: boolean,
-): void {
-  if (!required) rows.push({ kind: "action", action: "skip" });
-  if (controller.questionnaire.allowDiscuss) rows.push({ kind: "action", action: "discuss" });
-  if (controller.canPartialSubmit()) rows.push({ kind: "action", action: "partial" });
-}
-
-function findActionRowIndex(rows: OverlayRow[], action: OverlayAction): number | undefined {
-  const index = rows.findIndex((row) => row.kind === "action" && row.action === action);
-  return index >= 0 ? index : undefined;
-}
-
-function pushLine(lines: string[], text: string): void {
-  lines.push(text);
-}
-
-function pushWrapped(lines: string[], width: number, text: string): void {
-  for (const line of wrapTextWithAnsi(text, Math.max(1, width))) {
-    lines.push(truncateToWidth(line, width));
-  }
-}
-
-function addPrefixed(lines: string[], width: number, prefix: string, text: string): void {
-  const available = Math.max(1, width - visibleWidth(prefix));
-  const continuation = " ".repeat(visibleWidth(prefix));
-  for (const [index, line] of wrapTextWithAnsi(text, available).entries()) {
-    lines.push(`${index === 0 ? prefix : continuation}${truncateToWidth(line, available)}`);
-  }
+function padRight(text: string, width: number): string {
+  const visible = visibleWidth(text);
+  if (visible >= width) return truncateToWidth(text, width);
+  return `${text}${" ".repeat(width - visible)}`;
 }

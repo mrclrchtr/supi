@@ -1,12 +1,10 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
 import {
   type Component,
   Editor,
-  type EditorTheme,
   type Focusable,
   Key,
   matchesKey,
-  type TUI,
+  SelectList,
 } from "@earendil-works/pi-tui";
 import { AskUserController } from "../session/controller.ts";
 import type {
@@ -14,23 +12,28 @@ import type {
   NormalizedChoiceQuestion,
   NormalizedQuestionnaire,
 } from "../types.ts";
+import { createActionList } from "./overlay-actions.ts";
 import {
-  defaultSelectedIndex,
-  isEditorMode,
+  clampIndex,
+  currentCustomValue,
+  currentPreviewText,
+  currentTextValue,
+  makeEditorTheme,
+  makeSelectListTheme,
+  renderOverlayFrame,
+} from "./overlay-render.ts";
+import {
+  buildChoiceItems,
+  buildChoiceRows,
+  type ChoiceRow,
+  choiceRowValue,
+  defaultChoiceRowIndex,
+  type FocusTarget,
   type OverlayAction,
-  type OverlayRow,
-  renderOverlay,
-  rowsForCurrentQuestion,
+  type OverlayMode,
+  previewOptionIndexForRows,
 } from "./overlay-view.ts";
-import type { RunQuestionnaireOptions } from "./types.ts";
-
-interface OverlayArgs {
-  tui: TUI;
-  theme: Theme;
-  controller: AskUserController;
-  done: (result: AskUserOutcome) => void;
-  signal?: AbortSignal;
-}
+import type { OverlayArgs, RunQuestionnaireOptions } from "./types.ts";
 
 export async function runOverlayQuestionnaire(
   questionnaire: NormalizedQuestionnaire,
@@ -52,12 +55,21 @@ class AskUserOverlay implements Component, Focusable {
   focused = false;
 
   private readonly editor: Editor;
-  private mode: "choice" | "text" | "text-input" | "custom-input" | "discuss-input" = "choice";
-  private selectedIndex = 0;
+  private focus: FocusTarget = "choices";
+  private mode: OverlayMode = "choice";
   private closed = false;
   private cachedWidth: number | undefined;
   private cachedLines: string[] | undefined;
   private readonly onAbort: () => void;
+
+  private choiceRows: ChoiceRow[] = [];
+  private choiceRowIndex = 0;
+  private previewOptionIndex = 0;
+  private choiceList: SelectList | undefined;
+
+  private textActions: Array<{ action: OverlayAction; label: string }> = [];
+  private actionIndex = 0;
+  private actionList: SelectList | undefined;
 
   constructor(private readonly args: OverlayArgs) {
     this.editor = new Editor(args.tui, makeEditorTheme(args.theme));
@@ -71,31 +83,62 @@ class AskUserOverlay implements Component, Focusable {
   }
 
   render(width: number): string[] {
-    this.editor.focused = this.focused;
+    this.editor.focused = this.focus === "editor";
     if (this.cachedWidth === width && this.cachedLines) return this.cachedLines;
+
     this.cachedWidth = width;
-    this.cachedLines = renderOverlay({
+    this.cachedLines = renderOverlayFrame({
       width,
       theme: this.args.theme,
       controller: this.args.controller,
       mode: this.mode,
-      selectedIndex: this.selectedIndex,
+      focus: this.focus,
       editor: this.editor,
+      choiceList: this.choiceList,
+      actionList: this.actionList,
+      textActionLabels: this.textActions.map(({ label }) => label),
+      previewText: currentPreviewText(
+        this.args.controller.currentQuestion,
+        this.previewOptionIndex,
+      ),
     });
     return this.cachedLines;
   }
 
   handleInput(data: string): void {
     if (this.closed || this.args.controller.isTerminal) return;
-    if (isEditorMode(this.mode)) {
-      this.handleEditorKey(data);
+
+    if (matchesKey(data, Key.escape)) {
+      this.args.controller.cancel();
+      this.finish();
       return;
     }
-    this.handleSelectionKey(data);
+    if (matchesKey(data, Key.left)) {
+      if (this.args.controller.goBack()) {
+        this.syncCurrentQuestion();
+        this.refresh();
+      }
+      return;
+    }
+
+    switch (this.focus) {
+      case "choices":
+        this.handleChoiceKey(data);
+        return;
+      case "actions":
+        this.handleActionKey(data);
+        return;
+      case "editor":
+        this.handleEditorKey(data);
+        return;
+    }
   }
 
   invalidate(): void {
     this.cachedLines = undefined;
+    this.choiceList?.invalidate();
+    this.actionList?.invalidate();
+    this.editor.invalidate();
   }
 
   dispose(): void {
@@ -103,70 +146,47 @@ class AskUserOverlay implements Component, Focusable {
     this.args.signal?.removeEventListener("abort", this.onAbort);
   }
 
-  private handleSelectionKey(data: string): void {
-    const controller = this.args.controller;
-    const rows = rowsForCurrentQuestion(controller);
-    const question = controller.currentQuestion;
+  private handleChoiceKey(data: string): void {
+    const question = this.args.controller.currentQuestion;
+    if (question.type !== "choice" || !this.choiceList) return;
 
-    if (matchesKey(data, Key.escape)) {
-      controller.cancel();
-      this.finish();
+    if (matchesKey(data, Key.space)) {
+      const row = this.choiceRows[this.choiceRowIndex];
+      if (row?.kind === "option") this.applyChoiceSelection(question, row.optionIndex, false);
       return;
     }
-    if (matchesKey(data, Key.left)) {
-      if (controller.goBack()) {
-        this.syncCurrentQuestion();
-        this.refresh();
-      }
-      return;
-    }
-    if (matchesKey(data, Key.up)) {
-      if (question.type === "text" && this.mode === "text" && this.selectedIndex === 0) {
-        this.mode = "text-input";
+
+    this.choiceList.handleInput(data);
+    this.refresh();
+  }
+
+  private handleActionKey(data: string): void {
+    const question = this.args.controller.currentQuestion;
+    if (!this.actionList) return;
+
+    if (question.type === "text") {
+      if (matchesKey(data, Key.up) && this.actionIndex === 0) {
+        this.focus = "editor";
         this.refresh();
         return;
       }
-      this.selectedIndex = Math.max(0, this.selectedIndex - 1);
-      this.refresh();
-      return;
-    }
-    if (matchesKey(data, Key.down)) {
-      this.selectedIndex = Math.min(rows.length - 1, this.selectedIndex + 1);
+    } else if (matchesKey(data, Key.up) && this.actionIndex === 0) {
+      this.focus = "choices";
       this.refresh();
       return;
     }
 
-    const selectedRow = rows[this.selectedIndex];
-    if (
-      question.type === "choice" &&
-      matchesKey(data, Key.space) &&
-      selectedRow?.kind === "option"
-    ) {
-      this.selectChoice(question, selectedRow.optionIndex, false);
-      return;
-    }
-    if (matchesKey(data, Key.enter)) {
-      this.handleRowEnter(selectedRow);
-    }
+    this.actionList.handleInput(data);
+    this.refresh();
   }
 
   private handleEditorKey(data: string): void {
-    const rows = rowsForCurrentQuestion(this.args.controller);
-    if (matchesKey(data, Key.escape)) {
-      this.args.controller.cancel();
-      this.finish();
-      return;
-    }
-    if (
-      this.args.controller.currentQuestion.type === "text" &&
-      matchesKey(data, Key.down) &&
-      rows.length > 0
-    ) {
-      this.mode = "text";
-      this.selectedIndex = 0;
+    if (this.mode === "text" && matchesKey(data, Key.down) && this.textActions.length > 0) {
+      this.focus = "actions";
       this.refresh();
       return;
     }
+
     this.editor.handleInput(data);
     this.refresh();
   }
@@ -180,19 +200,13 @@ class AskUserOverlay implements Component, Focusable {
       this.finish();
       return;
     }
-
     if (this.mode === "custom-input") {
-      if (!trimmed) {
-        this.syncCurrentQuestion();
-        this.refresh();
-        return;
-      }
+      if (trimmed.length === 0) return;
       this.args.controller.setAnswer(question.id, { kind: "custom", value: trimmed });
       this.advanceAfterQuestion();
       return;
     }
-
-    if (!trimmed) {
+    if (trimmed.length === 0) {
       if (question.required) return;
       this.args.controller.clearAnswer(question.id);
       this.advanceAfterQuestion();
@@ -203,66 +217,43 @@ class AskUserOverlay implements Component, Focusable {
     this.advanceAfterQuestion();
   }
 
-  private handleRowEnter(row: OverlayRow | undefined): void {
-    if (!row) return;
-    if (row.kind === "option") {
-      const question = this.args.controller.currentQuestion;
-      if (question.type !== "choice") return;
-      this.selectChoice(question, row.optionIndex, true);
-      return;
-    }
-    this.handleAction(row.action);
-  }
-
-  private selectChoice(
+  private applyChoiceSelection(
     question: NormalizedChoiceQuestion,
     optionIndex: number,
     submit: boolean,
   ): void {
     if (question.multi) {
-      this.toggleMultiSelection(question, optionIndex);
+      this.toggleMultiChoice(question, optionIndex);
       if (submit && this.args.controller.hasAnswer(question.id)) this.advanceAfterQuestion();
       return;
     }
 
-    const option = resolveOption(question, optionIndex);
+    const option = question.options[optionIndex];
+    if (!option) return;
     this.args.controller.setAnswer(question.id, {
       kind: "choice",
       selections: [{ value: option.value, label: option.label }],
     });
-    if (submit) this.advanceAfterQuestion();
-    else this.refresh();
-  }
-
-  private handleAction(action: OverlayAction): void {
-    switch (action) {
-      case "other":
-        this.openCustomEditor();
-        return;
-      case "skip":
-        this.args.controller.clearAnswer(this.args.controller.currentQuestion.id);
-        this.advanceAfterQuestion();
-        return;
-      case "discuss":
-        this.openDiscussEditor();
-        return;
-      case "partial":
-        this.args.controller.finishPartial();
-        this.finish();
-        return;
+    this.choiceRowIndex = optionIndex;
+    this.previewOptionIndex = optionIndex;
+    if (submit) {
+      this.advanceAfterQuestion();
+      return;
     }
+    this.buildChoiceList(question);
+    this.refresh();
   }
 
-  private toggleMultiSelection(question: NormalizedChoiceQuestion, optionIndex: number): void {
+  private toggleMultiChoice(question: NormalizedChoiceQuestion, optionIndex: number): void {
     const existing = new Set(this.args.controller.getSelectedIndexes(question));
     if (existing.has(optionIndex)) existing.delete(optionIndex);
     else existing.add(optionIndex);
 
     const selections = [...existing]
       .sort((left, right) => left - right)
-      .map((index) => {
-        const option = resolveOption(question, index);
-        return { value: option.value, label: option.label };
+      .flatMap((index) => {
+        const option = question.options[index];
+        return option ? [{ value: option.value, label: option.label }] : [];
       });
 
     if (selections.length > 0) {
@@ -270,22 +261,35 @@ class AskUserOverlay implements Component, Focusable {
     } else {
       this.args.controller.clearAnswer(question.id);
     }
+    this.choiceRowIndex = optionIndex;
+    this.previewOptionIndex = optionIndex;
+    this.buildChoiceList(question);
     this.refresh();
   }
 
-  private openCustomEditor(): void {
-    const question = this.args.controller.currentQuestion;
-    if (question.type !== "choice") return;
-    this.mode = "custom-input";
-    const current = this.args.controller.getAnswer(question.id);
-    this.editor.setText(current?.kind === "custom" ? current.value : "");
-    this.refresh();
-  }
-
-  private openDiscussEditor(): void {
-    this.mode = "discuss-input";
-    this.editor.setText("");
-    this.refresh();
+  private handleAction(action: OverlayAction): void {
+    switch (action) {
+      case "other":
+        this.mode = "custom-input";
+        this.focus = "editor";
+        this.editor.setText(currentCustomValue(this.args.controller));
+        this.refresh();
+        return;
+      case "skip":
+        this.args.controller.clearAnswer(this.args.controller.currentQuestion.id);
+        this.advanceAfterQuestion();
+        return;
+      case "discuss":
+        this.mode = "discuss-input";
+        this.focus = "editor";
+        this.editor.setText("");
+        this.refresh();
+        return;
+      case "partial":
+        this.args.controller.finishPartial();
+        this.finish();
+        return;
+    }
   }
 
   private advanceAfterQuestion(): void {
@@ -301,16 +305,73 @@ class AskUserOverlay implements Component, Focusable {
   private syncCurrentQuestion(): void {
     const question = this.args.controller.currentQuestion;
     if (question.type === "text") {
-      this.mode = "text-input";
-      const current = this.args.controller.getAnswer(question.id);
-      this.editor.setText(current?.kind === "text" ? current.value : (question.initial ?? ""));
-      this.selectedIndex = 0;
+      this.mode = "text";
+      this.focus = "editor";
+      this.editor.setText(currentTextValue(this.args.controller, question.initial));
+      this.buildTextActions();
+      this.choiceRows = [];
+      this.choiceList = undefined;
       return;
     }
 
     this.mode = "choice";
-    this.selectedIndex = defaultSelectedIndex(this.args.controller);
+    this.focus = "choices";
+    this.textActions = [];
+    this.actionList = undefined;
     this.editor.setText("");
+    this.buildChoiceList(question);
+  }
+
+  private buildChoiceList(question: NormalizedChoiceQuestion): void {
+    this.choiceRows = buildChoiceRows(this.args.controller, question);
+    this.choiceRowIndex = clampIndex(
+      defaultChoiceRowIndex(this.args.controller, question, this.choiceRows),
+      this.choiceRows.length,
+    );
+    this.previewOptionIndex =
+      previewOptionIndexForRows(this.choiceRows, this.choiceRowIndex, this.previewOptionIndex) ?? 0;
+
+    const list = new SelectList(
+      buildChoiceItems(this.args.controller, question, this.choiceRows),
+      Math.min(this.choiceRows.length, 10),
+      makeSelectListTheme(this.args.theme),
+    );
+    list.onSelectionChange = (item) => {
+      const nextIndex = this.choiceRows.findIndex((row) => choiceRowValue(row) === item.value);
+      if (nextIndex < 0) return;
+      this.choiceRowIndex = nextIndex;
+      this.previewOptionIndex =
+        previewOptionIndexForRows(this.choiceRows, nextIndex, this.previewOptionIndex) ??
+        this.previewOptionIndex;
+      this.refresh();
+    };
+    list.onSelect = (item) => {
+      const row = this.choiceRows.find((candidate) => choiceRowValue(candidate) === item.value);
+      if (!row) return;
+      if (row.kind === "option") {
+        this.applyChoiceSelection(question, row.optionIndex, true);
+        return;
+      }
+      this.handleAction(row.action);
+    };
+    list.setSelectedIndex(this.choiceRowIndex);
+    this.choiceList = list;
+  }
+
+  private buildTextActions(): void {
+    const state = createActionList({
+      controller: this.args.controller,
+      theme: this.args.theme,
+      actionIndex: this.actionIndex,
+      onIndexChange: (index) => {
+        this.actionIndex = index;
+        this.refresh();
+      },
+      onAction: (action) => this.handleAction(action),
+    });
+    this.textActions = state.entries;
+    this.actionList = state.list;
+    this.actionIndex = state.index;
   }
 
   private refresh(): void {
@@ -324,25 +385,4 @@ class AskUserOverlay implements Component, Focusable {
     this.args.signal?.removeEventListener("abort", this.onAbort);
     this.args.done(this.args.controller.outcome());
   }
-}
-
-function makeEditorTheme(theme: Theme): EditorTheme {
-  return {
-    borderColor: (text) => theme.fg("accent", text),
-    selectList: {
-      selectedPrefix: (text) => theme.fg("accent", text),
-      selectedText: (text) => theme.fg("accent", text),
-      description: (text) => theme.fg("muted", text),
-      scrollInfo: (text) => theme.fg("dim", text),
-      noMatch: (text) => theme.fg("warning", text),
-    },
-  };
-}
-
-function resolveOption(question: NormalizedChoiceQuestion, optionIndex: number) {
-  const option = question.options[optionIndex];
-  if (!option) {
-    throw new Error(`Invalid option index for question "${question.id}".`);
-  }
-  return option;
 }
