@@ -1,6 +1,3 @@
 {
-  "packages": [
-    "..",
-    "npm:@mrclrchtr/supi-flow"
-  ]
+  "packages": ["..", "npm:@mrclrchtr/supi-flow"]
 }
