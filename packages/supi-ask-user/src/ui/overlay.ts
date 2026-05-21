@@ -6,6 +6,7 @@ import {
   matchesKey,
   SelectList,
 } from "@earendil-works/pi-tui";
+
 import { AskUserController } from "../session/controller.ts";
 import type {
   AskUserOutcome,
@@ -94,7 +95,8 @@ class AskUserOverlay implements Component, Focusable {
       mode: this.mode,
       focus: this.focus,
       editor: this.editor,
-      choiceList: this.choiceList,
+      choiceRows: this.choiceRows,
+      choiceRowIndex: this.choiceRowIndex,
       actionList: this.actionList,
       textActionLabels: this.textActions.map(({ label }) => label),
       previewText: currentPreviewText(
@@ -157,7 +159,6 @@ class AskUserOverlay implements Component, Focusable {
     }
 
     this.choiceList.handleInput(data);
-    this.refresh();
   }
 
   private handleActionKey(data: string): void {
@@ -310,7 +311,6 @@ class AskUserOverlay implements Component, Focusable {
       this.editor.setText(currentTextValue(this.args.controller, question.initial));
       this.buildTextActions();
       this.choiceRows = [];
-      this.choiceList = undefined;
       return;
     }
 
@@ -319,10 +319,6 @@ class AskUserOverlay implements Component, Focusable {
     this.textActions = [];
     this.actionList = undefined;
     this.editor.setText("");
-    this.buildChoiceList(question);
-  }
-
-  private buildChoiceList(question: NormalizedChoiceQuestion): void {
     this.choiceRows = buildChoiceRows(this.args.controller, question);
     this.choiceRowIndex = clampIndex(
       defaultChoiceRowIndex(this.args.controller, question, this.choiceRows),
@@ -330,9 +326,14 @@ class AskUserOverlay implements Component, Focusable {
     );
     this.previewOptionIndex =
       previewOptionIndexForRows(this.choiceRows, this.choiceRowIndex, this.previewOptionIndex) ?? 0;
+    this.buildChoiceList(question);
+  }
+
+  private buildChoiceList(question: NormalizedChoiceQuestion): void {
+    const items = buildChoiceItems(this.args.controller, question, this.choiceRows);
 
     const list = new SelectList(
-      buildChoiceItems(this.args.controller, question, this.choiceRows),
+      items,
       Math.min(this.choiceRows.length, 10),
       makeSelectListTheme(this.args.theme),
     );

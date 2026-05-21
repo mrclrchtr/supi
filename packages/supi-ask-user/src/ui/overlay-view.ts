@@ -1,6 +1,6 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { SelectItem } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { AskUserController } from "../session/controller.ts";
 import type { NormalizedChoiceQuestion } from "../types.ts";
 
@@ -45,7 +45,6 @@ export function buildChoiceItems(
               question,
               optionIndex: row.optionIndex,
               label: option.label,
-              description: option.description,
               selectedIndexes,
             }),
           ]
@@ -147,14 +146,106 @@ export function choiceRowValue(row: ChoiceRow): string {
   return row.kind === "option" ? `option:${row.optionIndex}` : `action:${row.action}`;
 }
 
+function renderOptionRow(args: {
+  option: { label: string; description?: string };
+  labelText: string;
+  isSelected: boolean;
+  theme: Theme;
+  width: number;
+}): string[] {
+  const { theme, isSelected, labelText, width, option } = args;
+  const prefix = isSelected ? "\u2192 " : "  ";
+
+  const lines: string[] = [
+    isSelected ? theme.fg("accent", `${prefix}${labelText}`) : `${prefix}${labelText}`,
+  ];
+
+  if (option.description) {
+    const descWidth = Math.max(10, width - 2);
+    const wrapped = wrapTextWithAnsi(option.description, descWidth);
+    for (const descLine of wrapped) {
+      lines.push(theme.fg("muted", `  ${descLine}`));
+    }
+  }
+
+  return lines;
+}
+
+function renderActionRow(args: {
+  actionLabel: string;
+  isSelected: boolean;
+  theme: Theme;
+}): string[] {
+  const { theme, isSelected, actionLabel } = args;
+  const prefix = isSelected ? "\u2192 " : "  ";
+  return [isSelected ? theme.fg("accent", `${prefix}${actionLabel}`) : `${prefix}${actionLabel}`];
+}
+
+function prepareOptionMarker(
+  question: NormalizedChoiceQuestion,
+  optionIndex: number,
+  selectedIndexes: Set<number>,
+): string {
+  if (question.multi) {
+    return selectedIndexes.has(optionIndex) ? "[x]" : "[ ]";
+  }
+  return selectedIndexes.has(optionIndex) ? "(*)" : "( )";
+}
+
+function prepareOptionLabel(
+  option: { label: string },
+  marker: string,
+  recommended: boolean,
+): string {
+  return `${marker} ${option.label}${recommended ? " (recommended)" : ""}`;
+}
+
+export function renderChoiceList(args: {
+  controller: AskUserController;
+  question: NormalizedChoiceQuestion;
+  rows: ChoiceRow[];
+  selectedIndex: number;
+  theme: Theme;
+  width: number;
+}): string[] {
+  const { controller, question, rows, selectedIndex, theme, width } = args;
+  const lines: string[] = [];
+  const selectedIndexes = new Set(controller.getSelectedIndexes(question));
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const isSelected = i === selectedIndex;
+
+    if (row.kind === "option") {
+      const option = question.options[row.optionIndex];
+      if (!option) continue;
+
+      const marker = prepareOptionMarker(question, row.optionIndex, selectedIndexes);
+      const recommended = question.recommendedIndexes.includes(row.optionIndex);
+      const labelText = prepareOptionLabel(option, marker, recommended);
+
+      lines.push(...renderOptionRow({ option, labelText, isSelected, theme, width }));
+    } else {
+      const answer = controller.getAnswer(question.id);
+      const actionLabelText =
+        row.action === "other" && answer?.kind === "custom"
+          ? `Other \u2014 ${answer.value}`
+          : actionLabel(row.action);
+
+      lines.push(...renderActionRow({ actionLabel: actionLabelText, isSelected, theme }));
+    }
+  }
+
+  return lines;
+}
+
 function buildOptionItem(args: {
   question: NormalizedChoiceQuestion;
   optionIndex: number;
   label: string;
-  description: string | undefined;
   selectedIndexes: Set<number>;
 }): SelectItem {
-  const { question, optionIndex, label, description, selectedIndexes } = args;
+  const { question, optionIndex, label, selectedIndexes } = args;
   const recommended = question.recommendedIndexes.includes(optionIndex) ? " (recommended)" : "";
   const marker = question.multi
     ? selectedIndexes.has(optionIndex)
@@ -166,7 +257,6 @@ function buildOptionItem(args: {
   return {
     value: choiceRowValue({ kind: "option", optionIndex }),
     label: `${marker} ${label}${recommended}`,
-    description,
   };
 }
 

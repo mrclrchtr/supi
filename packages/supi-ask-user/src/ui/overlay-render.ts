@@ -8,7 +8,14 @@ import {
 } from "@earendil-works/pi-tui";
 import type { AskUserController } from "../session/controller.ts";
 import type { NormalizedQuestionnaire } from "../types.ts";
-import { type FocusTarget, footerText, type OverlayMode, splitColumns } from "./overlay-view.ts";
+import {
+  type ChoiceRow,
+  type FocusTarget,
+  footerText,
+  type OverlayMode,
+  renderChoiceList,
+  splitColumns,
+} from "./overlay-view.ts";
 
 export interface RenderOverlayFrameArgs {
   width: number;
@@ -17,7 +24,8 @@ export interface RenderOverlayFrameArgs {
   mode: OverlayMode;
   focus: FocusTarget;
   editor: Editor;
-  choiceList: SelectList | undefined;
+  choiceRows: ChoiceRow[];
+  choiceRowIndex: number;
   actionList: SelectList | undefined;
   textActionLabels: string[];
   previewText?: string;
@@ -114,7 +122,20 @@ function renderBody(args: RenderOverlayFrameArgs): string[] {
 }
 
 function renderChoiceBody(args: RenderOverlayFrameArgs): string[] {
-  const leftLines = args.choiceList?.render(splitLeftWidth(args.width)) ?? [];
+  const question = args.controller.currentQuestion;
+  const listWidth = splitLeftWidth(args.width);
+
+  const leftLines =
+    question.type === "choice"
+      ? renderChoiceList({
+          controller: args.controller,
+          question,
+          rows: args.choiceRows,
+          selectedIndex: args.choiceRowIndex,
+          theme: args.theme,
+          width: listWidth,
+        })
+      : [];
 
   if (args.mode === "custom-input" || args.mode === "discuss-input") {
     const rightLines = renderEditorLines(args, splitRightWidth(args.width));
