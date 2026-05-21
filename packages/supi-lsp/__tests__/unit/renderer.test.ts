@@ -59,43 +59,47 @@ vi.mock("../../src/diagnostics/diagnostic-context.ts", () => ({
   MAX_DETAILED_DIAGNOSTICS: 5,
 }));
 
-vi.mock("@mrclrchtr/supi-core/api", () => ({
-  getContextToken: (details: unknown) =>
-    details && typeof details === "object"
-      ? ((details as { contextToken?: string }).contextToken ?? null)
-      : null,
-  fileToUri: (filePath: string) => `file://${filePath}`,
-  resolveToolPath: (cwd: string, target: string) =>
-    `${cwd}/${target.startsWith("@") ? target.slice(1) : target}`.replace(/\/\/+/g, "/"),
-  uriToFile: (uri: string) => uri.replace(/^file:\/\//, ""),
-  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
-  restorePromptContent(
-    messages: Array<{ customType?: string; content?: unknown; details?: unknown }>,
-    customType: string,
-    activeToken: string | null,
-  ) {
-    if (!activeToken) return messages;
-    const getContextToken = (d: unknown): string | null => {
-      if (!d || typeof d !== "object") return null;
-      const t = (d as { contextToken?: unknown }).contextToken;
-      return typeof t === "string" ? t : null;
-    };
-    const getPromptContent = (d: unknown): string | null => {
-      if (!d || typeof d !== "object") return null;
-      const p = (d as { promptContent?: unknown }).promptContent;
-      return typeof p === "string" ? p : null;
-    };
-    const idx = messages.findIndex(
-      (m) => m.customType === customType && getContextToken(m.details) === activeToken,
-    );
-    if (idx === -1) return messages;
-    const pc = getPromptContent(messages[idx]?.details);
-    if (!pc || messages[idx]?.content === pc) return messages;
-    const next = [...messages];
-    next[idx] = { ...next[idx], content: pc };
-    return next;
-  },
-}));
+vi.mock("@mrclrchtr/supi-core/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mrclrchtr/supi-core/api")>();
+  return {
+    ...actual,
+    getContextToken: (details: unknown) =>
+      details && typeof details === "object"
+        ? ((details as { contextToken?: string }).contextToken ?? null)
+        : null,
+    fileToUri: (filePath: string) => `file://${filePath}`,
+    resolveToolPath: (cwd: string, target: string) =>
+      `${cwd}/${target.startsWith("@") ? target.slice(1) : target}`.replace(/\/\/+/g, "/"),
+    uriToFile: (uri: string) => uri.replace(/^file:\/\//, ""),
+    pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
+    restorePromptContent(
+      messages: Array<{ customType?: string; content?: unknown; details?: unknown }>,
+      customType: string,
+      activeToken: string | null,
+    ) {
+      if (!activeToken) return messages;
+      const getContextToken = (d: unknown): string | null => {
+        if (!d || typeof d !== "object") return null;
+        const t = (d as { contextToken?: unknown }).contextToken;
+        return typeof t === "string" ? t : null;
+      };
+      const getPromptContent = (d: unknown): string | null => {
+        if (!d || typeof d !== "object") return null;
+        const p = (d as { promptContent?: unknown }).promptContent;
+        return typeof p === "string" ? p : null;
+      };
+      const idx = messages.findIndex(
+        (m) => m.customType === customType && getContextToken(m.details) === activeToken,
+      );
+      if (idx === -1) return messages;
+      const pc = getPromptContent(messages[idx]?.details);
+      if (!pc || messages[idx]?.content === pc) return messages;
+      const next = [...messages];
+      next[idx] = { ...next[idx], content: pc };
+      return next;
+    },
+  };
+});
 
 vi.mock("../../src/manager/manager.ts", () => ({
   LspManager: mockFns.LspManager,

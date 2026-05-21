@@ -67,14 +67,18 @@ vi.mock("../../src/diagnostics/diagnostic-context.ts", () => ({
   formatDiagnosticsContext: mockFns.formatDiagnosticsContext,
   MAX_DETAILED_DIAGNOSTICS: 5,
 }));
-vi.mock("@mrclrchtr/supi-core/api", () => ({
-  pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
-  restorePromptContent: mockFns.restorePromptContent,
-  fileToUri: (filePath: string) => `file://${filePath}`,
-  resolveToolPath: (cwd: string, target: string) =>
-    `${cwd}/${target.startsWith("@") ? target.slice(1) : target}`.replace(/\/\/+/g, "/"),
-  uriToFile: (uri: string) => uri.replace(/^file:\/\//, ""),
-}));
+vi.mock("@mrclrchtr/supi-core/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mrclrchtr/supi-core/api")>();
+  return {
+    ...actual,
+    pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
+    restorePromptContent: mockFns.restorePromptContent,
+    fileToUri: (filePath: string) => `file://${filePath}`,
+    resolveToolPath: (cwd: string, target: string) =>
+      `${cwd}/${target.startsWith("@") ? target.slice(1) : target}`.replace(/\/\/+/g, "/"),
+    uriToFile: (uri: string) => uri.replace(/^file:\/\//, ""),
+  };
+});
 vi.mock("../../src/session/settings-registration.ts", () => ({
   loadLspSettings: mockFns.loadLspSettings,
   getLspDisabledMessage: vi.fn(() => "LSP is disabled in settings"),
