@@ -8,8 +8,8 @@
       "groupName": "github actions"
     },
     {
-      "matchPackagePrefixes": ["@earendil-works/"],
-      "groupName": "earendil-works"
+      "groupName": "earendil-works",
+      "matchPackageNames": ["@earendil-works/{/,}**"]
     }
   ]
 }
