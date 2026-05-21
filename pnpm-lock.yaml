@@ -22,8 +22,8 @@ importers:
         specifier: 21.0.1
         version: 21.0.1
       '@earendil-works/pi-ai':
-        specifier: 0.74.1
-        version: 0.74.1(ws@8.20.1)(zod@4.4.3)
+        specifier: 0.75.1
+        version: 0.75.1(ws@8.20.1)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: 0.74.1
         version: 0.74.1(ws@8.20.1)(zod@4.4.3)
@@ -854,6 +854,11 @@ packages:
   '@earendil-works/pi-ai@0.74.1':
     resolution: {integrity: sha512-xBgJnsrB+eCIsEB2rQ+aD/goGDo/YJMzQoICyL+ltHSB0SVQDgawjCzNF1IuRCzvUFceqZGJETUiejfWRDUe0Q==}
     engines: {node: '>=20.0.0'}
+    hasBin: true
+
+  '@earendil-works/pi-ai@0.75.1':
+    resolution: {integrity: sha512-/bhCWS2R+qHLBDnN+d1t1QRUxtZk7sZpMcrlexPq3W++3bJ0Df0GjhM2FToTubhoCsjOBdBOuRYcV8FNPfRUVQ==}
+    engines: {node: '>=22.19.0'}
     hasBin: true
 
   '@earendil-works/pi-coding-agent@0.74.0':
@@ -3268,10 +3273,29 @@ snapshots:
       - ws
       - zod
 
+  '@earendil-works/pi-ai@0.75.1(ws@8.20.1)(zod@4.4.3)':
+    dependencies:
+      '@anthropic-ai/sdk': 0.91.1(zod@4.4.3)
+      '@aws-sdk/client-bedrock-runtime': 3.1048.0
+      '@google/genai': 1.52.0
+      '@mistralai/mistralai': 2.2.1
+      http-proxy-agent: 7.0.2
+      https-proxy-agent: 7.0.6
+      openai: 6.26.0(ws@8.20.1)(zod@4.4.3)
+      partial-json: 0.1.7
+      typebox: 1.1.38
+    transitivePeerDependencies:
+      - '@modelcontextprotocol/sdk'
+      - bufferutil
+      - supports-color
+      - utf-8-validate
+      - ws
+      - zod
+
   '@earendil-works/pi-coding-agent@0.74.0(ws@8.20.1)(zod@4.4.3)':
     dependencies:
       '@earendil-works/pi-agent-core': 0.74.0(ws@8.20.1)(zod@4.4.3)
-      '@earendil-works/pi-ai': 0.74.0(ws@8.20.1)(zod@4.4.3)
+      '@earendil-works/pi-ai': 0.74.1(ws@8.20.1)(zod@4.4.3)
       '@earendil-works/pi-tui': 0.74.0
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.6.2
