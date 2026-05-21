@@ -28,29 +28,29 @@ Command aliases for muscle memory (`/exit`, `/e`). Default bash timeouts so hung
 
 Included in `@mrclrchtr/supi`. Install the full stack or pick individual packages from the table below.
 
-| Package | Description |
+| Install | Description |
 |---|---|
-| `@mrclrchtr/supi-lsp` | Go-to-definition, references, rename, hover types, inline diagnostics |
-| `@mrclrchtr/supi-tree-sitter` | AST-level structural analysis — outline, imports, exports, queries |
-| `@mrclrchtr/supi-code-intelligence` | Architecture briefs, caller/callee analysis, impact assessment |
-| `@mrclrchtr/supi-ask-user` | Structured decision forms for agent-user handoff |
-| `@mrclrchtr/supi-claude-md` | Subdirectory context injection + CLAUDE.md maintenance skills |
-| `@mrclrchtr/supi-context` | Context window transparency — see what's eating tokens |
-| `@mrclrchtr/supi-debug` | Diagnostics guardrails + debug event inspection |
-| `@mrclrchtr/supi-extras` | Command aliases, skill shorthand, tab spinner, prompt stash |
-| `@mrclrchtr/supi-bash-timeout` | Default timeouts on bash tool calls |
+| `pi install npm:@mrclrchtr/supi-lsp` | Go-to-definition, references, rename, hover types, inline diagnostics |
+| `pi install npm:@mrclrchtr/supi-tree-sitter` | AST-level structural analysis — outline, imports, exports, queries |
+| `pi install npm:@mrclrchtr/supi-code-intelligence` | Architecture briefs, caller/callee analysis, impact assessment |
+| `pi install npm:@mrclrchtr/supi-ask-user` | Structured decision forms for agent-user handoff |
+| `pi install npm:@mrclrchtr/supi-claude-md` | Subdirectory context injection + CLAUDE.md maintenance skills |
+| `pi install npm:@mrclrchtr/supi-context` | Context window transparency — see what's eating tokens |
+| `pi install npm:@mrclrchtr/supi-debug` | Diagnostics guardrails + debug event inspection |
+| `pi install npm:@mrclrchtr/supi-extras` | Command aliases, skill shorthand, tab spinner, prompt stash |
+| `pi install npm:@mrclrchtr/supi-bash-timeout` | Default timeouts on bash tool calls |
 
 ### Beta
 
 Not bundled in the meta-package. Install individually.
 
-| Package | Description |
+| Install | Description |
 |---|---|
-| `@mrclrchtr/supi-web` | Fetch web pages as clean Markdown + Context7 library docs |
-| `@mrclrchtr/supi-cache` | Prompt cache health monitoring and cross-session forensics |
-| `@mrclrchtr/supi-insights` | Usage reports and session analytics |
-| `@mrclrchtr/supi-review` | Structured code reviews via `/supi-review` |
-| `@mrclrchtr/supi-rtk` | Transparent bash command rewriting for token savings |
+| `pi install npm:@mrclrchtr/supi-web` | Fetch web pages as clean Markdown + Context7 library docs |
+| `pi install npm:@mrclrchtr/supi-cache` | Prompt cache health monitoring and cross-session forensics |
+| `pi install npm:@mrclrchtr/supi-insights` | Usage reports and session analytics |
+| `pi install npm:@mrclrchtr/supi-review` | Structured code reviews via `/supi-review` |
+| `pi install npm:@mrclrchtr/supi-rtk` | Transparent bash command rewriting for token savings |
 
 Each package has its own README with full details, configuration, and API docs.
 
