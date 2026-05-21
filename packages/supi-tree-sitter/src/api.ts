@@ -1,5 +1,6 @@
-// Public tree-sitter session factory and shared types.
+// Public tree-sitter session factory, shared session service access, and shared types.
 
+export { getSessionTreeSitterService } from "./session/service-registry.ts";
 export { createTreeSitterSession } from "./session/session.ts";
 export type {
   CalleesAtResult,
@@ -9,8 +10,11 @@ export type {
   NodeAtResult,
   OutlineItem,
   QueryCapture,
+  SessionTreeSitterService,
+  SessionTreeSitterServiceState,
   SourceRange,
   SupportedExtension,
   TreeSitterResult,
+  TreeSitterService,
   TreeSitterSession,
 } from "./types.ts";

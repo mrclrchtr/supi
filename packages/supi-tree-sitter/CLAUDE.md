@@ -3,8 +3,8 @@
 ## Scope
 
 `@mrclrchtr/supi-tree-sitter` has two explicit surfaces:
-- `@mrclrchtr/supi-tree-sitter/extension` → `src/extension.ts` → registers the `tree_sitter` tool for pi
-- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports `createTreeSitterSession()` and shared types for other SuPi packages
+- `@mrclrchtr/supi-tree-sitter/extension` → `src/extension.ts` → registers the `tree_sitter` tool for pi and publishes a shared session-scoped structural service
+- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports `createTreeSitterSession()`, `getSessionTreeSitterService()`, and shared types for other SuPi packages
 
 The package is designed as a standalone structural-analysis substrate. It does not depend on `supi-lsp` and must remain correct when installed independently.
 
@@ -36,8 +36,10 @@ src/
   syntax-node.ts      # syntax node interface
   session/
     runtime.ts        # grammar initialization, parser reuse, parse/query services
-    session.ts        # session lifecycle factory and dispose()
+    service-registry.ts # shared session-scoped structural service registry
+    session.ts        # runtime-backed service helpers and owned session factory
   tool/
+    action-specs.ts   # single source of truth for public action metadata
     callees.ts        # callee extraction
     exports.ts        # export extraction
     formatting.ts     # tool output formatting and caps
@@ -112,3 +114,5 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 3. `supi-code-intelligence` — unified agent-facing layer above both
 
 Keep this package independent of `supi-lsp` internals. Any shared utilities belong in `supi-core`.
+
+The extension now publishes a shared session-scoped Tree-sitter service through `getSessionTreeSitterService(cwd)`. Peer packages that only need structural operations should prefer that shared service over repeatedly creating owned sessions. Use `createTreeSitterSession()` only when you need an explicitly owned lifecycle.

@@ -2,41 +2,12 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-// ── URI Handling ──────────────────────────────────────────────────────
 
-/** Convert a file path to a file:// URI. */
-export function fileToUri(filePath: string): string {
-  const resolved = path.resolve(filePath);
-  if (process.platform === "win32") {
-    return `file:///${resolved.replace(/\\/g, "/")}`;
-  }
-  return `file://${resolved}`;
-}
-
-/** Convert a file:// URI to a file path. */
-export function uriToFile(uri: string): string {
-  if (!uri.startsWith("file://")) return uri;
-  let filePath = decodeURIComponent(uri.slice(7));
-  if (
-    process.platform === "win32" &&
-    filePath.startsWith("/") &&
-    /^[A-Za-z]:/.test(filePath.slice(1))
-  ) {
-    filePath = filePath.slice(1);
-  }
-  return filePath;
-}
-
-/**
- * Resolve a tool-style file path against the active session cwd.
- *
- * Built-in pi file tools accept a leading `@` prefix in path arguments, so LSP
- * helpers strip that prefix as well before resolving relative paths.
- */
-export function resolveSessionPath(cwd: string, filePath: string): string {
-  const normalizedPath = filePath.startsWith("@") ? filePath.slice(1) : filePath;
-  return path.resolve(cwd, normalizedPath);
-}
+export {
+  fileToUri,
+  resolveToolPath as resolveSessionPath,
+  uriToFile,
+} from "@mrclrchtr/supi-core/api";
 
 // ── Language ID Detection ─────────────────────────────────────────────
 

@@ -25,6 +25,7 @@ src/
   index.ts            — public export surface (identical to api.ts)
   extension.ts        — minimal pi extension registering /supi-settings
   debug-registry.ts   — debug event registry (flat utility)
+  path-utils.ts       — shared tool-path and file-URI normalization helpers
   project-roots.ts    — directory walking, root discovery (flat utility)
   registry-utils.ts   — globalThis-backed shared registry (flat utility)
   session-utils.ts    — session utilities (flat utility)
@@ -59,6 +60,7 @@ __tests__/
 ### Key paths
 
 - `api.ts`, `index.ts` — public export surface; keep the shared API deliberate and small
+- `path-utils.ts` — preferred shared location for leading `@` stripping, cwd resolution, and file URI conversion used across SuPi tool packages
 
 ## Config gotchas
 

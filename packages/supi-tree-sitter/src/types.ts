@@ -66,8 +66,8 @@ export interface QueryCapture {
   text: string;
 }
 
-/** Session-level Tree-sitter service. */
-export interface TreeSitterSession {
+/** Shared Tree-sitter service surface, independent of lifecycle ownership. */
+export interface TreeSitterService {
   /** Validate that a supported file can be read and parsed; does not expose the raw tree. */
   canParse(file: string): Promise<TreeSitterResult<{ file: string; language: string }>>;
   /** Run a Tree-sitter query and return all captures. */
@@ -86,9 +86,20 @@ export interface TreeSitterSession {
     line: number,
     character: number,
   ): Promise<TreeSitterResult<CalleesAtResult>>;
+}
+
+/** Owned Tree-sitter session that must release its runtime resources. */
+export interface TreeSitterSession extends TreeSitterService {
   /** Release parser and grammar resources owned by this session. */
   dispose(): void;
 }
+
+/** Session-scoped shared structural service published by the extension runtime. */
+export type SessionTreeSitterService = TreeSitterService;
+
+export type SessionTreeSitterServiceState =
+  | { kind: "ready"; service: SessionTreeSitterService }
+  | { kind: "unavailable"; reason: string };
 
 /** Supported grammar identifiers. */
 export type GrammarId =

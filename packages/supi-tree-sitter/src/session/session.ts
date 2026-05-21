@@ -1,4 +1,4 @@
-// Session factory — creates a TreeSitterSession bound to a working directory.
+// Session factory — creates runtime-backed Tree-sitter services and owned sessions.
 
 import { detectGrammar, isJsTsGrammar } from "../language.ts";
 import {
@@ -16,17 +16,13 @@ import type {
   OutlineItem,
   QueryCapture,
   TreeSitterResult,
+  TreeSitterService,
   TreeSitterSession,
 } from "../types.ts";
 import { TreeSitterRuntime } from "./runtime.ts";
 
-/**
- * Create a new Tree-sitter session bound to the given working directory.
- * The session owns parser/grammar reuse and must be disposed when done.
- */
-export function createTreeSitterSession(cwd: string): TreeSitterSession {
-  const runtime = new TreeSitterRuntime(cwd);
-
+/** Create a runtime-backed structural service without taking ownership of disposal. */
+export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterService {
   return {
     async canParse(file: string) {
       const result = await runtime.parseFile(file);
@@ -104,7 +100,19 @@ export function createTreeSitterSession(cwd: string): TreeSitterSession {
     ): Promise<TreeSitterResult<CalleesAtResult>> {
       return lookupCalleesAt(runtime, file, line, character);
     },
+  };
+}
 
+/**
+ * Create a new Tree-sitter session bound to the given working directory.
+ * The session owns parser/grammar reuse and must be disposed when done.
+ */
+export function createTreeSitterSession(cwd: string): TreeSitterSession {
+  const runtime = new TreeSitterRuntime(cwd);
+  const service = createTreeSitterService(runtime);
+
+  return {
+    ...service,
     dispose() {
       runtime.dispose();
     },

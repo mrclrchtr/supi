@@ -9,16 +9,14 @@ import { executeImplementationsAction } from "./actions/implementations-action.t
 import { executeIndexAction } from "./actions/index-action.ts";
 import { executePatternAction } from "./actions/pattern-action.ts";
 import { normalizePath } from "./search-helpers.ts";
+import {
+  type CodeIntelAction,
+  formatCodeIntelActionList,
+  isCodeIntelAction,
+} from "./tool/action-specs.ts";
 import type { CodeIntelResult } from "./types.ts";
 
-export type CodeIntelAction =
-  | "brief"
-  | "callers"
-  | "callees"
-  | "implementations"
-  | "affected"
-  | "pattern"
-  | "index";
+export type { CodeIntelAction } from "./tool/action-specs.ts";
 
 /** Flat parameter bag shared by `code_intel` action handlers. */
 export interface ActionParams {
@@ -40,15 +38,20 @@ export interface ActionParams {
   summary?: boolean;
 }
 
-const SUPPORTED_ACTIONS = new Set<string>([
-  "brief",
-  "callers",
-  "callees",
-  "implementations",
-  "affected",
-  "pattern",
-  "index",
-]);
+type ActionHandler = (
+  params: ActionParams,
+  cwd: string,
+) => CodeIntelResult | Promise<CodeIntelResult>;
+
+const ACTION_HANDLERS: Record<CodeIntelAction, ActionHandler> = {
+  brief: executeBriefAction,
+  callers: executeCallersAction,
+  callees: executeCalleesAction,
+  implementations: executeImplementationsAction,
+  affected: executeAffectedAction,
+  pattern: executePatternAction,
+  index: (_params, cwd) => executeIndexAction(cwd),
+};
 
 /**
  * Main action dispatcher — validates params and routes to specific action handlers.
@@ -62,32 +65,12 @@ export async function executeAction(
   const error = validateParams(params, cwd);
   if (error) return { content: error, details: undefined };
 
-  switch (params.action) {
-    case "brief":
-      return executeBriefAction(params, cwd);
-    case "callers":
-      return executeCallersAction(params, cwd);
-    case "callees":
-      return executeCalleesAction(params, cwd);
-    case "implementations":
-      return executeImplementationsAction(params, cwd);
-    case "affected":
-      return executeAffectedAction(params, cwd);
-    case "pattern":
-      return executePatternAction(params, cwd);
-    case "index":
-      return executeIndexAction(cwd);
-    default:
-      return {
-        content: `**Error:** Unknown action \`${params.action}\`.`,
-        details: undefined,
-      };
-  }
+  return ACTION_HANDLERS[params.action](params, cwd);
 }
 
 function validateParams(params: ActionParams, cwd: string): string | null {
-  if (!params.action || !SUPPORTED_ACTIONS.has(params.action)) {
-    return `**Error:** Unknown action \`${params.action ?? "(none)"}\`. Supported: \`brief\`, \`callers\`, \`callees\`, \`implementations\`, \`affected\`, \`pattern\`, \`index\`.`;
+  if (!params.action || !isCodeIntelAction(params.action)) {
+    return `**Error:** Unknown action \`${params.action ?? "(none)"}\`. Supported: ${formatCodeIntelActionList({ fenced: true })}.`;
   }
 
   if (params.path && (params.line != null || params.character != null)) {

@@ -26,7 +26,6 @@ pnpm exec biome check packages/supi-code-intelligence/
 src/
 ├── code-intelligence.ts    # Extension factory — registers tool + event hooks
 ├── index.ts                # Public API exports for programmatic consumers
-├── guidance.ts             # promptGuidelines + promptSnippet + toolDescription
 ├── types.ts                # Result metadata types (BriefDetails, SearchDetails, etc.)
 ├── tool-actions.ts         # Action dispatcher + param validation
 ├── architecture.ts         # Project model builder (workspace scan, module detection)
@@ -39,9 +38,12 @@ src/
 ├── pattern-structured.ts   # Tree-sitter-based structured pattern search
 ├── prioritization-signals.ts # Diagnostics, coverage, knip unused signals
 ├── semantic-action-helpers.ts # Shared confidence/resolution helpers
+├── tool/
+│   ├── action-specs.ts        # Single source of truth for public action metadata
+│   └── guidance.ts            # promptGuidelines + promptSnippet + toolDescription
 ├── providers/
 │   ├── semantic-provider.ts   # Session-scoped LSP access + short readiness waits
-│   └── structural-provider.ts # Short-lived Tree-sitter session helper
+│   └── structural-provider.ts # Shared Tree-sitter service access with short-lived fallback
 └── actions/
     ├── brief-action.ts         # Architecture overviews + anchored briefs
     ├── callers-action.ts       # Find call sites (LSP → ripgrep)
@@ -177,7 +179,7 @@ t.writeFile("index.ts", "export const x = 1;\n");
 
 - **`@mrclrchtr/supi-core/api`** — `findProjectRoot`, `walkProject`, `isWithinOrEqual`
 - **`@mrclrchtr/supi-lsp/api`** — `getSessionLspService`, `SessionLspService`, `Position`
-- **`@mrclrchtr/supi-tree-sitter/api`** — `createTreeSitterSession` (for `callees` and anchored brief outline)
+- **`@mrclrchtr/supi-tree-sitter/api`** — `getSessionTreeSitterService`, `createTreeSitterSession`, `TreeSitterService`
 - **`@earendil-works/pi-ai`** — `StringEnum` for TypeScript enum type generation
 - **`@earendil-works/pi-coding-agent`** — `ExtensionAPI`, `BeforeAgentStartEventResult`
 - **`typebox`** — `Type.Object(...)` for tool parameter schema

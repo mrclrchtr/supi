@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { escapeRegex, isLowSignalPath, normalizePath } from "../../src/search-helpers.ts";
+import {
+  escapeRegex,
+  isLowSignalPath,
+  normalizePath,
+  uriToFile,
+} from "../../src/search-helpers.ts";
 
 // biome-ignore lint/security/noSecrets: function name in test describe
 describe("isLowSignalPath", () => {
@@ -49,5 +54,15 @@ describe("normalizePath", () => {
     const result = normalizePath("@packages/core", "/project");
     expect(result).not.toContain("@");
     expect(result).toContain("packages/core");
+  });
+});
+
+describe("uriToFile", () => {
+  it("decodes percent-encoded file URIs", () => {
+    expect(uriToFile("file:///project/my%20file.ts")).toBe("/project/my file.ts");
+  });
+
+  it("passes through non-file URIs", () => {
+    expect(uriToFile("https://example.com")).toBe("https://example.com");
   });
 });

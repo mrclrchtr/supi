@@ -2,7 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { TreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
+import type { TreeSitterService } from "@mrclrchtr/supi-tree-sitter/api";
 import { buildArchitectureModel, findModuleForPath } from "../architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import { withStructuralSession } from "../providers/structural-provider.ts";
@@ -123,7 +123,7 @@ async function addTreeSitterContext(input: TreeSitterContextInput): Promise<void
 
 async function addNodeContext(
   lines: string[],
-  ts: TreeSitterSession,
+  ts: TreeSitterService,
   relPath: string,
   pos: { line: number; char: number },
 ): Promise<void> {
@@ -143,7 +143,7 @@ async function addNodeContext(
 
 async function addOutlineContext(
   lines: string[],
-  ts: TreeSitterSession,
+  ts: TreeSitterService,
   relPath: string,
   line1: number,
 ): Promise<void> {
@@ -182,7 +182,7 @@ function getOutlinePrefix(kind: string): string {
 
 async function addImportsContext(
   lines: string[],
-  ts: TreeSitterSession,
+  ts: TreeSitterService,
   relPath: string,
 ): Promise<void> {
   const result = await ts.imports(relPath);
@@ -200,7 +200,7 @@ async function addImportsContext(
 
 async function addExportsContext(
   lines: string[],
-  ts: TreeSitterSession,
+  ts: TreeSitterService,
   relPath: string,
 ): Promise<void> {
   const result = await ts.exports(relPath);

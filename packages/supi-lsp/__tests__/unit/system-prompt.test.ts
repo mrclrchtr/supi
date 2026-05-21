@@ -60,6 +60,10 @@ vi.mock("../../src/diagnostics/diagnostic-context.ts", () => ({
 vi.mock("@mrclrchtr/supi-core/api", () => ({
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
   restorePromptContent: vi.fn((msgs: unknown[]) => msgs),
+  fileToUri: (filePath: string) => `file://${filePath}`,
+  resolveToolPath: (cwd: string, target: string) =>
+    `${cwd}/${target.startsWith("@") ? target.slice(1) : target}`.replace(/\/\/+/g, "/"),
+  uriToFile: (uri: string) => uri.replace(/^file:\/\//, ""),
 }));
 
 vi.mock("../../src/session/settings-registration.ts", () => ({

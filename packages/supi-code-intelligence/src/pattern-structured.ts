@@ -72,7 +72,7 @@ export async function getStructuredPatternMatches(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: kind-specific tree-sitter matching is clearest as one helper
 async function collectMatchesForFile(
   matches: StructuredMatch[],
-  tsSession: import("@mrclrchtr/supi-tree-sitter/api").TreeSitterSession,
+  tsSession: import("@mrclrchtr/supi-tree-sitter/api").TreeSitterService,
   relFile: string,
   kind: StructuredPatternKind,
   matcher: (value: string) => boolean,

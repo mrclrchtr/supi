@@ -2,15 +2,8 @@
 
 import * as path from "node:path";
 import type { ProjectServerInfo } from "../config/types.ts";
-import {
-  LSP_DIAGNOSTICS_TOOL,
-  LSP_DOCUMENT_SYMBOLS_TOOL,
-  LSP_LOOKUP_TOOL,
-  LSP_RECOVER_TOOL,
-  LSP_REFACTOR_TOOL,
-  LSP_WORKSPACE_SYMBOLS_TOOL,
-  type LspToolName,
-} from "./names.ts";
+import { LSP_LOOKUP_TOOL, type LspToolName } from "./names.ts";
+import { LSP_TOOL_DEFINITION_SPECS } from "./tool-specs.ts";
 
 export interface LspToolPromptSurface {
   description: string;
@@ -20,33 +13,6 @@ export interface LspToolPromptSurface {
 
 export type LspToolPromptSurfaceMap = Record<LspToolName, LspToolPromptSurface>;
 
-const LOOKUP_GUIDELINES = [
-  'Use lsp_lookup with `kind: "hover"` for semantic type or symbol information at a known `file`, `line`, and `character`.',
-  'Use lsp_lookup with `kind: "definition"`, `"references"`, or `"implementation"` for semantic navigation at a known position.',
-  "Use lsp_lookup after code_intel or tree_sitter has already narrowed the target file and position.",
-];
-
-const DOCUMENT_SYMBOL_GUIDELINES = [
-  "Use lsp_document_symbols(file) for semantic declarations in one supported file.",
-];
-
-const WORKSPACE_SYMBOL_GUIDELINES = [
-  "Use lsp_workspace_symbols(query) for semantic symbol-name lookup across the current project.",
-];
-
-const DIAGNOSTICS_GUIDELINES = [
-  "Use lsp_diagnostics(file?) when you need current diagnostics for one file or a workspace-level summary.",
-];
-
-const REFACTOR_GUIDELINES = [
-  'Use lsp_refactor with `kind: "rename"` for semantic rename planning at a known `file`, `line`, and `character`.',
-  'Use lsp_refactor with `kind: "code_actions"` for semantic fixes or refactors at a known position.',
-];
-
-const RECOVER_GUIDELINES = [
-  "Use lsp_recover() when diagnostics look stale after workspace-level changes or generated-file updates.",
-];
-
 export const defaultLspToolPromptSurfaces = buildLspToolPromptSurfaces([], ".");
 
 export function buildLspToolPromptSurfaces(
@@ -55,45 +21,19 @@ export function buildLspToolPromptSurfaces(
 ): LspToolPromptSurfaceMap {
   const coverageGuidelines = buildCoverageGuidelines(servers, cwd);
 
-  return {
-    [LSP_LOOKUP_TOOL]: {
-      description:
-        "Language Server Protocol lookup tool — semantic hover, definition, references, and implementation for supported files. Use lsp_lookup when you know the file and 1-based line/character position and need semantic drill-down rather than text search.",
-      promptSnippet:
-        "lsp_lookup — semantic hover/definition/references/implementation at a known file position",
-      promptGuidelines: [...LOOKUP_GUIDELINES, ...coverageGuidelines],
-    },
-    [LSP_DOCUMENT_SYMBOLS_TOOL]: {
-      description:
-        "Language Server Protocol document symbols tool — list semantic declarations in one supported file. Use lsp_document_symbols when you need a symbol-aware outline rather than raw text structure.",
-      promptSnippet: "lsp_document_symbols — semantic declarations for one supported file",
-      promptGuidelines: DOCUMENT_SYMBOL_GUIDELINES,
-    },
-    [LSP_WORKSPACE_SYMBOLS_TOOL]: {
-      description:
-        "Language Server Protocol workspace symbols tool — semantic symbol-name lookup across the current project. Use lsp_workspace_symbols to find declarations by name before opening a specific file.",
-      promptSnippet: "lsp_workspace_symbols — semantic symbol-name lookup across the project",
-      promptGuidelines: WORKSPACE_SYMBOL_GUIDELINES,
-    },
-    [LSP_DIAGNOSTICS_TOOL]: {
-      description:
-        "Language Server Protocol diagnostics tool — current diagnostics for one file or a workspace summary. Use lsp_diagnostics for semantic compiler or language-server issues instead of guessing from text alone.",
-      promptSnippet: "lsp_diagnostics — current diagnostics for one file or the workspace",
-      promptGuidelines: DIAGNOSTICS_GUIDELINES,
-    },
-    [LSP_REFACTOR_TOOL]: {
-      description:
-        "Language Server Protocol refactor tool — semantic rename planning and code actions at a known file position. Use lsp_refactor when you need language-server-backed edits or quick-fix suggestions.",
-      promptSnippet: "lsp_refactor — semantic rename planning and code actions at a known position",
-      promptGuidelines: REFACTOR_GUIDELINES,
-    },
-    [LSP_RECOVER_TOOL]: {
-      description:
-        "Language Server Protocol recover tool — refresh diagnostics after workspace changes and stale language-server state. Use lsp_recover when new files, generated types, or config updates leave diagnostics out of sync.",
-      promptSnippet: "lsp_recover — refresh stale diagnostics after workspace changes",
-      promptGuidelines: RECOVER_GUIDELINES,
-    },
-  };
+  return Object.fromEntries(
+    LSP_TOOL_DEFINITION_SPECS.map((spec) => [
+      spec.name,
+      {
+        description: spec.description,
+        promptSnippet: spec.promptSnippet,
+        promptGuidelines:
+          "includeCoverageGuidelines" in spec && spec.includeCoverageGuidelines
+            ? [...spec.basePromptGuidelines, ...coverageGuidelines]
+            : [...spec.basePromptGuidelines],
+      } satisfies LspToolPromptSurface,
+    ]),
+  ) as LspToolPromptSurfaceMap;
 }
 
 function buildCoverageGuidelines(servers: ProjectServerInfo[], cwd: string): string[] {

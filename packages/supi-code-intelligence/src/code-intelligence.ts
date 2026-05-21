@@ -6,20 +6,13 @@ import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/
 import { Type } from "typebox";
 import { buildArchitectureModel } from "./architecture.ts";
 import { generateOverview } from "./brief.ts";
+import { CODE_INTEL_ACTION_NAMES, type CodeIntelAction } from "./tool/action-specs.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
-import { type CodeIntelAction, executeAction } from "./tool-actions.ts";
+import { executeAction } from "./tool-actions.ts";
 
 const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";
 
-const CodeIntelActionEnum = StringEnum([
-  "brief",
-  "callers",
-  "callees",
-  "implementations",
-  "affected",
-  "pattern",
-  "index",
-] as const);
+const CodeIntelActionEnum = StringEnum(CODE_INTEL_ACTION_NAMES);
 
 /**
  * Register the `code_intel` tool and inject a lightweight architecture overview

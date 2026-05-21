@@ -2,6 +2,7 @@
 
 import { execFileSync } from "node:child_process";
 import * as path from "node:path";
+import { resolveToolPath, uriToFile as uriToFileShared } from "@mrclrchtr/supi-core/api";
 
 const LOW_SIGNAL_DIRS = new Set([
   "node_modules",
@@ -25,19 +26,8 @@ export function isLowSignalPath(filePath: string): boolean {
   return segments.some((s) => LOW_SIGNAL_DIRS.has(s));
 }
 
-/** Convert a file:// URI to a file path, matching the normalization in supi-lsp. */
-export function uriToFile(uri: string): string {
-  if (!uri.startsWith("file://")) return uri;
-  let filePath = decodeURIComponent(uri.slice(7));
-  if (
-    process.platform === "win32" &&
-    filePath.startsWith("/") &&
-    /^[A-Za-z]:/.test(filePath.slice(1))
-  ) {
-    filePath = filePath.slice(1);
-  }
-  return filePath;
-}
+/** Convert a file:// URI to a file path, matching the shared SuPi normalization. */
+export const uriToFile = uriToFileShared;
 
 /** Check whether a resolved file path is inside the current project (within cwd, not under node_modules or .pnpm). */
 export function isInProjectPath(filePath: string, cwd: string): boolean {
@@ -59,8 +49,7 @@ export function escapeRegex(s: string): string {
 
 /** Normalize a file/path value: strip leading @, resolve relative to cwd. */
 export function normalizePath(input: string, cwd: string): string {
-  const stripped = input.startsWith("@") ? input.slice(1) : input;
-  return path.resolve(cwd, stripped);
+  return resolveToolPath(cwd, input);
 }
 
 export interface RgMatch {

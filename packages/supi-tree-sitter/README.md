@@ -33,7 +33,7 @@ After install, pi gets one tool:
 | `query` | Run a custom Tree-sitter query against a file | Any supported grammar |
 | `callees` | Find outgoing calls from the enclosing function or method at a position | Supported for most grammars, but not all |
 
-Coordinates use **1-based** line and character columns. Character positions use UTF-16 code units.
+Coordinates use **1-based** line and character columns. Character positions use UTF-16 code units. Relative paths resolve from the session cwd, and a leading `@` on file paths is stripped.
 
 ## Supported file families
 
@@ -54,10 +54,10 @@ The current tool description covers:
 
 ## Package surfaces
 
-- `@mrclrchtr/supi-tree-sitter/api` — reusable parsing session factory and shared result types
+- `@mrclrchtr/supi-tree-sitter/api` — reusable parsing session factory, shared session-scoped structural service access, and shared result types
 - `@mrclrchtr/supi-tree-sitter/extension` — pi extension entrypoint
 
-Example:
+Owned session example:
 
 ```ts
 import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
@@ -71,9 +71,21 @@ const callees = await session.calleesAt("src/index.ts", 42, 10);
 session.dispose();
 ```
 
+Shared session-scoped service example:
+
+```ts
+import { getSessionTreeSitterService } from "@mrclrchtr/supi-tree-sitter/api";
+
+const state = getSessionTreeSitterService("/project");
+if (state.kind === "ready") {
+  const outline = await state.service.outline("src/index.ts");
+}
+```
+
 ## Source
 
 - `src/tree-sitter.ts` — tool registration and action handling
-- `src/runtime.ts` — parser and query runtime
-- `src/session.ts` — reusable session API
-- `src/outline.ts`, `src/imports.ts`, `src/exports.ts`, `src/node-at.ts`, `src/callees.ts` — structural analyses
+- `src/session/runtime.ts` — parser and query runtime
+- `src/session/session.ts` — runtime-backed service helpers and owned session API
+- `src/session/service-registry.ts` — shared session-scoped structural service registry
+- `src/tool/outline.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts` — structural analyses

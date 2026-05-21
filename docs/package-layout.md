@@ -49,7 +49,7 @@ Stay flat when a package is small or has only one clear subsystem.
 
 Preferred optional folders:
 - `config/` — config loading, schemas, defaults, capabilities
-- `tool/` — tool wiring, action dispatch, overrides, prompt guidance
+- `tool/` — tool wiring, action specs, capability metadata, overrides, prompt guidance
 - `ui/` — renderers, widgets, display formatting
 - `session/` — per-session state, registries, persistence, runtime wiring
 - domain folders such as `actions/`, `client/`, `manager/`, `forensics/`, `monitor/`, `report/`
@@ -70,9 +70,34 @@ Guidance modules should export the relevant prompt surfaces for that tool:
 - `promptGuidelines`
 - optional dynamic builders such as `buildPromptGuidelines()` when the guidance depends on runtime or project state
 
+### Tool metadata convention
+
+When a package has more than trivial tool metadata, keep a single source of truth for the public tool or action surface under `src/tool/`.
+
+Preferred pattern:
+- one multiplexed tool with an `action` parameter → `src/tool/action-specs.ts`
+- multiple public tools in one package → `src/tool/tool-specs.ts`
+- small packages with one simple tool may keep metadata inline until duplication appears
+
+These spec modules should own the public metadata that otherwise drifts between guidance, schemas, registration, and UI:
+- tool or action names
+- parameter schemas or enum values
+- descriptions, `promptSnippet`, and base `promptGuidelines`
+- validation support text such as ordered action lists
+- displayed capability labels when the package surfaces runtime support to users
+
+Guidance and registration code should derive from those specs rather than re-declaring the same literals in multiple files. Keep execution logic in separate action or service modules. For the full rationale and examples, see `docs/tool-architecture.md`.
+
 ### Prefer domain folders over generic buckets
 
 Prefer domain folders over `core/`, `shared/`, `misc/`, or other catch-all names. Use domain folders when files already share a prefix or responsibility boundary.
+
+### Shared helpers belong in `supi-core`
+
+When multiple SuPi packages need the same path, URI, config, or session helper semantics, prefer a shared helper in `@mrclrchtr/supi-core/api` over package-local copies. This is especially important for:
+- leading `@` path normalization
+- relative-to-`cwd` resolution
+- `file://` URI conversion
 
 ## Test layout rules
 
@@ -92,7 +117,7 @@ Prefer domain folders over `core/`, `shared/`, `misc/`, or other catch-all names
 | `supi-bash-timeout` | stay flat unless it grows |
 | `supi-cache` | domain-first: `forensics/`, `monitor/`, `report/`; optional `config/` later |
 | `supi-claude-md` | mostly flat; optional `config/` or `session/` if runtime state grows |
-| `supi-code-intelligence` | hybrid: root surfaces + `actions/`; optional `tool/` later |
+| `supi-code-intelligence` | hybrid: root surfaces + `actions/` + `tool/` |
 | `supi-context` | stay flat unless it grows |
 | `supi-core` | domain-first if reorganized: `config/`, `context/`, `settings/` |
 | `supi-debug` | stay flat unless it grows; optional `ui/` if renderer concerns expand |
@@ -102,7 +127,7 @@ Prefer domain folders over `core/`, `shared/`, `misc/`, or other catch-all names
 | `supi-review` | likely hybrid with `ui/` and `tool/` if reorganized |
 | `supi-rtk` | stay flat unless it grows |
 | `supi-test-utils` | stay flat utility package |
-| `supi-tree-sitter` | hybrid: root surfaces + possible `tool/` / `session/` |
+| `supi-tree-sitter` | hybrid: root surfaces + `tool/` + `session/` |
 | `supi-web` | mostly flat; use `tool/` for per-tool guidance files when multiple tools are present |
 
 ## Package-specific examples

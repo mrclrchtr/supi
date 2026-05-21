@@ -64,6 +64,10 @@ vi.mock("@mrclrchtr/supi-core/api", () => ({
     details && typeof details === "object"
       ? ((details as { contextToken?: string }).contextToken ?? null)
       : null,
+  fileToUri: (filePath: string) => `file://${filePath}`,
+  resolveToolPath: (cwd: string, target: string) =>
+    `${cwd}/${target.startsWith("@") ? target.slice(1) : target}`.replace(/\/\/+/g, "/"),
+  uriToFile: (uri: string) => uri.replace(/^file:\/\//, ""),
   pruneAndReorderContextMessages: mockFns.pruneAndReorderContextMessages,
   restorePromptContent(
     messages: Array<{ customType?: string; content?: unknown; details?: unknown }>,

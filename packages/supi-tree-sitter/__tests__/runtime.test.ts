@@ -55,6 +55,16 @@ describe("TreeSitterRuntime", () => {
       runtime.dispose();
     });
 
+    it("strips a leading @ from file paths", async () => {
+      const runtime = new TreeSitterRuntime(FIXTURE_DIR);
+      const result = await runtime.parseFile("@sample.ts");
+      expect(result.kind).toBe("success");
+      if (result.kind === "success") {
+        expect(result.data.resolvedPath).toContain("sample.ts");
+      }
+      runtime.dispose();
+    });
+
     it("parses a JavaScript file successfully", async () => {
       const runtime = new TreeSitterRuntime(FIXTURE_DIR);
       const result = await runtime.parseFile("sample.js");

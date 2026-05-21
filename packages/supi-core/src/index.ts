@@ -49,6 +49,7 @@ export {
   redactDebugData,
   resetDebugRegistry,
 } from "./debug-registry.ts";
+export { fileToUri, resolveToolPath, stripToolPathPrefix, uriToFile } from "./path-utils.ts";
 export type { KnownRootEntry } from "./project-roots.ts";
 export {
   buildKnownRootsMap,

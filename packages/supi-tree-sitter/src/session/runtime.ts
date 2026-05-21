@@ -2,6 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { resolveToolPath } from "@mrclrchtr/supi-core/api";
 import type { Language, Parser, Tree } from "web-tree-sitter";
 import { nodeToRange } from "../coordinates.ts";
 import { detectGrammar, resolveGrammarWasmPath } from "../language.ts";
@@ -113,7 +114,7 @@ export class TreeSitterRuntime {
       grammarId: GrammarId;
     }>
   > {
-    const resolvedPath = path.resolve(this.cwd, filePath);
+    const resolvedPath = resolveToolPath(this.cwd, filePath);
 
     // Check language support first
     const grammarId = detectGrammar(filePath);
@@ -212,7 +213,7 @@ export class TreeSitterRuntime {
 
   /** Resolve a file path from cwd. */
   resolvePath(filePath: string): string {
-    return path.resolve(this.cwd, filePath);
+    return resolveToolPath(this.cwd, filePath);
   }
 
   /** Dispose all held parser resources. */

@@ -2,6 +2,8 @@
 
 This guide matches the current `pi` repo behavior: docs, types, built-in tools, and extension examples.
 
+For SuPi's repo-specific package architecture conventions around `action-specs.ts`, `tool-specs.ts`, and deriving guidance or registration from one metadata source, see `../tool-architecture.md`.
+
 ## Recommended Tool Shape
 
 ```typescript

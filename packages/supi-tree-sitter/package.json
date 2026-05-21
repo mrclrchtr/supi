@@ -31,6 +31,7 @@
     "check:sql-wasm": "node scripts/generate-sql-wasm.mjs --check"
   },
   "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*",
     "web-tree-sitter": "^0.26.8"
   },
   "peerDependencies": {
@@ -71,9 +72,13 @@
   },
   "pi": {
     "extensions": [
-      "./src/extension.ts"
+      "./src/extension.ts",
+      "node_modules/@mrclrchtr/supi-core/src/extension.ts"
     ]
   },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
   "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",

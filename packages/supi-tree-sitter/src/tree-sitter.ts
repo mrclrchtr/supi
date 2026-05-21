@@ -6,6 +6,18 @@ import { Type } from "typebox";
 import { detectGrammar, isJsTsGrammar } from "./language.ts";
 import { TreeSitterRuntime } from "./session/runtime.ts";
 import {
+  clearSessionTreeSitterService,
+  setSessionTreeSitterService,
+} from "./session/service-registry.ts";
+import { createTreeSitterService } from "./session/session.ts";
+import {
+  formatTreeSitterActionList,
+  getTreeSitterActionSpec,
+  isTreeSitterAction,
+  TREE_SITTER_ACTION_NAMES,
+  type TreeSitterAction,
+} from "./tool/action-specs.ts";
+import {
   formatNonSuccess,
   formatOutlineItemsCapped,
   MAX_ITEMS,
@@ -18,26 +30,30 @@ import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidanc
 import { collectOutline } from "./tool/outline.ts";
 import { extractExports, extractImports, lookupCalleesAt, lookupNodeAt } from "./tool/structure.ts";
 
-const TreeSitterActionEnum = StringEnum([
-  "outline",
-  "imports",
-  "exports",
-  "node_at",
-  "query",
-  "callees",
-] as const);
+const TreeSitterActionEnum = StringEnum(TREE_SITTER_ACTION_NAMES);
 
 export default function treeSitterExtension(pi: ExtensionAPI) {
   let runtime: TreeSitterRuntime | undefined;
+  let activeCwd: string | null = null;
 
   pi.on("session_start", (_event, ctx) => {
-    runtime?.dispose();
+    if (runtime && activeCwd) {
+      clearSessionTreeSitterService(activeCwd);
+      runtime.dispose();
+    }
+
+    activeCwd = ctx.cwd;
     runtime = new TreeSitterRuntime(ctx.cwd);
+    setSessionTreeSitterService(ctx.cwd, createTreeSitterService(runtime));
   });
 
   pi.on("session_shutdown", () => {
+    if (activeCwd) {
+      clearSessionTreeSitterService(activeCwd);
+    }
     runtime?.dispose();
     runtime = undefined;
+    activeCwd = null;
   });
 
   pi.registerTool({
@@ -73,8 +89,6 @@ export default function treeSitterExtension(pi: ExtensionAPI) {
   });
 }
 
-type TreeSitterAction = "outline" | "imports" | "exports" | "node_at" | "query" | "callees";
-
 type ToolParams = {
   action?: string;
   file?: string;
@@ -83,17 +97,47 @@ type ToolParams = {
   query?: string;
 };
 
+interface ValidatedToolParams {
+  action: TreeSitterAction;
+  file: string;
+  line?: number;
+  character?: number;
+  query?: string;
+}
+
+const SUPPORTED_ACTIONS_TEXT = formatTreeSitterActionList();
+
+const ACTION_HANDLERS: Record<
+  TreeSitterAction,
+  (runtime: TreeSitterRuntime, params: ValidatedToolParams) => Promise<string>
+> = {
+  outline: (runtime, params) => handleOutline(runtime, params.file),
+  imports: (runtime, params) => handleImports(runtime, params.file),
+  exports: (runtime, params) => handleExports(runtime, params.file),
+  node_at: (runtime, params) =>
+    handleNodeAt(runtime, params.file, params.line as number, params.character as number),
+  query: (runtime, params) => handleQuery(runtime, params.file, params.query as string),
+  callees: (runtime, params) =>
+    handleCallees(runtime, params.file, params.line as number, params.character as number),
+};
+
 async function executeToolAction(runtime: TreeSitterRuntime, params: ToolParams): Promise<string> {
-  if (!params.action) {
-    return validationError(
-      "`action` is required. Supported: outline, imports, exports, node_at, query, callees.",
-    );
+  const validated = validateToolParams(params);
+  if (typeof validated === "string") {
+    return validated;
   }
 
-  const action = toSupportedAction(params.action);
-  if (!action) {
+  return ACTION_HANDLERS[validated.action](runtime, validated);
+}
+
+function validateToolParams(params: ToolParams): ValidatedToolParams | string {
+  if (!params.action) {
+    return validationError(`\`action\` is required. Supported: ${SUPPORTED_ACTIONS_TEXT}.`);
+  }
+
+  if (!isTreeSitterAction(params.action)) {
     return validationError(
-      `Unknown action: ${params.action}. Supported: outline, imports, exports, node_at, query, callees`,
+      `Unknown action: ${params.action}. Supported: ${SUPPORTED_ACTIONS_TEXT}`,
     );
   }
 
@@ -101,12 +145,37 @@ async function executeToolAction(runtime: TreeSitterRuntime, params: ToolParams)
     return validationError("`file` is required for all actions.");
   }
 
-  if (action === "outline") return handleOutline(runtime, params.file);
-  if (action === "imports") return handleImports(runtime, params.file);
-  if (action === "exports") return handleExports(runtime, params.file);
-  if (action === "node_at") return handleNodeAt(runtime, params);
-  if (action === "callees") return handleCallees(runtime, params);
-  return handleQuery(runtime, params);
+  const spec = getTreeSitterActionSpec(params.action);
+  if (spec.requiresPosition) {
+    const lineError = validatePositiveInteger("line", params.line, params.action);
+    if (lineError) return lineError;
+
+    const characterError = validatePositiveInteger("character", params.character, params.action);
+    if (characterError) return characterError;
+  }
+
+  if (spec.requiresQuery && (!params.query || params.query.trim().length === 0)) {
+    return validationError("`query` is required and must be non-empty.");
+  }
+
+  return {
+    action: params.action,
+    file: params.file,
+    line: params.line,
+    character: params.character,
+    query: params.query,
+  };
+}
+
+function validatePositiveInteger(
+  field: "line" | "character",
+  value: number | undefined,
+  action: TreeSitterAction,
+): string | null {
+  if (value === undefined || !Number.isInteger(value) || value < 1) {
+    return validationError(`\`${field}\` must be a positive 1-based integer for ${action} action.`);
+  }
+  return null;
 }
 
 async function handleOutline(runtime: TreeSitterRuntime, file: string): Promise<string> {
@@ -175,18 +244,13 @@ async function handleExports(runtime: TreeSitterRuntime, file: string): Promise<
   return lines.join("\n");
 }
 
-async function handleNodeAt(runtime: TreeSitterRuntime, params: ToolParams): Promise<string> {
-  if (!Number.isInteger(params.line) || (params.line as number) < 1) {
-    return validationError("`line` must be a positive 1-based integer for node_at action.");
-  }
-  if (!Number.isInteger(params.character) || (params.character as number) < 1) {
-    return validationError("`character` must be a positive 1-based integer for node_at action.");
-  }
-
-  const file = params.file;
-  const line = params.line as number;
-  const character = params.character as number;
-  const result = await lookupNodeAt(runtime, file as string, line, character);
+async function handleNodeAt(
+  runtime: TreeSitterRuntime,
+  file: string,
+  line: number,
+  character: number,
+): Promise<string> {
+  const result = await lookupNodeAt(runtime, file, line, character);
   if (result.kind !== "success") return formatNonSuccess(result);
 
   const { data } = result;
@@ -212,13 +276,12 @@ async function handleNodeAt(runtime: TreeSitterRuntime, params: ToolParams): Pro
   return lines.join("\n");
 }
 
-async function handleQuery(runtime: TreeSitterRuntime, params: ToolParams): Promise<string> {
-  if (!params.query || params.query.trim().length === 0) {
-    return validationError("`query` is required and must be non-empty.");
-  }
-
-  const file = params.file as string;
-  const result = await runtime.queryFile(file, params.query);
+async function handleQuery(
+  runtime: TreeSitterRuntime,
+  file: string,
+  query: string,
+): Promise<string> {
+  const result = await runtime.queryFile(file, query);
   if (result.kind !== "success") return formatNonSuccess(result);
 
   const { data: captures } = result;
@@ -237,25 +300,12 @@ async function handleQuery(runtime: TreeSitterRuntime, params: ToolParams): Prom
   return lines.join("\n");
 }
 
-function toSupportedAction(action: string): TreeSitterAction | undefined {
-  if (["outline", "imports", "exports", "node_at", "query", "callees"].includes(action)) {
-    return action as TreeSitterAction;
-  }
-  return undefined;
-}
-
-async function handleCallees(runtime: TreeSitterRuntime, params: ToolParams): Promise<string> {
-  if (!Number.isInteger(params.line) || (params.line as number) < 1) {
-    return validationError("`line` must be a positive 1-based integer for callees action.");
-  }
-  if (!Number.isInteger(params.character) || (params.character as number) < 1) {
-    return validationError("`character` must be a positive 1-based integer for callees action.");
-  }
-
-  const file = params.file as string;
-  const line = params.line as number;
-  const character = params.character as number;
-
+async function handleCallees(
+  runtime: TreeSitterRuntime,
+  file: string,
+  line: number,
+  character: number,
+): Promise<string> {
   const result = await lookupCalleesAt(runtime, file, line, character);
   if (result.kind !== "success") return formatNonSuccess(result);
 
