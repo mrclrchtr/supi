@@ -28,8 +28,8 @@ importers:
         specifier: 0.74.1
         version: 0.74.1(ws@8.20.1)(zod@4.4.3)
       '@earendil-works/pi-tui':
-        specifier: 0.74.0
-        version: 0.74.0
+        specifier: 0.75.1
+        version: 0.75.1
       '@pnpm/exportable-manifest':
         specifier: 1000.4.2
         version: 1000.4.2(@pnpm/logger@1001.0.1)
@@ -873,6 +873,10 @@ packages:
   '@earendil-works/pi-tui@0.74.1':
     resolution: {integrity: sha512-wQj2TRG43/BBNyd/lReQJWtTCOJVyIwI+7Ifp3hNITfTtQr4zQdMeF7uxqEMQ73LI6rQO7Ljx0P2w+oMx8uyIA==}
     engines: {node: '>=20.0.0'}
+
+  '@earendil-works/pi-tui@0.75.1':
+    resolution: {integrity: sha512-IFDSvCXcXMoIxFKxdhqc7ybX8p86KpdxoTUTYEq3FHilMFkBqlXqZD0jZBitqxStBjjMkAlhjS1bKS0IOXSpsg==}
+    engines: {node: '>=22.19.0'}
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -3272,7 +3276,7 @@ snapshots:
     dependencies:
       '@earendil-works/pi-agent-core': 0.74.0(ws@8.20.1)(zod@4.4.3)
       '@earendil-works/pi-ai': 0.74.0(ws@8.20.1)(zod@4.4.3)
-      '@earendil-works/pi-tui': 0.74.0
+      '@earendil-works/pi-tui': 0.74.1
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.6.2
       cli-highlight: 2.1.11
@@ -3340,6 +3344,13 @@ snapshots:
       koffi: 2.16.2
 
   '@earendil-works/pi-tui@0.74.1':
+    dependencies:
+      get-east-asian-width: 1.6.0
+      marked: 15.0.12
+    optionalDependencies:
+      koffi: 2.16.2
+
+  '@earendil-works/pi-tui@0.75.1':
     dependencies:
       get-east-asian-width: 1.6.0
       marked: 15.0.12

@@ -65,7 +65,7 @@
     "@commitlint/config-conventional": "21.0.1",
     "@earendil-works/pi-ai": "0.74.1",
     "@earendil-works/pi-coding-agent": "0.74.1",
-    "@earendil-works/pi-tui": "0.74.0",
+    "@earendil-works/pi-tui": "0.75.1",
     "@types/node": "25.8.0",
     "clipboardy": "5.3.1",
     "tree-sitter-javascript": "0.25.0",
