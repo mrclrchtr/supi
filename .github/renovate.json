@@ -6,6 +6,10 @@
     {
       "matchManagers": ["github-actions"],
       "groupName": "github actions"
+    },
+    {
+      "matchPackagePrefixes": ["@earendil-works/"],
+      "groupName": "earendil-works"
     }
   ]
 }
