@@ -174,7 +174,7 @@ describe("runOverlayQuestionnaire", () => {
     expect(captured.value.render(100).join("\n")).toContain("n note");
     captured.value.handleInput?.("\u001b[B");
     captured.value.handleInput?.("n");
-    expect(captured.value.render(100).join("\n")).toContain("Option note");
+    expect(captured.value.render(100).join("\n")).toContain("Note for: Prettier");
 
     for (const char of "Matches team style") captured.value.handleInput?.(char);
     captured.value.handleInput?.("\r");

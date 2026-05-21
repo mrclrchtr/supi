@@ -150,19 +150,34 @@ export function choiceRowValue(row: ChoiceRow): string {
   return row.kind === "option" ? `option:${row.optionIndex}` : `action:${row.action}`;
 }
 
+export function noteTargetLabel(
+  controller: AskUserController,
+  choiceRows: ChoiceRow[],
+  choiceRowIndex: number,
+): string | undefined {
+  const question = controller.currentQuestion;
+  if (question.type !== "choice") return undefined;
+  const row = choiceRows[choiceRowIndex];
+  if (row?.kind !== "option") return undefined;
+  return question.options[row.optionIndex]?.label;
+}
+
 function renderOptionRow(args: {
   option: { label: string; description?: string };
   labelText: string;
+  hasNote: boolean;
   isSelected: boolean;
   theme: Theme;
   width: number;
 }): string[] {
-  const { theme, isSelected, labelText, width, option } = args;
+  const { theme, isSelected, labelText, hasNote, width, option } = args;
   const prefix = isSelected ? "\u2192 " : "  ";
+  const baseText = isSelected
+    ? theme.fg("accent", `${prefix}${labelText}`)
+    : `${prefix}${labelText}`;
+  const noteSuffix = hasNote ? ` ${theme.fg("accent", "[note]")}` : "";
 
-  const lines: string[] = [
-    isSelected ? theme.fg("accent", `${prefix}${labelText}`) : `${prefix}${labelText}`,
-  ];
+  const lines: string[] = [`${baseText}${noteSuffix}`];
 
   if (option.description) {
     const descWidth = Math.max(10, width - 2);
@@ -200,9 +215,8 @@ function prepareOptionLabel(
   option: { label: string },
   marker: string,
   recommended: boolean,
-  hasNote: boolean,
 ): string {
-  return `${marker} ${option.label}${recommended ? " (recommended)" : ""}${hasNote ? " [note]" : ""}`;
+  return `${marker} ${option.label}${recommended ? " (recommended)" : ""}`;
 }
 
 export function renderChoiceList(args: {
@@ -228,9 +242,9 @@ export function renderChoiceList(args: {
       const marker = prepareOptionMarker(question, row.optionIndex, selectedIndexes);
       const recommended = question.recommendedIndexes.includes(row.optionIndex);
       const hasNote = !!controller.getChoiceOptionNote(question.id, option.value);
-      const labelText = prepareOptionLabel(option, marker, recommended, hasNote);
+      const labelText = prepareOptionLabel(option, marker, recommended);
 
-      lines.push(...renderOptionRow({ option, labelText, isSelected, theme, width }));
+      lines.push(...renderOptionRow({ option, labelText, hasNote, isSelected, theme, width }));
     } else {
       const answer = controller.getAnswer(question.id);
       const actionLabelText =

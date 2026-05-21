@@ -24,6 +24,7 @@ import {
   choiceRowValue,
   defaultChoiceRowIndex,
   type FocusTarget,
+  noteTargetLabel,
   type OverlayAction,
   type OverlayMode,
   previewOptionIndexForRows,
@@ -32,7 +33,6 @@ import type { OverlayArgs } from "./types.ts";
 
 export class AskUserOverlay implements Component, Focusable {
   focused = false;
-
   private readonly editor: Editor;
   private focus: FocusTarget = "choices";
   private mode: OverlayMode = "choice";
@@ -40,7 +40,6 @@ export class AskUserOverlay implements Component, Focusable {
   private cachedWidth: number | undefined;
   private cachedLines: string[] | undefined;
   private readonly onAbort: () => void;
-
   private choiceRows: ChoiceRow[] = [];
   private choiceRowIndex = 0;
   private previewOptionIndex = 0;
@@ -48,7 +47,6 @@ export class AskUserOverlay implements Component, Focusable {
   private textActions: Array<{ action: OverlayAction; label: string }> = [];
   private actionIndex = 0;
   private actionList: SelectList | undefined;
-
   constructor(private readonly args: OverlayArgs) {
     this.editor = new Editor(args.tui, makeEditorTheme(args.theme));
     this.editor.onSubmit = (value) => this.handleEditorSubmit(value);
@@ -79,6 +77,10 @@ export class AskUserOverlay implements Component, Focusable {
         this.args.controller.currentQuestion,
         this.previewOptionIndex,
       ),
+      noteTargetLabel:
+        this.mode === "note-input"
+          ? noteTargetLabel(this.args.controller, this.choiceRows, this.choiceRowIndex)
+          : undefined,
     });
     return this.cachedLines;
   }
@@ -155,7 +157,6 @@ export class AskUserOverlay implements Component, Focusable {
 
     this.choiceList.handleInput(data);
   }
-
   private handleActionKey(data: string): void {
     const question = this.args.controller.currentQuestion;
     if (!this.actionList) return;
@@ -390,7 +391,6 @@ export class AskUserOverlay implements Component, Focusable {
     this.cachedLines = undefined;
     this.args.tui.requestRender();
   }
-
   private finish(): void {
     if (this.closed) return;
     this.closed = true;

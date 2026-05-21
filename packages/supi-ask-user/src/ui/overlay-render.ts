@@ -29,6 +29,7 @@ export interface RenderOverlayFrameArgs {
   actionList: SelectList | undefined;
   textActionLabels: string[];
   previewText?: string;
+  noteTargetLabel?: string;
 }
 
 export function renderOverlayFrame(args: RenderOverlayFrameArgs): string[] {
@@ -191,7 +192,9 @@ function renderEditorLines(args: RenderOverlayFrameArgs, width: number): string[
       : args.mode === "custom-input"
         ? "Other answer"
         : args.mode === "note-input"
-          ? "Option note"
+          ? args.noteTargetLabel
+            ? `Note for: ${args.noteTargetLabel}`
+            : "Option note"
           : "Your answer";
 
   const lines = [args.theme.fg("accent", label), ...args.editor.render(Math.max(20, width - 1))];
