@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearSessionTreeSitterService,
@@ -44,6 +45,20 @@ describe("tree-sitter session service registry", () => {
     setSessionTreeSitterService("/test", makeService());
     clearSessionTreeSitterService("/test");
     expect(getSessionTreeSitterService("/test").kind).toBe("unavailable");
+  });
+
+  it("normalizes cwd aliases", () => {
+    const root = path.join(process.cwd(), "tmp", "tree-sitter-registry");
+    const alias = path.join(root, "..", "tree-sitter-registry");
+    const service = makeService();
+
+    setSessionTreeSitterService(alias, service);
+
+    const state = getSessionTreeSitterService(root);
+    expect(state.kind).toBe("ready");
+    if (state.kind === "ready") {
+      expect(state.service).toBe(service);
+    }
   });
 
   it("shares registry state across module instances", async () => {

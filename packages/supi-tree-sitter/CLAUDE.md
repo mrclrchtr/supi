@@ -36,7 +36,7 @@ src/
   syntax-node.ts      # syntax node interface
   session/
     runtime.ts        # grammar initialization, parser reuse, parse/query services
-    service-registry.ts # shared session-scoped structural service registry
+    service-registry.ts # shared session-scoped structural service registry (backed by the core helper)
     session.ts        # runtime-backed service helpers and owned session factory
   tool/
     action-specs.ts   # single source of truth for public action metadata
@@ -115,4 +115,4 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 
 Keep this package independent of `supi-lsp` internals. Any shared utilities belong in `supi-core`.
 
-The extension now publishes a shared session-scoped Tree-sitter service through `getSessionTreeSitterService(cwd)`. Peer packages that only need structural operations should prefer that shared service over repeatedly creating owned sessions. Use `createTreeSitterSession()` only when you need an explicitly owned lifecycle.
+The extension now publishes a shared session-scoped Tree-sitter service through `getSessionTreeSitterService(cwd)`. Its backing storage delegates to `createSessionStateRegistry()` from `@mrclrchtr/supi-core/api`, while the Tree-sitter package keeps its own `ready | unavailable` wrapper local. Peer packages that only need structural operations should prefer that shared service over repeatedly creating owned sessions. Use `createTreeSitterSession()` only when you need an explicitly owned lifecycle.

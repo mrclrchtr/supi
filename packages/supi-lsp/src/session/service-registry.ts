@@ -2,7 +2,7 @@
 // Peer extensions can import `getSessionLspService` from the package root
 // to reuse the active LSP runtime without starting duplicate servers.
 
-import * as path from "node:path";
+import { createSessionStateRegistry } from "@mrclrchtr/supi-core/api";
 import type {
   CodeAction,
   Diagnostic,
@@ -189,34 +189,18 @@ export class SessionLspService {
 
 // ── Registry ──────────────────────────────────────────────────────────
 
-const REGISTRY_KEY = Symbol.for("@mrclrchtr/supi-lsp/session-registry");
 const WAIT_INTERVAL_MS = 25;
-
-function getRegistry(): Map<string, SessionLspServiceState> {
-  const globalScope = globalThis as typeof globalThis & Record<symbol, unknown>;
-  const existing = globalScope[REGISTRY_KEY];
-  if (existing instanceof Map) return existing as Map<string, SessionLspServiceState>;
-
-  const registry = new Map<string, SessionLspServiceState>();
-  globalScope[REGISTRY_KEY] = registry;
-  return registry;
-}
-
-function normalizeCwd(cwd: string): string {
-  return path.resolve(cwd);
-}
-
-const registry = getRegistry();
+const registry = createSessionStateRegistry<SessionLspServiceState>("supi-lsp/session-registry");
 
 /** Publish the LSP service state for a session cwd. */
 export function setSessionLspServiceState(cwd: string, state: SessionLspServiceState): void {
-  registry.set(normalizeCwd(cwd), state);
+  registry.set(cwd, state);
 }
 
 /** Acquire the LSP service state for a session cwd. */
 export function getSessionLspService(cwd: string): SessionLspServiceState {
   return (
-    registry.get(normalizeCwd(cwd)) ?? {
+    registry.get(cwd) ?? {
       kind: "unavailable",
       reason: "No LSP session initialized for this workspace",
     }
@@ -241,5 +225,5 @@ export async function waitForSessionLspService(
 
 /** Remove the LSP service state for a session cwd. */
 export function clearSessionLspService(cwd: string): void {
-  registry.delete(normalizeCwd(cwd));
+  registry.clear(cwd);
 }

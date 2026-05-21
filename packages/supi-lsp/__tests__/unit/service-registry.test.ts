@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LspClient } from "../../src/client/client.ts";
 import type { DocumentSymbol, Hover, Location, SymbolInformation } from "../../src/config/types.ts";
@@ -72,6 +73,14 @@ describe("session registry", () => {
 
     expect(getSessionLspService("/test").kind).toBe("ready");
     expect(getSessionLspService("/other").kind).toBe("pending");
+  });
+
+  it("normalizes cwd aliases", () => {
+    const root = path.join(process.cwd(), "tmp", "lsp-registry");
+    const alias = path.join(root, "..", "lsp-registry");
+    setSessionLspServiceState(alias, { kind: "pending" });
+
+    expect(getSessionLspService(root).kind).toBe("pending");
   });
 
   it("shares registry state across module instances", async () => {

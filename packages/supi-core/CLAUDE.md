@@ -27,7 +27,7 @@ src/
   debug-registry.ts   — debug event registry (flat utility)
   path-utils.ts       — shared tool-path and file-URI normalization helpers
   project-roots.ts    — directory walking, root discovery (flat utility)
-  registry-utils.ts   — globalThis-backed shared registry (flat utility)
+  registry-utils.ts   — globalThis-backed shared registries, including session-state helpers (flat utility)
   session-utils.ts    — session utilities (flat utility)
   terminal.ts         — terminal formatting utilities (flat utility)
   config/
@@ -61,6 +61,7 @@ __tests__/
 
 - `api.ts`, `index.ts` — public export surface; keep the shared API deliberate and small
 - `path-utils.ts` — preferred shared location for leading `@` stripping, cwd resolution, and file URI conversion used across SuPi tool packages
+- `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages
 
 ## Config gotchas
 
@@ -74,6 +75,7 @@ __tests__/
 
 - `@mrclrchtr/supi-core/extension` registers only `/supi-settings`; the meta-package aggregated extension invokes it as part of the Production bundle.
 - The settings registry lives on `globalThis` with `Symbol.for("@mrclrchtr/supi-core/settings-registry")` so registrations survive jiti/symlinked duplicate module instances.
+- `createSessionStateRegistry()` is the shared helper for workspace-keyed session state; substrate packages should keep package-specific state unions and wait semantics local, and share only the normalized-cwd storage plumbing.
 - Call `registerSettings()` during the extension factory function, not async handlers.
 - `settings-ui.ts` prefixes flat item ids with `section.id` to avoid collisions, then strips the prefix before calling `persistChange()`.
 - `registerConfigSettings()` wraps `registerSettings()` and owns selected-scope loading (`loadSupiConfigForScope`) and scoped persistence (`set`/`unset` helpers); extensions only build `SettingItem[]` and handle string↔typed parsing.

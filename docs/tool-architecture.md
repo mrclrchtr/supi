@@ -166,6 +166,12 @@ Examples:
 - `supi-tree-sitter` exposes `getSessionTreeSitterService(cwd)` for shared
   structural reuse and `createTreeSitterSession(cwd)` for owned lifecycles
 
+When multiple packages need session-scoped state keyed by workspace, reuse the
+shared core session-registry helper instead of re-implementing normalized `cwd`,
+`globalThis`, and `Symbol.for(...)` storage in each package. Keep package-
+specific state unions, wait helpers, and fallback semantics local; share only the
+storage infrastructure.
+
 The public `/api` surface should expose stable wrappers, not internal manager or
 runtime details.
 
