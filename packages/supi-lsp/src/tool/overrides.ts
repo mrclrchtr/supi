@@ -17,6 +17,7 @@ interface LspOverrideState {
   getInlineSeverity(): number;
   getManager(): LspManager | null;
   getCwd(): string;
+  isActive(): boolean;
 }
 
 export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverrideState): void {
@@ -37,6 +38,7 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
       const cwd = state.getCwd();
       const originalRead = createReadTool(cwd);
       const result = await originalRead.execute(toolCallId, params, signal, onUpdate);
+      if (!state.isActive()) return result;
       await ensureFileOpen(state.getManager(), params.path);
       return result;
     },
@@ -55,6 +57,7 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
       const cwd = state.getCwd();
       const originalWrite = createWriteTool(cwd);
       const result = await originalWrite.execute(toolCallId, params, signal, onUpdate);
+      if (!state.isActive()) return result;
       return appendInlineDiagnostics({
         manager: state.getManager(),
         filePath: params.path,
@@ -78,6 +81,7 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
       const cwd = state.getCwd();
       const originalEdit = createEditTool(cwd);
       const result = await originalEdit.execute(toolCallId, params, signal, onUpdate);
+      if (!state.isActive()) return result;
       return appendInlineDiagnostics({
         manager: state.getManager(),
         filePath: params.path,

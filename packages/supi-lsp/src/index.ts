@@ -1,8 +1,9 @@
 // Public library entrypoint for @mrclrchtr/supi-lsp/api.
-// Import from the package root to reuse session-scoped LSP services
-// without reaching into private implementation files.
+// Consumers should import the published API surface from
+// `@mrclrchtr/supi-lsp/api`, not the package root.
 
 export type {
+  CodeAction,
   Diagnostic,
   DocumentSymbol,
   Hover,
@@ -10,8 +11,20 @@ export type {
   LocationLink,
   Position,
   ProjectServerInfo,
+  Range,
   SymbolInformation,
+  WorkspaceEdit,
   WorkspaceSymbol,
 } from "./config/types.ts";
-export type { SessionLspServiceState } from "./session/service-registry.ts";
-export { getSessionLspService, SessionLspService } from "./session/service-registry.ts";
+export { toLspPosition, toOneBasedPosition } from "./coordinates.ts";
+export type {
+  OutstandingDiagnosticSummaryEntry,
+  RecoverDiagnosticsResult,
+  SessionLspServiceState,
+  WorkspaceDiagnosticSummaryEntry,
+} from "./session/service-registry.ts";
+export {
+  getSessionLspService,
+  SessionLspService,
+  waitForSessionLspService,
+} from "./session/service-registry.ts";

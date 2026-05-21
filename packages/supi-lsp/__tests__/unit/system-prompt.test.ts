@@ -5,6 +5,26 @@ const mockFns = vi.hoisted(() => ({
   loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, active: [] })),
   pruneAndReorderContextMessages: vi.fn((msgs: unknown) => msgs),
   buildProjectGuidelines: vi.fn(() => []),
+  buildLspToolPromptSurfaces: vi.fn(() => ({
+    lsp_lookup: { description: "lookup", promptSnippet: "lookup", promptGuidelines: [] },
+    lsp_document_symbols: {
+      description: "document symbols",
+      promptSnippet: "document symbols",
+      promptGuidelines: [],
+    },
+    lsp_workspace_symbols: {
+      description: "workspace symbols",
+      promptSnippet: "workspace symbols",
+      promptGuidelines: [],
+    },
+    lsp_diagnostics: {
+      description: "diagnostics",
+      promptSnippet: "diagnostics",
+      promptGuidelines: [],
+    },
+    lsp_refactor: { description: "refactor", promptSnippet: "refactor", promptGuidelines: [] },
+    lsp_recover: { description: "recover", promptSnippet: "recover", promptGuidelines: [] },
+  })),
   diagnosticsContextFingerprint: vi.fn(),
   formatDiagnosticsContext: vi.fn(),
   promptGuidelines: [],
@@ -18,13 +38,14 @@ const mockFns = vi.hoisted(() => ({
   startDetectedServers: vi.fn(),
   toggleLspStatusOverlay: vi.fn(),
   updateLspUi: vi.fn(),
-  executeAction: vi.fn(),
 }));
 
 vi.mock("../../src/config/config.ts", () => ({ loadConfig: mockFns.loadConfig }));
 
 vi.mock("../../src/tool/guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
+  buildLspToolPromptSurfaces: mockFns.buildLspToolPromptSurfaces,
+  defaultLspToolPromptSurfaces: mockFns.buildLspToolPromptSurfaces(),
   toolDescription: "test",
   promptGuidelines: mockFns.promptGuidelines,
   promptSnippet: mockFns.promptSnippet,
@@ -65,10 +86,6 @@ vi.mock("../../src/ui/ui.ts", () => ({
   updateLspUi: mockFns.updateLspUi,
 }));
 
-vi.mock("../../src/tool/tool-actions.ts", () => ({
-  safeExecuteAction: mockFns.executeAction,
-}));
-
 vi.mock("../../src/ui/renderer.ts", () => ({ registerLspMessageRenderer: vi.fn() }));
 vi.mock("../../src/diagnostics/diagnostic-display.ts", () => ({
   formatDiagnosticsDisplayContent: vi.fn(() => "display content"),
@@ -85,6 +102,7 @@ import {
   clearSessionLspService,
   getSessionLspService,
 } from "../../src/session/service-registry.ts";
+import { LSP_TOOL_NAMES } from "../../src/tool/names.ts";
 
 function createManager(diagnostics: Array<{ file: string; total: number }>, cwd = "/project") {
   return {
@@ -110,7 +128,7 @@ function createManager(diagnostics: Array<{ file: string; total: number }>, cwd 
 
 function createPiWithHandlers() {
   const handlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
-  let activeTools = ["lsp"];
+  let activeTools: string[] = [...LSP_TOOL_NAMES];
   const pi = {
     on: vi.fn((event: string, handler: (...args: unknown[]) => Promise<unknown>) => {
       handlers.set(event, handler);
@@ -219,7 +237,10 @@ describe("system prompt stability", () => {
     );
 
     expect(result).toBeUndefined();
-    expect(pi.getActiveTools()).not.toContain("lsp");
+    expect(getSessionLspService("/project").kind).toBe("inactive");
+    for (const toolName of LSP_TOOL_NAMES) {
+      expect(pi.getActiveTools()).not.toContain(toolName);
+    }
   });
 });
 

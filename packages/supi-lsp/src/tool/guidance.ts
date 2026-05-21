@@ -1,46 +1,102 @@
-// Prompt guidance and tool description for the lsp tool.
-// Dynamic guidelines are built per-project to reflect active LSP servers.
-//
-// Note: We intentionally do NOT include cross-tool routing (e.g., "use code_intel
-// for architecture overviews") because this package can be installed standalone
-// without supi-code-intelligence.
+// Prompt guidance and tool descriptions for the expert LSP toolset.
 
 import * as path from "node:path";
 import type { ProjectServerInfo } from "../config/types.ts";
+import {
+  LSP_DIAGNOSTICS_TOOL,
+  LSP_DOCUMENT_SYMBOLS_TOOL,
+  LSP_LOOKUP_TOOL,
+  LSP_RECOVER_TOOL,
+  LSP_REFACTOR_TOOL,
+  LSP_WORKSPACE_SYMBOLS_TOOL,
+  type LspToolName,
+} from "./names.ts";
 
-const actionList =
-  "hover, definition, references, diagnostics, symbols, rename, code_actions, workspace_symbol, search, symbol_hover, recover";
+export interface LspToolPromptSurface {
+  description: string;
+  promptSnippet: string;
+  promptGuidelines: string[];
+}
 
-export const toolDescription = `Language Server Protocol tool — semantic code intelligence for supported languages.
+export type LspToolPromptSurfaceMap = Record<LspToolName, LspToolPromptSurface>;
 
-Actions: ${actionList}.
-
-Use lsp for semantic lookups in files covered by an active server: hover/type info, definitions, references, file symbols, diagnostics, rename, and code actions. Use lsp.search(query) for workspace symbol lookup with text-search fallback, lsp.symbol_hover(symbol) for hover by symbol name, and lsp.recover() when diagnostics look stale. Line and character are 1-based. File paths are relative to cwd.`;
-
-export const promptSnippet =
-  "lsp — semantic lookup, diagnostics, rename, and code actions in supported files";
-
-export const actionGuidelines = [
-  "Use lsp.diagnostics(file?) when you need current diagnostics for one file or the whole project.",
-  "Use lsp.hover(file, line, character), lsp.definition(file, line, character), or lsp.references(file, line, character) when you know a file position and need semantic info there.",
-  "Use lsp.symbols(file) when you need top-level declarations in one file.",
-  "Use lsp.workspace_symbol(query) for semantic symbol-name lookup, lsp.search(query) for symbol lookup with text-search fallback, and lsp.symbol_hover(symbol) for hover from the first workspace match.",
-  "Use lsp.rename(file, line, character, newName) for semantic renames at a known position.",
-  "Use lsp.code_actions(file, line, character) for quick fixes or refactor suggestions at a specific position.",
-  "Use lsp.recover() when diagnostics look stale after workspace-level changes.",
+const LOOKUP_GUIDELINES = [
+  'Use lsp_lookup with `kind: "hover"` for semantic type or symbol information at a known `file`, `line`, and `character`.',
+  'Use lsp_lookup with `kind: "definition"`, `"references"`, or `"implementation"` for semantic navigation at a known position.',
+  "Use lsp_lookup after code_intel or tree_sitter has already narrowed the target file and position.",
 ];
 
-export const fallbackGuideline =
-  "Use lsp first for semantic questions in supported files. lsp diagnostics also appear automatically after relevant edits, so call lsp when you need an explicit lookup, diagnostics snapshot, rename, code action, or recovery.";
+const DOCUMENT_SYMBOL_GUIDELINES = [
+  "Use lsp_document_symbols(file) for semantic declarations in one supported file.",
+];
 
-export const promptGuidelines = [...actionGuidelines, fallbackGuideline];
+const WORKSPACE_SYMBOL_GUIDELINES = [
+  "Use lsp_workspace_symbols(query) for semantic symbol-name lookup across the current project.",
+];
 
-/**
- * Build per-project `promptGuidelines` for the `lsp` tool registration.
- * These guidelines are part of pi's stable system prompt after session-start
- * tool registration, avoiding per-turn `before_agent_start` prompt overrides.
- */
-export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string): string[] {
+const DIAGNOSTICS_GUIDELINES = [
+  "Use lsp_diagnostics(file?) when you need current diagnostics for one file or a workspace-level summary.",
+];
+
+const REFACTOR_GUIDELINES = [
+  'Use lsp_refactor with `kind: "rename"` for semantic rename planning at a known `file`, `line`, and `character`.',
+  'Use lsp_refactor with `kind: "code_actions"` for semantic fixes or refactors at a known position.',
+];
+
+const RECOVER_GUIDELINES = [
+  "Use lsp_recover() when diagnostics look stale after workspace-level changes or generated-file updates.",
+];
+
+export const defaultLspToolPromptSurfaces = buildLspToolPromptSurfaces([], ".");
+
+export function buildLspToolPromptSurfaces(
+  servers: ProjectServerInfo[],
+  cwd: string,
+): LspToolPromptSurfaceMap {
+  const coverageGuidelines = buildCoverageGuidelines(servers, cwd);
+
+  return {
+    [LSP_LOOKUP_TOOL]: {
+      description:
+        "Language Server Protocol lookup tool — semantic hover, definition, references, and implementation for supported files. Use lsp_lookup when you know the file and 1-based line/character position and need semantic drill-down rather than text search.",
+      promptSnippet:
+        "lsp_lookup — semantic hover/definition/references/implementation at a known file position",
+      promptGuidelines: [...LOOKUP_GUIDELINES, ...coverageGuidelines],
+    },
+    [LSP_DOCUMENT_SYMBOLS_TOOL]: {
+      description:
+        "Language Server Protocol document symbols tool — list semantic declarations in one supported file. Use lsp_document_symbols when you need a symbol-aware outline rather than raw text structure.",
+      promptSnippet: "lsp_document_symbols — semantic declarations for one supported file",
+      promptGuidelines: DOCUMENT_SYMBOL_GUIDELINES,
+    },
+    [LSP_WORKSPACE_SYMBOLS_TOOL]: {
+      description:
+        "Language Server Protocol workspace symbols tool — semantic symbol-name lookup across the current project. Use lsp_workspace_symbols to find declarations by name before opening a specific file.",
+      promptSnippet: "lsp_workspace_symbols — semantic symbol-name lookup across the project",
+      promptGuidelines: WORKSPACE_SYMBOL_GUIDELINES,
+    },
+    [LSP_DIAGNOSTICS_TOOL]: {
+      description:
+        "Language Server Protocol diagnostics tool — current diagnostics for one file or a workspace summary. Use lsp_diagnostics for semantic compiler or language-server issues instead of guessing from text alone.",
+      promptSnippet: "lsp_diagnostics — current diagnostics for one file or the workspace",
+      promptGuidelines: DIAGNOSTICS_GUIDELINES,
+    },
+    [LSP_REFACTOR_TOOL]: {
+      description:
+        "Language Server Protocol refactor tool — semantic rename planning and code actions at a known file position. Use lsp_refactor when you need language-server-backed edits or quick-fix suggestions.",
+      promptSnippet: "lsp_refactor — semantic rename planning and code actions at a known position",
+      promptGuidelines: REFACTOR_GUIDELINES,
+    },
+    [LSP_RECOVER_TOOL]: {
+      description:
+        "Language Server Protocol recover tool — refresh diagnostics after workspace changes and stale language-server state. Use lsp_recover when new files, generated types, or config updates leave diagnostics out of sync.",
+      promptSnippet: "lsp_recover — refresh stale diagnostics after workspace changes",
+      promptGuidelines: RECOVER_GUIDELINES,
+    },
+  };
+}
+
+function buildCoverageGuidelines(servers: ProjectServerInfo[], cwd: string): string[] {
   const active = servers
     .filter((server) => server.status === "running")
     .map((server) => {
@@ -48,21 +104,21 @@ export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string
       const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(",");
       const actions = server.supportedActions.join(",");
       const actionText = actions.length > 0 ? ` | actions: ${actions}` : "";
-      return `lsp active: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
+      return `lsp server coverage: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
     });
 
   const unavailable = servers
     .filter((server) => server.status !== "running")
     .map((server) => server.name);
 
-  const dynamic: string[] = [...active];
+  const dynamic = [...active];
   if (unavailable.length > 0) {
     dynamic.push(
-      `lsp unavailable: ${unavailable.join(",")} — install or enable to extend coverage`,
+      `lsp server unavailable: ${unavailable.join(",")} — install or enable to extend semantic coverage`,
     );
   }
 
-  return [...actionGuidelines, ...dynamic, fallbackGuideline].filter(Boolean);
+  return dynamic;
 }
 
 function displayRoot(root: string, cwd: string): string {
@@ -70,4 +126,13 @@ function displayRoot(root: string, cwd: string): string {
   if (relative === "") return ".";
   if (relative.startsWith(`..${path.sep}`) || relative === "..") return root;
   return relative.replaceAll(path.sep, "/");
+}
+
+// Compatibility exports for older internal tests and helper imports.
+export const toolDescription = defaultLspToolPromptSurfaces[LSP_LOOKUP_TOOL].description;
+export const promptSnippet = defaultLspToolPromptSurfaces[LSP_LOOKUP_TOOL].promptSnippet;
+export const promptGuidelines = defaultLspToolPromptSurfaces[LSP_LOOKUP_TOOL].promptGuidelines;
+
+export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string): string[] {
+  return buildLspToolPromptSurfaces(servers, cwd)[LSP_LOOKUP_TOOL].promptGuidelines;
 }

@@ -11,6 +11,8 @@ import type {
   FileEvent,
   LspConfig,
   ProjectServerInfo,
+  SymbolInformation,
+  WorkspaceSymbol,
 } from "../config/types.ts";
 import {
   accumulateOutstandingDiagnostics,
@@ -67,6 +69,8 @@ export class LspManager {
   private knownRoots = new Map<string, string[]>();
   /** User-configured gitignore-style exclude patterns */
   private excludePatterns: string[] = [];
+  /** Project roots already warmed for workspace-symbol queries. */
+  private warmedWorkspaceSymbolProjects = new Set<string>();
   constructor(
     private readonly config: LspConfig,
     private readonly cwd: string,
@@ -86,13 +90,8 @@ export class LspManager {
   registerDetectedServers(detected: DetectedProjectServer[]): void {
     this.knownRoots = projectRoots.buildKnownRootsMap(detected);
   }
-  /** Check whether a file path has an available LSP server. */
-  isSupportedSourceFile(filePath: string): boolean {
-    // Dependency directories are intentionally excluded from recent-path
-    // tracking and diagnostic summaries (shouldIgnoreLspPath). Keep runtime
-    // guidance activation consistent: reading or editing a file under
-    // node_modules / .pnpm must not arm LSP guidance for dependency sources.
-    if (shouldIgnoreLspPath(filePath, this.cwd)) return false;
+  /** Check whether a file path has an available LSP server for explicit semantic operations. */
+  canServeFile(filePath: string): boolean {
     const match = getServerForFile(this.config, filePath);
     if (!match) return false;
     const [serverName, serverConfig] = match;
@@ -105,6 +104,20 @@ export class LspManager {
     });
     if (this.unavailable.has(`${serverName}:${root}`)) return false;
     return this.isServerCommandAvailable(serverConfig.command);
+  }
+
+  /**
+   * Check whether a file should participate in runtime guidance and diagnostics.
+   * This is stricter than {@link canServeFile} and intentionally filters dependency
+   * and tsconfig-excluded paths from UI/context behavior.
+   */
+  isSupportedSourceFile(filePath: string): boolean {
+    // Dependency directories are intentionally excluded from recent-path
+    // tracking and diagnostic summaries (shouldIgnoreLspPath). Keep runtime
+    // guidance activation consistent: reading or editing a file under
+    // node_modules / .pnpm must not arm LSP guidance for dependency sources.
+    if (shouldIgnoreLspPath(filePath, this.cwd)) return false;
+    return this.canServeFile(filePath);
   }
   private isServerCommandAvailable(command: string): boolean {
     // Only memoize positive lookups. A negative result may become stale if the
@@ -142,6 +155,7 @@ export class LspManager {
     if (existing && existing.status === "error") {
       this.clients.delete(key);
       this.unavailable.add(key);
+      this.clearWarmedWorkspaceSymbolProjects(existing.name, existing.root);
       return null;
     }
 
@@ -180,6 +194,7 @@ export class LspManager {
 
     // Spawn new client
     const client = new LspClient(serverName, serverConfig, root);
+    this.clearWarmedWorkspaceSymbolProjects(serverName, root);
     this.clients.set(key, client);
     rememberKnownRoot(this.knownRoots, serverName, root);
     try {
@@ -240,6 +255,7 @@ export class LspManager {
 
     this.clients.delete(key);
     this.unavailable.delete(key);
+    this.clearWarmedWorkspaceSymbolProjects(client.name, client.root);
 
     const replacement = new LspClient(client.name, serverConfig, client.root);
     this.clients.set(key, replacement);
@@ -384,6 +400,7 @@ export class LspManager {
     this.clients.clear();
     this.unavailable.clear();
     this.knownRoots.clear();
+    this.warmedWorkspaceSymbolProjects.clear();
   }
   /** Get status of all servers. */
   getStatus(): ManagerStatus {
@@ -529,10 +546,25 @@ export class LspManager {
       maxSeverity,
     );
   }
-  async workspaceSymbol(query: string) {
-    return (await import("./manager-workspace-symbol.ts")).managerWorkspaceSymbol(
-      this.clients.values(),
+  async workspaceSymbol(query: string): Promise<(SymbolInformation | WorkspaceSymbol)[] | null> {
+    const helper = await import("./manager-workspace-symbol.ts");
+    const initial = await helper.collectWorkspaceSymbols(this.clients.values(), query);
+    if (!initial.hasSupport) return null;
+    if (initial.results.length > 0) return initial.results;
+
+    const warmed = await this.warmWorkspaceSymbolProjectsUntilResult(
+      helper.findWorkspaceSymbolWarmTargets,
+      helper.getWorkspaceSymbolWarmPosition,
+      helper.collectWorkspaceSymbols,
       query,
+    );
+    if (warmed.results) return warmed.results;
+    if (!warmed.warmedAny) return initial.results;
+
+    return this.retryWorkspaceSymbolAfterWarmup(
+      helper.collectWorkspaceSymbols,
+      query,
+      initial.results,
     );
   }
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
@@ -545,6 +577,112 @@ export class LspManager {
     } catch {
       this.closeFile(resolvedPath);
       return null;
+    }
+  }
+
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: warm-up coordinates client/project iteration, targeted semantic nudges, and early-return queries in one place.
+  private async warmWorkspaceSymbolProjectsUntilResult(
+    findWarmTargets: (
+      root: string,
+      rootMarkers: string[],
+      fileTypes: string[],
+    ) => Array<{ projectRoot: string; file: string }>,
+    getWarmPosition: (
+      symbols: Awaited<ReturnType<LspClient["documentSymbols"]>>,
+    ) => import("../config/types.ts").Position | null,
+    collect: (
+      clients: Iterable<LspClient>,
+      query: string,
+    ) => Promise<{ results: (SymbolInformation | WorkspaceSymbol)[]; hasSupport: boolean }>,
+    query: string,
+  ): Promise<{ warmedAny: boolean; results: (SymbolInformation | WorkspaceSymbol)[] | null }> {
+    let warmedAny = false;
+
+    for (const client of Array.from(this.clients.values())) {
+      if (client.status !== "running") continue;
+      if (!client.serverCapabilities?.workspaceSymbolProvider) continue;
+
+      const serverConfig = this.config.servers[client.name];
+      if (!serverConfig) continue;
+
+      const warmTargets = findWarmTargets(
+        client.root,
+        serverConfig.rootMarkers,
+        serverConfig.fileTypes,
+      ).slice(0, 24);
+
+      for (const target of warmTargets) {
+        const projectKey = this.workspaceSymbolProjectKey(client.name, target.projectRoot);
+        if (this.warmedWorkspaceSymbolProjects.has(projectKey)) continue;
+        if (this.hasOpenFileInProject(client, target.projectRoot)) {
+          this.warmedWorkspaceSymbolProjects.add(projectKey);
+          continue;
+        }
+
+        const openedClient = await this.ensureFileOpen(target.file);
+        if (!openedClient) continue;
+
+        this.warmedWorkspaceSymbolProjects.add(projectKey);
+        warmedAny = true;
+
+        try {
+          const symbols = await openedClient.documentSymbols(target.file);
+          const hoverPosition = getWarmPosition(symbols);
+          if (hoverPosition) {
+            await openedClient.hover(target.file, hoverPosition);
+          }
+        } catch {
+          // Best-effort warm-up only.
+        }
+
+        const collected = await collect(this.clients.values(), query);
+        if (collected.hasSupport && collected.results.length > 0) {
+          return { warmedAny, results: collected.results };
+        }
+      }
+    }
+
+    return { warmedAny, results: null };
+  }
+
+  private async retryWorkspaceSymbolAfterWarmup(
+    collect: (
+      clients: Iterable<LspClient>,
+      query: string,
+    ) => Promise<{ results: (SymbolInformation | WorkspaceSymbol)[]; hasSupport: boolean }>,
+    query: string,
+    fallbackResults: (SymbolInformation | WorkspaceSymbol)[],
+  ): Promise<(SymbolInformation | WorkspaceSymbol)[]> {
+    const attempts = 5;
+    const delayMs = 50;
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+      const retried = await collect(this.clients.values(), query);
+      if (!retried.hasSupport || retried.results.length > 0) {
+        return retried.hasSupport ? retried.results : fallbackResults;
+      }
+    }
+
+    return fallbackResults;
+  }
+
+  private hasOpenFileInProject(client: LspClient, projectRoot: string): boolean {
+    return client.openFiles.some((openFile) => projectRoots.isWithinOrEqual(projectRoot, openFile));
+  }
+
+  private workspaceSymbolProjectKey(serverName: string, projectRoot: string): string {
+    return `${serverName}:${path.resolve(projectRoot)}`;
+  }
+
+  private clearWarmedWorkspaceSymbolProjects(serverName: string, root: string): void {
+    const prefix = `${serverName}:${path.resolve(root)}`;
+    for (const key of Array.from(this.warmedWorkspaceSymbolProjects)) {
+      if (key === prefix || key.startsWith(`${prefix}${path.sep}`)) {
+        this.warmedWorkspaceSymbolProjects.delete(key);
+      }
     }
   }
 }

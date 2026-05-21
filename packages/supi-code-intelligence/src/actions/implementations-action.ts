@@ -1,7 +1,7 @@
 // Implementations action — find concrete implementations via LSP or heuristic.
 
 import * as path from "node:path";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
+import { getSemanticService } from "../providers/semantic-provider.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import {
   escapeRegex,
@@ -52,11 +52,11 @@ export async function executeImplementationsAction(
     };
   }
 
-  const lspState = getSessionLspService(cwd);
+  const lsp = await getSemanticService(cwd, { waitForReady: true });
   const relPath = path.relative(cwd, target.file);
 
-  if (lspState.kind === "ready") {
-    const impls = await lspState.service.implementation(target.file, target.position);
+  if (lsp) {
+    const impls = await lsp.implementation(target.file, target.position);
     if (impls) {
       const locations = Array.isArray(impls) ? impls : [impls];
       if (locations.length > 0) {

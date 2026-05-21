@@ -5,12 +5,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
-import {
-  getSessionLspService,
-  type Position,
-  type SessionLspService,
-} from "@mrclrchtr/supi-lsp/api";
-import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
+import { type Position, type SessionLspService, toLspPosition } from "@mrclrchtr/supi-lsp/api";
+import { getSemanticService, getSemanticServiceState } from "./providers/semantic-provider.ts";
+import { withStructuralSession } from "./providers/structural-provider.ts";
 import { escapeRegex, normalizePath } from "./search-helpers.ts";
 import { highestConfidence } from "./semantic-action-helpers.ts";
 import type { ConfidenceMode, DisambiguationCandidate } from "./types.ts";
@@ -46,7 +43,7 @@ export { normalizePath } from "./search-helpers.ts";
  * Convert 1-based public coordinates to 0-based LSP Position.
  */
 export function toZeroBased(line: number, character: number): Position {
-  return { line: line - 1, character: character - 1 };
+  return toLspPosition(line, character);
 }
 
 /**
@@ -146,14 +143,10 @@ export async function resolveSymbolTarget(
     exportedOnly?: boolean;
   },
 ): Promise<TargetResolutionResult> {
-  const lspState = getSessionLspService(cwd);
+  const lspState = await getSemanticServiceState(cwd, { waitForReady: true });
 
   if (lspState.kind === "ready") {
     return resolveSymbolViaLsp(symbol, cwd, lspState.service, options);
-  }
-
-  if (lspState.kind === "pending") {
-    // In v1, we may wait for LSP. For now, try structural fallback.
   }
 
   // Structural fallback via text search
@@ -336,10 +329,10 @@ async function resolveFileTargetsViaLsp(
   cwd: string,
   structuralTargets: ResolvedTarget[] | null,
 ): Promise<ResolvedTarget[] | null> {
-  const lspState = getSessionLspService(cwd);
-  if (lspState.kind !== "ready") return null;
+  const lsp = await getSemanticService(cwd, { waitForReady: true });
+  if (!lsp) return null;
 
-  const symbols = await lspState.service.documentSymbols(resolvedFile);
+  const symbols = await lsp.documentSymbols(resolvedFile);
   if (!symbols || symbols.length === 0) {
     return structuralTargets;
   }
@@ -378,30 +371,28 @@ async function resolveFileTargetsViaTreeSitter(
   resolvedFile: string,
   cwd: string,
 ): Promise<ResolvedTarget[] | null> {
-  let tsSession: ReturnType<typeof createTreeSitterSession> | null = null;
   try {
-    tsSession = createTreeSitterSession(cwd);
-    const exportsResult = await tsSession.exports(relPath);
-    if (exportsResult.kind !== "success" || exportsResult.data.length === 0) {
-      return null;
-    }
+    return await withStructuralSession(cwd, async (tsSession) => {
+      const exportsResult = await tsSession.exports(relPath);
+      if (exportsResult.kind !== "success" || exportsResult.data.length === 0) {
+        return null;
+      }
 
-    return dedupeTargets(
-      exportsResult.data.map((record) =>
-        createResolvedTarget({
-          file: resolvedFile,
-          line: record.range.startLine,
-          character: record.range.startCharacter,
-          name: record.name,
-          kind: record.kind,
-          confidence: "structural",
-        }),
-      ),
-    );
+      return dedupeTargets(
+        exportsResult.data.map((record) =>
+          createResolvedTarget({
+            file: resolvedFile,
+            line: record.range.startLine,
+            character: record.range.startCharacter,
+            name: record.name,
+            kind: record.kind,
+            confidence: "structural",
+          }),
+        ),
+      );
+    });
   } catch {
     return null;
-  } finally {
-    tsSession?.dispose();
   }
 }
 

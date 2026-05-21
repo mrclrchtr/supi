@@ -2,12 +2,12 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: file-level and single-target affected flows share helpers to keep the blast-radius logic in one place
 
 import * as path from "node:path";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../architecture.ts";
 import {
   appendPrioritySignalsSection,
   summarizePrioritySignalsForFiles,
 } from "../prioritization-signals.ts";
+import { getSemanticService } from "../providers/semantic-provider.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import {
   escapeRegex,
@@ -188,12 +188,12 @@ async function gatherReferences(
   params: ActionParams,
   cwd: string,
 ): Promise<{ refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number }> {
-  const lspState = getSessionLspService(cwd);
+  const lsp = await getSemanticService(cwd, { waitForReady: true });
   const refs: GatheredRef[] = [];
   let externalCount = 0;
 
-  if (lspState.kind === "ready") {
-    const lspRefs = await lspState.service.references(target.file, target.position);
+  if (lsp) {
+    const lspRefs = await lsp.references(target.file, target.position);
     if (lspRefs && lspRefs.length > 0) {
       const filtered = filterOutDeclaration(lspRefs, target.file, target.position);
       for (const ref of filtered) {

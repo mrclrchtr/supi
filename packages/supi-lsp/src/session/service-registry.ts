@@ -4,6 +4,7 @@
 
 import * as path from "node:path";
 import type {
+  CodeAction,
   Diagnostic,
   DocumentSymbol,
   Hover,
@@ -12,12 +13,42 @@ import type {
   Position,
   ProjectServerInfo,
   SymbolInformation,
+  WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
 
+/** Workspace diagnostic summary grouped by file. */
+export interface WorkspaceDiagnosticSummaryEntry {
+  file: string;
+  errors: number;
+  warnings: number;
+}
+
+/** Outstanding diagnostics grouped by file, including info and hint counts. */
+export interface OutstandingDiagnosticSummaryEntry {
+  file: string;
+  total: number;
+  errors: number;
+  warnings: number;
+  information: number;
+  hints: number;
+}
+
+/** Result from a workspace diagnostic recovery pass. */
+export interface RecoverDiagnosticsResult {
+  refreshedClients: number;
+  restartedClients: number;
+  staleAssessment: {
+    suspected: boolean;
+    matchedFiles: Array<{ file: string; diagnostics: Diagnostic[] }>;
+    warning: string | null;
+  };
+}
+
 export type SessionLspServiceState =
   | { kind: "ready"; service: SessionLspService }
+  | { kind: "inactive"; service: SessionLspService }
   | { kind: "pending" }
   | { kind: "disabled" }
   | { kind: "unavailable"; reason: string };
@@ -25,7 +56,9 @@ export type SessionLspServiceState =
 /**
  * Public wrapper around {@link LspManager} that exposes stable semantic operations.
  * File path inputs may be absolute or session-cwd-relative; a leading `@` is stripped
- * to match pi's built-in path-tool convention.
+ * to match pi's built-in path-tool convention. Position arguments use raw 0-based LSP
+ * coordinates; use `toLspPosition()` from `@mrclrchtr/supi-lsp/api` when starting from
+ * user-facing 1-based line and character values.
  */
 export class SessionLspService {
   constructor(private readonly manager: LspManager) {}
@@ -77,33 +110,75 @@ export class SessionLspService {
     return this.manager.workspaceSymbol(query);
   }
 
+  async rename(
+    filePath: string,
+    position: Position,
+    newName: string,
+  ): Promise<WorkspaceEdit | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+    return client.rename(resolvedPath, position, newName);
+  }
+
+  async codeActions(filePath: string, position: Position): Promise<CodeAction[] | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+
+    const range = { start: position, end: position };
+    const diagnostics = client
+      .getDiagnostics(resolvedPath)
+      .filter((diagnostic) => diagnostic.range.start.line <= position.line)
+      .filter((diagnostic) => diagnostic.range.end.line >= position.line);
+
+    return client.codeActions(resolvedPath, range, { diagnostics });
+  }
+
   // ── Project / runtime awareness ─────────────────────────────────────
 
   getProjectServers(): ProjectServerInfo[] {
     return this.manager.getKnownProjectServers([]);
   }
 
+  /** Check whether the file can be served semantically for explicit LSP operations. */
   isSupportedSourceFile(filePath: string): boolean {
-    return this.manager.isSupportedSourceFile(this.resolveFilePath(filePath));
+    return this.manager.canServeFile(this.resolveFilePath(filePath));
   }
 
   // ── Diagnostics ─────────────────────────────────────────────────────
 
+  /** Sync a file through LSP and return diagnostics up to the supplied severity threshold. */
+  async fileDiagnostics(filePath: string, maxSeverity: number = 4): Promise<Diagnostic[] | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    if (!this.manager.canServeFile(resolvedPath)) return null;
+    return this.manager.syncFileAndGetDiagnostics(resolvedPath, maxSeverity);
+  }
+
+  /** Get a lightweight workspace diagnostic summary for all tracked files. */
+  getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSummaryEntry[] {
+    return this.manager.getDiagnosticSummary();
+  }
+
+  /** Get outstanding diagnostics grouped by file at or above the supplied severity threshold. */
   getOutstandingDiagnostics(
     maxSeverity: number = 1,
   ): Array<{ file: string; diagnostics: Diagnostic[] }> {
     return this.manager.getOutstandingDiagnostics(maxSeverity);
   }
 
-  getOutstandingDiagnosticSummary(
-    maxSeverity: number = 1,
-  ): import("../manager/manager-types.ts").OutstandingDiagnosticSummaryEntry[] {
+  /** Get outstanding diagnostic counts grouped by file. */
+  getOutstandingDiagnosticSummary(maxSeverity: number = 1): OutstandingDiagnosticSummaryEntry[] {
     return this.manager.getOutstandingDiagnosticSummary(maxSeverity);
   }
 
-  /** Access the underlying manager for advanced use cases (discouraged). */
-  getManager(): LspManager {
-    return this.manager;
+  /** Trigger a workspace-wide diagnostics refresh and stale-state recovery pass. */
+  async recoverDiagnostics(options?: {
+    restartIfStillStale?: boolean;
+    maxWaitMs?: number;
+    quietMs?: number;
+  }): Promise<RecoverDiagnosticsResult> {
+    return this.manager.recoverWorkspaceDiagnostics(options);
   }
 
   private resolveFilePath(filePath: string): string {
@@ -115,6 +190,7 @@ export class SessionLspService {
 // ── Registry ──────────────────────────────────────────────────────────
 
 const REGISTRY_KEY = Symbol.for("@mrclrchtr/supi-lsp/session-registry");
+const WAIT_INTERVAL_MS = 25;
 
 function getRegistry(): Map<string, SessionLspServiceState> {
   const globalScope = globalThis as typeof globalThis & Record<symbol, unknown>;
@@ -145,6 +221,22 @@ export function getSessionLspService(cwd: string): SessionLspServiceState {
       reason: "No LSP session initialized for this workspace",
     }
   );
+}
+
+/** Wait briefly for a pending session-scoped LSP service to become ready. */
+export async function waitForSessionLspService(
+  cwd: string,
+  timeoutMs: number = 250,
+): Promise<SessionLspServiceState> {
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  let state = getSessionLspService(cwd);
+
+  while (state.kind === "pending" && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, WAIT_INTERVAL_MS));
+    state = getSessionLspService(cwd);
+  }
+
+  return state;
 }
 
 /** Remove the LSP service state for a session cwd. */

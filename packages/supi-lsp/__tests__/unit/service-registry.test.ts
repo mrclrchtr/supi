@@ -7,6 +7,7 @@ import {
   getSessionLspService,
   SessionLspService,
   setSessionLspServiceState,
+  waitForSessionLspService,
 } from "../../src/session/service-registry.ts";
 
 describe("session registry", () => {
@@ -40,6 +41,16 @@ describe("session registry", () => {
     setSessionLspServiceState("/test", { kind: "pending" });
     const state = getSessionLspService("/test");
     expect(state.kind).toBe("pending");
+  });
+
+  it("returns inactive state", () => {
+    const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
+    setSessionLspServiceState("/test", {
+      kind: "inactive",
+      service: new SessionLspService(manager),
+    });
+    const state = getSessionLspService("/test");
+    expect(state.kind).toBe("inactive");
   });
 
   it("returns disabled state", () => {
@@ -82,10 +93,18 @@ describe("SessionLspService semantic operations", () => {
       getCwd: vi.fn().mockReturnValue("/project"),
       ensureFileOpen: vi.fn().mockResolvedValue(mockClient ?? null),
       workspaceSymbol: vi.fn().mockResolvedValue(null),
+      canServeFile: vi.fn().mockReturnValue(true),
       isSupportedSourceFile: vi.fn().mockReturnValue(true),
       getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
       getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
       getKnownProjectServers: vi.fn().mockReturnValue([]),
+      getDiagnosticSummary: vi.fn().mockReturnValue([]),
+      syncFileAndGetDiagnostics: vi.fn().mockResolvedValue([]),
+      recoverWorkspaceDiagnostics: vi.fn().mockResolvedValue({
+        refreshedClients: 0,
+        restartedClients: 0,
+        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
+      }),
     } as unknown as LspManager;
   }
 
@@ -194,12 +213,12 @@ describe("SessionLspService semantic operations", () => {
     expect(manager.getKnownProjectServers).toHaveBeenCalledWith([]);
   });
 
-  it("delegates isSupportedSourceFile to the manager", () => {
+  it("delegates explicit semantic support checks to the manager", () => {
     const manager = makeManager();
     const service = new SessionLspService(manager);
 
     service.isSupportedSourceFile("src/index.ts");
-    expect(manager.isSupportedSourceFile).toHaveBeenCalledWith("/project/src/index.ts");
+    expect(manager.canServeFile).toHaveBeenCalledWith("/project/src/index.ts");
   });
 
   it("delegates getOutstandingDiagnostics to the manager", () => {
@@ -253,6 +272,30 @@ describe("SessionLspService implementation support", () => {
     const service = new SessionLspService(manager);
     const result = await service.implementation("src/index.ts", { line: 0, character: 0 });
     expect(result).toBeNull();
+  });
+});
+
+describe("waitForSessionLspService", () => {
+  it("resolves a pending service once it becomes ready", async () => {
+    setSessionLspServiceState("/test", { kind: "pending" });
+    const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
+    const service = new SessionLspService(manager);
+
+    setTimeout(() => {
+      setSessionLspServiceState("/test", { kind: "ready", service });
+    }, 10);
+
+    const state = await waitForSessionLspService("/test", 100);
+    expect(state.kind).toBe("ready");
+  });
+
+  it("does not wait when the service is inactive", async () => {
+    const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
+    const service = new SessionLspService(manager);
+    setSessionLspServiceState("/test", { kind: "inactive", service });
+
+    const state = await waitForSessionLspService("/test", 100);
+    expect(state.kind).toBe("inactive");
   });
 });
 

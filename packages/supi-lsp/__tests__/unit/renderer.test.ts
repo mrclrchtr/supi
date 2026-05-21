@@ -5,6 +5,26 @@ const mockFns = vi.hoisted(() => ({
   loadLspSettings: vi.fn(() => ({ enabled: true, severity: 1, active: [] })),
   pruneAndReorderContextMessages: vi.fn((msgs: unknown) => msgs),
   buildProjectGuidelines: vi.fn(() => []),
+  buildLspToolPromptSurfaces: vi.fn(() => ({
+    lsp_lookup: { description: "lookup", promptSnippet: "lookup", promptGuidelines: [] },
+    lsp_document_symbols: {
+      description: "document symbols",
+      promptSnippet: "document symbols",
+      promptGuidelines: [],
+    },
+    lsp_workspace_symbols: {
+      description: "workspace symbols",
+      promptSnippet: "workspace symbols",
+      promptGuidelines: [],
+    },
+    lsp_diagnostics: {
+      description: "diagnostics",
+      promptSnippet: "diagnostics",
+      promptGuidelines: [],
+    },
+    lsp_refactor: { description: "refactor", promptSnippet: "refactor", promptGuidelines: [] },
+    lsp_recover: { description: "recover", promptSnippet: "recover", promptGuidelines: [] },
+  })),
   diagnosticsContextFingerprint: vi.fn(),
   formatDiagnosticsContext: vi.fn(),
   promptGuidelines: [],
@@ -18,7 +38,6 @@ const mockFns = vi.hoisted(() => ({
   startDetectedServers: vi.fn(),
   toggleLspStatusOverlay: vi.fn(),
   updateLspUi: vi.fn(),
-  executeAction: vi.fn(),
 }));
 
 vi.mock("../../src/config/config.ts", () => ({
@@ -27,6 +46,8 @@ vi.mock("../../src/config/config.ts", () => ({
 
 vi.mock("../../src/tool/guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
+  buildLspToolPromptSurfaces: mockFns.buildLspToolPromptSurfaces,
+  defaultLspToolPromptSurfaces: mockFns.buildLspToolPromptSurfaces(),
   toolDescription: "",
   promptGuidelines: mockFns.promptGuidelines,
   promptSnippet: mockFns.promptSnippet,
@@ -98,10 +119,6 @@ vi.mock("../../src/ui/ui.ts", () => ({
   updateLspUi: mockFns.updateLspUi,
 }));
 
-vi.mock("../../src/tool/tool-actions.ts", () => ({
-  safeExecuteAction: mockFns.executeAction,
-}));
-
 vi.mock("../../src/session/tree-persist.ts", () => ({
   persistLspActiveState: vi.fn(),
   persistLspInactiveState: vi.fn(),
@@ -111,6 +128,7 @@ vi.mock("../../src/session/tree-persist.ts", () => ({
 vi.mock("../../src/manager/manager-types.ts", () => ({}));
 
 import lspExtension from "../../src/lsp.ts";
+import { LSP_TOOL_NAMES } from "../../src/tool/names.ts";
 
 function resetMocks() {
   vi.clearAllMocks();
@@ -152,7 +170,7 @@ function createPiWithRenderers() {
     registerMessageRenderer(customType: string, renderer: (...args: unknown[]) => unknown) {
       renderers.set(customType, renderer);
     },
-    getActiveTools: () => ["lsp"] as string[],
+    getActiveTools: () => [...LSP_TOOL_NAMES] as string[],
     setActiveTools: vi.fn(),
     appendEntry: vi.fn(),
   } as never;

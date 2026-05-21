@@ -39,6 +39,9 @@ src/
 ├── pattern-structured.ts   # Tree-sitter-based structured pattern search
 ├── prioritization-signals.ts # Diagnostics, coverage, knip unused signals
 ├── semantic-action-helpers.ts # Shared confidence/resolution helpers
+├── providers/
+│   ├── semantic-provider.ts   # Session-scoped LSP access + short readiness waits
+│   └── structural-provider.ts # Short-lived Tree-sitter session helper
 └── actions/
     ├── brief-action.ts         # Architecture overviews + anchored briefs
     ├── callers-action.ts       # Find call sites (LSP → ripgrep)
@@ -86,7 +89,7 @@ switch (params.action) {
 
 ### Fallback Chain
 
-LSP → ripgrep text search (for callers/implementations/affected), with explicit confidence labeling on every result:
+Semantic provider (LSP) → structural provider (Tree-sitter where applicable) → ripgrep text search, with explicit confidence labeling on every result:
 
 | Label | Source |
 |---|---|
@@ -108,7 +111,7 @@ LSP → ripgrep text search (for callers/implementations/affected), with explici
 - `summary: true` returns aggregate counts by directory instead of line-level matches.
 
 ### Target Resolution
-- Symbol resolution: LSP `workspaceSymbol` → ripgrep fallback. Multiple candidates return a disambiguation message.
+- Symbol resolution: semantic provider (`workspaceSymbol` with a short readiness wait) → ripgrep fallback. Multiple candidates return a disambiguation message.
 - `filterOutDeclaration()` strips the source declaration from LSP reference results.
 - Binary files (`.png`, `.jpg`, `.wasm`, etc.) are explicitly rejected.
 

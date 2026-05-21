@@ -4,6 +4,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { DetectedProjectServer, ProjectServerInfo } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
+import { LSP_TOOL_NAMES } from "../tool/names.ts";
 import type { LspInspectorState } from "../ui/ui.ts";
 import { introspectCapabilities } from "./scanner.ts";
 import { clearSessionLspService } from "./service-registry.ts";
@@ -49,7 +50,12 @@ export function refreshProjectServers(state: LspRuntimeState): void {
 }
 
 export function isLspAwareTool(toolName: string): boolean {
-  return toolName === "lsp" || toolName === "read" || toolName === "write" || toolName === "edit";
+  return (
+    LSP_TOOL_NAMES.includes(toolName as (typeof LSP_TOOL_NAMES)[number]) ||
+    toolName === "read" ||
+    toolName === "write" ||
+    toolName === "edit"
+  );
 }
 
 export function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void {
@@ -66,17 +72,22 @@ export function disableLspState(pi: ExtensionAPI, state: LspRuntimeState): void 
   state.lastWorkspaceChangeAt = 0;
   state.sentinelSnapshot = new Map();
   state.lspActive = false;
-  removeLspTool(pi);
+  removeLspTools(pi);
 }
 
-export function removeLspTool(pi: ExtensionAPI): void {
+export function removeLspTools(pi: ExtensionAPI): void {
   const activeTools = pi.getActiveTools();
-  if (activeTools.includes("lsp"))
-    pi.setActiveTools(activeTools.filter((t: string) => t !== "lsp"));
+  const nextTools = activeTools.filter(
+    (toolName: string) => !LSP_TOOL_NAMES.includes(toolName as (typeof LSP_TOOL_NAMES)[number]),
+  );
+  if (nextTools.length !== activeTools.length) {
+    pi.setActiveTools(nextTools);
+  }
 }
 
-export function ensureLspToolActive(pi: ExtensionAPI): void {
+export function ensureLspToolsActive(pi: ExtensionAPI): void {
   const activeTools = pi.getActiveTools();
-  if (activeTools.includes("lsp")) return;
-  pi.setActiveTools([...activeTools, "lsp"]);
+  const missing = LSP_TOOL_NAMES.filter((toolName) => !activeTools.includes(toolName));
+  if (missing.length === 0) return;
+  pi.setActiveTools([...activeTools, ...missing]);
 }

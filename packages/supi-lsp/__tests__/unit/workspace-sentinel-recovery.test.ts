@@ -7,6 +7,26 @@ const mockFns = vi.hoisted(() => ({
   pruneAndReorderContextMessages: vi.fn((msgs: unknown) => msgs),
   restorePromptContent: vi.fn((msgs: unknown) => msgs),
   buildProjectGuidelines: vi.fn(() => []),
+  buildLspToolPromptSurfaces: vi.fn(() => ({
+    lsp_lookup: { description: "lookup", promptSnippet: "lookup", promptGuidelines: [] },
+    lsp_document_symbols: {
+      description: "document symbols",
+      promptSnippet: "document symbols",
+      promptGuidelines: [],
+    },
+    lsp_workspace_symbols: {
+      description: "workspace symbols",
+      promptSnippet: "workspace symbols",
+      promptGuidelines: [],
+    },
+    lsp_diagnostics: {
+      description: "diagnostics",
+      promptSnippet: "diagnostics",
+      promptGuidelines: [],
+    },
+    lsp_refactor: { description: "refactor", promptSnippet: "refactor", promptGuidelines: [] },
+    lsp_recover: { description: "recover", promptSnippet: "recover", promptGuidelines: [] },
+  })),
   diagnosticsContextFingerprint: vi.fn(() => null),
   formatDiagnosticsContext: vi.fn(() => null),
   promptGuidelines: [],
@@ -20,7 +40,6 @@ const mockFns = vi.hoisted(() => ({
   startDetectedServers: vi.fn(),
   toggleLspStatusOverlay: vi.fn(),
   updateLspUi: vi.fn(),
-  executeAction: vi.fn(),
   scanWorkspaceSentinels: vi.fn(() => new Map<string, number>()),
   syncWorkspaceSentinelSnapshot: vi.fn(() => ({
     snapshot: new Map<string, number>([["/project/package.json", 100]]),
@@ -32,6 +51,8 @@ const mockFns = vi.hoisted(() => ({
 vi.mock("../../src/config/config.ts", () => ({ loadConfig: mockFns.loadConfig }));
 vi.mock("../../src/tool/guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
+  buildLspToolPromptSurfaces: mockFns.buildLspToolPromptSurfaces,
+  defaultLspToolPromptSurfaces: mockFns.buildLspToolPromptSurfaces(),
   toolDescription: "test",
   promptGuidelines: mockFns.promptGuidelines,
   promptSnippet: mockFns.promptSnippet,
@@ -65,9 +86,6 @@ vi.mock("../../src/ui/ui.ts", () => ({
   toggleLspStatusOverlay: mockFns.toggleLspStatusOverlay,
   updateLspUi: mockFns.updateLspUi,
 }));
-vi.mock("../../src/tool/tool-actions.ts", () => ({
-  safeExecuteAction: mockFns.executeAction,
-}));
 vi.mock("../../src/session/tree-persist.ts", () => ({
   persistLspActiveState: vi.fn(),
   persistLspInactiveState: vi.fn(),
@@ -84,6 +102,7 @@ vi.mock("../../src/diagnostics/workspace-sentinels.ts", () => ({
 }));
 
 import lspExtension from "../../src/lsp.ts";
+import { LSP_TOOL_NAMES } from "../../src/tool/names.ts";
 
 function createManager() {
   return {
@@ -111,7 +130,7 @@ function createManager() {
 
 function createPiWithHandlers() {
   const handlers = new Map<string, (...args: unknown[]) => Promise<unknown>>();
-  let activeTools = ["lsp"];
+  let activeTools: string[] = [...LSP_TOOL_NAMES];
   const pi = {
     on: vi.fn((event: string, handler: (...args: unknown[]) => Promise<unknown>) => {
       handlers.set(event, handler);

@@ -13,7 +13,6 @@ import type {
   WorkspaceEdit,
 } from "./config/types.ts";
 import { isProjectSource } from "./summary.ts";
-import type { GrepMatch } from "./tool/search-fallback.ts";
 import { uriToFile } from "./utils.ts";
 
 // ── Hover ─────────────────────────────────────────────────────────────
@@ -295,26 +294,6 @@ export function formatWorkspaceSymbols(symbols: SymbolInformation[], cwd: string
   }
 
   return lines.join("\n");
-}
-
-// ── Search Results ────────────────────────────────────────────────────
-
-export function formatSearchResults(
-  lspSymbols: SymbolInformation[] | null,
-  grepMatches: GrepMatch[] | null,
-  cwd: string,
-): string {
-  if (lspSymbols && lspSymbols.length > 0) {
-    return formatWorkspaceSymbols(lspSymbols, cwd);
-  }
-  if (grepMatches && grepMatches.length > 0) {
-    const lines = [`Text search results (${grepMatches.length}):\n`];
-    for (const match of grepMatches) {
-      lines.push(`- ${match.file}:${match.line}: ${match.text}`);
-    }
-    return lines.join("\n");
-  }
-  return "No symbols or text matches found.";
 }
 
 // ── Symbol Kind Names ─────────────────────────────────────────────────

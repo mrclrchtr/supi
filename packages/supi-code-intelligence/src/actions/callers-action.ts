@@ -1,7 +1,7 @@
 // Callers action — find call sites for a symbol.
 
 import * as path from "node:path";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
+import { getSemanticService } from "../providers/semantic-provider.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import {
   escapeRegex,
@@ -169,10 +169,10 @@ async function collectCallerRefs(
   params: ActionParams,
   cwd: string,
 ): Promise<CallerCollection> {
-  const lspState = getSessionLspService(cwd);
+  const lsp = await getSemanticService(cwd, { waitForReady: true });
 
-  if (lspState.kind === "ready") {
-    const refs = await lspState.service.references(target.file, target.position);
+  if (lsp) {
+    const refs = await lsp.references(target.file, target.position);
     if (refs && refs.length > 0) {
       const filtered = filterOutDeclaration(refs, target.file, target.position);
       const projectRefs: CallerRef[] = [];

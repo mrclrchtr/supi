@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
+import { withStructuralSession } from "./providers/structural-provider.ts";
 import type { ActionParams } from "./tool-actions.ts";
 
 export const STRUCTURED_PATTERN_FILE_CAP = 200;
@@ -42,31 +42,29 @@ export async function getStructuredPatternMatches(
     return matcher;
   }
 
-  let tsSession: ReturnType<typeof createTreeSitterSession> | null = null;
   try {
-    tsSession = createTreeSitterSession(cwd);
-    const matches: StructuredMatch[] = [];
-    let timedOut = collected.timedOut;
+    return await withStructuralSession(cwd, async (tsSession) => {
+      const matches: StructuredMatch[] = [];
+      let timedOut = collected.timedOut;
 
-    for (const [index, file] of collected.files.entries()) {
-      if (Date.now() > deadline) {
-        collected.omittedCount += collected.files.length - index;
-        timedOut = true;
-        break;
+      for (const [index, file] of collected.files.entries()) {
+        if (Date.now() > deadline) {
+          collected.omittedCount += collected.files.length - index;
+          timedOut = true;
+          break;
+        }
+        const relFile = path.relative(cwd, file);
+        await collectMatchesForFile(matches, tsSession, relFile, params.kind, matcher);
       }
-      const relFile = path.relative(cwd, file);
-      await collectMatchesForFile(matches, tsSession, relFile, params.kind, matcher);
-    }
 
-    return {
-      matches,
-      omittedCount: timedOut ? Math.max(1, collected.omittedCount) : collected.omittedCount,
-      partialReason: timedOut ? "timeout" : collected.omittedCount > 0 ? "file-cap" : null,
-    };
+      return {
+        matches,
+        omittedCount: timedOut ? Math.max(1, collected.omittedCount) : collected.omittedCount,
+        partialReason: timedOut ? "timeout" : collected.omittedCount > 0 ? "file-cap" : null,
+      };
+    });
   } catch {
     return `No structured ${params.kind} search data available in \`${relScope}\`. Try omitting \`kind\` for plain text search.`;
-  } finally {
-    tsSession?.dispose();
   }
 }
 
@@ -74,7 +72,7 @@ export async function getStructuredPatternMatches(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: kind-specific tree-sitter matching is clearest as one helper
 async function collectMatchesForFile(
   matches: StructuredMatch[],
-  tsSession: ReturnType<typeof createTreeSitterSession>,
+  tsSession: import("@mrclrchtr/supi-tree-sitter/api").TreeSitterSession,
   relFile: string,
   kind: StructuredPatternKind,
   matcher: (value: string) => boolean,

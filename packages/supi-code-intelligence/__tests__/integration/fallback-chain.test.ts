@@ -112,6 +112,33 @@ describe("callers action — LSP unavailable", () => {
   });
 });
 
+describe("callers action — LSP inactive", () => {
+  beforeEach(() => {
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "inactive",
+      service: {
+        references: vi.fn(),
+        implementation: vi.fn(),
+      },
+    });
+  });
+
+  it("does not treat inactive LSP as semantic availability", async () => {
+    createSourceFile("test.ts", "export const x = 1;\n");
+
+    const result = await executeAction(
+      { action: "callers", file: "test.ts", line: 1, character: 1 },
+      { cwd: tmpDir },
+    );
+
+    expect(result.content).toContain("No caller data available");
+    expect(result.details).toBeDefined();
+    if (result.details?.type === "search") {
+      expect(result.details.data.confidence).toBe("unavailable");
+    }
+  });
+});
+
 // ── callers — LSP available ──────────────────────────────────────────
 
 describe("callers action — LSP available", () => {

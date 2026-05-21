@@ -3,12 +3,20 @@
 ## Scope
 
 `@mrclrchtr/supi-lsp` has two explicit surfaces:
-- `@mrclrchtr/supi-lsp/extension` → `src/extension.ts` → registers the `lsp` tool, LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer
-- `@mrclrchtr/supi-lsp/api` → `src/api.ts` → reusable library surface (`getSessionLspService`, `SessionLspService`, exported types, and session-scoped implementation lookup)
+- `@mrclrchtr/supi-lsp/extension` → `src/extension.ts` → registers the expert LSP toolset (`lsp_lookup`, `lsp_document_symbols`, `lsp_workspace_symbols`, `lsp_diagnostics`, `lsp_refactor`, `lsp_recover`), LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer
+- `@mrclrchtr/supi-lsp/api` → `src/api.ts` → reusable library surface (`getSessionLspService`, `waitForSessionLspService`, `SessionLspService`, and exported semantic/diagnostic result types)
 
 ## Tool actions overview
 
-The `lsp` tool uses a top-level `{ action, args }` input shape, with 1-based position coordinates inside `args` when applicable. `tool/tool-actions.ts` validates inputs and formats results. Language-level actions are `hover`, `definition`, `references`, `symbols`, `rename`, and `code_actions`. Workspace search actions are `workspace_symbol`, `search`, and `symbol_hover`. The `recover` action is the no-args case and forces a workspace-wide diagnostic refresh; it can restart clients that still look stale. Diagnostics can be requested per file or project-wide, and the same diagnostic data is also surfaced inline after `write` and `edit`.
+The public tool surface is split by job instead of multiplexing everything through one `{ action, args }` schema:
+- `lsp_lookup` → `kind: "hover" | "definition" | "references" | "implementation"` with top-level `file`, `line`, `character`
+- `lsp_document_symbols` → one-file semantic declarations
+- `lsp_workspace_symbols` → project-wide symbol-name lookup
+- `lsp_diagnostics` → file or workspace diagnostics
+- `lsp_refactor` → `kind: "rename" | "code_actions"` with top-level `file`, `line`, `character`, optional `newName`
+- `lsp_recover` → no-args diagnostic refresh and stale-state recovery
+
+`tool/register-tools.ts` owns tool registration and schemas. `tool/service-actions.ts` formats tool results and talks only to `SessionLspService`, not `LspManager` directly. Diagnostics can be requested explicitly through `lsp_diagnostics`, and the same diagnostic data is also surfaced inline after `write` and `edit`.
 
 ### Guidance layering
 
@@ -20,16 +28,16 @@ Diagnostics are controlled by `/supi-settings`. The default threshold is `1`, so
 
 ## Key files
 
-`lsp.ts` owns extension wiring, lifecycle, commands, and resource registration. `tool/tool-actions.ts` handles tool action execution and formatting. `manager.ts` and the `manager-*.ts` helpers own client lifecycle, root resolution, diagnostic state, and workspace recovery. `manager-helpers.ts` holds smaller private helpers such as `clientKey`, `resolveRootForFile`, and `isExcludedByPattern`. `client.ts` wraps initialization, document sync, and requests.
+`lsp.ts` owns extension wiring, lifecycle, commands, and resource registration. `tool/register-tools.ts` registers the split expert tools, while `tool/service-actions.ts` handles service-backed execution and formatting. `manager.ts` and the `manager-*.ts` helpers own client lifecycle, root resolution, diagnostic state, and workspace recovery. `manager-helpers.ts` holds smaller private helpers such as `clientKey`, `resolveRootForFile`, and `isExcludedByPattern`. `client.ts` wraps initialization, document sync, and requests.
 
-`session/service-registry.ts` exposes the shared session-scoped API for peer extensions. `tool/guidance.ts` formats prompt guidelines and diagnostic-context text. `diagnostics/stale-diagnostics.ts` detects suspicious missing-module clusters for stale-warning output, while `diagnostics/suppression-diagnostics.ts` handles stale suppression diagnostics for inline and pre-turn output. `manager/manager-diagnostics.ts` keeps file-sync and cascade-diagnostic helpers out of `manager.ts`, and `manager/manager-workspace-recovery.ts` owns soft recovery and targeted client restarts. `tool/overrides.ts`, `ui/renderer.ts`, and `ui/ui.ts` handle tool-result augmentation, custom messages, and the status overlay. `pattern-matcher.ts` implements gitignore-style exclusion matching. `session/settings-registration.ts` registers enable, severity, active-server, and exclude-pattern settings.
+`session/service-registry.ts` exposes the shared session-scoped API for peer extensions, including short waits for pending startup and semantic/diagnostic helpers used by `supi-code-intelligence`. `tool/guidance.ts` formats per-tool prompt guidance and dynamic server-coverage bullets. `diagnostics/stale-diagnostics.ts` detects suspicious missing-module clusters for stale-warning output, while `diagnostics/suppression-diagnostics.ts` handles stale suppression diagnostics for inline and pre-turn output. `manager/manager-diagnostics.ts` keeps file-sync and cascade-diagnostic helpers out of `manager.ts`, and `manager/manager-workspace-recovery.ts` owns soft recovery and targeted client restarts. `tool/overrides.ts`, `ui/renderer.ts`, and `ui/ui.ts` handle tool-result augmentation, custom messages, and the status overlay. `pattern-matcher.ts` implements gitignore-style exclusion matching. `session/settings-registration.ts` registers enable, severity, active-server, and exclude-pattern settings.
 
 
 ## Architecture gotchas
 
-Stable LSP guidance belongs in tool `promptGuidelines`. `before_agent_start` should inject only dynamic XML-framed diagnostic messages and should not mutate `systemPrompt`. `lsp-context` messages keep the renderer summary in `content` and stash raw XML in `details.promptContent`; the `context` hook restores `promptContent` before the model sees it. `buildProjectGuidelines()` is applied by re-registering the `lsp` tool at `session_start`, so `/reload` is required before newly scanned server guidance appears.
+Stable LSP guidance belongs in tool `promptGuidelines`. `before_agent_start` should inject only dynamic XML-framed diagnostic messages and should not mutate `systemPrompt`. `lsp-context` messages keep the renderer summary in `content` and stash raw XML in `details.promptContent`; the `context` hook restores `promptContent` before the model sees it. Dynamic server coverage is applied by re-registering the expert LSP tools at `session_start`, so `/reload` is required before newly scanned server guidance appears.
 
-`/lsp-status` must merge proactive scan roots with lazily started clients because the session-start scan snapshot is incomplete. Tool activation state is persisted with `pi.appendEntry()` as `lsp-active` entries and restored by inspecting the active branch during `session_tree`. The library surface behind `src/api.ts` / `src/index.ts` must not import extension-only modules such as `lsp.ts`, `ui/renderer.ts`, or `ui/ui.ts`. Keep the `/api` surface limited to `session/service-registry.ts`, `client.ts`, `manager.ts`, and `config/types.ts`. `SessionLspService` is the stable wrapper and should not leak `LspManager` internals. The session registry is process-global through `Symbol.for("@mrclrchtr/supi-lsp/session-registry")`, keyed by normalized `cwd`, updated synchronously in `session_start` and `session_shutdown`, and read synchronously by `getSessionLspService(cwd)`.
+`/lsp-status` must merge proactive scan roots with lazily started clients because the session-start scan snapshot is incomplete. Tool activation state is persisted with `pi.appendEntry()` as `lsp-active` entries and restored by inspecting the active branch during `session_tree`; this now toggles the whole expert LSP toolset, not a single `lsp` tool, and the public registry reflects that with `kind: "inactive"` when semantic access is branch-disabled. The library surface behind `src/api.ts` / `src/index.ts` must not import extension-only modules such as `lsp.ts`, `ui/renderer.ts`, or `ui/ui.ts`. Keep the `/api` surface limited to `session/service-registry.ts`, `client.ts`, `manager.ts`, and `config/types.ts`. `SessionLspService` is the stable wrapper and should not leak `LspManager` internals. Its position arguments are raw 0-based LSP coordinates; use `toLspPosition()` from `@mrclrchtr/supi-lsp/api` when starting from 1-based user coordinates. The session registry is process-global through `Symbol.for("@mrclrchtr/supi-lsp/session-registry")`, keyed by normalized `cwd`, updated synchronously in `session_start` and `session_shutdown`, and read through `getSessionLspService(cwd)` / `waitForSessionLspService(cwd)`.
 
 ## Diagnostic behavior gotchas
 
@@ -39,7 +47,7 @@ Pull diagnostic sync should use pull when `diagnosticProvider` is available and 
 
 ## Tool action gotchas
 
-Standalone `lsp` actions validate nested `args` explicitly and return `Validation error: ...` strings instead of throwing. Relative `file` inputs resolve from `manager.getCwd()`, not `process.cwd()`. `line` and `character` must be positive 1-based integers before conversion to zero-based coordinates. Missing-file diagnostics return a clear file-access message instead of relying on a thrown exception.
+The split expert tools use flat top-level parameters. `lsp_lookup` / `lsp_refactor` still validate positive 1-based `line` and `character` positions explicitly and return `Validation error: ...` strings instead of throwing. Relative `file` inputs resolve from the session cwd, not `process.cwd()`. `lsp_refactor` requires `newName` only for `kind: "rename"`. Missing-file diagnostics should return a clear file-access message instead of relying on a thrown exception.
 
 ## Package-specific conventions
 
@@ -47,13 +55,13 @@ Keep summary and relevance formatting out of `manager.ts`; use focused helpers s
 
 `loadConfig()` reads server definitions from supi config (`~/.pi/agent/supi/config.json` and `.pi/supi/config.json`) under `lsp.servers`. `.pi-lsp.json` is no longer read. Keys are language names such as `typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, and `kotlin`, not server binary names. Each language entry merges independently against built-in defaults, and omitted fields fall back to the code default for that language. The active-server allowlist is stored under `lsp.active` and applied in `session_start` after config load.
 
-User exclusion patterns live under `lsp.exclude` as gitignore-style glob strings. They are loaded in `session_start`, stored on `LspManager` through `setExcludePatterns()`, and applied only by diagnostic and coverage collection methods; explicit `lsp` tool actions are not filtered. `isGlobMatch()` in `pattern-matcher.ts` supports leading `/` for anchored matches, trailing `/` for directory-only matches, `**` for recursive wildcards, and `*` for single-segment wildcards.
+User exclusion patterns live under `lsp.exclude` as gitignore-style glob strings. They are loaded in `session_start`, stored on `LspManager` through `setExcludePatterns()`, and applied only by diagnostic and coverage collection methods; explicit expert LSP operations (`lsp_lookup`, `lsp_document_symbols`, `lsp_workspace_symbols`, `lsp_diagnostics`, `lsp_refactor`, `lsp_recover`) are not filtered. `isGlobMatch()` in `pattern-matcher.ts` supports leading `/` for anchored matches, trailing `/` for directory-only matches, `**` for recursive wildcards, and `*` for single-segment wildcards.
 
 ## Integration test coverage
 
 ### Required vs optional
 
-- **Required (CI)**: TypeScript integration tests (`client.integration.test.ts`, `manager.integration.test.ts`, `tool-actions.integration.test.ts`, `tool-actions-workspace.integration.test.ts`) — these use `typescript-language-server` + `tsserver`, which must be available.
+- **Required (CI)**: TypeScript integration tests (`client.integration.test.ts`, `manager.integration.test.ts`, `service-actions.integration.test.ts`, `service-actions-workspace.integration.test.ts`) — these use `typescript-language-server` + `tsserver`, which must be available.
 - **Optional (local)**: Python (`client.integration.python.test.ts`) and Bash (`client.integration.bash.test.ts`) tests that skip gracefully when the corresponding server binary is not on `PATH`.
 
 All integration tests use `describe.skipIf(!HAS_COMMAND)` so they are transparently skipped when the server is unavailable. The missing-server test in `client.integration.bash.test.ts` always runs because it tests behavior when a nonexistent binary is configured.
@@ -70,7 +78,7 @@ All integration tests use `describe.skipIf(!HAS_COMMAND)` so they are transparen
 
 Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/unit/renderer.test.ts` for a small pull-diagnostic and custom-message regression pass. Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/service-registry.test.ts` for the public API and registry lifecycle.
 
-Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/tool-actions.validation.test.ts packages/supi-lsp/__tests__/unit/tool-actions.recover.test.ts` for parameter validation, the recovery action contract, and path resolution. Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-cascade.test.ts packages/supi-lsp/__tests__/unit/overrides-cascade.test.ts packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts` for cascade detection, inline output, stale-module clustering, and suppression coverage.
+Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/service-actions.validation.test.ts packages/supi-lsp/__tests__/unit/service-actions.recover.test.ts` for parameter validation, the recovery action contract, and path resolution. Use `pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-cascade.test.ts packages/supi-lsp/__tests__/unit/overrides-cascade.test.ts packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts` for cascade detection, inline output, stale-module clustering, and suppression coverage.
 
 ```bash
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-refresh.test.ts packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/unit/transport.test.ts

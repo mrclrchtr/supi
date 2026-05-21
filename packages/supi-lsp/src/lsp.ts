@@ -1,13 +1,10 @@
-// LSP Extension for pi — provides hover, definition, diagnostics, symbols, rename, code-actions
-// via a registered `lsp` tool. Keeps language servers warm, surfaces inline diagnostics,
-// and injects diagnostic context only when outstanding issues exist.
+// LSP Extension for pi — registers an expert semantic toolset, keeps language servers warm,
+// surfaces inline diagnostics, and injects diagnostic context only when outstanding issues exist.
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: lsp.ts stays cohesive wiring; recovery and sentinel helpers live in focused modules.
 
 import * as path from "node:path";
-import { StringEnum } from "@earendil-works/pi-ai";
 import type {
   AgentEndEvent,
-  AgentToolUpdateCallback,
   BeforeAgentStartEvent,
   BeforeAgentStartEventResult,
   ContextEvent,
@@ -17,7 +14,6 @@ import type {
   ToolResultEvent,
 } from "@earendil-works/pi-coding-agent";
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/api";
-import { Type } from "typebox";
 import { loadConfig, resolveLanguageAlias } from "./config/config.ts";
 import { FileChangeType } from "./config/types.ts";
 import {
@@ -37,11 +33,11 @@ import { forceResyncStaleModuleFiles } from "./manager/manager-stale-resync.ts";
 import {
   createRuntimeState,
   disableLspState,
-  ensureLspToolActive,
+  ensureLspToolsActive,
   isLspAwareTool,
   type LspRuntimeState,
   refreshProjectServers,
-  removeLspTool,
+  removeLspTools,
 } from "./session/lsp-state.ts";
 import {
   scanMissingServers,
@@ -63,60 +59,12 @@ import {
   persistLspInactiveState,
   registerTreePersistHandlers,
 } from "./session/tree-persist.ts";
-import {
-  buildProjectGuidelines,
-  promptGuidelines,
-  promptSnippet,
-  toolDescription,
-} from "./tool/guidance.ts";
+import { buildLspToolPromptSurfaces, defaultLspToolPromptSurfaces } from "./tool/guidance.ts";
 import { registerLspAwareToolOverrides } from "./tool/overrides.ts";
-import { type LspToolParams, safeExecuteAction } from "./tool/tool-actions.ts";
+import { registerLspTools } from "./tool/register-tools.ts";
 import { registerLspMessageRenderer } from "./ui/renderer.ts";
 import { toggleLspStatusOverlay, updateLspUi } from "./ui/ui.ts";
 import { fileToUri } from "./utils.ts";
-
-const LspActionEnum = StringEnum([
-  "hover",
-  "definition",
-  "references",
-  "diagnostics",
-  "symbols",
-  "rename",
-  "code_actions",
-  "workspace_symbol",
-  "search",
-  "symbol_hover",
-  "recover",
-] as const);
-
-const FileParam = Type.String({ description: "File path (relative or absolute)" });
-const LineParam = Type.Number({ description: "1-based line number" });
-const CharacterParam = Type.Number({ description: "1-based column number" });
-const NewNameParam = Type.String({ description: "New name (for rename action)" });
-const QueryParam = Type.String({
-  description: "Search query (for workspace_symbol and search actions)",
-});
-const SymbolParam = Type.String({ description: "Symbol name (for symbol_hover action)" });
-
-const LspToolParameters = Type.Object(
-  {
-    action: LspActionEnum,
-    args: Type.Optional(
-      Type.Object(
-        {
-          file: Type.Optional(FileParam),
-          line: Type.Optional(LineParam),
-          character: Type.Optional(CharacterParam),
-          newName: Type.Optional(NewNameParam),
-          query: Type.Optional(QueryParam),
-          symbol: Type.Optional(SymbolParam),
-        },
-        { additionalProperties: false },
-      ),
-    ),
-  },
-  { additionalProperties: false },
-);
 
 export default function lspExtension(pi: ExtensionAPI) {
   registerLspSettings();
@@ -126,9 +74,10 @@ export default function lspExtension(pi: ExtensionAPI) {
     getInlineSeverity: () => state.inlineSeverity,
     getManager: () => state.manager,
     getCwd: () => state.manager?.getCwd() ?? process.cwd(),
+    isActive: () => state.lspActive,
   });
 
-  registerLspTool(pi, state, promptGuidelines);
+  registerLspTools(pi, defaultLspToolPromptSurfaces);
   registerSessionLifecycleHandlers(pi, state);
   registerBehaviorHandlers(pi, state);
   registerTreePersistHandlers(pi, state);
@@ -197,8 +146,8 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
       kind: "ready",
       service: new SessionLspService(state.manager),
     });
-    registerLspTool(pi, state, buildProjectGuidelines(state.projectServers, cwd));
-    ensureLspToolActive(pi);
+    registerLspTools(pi, buildLspToolPromptSurfaces(state.projectServers, cwd));
+    ensureLspToolsActive(pi);
     persistLspActiveState(pi, state);
     updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
   });
@@ -324,14 +273,14 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: before_agent_start coordinates sentinel recovery, pruning, refresh, and diagnostic injection.
   pi.on("before_agent_start", async (_event: BeforeAgentStartEvent, ctx: ExtensionContext) => {
     if (!state.manager || !state.lspActive) {
-      removeLspTool(pi);
+      removeLspTools(pi);
       if (!state.manager && state.lspActive) {
         persistLspInactiveState(pi, state);
       }
       return;
     }
 
-    ensureLspToolActive(pi);
+    ensureLspToolsActive(pi);
 
     refreshWorkspaceSentinels(state, ctx.cwd);
 
@@ -442,43 +391,6 @@ function registerBehaviorHandlers(pi: ExtensionAPI, state: LspRuntimeState): voi
       refreshProjectServers(state);
       updateLspUi(ctx, state.manager, state.inlineSeverity, state.projectServers);
     }
-  });
-}
-
-function registerLspTool(
-  pi: ExtensionAPI,
-  state: LspRuntimeState,
-  promptGuidelines: string[],
-): void {
-  pi.registerTool({
-    name: "lsp",
-    label: "LSP",
-    description: toolDescription,
-    promptSnippet: promptSnippet,
-    promptGuidelines,
-    parameters: LspToolParameters,
-    // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-    async execute(
-      _toolCallId: string,
-      params: LspToolParams,
-      _signal: AbortSignal | undefined,
-      _onUpdate: AgentToolUpdateCallback | undefined,
-      _ctx: ExtensionContext,
-    ) {
-      if (!state.manager) {
-        return {
-          content: [{ type: "text", text: "LSP not initialized. Start a new session first." }],
-          details: {},
-        };
-      }
-
-      const text = await safeExecuteAction(state.manager, params as LspToolParams);
-
-      return {
-        content: [{ type: "text", text }],
-        details: {},
-      };
-    },
   });
 }
 

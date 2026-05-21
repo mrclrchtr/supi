@@ -196,21 +196,26 @@ describe("SuPi e2e smoke – extension load", () => {
 });
 
 describe("SuPi e2e smoke – tool registration", () => {
-  it("registers all three expected tools with correct names", () => {
+  it("registers the expert LSP toolset plus tree_sitter and code_intel", () => {
     const pi = createPiMock();
     lspExtension(pi);
     treeSitterExtension(pi);
     codeIntelligenceExtension(pi);
 
     const toolNames = pi.tools.map((t) => t.name);
-    expect(toolNames).toContain("lsp");
+    expect(toolNames).toContain("lsp_lookup");
+    expect(toolNames).toContain("lsp_document_symbols");
+    expect(toolNames).toContain("lsp_workspace_symbols");
+    expect(toolNames).toContain("lsp_diagnostics");
+    expect(toolNames).toContain("lsp_refactor");
+    expect(toolNames).toContain("lsp_recover");
     expect(toolNames).toContain("tree_sitter");
     expect(toolNames).toContain("code_intel");
     // LSP also registers read/write/edit overrides for inline diagnostics
     expect(toolNames).toContain("read");
     expect(toolNames).toContain("write");
     expect(toolNames).toContain("edit");
-    expect(pi.tools).toHaveLength(6);
+    expect(pi.tools).toHaveLength(11);
   });
 
   it("each tool has execute function, description, and parameters", () => {
@@ -228,25 +233,25 @@ describe("SuPi e2e smoke – tool registration", () => {
     }
   });
 
-  it("lsp tool has action enum with all expected actions", () => {
+  it("expert LSP tool descriptions advertise the split semantic workflow", () => {
     const pi = createPiMock();
     lspExtension(pi);
-    const lspTool = pi.tools.find((t) => t.name === "lsp");
-    expect(lspTool).toBeDefined();
 
-    // Check the action enum in description
-    const desc = lspTool?.description;
-    expect(desc).toContain("hover");
-    expect(desc).toContain("definition");
-    expect(desc).toContain("references");
-    expect(desc).toContain("diagnostics");
-    expect(desc).toContain("symbols");
-    expect(desc).toContain("rename");
-    expect(desc).toContain("code_actions");
-    expect(desc).toContain("workspace_symbol");
-    expect(desc).toContain("search");
-    expect(desc).toContain("symbol_hover");
-    expect(desc).toContain("recover");
+    expect(pi.tools.find((t) => t.name === "lsp_lookup")?.description).toContain("hover");
+    expect(pi.tools.find((t) => t.name === "lsp_lookup")?.description).toContain("implementation");
+    expect(pi.tools.find((t) => t.name === "lsp_document_symbols")?.description).toContain(
+      "semantic declarations",
+    );
+    expect(pi.tools.find((t) => t.name === "lsp_workspace_symbols")?.description).toContain(
+      "symbol-name lookup",
+    );
+    expect(pi.tools.find((t) => t.name === "lsp_diagnostics")?.description).toContain(
+      "diagnostics",
+    );
+    expect(pi.tools.find((t) => t.name === "lsp_refactor")?.description).toContain("rename");
+    expect(pi.tools.find((t) => t.name === "lsp_recover")?.description).toContain(
+      "refresh diagnostics",
+    );
   });
 
   it("tree_sitter tool has action enum with all expected actions", () => {
@@ -262,7 +267,7 @@ describe("SuPi e2e smoke – tool registration", () => {
     expect(desc).toContain("node_at");
     expect(desc).toContain("query");
     expect(desc).toContain("callees");
-    expect(desc).toContain("Supported extensions");
+    expect(desc).toContain("supported files");
   });
 
   it("code_intel tool has action enum with all expected actions", () => {
@@ -287,10 +292,21 @@ describe("SuPi e2e smoke – tool registration", () => {
     treeSitterExtension(pi);
     codeIntelligenceExtension(pi);
 
-    // lsp, tree_sitter, and code_intel are registered via pi.registerTool with full metadata.
+    // The expert LSP tools, tree_sitter, and code_intel are registered via pi.registerTool with full metadata.
     // The read/write/edit overrides come from createReadTool etc. and are AgentTools
     // which wrap ToolDefinitions but strip promptGuidelines/promptSnippet.
-    const supiTools = pi.tools.filter((t) => ["lsp", "tree_sitter", "code_intel"].includes(t.name));
+    const supiTools = pi.tools.filter((t) =>
+      [
+        "lsp_lookup",
+        "lsp_document_symbols",
+        "lsp_workspace_symbols",
+        "lsp_diagnostics",
+        "lsp_refactor",
+        "lsp_recover",
+        "tree_sitter",
+        "code_intel",
+      ].includes(t.name),
+    );
     for (const tool of supiTools) {
       expect(tool.promptGuidelines).toBeDefined();
       expect(tool.promptGuidelines?.length).toBeGreaterThan(0);
@@ -860,7 +876,12 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     expect(pi.tools.map((t) => t.name).sort()).toEqual([
       "code_intel",
       "edit",
-      "lsp",
+      "lsp_diagnostics",
+      "lsp_document_symbols",
+      "lsp_lookup",
+      "lsp_recover",
+      "lsp_refactor",
+      "lsp_workspace_symbols",
       "read",
       "tree_sitter",
       "write",
@@ -924,59 +945,49 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
 });
 
 describe("SuPi e2e smoke – lsp extension behavior", () => {
-  it("uses a top-level action-plus-args parameter schema", () => {
+  it("uses focused top-level parameter schemas for the split LSP tools", () => {
     const pi = createPiMock();
     lspExtension(pi);
-    const lspTool = pi.tools.find((t) => t.name === "lsp")!;
+    const lookupTool = pi.tools.find((t) => t.name === "lsp_lookup")!;
+    const refactorTool = pi.tools.find((t) => t.name === "lsp_refactor")!;
+    const diagnosticsTool = pi.tools.find((t) => t.name === "lsp_diagnostics")!;
+    const recoverTool = pi.tools.find((t) => t.name === "lsp_recover")!;
 
-    expect((lspTool.parameters as { type?: string }).type).toBe("object");
+    expect((lookupTool.parameters as { type?: string }).type).toBe("object");
     expect(
-      Check(lspTool.parameters as object, {
-        action: "symbol_hover",
-        args: {
-          symbol: "buildArchitectureModel",
-        },
+      Check(lookupTool.parameters as object, {
+        kind: "hover",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
       }),
     ).toBe(true);
     expect(
-      Check(lspTool.parameters as object, {
-        action: "hover",
-        args: {
-          file: "src/index.ts",
-          line: 1,
-        },
-      }),
-    ).toBe(true);
-    expect(
-      Check(lspTool.parameters as object, {
-        action: "symbol_hover",
-        args: {
-          symbol: "buildArchitectureModel",
-          path: "packages/supi-code-intelligence/",
-        },
+      Check(lookupTool.parameters as object, {
+        kind: "hover",
+        file: "src/index.ts",
+        line: 1,
       }),
     ).toBe(false);
     expect(
-      Check(lspTool.parameters as object, {
-        action: "hover",
-        args: {
-          file: "src/index.ts",
-          line: 1,
-          character: 1,
-        },
+      Check(refactorTool.parameters as object, {
+        kind: "rename",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "nextName",
       }),
     ).toBe(true);
     expect(
-      Check(lspTool.parameters as object, {
-        action: "hover",
-        args: {
-          file: "src/index.ts",
-          line: 1,
-          character: 1,
-          path: "extra",
-        },
+      Check(refactorTool.parameters as object, {
+        kind: "code_actions",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
       }),
-    ).toBe(false);
+    ).toBe(true);
+    expect(Check(diagnosticsTool.parameters as object, { file: "src/index.ts" })).toBe(true);
+    expect(Check(recoverTool.parameters as object, {})).toBe(true);
   });
 });
 

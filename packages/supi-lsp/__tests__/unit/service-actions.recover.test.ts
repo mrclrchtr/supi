@@ -1,24 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
-import type { LspManager } from "../../src/manager/manager.ts";
-import { executeAction } from "../../src/tool/tool-actions.ts";
+import type { SessionLspService } from "../../src/session/service-registry.ts";
+import { executeRecover } from "../../src/tool/service-actions.ts";
 
-describe("recover action", () => {
-  it("preserves manager context when triggering workspace recovery", async () => {
+describe("recover service action", () => {
+  it("preserves service context when triggering workspace recovery", async () => {
     const recoverSpy = vi.fn();
-    const manager = {
-      cwd: "/project",
-      getCwd(this: { cwd: string }) {
-        return this.cwd;
-      },
-      async recoverWorkspaceDiagnostics(
-        this: LspManager & { cwd: string },
+    const service = {
+      async recoverDiagnostics(
+        this: SessionLspService,
         options?: {
           restartIfStillStale?: boolean;
         },
       ) {
         recoverSpy(this, options);
-        if (this !== manager) {
-          throw new Error("recoverWorkspaceDiagnostics lost manager context");
+        if (this !== service) {
+          throw new Error("recoverDiagnostics lost service context");
         }
         return {
           refreshedClients: 2,
@@ -30,12 +26,12 @@ describe("recover action", () => {
           },
         };
       },
-    } as unknown as LspManager & { cwd: string };
+    } as unknown as SessionLspService;
 
-    const result = await executeAction(manager, { action: "recover" });
+    const result = await executeRecover(service);
 
     expect(recoverSpy).toHaveBeenCalledWith(
-      manager,
+      service,
       expect.objectContaining({ restartIfStillStale: true }),
     );
     expect(result).toContain("recovery complete");

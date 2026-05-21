@@ -13,7 +13,6 @@ import {
   formatDocumentSymbols,
   formatHover,
   formatLocations,
-  formatSearchResults,
   formatSymbolInformation,
   formatWorkspaceEdit,
   formatWorkspaceSymbols,
@@ -346,29 +345,6 @@ describe("formatWorkspaceSymbols", () => {
     const result = formatWorkspaceSymbols(symbols, "/project");
     expect(result).toContain("No in-project symbols found.");
     expect(result).toContain("+1 external symbol");
-  });
-});
-
-describe("formatSearchResults", () => {
-  it("formats LSP symbols when available", () => {
-    const symbols: SymbolInformation[] = [
-      { name: "add", kind: 12, location: loc("file:///project/src/math.ts", 0, 0) },
-    ];
-    const result = formatSearchResults(symbols, null, "/project");
-    expect(result).toContain("add");
-    expect(result).toContain("Workspace symbols");
-  });
-
-  it("formats grep matches when LSP returns nothing", () => {
-    const matches = [{ file: "src/math.ts", line: 5, text: "export function add" }];
-    const result = formatSearchResults(null, matches, "/project");
-    expect(result).toContain("Text search results");
-    expect(result).toContain("src/math.ts:5");
-    expect(result).toContain("export function add");
-  });
-
-  it("reports no results when both are empty", () => {
-    expect(formatSearchResults(null, null, "/project")).toBe("No symbols or text matches found.");
   });
 });
 

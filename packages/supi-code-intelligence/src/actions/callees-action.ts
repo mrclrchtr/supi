@@ -3,7 +3,7 @@
 // extraction to @mrclrchtr/supi-tree-sitter/api.
 
 import * as path from "node:path";
-import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
+import { withStructuralSession } from "../providers/structural-provider.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
 import type { ActionParams } from "../tool-actions.ts";
@@ -47,11 +47,11 @@ export async function executeCalleesAction(
   }
 
   const relPath = path.relative(cwd, target.file);
-  let tsSession: ReturnType<typeof createTreeSitterSession> | null = null;
 
   try {
-    tsSession = createTreeSitterSession(cwd);
-    const result = await tsSession.calleesAt(relPath, target.displayLine, target.displayCharacter);
+    const result = await withStructuralSession(cwd, (tsSession) =>
+      tsSession.calleesAt(relPath, target.displayLine, target.displayCharacter),
+    );
 
     if (result.kind !== "success") {
       return {
@@ -63,7 +63,9 @@ export async function executeCalleesAction(
             scope: null,
             candidateCount: 0,
             omittedCount: 0,
-            nextQueries: ["Use `lsp` for type-aware analysis on this file"],
+            nextQueries: [
+              'Use `lsp_lookup` with `kind: "hover"` for type-aware analysis on this file',
+            ],
           },
         },
       };
@@ -95,7 +97,9 @@ export async function executeCalleesAction(
       scope: null,
       candidateCount: callees.length,
       omittedCount: Math.max(0, callees.length - (params.maxResults ?? 8)),
-      nextQueries: ["Use `lsp` for precise type information on callees"],
+      nextQueries: [
+        'Use `lsp_lookup` with `kind: "hover"` for precise type information on callees',
+      ],
     };
     return { content, details: { type: "search" as const, data: details } };
   } catch {
@@ -108,12 +112,12 @@ export async function executeCalleesAction(
           scope: null,
           candidateCount: 0,
           omittedCount: 0,
-          nextQueries: ["Use `lsp` for type-aware analysis on this file"],
+          nextQueries: [
+            'Use `lsp_lookup` with `kind: "hover"` for type-aware analysis on this file',
+          ],
         },
       },
     };
-  } finally {
-    tsSession?.dispose();
   }
 }
 
@@ -140,7 +144,7 @@ function formatCallees(
   }
   lines.push("");
   lines.push(
-    "_Structural analysis — may include unresolved or qualified names. Use `lsp` for precise type information._",
+    '_Structural analysis — may include unresolved or qualified names. Use `lsp_lookup` with `kind: "hover"` for precise type information._',
   );
   lines.push("");
   return lines.join("\n");

@@ -9,39 +9,52 @@ import {
 } from "../../src/diagnostics/diagnostic-context.ts";
 import { LspManager } from "../../src/manager/manager.ts";
 import {
-  buildProjectGuidelines,
-  promptGuidelines,
-  promptSnippet,
-  toolDescription,
+  buildLspToolPromptSurfaces,
+  defaultLspToolPromptSurfaces,
 } from "../../src/tool/guidance.ts";
+import {
+  LSP_DIAGNOSTICS_TOOL,
+  LSP_DOCUMENT_SYMBOLS_TOOL,
+  LSP_LOOKUP_TOOL,
+  LSP_RECOVER_TOOL,
+  LSP_REFACTOR_TOOL,
+  LSP_WORKSPACE_SYMBOLS_TOOL,
+} from "../../src/tool/names.ts";
 
 beforeEach(() => {
   clearTsconfigCache();
 });
 
 describe("LSP prompt guidance", () => {
-  it("exports prompt surfaces that name lsp explicitly", () => {
-    expect(toolDescription).toContain("Language Server Protocol tool");
-    expect(toolDescription).toContain(
-      "Use lsp for semantic lookups in files covered by an active server",
+  it("exports prompt surfaces for every expert LSP tool", () => {
+    const lookup = defaultLspToolPromptSurfaces[LSP_LOOKUP_TOOL];
+    const documentSymbols = defaultLspToolPromptSurfaces[LSP_DOCUMENT_SYMBOLS_TOOL];
+    const workspaceSymbols = defaultLspToolPromptSurfaces[LSP_WORKSPACE_SYMBOLS_TOOL];
+    const diagnostics = defaultLspToolPromptSurfaces[LSP_DIAGNOSTICS_TOOL];
+    const refactor = defaultLspToolPromptSurfaces[LSP_REFACTOR_TOOL];
+    const recover = defaultLspToolPromptSurfaces[LSP_RECOVER_TOOL];
+
+    expect(lookup.description).toContain("Language Server Protocol lookup tool");
+    expect(lookup.promptSnippet).toContain("lsp_lookup");
+    expect(lookup.promptGuidelines.every((guideline) => guideline.includes("lsp"))).toBe(true);
+    expect(documentSymbols.promptGuidelines[0]).toContain("lsp_document_symbols");
+    expect(workspaceSymbols.promptGuidelines[0]).toContain("lsp_workspace_symbols");
+    expect(diagnostics.promptGuidelines[0]).toContain("lsp_diagnostics");
+    expect(refactor.promptGuidelines.some((guideline) => guideline.includes("lsp_refactor"))).toBe(
+      true,
     );
-    expect(promptSnippet).toContain("lsp");
-    expect(promptSnippet).toContain("semantic lookup");
-    expect(promptGuidelines.every((guideline) => guideline.includes("lsp"))).toBe(true);
-    expect(promptGuidelines.some((guideline) => guideline.includes("lsp.symbol_hover"))).toBe(true);
-    expect(promptGuidelines.some((guideline) => guideline.includes("lsp.rename"))).toBe(true);
-    expect(promptGuidelines.some((guideline) => guideline.includes("lsp.code_actions"))).toBe(true);
+    expect(recover.promptGuidelines[0]).toContain("lsp_recover");
   });
 
-  it("builds project guidelines with explicit lsp prefixes", () => {
-    const guidelines = buildProjectGuidelines(
+  it("builds lookup guidance with dynamic server coverage lines", () => {
+    const surfaces = buildLspToolPromptSurfaces(
       [
         {
           name: "typescript",
           status: "running",
           root: process.cwd(),
           fileTypes: ["ts", "tsx"],
-          supportedActions: ["diagnostics", "hover", "definition"],
+          supportedActions: ["diagnostics", "hover", "definition", "implementation"],
           openFiles: [],
         },
         {
@@ -56,12 +69,13 @@ describe("LSP prompt guidance", () => {
       process.cwd(),
     );
 
-    expect(guidelines.some((guideline) => guideline.startsWith("lsp active: typescript"))).toBe(
-      true,
-    );
-    expect(guidelines.some((guideline) => guideline.startsWith("lsp unavailable: python"))).toBe(
-      true,
-    );
+    const lookupGuidelines = surfaces[LSP_LOOKUP_TOOL].promptGuidelines;
+    expect(
+      lookupGuidelines.some((guideline) => guideline.startsWith("lsp server coverage: typescript")),
+    ).toBe(true);
+    expect(
+      lookupGuidelines.some((guideline) => guideline.startsWith("lsp server unavailable: python")),
+    ).toBe(true);
   });
 
   it("formats diagnostics as xml extension context", () => {
@@ -389,6 +403,27 @@ describe("LspManager getOutstandingDiagnostics", () => {
     const errorsOnly = manager.getOutstandingDiagnostics(1);
     expect(errorsOnly[0]?.diagnostics).toHaveLength(1);
     expect(errorsOnly[0]?.diagnostics[0]?.message).toBe("type error");
+  });
+});
+
+describe("LspManager semantic support checks", () => {
+  it("allows explicit semantic serving for dependency files while keeping runtime guidance filtered", () => {
+    const manager = new LspManager(
+      {
+        servers: {
+          typescript: {
+            command: "node",
+            args: [],
+            fileTypes: ["ts"],
+            rootMarkers: ["package.json"],
+          },
+        },
+      },
+      process.cwd(),
+    );
+
+    expect(manager.canServeFile("node_modules/example/index.ts")).toBe(true);
+    expect(manager.isSupportedSourceFile("node_modules/example/index.ts")).toBe(false);
   });
 });
 
