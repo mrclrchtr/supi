@@ -131,7 +131,7 @@ describe("ask_user tool", () => {
       answersById: {
         formatter: {
           kind: "choice",
-          selections: [{ value: "biome", label: "Biome" }],
+          selections: [{ value: "biome", label: "Biome", note: "Use repo defaults" }],
         },
       },
       missingQuestionIds: [],
@@ -146,10 +146,10 @@ describe("ask_user tool", () => {
     expect(result.details.answersById).toMatchObject({
       formatter: {
         kind: "choice",
-        selections: [{ value: "biome", label: "Biome" }],
+        selections: [{ value: "biome", label: "Biome", note: "Use repo defaults" }],
       },
     });
-    expect(result.content[0]?.text).toContain("Formatter: Biome");
+    expect(result.content[0]?.text).toContain("Formatter: Biome (note: Use repo defaults)");
     expect(ctx.abort).not.toHaveBeenCalled();
     expect(pi.entries[0]?.type).toContain("ask_user");
   });

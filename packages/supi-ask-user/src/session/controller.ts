@@ -1,5 +1,6 @@
 import type {
   Answer,
+  AnswerSelection,
   AskUserOutcome,
   AskUserStatus,
   NormalizedChoiceQuestion,
@@ -57,6 +58,77 @@ export class AskUserController {
     return answer.selections
       .map((selection) => question.options.findIndex((option) => option.value === selection.value))
       .filter((index) => index >= 0);
+  }
+
+  getChoiceOptionNote(questionId: string, optionValue: string): string | undefined {
+    const answer = this.answers.get(questionId);
+    if (answer?.kind !== "choice") return undefined;
+    return answer.selections.find((selection) => selection.value === optionValue)?.note;
+  }
+
+  selectChoiceOption(question: NormalizedChoiceQuestion, optionIndex: number): void {
+    if (this.isTerminal) return;
+    const option = question.options[optionIndex];
+    if (!option) return;
+    const existingNote = this.getChoiceOptionNote(question.id, option.value);
+    this.commitChoiceSelections(question, [
+      buildSelection(option.value, option.label, existingNote),
+    ]);
+  }
+
+  toggleChoiceOption(question: NormalizedChoiceQuestion, optionIndex: number): void {
+    if (this.isTerminal) return;
+    const option = question.options[optionIndex];
+    if (!option) return;
+    if (!question.multi) {
+      this.selectChoiceOption(question, optionIndex);
+      return;
+    }
+
+    const selections = this.getStoredChoiceSelections(question.id);
+    const filtered = selections.filter((selection) => selection.value !== option.value);
+    if (filtered.length !== selections.length) {
+      this.commitChoiceSelections(question, filtered);
+      return;
+    }
+
+    this.commitChoiceSelections(question, [
+      ...selections,
+      buildSelection(option.value, option.label),
+    ]);
+  }
+
+  setChoiceOptionNote(
+    question: NormalizedChoiceQuestion,
+    optionIndex: number,
+    note: string | undefined,
+  ): void {
+    if (this.isTerminal) return;
+    const option = question.options[optionIndex];
+    if (!option) return;
+
+    const trimmedNote = trimOptional(note);
+    const selections = this.getStoredChoiceSelections(question.id);
+    const existing = selections.find((selection) => selection.value === option.value);
+
+    if (existing) {
+      this.commitChoiceSelections(
+        question,
+        selections.map((selection) => {
+          if (selection.value !== option.value) return selection;
+          return buildSelection(selection.value, selection.label, trimmedNote);
+        }),
+      );
+      return;
+    }
+
+    if (!trimmedNote) return;
+
+    const nextSelection = buildSelection(option.value, option.label, trimmedNote);
+    this.commitChoiceSelections(
+      question,
+      question.multi ? [...selections, nextSelection] : [nextSelection],
+    );
   }
 
   setAnswer(questionId: string, answer: Answer): void {
@@ -138,6 +210,29 @@ export class AskUserController {
       .filter((question) => question.required && !this.answers.has(question.id))
       .map((question) => question.id);
   }
+
+  private getStoredChoiceSelections(questionId: string): AnswerSelection[] {
+    const answer = this.answers.get(questionId);
+    if (answer?.kind !== "choice") return [];
+    return answer.selections.map((selection) => ({ ...selection }));
+  }
+
+  private commitChoiceSelections(
+    question: NormalizedChoiceQuestion,
+    selections: AnswerSelection[],
+  ): void {
+    const ordered = orderSelections(question, normalizeChoiceSelections(selections));
+    const nextSelections = question.multi ? ordered : ordered.slice(0, 1);
+    if (nextSelections.length === 0) {
+      this.answers.delete(question.id);
+      return;
+    }
+
+    this.answers.set(question.id, {
+      kind: "choice",
+      selections: nextSelections,
+    });
+  }
 }
 
 function normalizeAnswer(answer: Answer): Answer {
@@ -145,16 +240,39 @@ function normalizeAnswer(answer: Answer): Answer {
     case "choice":
       return {
         kind: "choice",
-        selections: answer.selections.map((selection) => ({
-          value: selection.value.trim(),
-          label: selection.label.trim(),
-        })),
+        selections: normalizeChoiceSelections(answer.selections),
       };
     case "custom":
       return { kind: "custom", value: answer.value.trim() };
     case "text":
       return { kind: "text", value: answer.value.trim() };
   }
+}
+
+function normalizeChoiceSelections(selections: AnswerSelection[]): AnswerSelection[] {
+  return selections.map((selection) =>
+    buildSelection(selection.value, selection.label, selection.note),
+  );
+}
+
+function orderSelections(
+  question: NormalizedChoiceQuestion,
+  selections: AnswerSelection[],
+): AnswerSelection[] {
+  const byValue = new Map(selections.map((selection) => [selection.value, selection]));
+  return question.options.flatMap((option) => {
+    const selection = byValue.get(option.value);
+    return selection ? [selection] : [];
+  });
+}
+
+function buildSelection(value: string, label: string, note?: string): AnswerSelection {
+  const trimmedNote = trimOptional(note);
+  return {
+    value: value.trim(),
+    label: label.trim(),
+    ...(trimmedNote ? { note: trimmedNote } : {}),
+  };
 }
 
 function trimOptional(value: string | undefined): string | undefined {

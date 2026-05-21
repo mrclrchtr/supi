@@ -137,7 +137,7 @@ function renderChoiceBody(args: RenderOverlayFrameArgs): string[] {
         })
       : [];
 
-  if (args.mode === "custom-input" || args.mode === "discuss-input") {
+  if (args.mode === "custom-input" || args.mode === "discuss-input" || args.mode === "note-input") {
     const rightLines = renderEditorLines(args, splitRightWidth(args.width));
     if (args.width >= 100) {
       return splitColumns({
@@ -190,7 +190,9 @@ function renderEditorLines(args: RenderOverlayFrameArgs, width: number): string[
       ? "Discuss instead"
       : args.mode === "custom-input"
         ? "Other answer"
-        : "Your answer";
+        : args.mode === "note-input"
+          ? "Option note"
+          : "Your answer";
 
   const lines = [args.theme.fg("accent", label), ...args.editor.render(Math.max(20, width - 1))];
   const question = args.controller.currentQuestion;

@@ -6,7 +6,7 @@ import type { NormalizedChoiceQuestion } from "../types.ts";
 
 export type OverlayAction = "other" | "skip" | "discuss" | "partial";
 export type FocusTarget = "choices" | "editor" | "actions";
-export type OverlayMode = "choice" | "text" | "custom-input" | "discuss-input";
+export type OverlayMode = "choice" | "text" | "custom-input" | "discuss-input" | "note-input";
 
 export type ChoiceRow =
   | { kind: "option"; optionIndex: number }
@@ -46,6 +46,7 @@ export function buildChoiceItems(
               optionIndex: row.optionIndex,
               label: option.label,
               selectedIndexes,
+              hasNote: !!controller.getChoiceOptionNote(question.id, option.value),
             }),
           ]
         : [];
@@ -116,9 +117,12 @@ export function footerText(args: {
   if (mode === "custom-input" || mode === "discuss-input") {
     return "Enter submit • Esc cancel";
   }
+  if (mode === "note-input") {
+    return "Enter save • Esc close";
+  }
   return question.multi
-    ? "↑↓ move • Space toggle • Enter submit • ← back • Esc cancel"
-    : "↑↓ move • Space select • Enter submit • ← back • Esc cancel";
+    ? "↑↓ move • Space toggle • Enter submit • n note • ← back • Esc cancel"
+    : "↑↓ move • Space select • Enter submit • n note • ← back • Esc cancel";
 }
 
 export function splitColumns(args: {
@@ -196,8 +200,9 @@ function prepareOptionLabel(
   option: { label: string },
   marker: string,
   recommended: boolean,
+  hasNote: boolean,
 ): string {
-  return `${marker} ${option.label}${recommended ? " (recommended)" : ""}`;
+  return `${marker} ${option.label}${recommended ? " (recommended)" : ""}${hasNote ? " [note]" : ""}`;
 }
 
 export function renderChoiceList(args: {
@@ -222,7 +227,8 @@ export function renderChoiceList(args: {
 
       const marker = prepareOptionMarker(question, row.optionIndex, selectedIndexes);
       const recommended = question.recommendedIndexes.includes(row.optionIndex);
-      const labelText = prepareOptionLabel(option, marker, recommended);
+      const hasNote = !!controller.getChoiceOptionNote(question.id, option.value);
+      const labelText = prepareOptionLabel(option, marker, recommended, hasNote);
 
       lines.push(...renderOptionRow({ option, labelText, isSelected, theme, width }));
     } else {
@@ -244,8 +250,9 @@ function buildOptionItem(args: {
   optionIndex: number;
   label: string;
   selectedIndexes: Set<number>;
+  hasNote: boolean;
 }): SelectItem {
-  const { question, optionIndex, label, selectedIndexes } = args;
+  const { question, optionIndex, label, selectedIndexes, hasNote } = args;
   const recommended = question.recommendedIndexes.includes(optionIndex) ? " (recommended)" : "";
   const marker = question.multi
     ? selectedIndexes.has(optionIndex)
@@ -256,7 +263,7 @@ function buildOptionItem(args: {
       : "( )";
   return {
     value: choiceRowValue({ kind: "option", optionIndex }),
-    label: `${marker} ${label}${recommended}`,
+    label: `${marker} ${label}${recommended}${hasNote ? " [note]" : ""}`,
   };
 }
 

@@ -96,7 +96,7 @@ A completed form returns a result with `details.status` set to one of:
 
 `details.answersById` maps question IDs to their answers. Each answer has a `kind` and type-specific data:
 
-- `{ kind: "choice", selections: [{ value, label }] }` — single or multi-select choice
+- `{ kind: "choice", selections: [{ value, label, note? }] }` — single or multi-select choice, with optional per-option user notes
 - `{ kind: "custom", value: "..." }` — freeform `allowOther` answer
 - `{ kind: "text", value: "..." }` — freeform text answer
 
@@ -128,10 +128,13 @@ The tool registers the following prompt guidance that the model sees:
 - `↑↓` — move between options
 - `Space` — select the focused option (single-select) or toggle (multi-select)
 - `Enter` — submit the current answer
+- `n` — edit a note for the focused choice option
 - `←` — go back to the previous question
-- `Esc` — cancel the whole form
+- `Esc` — cancel the whole form (or close the note editor if one is open)
 
 On wide terminals, option previews render side-by-side with the option list. On narrow terminals, previews stack below.
+
+Notes are available only for real `choice` options. They do not apply to `text` questions, `Other…` freeform answers, or other exceptional action rows. Saving a non-empty note selects the option if needed; clearing a note leaves the current selection alone; deselecting a multi-select option removes its note with the selection.
 
 Only exceptional action rows are visible:
 
@@ -197,7 +200,8 @@ Exceptional action rows (`Discuss instead…`, `Submit partial answers`) may app
 - `src/session/controller.ts` — headless decision-form state machine
 - `src/session/lock.ts` — session-scoped concurrency lock
 - `src/ui/choose-renderer.ts` — custom-overlay capability gate
-- `src/ui/overlay.ts` — rich custom interaction orchestration
+- `src/ui/overlay.ts` — overlay runner that creates the custom interaction session
+- `src/ui/overlay-component.ts` — rich custom interaction state and input orchestration
 - `src/ui/overlay-view.ts` — choice/action row modeling and split-layout helpers
 - `src/ui/overlay-render.ts` — rich overlay rendering built on `Markdown`, `Editor`, and `SelectList`
 - `src/ui/overlay-actions.ts` — exceptional-action list wiring for text questions

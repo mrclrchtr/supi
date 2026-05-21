@@ -85,6 +85,30 @@ const textQuestionnaire: NormalizedQuestionnaire = {
   ],
 };
 
+const multiQuestionnaire: NormalizedQuestionnaire = {
+  title: "Checks",
+  intro: "Need all required checks.",
+  allowPartialSubmit: false,
+  allowDiscuss: false,
+  questions: [
+    {
+      type: "choice",
+      id: "checks",
+      header: "Checks",
+      prompt: "Which checks should run?",
+      required: true,
+      options: [
+        { value: "lint", label: "Lint" },
+        { value: "tests", label: "Tests" },
+      ],
+      multi: true,
+      allowOther: false,
+      recommendedIndexes: [],
+      initialIndexes: [],
+    },
+  ],
+};
+
 describe("runOverlayQuestionnaire", () => {
   it("uses space to select and enter to submit while keeping exceptional rows visible", async () => {
     const { captured, ctx, outcomePromise } = makeOverlayCtx();
@@ -134,6 +158,86 @@ describe("runOverlayQuestionnaire", () => {
     expect(rendered).toContain("Discuss instead…");
   });
 
+  it("opens note editing with n, saves the note, and stays in the form", async () => {
+    const { captured, ctx, outcomePromise } = makeOverlayCtx();
+    let settled = false;
+    void outcomePromise.then(() => {
+      settled = true;
+    });
+    const runPromise = runOverlayQuestionnaire(questionnaire, {
+      ui: ctx.ui as unknown as AskUserUiContext,
+    });
+
+    await Promise.resolve();
+    if (!captured.value) throw new Error("overlay component was not created");
+
+    expect(captured.value.render(100).join("\n")).toContain("n note");
+    captured.value.handleInput?.("\u001b[B");
+    captured.value.handleInput?.("n");
+    expect(captured.value.render(100).join("\n")).toContain("Option note");
+
+    for (const char of "Matches team style") captured.value.handleInput?.(char);
+    captured.value.handleInput?.("\r");
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
+    const renderedAfterSave = captured.value.render(100).join("\n");
+    expect(renderedAfterSave).toContain("(*) Prettier [note]");
+
+    captured.value.handleInput?.("\r");
+
+    const outcome = await outcomePromise;
+    await expect(runPromise).resolves.toEqual(outcome);
+    expect(outcome).toMatchObject({
+      status: "submitted",
+      answersById: {
+        formatter: {
+          kind: "choice",
+          selections: [{ value: "prettier", label: "Prettier", note: "Matches team style" }],
+        },
+      },
+    });
+  });
+
+  it("closes note editing with escape without cancelling the form", async () => {
+    const { captured, ctx, outcomePromise } = makeOverlayCtx();
+    let settled = false;
+    void outcomePromise.then(() => {
+      settled = true;
+    });
+    const runPromise = runOverlayQuestionnaire(questionnaire, {
+      ui: ctx.ui as unknown as AskUserUiContext,
+    });
+
+    await Promise.resolve();
+    if (!captured.value) throw new Error("overlay component was not created");
+
+    captured.value.handleInput?.("n");
+    for (const char of "Temporary note") captured.value.handleInput?.(char);
+    captured.value.handleInput?.("\u001b");
+    await Promise.resolve();
+
+    expect(settled).toBe(false);
+    const rendered = captured.value.render(100).join("\n");
+    expect(rendered).not.toContain("Option note");
+    expect(rendered).not.toContain("[note]");
+
+    captured.value.handleInput?.(" ");
+    captured.value.handleInput?.("\r");
+
+    const outcome = await outcomePromise;
+    await expect(runPromise).resolves.toEqual(outcome);
+    expect(outcome).toMatchObject({
+      status: "submitted",
+      answersById: {
+        formatter: {
+          kind: "choice",
+          selections: [{ value: "biome", label: "Biome" }],
+        },
+      },
+    });
+  });
+
   it("uses left arrow to navigate back without a visible back row", async () => {
     const { captured, ctx } = makeOverlayCtx();
     void runOverlayQuestionnaire(twoStepQuestionnaire, {
@@ -171,6 +275,40 @@ describe("runOverlayQuestionnaire", () => {
     expect(outcome).toMatchObject({
       status: "discuss",
       discussMessage: "Need trade-offs",
+    });
+  });
+
+  it("removes a multi-select note when the option is deselected", async () => {
+    const { captured, ctx, outcomePromise } = makeOverlayCtx();
+    const runPromise = runOverlayQuestionnaire(multiQuestionnaire, {
+      ui: ctx.ui as unknown as AskUserUiContext,
+    });
+
+    await Promise.resolve();
+    if (!captured.value) throw new Error("overlay component was not created");
+
+    captured.value.handleInput?.("n");
+    for (const char of "Required for CI") captured.value.handleInput?.(char);
+    captured.value.handleInput?.("\r");
+    expect(captured.value.render(100).join("\n")).toContain("[x] Lint [note]");
+
+    captured.value.handleInput?.(" ");
+    expect(captured.value.render(100).join("\n")).toContain("[ ] Lint");
+    expect(captured.value.render(100).join("\n")).not.toContain("Lint [note]");
+
+    captured.value.handleInput?.("\u001b[B");
+    captured.value.handleInput?.("\r");
+
+    const outcome = await outcomePromise;
+    await expect(runPromise).resolves.toEqual(outcome);
+    expect(outcome).toMatchObject({
+      status: "submitted",
+      answersById: {
+        checks: {
+          kind: "choice",
+          selections: [{ value: "tests", label: "Tests" }],
+        },
+      },
     });
   });
 });

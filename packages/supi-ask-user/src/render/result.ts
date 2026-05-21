@@ -42,12 +42,16 @@ export function buildErrorResult(message: string): AskUserToolResult {
 export function formatAnswerSummary(_question: NormalizedQuestion, answer: Answer): string {
   switch (answer.kind) {
     case "choice":
-      return answer.selections.map((selection) => selection.label).join("; ");
+      return answer.selections.map(formatChoiceSelectionSummary).join("; ");
     case "custom":
       return `Other — ${answer.value}`;
     case "text":
       return answer.value;
   }
+}
+
+function formatChoiceSelectionSummary(selection: { label: string; note?: string }): string {
+  return selection.note ? `${selection.label} (note: ${selection.note})` : selection.label;
 }
 
 function summarizeOutcome(questions: NormalizedQuestion[], outcome: AskUserOutcome): string {

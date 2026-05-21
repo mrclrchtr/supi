@@ -43,9 +43,16 @@ export interface NormalizedQuestionnaire {
   allowDiscuss: boolean;
 }
 
+/**
+ * One selected choice option returned from `ask_user`.
+ *
+ * `note` is optional user-entered context attached to this specific option.
+ * It is only used on `choice` answers and is absent for `text` / `custom` answers.
+ */
 export interface AnswerSelection {
   value: string;
   label: string;
+  note?: string;
 }
 
 export interface ChoiceAnswer {

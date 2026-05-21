@@ -33,10 +33,10 @@ describe("ask_user transcript rendering", () => {
     expect(component.render(120).join("\n")).toContain("Formatter decision");
   });
 
-  it("renders submitted answers", () => {
+  it("renders submitted answers with per-selection notes", () => {
     const component = renderAskUserResult(
       {
-        content: [{ type: "text", text: "Formatter: Biome" }],
+        content: [{ type: "text", text: "Formatter: Biome (note: Use repo defaults)" }],
         details: {
           title: "Formatter decision",
           questions: [
@@ -60,7 +60,7 @@ describe("ask_user transcript rendering", () => {
           answersById: {
             formatter: {
               kind: "choice",
-              selections: [{ value: "biome", label: "Biome" }],
+              selections: [{ value: "biome", label: "Biome", note: "Use repo defaults" }],
             },
           },
           missingQuestionIds: [],
@@ -69,7 +69,9 @@ describe("ask_user transcript rendering", () => {
       theme,
     );
 
-    expect(component.render(120).join("\n")).toContain("Formatter: Biome");
+    expect(component.render(120).join("\n")).toContain(
+      "Formatter: Biome (note: Use repo defaults)",
+    );
   });
 
   it("renders error details as an error line", () => {
