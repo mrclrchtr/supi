@@ -12,7 +12,7 @@ Go-to-definition, find-references, rename, hover types — your agent navigates 
 
 ### Smarter agent interaction
 
-Structured questionnaires keep the agent from spinning when it needs your input. Diagnostics surface problems inline after every edit. Subdirectory context injection keeps the agent focused on the right files. Transparency tools show you exactly what's eating your context window.
+Structured decision forms keep the agent from spinning when it needs your input. Diagnostics surface problems inline after every edit. Subdirectory context injection keeps the agent focused on the right files. Transparency tools show you exactly what's eating your context window.
 
 **Extensions**: ask_user, claude-md, context, debug
 
@@ -33,7 +33,7 @@ Included in `@mrclrchtr/supi`. Install the full stack or pick individual package
 | `@mrclrchtr/supi-lsp` | Go-to-definition, references, rename, hover types, inline diagnostics |
 | `@mrclrchtr/supi-tree-sitter` | AST-level structural analysis — outline, imports, exports, queries |
 | `@mrclrchtr/supi-code-intelligence` | Architecture briefs, caller/callee analysis, impact assessment |
-| `@mrclrchtr/supi-ask-user` | Structured questionnaires for agent-user decisions |
+| `@mrclrchtr/supi-ask-user` | Structured decision forms for agent-user handoff |
 | `@mrclrchtr/supi-claude-md` | Subdirectory context injection + CLAUDE.md maintenance skills |
 | `@mrclrchtr/supi-context` | Context window transparency — see what's eating tokens |
 | `@mrclrchtr/supi-debug` | Diagnostics guardrails + debug event inspection |

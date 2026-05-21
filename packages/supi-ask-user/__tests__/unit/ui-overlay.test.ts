@@ -28,8 +28,65 @@ const questionnaire: NormalizedQuestionnaire = {
   ],
 };
 
+const twoStepQuestionnaire: NormalizedQuestionnaire = {
+  title: "Two step",
+  intro: "Need two answers.",
+  allowPartialSubmit: false,
+  allowDiscuss: false,
+  questions: [
+    {
+      type: "choice",
+      id: "one",
+      header: "One",
+      prompt: "Pick the first answer.",
+      required: true,
+      options: [
+        { value: "a", label: "A" },
+        { value: "b", label: "B" },
+      ],
+      multi: false,
+      allowOther: false,
+      recommendedIndexes: [],
+      initialIndexes: [],
+    },
+    {
+      type: "choice",
+      id: "two",
+      header: "Two",
+      prompt: "Pick the second answer.",
+      required: true,
+      options: [
+        { value: "c", label: "C" },
+        { value: "d", label: "D" },
+      ],
+      multi: false,
+      allowOther: false,
+      recommendedIndexes: [],
+      initialIndexes: [],
+    },
+  ],
+};
+
+const textQuestionnaire: NormalizedQuestionnaire = {
+  title: "Reason",
+  intro: "Need a short explanation.",
+  allowPartialSubmit: true,
+  allowDiscuss: true,
+  questions: [
+    {
+      type: "text",
+      id: "reason",
+      header: "Reason",
+      prompt: "Type the reason.",
+      required: true,
+      initial: "prefilled",
+      placeholder: "optional",
+    },
+  ],
+};
+
 describe("runOverlayQuestionnaire", () => {
-  it("submits a single-select choice", async () => {
+  it("uses space to select and enter to submit while keeping exceptional rows visible", async () => {
     const { captured, ctx, outcomePromise } = makeOverlayCtx();
     const runPromise = runOverlayQuestionnaire(questionnaire, {
       ui: ctx.ui as unknown as AskUserUiContext,
@@ -40,7 +97,12 @@ describe("runOverlayQuestionnaire", () => {
 
     const rendered = captured.value.render(100).join("\n");
     expect(rendered).toContain("Fast and integrated");
+    expect(rendered).not.toContain("Submit form");
+    expect(rendered).toContain("Discuss instead…");
+    expect(rendered).not.toContain("Cancel form");
 
+    captured.value.handleInput?.(" ");
+    expect(captured.value.render(100).join("\n")).toContain("(*) Biome");
     captured.value.handleInput?.("\r");
 
     const outcome = await outcomePromise;
@@ -56,7 +118,41 @@ describe("runOverlayQuestionnaire", () => {
     });
   });
 
-  it("supports switching into discuss mode", async () => {
+  it("shows text input immediately without an enter-response row", async () => {
+    const { captured, ctx } = makeOverlayCtx();
+    void runOverlayQuestionnaire(textQuestionnaire, {
+      ui: ctx.ui as unknown as AskUserUiContext,
+    });
+
+    await Promise.resolve();
+    if (!captured.value) throw new Error("overlay component was not created");
+
+    const rendered = captured.value.render(100).join("\n");
+    expect(rendered).toContain("Your answer");
+    expect(rendered).toContain("prefilled");
+    expect(rendered).not.toContain("Enter response…");
+    expect(rendered).toContain("Discuss instead…");
+  });
+
+  it("uses left arrow to navigate back without a visible back row", async () => {
+    const { captured, ctx } = makeOverlayCtx();
+    void runOverlayQuestionnaire(twoStepQuestionnaire, {
+      ui: ctx.ui as unknown as AskUserUiContext,
+    });
+
+    await Promise.resolve();
+    if (!captured.value) throw new Error("overlay component was not created");
+
+    captured.value.handleInput?.(" ");
+    captured.value.handleInput?.("\r");
+    expect(captured.value.render(100).join("\n")).toContain("2/2 · Two");
+
+    captured.value.handleInput?.("\u001b[D");
+    expect(captured.value.render(100).join("\n")).toContain("1/2 · One");
+    expect(captured.value.render(100).join("\n")).not.toContain("Back");
+  });
+
+  it("supports switching into discuss mode via a selectable action row", async () => {
     const { captured, ctx, outcomePromise } = makeOverlayCtx();
     const runPromise = runOverlayQuestionnaire(questionnaire, {
       ui: ctx.ui as unknown as AskUserUiContext,
@@ -65,7 +161,8 @@ describe("runOverlayQuestionnaire", () => {
     await Promise.resolve();
     if (!captured.value) throw new Error("overlay component was not created");
 
-    captured.value.handleInput?.("\x07");
+    for (let index = 0; index < 3; index += 1) captured.value.handleInput?.("\u001b[B");
+    captured.value.handleInput?.("\r");
     for (const char of "Need trade-offs") captured.value.handleInput?.(char);
     captured.value.handleInput?.("\r");
 

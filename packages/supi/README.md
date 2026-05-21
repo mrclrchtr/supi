@@ -30,7 +30,7 @@ The meta-package currently bundles these production packages:
 
 | Package | What you get |
 | --- | --- |
-| [`@mrclrchtr/supi-ask-user`](../supi-ask-user/README.md) | `ask_user` for focused interactive questionnaires |
+| [`@mrclrchtr/supi-ask-user`](../supi-ask-user/README.md) | `ask_user` for focused interactive decision forms |
 | [`@mrclrchtr/supi-bash-timeout`](../supi-bash-timeout/README.md) | default timeout injection for `bash` |
 | [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | subdirectory `CLAUDE.md` / `AGENTS.md` context discovery |
 | [`@mrclrchtr/supi-code-intelligence`](../supi-code-intelligence/README.md) | `code_intel` for briefs, callers, blast radius, and structured search |

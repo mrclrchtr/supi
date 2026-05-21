@@ -113,7 +113,7 @@ describe("ask_user tool", () => {
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
     const ctx = makeDialogCtx();
-    ctx.ui.select = vi.fn(async () => "Cancel form");
+    ctx.ui.select = vi.fn(async () => undefined);
 
     const result = (await tool.execute("tc-3", request, undefined, undefined, ctx)) as {
       details: { status: string };

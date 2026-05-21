@@ -15,12 +15,12 @@ import type {
   NormalizedQuestionnaire,
 } from "../types.ts";
 import {
-  type ChoiceRow,
   defaultSelectedIndex,
   isEditorMode,
-  type OverlayMode,
+  type OverlayAction,
+  type OverlayRow,
   renderOverlay,
-  rowsForQuestion,
+  rowsForCurrentQuestion,
 } from "./overlay-view.ts";
 import type { RunQuestionnaireOptions } from "./types.ts";
 
@@ -52,7 +52,7 @@ class AskUserOverlay implements Component, Focusable {
   focused = false;
 
   private readonly editor: Editor;
-  private mode: OverlayMode = "choice";
+  private mode: "choice" | "text" | "text-input" | "custom-input" | "discuss-input" = "choice";
   private selectedIndex = 0;
   private closed = false;
   private cachedWidth: number | undefined;
@@ -91,8 +91,7 @@ class AskUserOverlay implements Component, Focusable {
       this.handleEditorKey(data);
       return;
     }
-    if (this.handleGlobalKey(data)) return;
-    this.handleChoiceKey(data);
+    this.handleSelectionKey(data);
   }
 
   invalidate(): void {
@@ -104,42 +103,29 @@ class AskUserOverlay implements Component, Focusable {
     this.args.signal?.removeEventListener("abort", this.onAbort);
   }
 
-  private handleGlobalKey(data: string): boolean {
+  private handleSelectionKey(data: string): void {
+    const controller = this.args.controller;
+    const rows = rowsForCurrentQuestion(controller);
+    const question = controller.currentQuestion;
+
     if (matchesKey(data, Key.escape)) {
-      this.args.controller.cancel();
+      controller.cancel();
       this.finish();
-      return true;
+      return;
     }
-    if (matchesKey(data, Key.left) || matchesKey(data, "b")) {
-      if (this.args.controller.goBack()) {
+    if (matchesKey(data, Key.left)) {
+      if (controller.goBack()) {
         this.syncCurrentQuestion();
         this.refresh();
       }
-      return true;
-    }
-    if (matchesKey(data, Key.ctrl("g")) && this.args.controller.questionnaire.allowDiscuss) {
-      this.openDiscussEditor();
-      return true;
-    }
-    if (matchesKey(data, Key.ctrl("p")) && this.args.controller.canPartialSubmit()) {
-      this.args.controller.finishPartial();
-      this.finish();
-      return true;
-    }
-    return false;
-  }
-
-  private handleChoiceKey(data: string): void {
-    const question = this.args.controller.currentQuestion;
-    if (question.type === "text") {
-      this.mode = "text";
-      this.editor.handleInput(data);
-      this.refresh();
       return;
     }
-
-    const rows = rowsForQuestion(question);
     if (matchesKey(data, Key.up)) {
+      if (question.type === "text" && this.mode === "text" && this.selectedIndex === 0) {
+        this.mode = "text-input";
+        this.refresh();
+        return;
+      }
       this.selectedIndex = Math.max(0, this.selectedIndex - 1);
       this.refresh();
       return;
@@ -149,58 +135,53 @@ class AskUserOverlay implements Component, Focusable {
       this.refresh();
       return;
     }
-    if (question.multi && matchesKey(data, Key.space)) {
-      this.toggleMultiSelection(question, rows[this.selectedIndex]);
+
+    const selectedRow = rows[this.selectedIndex];
+    if (
+      question.type === "choice" &&
+      matchesKey(data, Key.space) &&
+      selectedRow?.kind === "option"
+    ) {
+      this.selectChoice(question, selectedRow.optionIndex, false);
       return;
     }
     if (matchesKey(data, Key.enter)) {
-      this.handleChoiceEnter(question, rows[this.selectedIndex]);
+      this.handleRowEnter(selectedRow);
     }
   }
 
   private handleEditorKey(data: string): void {
+    const rows = rowsForCurrentQuestion(this.args.controller);
     if (matchesKey(data, Key.escape)) {
-      this.handleEditorEscape();
-      return;
-    }
-    if (matchesKey(data, Key.ctrl("g")) && this.args.controller.questionnaire.allowDiscuss) {
-      this.openDiscussEditor();
-      return;
-    }
-    if (matchesKey(data, Key.ctrl("p")) && this.args.controller.canPartialSubmit()) {
-      this.args.controller.finishPartial();
+      this.args.controller.cancel();
       this.finish();
+      return;
+    }
+    if (
+      this.args.controller.currentQuestion.type === "text" &&
+      matchesKey(data, Key.down) &&
+      rows.length > 0
+    ) {
+      this.mode = "text";
+      this.selectedIndex = 0;
+      this.refresh();
       return;
     }
     this.editor.handleInput(data);
     this.refresh();
   }
 
-  private handleEditorEscape(): void {
-    if (this.mode !== "text") {
-      this.syncCurrentQuestion();
-      this.refresh();
-      return;
-    }
-    if (this.args.controller.currentQuestion.required) {
-      this.args.controller.cancel();
-      this.finish();
-      return;
-    }
-    this.args.controller.clearAnswer(this.args.controller.currentQuestion.id);
-    this.advanceAfterQuestion();
-  }
-
   private handleEditorSubmit(value: string): void {
     const trimmed = value.trim();
     const question = this.args.controller.currentQuestion;
 
-    if (this.mode === "discuss") {
+    if (this.mode === "discuss-input") {
       this.args.controller.finishDiscuss(trimmed || undefined);
       this.finish();
       return;
     }
-    if (this.mode === "custom") {
+
+    if (this.mode === "custom-input") {
       if (!trimmed) {
         this.syncCurrentQuestion();
         this.refresh();
@@ -210,52 +191,69 @@ class AskUserOverlay implements Component, Focusable {
       this.advanceAfterQuestion();
       return;
     }
+
     if (!trimmed) {
       if (question.required) return;
       this.args.controller.clearAnswer(question.id);
       this.advanceAfterQuestion();
       return;
     }
+
     this.args.controller.setAnswer(question.id, { kind: "text", value: trimmed });
     this.advanceAfterQuestion();
   }
 
-  private handleChoiceEnter(question: NormalizedChoiceQuestion, row: ChoiceRow | undefined): void {
+  private handleRowEnter(row: OverlayRow | undefined): void {
     if (!row) return;
-    if (row.kind === "continue") {
-      if (this.args.controller.hasAnswer(question.id) || !question.required) {
-        this.advanceAfterQuestion();
-      }
+    if (row.kind === "option") {
+      const question = this.args.controller.currentQuestion;
+      if (question.type !== "choice") return;
+      this.selectChoice(question, row.optionIndex, true);
       return;
     }
-    if (row.kind === "other") {
-      this.mode = "custom";
-      const current = this.args.controller.getAnswer(question.id);
-      this.editor.setText(current?.kind === "custom" ? current.value : "");
-      this.refresh();
-      return;
-    }
+    this.handleAction(row.action);
+  }
+
+  private selectChoice(
+    question: NormalizedChoiceQuestion,
+    optionIndex: number,
+    submit: boolean,
+  ): void {
     if (question.multi) {
-      this.toggleMultiSelection(question, row);
+      this.toggleMultiSelection(question, optionIndex);
+      if (submit && this.args.controller.hasAnswer(question.id)) this.advanceAfterQuestion();
       return;
     }
 
-    const option = resolveOption(question, row.optionIndex);
+    const option = resolveOption(question, optionIndex);
     this.args.controller.setAnswer(question.id, {
       kind: "choice",
       selections: [{ value: option.value, label: option.label }],
     });
-    this.advanceAfterQuestion();
+    if (submit) this.advanceAfterQuestion();
+    else this.refresh();
   }
 
-  private toggleMultiSelection(
-    question: NormalizedChoiceQuestion,
-    row: ChoiceRow | undefined,
-  ): void {
-    if (!row || row.kind !== "option") return;
-    const optionIndex = row.optionIndex;
-    if (optionIndex === undefined) return;
+  private handleAction(action: OverlayAction): void {
+    switch (action) {
+      case "other":
+        this.openCustomEditor();
+        return;
+      case "skip":
+        this.args.controller.clearAnswer(this.args.controller.currentQuestion.id);
+        this.advanceAfterQuestion();
+        return;
+      case "discuss":
+        this.openDiscussEditor();
+        return;
+      case "partial":
+        this.args.controller.finishPartial();
+        this.finish();
+        return;
+    }
+  }
 
+  private toggleMultiSelection(question: NormalizedChoiceQuestion, optionIndex: number): void {
     const existing = new Set(this.args.controller.getSelectedIndexes(question));
     if (existing.has(optionIndex)) existing.delete(optionIndex);
     else existing.add(optionIndex);
@@ -275,8 +273,17 @@ class AskUserOverlay implements Component, Focusable {
     this.refresh();
   }
 
+  private openCustomEditor(): void {
+    const question = this.args.controller.currentQuestion;
+    if (question.type !== "choice") return;
+    this.mode = "custom-input";
+    const current = this.args.controller.getAnswer(question.id);
+    this.editor.setText(current?.kind === "custom" ? current.value : "");
+    this.refresh();
+  }
+
   private openDiscussEditor(): void {
-    this.mode = "discuss";
+    this.mode = "discuss-input";
     this.editor.setText("");
     this.refresh();
   }
@@ -294,14 +301,15 @@ class AskUserOverlay implements Component, Focusable {
   private syncCurrentQuestion(): void {
     const question = this.args.controller.currentQuestion;
     if (question.type === "text") {
-      this.mode = "text";
+      this.mode = "text-input";
       const current = this.args.controller.getAnswer(question.id);
       this.editor.setText(current?.kind === "text" ? current.value : (question.initial ?? ""));
       this.selectedIndex = 0;
       return;
     }
+
     this.mode = "choice";
-    this.selectedIndex = defaultSelectedIndex(this.args.controller, question);
+    this.selectedIndex = defaultSelectedIndex(this.args.controller);
     this.editor.setText("");
   }
 
@@ -331,8 +339,8 @@ function makeEditorTheme(theme: Theme): EditorTheme {
   };
 }
 
-function resolveOption(question: NormalizedChoiceQuestion, optionIndex: number | undefined) {
-  const option = optionIndex !== undefined ? question.options[optionIndex] : undefined;
+function resolveOption(question: NormalizedChoiceQuestion, optionIndex: number) {
+  const option = question.options[optionIndex];
   if (!option) {
     throw new Error(`Invalid option index for question "${question.id}".`);
   }

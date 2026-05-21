@@ -24,6 +24,7 @@ Entrypoint: `src/ask-user.ts`
 4. **Renderer selection** — `src/ui/choose-renderer.ts`
 5. **UI renderers**
    - `src/ui/overlay.ts`
+   - `src/ui/overlay-view.ts`
    - `src/ui/dialog.ts`
 6. **Result + transcript rendering**
    - `src/render/result.ts`
@@ -37,6 +38,10 @@ Entrypoint: `src/ask-user.ts`
 - `allowPartialSubmit` is form-level and only meaningful when partial progress is actionable.
 - Cancellation and abort call `ctx.abort()` from `ask-user.ts`.
 - A session-scoped lock prevents concurrent `ask_user` interactions.
+- In the rich overlay, choice questions use `Space` to select or toggle and `Enter` to submit.
+- In the rich overlay, text questions open with the editor visible immediately — there is no `Enter response…` row.
+- The rich overlay keeps only exceptional rows visible (`Other…`, `Discuss instead…`, `Submit partial answers`, optional `Skip question`). Back and cancel stay keyboard-only (`←`, `Esc`).
+- The dialog fallback is simpler and may present actions differently from the rich overlay.
 
 ## Package layout
 
@@ -56,6 +61,7 @@ src/
     choose-renderer.ts
     dialog.ts
     overlay.ts
+    overlay-view.ts
     types.ts
   render/
     result.ts

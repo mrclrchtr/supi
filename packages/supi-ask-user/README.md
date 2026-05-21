@@ -90,6 +90,39 @@ A completed form returns one of these statuses in `details.status`:
 - cancellation or abort stops the current agent turn
 - completed forms are summarized in the session tree
 
+## Rich overlay controls
+
+When the rich overlay renderer is available, the current interaction model is:
+
+### Choice questions
+
+- `↑↓` move between rows
+- `Space` selects the focused option in single-select mode
+- `Space` toggles the focused option in multi-select mode
+- `Enter` submits the current choice answer
+- `←` goes back to the previous question
+- `Esc` cancels the whole form
+
+Visible rows are kept for exceptional paths only:
+
+- `Other…`
+- `Discuss instead…`
+- `Submit partial answers`
+- `Skip question` for optional questions
+
+There is no visible Back row or Cancel row in the overlay.
+
+### Text questions
+
+- the text editor is visible immediately
+- there is no separate `Enter response…` row
+- `Enter` submits the current text answer
+- `↓` moves from the editor into any visible exceptional action rows
+- `↑` from the first action row returns focus to the editor
+- `Esc` cancels the whole form
+
+Text questions may still show exceptional action rows such as `Discuss instead…` or `Submit partial answers` below the editor when those paths are enabled.
+
 ## Example
 
 ```json
@@ -129,6 +162,9 @@ A completed form returns one of these statuses in `details.status`:
 - `src/normalize.ts` — validation and lowering into internal types
 - `src/session/controller.ts` — headless decision-form state
 - `src/ui/dialog.ts` — basic dialog fallback
-- `src/ui/overlay.ts` — rich custom renderer
+- `src/ui/overlay.ts` — rich custom interaction logic
+- `src/ui/overlay-view.ts` — rich overlay rendering helpers
+- `src/ui/types.ts` — shared UI runner types
 - `src/render/result.ts` — tool result shaping
 - `src/render/transcript.ts` — transcript rendering
+- `src/render/tree-summary.ts` — session-tree summary labels

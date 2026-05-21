@@ -199,12 +199,6 @@ function appendSharedActions(args: {
     });
     options.push(partialLabel);
   }
-
-  const cancelLabel = "Cancel form";
-  actions.set(cancelLabel, async () => {
-    controller.cancel();
-  });
-  options.push(cancelLabel);
 }
 
 function advanceAfterQuestion(controller: AskUserController): void {
