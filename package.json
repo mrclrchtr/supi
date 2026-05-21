@@ -67,7 +67,7 @@
     "@earendil-works/pi-coding-agent": "0.75.4",
     "@earendil-works/pi-tui": "0.75.4",
     "@pnpm/exportable-manifest": "1000.4.2",
-    "@types/node": "25.8.0",
+    "@types/node": "25.9.0",
     "clipboardy": "5.3.1",
     "tree-sitter-javascript": "0.25.0",
     "tree-sitter-typescript": "0.23.2",
