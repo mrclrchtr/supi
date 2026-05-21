@@ -72,7 +72,71 @@ describe("isFileExcludedByTsconfig", () => {
     }
   });
 
+  it("treats non-recursive include patterns like TypeScript does", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-include-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":["*.ts"]}');
+      fs.writeFileSync(path.join(tempRoot, "root.ts"), "export const root = true;\n");
+      fs.writeFileSync(path.join(tempRoot, "src/nested.ts"), "export const nested = true;\n");
+
+      expect(isFileExcludedByTsconfig("root.ts", tempRoot)).toBe(false);
+      expect(isFileExcludedByTsconfig("src/nested.ts", tempRoot)).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("treats include: [] as including no files", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-empty-include-"));
+    try {
+      fs.writeFileSync(path.join(tempRoot, "tsconfig.json"), '{"include":[]}');
+      fs.writeFileSync(path.join(tempRoot, "root.ts"), "export const root = true;\n");
+
+      expect(isFileExcludedByTsconfig("root.ts", tempRoot)).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("follows extends chains when determining scope", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-extends-"));
+    try {
+      const projectRoot = path.join(tempRoot, "project");
+      fs.mkdirSync(path.join(projectRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "base.json"), '{"include":["project/src/**/*.ts"]}');
+      fs.writeFileSync(path.join(projectRoot, "tsconfig.json"), '{"extends":"../base.json"}');
+      fs.writeFileSync(path.join(projectRoot, "src/included.ts"), "export const ok = true;\n");
+      fs.writeFileSync(path.join(projectRoot, "other.ts"), "export const other = true;\n");
+
+      expect(isFileExcludedByTsconfig("src/included.ts", projectRoot)).toBe(false);
+      expect(isFileExcludedByTsconfig("other.ts", projectRoot)).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("uses jsconfig.json when no tsconfig.json is present", () => {
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-jsconfig-"));
+    try {
+      fs.mkdirSync(path.join(tempRoot, "src"), { recursive: true });
+      fs.writeFileSync(path.join(tempRoot, "jsconfig.json"), '{"include":["src/**/*.js"]}');
+      fs.writeFileSync(path.join(tempRoot, "src/app.js"), "export const app = true;\n");
+      fs.writeFileSync(path.join(tempRoot, "src/app.ts"), "export const app = true;\n");
+
+      expect(isFileExcludedByTsconfig("src/app.js", tempRoot)).toBe(false);
+      expect(isFileExcludedByTsconfig("src/app.ts", tempRoot)).toBe(true);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
+  });
+
   it("returns false for a file with no nearby tsconfig", () => {
-    expect(isFileExcludedByTsconfig("some-random-file.ts", CWD)).toBe(false);
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "supi-lsp-no-config-"));
+    try {
+      expect(isFileExcludedByTsconfig("some-random-file.ts", tempRoot)).toBe(false);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+    }
   });
 });

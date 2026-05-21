@@ -348,16 +348,18 @@ export interface TextDocumentPositionParams {
 
 // ── JSON-RPC ──────────────────────────────────────────────────────────
 
+export type JsonRpcId = number | string;
+
 export interface JsonRpcRequest {
   jsonrpc: "2.0";
-  id: number;
+  id: JsonRpcId;
   method: string;
   params?: unknown;
 }
 
 export interface JsonRpcResponse {
   jsonrpc: "2.0";
-  id: number;
+  id: JsonRpcId | null;
   result?: unknown;
   error?: { code: number; message: string; data?: unknown };
 }

@@ -1,6 +1,6 @@
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { JsonRpcClient } from "../../src/client/transport.ts";
+import { JsonRpcClient, JsonRpcRequestError } from "../../src/client/transport.ts";
 
 function createPair() {
   const serverIn = new PassThrough(); // client writes here (server stdin)
@@ -13,6 +13,15 @@ function writeMessage(stream: PassThrough, body: object) {
   const json = JSON.stringify(body);
   const header = `Content-Length: ${Buffer.byteLength(json, "utf-8")}\r\n\r\n`;
   stream.write(header + json);
+}
+
+async function readWrittenMessage(stream: PassThrough): Promise<Record<string, unknown>> {
+  const chunk = await new Promise<Buffer>((resolve) => {
+    stream.once("data", (data: Buffer) => resolve(data));
+  });
+  const raw = chunk.toString("utf-8");
+  const body = raw.split("\r\n\r\n")[1] ?? "{}";
+  return JSON.parse(body) as Record<string, unknown>;
 }
 
 // biome-ignore lint/security/noSecrets: test class name, not a secret
@@ -114,6 +123,66 @@ describe("JsonRpcClient", () => {
     const raw = Buffer.concat(chunks).toString("utf-8");
     expect(raw).toContain('"method":"initialized"');
     expect(raw).not.toContain('"id"');
+  });
+
+  it("responds to server requests through the registered request handler", async () => {
+    client.onRequest((method, params) => ({ method, params }));
+
+    writeMessage(serverOut, {
+      jsonrpc: "2.0",
+      id: 7,
+      method: "workspace/configuration",
+      params: { items: [] },
+    });
+
+    const response = await readWrittenMessage(serverIn);
+    expect(response).toEqual({
+      jsonrpc: "2.0",
+      id: 7,
+      result: { method: "workspace/configuration", params: { items: [] } },
+    });
+  });
+
+  it("returns Method not found for server requests without a registered handler", async () => {
+    writeMessage(serverOut, {
+      jsonrpc: "2.0",
+      id: 8,
+      method: "workspace/configuration",
+      params: { items: [] },
+    });
+
+    const response = await readWrittenMessage(serverIn);
+    expect(response).toEqual({
+      jsonrpc: "2.0",
+      id: 8,
+      error: {
+        code: -32601,
+        message: "Method not found: workspace/configuration",
+      },
+    });
+  });
+
+  it("serializes request handler failures as JSON-RPC errors", async () => {
+    client.onRequest(() => {
+      throw new JsonRpcRequestError(-32602, "Invalid params");
+    });
+
+    writeMessage(serverOut, {
+      jsonrpc: "2.0",
+      id: 9,
+      method: "workspace/configuration",
+      params: { items: [] },
+    });
+
+    const response = await readWrittenMessage(serverIn);
+    expect(response).toEqual({
+      jsonrpc: "2.0",
+      id: 9,
+      error: {
+        code: -32602,
+        message: "Invalid params",
+      },
+    });
   });
 
   it("handles partial messages split across chunks", async () => {

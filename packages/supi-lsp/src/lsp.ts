@@ -2,6 +2,7 @@
 // surfaces inline diagnostics, and injects diagnostic context only when outstanding issues exist.
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: lsp.ts stays cohesive wiring; recovery and sentinel helpers live in focused modules.
 
+import * as path from "node:path";
 import type {
   AgentEndEvent,
   BeforeAgentStartEvent,
@@ -14,6 +15,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/api";
 import { loadConfig, resolveLanguageAlias } from "./config/config.ts";
+import { clearTsconfigCache } from "./config/tsconfig-scope.ts";
 import { FileChangeType } from "./config/types.ts";
 import {
   diagnosticsContextFingerprint,
@@ -92,6 +94,7 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
     }
 
     const cwd = ctx.cwd;
+    clearTsconfigCache();
     const lspSettings = loadLspSettings(cwd);
 
     if (!lspSettings.enabled) {
@@ -151,6 +154,7 @@ function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeSta
   });
 
   pi.on("session_shutdown", async () => {
+    clearTsconfigCache();
     if (state.manager) {
       clearSessionLspService(state.manager.getCwd());
       await state.manager.shutdownAll();
@@ -190,6 +194,7 @@ function softRecoverWorkspaceChanges(
 ): boolean {
   if (!state.manager || changes.length === 0) return false;
 
+  clearTsconfigCache();
   state.manager.clearAllPullResultIds();
   state.manager.notifyWorkspaceFileChanges(changes);
   markWorkspaceChange(state);
@@ -200,6 +205,11 @@ function refreshWorkspaceSentinels(state: LspRuntimeState, cwd: string): boolean
   const { snapshot, changes } = syncWorkspaceSentinelSnapshot(cwd, state.sentinelSnapshot);
   state.sentinelSnapshot = snapshot;
   return softRecoverWorkspaceChanges(state, changes);
+}
+
+function shouldInvalidateTsconfigScopeCache(filePath: string): boolean {
+  const ext = path.extname(filePath).toLowerCase();
+  return ext === ".json" || ext === ".jsonc";
 }
 
 function recoverWorkspaceChangesFromToolResult(
@@ -215,6 +225,9 @@ function recoverWorkspaceChangesFromToolResult(
   if (typeof pathValue !== "string") return false;
 
   const resolvedPath = resolveSessionPath(cwd, pathValue);
+  if (shouldInvalidateTsconfigScopeCache(resolvedPath)) {
+    clearTsconfigCache();
+  }
   const fileEvent = { uri: fileToUri(resolvedPath), type: FileChangeType.Changed };
 
   // Sentinel files (package.json, tsconfig.json, lockfiles, .d.ts)

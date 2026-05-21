@@ -46,9 +46,13 @@ const mockFns = vi.hoisted(() => ({
     changes: [{ uri: "file:///project/package.json", type: FileChangeType.Changed }],
   })),
   isWorkspaceRecoveryTrigger: vi.fn(),
+  clearTsconfigCache: vi.fn(),
 }));
 
 vi.mock("../../src/config/config.ts", () => ({ loadConfig: mockFns.loadConfig }));
+vi.mock("../../src/config/tsconfig-scope.ts", () => ({
+  clearTsconfigCache: mockFns.clearTsconfigCache,
+}));
 vi.mock("../../src/tool/guidance.ts", () => ({
   buildProjectGuidelines: mockFns.buildProjectGuidelines,
   buildLspToolPromptSurfaces: mockFns.buildLspToolPromptSurfaces,
@@ -291,6 +295,25 @@ describe("workspace sentinel recovery", () => {
       ctx,
     );
 
+    expect(manager.clearAllPullResultIds).not.toHaveBeenCalled();
+    expect(manager.notifyWorkspaceFileChanges).not.toHaveBeenCalled();
+  });
+
+  it("clears the tsconfig scope cache after editing a non-sentinel json file", async () => {
+    const { handlers, ctx, manager } = await setupExtension();
+    mockFns.clearTsconfigCache.mockClear();
+
+    await handlers.get("tool_result")?.(
+      {
+        isError: false,
+        toolName: "edit",
+        input: { path: "config/base.json" },
+        content: [],
+      },
+      ctx,
+    );
+
+    expect(mockFns.clearTsconfigCache).toHaveBeenCalledTimes(1);
     expect(manager.clearAllPullResultIds).not.toHaveBeenCalled();
     expect(manager.notifyWorkspaceFileChanges).not.toHaveBeenCalled();
   });

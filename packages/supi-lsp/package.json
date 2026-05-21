@@ -21,7 +21,8 @@
     "!__tests__"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*"
+    "@mrclrchtr/supi-core": "workspace:*",
+    "typescript": "6.0.3"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"
@@ -47,8 +48,8 @@
     }
   },
   "devDependencies": {
-    "vitest": "4.1.6",
-    "@mrclrchtr/supi-test-utils": "workspace:*"
+    "@mrclrchtr/supi-test-utils": "workspace:*",
+    "vitest": "4.1.6"
   },
   "pi": {
     "extensions": [

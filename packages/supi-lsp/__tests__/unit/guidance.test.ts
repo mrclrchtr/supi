@@ -451,9 +451,11 @@ describe("LspManager detected root reuse", () => {
       },
     ]);
 
-    (manager as unknown as { unavailable: Set<string> }).unavailable.add(
-      `node-based:${process.cwd()}`,
-    );
+    (
+      manager as unknown as {
+        unavailable: Map<string, "missing-command" | "start-failed" | "runtime-error">;
+      }
+    ).unavailable.set(`node-based:${process.cwd()}`, "start-failed");
 
     expect(manager.isSupportedSourceFile("packages/supi-lsp/ui.ts")).toBe(false);
   });

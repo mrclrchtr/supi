@@ -4,6 +4,7 @@
 // biome-ignore lint/nursery/noExcessiveLinesPerFile: LspClient remains a cohesive stateful wrapper; refresh logic is already split out.
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import * as path from "node:path";
 import { CLIENT_CAPABILITIES } from "../config/capabilities.ts";
 import type {
   CodeAction,
@@ -29,7 +30,7 @@ import type {
   WorkspaceSymbol,
 } from "../config/types.ts";
 import { detectLanguageId, fileToUri, uriToFile } from "../utils.ts";
-import { JsonRpcClient } from "./transport.ts";
+import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
 const DIAGNOSTIC_WAIT_MS = 3_000;
@@ -119,6 +120,7 @@ export class LspClient {
         this.handlePublishDiagnostics(params as PublishDiagnosticsParams);
       }
     });
+    this.rpc.onRequest((method, params) => this.handleServerRequest(method, params));
 
     // Handle crashes
     this.process.on("exit", (_code) => {
@@ -467,6 +469,28 @@ export class LspClient {
     } catch {
       return null;
     }
+  }
+
+  private handleServerRequest(method: string, params: unknown): unknown {
+    switch (method) {
+      case "workspace/configuration":
+        return this.buildWorkspaceConfigurationResult(params);
+      case "workspace/workspaceFolders":
+        return [{ uri: fileToUri(this.root), name: path.basename(this.root) || this.root }];
+      case "client/registerCapability":
+      case "client/unregisterCapability":
+      case "window/workDoneProgress/create":
+        return null;
+      default:
+        throw new JsonRpcRequestError(-32601, `Method not found: ${method}`);
+    }
+  }
+
+  private buildWorkspaceConfigurationResult(params: unknown): unknown[] {
+    if (!params || typeof params !== "object") return [];
+    const items = (params as { items?: unknown }).items;
+    if (!Array.isArray(items)) return [];
+    return items.map(() => null);
   }
 
   private handlePublishDiagnostics(params: PublishDiagnosticsParams): void {

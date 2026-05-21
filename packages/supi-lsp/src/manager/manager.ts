@@ -55,12 +55,15 @@ import type {
   ServerStatus,
 } from "./manager-types.ts";
 import { recoverWorkspaceDiagnostics as recoverWorkspaceDiagnosticsImpl } from "./manager-workspace-recovery.ts";
+
+type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
+
 // ── LspManager ────────────────────────────────────────────────────────
 export class LspManager {
   /** Active clients keyed by "serverName:root" */
   private clients = new Map<string, LspClient>();
-  /** Servers we've already tried and failed to start */
-  private unavailable = new Set<string>();
+  /** Per-root startup failures keyed by "serverName:root" */
+  private unavailable = new Map<string, UnavailableReason>();
   /** Memoized per-command availability of LSP server binaries on PATH */
   private commandAvailability = new Map<string, boolean>();
   /** Guards against concurrent client creation for the same server:root key */
@@ -103,7 +106,8 @@ export class LspManager {
       knownRoots: this.knownRoots,
       cwd: this.cwd,
     });
-    if (this.unavailable.has(`${serverName}:${root}`)) return false;
+    const key = clientKey(serverName, root);
+    if (this.getUnavailableReason(key, serverConfig.command)) return false;
     return this.isServerCommandAvailable(serverConfig.command);
   }
 
@@ -131,6 +135,18 @@ export class LspManager {
     if (available) this.commandAvailability.set(command, true);
     return available;
   }
+
+  private getUnavailableReason(key: string, command?: string): UnavailableReason | null {
+    const reason = this.unavailable.get(key);
+    if (!reason) return null;
+
+    if (reason === "missing-command" && command && this.isServerCommandAvailable(command)) {
+      this.unavailable.delete(key);
+      return null;
+    }
+
+    return reason;
+  }
   /** Get or create an LSP client for the given file. */
   async getClientForFile(filePath: string): Promise<LspClient | null> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
@@ -147,7 +163,7 @@ export class LspManager {
     const serverConfig = this.config.servers[serverName];
     if (!serverConfig) return null;
     const key = clientKey(serverName, root);
-    if (this.unavailable.has(key)) return null;
+    if (this.getUnavailableReason(key, serverConfig.command)) return null;
 
     // Return existing client
     const existing = this.clients.get(key);
@@ -156,7 +172,7 @@ export class LspManager {
     // If existing client errored, remove it
     if (existing && existing.status === "error") {
       this.clients.delete(key);
-      this.unavailable.add(key);
+      this.unavailable.set(key, "runtime-error");
       this.clearWarmedWorkspaceSymbolProjects(existing.name, existing.root);
       return null;
     }
@@ -190,7 +206,7 @@ export class LspManager {
   ): Promise<LspClient | null> {
     // Validate command exists
     if (!commandExists(serverConfig.command)) {
-      this.unavailable.add(key);
+      this.unavailable.set(key, "missing-command");
       return null;
     }
 
@@ -201,9 +217,10 @@ export class LspManager {
     rememberKnownRoot(this.knownRoots, serverName, root);
     try {
       await client.start();
+      this.unavailable.delete(key);
       return client;
     } catch {
-      this.unavailable.add(key);
+      this.unavailable.set(key, "start-failed");
       this.clients.delete(key);
       return null;
     }
@@ -277,7 +294,7 @@ export class LspManager {
       return true;
     } catch {
       this.clients.delete(key);
-      this.unavailable.add(key);
+      this.unavailable.set(key, "start-failed");
       return false;
     }
   }
@@ -290,7 +307,8 @@ export class LspManager {
         root,
         fileTypes,
         client: this.clients.get(key),
-        unavailable: this.unavailable.has(key),
+        unavailableReason:
+          this.getUnavailableReason(key, this.config.servers[serverName]?.command) ?? undefined,
       },
       this.cwd,
     );

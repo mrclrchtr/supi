@@ -2,6 +2,7 @@
 
 import type { Readable, Writable } from "node:stream";
 import type {
+  JsonRpcId,
   JsonRpcMessage,
   JsonRpcNotification,
   JsonRpcRequest,
@@ -15,6 +16,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 // ── Types ─────────────────────────────────────────────────────────────
 
 export type NotificationHandler = (method: string, params: unknown) => void;
+export type RequestHandler = (method: string, params: unknown) => Promise<unknown> | unknown;
 
 interface PendingRequest {
   resolve: (result: unknown) => void;
@@ -22,13 +24,25 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
+export class JsonRpcRequestError extends Error {
+  constructor(
+    readonly code: number,
+    message: string,
+    readonly data?: unknown,
+  ) {
+    super(message);
+    this.name = "JsonRpcRequestError";
+  }
+}
+
 // ── JsonRpcClient ─────────────────────────────────────────────────────
 
 export class JsonRpcClient {
   private nextId = 1;
   private buffer = Buffer.alloc(0);
-  private pending = new Map<number, PendingRequest>();
+  private pending = new Map<JsonRpcId, PendingRequest>();
   private notificationHandler: NotificationHandler | null = null;
+  private requestHandler: RequestHandler | null = null;
   private closed = false;
   private readonly timeoutMs: number;
 
@@ -46,6 +60,11 @@ export class JsonRpcClient {
   /** Register a handler for server notifications (no id). */
   onNotification(handler: NotificationHandler): void {
     this.notificationHandler = handler;
+  }
+
+  /** Register a handler for server-initiated requests. */
+  onRequest(handler: RequestHandler): void {
+    this.requestHandler = handler;
   }
 
   /** Send a request and wait for the correlated response, optionally overriding the timeout. */
@@ -147,9 +166,11 @@ export class JsonRpcClient {
     // Response (has id, has result or error)
     if ("id" in msg && msg.id != null && ("result" in msg || "error" in msg)) {
       const response = msg as JsonRpcResponse;
-      const pending = this.pending.get(response.id);
+      const id = response.id;
+      if (id === null) return;
+      const pending = this.pending.get(id);
       if (pending) {
-        this.pending.delete(response.id);
+        this.pending.delete(id);
         clearTimeout(pending.timer);
         if (response.error) {
           pending.reject(new Error(`LSP error ${response.error.code}: ${response.error.message}`));
@@ -164,9 +185,44 @@ export class JsonRpcClient {
     if ("method" in msg && !("id" in msg)) {
       const notification = msg as JsonRpcNotification;
       this.notificationHandler?.(notification.method, notification.params);
+      return;
     }
 
-    // Request from server (has id + method) — we don't handle server→client requests yet
+    // Request from server (has id + method)
+    if ("method" in msg && "id" in msg && msg.id != null) {
+      void this.handleInboundRequest(msg as JsonRpcRequest);
+    }
+  }
+
+  private async handleInboundRequest(request: JsonRpcRequest): Promise<void> {
+    if (this.closed) return;
+
+    try {
+      if (!this.requestHandler) {
+        throw new JsonRpcRequestError(-32601, `Method not found: ${request.method}`);
+      }
+
+      const result = await this.requestHandler(request.method, request.params);
+      this.writeMessage({
+        jsonrpc: "2.0",
+        id: request.id,
+        result: result ?? null,
+      } satisfies JsonRpcResponse);
+    } catch (error) {
+      const failure =
+        error instanceof JsonRpcRequestError
+          ? error
+          : new JsonRpcRequestError(-32603, error instanceof Error ? error.message : String(error));
+      this.writeMessage({
+        jsonrpc: "2.0",
+        id: request.id,
+        error: {
+          code: failure.code,
+          message: failure.message,
+          ...(failure.data !== undefined ? { data: failure.data } : {}),
+        },
+      } satisfies JsonRpcResponse);
+    }
   }
 
   private onClose(): void {

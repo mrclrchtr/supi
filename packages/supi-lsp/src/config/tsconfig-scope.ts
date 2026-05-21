@@ -1,23 +1,46 @@
 // tsconfig-aware file scope detection.
 //
 // Determines whether a file is within the compilation scope of its nearest
-// tsconfig.json by checking `include` and `exclude` patterns. Used by the
-// diagnostic filter to suppress LSP errors on files that TypeScript itself
-// would not type-check.
+// tsconfig.json or jsconfig.json using the TypeScript compiler's own config
+// parsing APIs. Used by the diagnostic filter to suppress LSP errors on files
+// that TypeScript itself would not include in the project.
 
-import * as fs from "node:fs";
 import * as path from "node:path";
+import ts from "typescript";
 
-interface TsconfigInfo {
-  dir: string;
-  include: string[] | undefined;
-  exclude: string[] | undefined;
+interface ParsedProjectConfig {
+  configPath: string;
+  configDir: string;
+  fileNames: Set<string>;
+  explicitFiles: Set<string> | null;
+  includeFilePattern: RegExp | null;
+  excludePattern: RegExp | null;
+  supportedExtensions: Set<string>;
+  usesDefaultInclude: boolean;
 }
 
-const cache = new Map<string, TsconfigInfo | null>();
+const nearestConfigCache = new Map<string, string | null>();
+const parsedConfigCache = new Map<string, ParsedProjectConfig | null>();
+
+const tsInternal = ts as typeof ts & {
+  getFileMatcherPatterns?: (
+    configDir: string,
+    excludes: readonly string[] | undefined,
+    includes: readonly string[] | undefined,
+    useCaseSensitiveFileNames: boolean,
+    currentDirectory: string,
+  ) => {
+    includeFilePattern?: string;
+    excludePattern?: string;
+  };
+  getSupportedExtensions?: (
+    options: ts.CompilerOptions,
+    extraFileExtensions?: unknown,
+  ) => ReadonlyArray<ReadonlyArray<string>>;
+};
 
 /**
- * Check whether a file is excluded by its nearest tsconfig.json.
+ * Check whether a file is excluded by its nearest tsconfig.json or jsconfig.json.
  *
  * @param filePath - Project-relative file path (e.g., "packages/foo/__tests__/x.test.ts")
  * @param cwd - Absolute project root directory
@@ -25,132 +48,197 @@ const cache = new Map<string, TsconfigInfo | null>();
  */
 export function isFileExcludedByTsconfig(filePath: string, cwd: string): boolean {
   const absolutePath = path.resolve(cwd, filePath);
-  const tsconfig = findNearestTsconfig(path.dirname(absolutePath), cwd);
-  if (!tsconfig) return false;
+  const configPath = findNearestProjectConfig(path.dirname(absolutePath), cwd);
+  if (!configPath) return false;
 
-  const relativeToTsconfig = path.relative(tsconfig.dir, absolutePath).replaceAll("\\", "/");
+  const parsed = parseProjectConfig(configPath);
+  if (!parsed) return false;
 
-  // Check exclude patterns first
-  if (tsconfig.exclude) {
-    for (const pattern of tsconfig.exclude) {
-      if (matchesPattern(relativeToTsconfig, pattern)) return true;
-    }
-  }
-
-  // If include is specified, the file must match at least one pattern
-  if (tsconfig.include) {
-    let included = false;
-    for (const pattern of tsconfig.include) {
-      if (matchesPattern(relativeToTsconfig, pattern)) {
-        included = true;
-        break;
-      }
-    }
-    if (!included) return true;
-  }
-
-  return false;
+  return !isFileInProjectScope(parsed, absolutePath);
 }
 
 /**
- * Find the nearest tsconfig.json walking upward from `startDir`,
+ * Find the nearest tsconfig.json or jsconfig.json walking upward from `startDir`,
  * stopping at `rootDir`.
  */
-function findNearestTsconfig(startDir: string, rootDir: string): TsconfigInfo | null {
-  let dir = startDir;
+function findNearestProjectConfig(startDir: string, rootDir: string): string | null {
+  let dir = path.resolve(startDir);
+  const resolvedRoot = path.resolve(rootDir);
+
   while (true) {
-    const cached = cache.get(dir);
+    const cacheKey = `${normalizePath(dir)}::${normalizePath(resolvedRoot)}`;
+    const cached = nearestConfigCache.get(cacheKey);
     if (cached !== undefined) return cached;
 
-    const tsconfigPath = path.join(dir, "tsconfig.json");
-    if (fs.existsSync(tsconfigPath)) {
-      const info = parseTsconfig(dir, tsconfigPath);
-      cache.set(dir, info);
-      return info;
+    const configPath = getLocalProjectConfig(dir);
+    if (configPath) {
+      const resolvedConfigPath = path.resolve(configPath);
+      nearestConfigCache.set(cacheKey, resolvedConfigPath);
+      return resolvedConfigPath;
     }
 
-    if (path.relative(rootDir, dir).startsWith("..") || dir === rootDir) {
-      // Don't look above the project root
+    if (path.relative(resolvedRoot, dir).startsWith("..") || dir === resolvedRoot) {
+      nearestConfigCache.set(cacheKey, null);
       return null;
     }
 
     const parent = path.dirname(dir);
     if (parent === dir) {
+      nearestConfigCache.set(cacheKey, null);
       return null;
     }
     dir = parent;
   }
 }
 
-function parseTsconfig(dir: string, tsconfigPath: string): TsconfigInfo | null {
-  try {
-    const raw = fs.readFileSync(tsconfigPath, "utf-8");
-    // Strip comments without touching content inside double-quoted strings.
-    const cleaned = raw
-      .replace(/("(?:\\.|[^"\\])*")|\/\/.*$/gm, "$1")
-      .replace(/("(?:\\.|[^"\\])*")|\/[\s\S]*?\*\//g, "$1");
-    const json = JSON.parse(cleaned);
-    return {
-      dir,
-      include: json.include as string[] | undefined,
-      exclude: json.exclude as string[] | undefined,
-    };
-  } catch {
+function getLocalProjectConfig(directory: string): string | null {
+  const tsconfigPath = path.join(directory, "tsconfig.json");
+  if (ts.sys.fileExists(tsconfigPath)) return tsconfigPath;
+
+  const jsconfigPath = path.join(directory, "jsconfig.json");
+  if (ts.sys.fileExists(jsconfigPath)) return jsconfigPath;
+
+  return null;
+}
+
+function parseProjectConfig(configPath: string): ParsedProjectConfig | null {
+  const normalizedConfigPath = normalizePath(configPath);
+  const cached = parsedConfigCache.get(normalizedConfigPath);
+  if (cached !== undefined) return cached;
+
+  const parsed = ts.getParsedCommandLineOfConfigFile(configPath, {}, createParseConfigHost());
+  if (!parsed) {
+    parsedConfigCache.set(normalizedConfigPath, null);
     return null;
   }
+
+  const configDir = path.dirname(path.resolve(configPath));
+  const explicitFiles = extractExplicitFiles(parsed.raw.files, configDir);
+  const usesDefaultInclude = explicitFiles === null && !Array.isArray(parsed.raw.include);
+  const { includeFilePattern, excludePattern } = createFileMatchers(
+    configDir,
+    parsed.raw.include,
+    parsed.raw.exclude,
+    usesDefaultInclude,
+  );
+  const supportedExtensions = new Set(getSupportedExtensions(parsed.options));
+  if (parsed.options.resolveJsonModule) supportedExtensions.add(".json");
+
+  const result = {
+    configPath: path.resolve(configPath),
+    configDir,
+    fileNames: new Set(parsed.fileNames.map(normalizePath)),
+    explicitFiles,
+    includeFilePattern,
+    excludePattern,
+    supportedExtensions,
+    usesDefaultInclude,
+  } satisfies ParsedProjectConfig;
+  parsedConfigCache.set(normalizedConfigPath, result);
+  return result;
+}
+
+function extractExplicitFiles(rawFiles: unknown, configDir: string): Set<string> | null {
+  if (!Array.isArray(rawFiles)) return null;
+  return new Set(
+    rawFiles
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => normalizePath(path.resolve(configDir, entry))),
+  );
+}
+
+function createFileMatchers(
+  configDir: string,
+  rawInclude: unknown,
+  rawExclude: unknown,
+  useDefaultInclude: boolean,
+): {
+  includeFilePattern: RegExp | null;
+  excludePattern: RegExp | null;
+} {
+  const includeSpecs = Array.isArray(rawInclude)
+    ? rawInclude.filter((entry): entry is string => typeof entry === "string")
+    : undefined;
+  const excludeSpecs = Array.isArray(rawExclude)
+    ? rawExclude.filter((entry): entry is string => typeof entry === "string")
+    : undefined;
+  const matcherPatterns = getFileMatcherPatterns(
+    configDir,
+    excludeSpecs,
+    useDefaultInclude ? ["**/*"] : includeSpecs,
+  );
+
+  return {
+    includeFilePattern: matcherPatterns.includeFilePattern
+      ? new RegExp(matcherPatterns.includeFilePattern)
+      : null,
+    excludePattern: matcherPatterns.excludePattern
+      ? new RegExp(matcherPatterns.excludePattern)
+      : null,
+  };
+}
+
+function isFileInProjectScope(parsed: ParsedProjectConfig, absolutePath: string): boolean {
+  const normalizedPath = normalizePath(absolutePath);
+  if (parsed.fileNames.has(normalizedPath)) return true;
+
+  const extension = path.extname(absolutePath).toLowerCase();
+  if (!parsed.supportedExtensions.has(extension)) return false;
+
+  if (parsed.explicitFiles) return parsed.explicitFiles.has(normalizedPath);
+  if (!isWithinOrEqual(parsed.configDir, absolutePath)) return false;
+  if (parsed.excludePattern?.test(normalizedPath)) return false;
+  if (parsed.usesDefaultInclude) return true;
+  return parsed.includeFilePattern ? parsed.includeFilePattern.test(normalizedPath) : false;
+}
+
+function getSupportedExtensions(options: ts.CompilerOptions): string[] {
+  return tsInternal.getSupportedExtensions
+    ? [...tsInternal.getSupportedExtensions(options, undefined).flat()]
+    : [".ts", ".tsx", ".d.ts", ".cts", ".d.cts", ".mts", ".d.mts"];
+}
+
+function getFileMatcherPatterns(
+  configDir: string,
+  excludeSpecs: readonly string[] | undefined,
+  includeSpecs: readonly string[] | undefined,
+): { includeFilePattern?: string; excludePattern?: string } {
+  return tsInternal.getFileMatcherPatterns
+    ? tsInternal.getFileMatcherPatterns(
+        configDir,
+        excludeSpecs,
+        includeSpecs,
+        ts.sys.useCaseSensitiveFileNames,
+        path.parse(configDir).root,
+      )
+    : {};
+}
+
+function createParseConfigHost(): ts.ParseConfigFileHost {
+  return {
+    ...ts.sys,
+    onUnRecoverableConfigFileDiagnostic: () => {
+      // Treat invalid configs as unsupported rather than surfacing a secondary
+      // filter failure to the agent.
+    },
+  };
+}
+
+function isWithinOrEqual(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== "..");
+}
+
+function normalizePath(target: string): string {
+  const resolved = path.resolve(target).replaceAll("\\", "/");
+  return ts.sys.useCaseSensitiveFileNames ? resolved : resolved.toLowerCase();
 }
 
 /**
- * Lightweight pattern matching for tsconfig include/exclude patterns.
- * Handles directory names, extensions, recursive globs, and literal paths.
- */
-function matchesPattern(filePath: string, pattern: string): boolean {
-  const normalizedPattern = pattern.replaceAll("\\", "/");
-
-  // Directory-prefixed recursive glob: prefix/**/*.ext
-  if (normalizedPattern.includes("/**/")) {
-    const idx = normalizedPattern.indexOf("/**/");
-    const prefix = normalizedPattern.slice(0, idx);
-    const suffix = normalizedPattern.slice(idx + 4);
-    return (
-      filePath.startsWith(`${prefix}/`) && matchesPattern(filePath.slice(prefix.length + 1), suffix)
-    );
-  }
-
-  // Recursive glob: **/*.ext
-  if (normalizedPattern.startsWith("**/")) {
-    const suffix = normalizedPattern.slice(3); // e.g., "*.ts"
-    return matchesPattern(filePath, suffix) || filePath.includes(`/${suffix}`);
-  }
-
-  // Directory match: pattern has no glob chars and no "."
-  // e.g., "node_modules" or "__tests__"
-  if (!normalizedPattern.includes("*") && !normalizedPattern.includes(".")) {
-    return (
-      filePath === normalizedPattern ||
-      filePath.startsWith(`${normalizedPattern}/`) ||
-      filePath.includes(`/${normalizedPattern}/`)
-    );
-  }
-
-  // Simple glob: *.ext — match basename
-  if (normalizedPattern.startsWith("*.")) {
-    const ext = normalizedPattern.slice(1); // e.g., ".ts"
-    return filePath.endsWith(ext) && !filePath.includes("/", filePath.length - ext.length - 1);
-  }
-
-  // Literal path
-  if (!normalizedPattern.includes("*")) {
-    return filePath === normalizedPattern || filePath.startsWith(`${normalizedPattern}/`);
-  }
-
-  // Fallback: path contains the pattern segment
-  return filePath.includes(`/${normalizedPattern}`) || filePath === normalizedPattern;
-}
-
-/**
- * Clear the tsconfig cache. Useful for testing or after filesystem changes.
+ * Clear cached nearest-config lookups and parsed project config state.
+ * Useful for testing and after workspace file changes.
  */
 export function clearTsconfigCache(): void {
-  cache.clear();
+  nearestConfigCache.clear();
+  parsedConfigCache.clear();
 }

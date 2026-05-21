@@ -7,20 +7,21 @@ interface ProjectServerInfoInput {
   root: string;
   fileTypes: string[];
   client: LspClient | undefined;
-  unavailable: boolean;
+  unavailableReason?: "missing-command" | "start-failed" | "runtime-error";
 }
 
 export function buildProjectServerInfo(
   input: ProjectServerInfoInput,
   cwd: string,
 ): ProjectServerInfo {
-  const status = input.unavailable
-    ? "unavailable"
-    : input.client?.status === "running"
+  const status =
+    input.client?.status === "running"
       ? "running"
-      : input.client?.status === "error"
+      : input.client?.status === "error" || input.unavailableReason === "start-failed"
         ? "error"
-        : "unavailable";
+        : input.unavailableReason === "runtime-error"
+          ? "error"
+          : "unavailable";
 
   return {
     name: input.serverName,

@@ -10,12 +10,12 @@ let tmpDir: string;
 beforeAll(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "supi-summary-test-"));
 
-  // Create a tsconfig that excludes the __tests__ directory
+  // Create a tsconfig that excludes the nested src/__tests__ directory
   fs.writeFileSync(
     path.join(tmpDir, "tsconfig.json"),
     JSON.stringify({
       include: ["src"],
-      exclude: ["__tests__"],
+      exclude: ["src/__tests__"],
     }),
   );
 
