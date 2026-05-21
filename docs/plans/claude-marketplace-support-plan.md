@@ -486,31 +486,31 @@ Until then, a fork is likely unnecessary maintenance overhead.
 
 ### Pi docs and examples
 
-- Pi extensions docs:  
+- Pi extensions docs:
   https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md
-- Pi packages docs:  
+- Pi packages docs:
   https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md
-- Pi subagent example README:  
+- Pi subagent example README:
   https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/subagent/README.md
 
 ### Existing pi ecosystem references
 
-- `ross-jill-ws/pi-claude-plugins` - skill/command marketplace bridge prototype:  
+- `ross-jill-ws/pi-claude-plugins` - skill/command marketplace bridge prototype:
   https://github.com/ross-jill-ws/pi-claude-plugins
-- `hsingjui/pi-hooks` - Claude-style command hook compatibility for pi:  
+- `hsingjui/pi-hooks` - Claude-style command hook compatibility for pi:
   https://github.com/hsingjui/pi-hooks
 
 ### Claude Code docs
 
-- Discover plugins / marketplaces:  
+- Discover plugins / marketplaces:
   https://code.claude.com/docs/en/discover-plugins.md
-- Create plugins:  
+- Create plugins:
   https://code.claude.com/docs/en/plugins.md
-- Plugins reference:  
+- Plugins reference:
   https://code.claude.com/docs/en/plugins-reference
-- Subagents reference:  
+- Subagents reference:
   https://code.claude.com/docs/en/sub-agents
-- Hooks reference:  
+- Hooks reference:
   https://code.claude.com/docs/en/hooks
 
 ### Notes derived from the references above
