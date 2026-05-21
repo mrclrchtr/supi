@@ -17,6 +17,7 @@ import type {
   WorkspaceSymbol,
 } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
+import { resolveSessionPath } from "../utils.ts";
 
 /** Workspace diagnostic summary grouped by file. */
 export interface WorkspaceDiagnosticSummaryEntry {
@@ -182,8 +183,7 @@ export class SessionLspService {
   }
 
   private resolveFilePath(filePath: string): string {
-    const normalizedPath = filePath.startsWith("@") ? filePath.slice(1) : filePath;
-    return path.resolve(this.manager.getCwd(), normalizedPath);
+    return resolveSessionPath(this.manager.getCwd(), filePath);
   }
 }
 

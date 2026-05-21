@@ -5,6 +5,7 @@ import {
   detectLanguageId,
   fileToUri,
   getFileExtension,
+  resolveSessionPath,
   uriToFile,
 } from "../../src/utils.ts";
 
@@ -33,6 +34,16 @@ describe("uriToFile", () => {
 
   it("passes through non-file URIs", () => {
     expect(uriToFile("https://example.com")).toBe("https://example.com");
+  });
+});
+
+describe("resolveSessionPath", () => {
+  it("resolves relative paths from the session cwd", () => {
+    expect(resolveSessionPath("/project", "src/index.ts")).toBe("/project/src/index.ts");
+  });
+
+  it("strips the leading @ path prefix", () => {
+    expect(resolveSessionPath("/project", "@src/index.ts")).toBe("/project/src/index.ts");
   });
 });
 

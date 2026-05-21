@@ -120,6 +120,18 @@ describe("SessionLspService semantic operations", () => {
     expect(client.hover).toHaveBeenCalledWith("/project/src/index.ts", { line: 0, character: 0 });
   });
 
+  it("strips a leading @ from semantic file paths", async () => {
+    const hover: Hover = { contents: "hover text" };
+    const client = { hover: vi.fn().mockResolvedValue(hover) } as unknown as LspClient;
+    const manager = makeManager(client);
+    const service = new SessionLspService(manager);
+
+    await service.hover("@src/index.ts", { line: 0, character: 0 });
+
+    expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/src/index.ts");
+    expect(client.hover).toHaveBeenCalledWith("/project/src/index.ts", { line: 0, character: 0 });
+  });
+
   it("returns null hover when no client is available", async () => {
     const manager = makeManager(null);
     const service = new SessionLspService(manager);

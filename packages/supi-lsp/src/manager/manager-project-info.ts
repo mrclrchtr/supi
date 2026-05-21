@@ -39,7 +39,9 @@ function getSupportedActions(capabilities: LspClient["serverCapabilities"] | und
   if (capabilities.hoverProvider) actions.push("hover(file,line,char)");
   if (capabilities.definitionProvider) actions.push("definition(file,line,char)");
   if (capabilities.referencesProvider) actions.push("references(file,line,char)");
+  if (capabilities.implementationProvider) actions.push("implementation(file,line,char)");
   if (capabilities.documentSymbolProvider) actions.push("symbols(file)");
+  if (capabilities.workspaceSymbolProvider) actions.push("workspace_symbols(query)");
   if (capabilities.renameProvider) actions.push("rename(file,line,char,newName)");
   if (capabilities.codeActionProvider) actions.push("code_actions(file,line,char)");
   return actions;

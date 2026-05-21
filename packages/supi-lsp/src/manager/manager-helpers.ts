@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import * as projectRoots from "@mrclrchtr/supi-core/api";
 import { isGlobMatch } from "../pattern-matcher.ts";
+import { resolveSessionPath } from "../utils.ts";
 
 /** Unique key for a client identified by server name and root. */
 export function clientKey(serverName: string, root: string): string {
@@ -14,10 +15,11 @@ export function resolveRootForFile(
   rootMarkers: string[],
   opts: { knownRoots: Map<string, string[]>; cwd: string },
 ): string {
+  const resolvedFilePath = resolveSessionPath(opts.cwd, filePath);
   const preferredRoots = opts.knownRoots.get(serverName) ?? [];
-  const knownRoot = projectRoots.resolveKnownRoot(filePath, preferredRoots);
+  const knownRoot = projectRoots.resolveKnownRoot(resolvedFilePath, preferredRoots);
   if (knownRoot) return knownRoot;
-  const fileDir = path.dirname(path.resolve(filePath));
+  const fileDir = path.dirname(resolvedFilePath);
   return projectRoots.findProjectRoot(fileDir, rootMarkers, opts.cwd);
 }
 

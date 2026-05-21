@@ -2,6 +2,7 @@ import { type Diagnostic, DiagnosticSeverity } from "../config/types.ts";
 import type { OutstandingDiagnosticSummaryEntry } from "../manager/manager-types.ts";
 import { isGlobMatch } from "../pattern-matcher.ts";
 import { displayRelativeFilePath, shouldIgnoreLspPath } from "../summary.ts";
+import { uriToFile } from "../utils.ts";
 
 export function collectDiagnosticSummaryCounts(
   fileDiags: Map<string, { errors: number; warnings: number }>,
@@ -52,7 +53,7 @@ export function accumulateOutstandingDiagnostics(
 }
 
 export function relativeFilePathFromUri(uri: string, cwd: string): string {
-  return displayRelativeFilePath(uri.replace("file://", ""), cwd);
+  return displayRelativeFilePath(uriToFile(uri), cwd);
 }
 
 function isDiagnosticWithinThreshold(

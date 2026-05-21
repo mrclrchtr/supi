@@ -2,7 +2,6 @@
 // surfaces inline diagnostics, and injects diagnostic context only when outstanding issues exist.
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: lsp.ts stays cohesive wiring; recovery and sentinel helpers live in focused modules.
 
-import * as path from "node:path";
 import type {
   AgentEndEvent,
   BeforeAgentStartEvent,
@@ -64,7 +63,7 @@ import { registerLspAwareToolOverrides } from "./tool/overrides.ts";
 import { registerLspTools } from "./tool/register-tools.ts";
 import { registerLspMessageRenderer } from "./ui/renderer.ts";
 import { toggleLspStatusOverlay, updateLspUi } from "./ui/ui.ts";
-import { fileToUri } from "./utils.ts";
+import { fileToUri, resolveSessionPath } from "./utils.ts";
 
 export default function lspExtension(pi: ExtensionAPI) {
   registerLspSettings();
@@ -73,7 +72,6 @@ export default function lspExtension(pi: ExtensionAPI) {
   registerLspAwareToolOverrides(pi, {
     getInlineSeverity: () => state.inlineSeverity,
     getManager: () => state.manager,
-    getCwd: () => state.manager?.getCwd() ?? process.cwd(),
     isActive: () => state.lspActive,
   });
 
@@ -216,11 +214,11 @@ function recoverWorkspaceChangesFromToolResult(
   const pathValue = (event.input as { path?: unknown }).path;
   if (typeof pathValue !== "string") return false;
 
-  const resolvedPath = path.resolve(cwd, pathValue);
+  const resolvedPath = resolveSessionPath(cwd, pathValue);
   const fileEvent = { uri: fileToUri(resolvedPath), type: FileChangeType.Changed };
 
   // Sentinel files (package.json, tsconfig.json, lockfiles, .d.ts)
-  if (isWorkspaceRecoveryTrigger(pathValue, cwd)) {
+  if (isWorkspaceRecoveryTrigger(resolvedPath, cwd)) {
     if (resolvedPath.endsWith(".d.ts")) {
       return softRecoverWorkspaceChanges(state, [fileEvent]);
     }
@@ -231,7 +229,7 @@ function recoverWorkspaceChangesFromToolResult(
   }
 
   // Source files matching an active language server's file types
-  if (state.manager.hasServerForExtension(pathValue)) {
+  if (state.manager.hasServerForExtension(resolvedPath)) {
     return softRecoverWorkspaceChanges(state, [fileEvent]);
   }
 

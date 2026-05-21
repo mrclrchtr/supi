@@ -198,4 +198,53 @@ describe("introspectCapabilities", () => {
       },
     ]);
   });
+
+  it("reports implementation and workspace-symbol support when available", () => {
+    const root = makeTmpProject();
+    const manager = new LspManager(makeConfig(), root);
+
+    (
+      manager as unknown as {
+        clients: Map<
+          string,
+          {
+            name: string;
+            root: string;
+            status: "running";
+            openFiles: string[];
+            serverCapabilities: {
+              implementationProvider: boolean;
+              workspaceSymbolProvider: boolean;
+            };
+          }
+        >;
+      }
+    ).clients.set(`typescript:${root}`, {
+      name: "typescript",
+      root,
+      status: "running",
+      openFiles: [],
+      serverCapabilities: {
+        implementationProvider: true,
+        workspaceSymbolProvider: true,
+      },
+    });
+
+    const info = introspectCapabilities(manager, []);
+
+    expect(info).toEqual([
+      {
+        name: "typescript",
+        root,
+        fileTypes: ["ts", "tsx"],
+        status: "running",
+        supportedActions: [
+          "diagnostics [optional file]",
+          "implementation(file,line,char)",
+          "workspace_symbols(query)",
+        ],
+        openFiles: [],
+      },
+    ]);
+  });
 });

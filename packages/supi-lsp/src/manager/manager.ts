@@ -28,7 +28,7 @@ import {
   normalizeRelevantPaths,
   shouldIgnoreLspPath,
 } from "../summary.ts";
-import { commandExists } from "../utils.ts";
+import { commandExists, resolveSessionPath } from "../utils.ts";
 import {
   closeFileAcrossClients,
   pruneMissingFilesFromClients,
@@ -84,7 +84,7 @@ export class LspManager {
 
   /** Check whether any configured language server handles the given file's extension. */
   hasServerForExtension(filePath: string): boolean {
-    return getServerForFile(this.config, filePath) !== null;
+    return getServerForFile(this.config, resolveSessionPath(this.cwd, filePath)) !== null;
   }
   // ── Public API ────────────────────────────────────────────────────
   registerDetectedServers(detected: DetectedProjectServer[]): void {
@@ -92,13 +92,14 @@ export class LspManager {
   }
   /** Check whether a file path has an available LSP server for explicit semantic operations. */
   canServeFile(filePath: string): boolean {
-    const match = getServerForFile(this.config, filePath);
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    const match = getServerForFile(this.config, resolvedPath);
     if (!match) return false;
     const [serverName, serverConfig] = match;
     // Mirror getClientForFile's root resolution so the unavailable check stays
     // root-specific. A failed startup in one workspace must not suppress
     // activation for unrelated roots served by the same language server.
-    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, {
+    const root = resolveRootForFile(resolvedPath, serverName, serverConfig.rootMarkers, {
       knownRoots: this.knownRoots,
       cwd: this.cwd,
     });
@@ -132,10 +133,11 @@ export class LspManager {
   }
   /** Get or create an LSP client for the given file. */
   async getClientForFile(filePath: string): Promise<LspClient | null> {
-    const match = getServerForFile(this.config, filePath);
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    const match = getServerForFile(this.config, resolvedPath);
     if (!match) return null;
     const [serverName, serverConfig] = match;
-    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, {
+    const root = resolveRootForFile(resolvedPath, serverName, serverConfig.rootMarkers, {
       knownRoots: this.knownRoots,
       cwd: this.cwd,
     });
@@ -209,10 +211,11 @@ export class LspManager {
 
   /** Find an already-started client for a file without spawning a new server. */
   private getExistingClientForFile(filePath: string): LspClient | null {
-    const match = getServerForFile(this.config, filePath);
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    const match = getServerForFile(this.config, resolvedPath);
     if (!match) return null;
     const [serverName, serverConfig] = match;
-    const root = resolveRootForFile(filePath, serverName, serverConfig.rootMarkers, {
+    const root = resolveRootForFile(resolvedPath, serverName, serverConfig.rootMarkers, {
       knownRoots: this.knownRoots,
       cwd: this.cwd,
     });
@@ -225,7 +228,7 @@ export class LspManager {
     const seen = new Set<string>();
 
     for (const filePath of filePaths) {
-      const resolvedPath = path.resolve(this.cwd, filePath);
+      const resolvedPath = resolveSessionPath(this.cwd, filePath);
       const client = this.getExistingClientForFile(resolvedPath);
       if (!client) continue;
 
@@ -319,7 +322,7 @@ export class LspManager {
     filePath: string,
     maxSeverity: number = 1,
   ): Promise<Diagnostic[]> {
-    const resolvedPath = path.resolve(filePath);
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
     return (
       (await this.syncFileAndGetCascadingDiagnostics(resolvedPath, maxSeverity)).find(
         (entry) => entry.file === resolvedPath,
@@ -330,9 +333,9 @@ export class LspManager {
     filePath: string,
     maxSeverity: number = 1,
   ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>> {
-    const client = await this.getClientForFile(filePath);
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    const client = await this.getClientForFile(resolvedPath);
     if (!client) return [];
-    const resolvedPath = path.resolve(filePath);
     try {
       const { primary, cascade } = await syncClientFileAndGetCascadingDiagnostics(
         client,
@@ -350,7 +353,7 @@ export class LspManager {
   }
   /** Close a file across any active LSP clients and clear its cached diagnostics. */
   closeFile(filePath: string): void {
-    closeFileAcrossClients(this.clients.values(), filePath);
+    closeFileAcrossClients(this.clients.values(), resolveSessionPath(this.cwd, filePath));
   }
   /** Remove any missing files from open-document and diagnostic state. */
   pruneMissingFiles(): string[] {
@@ -568,8 +571,8 @@ export class LspManager {
     );
   }
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
-    const client = await this.getClientForFile(filePath);
-    const resolvedPath = path.resolve(filePath);
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    const client = await this.getClientForFile(resolvedPath);
     if (!client) return null;
     try {
       client.didOpen(resolvedPath, fs.readFileSync(resolvedPath, "utf-8"));

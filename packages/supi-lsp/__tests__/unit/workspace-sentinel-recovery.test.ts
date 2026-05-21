@@ -206,6 +206,25 @@ describe("workspace sentinel recovery", () => {
     ]);
   });
 
+  it("normalizes a leading @ when recovering after a write", async () => {
+    const { handlers, ctx, manager } = await setupExtension();
+
+    await handlers.get("tool_result")?.(
+      {
+        isError: false,
+        toolName: "write",
+        input: { path: "@src/generated/types.d.ts" },
+        content: [],
+      },
+      ctx,
+    );
+
+    expect(manager.clearAllPullResultIds).toHaveBeenCalled();
+    expect(manager.notifyWorkspaceFileChanges).toHaveBeenCalledWith([
+      { uri: "file:///project/src/generated/types.d.ts", type: FileChangeType.Changed },
+    ]);
+  });
+
   it("does not recover after reading a recovery-trigger file", async () => {
     const { handlers, ctx, manager } = await setupExtension();
 

@@ -15,6 +15,7 @@ import {
   normalizeLocations,
 } from "../format.ts";
 import type { SessionLspService } from "../session/service-registry.ts";
+import { resolveSessionPath } from "../utils.ts";
 
 export type LspLookupKind = "hover" | "definition" | "references" | "implementation";
 export type LspRefactorKind = "rename" | "code_actions";
@@ -44,11 +45,6 @@ export interface LspRefactorToolParams {
   line: number;
   character: number;
   newName?: string;
-}
-
-function resolveSessionPath(cwd: string, file: string): string {
-  const normalizedPath = file.startsWith("@") ? file.slice(1) : file;
-  return path.resolve(cwd, normalizedPath);
 }
 
 function validatePositivePosition(line: number, character: number): string | null {

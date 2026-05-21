@@ -27,6 +27,17 @@ export function uriToFile(uri: string): string {
   return filePath;
 }
 
+/**
+ * Resolve a tool-style file path against the active session cwd.
+ *
+ * Built-in pi file tools accept a leading `@` prefix in path arguments, so LSP
+ * helpers strip that prefix as well before resolving relative paths.
+ */
+export function resolveSessionPath(cwd: string, filePath: string): string {
+  const normalizedPath = filePath.startsWith("@") ? filePath.slice(1) : filePath;
+  return path.resolve(cwd, normalizedPath);
+}
+
 // ── Language ID Detection ─────────────────────────────────────────────
 
 const EXT_TO_LANGUAGE: Record<string, string> = {

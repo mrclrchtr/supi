@@ -1,6 +1,6 @@
-import * as path from "node:path";
 import type { Diagnostic, Hover, MarkedString, MarkupContent } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
+import { resolveSessionPath } from "../utils.ts";
 
 const AUGMENT_TIMEOUT_MS = 500;
 
@@ -12,13 +12,13 @@ export async function augmentDiagnostics(
   filePath: string,
   diags: Diagnostic[],
   manager: LspManager,
-  _cwd: string,
+  cwd: string,
 ): Promise<string | null> {
   const firstError = diags.find((d) => d.severity === 1);
   if (!firstError) return null;
 
-  const resolvedPath = path.resolve(filePath);
-  const client = await manager.getClientForFile(filePath);
+  const resolvedPath = resolveSessionPath(cwd, filePath);
+  const client = await manager.getClientForFile(resolvedPath);
   if (!client) return null;
 
   const pos = firstError.range.start;

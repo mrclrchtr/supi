@@ -12,11 +12,11 @@ import { augmentDiagnostics } from "../diagnostics/diagnostic-augmentation.ts";
 import { formatGroupedDiagnostics } from "../diagnostics/diagnostics.ts";
 import { splitSuppressionDiagnostics } from "../diagnostics/suppression-diagnostics.ts";
 import type { LspManager } from "../manager/manager.ts";
+import { resolveSessionPath } from "../utils.ts";
 
 interface LspOverrideState {
   getInlineSeverity(): number;
   getManager(): LspManager | null;
-  getCwd(): string;
   isActive(): boolean;
 }
 
@@ -33,13 +33,12 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
       params: ReadToolInput,
       signal: AbortSignal | undefined,
       onUpdate: AgentToolUpdateCallback | undefined,
-      _ctx: ExtensionContext,
+      ctx: ExtensionContext,
     ) {
-      const cwd = state.getCwd();
-      const originalRead = createReadTool(cwd);
+      const originalRead = createReadTool(ctx.cwd);
       const result = await originalRead.execute(toolCallId, params, signal, onUpdate);
       if (!state.isActive()) return result;
-      await ensureFileOpen(state.getManager(), params.path);
+      await ensureFileOpen(state.getManager(), ctx.cwd, params.path);
       return result;
     },
   });
@@ -52,17 +51,16 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
       params: WriteToolInput,
       signal: AbortSignal | undefined,
       onUpdate: AgentToolUpdateCallback | undefined,
-      _ctx: ExtensionContext,
+      ctx: ExtensionContext,
     ) {
-      const cwd = state.getCwd();
-      const originalWrite = createWriteTool(cwd);
+      const originalWrite = createWriteTool(ctx.cwd);
       const result = await originalWrite.execute(toolCallId, params, signal, onUpdate);
       if (!state.isActive()) return result;
       return appendInlineDiagnostics({
         manager: state.getManager(),
         filePath: params.path,
         inlineSeverity: state.getInlineSeverity(),
-        cwd,
+        cwd: ctx.cwd,
         result,
       });
     },
@@ -76,17 +74,16 @@ export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspOverri
       params: EditToolInput,
       signal: AbortSignal | undefined,
       onUpdate: AgentToolUpdateCallback | undefined,
-      _ctx: ExtensionContext,
+      ctx: ExtensionContext,
     ) {
-      const cwd = state.getCwd();
-      const originalEdit = createEditTool(cwd);
+      const originalEdit = createEditTool(ctx.cwd);
       const result = await originalEdit.execute(toolCallId, params, signal, onUpdate);
       if (!state.isActive()) return result;
       return appendInlineDiagnostics({
         manager: state.getManager(),
         filePath: params.path,
         inlineSeverity: state.getInlineSeverity(),
-        cwd,
+        cwd: ctx.cwd,
         result,
       });
     },
@@ -107,17 +104,18 @@ async function appendInlineDiagnostics<T extends { content: unknown[]; details: 
   if (!options.manager) return options.result;
 
   try {
+    const resolvedFilePath = resolveSessionPath(options.cwd, options.filePath);
     const effectiveSeverity = Math.max(options.inlineSeverity, 2);
     const entries = await options.manager.syncFileAndGetCascadingDiagnostics(
-      options.filePath,
+      resolvedFilePath,
       effectiveSeverity,
     );
     if (entries.length === 0) return options.result;
 
     const primaryDiagnostics =
-      entries.find((entry) => entry.file === options.filePath)?.diagnostics ?? [];
+      entries.find((entry) => entry.file === resolvedFilePath)?.diagnostics ?? [];
     const augmentation = await augmentDiagnostics(
-      options.filePath,
+      resolvedFilePath,
       splitSuppressionDiagnostics(primaryDiagnostics, options.inlineSeverity).regular,
       options.manager,
       options.cwd,
@@ -191,11 +189,15 @@ export function buildInlineDiagnosticsMessage(
   return sections.join("\n\n");
 }
 
-async function ensureFileOpen(manager: LspManager | null, filePath: string): Promise<void> {
+async function ensureFileOpen(
+  manager: LspManager | null,
+  cwd: string,
+  filePath: string,
+): Promise<void> {
   if (!manager) return;
 
   try {
-    await manager.ensureFileOpen(filePath);
+    await manager.ensureFileOpen(resolveSessionPath(cwd, filePath));
   } catch {
     // Never block the agent on LSP errors
   }
