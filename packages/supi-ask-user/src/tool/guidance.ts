@@ -7,7 +7,9 @@ export const promptSnippet = "ask_user — request a focused blocking user decis
 
 export const promptGuidelines = [
   "Use ask_user only when explicit user input is required to proceed safely; do not use ask_user for open-ended interviews or repo facts.",
-  "Keep ask_user forms to 1-4 related questions; prefer one when possible.",
+  "Use ask_user with 1-4 related questions; prefer one when possible.",
   'Use ask_user `choice` for fixed options and ask_user `text` for freeform input; model yes/no as `choice` with `{ value: "yes", label: "Yes" }` and `{ value: "no", label: "No" }`.',
-  "Use ask_user `allowOther` only on single-select `choice`; use ask_user `allowDiscuss` or `allowPartialSubmit` only when actionable; do not call ask_user while another form is in flight.",
+  "Use ask_user `allowOther` only on single-select `choice` questions.",
+  "Use ask_user `allowDiscuss` or `allowPartialSubmit` only when that outcome is actionable.",
+  "Do not call ask_user while another ask_user form is already in flight.",
 ];
