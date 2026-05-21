@@ -64,7 +64,7 @@
     "@commitlint/cli": "21.0.1",
     "@commitlint/config-conventional": "21.0.1",
     "@earendil-works/pi-ai": "0.74.1",
-    "@earendil-works/pi-coding-agent": "0.74.1",
+    "@earendil-works/pi-coding-agent": "0.75.1",
     "@earendil-works/pi-tui": "0.74.0",
     "@types/node": "25.8.0",
     "clipboardy": "5.3.1",
