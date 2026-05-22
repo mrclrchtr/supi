@@ -3,6 +3,7 @@ import { Container, type SelectItem, SelectList, Spacer, Text } from "@earendil-
 import { getLocalBranches, getRecentCommits } from "../git.ts";
 import { getSelectableReviewModels } from "../model.ts";
 import type { ReviewModelSelection, ReviewPlan, ReviewTargetSpec } from "../types.ts";
+import type { ReviewTheme } from "./theme-type.ts";
 
 interface SelectFromListOptions<T> {
   items: SelectItem[];
@@ -152,11 +153,7 @@ export function previewReviewPlan(ctx: ExtensionContext, plan: ReviewPlan): Prom
 }
 
 /** Build the review plan preview container with all styled sections. */
-function buildReviewPlanContainer(
-  // biome-ignore lint/suspicious/noExplicitAny: Theme type not publicly re-exported from pi; only called from ctx.ui.custom callback
-  theme: any,
-  plan: ReviewPlan,
-): Container {
+function buildReviewPlanContainer(theme: ReviewTheme, plan: ReviewPlan): Container {
   const { model, snapshot, brief, packet } = plan;
   const container = new Container();
 
