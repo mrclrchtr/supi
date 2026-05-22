@@ -20,7 +20,7 @@ function getProjectConfigPath(cwd: string): string {
   return path.join(cwd, PROJECT_CONFIG_DIR, CONFIG_FILE);
 }
 
-function readJsonFile(filePath: string): Record<string, unknown> | null {
+export function readJsonFile(filePath: string): Record<string, unknown> | null {
   let content: string;
   try {
     content = fs.readFileSync(filePath, "utf-8");

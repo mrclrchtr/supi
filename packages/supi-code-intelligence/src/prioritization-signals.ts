@@ -1,5 +1,5 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
+import { readJsonFile } from "@mrclrchtr/supi-core/api";
 import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 
 export interface PrioritySignalsSummary {
@@ -106,22 +106,18 @@ function loadDiagnostics(
 
 function loadCoverageSummary(cwd: string): Map<string, number> {
   const coveragePath = path.join(cwd, "coverage", "coverage-summary.json");
-  if (!fs.existsSync(coveragePath)) return new Map();
+  const parsed = readJsonFile(coveragePath);
+  if (!parsed) return new Map();
 
-  try {
-    const parsed = JSON.parse(fs.readFileSync(coveragePath, "utf-8")) as Record<string, unknown>;
-    const map = new Map<string, number>();
-    for (const [file, value] of Object.entries(parsed)) {
-      if (file === "total" || typeof value !== "object" || value === null) continue;
-      const linesPct = getPct(value, "lines");
-      const statementsPct = getPct(value, "statements");
-      const pct = Math.min(linesPct ?? 100, statementsPct ?? 100);
-      map.set(path.resolve(cwd, file), pct);
-    }
-    return map;
-  } catch {
-    return new Map();
+  const map = new Map<string, number>();
+  for (const [file, value] of Object.entries(parsed)) {
+    if (file === "total" || typeof value !== "object" || value === null) continue;
+    const linesPct = getPct(value, "lines");
+    const statementsPct = getPct(value, "statements");
+    const pct = Math.min(linesPct ?? 100, statementsPct ?? 100);
+    map.set(path.resolve(cwd, file), pct);
   }
+  return map;
 }
 
 function loadUnusedFiles(cwd: string): Set<string> {
@@ -157,16 +153,7 @@ function loadUnusedExports(cwd: string): Array<{ file: string; name: string }> {
 }
 
 function loadKnipJson(cwd: string): Record<string, unknown> | null {
-  const knipPath = path.join(cwd, "knip.json");
-  if (!fs.existsSync(knipPath)) return null;
-  try {
-    const parsed = JSON.parse(fs.readFileSync(knipPath, "utf-8"));
-    return typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : null;
-  } catch {
-    return null;
-  }
+  return readJsonFile(path.join(cwd, "knip.json"));
 }
 
 function getPct(value: object, key: string): number | null {

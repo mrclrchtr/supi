@@ -7,12 +7,13 @@
  * Stashes are persisted to ~/.pi/agent/supi/prompt-stash.json so they survive
  * pi restarts. On I/O errors the stash falls back to in-memory-only operation.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { DynamicBorder } from "@earendil-works/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
+import { readJsonFile } from "@mrclrchtr/supi-core/api";
 import { copyToClipboard } from "./clipboard.ts";
 
 /** In-memory stash entry. */
@@ -49,34 +50,9 @@ function parseStashEntries(raw: unknown): Map<string, Stash> | null {
  * or cannot be parsed — the stash degrades gracefully to in-memory-only.
  */
 function loadStashesFromDisk(): Map<string, Stash> {
-  let content: string;
-  try {
-    content = readFileSync(getStashFilePath(), "utf-8");
-  } catch (err) {
-    // ENOENT on first run is expected — warn on all other errors
-    if ((err as NodeJS.ErrnoException)?.code !== "ENOENT") {
-      // biome-ignore lint/suspicious/noConsole: deliberate degradation warning
-      console.warn("[supi-extras] Failed to load prompt stash from disk, starting fresh:", err);
-    }
-    return new Map();
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch (err) {
-    // biome-ignore lint/suspicious/noConsole: deliberate degradation warning
-    console.warn("[supi-extras] Failed to parse prompt stash file, starting fresh:", err);
-    return new Map();
-  }
-
-  const root =
-    parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : null;
-  if (!root) return new Map();
-
-  return parseStashEntries(root.stashes) ?? new Map();
+  const parsed = readJsonFile(getStashFilePath());
+  if (!parsed) return new Map();
+  return parseStashEntries(parsed.stashes) ?? new Map();
 }
 
 /**

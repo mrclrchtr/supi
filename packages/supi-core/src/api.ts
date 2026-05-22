@@ -6,6 +6,7 @@ export type { SupiConfigLocation, SupiConfigOptions } from "./config/config.ts";
 export {
   loadSupiConfig,
   loadSupiConfigForScope,
+  readJsonFile,
   removeSupiConfigKey,
   writeSupiConfig,
 } from "./config/config.ts";
