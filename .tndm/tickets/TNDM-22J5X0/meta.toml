@@ -1,0 +1,11 @@
+schema_version = 1
+id = "TNDM-22J5X0"
+title = "Improve SuPi-LSP stale diagnostic recovery after workspace changes"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:brainstorm"]
+
+[[documents]]
+name = "content"
+path = "content.md"
