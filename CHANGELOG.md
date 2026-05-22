@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/mrclrchtr/supi/compare/v1.5.0...v1.6.0) (2026-05-22)
+
+
+### Features
+
+* **supi-review:** show reviewer prompt preview in colored confirmation dialog ([d6e4edd](https://github.com/mrclrchtr/supi/commit/d6e4edd8511fd57c39670dc2cec5ffa512119c76))
+
+
+### Bug Fixes
+
+* **ci:** use GitHub App token for release-please ([4d61d69](https://github.com/mrclrchtr/supi/commit/4d61d6955077c8d64dee20a7507303b8e2e64d5d))
+
 ## [1.5.0](https://github.com/mrclrchtr/supi/compare/v1.4.0...v1.5.0) (2026-05-21)
 
 
