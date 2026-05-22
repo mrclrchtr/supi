@@ -1,5 +1,5 @@
 import { DynamicBorder, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
+import { Container, type SelectItem, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
 import { getLocalBranches, getRecentCommits } from "../git.ts";
 import { getSelectableReviewModels } from "../model.ts";
 import type { ReviewModelSelection, ReviewPlan, ReviewTargetSpec } from "../types.ts";
@@ -132,9 +132,142 @@ export async function collectReviewNote(ctx: ExtensionContext): Promise<string |
   return value.trim();
 }
 
-/** Show the synthesized brief and packet coverage, then ask for approval. */
+/** Show the synthesized brief, the actual reviewer prompt preview, and ask for approval. */
 export function previewReviewPlan(ctx: ExtensionContext, plan: ReviewPlan): Promise<boolean> {
-  return ctx.ui.confirm("Run generated review?", formatPlanPreview(plan));
+  return ctx.ui.custom<boolean>((_tui, theme, _kb, done) => {
+    const container = buildReviewPlanContainer(theme, plan);
+
+    return {
+      render: (width) => container.render(width),
+      invalidate: () => container.invalidate(),
+      handleInput: (data) => {
+        if (data === "\r" || data === "\n" || data === "y" || data === "Y") {
+          done(true);
+        } else if (data === "\x1b" || data === "n" || data === "N") {
+          done(false);
+        }
+      },
+    };
+  });
+}
+
+/** Build the review plan preview container with all styled sections. */
+function buildReviewPlanContainer(
+  // biome-ignore lint/suspicious/noExplicitAny: Theme type not publicly re-exported from pi; only called from ctx.ui.custom callback
+  theme: any,
+  plan: ReviewPlan,
+): Container {
+  const { model, snapshot, brief, packet } = plan;
+  const container = new Container();
+
+  const accent = (s: string) => theme.fg("accent", s);
+  const dim = (s: string) => theme.fg("dim", s);
+  const bold = (s: string) => theme.bold(s);
+
+  // ── Top border ──
+  container.addChild(new DynamicBorder((s: string) => accent(s)));
+  container.addChild(new Spacer(1));
+
+  // ── Title ──
+  container.addChild(new Text(accent(bold("  Review Plan")), 1, 0));
+  container.addChild(new Spacer(1));
+
+  // ── Metadata section ──
+  const kind = snapshot.target.kind;
+  const targetLabel =
+    kind === "working-tree"
+      ? "Working tree"
+      : kind === "branch"
+        ? `${snapshot.target.base} \u2190 current`
+        : `commit ${snapshot.target.sha.slice(0, 7)}`;
+
+  container.addChild(new Text(accent(bold("  \u2500\u2500 Metadata \u2500\u2500")), 1, 0));
+  container.addChild(
+    new Text(
+      [
+        `  ${dim("Model:")}   ${model.canonicalId}`,
+        `  ${dim("Target:")}  ${snapshot.title}`,
+        `  ${dim("Kind:")}    ${targetLabel}`,
+        `  ${dim("Files:")}   ${snapshot.changedFiles.length} changed  ${theme.fg("toolDiffAdded", `+${snapshot.stats.additions}`)}/${theme.fg("toolDiffRemoved", `-${snapshot.stats.deletions}`)}`,
+      ].join("\n"),
+      1,
+      0,
+    ),
+  );
+  container.addChild(new Spacer(1));
+
+  // ── Brief section ──
+  container.addChild(
+    new Text(accent(bold("  \u2500\u2500 Session-derived Brief \u2500\u2500")), 1, 0),
+  );
+  const briefParts = [
+    `  ${dim("Summary:")}  ${brief.summary}`,
+    `  ${dim("Outcome:")}  ${brief.intendedOutcome}`,
+  ];
+  if (brief.constraints.length > 0) {
+    briefParts.push(`  ${dim("Constraints:")}  ${brief.constraints.join("; ")}`);
+  }
+  if (brief.focusAreas.length > 0) {
+    briefParts.push(`  ${dim("Focus:")}  ${brief.focusAreas.join("; ")}`);
+  }
+  if (brief.riskyFiles.length > 0) {
+    briefParts.push(`  ${dim("Risky:")}  ${brief.riskyFiles.join(", ")}`);
+  }
+  if (brief.unresolvedQuestions.length > 0) {
+    briefParts.push(`  ${dim("Questions:")}  ${brief.unresolvedQuestions.join("; ")}`);
+  }
+  container.addChild(new Text(briefParts.join("\n"), 1, 0));
+  container.addChild(new Spacer(1));
+
+  // ── Reviewer Prompt preview ──
+  const totalChars = packet.prompt.length;
+  const maxPreview = 2000;
+  const previewText =
+    totalChars > maxPreview
+      ? `${packet.prompt.slice(0, maxPreview)}\n\n${theme.fg("warning", `[Preview truncated \u2014 showing ${maxPreview.toLocaleString()} of ${totalChars.toLocaleString()} total chars]`)}`
+      : packet.prompt;
+
+  container.addChild(
+    new Text(
+      accent(
+        bold(`  \u2500\u2500 Reviewer Prompt (${totalChars.toLocaleString()} chars) \u2500\u2500`),
+      ),
+      1,
+      0,
+    ),
+  );
+  container.addChild(new Text(previewText, 1, 0));
+  container.addChild(new Spacer(1));
+
+  // ── File coverage line ──
+  container.addChild(
+    new Text(
+      theme.fg(
+        "dim",
+        `  Included diffs: ${packet.includedFiles.length} file${packet.includedFiles.length === 1 ? "" : "s"}` +
+          `  \u2022  Omitted: ${packet.omittedFiles.length} file${packet.omittedFiles.length === 1 ? "" : "s"}` +
+          `  \u2022  Budget: ${(packet.charBudget / 1000).toFixed(0)}K chars`,
+      ),
+      1,
+      0,
+    ),
+  );
+  container.addChild(new Spacer(1));
+
+  // ── Confirm / Cancel hints ──
+  container.addChild(
+    new Text(
+      `  ${dim("Enter")} ${theme.fg("success", "Run review")}  ${dim("\u2022")}  ${dim("Esc")} ${theme.fg("muted", "Cancel")}  ${dim("\u2022 y/n")}`,
+      1,
+      0,
+    ),
+  );
+  container.addChild(new Spacer(1));
+
+  // ── Bottom border ──
+  container.addChild(new DynamicBorder((s: string) => accent(s)));
+
+  return container;
 }
 
 export async function selectBranch(ctx: ExtensionContext): Promise<string | undefined> {
@@ -169,48 +302,4 @@ export async function selectCommit(ctx: ExtensionContext): Promise<string | unde
     maxHeight: 15,
     onSelect: (item) => item.value,
   });
-}
-
-function formatPlanPreview(plan: ReviewPlan): string {
-  const { model, snapshot, brief } = plan;
-  const parts: string[] = [
-    `Model: ${model.canonicalId}`,
-    `Snapshot: ${snapshot.title}`,
-    `Files changed: ${snapshot.changedFiles.length}`,
-    `Inline diff files: ${plan.packet.includedFiles.length}`,
-    `Omitted files: ${plan.packet.omittedFiles.length}`,
-    "",
-    "Summary:",
-    brief.summary,
-    "",
-    "Intended outcome:",
-    brief.intendedOutcome,
-  ];
-
-  if (brief.constraints.length > 0) {
-    parts.push("", "Constraints:", ...brief.constraints.map((item) => `- ${item}`));
-  }
-  if (brief.focusAreas.length > 0) {
-    parts.push("", "Focus areas:", ...brief.focusAreas.map((item) => `- ${item}`));
-  }
-  if (brief.riskyFiles.length > 0) {
-    parts.push("", "Risky files:", ...brief.riskyFiles.map((item) => `- ${item}`));
-  }
-  if (brief.unresolvedQuestions.length > 0) {
-    parts.push(
-      "",
-      "Unresolved questions:",
-      ...brief.unresolvedQuestions.map((item) => `- ${item}`),
-    );
-  }
-  if (plan.packet.omittedFiles.length > 0) {
-    parts.push(
-      "",
-      "Prompt coverage:",
-      `Included: ${plan.packet.includedFiles.join(", ") || "none"}`,
-      `Omitted: ${plan.packet.omittedFiles.join(", ")}`,
-    );
-  }
-
-  return parts.join("\n");
 }
