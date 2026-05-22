@@ -4,9 +4,9 @@
 
 import * as path from "node:path";
 import { withStructuralSession } from "../providers/structural-provider.ts";
+import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
-import type { ActionParams } from "../tool-actions.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 export async function executeCalleesAction(

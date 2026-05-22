@@ -2,7 +2,22 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const STATUS_LOG_PREFIX = "SUPI_STATUS ";
 const STATUS_LOG_ENV = "SUPI_LOG_STATUS";
-const EXPECTED_SUPI_TOOLS = ["ask_user", "lsp", "tree_sitter", "code_intel", "supi_debug"];
+const EXPECTED_SUPI_TOOLS = [
+  "ask_user",
+  "lsp_lookup",
+  "lsp_document_symbols",
+  "lsp_workspace_symbols",
+  "lsp_diagnostics",
+  "lsp_refactor",
+  "lsp_recover",
+  "tree_sitter",
+  "code_brief",
+  "code_map",
+  "code_relations",
+  "code_affected",
+  "code_pattern",
+  "supi_debug",
+];
 const EXPECTED_SUPI_COMMANDS = [
   "supi-settings",
   "supi-debug",

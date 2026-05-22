@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { ActionParams } from "../../src/tool-actions.ts";
-import { executeAction } from "../../src/tool-actions.ts";
+import type { ActionParams } from "../helpers/execute-action.ts";
+import { executeAction } from "../helpers/execute-action.ts";
 
 let tmpDir: string;
 
@@ -19,7 +19,7 @@ function writeSource(fileName: string, source: string): void {
   writeFileSync(path.join(tmpDir, fileName), source, "utf-8");
 }
 
-describe("code_intel callees action", () => {
+describe("code_relations callees behavior", () => {
   it("rejects callees without file", async () => {
     const result = await executeAction({ action: "callees" } as unknown as ActionParams, {
       cwd: tmpDir,

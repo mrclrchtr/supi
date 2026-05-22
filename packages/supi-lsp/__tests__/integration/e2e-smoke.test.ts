@@ -167,6 +167,23 @@ function createTempProjectDir(): string {
   return dir;
 }
 
+const CODE_INTELLIGENCE_TOOL_NAMES = [
+  "code_brief",
+  "code_map",
+  "code_relations",
+  "code_affected",
+  "code_pattern",
+] as const;
+
+const LSP_TOOL_NAMES = [
+  "lsp_lookup",
+  "lsp_document_symbols",
+  "lsp_workspace_symbols",
+  "lsp_diagnostics",
+  "lsp_refactor",
+  "lsp_recover",
+] as const;
+
 // ── Test Suite ────────────────────────────────────────────────────────
 
 describe("SuPi e2e smoke – extension load", () => {
@@ -196,26 +213,25 @@ describe("SuPi e2e smoke – extension load", () => {
 });
 
 describe("SuPi e2e smoke – tool registration", () => {
-  it("registers the expert LSP toolset plus tree_sitter and code_intel", () => {
+  it("registers the expert LSP toolset plus tree_sitter and the focused code-intelligence tools", () => {
     const pi = createPiMock();
     lspExtension(pi);
     treeSitterExtension(pi);
     codeIntelligenceExtension(pi);
 
     const toolNames = pi.tools.map((t) => t.name);
-    expect(toolNames).toContain("lsp_lookup");
-    expect(toolNames).toContain("lsp_document_symbols");
-    expect(toolNames).toContain("lsp_workspace_symbols");
-    expect(toolNames).toContain("lsp_diagnostics");
-    expect(toolNames).toContain("lsp_refactor");
-    expect(toolNames).toContain("lsp_recover");
+    for (const toolName of LSP_TOOL_NAMES) {
+      expect(toolNames).toContain(toolName);
+    }
+    for (const toolName of CODE_INTELLIGENCE_TOOL_NAMES) {
+      expect(toolNames).toContain(toolName);
+    }
     expect(toolNames).toContain("tree_sitter");
-    expect(toolNames).toContain("code_intel");
     // LSP also registers read/write/edit overrides for inline diagnostics
     expect(toolNames).toContain("read");
     expect(toolNames).toContain("write");
     expect(toolNames).toContain("edit");
-    expect(pi.tools).toHaveLength(11);
+    expect(pi.tools).toHaveLength(15);
   });
 
   it("each tool has execute function, description, and parameters", () => {
@@ -270,20 +286,36 @@ describe("SuPi e2e smoke – tool registration", () => {
     expect(desc).toContain("supported files");
   });
 
-  it("code_intel tool has action enum with all expected actions", () => {
+  it("focused code-intelligence tools expose split descriptions and parameter schemas", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi);
-    const ciTool = pi.tools.find((t) => t.name === "code_intel");
-    expect(ciTool).toBeDefined();
 
-    const desc = ciTool?.description;
-    expect(desc).toContain("brief");
-    expect(desc).toContain("callers");
-    expect(desc).toContain("callees");
-    expect(desc).toContain("implementations");
-    expect(desc).toContain("affected");
-    expect(desc).toContain("pattern");
-    expect(desc).toContain("index");
+    const briefTool = pi.tools.find((t) => t.name === "code_brief");
+    const mapTool = pi.tools.find((t) => t.name === "code_map");
+    const relationsTool = pi.tools.find((t) => t.name === "code_relations");
+    const affectedTool = pi.tools.find((t) => t.name === "code_affected");
+    const patternTool = pi.tools.find((t) => t.name === "code_pattern");
+
+    expect(briefTool?.description).toContain("interpretive orientation");
+    expect(mapTool?.description).toContain("factual inventory");
+    expect(relationsTool?.description).toContain("callers, callees, or implementations");
+    expect(affectedTool?.description).toContain("blast radius");
+    expect(patternTool?.description).toContain("literal, regex, or structured search");
+
+    expect(Check(briefTool?.parameters as object, { path: "src" })).toBe(true);
+    expect(Check(mapTool?.parameters as object, { path: "src" })).toBe(true);
+    expect(Check(mapTool?.parameters as object, { file: "src/index.ts" })).toBe(false);
+    expect(
+      Check(relationsTool?.parameters as object, {
+        kind: "callers",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+      }),
+    ).toBe(true);
+    expect(Check(affectedTool?.parameters as object, { symbol: "Widget" })).toBe(true);
+    expect(Check(patternTool?.parameters as object, { pattern: "Widget" })).toBe(true);
+    expect(Check(patternTool?.parameters as object, {})).toBe(false);
   });
 
   it("each SuPi-specific tool has prompt guidelines and snippet", () => {
@@ -292,20 +324,12 @@ describe("SuPi e2e smoke – tool registration", () => {
     treeSitterExtension(pi);
     codeIntelligenceExtension(pi);
 
-    // The expert LSP tools, tree_sitter, and code_intel are registered via pi.registerTool with full metadata.
-    // The read/write/edit overrides come from createReadTool etc. and are AgentTools
-    // which wrap ToolDefinitions but strip promptGuidelines/promptSnippet.
+    // The expert LSP tools, tree_sitter, and focused code-intelligence tools are
+    // registered via pi.registerTool with full metadata. The read/write/edit overrides
+    // come from createReadTool etc. and are AgentTools which wrap ToolDefinitions but
+    // strip promptGuidelines/promptSnippet.
     const supiTools = pi.tools.filter((t) =>
-      [
-        "lsp_lookup",
-        "lsp_document_symbols",
-        "lsp_workspace_symbols",
-        "lsp_diagnostics",
-        "lsp_refactor",
-        "lsp_recover",
-        "tree_sitter",
-        "code_intel",
-      ].includes(t.name),
+      [...LSP_TOOL_NAMES, "tree_sitter", ...CODE_INTELLIGENCE_TOOL_NAMES].includes(t.name),
     );
     for (const tool of supiTools) {
       expect(tool.promptGuidelines).toBeDefined();
@@ -458,7 +482,7 @@ describe("SuPi e2e smoke – session lifecycle (all three extensions)", () => {
     expect(await safeEmit("session_shutdown")).toBeUndefined();
   });
 
-  it("code_intel registers before_agent_start handler", () => {
+  it("code-intelligence registers before_agent_start handler", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi);
     expect(pi.handlers.has("before_agent_start")).toBe(true);
@@ -471,7 +495,7 @@ describe("SuPi e2e smoke – session lifecycle (all three extensions)", () => {
   });
 });
 
-describe("SuPi e2e smoke – code-intel overview injection", () => {
+describe("SuPi e2e smoke – code-intelligence overview injection", () => {
   let tmpDir: string;
 
   afterEach(() => {
@@ -528,7 +552,7 @@ describe("SuPi e2e smoke – code-intel overview injection", () => {
     expect(overviewMsg2?.content).toBeDefined();
     expect(overviewMsg2?.content!).toContain("## Modules");
     expect(overviewMsg2?.content!).toContain("(leaf)");
-    expect(overviewMsg2?.content!).toContain("code_intel brief");
+    expect(overviewMsg2?.content!).toContain("code_brief");
   });
 
   it("scans session branch for existing overview to prevent duplicate on reload/resume", async () => {
@@ -808,53 +832,55 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
   });
 });
 
-describe("SuPi e2e smoke – code_intel tool availability", () => {
+describe("SuPi e2e smoke – focused code-intelligence tool availability", () => {
   let tmpDir: string;
 
   afterEach(() => {
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("code_intel tool executes brief action on project", async () => {
+  it("code_map executes on a project directory", async () => {
     tmpDir = createTempProjectDir();
     const pi = createPiMock();
     codeIntelligenceExtension(pi);
 
-    const tool = pi.tools.find((t) => t.name === "code_intel")!;
-    const result = await tool.execute("test-id", { action: "index" }, undefined, () => {}, {
+    const tool = pi.tools.find((t) => t.name === "code_map")!;
+    const result = await tool.execute("test-id", {}, undefined, () => {}, {
       cwd: tmpDir,
     });
 
     expect(result).toBeDefined();
     expect(result.content).toBeDefined();
     const text = result.content[0].text;
-    expect(text).toContain("Project Map");
-    expect(text).toContain(".ts");
+    expect(text).toContain("Code Map");
+    expect(text).toContain("TypeScript");
   });
 
-  it("code_intel tool validates missing action parameter", async () => {
+  it("code_pattern validates a missing pattern parameter", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi);
 
-    const tool = pi.tools.find((t) => t.name === "code_intel")!;
+    const tool = pi.tools.find((t) => t.name === "code_pattern")!;
     const result = await tool.execute("test-id", {}, undefined, () => {}, { cwd: "/tmp" });
 
     expect(result).toBeDefined();
     const text = result.content[0].text;
-    expect(text).toContain("Unknown action");
+    expect(text).toContain("pattern");
+    expect(text).toContain("requires");
   });
 
-  it("code_intel tool rejects unknown action", async () => {
+  it("code_relations surfaces target-resolution errors with the split parameter shape", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi);
 
-    const tool = pi.tools.find((t) => t.name === "code_intel")!;
-    const result = await tool.execute("test-id", { action: "bogus" }, undefined, () => {}, {
+    const tool = pi.tools.find((t) => t.name === "code_relations")!;
+    const result = await tool.execute("test-id", { kind: "callers" }, undefined, () => {}, {
       cwd: "/tmp",
     });
 
     const text = result.content[0].text;
-    expect(text).toContain("Unknown action");
+    expect(text).toContain("anchored coordinates");
+    expect(text).not.toContain("Unknown action");
   });
 });
 
@@ -874,7 +900,11 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     codeIntelligenceExtension(pi);
 
     expect(pi.tools.map((t) => t.name).sort()).toEqual([
-      "code_intel",
+      "code_affected",
+      "code_brief",
+      "code_map",
+      "code_pattern",
+      "code_relations",
       "edit",
       "lsp_diagnostics",
       "lsp_document_symbols",
@@ -919,11 +949,11 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     );
     expect(tsImportResult.content[0].text).toContain("No imports");
 
-    const ciTool = pi.tools.find((t) => t.name === "code_intel")!;
-    const ciResult = await ciTool.execute("test-id", { action: "index" }, undefined, () => {}, {
+    const codeMapTool = pi.tools.find((t) => t.name === "code_map")!;
+    const codeMapResult = await codeMapTool.execute("test-id", {}, undefined, () => {}, {
       cwd: tmpDir,
     });
-    expect(ciResult.content[0].text).toContain("Project Map");
+    expect(codeMapResult.content[0].text).toContain("Code Map");
 
     let shutdownError: Error | undefined;
     try {

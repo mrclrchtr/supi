@@ -8,7 +8,7 @@ import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import { type Position, type SessionLspService, toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { getSemanticService, getSemanticServiceState } from "./providers/semantic-provider.ts";
 import { withStructuralSession } from "./providers/structural-provider.ts";
-import { escapeRegex, normalizePath } from "./search-helpers.ts";
+import { normalizePath } from "./search-helpers.ts";
 import { highestConfidence } from "./semantic-action-helpers.ts";
 import type { ConfidenceMode, DisambiguationCandidate } from "./types.ts";
 
@@ -64,7 +64,7 @@ export function resolveAnchoredTarget(
   if (isBinaryFile(resolvedFile)) {
     return {
       kind: "error",
-      message: `File type not supported for semantic analysis: \`${file}\`. Try \`code_intel pattern\` for text search.`,
+      message: `File type not supported for semantic analysis: \`${file}\`. Use \`code_pattern\` for explicit text search.`,
     };
   }
 
@@ -101,7 +101,7 @@ export async function resolveFileTargetGroup(
   if (isBinaryFile(resolvedFile)) {
     return {
       kind: "error",
-      message: `File type not supported for semantic analysis: \`${file}\`. Try \`code_intel pattern\` for text search.`,
+      message: `File type not supported for semantic analysis: \`${file}\`. Use \`code_pattern\` for explicit text search.`,
     };
   }
 
@@ -132,7 +132,7 @@ export async function resolveFileTargetGroup(
 
 /**
  * Resolve a target from symbol discovery — finds matching declarations.
- * Uses LSP workspace symbols when available, falls back to Tree-sitter/text search.
+ * Symbol discovery is semantic-only; it does not fall back to text search.
  */
 export async function resolveSymbolTarget(
   symbol: string,
@@ -145,12 +145,16 @@ export async function resolveSymbolTarget(
 ): Promise<TargetResolutionResult> {
   const lspState = await getSemanticServiceState(cwd, { waitForReady: true });
 
-  if (lspState.kind === "ready") {
-    return resolveSymbolViaLsp(symbol, cwd, lspState.service, options);
+  if (lspState.kind !== "ready") {
+    return {
+      kind: "error",
+      message:
+        `Symbol discovery for \`${symbol}\` requires active LSP. ` +
+        "Use `file` + coordinates, or enable LSP and retry.",
+    };
   }
 
-  // Structural fallback via text search
-  return resolveSymbolViaSearch(symbol, cwd, options);
+  return resolveSymbolViaLsp(symbol, cwd, lspState.service, options);
 }
 
 async function resolveSymbolViaLsp(
@@ -233,95 +237,6 @@ async function resolveSymbolViaLsp(
     candidates: disambiguated,
     omittedCount: Math.max(0, candidates.length - MAX_CANDIDATES),
   };
-}
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: ripgrep-based symbol discovery with pattern parsing
-async function resolveSymbolViaSearch(
-  symbol: string,
-  cwd: string,
-  options?: { path?: string; kind?: string; exportedOnly?: boolean },
-): Promise<TargetResolutionResult> {
-  const { execFileSync } = await import("node:child_process");
-  const scopePath = options?.path ? normalizePath(options.path, cwd) : cwd;
-
-  try {
-    const exportOnly = options?.exportedOnly;
-    const pattern = exportOnly
-      ? `export\\s+(function|class|interface|type|const|let|var)\\s+${escapeRegex(symbol)}\\b`
-      : `(function|class|interface|type|const|let|var|export)\\s+${escapeRegex(symbol)}\\b`;
-    let output: string;
-    try {
-      output = execFileSync("rg", ["--json", "-m", "10", "-e", pattern, scopePath], {
-        encoding: "utf-8",
-        cwd,
-        timeout: 5000,
-        stdio: ["pipe", "pipe", "pipe"],
-      });
-    } catch (err: unknown) {
-      // rg exits 1 for no-match; capture stdout if available
-      const e = err as { status?: number; stdout?: string };
-      output = e.stdout ?? "";
-    }
-
-    const matches: Array<{ file: string; line: number; text: string }> = [];
-    for (const line of output.split("\n")) {
-      if (!line.trim()) continue;
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed.type === "match" && parsed.data) {
-          const filePath = parsed.data.path?.text;
-          const lineNum = parsed.data.line_number;
-          const text = parsed.data.lines?.text?.trim();
-          if (filePath && lineNum) {
-            matches.push({ file: filePath, line: lineNum, text: text ?? "" });
-          }
-        }
-      } catch {
-        // Skip malformed JSON lines
-      }
-    }
-
-    if (matches.length === 0) {
-      return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
-    }
-
-    if (matches.length === 1) {
-      const m = matches[0];
-      const resolvedFile = path.resolve(cwd, m.file);
-      return {
-        kind: "resolved",
-        target: {
-          file: resolvedFile,
-          position: { line: m.line - 1, character: 0 },
-          displayLine: m.line,
-          displayCharacter: 1,
-          name: symbol,
-          kind: null,
-          confidence: "heuristic",
-        },
-      };
-    }
-
-    // Multiple matches — disambiguation
-    const disambiguated: DisambiguationCandidate[] = matches.slice(0, 8).map((m, idx) => ({
-      name: symbol,
-      kind: null,
-      container: null,
-      file: m.file,
-      line: m.line,
-      character: 1,
-      reason: m.text.slice(0, 80),
-      rank: idx + 1,
-    }));
-
-    return {
-      kind: "disambiguation",
-      candidates: disambiguated,
-      omittedCount: Math.max(0, matches.length - 8),
-    };
-  } catch {
-    return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
-  }
 }
 
 async function resolveFileTargetsViaLsp(

@@ -8,22 +8,15 @@ import {
   summarizePrioritySignalsForFiles,
 } from "../prioritization-signals.ts";
 import { getSemanticService } from "../providers/semantic-provider.ts";
+import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
-import {
-  escapeRegex,
-  filterOutDeclaration,
-  isInProjectPath,
-  normalizePath,
-  runRipgrep,
-  uriToFile,
-} from "../search-helpers.ts";
+import { filterOutDeclaration, isInProjectPath, uriToFile } from "../search-helpers.ts";
 import {
   dedupeFileLineRefs,
   highestConfidence,
   isResolvedTargetGroup,
 } from "../semantic-action-helpers.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
-import type { ActionParams } from "../tool-actions.ts";
 import type { AffectedDetails, CodeIntelResult, ConfidenceMode } from "../types.ts";
 
 export async function executeAffectedAction(
@@ -89,7 +82,15 @@ async function executeSingleAffected(
     cwd,
     analysis.affectedFiles.size > 0 ? [...analysis.affectedFiles] : [target.file],
   );
-  const content = formatAffectedOutput(symbolName, refs, analysis, params, prioritySignals);
+  const content = formatAffectedOutput(
+    symbolName,
+    refs,
+    analysis,
+    params,
+    prioritySignals,
+    target,
+    cwd,
+  );
   const details: AffectedDetails = {
     confidence: analysis.confidence,
     directCount: refs.refs.length,
@@ -98,10 +99,7 @@ async function executeSingleAffected(
     checkNext: analysis.checkNext,
     likelyTests: analysis.likelyTests,
     omittedCount: computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, params),
-    nextQueries: [
-      "`code_intel brief` on the most-affected module for deeper context",
-      `\`code_intel callers\` with \`symbol: "${symbolName}"\` for grouped call-site detail`,
-    ],
+    nextQueries: buildAffectedNextQueries(target, symbolName, cwd),
     prioritySignals,
   };
   return { content, details: { type: "affected" as const, data: details } };
@@ -160,7 +158,7 @@ async function executeFileLevelAffected(
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
   lines.push("## Next");
-  lines.push("- `code_intel brief` on the most-affected module for deeper context");
+  lines.push("- `code_brief` on the most-affected module for deeper context");
   lines.push("- Use `file` + coordinates to inspect one exported target precisely");
   lines.push("");
 
@@ -173,7 +171,7 @@ async function executeFileLevelAffected(
     likelyTests: analysis.likelyTests,
     omittedCount: computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, params),
     nextQueries: [
-      "`code_intel brief` on the most-affected module for deeper context",
+      "`code_brief` on the most-affected module for deeper context",
       "Use `file` + coordinates to inspect one exported target precisely",
     ],
     prioritySignals,
@@ -182,45 +180,40 @@ async function executeFileLevelAffected(
   return { content: lines.join("\n"), details: { type: "affected" as const, data: details } };
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: multi-source reference gathering with fallback logic
 async function gatherReferences(
   target: ResolvedTarget,
-  params: ActionParams,
+  _params: ActionParams,
   cwd: string,
 ): Promise<{ refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number }> {
   const lsp = await getSemanticService(cwd, { waitForReady: true });
+  if (!lsp) {
+    return { refs: [], confidence: "unavailable", externalCount: 0 };
+  }
+
+  const lspRefs = await lsp.references(target.file, target.position);
+  if (lspRefs === null) {
+    return { refs: [], confidence: "unavailable", externalCount: 0 };
+  }
+
   const refs: GatheredRef[] = [];
   let externalCount = 0;
+  const filtered = filterOutDeclaration(lspRefs, target.file, target.position);
 
-  if (lsp) {
-    const lspRefs = await lsp.references(target.file, target.position);
-    if (lspRefs && lspRefs.length > 0) {
-      const filtered = filterOutDeclaration(lspRefs, target.file, target.position);
-      for (const ref of filtered) {
-        const filePath = uriToFile(ref.uri);
-        if (isInProjectPath(filePath, cwd)) {
-          refs.push({ file: path.relative(cwd, filePath), line: ref.range.start.line + 1 });
-        } else {
-          externalCount++;
-        }
-      }
-      return { refs, confidence: "semantic", externalCount };
+  for (const ref of lspRefs) {
+    const filePath = uriToFile(ref.uri);
+    if (!isInProjectPath(filePath, cwd)) {
+      externalCount++;
     }
   }
 
-  if (target.name) {
-    const scopePath = params.path ? normalizePath(params.path, cwd) : cwd;
-    const pattern = `\\b${escapeRegex(target.name)}\\b`;
-    const matches = runRipgrep(pattern, scopePath, cwd, { maxMatches: 30 });
-    for (const m of matches) {
-      if (!isDeclarationMatch(m.file, m.line, target, cwd)) {
-        refs.push({ file: path.relative(cwd, path.resolve(cwd, m.file)), line: m.line });
-      }
+  for (const ref of filtered) {
+    const filePath = uriToFile(ref.uri);
+    if (isInProjectPath(filePath, cwd)) {
+      refs.push({ file: path.relative(cwd, filePath), line: ref.range.start.line + 1 });
     }
-    return { refs, confidence: "heuristic", externalCount: 0 };
   }
 
-  return { refs, confidence: "unavailable", externalCount: 0 };
+  return { refs, confidence: "semantic", externalCount };
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: impact analysis with downstream module traversal
@@ -303,6 +296,8 @@ function formatAffectedOutput(
   analysis: ImpactAnalysis,
   params: ActionParams,
   prioritySignals: import("../prioritization-signals.ts").PrioritySignalsSummary | null,
+  target: ResolvedTarget,
+  cwd: string,
 ): string {
   const totalRefs = result.refs.length + analysis.externalRefs;
   const lines: string[] = [];
@@ -328,7 +323,12 @@ function formatAffectedOutput(
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
-  addAffectedNextQueries(lines, symbolName, analysis);
+  addAffectedNextQueries(lines, {
+    target,
+    symbolName,
+    showBriefQuery: analysis.checkNext.length > 0,
+    cwd,
+  });
 
   return lines.join("\n");
 }
@@ -416,24 +416,37 @@ function formatFileLevelAffectedHeader(
 
 function addAffectedNextQueries(
   lines: string[],
-  symbolName: string,
-  analysis: ImpactAnalysis,
+  options: {
+    target: ResolvedTarget;
+    symbolName: string;
+    showBriefQuery: boolean;
+    cwd: string;
+  },
 ): void {
   lines.push("## Next");
-  if (analysis.checkNext.length > 0) {
-    lines.push("- `code_intel brief` on the most-affected module for deeper context");
+  const nextQueries = buildAffectedNextQueries(options.target, options.symbolName, options.cwd);
+  if (options.showBriefQuery) {
+    lines.push(`- ${nextQueries[0]}`);
   }
-  lines.push(
-    `- \`code_intel callers\` with \`symbol: "${symbolName}"\` for grouped call-site detail`,
-  );
+  lines.push(`- ${nextQueries[1]}`);
   lines.push("");
 }
 
-function isDeclarationMatch(
-  file: string,
-  line: number,
+function buildAffectedNextQueries(
   target: ResolvedTarget,
+  symbolName: string,
   cwd: string,
-): boolean {
-  return path.resolve(cwd, file) === target.file && line === target.displayLine;
+): [string, string] {
+  const briefQuery = "`code_brief` on the most-affected module for deeper context";
+  if (target.name) {
+    return [
+      briefQuery,
+      `\`code_relations\` with \`kind: "callers"\` and \`symbol: "${symbolName}"\` for grouped call-site detail`,
+    ];
+  }
+
+  return [
+    briefQuery,
+    `\`code_relations\` with \`kind: "callers"\`, \`file: "${path.relative(cwd, target.file)}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for grouped call-site detail`,
+  ];
 }

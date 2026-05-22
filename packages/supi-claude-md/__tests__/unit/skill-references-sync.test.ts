@@ -19,5 +19,16 @@ describe("skill reference files sync", () => {
 
       expect(revisionContent).toBe(improverContent);
     });
+
+    it(`\`${file}\` does not reference removed code_intel brief guidance`, () => {
+      const improverPath = join(IMPROVER_REFS, file);
+      const revisionPath = join(REVISION_REFS, file);
+
+      const improverContent = readFileSync(improverPath, "utf-8");
+      const revisionContent = readFileSync(revisionPath, "utf-8");
+
+      expect(improverContent).not.toContain("code_intel brief");
+      expect(revisionContent).not.toContain("code_intel brief");
+    });
   }
 });

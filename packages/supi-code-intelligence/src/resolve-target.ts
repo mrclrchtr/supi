@@ -1,3 +1,4 @@
+import type { CodeQueryParams as ActionParams } from "./query-params.ts";
 import {
   type ResolvedTarget,
   type ResolvedTargetGroup,
@@ -5,7 +6,6 @@ import {
   resolveFileTargetGroup,
   resolveSymbolTarget,
 } from "./target-resolution.ts";
-import type { ActionParams } from "./tool-actions.ts";
 
 /**
  * Resolve a target from action params. Returns either a target, a file-level target group,
@@ -104,7 +104,7 @@ function formatDisambiguation(
   if (result.candidates.length > 0) {
     const first = result.candidates[0];
     lines.push(
-      `Example: \`{ "action": "${params.action}", "file": "${first.file}", "line": ${first.line}, "character": ${first.character} }\``,
+      `Example: rerun with \`file: "${first.file}"\`, \`line: ${first.line}\`, and \`character: ${first.character}\`.`,
     );
   }
 

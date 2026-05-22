@@ -1,9 +1,9 @@
 # @mrclrchtr/supi-code-intelligence
 
-Architecture briefs, caller/callee analysis, impact assessment, and pattern search for pi.
+Architecture briefs, factual code maps, relationship tracing, impact assessment, and explicit search for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the `code_intel` tool
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_map`, `code_relations`, `code_affected`, `code_pattern`)
 - `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
 
 ## Commands
@@ -22,158 +22,89 @@ pnpm exec biome check packages/supi-code-intelligence/
 
 ## Architecture
 
-```
+```text
 src/
-├── code-intelligence.ts    # Extension factory — registers tool + event hooks
+├── code-intelligence.ts    # Extension factory — overview injection + focused tool registration
 ├── index.ts                # Public API exports for programmatic consumers
-├── types.ts                # Result metadata types (BriefDetails, SearchDetails, etc.)
-├── tool-actions.ts         # Action dispatcher + param validation
+├── types.ts                # Result metadata types (BriefDetails, MapDetails, SearchDetails, etc.)
 ├── architecture.ts         # Project model builder (workspace scan, module detection)
 ├── brief.ts                # Overview + project brief generation
 ├── brief-focused.ts        # Directory/file/symbol focused brief generation
 ├── git-context.ts          # Git branch, dirty files, last commit helpers
-├── target-resolution.ts    # Symbol → file:position resolution (LSP / ripgrep)
-├── resolve-target.ts       # Action params → resolved target or disambiguation
+├── target-resolution.ts    # Symbol → file:position resolution (semantic-first, no heuristic fallback)
+├── resolve-target.ts       # Shared target resolution helpers for semantic/structural actions
 ├── search-helpers.ts       # ripgrep wrapper, path normalization, URI helpers
 ├── pattern-structured.ts   # Tree-sitter-based structured pattern search
 ├── prioritization-signals.ts # Diagnostics, coverage, knip unused signals
 ├── semantic-action-helpers.ts # Shared confidence/resolution helpers
 ├── tool/
-│   ├── action-specs.ts        # Single source of truth for public action metadata
-│   └── guidance.ts            # promptGuidelines + promptSnippet + toolDescription
+│   ├── tool-specs.ts          # Single source of truth for the public focused-tool metadata
+│   ├── guidance.ts            # prompt surfaces derived from tool specs
+│   ├── register-tools.ts      # focused Pi tool registration
+│   ├── execute-brief.ts       # public code_brief adapter
+│   ├── execute-map.ts         # public code_map adapter
+│   ├── execute-relations.ts   # public code_relations adapter
+│   ├── execute-affected.ts    # public code_affected adapter
+│   └── execute-pattern.ts     # public code_pattern adapter
 ├── providers/
 │   ├── semantic-provider.ts   # Session-scoped LSP access + short readiness waits
 │   └── structural-provider.ts # Shared Tree-sitter service access with short-lived fallback
 └── actions/
     ├── brief-action.ts         # Architecture overviews + anchored briefs
-    ├── callers-action.ts       # Find call sites (LSP → ripgrep)
-    ├── callees-action.ts       # Outgoing call map (tree-sitter)
-    ├── implementations-action.ts # Find implementations (LSP → ripgrep)
-    ├── affected-action.ts      # Blast-radius + risk assessment
-    ├── pattern-action.ts       # Bounded text search (literal or regex)
-    └── index-action.ts         # Factual project map (file counts, directories, landmarks)
-
-__tests__/
-├── helpers/
-│   └── test-utils.ts          # createTempDir() — shared temp-dir/cleanup/writeJson utility
-├── fixtures/                  # Sample data and test projects (available for future use)
-├── unit/                      # Focused, fast tests (16 files testing individual modules)
-├── integration/               # End-to-end and cross-module tests (3 files)
-└── tsconfig.json
+    ├── map-action.ts           # Factual project/package/directory maps
+    ├── callers-action.ts       # Semantic callers only
+    ├── callees-action.ts       # Structural callees only
+    ├── implementations-action.ts # Semantic implementations only
+    ├── affected-action.ts      # Semantic + architecture-only impact behavior
+    └── pattern-action.ts       # Explicit literal/regex/structured search
 ```
 
-### Injection Points (6 hooks into pi)
+## Public tool contracts
 
-| # | Hook | What It Does |
-|---|---|---|
-| 1 | `package.json` → `pi.extensions` | Manifest entry — pi loads the extension at startup |
-| 2 | `pi.registerTool({ name: "code_intel" })` | Registers 7 actions as agent-callable tool |
-| 3 | `promptGuidelines` (routing bullets) | Flattened into system prompt `Guidelines:` section |
-| 4 | `promptSnippet` (1 line) | Tool-context reminder to favor `code_intel` over raw reads |
-| 5 | `pi.on("session_start", ...)` | Resets dedup state, scans branch for existing overview |
-| 6 | `pi.on("before_agent_start", ...)` | Injects compact architecture overview on first agent turn |
+### `code_brief`
+Interpretive orientation tool. Use for prioritized project/package/directory/file/symbol context.
 
-### Action Dispatching
+### `code_map`
+Strictly factual inventory tool. Accepts the repo root, a package root, or **any directory path**. Rejects file paths.
 
-`tool-actions.ts` validates params, then routes to one of seven action handlers in `src/actions/`. Validation errors are returned as explicit Markdown strings, not thrown.
+### `code_relations`
+Relationship tracing tool with `kind: "callers" | "callees" | "implementations"`.
+- `callers` — semantic-only
+- `callees` — structural-only
+- `implementations` — semantic-only
 
-```ts
-switch (params.action) {
-  case "brief":       → executeBriefAction(params, cwd)
-  case "callers":     → executeCallersAction(params, cwd)
-  case "callees":     → executeCalleesAction(params, cwd)
-  case "implementations": → executeImplementationsAction(params, cwd)
-  case "affected":    → executeAffectedAction(params, cwd)
-  case "pattern":     → executePatternAction(params, cwd)
-  case "index":       → executeIndexAction(cwd)
-}
-```
+### `code_affected`
+Semantic blast-radius tool. Uses semantic references plus the architecture model. No implicit grep fallback.
 
-### Fallback Chain
+### `code_pattern`
+Explicit search tool. This is the only tool in the family that intentionally exposes heuristic/text-search behavior.
 
-Semantic provider (LSP) → structural provider (Tree-sitter where applicable) → ripgrep text search, with explicit confidence labeling on every result:
+## Key gotchas
 
-| Label | Source |
-|---|---|
-| `semantic` | LSP (definitions, references, diagnostics, implementations) |
-| `structural` | Tree-sitter AST (outlines, imports/exports, callees) |
-| `heuristic` | `rg` text search |
-| `unavailable` | No data produced |
+### Public-surface split
+- `code_map` must stay factual. Do not add prioritized “start here” guidance there.
+- `code_pattern` is the sole heuristic/search-oriented tool.
+- `code_relations` and `code_affected` should prefer explicit unavailable states over text-search guesses.
 
-## Key Gotchas
+### Param validation
+- `line`/`character` require `file`, **not** `path`.
+- `code_map` should reject file paths.
+- `pattern` structured `kind` must be `definition`, `export`, or `import`.
 
-### Param Validation
-- `line`/`character` require `file`, **not** `path`. `path` is for scope/focus; `file` anchors a position.
-- `file` pointing to a directory is rejected — use `path` for directory scoping.
-- `line`/`character` without `file` is rejected.
+### Target resolution
+- Symbol discovery is semantic-only for non-search tools.
+- File-level target expansion is allowed only when the required substrate can support it.
+- Multiple semantic symbol matches should return disambiguation, not heuristic guesses.
 
-### Pattern Search
-- `pattern` is treated as a **literal string by default** — set `regex: true` to opt into raw ripgrep regex.
-- Malformed regex returns an explicit error message, never a misleading "No matches found."
-- `summary: true` returns aggregate counts by directory instead of line-level matches.
-
-### Target Resolution
-- Symbol resolution: semantic provider (`workspaceSymbol` with a short readiness wait) → ripgrep fallback. Multiple candidates return a disambiguation message.
-- `filterOutDeclaration()` strips the source declaration from LSP reference results.
-- Binary files (`.png`, `.jpg`, `.wasm`, etc.) are explicitly rejected.
-
-### First-Turn Overview
-- Injected via `before_agent_start` on the first turn; deduplicated via `hasInjectedOverview` flag.
+### First-turn overview
+- Injected via `before_agent_start` on the first turn; deduplicated via `hasInjectedOverview`.
 - Uses `display: false` so the overview is agent-visible but TUI-invisible.
 - On reload/resume, scans the branch for an existing `code-intelligence-overview` custom message.
-- `buildArchitectureModel` supports: pnpm-workspace.yaml, package.json workspaces, single-package, and minimal.
 
-### Architecture Model
-- Internal vs external dep separation uses `workspace:*` version prefix heuristic.
-- `findModuleForPath()` returns the deepest matching module for nested monorepo layouts.
-
-### Confidence & Metadata
-- `details` is always returned for action handler executions. It is `undefined` only when the request is rejected before any handler runs (parameter validation, unknown action, missing required `pattern`).
-- No-result and error states carry `confidence: "unavailable"` or `confidence: "heuristic"` with appropriately zeroed counts.
-- Every action handler returns structured `details` alongside formatted Markdown:
-  - `brief` → `{ type: "brief", data: BriefDetails }` (confidence, focus target, start-here, public surfaces, dependency summary, next queries)
-  - `search` (callers, callees, implementations, pattern, index) → `{ type: "search", data: SearchDetails }` (confidence, scope, candidate count, omitted count)
-  - `affected` → `{ type: "affected", data: AffectedDetails }` (confidence, direct count, downstream count, risk level, check-next, likely tests)
-- Risk thresholds: `high` (>10 refs / >3 modules / >1 downstream), `medium` (>3 refs / >1 module / ≥1 downstream), `low` (otherwise).
-
-## Testing Patterns
-
-### Test layout
-
-- **Unit tests** live in `__tests__/unit/` — focused, fast tests that test individual modules with temporary filesystem fixtures.
-- **Integration tests** live in `__tests__/integration/` — end-to-end and cross-module tests that exercise the full action pipeline or require real system tools (git, ripgrep).
-- **Shared helpers** in `__tests__/helpers/test-utils.ts` provide `createTempDir()` for consistent temp-directory setup/teardown.
-- **Fixtures** in `__tests__/fixtures/` are available for sample data (currently empty).
-- Package test tsconfig (`__tests__/tsconfig.json`) extends root with `include: ["**/*.ts", "../src/**/*.ts"].`
-
-### Patterns
-
-- Many tests use `mkdtempSync` + `writeJson` helpers to build temporary project structures.
-- `graphql-test-v2`-style: create minimal `package.json`, `pnpm-workspace.yaml`, and source files in a temp dir, then call functions directly.
-- Architecture tests verify model shape (name, modules, edges, leaf marking).
-- Action tests verify validation, error messages, and output formatting.
-- No `vi.mock` needed for most tests — they operate on the real filesystem in temp dirs.
-- Fallback-chain and prioritization-signals tests use `vi.mock` to control LSP state.
-- Tests that operate on real git repos (e.g., `integration/git-context.test.ts`) must disable GPG signing and pre-commit hooks:
-
-  ```ts
-  execFileSync("git", ["config", "commit.gpgsign", "false"], { cwd: dir });
-  execFileSync("git", ["config", "core.hooksPath", "/dev/null"], { cwd: dir });
-  execFileSync("git", ["branch", "-m", "main"], { cwd: dir });
-  ```
-
-  **Why**: `commit.gpgsign` fails with `fatal: either user.signingkey or gpg.ssh.defaultKeyCommand needs to be configured` when a global signingkey is set. `core.hooksPath` skips pre-commit hooks (e.g., pre-commit) that may error on missing config. `git init` default branch varies by git version; rename forces a known name for assertions.
-
-### Helper
-
-```ts
-import { createTempDir } from "../helpers/test-utils.ts";
-
-const t = createTempDir("prefix-");
-afterEach(() => t.cleanup());
-t.writeJson("package.json", { name: "test" });
-t.writeFile("index.ts", "export const x = 1;\n");
-```
+### Confidence & metadata
+- `details` should stay tool-specific and explicit.
+- `heuristic` confidence should primarily appear in `code_pattern` results.
+- Relationship and impact tools should usually resolve to `semantic`, `structural`, or `unavailable`.
 
 ## Dependencies
 

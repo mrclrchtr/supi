@@ -1,22 +1,16 @@
-// Code Intelligence extension entry point — registers the `code_intel` tool with pi.
-// Provides architecture briefs, caller/callee analysis, impact assessment, and pattern search.
+// Code Intelligence extension entry point — registers the focused code-intelligence tools.
+// Provides architecture briefs, project maps, relationship tracing, impact assessment, and pattern search.
 
-import { StringEnum } from "@earendil-works/pi-ai";
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 import { buildArchitectureModel } from "./architecture.ts";
 import { generateOverview } from "./brief.ts";
-import { CODE_INTEL_ACTION_NAMES, type CodeIntelAction } from "./tool/action-specs.ts";
-import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
-import { executeAction } from "./tool-actions.ts";
+import { registerCodeIntelligenceTools } from "./tool/register-tools.ts";
 
 const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";
 
-const CodeIntelActionEnum = StringEnum(CODE_INTEL_ACTION_NAMES);
-
 /**
- * Register the `code_intel` tool and inject a lightweight architecture overview
- * once per session.
+ * Register the focused code-intelligence tools and inject a lightweight
+ * architecture overview once per session.
  */
 export default function codeIntelligenceExtension(pi: ExtensionAPI) {
   let hasInjectedOverview = false;
@@ -56,68 +50,5 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
     },
   );
 
-  pi.registerTool({
-    name: "code_intel",
-    label: "Code Intelligence",
-    description: toolDescription,
-    parameters: Type.Object({
-      action: CodeIntelActionEnum,
-      path: Type.Optional(
-        Type.String({ description: "Scope or focus path (package, directory, or file)" }),
-      ),
-      file: Type.Optional(
-        Type.String({
-          description:
-            "Anchored target file (use with line/character) or a file-level semantic target for brief/callers/affected",
-        }),
-      ),
-      line: Type.Optional(Type.Number({ description: "1-based line number for anchored target" })),
-      character: Type.Optional(
-        Type.Number({ description: "1-based character column (UTF-16) for anchored target" }),
-      ),
-      symbol: Type.Optional(
-        Type.String({ description: "Symbol name for discovery-based resolution" }),
-      ),
-      pattern: Type.Optional(
-        Type.String({
-          description: "Text search pattern (pattern action only; literal by default)",
-        }),
-      ),
-      regex: Type.Optional(
-        Type.Boolean({
-          description: "Use regex semantics for pattern action (default: false, literal search)",
-        }),
-      ),
-      kind: Type.Optional(
-        Type.String({
-          description:
-            "Symbol kind filter for discovery, or pattern kind (`definition` | `export` | `import`) for structured searches",
-        }),
-      ),
-      exportedOnly: Type.Optional(
-        Type.Boolean({ description: "Limit discovery to exported symbols" }),
-      ),
-      maxResults: Type.Optional(Type.Number({ description: "Maximum results to return" })),
-      contextLines: Type.Optional(Type.Number({ description: "Context lines around matches" })),
-      summary: Type.Optional(
-        Type.Boolean({
-          description:
-            "Aggregate counts by directory instead of line-level matches (pattern action only)",
-        }),
-      ),
-    }),
-    promptSnippet,
-    promptGuidelines,
-    // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
-    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
-      const { content, details } = await executeAction(
-        params as unknown as { action: CodeIntelAction } & Record<string, unknown>,
-        { cwd: ctx.cwd },
-      );
-      return {
-        content: [{ type: "text", text: content }],
-        details,
-      };
-    },
-  });
+  registerCodeIntelligenceTools(pi);
 }

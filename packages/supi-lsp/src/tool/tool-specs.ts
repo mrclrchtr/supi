@@ -103,7 +103,7 @@ export const LSP_TOOL_DEFINITION_SPECS = [
     basePromptGuidelines: [
       'Use lsp_lookup with `kind: "hover"` for semantic type or symbol information at a known `file`, `line`, and `character`.',
       'Use lsp_lookup with `kind: "definition"`, `"references"`, or `"implementation"` for semantic navigation at a known position.',
-      "Use lsp_lookup after code_intel or tree_sitter has already narrowed the target file and position.",
+      "Use lsp_lookup after code_brief, code_map, or tree_sitter has already narrowed the target file and position.",
     ],
     parameters: LookupParameters,
     run: (service, cwd, params) =>

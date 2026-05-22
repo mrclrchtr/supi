@@ -2,11 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeIndexAction } from "../../src/actions/index-action.ts";
 import { executePatternAction } from "../../src/actions/pattern-action.ts";
 import { buildArchitectureModel } from "../../src/architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
-import { executeAction } from "../../src/tool-actions.ts";
+import { executeBriefTool } from "../../src/tool/execute-brief.ts";
+import { executeMapTool } from "../../src/tool/execute-map.ts";
+import { executeAction } from "../helpers/execute-action.ts";
 
 let tmpDir: string;
 
@@ -169,30 +170,35 @@ describe("focused brief details metadata", () => {
   });
 });
 
-describe("structured details via executeAction", () => {
-  it("returns brief details for project brief action", async () => {
+describe("structured details via tool adapters and action routers", () => {
+  it("returns project-level brief details for code_brief when called without a target", async () => {
     setupWorkspace();
-    const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
+    const result = await executeBriefTool({}, { cwd: tmpDir });
+    expect(result.content).toContain("Project Brief");
     expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("brief");
     if (result.details?.type === "brief") {
       expect(result.details.data.confidence).toBe("structural");
+      expect(result.details.data.focusTarget).toBeNull();
+      expect(result.details.data.dependencySummary?.moduleCount).toBe(3);
     }
   });
 
-  it("returns index search details", async () => {
-    const result = executeIndexAction(tmpDir);
+  it("returns dedicated map details for the code_map tool", async () => {
+    setupWorkspace();
+    const result = await executeMapTool({}, { cwd: tmpDir });
     expect(result.details).toBeDefined();
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("structural");
-      expect(result.details.data.candidateCount).toBeGreaterThanOrEqual(0);
+    expect(result.details?.type).toBe("map");
+    if (result.details?.type === "map") {
+      expect(result.details.data.scope).toBe(".");
+      expect(result.details.data.totalFiles).toBeGreaterThan(0);
+      expect(result.details.data.childDirectoryCount).toBeGreaterThanOrEqual(1);
     }
   });
 
   it("returns pattern search details", async () => {
     writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;");
-    const result = await executePatternAction({ action: "pattern", pattern: "foo" }, tmpDir);
+    const result = await executePatternAction({ pattern: "foo" }, tmpDir);
     expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("search");
   });
@@ -222,6 +228,29 @@ describe("structured details via executeAction", () => {
       if (result.details?.type === "search") {
         expect(result.details.data.confidence).toBe("unavailable");
       }
+    });
+
+    it("callers symbol lookup without LSP stays unavailable rather than heuristic", async () => {
+      const result = await executeAction({ action: "callers", symbol: "Widget" }, { cwd: tmpDir });
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type === "search") {
+        expect(result.details.data.confidence).toBe("unavailable");
+      }
+      expect(result.content).not.toContain("heuristic");
+    });
+
+    it("implementations symbol lookup without LSP stays unavailable rather than heuristic", async () => {
+      const result = await executeAction(
+        { action: "implementations", symbol: "Widget" },
+        { cwd: tmpDir },
+      );
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type === "search") {
+        expect(result.details.data.confidence).toBe("unavailable");
+      }
+      expect(result.content).not.toContain("heuristic");
     });
   });
 
@@ -264,10 +293,7 @@ describe("structured details via executeAction", () => {
 
     describe("pattern action — no-result detail states", () => {
       it("returns details for regex error", async () => {
-        const result = await executePatternAction(
-          { action: "pattern", pattern: "[invalid", regex: true },
-          tmpDir,
-        );
+        const result = await executePatternAction({ pattern: "[invalid", regex: true }, tmpDir);
         expect(result.details).toBeDefined();
         expect(result.details?.type).toBe("search");
         if (result.details?.type === "search") {
@@ -278,10 +304,7 @@ describe("structured details via executeAction", () => {
 
       it("returns details for zero matches", async () => {
         writeFileSync(path.join(tmpDir, "a.ts"), "const x = 1;");
-        const result = await executePatternAction(
-          { action: "pattern", pattern: "nonexistent999" },
-          tmpDir,
-        );
+        const result = await executePatternAction({ pattern: "nonexistent999" }, tmpDir);
         expect(result.details).toBeDefined();
         expect(result.details?.type).toBe("search");
         if (result.details?.type === "search") {

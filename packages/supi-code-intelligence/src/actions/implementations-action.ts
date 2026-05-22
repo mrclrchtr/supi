@@ -1,20 +1,14 @@
-// Implementations action — find concrete implementations via LSP or heuristic.
+// Implementations action — find concrete implementations via LSP.
 
 import * as path from "node:path";
 import { getSemanticService } from "../providers/semantic-provider.ts";
+import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
-import {
-  escapeRegex,
-  isInProjectPath,
-  normalizePath,
-  runRipgrep,
-  uriToFile,
-} from "../search-helpers.ts";
+import { isInProjectPath, uriToFile } from "../search-helpers.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
-import type { ActionParams } from "../tool-actions.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: implementation lookup has distinct semantic, unsupported-file, and heuristic branches
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: implementation lookup keeps semantic and unsupported-file paths explicit for maintainability
 export async function executeImplementationsAction(
   params: ActionParams,
   cwd: string,
@@ -57,7 +51,7 @@ export async function executeImplementationsAction(
 
   if (lsp) {
     const impls = await lsp.implementation(target.file, target.position);
-    if (impls) {
+    if (impls !== null) {
       const locations = Array.isArray(impls) ? impls : [impls];
       if (locations.length > 0) {
         const content = formatSemanticImpls(locations, cwd, params.maxResults ?? 8);
@@ -68,29 +62,35 @@ export async function executeImplementationsAction(
           candidateCount: projectLocs.length,
           omittedCount: externalLocs.length,
           nextQueries: [
-            "`code_intel affected` before changing implementations",
-            "`code_intel brief` on containing modules for deeper context",
+            "`code_affected` before changing implementations",
+            "`code_brief` on containing modules for deeper context",
           ],
         };
         return { content, details: { type: "search" as const, data: searchDetails } };
       }
+
+      const semanticEmptyDetails: SearchDetails = {
+        confidence: "semantic",
+        scope: params.path ?? null,
+        candidateCount: 0,
+        omittedCount: 0,
+        nextQueries: [
+          "`code_pattern` only if you explicitly want text-search hints for likely implementations",
+        ],
+      };
+      return {
+        content: target.name
+          ? `No implementations found for \`${target.name}\`.`
+          : `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.`,
+        details: { type: "search" as const, data: semanticEmptyDetails },
+      };
     }
   }
 
-  if (target.name) {
-    const result = formatHeuristicImpls(target.name, params, cwd);
-    const details: SearchDetails = {
-      confidence: "heuristic",
-      scope: params.path ?? null,
-      candidateCount: result.matchCount,
-      omittedCount: 0,
-      nextQueries: ["Enable LSP for semantic implementation resolution"],
-    };
-    return { content: result.content, details: { type: "search" as const, data: details } };
-  }
-
   return {
-    content: `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.\n\nLSP implementation lookup may not be available. Try \`code_intel pattern\` with the type name.`,
+    content: target.name
+      ? `No implementations found for \`${target.name}\`.`
+      : `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.`,
     details: {
       type: "search" as const,
       data: {
@@ -98,9 +98,7 @@ export async function executeImplementationsAction(
         scope: params.path ?? null,
         candidateCount: 0,
         omittedCount: 0,
-        nextQueries: [
-          "Enable LSP for semantic implementation resolution, or try `code_intel pattern`",
-        ],
+        nextQueries: ["Enable LSP for semantic implementation resolution."],
       },
     },
   };
@@ -171,38 +169,4 @@ function formatSemanticImpls(
   }
   lines.push("");
   return lines.join("\n");
-}
-
-function formatHeuristicImpls(
-  symbol: string,
-  params: ActionParams,
-  cwd: string,
-): { content: string; matchCount: number } {
-  const scopePath = params.path ? normalizePath(params.path, cwd) : cwd;
-  const pattern = `(implements|extends)\\s+.*\\b${escapeRegex(symbol)}\\b`;
-  const matches = runRipgrep(pattern, scopePath, cwd, { maxMatches: 10 });
-
-  if (matches.length === 0) {
-    return {
-      content: `No implementations found for \`${symbol}\`.\n\nTry \`code_intel pattern\` with the type name.`,
-      matchCount: 0,
-    };
-  }
-
-  const lines: string[] = [];
-  lines.push(`# Implementations of \`${symbol}\` (heuristic)`);
-  lines.push("");
-  lines.push(
-    `**${matches.length} candidate${matches.length > 1 ? "s" : ""}** — text-search hints, not semantic implementations`,
-  );
-  lines.push("");
-
-  for (const m of matches.slice(0, 8)) {
-    lines.push(`- \`${m.file}\`:${m.line} — \`${m.text.slice(0, 80)}\``);
-  }
-  if (matches.length > 8) {
-    lines.push(`- _+${matches.length - 8} more omitted_`);
-  }
-  lines.push("");
-  return { content: lines.join("\n"), matchCount: matches.length };
 }

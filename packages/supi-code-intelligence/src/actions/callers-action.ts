@@ -2,22 +2,15 @@
 
 import * as path from "node:path";
 import { getSemanticService } from "../providers/semantic-provider.ts";
+import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
-import {
-  escapeRegex,
-  filterOutDeclaration,
-  isInProjectPath,
-  normalizePath,
-  runRipgrep,
-  uriToFile,
-} from "../search-helpers.ts";
+import { filterOutDeclaration, isInProjectPath, uriToFile } from "../search-helpers.ts";
 import {
   dedupeFileLineRefs,
   highestConfidence,
   isResolvedTargetGroup,
 } from "../semantic-action-helpers.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
-import type { ActionParams } from "../tool-actions.ts";
 import type { CodeIntelResult, ConfidenceMode, SearchDetails } from "../types.ts";
 
 export async function executeCallersAction(
@@ -59,8 +52,8 @@ export async function executeCallersAction(
       candidateCount: result.candidateCount,
       omittedCount: result.externalCount,
       nextQueries: [
-        "`code_intel affected` for impact analysis",
-        "`code_intel pattern` with broader scope for additional matches",
+        "`code_affected` for impact analysis",
+        "Use `code_pattern` only when you explicitly want text-search hints",
       ],
     };
     return { content, details: { type: "search" as const, data: details } };
@@ -76,7 +69,7 @@ export async function executeCallersAction(
           scope: params.path ?? null,
           candidateCount: 0,
           omittedCount: 0,
-          nextQueries: ["Enable LSP for `semantic` caller accuracy"],
+          nextQueries: ["Use `code_affected` before editing a broadly referenced target"],
         },
       },
     };
@@ -84,7 +77,7 @@ export async function executeCallersAction(
 
   const relPath = path.relative(cwd, target.file);
   return {
-    content: `No caller data available for ${relPath}:${target.displayLine}:${target.displayCharacter}. LSP may not be active.\n\nTry \`code_intel pattern\` with the symbol name for text-search matches.`,
+    content: `No caller data available for ${relPath}:${target.displayLine}:${target.displayCharacter}.`,
     details: {
       type: "search" as const,
       data: {
@@ -92,7 +85,7 @@ export async function executeCallersAction(
         scope: params.path ?? null,
         candidateCount: 0,
         omittedCount: 0,
-        nextQueries: ["Enable LSP for semantic caller resolution, or try `code_intel pattern`"],
+        nextQueries: ["Enable LSP for semantic caller resolution or use `code_pattern` explicitly"],
       },
     },
   };
@@ -124,8 +117,8 @@ async function executeFileLevelCallers(
 
   const withRefs = perTarget.filter((entry) => entry.result.refs.length > 0);
   const uniqueRefs = dedupeFileLineRefs(withRefs.flatMap((entry) => entry.result.refs));
-  const confidence = highestConfidence(withRefs.map((entry) => entry.result.confidence));
-  const externalCount = withRefs.reduce((sum, entry) => sum + entry.result.externalCount, 0);
+  const confidence = highestConfidence(perTarget.map((entry) => entry.result.confidence));
+  const externalCount = perTarget.reduce((sum, entry) => sum + entry.result.externalCount, 0);
 
   const lines: string[] = [];
   lines.push(`# Callers in \`${targetGroup.displayName}\``);
@@ -155,7 +148,7 @@ async function executeFileLevelCallers(
     candidateCount: uniqueRefs.length,
     omittedCount: externalCount,
     nextQueries: [
-      "`code_intel affected` for impact analysis",
+      "`code_affected` for impact analysis",
       "Use `file` + coordinates to drill into one symbol precisely",
     ],
   };
@@ -163,58 +156,45 @@ async function executeFileLevelCallers(
   return { content: lines.join("\n"), details: { type: "search" as const, data: details } };
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: LSP-first caller collection with fallback and declaration filtering is clearest in one helper
 async function collectCallerRefs(
   target: ResolvedTarget,
-  params: ActionParams,
+  _params: ActionParams,
   cwd: string,
 ): Promise<CallerCollection> {
   const lsp = await getSemanticService(cwd, { waitForReady: true });
-
-  if (lsp) {
-    const refs = await lsp.references(target.file, target.position);
-    if (refs && refs.length > 0) {
-      const filtered = filterOutDeclaration(refs, target.file, target.position);
-      const projectRefs: CallerRef[] = [];
-      let externalCount = 0;
-      for (const ref of refs) {
-        const filePath = uriToFile(ref.uri);
-        if (!isInProjectPath(filePath, cwd)) {
-          externalCount++;
-        }
-      }
-      for (const ref of filtered) {
-        const filePath = uriToFile(ref.uri);
-        if (isInProjectPath(filePath, cwd)) {
-          projectRefs.push({ file: path.relative(cwd, filePath), line: ref.range.start.line + 1 });
-        }
-      }
-      if (projectRefs.length > 0) {
-        return {
-          refs: projectRefs,
-          confidence: "semantic",
-          externalCount,
-          candidateCount: projectRefs.length,
-        };
-      }
-    }
-  }
-
-  if (!target.name) {
+  if (!lsp) {
     return { refs: [], confidence: "unavailable", externalCount: 0, candidateCount: 0 };
   }
 
-  const scopePath = params.path ? normalizePath(params.path, cwd) : cwd;
-  const pattern = `\\b${escapeRegex(target.name)}\\b`;
-  const matches = runRipgrep(pattern, scopePath, cwd, { maxMatches: (params.maxResults ?? 8) * 3 });
-  const refs = matches
-    .filter((match) => !isDeclarationMatch(match.file, match.line, target, cwd))
-    .map((match) => ({
-      file: path.relative(cwd, path.resolve(cwd, match.file)),
-      line: match.line,
-    }));
+  const refs = await lsp.references(target.file, target.position);
+  if (refs === null) {
+    return { refs: [], confidence: "unavailable", externalCount: 0, candidateCount: 0 };
+  }
 
-  return { refs, confidence: "heuristic", externalCount: 0, candidateCount: refs.length };
+  const filtered = filterOutDeclaration(refs, target.file, target.position);
+  const projectRefs: CallerRef[] = [];
+  let externalCount = 0;
+
+  for (const ref of refs) {
+    const filePath = uriToFile(ref.uri);
+    if (!isInProjectPath(filePath, cwd)) {
+      externalCount++;
+    }
+  }
+
+  for (const ref of filtered) {
+    const filePath = uriToFile(ref.uri);
+    if (isInProjectPath(filePath, cwd)) {
+      projectRefs.push({ file: path.relative(cwd, filePath), line: ref.range.start.line + 1 });
+    }
+  }
+
+  return {
+    refs: projectRefs,
+    confidence: "semantic",
+    externalCount,
+    candidateCount: projectRefs.length,
+  };
 }
 
 function formatTargetCallers(
@@ -270,13 +250,4 @@ function groupRefsByFile(refs: CallerRef[], _cwd: string): Map<string, number[]>
     byFile.set(ref.file, group);
   }
   return byFile;
-}
-
-function isDeclarationMatch(
-  file: string,
-  line: number,
-  target: ResolvedTarget,
-  cwd: string,
-): boolean {
-  return path.resolve(cwd, file) === target.file && line === target.displayLine;
 }

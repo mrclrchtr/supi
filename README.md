@@ -8,7 +8,7 @@
 
 Go-to-definition, find-references, rename, hover types — your agent navigates your codebase with IDE precision. Combined with AST-level structural analysis and architecture-aware code intelligence, the agent understands your code instead of just grepping it.
 
-**Extensions**: lsp, tree_sitter, code_intel
+**Extensions**: lsp, tree_sitter, code-intelligence
 
 ### Smarter agent interaction
 

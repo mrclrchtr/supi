@@ -33,12 +33,12 @@ The meta-package currently bundles these production packages:
 | [`@mrclrchtr/supi-ask-user`](../supi-ask-user/README.md) | `ask_user` for focused interactive decision forms |
 | [`@mrclrchtr/supi-bash-timeout`](../supi-bash-timeout/README.md) | default timeout injection for `bash` |
 | [`@mrclrchtr/supi-claude-md`](../supi-claude-md/README.md) | subdirectory `CLAUDE.md` / `AGENTS.md` context discovery |
-| [`@mrclrchtr/supi-code-intelligence`](../supi-code-intelligence/README.md) | `code_intel` for briefs, callers, blast radius, and structured search |
+| [`@mrclrchtr/supi-code-intelligence`](../supi-code-intelligence/README.md) | `code_brief`, `code_map`, `code_relations`, `code_affected`, and `code_pattern` |
 | [`@mrclrchtr/supi-context`](../supi-context/README.md) | `/supi-context` context-usage report |
 | [`@mrclrchtr/supi-core`](../supi-core/README.md) | shared config/settings plumbing and `/supi-settings` |
 | [`@mrclrchtr/supi-debug`](../supi-debug/README.md) | shared debug-event inspection |
 | [`@mrclrchtr/supi-extras`](../supi-extras/README.md) | prompt stash, command aliases, skill shorthand, spinner, and other small utilities |
-| [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | `lsp`, `/lsp-status`, and automatic diagnostics |
+| [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | expert LSP tools, `/lsp-status`, and automatic diagnostics |
 | [`@mrclrchtr/supi-tree-sitter`](../supi-tree-sitter/README.md) | `tree_sitter` structural parsing and AST-style queries |
 
 ## Direct-install packages not bundled here

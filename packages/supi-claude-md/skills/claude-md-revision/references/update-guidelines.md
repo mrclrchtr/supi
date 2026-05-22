@@ -71,13 +71,13 @@ When auditing or updating CLAUDE.md in a project using SuPi extensions, these se
 | `supi-claude-md` | Subdirectory `CLAUDE.md` files wrapped in `<extension-context>` | On `read`/`edit`/`lsp`/`tree_sitter` to subdirectories |
 | `supi-core` | `findProjectRoot`, `walkProject`, XML `<extension-context>` tagging | Available to all extensions |
 
-**Implication:** A root CLAUDE.md doesn't need to document what `code_intel brief` would say. Focus instead on:
+**Implication:** A root CLAUDE.md doesn't need to document what `code_brief` would say. Focus instead on:
 - Commands and workflows
 - Cross-package conventions and patterns
 - Gotchas that aren't in code
 - Human-curated guidance ("start here for X")
 
-When SuPi is active, do a quick baseline review first: compare the CLAUDE.md against `code_intel brief` and other known injected context, then separate each section into overlap vs unique value. If a root `## Project structure` / `## Architecture` section mostly restates the workspace tree, treat that portion as redundant and keep only the orientation, boundary rules, or exceptions that the generated overview cannot supply.
+When SuPi is active, do a quick baseline review first: compare the CLAUDE.md against `code_brief` and other known injected context, then separate each section into overlap vs unique value. If a root `## Project structure` / `## Architecture` section mostly restates the workspace tree, treat that portion as redundant and keep only the orientation, boundary rules, or exceptions that the generated overview cannot supply.
 
 ## What NOT to Add
 
@@ -180,7 +180,7 @@ Bad:
 - `api` depends on `db`, `auth`
 - `web` depends on `api`
 
-Better: Skip — `code_intel brief` shows this live.
+Better: Skip — `code_brief` shows this live.
 ```
 
 **Partially redundant: Root project structure section with both overlap and unique value**

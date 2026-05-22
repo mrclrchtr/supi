@@ -1,6 +1,6 @@
 # @mrclrchtr/supi-code-intelligence
 
-Adds a `code_intel` tool to the [pi coding agent](https://github.com/earendil-works/pi) for higher-level codebase analysis.
+Adds a focused code-understanding toolset to the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -20,7 +20,11 @@ After editing the source, run `/reload`.
 
 After install, pi gets:
 
-- `code_intel` — one tool with several analysis actions
+- `code_brief` — interpretive orientation for a project, package, directory, file, or symbol
+- `code_map` — factual repo/package/directory inventory
+- `code_relations` — callers, callees, or implementations for a resolved target
+- `code_affected` — blast radius, downstream impact, and risk for a target
+- `code_pattern` — explicit literal, regex, or structured search
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
 
@@ -32,53 +36,65 @@ This package is for questions like:
 - what is the likely blast radius of a change?
 - where is this pattern defined, imported, or exported?
 
-## `code_intel` actions
+## Tool overview
 
-| Action | What it is for |
-| --- | --- |
-| `brief` | Generate a project, package, directory, file, or symbol-focused brief |
-| `callers` | Find call sites for a symbol, or inspect a file's exported surface |
-| `callees` | Show outgoing calls from a symbol using structural analysis |
-| `implementations` | Find concrete implementations of an interface or abstract type |
-| `affected` | Estimate blast radius, affected files/modules, downstream dependents, and risk |
-| `pattern` | Run bounded text search with optional regex mode and structured `kind` filters |
-| `index` | Build a factual project map: counts, top-level tree, and landmark files |
+### `code_brief`
+Interpretive orientation. Use for prioritized context, start-here guidance, and project/package/directory/file/symbol overview.
 
-## Input shape
+### `code_map`
+Strictly factual inventory. Accepts the repo root, a package root, or **any directory path**. Rejects file paths.
 
-The tool accepts a shared parameter set across actions. The main fields are:
+### `code_relations`
+Relationship tracing tool with:
+- `kind: "callers"`
+- `kind: "callees"`
+- `kind: "implementations"`
 
-- `action`
+`callers` and `implementations` are semantic-only. `callees` is structural-only.
+
+### `code_affected`
+Semantic blast-radius analysis for a concrete target. This tool no longer falls back to grep-style guesses.
+
+### `code_pattern`
+Explicit search tool for:
+- literal search
+- regex search (`regex: true`)
+- structured search (`kind: "definition" | "export" | "import"`)
+
+This is the only tool in the family that intentionally returns heuristic/text-search results.
+
+## Shared input conventions
+
+Depending on the tool, inputs may include:
 - `path`
 - `file`
 - `line`
 - `character`
 - `symbol`
+- `kind`
 - `pattern`
 - `regex`
-- `kind`
 - `exportedOnly`
 - `maxResults`
 - `contextLines`
 - `summary`
 
-Notes from the current implementation:
-
+Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `path`
-- `pattern` action `kind` must be `definition`, `export`, or `import`
 - a leading `@` is stripped from `path` and `file`
+- non-search tools do **not** silently fall back to heuristic grep behavior
 
 ## Result style
 
-Depending on the action and what supporting services are available, results report different confidence modes such as:
+Results report confidence such as:
 
 - `semantic`
 - `structural`
 - `heuristic`
 - `unavailable`
 
-That lets the model tell the difference between LSP-backed answers, tree-sitter-backed answers, and weaker text-search fallbacks.
+`heuristic` is now primarily a `code_pattern` concern. The other tools prefer explicit unavailable states over silent search fallbacks.
 
 ## Package surfaces
 
@@ -96,6 +112,8 @@ const overview = generateOverview(model);
 
 ## Source
 
-- `src/code-intelligence.ts` — tool registration and session overview injection
-- `src/tool-actions.ts` — action routing and parameter validation
-- `src/actions/*.ts` — per-action implementations
+- `src/code-intelligence.ts` — focused tool registration and session overview injection
+- `src/tool/tool-specs.ts` — single source of truth for the public tool surface
+- `src/tool/register-tools.ts` — focused tool registration wiring
+- `src/tool/guidance.ts` — prompt surfaces derived from tool specs
+- `src/actions/*.ts` — domain implementations

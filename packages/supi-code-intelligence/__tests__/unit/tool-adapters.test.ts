@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeAction } from "../../src/tool-actions.ts";
+import { executeAction } from "../helpers/execute-action.ts";
 
 let tmpDir: string;
 
@@ -91,6 +91,17 @@ describe("brief action", () => {
   it("returns no-structure message for empty dir", async () => {
     const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
     expect(result.content).toContain("No project structure");
+  });
+});
+
+describe("affected action", () => {
+  it("keeps unavailable confidence for affected symbol requests without semantic support", async () => {
+    const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
+    expect(result.details?.type).toBe("affected");
+    if (result.details?.type === "affected") {
+      expect(result.details.data.confidence).toBe("unavailable");
+    }
+    expect(result.content).not.toContain("heuristic");
   });
 });
 

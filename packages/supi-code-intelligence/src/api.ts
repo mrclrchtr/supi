@@ -23,5 +23,6 @@ export type {
   CodeIntelResult,
   ConfidenceMode,
   DisambiguationCandidate,
+  MapDetails,
   SearchDetails,
 } from "./types.ts";

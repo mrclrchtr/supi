@@ -1,6 +1,23 @@
 import * as path from "node:path";
-import { describe, expect, it } from "vitest";
-import { normalizePath, resolveAnchoredTarget, toZeroBased } from "../../src/target-resolution.ts";
+import { describe, expect, it, vi } from "vitest";
+import {
+  normalizePath,
+  resolveAnchoredTarget,
+  resolveSymbolTarget,
+  toZeroBased,
+} from "../../src/target-resolution.ts";
+
+const mockLspFns = vi.hoisted(() => ({
+  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
+}));
+
+vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
+  return {
+    ...actual,
+    getSessionLspService: mockLspFns.getSessionLspService,
+  };
+});
 
 describe("normalizePath", () => {
   it("resolves relative path against cwd", () => {
@@ -59,6 +76,56 @@ describe("resolveAnchoredTarget", () => {
       expect(result.target.position.line).toBe(0);
       expect(result.target.position.character).toBe(0);
       expect(result.target.confidence).toBe("semantic");
+    }
+  });
+});
+
+describe("resolveSymbolTarget", () => {
+  it("returns an explicit error when semantic symbol discovery is unavailable", async () => {
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "unavailable",
+      reason: "No LSP session initialized for this workspace",
+    });
+
+    const result = await resolveSymbolTarget("Widget", "/project");
+
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.message).toContain("requires active LSP");
+    }
+  });
+
+  it("returns disambiguation from semantic workspace symbols without text-search fallback", async () => {
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "ready",
+      service: {
+        workspaceSymbol: vi.fn().mockResolvedValue([
+          {
+            name: "Widget",
+            kind: 5,
+            location: {
+              uri: "file:///project/src/a.ts",
+              range: { start: { line: 1, character: 2 }, end: { line: 1, character: 8 } },
+            },
+          },
+          {
+            name: "Widget",
+            kind: 5,
+            location: {
+              uri: "file:///project/src/b.ts",
+              range: { start: { line: 4, character: 1 }, end: { line: 4, character: 7 } },
+            },
+          },
+        ]),
+      },
+    });
+
+    const result = await resolveSymbolTarget("Widget", "/project");
+
+    expect(result.kind).toBe("disambiguation");
+    if (result.kind === "disambiguation") {
+      expect(result.candidates).toHaveLength(2);
+      expect(result.candidates[0]?.file).toContain("src/");
     }
   });
 });

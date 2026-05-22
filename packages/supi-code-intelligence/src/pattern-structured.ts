@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { withStructuralSession } from "./providers/structural-provider.ts";
-import type { ActionParams } from "./tool-actions.ts";
+import type { CodeQueryParams as ActionParams } from "./query-params.ts";
 
 export const STRUCTURED_PATTERN_FILE_CAP = 200;
 const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;

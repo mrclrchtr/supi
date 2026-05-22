@@ -71,7 +71,7 @@ describe("generateOverview", () => {
     expect(overview).toContain("Code Intelligence Overview");
     expect(overview).toContain("core");
     expect(overview).toContain("app");
-    expect(overview).toContain("code_intel brief");
+    expect(overview).toContain("code_brief");
   });
 
   it("shows leaf annotation for modules with no deps and no dependents", async () => {

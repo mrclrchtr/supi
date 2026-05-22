@@ -183,13 +183,13 @@ function addDependentsSection(
       const depShort = dep.name.replace(/^@[^/]+\//, "");
       lines.push(`- ${depShort} (\`${dep.relativePath}\`)`);
     }
-    nextQueries.push("`code_intel affected` before modifying exports from this module");
+    nextQueries.push("`code_affected` before modifying exports from this module");
   }
 
   if (mod.entrypoints.length > 0) {
     const ep = mod.entrypoints[0];
     nextQueries.push(
-      `\`code_intel brief\` with \`file: "${mod.relativePath}/${ep.replace(/^\.\//, "")}"\` for entrypoint details`,
+      `\`code_brief\` with \`file: "${mod.relativePath}/${ep.replace(/^\.\//, "")}"\` for entrypoint details`,
     );
   }
 }
@@ -276,7 +276,7 @@ function formatNonModuleDir(ctx: NonModuleDirContext): void {
     lines.push(`- Exports: ${summary.exportCount}`);
     lines.push("");
     nextQueries.push(
-      `\`code_intel pattern\` with \`path: "${relPath || originalPath}"\` to inspect a specific nested symbol`,
+      `\`code_pattern\` with \`path: "${relPath || originalPath}"\` to inspect a specific nested symbol`,
     );
   }
 
@@ -334,11 +334,11 @@ function generateFileBrief(
   }
 
   nextQueries.push(
-    `\`code_intel callers\` with \`file: "${relPath}"\` and a line/character for call-site analysis`,
+    `\`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, and a line/character for call-site analysis`,
   );
   if (mod) {
     nextQueries.push(
-      `\`code_intel brief\` with \`path: "${mod.relativePath}"\` for the containing module overview`,
+      `\`code_brief\` with \`path: "${mod.relativePath}"\` for the containing module overview`,
     );
   }
 

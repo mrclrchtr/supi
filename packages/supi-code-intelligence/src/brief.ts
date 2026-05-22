@@ -64,7 +64,7 @@ export function generateOverview(model: ArchitectureModel): string | null {
     lines.push(formatGitContext(gitCtx));
   }
 
-  lines.push("_Use `code_intel brief` for deeper context on any module or file._");
+  lines.push("_Use `code_brief` for deeper context on any module or file._");
 
   return lines.join("\n");
 }
@@ -208,11 +208,11 @@ function buildNextQueries(model: ArchitectureModel, publicSurfaces: string[]): s
   if (model.modules.length > 0) {
     const firstMod = model.modules[0];
     nextQueries.push(
-      `\`code_intel brief\` with \`path: "${firstMod.relativePath}"\` for a focused module brief`,
+      `\`code_brief\` with \`path: "${firstMod.relativePath}"\` for a focused module brief`,
     );
   }
   if (publicSurfaces.length > 0) {
-    nextQueries.push("`code_intel affected` before modifying shared exports");
+    nextQueries.push("`code_affected` before modifying shared exports");
   }
   return nextQueries;
 }

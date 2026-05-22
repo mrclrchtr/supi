@@ -64,7 +64,6 @@ parameter.
 
 Typical examples:
 - `tree_sitter`
-- `code_intel`
 
 The spec module should own the ordered public action list and any action-level
 metadata needed by guidance or validation.
@@ -191,13 +190,13 @@ creating a fresh owned session for every operation.
 
 ### `packages/supi-code-intelligence`
 
-Uses `src/tool/action-specs.ts` as the single source of truth for:
-- public `code_intel` action names
-- prompt-guidance bullets
-- formatted action lists used by validation
+Uses `src/tool/tool-specs.ts` as the single source of truth for:
+- public focused-tool names (`code_brief`, `code_map`, `code_relations`, `code_affected`, `code_pattern`)
+- descriptions, snippets, and base guidance
+- parameter schemas for each public tool
 
-`src/tool/guidance.ts`, `src/tool-actions.ts`, and `src/code-intelligence.ts`
-derive from those specs.
+`src/tool/guidance.ts`, `src/tool/register-tools.ts`, and
+`src/code-intelligence.ts` derive from those specs.
 
 ### `packages/supi-lsp`
 

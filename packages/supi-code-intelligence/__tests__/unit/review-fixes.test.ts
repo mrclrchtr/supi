@@ -1,10 +1,22 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildArchitectureModel, getDependents } from "../../src/architecture.ts";
 import { runRipgrep } from "../../src/search-helpers.ts";
-import { executeAction } from "../../src/tool-actions.ts";
+import { executeAction } from "../helpers/execute-action.ts";
+
+const mockLspFns = vi.hoisted(() => ({
+  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
+}));
+
+vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
+  return {
+    ...actual,
+    getSessionLspService: mockLspFns.getSessionLspService,
+  };
+});
 
 let tmpDir: string;
 
@@ -13,6 +25,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -77,14 +90,112 @@ describe("transitive downstream impact", () => {
       "import { api } from '@t/api';",
     );
 
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "ready",
+      service: {
+        workspaceSymbol: vi.fn().mockResolvedValue([
+          {
+            name: "shared",
+            kind: 14,
+            location: {
+              uri: `file://${path.join(tmpDir, "packages", "core", "index.ts")}`,
+              range: { start: { line: 0, character: 13 }, end: { line: 0, character: 19 } },
+            },
+          },
+        ]),
+        references: vi.fn().mockResolvedValue([
+          {
+            uri: `file://${path.join(tmpDir, "packages", "core", "index.ts")}`,
+            range: { start: { line: 0, character: 13 }, end: { line: 0, character: 19 } },
+          },
+          {
+            uri: `file://${path.join(tmpDir, "packages", "api", "index.ts")}`,
+            range: { start: { line: 0, character: 9 }, end: { line: 0, character: 15 } },
+          },
+        ]),
+        getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
+      },
+    });
+
     const result = await executeAction(
       { action: "affected", symbol: "shared", path: "packages/" },
       { cwd: tmpDir },
     );
 
-    // The result should mention downstream impact beyond just api
-    // The BFS traversal should find app through api
+    // The result should mention downstream impact beyond just api.
+    // The BFS traversal should find app through api.
     expect(result.content).toContain("Affected");
+    expect(result.content).toContain("downstream");
+  });
+});
+
+describe("focused-tool follow-up regressions", () => {
+  it("uses symbol input for code_brief instead of falling back to a project brief", async () => {
+    writeJson(tmpDir, "package.json", { name: "test" });
+    const srcDir = path.join(tmpDir, "src");
+    mkdirSync(srcDir, { recursive: true });
+    const widgetPath = path.join(srcDir, "widget.ts");
+    writeFileSync(widgetPath, "export function Widget() {\n  return 1;\n}\n");
+
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "ready",
+      service: {
+        workspaceSymbol: vi.fn().mockResolvedValue([
+          {
+            name: "Widget",
+            kind: 12,
+            location: {
+              uri: `file://${widgetPath}`,
+              range: { start: { line: 0, character: 16 }, end: { line: 0, character: 22 } },
+            },
+          },
+        ]),
+      },
+    });
+
+    const result = await executeAction({ action: "brief", symbol: "Widget" }, { cwd: tmpDir });
+
+    expect(result.content).toContain("Symbol Brief: Widget");
+    expect(result.content).toContain("Resolved to:");
+    expect(result.content).toContain("src/widget.ts");
+    expect(result.content).not.toContain("Project Brief");
+    expect(result.details?.type).toBe("brief");
+    if (result.details?.type === "brief") {
+      expect(result.details.data.confidence).toBe("semantic");
+      expect(result.details.data.focusTarget).toContain("Widget");
+    }
+  });
+
+  it("uses file coordinates for anchored code_affected follow-up hints when no symbol name is known", async () => {
+    writeJson(tmpDir, "package.json", { name: "test" });
+    const srcDir = path.join(tmpDir, "src");
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(path.join(srcDir, "widget.ts"), "export function doThing() {\n  return 1;\n}\n");
+
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "ready",
+      service: {
+        references: vi.fn().mockResolvedValue([]),
+        getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
+      },
+    });
+
+    const result = await executeAction(
+      { action: "affected", file: "src/widget.ts", line: 1, character: 1 },
+      { cwd: tmpDir },
+    );
+
+    expect(result.content).toContain('file: "src/widget.ts"');
+    expect(result.content).not.toContain('symbol: "symbol at src/widget.ts:1"');
+    expect(result.details?.type).toBe("affected");
+    if (result.details?.type === "affected") {
+      const callersQuery = result.details.data.nextQueries.find((query) =>
+        query.includes("code_relations"),
+      );
+      expect(callersQuery).toContain('file: "src/widget.ts"');
+      expect(callersQuery).toContain("line: 1");
+      expect(callersQuery).not.toContain('symbol: "symbol at');
+    }
   });
 });
 

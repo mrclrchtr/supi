@@ -60,7 +60,22 @@ JSON
     node - /tmp/supi-status.json <<"NODE"
 const fs = require("node:fs");
 const status = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-const requiredTools = ["ask_user", "lsp", "tree_sitter", "code_intel", "supi_debug"];
+const requiredTools = [
+  "ask_user",
+  "lsp_lookup",
+  "lsp_document_symbols",
+  "lsp_workspace_symbols",
+  "lsp_diagnostics",
+  "lsp_refactor",
+  "lsp_recover",
+  "tree_sitter",
+  "code_brief",
+  "code_map",
+  "code_relations",
+  "code_affected",
+  "code_pattern",
+  "supi_debug",
+];
 const missing = requiredTools.filter((name) => !status.expectedTools?.[name]?.registered);
 const inactive = requiredTools.filter((name) => !status.expectedTools?.[name]?.active);
 if (missing.length || inactive.length) {

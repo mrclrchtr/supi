@@ -1,43 +1,58 @@
-import { createPiMock } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getTool, getTools } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
+import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
 
-describe("code_intel tool registration", () => {
-  it("registers the code_intel tool", () => {
+describe("focused code intelligence tool registration", () => {
+  it("registers the focused tool set from shared specs", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    expect(pi.tools).toHaveLength(1);
-    expect((pi.tools[0] as { name: string }).name).toBe("code_intel");
+
+    const tools = getTools(pi);
+    expect(tools).toHaveLength(CODE_INTELLIGENCE_TOOL_SPECS.length);
+    expect(tools.map((tool) => tool.name)).toEqual(
+      CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => spec.name),
+    );
   });
 
-  it("keeps the description focused on the available actions", () => {
+  it("keeps descriptions focused on each tool contract", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const desc = (pi.tools[0] as { description: string }).description;
-    expect(desc).toContain("brief");
-    expect(desc).toContain("callers");
-    expect(desc).toContain("callees");
-    expect(desc).toContain("implementations");
-    expect(desc).toContain("affected");
-    expect(desc).toContain("pattern");
-    expect(desc).not.toContain('"action": "brief"');
+
+    const brief = getTool(pi, "code_brief");
+    const map = getTool(pi, "code_map");
+    const relations = getTool(pi, "code_relations");
+    const affected = getTool(pi, "code_affected");
+    const pattern = getTool(pi, "code_pattern");
+
+    expect(brief.description).toContain("brief");
+    expect(map.description).toContain("map");
+    expect(relations.description).toContain("callers");
+    expect(affected.description).toContain("blast radius");
+    expect(pattern.description).toContain("search");
   });
 
-  it("registers an optional regex parameter for pattern searches", () => {
+  it("registers a relation kind parameter on code_relations", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
+
     expect(
-      (pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters
-        ?.properties,
+      (getTool(pi, "code_relations") as { parameters?: { properties?: Record<string, unknown> } })
+        .parameters?.properties,
+    ).toHaveProperty("kind");
+  });
+
+  it("registers regex and kind parameters on code_pattern", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    expect(
+      (getTool(pi, "code_pattern") as { parameters?: { properties?: Record<string, unknown> } })
+        .parameters?.properties,
     ).toHaveProperty("regex");
-  });
-
-  it("registers an optional kind parameter for structured pattern searches", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
     expect(
-      (pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters
-        ?.properties,
+      (getTool(pi, "code_pattern") as { parameters?: { properties?: Record<string, unknown> } })
+        .parameters?.properties,
     ).toHaveProperty("kind");
   });
 });
@@ -107,8 +122,8 @@ describe("session lifecycle", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     expect(
-      (pi.tools[0] as { parameters?: { properties?: Record<string, unknown> } }).parameters
-        ?.properties,
+      (getTool(pi, "code_pattern") as { parameters?: { properties?: Record<string, unknown> } })
+        .parameters?.properties,
     ).toHaveProperty("summary");
   });
 });

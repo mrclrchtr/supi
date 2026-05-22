@@ -1,4 +1,4 @@
-// Shared search helpers for code_intel actions.
+// Shared search helpers for code-intelligence search and routing helpers.
 
 import { execFileSync } from "node:child_process";
 import * as path from "node:path";
@@ -71,7 +71,7 @@ export interface RipgrepRunResult {
 /**
  * Run ripgrep with JSON output and parse matches, filtering low-signal paths.
  *
- * This helper preserves the historical behavior used by most `code_intel`
+ * This helper preserves the historical behavior used by internal
  * actions: any ripgrep execution failure is treated like an empty match set.
  * Call `runRipgrepDetailed()` when a caller needs to surface regex parse errors
  * or other non-no-match failures to the agent.

@@ -1,20 +1,8 @@
-/**
- * Regression tests for code_intel fallback chains and confidence labeling.
- *
- * Verifies that:
- * - `callers` uses LSP → ripgrep (no tree-sitter)
- * - `implementations` uses LSP → ripgrep (no tree-sitter)
- * - Confidence labels match the actual source of data
- * - Fallthrough happens correctly when LSP returns empty/no results
- */
-
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { executeAction } from "../../src/tool-actions.ts";
-
-// ── LSP mock ──────────────────────────────────────────────────────────
+import { executeAction } from "../helpers/execute-action.ts";
 
 const mockLspFns = vi.hoisted(() => ({
   getSessionLspService: vi.fn<(cwd: string) => unknown>(),
@@ -27,8 +15,6 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
     getSessionLspService: mockLspFns.getSessionLspService,
   };
 });
-
-// ── Test helpers ──────────────────────────────────────────────────────
 
 let tmpDir: string;
 
@@ -48,105 +34,43 @@ function createSourceFile(name: string, content: string): string {
   return filePath;
 }
 
-// ── callers — LSP unavailable ─────────────────────────────────────────
+function mockReadyService(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}) {
+  mockLspFns.getSessionLspService.mockReturnValue({
+    kind: "ready",
+    service: {
+      workspaceSymbol: vi.fn().mockResolvedValue([]),
+      documentSymbols: vi.fn().mockResolvedValue(null),
+      references: vi.fn().mockResolvedValue(null),
+      implementation: vi.fn().mockResolvedValue(null),
+      getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
+      ...overrides,
+    },
+  });
+}
 
-describe("callers action — LSP unavailable", () => {
-  beforeEach(() => {
+describe("callers action without heuristic fallback", () => {
+  it("returns unavailable details when symbol discovery lacks active LSP", async () => {
     mockLspFns.getSessionLspService.mockReturnValue({
       kind: "unavailable",
       reason: "No LSP in test env",
     });
-  });
-
-  it("returns no-data message for anchored target without symbol name", async () => {
-    createSourceFile("test.ts", "export const x = 1;\n");
-
-    const result = await executeAction(
-      { action: "callers", file: "test.ts", line: 1, character: 1 },
-      { cwd: tmpDir },
-    );
-
-    expect(result.content).toContain("No caller data available");
-    expect(result.details).toBeDefined();
-    if (result.details) {
-      expect(result.details.type).toBe("search");
-      if (result.details.type === "search") {
-        expect(result.details.data.confidence).toBe("unavailable");
-      }
-    }
-  });
-
-  it("falls back to heuristic text search when symbol is provided", async () => {
-    createSourceFile("lib.ts", "function myFunc() { return 42; }\nmyFunc();\n");
 
     const result = await executeAction({ action: "callers", symbol: "myFunc" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("heuristic");
-    expect(result.content).toContain("myFunc");
-    expect(result.details).toBeDefined();
+    expect(result.content).toContain("requires active LSP");
+    expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("heuristic");
-      // heuristic path now sets candidateCount to actual ripgrep match count
-      expect(result.details.data.candidateCount).toBeGreaterThan(0);
-    }
-  });
-
-  it("returns heuristic confidence for symbol target with declaration-only matches", async () => {
-    createSourceFile("lib.ts", "function orphanFunc() { return 42; }\n");
-
-    const result = await executeAction(
-      { action: "callers", symbol: "orphanFunc" },
-      { cwd: tmpDir },
-    );
-
-    // ripgrep finds the declaration as a match (word-boundary search), so
-    // the heuristic path shows matches rather than "No references found"
-    expect(result.content).toContain("heuristic");
-    expect(result.content).toContain("orphanFunc");
-    expect(result.details).toBeDefined();
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("heuristic");
-    }
-  });
-});
-
-describe("callers action — LSP inactive", () => {
-  beforeEach(() => {
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "inactive",
-      service: {
-        references: vi.fn(),
-        implementation: vi.fn(),
-      },
-    });
-  });
-
-  it("does not treat inactive LSP as semantic availability", async () => {
-    createSourceFile("test.ts", "export const x = 1;\n");
-
-    const result = await executeAction(
-      { action: "callers", file: "test.ts", line: 1, character: 1 },
-      { cwd: tmpDir },
-    );
-
-    expect(result.content).toContain("No caller data available");
-    expect(result.details).toBeDefined();
     if (result.details?.type === "search") {
       expect(result.details.data.confidence).toBe("unavailable");
+      expect(result.details.data.candidateCount).toBe(0);
     }
   });
-});
 
-// ── callers — LSP available ──────────────────────────────────────────
-
-describe("callers action — LSP available", () => {
   it("returns semantic confidence when LSP returns caller references", async () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
     createSourceFile("src/caller.ts", "import { target } from './module';\ntarget();\n");
 
-    const mockService = {
+    mockReadyService({
       references: vi.fn().mockResolvedValue([
         {
           uri: `file://${sourcePath}`,
@@ -154,15 +78,9 @@ describe("callers action — LSP available", () => {
         },
         {
           uri: `file://${path.join(tmpDir, "src", "caller.ts")}`,
-          range: { start: { line: 2, character: 0 }, end: { line: 2, character: 6 } },
+          range: { start: { line: 1, character: 0 }, end: { line: 1, character: 6 } },
         },
       ]),
-      implementation: vi.fn(),
-    } as { references: ReturnType<typeof vi.fn>; implementation: ReturnType<typeof vi.fn> };
-
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: mockService,
     });
 
     const result = await executeAction(
@@ -170,261 +88,107 @@ describe("callers action — LSP available", () => {
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain("Callers");
     expect(result.content).toContain("semantic");
-    expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
       expect(result.details.data.confidence).toBe("semantic");
-      // candidateCount should match the rendered, non-declaration caller refs
       expect(result.details.data.candidateCount).toBe(1);
     }
-    // Verify LSP was called
-    expect(mockService.references).toHaveBeenCalledTimes(1);
   });
 
-  it("falls through to heuristic when LSP returns only the declaration (anchored, no name)", async () => {
+  it("does not fall back to heuristic when semantic caller lookup finds no refs", async () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
 
-    const mockService = {
-      references: vi.fn().mockResolvedValue([
-        {
-          uri: `file://${sourcePath}`,
-          // Matches the declaration position (line 1, char 1 → 0-based line 0, char 0)
-          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
-        },
-      ]),
-      implementation: vi.fn(),
-    } as { references: ReturnType<typeof vi.fn>; implementation: ReturnType<typeof vi.fn> };
-
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: mockService,
-    });
-
-    const result = await executeAction(
-      { action: "callers", file: "src/module.ts", line: 1, character: 1 },
-      { cwd: tmpDir },
-    );
-
-    // Anchored target has no symbol name → cannot do heuristic fallback
-    expect(result.content).toContain("No caller data available");
-    expect(result.details).toBeDefined();
-    if (result.details) {
-      expect(result.details.type).toBe("search");
-      if (result.details.type === "search") {
-        expect(result.details.data.confidence).toBe("unavailable");
-      }
-    }
-  });
-
-  it("falls back to heuristic when LSP returns only the declaration with symbol name", async () => {
-    const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
-
-    const mockService: Record<string, ReturnType<typeof vi.fn>> = {
-      references: vi.fn().mockResolvedValue([
-        {
-          uri: `file://${sourcePath}`,
-          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
-        },
-      ]),
-      implementation: vi.fn(),
+    mockReadyService({
       workspaceSymbol: vi.fn().mockResolvedValue([
         {
           name: "target",
-          kind: 6, // Method
+          kind: 6,
           location: {
             uri: `file://${sourcePath}`,
             range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
           },
         },
       ]),
-    };
-
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: mockService,
+      references: vi.fn().mockResolvedValue([]),
     });
-
-    // Symbol target: resolveTarget uses LSP workspaceSymbol to find the declaration,
-    // then action's LSP references returns only the declaration → falls through.
-    // target.name is set from the resolved symbol → falls to heuristic.
 
     const result = await executeAction({ action: "callers", symbol: "target" }, { cwd: tmpDir });
 
-    // LSP refs found only declaration, filtered out → callerRefs.length === 0
-    // target.name is "target" → falls to heuristic
-    expect(result.content).toContain("heuristic");
-    expect(result.details).toBeDefined();
+    expect(result.content).toContain("No references found for `target` (semantic)");
+    expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("heuristic");
-    }
-  });
-
-  it("falls back to heuristic when LSP returns null references with symbol name", async () => {
-    createSourceFile("src/module.ts", "export function target() {}\n");
-
-    const mockService = {
-      references: vi.fn().mockResolvedValue(null),
-      implementation: vi.fn(),
-      workspaceSymbol: vi.fn().mockResolvedValue([
-        {
-          name: "target",
-          kind: 6,
-          location: {
-            uri: `file://${path.join(tmpDir, "src", "module.ts")}`,
-            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
-          },
-        },
-      ]),
-    };
-
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: mockService,
-    });
-
-    const result = await executeAction({ action: "callers", symbol: "target" }, { cwd: tmpDir });
-
-    expect(result.content).toContain("heuristic");
-    expect(result.details).toBeDefined();
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("heuristic");
+      expect(result.details.data.confidence).toBe("semantic");
+      expect(result.details.data.candidateCount).toBe(0);
     }
   });
 });
 
-// ── implementations — LSP unavailable ─────────────────────────────────
-
-describe("implementations action — LSP unavailable", () => {
-  beforeEach(() => {
+describe("implementations action without heuristic fallback", () => {
+  it("returns unavailable details when symbol discovery lacks active LSP", async () => {
     mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "unavailable",
-      reason: "No LSP in test env",
+      kind: "inactive",
+      service: {
+        workspaceSymbol: vi.fn(),
+        implementation: vi.fn(),
+      },
     });
-  });
-
-  it("returns no-data message for anchored target without symbol name", async () => {
-    createSourceFile("interface.ts", "export interface MyInterface {}\n");
-
-    const result = await executeAction(
-      { action: "implementations", file: "interface.ts", line: 1, character: 1 },
-      { cwd: tmpDir },
-    );
-
-    expect(result.content).toContain("No implementations found");
-    expect(result.details).toBeDefined();
-    if (result.details) {
-      expect(result.details.type).toBe("search");
-      if (result.details.type === "search") {
-        expect(result.details.data.confidence).toBe("unavailable");
-      }
-    }
-  });
-
-  it("falls back to heuristic text search when symbol is provided", async () => {
-    createSourceFile(
-      "shapes.ts",
-      [
-        "interface Drawable { draw(): void; }",
-        "class Circle implements Drawable { draw() {} }",
-        "class Square implements Drawable { draw() {} }",
-      ].join("\n"),
-    );
 
     const result = await executeAction(
       { action: "implementations", symbol: "Drawable" },
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain("heuristic");
-    expect(result.content).toContain("Drawable");
-    expect(result.details).toBeDefined();
+    expect(result.content).toContain("requires active LSP");
+    expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("heuristic");
+      expect(result.details.data.confidence).toBe("unavailable");
     }
   });
 
-  it("returns no-matches message with heuristic confidence when heuristic finds nothing", async () => {
-    createSourceFile("alone.ts", "interface Lonesome {}\n");
-
-    const result = await executeAction(
-      { action: "implementations", symbol: "Lonesome" },
-      { cwd: tmpDir },
-    );
-
-    // Symbol resolves, but heuristic finds no implements/extends matches
-    expect(result.content).toContain("No implementations found");
-    // Details ARE returned with heuristic confidence (the heuristic search ran, just found nothing)
-    expect(result.details).toBeDefined();
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("heuristic");
-    }
-  });
-});
-
-// ── implementations — LSP available ────────────────────────────────────
-
-describe("implementations action — LSP available", () => {
   it("returns semantic confidence when LSP returns implementation locations", async () => {
-    createSourceFile("src/iface.ts", "export interface Drawable { draw(): void; }\n");
-    createSourceFile("src/circle.ts", "export class Circle implements Drawable { draw() {} }\n");
+    const ifacePath = createSourceFile("src/iface.ts", "export interface Drawable {}\n");
+    createSourceFile("src/circle.ts", "export class Circle implements Drawable {}\n");
 
-    const mockService = {
-      references: vi.fn(),
+    mockReadyService({
       implementation: vi.fn().mockResolvedValue([
         {
           uri: `file://${path.join(tmpDir, "src", "circle.ts")}`,
-          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
         },
       ]),
-    } as { references: ReturnType<typeof vi.fn>; implementation: ReturnType<typeof vi.fn> };
-
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: mockService,
     });
 
     const result = await executeAction(
-      { action: "implementations", file: "src/iface.ts", line: 1, character: 1 },
+      { action: "implementations", file: path.relative(tmpDir, ifacePath), line: 1, character: 1 },
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain("Implementations");
     expect(result.content).toContain("semantic");
-    expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
       expect(result.details.data.confidence).toBe("semantic");
       expect(result.details.data.candidateCount).toBe(1);
     }
-    expect(mockService.implementation).toHaveBeenCalledTimes(1);
   });
 
-  it("falls through to heuristic when LSP implementation returns empty (with symbol name)", async () => {
-    createSourceFile("src/iface.ts", "export interface Solo { run(): void; }\n");
+  it("keeps semantic confidence when implementation lookup returns no matches", async () => {
+    const ifacePath = createSourceFile("src/iface.ts", "export interface Solo {}\n");
 
-    const mockService: Record<string, ReturnType<typeof vi.fn>> = {
-      references: vi.fn(),
-      implementation: vi.fn().mockResolvedValue([]),
+    mockReadyService({
       workspaceSymbol: vi.fn().mockResolvedValue([
         {
           name: "Solo",
-          kind: 11, // Interface
+          kind: 11,
           location: {
-            uri: `file://${path.join(tmpDir, "src", "iface.ts")}`,
+            uri: `file://${ifacePath}`,
             range: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } },
           },
         },
       ]),
-    };
-
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: mockService,
+      implementation: vi.fn().mockResolvedValue([]),
     });
 
     const result = await executeAction(
@@ -432,112 +196,59 @@ describe("implementations action — LSP available", () => {
       { cwd: tmpDir },
     );
 
-    // Content says "No implementations found" (no heuristic label in no-match content)
-    // but details carry heuristic confidence
-    expect(result.content).toContain("No implementations found");
-    expect(result.details).toBeDefined();
+    expect(result.content).toContain("No implementations found for `Solo`.");
+    expect(result.content).not.toContain("heuristic");
+    expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("heuristic");
-    }
-  });
-
-  it("falls through to heuristic when LSP returns null implementations (with symbol name)", async () => {
-    createSourceFile("src/iface.ts", "export interface EmptyIface {}\n");
-
-    const mockService: Record<string, ReturnType<typeof vi.fn>> = {
-      references: vi.fn(),
-      implementation: vi.fn().mockResolvedValue(null),
-      workspaceSymbol: vi.fn().mockResolvedValue([
-        {
-          name: "EmptyIface",
-          kind: 11,
-          location: {
-            uri: `file://${path.join(tmpDir, "src", "iface.ts")}`,
-            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } },
-          },
-        },
-      ]),
-    };
-
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: mockService,
-    });
-
-    const result = await executeAction(
-      { action: "implementations", symbol: "EmptyIface" },
-      { cwd: tmpDir },
-    );
-
-    expect(result.content).toContain("No implementations found");
-    expect(result.details).toBeDefined();
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("heuristic");
-    }
-  });
-
-  it("returns no-data for anchored target when LSP returns empty implementations (no name)", async () => {
-    createSourceFile("src/iface.ts", "export interface Lonesome {}\n");
-
-    const mockService = {
-      references: vi.fn(),
-      implementation: vi.fn().mockResolvedValue([]),
-    } as { references: ReturnType<typeof vi.fn>; implementation: ReturnType<typeof vi.fn> };
-
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: mockService,
-    });
-
-    const result = await executeAction(
-      { action: "implementations", file: "src/iface.ts", line: 1, character: 1 },
-      { cwd: tmpDir },
-    );
-
-    // Anchored target has no name → cannot do heuristic fallback
-    expect(result.content).toContain("No implementations found");
-    expect(result.details).toBeDefined();
-    if (result.details) {
-      expect(result.details.type).toBe("search");
-      if (result.details.type === "search") {
-        expect(result.details.data.confidence).toBe("unavailable");
-      }
+      expect(result.details.data.confidence).toBe("semantic");
+      expect(result.details.data.candidateCount).toBe(0);
     }
   });
 });
 
-// ── Confidence label accuracy ─────────────────────────────────────────
-
-describe("confidence labels never overstated", () => {
-  it("callers never reports structural confidence", async () => {
-    createSourceFile("test.ts", "export function f() {}\n");
-
+describe("affected action without heuristic fallback", () => {
+  it("returns unavailable details when symbol discovery lacks active LSP", async () => {
     mockLspFns.getSessionLspService.mockReturnValue({
       kind: "unavailable",
-      reason: "No LSP",
+      reason: "No LSP in test env",
     });
 
-    const result = await executeAction({ action: "callers", symbol: "f" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
 
-    if (result.details?.type === "search") {
-      // callers has no tree-sitter fallback, so it can never be "structural"
-      expect(result.details.data.confidence).not.toBe("structural");
+    expect(result.content).toContain("requires active LSP");
+    expect(result.content).not.toContain("heuristic");
+    expect(result.details?.type).toBe("affected");
+    if (result.details?.type === "affected") {
+      expect(result.details.data.confidence).toBe("unavailable");
+      expect(result.details.data.directCount).toBe(0);
     }
   });
 
-  it("implementations never reports structural confidence", async () => {
-    createSourceFile("test.ts", "interface I {}\nclass C implements I {}\n");
+  it("keeps semantic confidence when affected reference gathering finds no refs", async () => {
+    const targetPath = createSourceFile("src/widget.ts", "export interface Widget {}\n");
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "unavailable",
-      reason: "No LSP",
+    mockReadyService({
+      workspaceSymbol: vi.fn().mockResolvedValue([
+        {
+          name: "Widget",
+          kind: 11,
+          location: {
+            uri: `file://${targetPath}`,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
+          },
+        },
+      ]),
+      references: vi.fn().mockResolvedValue([]),
     });
 
-    const result = await executeAction({ action: "implementations", symbol: "I" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
 
-    if (result.details?.type === "search") {
-      // implementations has no tree-sitter fallback
-      expect(result.details.data.confidence).not.toBe("structural");
+    expect(result.content).toContain("(semantic)");
+    expect(result.content).not.toContain("heuristic");
+    expect(result.details?.type).toBe("affected");
+    if (result.details?.type === "affected") {
+      expect(result.details.data.confidence).toBe("semantic");
+      expect(result.details.data.directCount).toBe(0);
     }
   });
 });

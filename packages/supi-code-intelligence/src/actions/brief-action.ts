@@ -6,8 +6,13 @@ import type { TreeSitterService } from "@mrclrchtr/supi-tree-sitter/api";
 import { buildArchitectureModel, findModuleForPath } from "../architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import { withStructuralSession } from "../providers/structural-provider.ts";
+import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { normalizePath } from "../search-helpers.ts";
-import type { ActionParams } from "../tool-actions.ts";
+import {
+  type ResolvedTarget,
+  resolveSymbolTarget,
+  type TargetResolutionResult,
+} from "../target-resolution.ts";
 import type { CodeIntelResult } from "../types.ts";
 
 export async function executeBriefAction(
@@ -52,12 +57,16 @@ export async function executeBriefAction(
           dependencySummary: mod && model ? { moduleCount: 1, edgeCount: 0 } : null,
           omittedCount: 0,
           nextQueries: [
-            `\`code_intel callers\` with \`file: "${relPath}", line: ${params.line}, character: ${params.character}\` for call sites`,
-            `\`code_intel affected\` with \`file: "${relPath}", line: ${params.line}, character: ${params.character}\` for impact analysis`,
+            `\`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, \`line: ${params.line}\`, and \`character: ${params.character}\` for call sites`,
+            `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${params.line}\`, and \`character: ${params.character}\` for impact analysis`,
           ],
         },
       },
     };
+  }
+
+  if (params.symbol) {
+    return executeSymbolBrief(params, cwd, model);
   }
 
   if (params.path) {
@@ -72,6 +81,29 @@ export async function executeBriefAction(
 
   const result = generateProjectBrief(model);
   return { content: result.content, details: { type: "brief" as const, data: result.details } };
+}
+
+async function executeSymbolBrief(
+  params: ActionParams,
+  cwd: string,
+  model: NonNullable<Awaited<ReturnType<typeof buildArchitectureModel>>>,
+): Promise<CodeIntelResult> {
+  const symbol = params.symbol ?? "";
+  const resolved = await resolveSymbolTarget(symbol, cwd, { path: params.path });
+
+  if (resolved.kind === "error") {
+    return createUnavailableSymbolBriefResult(symbol, resolved.message);
+  }
+
+  if (resolved.kind === "disambiguation") {
+    return createUnavailableSymbolBriefResult(
+      symbol,
+      formatBriefDisambiguation(symbol, resolved),
+      resolved.omittedCount,
+    );
+  }
+
+  return buildResolvedSymbolBriefResult(resolved.target, cwd, model);
 }
 
 async function executeAnchoredBrief(
@@ -95,6 +127,63 @@ async function executeAnchoredBrief(
   await addTreeSitterContext({ lines, relPath, line1, char1, cwd });
   addModuleContext(lines, model, file);
   addNextQueries(lines, relPath, line1, char1);
+
+  return lines.join("\n");
+}
+
+async function buildResolvedSymbolBriefResult(
+  target: ResolvedTarget,
+  cwd: string,
+  model: NonNullable<Awaited<ReturnType<typeof buildArchitectureModel>>>,
+): Promise<CodeIntelResult> {
+  const relPath = path.relative(cwd, target.file);
+  const content = await executeResolvedSymbolBrief(target, cwd, model);
+  const mod = findModuleForPath(model, target.file);
+
+  return {
+    content,
+    details: {
+      type: "brief" as const,
+      data: {
+        confidence: target.confidence,
+        focusTarget: `${target.name ?? relPath}:${target.displayLine}:${target.displayCharacter}`,
+        startHere: [],
+        publicSurfaces: [],
+        dependencySummary: mod ? { moduleCount: 1, edgeCount: 0 } : null,
+        omittedCount: 0,
+        nextQueries: [
+          `\`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for call sites`,
+          `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for impact analysis`,
+        ],
+      },
+    },
+  };
+}
+
+async function executeResolvedSymbolBrief(
+  target: ResolvedTarget,
+  cwd: string,
+  model: NonNullable<Awaited<ReturnType<typeof buildArchitectureModel>>>,
+): Promise<string> {
+  const relPath = path.relative(cwd, target.file);
+  const lines: string[] = [];
+
+  lines.push(`# Symbol Brief: ${target.name ?? relPath}`);
+  lines.push("");
+  lines.push(
+    `**Resolved to:** \`${relPath}:${target.displayLine}:${target.displayCharacter}\`${target.kind ? ` (${target.kind})` : ""}`,
+  );
+  lines.push("");
+
+  await addTreeSitterContext({
+    lines,
+    relPath,
+    line1: target.displayLine,
+    char1: target.displayCharacter,
+    cwd,
+  });
+  addModuleContext(lines, model, target.file);
+  addNextQueries(lines, relPath, target.displayLine, target.displayCharacter);
 
   return lines.join("\n");
 }
@@ -232,10 +321,58 @@ function addModuleContext(
 function addNextQueries(lines: string[], relPath: string, line1: number, char1: number): void {
   lines.push("## Next");
   lines.push(
-    `- \`code_intel callers\` with \`file: "${relPath}", line: ${line1}, character: ${char1}\` for call sites`,
+    `- \`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, \`line: ${line1}\`, and \`character: ${char1}\` for call sites`,
   );
   lines.push(
-    `- \`code_intel affected\` with \`file: "${relPath}", line: ${line1}, character: ${char1}\` for impact analysis`,
+    `- \`code_affected\` with \`file: "${relPath}"\`, \`line: ${line1}\`, and \`character: ${char1}\` for impact analysis`,
   );
   lines.push("");
+}
+
+function createUnavailableSymbolBriefResult(
+  symbol: string,
+  content: string,
+  omittedCount = 0,
+): CodeIntelResult {
+  return {
+    content,
+    details: {
+      type: "brief" as const,
+      data: {
+        confidence: "unavailable",
+        focusTarget: symbol,
+        startHere: [],
+        publicSurfaces: [],
+        dependencySummary: null,
+        omittedCount,
+        nextQueries: [
+          "Use `file` + coordinates for a precise symbol brief, or enable LSP and retry",
+        ],
+      },
+    },
+  };
+}
+
+function formatBriefDisambiguation(
+  symbol: string,
+  result: Extract<TargetResolutionResult, { kind: "disambiguation" }>,
+): string {
+  const lines: string[] = [];
+  lines.push(`# Disambiguation needed for \`${symbol}\``);
+  lines.push("");
+  const omitNote = result.omittedCount > 0 ? ` (+${result.omittedCount} more)` : "";
+  lines.push(
+    `Found ${result.candidates.length} candidates${omitNote}. Rerun with anchored coordinates:`,
+  );
+  lines.push("");
+
+  for (const candidate of result.candidates) {
+    const kind = candidate.kind ? ` (${candidate.kind})` : "";
+    const container = candidate.container ? ` in ${candidate.container}` : "";
+    lines.push(
+      `${candidate.rank}. **${candidate.name}**${kind}${container} — \`${candidate.file}\`:${candidate.line}:${candidate.character}`,
+    );
+  }
+
+  return lines.join("\n");
 }

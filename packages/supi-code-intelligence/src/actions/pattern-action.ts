@@ -7,6 +7,7 @@ import {
   type StructuredMatch,
   type StructuredPatternResult,
 } from "../pattern-structured.ts";
+import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import type { RgMatch } from "../search-helpers.ts";
 import {
   escapeRegex,
@@ -15,7 +16,6 @@ import {
   runRipgrep,
   runRipgrepDetailed,
 } from "../search-helpers.ts";
-import type { ActionParams } from "../tool-actions.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 /**

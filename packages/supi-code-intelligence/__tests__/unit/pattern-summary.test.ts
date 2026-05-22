@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executePatternAction } from "../../src/actions/pattern-action.ts";
-import { executeAction } from "../../src/tool-actions.ts";
+import { executeAction } from "../helpers/execute-action.ts";
 
 let tmpDir: string;
 
@@ -25,10 +25,7 @@ describe("pattern summary via executePatternAction", () => {
     writeFileSync(join(tmpDir, "b.ts"), "const foo = 3;");
     writeFileSync(join(tmpDir, "c.ts"), "const bar = 4;");
 
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "foo", summary: true },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "foo", summary: true }, tmpDir);
     expect(result.content).toContain("Pattern Summary");
     expect(result.content).toContain("2 files");
     expect(result.content).not.toContain("L1:");
@@ -38,7 +35,7 @@ describe("pattern summary via executePatternAction", () => {
     writeFileSync(join(tmpDir, "a.ts"), "const foo = 1;");
     writeFileSync(join(tmpDir, "b.ts"), "const foo = 2;");
 
-    const result = await executePatternAction({ action: "pattern", pattern: "foo" }, tmpDir);
+    const result = await executePatternAction({ pattern: "foo" }, tmpDir);
     expect(result.content).toContain("Pattern:");
     expect(result.content).toContain("L1:");
     expect(result.content).not.toContain("Pattern Summary");
@@ -48,10 +45,7 @@ describe("pattern summary via executePatternAction", () => {
     writeFileSync(join(tmpDir, "a.ts"), "const foo = 1;");
     writeFileSync(join(tmpDir, "b.ts"), "const foo = 2;");
 
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "foo", summary: false },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "foo", summary: false }, tmpDir);
     expect(result.content).toContain("L1:");
     expect(result.content).not.toContain("Pattern Summary");
   });
@@ -66,10 +60,7 @@ describe("pattern summary via executePatternAction", () => {
     writeFileSync(join(srcDir, "b.ts"), "const foo = 2;");
     writeFileSync(join(libDir, "c.ts"), "const foo = 3;");
 
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "foo", summary: true },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "foo", summary: true }, tmpDir);
     expect(result.content).toContain("Pattern Summary");
     expect(result.content).toContain("3 files");
     expect(result.content).toContain("src/");
@@ -80,10 +71,7 @@ describe("pattern summary via executePatternAction", () => {
   it("returns search details metadata", async () => {
     writeFileSync(join(tmpDir, "a.ts"), "const foo = 1;");
 
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "foo", summary: true },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "foo", summary: true }, tmpDir);
 
     expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("search");
@@ -103,7 +91,7 @@ describe("pattern summary via executePatternAction", () => {
     writeFileSync(join(subDirOther, "b.ts"), "const target = 2;");
 
     const result = await executePatternAction(
-      { action: "pattern", pattern: "target", path: "src/", summary: true },
+      { pattern: "target", path: "src/", summary: true },
       tmpDir,
     );
 
@@ -114,10 +102,7 @@ describe("pattern summary via executePatternAction", () => {
   it("returns no-matches message when pattern not found in summary mode", async () => {
     writeFileSync(join(tmpDir, "a.ts"), "const foo = 1;");
 
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "nonexistent", summary: true },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "nonexistent", summary: true }, tmpDir);
     expect(result.content).toContain("No matches");
   });
 
@@ -126,7 +111,7 @@ describe("pattern summary via executePatternAction", () => {
     writeFileSync(join(tmpDir, "b.ts"), "const ConfigFoo = 3;");
 
     const result = await executePatternAction(
-      { action: "pattern", pattern: "Settings|Config", regex: true, summary: true },
+      { pattern: "Settings|Config", regex: true, summary: true },
       tmpDir,
     );
 
@@ -141,7 +126,7 @@ describe("pattern summary via executePatternAction", () => {
     }
 
     const result = await executePatternAction(
-      { action: "pattern", pattern: "^const", regex: true, summary: true },
+      { pattern: "^const", regex: true, summary: true },
       tmpDir,
     );
 
@@ -152,20 +137,14 @@ describe("pattern summary via executePatternAction", () => {
   it("handles single match in summary", async () => {
     writeFileSync(join(tmpDir, "a.ts"), "const foo = 1;");
 
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "foo", summary: true },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "foo", summary: true }, tmpDir);
 
     expect(result.content).toContain("1 match");
     expect(result.content).toContain("1 file");
   });
 
   it("handles empty directory scope in summary", async () => {
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "anything", summary: true },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "anything", summary: true }, tmpDir);
     expect(result.content).toContain("No matches");
   });
 });
@@ -219,7 +198,7 @@ describe("non-summary output unaffected", () => {
   it("returns normal line-level results without summary param", async () => {
     writeFileSync(join(tmpDir, "index.ts"), "const hello = 1;\nconst hello = 2;\nconst world = 3;");
 
-    const result = await executePatternAction({ action: "pattern", pattern: "hello" }, tmpDir);
+    const result = await executePatternAction({ pattern: "hello" }, tmpDir);
 
     expect(result.content).toContain("Pattern:");
     expect(result.content).toContain("L1:");
@@ -232,10 +211,7 @@ describe("non-summary output unaffected", () => {
       writeFileSync(join(tmpDir, `file${i}.ts`), `const hello = ${i};`);
     }
 
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "hello", maxResults: 3 },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "hello", maxResults: 3 }, tmpDir);
 
     expect(result.content).toContain("10 matches");
     expect(result.content).toMatch(/omitted/);
@@ -244,10 +220,7 @@ describe("non-summary output unaffected", () => {
   it("literal default still works when summary=false", async () => {
     writeFileSync(join(tmpDir, "index.ts"), "const x = sendMessage({ ok: true });");
 
-    const result = await executePatternAction(
-      { action: "pattern", pattern: "sendMessage({", summary: false },
-      tmpDir,
-    );
+    const result = await executePatternAction({ pattern: "sendMessage({", summary: false }, tmpDir);
 
     expect(result.content).toContain("sendMessage({");
     expect(result.content).not.toContain("No matches");
@@ -260,7 +233,7 @@ describe("non-summary output unaffected", () => {
     );
 
     const result = await executePatternAction(
-      { action: "pattern", pattern: "register(Settings|Config)", regex: true, summary: false },
+      { pattern: "register(Settings|Config)", regex: true, summary: false },
       tmpDir,
     );
 
@@ -272,7 +245,7 @@ describe("non-summary output unaffected", () => {
     writeFileSync(join(tmpDir, "index.ts"), "const x = 1;");
 
     const result = await executePatternAction(
-      { action: "pattern", pattern: "(", regex: true, summary: false },
+      { pattern: "(", regex: true, summary: false },
       tmpDir,
     );
 
@@ -282,15 +255,12 @@ describe("non-summary output unaffected", () => {
 
   it("no-matches message works whether summary is set or not", async () => {
     const resultSummary = await executePatternAction(
-      { action: "pattern", pattern: "xyznonexistent", summary: true },
+      { pattern: "xyznonexistent", summary: true },
       tmpDir,
     );
-    const resultNoSummary = await executePatternAction(
-      { action: "pattern", pattern: "xyznonexistent" },
-      tmpDir,
-    );
+    const resultNoSummary = await executePatternAction({ pattern: "xyznonexistent" }, tmpDir);
     const resultFalse = await executePatternAction(
-      { action: "pattern", pattern: "xyznonexistent", summary: false },
+      { pattern: "xyznonexistent", summary: false },
       tmpDir,
     );
 

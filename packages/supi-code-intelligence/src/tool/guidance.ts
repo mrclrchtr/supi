@@ -1,18 +1,29 @@
-// Prompt guidance and tool description for the code_intel tool.
+// Prompt guidance and tool descriptions for the focused code-intelligence tool surface.
 
-import { CODE_INTEL_ACTION_SPECS, formatCodeIntelActionList } from "./action-specs.ts";
+import { CODE_INTELLIGENCE_TOOL_SPECS, type CodeIntelligenceToolName } from "./tool-specs.ts";
 
-export const toolDescription = `Code intelligence tool — codebase orientation, semantic relationships, impact analysis, and scoped search.
+export interface CodeIntelligenceToolPromptSurface {
+  description: string;
+  promptSnippet: string;
+  promptGuidelines: string[];
+}
 
-Actions: ${formatCodeIntelActionList()}.
+export type CodeIntelligenceToolPromptSurfaceMap = Record<
+  CodeIntelligenceToolName,
+  CodeIntelligenceToolPromptSurface
+>;
 
-Use code_intel to localize relevant files before precise drill-down: summarize a project/package/file, find callers/callees/implementations, estimate blast radius, or search within a scope. Prefer lsp_lookup, lsp_document_symbols, lsp_workspace_symbols, lsp_diagnostics, lsp_refactor, and lsp_recover for semantic drill-down once the target is known; use tree_sitter for exact syntax and read/rg once you know the file. line and character are 1-based and require file. pattern is literal unless regex is true; kind supports definition, export, or import. Relative paths resolve from cwd, and leading @ on path/file is stripped.`;
+export function buildCodeIntelligenceToolPromptSurfaces(): CodeIntelligenceToolPromptSurfaceMap {
+  return Object.fromEntries(
+    CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => [
+      spec.name,
+      {
+        description: spec.description,
+        promptSnippet: spec.promptSnippet,
+        promptGuidelines: [...spec.basePromptGuidelines],
+      } satisfies CodeIntelligenceToolPromptSurface,
+    ]),
+  ) as CodeIntelligenceToolPromptSurfaceMap;
+}
 
-export const promptGuidelines = [
-  ...CODE_INTEL_ACTION_SPECS.map((spec) => spec.promptGuideline),
-  "Use code_intel with `file`, `line`, and `character` for anchored positions; do not pair `line` or `character` with `path`.",
-  "Use code_intel first when the area is not yet localized; switch to lsp_lookup, lsp_document_symbols, lsp_workspace_symbols, lsp_diagnostics, lsp_refactor, or lsp_recover for semantic drill-down once code_intel narrows the target.",
-];
-
-export const promptSnippet =
-  "code_intel — codebase orientation, callers/callees, blast radius, and scoped search before file drill-down";
+export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES = buildCodeIntelligenceToolPromptSurfaces();
