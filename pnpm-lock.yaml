@@ -332,6 +332,9 @@ importers:
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
+      ignore:
+        specifier: ^7.0.5
+        version: 7.0.5
       typebox:
         specifier: '*'
         version: 1.1.38
