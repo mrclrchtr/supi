@@ -167,6 +167,9 @@ registerSettings({
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
 - OpenSpec `PostHogFetchNetworkError` output is harmless when offline.
 - `npm pack <pkg>@<ver> --silent && tar -tzf` — inspect actual npm tarball contents; `npm view` only shows registry metadata which may not match shipped files
+- `Theme` type (`theme.fg()`, `theme.bold()`) is not publicly re-exported from `@earendil-works/pi-coding-agent` — `theme.fg()` first param is a narrow union `n`, not plain `string`. Private helper functions receiving `theme` must use `any` with `biome-ignore` or inline styled strings directly.
+- Biome `noExcessiveCognitiveComplexity` (max 15) applies inside `ctx.ui.custom()` factory callbacks — the callback body counts toward the enclosing exported function. Extract container-building into a separate function when the component has multiple sections.
+- `DynamicBorder` constructor's optional styling lambda needs an explicit type annotation: `(s: string) => theme.fg("accent", s)` — see the `selectFromList` pattern in `supi-review` for reference.
 ## Publish pipeline
 
 Published npm tarballs must produce npm-compatible manifests because PI installs packages via `npm install`. The pipeline has four stages:
