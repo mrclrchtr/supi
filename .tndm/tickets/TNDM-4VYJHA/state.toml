@@ -1,0 +1,96 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-23T02:25:59.358718Z"
+revision = 30
+
+[document_fingerprints]
+archive = "sha256:1283e56f4c18710277c10573c8044b2572ab2704760dad9a804cd950ee45a2fe"
+content = "sha256:d905e6e27e58ca6c208e27a33941d8c46a4e49998221ced22b9ad66e1256c5ff"
+
+[[tasks]]
+number = 1
+title = "Add vscode-languageserver-node packages as dependencies"
+status = "done"
+files = ["packages/supi-lsp/package.json"]
+verification = "pnpm install && ls node_modules/vscode-languageserver-types/package.json node_modules/vscode-languageserver-protocol/package.json node_modules/vscode-jsonrpc/package.json"
+notes = "Add vscode-jsonrpc@^9.0.0, vscode-languageserver-types@^3.17.5, vscode-languageserver-protocol@^3.17.5 to both dependencies and bundledDependencies. Run pnpm install. Since supi-lsp is bundled in the meta-package, these also need listing in bundledDependencies — verify with pack:check at end."
+
+[[tasks]]
+number = 2
+title = "Extract custom SuPi config types to separate file before deleting types.ts"
+status = "done"
+files = ["packages/supi-lsp/src/config/server-config.ts"]
+verification = "pnpm typecheck:packages/supi-lsp — no errors from missing ServerConfig/LspConfig/DetectedProjectServer/ProjectServerInfo/MissingServer types"
+notes = "Move ServerConfig, LspConfig, DetectedProjectServer, ProjectServerInfo, MissingServer from config/types.ts to a new config/server-config.ts. These are SuPi-specific config types, not part of the LSP spec, so they stay in our code. Update all imports that reference these types (scanner.ts, lsp-state.ts, guidance.ts, service-registry.ts, manager.ts, etc.). After this, types.ts only contains types that will be replaced by the vscode packages."
+
+[[tasks]]
+number = 3
+title = "Replace config/types.ts with re-exports from vscode-languageserver packages"
+status = "done"
+files = ["packages/supi-lsp/src/config/types.ts", "packages/supi-lsp/src/api.ts"]
+verification = "pnpm typecheck for supi-lsp passes. Check that Position, Diagnostic, Hover, Range, SymbolKind, etc. resolve from the new sources."
+notes = "Rewrite config/types.ts to re-export from vscode-languageserver-types and vscode-languageserver-protocol instead of defining types inline. Keep the same export names so imports across the codebase resolve. Key mapping: Position/Range/Diagnostic/Hover/SymbolKind/CodeAction/etc from vscode-languageserver-types. InitializeParams/InitializeResult/ServerCapabilities/ClientCapabilities/TextDocumentPositionParams/etc from vscode-languageserver-protocol. The JSON-RPC types (JsonRpcId, JsonRpcMessage, etc.) will be handled in the transport task. Also update src/api.ts re-exports to pull from the new sources."
+
+[[tasks]]
+number = 4
+title = "Update all internal imports from ../config/types.ts to new sources"
+status = "done"
+files = ["packages/supi-lsp/src/client/client.ts", "packages/supi-lsp/src/client/client-refresh.ts", "packages/supi-lsp/src/config/capabilities.ts", "packages/supi-lsp/src/diagnostics/diagnostics.ts", "packages/supi-lsp/src/diagnostics/stale-diagnostics.ts", "packages/supi-lsp/src/diagnostics/suppression-diagnostics.ts", "packages/supi-lsp/src/manager/manager.ts", "packages/supi-lsp/src/manager/manager-diagnostics.ts", "packages/supi-lsp/src/manager/manager-helpers.ts", "packages/supi-lsp/src/session/scanner.ts", "packages/supi-lsp/src/session/service-registry.ts", "packages/supi-lsp/src/tool/service-actions.ts", "packages/supi-lsp/src/tool/tool-specs.ts", "packages/supi-lsp/src/tool/overrides.ts", "packages/supi-lsp/src/tool/guidance.ts"]
+verification = 'pnpm typecheck for supi-lsp passes with no import errors. rg "from.*config/types" packages/supi-lsp/src returns zero results (except possibly types.ts self-reference).'
+notes = "25+ files import from ../config/types.ts (or ../../config/types.ts from nested dirs). After task 3 rewrites types.ts as re-exports, most imports can stay pointing at config/types.ts. However, the ideal end state is direct imports from the vscode packages. Audit each file: if it imports types also used by the public API, re-export through config/types.ts. If it only imports internal-use types, can import directly from vscode-languageserver-types/protocol. The key constraint: src/api.ts re-exports must resolve cleanly for supi-code-intelligence. Also import ServerConfig from the new config/server-config.ts where needed."
+
+[[tasks]]
+number = 5
+title = "Update capabilities.ts to use vscode-languageserver-protocol ClientCapabilities"
+status = "done"
+files = ["packages/supi-lsp/src/config/capabilities.ts"]
+verification = "pnpm typecheck — ClientCapabilities type from vscode-languageserver-protocol is satisfied by CLIENT_CAPABILITIES object literal"
+notes = "Replace the custom ClientCapabilities import with the one from vscode-languageserver-protocol. The type shape should be nearly identical. Verify that the CLIENT_CAPABILITIES object literal still satisfies the type."
+
+[[tasks]]
+number = 6
+title = "Replace transport.ts with vscode-jsonrpc connection wrapper"
+status = "done"
+files = ["packages/supi-lsp/src/client/transport.ts"]
+verification = "Write a new unit test (or update transport.test.ts) that verifies: (a) StreamMessageReader/Writer wrap stdin/stdout, (b) createMessageConnection dispatches requests and notifications, (c) sendRequest resolves with response, (d) connection disposal cleans up. Run: pnpm vitest run packages/supi-lsp/__tests__/unit/transport.test.ts"
+notes = "Replace the custom JsonRpcClient class with a thin wrapper around vscode-jsonrpc's createMessageConnection, StreamMessageReader, and StreamMessageWriter. The wrapper should expose the same interface LspClient expects: sendRequest(method, params, options?), sendNotification(method, params), onNotification(handler), onRequest(handler), dispose(). vscode-jsonrpc handles Content-Length framing, partial message buffering, and connection lifecycle. Wire timeout via CancellationToken. The JsonRpcRequestError class should be replaced with vscode-jsonrpc's ResponseError or kept as a re-export shim."
+
+[[tasks]]
+number = 7
+title = "Update client.ts to use vscode-jsonrpc connection instead of JsonRpcClient"
+status = "done"
+files = ["packages/supi-lsp/src/client/client.ts", "packages/supi-lsp/src/client/client-refresh.ts"]
+verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/client.integration.test.ts — TypeScript LSP lifecycle (start → hover → definition → symbols → diagnostics → shutdown) passes"
+notes = "Update LspClient.start() to use the new transport wrapper instead of JsonRpcClient. The main changes: replace rpc field type, update notification/request handler registration, update sendRequest/sendNotification calls. client-refresh.ts also needs updating since it directly uses JsonRpcResponse type and sendRequest — switch to the new transport wrapper's types. The LspClient public API (hover, definition, references, etc.) should remain unchanged."
+
+[[tasks]]
+number = 8
+title = "Update all unit tests for new types and transport"
+status = "done"
+files = ["packages/supi-lsp/__tests__/unit/transport.test.ts", "packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts", "packages/supi-lsp/__tests__/unit/client-refresh.test.ts", "packages/supi-lsp/__tests__/unit/diagnostic-cascade.test.ts", "packages/supi-lsp/__tests__/unit/overrides-cascade.test.ts", "packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts", "packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts", "packages/supi-lsp/__tests__/unit/renderer.test.ts", "packages/supi-lsp/__tests__/unit/service-actions.validation.test.ts", "packages/supi-lsp/__tests__/unit/service-actions.recover.test.ts", "packages/supi-lsp/__tests__/unit/service-registry.test.ts", "packages/supi-lsp/__tests__/unit/system-prompt.test.ts"]
+verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/ — all unit tests pass"
+notes = 'Update any test that imports from ../config/types.ts or constructs Position/Diagnostic/etc objects. Most tests should just need import path changes. transport.test.ts needs a full rewrite since JsonRpcClient is replaced. Mock factories (vi.mock) that reference config/types.ts need their paths updated. Pay attention to: vi.mock("../config/types.ts") patterns in test files.'
+
+[[tasks]]
+number = 9
+title = "Run integration tests for TypeScript, Python, and Bash"
+status = "done"
+files = ["packages/supi-lsp/__tests__/integration/"]
+verification = "pnpm vitest run packages/supi-lsp/__tests__/integration/ — all integration tests pass (skipped servers are OK)"
+notes = "Run the full integration suite: TypeScript (typescript-language-server), Python (pyright), Bash (bash-language-server). These test the full LSP lifecycle end-to-end. Since the LspClient public API is unchanged, these should pass. If typescript-language-server or pyright is not on PATH, those tests will skip — that's fine. The bash missing-server test should always run."
+
+[[tasks]]
+number = 10
+title = "Verify supi-code-intelligence compatibility"
+status = "done"
+files = ["packages/supi-code-intelligence/"]
+verification = "pnpm typecheck for supi-code-intelligence passes. pnpm vitest run packages/supi-code-intelligence/ — all tests pass."
+notes = "supi-code-intelligence imports { Position, SessionLspService, toLspPosition } from @mrclrchtr/supi-lsp/api. Since src/api.ts re-exports are updated to pull from vscode-languageserver-types, verify the Position type is compatible. Run supi-code-intelligence tests (especially target-resolution.test.ts and fallback-chain.test.ts which mock @mrclrchtr/supi-lsp/api)."
+
+[[tasks]]
+number = 11
+title = "Verify packaging — pnpm pack:check and workspace typecheck"
+status = "done"
+files = ["packages/supi-lsp/package.json", "packages/supi/package.json"]
+verification = "pnpm pack:check passes. pnpm typecheck (full workspace) passes."
+notes = "Run pnpm pack:check to verify: (a) vscode-jsonrpc, vscode-languageserver-types, vscode-languageserver-protocol are correctly bundled in the tarball, (b) no workspace: protocols leak into the published manifest, (c) no ../ paths in the tarball. Also run full workspace typecheck to ensure no downstream packages are broken. The meta-package (packages/supi) bundles supi-lsp and needs its bundledDependencies updated if the new vscode packages need to be transitively bundled."

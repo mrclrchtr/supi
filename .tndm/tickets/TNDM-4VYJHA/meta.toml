@@ -1,0 +1,15 @@
+schema_version = 1
+id = "TNDM-4VYJHA"
+title = "Migrate supi-lsp to vscode-languageserver-node packages"
+type = "chore"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"

@@ -16,7 +16,7 @@ import type {
 import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/api";
 import { loadConfig, resolveLanguageAlias } from "./config/config.ts";
 import { clearTsconfigCache } from "./config/tsconfig-scope.ts";
-import { FileChangeType } from "./config/types.ts";
+import { FileChangeType, type FileEvent } from "./config/types.ts";
 import {
   diagnosticsContextFingerprint,
   formatDiagnosticsContext,
@@ -228,7 +228,7 @@ function recoverWorkspaceChangesFromToolResult(
   if (shouldInvalidateTsconfigScopeCache(resolvedPath)) {
     clearTsconfigCache();
   }
-  const fileEvent = { uri: fileToUri(resolvedPath), type: FileChangeType.Changed };
+  const fileEvent: FileEvent = { uri: fileToUri(resolvedPath), type: FileChangeType.Changed };
 
   // Sentinel files (package.json, tsconfig.json, lockfiles, .d.ts)
   if (isWorkspaceRecoveryTrigger(resolvedPath, cwd)) {

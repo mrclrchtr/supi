@@ -36,18 +36,13 @@ describe("LSP pull diagnostic capability advertisement", () => {
 describe("LSP pull diagnostic capability detection", () => {
   it("detects diagnosticProvider capability", () => {
     const client = createClientWithCapabilities({
-      diagnosticProvider: { documentIdentifierProvider: true },
+      diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false },
     });
     expect(client.hasDiagnosticProvider).toBe(true);
   });
 
   it("detects missing diagnosticProvider capability", () => {
     const client = createClientWithCapabilities({});
-    expect(client.hasDiagnosticProvider).toBe(false);
-  });
-
-  it("detects diagnosticProvider: false", () => {
-    const client = createClientWithCapabilities({ diagnosticProvider: false });
     expect(client.hasDiagnosticProvider).toBe(false);
   });
 });

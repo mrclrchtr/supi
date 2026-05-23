@@ -1,7 +1,7 @@
 // Prompt guidance and tool descriptions for the expert LSP toolset.
 
 import * as path from "node:path";
-import type { ProjectServerInfo } from "../config/types.ts";
+import type { ProjectServerInfo } from "../config/server-config.ts";
 import { LSP_LOOKUP_TOOL, type LspToolName } from "./names.ts";
 import { LSP_TOOL_DEFINITION_SPECS } from "./tool-specs.ts";
 

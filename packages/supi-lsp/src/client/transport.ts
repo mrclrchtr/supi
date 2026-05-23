@@ -1,16 +1,18 @@
-// JSON-RPC 2.0 transport over stdio with Content-Length header framing.
+// JSON-RPC 2.0 transport — thin wrapper around vscode-jsonrpc.
+// Handles Content-Length framing, request/response correlation, timeouts,
+// and notification/request dispatching through vscode-jsonrpc's MessageConnection.
 
 import type { Readable, Writable } from "node:stream";
-import type {
-  JsonRpcId,
-  JsonRpcMessage,
-  JsonRpcNotification,
-  JsonRpcRequest,
-  JsonRpcResponse,
-} from "../config/types.ts";
+import {
+  CancellationTokenSource,
+  createMessageConnection,
+  type MessageConnection,
+  NullLogger,
+  ResponseError,
+  StreamMessageReader,
+  StreamMessageWriter,
+} from "vscode-jsonrpc/node";
 
-const CONTENT_LENGTH = "Content-Length: ";
-const HEADER_DELIMITER = "\r\n\r\n";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -18,29 +20,15 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 export type NotificationHandler = (method: string, params: unknown) => void;
 export type RequestHandler = (method: string, params: unknown) => Promise<unknown> | unknown;
 
-interface PendingRequest {
-  resolve: (result: unknown) => void;
-  reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
-}
+/** Re-export ResponseError so callers don't need a separate vscode-jsonrpc import. */
+const JsonRpcRequestError = ResponseError;
 
-export class JsonRpcRequestError extends Error {
-  constructor(
-    readonly code: number,
-    message: string,
-    readonly data?: unknown,
-  ) {
-    super(message);
-    this.name = "JsonRpcRequestError";
-  }
-}
+export { JsonRpcRequestError };
 
 // ── JsonRpcClient ─────────────────────────────────────────────────────
 
 export class JsonRpcClient {
-  private nextId = 1;
-  private buffer = Buffer.alloc(0);
-  private pending = new Map<JsonRpcId, PendingRequest>();
+  private connection: MessageConnection | null = null;
   private notificationHandler: NotificationHandler | null = null;
   private requestHandler: RequestHandler | null = null;
   private closed = false;
@@ -52,9 +40,31 @@ export class JsonRpcClient {
     options?: { timeoutMs?: number },
   ) {
     this.timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.input.on("data", (chunk: Buffer) => this.onData(chunk));
-    this.input.on("end", () => this.onClose());
-    this.input.on("error", () => this.onClose());
+
+    const reader = new StreamMessageReader(this.input);
+    const writer = new StreamMessageWriter(this.output);
+
+    this.connection = createMessageConnection(reader, writer, NullLogger);
+
+    // Register catch-all notification handler
+    this.connection.onNotification((method, params) => {
+      this.notificationHandler?.(method, params);
+    });
+
+    // Register catch-all request handler for server-initiated requests
+    this.connection.onRequest(async (method, params, _token) => {
+      if (!this.requestHandler) {
+        throw new JsonRpcRequestError(-32601, `Method not found: ${method}`);
+      }
+      return this.requestHandler(method, params);
+    });
+
+    // Handle connection close
+    this.connection.onClose(() => {
+      this.closed = true;
+    });
+
+    this.connection.listen();
   }
 
   /** Register a handler for server notifications (no id). */
@@ -73,176 +83,47 @@ export class JsonRpcClient {
     params?: unknown,
     options?: { timeoutMs?: number },
   ): Promise<unknown> {
-    if (this.closed) {
+    if (this.closed || !this.connection) {
       return Promise.reject(new Error("JSON-RPC client is closed"));
     }
 
-    const id = this.nextId++;
     const timeoutMs = options?.timeoutMs ?? this.timeoutMs;
-    const promise = new Promise<unknown>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`Request ${method} (id=${id}) timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
+    const tokenSource = new CancellationTokenSource();
 
-      this.pending.set(id, { resolve, reject, timer });
-    });
+    const timer = setTimeout(() => tokenSource.cancel(), timeoutMs);
 
-    const msg: JsonRpcRequest = { jsonrpc: "2.0", id, method, params };
-    this.writeMessage(msg);
+    const request = this.connection.sendRequest(method, params, tokenSource.token);
 
-    // Prevent unhandled rejection when dispose() rejects orphaned promises
+    // Race the request against a timeout so callers don't hang forever.
+    // The CancellationToken is also passed to sendRequest so the connection
+    // can short-circuit writes and cleanup when the token fires.
+    const promise = Promise.race([
+      request,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Request ${method} timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        ),
+      ),
+    ]).finally(() => clearTimeout(timer));
+
+    // Prevent unhandled rejection when dispose() cancels requests
     promise.catch(() => {});
     return promise;
   }
 
   /** Send a notification (no response expected). */
   sendNotification(method: string, params?: unknown): void {
-    if (this.closed) return;
-    const msg: JsonRpcNotification = { jsonrpc: "2.0", method, params };
-    this.writeMessage(msg);
+    if (this.closed || !this.connection) return;
+    this.connection.sendNotification(method, params).catch(() => {});
   }
 
-  /** Clean up all pending requests. */
+  /** Clean up the connection. */
   dispose(): void {
     this.closed = true;
-    for (const [id, p] of this.pending) {
-      clearTimeout(p.timer);
-      p.reject(new Error("JSON-RPC client disposed"));
-      this.pending.delete(id);
+    if (this.connection) {
+      this.connection.dispose();
+      this.connection = null;
     }
   }
-
-  // ── Private ───────────────────────────────────────────────────────
-
-  private writeMessage(msg: JsonRpcMessage): void {
-    const body = JSON.stringify(msg);
-    const contentLength = Buffer.byteLength(body, "utf-8");
-    const header = `${CONTENT_LENGTH}${contentLength}${HEADER_DELIMITER}`;
-    this.output.write(header + body);
-  }
-
-  private onData(chunk: Buffer): void {
-    this.buffer = Buffer.concat([this.buffer, chunk]);
-    this.processBuffer();
-  }
-
-  private processBuffer(): void {
-    while (true) {
-      // Look for header delimiter
-      const headerEnd = this.buffer.indexOf(HEADER_DELIMITER);
-      if (headerEnd === -1) return;
-
-      // Parse Content-Length from headers
-      const headerText = this.buffer.subarray(0, headerEnd).toString("utf-8");
-      const contentLength = parseContentLength(headerText);
-      if (contentLength === null) {
-        // Malformed header — skip past delimiter and try again
-        this.buffer = this.buffer.subarray(headerEnd + HEADER_DELIMITER.length);
-        continue;
-      }
-
-      // Check if we have the full body
-      const bodyStart = headerEnd + HEADER_DELIMITER.length;
-      const messageEnd = bodyStart + contentLength;
-      if (this.buffer.length < messageEnd) {
-        return; // Need more data — partial message
-      }
-
-      // Extract and parse the body
-      const body = this.buffer.subarray(bodyStart, messageEnd).toString("utf-8");
-      this.buffer = this.buffer.subarray(messageEnd);
-
-      try {
-        const msg = JSON.parse(body) as JsonRpcMessage;
-        this.handleMessage(msg);
-      } catch {
-        // Malformed JSON — skip
-      }
-    }
-  }
-
-  private handleMessage(msg: JsonRpcMessage): void {
-    // Response (has id, has result or error)
-    if ("id" in msg && msg.id != null && ("result" in msg || "error" in msg)) {
-      const response = msg as JsonRpcResponse;
-      const id = response.id;
-      if (id === null) return;
-      const pending = this.pending.get(id);
-      if (pending) {
-        this.pending.delete(id);
-        clearTimeout(pending.timer);
-        if (response.error) {
-          pending.reject(new Error(`LSP error ${response.error.code}: ${response.error.message}`));
-        } else {
-          pending.resolve(response.result);
-        }
-      }
-      return;
-    }
-
-    // Notification (no id)
-    if ("method" in msg && !("id" in msg)) {
-      const notification = msg as JsonRpcNotification;
-      this.notificationHandler?.(notification.method, notification.params);
-      return;
-    }
-
-    // Request from server (has id + method)
-    if ("method" in msg && "id" in msg && msg.id != null) {
-      void this.handleInboundRequest(msg as JsonRpcRequest);
-    }
-  }
-
-  private async handleInboundRequest(request: JsonRpcRequest): Promise<void> {
-    if (this.closed) return;
-
-    try {
-      if (!this.requestHandler) {
-        throw new JsonRpcRequestError(-32601, `Method not found: ${request.method}`);
-      }
-
-      const result = await this.requestHandler(request.method, request.params);
-      this.writeMessage({
-        jsonrpc: "2.0",
-        id: request.id,
-        result: result ?? null,
-      } satisfies JsonRpcResponse);
-    } catch (error) {
-      const failure =
-        error instanceof JsonRpcRequestError
-          ? error
-          : new JsonRpcRequestError(-32603, error instanceof Error ? error.message : String(error));
-      this.writeMessage({
-        jsonrpc: "2.0",
-        id: request.id,
-        error: {
-          code: failure.code,
-          message: failure.message,
-          ...(failure.data !== undefined ? { data: failure.data } : {}),
-        },
-      } satisfies JsonRpcResponse);
-    }
-  }
-
-  private onClose(): void {
-    this.closed = true;
-    for (const [id, p] of this.pending) {
-      clearTimeout(p.timer);
-      p.reject(new Error("JSON-RPC connection closed"));
-      this.pending.delete(id);
-    }
-  }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────
-
-function parseContentLength(header: string): number | null {
-  for (const line of header.split("\r\n")) {
-    if (line.startsWith(CONTENT_LENGTH)) {
-      const value = parseInt(line.slice(CONTENT_LENGTH.length), 10);
-      if (Number.isFinite(value) && value >= 0) return value;
-    }
-  }
-  return null;
 }

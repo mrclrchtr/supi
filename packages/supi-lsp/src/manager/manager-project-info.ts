@@ -1,5 +1,5 @@
 import type { LspClient } from "../client/client.ts";
-import type { ProjectServerInfo } from "../config/types.ts";
+import type { ProjectServerInfo } from "../config/server-config.ts";
 import { displayRelativeFilePath } from "../summary.ts";
 import { getSupportedLspServerActions } from "../tool/tool-specs.ts";
 

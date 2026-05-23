@@ -23,10 +23,16 @@
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*",
     "ignore": "^7.0.5",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vscode-jsonrpc": "^8.2.1",
+    "vscode-languageserver-protocol": "^3.17.5",
+    "vscode-languageserver-types": "^3.17.5"
   },
   "bundledDependencies": [
-    "@mrclrchtr/supi-core"
+    "@mrclrchtr/supi-core",
+    "vscode-jsonrpc",
+    "vscode-languageserver-protocol",
+    "vscode-languageserver-types"
   ],
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

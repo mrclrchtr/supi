@@ -2,7 +2,7 @@
 // Extracted from lsp.ts to keep file sizes within Biome limits.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import type { DetectedProjectServer, ProjectServerInfo } from "../config/types.ts";
+import type { DetectedProjectServer, ProjectServerInfo } from "../config/server-config.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { LSP_TOOL_NAMES } from "../tool/names.ts";
 import type { LspInspectorState } from "../ui/ui.ts";

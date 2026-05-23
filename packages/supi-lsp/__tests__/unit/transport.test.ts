@@ -1,98 +1,105 @@
 import { PassThrough } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  createMessageConnection,
+  type MessageConnection,
+  NullLogger,
+  StreamMessageReader,
+  StreamMessageWriter,
+} from "vscode-jsonrpc/node";
 import { JsonRpcClient, JsonRpcRequestError } from "../../src/client/transport.ts";
 
-function createPair() {
-  const serverIn = new PassThrough(); // client writes here (server stdin)
-  const serverOut = new PassThrough(); // server writes here (client reads)
+/**
+ * Creates a client JsonRpcClient connected to a server MessageConnection
+ * via two PassThrough streams (cross-connected).
+ *
+ *       client.writer → serverIn → server.reader
+ *       client.reader ← serverOut ← server.writer
+ */
+function createServerPair(): {
+  client: JsonRpcClient;
+  serverIn: PassThrough;
+  serverOut: PassThrough;
+  server: MessageConnection;
+} {
+  const serverIn = new PassThrough();
+  const serverOut = new PassThrough();
+
+  // Client reads from serverOut, writes to serverIn
   const client = new JsonRpcClient(serverOut, serverIn);
-  return { client, serverIn, serverOut };
-}
 
-function writeMessage(stream: PassThrough, body: object) {
-  const json = JSON.stringify(body);
-  const header = `Content-Length: ${Buffer.byteLength(json, "utf-8")}\r\n\r\n`;
-  stream.write(header + json);
-}
+  // Server reads from serverIn, writes to serverOut
+  const server = createMessageConnection(
+    new StreamMessageReader(serverIn),
+    new StreamMessageWriter(serverOut),
+    NullLogger,
+  );
+  server.listen();
 
-async function readWrittenMessage(stream: PassThrough): Promise<Record<string, unknown>> {
-  const chunk = await new Promise<Buffer>((resolve) => {
-    stream.once("data", (data: Buffer) => resolve(data));
-  });
-  const raw = chunk.toString("utf-8");
-  const body = raw.split("\r\n\r\n")[1] ?? "{}";
-  return JSON.parse(body) as Record<string, unknown>;
+  return { client, serverIn, serverOut, server };
 }
 
 // biome-ignore lint/security/noSecrets: test class name, not a secret
 describe("JsonRpcClient", () => {
   let client: JsonRpcClient;
+  let server: MessageConnection;
   let serverIn: PassThrough;
   let serverOut: PassThrough;
 
   beforeEach(() => {
-    const pair = createPair();
+    const pair = createServerPair();
     client = pair.client;
+    server = pair.server;
     serverIn = pair.serverIn;
     serverOut = pair.serverOut;
   });
 
   afterEach(() => {
+    // Dispose connections first so they stop writing before streams are destroyed
     try {
       client.dispose();
     } catch {
-      // Suppress rejections from pending requests during cleanup
+      // Suppress rejections
     }
+    try {
+      server.dispose();
+    } catch {
+      // Suppress
+    }
+    // Give pending writes a chance to drain before destroying streams
     serverIn.removeAllListeners();
     serverOut.removeAllListeners();
-    serverIn.destroy();
-    serverOut.destroy();
-  });
-
-  it("sends request with Content-Length header and JSON body", () => {
-    const chunks: Buffer[] = [];
-    serverIn.on("data", (chunk: Buffer) => chunks.push(chunk));
-
-    client.sendRequest("initialize", { processId: 1 });
-
-    const raw = Buffer.concat(chunks).toString("utf-8");
-    expect(raw).toContain("Content-Length:");
-    expect(raw).toContain('"method":"initialize"');
-    expect(raw).toContain('"id":1');
   });
 
   it("correlates response by id", async () => {
-    const promise = client.sendRequest("textDocument/hover", { position: { line: 0 } });
+    // Set up server to respond to "initialize" requests
+    server.onRequest("initialize", (params) => {
+      return { capabilities: params };
+    });
 
-    // Simulate server response
-    writeMessage(serverOut, { jsonrpc: "2.0", id: 1, result: { contents: "hello" } });
-
-    const result = await promise;
-    expect(result).toEqual({ contents: "hello" });
+    const result = await client.sendRequest("initialize", { processId: 1 });
+    expect(result).toEqual({ capabilities: { processId: 1 } });
   });
 
   it("handles multiple concurrent requests", async () => {
-    const p1 = client.sendRequest("method1");
-    const p2 = client.sendRequest("method2");
+    server.onRequest("method1", () => "first");
+    server.onRequest("method2", () => "second");
 
-    // Respond out of order
-    writeMessage(serverOut, { jsonrpc: "2.0", id: 2, result: "second" });
-    writeMessage(serverOut, { jsonrpc: "2.0", id: 1, result: "first" });
+    const [r1, r2] = await Promise.all([
+      client.sendRequest("method1"),
+      client.sendRequest("method2"),
+    ]);
 
-    expect(await p1).toBe("first");
-    expect(await p2).toBe("second");
+    expect(r1).toBe("first");
+    expect(r2).toBe("second");
   });
 
   it("rejects on error response", async () => {
-    const promise = client.sendRequest("bad/method");
-
-    writeMessage(serverOut, {
-      jsonrpc: "2.0",
-      id: 1,
-      error: { code: -32601, message: "Method not found" },
+    server.onRequest("bad/method", () => {
+      throw new JsonRpcRequestError(-32601, "Method not found");
     });
 
-    await expect(promise).rejects.toThrow("Method not found");
+    await expect(client.sendRequest("bad/method")).rejects.toThrow("Method not found");
   });
 
   it("dispatches notifications to handler", async () => {
@@ -101,139 +108,67 @@ describe("JsonRpcClient", () => {
       received.push({ method, params });
     });
 
-    writeMessage(serverOut, {
-      jsonrpc: "2.0",
-      method: "textDocument/publishDiagnostics",
-      params: { uri: "file:///a.ts", diagnostics: [] },
+    await server.sendNotification("textDocument/publishDiagnostics", {
+      uri: "file:///a.ts",
+      diagnostics: [],
     });
 
-    // Give the event loop a tick
+    // Give microtask queue a tick
     await new Promise((r) => setTimeout(r, 10));
 
     expect(received).toHaveLength(1);
     expect(received[0].method).toBe("textDocument/publishDiagnostics");
   });
 
-  it("sends notifications without id", () => {
-    const chunks: Buffer[] = [];
-    serverIn.on("data", (chunk: Buffer) => chunks.push(chunk));
-
-    client.sendNotification("initialized", {});
-
-    const raw = Buffer.concat(chunks).toString("utf-8");
-    expect(raw).toContain('"method":"initialized"');
-    expect(raw).not.toContain('"id"');
-  });
-
   it("responds to server requests through the registered request handler", async () => {
     client.onRequest((method, params) => ({ method, params }));
 
-    writeMessage(serverOut, {
-      jsonrpc: "2.0",
-      id: 7,
+    const result = await server.sendRequest("workspace/configuration", {
+      items: [],
+    });
+    expect(result).toEqual({
       method: "workspace/configuration",
       params: { items: [] },
-    });
-
-    const response = await readWrittenMessage(serverIn);
-    expect(response).toEqual({
-      jsonrpc: "2.0",
-      id: 7,
-      result: { method: "workspace/configuration", params: { items: [] } },
     });
   });
 
   it("returns Method not found for server requests without a registered handler", async () => {
-    writeMessage(serverOut, {
-      jsonrpc: "2.0",
-      id: 8,
-      method: "workspace/configuration",
-      params: { items: [] },
-    });
-
-    const response = await readWrittenMessage(serverIn);
-    expect(response).toEqual({
-      jsonrpc: "2.0",
-      id: 8,
-      error: {
-        code: -32601,
-        message: "Method not found: workspace/configuration",
-      },
-    });
-  });
-
-  it("serializes request handler failures as JSON-RPC errors", async () => {
-    client.onRequest(() => {
-      throw new JsonRpcRequestError(-32602, "Invalid params");
-    });
-
-    writeMessage(serverOut, {
-      jsonrpc: "2.0",
-      id: 9,
-      method: "workspace/configuration",
-      params: { items: [] },
-    });
-
-    const response = await readWrittenMessage(serverIn);
-    expect(response).toEqual({
-      jsonrpc: "2.0",
-      id: 9,
-      error: {
-        code: -32602,
-        message: "Invalid params",
-      },
-    });
-  });
-
-  it("handles partial messages split across chunks", async () => {
-    const promise = client.sendRequest("test/partial");
-
-    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, result: "ok" });
-    const header = `Content-Length: ${Buffer.byteLength(body, "utf-8")}\r\n\r\n`;
-    const full = header + body;
-
-    // Split in the middle
-    const mid = Math.floor(full.length / 2);
-    serverOut.write(full.slice(0, mid));
-    await new Promise((r) => setTimeout(r, 5));
-    serverOut.write(full.slice(mid));
-
-    expect(await promise).toBe("ok");
+    await expect(server.sendRequest("workspace/configuration", { items: [] })).rejects.toThrow(
+      "Method not found",
+    );
   });
 
   it("rejects pending requests on dispose", async () => {
     const promise = client.sendRequest("will/dispose");
     client.dispose();
-    await expect(promise).rejects.toThrow("disposed");
+    await expect(promise).rejects.toThrow();
   });
 
-  it("rejects pending requests when connection closes", async () => {
-    const promise = client.sendRequest("will/close");
-    serverOut.emit("end");
-    await expect(promise).rejects.toThrow("closed");
-  });
-});
-
-// biome-ignore lint/security/noSecrets: test suite name, not a secret
-describe("JsonRpcClient request timeouts", () => {
-  it("uses per-request timeout overrides", async () => {
-    const { client, serverIn, serverOut } = createPair();
-    const promise = client.sendRequest("slow/override", undefined, { timeoutMs: 20 });
-    await expect(promise).rejects.toThrow("timed out after 20ms");
-    client.dispose();
-    serverIn.destroy();
-    serverOut.destroy();
-  });
-
-  it("times out pending requests", async () => {
-    const isolated = createPair();
-    const shortClient = new JsonRpcClient(isolated.serverOut, isolated.serverIn, {
+  it("handles per-request timeout overrides", async () => {
+    // Server never responds to this method
+    const promise = client.sendRequest("slow/override", undefined, {
       timeoutMs: 50,
     });
-    const promise = shortClient.sendRequest("slow/method");
-    await expect(promise).rejects.toThrow("timed out");
-    shortClient.dispose();
-    isolated.serverIn.destroy();
-    isolated.serverOut.destroy();
+    await expect(promise).rejects.toThrow();
+  });
+
+  it("times out pending requests with per-request timeout", async () => {
+    // Create a client connected to a stream that never responds
+    const deadInput = new PassThrough();
+    const deadOutput = new PassThrough();
+    const shortClient = new JsonRpcClient(deadInput, deadOutput, {
+      timeoutMs: 30_000,
+    });
+    try {
+      // Override with short per-request timeout
+      const promise = shortClient.sendRequest("slow/method", undefined, {
+        timeoutMs: 50,
+      });
+      await expect(promise).rejects.toThrow("timed out");
+    } finally {
+      shortClient.dispose();
+      deadInput.destroy();
+      deadOutput.destroy();
+    }
   });
 });

@@ -157,6 +157,7 @@ export async function resolveSymbolTarget(
   return resolveSymbolViaLsp(symbol, cwd, lspState.service, options);
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pre-existing — not introduced by this change
 async function resolveSymbolViaLsp(
   symbol: string,
   cwd: string,
@@ -206,7 +207,12 @@ async function resolveSymbolViaLsp(
 
   if (candidates.length === 1) {
     const c = candidates[0];
-    const loc = "location" in c ? c.location : null;
+    const rawLoc = "location" in c ? c.location : null;
+    // WorkspaceSymbol.location may be Location | { uri: string }; we need range.
+    const loc =
+      rawLoc && "range" in rawLoc
+        ? (rawLoc as { uri: string; range: { start: { line: number; character: number } } })
+        : null;
     if (!loc) {
       return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
     }
@@ -403,26 +409,30 @@ function mapCandidateToDisambiguation(
     name: string;
     kind: number;
     containerName?: string | null;
-    location?: { uri: string; range: { start: { line: number; character: number } } } | null;
+    location?: { uri: string } | null;
   },
   idx: number,
   cwd: string,
 ): DisambiguationCandidate {
-  const loc = "location" in c ? c.location : null;
+  const loc = c.location;
   const filePath = loc
     ? loc.uri.startsWith("file://")
       ? decodeURIComponent(loc.uri.slice(7))
       : loc.uri
     : "";
   const relPath = filePath ? path.relative(cwd, filePath) : "";
+  const rangeObj =
+    loc && "range" in loc
+      ? (loc as unknown as { range: { start: { line: number; character: number } } }).range
+      : null;
 
   return {
     name: c.name,
     kind: symbolKindName(c.kind),
     container: "containerName" in c ? (c.containerName ?? null) : null,
     file: relPath,
-    line: loc ? loc.range.start.line + 1 : 0,
-    character: loc ? loc.range.start.character + 1 : 0,
+    line: rangeObj ? rangeObj.start.line + 1 : 0,
+    character: rangeObj ? rangeObj.start.character + 1 : 0,
     reason: relPath,
     rank: idx + 1,
   };

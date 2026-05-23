@@ -333,10 +333,7 @@ export class LspClient {
 
   /** Check if server supports pull diagnostics. */
   get hasDiagnosticProvider(): boolean {
-    return (
-      this.capabilities?.diagnosticProvider !== undefined &&
-      this.capabilities.diagnosticProvider !== false
-    );
+    return this.capabilities?.diagnosticProvider !== undefined;
   }
 
   /** Notify the server that watched workspace files changed. */
