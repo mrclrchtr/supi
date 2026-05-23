@@ -260,20 +260,60 @@ function maybeQueueReviewFollowUp(pi: ExtensionAPI, result: ReviewResult): void 
 function buildReviewFollowUpInstruction(
   result: Extract<ReviewResult, { kind: "success" }>,
 ): string {
-  const findings = result.output.findings.map(
-    (finding, index) => `- #${index + 1}: ${finding.title}`,
-  );
+  const { findings, overall_correctness } = result.output;
+  const criticalCount = findings.filter((f) => f.priority === 3).length;
+  const majorCount = findings.filter((f) => f.priority === 2).length;
 
-  return [
-    "A code review just completed and the result is available in the preceding `supi-review` message.",
-    "Do not start fixing code immediately.",
-    "Your next task is to ask the user what to do with the review findings.",
-    "If the `ask_user` tool is available, use it for this decision.",
-    "Offer exactly these options: Done, Fix all, Fix selected, Verify findings.",
-    "If the user chooses Fix selected, ask a follow-up question listing the findings by number/title.",
-    "If the user chooses Verify findings, verify the findings first and then ask again whether to Fix all or Fix selected.",
+  const findingList = findings.map((finding, index) => `- #${index + 1}: ${finding.title}`);
+
+  const header =
+    "A code review just completed and the result is available in the preceding `supi-review` message.";
+  const noFixing = "Do not start fixing code immediately.";
+  const useAskUser = "If the `ask_user` tool is available, use it for this decision.";
+
+  const appendFindings = (lines: string[]): string[] => [
+    ...lines,
     "",
     "Current findings:",
-    ...findings,
-  ].join("\n");
+    ...findingList,
+  ];
+
+  if (criticalCount > 0) {
+    return appendFindings([
+      header,
+      `⚠️ ${criticalCount} critical finding(s) found. Urge the user to fix before merging.`,
+      noFixing,
+      useAskUser,
+      "Offer these options: Fix all, Fix critical only, Done.",
+    ]).join("\n");
+  }
+
+  const contradictionNote =
+    overall_correctness === "patch is correct" && findings.length > 0
+      ? "The reviewer marked the patch as correct but found issues — verify the verdict before acting."
+      : undefined;
+
+  if (majorCount > 0) {
+    const lines: string[] = [header];
+    if (contradictionNote) lines.push(contradictionNote);
+    lines.push(
+      noFixing,
+      useAskUser,
+      "Offer exactly these options: Done, Fix all, Fix selected, Verify findings.",
+      "If the user chooses Fix selected, ask a follow-up question listing the findings by number/title.",
+      "If the user chooses Verify findings, verify the findings first and then ask again whether to Fix all or Fix selected.",
+    );
+    return appendFindings(lines).join("\n");
+  }
+
+  // Only minor/info findings
+  return appendFindings([
+    header,
+    ...(contradictionNote
+      ? [contradictionNote]
+      : ["Only minor/info suggestions — no blocking issues."]),
+    noFixing,
+    useAskUser,
+    "Offer these options: Apply suggestions, Skip.",
+  ]).join("\n");
 }

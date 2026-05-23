@@ -279,4 +279,159 @@ describe("/supi-review command", () => {
     expect(mockFns.selectModel).not.toHaveBeenCalled();
     expect(mockFns.synthesizeReviewBrief).not.toHaveBeenCalled();
   });
+
+  describe("follow-up instruction branching by severity", () => {
+    async function runWithFindings(findings: Array<Record<string, unknown>>) {
+      const pi = createPi();
+      reviewExtension(pi);
+      const handler = getHandler(pi);
+      if (!handler) throw new Error("Handler not registered");
+
+      mockFns.runReviewer.mockResolvedValue({
+        kind: "success",
+        snapshot,
+        brief,
+        modelId: modelSelection.canonicalId,
+        output: {
+          findings,
+          overall_correctness: "mostly correct",
+          overall_explanation: "See findings",
+          overall_confidence_score: 0.7,
+        },
+      });
+
+      await handler("", makeCtx());
+      const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
+      const followUpCall = sendMessage.mock.calls.find(
+        (call: unknown[]) =>
+          (call[0] as Record<string, unknown>)?.customType === "supi-review-followup",
+      );
+      return (followUpCall?.[0] as Record<string, unknown>)?.content as string | undefined;
+    }
+
+    const baseFinding = {
+      title: "Missing null check",
+      body: "Null token path is not checked",
+      confidence_score: 0.9,
+      code_location: {
+        absolute_file_path: "/project/src/auth.ts",
+        line_range: { start: 4, end: 5 },
+      },
+    };
+
+    const criticalFinding = { ...baseFinding, priority: 3 };
+    const majorFinding = { ...baseFinding, priority: 2 };
+    const minorFinding = { ...baseFinding, priority: 1 };
+    const infoFinding = { ...baseFinding, priority: 0 };
+
+    it("produces urgent message when findings include critical priority", async () => {
+      const content = await runWithFindings([criticalFinding]);
+      expect(content).toContain("⚠");
+      expect(content).toContain("critical");
+      expect(content).toContain("Fix all");
+      expect(content).toContain("Fix critical only");
+    });
+
+    it("produces standard message for major findings without critical", async () => {
+      const content = await runWithFindings([majorFinding]);
+      expect(content).toContain("Fix all");
+      expect(content).toContain("Fix selected");
+      expect(content).toContain("Verify findings");
+      expect(content).not.toContain("⚠");
+    });
+
+    it("produces light message for minor/info-only findings", async () => {
+      const content = await runWithFindings([minorFinding, infoFinding]);
+      expect(content).toContain("minor/info");
+      expect(content).not.toContain("Fix selected");
+    });
+
+    function findFollowUpMessage(sendMessage: ReturnType<typeof vi.fn>) {
+      return sendMessage.mock.calls.find(
+        (call: unknown[]) =>
+          (call[0] as Record<string, unknown>)?.customType === "supi-review-followup",
+      );
+    }
+
+    it("notes contradiction when patch is marked correct but issues exist", async () => {
+      const pi = createPi();
+      reviewExtension(pi);
+      const handler = getHandler(pi);
+      if (!handler) throw new Error("Handler not registered");
+
+      mockFns.runReviewer.mockResolvedValue({
+        kind: "success",
+        snapshot,
+        brief,
+        modelId: modelSelection.canonicalId,
+        output: {
+          findings: [minorFinding],
+          overall_correctness: "patch is correct",
+          overall_explanation: "Minor suggestion only",
+          overall_confidence_score: 0.9,
+        },
+      });
+
+      await handler("", makeCtx());
+      const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
+      const followUpCall = findFollowUpMessage(sendMessage);
+      const content = (followUpCall?.[0] as Record<string, unknown>)?.content as string;
+      expect(content).toContain("correct");
+      expect(content).toContain("issues");
+    });
+
+    it("notes contradiction even with major findings", async () => {
+      const pi = createPi();
+      reviewExtension(pi);
+      const handler = getHandler(pi);
+      if (!handler) throw new Error("Handler not registered");
+
+      mockFns.runReviewer.mockResolvedValue({
+        kind: "success",
+        snapshot,
+        brief,
+        modelId: modelSelection.canonicalId,
+        output: {
+          findings: [majorFinding],
+          overall_correctness: "patch is correct",
+          overall_explanation: "Contradictory",
+          overall_confidence_score: 0.5,
+        },
+      });
+
+      await handler("", makeCtx());
+      const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
+      const followUpCall = findFollowUpMessage(sendMessage);
+      const content = (followUpCall?.[0] as Record<string, unknown>)?.content as string;
+      expect(content).toContain("correct");
+      expect(content).toContain("issues");
+      // Should still offer standard options even with contradiction
+      expect(content).toContain("Fix selected");
+    });
+
+    it("skips follow-up when there are no findings", async () => {
+      const pi = createPi();
+      reviewExtension(pi);
+      const handler = getHandler(pi);
+      if (!handler) throw new Error("Handler not registered");
+
+      mockFns.runReviewer.mockResolvedValue({
+        kind: "success",
+        snapshot,
+        brief,
+        modelId: modelSelection.canonicalId,
+        output: {
+          findings: [],
+          overall_correctness: "patch is correct",
+          overall_explanation: "All good",
+          overall_confidence_score: 0.95,
+        },
+      });
+
+      await handler("", makeCtx());
+      const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
+      const followUpCall = findFollowUpMessage(sendMessage);
+      expect(followUpCall).toBeUndefined();
+    });
+  });
 });

@@ -1,0 +1,53 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-23T12:16:47.481023Z"
+revision = 28
+
+[document_fingerprints]
+archive = "sha256:f4ae675653fa283cce98421102798174ec6036d255693ded8058d2eba61b5e28"
+content = "sha256:ee0a15cd3861589d3402f788217b1969c71800b512db8c6bb3336b9f590183ad"
+task-01 = "sha256:30fe7545314a9d02383331de072ab3f51211ad2d07e84282322ccdb67ef9b193"
+task-02 = "sha256:44cc6b7ea190f3dc7a30aab5c068bb061baf9ca2c5f7204ccc45e25c60b7773d"
+task-03 = "sha256:fa0f4e03e51f6ba1ac8fec0802d030420a96205b22a92a0a5939c143b3e7b2ee"
+task-04 = "sha256:75af7c08f0d81ae436626376a17cf690f70741a97f0f62805bbd1b5823303608"
+task-05 = "sha256:9c60b3ef9556e22e98dadab47894746f129f1f1edf5a7ea92338a7a8658eaf41"
+
+[[tasks]]
+number = 1
+title = "Compute per-file diff stats in splitDiffSections"
+status = "done"
+files = ["packages/supi-review/src/target/packet.ts"]
+verification = 'pnpm vitest run packages/supi-review/ -t "diff stat"'
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "Add file overview table to review packet"
+status = "done"
+files = ["packages/supi-review/src/target/packet.ts"]
+verification = 'pnpm vitest run packages/supi-review/ -t "file overview"'
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "Add skip-list annotations to file overview table"
+status = "done"
+files = ["packages/supi-review/src/target/packet.ts"]
+verification = 'pnpm vitest run packages/supi-review/ -t "skip"'
+detail_path = "tasks/task-03.md"
+
+[[tasks]]
+number = 4
+title = "Add calibration examples and skip-list to reviewer system prompt"
+status = "done"
+files = ["packages/supi-review/src/tool/review-runner.ts"]
+verification = 'pnpm vitest run packages/supi-review/ -t "system prompt"'
+detail_path = "tasks/task-04.md"
+
+[[tasks]]
+number = 5
+title = "Severity-branching follow-up instruction for review results"
+status = "done"
+files = ["packages/supi-review/src/review.ts"]
+verification = 'pnpm vitest run packages/supi-review/ -t "follow-up"'
+detail_path = "tasks/task-05.md"

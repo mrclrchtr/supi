@@ -5,9 +5,11 @@ import type {
   SynthesizedReviewBrief,
 } from "../types.ts";
 
-interface DiffSection {
+export interface DiffSection {
   file: string;
   text: string;
+  additions: number;
+  deletions: number;
 }
 
 /** Build the final prompt packet for the reviewer child session. */
@@ -48,6 +50,8 @@ export function buildReviewPacket(
     "## Changed files manifest",
     ...snapshot.changedFiles.map((file) => `- ${file}`),
   ];
+
+  baseParts.push("", buildFileOverviewTable(snapshot.changedFiles, sections));
 
   if (preamble.trim()) {
     baseParts.push("", "## Snapshot notes", truncate(preamble.trim(), 1_500));
@@ -115,7 +119,21 @@ export function getPacketCharBudget(model: ReviewModelSelection): number {
   return tokenBudget * 4;
 }
 
-function splitDiffSections(text: string): { preamble: string; sections: DiffSection[] } {
+function countDiffLines(lines: string[]): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  for (const line of lines) {
+    // Skip diff header lines (e.g. "--- a/file", "+++ b/file").
+    // The trailing space ensures we do not skip content lines whose first
+    // characters happen to be "+++" or "---".
+    if (line.startsWith("--- ") || line.startsWith("+++ ")) continue;
+    if (line.startsWith("+")) additions++;
+    else if (line.startsWith("-")) deletions++;
+  }
+  return { additions, deletions };
+}
+
+export function splitDiffSections(text: string): { preamble: string; sections: DiffSection[] } {
   const lines = text.split("\n");
   const preamble: string[] = [];
   const sections: DiffSection[] = [];
@@ -128,7 +146,13 @@ function splitDiffSections(text: string): { preamble: string; sections: DiffSect
       currentFile = undefined;
       return;
     }
-    sections.push({ file: currentFile, text: current.join("\n").trimEnd() });
+    const stats = countDiffLines(current);
+    sections.push({
+      file: currentFile,
+      text: current.join("\n").trimEnd(),
+      additions: stats.additions,
+      deletions: stats.deletions,
+    });
     current = [];
     currentFile = undefined;
   };
@@ -204,6 +228,100 @@ function toPathTokens(path: string): string[] {
     .split(/[\\/._-]/)
     .map((part) => part.trim())
     .filter((part) => part.length >= 3);
+}
+
+/** Categorize a file path for skip-list annotation, or undefined if it should be reviewed. */
+export function classifySkipCategory(file: string): string | undefined {
+  const lockfiles = new Set([
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "Gemfile.lock",
+    "Cargo.lock",
+    "poetry.lock",
+    "composer.lock",
+  ]);
+
+  const name = file.split("/").pop() ?? file;
+  if (lockfiles.has(name)) return "lockfile";
+  if (name.startsWith("CHANGELOG") || name.startsWith("CHANGES") || name === "CHANGE_LOG") {
+    return "changelog";
+  }
+
+  if (file.includes("__snapshots__/") || name.endsWith(".snap")) {
+    return "snapshot";
+  }
+
+  if (
+    file.includes("dist/") ||
+    file.includes("build/") ||
+    file.includes(".next/") ||
+    file.includes("__generated__/")
+  ) {
+    return "generated";
+  }
+
+  if (file.includes("vendor/") || file.includes("third_party/")) {
+    return "vendored";
+  }
+
+  if (name.endsWith(".min.js") || name.endsWith(".min.css")) return "generated";
+
+  return undefined;
+}
+
+function formatOverviewRow(
+  file: string,
+  statsMap: Map<string, { additions: number; deletions: number }>,
+  binaryFiles: Set<string>,
+): string {
+  const stats = statsMap.get(file);
+  const skipCategory = classifySkipCategory(file);
+  const annotations: string[] = [];
+
+  if (!stats) {
+    // File in the changed-files manifest but not in the parsed diff sections.
+    // This happens for untracked files in working-tree snapshots, which
+    // have no diff section to parse. Do not guess 0/0 or mark as trivial.
+    if (skipCategory) annotations.push(`skip — ${skipCategory}`);
+    const annotation = annotations.length > 0 ? ` (${annotations.join(", ")})` : "";
+    return `| ${file} | ? | ?${annotation} |`;
+  }
+
+  if (binaryFiles.has(file)) {
+    // Binary diffs have no diffable +/- lines. Show unknown stats.
+    if (skipCategory) annotations.push(`skip — ${skipCategory}`);
+    annotations.push("binary");
+    const annotation = annotations.length > 0 ? ` (${annotations.join(", ")})` : "";
+    return `| ${file} | ? | ?${annotation} |`;
+  }
+
+  const total = stats.additions + stats.deletions;
+  if (total < 5) annotations.push("trivial");
+  if (skipCategory) annotations.push(`skip — ${skipCategory}`);
+  const annotation = annotations.length > 0 ? ` (${annotations.join(", ")})` : "";
+  return `| ${file} | ${stats.additions} | ${stats.deletions}${annotation} |`;
+}
+
+function buildFileOverviewTable(changedFiles: string[], sections: DiffSection[]): string {
+  const statsMap = new Map<string, { additions: number; deletions: number }>();
+  const binaryFiles = new Set<string>();
+  for (const section of sections) {
+    const existing = statsMap.get(section.file);
+    statsMap.set(section.file, {
+      additions: (existing?.additions ?? 0) + section.additions,
+      deletions: (existing?.deletions ?? 0) + section.deletions,
+    });
+    if (section.text.includes("Binary files ")) {
+      binaryFiles.add(section.file);
+    }
+  }
+
+  const header = "| File | +Add | -Del |";
+  const separator = "|---|---|---|";
+  const rows = changedFiles.map((file) => formatOverviewRow(file, statsMap, binaryFiles));
+
+  return [`## File overview`, "", header, separator, ...rows].join("\n");
 }
 
 function toBullets(items: string[], fallback: string): string[] {
