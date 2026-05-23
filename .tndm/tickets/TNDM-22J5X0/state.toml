@@ -1,7 +1,16 @@
 schema_version = 1
 status = "todo"
-updated_at = "2026-05-22T12:15:26.289217Z"
-revision = 2
+updated_at = "2026-05-23T13:14:22.464586Z"
+revision = 6
 
 [document_fingerprints]
-content = "sha256:986b06722aaec85527d1fecac039b977f089b8f93242a819dc4602d41632ceb4"
+content = "sha256:f298fb730bda493dc61397f4f33fad045530a9176bfcf3aaadafbf9fb77e204e"
+task-01 = "sha256:f32224608d677797efb8cac18e9348da9100ff4f90c4ec7bf1a97e60dd4ed137"
+
+[[tasks]]
+number = 1
+title = "Investigate and verify all possible solutions for stale LSP diagnostic recovery"
+status = "todo"
+files = ["packages/supi-lsp/src/diagnostics/stale-diagnostics.ts", "packages/supi-lsp/src/manager/manager-workspace-recovery.ts", "packages/supi-lsp/src/manager/manager-diagnostics.ts", "packages/supi-lsp/src/manager/manager.ts", "packages/supi-lsp/src/tool/service-actions.ts"]
+verification = "pnpm typecheck && pnpm exec vitest run packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts packages/supi-lsp/__tests__/unit/diagnostic-cascade.test.ts packages/supi-lsp/__tests__/unit/overrides-cascade.test.ts packages/supi-lsp/__tests__/unit/service-actions.recover.test.ts packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts"
+detail_path = "tasks/task-01.md"

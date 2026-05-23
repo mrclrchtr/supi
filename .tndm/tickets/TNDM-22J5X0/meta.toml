@@ -4,8 +4,12 @@ title = "Improve SuPi-LSP stale diagnostic recovery after workspace changes"
 type = "task"
 priority = "p2"
 depends_on = []
-tags = ["flow:brainstorm"]
+tags = ["diagnostics", "flow:brainstorm", "lsp"]
 
 [[documents]]
 name = "content"
 path = "content.md"
+
+[[documents]]
+name = "task-01"
+path = "tasks/task-01.md"
