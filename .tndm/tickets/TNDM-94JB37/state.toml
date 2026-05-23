@@ -1,7 +1,22 @@
 schema_version = 1
-status = "todo"
-updated_at = "2026-05-17T15:03:07.483094Z"
-revision = 3
+status = "done"
+updated_at = "2026-05-23T13:06:08.620221Z"
+revision = 13
 
 [document_fingerprints]
-content = "sha256:986b06722aaec85527d1fecac039b977f089b8f93242a819dc4602d41632ceb4"
+archive = "sha256:3c1c5863f868ec69c27e2fda45b7310e0bb35483f7eb0782be17a473d161f22e"
+content = "sha256:ef6d65d9c5880eeb3c6973978c77d602b2f5a4e9129ea26f933a821cb7a068d6"
+
+[[tasks]]
+number = 1
+title = "Implement model-effort-colors extension module with theme-native footer"
+status = "done"
+files = ["packages/supi-extras/src/model-effort-colors.ts", "packages/supi-extras/src/model-effort-colors-helpers.ts"]
+verification = "cd packages/supi-extras && pnpm vitest run --reporter=verbose model-effort-color"
+
+[[tasks]]
+number = 2
+title = "Wire module into index.ts and update documentation"
+status = "done"
+files = ["packages/supi-extras/src/index.ts", "packages/supi-extras/CLAUDE.md", "packages/supi-extras/README.md"]
+verification = "cd packages/supi-extras && pnpm vitest run --reporter=verbose && pnpm exec biome check src/ && pnpm exec tsc --noEmit -p tsconfig.json"

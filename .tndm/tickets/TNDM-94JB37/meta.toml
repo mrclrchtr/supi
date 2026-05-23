@@ -4,7 +4,11 @@ title = "supi-model-effort-colors: PI-theme-native footer extension for model/ef
 type = "feature"
 priority = "p3"
 depends_on = []
-tags = ["flow:brainstorm"]
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
 
 [[documents]]
 name = "content"

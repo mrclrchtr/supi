@@ -44,7 +44,7 @@ __tests__/
 
 ## Modules
 
-`src/index.ts` composes six independent extensions and one shared utility:
+`src/index.ts` composes extensions and shared utilities:
 
 | Module | What it does |
 |---|---|
