@@ -1,0 +1,34 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-23T12:09:15.152541Z"
+revision = 21
+
+[document_fingerprints]
+archive = "sha256:5c48598c4e0063c41f07468f38918ab58523c01c9fa0b66d5fba02b0a3963c62"
+content = "sha256:5950346f114aa4af00ddc6c0108b1b6941a47c261c82d4e35688143e0205a68e"
+task-01 = "sha256:6a9916750fc27facf1911dcc04d07a34858d25f06678d40ba9b49a31570c4671"
+task-02 = "sha256:eb15eceaf558d4ce6ace4b56e4a09f4ca0cffd788c50e83d775b35a57f58141b"
+task-03 = "sha256:b97e7e3ee98529c16521df739052a1e7a320b893aa2a846883ee3bf512c4445f"
+
+[[tasks]]
+number = 1
+title = "Write failing tests for tool-framework module"
+status = "done"
+files = ["packages/supi-core/__tests__/unit/tool-framework.test.ts"]
+verification = "pnpm vitest run packages/supi-core/__tests__/unit/tool-framework.test.ts (expect FAIL — module doesn't exist yet)"
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "Implement src/tool-framework.ts and export from api.ts/index.ts"
+status = "done"
+files = ["packages/supi-core/src/tool-framework.ts", "packages/supi-core/src/api.ts", "packages/supi-core/src/index.ts"]
+verification = "pnpm vitest run packages/supi-core/__tests__/unit/tool-framework.test.ts (expect PASS)"
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "Full verification: typecheck, biome, tests, downstream smoke test"
+status = "done"
+verification = "All commands pass: biome check (clean), tsc (no errors), vitest (all green), downstream smoke test (all green)"
+detail_path = "tasks/task-03.md"

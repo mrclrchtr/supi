@@ -3,7 +3,7 @@
 ## Scope
 
 `@mrclrchtr/supi-core` now has two explicit surfaces:
-- `src/api.ts` — shared config/context/settings/project-root library helpers
+- `src/api.ts` — shared config/context/settings/project-root library helpers, plus the shared tool-spec/registration framework
 - `src/extension.ts` — minimal pi extension registering `/supi-settings`
 
 Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/api`. PI discovery still uses the real file path `./src/extension.ts` from `package.json`.
@@ -30,6 +30,7 @@ src/
   registry-utils.ts   — globalThis-backed shared registries, including session-state helpers (flat utility)
   session-utils.ts    — session utilities (flat utility)
   terminal.ts         — terminal formatting utilities (flat utility)
+  tool-framework.ts   — shared tool-spec/registration framework for SuPi tool packages
   config/
     config.ts         — loadSupiConfig*(), writeSupiConfig(), removeSupiConfigKey()
     config-settings.ts — registerConfigSettings() helper
@@ -52,9 +53,12 @@ __tests__/
     context/            — tests for src/context/*
     settings/           — tests for src/settings/*
     debug-registry.test.ts
+    path-utils.test.ts
     project-roots.test.ts
+    registry-utils.test.ts
     session-utils.test.ts
     terminal.test.ts
+    tool-framework.test.ts
 ```
 
 ### Key paths
@@ -62,6 +66,7 @@ __tests__/
 - `api.ts`, `index.ts` — public export surface; keep the shared API deliberate and small
 - `path-utils.ts` — preferred shared location for leading `@` stripping, cwd resolution, and file URI conversion used across SuPi tool packages
 - `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages
+- `tool-framework.ts` — shared `SuiPiToolSpec`, `SuiPiToolPromptSurface`, `derivePromptSurface()`, `registerSuiPiTools()`, and shared TypeBox param builders (`FileParam`, `LineParam`, etc.) for SuPi tool packages; packages keep their own execute logic
 
 ## Config gotchas
 

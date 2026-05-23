@@ -1,6 +1,6 @@
 // supi-core — shared infrastructure for SuPi extensions.
 // Provides XML context tag wrapping, unified config system, context-message utilities,
-// and settings registry for supi-wide TUI settings.
+// settings registry for supi-wide TUI settings, and a shared tool-spec/registration framework.
 
 export type { SupiConfigLocation, SupiConfigOptions } from "./config/config.ts";
 export {
@@ -84,3 +84,13 @@ export {
   signalWaiting,
   WAITING_SYMBOL,
 } from "./terminal.ts";
+export type { SuiPiToolPromptSurface, SuiPiToolSpec, ToolExecuteFn } from "./tool-framework.ts";
+export {
+  CharacterParam,
+  derivePromptSurface,
+  FileParam,
+  LineParam,
+  MaxResultsParam,
+  registerSuiPiTools,
+  SymbolParam,
+} from "./tool-framework.ts";
