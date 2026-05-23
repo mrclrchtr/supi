@@ -133,7 +133,12 @@ describe("packStaged clean manifest", () => {
     tarball = await packStaged("packages/supi-lsp", { outDir });
 
     const pkg = extractJson(tarball, "package/package.json");
-    expect(pkg.bundledDependencies).toEqual(["@mrclrchtr/supi-core", "vscode-jsonrpc", "vscode-languageserver-protocol", "vscode-languageserver-types"]);
+    expect(pkg.bundledDependencies).toEqual([
+      "@mrclrchtr/supi-core",
+      "vscode-jsonrpc",
+      "vscode-languageserver-protocol",
+      "vscode-languageserver-types",
+    ]);
 
     // The bundled sub-package may or may not have its own bundledDependencies,
     // but if it does they should be preserved
