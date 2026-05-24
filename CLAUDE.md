@@ -94,43 +94,30 @@ Extensions register settings via `registerSettings()` from `@mrclrchtr/supi-core
 
 ## Shared gotchas
 
+### Event & session semantics
 - pi loads these extensions from the working tree directly; after edits, use `/reload` or restart pi.
 - `pi.on("tool_result")` can modify tool output after execution; `pi.on("tool_call")` runs before execution — it can mutate input parameters (e.g. inject defaults) or block the call, but cannot add result content.
 - Session cleanup event is `session_shutdown`, not `session_end`.
-- `ctx.ui.notify()` accepts `"info"` | `"warning"` | `"error"` severity — the gotcha about "info" is for `ctx.ui.theme` colors, not `notify`.
-- `ctx.ui.theme` does not expose an `"info"` color; use existing colors like `"accent"` / `"dim"` for info-level UI.
-- PI sets the terminal title directly on `this.ui.terminal` during startup and on `/name` renames — it never flows through `ctx.ui.setTitle`. Intercepting `ctx.ui.setTitle` to capture PI's title won't work; recompute dynamically with `pi.getSessionName()` and `ctx.cwd` instead.
 - PI internal events like `session_info_changed` are consumed by the interactive mode only; they are **not** forwarded to extension handlers via `pi.on()`. The `pi.events` EventBus is strictly for extension-to-extension communication.
 - `createAgentSession()` child sessions do NOT bubble `agent_start`/`agent_end` to parent extension handlers; use `pi.events` to signal activity from programmatic sub-sessions.
 - `pi.events.emit("supi:working:start", { source: "supi-<pkg>" })` / `pi.events.emit("supi:working:end", { source: "supi-<pkg>" })` — generic SuPi convention for indicating long-running work across extensions; `tab-spinner` listens to these. Emitters must ensure `end` always fires (success, failure, cancel, timeout).
+
+### UI & rendering
+- `ctx.ui.theme` does not expose an `"info"` color; use existing colors like `"accent"` / `"dim"` for info-level UI.
+- PI sets the terminal title directly on `this.ui.terminal` during startup and on `/name` renames — it never flows through `ctx.ui.setTitle`. Intercepting `ctx.ui.setTitle` to capture PI's title won't work; recompute dynamically with `pi.getSessionName()` and `ctx.cwd` instead.
+
+### Dependencies & tool behavior
 - Pi core peer deps (`@earendil-works/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
-- Mark pi-provided peer deps (`@earendil-works/pi-*`, `typebox`) as optional via `peerDependenciesMeta` to prevent `npm install -g` from auto-installing them (which can pull in native addons like koffi that fail on newer Node.js versions).
-- Other runtime imports belong in `dependencies`, not `peerDependencies`.
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
-- Package-local `node_modules/@earendil-works/pi-*` copies can pin older PI typings after an upgrade — if one package “loses” a new PI field, run that package's scoped `tsc` and inspect `packages/<pkg>/node_modules/@earendil-works/pi-*` before assuming the docs are wrong.
-- Standalone workspace packages are real install targets; dependency removals often need matching edits in `packages/*/package.json`, not just the root manifest.
-- Pi discovers package skills from `node_modules` scanning, not workspace packages' `package.json`. Workspace skills must be registered explicitly — SuPi uses `resources_discover` for this (see documentation section above).
-- Packages that only contribute settings sections should document `/supi-settings` as conditional on the install surface, not as a standalone command they ship.
-- Avoid TS JSON import assertions here; prefer `JSON.parse(fs.readFileSync(..., "utf-8"))`. pi's jiti loader provides `__dirname`.
-- `pnpm exec jiti /tmp/script.mjs` — use this for ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
-- pi flattens tool `promptGuidelines` into the system prompt `Guidelines:` section; each bullet must name its tool explicitly.
-- Prefer stable system-prompt guidance via tool `promptGuidelines`; avoid `before_agent_start` `systemPrompt` mutations unless dynamic per-turn guidance is worth the prompt-cache tradeoff.
-- `ctx.sessionManager.getBranch()` returns `SessionEntry[]`; reconstruct state from `type === "message"` / `entry.message.role` and `type === "custom_message"`, not flattened branch entries.
-- `parseSessionEntries()` returns raw entries; call `migrateSessionEntries(entries)` afterward to handle legacy v1/v2 session files that lack `id`/`parentId`.
-- Session files are append-only trees. The active branch is the path from the **last entry** (current leaf) back to root via `parentId` — do not count every entry in the file.
-- Cache keys for session-derived data should include `sessionId + filePath hash + modified timestamp` to handle branch deduplication and stale-cache invalidation.
-- `docs/extensions.md` + `examples/extensions/message-renderer.ts` — authoritative for custom-message rendering; `display: false` suppresses TUI rendering and `content` should hold the visible summary.
-- `pi.registerMessageRenderer(customType, renderer)` — `message.content` is what the LLM sees in conversation context; `message.details` is renderer-only data. Pass structured events in `details` and plain text in `content` so agents see JSON while users see styled, themed output.
-- Custom `registerMessageRenderer` handlers must explicitly display `warning` for all result states (including `success` and `canceled`), not just `failed`/`timeout`.
-- Biome config lives in `biome.jsonc`. For new tests, run `pnpm exec biome check --write <files...>` before verifying.
-- Biome's import organizer sorts `export type { X }` before `export { Y }` from the same module — use `--write` to apply the canonical order automatically
+
+### Dev workflow
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
-- OpenSpec `PostHogFetchNetworkError` output is harmless when offline.
-- `npm pack <pkg>@<ver> --silent && tar -tzf` — inspect actual npm tarball contents; `npm view` only shows registry metadata which may not match shipped files
-- `Theme` type (`theme.fg()`, `theme.bold()`) is not publicly re-exported from `@earendil-works/pi-coding-agent` — `theme.fg()` first param is a narrow union `n`, not plain `string`. Private helper functions receiving `theme` must use `any` with `biome-ignore` or inline styled strings directly.
-- Biome `noExcessiveCognitiveComplexity` (max 15) applies inside `ctx.ui.custom()` factory callbacks — the callback body counts toward the enclosing exported function. Extract container-building into a separate function when the component has multiple sections.
-- `DynamicBorder` constructor's optional styling lambda needs an explicit type annotation: `(s: string) => theme.fg("accent", s)` — see the `selectFromList` pattern in `supi-review` for reference.
+- `pnpm exec jiti /tmp/script.mjs` — ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
+- pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli).
+- RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward.
+
+> For per-package gotchas (session entry parsing, message rendering, config patterns, WASM quirks), see individual `packages/*/CLAUDE.md` files — injected automatically by supi-claude-md when working in that directory.
 ## Publish pipeline
 
 Published npm tarballs must produce npm-compatible manifests because PI installs packages via `npm install`. The pipeline has four stages:
@@ -148,8 +135,6 @@ node scripts/publish.mjs packages/supi-lsp --publish  # pack + verify + publish
 The `pack:check` and `pack:verify` commands in `pnpm verify` run this pipeline for all publishable packages.
 
 Root cause for the staging pipeline: direct `pnpm pack` on workspace packages produces tarball entries with `../` paths to the root `node_modules`. The staged `cp -RL` + `npm pack` approach avoids this because npm produces correct tarballs from a flat, dereferenced `node_modules`.
-- pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli)
-- RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward
 
 ## Release & tagging convention
 
