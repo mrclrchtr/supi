@@ -1,4 +1,5 @@
 import type { CodeQueryParams as ActionParams } from "./query-params.ts";
+import type { SemanticSubstrate } from "./substrates/types.ts";
 import {
   type ResolvedTarget,
   type ResolvedTargetGroup,
@@ -14,6 +15,7 @@ import {
 export async function resolveTarget(
   params: ActionParams,
   cwd: string,
+  semantic?: SemanticSubstrate,
 ): Promise<ResolvedTarget | ResolvedTargetGroup | string> {
   if (!params.file && !params.symbol) {
     return "**Error:** Semantic actions require either anchored coordinates (`file`, `line`, `character`) or a `symbol` for discovery.";
@@ -28,7 +30,7 @@ export async function resolveTarget(
   }
 
   if (params.symbol) {
-    return resolveBySymbol(params, cwd);
+    return resolveBySymbol(params, cwd, semantic);
   }
 
   return "**Error:** Could not resolve target.";
@@ -55,8 +57,12 @@ async function resolveByFile(file: string, cwd: string): Promise<ResolvedTargetG
 async function resolveBySymbol(
   params: ActionParams,
   cwd: string,
+  semantic?: SemanticSubstrate,
 ): Promise<ResolvedTarget | string> {
-  const result = await resolveSymbolTarget(params.symbol ?? "", cwd, {
+  if (!semantic) {
+    return "**Error:** Symbol discovery requires active LSP. Use `file` + coordinates, or enable LSP and retry.";
+  }
+  const result = await resolveSymbolTarget(params.symbol ?? "", cwd, semantic, {
     path: params.path,
     kind: params.kind,
     exportedOnly: params.exportedOnly,

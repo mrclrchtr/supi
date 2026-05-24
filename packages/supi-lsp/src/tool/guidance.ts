@@ -2,7 +2,7 @@
 
 import * as path from "node:path";
 import type { ProjectServerInfo } from "../config/server-config.ts";
-import { LSP_LOOKUP_TOOL, type LspToolName } from "./names.ts";
+import type { LspToolName } from "./names.ts";
 import { LSP_TOOL_DEFINITION_SPECS } from "./tool-specs.ts";
 
 export interface LspToolPromptSurface {
@@ -66,13 +66,4 @@ function displayRoot(root: string, cwd: string): string {
   if (relative === "") return ".";
   if (relative.startsWith(`..${path.sep}`) || relative === "..") return root;
   return relative.replaceAll(path.sep, "/");
-}
-
-// Compatibility exports for older internal tests and helper imports.
-export const toolDescription = defaultLspToolPromptSurfaces[LSP_LOOKUP_TOOL].description;
-export const promptSnippet = defaultLspToolPromptSurfaces[LSP_LOOKUP_TOOL].promptSnippet;
-export const promptGuidelines = defaultLspToolPromptSurfaces[LSP_LOOKUP_TOOL].promptGuidelines;
-
-export function buildProjectGuidelines(servers: ProjectServerInfo[], cwd: string): string[] {
-  return buildLspToolPromptSurfaces(servers, cwd)[LSP_LOOKUP_TOOL].promptGuidelines;
 }

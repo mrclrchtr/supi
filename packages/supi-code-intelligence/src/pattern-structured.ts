@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { withStructuralSession } from "./providers/structural-provider.ts";
 import type { CodeQueryParams as ActionParams } from "./query-params.ts";
+import type { StructuralSubstrate } from "./substrates/types.ts";
 
 export const STRUCTURED_PATTERN_FILE_CAP = 200;
 const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;
@@ -25,11 +25,13 @@ export function isStructuredPatternKind(kind: string | undefined): kind is Struc
   return kind === "definition" || kind === "export" || kind === "import";
 }
 
+// biome-ignore lint/complexity/useMaxParams: substrate injection keeps related inputs explicit for readability
 export async function getStructuredPatternMatches(
   params: ActionParams & { pattern: string; kind: StructuredPatternKind },
   scopePath: string,
   cwd: string,
   relScope: string,
+  structural: StructuralSubstrate,
 ): Promise<StructuredPatternResult | string | null> {
   const deadline = Date.now() + STRUCTURED_PATTERN_TIMEOUT_MS;
   const collected = collectStructuredFiles(scopePath, deadline);
@@ -43,26 +45,24 @@ export async function getStructuredPatternMatches(
   }
 
   try {
-    return await withStructuralSession(cwd, async (tsSession) => {
-      const matches: StructuredMatch[] = [];
-      let timedOut = collected.timedOut;
+    const matches: StructuredMatch[] = [];
+    let timedOut = collected.timedOut;
 
-      for (const [index, file] of collected.files.entries()) {
-        if (Date.now() > deadline) {
-          collected.omittedCount += collected.files.length - index;
-          timedOut = true;
-          break;
-        }
-        const relFile = path.relative(cwd, file);
-        await collectMatchesForFile(matches, tsSession, relFile, params.kind, matcher);
+    for (const [index, file] of collected.files.entries()) {
+      if (Date.now() > deadline) {
+        collected.omittedCount += collected.files.length - index;
+        timedOut = true;
+        break;
       }
+      const relFile = path.relative(cwd, file);
+      await collectMatchesForFile(matches, structural, relFile, params.kind, matcher);
+    }
 
-      return {
-        matches,
-        omittedCount: timedOut ? Math.max(1, collected.omittedCount) : collected.omittedCount,
-        partialReason: timedOut ? "timeout" : collected.omittedCount > 0 ? "file-cap" : null,
-      };
-    });
+    return {
+      matches,
+      omittedCount: timedOut ? Math.max(1, collected.omittedCount) : collected.omittedCount,
+      partialReason: timedOut ? "timeout" : collected.omittedCount > 0 ? "file-cap" : null,
+    };
   } catch {
     return `No structured ${params.kind} search data available in \`${relScope}\`. Try omitting \`kind\` for plain text search.`;
   }
@@ -72,32 +72,32 @@ export async function getStructuredPatternMatches(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: kind-specific tree-sitter matching is clearest as one helper
 async function collectMatchesForFile(
   matches: StructuredMatch[],
-  tsSession: import("@mrclrchtr/supi-tree-sitter/api").TreeSitterService,
+  structural: StructuralSubstrate,
   relFile: string,
   kind: StructuredPatternKind,
   matcher: (value: string) => boolean,
 ): Promise<void> {
   if (kind === "definition") {
-    const outline = await tsSession.outline(relFile);
+    const outline = await structural.outline(relFile);
     if (outline.kind !== "success") return;
     for (const item of outline.data) {
       if (!matcher(item.name)) continue;
-      matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.range.startLine });
+      matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
     }
     return;
   }
 
   if (kind === "export") {
-    const exportsResult = await tsSession.exports(relFile);
+    const exportsResult = await structural.exports(relFile);
     if (exportsResult.kind !== "success") return;
     for (const item of exportsResult.data) {
       if (!matcher(item.name)) continue;
-      matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.range.startLine });
+      matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
     }
     return;
   }
 
-  const importsResult = await tsSession.imports(relFile);
+  const importsResult = await structural.imports(relFile);
   if (importsResult.kind !== "success") return;
   for (const item of importsResult.data) {
     if (!matcher(item.moduleSpecifier)) continue;
@@ -105,7 +105,7 @@ async function collectMatchesForFile(
       file: relFile,
       name: item.moduleSpecifier,
       kind: "import",
-      line: item.range.startLine,
+      line: item.startLine,
     });
   }
 }

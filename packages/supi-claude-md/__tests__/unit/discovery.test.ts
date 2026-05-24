@@ -163,11 +163,11 @@ describe("extractPathFromToolEvent", () => {
   });
 
   it("extracts file from lsp tool", () => {
-    expect(extractPathFromToolEvent("lsp", { file: "qux.ts" })).toBe("qux.ts");
+    expect(extractPathFromToolEvent("lsp_hover", { file: "qux.ts" })).toBe("qux.ts");
   });
 
   it("extracts file from tree_sitter tool", () => {
-    expect(extractPathFromToolEvent("tree_sitter", { file: "ast.ts" })).toBe("ast.ts");
+    expect(extractPathFromToolEvent("tree_sitter_outline", { file: "ast.ts" })).toBe("ast.ts");
   });
 
   it("returns null for bash tool", () => {

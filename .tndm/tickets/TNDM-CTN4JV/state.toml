@@ -1,0 +1,88 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-23T13:59:54.509341Z"
+revision = 45
+
+[document_fingerprints]
+archive = "sha256:673241d13bb0bcbf233b2b4e99f61a966ab2df89380f08ab4b72e80b41b09458"
+content = "sha256:9bffa50f807b6dbea136e1aa71bf102fb7ccd2e729df7c624606c6d2711516ab"
+task-01 = "sha256:83abc6da002214e76ff86a26ab8f27035407eaf5b6c643439fd9f80aa8ed6354"
+task-02 = "sha256:03a0a19027332e19e84b894fd4a84640f6a3c7a89600fbf5932c10be9158c92a"
+task-03 = "sha256:402b153f75ef3a70b1b56d18a6111a4232580493ea5d078c8c60c484cd3a3ced"
+task-04 = "sha256:d05c26c527361223f1ddf0b019908ffd90555645c6ade6bf4e241a9591d904ac"
+task-05 = "sha256:a12a0ce7ef8bd5b5c56313230b32acd2b76068c24988d8cff4ca7e0625e9c2f5"
+task-06 = "sha256:30133b0ca00da87a6e24c0bec5c2678882b83ebadcf7beade32b34e28864f198"
+task-07 = "sha256:0d07215f585bd54f457324ea31812f6d57a8442d41abf611ba34e29eada7ff85"
+task-08 = "sha256:3d43d5daa531f708feb123e5ef3d6ab8b131297bd5961d31fdf431d111329f16"
+task-09 = "sha256:4ce78bca5aea8f537c7de64ee24708939ec805e14d02402841fcef87258c47d4"
+
+[[tasks]]
+number = 1
+title = "Add CodePosition and CodeLocation to supi-core"
+status = "done"
+files = ["packages/supi-core/src/substrate-types.ts", "packages/supi-core/src/api.ts", "packages/supi-core/src/index.ts", "packages/supi-core/__tests__/unit/substrate-types.test.ts"]
+verification = "pnpm vitest run packages/supi-core/__tests__/unit/substrate-types.test.ts"
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "Define substrate interfaces and value types in supi-code-intelligence"
+status = "done"
+files = ["packages/supi-code-intelligence/src/substrates/types.ts"]
+verification = "pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json"
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "Implement LSP semantic substrate adapter"
+status = "done"
+files = ["packages/supi-code-intelligence/src/substrates/lsp-adapter.ts", "packages/supi-code-intelligence/__tests__/unit/substrates/lsp-adapter.test.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/substrates/lsp-adapter.test.ts"
+detail_path = "tasks/task-03.md"
+
+[[tasks]]
+number = 4
+title = "Implement tree-sitter structural substrate adapter"
+status = "done"
+files = ["packages/supi-code-intelligence/src/substrates/tree-sitter-adapter.ts", "packages/supi-code-intelligence/__tests__/unit/substrates/tree-sitter-adapter.test.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/substrates/tree-sitter-adapter.test.ts"
+detail_path = "tasks/task-04.md"
+
+[[tasks]]
+number = 5
+title = "Wire substrates through tool executors"
+status = "done"
+files = ["packages/supi-code-intelligence/src/tool/execute-brief.ts", "packages/supi-code-intelligence/src/tool/execute-relations.ts", "packages/supi-code-intelligence/src/tool/execute-affected.ts", "packages/supi-code-intelligence/src/tool/execute-pattern.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/"
+detail_path = "tasks/task-05.md"
+
+[[tasks]]
+number = 6
+title = "Update action files to accept substrate parameters"
+status = "done"
+files = ["packages/supi-code-intelligence/src/actions/callers-action.ts", "packages/supi-code-intelligence/src/actions/affected-action.ts", "packages/supi-code-intelligence/src/actions/implementations-action.ts", "packages/supi-code-intelligence/src/actions/callees-action.ts", "packages/supi-code-intelligence/src/actions/brief-action.ts", "packages/supi-code-intelligence/src/pattern-structured.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/"
+detail_path = "tasks/task-06.md"
+
+[[tasks]]
+number = 7
+title = "Update target-resolution.ts to use substrates"
+status = "done"
+files = ["packages/supi-code-intelligence/src/target-resolution.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/"
+detail_path = "tasks/task-07.md"
+
+[[tasks]]
+number = 8
+title = "Delete providers, export from API, clean up test mocks"
+status = "done"
+files = ["packages/supi-code-intelligence/src/api.ts", "packages/supi-code-intelligence/src/index.ts", "packages/supi-code-intelligence/src/providers/semantic-provider.ts", "packages/supi-code-intelligence/src/providers/structural-provider.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/ && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json"
+detail_path = "tasks/task-08.md"
+
+[[tasks]]
+number = 9
+title = "Full verification: biome, typecheck, full test suite"
+status = "done"
+verification = "pnpm exec biome check packages/supi-code-intelligence/ packages/supi-core/ && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-core/__tests__/tsconfig.json && pnpm vitest run packages/supi-code-intelligence/ packages/supi-core/"
+detail_path = "tasks/task-09.md"

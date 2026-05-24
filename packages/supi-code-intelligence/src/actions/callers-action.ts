@@ -1,7 +1,6 @@
 // Callers action — find call sites for a symbol.
 
 import * as path from "node:path";
-import { getSemanticService } from "../providers/semantic-provider.ts";
 import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { filterOutDeclaration, isInProjectPath, uriToFile } from "../search-helpers.ts";
@@ -10,14 +9,16 @@ import {
   highestConfidence,
   isResolvedTargetGroup,
 } from "../semantic-action-helpers.ts";
+import type { SemanticSubstrate } from "../substrates/types.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
 import type { CodeIntelResult, ConfidenceMode, SearchDetails } from "../types.ts";
 
 export async function executeCallersAction(
   params: ActionParams,
   cwd: string,
+  semantic: SemanticSubstrate,
 ): Promise<CodeIntelResult> {
-  const target = await resolveTarget(params, cwd);
+  const target = await resolveTarget(params, cwd, semantic);
   if (typeof target === "string") {
     return {
       content: target,
@@ -35,10 +36,10 @@ export async function executeCallersAction(
   }
 
   if (isResolvedTargetGroup(target)) {
-    return executeFileLevelCallers(target, params, cwd);
+    return executeFileLevelCallers(target, params, cwd, semantic);
   }
 
-  const result = await collectCallerRefs(target, params, cwd);
+  const result = await collectCallerRefs(target, params, cwd, semantic);
   if (result.refs.length > 0) {
     const content = formatTargetCallers(
       `Callers of \`${target.name ?? "symbol"}\``,
@@ -107,11 +108,12 @@ async function executeFileLevelCallers(
   targetGroup: ResolvedTargetGroup,
   params: ActionParams,
   cwd: string,
+  semantic: SemanticSubstrate,
 ): Promise<CodeIntelResult> {
   const perTarget = await Promise.all(
     targetGroup.targets.map(async (target) => ({
       target,
-      result: await collectCallerRefs(target, params, cwd),
+      result: await collectCallerRefs(target, params, cwd, semantic),
     })),
   );
 
@@ -160,22 +162,18 @@ async function collectCallerRefs(
   target: ResolvedTarget,
   _params: ActionParams,
   cwd: string,
+  semantic: SemanticSubstrate,
 ): Promise<CallerCollection> {
-  const lsp = await getSemanticService(cwd, { waitForReady: true });
-  if (!lsp) {
+  const locs = await semantic.references(target.file, target.position);
+  if (!locs) {
     return { refs: [], confidence: "unavailable", externalCount: 0, candidateCount: 0 };
   }
 
-  const refs = await lsp.references(target.file, target.position);
-  if (refs === null) {
-    return { refs: [], confidence: "unavailable", externalCount: 0, candidateCount: 0 };
-  }
-
-  const filtered = filterOutDeclaration(refs, target.file, target.position);
+  const filtered = filterOutDeclaration(locs, target.file, target.position);
   const projectRefs: CallerRef[] = [];
   let externalCount = 0;
 
-  for (const ref of refs) {
+  for (const ref of locs) {
     const filePath = uriToFile(ref.uri);
     if (!isInProjectPath(filePath, cwd)) {
       externalCount++;

@@ -9,6 +9,21 @@ export {
 } from "./architecture.ts";
 
 export { generateFocusedBrief, generateOverview, generateProjectBrief } from "./brief.ts";
+export { createSemanticSubstrate } from "./substrates/lsp-adapter.ts";
+export { createStructuralSubstrate } from "./substrates/tree-sitter-adapter.ts";
+
+// Substrate adapters
+export type {
+  CalleesData,
+  CodeSymbol,
+  ExportData,
+  ImportData,
+  NodeAtData,
+  OutlineData,
+  SemanticSubstrate,
+  StructuralResult,
+  StructuralSubstrate,
+} from "./substrates/types.ts";
 export type { ResolvedTarget, TargetResolutionResult } from "./target-resolution.ts";
 export {
   normalizePath,

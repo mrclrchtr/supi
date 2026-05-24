@@ -5,11 +5,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
-import { type Position, type SessionLspService, toLspPosition } from "@mrclrchtr/supi-lsp/api";
-import { getSemanticService, getSemanticServiceState } from "./providers/semantic-provider.ts";
-import { withStructuralSession } from "./providers/structural-provider.ts";
+import { type Position, toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { normalizePath } from "./search-helpers.ts";
 import { highestConfidence } from "./semantic-action-helpers.ts";
+import { createSemanticSubstrate } from "./substrates/lsp-adapter.ts";
+import { createStructuralSubstrate } from "./substrates/tree-sitter-adapter.ts";
+import type { SemanticSubstrate, StructuralSubstrate } from "./substrates/types.ts";
 import type { ConfidenceMode, DisambiguationCandidate } from "./types.ts";
 
 export interface ResolvedTarget {
@@ -91,6 +92,7 @@ export function resolveAnchoredTarget(
 export async function resolveFileTargetGroup(
   file: string,
   cwd: string,
+  structural?: StructuralSubstrate,
 ): Promise<{ kind: "resolved"; group: ResolvedTargetGroup } | { kind: "error"; message: string }> {
   const resolvedFile = normalizePath(file, cwd);
 
@@ -106,7 +108,12 @@ export async function resolveFileTargetGroup(
   }
 
   const relPath = path.relative(cwd, resolvedFile);
-  const structuralTargets = await resolveFileTargetsViaTreeSitter(relPath, resolvedFile, cwd);
+  const structuralTargets = await resolveFileTargetsViaTreeSitter(
+    relPath,
+    resolvedFile,
+    cwd,
+    structural,
+  );
   const lspTargets = await resolveFileTargetsViaLsp(resolvedFile, cwd, structuralTargets);
   const targets = lspTargets ?? structuralTargets;
 
@@ -137,67 +144,79 @@ export async function resolveFileTargetGroup(
 export async function resolveSymbolTarget(
   symbol: string,
   cwd: string,
+  semantic: SemanticSubstrate,
   options?: {
     path?: string;
     kind?: string;
     exportedOnly?: boolean;
   },
 ): Promise<TargetResolutionResult> {
-  const lspState = await getSemanticServiceState(cwd, { waitForReady: true });
-
-  if (lspState.kind !== "ready") {
-    return {
-      kind: "error",
-      message:
-        `Symbol discovery for \`${symbol}\` requires active LSP. ` +
-        "Use `file` + coordinates, or enable LSP and retry.",
-    };
-  }
-
-  return resolveSymbolViaLsp(symbol, cwd, lspState.service, options);
+  return resolveSymbolViaSemantic(symbol, cwd, semantic, options);
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pre-existing — not introduced by this change
-async function resolveSymbolViaLsp(
+// New semantic-based symbol resolution using the adapter
+async function resolveSymbolViaSemantic(
   symbol: string,
   cwd: string,
-  lsp: SessionLspService,
-  options?: { path?: string; kind?: string; exportedOnly?: boolean },
+  semantic: SemanticSubstrate,
+  options?: {
+    path?: string;
+    kind?: string;
+    exportedOnly?: boolean;
+  },
 ): Promise<TargetResolutionResult> {
-  const results = await lsp.workspaceSymbol(symbol);
-  if (!results || results.length === 0) {
+  const results = await semantic.workspaceSymbols(symbol);
+  if (results === null) {
+    return {
+      kind: "error",
+      message: `Symbol discovery for \`${symbol}\` requires active LSP. Use \`file\` + coordinates, or enable LSP and retry.`,
+    };
+  }
+  if (results.length === 0) {
     return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
   }
 
   // Filter by path scope
   const scopePath = options?.path ? normalizePath(options.path, cwd) : null;
   let candidates = results.filter((s) => {
-    if (!("location" in s) || !s.location) return false;
-    const uri = s.location.uri;
-    const filePath = uri.startsWith("file://") ? decodeURIComponent(uri.slice(7)) : uri;
-    if (scopePath && !isWithinOrEqual(scopePath, filePath)) return false;
+    if (scopePath && !isWithinOrEqual(scopePath, s.file)) return false;
     return true;
   });
 
   // Filter by kind
   if (options?.kind) {
     const kindLower = options.kind.toLowerCase();
-    candidates = candidates.filter((s) => {
-      const symbolKind = symbolKindName(s.kind);
-      return symbolKind.toLowerCase().includes(kindLower);
-    });
+    candidates = candidates.filter((s) => s.kind.toLowerCase().includes(kindLower));
   }
 
-  // Filter to exported symbols only (heuristic: non-local SymbolKinds)
+  // Filter to exported symbols only
   if (options?.exportedOnly) {
-    candidates = candidates.filter((s) => {
-      // LSP workspace symbols don't expose export visibility directly.
-      // Filter out SymbolKinds that are typically local/private (Variable, Field, Property).
-      const NON_EXPORTED_KINDS = new Set([7, 8, 13]); // Property, Field, Variable
-      return !NON_EXPORTED_KINDS.has(s.kind);
-    });
+    const NON_EXPORTED_KINDS = new Set(["Variable", "Field", "Property"]);
+    candidates = candidates.filter((s) => !NON_EXPORTED_KINDS.has(s.kind));
   }
 
+  // Range-less candidates (line=0,char=0) come from URI-only workspace symbols.
+  // Keep them for disambiguation but don't promote to single-match resolution.
+  const ranged = candidates.filter((s) => s.line > 0 || s.character > 0);
+  const _rangeless = candidates.filter((s) => s.line === 0 && s.character === 0);
+
+  if (ranged.length === 1) {
+    const c = ranged[0];
+    return {
+      kind: "resolved",
+      target: {
+        file: c.file,
+        position: { line: c.line - 1, character: c.character - 1 },
+        displayLine: c.line,
+        displayCharacter: c.character,
+        name: c.name,
+        kind: c.kind,
+        confidence: "semantic",
+      },
+    };
+  }
+
+  // All candidates lost or only rangeless — report error if nothing at all
   if (candidates.length === 0) {
     return {
       kind: "error",
@@ -205,38 +224,18 @@ async function resolveSymbolViaLsp(
     };
   }
 
-  if (candidates.length === 1) {
-    const c = candidates[0];
-    const rawLoc = "location" in c ? c.location : null;
-    // WorkspaceSymbol.location may be Location | { uri: string }; we need range.
-    const loc =
-      rawLoc && "range" in rawLoc
-        ? (rawLoc as { uri: string; range: { start: { line: number; character: number } } })
-        : null;
-    if (!loc) {
-      return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
-    }
-    const filePath = loc.uri.startsWith("file://") ? decodeURIComponent(loc.uri.slice(7)) : loc.uri;
-
-    return {
-      kind: "resolved",
-      target: {
-        file: filePath,
-        position: loc.range.start,
-        displayLine: loc.range.start.line + 1,
-        displayCharacter: loc.range.start.character + 1,
-        name: c.name,
-        kind: symbolKindName(c.kind),
-        confidence: "semantic",
-      },
-    };
-  }
-
-  // Multiple candidates — return disambiguation
+  // Multiple candidates (or single rangeless) — return disambiguation with all candidates
   const MAX_CANDIDATES = 8;
-  const disambiguated = candidates
-    .slice(0, MAX_CANDIDATES)
-    .map((c, idx) => mapCandidateToDisambiguation(c, idx, cwd));
+  const disambiguated = candidates.slice(0, MAX_CANDIDATES).map((c, idx) => ({
+    name: c.name,
+    kind: c.kind,
+    container: c.container ?? null,
+    file: path.relative(cwd, c.file),
+    line: c.line,
+    character: c.character,
+    reason: path.relative(cwd, c.file),
+    rank: idx + 1,
+  }));
 
   return {
     kind: "disambiguation",
@@ -250,15 +249,13 @@ async function resolveFileTargetsViaLsp(
   cwd: string,
   structuralTargets: ResolvedTarget[] | null,
 ): Promise<ResolvedTarget[] | null> {
-  const lsp = await getSemanticService(cwd, { waitForReady: true });
-  if (!lsp) return null;
-
+  const lsp = createSemanticSubstrate(cwd);
   const symbols = await lsp.documentSymbols(resolvedFile);
   if (!symbols || symbols.length === 0) {
     return structuralTargets;
   }
 
-  const topLevel = flattenDocumentSymbols(symbols)
+  const topLevel = symbols
     .filter((symbol) => !symbol.container)
     .map((symbol) =>
       createResolvedTarget({
@@ -291,85 +288,45 @@ async function resolveFileTargetsViaTreeSitter(
   relPath: string,
   resolvedFile: string,
   cwd: string,
+  structural?: StructuralSubstrate,
 ): Promise<ResolvedTarget[] | null> {
   try {
-    return await withStructuralSession(cwd, async (tsSession) => {
-      const exportsResult = await tsSession.exports(relPath);
-      if (exportsResult.kind !== "success" || exportsResult.data.length === 0) {
-        return null;
-      }
-
+    if (structural) {
+      const exportsResult = await structural.exports(relPath);
+      if (exportsResult.kind !== "success" || exportsResult.data.length === 0) return null;
       return dedupeTargets(
         exportsResult.data.map((record) =>
           createResolvedTarget({
             file: resolvedFile,
-            line: record.range.startLine,
-            character: record.range.startCharacter,
+            line: record.startLine,
+            character: record.startCharacter,
             name: record.name,
             kind: record.kind,
             confidence: "structural",
           }),
         ),
       );
-    });
+    }
+
+    // Fallback: create a structural adapter on the fly
+    const fallback = createStructuralSubstrate(cwd);
+    const exportsResult = await fallback.exports(relPath);
+    if (exportsResult.kind !== "success" || exportsResult.data.length === 0) return null;
+    return dedupeTargets(
+      exportsResult.data.map((record) =>
+        createResolvedTarget({
+          file: resolvedFile,
+          line: record.startLine,
+          character: record.startCharacter,
+          name: record.name,
+          kind: record.kind,
+          confidence: "structural",
+        }),
+      ),
+    );
   } catch {
     return null;
   }
-}
-
-function flattenDocumentSymbols(
-  symbols: Array<{
-    name: string;
-    kind: number;
-    selectionRange?: { start: { line: number; character: number } };
-    location?: { range: { start: { line: number; character: number } } };
-    children?: Array<unknown>;
-  }>,
-  container: string | null = null,
-): Array<{
-  name: string;
-  kind: string;
-  line: number;
-  character: number;
-  container: string | null;
-}> {
-  const flattened: Array<{
-    name: string;
-    kind: string;
-    line: number;
-    character: number;
-    container: string | null;
-  }> = [];
-
-  for (const symbol of symbols) {
-    const start = symbol.selectionRange?.start ?? symbol.location?.range.start;
-    if (!start) continue;
-
-    flattened.push({
-      name: symbol.name,
-      kind: symbolKindName(symbol.kind),
-      line: start.line + 1,
-      character: start.character + 1,
-      container,
-    });
-
-    if (Array.isArray(symbol.children) && symbol.children.length > 0) {
-      flattened.push(
-        ...flattenDocumentSymbols(
-          symbol.children as Array<{
-            name: string;
-            kind: number;
-            selectionRange?: { start: { line: number; character: number } };
-            location?: { range: { start: { line: number; character: number } } };
-            children?: Array<unknown>;
-          }>,
-          symbol.name,
-        ),
-      );
-    }
-  }
-
-  return flattened;
 }
 
 function createResolvedTarget(input: {
@@ -404,40 +361,6 @@ function dedupeTargets(targets: ResolvedTarget[]): ResolvedTarget[] {
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-function mapCandidateToDisambiguation(
-  c: {
-    name: string;
-    kind: number;
-    containerName?: string | null;
-    location?: { uri: string } | null;
-  },
-  idx: number,
-  cwd: string,
-): DisambiguationCandidate {
-  const loc = c.location;
-  const filePath = loc
-    ? loc.uri.startsWith("file://")
-      ? decodeURIComponent(loc.uri.slice(7))
-      : loc.uri
-    : "";
-  const relPath = filePath ? path.relative(cwd, filePath) : "";
-  const rangeObj =
-    loc && "range" in loc
-      ? (loc as unknown as { range: { start: { line: number; character: number } } }).range
-      : null;
-
-  return {
-    name: c.name,
-    kind: symbolKindName(c.kind),
-    container: "containerName" in c ? (c.containerName ?? null) : null,
-    file: relPath,
-    line: rangeObj ? rangeObj.start.line + 1 : 0,
-    character: rangeObj ? rangeObj.start.character + 1 : 0,
-    reason: relPath,
-    rank: idx + 1,
-  };
-}
-
 const BINARY_EXTENSIONS = new Set([
   ".png",
   ".jpg",
@@ -467,37 +390,4 @@ const BINARY_EXTENSIONS = new Set([
 
 function isBinaryFile(filePath: string): boolean {
   return BINARY_EXTENSIONS.has(path.extname(filePath).toLowerCase());
-}
-
-/** Map LSP SymbolKind to a human-readable name. */
-function symbolKindName(kind: number): string {
-  const kinds: Record<number, string> = {
-    1: "File",
-    2: "Module",
-    3: "Namespace",
-    4: "Package",
-    5: "Class",
-    6: "Method",
-    7: "Property",
-    8: "Field",
-    9: "Constructor",
-    10: "Enum",
-    11: "Interface",
-    12: "Function",
-    13: "Variable",
-    14: "Constant",
-    15: "String",
-    16: "Number",
-    17: "Boolean",
-    18: "Array",
-    19: "Object",
-    20: "Key",
-    21: "Null",
-    22: "EnumMember",
-    23: "Struct",
-    24: "Event",
-    25: "Operator",
-    26: "TypeParameter",
-  };
-  return kinds[kind] ?? "Unknown";
 }

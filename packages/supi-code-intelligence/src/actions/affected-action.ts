@@ -7,7 +7,6 @@ import {
   appendPrioritySignalsSection,
   summarizePrioritySignalsForFiles,
 } from "../prioritization-signals.ts";
-import { getSemanticService } from "../providers/semantic-provider.ts";
 import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { filterOutDeclaration, isInProjectPath, uriToFile } from "../search-helpers.ts";
@@ -16,14 +15,16 @@ import {
   highestConfidence,
   isResolvedTargetGroup,
 } from "../semantic-action-helpers.ts";
+import type { SemanticSubstrate } from "../substrates/types.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
 import type { AffectedDetails, CodeIntelResult, ConfidenceMode } from "../types.ts";
 
 export async function executeAffectedAction(
   params: ActionParams,
   cwd: string,
+  semantic: SemanticSubstrate,
 ): Promise<CodeIntelResult> {
-  const target = await resolveTarget(params, cwd);
+  const target = await resolveTarget(params, cwd, semantic);
   if (typeof target === "string") {
     return {
       content: target,
@@ -44,12 +45,12 @@ export async function executeAffectedAction(
   }
 
   if (isResolvedTargetGroup(target)) {
-    return executeFileLevelAffected(target, params, cwd);
+    return executeFileLevelAffected(target, params, cwd, semantic);
   }
 
   const symbolName =
     target.name ?? `symbol at ${path.relative(cwd, target.file)}:${target.displayLine}`;
-  return executeSingleAffected(target, symbolName, params, cwd);
+  return executeSingleAffected(target, symbolName, params, cwd, semantic);
 }
 
 interface GatheredRef {
@@ -68,13 +69,15 @@ interface ImpactAnalysis {
   externalRefs: number;
 }
 
+// biome-ignore lint/complexity/useMaxParams: substrate injection keeps related inputs explicit for readability
 async function executeSingleAffected(
   target: ResolvedTarget,
   symbolName: string,
   params: ActionParams,
   cwd: string,
+  semantic: SemanticSubstrate,
 ): Promise<CodeIntelResult> {
-  const refs = await gatherReferences(target, params, cwd);
+  const refs = await gatherReferences(target, params, cwd, semantic);
   const model = await buildArchitectureModel(cwd);
   const analysis = analyzeImpact(refs, model, target.name, cwd);
 
@@ -109,11 +112,12 @@ async function executeFileLevelAffected(
   targetGroup: ResolvedTargetGroup,
   params: ActionParams,
   cwd: string,
+  semantic: SemanticSubstrate,
 ): Promise<CodeIntelResult> {
   const perTarget = await Promise.all(
     targetGroup.targets.map(async (target) => ({
       target,
-      refs: await gatherReferences(target, params, cwd),
+      refs: await gatherReferences(target, params, cwd, semantic),
     })),
   );
 
@@ -184,22 +188,18 @@ async function gatherReferences(
   target: ResolvedTarget,
   _params: ActionParams,
   cwd: string,
+  semantic: SemanticSubstrate,
 ): Promise<{ refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number }> {
-  const lsp = await getSemanticService(cwd, { waitForReady: true });
-  if (!lsp) {
-    return { refs: [], confidence: "unavailable", externalCount: 0 };
-  }
-
-  const lspRefs = await lsp.references(target.file, target.position);
-  if (lspRefs === null) {
+  const locs = await semantic.references(target.file, target.position);
+  if (!locs) {
     return { refs: [], confidence: "unavailable", externalCount: 0 };
   }
 
   const refs: GatheredRef[] = [];
   let externalCount = 0;
-  const filtered = filterOutDeclaration(lspRefs, target.file, target.position);
+  const filtered = filterOutDeclaration(locs, target.file, target.position);
 
-  for (const ref of lspRefs) {
+  for (const ref of locs) {
     const filePath = uriToFile(ref.uri);
     if (!isInProjectPath(filePath, cwd)) {
       externalCount++;

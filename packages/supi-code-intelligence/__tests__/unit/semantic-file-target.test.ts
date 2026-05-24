@@ -9,7 +9,8 @@ const mockLspFns = vi.hoisted(() => ({
 }));
 
 const mockStructuralFns = vi.hoisted(() => ({
-  withStructuralSession: vi.fn(),
+  getSessionTreeSitterService: vi.fn(),
+  createTreeSitterSession: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
@@ -20,25 +21,29 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   };
 });
 
-vi.mock("../../src/providers/structural-provider.ts", () => ({
-  withStructuralSession: mockStructuralFns.withStructuralSession,
+vi.mock("@mrclrchtr/supi-tree-sitter/api", () => ({
+  getSessionTreeSitterService: mockStructuralFns.getSessionTreeSitterService,
+  createTreeSitterSession: mockStructuralFns.createTreeSitterSession,
 }));
 
 let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-intel-file-target-"));
-  mockStructuralFns.withStructuralSession.mockImplementation(
-    async (
-      cwd: string,
-      fn: (session: {
-        exports: (file: string) => Promise<ReturnType<typeof getMockExportsResult>>;
-      }) => Promise<unknown>,
-    ) =>
-      fn({
-        exports: async (file: string) => getMockExportsResult(cwd, file),
-      }),
-  );
+  const dispose = vi.fn();
+  const mockSession = {
+    exports: async (file: string) => getMockExportsResult(tmpDir, file),
+    outline: vi.fn(),
+    imports: vi.fn(),
+    nodeAt: vi.fn(),
+    calleesAt: vi.fn(),
+    dispose,
+  };
+  mockStructuralFns.getSessionTreeSitterService.mockReturnValue({
+    kind: "unavailable",
+    reason: "No tree-sitter session",
+  });
+  mockStructuralFns.createTreeSitterSession.mockReturnValue(mockSession);
 });
 
 afterEach(() => {

@@ -1,4 +1,5 @@
 import { executeBriefAction } from "../actions/brief-action.ts";
+import { createStructuralSubstrate } from "../substrates/tree-sitter-adapter.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
@@ -21,5 +22,6 @@ export async function executeBriefTool(
     return { content: error, details: undefined };
   }
 
-  return executeBriefAction(params, ctx.cwd);
+  const structural = createStructuralSubstrate(ctx.cwd);
+  return executeBriefAction(params, ctx.cwd, structural);
 }

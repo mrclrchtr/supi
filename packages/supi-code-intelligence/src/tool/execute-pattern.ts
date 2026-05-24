@@ -1,4 +1,5 @@
 import { executePatternAction } from "../actions/pattern-action.ts";
+import { createStructuralSubstrate } from "../substrates/tree-sitter-adapter.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { validatePatternToolParams } from "./validation.ts";
 
@@ -22,5 +23,6 @@ export async function executePatternTool(
     return { content: error, details: undefined };
   }
 
-  return executePatternAction(params, ctx.cwd);
+  const structural = createStructuralSubstrate(ctx.cwd);
+  return executePatternAction(params, ctx.cwd, structural);
 }

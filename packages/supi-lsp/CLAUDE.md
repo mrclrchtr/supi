@@ -3,18 +3,22 @@
 ## Scope
 
 `@mrclrchtr/supi-lsp` has two explicit surfaces:
-- `@mrclrchtr/supi-lsp/extension` → `src/extension.ts` → registers the expert LSP toolset (`lsp_lookup`, `lsp_document_symbols`, `lsp_workspace_symbols`, `lsp_diagnostics`, `lsp_refactor`, `lsp_recover`), LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer
+- `@mrclrchtr/supi-lsp/extension` → `src/extension.ts` → registers **10 focused tools** (`lsp_hover`, `lsp_definition`, `lsp_references`, `lsp_implementation`, `lsp_document_symbols`, `lsp_workspace_symbols`, `lsp_diagnostics`, `lsp_rename`, `lsp_code_actions`, `lsp_recover`), LSP-aware read/write/edit overrides, `/lsp-status`, settings, and the custom diagnostic message renderer
 - `@mrclrchtr/supi-lsp/api` → `src/api.ts` → reusable library surface (`getSessionLspService`, `waitForSessionLspService`, `SessionLspService`, and exported semantic/diagnostic result types)
 
 ## Tool actions overview
 
-The public tool surface is split by job instead of multiplexing everything through one `{ action, args }` schema:
-- `lsp_lookup` → `kind: "hover" | "definition" | "references" | "implementation"` with top-level `file`, `line`, `character`
-- `lsp_document_symbols` → one-file semantic declarations
-- `lsp_workspace_symbols` → project-wide symbol-name lookup
-- `lsp_diagnostics` → file or workspace diagnostics
-- `lsp_refactor` → `kind: "rename" | "code_actions"` with top-level `file`, `line`, `character`, optional `newName`
-- `lsp_recover` → no-args diagnostic refresh and stale-state recovery
+The public tool surface is split by job instead of multiplexing everything through one `{ kind, args }` schema:
+- `lsp_hover` → `{ file, line, character }` — semantic type and symbol information
+- `lsp_definition` → `{ file, line, character }` — go to definition
+- `lsp_references` → `{ file, line, character }` — find all references
+- `lsp_implementation` → `{ file, line, character }` — find implementations
+- `lsp_document_symbols` → `{ file }` — one-file semantic declarations
+- `lsp_workspace_symbols` → `{ query }` — project-wide symbol-name lookup
+- `lsp_diagnostics` → `{ file? }` — file or workspace diagnostics
+- `lsp_rename` → `{ file, line, character, newName }` — semantic rename planning
+- `lsp_code_actions` → `{ file, line, character }` — semantic fixes or refactors
+- `lsp_recover` → `{}` — no-args diagnostic refresh and stale-state recovery
 
 `tool/register-tools.ts` owns tool registration and schemas. `tool/service-actions.ts` formats tool results and talks only to `SessionLspService`, not `LspManager` directly. Diagnostics can be requested explicitly through `lsp_diagnostics`, and the same diagnostic data is also surfaced inline after `write` and `edit`.
 
@@ -49,7 +53,7 @@ Pull diagnostic sync should use pull when `diagnosticProvider` is available and 
 
 ## Tool action gotchas
 
-The split expert tools use flat top-level parameters. `lsp_lookup` / `lsp_refactor` still validate positive 1-based `line` and `character` positions explicitly and return `Validation error: ...` strings instead of throwing. Relative `file` inputs resolve from the session cwd, not `process.cwd()`. `lsp_refactor` requires `newName` only for `kind: "rename"`. Missing-file diagnostics should return a clear file-access message instead of relying on a thrown exception.
+The split expert tools use flat top-level parameters. All position-based tools validate positive 1-based `line` and `character` positions explicitly and return `Validation error: ...` strings instead of throwing. `lsp_rename` requires `newName` as a required schema field. Relative `file` inputs resolve from the session cwd, not `process.cwd()`. Missing-file diagnostics should return a clear file-access message instead of relying on a thrown exception.
 
 ## Package-specific conventions
 

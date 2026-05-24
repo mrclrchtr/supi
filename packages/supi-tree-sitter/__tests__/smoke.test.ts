@@ -5,7 +5,7 @@ import treeSitterExtension from "../src/tree-sitter.ts";
 type RegisteredTool = { name: string };
 
 describe("supi-tree-sitter smoke", () => {
-  it("registers the extension tool when loaded", () => {
+  it("registers 6 focused tools when loaded", () => {
     const tools: RegisteredTool[] = [];
     const pi = {
       on: vi.fn(),
@@ -16,8 +16,17 @@ describe("supi-tree-sitter smoke", () => {
 
     treeSitterExtension(pi);
 
-    expect(pi.registerTool).toHaveBeenCalledOnce();
-    expect(tools[0]?.name).toBe("tree_sitter");
+    expect(pi.registerTool).toHaveBeenCalledTimes(6);
+    expect(tools.length).toBe(6);
+    expect(tools[0]?.name).toBe("tree_sitter_outline");
+    expect(tools.map((t) => t.name).sort((a, b) => a.localeCompare(b))).toEqual([
+      "tree_sitter_callees",
+      "tree_sitter_exports",
+      "tree_sitter_imports",
+      "tree_sitter_node_at",
+      "tree_sitter_outline",
+      "tree_sitter_query",
+    ]);
   });
 
   it("the meta-package aggregated extension surface is importable", {

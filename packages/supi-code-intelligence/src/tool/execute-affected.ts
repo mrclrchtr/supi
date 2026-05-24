@@ -1,4 +1,5 @@
 import { executeAffectedAction } from "../actions/affected-action.ts";
+import { createSemanticSubstrate } from "../substrates/lsp-adapter.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
@@ -21,5 +22,6 @@ export async function executeAffectedTool(
     return { content: error, details: undefined };
   }
 
-  return executeAffectedAction(params, ctx.cwd);
+  const semantic = createSemanticSubstrate(ctx.cwd);
+  return executeAffectedAction(params, ctx.cwd, semantic);
 }

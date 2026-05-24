@@ -176,11 +176,15 @@ const CODE_INTELLIGENCE_TOOL_NAMES = [
 ] as const;
 
 const LSP_TOOL_NAMES = [
-  "lsp_lookup",
+  "lsp_hover",
+  "lsp_definition",
+  "lsp_references",
+  "lsp_implementation",
   "lsp_document_symbols",
   "lsp_workspace_symbols",
   "lsp_diagnostics",
-  "lsp_refactor",
+  "lsp_rename",
+  "lsp_code_actions",
   "lsp_recover",
 ] as const;
 
@@ -226,12 +230,17 @@ describe("SuPi e2e smoke – tool registration", () => {
     for (const toolName of CODE_INTELLIGENCE_TOOL_NAMES) {
       expect(toolNames).toContain(toolName);
     }
-    expect(toolNames).toContain("tree_sitter");
+    expect(toolNames).toContain("tree_sitter_outline");
+    expect(toolNames).toContain("tree_sitter_imports");
+    expect(toolNames).toContain("tree_sitter_exports");
+    expect(toolNames).toContain("tree_sitter_node_at");
+    expect(toolNames).toContain("tree_sitter_query");
+    expect(toolNames).toContain("tree_sitter_callees");
     // LSP also registers read/write/edit overrides for inline diagnostics
     expect(toolNames).toContain("read");
     expect(toolNames).toContain("write");
     expect(toolNames).toContain("edit");
-    expect(pi.tools).toHaveLength(15);
+    expect(pi.tools).toHaveLength(24);
   });
 
   it("each tool has execute function, description, and parameters", () => {
@@ -249,12 +258,22 @@ describe("SuPi e2e smoke – tool registration", () => {
     }
   });
 
-  it("expert LSP tool descriptions advertise the split semantic workflow", () => {
+  it("focused LSP tool descriptions advertise each semantic capability", () => {
     const pi = createPiMock();
     lspExtension(pi);
 
-    expect(pi.tools.find((t) => t.name === "lsp_lookup")?.description).toContain("hover");
-    expect(pi.tools.find((t) => t.name === "lsp_lookup")?.description).toContain("implementation");
+    const hover = pi.tools.find((t) => t.name === "lsp_hover");
+    expect(hover?.description).toContain("hover");
+
+    const definition = pi.tools.find((t) => t.name === "lsp_definition");
+    expect(definition?.description).toContain("definition");
+
+    const references = pi.tools.find((t) => t.name === "lsp_references");
+    expect(references?.description).toContain("references");
+
+    const implementation = pi.tools.find((t) => t.name === "lsp_implementation");
+    expect(implementation?.description).toContain("implementation");
+
     expect(pi.tools.find((t) => t.name === "lsp_document_symbols")?.description).toContain(
       "semantic declarations",
     );
@@ -264,26 +283,45 @@ describe("SuPi e2e smoke – tool registration", () => {
     expect(pi.tools.find((t) => t.name === "lsp_diagnostics")?.description).toContain(
       "diagnostics",
     );
-    expect(pi.tools.find((t) => t.name === "lsp_refactor")?.description).toContain("rename");
+
+    const rename = pi.tools.find((t) => t.name === "lsp_rename");
+    expect(rename?.description).toContain("rename");
+
+    const codeActions = pi.tools.find((t) => t.name === "lsp_code_actions");
+    expect(codeActions?.description).toContain("code");
+
     expect(pi.tools.find((t) => t.name === "lsp_recover")?.description).toContain(
-      "refresh diagnostics",
+      "Refresh diagnostics",
     );
   });
 
-  it("tree_sitter tool has action enum with all expected actions", () => {
+  it("focused tree_sitter tools advertise each structural capability", () => {
     const pi = createPiMock();
     treeSitterExtension(pi);
-    const tsTool = pi.tools.find((t) => t.name === "tree_sitter");
-    expect(tsTool).toBeDefined();
 
-    const desc = tsTool?.description;
-    expect(desc).toContain("outline");
-    expect(desc).toContain("imports");
-    expect(desc).toContain("exports");
-    expect(desc).toContain("node_at");
-    expect(desc).toContain("query");
-    expect(desc).toContain("callees");
-    expect(desc).toContain("supported files");
+    const outline = pi.tools.find((t) => t.name === "tree_sitter_outline");
+    expect(outline).toBeDefined();
+    expect(outline?.description).toContain("outline");
+
+    const imports = pi.tools.find((t) => t.name === "tree_sitter_imports");
+    expect(imports).toBeDefined();
+    expect(imports?.description).toContain("import");
+
+    const exports = pi.tools.find((t) => t.name === "tree_sitter_exports");
+    expect(exports).toBeDefined();
+    expect(exports?.description).toContain("export");
+
+    const nodeAt = pi.tools.find((t) => t.name === "tree_sitter_node_at");
+    expect(nodeAt).toBeDefined();
+    expect(nodeAt?.description).toContain("node");
+
+    const query = pi.tools.find((t) => t.name === "tree_sitter_query");
+    expect(query).toBeDefined();
+    expect(query?.description).toContain("query");
+
+    const callees = pi.tools.find((t) => t.name === "tree_sitter_callees");
+    expect(callees).toBeDefined();
+    expect(callees?.description).toContain("callee");
   });
 
   it("focused code-intelligence tools expose split descriptions and parameter schemas", () => {
@@ -329,7 +367,16 @@ describe("SuPi e2e smoke – tool registration", () => {
     // come from createReadTool etc. and are AgentTools which wrap ToolDefinitions but
     // strip promptGuidelines/promptSnippet.
     const supiTools = pi.tools.filter((t) =>
-      [...LSP_TOOL_NAMES, "tree_sitter", ...CODE_INTELLIGENCE_TOOL_NAMES].includes(t.name),
+      [
+        ...LSP_TOOL_NAMES,
+        "tree_sitter_callees",
+        "tree_sitter_exports",
+        "tree_sitter_imports",
+        "tree_sitter_node_at",
+        "tree_sitter_outline",
+        "tree_sitter_query",
+        ...CODE_INTELLIGENCE_TOOL_NAMES,
+      ].includes(t.name),
     );
     for (const tool of supiTools) {
       expect(tool.promptGuidelines).toBeDefined();
@@ -643,11 +690,12 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
     return pi;
   }
 
-  async function exec(
+  async function execTool(
     pi: ExtensionAPI & MockInternals,
+    toolName: string,
     params: Record<string, unknown>,
   ): Promise<string> {
-    const tool = pi.tools.find((t) => t.name === "tree_sitter")!;
+    const tool = pi.tools.find((t) => t.name === toolName)!;
     const result = await tool.execute("test-id", params, undefined, () => {}, {
       cwd: tmpDir,
     });
@@ -658,21 +706,17 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
     const pi = createPiMock();
     treeSitterExtension(pi);
 
-    const tool = pi.tools.find((t) => t.name === "tree_sitter")!;
-    const result = await tool.execute(
-      "test-id",
-      { action: "outline", file: "x.ts" },
-      undefined,
-      () => {},
-      { cwd: "/" },
-    );
+    const tool = pi.tools.find((t) => t.name === "tree_sitter_outline")!;
+    const result = await tool.execute("test-id", { file: "x.ts" }, undefined, () => {}, {
+      cwd: "/",
+    });
     const text = (result.content as Array<{ text: string }>)[0].text;
     expect(text).toContain("not initialized");
   });
 
   it("parses outline from a TypeScript file", async () => {
     const pi = await setup();
-    const text = await exec(pi, { action: "outline", file: "math.ts" });
+    const text = await execTool(pi, "tree_sitter_outline", { file: "math.ts" });
 
     expect(text).toContain("Outline");
     expect(text).toContain("add"); // function declaration
@@ -682,14 +726,14 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
 
   it("reports no imports for a re-export file", async () => {
     const pi = await setup();
-    const text = await exec(pi, { action: "imports", file: "index.ts" });
     // index.ts re-exports — not plain imports — so tree-sitter finds none
+    const text = await execTool(pi, "tree_sitter_imports", { file: "index.ts" });
     expect(text).toContain("No imports");
   });
 
   it("parses exports from a TypeScript file", async () => {
     const pi = await setup();
-    const text = await exec(pi, { action: "exports", file: "math.ts" });
+    const text = await execTool(pi, "tree_sitter_exports", { file: "math.ts" });
 
     expect(text).toContain("Exports");
     expect(text).toContain("function: add");
@@ -699,8 +743,7 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
 
   it("finds node at a given position", async () => {
     const pi = await setup();
-    const text = await exec(pi, {
-      action: "node_at",
+    const text = await execTool(pi, "tree_sitter_node_at", {
       file: "math.ts",
       line: 2,
       character: 17,
@@ -713,8 +756,7 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
 
   it("finds node at first char position", async () => {
     const pi = await setup();
-    const text = await exec(pi, {
-      action: "node_at",
+    const text = await execTool(pi, "tree_sitter_node_at", {
       file: "math.ts",
       line: 1,
       character: 1,
@@ -722,14 +764,12 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
 
     expect(text).toContain("Node at");
     expect(text).toContain("Type:");
-    // Should find the comment or function declaration at start of file
     expect(text).toContain("Range:");
   });
 
   it("runs a TS query", async () => {
     const pi = await setup();
-    const text = await exec(pi, {
-      action: "query",
+    const text = await execTool(pi, "tree_sitter_query", {
       file: "math.ts",
       query: "(function_declaration name: (identifier) @fn)",
     });
@@ -741,8 +781,7 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
 
   it("returns no matches for a query that matches nothing", async () => {
     const pi = await setup();
-    const text = await exec(pi, {
-      action: "query",
+    const text = await execTool(pi, "tree_sitter_query", {
       file: "math.ts",
       query: "(decorator) @dec",
     });
@@ -752,22 +791,19 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
 
   it("handles invalid query syntax gracefully", async () => {
     const pi = await setup();
-    const text = await exec(pi, {
-      action: "query",
+    const text = await execTool(pi, "tree_sitter_query", {
       file: "math.ts",
       query: "(((invalid",
     });
 
-    // Should not crash — should return an error message
     expect(text).not.toContain("not initialized");
     expect(text).toContain("Invalid query");
   });
 
   it("returns unsupported language error for non-JS outline", async () => {
     const pi = await setup();
-    // Write .py file AFTER setup so tmpDir is valid
     writeFileSync(path.join(tmpDir, "data.py"), "def hello():\n    pass\n");
-    const text = await exec(pi, { action: "outline", file: "data.py" });
+    const text = await execTool(pi, "tree_sitter_outline", { file: "data.py" });
 
     expect(text).toContain("Unsupported language");
     expect(text).toContain("outline");
@@ -775,15 +811,14 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
 
   it("returns file access error for missing file", async () => {
     const pi = await setup();
-    const text = await exec(pi, { action: "imports", file: "nonexistent.ts" });
+    const text = await execTool(pi, "tree_sitter_imports", { file: "nonexistent.ts" });
 
     expect(text).toContain("File access error");
   });
 
   it("handles callees action for a TypeScript file", async () => {
     const pi = await setup();
-    const text = await exec(pi, {
-      action: "callees",
+    const text = await execTool(pi, "tree_sitter_callees", {
       file: "math.ts",
       line: 10,
       character: 12,
@@ -793,33 +828,22 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
     expect(text).toContain("add"); // Calculator.sum calls add()
   });
 
-  it("validates missing parameters", async () => {
+  it("validates missing parameters per-focused-tool", async () => {
     const pi = await setup();
-    const noAction = await exec(pi, {});
-    expect(noAction).toContain("Validation error");
+    // Missing file for outline
+    const noFileOutline = await execTool(pi, "tree_sitter_outline", {});
+    expect(noFileOutline).toContain("Validation error");
 
-    const badAction = await exec(pi, { action: "bogus" });
-    expect(badAction).toContain("Unknown action");
-
-    const noFile = await exec(pi, { action: "outline" });
-    expect(noFile).toContain("file");
-
-    const noLine = await exec(pi, { action: "node_at", file: "math.ts", character: 1 });
-    expect(noLine).toContain("line");
-
-    const badLine = await exec(pi, { action: "node_at", file: "math.ts", line: 0, character: 1 });
-    expect(badLine).toContain("positive 1-based");
-  });
-
-  it("returns unsupported language for callees on HTML files", async () => {
-    const pi = await setup();
-    const text = await exec(pi, {
-      action: "callees",
-      file: "test.html",
-      line: 1,
-      character: 5,
+    // Missing line for node_at
+    const noLineNodeAt = await execTool(pi, "tree_sitter_node_at", {
+      file: "math.ts",
+      character: 1,
     });
-    expect(text).toContain("Unsupported language");
+    expect(noLineNodeAt).toContain("Validation error");
+
+    // Missing file for node_at (file guard fires before line/character check)
+    const noFileNodeAt = await execTool(pi, "tree_sitter_node_at", {});
+    expect(noFileNodeAt).toContain("Validation error");
   });
 
   it("disposes runtime on session_shutdown", async () => {
@@ -827,7 +851,7 @@ describe("SuPi e2e smoke – tree_sitter tool execution", () => {
     const shutdownHandler = pi.handlers.get("session_shutdown")!;
     await shutdownHandler();
 
-    const text = await exec(pi, { action: "outline", file: "math.ts" });
+    const text = await execTool(pi, "tree_sitter_outline", { file: "math.ts" });
     expect(text).toContain("not initialized");
   });
 });
@@ -906,14 +930,23 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
       "code_pattern",
       "code_relations",
       "edit",
+      "lsp_code_actions",
+      "lsp_definition",
       "lsp_diagnostics",
       "lsp_document_symbols",
-      "lsp_lookup",
+      "lsp_hover",
+      "lsp_implementation",
       "lsp_recover",
-      "lsp_refactor",
+      "lsp_references",
+      "lsp_rename",
       "lsp_workspace_symbols",
       "read",
-      "tree_sitter",
+      "tree_sitter_callees",
+      "tree_sitter_exports",
+      "tree_sitter_imports",
+      "tree_sitter_node_at",
+      "tree_sitter_outline",
+      "tree_sitter_query",
       "write",
     ]);
 
@@ -928,21 +961,22 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     expect(overviewMsg3?.customType).toBe("code-intelligence-overview");
     expect(overviewMsg3?.display).toBe(false);
 
-    const tsTool = pi.tools.find((t) => t.name === "tree_sitter")!;
-    const tsResult = await tsTool.execute(
+    const tsOutlineTool = pi.tools.find((t) => t.name === "tree_sitter_outline")!;
+    const tsOutlineResult = await tsOutlineTool.execute(
       "test-id",
-      { action: "outline", file: "math.ts" },
+      { file: "math.ts" },
       undefined,
       () => {},
       { cwd: tmpDir },
     );
-    const tsText = tsResult.content[0].text;
+    const tsText = tsOutlineResult.content[0].text;
     expect(tsText).toContain("add");
     expect(tsText).toContain("Calculator");
 
-    const tsImportResult = await tsTool.execute(
+    const tsImportTool = pi.tools.find((t) => t.name === "tree_sitter_imports")!;
+    const tsImportResult = await tsImportTool.execute(
       "test-id",
-      { action: "imports", file: "index.ts" },
+      { file: "index.ts" },
       undefined,
       () => {},
       { cwd: tmpDir },
@@ -963,9 +997,9 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     }
     expect(shutdownError).toBeUndefined();
 
-    const tsAfterShutdown = await tsTool.execute(
+    const tsAfterShutdown = await tsOutlineTool.execute(
       "test-id",
-      { action: "outline", file: "math.ts" },
+      { file: "math.ts" },
       undefined,
       () => {},
       { cwd: tmpDir },
@@ -978,30 +1012,51 @@ describe("SuPi e2e smoke – lsp extension behavior", () => {
   it("uses focused top-level parameter schemas for the split LSP tools", () => {
     const pi = createPiMock();
     lspExtension(pi);
-    const lookupTool = pi.tools.find((t) => t.name === "lsp_lookup")!;
-    const refactorTool = pi.tools.find((t) => t.name === "lsp_refactor")!;
+    const hoverTool = pi.tools.find((t) => t.name === "lsp_hover")!;
+    const definitionTool = pi.tools.find((t) => t.name === "lsp_definition")!;
+    const referencesTool = pi.tools.find((t) => t.name === "lsp_references")!;
+    const implementationTool = pi.tools.find((t) => t.name === "lsp_implementation")!;
+    const renameTool = pi.tools.find((t) => t.name === "lsp_rename")!;
+    const codeActionsTool = pi.tools.find((t) => t.name === "lsp_code_actions")!;
     const diagnosticsTool = pi.tools.find((t) => t.name === "lsp_diagnostics")!;
     const recoverTool = pi.tools.find((t) => t.name === "lsp_recover")!;
 
-    expect((lookupTool.parameters as { type?: string }).type).toBe("object");
+    expect((hoverTool.parameters as { type?: string }).type).toBe("object");
+
+    // Position tools share the same schema: file, line, character (no kind)
+    for (const tool of [
+      hoverTool,
+      definitionTool,
+      referencesTool,
+      implementationTool,
+      codeActionsTool,
+    ]) {
+      expect(
+        Check(tool.parameters as object, {
+          file: "src/index.ts",
+          line: 1,
+          character: 1,
+        }),
+      ).toBe(true);
+      expect(
+        Check(tool.parameters as object, {
+          file: "src/index.ts",
+          line: 1,
+        }),
+      ).toBe(false);
+      expect(
+        Check(tool.parameters as object, {
+          kind: "hover",
+          file: "src/index.ts",
+          line: 1,
+          character: 1,
+        }),
+      ).toBe(false);
+    }
+
+    // Rename has newName required
     expect(
-      Check(lookupTool.parameters as object, {
-        kind: "hover",
-        file: "src/index.ts",
-        line: 1,
-        character: 1,
-      }),
-    ).toBe(true);
-    expect(
-      Check(lookupTool.parameters as object, {
-        kind: "hover",
-        file: "src/index.ts",
-        line: 1,
-      }),
-    ).toBe(false);
-    expect(
-      Check(refactorTool.parameters as object, {
-        kind: "rename",
+      Check(renameTool.parameters as object, {
         file: "src/index.ts",
         line: 1,
         character: 1,
@@ -1009,13 +1064,13 @@ describe("SuPi e2e smoke – lsp extension behavior", () => {
       }),
     ).toBe(true);
     expect(
-      Check(refactorTool.parameters as object, {
-        kind: "code_actions",
+      Check(renameTool.parameters as object, {
         file: "src/index.ts",
         line: 1,
         character: 1,
       }),
-    ).toBe(true);
+    ).toBe(false);
+
     expect(Check(diagnosticsTool.parameters as object, { file: "src/index.ts" })).toBe(true);
     expect(Check(recoverTool.parameters as object, {})).toBe(true);
   });

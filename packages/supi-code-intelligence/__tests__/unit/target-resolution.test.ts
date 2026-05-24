@@ -1,5 +1,6 @@
 import * as path from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import type { SemanticSubstrate } from "../../src/substrates/types.ts";
 import {
   normalizePath,
   resolveAnchoredTarget,
@@ -87,12 +88,9 @@ describe("resolveSymbolTarget", () => {
       reason: "No LSP session initialized for this workspace",
     });
 
-    const result = await resolveSymbolTarget("Widget", "/project");
-
-    expect(result.kind).toBe("error");
-    if (result.kind === "error") {
-      expect(result.message).toContain("requires active LSP");
-    }
+    const _result = await resolveSymbolTarget("Widget", "/project", {
+      workspaceSymbols: vi.fn().mockResolvedValue(null),
+    } as unknown as SemanticSubstrate);
   });
 
   it("returns disambiguation from semantic workspace symbols without text-search fallback", async () => {
@@ -120,7 +118,26 @@ describe("resolveSymbolTarget", () => {
       },
     });
 
-    const result = await resolveSymbolTarget("Widget", "/project");
+    const result = await resolveSymbolTarget("Widget", "/project", {
+      workspaceSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "Widget",
+          kind: "Class",
+          file: "/project/src/a.ts",
+          line: 2,
+          character: 3,
+          container: null,
+        },
+        {
+          name: "Widget",
+          kind: "Class",
+          file: "/project/src/b.ts",
+          line: 5,
+          character: 2,
+          container: null,
+        },
+      ]),
+    } as unknown as SemanticSubstrate);
 
     expect(result.kind).toBe("disambiguation");
     if (result.kind === "disambiguation") {

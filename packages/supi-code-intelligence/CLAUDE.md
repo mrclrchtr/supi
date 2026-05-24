@@ -46,9 +46,9 @@ src/
 │   ├── execute-relations.ts   # public code_relations adapter
 │   ├── execute-affected.ts    # public code_affected adapter
 │   └── execute-pattern.ts     # public code_pattern adapter
-├── providers/
-│   ├── semantic-provider.ts   # Session-scoped LSP access + short readiness waits
-│   └── structural-provider.ts # Shared Tree-sitter service access with short-lived fallback
+├── substrates/
+│   ├── lsp-adapter.ts         # Session-scoped LSP access via SemanticSubstrate
+│   └── tree-sitter-adapter.ts # Shared Tree-sitter service access via StructuralSubstrate
 └── actions/
     ├── brief-action.ts         # Architecture overviews + anchored briefs
     ├── map-action.ts           # Factual project/package/directory maps

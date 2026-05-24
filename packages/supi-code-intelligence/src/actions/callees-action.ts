@@ -3,17 +3,19 @@
 // extraction to @mrclrchtr/supi-tree-sitter/api.
 
 import * as path from "node:path";
-import { withStructuralSession } from "../providers/structural-provider.ts";
 import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
+import type { SemanticSubstrate, StructuralSubstrate } from "../substrates/types.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 export async function executeCalleesAction(
   params: ActionParams,
   cwd: string,
+  structural: StructuralSubstrate,
+  semantic?: SemanticSubstrate,
 ): Promise<CodeIntelResult> {
-  const target = await resolveTarget(params, cwd);
+  const target = await resolveTarget(params, cwd, semantic);
   if (typeof target === "string") {
     return {
       content: target,
@@ -49,9 +51,7 @@ export async function executeCalleesAction(
   const relPath = path.relative(cwd, target.file);
 
   try {
-    const result = await withStructuralSession(cwd, (tsSession) =>
-      tsSession.calleesAt(relPath, target.displayLine, target.displayCharacter),
-    );
+    const result = await structural.calleesAt(relPath, target.displayLine, target.displayCharacter);
 
     if (result.kind !== "success") {
       return {
@@ -64,7 +64,7 @@ export async function executeCalleesAction(
             candidateCount: 0,
             omittedCount: 0,
             nextQueries: [
-              'Use `lsp_lookup` with `kind: "hover"` for type-aware analysis on this file',
+              "Use `lsp_hover` with `file`, `line`, and `character` for type-aware analysis on this file",
             ],
           },
         },
@@ -84,7 +84,7 @@ export async function executeCalleesAction(
             candidateCount: 0,
             omittedCount: 0,
             nextQueries: [
-              'Use `tree_sitter` with `action: "outline"` to explore the enclosing function',
+              "Use `tree_sitter_outline` with `file` to explore the enclosing function",
             ],
           },
         },
@@ -98,7 +98,7 @@ export async function executeCalleesAction(
       candidateCount: callees.length,
       omittedCount: Math.max(0, callees.length - (params.maxResults ?? 8)),
       nextQueries: [
-        'Use `lsp_lookup` with `kind: "hover"` for precise type information on callees',
+        "Use `lsp_hover` with `file`, `line`, and `character` for precise type information on callees",
       ],
     };
     return { content, details: { type: "search" as const, data: details } };
@@ -113,7 +113,7 @@ export async function executeCalleesAction(
           candidateCount: 0,
           omittedCount: 0,
           nextQueries: [
-            'Use `lsp_lookup` with `kind: "hover"` for type-aware analysis on this file',
+            "Use `lsp_hover` with `file`, `line`, and `character` for type-aware analysis on this file",
           ],
         },
       },
@@ -122,7 +122,7 @@ export async function executeCalleesAction(
 }
 
 function formatCallees(
-  callees: Array<{ name: string; range: { startLine: number } }>,
+  callees: Array<{ name: string; startLine: number }>,
   enclosingName: string,
   relPath: string,
   maxResults: number,
@@ -137,19 +137,19 @@ function formatCallees(
 
   const shown = callees.slice(0, maxResults);
   for (const c of shown) {
-    lines.push(`- \`${c.name}\` (L${c.range.startLine})`);
+    lines.push(`- \`${c.name}\` (L${c.startLine})`);
   }
   if (callees.length > maxResults) {
     lines.push(`- _+${callees.length - maxResults} more_`);
   }
   lines.push("");
   lines.push(
-    '_Structural analysis — may include unresolved or qualified names. Use `lsp_lookup` with `kind: "hover"` for precise type information._',
+    "_Structural analysis — may include unresolved or qualified names. Use `lsp_hover` with `file`, `line`, and `character` for precise type information._",
   );
   lines.push("");
   return lines.join("\n");
 }
 
 function noCalleesMessage(relPath: string, line: number, char: number): string {
-  return `No callee data available for ${relPath}:${line}:${char}.\n\nUse \`tree_sitter\` with \`action: "callees"\` for structural drill-down.`;
+  return `No callee data available for ${relPath}:${line}:${char}.\n\nUse \`tree_sitter_callees\` with \`file\`, \`line\`, and \`character\` for structural drill-down.`;
 }

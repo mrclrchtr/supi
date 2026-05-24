@@ -128,6 +128,147 @@ export async function executeLookup(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Focused lookup tools (replacing the old multiplexed executeLookup)
+// ---------------------------------------------------------------------------
+
+export interface LspPositionToolParams {
+  file: string;
+  line: number;
+  character: number;
+}
+
+export interface LspRenameToolParams {
+  file: string;
+  line: number;
+  character: number;
+  newName: string;
+}
+
+export async function executeHover(
+  service: SessionLspService,
+  cwd: string,
+  params: LspPositionToolParams,
+): Promise<string> {
+  try {
+    const positionError = validatePositivePosition(params.line, params.character);
+    if (positionError) return positionError;
+    const fileError = validateFile(service, cwd, params.file);
+    if (fileError) return fileError;
+    const position = toZeroBased(params.line, params.character);
+    const hover = await service.hover(params.file, position);
+    return hover ? formatHover(hover) : "No hover information available at this position.";
+  } catch (error) {
+    return formatUnexpectedFailure("hover", error);
+  }
+}
+
+export async function executeDefinition(
+  service: SessionLspService,
+  cwd: string,
+  params: LspPositionToolParams,
+): Promise<string> {
+  try {
+    const positionError = validatePositivePosition(params.line, params.character);
+    if (positionError) return positionError;
+    const fileError = validateFile(service, cwd, params.file);
+    if (fileError) return fileError;
+    const position = toZeroBased(params.line, params.character);
+    const result = await service.definition(params.file, position);
+    if (!result) return "No definition found.";
+    const locations = normalizeLocations(result);
+    return locations.length > 0
+      ? formatLocations("Definition", locations, cwd)
+      : "No definition found.";
+  } catch (error) {
+    return formatUnexpectedFailure("definition", error);
+  }
+}
+
+export async function executeReferences(
+  service: SessionLspService,
+  cwd: string,
+  params: LspPositionToolParams,
+): Promise<string> {
+  try {
+    const positionError = validatePositivePosition(params.line, params.character);
+    if (positionError) return positionError;
+    const fileError = validateFile(service, cwd, params.file);
+    if (fileError) return fileError;
+    const position = toZeroBased(params.line, params.character);
+    const references = await service.references(params.file, position);
+    return references && references.length > 0
+      ? formatLocations("References", references, cwd)
+      : "No references found.";
+  } catch (error) {
+    return formatUnexpectedFailure("references", error);
+  }
+}
+
+export async function executeImplementation(
+  service: SessionLspService,
+  cwd: string,
+  params: LspPositionToolParams,
+): Promise<string> {
+  try {
+    const positionError = validatePositivePosition(params.line, params.character);
+    if (positionError) return positionError;
+    const fileError = validateFile(service, cwd, params.file);
+    if (fileError) return fileError;
+    const position = toZeroBased(params.line, params.character);
+    const result = await service.implementation(params.file, position);
+    if (!result) return "No implementation found.";
+    const locations = normalizeLocations(result);
+    return locations.length > 0
+      ? formatLocations("Implementation", locations, cwd)
+      : "No implementation found.";
+  } catch (error) {
+    return formatUnexpectedFailure("implementation", error);
+  }
+}
+
+export async function executeRename(
+  service: SessionLspService,
+  cwd: string,
+  params: LspRenameToolParams,
+): Promise<string> {
+  try {
+    const positionError = validatePositivePosition(params.line, params.character);
+    if (positionError) return positionError;
+    const fileError = validateFile(service, cwd, params.file);
+    if (fileError) return fileError;
+    const newName = params.newName?.trim();
+    if (!newName) {
+      return "Validation error: `newName` is required for rename.";
+    }
+    const position = toZeroBased(params.line, params.character);
+    const edit = await service.rename(params.file, position, newName);
+    return edit ? formatWorkspaceEdit(edit, cwd) : "Rename not available at this position.";
+  } catch (error) {
+    return formatUnexpectedFailure("rename", error);
+  }
+}
+
+export async function executeCodeActions(
+  service: SessionLspService,
+  cwd: string,
+  params: LspPositionToolParams,
+): Promise<string> {
+  try {
+    const positionError = validatePositivePosition(params.line, params.character);
+    if (positionError) return positionError;
+    const fileError = validateFile(service, cwd, params.file);
+    if (fileError) return fileError;
+    const position = toZeroBased(params.line, params.character);
+    const actions = await service.codeActions(params.file, position);
+    return actions && actions.length > 0
+      ? formatCodeActions(actions)
+      : "No code actions available at this position.";
+  } catch (error) {
+    return formatUnexpectedFailure("code actions", error);
+  }
+}
+
 export async function executeDocumentSymbols(
   service: SessionLspService,
   cwd: string,

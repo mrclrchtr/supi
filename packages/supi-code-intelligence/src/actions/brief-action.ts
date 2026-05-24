@@ -2,12 +2,11 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { TreeSitterService } from "@mrclrchtr/supi-tree-sitter/api";
 import { buildArchitectureModel, findModuleForPath } from "../architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
-import { withStructuralSession } from "../providers/structural-provider.ts";
 import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { normalizePath } from "../search-helpers.ts";
+import type { SemanticSubstrate, StructuralSubstrate } from "../substrates/types.ts";
 import {
   type ResolvedTarget,
   resolveSymbolTarget,
@@ -18,6 +17,7 @@ import type { CodeIntelResult } from "../types.ts";
 export async function executeBriefAction(
   params: ActionParams,
   cwd: string,
+  structural: StructuralSubstrate,
 ): Promise<CodeIntelResult> {
   const model = await buildArchitectureModel(cwd);
   if (!model) {
@@ -42,7 +42,7 @@ export async function executeBriefAction(
   }
 
   if (params.file && params.line != null && params.character != null) {
-    const content = await executeAnchoredBrief(params, cwd, model);
+    const content = await executeAnchoredBrief(params, cwd, model, structural);
     const relPath = path.relative(cwd, normalizePath(params.file ?? "", cwd));
     const mod = findModuleForPath(model, path.resolve(cwd, relPath));
     return {
@@ -66,7 +66,7 @@ export async function executeBriefAction(
   }
 
   if (params.symbol) {
-    return executeSymbolBrief(params, cwd, model);
+    return executeSymbolBrief(params, cwd, model, structural);
   }
 
   if (params.path) {
@@ -87,9 +87,13 @@ async function executeSymbolBrief(
   params: ActionParams,
   cwd: string,
   model: NonNullable<Awaited<ReturnType<typeof buildArchitectureModel>>>,
+  structural: StructuralSubstrate,
 ): Promise<CodeIntelResult> {
   const symbol = params.symbol ?? "";
-  const resolved = await resolveSymbolTarget(symbol, cwd, { path: params.path });
+  const semantic: SemanticSubstrate = await import("../substrates/lsp-adapter.ts").then((m) =>
+    m.createSemanticSubstrate(cwd),
+  );
+  const resolved = await resolveSymbolTarget(symbol, cwd, semantic, { path: params.path });
 
   if (resolved.kind === "error") {
     return createUnavailableSymbolBriefResult(symbol, resolved.message);
@@ -103,13 +107,14 @@ async function executeSymbolBrief(
     );
   }
 
-  return buildResolvedSymbolBriefResult(resolved.target, cwd, model);
+  return buildResolvedSymbolBriefResult(resolved.target, cwd, model, structural);
 }
 
 async function executeAnchoredBrief(
   params: ActionParams,
   cwd: string,
   model: NonNullable<Awaited<ReturnType<typeof buildArchitectureModel>>>,
+  structural: StructuralSubstrate,
 ): Promise<string> {
   const file = normalizePath(params.file ?? "", cwd);
   const line1 = params.line ?? 1;
@@ -124,7 +129,7 @@ async function executeAnchoredBrief(
   lines.push(`# Anchored Brief: ${relPath}:${line1}:${char1}`);
   lines.push("");
 
-  await addTreeSitterContext({ lines, relPath, line1, char1, cwd });
+  await addTreeSitterContext(lines, structural, relPath, line1, char1);
   addModuleContext(lines, model, file);
   addNextQueries(lines, relPath, line1, char1);
 
@@ -135,9 +140,10 @@ async function buildResolvedSymbolBriefResult(
   target: ResolvedTarget,
   cwd: string,
   model: NonNullable<Awaited<ReturnType<typeof buildArchitectureModel>>>,
+  structural: StructuralSubstrate,
 ): Promise<CodeIntelResult> {
   const relPath = path.relative(cwd, target.file);
-  const content = await executeResolvedSymbolBrief(target, cwd, model);
+  const content = await executeResolvedSymbolBrief(target, cwd, model, structural);
   const mod = findModuleForPath(model, target.file);
 
   return {
@@ -164,6 +170,7 @@ async function executeResolvedSymbolBrief(
   target: ResolvedTarget,
   cwd: string,
   model: NonNullable<Awaited<ReturnType<typeof buildArchitectureModel>>>,
+  structural: StructuralSubstrate,
 ): Promise<string> {
   const relPath = path.relative(cwd, target.file);
   const lines: string[] = [];
@@ -175,36 +182,32 @@ async function executeResolvedSymbolBrief(
   );
   lines.push("");
 
-  await addTreeSitterContext({
+  await addTreeSitterContext(
     lines,
+    structural,
     relPath,
-    line1: target.displayLine,
-    char1: target.displayCharacter,
-    cwd,
-  });
+    target.displayLine,
+    target.displayCharacter,
+  );
   addModuleContext(lines, model, target.file);
   addNextQueries(lines, relPath, target.displayLine, target.displayCharacter);
 
   return lines.join("\n");
 }
 
-interface TreeSitterContextInput {
-  lines: string[];
-  relPath: string;
-  line1: number;
-  char1: number;
-  cwd: string;
-}
-
-async function addTreeSitterContext(input: TreeSitterContextInput): Promise<void> {
-  const { lines, relPath, line1, char1, cwd } = input;
+// biome-ignore lint/complexity/useMaxParams: substrate injection keeps related inputs explicit for readability
+async function addTreeSitterContext(
+  lines: string[],
+  structural: StructuralSubstrate,
+  relPath: string,
+  line1: number,
+  char1: number,
+): Promise<void> {
   try {
-    await withStructuralSession(cwd, async (tsSession) => {
-      await addNodeContext(lines, tsSession, relPath, { line: line1, char: char1 });
-      await addOutlineContext(lines, tsSession, relPath, line1);
-      await addImportsContext(lines, tsSession, relPath);
-      await addExportsContext(lines, tsSession, relPath);
-    });
+    await addNodeContext(lines, structural, relPath, { line: line1, char: char1 });
+    await addOutlineContext(lines, structural, relPath, line1);
+    await addImportsContext(lines, structural, relPath);
+    await addExportsContext(lines, structural, relPath);
   } catch {
     // Tree-sitter not available
   }
@@ -212,16 +215,14 @@ async function addTreeSitterContext(input: TreeSitterContextInput): Promise<void
 
 async function addNodeContext(
   lines: string[],
-  ts: TreeSitterService,
+  structural: StructuralSubstrate,
   relPath: string,
   pos: { line: number; char: number },
 ): Promise<void> {
-  const result = await ts.nodeAt(relPath, pos.line, pos.char);
+  const result = await structural.nodeAt(relPath, pos.line, pos.char);
   if (result.kind !== "success") return;
   const node = result.data;
-  lines.push(
-    `**Node:** \`${node.type}\` at ${relPath}:${node.range.startLine}:${node.range.startCharacter}`,
-  );
+  lines.push(`**Node:** \`${node.type}\` at ${relPath}:${node.startLine}:${node.startCharacter}`);
   if (node.text && node.text.length <= 200) {
     lines.push("```");
     lines.push(node.text);
@@ -232,20 +233,18 @@ async function addNodeContext(
 
 async function addOutlineContext(
   lines: string[],
-  ts: TreeSitterService,
+  structural: StructuralSubstrate,
   relPath: string,
   line1: number,
 ): Promise<void> {
-  const result = await ts.outline(relPath);
+  const result = await structural.outline(relPath);
   if (result.kind !== "success") return;
   const outline = result.data;
 
-  const enclosing = outline.find(
-    (item) => item.range.startLine <= line1 && item.range.endLine >= line1,
-  );
+  const enclosing = outline.find((item) => item.startLine <= line1 && item.endLine >= line1);
   if (enclosing) {
     lines.push(`**Enclosing symbol:** \`${enclosing.name}\` (${enclosing.kind})`);
-    lines.push(`- Range: ${relPath}:${enclosing.range.startLine}–${enclosing.range.endLine}`);
+    lines.push(`- Range: ${relPath}:${enclosing.startLine}–${enclosing.endLine}`);
     lines.push("");
   }
 
@@ -254,7 +253,7 @@ async function addOutlineContext(
     const shown = outline.slice(0, 15);
     for (const item of shown) {
       const prefix = getOutlinePrefix(item.kind);
-      lines.push(`- ${prefix} \`${item.name}\` (${item.kind}) L${item.range.startLine}`);
+      lines.push(`- ${prefix} \`${item.name}\` (${item.kind}) L${item.startLine}`);
     }
     if (outline.length > 15) {
       lines.push(`- _+${outline.length - 15} more declarations_`);
@@ -271,10 +270,10 @@ function getOutlinePrefix(kind: string): string {
 
 async function addImportsContext(
   lines: string[],
-  ts: TreeSitterService,
+  structural: StructuralSubstrate,
   relPath: string,
 ): Promise<void> {
-  const result = await ts.imports(relPath);
+  const result = await structural.imports(relPath);
   if (result.kind !== "success" || result.data.length === 0) return;
   lines.push("## Imports");
   const shown = result.data.slice(0, 10);
@@ -289,10 +288,10 @@ async function addImportsContext(
 
 async function addExportsContext(
   lines: string[],
-  ts: TreeSitterService,
+  structural: StructuralSubstrate,
   relPath: string,
 ): Promise<void> {
-  const result = await ts.exports(relPath);
+  const result = await structural.exports(relPath);
   if (result.kind !== "success" || result.data.length === 0) return;
   lines.push("## Exports");
   const shown = result.data.slice(0, 10);

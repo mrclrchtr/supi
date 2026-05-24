@@ -75,6 +75,7 @@ export {
   registerSettings,
 } from "./settings/settings-registry.ts";
 export { createInputSubmenu, openSettingsOverlay } from "./settings/settings-ui.ts";
+export type { CodeLocation, CodePosition } from "./substrate-types.ts";
 export type { TitleTarget } from "./terminal.ts";
 export {
   DONE_SYMBOL,

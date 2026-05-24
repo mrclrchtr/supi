@@ -8,8 +8,12 @@ const FIXTURE_DIR = path.resolve(__dirname, "fixtures");
 
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 
-async function executeTool(pi: ReturnType<typeof createPiMock>, params: Record<string, unknown>) {
-  const tool = pi.tools.find((t) => (t as { name: string }).name === "tree_sitter") as
+async function executeTool(
+  pi: ReturnType<typeof createPiMock>,
+  toolName: string,
+  params: Record<string, unknown>,
+) {
+  const tool = pi.tools.find((t) => (t as { name: string }).name === toolName) as
     | { execute: (...args: unknown[]) => Promise<unknown> }
     | undefined;
   expect(tool).toBeDefined();
@@ -29,109 +33,43 @@ function setupWithSession() {
 }
 
 describe("tree_sitter tool registration", () => {
-  it("registers the tree_sitter tool", () => {
+  it("registers 6 focused tools", () => {
     const pi = createPiMock();
     treeSitterExtension(pi as never);
-    expect(pi.tools.length).toBe(1);
-    expect((pi.tools[0] as { name: string }).name).toBe("tree_sitter");
+    expect(pi.tools.length).toBe(6);
+    expect((pi.tools[0] as { name: string }).name).toBe("tree_sitter_outline");
   });
 
   it("returns not initialized before session_start", async () => {
     const pi = createPiMock();
     treeSitterExtension(pi as never);
-    const text = await executeTool(pi, { action: "outline", file: "sample.ts" });
+    const text = await executeTool(pi, "tree_sitter_outline", { file: "sample.ts" });
     expect(text).toContain("not initialized");
   });
 });
 
-describe("tree_sitter tool validation", () => {
+describe("tree_sitter tool file validation", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("validates missing action before file", async () => {
+  it("validates missing file", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, {});
-    expect(text).toContain("Validation error");
-    expect(text).toContain("action");
-    expect(text).not.toContain("file` is required");
-  });
-
-  it("validates unknown action before file", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "bogus" });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("Unknown action");
-  });
-
-  it("validates missing file when action is present", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "outline" });
+    const text = await executeTool(pi, "tree_sitter_outline", {});
     expect(text).toContain("Validation error");
     expect(text).toContain("file");
   });
 
-  it("validates missing line for node_at", async () => {
+  it("returns unsupported language for .lua files on outline", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "node_at", file: "sample.ts", character: 1 });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("line");
+    const text = await executeTool(pi, "tree_sitter_outline", { file: "script.lua" });
+    expect(text).toContain("Unsupported language");
   });
 
-  it("validates missing character for node_at", async () => {
+  it("returns file access error for missing files", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "node_at", file: "sample.ts", line: 1 });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("character");
-  });
-
-  it("validates non-positive line for node_at", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, {
-      action: "node_at",
-      file: "sample.ts",
-      line: 0,
-      character: 1,
-    });
-    expect(text).toContain("positive 1-based");
-  });
-
-  it("validates non-integer line for node_at", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, {
-      action: "node_at",
-      file: "sample.ts",
-      line: 1.5,
-      character: 1,
-    });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("line");
-  });
-
-  it("validates non-integer character for node_at", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, {
-      action: "node_at",
-      file: "sample.ts",
-      line: 1,
-      character: 1.5,
-    });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("character");
-  });
-
-  it("validates missing query for query action", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "query", file: "sample.ts" });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("query");
-  });
-
-  it("validates whitespace query for query action", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "query", file: "sample.ts", query: "   " });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("non-empty");
+    const text = await executeTool(pi, "tree_sitter_imports", { file: "missing.ts" });
+    expect(text).toContain("File access error");
   });
 });
 
@@ -140,21 +78,9 @@ describe("tree_sitter tool actions", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns unsupported language for .lua files", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "outline", file: "script.lua" });
-    expect(text).toContain("Unsupported language");
-  });
-
-  it("returns file access error for missing files", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "imports", file: "missing.ts" });
-    expect(text).toContain("File access error");
-  });
-
   it("handles outline action", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "outline", file: "sample.ts" });
+    const text = await executeTool(pi, "tree_sitter_outline", { file: "sample.ts" });
     expect(text).toContain("Outline");
     expect(text).toContain("hello");
     expect(text).toContain("Greeter");
@@ -162,22 +88,21 @@ describe("tree_sitter tool actions", () => {
 
   it("handles imports action", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "imports", file: "sample.ts" });
+    const text = await executeTool(pi, "tree_sitter_imports", { file: "sample.ts" });
     expect(text).toContain("Imports");
     expect(text).toContain("node:fs/promises");
   });
 
   it("handles exports action", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "exports", file: "sample.ts" });
+    const text = await executeTool(pi, "tree_sitter_exports", { file: "sample.ts" });
     expect(text).toContain("Exports");
     expect(text).toContain("hello");
   });
 
   it("handles node_at action", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, {
-      action: "node_at",
+    const text = await executeTool(pi, "tree_sitter_node_at", {
       file: "sample.ts",
       line: 1,
       character: 17,
@@ -188,8 +113,7 @@ describe("tree_sitter tool actions", () => {
 
   it("handles query action", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, {
-      action: "query",
+    const text = await executeTool(pi, "tree_sitter_query", {
       file: "sample.ts",
       query: "(function_declaration name: (identifier) @fn)",
     });
@@ -199,8 +123,7 @@ describe("tree_sitter tool actions", () => {
 
   it("handles query with no matches", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, {
-      action: "query",
+    const text = await executeTool(pi, "tree_sitter_query", {
       file: "sample.ts",
       query: "(decorator) @dec",
     });
@@ -209,15 +132,14 @@ describe("tree_sitter tool actions", () => {
 
   it("handles invalid query syntax", async () => {
     const pi = await setupWithSession();
-    const text = await executeTool(pi, {
-      action: "query",
+    const text = await executeTool(pi, "tree_sitter_query", {
       file: "sample.ts",
       query: "(((invalid",
     });
     expect(text).toContain("Invalid query");
   });
 
-  it("includes a truncation notice for large output", async () => {
+  it("includes a truncation notice for large outline output", async () => {
     const tmpDir = mkdtempSync(path.join(os.tmpdir(), "tree-sitter-tool-"));
     try {
       const source = Array.from(
@@ -229,7 +151,7 @@ describe("tree_sitter tool actions", () => {
       treeSitterExtension(pi as never);
       await startSession(pi, tmpDir);
 
-      const text = await executeTool(pi, { action: "outline", file: "large.ts" });
+      const text = await executeTool(pi, "tree_sitter_outline", { file: "large.ts" });
       expect(text).toContain("additional outline items omitted");
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
@@ -246,34 +168,13 @@ describe("tree_sitter tool actions", () => {
       treeSitterExtension(pi as never);
       await startSession(pi, tmpDir);
 
-      const text = await executeTool(pi, { action: "outline", file: "nested.ts" });
+      const text = await executeTool(pi, "tree_sitter_outline", { file: "nested.ts" });
       expect(text).toContain("additional outline items omitted");
       expect(text).toContain("m98");
       expect(text).not.toContain("m99");
     } finally {
       rmSync(tmpDir, { recursive: true, force: true });
     }
-  });
-
-  it("rejects callees action without file", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "callees" });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("file");
-  });
-
-  it("rejects callees action without line", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "callees", file: "sample.ts", character: 1 });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("line");
-  });
-
-  it("rejects callees action without character", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, { action: "callees", file: "sample.ts", line: 1 });
-    expect(text).toContain("Validation error");
-    expect(text).toContain("character");
   });
 
   it("handles callees action for a TypeScript file", async () => {
@@ -294,8 +195,7 @@ describe("tree_sitter tool actions", () => {
       treeSitterExtension(pi as never);
       await startSession(pi, tmpDir);
 
-      const text = await executeTool(pi, {
-        action: "callees",
+      const text = await executeTool(pi, "tree_sitter_callees", {
         file: "sample.ts",
         line: 1,
         character: 22,
@@ -308,23 +208,12 @@ describe("tree_sitter tool actions", () => {
     }
   });
 
-  it("returns unsupported-language for callees with HTML files", async () => {
-    const pi = await setupWithSession();
-    const text = await executeTool(pi, {
-      action: "callees",
-      file: "test.html",
-      line: 1,
-      character: 5,
-    });
-    expect(text).toContain("Unsupported language");
-  });
-
   it("disposes on session_shutdown", async () => {
     const pi = await setupWithSession();
     const shutdownHandler = pi.handlers.get("session_shutdown")?.[0];
     expect(shutdownHandler).toBeDefined();
     await shutdownHandler?.();
-    const text = await executeTool(pi, { action: "outline", file: "sample.ts" });
+    const text = await executeTool(pi, "tree_sitter_outline", { file: "sample.ts" });
     expect(text).toContain("not initialized");
   });
 });

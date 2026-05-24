@@ -3,7 +3,7 @@
 ## Scope
 
 `@mrclrchtr/supi-tree-sitter` has two explicit surfaces:
-- `@mrclrchtr/supi-tree-sitter/extension` → `src/extension.ts` → registers the `tree_sitter` tool for pi and publishes a shared session-scoped structural service
+- `@mrclrchtr/supi-tree-sitter/extension` → `src/extension.ts` → registers **6 focused tools** (`tree_sitter_outline`, `tree_sitter_imports`, `tree_sitter_exports`, `tree_sitter_node_at`, `tree_sitter_query`, `tree_sitter_callees`) and publishes a shared session-scoped structural service
 - `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports `createTreeSitterSession()`, `getSessionTreeSitterService()`, and shared types for other SuPi packages
 
 The package is designed as a standalone structural-analysis substrate. It does not depend on `supi-lsp` and must remain correct when installed independently.
@@ -29,7 +29,7 @@ src/
   api.ts              # public API surface
   index.ts            # re-export surface
   extension.ts        # pi extension entry (re-exports tree-sitter.ts)
-  tree-sitter.ts      # main tool definition and action dispatch
+  tree-sitter.ts      # extension entry — session lifecycle + focused tool registration
   types.ts            # shared type definitions
   coordinates.ts      # 1-based UTF-16 coordinate conversion
   language.ts         # file extension → grammar ID detection and WASM path resolution
@@ -39,21 +39,25 @@ src/
     service-registry.ts # shared session-scoped structural service registry (backed by the core helper)
     session.ts        # runtime-backed service helpers and owned session factory
   tool/
-    action-specs.ts   # single source of truth for public action metadata
+    action-specs.ts   # internal action metadata for handler functions
     callees.ts        # callee extraction
     exports.ts        # export extraction
     formatting.ts     # tool output formatting and caps
-    guidance.ts       # prompt guidance and tool description
+    guidance.ts       # (minimal — per-tool guidance lives in register-tools.ts)
+    handlers.ts       # per-action handler functions (moved from tree-sitter.ts)
     imports.ts        # import extraction
     node-at.ts        # node_at action
     outline.ts        # outline extraction
+    register-tools.ts # focused tool spec definitions and pi registration
     structure.ts      # re-exports from tool sub-modules
 ```
 
 ## Key files
 
 - `resources/grammars/<id>/` — vendored WASM files for all 14 supported grammars
-- `scripts/vendor-wasm.mjs` — copies WASM from installed npm packages (13 grammars)
+- `tree-sitter.ts` — extension entry with session lifecycle
+- `tool/register-tools.ts` — focused tool spec definitions and registration
+- `tool/handlers.ts` — per-action handler functions
 - `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source
 - `scripts/generate-sql-wasm.mjs` — builds SQL WASM from source
 

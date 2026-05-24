@@ -13,11 +13,15 @@ import {
   defaultLspToolPromptSurfaces,
 } from "../../src/tool/guidance.ts";
 import {
+  LSP_CODE_ACTIONS_TOOL,
+  LSP_DEFINITION_TOOL,
   LSP_DIAGNOSTICS_TOOL,
   LSP_DOCUMENT_SYMBOLS_TOOL,
-  LSP_LOOKUP_TOOL,
+  LSP_HOVER_TOOL,
+  LSP_IMPLEMENTATION_TOOL,
   LSP_RECOVER_TOOL,
-  LSP_REFACTOR_TOOL,
+  LSP_REFERENCES_TOOL,
+  LSP_RENAME_TOOL,
   LSP_WORKSPACE_SYMBOLS_TOOL,
 } from "../../src/tool/names.ts";
 
@@ -27,22 +31,33 @@ beforeEach(() => {
 
 describe("LSP prompt guidance", () => {
   it("exports prompt surfaces for every expert LSP tool", () => {
-    const lookup = defaultLspToolPromptSurfaces[LSP_LOOKUP_TOOL];
+    const hover = defaultLspToolPromptSurfaces[LSP_HOVER_TOOL];
+    const definition = defaultLspToolPromptSurfaces[LSP_DEFINITION_TOOL];
+    const references = defaultLspToolPromptSurfaces[LSP_REFERENCES_TOOL];
+    const implementation = defaultLspToolPromptSurfaces[LSP_IMPLEMENTATION_TOOL];
     const documentSymbols = defaultLspToolPromptSurfaces[LSP_DOCUMENT_SYMBOLS_TOOL];
     const workspaceSymbols = defaultLspToolPromptSurfaces[LSP_WORKSPACE_SYMBOLS_TOOL];
     const diagnostics = defaultLspToolPromptSurfaces[LSP_DIAGNOSTICS_TOOL];
-    const refactor = defaultLspToolPromptSurfaces[LSP_REFACTOR_TOOL];
+    const rename = defaultLspToolPromptSurfaces[LSP_RENAME_TOOL];
+    const codeActions = defaultLspToolPromptSurfaces[LSP_CODE_ACTIONS_TOOL];
     const recover = defaultLspToolPromptSurfaces[LSP_RECOVER_TOOL];
 
-    expect(lookup.description).toContain("Language Server Protocol lookup tool");
-    expect(lookup.promptSnippet).toContain("lsp_lookup");
-    expect(lookup.promptGuidelines.every((guideline) => guideline.includes("lsp"))).toBe(true);
+    expect(hover.description).toContain("hover");
+    expect(hover.promptSnippet).toContain("lsp_hover");
+    expect(hover.promptGuidelines.every((guideline) => guideline.includes("lsp"))).toBe(true);
+    expect(definition.description).toContain("definition");
+    expect(definition.promptSnippet).toContain("lsp_definition");
+    expect(references.description).toContain("references");
+    expect(references.promptSnippet).toContain("lsp_references");
+    expect(implementation.description).toContain("implementation");
+    expect(implementation.promptSnippet).toContain("lsp_implementation");
+    expect(rename.description).toContain("rename");
+    expect(rename.promptSnippet).toContain("lsp_rename");
+    expect(codeActions.description).toContain("code");
+    expect(codeActions.promptSnippet).toContain("lsp_code_actions");
     expect(documentSymbols.promptGuidelines[0]).toContain("lsp_document_symbols");
     expect(workspaceSymbols.promptGuidelines[0]).toContain("lsp_workspace_symbols");
     expect(diagnostics.promptGuidelines[0]).toContain("lsp_diagnostics");
-    expect(refactor.promptGuidelines.some((guideline) => guideline.includes("lsp_refactor"))).toBe(
-      true,
-    );
     expect(recover.promptGuidelines[0]).toContain("lsp_recover");
   });
 
@@ -69,12 +84,28 @@ describe("LSP prompt guidance", () => {
       process.cwd(),
     );
 
-    const lookupGuidelines = surfaces[LSP_LOOKUP_TOOL].promptGuidelines;
+    const hoverGuidelines = surfaces[LSP_HOVER_TOOL].promptGuidelines;
+    const definitionGuidelines = surfaces[LSP_DEFINITION_TOOL].promptGuidelines;
+    const referencesGuidelines = surfaces[LSP_REFERENCES_TOOL].promptGuidelines;
+    const implementationGuidelines = surfaces[LSP_IMPLEMENTATION_TOOL].promptGuidelines;
+    const renameGuidelines = surfaces[LSP_RENAME_TOOL].promptGuidelines;
+    const codeActionsGuidelines = surfaces[LSP_CODE_ACTIONS_TOOL].promptGuidelines;
+
+    for (const guidelines of [
+      hoverGuidelines,
+      definitionGuidelines,
+      referencesGuidelines,
+      implementationGuidelines,
+      renameGuidelines,
+      codeActionsGuidelines,
+    ]) {
+      expect(guidelines.some((g) => g.startsWith("lsp server coverage:"))).toBe(true);
+    }
     expect(
-      lookupGuidelines.some((guideline) => guideline.startsWith("lsp server coverage: typescript")),
+      hoverGuidelines.some((guideline) => guideline.startsWith("lsp server coverage: typescript")),
     ).toBe(true);
     expect(
-      lookupGuidelines.some((guideline) => guideline.startsWith("lsp server unavailable: python")),
+      hoverGuidelines.some((guideline) => guideline.startsWith("lsp server unavailable: python")),
     ).toBe(true);
   });
 

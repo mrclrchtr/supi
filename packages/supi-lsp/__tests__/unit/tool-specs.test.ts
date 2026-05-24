@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LSP_LOOKUP_TOOL, LSP_TOOL_NAMES } from "../../src/tool/names.ts";
+import { LSP_HOVER_TOOL, LSP_TOOL_NAMES } from "../../src/tool/names.ts";
 import {
   getSupportedLspServerActions,
   LSP_TOOL_DEFINITION_SPECS,
@@ -11,7 +11,7 @@ describe("LSP tool specs", () => {
     expect(
       LSP_TOOL_DEFINITION_SPECS.some(
         (spec) =>
-          spec.name === LSP_LOOKUP_TOOL &&
+          spec.name === LSP_HOVER_TOOL &&
           "includeCoverageGuidelines" in spec &&
           spec.includeCoverageGuidelines,
       ),

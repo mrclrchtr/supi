@@ -6,7 +6,22 @@ const mockFns = vi.hoisted(() => ({
   pruneAndReorderContextMessages: vi.fn((msgs: unknown) => msgs),
   buildProjectGuidelines: vi.fn(() => []),
   buildLspToolPromptSurfaces: vi.fn(() => ({
-    lsp_lookup: { description: "lookup", promptSnippet: "lookup", promptGuidelines: [] },
+    lsp_hover: { description: "hover", promptSnippet: "lsp_hover", promptGuidelines: [] },
+    lsp_definition: {
+      description: "definition",
+      promptSnippet: "lsp_definition",
+      promptGuidelines: [],
+    },
+    lsp_references: {
+      description: "references",
+      promptSnippet: "lsp_references",
+      promptGuidelines: [],
+    },
+    lsp_implementation: {
+      description: "implementation",
+      promptSnippet: "lsp_implementation",
+      promptGuidelines: [],
+    },
     lsp_document_symbols: {
       description: "document symbols",
       promptSnippet: "document symbols",
@@ -22,7 +37,16 @@ const mockFns = vi.hoisted(() => ({
       promptSnippet: "diagnostics",
       promptGuidelines: [],
     },
-    lsp_refactor: { description: "refactor", promptSnippet: "refactor", promptGuidelines: [] },
+    lsp_rename: {
+      description: "rename",
+      promptSnippet: "lsp_rename",
+      promptGuidelines: [],
+    },
+    lsp_code_actions: {
+      description: "code actions",
+      promptSnippet: "lsp_code_actions",
+      promptGuidelines: [],
+    },
     lsp_recover: { description: "recover", promptSnippet: "recover", promptGuidelines: [] },
   })),
   diagnosticsContextFingerprint: vi.fn(),

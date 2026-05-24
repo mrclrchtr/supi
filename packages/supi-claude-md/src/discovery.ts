@@ -122,12 +122,17 @@ export function extractPathFromToolEvent(
       const p = input.path;
       return typeof p === "string" ? p : null;
     }
-    case "lsp":
-    case "tree_sitter": {
-      const f = input.file;
-      return typeof f === "string" ? f : null;
-    }
-    default:
+    default: {
+      if (isFileBasedTool(toolName)) {
+        const f = input.file;
+        return typeof f === "string" ? f : null;
+      }
       return null;
+    }
   }
+}
+
+/** Check if a tool name uses `file` for its primary path input. */
+function isFileBasedTool(toolName: string): boolean {
+  return toolName.startsWith("lsp_") || toolName.startsWith("tree_sitter_");
 }

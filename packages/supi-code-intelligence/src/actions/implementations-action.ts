@@ -1,19 +1,19 @@
 // Implementations action — find concrete implementations via LSP.
 
 import * as path from "node:path";
-import { getSemanticService } from "../providers/semantic-provider.ts";
 import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isInProjectPath, uriToFile } from "../search-helpers.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
+import type { SemanticSubstrate } from "../substrates/types.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: implementation lookup keeps semantic and unsupported-file paths explicit for maintainability
 export async function executeImplementationsAction(
   params: ActionParams,
   cwd: string,
+  semantic: SemanticSubstrate,
 ): Promise<CodeIntelResult> {
-  const target = await resolveTarget(params, cwd);
+  const target = await resolveTarget(params, cwd, semantic);
   if (typeof target === "string") {
     return {
       content: target,
@@ -46,45 +46,41 @@ export async function executeImplementationsAction(
     };
   }
 
-  const lsp = await getSemanticService(cwd, { waitForReady: true });
   const relPath = path.relative(cwd, target.file);
 
-  if (lsp) {
-    const impls = await lsp.implementation(target.file, target.position);
-    if (impls !== null) {
-      const locations = Array.isArray(impls) ? impls : [impls];
-      if (locations.length > 0) {
-        const content = formatSemanticImpls(locations, cwd, params.maxResults ?? 8);
-        const { project: projectLocs, external: externalLocs } = partitionImpls(locations, cwd);
-        const searchDetails: SearchDetails = {
-          confidence: "semantic",
-          scope: params.path ?? null,
-          candidateCount: projectLocs.length,
-          omittedCount: externalLocs.length,
-          nextQueries: [
-            "`code_affected` before changing implementations",
-            "`code_brief` on containing modules for deeper context",
-          ],
-        };
-        return { content, details: { type: "search" as const, data: searchDetails } };
-      }
-
-      const semanticEmptyDetails: SearchDetails = {
+  const impls = await semantic.implementation(target.file, target.position);
+  if (impls) {
+    if (impls.length > 0) {
+      const content = formatSemanticImpls(impls, cwd, params.maxResults ?? 8);
+      const { project: projectLocs, external: externalLocs } = partitionImpls(impls, cwd);
+      const searchDetails: SearchDetails = {
         confidence: "semantic",
         scope: params.path ?? null,
-        candidateCount: 0,
-        omittedCount: 0,
+        candidateCount: projectLocs.length,
+        omittedCount: externalLocs.length,
         nextQueries: [
-          "`code_pattern` only if you explicitly want text-search hints for likely implementations",
+          "`code_affected` before changing implementations",
+          "`code_brief` on containing modules for deeper context",
         ],
       };
-      return {
-        content: target.name
-          ? `No implementations found for \`${target.name}\`.`
-          : `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.`,
-        details: { type: "search" as const, data: semanticEmptyDetails },
-      };
+      return { content, details: { type: "search" as const, data: searchDetails } };
     }
+
+    const semanticEmptyDetails: SearchDetails = {
+      confidence: "semantic",
+      scope: params.path ?? null,
+      candidateCount: 0,
+      omittedCount: 0,
+      nextQueries: [
+        "`code_pattern` only if you explicitly want text-search hints for likely implementations",
+      ],
+    };
+    return {
+      content: target.name
+        ? `No implementations found for \`${target.name}\`.`
+        : `No implementations found for ${relPath}:${target.displayLine}:${target.displayCharacter}.`,
+      details: { type: "search" as const, data: semanticEmptyDetails },
+    };
   }
 
   return {

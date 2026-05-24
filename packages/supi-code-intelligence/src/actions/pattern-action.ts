@@ -16,6 +16,7 @@ import {
   runRipgrep,
   runRipgrepDetailed,
 } from "../search-helpers.ts";
+import type { StructuralSubstrate } from "../substrates/types.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 /**
@@ -30,6 +31,7 @@ import type { CodeIntelResult, SearchDetails } from "../types.ts";
 export async function executePatternAction(
   params: ActionParams,
   cwd: string,
+  structural?: StructuralSubstrate,
 ): Promise<CodeIntelResult> {
   if (!params.pattern) {
     return {
@@ -44,11 +46,18 @@ export async function executePatternAction(
   const relScope = params.path ?? ".";
 
   if (isStructuredPatternKind(params.kind)) {
+    if (!structural) {
+      return {
+        content: `**Error:** Structured ${params.kind} search requires tree-sitter, which is not available.`,
+        details: undefined,
+      };
+    }
     const structured = await getStructuredPatternMatches(
       { ...params, pattern: params.pattern, kind: params.kind },
       scopePath,
       cwd,
       relScope,
+      structural,
     );
     if (typeof structured === "string") {
       const errorDetails: SearchDetails = {
