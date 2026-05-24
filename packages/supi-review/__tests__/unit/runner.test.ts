@@ -32,6 +32,8 @@ vi.mock("typebox", () => ({
     Array: vi.fn((schema) => schema),
     String: vi.fn(() => ({})),
     Number: vi.fn(() => ({})),
+    Union: vi.fn((options) => ({ type: "union", options })),
+    Literal: vi.fn((value) => ({ type: "literal", value })),
   },
 }));
 
@@ -130,7 +132,7 @@ describe("runReviewer", () => {
     expect(mockCreateAgentSession).not.toHaveBeenCalled();
   });
 
-  it("creates the reviewer session with read-only tools", async () => {
+  it("creates the reviewer session with read-only tools and snapshot tools", async () => {
     let listener: ((event: unknown) => void) | undefined;
     mockSession.subscribe.mockImplementation((fn: (event: unknown) => void) => {
       listener = fn;
@@ -151,7 +153,20 @@ describe("runReviewer", () => {
     await resultPromise;
 
     const callOpts = mockCreateAgentSession.mock.calls[0]?.[0];
-    expect(callOpts.tools).toEqual(["read", "grep", "find", "ls", "submit_review"]);
+    expect(callOpts.tools).toEqual([
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "submit_review",
+      "read_snapshot_diff",
+      "read_snapshot_file",
+    ]);
+    // Verify custom tools include snapshot tools
+    const customToolNames = callOpts.customTools?.map((t: { name: string }) => t.name) ?? [];
+    expect(customToolNames).toContain("read_snapshot_diff");
+    expect(customToolNames).toContain("read_snapshot_file");
+    expect(customToolNames).toContain("submit_review");
   });
 
   it("returns success when submit_review is called", async () => {
@@ -249,6 +264,12 @@ describe("runReviewer", () => {
       expect(prompt).toContain("Skip reviewing");
       expect(prompt).toContain("lockfiles");
       expect(prompt).toContain("generated");
+    });
+
+    it("mentions on-demand snapshot tools", () => {
+      const prompt = buildReviewerSystemPrompt();
+      expect(prompt).toContain("read_snapshot_diff");
+      expect(prompt).toContain("read_snapshot_file");
     });
   });
 });

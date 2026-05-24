@@ -27,7 +27,7 @@ After install, pi gets one command:
 The reviewer runs in managed child agent sessions:
 
 - a **brief synthesizer** creates a structured review brief from the active session branch
-- a **read-only reviewer** inspects the selected snapshot and submits structured findings
+- a **read-only reviewer** inspects the selected snapshot (without receiving bulk inline diffs) and submits structured findings
 
 ## Review flow
 
@@ -38,8 +38,8 @@ The reviewer runs in managed child agent sessions:
 3. optionally add a short note
 4. resolve the snapshot
 5. synthesize a review brief from the current session history
-6. preview the synthesized brief + prompt coverage
-7. run the review with a live progress widget
+6. preview the synthesized brief + compact prompt preview
+7. the reviewer fetches per-file diffs on demand via snapshot-aware tools; live progress widget shows activity
 8. show the structured result as a custom message
 9. if findings exist, hand off to the main agent so it can ask what to do next
 
@@ -70,7 +70,7 @@ Before the actual review starts, the package:
 
 The synthesizer also receives a bounded diff excerpt from the snapshot so it can reason about actual code changes, not just filenames.
 
-That synthesized brief is then combined with the git snapshot into the final reviewer prompt.
+That synthesized brief is then combined with the git snapshot into a compact reviewer prompt. The prompt contains the brief, file manifest, and per-file overview, but no large inline diffs. Instead, the reviewer session gets snapshot-aware tools (`read_snapshot_diff`, `read_snapshot_file`) to fetch exact per-file diffs and before/after file contents on demand.
 
 The session-transcript approach mirrors how Pi summarizes context for compaction: the entire resolved conversation is rendered in a readable label format and sent to the model as a whole, rather than relying on heuristic excerpt ranking.
 
@@ -111,5 +111,6 @@ When a successful review contains findings, `supi-review` also injects an agent-
 - `src/history/synthesize.ts` — brief synthesis orchestration
 - `src/target/packet.ts` — final reviewer packet builder
 - `src/tool/brief-runner.ts` — brief synthesis child session
-- `src/tool/review-runner.ts` — read-only reviewer child session
+- `src/tool/review-runner.ts` — read-only reviewer child session with snapshot-aware tools
+- `src/tool/snapshot-tools.ts` — per-file diff and before/after content tools scoped to the selected snapshot
 - `src/ui/renderer.ts` — structured result rendering

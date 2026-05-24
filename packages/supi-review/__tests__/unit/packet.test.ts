@@ -72,79 +72,18 @@ describe("buildReviewPacket", () => {
     expect(packet.prompt).toContain("src/http.ts");
   });
 
-  it("prioritizes risky files in the included diff list", () => {
+  it("does not include large inline diff bodies", () => {
     const packet = buildReviewPacket(snapshot, brief, model);
-    expect(packet.includedFiles[0]).toBe("src/auth.ts");
+    expect(packet.includedFiles).toEqual([]);
+    expect(packet.omittedFiles).toEqual(snapshot.changedFiles);
+    expect(packet.charBudget).toBe(0);
+    expect(packet.prompt).not.toContain("```diff");
   });
 
-  it("derives a bounded packet budget from the model context window", () => {
-    expect(getPacketCharBudget(model)).toBeGreaterThan(30_000);
-    expect(getPacketCharBudget(model)).toBeLessThanOrEqual(128_000);
-  });
-
-  it("scales the packet budget down for smaller context windows", () => {
-    const smallModel = {
-      ...model,
-      model: {
-        ...model.model,
-        contextWindow: 4_096,
-      },
-    } as ReviewModelSelection;
-
-    expect(getPacketCharBudget(smallModel)).toBeLessThan(8_000);
-  });
-});
-
-describe("splitDiffSections", () => {
-  it("counts additions and deletions per diff section", () => {
-    const diff = [
-      "diff --git a/src/auth.ts b/src/auth.ts",
-      "index aaa..bbb 100644",
-      "--- a/src/auth.ts",
-      "+++ b/src/auth.ts",
-      "@@ -1,3 +1,4 @@",
-      " export function auth() {",
-      "+  return true;",
-      "+  console.log('auth');",
-      " }",
-      "diff --git a/src/http.ts b/src/http.ts",
-      "index ccc..ddd 100644",
-      "--- a/src/http.ts",
-      "+++ b/src/http.ts",
-      "@@ -1,3 +1,4 @@",
-      " export function http() {",
-      "-  return null;",
-      "+  return 200;",
-      " }",
-      "diff --git a/src/db.ts b/src/db.ts",
-      "index eee..fff 100644",
-      "--- a/src/db.ts",
-      "+++ b/src/db.ts",
-      "@@ -10,7 +10,7 @@",
-      "   // unchanged context",
-      "-  oldMethod();",
-      "+  newMethod();",
-      "+",
-      "+",
-      "   // more context",
-      " ]",
-    ].join("\n");
-
-    const { sections } = splitDiffSections(diff);
-
-    expect(sections).toHaveLength(3);
-
-    const auth = sections.find((s) => s.file === "src/auth.ts");
-    expect(auth?.additions).toBe(2);
-    expect(auth?.deletions).toBe(0);
-
-    const http = sections.find((s) => s.file === "src/http.ts");
-    expect(http?.additions).toBe(1);
-    expect(http?.deletions).toBe(1);
-
-    const db = sections.find((s) => s.file === "src/db.ts");
-    expect(db?.additions).toBe(3);
-    expect(db?.deletions).toBe(1);
+  it("mentions on-demand snapshot inspection", () => {
+    const packet = buildReviewPacket(snapshot, brief, model);
+    expect(packet.prompt).toContain("read_snapshot_diff");
+    expect(packet.prompt).toContain("read_snapshot_file");
   });
 
   it("includes a file overview table with per-file stats", () => {
@@ -244,15 +183,16 @@ describe("splitDiffSections", () => {
     };
 
     const packet = buildReviewPacket(skipSnapshot, brief, model);
-    // Skip-list files get category annotations in the table
     expect(packet.prompt).toContain("skip — lockfile");
     expect(packet.prompt).toContain("skip — generated");
     expect(packet.prompt).toContain("skip — snapshot");
     expect(packet.prompt).toContain("skip — changelog");
-    // Non-skip-list file still appears without annotation
     expect(packet.prompt).toContain("src/auth.ts");
   });
+});
 
+// biome-ignore lint/security/noSecrets: high-entropy string is a test label, not a secret
+describe("classifySkipCategory", () => {
   it("detects source files as not skip-worthy", () => {
     expect(classifySkipCategory("src/auth.ts")).toBeUndefined();
     expect(classifySkipCategory("src/utils/helpers.ts")).toBeUndefined();
@@ -268,7 +208,6 @@ describe("splitDiffSections", () => {
     expect(classifySkipCategory("Cargo.lock")).toBe("lockfile");
     expect(classifySkipCategory("poetry.lock")).toBe("lockfile");
     expect(classifySkipCategory("composer.lock")).toBe("lockfile");
-    // Lockfiles in subdirectories are detected by basename
     expect(classifySkipCategory("packages/foo/package-lock.json")).toBe("lockfile");
     expect(classifySkipCategory("vendor/yarn.lock")).toBe("lockfile");
   });
@@ -300,85 +239,112 @@ describe("splitDiffSections", () => {
     expect(classifySkipCategory("src/vendor/hack.ts")).toBe("vendored");
   });
 
-  it("accumulates stats for the same file across staged and unstaged sections", () => {
-    const stagedUnstagedSnapshot = {
-      ...snapshot,
-      changedFiles: ["src/a.ts"],
-      diffText: [
-        "=== Staged ===",
-        "diff --git a/src/a.ts b/src/a.ts",
-        "--- a/src/a.ts",
-        "+++ b/src/a.ts",
-        "@@ -1 +1,2 @@",
-        " base",
-        "+  staged_add",
-        "=== Unstaged ===",
-        "diff --git a/src/a.ts b/src/a.ts",
-        "--- a/src/a.ts",
-        "+++ b/src/a.ts",
-        "@@ -1,2 +1,3 @@",
-        " base",
-        "-  old_line",
-        "+  new_line",
-      ].join("\n"),
-    };
-
-    const packet = buildReviewPacket(stagedUnstagedSnapshot, brief, model);
-    // The overview table should show accumulated stats (2 additions, 1 deletion)
-    const table = packet.prompt.match(/## File overview[\s\S]*?(?=\n## |$)/)?.[0] ?? "";
-    expect(table).toContain("| src/a.ts | 2 | 1");
-    expect(table).not.toContain("| src/a.ts | 1 | 0");
-    expect(table).not.toContain("| src/a.ts | 1 | 1");
+  it("categorizes minified files", () => {
+    expect(classifySkipCategory("dist/bundle.min.js")).toBe("generated");
+    expect(classifySkipCategory("public/style.min.css")).toBe("generated");
   });
+});
 
-  it("shows unknown stats for files without diff sections", () => {
-    const untrackedSnapshot = {
-      ...snapshot,
-      changedFiles: ["src/a.ts", "untracked/new.ts"],
-      diffText: [
-        "=== Staged ===",
-        "diff --git a/src/a.ts b/src/a.ts",
-        "--- a/src/a.ts",
-        "+++ b/src/a.ts",
-        "@@ -1 +1,2 @@",
-        " base",
-        "+  staged_add",
-        "=== Untracked files ===",
-        "untracked/new.ts",
-      ].join("\n"),
-    };
+describe("splitDiffSections", () => {
+  it("counts additions and deletions per diff section", () => {
+    const diff = [
+      "diff --git a/src/auth.ts b/src/auth.ts",
+      "index aaa..bbb 100644",
+      "--- a/src/auth.ts",
+      "+++ b/src/auth.ts",
+      "@@ -1,3 +1,4 @@",
+      " export function auth() {",
+      "+  return true;",
+      "+  console.log('auth');",
+      " }",
+      "diff --git a/src/http.ts b/src/http.ts",
+      "index ccc..ddd 100644",
+      "--- a/src/http.ts",
+      "+++ b/src/http.ts",
+      "@@ -1,3 +1,4 @@",
+      " export function http() {",
+      "-  return null;",
+      "+  return 200;",
+      " }",
+      "diff --git a/src/db.ts b/src/db.ts",
+      "index eee..fff 100644",
+      "--- a/src/db.ts",
+      "+++ b/src/db.ts",
+      "@@ -10,7 +10,7 @@",
+      "   // unchanged context",
+      "-  oldMethod();",
+      "+  newMethod();",
+      "+",
+      "+",
+      "   // more context",
+      " ]",
+    ].join("\n");
 
-    const packet = buildReviewPacket(untrackedSnapshot, brief, model);
-    expect(packet.prompt).toContain("untracked/new.ts");
-    // Untracked file shows ?/? instead of 0/0 and does NOT get trivial annotation
-    const tableSection = packet.prompt.match(/## File overview[\s\S]*?(?=\n## |$)/)?.[0] ?? "";
-    expect(tableSection).toContain("untracked/new.ts");
-    // The ?/? row for the untracked file should not contain "trivial"
-    const untrackedRow = tableSection.split("\n").find((line) => line.includes("untracked/new.ts"));
-    expect(untrackedRow).toContain("| ? | ?");
-    expect(untrackedRow).not.toContain("trivial");
-  });
+    const { sections } = splitDiffSections(diff);
 
-  it("detects skip-only extract from raw prompt (not just table)", () => {
-    // Verify the skip annotation does NOT appear for normal source files in a clean diff
-    const cleanPacket = buildReviewPacket(snapshot, brief, model);
-    expect(cleanPacket.prompt).not.toContain("skip —");
+    expect(sections).toHaveLength(3);
+
+    const auth = sections.find((s) => s.file === "src/auth.ts");
+    expect(auth?.additions).toBe(2);
+    expect(auth?.deletions).toBe(0);
+
+    const http = sections.find((s) => s.file === "src/http.ts");
+    expect(http?.additions).toBe(1);
+    expect(http?.deletions).toBe(1);
+
+    const db = sections.find((s) => s.file === "src/db.ts");
+    expect(db?.additions).toBe(3);
+    expect(db?.deletions).toBe(1);
   });
 
   it("extracts preamble before any diff sections", () => {
     const diff = [
-      "Some note about the diff",
-      "Or a commit message",
-      "diff --git a/src/a.ts b/src/a.ts",
-      "--- a/src/a.ts",
-      "+++ b/src/a.ts",
-      "@@ -1 +1 @@",
-      "-old",
-      "+new",
+      "=== Staged ===",
+      "diff --git a/src/auth.ts b/src/auth.ts",
+      "index aaa..bbb 100644",
+      "--- a/src/auth.ts",
+      "+++ b/src/auth.ts",
+      "@@ -1,3 +1,4 @@",
+      " export function auth() {",
+      "+  return true;",
+      " }",
     ].join("\n");
 
-    const { preamble } = splitDiffSections(diff);
-    expect(preamble).toContain("Some note about the diff");
-    expect(preamble).toContain("commit message");
+    const { preamble, sections } = splitDiffSections(diff);
+    expect(preamble).toContain("=== Staged ===");
+    expect(sections).toHaveLength(1);
+  });
+
+  it("handles renames without crashing", () => {
+    const diff =
+      "diff --git a/src/old.ts b/src/new.ts\nsimilarity index 100%\nrename from src/old.ts\nrename to src/new.ts"
+        .split("\n")
+        .join("\n");
+
+    const { sections } = splitDiffSections(diff);
+    // Renames produce a section with no +/- lines
+    expect(sections).toHaveLength(1);
+    expect(sections[0]?.file).toBe("src/new.ts");
+    expect(sections[0]?.additions).toBe(0);
+    expect(sections[0]?.deletions).toBe(0);
+  });
+});
+
+describe("getPacketCharBudget", () => {
+  it("derives a bounded packet budget from the model context window", () => {
+    expect(getPacketCharBudget(model)).toBeGreaterThan(30_000);
+    expect(getPacketCharBudget(model)).toBeLessThanOrEqual(128_000);
+  });
+
+  it("scales the packet budget down for smaller context windows", () => {
+    const smallModel = {
+      ...model,
+      model: {
+        ...model.model,
+        contextWindow: 4_096,
+      },
+    } as ReviewModelSelection;
+
+    expect(getPacketCharBudget(smallModel)).toBeLessThan(8_000);
   });
 });

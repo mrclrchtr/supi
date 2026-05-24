@@ -17,6 +17,8 @@ import {
   getLocalBranches,
   getMergeBase,
   getRecentCommits,
+  getSnapshotFileContent,
+  getSnapshotFileDiff,
   getUncommittedDiff,
 } from "../../src/git.ts";
 
@@ -91,6 +93,54 @@ describe("git timeout propagation", () => {
     expect(execFileMock).toHaveBeenCalledWith(
       "git",
       ["branch", "--show-current"],
+      expect.objectContaining({ timeout: 30_000 }),
+    );
+  });
+
+  it("getSnapshotFileDiff passes timeout for working tree", async () => {
+    const snapshot = {
+      target: { kind: "working-tree" as const },
+      title: "Working tree changes",
+      changedFiles: ["file.txt"],
+      diffText: "",
+      stats: { files: 1, additions: 0, deletions: 0 },
+    };
+    await getSnapshotFileDiff("/repo", snapshot, "file.txt");
+    expect(execFileMock).toHaveBeenCalledWith(
+      "git",
+      ["diff", "HEAD", "--", "file.txt"],
+      expect.objectContaining({ timeout: 30_000 }),
+    );
+  });
+
+  it("getSnapshotFileDiff passes timeout for commit", async () => {
+    const snapshot = {
+      target: { kind: "commit" as const, sha: "abc123" },
+      title: "Commit",
+      changedFiles: ["file.txt"],
+      diffText: "",
+      stats: { files: 1, additions: 0, deletions: 0 },
+    };
+    await getSnapshotFileDiff("/repo", snapshot, "file.txt");
+    expect(execFileMock).toHaveBeenCalledWith(
+      "git",
+      ["show", "abc123", "--", "file.txt"],
+      expect.objectContaining({ timeout: 30_000 }),
+    );
+  });
+
+  it("getSnapshotFileContent passes timeout for before content", async () => {
+    const snapshot = {
+      target: { kind: "working-tree" as const },
+      title: "Working tree changes",
+      changedFiles: ["file.txt"],
+      diffText: "",
+      stats: { files: 1, additions: 0, deletions: 0 },
+    };
+    await getSnapshotFileContent("/repo", snapshot, "file.txt", "before");
+    expect(execFileMock).toHaveBeenCalledWith(
+      "git",
+      ["show", "HEAD:file.txt"],
       expect.objectContaining({ timeout: 30_000 }),
     );
   });

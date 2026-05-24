@@ -12,17 +12,20 @@ export interface DiffSection {
   deletions: number;
 }
 
-/** Build the final prompt packet for the reviewer child session. */
+/** Build a compact review packet for the reviewer child session.
+ *
+ * The packet contains only the session-derived brief, target metadata, and a
+ * changed-file overview. No large inline diffs are included. The reviewer uses
+ * read_snapshot_diff and read_snapshot_file tools to inspect diffs on demand.
+ */
 export function buildReviewPacket(
   snapshot: ReviewSnapshot,
   brief: SynthesizedReviewBrief,
   model: ReviewModelSelection,
 ): ReviewPacket {
-  const charBudget = getPacketCharBudget(model);
   const { preamble, sections } = splitDiffSections(snapshot.diffText);
-  const orderedSections = prioritizeSections(sections, brief, snapshot.changedFiles);
 
-  const baseParts: string[] = [
+  const parts: string[] = [
     "# Review Task",
     "",
     "## Session-derived intent",
@@ -49,62 +52,29 @@ export function buildReviewPacket(
     "",
     "## Changed files manifest",
     ...snapshot.changedFiles.map((file) => `- ${file}`),
+    "",
+    buildFileOverviewTable(snapshot.changedFiles, sections),
   ];
 
-  baseParts.push("", buildFileOverviewTable(snapshot.changedFiles, sections));
-
   if (preamble.trim()) {
-    baseParts.push("", "## Snapshot notes", truncate(preamble.trim(), 1_500));
+    parts.push("", "## Snapshot notes", truncate(preamble.trim(), 1_500));
   }
 
-  let prompt = baseParts.join("\n");
-  let remaining = charBudget - prompt.length;
-  const includedFiles: string[] = [];
-  const diffBlocks: string[] = [];
-
-  for (const section of orderedSections) {
-    if (remaining <= 2_000) break;
-    const fenced = [`### ${section.file}`, "", "```diff", section.text, "```"].join("\n");
-
-    if (fenced.length <= remaining) {
-      diffBlocks.push(fenced);
-      includedFiles.push(section.file);
-      remaining -= fenced.length + 2;
-      continue;
-    }
-
-    if (includedFiles.length === 0) {
-      const excerptBudget = Math.max(1_000, remaining - 200);
-      const excerpt = truncate(section.text, excerptBudget);
-      const partialBlock = [`### ${section.file}`, "", "```diff", excerpt, "```"].join("\n");
-      diffBlocks.push(partialBlock);
-      includedFiles.push(section.file);
-      remaining -= partialBlock.length + 2;
-    }
-    break;
-  }
-
-  const omittedFiles = snapshot.changedFiles.filter((file) => !includedFiles.includes(file));
-
-  prompt = [
-    prompt,
+  parts.push(
     "",
-    "## Included diffs",
-    diffBlocks.length > 0
-      ? diffBlocks.join("\n\n")
-      : "No inline diff sections fit in the prompt budget. Use the changed-file manifest to inspect the files directly.",
+    "## On-demand snapshot inspection",
+    "Use read_snapshot_diff <file> to see the exact diff for any changed file.",
+    "Use read_snapshot_file <file> before|after to inspect file contents on either side of the change.",
+    "These tools are scoped to the snapshot's changed-files list — request a file from the manifest above.",
     "",
-    "## Omitted files",
-    ...toBullets(omittedFiles, "- None"),
-    "",
-    "Review the included diff carefully. Use read/grep/find/ls to inspect surrounding code before submitting findings.",
-  ].join("\n");
+    "Combine snapshot inspection with read/grep/find/ls for broader codebase context.",
+  );
 
   return {
-    prompt,
-    includedFiles,
-    omittedFiles,
-    charBudget,
+    prompt: parts.join("\n"),
+    includedFiles: [],
+    omittedFiles: [...snapshot.changedFiles],
+    charBudget: 0,
   };
 }
 
@@ -191,43 +161,6 @@ function parseDiffFile(line: string): string | undefined {
   if (!match) return undefined;
   const next = match[2] ?? match[1];
   return next === "/dev/null" ? match[1] : next;
-}
-
-function prioritizeSections(
-  sections: DiffSection[],
-  brief: SynthesizedReviewBrief,
-  changedFiles: string[],
-): DiffSection[] {
-  const riskyTokens = brief.riskyFiles.flatMap(toPathTokens);
-  const order = new Map(changedFiles.map((file, index) => [file, index]));
-
-  return [...sections].sort((a, b) => {
-    const delta = sectionScore(b, riskyTokens, order) - sectionScore(a, riskyTokens, order);
-    if (delta !== 0) return delta;
-    return a.file.localeCompare(b.file);
-  });
-}
-
-function sectionScore(
-  section: DiffSection,
-  riskyTokens: string[],
-  order: Map<string, number>,
-): number {
-  const lowerFile = section.file.toLowerCase();
-  const riskyScore = riskyTokens.reduce(
-    (score, token) => score + (lowerFile.includes(token) ? 20 : 0),
-    0,
-  );
-  const orderScore = order.has(section.file) ? Math.max(0, 10 - (order.get(section.file) ?? 0)) : 0;
-  return riskyScore + orderScore;
-}
-
-function toPathTokens(path: string): string[] {
-  return path
-    .toLowerCase()
-    .split(/[\\/._-]/)
-    .map((part) => part.trim())
-    .filter((part) => part.length >= 3);
 }
 
 /** Categorize a file path for skip-list annotation, or undefined if it should be reviewed. */

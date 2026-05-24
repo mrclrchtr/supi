@@ -9,6 +9,8 @@ import {
   getLocalBranches,
   getMergeBase,
   getRecentCommits,
+  getSnapshotFileContent,
+  getSnapshotFileDiff,
   getUncommittedDiff,
 } from "../../src/git.ts";
 
@@ -145,4 +147,149 @@ describe("git functions", () => {
     },
     GIT_TEST_TIMEOUT_MS,
   );
+
+  describe("getSnapshotFileDiff", () => {
+    it(
+      "returns per-file diff for a working tree snapshot",
+      async () => {
+        fs.writeFileSync(path.join(repo, "a.txt"), "line1\nline2");
+        execGit("git add . && git commit -m 'init'", repo, true);
+
+        fs.writeFileSync(path.join(repo, "a.txt"), "line1\nline2\nline3");
+
+        const snapshot = {
+          target: { kind: "working-tree" as const },
+          title: "Working tree changes",
+          changedFiles: ["a.txt"],
+          diffText: "",
+          stats: { files: 1, additions: 1, deletions: 0 },
+        };
+
+        const diff = await getSnapshotFileDiff(repo, snapshot, "a.txt");
+        expect(diff).toContain("+line3");
+      },
+      GIT_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "returns per-file diff for a commit snapshot",
+      async () => {
+        fs.writeFileSync(path.join(repo, "a.txt"), "line1");
+        execGit("git add . && git commit -m 'first'", repo, true);
+        fs.writeFileSync(path.join(repo, "a.txt"), "line1\nline2");
+        execGit("git add . && git commit -m 'second'", repo, true);
+
+        const sha = execGit("git rev-parse HEAD", repo).trim();
+        const snapshot = {
+          target: { kind: "commit" as const, sha },
+          title: "Commit",
+          changedFiles: ["a.txt"],
+          diffText: "",
+          stats: { files: 1, additions: 1, deletions: 0 },
+        };
+
+        const diff = await getSnapshotFileDiff(repo, snapshot, "a.txt");
+        expect(diff).toContain("+line2");
+      },
+      GIT_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "returns per-file diff for a branch snapshot",
+      async () => {
+        fs.writeFileSync(path.join(repo, "a.txt"), "line1");
+        execGit("git add . && git commit -m 'base'", repo, true);
+        execGit("git checkout -b feature", repo, true);
+        fs.writeFileSync(path.join(repo, "a.txt"), "line1\nfeature");
+        execGit("git add . && git commit -m 'feature'", repo, true);
+
+        const snapshot = {
+          target: { kind: "branch" as const, base: "main" },
+          title: "Changes vs main",
+          changedFiles: ["a.txt"],
+          diffText: "",
+          stats: { files: 1, additions: 1, deletions: 0 },
+        };
+
+        const diff = await getSnapshotFileDiff(repo, snapshot, "a.txt");
+        expect(diff).toContain("+feature");
+      },
+      GIT_TEST_TIMEOUT_MS,
+    );
+  });
+
+  describe("getSnapshotFileContent", () => {
+    it(
+      "returns before and after content for a working tree snapshot",
+      async () => {
+        fs.writeFileSync(path.join(repo, "a.txt"), "original");
+        execGit("git add . && git commit -m 'init'", repo, true);
+
+        fs.writeFileSync(path.join(repo, "a.txt"), "modified");
+
+        const snapshot = {
+          target: { kind: "working-tree" as const },
+          title: "Working tree changes",
+          changedFiles: ["a.txt"],
+          diffText: "",
+          stats: { files: 1, additions: 0, deletions: 0 },
+        };
+
+        const before = await getSnapshotFileContent(repo, snapshot, "a.txt", "before");
+        const after = await getSnapshotFileContent(repo, snapshot, "a.txt", "after");
+
+        expect(before).toBe("original");
+        expect(after).toBe("modified");
+      },
+      GIT_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "returns undefined before for an untracked file",
+      async () => {
+        fs.writeFileSync(path.join(repo, "untracked.txt"), "new file");
+
+        const snapshot = {
+          target: { kind: "working-tree" as const },
+          title: "Working tree changes",
+          changedFiles: ["untracked.txt"],
+          diffText: "",
+          stats: { files: 1, additions: 1, deletions: 0 },
+        };
+
+        const before = await getSnapshotFileContent(repo, snapshot, "untracked.txt", "before");
+        const after = await getSnapshotFileContent(repo, snapshot, "untracked.txt", "after");
+
+        expect(before).toBeUndefined();
+        expect(after).toBe("new file");
+      },
+      GIT_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "returns before and after for a commit snapshot",
+      async () => {
+        fs.writeFileSync(path.join(repo, "a.txt"), "initial");
+        execGit("git add . && git commit -m 'first'", repo, true);
+        fs.writeFileSync(path.join(repo, "a.txt"), "updated");
+        execGit("git add . && git commit -m 'second'", repo, true);
+
+        const sha = execGit("git rev-parse HEAD", repo).trim();
+        const snapshot = {
+          target: { kind: "commit" as const, sha },
+          title: "Commit",
+          changedFiles: ["a.txt"],
+          diffText: "",
+          stats: { files: 1, additions: 0, deletions: 0 },
+        };
+
+        const before = await getSnapshotFileContent(repo, snapshot, "a.txt", "before");
+        const after = await getSnapshotFileContent(repo, snapshot, "a.txt", "after");
+
+        expect(before).toBe("initial");
+        expect(after).toBe("updated");
+      },
+      GIT_TEST_TIMEOUT_MS,
+    );
+  });
 });

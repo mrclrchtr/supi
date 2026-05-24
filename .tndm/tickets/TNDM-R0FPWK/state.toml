@@ -1,0 +1,48 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T12:44:36.943875Z"
+revision = 24
+
+[document_fingerprints]
+archive = "sha256:5296b1ed887f4a8c51efa28d7da4c5c89d886f15ce2f39c4c4e7c9b0c89b391a"
+content = "sha256:1bb26ea6fee4e4a350c0e1536b35a50f1732e16b68377b69ebfcefd7133d975a"
+task-01 = "sha256:1f4b4239332477fe40910dfa8e17fb1b077676c7f83a29dbd7b1931837249d1b"
+task-02 = "sha256:8c7d9534c0b5eec81eb8a804d3429ebd536ac2306003eeb8e6934347c8cab0cb"
+task-03 = "sha256:b1218ce917e0050077f06151e21c35017dc1814c279f485efb01b9f1234cb84d"
+task-04 = "sha256:390a37e33bd8d6d5820505f0575514acb7ae1cb9273eec21cab7ba6d7d135893"
+
+[[tasks]]
+number = 1
+title = "Add snapshot-specific git helpers for per-file diffs and before/after reads"
+status = "done"
+files = ["packages/supi-review/src/git.ts", "packages/supi-review/__tests__/unit/git.test.ts", "packages/supi-review/__tests__/unit/git-timeout.test.ts"]
+verification = "pnpm vitest run packages/supi-review/__tests__/unit/git.test.ts packages/supi-review/__tests__/unit/git-timeout.test.ts"
+notes = "TDD task. Start by adding failing coverage for working-tree, branch, and commit snapshot file access plus timeout propagation, then implement the minimal git helpers to satisfy those cases."
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "Expose snapshot inspection tools in the review child session"
+status = "done"
+files = ["packages/supi-review/src/tool/snapshot-tools.ts", "packages/supi-review/src/tool/review-runner.ts", "packages/supi-review/src/tool/schemas.ts", "packages/supi-review/__tests__/unit/snapshot-tools.test.ts", "packages/supi-review/__tests__/unit/runner.test.ts"]
+verification = "pnpm vitest run packages/supi-review/__tests__/unit/snapshot-tools.test.ts packages/supi-review/__tests__/unit/runner.test.ts"
+notes = "TDD task. Add failing tool-level and runner-level tests before wiring the new reviewer custom tools into the child session."
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "Slim the review packet and update preview metadata for the compact review flow"
+status = "done"
+files = ["packages/supi-review/src/target/packet.ts", "packages/supi-review/src/types.ts", "packages/supi-review/src/ui/flow.ts", "packages/supi-review/__tests__/unit/packet.test.ts", "packages/supi-review/__tests__/unit/review-command.test.ts"]
+verification = "pnpm vitest run packages/supi-review/__tests__/unit/packet.test.ts packages/supi-review/__tests__/unit/review-command.test.ts"
+notes = "TDD task. Start by rewriting packet expectations so the prompt no longer depends on large inline diff sections, then update packet shape and preview UI to match."
+detail_path = "tasks/task-03.md"
+
+[[tasks]]
+number = 4
+title = "Update supi-review docs and run package regression verification"
+status = "done"
+files = ["packages/supi-review/README.md", "packages/supi-review/CLAUDE.md", "packages/supi-review/__tests__/unit/packet.test.ts", "packages/supi-review/__tests__/unit/git.test.ts", "packages/supi-review/__tests__/unit/git-timeout.test.ts", "packages/supi-review/__tests__/unit/snapshot-tools.test.ts", "packages/supi-review/__tests__/unit/runner.test.ts", "packages/supi-review/__tests__/unit/review-command.test.ts"]
+verification = "pnpm vitest run packages/supi-review/ && pnpm exec tsc --noEmit -p packages/supi-review/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-review/__tests__/tsconfig.json && pnpm exec biome check packages/supi-review/"
+notes = "Docs/task polish plus full package verification after the code changes land."
+detail_path = "tasks/task-04.md"

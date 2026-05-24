@@ -21,8 +21,8 @@ The `/supi-review` command follows a **history-aware** pipeline:
 4. **Resolve snapshot** — concrete changed files + diff/show text
 5. **Serialize session context** — compaction-style transcript of the active branch's resolved LLM-visible context
 6. **Synthesize brief** — child session turns history + snapshot metadata into a structured brief
-7. **Build review packet** — combine brief + snapshot into the final reviewer prompt
-8. **Preview and confirm** — show the synthesized brief and prompt coverage
+7. **Build review packet** — compact prompt with brief + file metadata; no bulk diffs; reviewer fetches diffs on demand
+8. **Preview and confirm** — show the synthesized brief and compact prompt preview
 9. **Run reviewer** — read-only child session inspects the code and submits findings
 10. **Render results** — synthesized brief context + verdict + findings
 11. **Main-agent handoff** — if findings exist, inject a hidden follow-up instruction so the main agent asks the user what to do next
@@ -32,7 +32,7 @@ The `/supi-review` command follows a **history-aware** pipeline:
 - `ReviewTargetSpec` — selected git target (`working-tree` | `branch` | `commit`)
 - `ReviewSnapshot` — fully resolved git snapshot (title, changed files, diff text, stats)
 - `SynthesizedReviewBrief` — structured intent inferred from the current session
-- `ReviewPacket` — final reviewer prompt plus included/omitted file coverage
+- `ReviewPacket` — compact reviewer prompt with brief + file manifest; no inline diffs
 - `ReviewPlan` — model + snapshot + synthesized brief + reviewer packet
 - `ReviewResult` — success / failed / canceled / timeout result for the review run
 
@@ -48,12 +48,13 @@ src/
     collect.ts          Compaction-style session-context serialization
     synthesize.ts       Brief synthesis prompt builder + runner orchestration
   target/
-    packet.ts           Reviewer prompt packet builder with file-aware diff packing
+    packet.ts           Compact review packet builder (no inline diffs)
   tool/
     brief-runner.ts     Brief synthesis child session
     review-runner.ts    Read-only reviewer child session
     runner-types.ts     Shared runner progress/result types
     schemas.ts          TypeBox schemas for submit_review[_brief]
+    snapshot-tools.ts   Snapshot-aware diff/file tools for the reviewer session
   ui/
     flow.ts             TUI selection + preview steps
     progress-widget.ts  Live progress widget for child sessions
@@ -71,7 +72,7 @@ __tests__/
 - **No editable raw prompt step** — the user previews the synthesized brief, not a hand-edited prompt blob
 - **Snapshot first** — review targets are fully resolved before synthesis/review starts; no lazy target hydration
 - **Active branch only** — session-context serialization uses `buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId())` so compaction and branch-summary semantics match the actual LLM-visible context
-- **Read-only review session** — reviewer tools are restricted to `read`, `grep`, `find`, `ls`, and `submit_review`
+- **Read-only review session** — reviewer tools include `read`, `grep`, `find`, `ls`, `submit_review`, and snapshot-aware `read_snapshot_diff` and `read_snapshot_file` for on-demand inspection
 - **Minimal synthesis session** — brief synthesis uses only `submit_review_brief` and no context files/extensions/skills/themes
 
 ## Child-session design
@@ -87,8 +88,9 @@ __tests__/
 ### Review session
 
 - created with `createAgentSession()` + `SessionManager.inMemory()`
-- tools: `read`, `grep`, `find`, `ls`, `submit_review`
+- tools: `read`, `grep`, `find`, `ls`, `submit_review`, `read_snapshot_diff`, `read_snapshot_file`
 - resource loader keeps project context files enabled so the reviewer inherits repo guidance
+- snapshot tools (`read_snapshot_diff`, `read_snapshot_file`) are scoped to the selected snapshot's changed-files list and are the primary way the reviewer inspects per-file diffs
 - live progress comes from `session.subscribe()` events (turns, tool activity, token stats)
 - soft timeout steers the model to finish, then aborts after grace turns if needed
 
@@ -97,7 +99,7 @@ __tests__/
 - `ctx.sessionManager` in extension contexts is read-only; use `getBranch()` and derive any extra views yourself
 - The session-context serializer operates on the resolved `buildSessionContext(...)` output, so `custom_message` entries, compaction summaries, and branch summaries all appear in the transcript exactly as the LLM would see them
 - `buildBriefSynthesisPrompt()` must include a bounded diff excerpt so the synthesizer can see actual code changes, not just filenames/stats
-- `buildReviewPacket()` is file-aware and explicitly lists omitted files; avoid reintroducing whole-diff middle truncation
+- `buildReviewPacket()` now produces a compact packet with no inline diffs. The reviewer inspects per-file diffs on demand via `read_snapshot_diff` and file contents via `read_snapshot_file`. Do not reintroduce bulk diff embedding.
 - Review results carry `snapshot`, `brief`, and `modelId`; renderers and plain-text formatting should use those instead of older prompt-centric metadata
 - The visible `supi-review` custom message is followed by a hidden `supi-review-followup` custom message when findings exist; its content instructs the main agent to ask the user what to do next, preferably via `ask_user`
 - Keep the final custom message content concise and structured: plain text in `content`, richer data in `details`

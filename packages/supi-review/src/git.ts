@@ -1,10 +1,11 @@
+// biome-ignore lint/nursery/noExcessiveLinesPerFile: many tightly-coupled git helpers; splitting would create cross-ref overhead
 import { execFile } from "node:child_process";
-import { basename } from "node:path";
+import { readFile } from "node:fs/promises";
+import { basename, join } from "node:path";
 import { promisify } from "node:util";
-import type { DiffStats, ReviewSnapshot } from "./types.ts";
+import type { DiffStats, ReviewSnapshot, ReviewTargetSpec } from "./types.ts";
 
 const execFileAsync = promisify(execFile);
-
 const GIT_TIMEOUT_MS = 30_000;
 
 function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -237,11 +238,7 @@ export async function resolveWorkingTreeSnapshot(
     getUncommittedDiff(repoPath),
     getUncommittedFileNames(repoPath),
   ]);
-
-  if (!diffText.trim() && changedFiles.length === 0) {
-    return undefined;
-  }
-
+  if (!diffText.trim() && changedFiles.length === 0) return undefined;
   return {
     target: { kind: "working-tree" },
     title: "Working tree changes",
@@ -257,19 +254,12 @@ export async function resolveBranchSnapshot(
   base: string,
 ): Promise<ReviewSnapshot | undefined> {
   const baseSha = await getMergeBase(repoPath, base);
-  if (!baseSha) {
-    return undefined;
-  }
-
+  if (!baseSha) return undefined;
   const [diffText, changedFiles] = await Promise.all([
     getDiff(repoPath, baseSha),
     getDiffFileNames(repoPath, baseSha),
   ]);
-
-  if (!diffText.trim() && changedFiles.length === 0) {
-    return undefined;
-  }
-
+  if (!diffText.trim() && changedFiles.length === 0) return undefined;
   return {
     target: { kind: "branch", base },
     title: `Changes vs ${base}`,
@@ -288,11 +278,7 @@ export async function resolveCommitSnapshot(
     getCommitShow(repoPath, sha),
     getCommitFileNames(repoPath, sha),
   ]);
-
-  if (!diffText.trim() && changedFiles.length === 0) {
-    return undefined;
-  }
-
+  if (!diffText.trim() && changedFiles.length === 0) return undefined;
   return {
     target: { kind: "commit", sha },
     title: `Commit ${sha.slice(0, 7)}`,
@@ -300,6 +286,122 @@ export async function resolveCommitSnapshot(
     diffText,
     stats: parseDiffStats(diffText),
   };
+}
+
+/** Get the per-file diff for a single changed file in the snapshot. */
+export async function getSnapshotFileDiff(
+  repoPath: string,
+  snapshot: ReviewSnapshot,
+  file: string,
+): Promise<string> {
+  const { target } = snapshot;
+  switch (target.kind) {
+    case "working-tree": {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["diff", "HEAD", "--", file],
+        gitExecOptions(repoPath),
+      );
+      return stdout;
+    }
+    case "branch": {
+      const baseSha = await getMergeBase(repoPath, target.base);
+      if (!baseSha) return "";
+      const { stdout } = await execFileAsync(
+        "git",
+        ["diff", baseSha, "HEAD", "--", file],
+        gitExecOptions(repoPath),
+      );
+      return stdout;
+    }
+    case "commit": {
+      const { stdout } = await execFileAsync(
+        "git",
+        ["show", target.sha, "--", file],
+        gitExecOptions(repoPath),
+      );
+      return stdout;
+    }
+  }
+}
+
+/** Run `git show <ref>:<file>` and return the blob content. */
+async function showGitBlob(repoPath: string, ref: string, file: string): Promise<string> {
+  const { stdout } = await execFileAsync(
+    "git",
+    ["show", `${ref}:${file}`],
+    gitExecOptions(repoPath),
+  );
+  return stdout;
+}
+
+async function resolveWorkingTreeContent(
+  repoPath: string,
+  file: string,
+  side: "before" | "after",
+): Promise<string | undefined> {
+  if (side === "before") {
+    try {
+      return await showGitBlob(repoPath, "HEAD", file);
+    } catch {
+      return undefined;
+    }
+  }
+  try {
+    return await readFile(join(repoPath, file), "utf-8");
+  } catch {
+    return undefined;
+  }
+}
+
+async function resolveBranchContent(
+  repoPath: string,
+  target: ReviewTargetSpec & { kind: "branch" },
+  file: string,
+  side: "before" | "after",
+): Promise<string | undefined> {
+  const baseSha = await getMergeBase(repoPath, target.base);
+  if (!baseSha) return undefined;
+  const ref = side === "before" ? baseSha : "HEAD";
+  try {
+    return await showGitBlob(repoPath, ref, file);
+  } catch (err) {
+    if (side === "before") return undefined;
+    throw err;
+  }
+}
+
+async function resolveCommitContent(
+  repoPath: string,
+  target: ReviewTargetSpec & { kind: "commit" },
+  file: string,
+  side: "before" | "after",
+): Promise<string | undefined> {
+  const ref = side === "before" ? `${target.sha}^` : target.sha;
+  try {
+    return await showGitBlob(repoPath, ref, file);
+  } catch (err) {
+    if (side === "before") return undefined;
+    throw err;
+  }
+}
+
+/** Get before or after content for a single changed file in the snapshot. Returns undefined when legitimately unavailable; propagates unexpected errors. */
+export async function getSnapshotFileContent(
+  repoPath: string,
+  snapshot: ReviewSnapshot,
+  file: string,
+  side: "before" | "after",
+): Promise<string | undefined> {
+  const { target } = snapshot;
+  switch (target.kind) {
+    case "working-tree":
+      return resolveWorkingTreeContent(repoPath, file, side);
+    case "branch":
+      return resolveBranchContent(repoPath, target, file, side);
+    case "commit":
+      return resolveCommitContent(repoPath, target, file, side);
+  }
 }
 
 /** Convenience label for one changed file, used in synthesized prompts/UI. */

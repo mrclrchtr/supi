@@ -11,6 +11,7 @@ import {
 import type { ReviewOutputEvent, ReviewResult } from "../types.ts";
 import type { ReviewInvocation, ReviewProgress } from "./runner-types.ts";
 import { reviewOutputSchema } from "./schemas.ts";
+import { createSnapshotDiffTool, createSnapshotFileTool } from "./snapshot-tools.ts";
 
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
 const GRACE_TURNS = 3;
@@ -25,6 +26,8 @@ function toolNameToActivity(name: string, phase: "start" | "end"): string {
     find: "finding files",
     ls: "listing files",
     submit_review: "submitting review",
+    read_snapshot_diff: "reading diff",
+    read_snapshot_file: "reading file",
   };
   return map[name] ?? name;
 }
@@ -53,7 +56,7 @@ function createSubmitReviewTool(resultHolder: {
 export function buildReviewerSystemPrompt(): string {
   return [
     "You are a rigorous code reviewer.",
-    "The review task already includes session-derived intent and a concrete code snapshot.",
+    "The review task already includes session-derived intent and a concrete list of changed files.",
     "Use the prompt packet as the primary brief, then inspect files with the available read-only tools before drawing conclusions.",
     "",
     "--- Guardrails ---",
@@ -82,6 +85,8 @@ export function buildReviewerSystemPrompt(): string {
     "  'patch is incorrect': major/critical issues that should block merge",
     "",
     "--- Tool strategy ---",
+    "- Start by fetching the diff for each changed file using read_snapshot_diff.",
+    "- Use read_snapshot_file <file> before|after to inspect file contents on either side of the change.",
     "- Use read to inspect full files when the inline diff lacks context.",
     "- Use grep to verify patterns across the codebase.",
     "- Use find to locate related files quickly.",
@@ -99,6 +104,8 @@ export function buildReviewerSystemPrompt(): string {
 async function createReviewerSession(
   invocation: ReviewInvocation,
   submitReviewTool: ReturnType<typeof defineTool>,
+  snapshotDiffTool: ReturnType<typeof defineTool>,
+  snapshotFileTool: ReturnType<typeof defineTool>,
 ): Promise<AgentSession> {
   const resourceLoader = new DefaultResourceLoader({
     cwd: invocation.cwd,
@@ -117,8 +124,16 @@ async function createReviewerSession(
     model: invocation.model.model,
     modelRegistry: invocation.modelRegistry,
     thinkingLevel: clampThinkingLevel(invocation.model.model, "xhigh"),
-    tools: ["read", "grep", "find", "ls", "submit_review"],
-    customTools: [submitReviewTool],
+    tools: [
+      "read",
+      "grep",
+      "find",
+      "ls",
+      "submit_review",
+      "read_snapshot_diff",
+      "read_snapshot_file",
+    ],
+    customTools: [submitReviewTool, snapshotDiffTool, snapshotFileTool],
     resourceLoader,
     sessionManager: SessionManager.inMemory(invocation.cwd),
   });
@@ -313,10 +328,17 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<ReviewR
 
   const resultHolder: { value: ReviewOutputEvent | undefined } = { value: undefined };
   const submitReviewTool = createSubmitReviewTool(resultHolder);
+  const snapshotDiffTool = createSnapshotDiffTool(invocation.cwd, invocation.snapshot);
+  const snapshotFileTool = createSnapshotFileTool(invocation.cwd, invocation.snapshot);
 
   let session: AgentSession;
   try {
-    session = await createReviewerSession(invocation, submitReviewTool);
+    session = await createReviewerSession(
+      invocation,
+      submitReviewTool,
+      snapshotDiffTool,
+      snapshotFileTool,
+    );
   } catch (error) {
     return {
       kind: "failed",
