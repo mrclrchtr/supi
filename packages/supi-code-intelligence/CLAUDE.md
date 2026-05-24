@@ -17,7 +17,7 @@ src/
 ├── index.ts                # Public API exports for programmatic consumers
 ├── types.ts                # Result metadata types (BriefDetails, MapDetails, SearchDetails, etc.)
 ├── architecture.ts         # Project model builder (workspace scan, module detection)
-├── brief.ts                # Overview + project brief generation
+├── brief.ts                # Public facade for brief/overview helpers (delegates to use-case + presentation)
 ├── brief-focused.ts        # Directory/file/symbol focused brief generation
 ├── git-context.ts          # Git branch, dirty files, last commit helpers
 ├── resolve-target.ts       # Action-facing target resolution — routes normalized queries, maps typed outcomes
@@ -28,6 +28,23 @@ src/
 │   ├── resolve-anchored.ts     # File + position resolution (no LSP needed)
 │   ├── resolve-symbol.ts       # Semantic symbol discovery (LSP-only, no text fallback)
 │   └── resolve-file.ts         # File-level target group discovery (LSP+Tree-sitter with fallback)
+├── use-case/
+│   ├── types.ts                # Shared typed data interfaces (OverviewData, BriefInput, etc.)
+│   ├── build-overview.ts       # Hidden overview data builder from ArchitectureModel
+│   ├── generate-brief.ts       # Brief orchestration — project/path/file/anchored/symbol
+│   ├── generate-map.ts         # Map orchestration — factual filesystem inventory
+│   ├── generate-relations.ts   # Relations orchestration — callers, callees, implementations
+│   ├── generate-affected.ts    # Affected orchestration — impact analysis
+│   ├── generate-pattern.ts     # Pattern orchestration — literal/regex/structured search
+│   └── support/
+│       └── semantic-references.ts  # Shared reference collection/aggregation helpers
+├── presentation/markdown/
+│   ├── overview.ts             # Hidden overview markdown renderer
+│   ├── brief.ts                # Brief markdown renderer (anchored + symbol)
+│   ├── map.ts                  # Factual map markdown renderer
+│   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
+│   ├── affected.ts             # Affected markdown renderer
+│   └── pattern.ts              # Pattern search markdown renderer
 ├── search-helpers.ts       # ripgrep wrapper, path normalization, URI helpers
 ├── pattern-structured.ts   # Tree-sitter-based structured pattern search
 ├── prioritization-signals.ts # Diagnostics, coverage, knip unused signals
@@ -36,23 +53,14 @@ src/
 │   ├── tool-specs.ts          # Single source of truth for the public focused-tool metadata
 │   ├── guidance.ts            # prompt surfaces derived from tool specs
 │   ├── register-tools.ts      # focused Pi tool registration
-│   ├── execute-brief.ts       # public code_brief adapter
-│   ├── execute-map.ts         # public code_map adapter
-│   ├── execute-relations.ts   # public code_relations adapter
-│   ├── execute-affected.ts    # public code_affected adapter
-│   └── execute-pattern.ts     # public code_pattern adapter
+│   ├── execute-brief.ts       # Thin code_brief adapter → use-case/presentation
+│   ├── execute-map.ts         # Thin code_map adapter → use-case/presentation
+│   ├── execute-relations.ts   # Thin code_relations adapter → use-case/presentation
+│   ├── execute-affected.ts    # Thin code_affected adapter → use-case/presentation
+│   └── execute-pattern.ts     # Thin code_pattern adapter → use-case/presentation
 ├── substrates/
 │   ├── lsp-adapter.ts         # Session-scoped LSP access via SemanticSubstrate
 │   └── tree-sitter-adapter.ts # Shared Tree-sitter service access via StructuralSubstrate
-└── actions/
-    ├── semantic-references.ts   # Shared helpers: collectReferences, aggregatePerTarget, formatReferenceList
-    ├── brief-action.ts         # Architecture overviews + anchored briefs
-    ├── map-action.ts           # Factual project/package/directory maps
-    ├── callers-action.ts       # Semantic callers only
-    ├── callees-action.ts       # Structural callees only
-    ├── implementations-action.ts # Semantic implementations only
-    ├── affected-action.ts      # Semantic + architecture-only impact behavior
-    └── pattern-action.ts       # Explicit literal/regex/structured search
 ```
 
 ## Public tool contracts

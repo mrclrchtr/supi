@@ -2,11 +2,11 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executePatternAction } from "../../src/actions/pattern-action.ts";
 import { buildArchitectureModel } from "../../src/architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
 import { executeMapTool } from "../../src/tool/execute-map.ts";
+import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 
 let tmpDir: string;

@@ -1,6 +1,5 @@
-import { executeAffectedAction } from "../actions/affected-action.ts";
-import { createSemanticSubstrate } from "../substrates/lsp-adapter.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { executeAffected } from "../use-case/generate-affected.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeAffectedToolParams {
@@ -12,7 +11,7 @@ export interface CodeAffectedToolParams {
   maxResults?: number;
 }
 
-/** Execute the public code_affected tool through the substrate-only affected action. */
+/** Execute the public code_affected tool through the affected use-case. */
 export async function executeAffectedTool(
   params: CodeAffectedToolParams,
   ctx: { cwd: string },
@@ -22,6 +21,5 @@ export async function executeAffectedTool(
     return { content: error, details: undefined };
   }
 
-  const semantic = createSemanticSubstrate(ctx.cwd);
-  return executeAffectedAction(params, ctx.cwd, semantic);
+  return executeAffected(params, { cwd: ctx.cwd });
 }

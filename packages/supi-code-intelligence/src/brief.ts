@@ -1,9 +1,12 @@
-// Brief generation — compact overviews and project briefs from the architecture model.
+// Public facade — delegates to the new use-case and presentation layers.
+// Existing callers (api.ts, index.ts, code-intelligence.ts) remain compatible.
 
 import type { ArchitectureModel } from "./architecture.ts";
 import { getDependents } from "./architecture.ts";
 import { formatGitContext, gatherGitContext } from "./git-context.ts";
+import { renderOverview } from "./presentation/markdown/overview.ts";
 import type { BriefDetails, ConfidenceMode } from "./types.ts";
+import { buildOverviewData } from "./use-case/build-overview.ts";
 
 // Re-export focused brief generation
 export { generateFocusedBrief } from "./brief-focused.ts";
@@ -13,60 +16,13 @@ export { generateFocusedBrief } from "./brief-focused.ts";
 /**
  * Generate a compact architecture overview for first-turn session injection.
  * Targets roughly 500 tokens or less; prefers dense module-edge format.
+ *
+ * Delegates to use-case/build-overview + presentation/markdown/overview.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: overview formatting with module/edge budget logic
 export function generateOverview(model: ArchitectureModel): string | null {
-  if (model.modules.length === 0) return null;
-
-  const lines: string[] = [];
-  lines.push("# Project: Code Intelligence Overview");
-  lines.push("");
-
-  if (model.name) {
-    lines.push(`**${model.name}**${model.description ? ` — ${model.description}` : ""}`);
-    lines.push("");
-  }
-
-  // Dense module-edge format (budget: ~8 modules, ~8 edges)
-  const modules = model.modules.slice(0, 8);
-  const dependedOn = new Set(model.edges.map((e) => e.to));
-
-  lines.push("## Modules");
-  lines.push("");
-
-  for (const mod of modules) {
-    const isLeaf = !dependedOn.has(mod.name);
-    const deps = mod.internalDeps.filter((d) => modules.some((m) => m.name === d));
-    const shortName = mod.name.replace(/^@[^/]+\//, "");
-
-    if (deps.length === 0) {
-      lines.push(
-        `- **${shortName}**${isLeaf ? " (leaf)" : ""}${mod.description ? ` — ${mod.description}` : ""}`,
-      );
-    } else {
-      const depNames = deps.slice(0, 4).map((d) => d.replace(/^@[^/]+\//, ""));
-      const depStr = depNames.join(", ");
-      const suffix = deps.length > 4 ? ` +${deps.length - 4} more` : "";
-      lines.push(
-        `- **${shortName}** → ${depStr}${suffix}${mod.description ? ` — ${mod.description}` : ""}`,
-      );
-    }
-  }
-
-  if (model.modules.length > 8) {
-    lines.push(`- _+${model.modules.length - 8} more modules omitted_`);
-  }
-
-  lines.push("");
-
-  const gitCtx = gatherGitContext(model.root);
-  if (gitCtx) {
-    lines.push(formatGitContext(gitCtx));
-  }
-
-  lines.push("_Use `code_brief` for deeper context on any module or file._");
-
-  return lines.join("\n");
+  const data = buildOverviewData(model);
+  if (!data) return null;
+  return renderOverview(data);
 }
 
 // ── Full-project brief ────────────────────────────────────────────────

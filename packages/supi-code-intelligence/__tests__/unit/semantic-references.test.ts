@@ -69,7 +69,7 @@ describe("collectReferences", () => {
       workspaceSymbols: vi.fn(),
     };
 
-    const { collectReferences } = await import("../../src/actions/semantic-references.ts");
+    const { collectReferences } = await import("../../src/use-case/support/semantic-references.ts");
     const result = await collectReferences(target, tmpDir, semantic);
 
     expect(result.refs).toHaveLength(2);
@@ -108,7 +108,7 @@ describe("collectReferences", () => {
       workspaceSymbols: vi.fn(),
     };
 
-    const { collectReferences } = await import("../../src/actions/semantic-references.ts");
+    const { collectReferences } = await import("../../src/use-case/support/semantic-references.ts");
     const result = await collectReferences(target, tmpDir, semantic);
 
     expect(result.refs).toHaveLength(1);
@@ -138,7 +138,7 @@ describe("collectReferences", () => {
       workspaceSymbols: vi.fn(),
     };
 
-    const { collectReferences } = await import("../../src/actions/semantic-references.ts");
+    const { collectReferences } = await import("../../src/use-case/support/semantic-references.ts");
     const result = await collectReferences(target, tmpDir, semantic);
 
     expect(result.refs).toHaveLength(0); // external, not project
@@ -167,7 +167,7 @@ describe("collectReferences", () => {
       workspaceSymbols: vi.fn(),
     };
 
-    const { collectReferences } = await import("../../src/actions/semantic-references.ts");
+    const { collectReferences } = await import("../../src/use-case/support/semantic-references.ts");
     const result = await collectReferences(target, tmpDir, semantic);
 
     expect(result.refs).toHaveLength(0);
@@ -210,7 +210,9 @@ describe("aggregatePerTarget", () => {
       externalCount: 1,
     });
 
-    const { aggregatePerTarget } = await import("../../src/actions/semantic-references.ts");
+    const { aggregatePerTarget } = await import(
+      "../../src/use-case/support/semantic-references.ts"
+    );
     const result = await aggregatePerTarget(targets, collectFn);
 
     // Deduped — same refs from both targets
@@ -234,7 +236,9 @@ describe("aggregatePerTarget", () => {
       externalCount: 0,
     });
 
-    const { aggregatePerTarget } = await import("../../src/actions/semantic-references.ts");
+    const { aggregatePerTarget } = await import(
+      "../../src/use-case/support/semantic-references.ts"
+    );
     const result = await aggregatePerTarget(
       [
         {
@@ -263,7 +267,9 @@ describe("aggregatePerTarget", () => {
   });
 
   it("handles empty targets array", async () => {
-    const { aggregatePerTarget } = await import("../../src/actions/semantic-references.ts");
+    const { aggregatePerTarget } = await import(
+      "../../src/use-case/support/semantic-references.ts"
+    );
     const result = await aggregatePerTarget([], vi.fn());
 
     expect(result.refs).toHaveLength(0);
@@ -276,7 +282,9 @@ describe("aggregatePerTarget", () => {
 
 describe("formatReferenceList", () => {
   it("groups refs by file and appends per-file sections", async () => {
-    const { formatReferenceList } = await import("../../src/actions/semantic-references.ts");
+    const { formatReferenceList } = await import(
+      "../../src/use-case/support/semantic-references.ts"
+    );
     const lines: string[] = [];
 
     formatReferenceList(
@@ -300,7 +308,9 @@ describe("formatReferenceList", () => {
   });
 
   it("caps per-file lines at 5 with omitted notice", async () => {
-    const { formatReferenceList } = await import("../../src/actions/semantic-references.ts");
+    const { formatReferenceList } = await import(
+      "../../src/use-case/support/semantic-references.ts"
+    );
     const lines: string[] = [];
     const refs = Array.from({ length: 8 }, (_, i) => ({ file: "src/a.ts", line: i + 1 }));
 
@@ -312,7 +322,9 @@ describe("formatReferenceList", () => {
   });
 
   it("caps total files at maxResults with omitted notice", async () => {
-    const { formatReferenceList } = await import("../../src/actions/semantic-references.ts");
+    const { formatReferenceList } = await import(
+      "../../src/use-case/support/semantic-references.ts"
+    );
     const lines: string[] = [];
     const refs = [
       { file: "src/a.ts", line: 1 },
@@ -329,7 +341,9 @@ describe("formatReferenceList", () => {
   });
 
   it("is a no-op with empty refs", async () => {
-    const { formatReferenceList } = await import("../../src/actions/semantic-references.ts");
+    const { formatReferenceList } = await import(
+      "../../src/use-case/support/semantic-references.ts"
+    );
     const lines: string[] = [];
 
     formatReferenceList(lines, [], 5, tmpDir);

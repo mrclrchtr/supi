@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T23:44:59.860495Z"
+revision = 29
+
+[document_fingerprints]
+archive = "sha256:e1b562959506e18bf2c4239fad828aff53dd965c03c590369f4d4296ec8e6f51"
+content = "sha256:16e1006e7f8236bb6f29ab03ed4fe52aa3560d35b7c1a7b7ee31008b89619c59"
+task-01 = "sha256:9f447995e162b58b4ddbd576b8fb6dcdbecd59bf31fefe2ececb2429e5e6d72a"
+task-02 = "sha256:d942a5dcded3d56fb5952f98be8f2e08935d5a7deb4e85cc70106ab7d5fb4eef"
+task-03 = "sha256:a79f6b1ffb0d18e69d883abcd3615f5d64dbcc1e554e6d4d4adb5d08df50226a"
+task-04 = "sha256:e99cd2d47dea21e2487918da1a517886225e06fd5c5fd9aa2352a5abbc6c2010"
+task-05 = "sha256:f34e1e4dd913178a37e158866982fe5c95f9f9301387359429d91d79e3ff2dea"
+
+[[tasks]]
+number = 1
+title = "Extract overview and brief into typed use-case and markdown presentation layers"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Migrate factual map and relations flows to use-case and renderer modules"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Refactor affected analysis into a typed impact use-case and dedicated renderer"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Move pattern search logic onto explicit use-case and markdown modules"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Remove obsolete action-layer files, refresh docs, and run full package verification"
+status = "done"

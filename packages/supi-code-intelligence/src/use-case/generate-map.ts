@@ -1,6 +1,22 @@
+// Map use-case — typed filesystem scanning for factual project/directory inventory.
+// Produces structured data for the markdown renderer.
+
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { CodeIntelResult, MapDetails } from "../types.ts";
+
+// ── Types ────────────────────────────────────────────────────────────
+
+export interface MapStats {
+  byExtension: Map<string, number>;
+  byChildDir: Map<string, number>;
+  landmarkFiles: string[];
+  total: number;
+}
+
+export interface MapData {
+  scope: string;
+  stats: MapStats;
+}
 
 const SOURCE_EXTENSIONS = new Map([
   [".ts", "TypeScript"],
@@ -79,30 +95,16 @@ const LANDMARK_FILES = new Set([
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "build", ".git"]);
 
-interface FileStats {
-  byExtension: Map<string, number>;
-  byChildDir: Map<string, number>;
-  landmarkFiles: string[];
-  total: number;
-}
+// ── Public entrypoint ────────────────────────────────────────────────
 
-export function executeMapAction(scopePath: string, cwd: string): CodeIntelResult {
+export function buildMapData(scopePath: string, cwd: string): MapData {
   const stats = gatherStats(scopePath);
   const scope = formatScope(scopePath, cwd);
-  const content = formatMap(scope, stats);
-  const details: MapDetails = {
-    scope,
-    totalFiles: stats.total,
-    childDirectoryCount: stats.byChildDir.size,
-    landmarkCount: stats.landmarkFiles.length,
-    nextQueries: ["`code_brief` for prioritized context on this scope"],
-  };
-
-  return { content, details: { type: "map", data: details } };
+  return { scope, stats };
 }
 
-function gatherStats(scopePath: string): FileStats {
-  const stats: FileStats = {
+function gatherStats(scopePath: string): MapStats {
+  const stats: MapStats = {
     byExtension: new Map<string, number>(),
     byChildDir: new Map<string, number>(),
     landmarkFiles: [],
@@ -113,7 +115,7 @@ function gatherStats(scopePath: string): FileStats {
   return stats;
 }
 
-function walkDirectory(dir: string, rel: string, stats: FileStats): void {
+function walkDirectory(dir: string, rel: string, stats: MapStats): void {
   const entries = readEntries(dir);
   if (!entries) return;
 
@@ -132,10 +134,12 @@ function readEntries(dir: string): fs.Dirent[] | null {
 }
 
 function shouldSkipEntry(entry: fs.Dirent): boolean {
-  return entry.name.startsWith(".") || SKIP_DIRS.has(entry.name);
+  // Skip hidden directories and node_modules, but keep dot-prefixed landmark files
+  if (entry.name.startsWith(".") && entry.isDirectory()) return true;
+  return SKIP_DIRS.has(entry.name);
 }
 
-function visitEntry(dir: string, rel: string, entry: fs.Dirent, stats: FileStats): void {
+function visitEntry(dir: string, rel: string, entry: fs.Dirent, stats: MapStats): void {
   const entryRel = rel ? `${rel}/${entry.name}` : entry.name;
   const fullPath = path.join(dir, entry.name);
 
@@ -147,7 +151,7 @@ function visitEntry(dir: string, rel: string, entry: fs.Dirent, stats: FileStats
   recordFileStats(entry.name, entryRel, stats);
 }
 
-function recordFileStats(entryName: string, entryRel: string, stats: FileStats): void {
+function recordFileStats(entryName: string, entryRel: string, stats: MapStats): void {
   stats.total++;
   const ext = path.extname(entryName).toLowerCase();
   stats.byExtension.set(ext, (stats.byExtension.get(ext) ?? 0) + 1);
@@ -162,45 +166,11 @@ function recordFileStats(entryName: string, entryRel: string, stats: FileStats):
   }
 }
 
-function formatMap(scope: string, stats: FileStats): string {
-  const lines: string[] = [];
-
-  lines.push(`# Code Map: ${scope}`);
-  lines.push("");
-  lines.push(`**Files:** ${stats.total} total`);
-  for (const [ext, count] of [...stats.byExtension.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)) {
-    const label = SOURCE_EXTENSIONS.get(ext) ?? (ext || "(no extension)");
-    lines.push(`- ${label}: ${count}`);
-  }
-  if (stats.byExtension.size > 10) {
-    lines.push(`- _+${stats.byExtension.size - 10} more extensions_`);
-  }
-  lines.push("");
-
-  if (stats.byChildDir.size > 0) {
-    lines.push("**Child directories:**");
-    for (const [dir, count] of [...stats.byChildDir.entries()].sort((a, b) => b[1] - a[1])) {
-      lines.push(`- ${dir}/ (${count} file${count !== 1 ? "s" : ""})`);
-    }
-    lines.push("");
-  }
-
-  if (stats.landmarkFiles.length > 0) {
-    lines.push("**Landmark files:**");
-    for (const file of stats.landmarkFiles) {
-      lines.push(`- \`${file}\``);
-    }
-    lines.push("");
-  }
-
-  return lines.join("\n");
-}
-
 function formatScope(scopePath: string, cwd: string): string {
   const relative = path.relative(cwd, scopePath);
   if (relative === "") return ".";
   if (relative.startsWith(`..${path.sep}`) || relative === "..") return scopePath;
   return relative.replaceAll(path.sep, "/");
 }
+
+export { SOURCE_EXTENSIONS };

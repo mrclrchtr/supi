@@ -120,8 +120,11 @@ const overview = generateOverview(model);
 
 ## Source
 
-- `src/code-intelligence.ts` — focused tool registration and session overview injection
+- `src/code-intelligence.ts` — extension entry point: overview injection and tool registration
+- `src/use-case/` — typed orchestration modules for brief, map, relations, affected, and pattern
+- `src/presentation/markdown/` — markdown renderers that format use-case results
+- `src/targeting/` — typed target-resolution pipeline
 - `src/tool/tool-specs.ts` — single source of truth for the public tool surface
 - `src/tool/register-tools.ts` — focused tool registration wiring
 - `src/tool/guidance.ts` — prompt surfaces derived from tool specs
-- `src/actions/*.ts` — domain implementations
+- `src/tool/execute-*.ts` — thin adapters that validate params and route to use-case/presentation layers

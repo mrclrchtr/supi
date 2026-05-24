@@ -3,8 +3,9 @@
 
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildArchitectureModel } from "./architecture.ts";
-import { generateOverview } from "./brief.ts";
+import { renderOverview } from "./presentation/markdown/overview.ts";
 import { registerCodeIntelligenceTools } from "./tool/register-tools.ts";
+import { buildOverviewData } from "./use-case/build-overview.ts";
 
 const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";
 
@@ -37,7 +38,10 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
       const model = await buildArchitectureModel(ctx.cwd);
       if (!model || model.modules.length === 0) return;
 
-      const overview = generateOverview(model);
+      const data = buildOverviewData(model);
+      if (!data) return;
+
+      const overview = renderOverview(data);
       if (!overview) return;
 
       return {

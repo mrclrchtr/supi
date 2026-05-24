@@ -1,7 +1,8 @@
 import * as fs from "node:fs";
-import { executeMapAction } from "../actions/map-action.ts";
+import { renderMap } from "../presentation/markdown/map.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { buildMapData } from "../use-case/generate-map.ts";
 
 export interface CodeMapToolParams {
   path?: string;
@@ -28,5 +29,7 @@ export async function executeMapTool(
     };
   }
 
-  return executeMapAction(scopePath, ctx.cwd);
+  const data = buildMapData(scopePath, ctx.cwd);
+  const rendered = renderMap(data);
+  return { content: rendered.content, details: { type: "map", data: rendered.details } };
 }

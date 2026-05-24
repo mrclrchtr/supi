@@ -1,12 +1,12 @@
-// Shared helpers for semantic reference collection, aggregation, and formatting.
-// Extracted from callers-action.ts and affected-action.ts to eliminate duplication.
+// Shared low-level helpers for reference collection, aggregation, and formatting.
+// Moved from src/actions/semantic-references.ts into the use-case support layer.
 
 import * as path from "node:path";
-import { filterOutDeclaration, isInProjectPath, uriToFile } from "../search-helpers.ts";
-import { dedupeFileLineRefs, highestConfidence } from "../semantic-action-helpers.ts";
-import type { SemanticSubstrate } from "../substrates/types.ts";
-import type { ResolvedTarget } from "../target-resolution.ts";
-import type { ConfidenceMode } from "../types.ts";
+import { filterOutDeclaration, isInProjectPath, uriToFile } from "../../search-helpers.ts";
+import { dedupeFileLineRefs, highestConfidence } from "../../semantic-action-helpers.ts";
+import type { SemanticSubstrate } from "../../substrates/types.ts";
+import type { ResolvedTarget } from "../../target-resolution.ts";
+import type { ConfidenceMode } from "../../types.ts";
 
 export interface FileLineRef {
   file: string;

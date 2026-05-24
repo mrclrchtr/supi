@@ -1,6 +1,6 @@
-import { executePatternAction } from "../actions/pattern-action.ts";
 import { createStructuralSubstrate } from "../substrates/tree-sitter-adapter.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { executePattern } from "../use-case/generate-pattern.ts";
 import { validatePatternToolParams } from "./validation.ts";
 
 export interface CodePatternToolParams {
@@ -13,7 +13,7 @@ export interface CodePatternToolParams {
   summary?: boolean;
 }
 
-/** Execute the public code_pattern tool as the sole heuristic/structured search surface. */
+/** Execute the public code_pattern tool through the pattern use-case. */
 export async function executePatternTool(
   params: CodePatternToolParams,
   ctx: { cwd: string },
@@ -24,5 +24,5 @@ export async function executePatternTool(
   }
 
   const structural = createStructuralSubstrate(ctx.cwd);
-  return executePatternAction(params, ctx.cwd, structural);
+  return executePattern(params, { cwd: ctx.cwd, structural });
 }
