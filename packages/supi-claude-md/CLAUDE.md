@@ -47,15 +47,6 @@ Global: `~/.pi/agent/supi/config.json`; project: `.pi/supi/config.json`
 }
 ```
 
-## Commands
-
-```bash
-pnpm vitest run packages/supi-claude-md/
-pnpm exec tsc --noEmit -p packages/supi-claude-md/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-claude-md/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-claude-md/
-```
-
 ## Testing
 
 - Unit tests in `__tests__/unit/`: pure function tests for config, discovery, subdirectory, state, settings-registration, and skill-reference sync

@@ -4,15 +4,6 @@
 
 `@mrclrchtr/supi-cache` is a real-time prompt cache health monitor plus a cross-session forensics engine. It tracks per-turn cache hit rates, detects regressions with root-cause diagnosis (compaction, model change, prompt change), and provides two user commands and an agent-callable tool.
 
-## Commands
-
-```bash
-pnpm vitest run packages/supi-cache/
-pnpm exec biome check packages/supi-cache
-pnpm exec tsc --noEmit -p packages/supi-cache/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-cache/__tests__/tsconfig.json
-```
-
 ## Architecture
 
 ```

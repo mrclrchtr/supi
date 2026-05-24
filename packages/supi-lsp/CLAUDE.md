@@ -32,11 +32,14 @@ Diagnostics are controlled by `/supi-settings`. The default threshold is `1`, so
 
 ## Key files
 
-`lsp.ts` is a thin wire-up (~50 lines) that delegates orchestration to focused handler modules. `handlers/session-lifecycle.ts` manages session_start / shutdown / agent_end, `handlers/diagnostic-injection.ts` handles before_agent_start and context (diagnostic injection pipeline), `handlers/workspace-recovery.ts` handles tool_result (workspace change recovery), `handlers/status-command.ts` registers the `/lsp-status` command, and `workspace-change.ts` provides shared workspace-tracking helpers (`markWorkspaceChange`, `softRecoverWorkspaceChanges`, `refreshWorkspaceSentinels`, `shouldInvalidateTsconfigScopeCache`).
-
-`tool/tool-specs.ts` is the single source of truth for split-tool metadata, parameter schemas, and server capability labels; `tool/register-tools.ts` wires those specs into pi, while `tool/service-actions.ts` handles service-backed execution and formatting. `manager.ts` and the `manager-*.ts` helpers own client lifecycle, root resolution, diagnostic state, and workspace recovery. `manager-helpers.ts` holds smaller private helpers such as `clientKey`, `resolveRootForFile`, and `isExcludedByPattern`. `client.ts` wraps initialization, document sync, and requests. LSP types now come from `vscode-languageserver-types` and `vscode-languageserver-protocol` (re-exported through `config/types.ts`), and the JSON-RPC transport delegates to `vscode-jsonrpc`'s `createMessageConnection` (`client/transport.ts`). SuPi-specific config types (`ServerConfig`, `LspConfig`, etc.) live in `config/server-config.ts`.
-
-`session/service-registry.ts` exposes the shared session-scoped API for peer extensions, including short waits for pending startup and semantic/diagnostic helpers used by `supi-code-intelligence`. Its backing storage now delegates to `createSessionStateRegistry()` from `@mrclrchtr/supi-core/api`, while the LSP-specific state union and wait semantics stay package-local. `tool/guidance.ts` formats per-tool prompt guidance and dynamic server-coverage bullets from the shared tool specs. `diagnostics/stale-diagnostics.ts` detects suspicious missing-module clusters for stale-warning output, while `diagnostics/suppression-diagnostics.ts` handles stale suppression diagnostics for inline and pre-turn output. `manager/manager-diagnostics.ts` keeps file-sync and cascade-diagnostic helpers out of `manager.ts`, and `manager/manager-workspace-recovery.ts` owns soft recovery and targeted client restarts. `tool/overrides.ts`, `ui/renderer.ts`, and `ui/ui.ts` handle tool-result augmentation, custom messages, and the status overlay. `pattern-matcher.ts` implements gitignore-style exclusion matching. `session/settings-registration.ts` registers enable, severity, active-server, and exclude-pattern settings.
+- **Orchestration**: `lsp.ts` (thin wire-up), `handlers/session-lifecycle.ts`, `handlers/diagnostic-injection.ts`, `handlers/workspace-recovery.ts`, `handlers/status-command.ts`, `workspace-change.ts`
+- **Tool surface**: `tool/tool-specs.ts` (source of truth), `tool/register-tools.ts`, `tool/service-actions.ts`, `tool/guidance.ts`
+- **LSP client**: `client.ts` (init, sync, requests), `client/transport.ts` (JSON-RPC via vscode-jsonrpc), `manager.ts` + `manager-*.ts` (lifecycle, root, diagnostics, recovery)
+- **Config**: `config/types.ts` (re-exports vscode-lsp types), `config/server-config.ts` (SuPi types), `session/settings-registration.ts`
+- **Session API**: `session/service-registry.ts` (peer extension access, backed by supi-core)
+- **Diagnostics**: `diagnostics/stale-diagnostics.ts`, `diagnostics/suppression-diagnostics.ts`, `manager/manager-diagnostics.ts`
+- **UI**: `tool/overrides.ts`, `ui/renderer.ts`, `ui/ui.ts`
+- **Other**: `pattern-matcher.ts` (gitignore-style exclusion)
 
 
 ## Architecture gotchas

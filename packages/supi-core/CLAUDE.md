@@ -8,15 +8,6 @@
 
 Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/api`. PI discovery still uses the real file path `./src/extension.ts` from `package.json`.
 
-## Commands
-
-```bash
-pnpm vitest run packages/supi-core/
-pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-core/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-core/
-```
-
 ## Source layout (domain-first)
 
 ```text

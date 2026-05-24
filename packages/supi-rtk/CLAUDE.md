@@ -19,17 +19,7 @@ Registers a `bash` tool override (`createBashTool`) with a `spawnHook` that inte
 - `guards.ts` — SuPi-side passthrough guard for RTK rewrite collisions
 - `tracking.ts` — session-level rewrite/fallback stats
 
-## Commands
 
-```bash
-pnpm vitest run packages/supi-rtk/
-pnpm exec tsc --noEmit -p packages/supi-rtk/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-rtk/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-rtk/
-
-```
-
-## RTK CLI behavior
 
 - `rtk rewrite <command>` returns exit code **3** on successful rewrites (rewritten command on stdout); non-zero exit alone is not a failure.
 - RTK cannot rewrite multi-line commands; if the shell `commandPrefix` is present, it must be stripped before calling `rtk rewrite` and re-applied to the result.

@@ -2,16 +2,7 @@
 
 Session-aware code review via managed in-process child sessions.
 
-## Commands
 
-```bash
-pnpm vitest run packages/supi-review/
-pnpm exec tsc --noEmit -p packages/supi-review/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-review/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-review/
-```
-
-## Architecture
 
 The `/supi-review` command follows a **history-aware** pipeline:
 

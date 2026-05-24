@@ -2,7 +2,7 @@
 
 ## Scope
 
-`@mrclrchtr/supi-insights` is a PI extension that scans historical sessions, extracts metadata and LLM facets, and generates HTML reports.
+`@mrclrchtr/supi-insights` is a PI extension that scans historical sessions, extracts metadata and LLM facets, and generates HTML reports. Command surface is `/supi-insights`, not `/insights`.
 
 ## Package layout
 
@@ -48,25 +48,3 @@ __tests__/
 
 - Uses `@earendil-works/pi-ai/complete()` directly with `ctx.modelRegistry.getApiKeyAndHeaders()` — no external SDK needed.
 - Long transcripts should be chunked and summarized before facet extraction to stay within token limits.
-
-## Settings
-
-- Uses `registerConfigSettings()` from `supi-core` for scoped `/supi-settings` integration.
-- Config section: `"insights"`, keys: `enabled` (boolean), `maxSessions` (number), `maxFacets` (number).
-
-## Tests
-
-- Unit tests live at `packages/supi-insights/__tests__/unit/`.
-- Package test tsconfig lives at `packages/supi-insights/__tests__/tsconfig.json`.
-
-## Commands
-
-- Command surface is `/supi-insights`, not `/insights`.
-
-```bash
-pnpm vitest run packages/supi-insights/
-pnpm exec tsc --noEmit -p packages/supi-insights/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-insights/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-insights/
-```
-

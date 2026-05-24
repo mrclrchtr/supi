@@ -76,11 +76,4 @@ src/
     guidance.ts
 ```
 
-## Commands
 
-```bash
-pnpm vitest run packages/supi-ask-user/
-pnpm exec tsc --noEmit -p packages/supi-ask-user/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-ask-user/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-ask-user/
-```

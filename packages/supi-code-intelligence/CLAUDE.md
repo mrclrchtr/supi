@@ -9,20 +9,6 @@ Surfaces:
 - Does **not** own a session-scoped cache or runtime service — stays stateless at the orchestration level
 - `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
 
-## Commands
-
-```bash
-# Test (package-scoped)
-pnpm vitest run packages/supi-code-intelligence/
-
-# Typecheck (source + tests)
-pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json
-
-# Biome (package-scoped)
-pnpm exec biome check packages/supi-code-intelligence/
-```
-
 ## Architecture
 
 ```text

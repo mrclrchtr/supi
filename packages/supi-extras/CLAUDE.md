@@ -2,15 +2,6 @@
 
 Collection of small pi extension utilities bundled into one package.
 
-## Commands
-
-```bash
-pnpm vitest run packages/supi-extras/
-pnpm exec tsc --noEmit -p packages/supi-extras/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-extras/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-extras/
-```
-
 ## Package layout
 
 Source stays flat per convention. Tests are organized into `unit/` and `integration/` subdirectories.

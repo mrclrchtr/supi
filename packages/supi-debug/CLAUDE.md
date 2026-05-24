@@ -2,15 +2,6 @@
 
 Session-local debug event capture, querying, and reporting for SuPi extensions.
 
-## Commands
-
-```bash
-pnpm vitest run packages/supi-debug/
-pnpm exec tsc --noEmit -p packages/supi-debug/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-debug/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-debug/
-```
-
 ## Architecture
 
 Registers three surfaces:

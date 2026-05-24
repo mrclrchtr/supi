@@ -16,9 +16,8 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 
 ## Documentation expectations
 
-- Add JSDoc when introducing or changing exported APIs, extension entrypoints, config/settings surfaces, or other non-obvious TypeScript behavior when applicable.
-- Add inline JSDoc for complex internal logic when a short explanatory block will make the code easier to maintain.
-- Keep JSDoc concise and useful: explain purpose, important parameters/returns, side effects, and pi-specific constraints; skip boilerplate comments for trivial private code.
+- Add JSDoc for exported APIs, config surfaces, and non-obvious behavior; skip boilerplate for trivial private code.
+- Add inline JSDoc for complex internal logic where a short explanation would help maintainers.
 
 ## Package layout convention
 
@@ -34,16 +33,7 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 
 ## Commands
 
-```bash
-pnpm verify
-pnpm typecheck[:tests]
-pnpm biome<:ai/:fix>
-pnpm test
-pnpm pack:check
-pnpm pack:verify  # real tarball verification for packages with bundledDependencies
-```
-
-Toolchain versions are pinned in `.mise.toml`.
+See `pnpm run` for routine build/lint/test. Toolchain versions pinned in `.mise.toml`.
 
 ## Architecture
 
@@ -95,30 +85,12 @@ Extension packages with prompts/skills:
 
 ## Settings registry
 
-SuPi extensions can register their settings with the shared registry in `supi-core`:
+Extensions register settings via `registerSettings()` from `@mrclrchtr/supi-core/api`. Call it during the factory function (not async handlers). Prefer `registerConfigSettings()` for config-backed sections over manual `registerSettings()` + scoped-load + write wiring.
 
-```ts
-import { registerSettings } from "@mrclrchtr/supi-core/api";
-
-registerSettings({
-  id: "my-ext",
-  label: "My Extension",
-  loadValues: (scope, cwd) => [
-    { id: "enabled", label: "Enable", currentValue: "on", values: ["on", "off"] },
-  ],
-  persistChange: (scope, cwd, settingId, value) => {
-    // Write to ~/.pi/agent/supi/config.json (global) or .pi/supi/config.json (project)
-  },
-});
-```
-
-- Call `registerSettings()` during the extension factory function (not in async handlers)
-- The registry stores `SettingItem[]` compatible with pi-tui's `SettingsList`
-- `/supi-settings` (registered by `packages/supi-core/src/extension.ts`) renders all registered sections
-- Scope toggle (Tab) switches between project/global config; values are strings — extensions handle string↔typed conversion
-- `loadValues(scope, cwd)` should use raw scope reads (`loadSupiConfigForScope()`), while `loadSupiConfig()` is for merged runtime config
-- For config-backed sections, prefer `registerConfigSettings()` in `supi-core` over manual `registerSettings()` + `loadSupiConfigForScope()` + `writeSupiConfig()` wiring
-- Submenus use `SettingItem.submenu` returning a pi-tui `Component`; Escape confirms, empty-string done() cancels
+- The registry stores `SettingItem[]` compatible with pi-tui's `SettingsList`.
+- `/supi-settings` (from `supi-core`) renders all registered sections.
+- Scope toggle (Tab) switches between project/global; values are strings, extensions handle conversion.
+- Submenus use `SettingItem.submenu` returning a pi-tui `Component`; Escape confirms, empty-string done() cancels.
 
 ## Shared gotchas
 
@@ -203,22 +175,17 @@ Root cause for the staging pipeline: direct `pnpm pack` on workspace packages pr
 - Biome enforces `noExcessiveLinesPerFunction` (120) and `noExcessiveLinesPerFile` (400, nursery) on test files too — split large describe blocks into separate test files
 - Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils` for pi mocks instead of defining local factories — includes `events`, `getActiveTools`, `sendMessage`, `registerShortcut`, `exec`, `emit`, and `getAllTools`
 - Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
-- `pnpm vitest run packages/supi-<pkg>/` — run tests for a single package
+- Package-scoped commands: `pnpm vitest run packages/<pkg>/`, `pnpm exec biome check packages/<pkg>`, `pnpm exec tsc --noEmit -p packages/<pkg>/tsconfig.json`. For shared-config changes, sweep `packages/supi-core/ packages/supi-lsp/ packages/supi-claude-md/`.
 - Global-scope tests for `registerConfigSettings` should pass `homeDir` in the options object rather than mutating `process.env.HOME`.
-- `pnpm vitest run packages/supi-core/ packages/supi-lsp/ packages/supi-claude-md/` — targeted regression sweep for shared config/settings/session-state changes
-- `pnpm exec biome check packages/supi-<pkg>` — package-scoped Biome check for faster iteration on one extension
-- `pnpm exec tsc --noEmit -p packages/supi-<pkg>/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-<pkg>/__tests__/tsconfig.json` — package-scoped typecheck for one extension and its tests
-- `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports and other unsafe lint issues
-- `pnpm exec biome check --max-diagnostics=20 <files>` — when the full workspace check OOMs, cap diagnostics
+- `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports. `--max-diagnostics=20` caps output when the full check OOMs.
 - `ctx.ui.select()` accepts only `string[]`; use label-encoding (e.g. `"[id] name"`) if you need metadata
 - `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` — required to trigger `setInterval` callbacks in vitest
 - In Vitest 4.x, constructor mocks inside `vi.mock` factories must use `class` — `vi.fn().mockImplementation(() => ({}))` silently returns `this` instead of the object
 - `vi.mock` hoisting errors propagate from the importing module (e.g. `runner.ts:2:1`), not the test file's `vi.mock` call site — check the Caused-by chain
 - Shared `createPiMock` stores handlers as `Map<string, handler[]>` — access as `handlers.get(event)?.[0]`, not `handlers.get(event)!`
 - `pi.handlers.get("event")?.[0]!` triggers Biome `noNonNullAssertedOptionalChain` (blocks CI); use `getHandlerOrThrow(pi, event)` from `@mrclrchtr/supi-test-utils` instead
-- `pnpm vitest run` does not check types (esbuild strips them) — run `pnpm typecheck:tests` (or per-package `pnpm exec tsc --noEmit -p packages/<pkg>/__tests__/tsconfig.json`) alongside test runs to catch type errors
-- Adding a new runtime export to `supi-core/index.ts` breaks every downstream `vi.mock("@mrclrchtr/supi-core")` factory that omits it; audit all `vi.mock` blocks in consuming packages
-- The same applies to new runtime exports from local modules (e.g., `CLAUDE_MD_DEFAULTS` from `config.ts`) consumed by `vi.mock("../config.ts")` factories
+- `pnpm vitest run` strips types (esbuild) — always run per-package `pnpm exec tsc --noEmit -p packages/<pkg>/__tests__/tsconfig.json` alongside.
+- Adding exports to `supi-core/index.ts` or deleting source files breaks downstream `vi.mock` factories — audit all consuming test files.
 - **Deleting a source file breaks every test with `vi.mock("../<file>")` referencing it** — audit all test files for stale mock factories after module deletion
 - **Removing code may leave `// biome-ignore` suppression comments unused** — Biome flags these; remove them
 - **Changing state shape requires updating every `createInitialState` mock in test files** — keep mock shapes in sync with real types

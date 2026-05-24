@@ -86,11 +86,4 @@ src/
 
 Tests live in `__tests__/unit/` following the package layout convention.
 
-## Commands
 
-```bash
-pnpm vitest run packages/supi-web/
-pnpm exec tsc --noEmit -p packages/supi-web/tsconfig.json
-pnpm exec tsc --noEmit -p packages/supi-web/__tests__/tsconfig.json
-pnpm exec biome check packages/supi-web/
-```

@@ -2,112 +2,52 @@
 
 Shared test utilities for SuPi extension tests. Not a pi extension — imported directly in test files.
 
-## Package layout
+## API Surface
 
-See `docs/package-layout.md` for the standard convention. This package follows the **stay flat utility package** layout:
+`createPiMock(options?)` returns a `PiMock` — a configurable mock `ExtensionAPI` with captured handlers, commands, tools, renderers, entries, messages, shortcuts, and execCalls. `makeCtx(overrides?)` returns a mock handler context with stubbed `ui`, `sessionManager`, `model`, `cwd`. Utility helpers avoid `!` assertions that Biome prohibits:
 
-```text
-packages/supi-test-utils/
-  package.json
-  README.md
-  CLAUDE.md
-  tsconfig.json
-  src/
-    api.ts           # Public API surface — re-exports from internal modules
-    index.ts         # Package-root re-export surface — re-exports from api.ts
-    pi-mock.ts       # Main file — createPiMock(), makeCtx(), PiMock types
-    handler-utils.ts # Handler lookup helpers
-    tool-utils.ts    # Tool lookup helpers and ToolDef type
-  __tests__/
-    tsconfig.json
-    helpers/         # Shared test utilities
-    fixtures/        # Test data
-    unit/            # Focused fast tests
-    integration/     # Integration tests
-```
+- `getTools(pi)` / `getTool(pi, name)` — typed tool access; `getTool` throws if not found
+- `getHandler(pi, event)` → `handler | undefined` / `getHandlerOrThrow(pi, event)` → `handler`
 
-## Exports
+### PiMock properties
 
-- `createPiMock(options?)` — returns a configurable mock `ExtensionAPI` with `Map`-captured handlers, commands, tools, renderers, entries, messages, shortcuts, and execCalls. Accepts `{ sessionName? }` options.
-- `makeCtx(overrides?)` — returns a mock handler context (`ctx`) with stubbed `ui` (notify, setStatus, setTitle, setWidget, setEditorText, getEditorText, input, custom, theme), `sessionManager`, `model`, `getContextUsage`, `getSystemPrompt`, and `cwd`.
-- `getTools(pi)` — returns all registered tools typed as `ToolDef[]`
-- `getTool(pi, name)` — finds a tool by name, throws if not found (avoids `!` assertions that Biome prohibits)
-- `ToolDef` — type for registered tools with `name`, `label`, `execute`, etc.
-- `getHandler(pi, event)` — returns first handler or `undefined` (avoids `!` assertions)
-- `getHandlerOrThrow(pi, event)` — returns first handler or throws if not found (avoids `!` assertions)
-
-## Additional mock surfaces
-
-The `createPiMock()` return value (`PiMock`) includes these captured data structures and helpers:
-
-| Surface | Type | Description |
-|---------|------|-------------|
-| `handlers` | `Map<string, handler[]>` | All handlers registered via `pi.on()`, stored as arrays |
-| `commands` | `Map<string, spec>` | All commands registered via `pi.registerCommand()` |
-| `tools` | `unknown[]` | All tools registered via `pi.registerTool()` |
-| `renderers` | `Map<string, renderer>` | Renderers registered via `pi.registerMessageRenderer()` |
-| `entries` | `{ type, data }[]` | Entries appended via `pi.appendEntry()` |
-| `messages` | `Record[]` | Messages sent via `pi.sendMessage()` |
-| `shortcuts` | `Map<string, handler[]>` | Shortcuts registered via `pi.registerShortcut()` |
-| `execCalls` | `{ command, args }[]` | Calls made via `pi.exec()` |
-| `events` | `{ on, emit }` | EventBus for `pi.events.on()` / `pi.events.emit()` |
-| `getHandlers(event)` | `handler[]` | Convenience accessor for event handlers |
-| `getCommandHandler(name)` | `unknown` | Returns the handler function directly (extracts from spec if wrapped) |
-| `getShortcutHandlers(key)` | `handler[]` | Convenience accessor for shortcut handlers |
-| `emit(event, ...args)` | `Promise<void>` | Fires all registered handlers for an event, in registration order |
-| `getAllTools()` | `unknown[]` | Returns the `tools` array |
-| `getActiveTools()` / `setActiveTools()` | — | Active tool name tracking |
+| Property | Type |
+|----------|------|
+| `handlers` | `Map<string, handler[]>` |
+| `commands` | `Map<string, spec>` |
+| `tools` | `unknown[]` |
+| `renderers` | `Map<string, renderer>` |
+| `entries` | `{ type, data }[]` |
+| `messages` | `Record[]` |
+| `shortcuts` | `Map<string, handler[]>` |
+| `execCalls` | `{ command, args }[]` |
+| `events` | `{ on, emit }` |
+| `emit(event, ...args)` | Fire all handlers in registration order |
+| `getAllTools()` | Returns tools array |
+| `getActiveTools()` / `setActiveTools()` | Active tool name tracking |
 
 ## Usage
 
 ```ts
-import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { vi } from "vitest";
+import { createPiMock, getHandlerOrThrow, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 
 const pi = createPiMock({ sessionName: "my-session" });
 myExtension(pi);
-
-// Assert handlers were registered (handlers are arrays)
 expect(pi.handlers.has("session_start")).toBe(true);
 
-// Call a handler (no ! assertion — throws if handler not registered)
+// Call a handler
 const handler = getHandlerOrThrow(pi, "tool_call");
 await handler(mockEvent, makeCtx({ cwd: "/test" }));
 
-// Or if the handler may not exist:
-const maybeHandler = getHandler(pi, "tool_call");
-await maybeHandler?.(mockEvent, makeCtx({ cwd: "/test" }));
-
-// Fire all handlers for an event
-await pi.emit("session_start", {}, makeCtx());
-```
-
-### Tool assertions
-
-```ts
-import { getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { createPiMock } from "@mrclrchtr/supi-test-utils";
-
-const pi = createPiMock();
-myExtension(pi);
-
-// Assert on registration (typed, no casts needed)
-const tools = getTools(pi);
-expect(tools).toHaveLength(2);
-
-// Get a specific tool (throws if not found — avoids `!` assertions)
+// Tool assertions
 const tool = getTool(pi, "web_docs_search");
-
-// Execute with typed result via local cast
 const result = (await tool.execute(
-  "tc-1",
-  { library_name: "react", query: "hooks" },
-  undefined,
-  undefined,
-  makeCtx(),
-)) as { content: { type: "text"; text: string }[]; isError?: boolean };
-
+  "tc-1", { library_name: "react", query: "hooks" }, undefined, undefined, makeCtx()
+)) as { isError?: boolean };
 expect(result.isError).toBe(true);
+
+// Fire all handlers
+await pi.emit("session_start", {}, makeCtx());
 ```
 
 ## Gotchas

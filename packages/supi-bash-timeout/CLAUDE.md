@@ -2,14 +2,6 @@
 
 Injects a default timeout on bash tool calls when the LLM omits one. Prevents hung commands (e.g., `find /`) from blocking the agent indefinitely.
 
-## Commands
-
-```bash
-pnpm vitest run packages/supi-bash-timeout/
-pnpm exec tsc --noEmit -p packages/supi-bash-timeout/tsconfig.json
-pnpm exec biome check packages/supi-bash-timeout/
-```
-
 ## Architecture
 
 A single `tool_call` handler intercepting `bash` events:

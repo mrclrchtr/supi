@@ -65,19 +65,7 @@ src/
 
 ## Supported languages
 
-All grammar WASM files are vendored and resolved at runtime from `resources/grammars/<id>/`. See `resources/grammars/` for the complete list. Supported file families:
-- **JavaScript/TypeScript**: `.js`, `.jsx`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.tsx`
-- **Python**: `.py`, `.pyi`
-- **Rust**: `.rs`
-- **Go**: `.go`, `.mod`
-- **C/C++**: `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, `.cxx`, `.hxx`, `.c++`, `.h++`
-- **Java**: `.java`
-- **Kotlin**: `.kt`, `.kts`
-- **Ruby**: `.rb`
-- **Bash/Shell**: `.sh`, `.bash`, `.zsh`
-- **HTML**: `.html`, `.htm`, `.xhtml`
-- **R**: `.r`
-- **SQL**: `.sql`
+14 grammars vendored in `resources/grammars/<id>/`: JavaScript/TypeScript, Python, Rust, Go, C/C++, Java, Kotlin, Ruby, Bash/Shell, HTML, R, SQL. See `resources/grammars/` for the complete file-extension mapping.
 
 ## Validation
 
