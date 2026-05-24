@@ -70,7 +70,11 @@ export function buildReviewPacket(
     "Combine snapshot inspection with read/grep/find/ls for broader codebase context.",
   );
 
-  return { prompt: parts.join("\n") };
+  const includedFiles = snapshot.changedFiles.filter((f) => !classifySkipCategory(f));
+  const omittedFiles = snapshot.changedFiles.filter((f) => !!classifySkipCategory(f));
+  const charBudget = getPacketCharBudget(model);
+
+  return { prompt: parts.join("\n"), includedFiles, omittedFiles, charBudget };
 }
 
 /** Derive a conservative prompt budget from the selected model's context window. */
