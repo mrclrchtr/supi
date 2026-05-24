@@ -278,7 +278,7 @@ describe("SuPi e2e smoke – tool registration", () => {
       "semantic declarations",
     );
     expect(pi.tools.find((t) => t.name === "lsp_workspace_symbols")?.description).toContain(
-      "symbol-name lookup",
+      "symbol declarations by name",
     );
     expect(pi.tools.find((t) => t.name === "lsp_diagnostics")?.description).toContain(
       "diagnostics",
@@ -291,7 +291,7 @@ describe("SuPi e2e smoke – tool registration", () => {
     expect(codeActions?.description).toContain("code");
 
     expect(pi.tools.find((t) => t.name === "lsp_recover")?.description).toContain(
-      "Refresh diagnostics",
+      "LSP diagnostics",
     );
   });
 
@@ -334,11 +334,11 @@ describe("SuPi e2e smoke – tool registration", () => {
     const affectedTool = pi.tools.find((t) => t.name === "code_affected");
     const patternTool = pi.tools.find((t) => t.name === "code_pattern");
 
-    expect(briefTool?.description).toContain("interpretive orientation");
-    expect(mapTool?.description).toContain("factual inventory");
+    expect(briefTool?.description).toContain("Prioritized brief");
+    expect(mapTool?.description).toContain("Factual map");
     expect(relationsTool?.description).toContain("callers, callees, or implementations");
     expect(affectedTool?.description).toContain("blast radius");
-    expect(patternTool?.description).toContain("literal, regex, or structured search");
+    expect(patternTool?.description).toContain("literal, regex, or structured matching");
 
     expect(Check(briefTool?.parameters as object, { path: "src" })).toBe(true);
     expect(Check(mapTool?.parameters as object, { path: "src" })).toBe(true);
