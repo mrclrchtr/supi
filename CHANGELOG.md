@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.7.0](https://github.com/mrclrchtr/supi/compare/v1.6.0...v1.7.0) (2026-05-24)
+
+
+### Features
+
+* **code-intelligence:** split code_intel into focused tools ([ebe7bdc](https://github.com/mrclrchtr/supi/commit/ebe7bdc75c8ebe4c910efc4b95ed2adafd67563f))
+* **core:** add shared tool-spec/registration framework ([f624de6](https://github.com/mrclrchtr/supi/commit/f624de6d7898fa2318e56b8f3ddb5281fe202c0b))
+* **supi-review:** add file overview, skip annotations, calibration, smart follow-up ([456d8f7](https://github.com/mrclrchtr/supi/commit/456d8f7b50232ecb5257aaee0fe64001e92b252f))
+* **supi-review:** bump brief synthesis thinking level to xhigh ([d2e4a39](https://github.com/mrclrchtr/supi/commit/d2e4a39ab35b3c9784e4823a10b8ed445fcbe404))
+
+
+### Bug Fixes
+
+* **lsp:** add timeout guard for exit notification flush ([4dc3be8](https://github.com/mrclrchtr/supi/commit/4dc3be889b50fc9f3a6fdf55f7af8cce39dde0e9))
+* **lsp:** avoid vscode-jsonrpc shutdown noise ([c37ef54](https://github.com/mrclrchtr/supi/commit/c37ef5458c3235318f50130d21b22d941d73a542))
+* **test:** mock spawnSync in web.test.ts to prevent CI flake ([784967b](https://github.com/mrclrchtr/supi/commit/784967bade2cf5fcee223942101faa5bdc41a8ec))
+* **test:** update pack-staged bundledDependencies assertion for vscode-* ([0982c24](https://github.com/mrclrchtr/supi/commit/0982c24cde62d712c88178bdfbce081b42d37ab4))
+
 ## [1.6.0](https://github.com/mrclrchtr/supi/compare/v1.5.0...v1.6.0) (2026-05-22)
 
 
