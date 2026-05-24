@@ -1,5 +1,14 @@
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
+
+const { spawnSync } = vi.hoisted(() => ({
+  spawnSync: vi.fn(() => ({ status: 0 })),
+}));
+
+vi.mock("node:child_process", () => ({
+  spawnSync,
+}));
+
 import webExtension from "../../src/web.ts";
 
 describe("webExtension", () => {
