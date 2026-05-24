@@ -1,0 +1,79 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T11:05:58.60375Z"
+revision = 40
+
+[document_fingerprints]
+archive = "sha256:501e309ac4b7158c0016d927bc0c3af7f80097a5853b84eb75efb84caae7f435"
+content = "sha256:a3ec0e66552aa3ee0e9cd6c5830f5891e0500432a525783417c67aeda4f798fe"
+task-01 = "sha256:b7447ae31e9007e6ca614b939911e1ec8eec6f148a212878824487bd9595aa4a"
+task-02 = "sha256:162b69322733ff16b82d6b0e5c6d8d890088c58a4bbcd273f5f4cdcf5ca67fc0"
+task-03 = "sha256:38babcffae39333bcf86103bf19525dd12758aefd800393bb9d158adaac9960a"
+task-04 = "sha256:e372c85fa48de0711673fc0ea51c7ee99ffda1d714748e9a7a0daa1d0ef79df2"
+task-05 = "sha256:bfbf3a5e9b070776a7a5b48c7d60d19cc80edab191e6544e5785e0f0e29abeae"
+task-06 = "sha256:6d667d21faac74c5ab90c862ab3f427ac4b139729777938204cd63ebbfd2dd77"
+task-07 = "sha256:71184b1eeace66334b5e5853d9df153ec92f0e7d5e2ae954794ae647cd93be31"
+task-08 = "sha256:3a0e8c8b4a89ab94580784318100a02a34ad60017962f2f31e3e2f058b6dd04e"
+
+[[tasks]]
+number = 1
+title = "Create src/workspace-change.ts with shared workspace helpers"
+status = "done"
+files = ["packages/supi-lsp/src/workspace-change.ts"]
+verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json"
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "Create handlers/session-lifecycle.ts (session_start, session_shutdown, agent_end)"
+status = "done"
+files = ["packages/supi-lsp/src/handlers/session-lifecycle.ts"]
+verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/handlers/session-lifecycle.ts"
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "Create handlers/diagnostic-injection.ts (before_agent_start + context)"
+status = "done"
+files = ["packages/supi-lsp/src/handlers/diagnostic-injection.ts"]
+verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/handlers/diagnostic-injection.ts"
+detail_path = "tasks/task-03.md"
+
+[[tasks]]
+number = 4
+title = "Create handlers/workspace-recovery.ts (tool_result handler)"
+status = "done"
+files = ["packages/supi-lsp/src/handlers/workspace-recovery.ts"]
+verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/handlers/workspace-recovery.ts"
+detail_path = "tasks/task-04.md"
+
+[[tasks]]
+number = 5
+title = "Create handlers/status-command.ts (/lsp-status command)"
+status = "done"
+files = ["packages/supi-lsp/src/handlers/status-command.ts"]
+verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/handlers/status-command.ts"
+detail_path = "tasks/task-05.md"
+
+[[tasks]]
+number = 6
+title = "Rewire lsp.ts to delegate to handler modules"
+status = "done"
+files = ["packages/supi-lsp/src/lsp.ts"]
+verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/lsp.ts"
+detail_path = "tasks/task-06.md"
+
+[[tasks]]
+number = 7
+title = "Update CLAUDE.md with new source layout"
+status = "done"
+files = ["packages/supi-lsp/CLAUDE.md"]
+verification = "pnpm exec biome check packages/supi-lsp/CLAUDE.md"
+detail_path = "tasks/task-07.md"
+
+[[tasks]]
+number = 8
+title = "Full workspace verification"
+status = "done"
+verification = "pnpm verify"
+detail_path = "tasks/task-08.md"

@@ -11,7 +11,6 @@ vi.mock("@mrclrchtr/supi-lsp/api", () => ({
 }));
 
 import { createSemanticSubstrate } from "../../../src/substrates/lsp-adapter.ts";
-import type { SemanticSubstrate } from "../../../src/substrates/types.ts";
 
 function makeLspServiceStub() {
   return {

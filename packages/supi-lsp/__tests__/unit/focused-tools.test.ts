@@ -56,7 +56,7 @@ const STABLE_TOOL_NAMES = [
 describe("LSP focused tools", () => {
   describe("registration", () => {
     it("registers the 6 new focused tools (plus 4 existing stable tools = 10 total)", () => {
-      const { pi, tools } = setupPi();
+      const { tools } = setupPi();
       const registeredNames = tools.map((t) => t.name);
 
       // Check all new tools are registered
