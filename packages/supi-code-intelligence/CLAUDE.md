@@ -50,6 +50,7 @@ src/
 │   ├── lsp-adapter.ts         # Session-scoped LSP access via SemanticSubstrate
 │   └── tree-sitter-adapter.ts # Shared Tree-sitter service access via StructuralSubstrate
 └── actions/
+    ├── semantic-references.ts   # Shared helpers: collectReferences, aggregatePerTarget, formatReferenceList
     ├── brief-action.ts         # Architecture overviews + anchored briefs
     ├── map-action.ts           # Factual project/package/directory maps
     ├── callers-action.ts       # Semantic callers only

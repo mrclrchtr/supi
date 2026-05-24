@@ -1,0 +1,53 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T12:12:21.322572Z"
+revision = 28
+
+[document_fingerprints]
+archive = "sha256:787cd72faf8b64a114a26767b6475c809cfcbd7fcc4dc1ca0c9fe446b2ae82fd"
+content = "sha256:ceac1f0410d48fa535ec1d57d64fab4ac0eb6752da3031e16fef7391bd6cd057"
+task-01 = "sha256:cb550515659452385b7d941f7ab19557481bef0e2e190c2d942ee39bae7c6c99"
+task-02 = "sha256:dde329530945a527c03df86ef8c34dc4a8e3be34729f7848c58dd993e6a14fb7"
+task-03 = "sha256:06d097d9169fa47cc1cf0ed32a4e4e343f2e75e61e521245688d5571d9526831"
+task-04 = "sha256:dae7fa6c45a2b6e9ffc09eac5d49ae85dc532b2eb077e1bfae3abee063701ab1"
+task-05 = "sha256:874cd3262f6772356f076276eddbd18793f6fe5cc58899a7a9c0d287b7891c1a"
+
+[[tasks]]
+number = 1
+title = "RED: Write failing tests for collectReferences, aggregatePerTarget, formatReferenceList"
+status = "done"
+files = ["packages/supi-code-intelligence/__tests__/unit/semantic-references.test.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/semantic-references.test.ts (expected: 3 suites, ~12 tests, all FAIL — module doesn't exist yet)"
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "GREEN: Implement semantic-references.ts with three shared helpers"
+status = "done"
+files = ["packages/supi-code-intelligence/src/actions/semantic-references.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/semantic-references.test.ts (expected: all pass)"
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "REFACTOR: Replace private helpers in callers-action.ts with shared imports"
+status = "done"
+files = ["packages/supi-code-intelligence/src/actions/callers-action.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/ (expected: all existing tests pass, no behavior changes)"
+detail_path = "tasks/task-03.md"
+
+[[tasks]]
+number = 4
+title = "REFACTOR: Replace private helpers in affected-action.ts with shared imports"
+status = "done"
+files = ["packages/supi-code-intelligence/src/actions/affected-action.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/ (expected: all existing tests pass, no behavior changes)"
+detail_path = "tasks/task-04.md"
+
+[[tasks]]
+number = 5
+title = "Full verification: typecheck, lint, and downstream test sweep"
+status = "done"
+files = ["packages/supi-code-intelligence/CLAUDE.md"]
+verification = "pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json && pnpm exec biome check packages/supi-code-intelligence/ && pnpm vitest run packages/supi-code-intelligence/ && pnpm vitest run packages/supi-core/ packages/supi-lsp/ packages/supi-tree-sitter/ (downstream regression sweep)"
+detail_path = "tasks/task-05.md"

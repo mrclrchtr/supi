@@ -1,5 +1,4 @@
 // Affected action — blast-radius analysis for a symbol change.
-// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: file-level and single-target affected flows share helpers to keep the blast-radius logic in one place
 
 import * as path from "node:path";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../architecture.ts";
@@ -9,15 +8,16 @@ import {
 } from "../prioritization-signals.ts";
 import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import { resolveTarget } from "../resolve-target.ts";
-import { filterOutDeclaration, isInProjectPath, uriToFile } from "../search-helpers.ts";
-import {
-  dedupeFileLineRefs,
-  highestConfidence,
-  isResolvedTargetGroup,
-} from "../semantic-action-helpers.ts";
+import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
 import type { SemanticSubstrate } from "../substrates/types.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
 import type { AffectedDetails, CodeIntelResult, ConfidenceMode } from "../types.ts";
+import {
+  aggregatePerTarget,
+  collectReferences,
+  formatReferenceList,
+  type ReferenceCollection,
+} from "./semantic-references.ts";
 
 export async function executeAffectedAction(
   params: ActionParams,
@@ -53,11 +53,6 @@ export async function executeAffectedAction(
   return executeSingleAffected(target, symbolName, params, cwd, semantic);
 }
 
-interface GatheredRef {
-  file: string;
-  line: number;
-}
-
 interface ImpactAnalysis {
   confidence: ConfidenceMode;
   affectedFiles: Set<string>;
@@ -77,7 +72,7 @@ async function executeSingleAffected(
   cwd: string,
   semantic: SemanticSubstrate,
 ): Promise<CodeIntelResult> {
-  const refs = await gatherReferences(target, params, cwd, semantic);
+  const refs = await collectReferences(target, cwd, semantic);
   const model = await buildArchitectureModel(cwd);
   const analysis = analyzeImpact(refs, model, target.name, cwd);
 
@@ -117,20 +112,16 @@ async function executeFileLevelAffected(
   const perTarget = await Promise.all(
     targetGroup.targets.map(async (target) => ({
       target,
-      refs: await gatherReferences(target, params, cwd, semantic),
+      refs: await collectReferences(target, cwd, semantic),
     })),
   );
 
-  const combinedRefs = dedupeFileLineRefs(perTarget.flatMap((entry) => entry.refs.refs));
-  const combinedExternal = perTarget.reduce((sum, entry) => sum + entry.refs.externalCount, 0);
-  const combinedConfidence = highestConfidence(perTarget.map((entry) => entry.refs.confidence));
-  const model = await buildArchitectureModel(cwd);
-  const analysis = analyzeImpact(
-    { refs: combinedRefs, confidence: combinedConfidence, externalCount: combinedExternal },
-    model,
-    null,
-    cwd,
+  const aggregated = await aggregatePerTarget(targetGroup.targets, (target) =>
+    collectReferences(target, cwd, semantic),
   );
+
+  const model = await buildArchitectureModel(cwd);
+  const analysis = analyzeImpact(aggregated, model, null, cwd);
 
   const prioritySignals = summarizePrioritySignalsForFiles(
     cwd,
@@ -140,10 +131,10 @@ async function executeFileLevelAffected(
   const lines: string[] = [];
   lines.push(`# Affected: \`${targetGroup.displayName}\``);
   lines.push("");
-  const totalRefs = combinedRefs.length + combinedExternal;
+  const totalRefs = aggregated.refs.length + aggregated.externalCount;
   const refSummary =
-    combinedExternal > 0
-      ? `${totalRefs} refs (${combinedRefs.length} direct + ${combinedExternal} external)`
+    aggregated.externalCount > 0
+      ? `${totalRefs} refs (${aggregated.refs.length} direct + ${aggregated.externalCount} external)`
       : `${totalRefs} ref${totalRefs !== 1 ? "s" : ""}`;
   lines.push(formatFileLevelAffectedHeader(targetGroup.targets.length, refSummary, analysis));
   lines.push("");
@@ -157,7 +148,7 @@ async function executeFileLevelAffected(
   lines.push("");
 
   addRiskSection(lines, analysis, totalRefs);
-  addReferencesSection(lines, combinedRefs, params.maxResults ?? 8);
+  formatReferenceList(lines, aggregated.refs, params.maxResults ?? 8, cwd);
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
@@ -168,7 +159,7 @@ async function executeFileLevelAffected(
 
   const details: AffectedDetails = {
     confidence: analysis.confidence,
-    directCount: combinedRefs.length,
+    directCount: aggregated.refs.length,
     downstreamCount: analysis.downstreamCount,
     riskLevel: analysis.riskLevel,
     checkNext: analysis.checkNext,
@@ -184,41 +175,9 @@ async function executeFileLevelAffected(
   return { content: lines.join("\n"), details: { type: "affected" as const, data: details } };
 }
 
-async function gatherReferences(
-  target: ResolvedTarget,
-  _params: ActionParams,
-  cwd: string,
-  semantic: SemanticSubstrate,
-): Promise<{ refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number }> {
-  const locs = await semantic.references(target.file, target.position);
-  if (!locs) {
-    return { refs: [], confidence: "unavailable", externalCount: 0 };
-  }
-
-  const refs: GatheredRef[] = [];
-  let externalCount = 0;
-  const filtered = filterOutDeclaration(locs, target.file, target.position);
-
-  for (const ref of locs) {
-    const filePath = uriToFile(ref.uri);
-    if (!isInProjectPath(filePath, cwd)) {
-      externalCount++;
-    }
-  }
-
-  for (const ref of filtered) {
-    const filePath = uriToFile(ref.uri);
-    if (isInProjectPath(filePath, cwd)) {
-      refs.push({ file: path.relative(cwd, filePath), line: ref.range.start.line + 1 });
-    }
-  }
-
-  return { refs, confidence: "semantic", externalCount };
-}
-
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: impact analysis with downstream module traversal
 function analyzeImpact(
-  result: { refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number },
+  result: ReferenceCollection,
   model: Awaited<ReturnType<typeof buildArchitectureModel>>,
   symbolName: string | null,
   cwd: string,
@@ -292,7 +251,7 @@ function assessRisk(
 // biome-ignore lint/complexity/useMaxParams: affected formatting keeps related inputs explicit for readability
 function formatAffectedOutput(
   symbolName: string,
-  result: { refs: GatheredRef[]; confidence: ConfidenceMode; externalCount: number },
+  result: ReferenceCollection,
   analysis: ImpactAnalysis,
   params: ActionParams,
   prioritySignals: import("../prioritization-signals.ts").PrioritySignalsSummary | null,
@@ -319,7 +278,7 @@ function formatAffectedOutput(
   lines.push("");
 
   addRiskSection(lines, analysis, totalRefs);
-  addReferencesSection(lines, result.refs, params.maxResults ?? 8);
+  formatReferenceList(lines, result.refs, params.maxResults ?? 8, cwd);
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
@@ -349,33 +308,6 @@ function addRiskSection(lines: string[], analysis: ImpactAnalysis, directCount: 
     lines.push(
       `\`high\` — ${directCount} ref${directCount !== 1 ? "s" : ""} across ${affectedFiles.size} file${affectedFiles.size !== 1 ? "s" : ""} in ${affectedModules.size} module${affectedModules.size !== 1 ? "s" : ""}${downstreamCount > 0 ? `, ${downstreamCount} downstream` : ""}.`,
     );
-  }
-  lines.push("");
-}
-
-function addReferencesSection(lines: string[], refs: GatheredRef[], maxFiles: number): void {
-  if (refs.length === 0) return;
-  lines.push("## Direct References");
-  const byFile = new Map<string, number[]>();
-  for (const ref of refs) {
-    const fileLines = byFile.get(ref.file) ?? [];
-    fileLines.push(ref.line);
-    byFile.set(ref.file, fileLines);
-  }
-
-  let shown = 0;
-  for (const [file, fileLines] of byFile) {
-    if (shown >= maxFiles) break;
-    const lineStr = fileLines
-      .slice(0, 5)
-      .map((l) => `L${l}`)
-      .join(", ");
-    const extra = fileLines.length > 5 ? ` +${fileLines.length - 5} more` : "";
-    lines.push(`- \`${file}\` ${lineStr}${extra}`);
-    shown++;
-  }
-  if (byFile.size > maxFiles) {
-    lines.push(`- _+${byFile.size - maxFiles} more files omitted_`);
   }
   lines.push("");
 }
