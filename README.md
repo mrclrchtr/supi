@@ -54,6 +54,16 @@ Each package has its own README with full details, configuration, and API docs.
 
 ## Install
 
+### All packages at once
+
+```bash
+# Global install
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash
+
+# Project-local install (.pi/settings.json)
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash -s -- -l
+```
+
 ### Individual packages
 
 ```bash
