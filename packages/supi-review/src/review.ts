@@ -288,7 +288,7 @@ function buildReviewFollowUpInstruction(
   }
 
   const contradictionNote =
-    overall_correctness === "patch is correct" && findings.length > 0
+    overall_correctness.toLowerCase().includes("is correct") && findings.length > 0
       ? "The reviewer marked the patch as correct but found issues — verify the verdict before acting."
       : undefined;
 

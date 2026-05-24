@@ -169,7 +169,7 @@ describe("/supi-review command", () => {
       modelId: modelSelection.canonicalId,
       output: {
         findings: [],
-        overall_correctness: "patch is correct",
+        overall_correctness: "PATCH IS CORRECT",
         overall_explanation: "Looks good",
         overall_confidence_score: 0.9,
       },
@@ -230,7 +230,7 @@ describe("/supi-review command", () => {
             },
           },
         ],
-        overall_correctness: "mostly correct",
+        overall_correctness: "PATCH HAS ISSUES",
         overall_explanation: "One issue remains",
         overall_confidence_score: 0.8,
       },
@@ -290,7 +290,7 @@ describe("/supi-review command", () => {
         modelId: modelSelection.canonicalId,
         output: {
           findings,
-          overall_correctness: "mostly correct",
+          overall_correctness: "PATCH HAS ISSUES",
           overall_explanation: "See findings",
           overall_confidence_score: 0.7,
         },
@@ -362,7 +362,7 @@ describe("/supi-review command", () => {
         modelId: modelSelection.canonicalId,
         output: {
           findings: [minorFinding],
-          overall_correctness: "patch is correct",
+          overall_correctness: "PATCH IS CORRECT",
           overall_explanation: "Minor suggestion only",
           overall_confidence_score: 0.9,
         },
@@ -389,7 +389,7 @@ describe("/supi-review command", () => {
         modelId: modelSelection.canonicalId,
         output: {
           findings: [majorFinding],
-          overall_correctness: "patch is correct",
+          overall_correctness: "PATCH IS CORRECT",
           overall_explanation: "Contradictory",
           overall_confidence_score: 0.5,
         },
@@ -418,7 +418,7 @@ describe("/supi-review command", () => {
         modelId: modelSelection.canonicalId,
         output: {
           findings: [],
-          overall_correctness: "patch is correct",
+          overall_correctness: "PATCH IS CORRECT",
           overall_explanation: "All good",
           overall_confidence_score: 0.95,
         },

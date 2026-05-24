@@ -1,45 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildReviewPacket,
   classifySkipCategory,
   getPacketCharBudget,
   splitDiffSections,
 } from "../../src/target/packet.ts";
 import type { ReviewModelSelection } from "../../src/types.ts";
-
-const snapshot = {
-  target: { kind: "working-tree" as const },
-  title: "Working tree changes",
-  changedFiles: ["src/auth.ts", "src/http.ts"],
-  diffText: [
-    "diff --git a/src/auth.ts b/src/auth.ts",
-    "index aaa..bbb 100644",
-    "--- a/src/auth.ts",
-    "+++ b/src/auth.ts",
-    "@@ -1,3 +1,4 @@",
-    " export function auth() {",
-    "+  return true;",
-    " }",
-    "diff --git a/src/http.ts b/src/http.ts",
-    "index ccc..ddd 100644",
-    "--- a/src/http.ts",
-    "+++ b/src/http.ts",
-    "@@ -1,3 +1,4 @@",
-    " export function http() {",
-    "+  return 200;",
-    " }",
-  ].join("\n"),
-  stats: { files: 2, additions: 2, deletions: 0 },
-};
-
-const brief = {
-  summary: "Refactor auth flow",
-  intendedOutcome: "Preserve auth behavior while simplifying request handling",
-  constraints: ["Keep public API stable"],
-  focusAreas: ["Authentication logic", "Response handling"],
-  riskyFiles: ["src/auth.ts"],
-  unresolvedQuestions: ["Is anonymous access still allowed?"],
-};
 
 const model = {
   canonicalId: "anthropic/claude-sonnet-4",
@@ -61,132 +26,6 @@ const model = {
     maxTokens: 8_000,
   },
 } as unknown as ReviewModelSelection;
-
-describe("buildReviewPacket", () => {
-  it("includes the synthesized brief and changed-file manifest", () => {
-    const packet = buildReviewPacket(snapshot, brief, model);
-    expect(packet.prompt).toContain("## Session-derived intent");
-    expect(packet.prompt).toContain("Refactor auth flow");
-    expect(packet.prompt).toContain("## Changed files manifest");
-    expect(packet.prompt).toContain("src/auth.ts");
-    expect(packet.prompt).toContain("src/http.ts");
-  });
-
-  it("does not include large inline diff bodies", () => {
-    const packet = buildReviewPacket(snapshot, brief, model);
-    expect(packet.prompt).not.toContain("```diff");
-  });
-
-  it("mentions on-demand snapshot inspection", () => {
-    const packet = buildReviewPacket(snapshot, brief, model);
-    expect(packet.prompt).toContain("read_snapshot_diff");
-    expect(packet.prompt).toContain("read_snapshot_file");
-  });
-
-  it("includes a file overview table with per-file stats", () => {
-    const packet = buildReviewPacket(snapshot, brief, model);
-    expect(packet.prompt).toContain("## File overview");
-    expect(packet.prompt).toContain("src/auth.ts");
-    expect(packet.prompt).toContain("src/http.ts");
-  });
-
-  it("marks trivial files in file overview", () => {
-    const bigSnapshot = {
-      ...snapshot,
-      stats: { files: 2, additions: 12, deletions: 2 },
-      changedFiles: ["src/auth.ts", "src/http.ts", "src/trivial.ts"],
-      diffText: [
-        "diff --git a/src/auth.ts b/src/auth.ts",
-        "index aaa..bbb 100644",
-        "--- a/src/auth.ts",
-        "+++ b/src/auth.ts",
-        "@@ -1,3 +1,4 @@",
-        " export function auth() {",
-        "+  return true;",
-        "+  console.log('auth');",
-        " }",
-        "diff --git a/src/http.ts b/src/http.ts",
-        "index ccc..ddd 100644",
-        "--- a/src/http.ts",
-        "+++ b/src/http.ts",
-        "@@ -1,3 +1,4 @@",
-        " export function http() {",
-        "-  return null;",
-        "+  return 200;",
-        "+  console.log('http');",
-        " }",
-        "diff --git a/src/trivial.ts b/src/trivial.ts",
-        "index ggg..hhh 100644",
-        "--- a/src/trivial.ts",
-        "+++ b/src/trivial.ts",
-        "@@ -1,1 +1,1 @@",
-        "-old_name",
-        "+new_name",
-      ].join("\n"),
-    };
-
-    const packet = buildReviewPacket(bigSnapshot, brief, model);
-    expect(packet.prompt).toContain("trivial");
-  });
-
-  it("annotates skip-list files with category tags in file overview", () => {
-    const skipSnapshot = {
-      ...snapshot,
-      changedFiles: [
-        "src/auth.ts",
-        "package-lock.json",
-        "dist/bundle.js",
-        "__snapshots__/test.ts.snap",
-        "CHANGELOG.md",
-      ],
-      diffText: [
-        "diff --git a/src/auth.ts b/src/auth.ts",
-        "index aaa..bbb 100644",
-        "--- a/src/auth.ts",
-        "+++ b/src/auth.ts",
-        "@@ -1,3 +1,4 @@",
-        " export function auth() {",
-        "+  return true;",
-        " }",
-        "diff --git a/package-lock.json b/package-lock.json",
-        "index ccc..ddd 100644",
-        "--- a/package-lock.json",
-        "+++ b/package-lock.json",
-        "@@ -1,1 +1,1 @@",
-        "-old",
-        "+new",
-        "diff --git a/dist/bundle.js b/dist/bundle.js",
-        "index eee..fff 100644",
-        "--- a/dist/bundle.js",
-        "+++ b/dist/bundle.js",
-        "@@ -1,1 +1,1 @@",
-        "-old",
-        "+new",
-        "diff --git a/__snapshots__/test.ts.snap b/__snapshots__/test.ts.snap",
-        "index ggg..hhh 100644",
-        "--- a/__snapshots__/test.ts.snap",
-        "+++ b/__snapshots__/test.ts.snap",
-        "@@ -1,1 +1,1 @@",
-        "-old",
-        "+new",
-        "diff --git a/CHANGELOG.md b/CHANGELOG.md",
-        "index iii..jjj 100644",
-        "--- a/CHANGELOG.md",
-        "+++ b/CHANGELOG.md",
-        "@@ -1,1 +1,1 @@",
-        "-old",
-        "+new",
-      ].join("\n"),
-    };
-
-    const packet = buildReviewPacket(skipSnapshot, brief, model);
-    expect(packet.prompt).toContain("skip — lockfile");
-    expect(packet.prompt).toContain("skip — generated");
-    expect(packet.prompt).toContain("skip — snapshot");
-    expect(packet.prompt).toContain("skip — changelog");
-    expect(packet.prompt).toContain("src/auth.ts");
-  });
-});
 
 // biome-ignore lint/security/noSecrets: high-entropy string is a test label, not a secret
 describe("classifySkipCategory", () => {

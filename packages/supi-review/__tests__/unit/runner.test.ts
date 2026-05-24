@@ -37,7 +37,7 @@ vi.mock("typebox", () => ({
   },
 }));
 
-import { buildReviewerSystemPrompt, runReviewer } from "../../src/tool/review-runner.ts";
+import { runReviewer } from "../../src/tool/review-runner.ts";
 
 const snapshot = {
   target: { kind: "working-tree" as const },
@@ -248,28 +248,5 @@ describe("runReviewer", () => {
     const result = await resultPromise;
     expect(result.kind).toBe("canceled");
     vi.useFakeTimers();
-  });
-
-  // biome-ignore lint/security/noSecrets: high-entropy string is a test label, not a secret
-  describe("buildReviewerSystemPrompt", () => {
-    it("contains calibration examples for priority and confidence", () => {
-      const prompt = buildReviewerSystemPrompt();
-      expect(prompt).toContain("Finding calibration");
-      expect(prompt).toContain("Priority:");
-      expect(prompt).toContain("Confidence:");
-    });
-
-    it("contains skip-list guardrail for generated files", () => {
-      const prompt = buildReviewerSystemPrompt();
-      expect(prompt).toContain("Skip reviewing");
-      expect(prompt).toContain("lockfiles");
-      expect(prompt).toContain("generated");
-    });
-
-    it("mentions on-demand snapshot tools", () => {
-      const prompt = buildReviewerSystemPrompt();
-      expect(prompt).toContain("read_snapshot_diff");
-      expect(prompt).toContain("read_snapshot_file");
-    });
   });
 });

@@ -81,7 +81,9 @@ export function buildBriefSynthesisPrompt(
     "- intendedOutcome: what the session seems to be trying to achieve",
     "- constraints: invariants or requirements to preserve",
     "- focusAreas: what the reviewer should inspect carefully",
-    "- riskyFiles: changed files that seem especially important or risky",
+    "- riskyFiles: changed files that seem especially important or risky.",
+    "  Prioritize files touching auth, data handling, core logic, error handling, or public APIs.",
+    "  Include only files from the changed-files list above.",
     "- unresolvedQuestions: ambiguities or concerns that remain unclear",
   );
 
