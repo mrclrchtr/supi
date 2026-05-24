@@ -77,9 +77,6 @@ export interface SynthesizedReviewBrief {
 /** Final prompt packet passed to the reviewer child session. */
 export interface ReviewPacket {
   prompt: string;
-  includedFiles: string[];
-  omittedFiles: string[];
-  charBudget: number;
 }
 
 /** Fully prepared review run. */

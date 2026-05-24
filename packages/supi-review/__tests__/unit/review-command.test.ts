@@ -105,9 +105,6 @@ const brief = {
 
 const packet = {
   prompt: "# Review Task",
-  includedFiles: ["src/auth.ts"],
-  omittedFiles: [],
-  charBudget: 64_000,
 };
 
 function createPi(): ExtensionAPI {
