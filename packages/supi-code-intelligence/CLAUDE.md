@@ -4,6 +4,9 @@ Architecture briefs, factual code maps, relationship tracing, impact assessment,
 
 Surfaces:
 - `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_map`, `code_relations`, `code_affected`, `code_pattern`)
+- May include cross-family orchestration guidance that steers the model between `code_*`, `lsp_*`, and `tree_sitter_*` tools
+- Installing this package activates all three tool families (`code_*`, `lsp_*`, `tree_sitter_*`)
+- Does **not** own a session-scoped cache or runtime service — stays stateless at the orchestration level
 - `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
 
 ## Commands

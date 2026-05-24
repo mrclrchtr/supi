@@ -178,12 +178,12 @@ runtime details.
 
 ### `packages/supi-tree-sitter`
 
-Uses `src/tool/action-specs.ts` as the single source of truth for:
-- public action names
-- action validation requirements
-- guidance grouping
+Uses `src/tool/tool-specs.ts` as the single source of truth for:
+- public focused-tool names (`tree_sitter_outline`, `tree_sitter_imports`, `tree_sitter_exports`, `tree_sitter_node_at`, `tree_sitter_query`, `tree_sitter_callees`)
+- descriptions, labels, prompt snippets, and prompt guidelines
+- parameter schema keys for each tool
 
-`src/tool/guidance.ts` and `src/tree-sitter.ts` derive from those specs.
+`src/tool/guidance.ts` and `src/tool/register-tools.ts` derive from those specs.
 The extension also publishes a shared session-scoped structural service via
 `getSessionTreeSitterService(cwd)` so peer packages can reuse parsers instead of
 creating a fresh owned session for every operation.
@@ -209,6 +209,23 @@ Uses `src/tool/tool-specs.ts` as the single source of truth for:
 
 `src/tool/guidance.ts`, `src/tool/register-tools.ts`, and
 `src/manager/manager-project-info.ts` derive from those specs.
+
+## Package ownership and cross-family orchestration
+
+In the SuPi code-understanding stack, tool ownership follows a clear rule:
+
+- **`supi-tree-sitter`** owns the structural substrate and all `tree_sitter_*` expert tools.
+- **`supi-lsp`** owns the semantic substrate, the diagnostics lifecycle, and all `lsp_*` expert tools.
+- **`supi-code-intelligence`** owns the high-level `code_*` tools and may add **cross-family orchestration guidance** —
+  for example, steering the model toward `lsp_*` for semantic navigation, `tree_sitter_*` for structural inspection,
+  and `code_pattern` for explicit search.
+
+Cross-family orchestration guidance is intentional coupling at the prompt level, not at the code level.
+Each package still owns its own metadata and rendering. `supi-code-intelligence` does not re-own substrate
+metadata; it only adds strategy-level prompt guidelines.
+
+Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. Each tool family
+is independently installed and documented from its home package.
 
 ## Anti-patterns
 

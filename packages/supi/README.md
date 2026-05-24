@@ -39,7 +39,7 @@ The meta-package currently bundles these production packages:
 | [`@mrclrchtr/supi-debug`](../supi-debug/README.md) | shared debug-event inspection |
 | [`@mrclrchtr/supi-extras`](../supi-extras/README.md) | prompt stash, command aliases, skill shorthand, spinner, and other small utilities |
 | [`@mrclrchtr/supi-lsp`](../supi-lsp/README.md) | expert LSP tools, `/lsp-status`, and automatic diagnostics |
-| [`@mrclrchtr/supi-tree-sitter`](../supi-tree-sitter/README.md) | `tree_sitter` structural parsing and AST-style queries |
+| [`@mrclrchtr/supi-tree-sitter`](../supi-tree-sitter/README.md) | `tree_sitter_outline`, `tree_sitter_imports`, `tree_sitter_exports`, `tree_sitter_node_at`, `tree_sitter_query`, `tree_sitter_callees` for structural AST analysis |
 
 ## Direct-install packages not bundled here
 

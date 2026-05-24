@@ -39,16 +39,16 @@ src/
     service-registry.ts # shared session-scoped structural service registry (backed by the core helper)
     session.ts        # runtime-backed service helpers and owned session factory
   tool/
-    action-specs.ts   # internal action metadata for handler functions
+    tool-specs.ts     # single source of truth for the public tool surface
     callees.ts        # callee extraction
     exports.ts        # export extraction
     formatting.ts     # tool output formatting and caps
-    guidance.ts       # (minimal — per-tool guidance lives in register-tools.ts)
+    guidance.ts       # prompt surfaces derived from tool specs
     handlers.ts       # per-action handler functions (moved from tree-sitter.ts)
     imports.ts        # import extraction
     node-at.ts        # node_at action
     outline.ts        # outline extraction
-    register-tools.ts # focused tool spec definitions and pi registration
+    register-tools.ts # focused tool spec-driven registration
     structure.ts      # re-exports from tool sub-modules
 ```
 
@@ -56,7 +56,9 @@ src/
 
 - `resources/grammars/<id>/` — vendored WASM files for all 14 supported grammars
 - `tree-sitter.ts` — extension entry with session lifecycle
-- `tool/register-tools.ts` — focused tool spec definitions and registration
+- `tool/tool-specs.ts` — single source of truth for the public focused-tool surface
+- `tool/guidance.ts` — prompt surfaces derived from tool specs
+- `tool/register-tools.ts` — focused tool spec-driven registration
 - `tool/handlers.ts` — per-action handler functions
 - `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source
 - `scripts/generate-sql-wasm.mjs` — builds SQL WASM from source

@@ -18,22 +18,25 @@ After editing the source, run `/reload`.
 
 ## What you get
 
-After install, pi gets:
+After install, pi gets **10 focused expert tools** for semantic language-server analysis:
 
-- `lsp_lookup` — semantic hover, definition, references, and implementation at a known position
+- `lsp_hover` — semantic type or symbol information at a given position
+- `lsp_definition` — go to definition at a known position
+- `lsp_references` — find all references to a symbol
+- `lsp_implementation` — find implementations of an interface or method
 - `lsp_document_symbols` — semantic declarations for one supported file
 - `lsp_workspace_symbols` — semantic symbol-name lookup across the project
 - `lsp_diagnostics` — current diagnostics for one file or a workspace summary
-- `lsp_refactor` — semantic rename planning and code actions at a known position
+- `lsp_rename` — semantic rename planning at a known position
+- `lsp_code_actions` — semantic fixes or refactors at a known position
 - `lsp_recover` — refresh stale diagnostics after workspace changes
 - `/lsp-status` — inspect detected servers, roots, open files, and diagnostics
-- automatic LSP-aware diagnostic surfacing around edits and agent turns
 
 Coordinates use **1-based** line and character positions.
 
 ## Automatic behavior
 
-This package does more than register a tool:
+This package does more than register these tools:
 
 - starts detected language servers for the current project
 - rebuilds project-specific prompt guidance based on active servers
@@ -74,16 +77,18 @@ if (state.kind === "ready") {
 }
 ```
 
-`SessionLspService` methods use raw **0-based LSP positions**. The expert tools (`lsp_lookup`, `lsp_refactor`, etc.) keep the public 1-based coordinate UX.
+`SessionLspService` methods use raw **0-based LSP positions**. The expert tools (`lsp_hover`, `lsp_definition`, etc.) keep the public 1-based coordinate UX.
 
 ## Source
 
 - `src/lsp.ts` — extension wiring, session lifecycle, and `/lsp-status`
 - `src/config/` — server config, defaults, capabilities, and exported LSP protocol types
 - `src/session/` — session state, scanning, settings registration, tree persistence, and shared service registry
-- `src/tool/register-tools.ts` — expert tool registration for the split LSP toolset
+- `src/tool/tool-specs.ts` — single source of truth for the public LSP tool surface
+- `src/tool/guidance.ts` — prompt surfaces derived from tool specs
+- `src/tool/register-tools.ts` — focused tool registration driven by tool specs
 - `src/tool/service-actions.ts` — service-backed tool execution and formatting
-- `src/tool/guidance.ts` / `src/tool/names.ts` — prompt surfaces and stable tool names
+- `src/tool/names.ts` — stable tool name constants
 - `src/tool/overrides.ts` — read/write/edit overrides for inline diagnostics
 - `src/ui/` — custom diagnostic message rendering and the status overlay
 - `src/client/`, `src/manager/`, `src/diagnostics/` — runtime engine subsystems

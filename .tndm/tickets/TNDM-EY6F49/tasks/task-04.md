@@ -1,0 +1,3 @@
+# Task 4: Sync maintainer-facing architecture docs and run the cross-package regression sweep
+
+Update `docs/tool-architecture.md`, `packages/supi-lsp/CLAUDE.md`, `packages/supi-tree-sitter/CLAUDE.md`, and `packages/supi-code-intelligence/CLAUDE.md` so the maintainer-facing guidance matches the approved architecture: each package owns its own expert tools, `supi-code-intelligence` owns cross-family orchestration guidance only, installing `@mrclrchtr/supi-code-intelligence` exposes all three tool families, and `supi-code-intelligence` must not grow a session-scoped cache/service. After the docs are in sync, run the listed regression sweep and confirm the docs contain no stale multiplexed tool names or contradictory package-boundary guidance.

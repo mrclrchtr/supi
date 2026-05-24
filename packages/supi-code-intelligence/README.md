@@ -26,7 +26,11 @@ After install, pi gets:
 - `code_affected` — blast radius, downstream impact, and risk for a target
 - `code_pattern` — explicit literal, regex, or structured search
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
+- **all `lsp_*` expert tools** from `@mrclrchtr/supi-lsp` (hover, definition, references, implementation, diagnostics, rename, code actions, recover, document/workspace symbols)
+- **all `tree_sitter_*` expert tools** from `@mrclrchtr/supi-tree-sitter` (outline, imports, exports, node-at, query, callees)
 - bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
+
+Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. Each family is owned and documented by its own package:
 
 This package is for questions like:
 
@@ -35,6 +39,10 @@ This package is for questions like:
 - what does this function call?
 - what is the likely blast radius of a change?
 - where is this pattern defined, imported, or exported?
+
+- `@mrclrchtr/supi-lsp` owns the semantic `lsp_*` tools
+- `@mrclrchtr/supi-tree-sitter` owns the structural `tree_sitter_*` tools
+- `@mrclrchtr/supi-code-intelligence` owns the analysis `code_*` tools and provides cross-family orchestration guidance
 
 ## Tool overview
 

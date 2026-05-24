@@ -1,8 +1,35 @@
-// Per-tool guidance and descriptions for the focused tree_sitter_* tool surface.
+// Guidance surfaces for the focused tree_sitter_* tool set.
 //
-// Each focused tool defines its own description, prompt snippet, and prompt
-// guidelines inline in the tool registration (register-tools.ts). This file
-// exists for backward-compatible imports — the old single-tool compatibility
-// exports have been replaced with per-tool guidance maps.
+// Derives from tool-specs.ts so prompt surfaces stay in sync with
+// the public tool metadata.
 
-export {};
+import { TREE_SITTER_TOOL_SPECS, type TreeSitterToolName } from "./tool-specs.ts";
+
+export interface TreeSitterToolPromptSurface {
+  description: string;
+  promptSnippet: string;
+  promptGuidelines: string[];
+}
+
+export type TreeSitterToolPromptSurfaceMap = Record<
+  TreeSitterToolName,
+  TreeSitterToolPromptSurface
+>;
+
+const _DEFAULT_SURFACES = buildTreeSitterToolPromptSurfaces();
+
+/**
+ * Build the full prompt-surface map for all 6 tree_sitter_* tools.
+ */
+export function buildTreeSitterToolPromptSurfaces(): TreeSitterToolPromptSurfaceMap {
+  return Object.fromEntries(
+    TREE_SITTER_TOOL_SPECS.map((spec) => [
+      spec.name,
+      {
+        description: spec.description,
+        promptSnippet: spec.promptSnippet,
+        promptGuidelines: [...spec.promptGuidelines],
+      } satisfies TreeSitterToolPromptSurface,
+    ]),
+  ) as TreeSitterToolPromptSurfaceMap;
+}
