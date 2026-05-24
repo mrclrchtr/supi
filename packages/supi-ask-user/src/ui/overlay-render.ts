@@ -5,6 +5,7 @@ import {
   Markdown,
   type SelectList,
   type SelectListTheme,
+  wrapTextWithAnsi,
 } from "@earendil-works/pi-tui";
 import type { AskUserController } from "../session/controller.ts";
 import type { NormalizedQuestionnaire } from "../types.ts";
@@ -100,11 +101,15 @@ export function clampIndex(index: number, length: number): number {
 function renderHeader(args: RenderOverlayFrameArgs): string[] {
   const lines: string[] = [];
   const { title, intro } = args.controller.questionnaire;
-  if (title) lines.push(args.theme.fg("accent", args.theme.bold(title)));
+  if (title)
+    lines.push(...wrapTextWithAnsi(args.theme.fg("accent", args.theme.bold(title)), args.width));
   lines.push(
-    args.theme.fg(
-      "muted",
-      `${args.controller.currentIndex + 1}/${args.controller.questions.length} · ${args.controller.currentQuestion.header}`,
+    ...wrapTextWithAnsi(
+      args.theme.fg(
+        "muted",
+        `${args.controller.currentIndex + 1}/${args.controller.questions.length} · ${args.controller.currentQuestion.header}`,
+      ),
+      args.width,
     ),
   );
   if (intro) {
@@ -197,14 +202,17 @@ function renderEditorLines(args: RenderOverlayFrameArgs, width: number): string[
             : "Option note"
           : "Your answer";
 
-  const lines = [args.theme.fg("accent", label), ...args.editor.render(Math.max(20, width - 1))];
+  const labelLines = wrapTextWithAnsi(args.theme.fg("accent", label), width);
+  const lines = [...labelLines, ...args.editor.render(Math.max(20, width - 1))];
   const question = args.controller.currentQuestion;
   if (question.type !== "text" || args.editor.getText()) return lines;
 
   if (question.initial) {
-    lines.push(args.theme.fg("dim", `Initial: ${question.initial}`));
+    lines.push(...wrapTextWithAnsi(args.theme.fg("dim", `Initial: ${question.initial}`), width));
   } else if (question.placeholder) {
-    lines.push(args.theme.fg("dim", `Placeholder: ${question.placeholder}`));
+    lines.push(
+      ...wrapTextWithAnsi(args.theme.fg("dim", `Placeholder: ${question.placeholder}`), width),
+    );
   }
   return lines;
 }

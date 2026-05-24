@@ -177,7 +177,7 @@ function renderOptionRow(args: {
     : `${prefix}${labelText}`;
   const noteSuffix = hasNote ? ` ${theme.fg("accent", "[note]")}` : "";
 
-  const lines: string[] = [`${baseText}${noteSuffix}`];
+  const lines: string[] = wrapTextWithAnsi(`${baseText}${noteSuffix}`, width);
 
   if (option.description) {
     const descWidth = Math.max(10, width - 2);
