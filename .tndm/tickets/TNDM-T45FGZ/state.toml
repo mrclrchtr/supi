@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T22:50:32.845274Z"
+revision = 33
+
+[document_fingerprints]
+archive = "sha256:71df9d4050911a29a91a193a17db0687df149c458964bd5ba595b2c264ac091b"
+content = "sha256:8b7cac57dae64872e9b511536398ac0950ff94935234a3f1c8fff65ec44d2b25"
+task-01 = "sha256:75122a889a1e3ea6fd7b6cb19c8548192e27fdc70d1537a56131ddd430e97604"
+task-02 = "sha256:f73fa5c9c8a0850f3ecab7494879e4753253582594cd86dd438a4efd35c81125"
+task-03 = "sha256:d3723f7a473d3eba930218ec6fd94df2c5ab81f4fa38be00f9046a42c62ef8e9"
+task-04 = "sha256:ad487d997d6dc7f9cc7d77df0309e20f2c5623aa7a2888535d3b92e6ada090de"
+task-05 = "sha256:0a522ffded1677162b3d0289b559cc458217c2b05fa657fac15b63ab5c50dd0c"
+task-06 = "sha256:1363c097d98a834a222b3494a53e0344a95a81de51105c1b71dc1610a761d987"
+
+[[tasks]]
+number = 1
+title = "Add .gitignore entries for generated files"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Update package.json scripts — single tsc -b command"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Convert composite source tsconfigs (supi-core, supi-lsp, supi-tree-sitter)"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Add references to non-composite source tsconfigs (10 packages)"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Add references to test tsconfigs (15 packages)"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Verification — performance measurement and full pipeline pass"
+status = "done"
