@@ -48,10 +48,9 @@ function createToolExecutor(
   return async (
     _toolCallId: string,
     params: unknown,
-    _signal: AbortSignal | undefined,
-    _onUpdate: unknown,
-    ctx: ExtensionContext,
+    ...rest: [AbortSignal | undefined, unknown, ExtensionContext]
   ) => {
+    const ctx = rest[2];
     const service = getReadyService(ctx.cwd);
     const text = service
       ? await run(service, ctx.cwd, params)

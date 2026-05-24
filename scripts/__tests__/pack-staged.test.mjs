@@ -93,7 +93,7 @@ describe("packStaged clean manifest", () => {
     // supi-lsp no longer bundles supi-core — it's a regular npm dependency
     const entries = listTarballEntries(tarball);
     const hasBundledCore = entries.some((e) =>
-      e.startsWith("package/node_modules/@mrclrchtr/supi-core/")
+      e.startsWith("package/node_modules/@mrclrchtr/supi-core/"),
     );
     expect(hasBundledCore).toBe(false);
   });

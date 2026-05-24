@@ -1,5 +1,4 @@
 // LSP tool actions — service-backed execution helpers for the umbrella LSP adapter.
-// biome-ignore lint/nursery/noExcessiveLinesPerFile: consolidated for now; split when stable
 //
 // These modules consume the public `@mrclrchtr/supi-lsp/api` surface and format
 // results for model consumption. They are the same logic that lived in
