@@ -281,12 +281,7 @@ function buildReviewPlanContainer(theme: ReviewTheme, plan: ReviewPlan): Contain
   container.addChild(new Spacer(1));
 
   // ── Snapshot access line ──
-  const isCompact = packet.charBudget === 0;
-  const accessLine = isCompact
-    ? `  Diffs: on-demand via read_snapshot_diff  \u2022  Files: ${snapshot.changedFiles.length} changed`
-    : `  Included diffs: ${packet.includedFiles.length} file${packet.includedFiles.length === 1 ? "" : "s"}` +
-      `  \u2022  Omitted: ${packet.omittedFiles.length} file${packet.omittedFiles.length === 1 ? "" : "s"}` +
-      `  \u2022  Budget: ${(packet.charBudget / 1000).toFixed(0)}K chars`;
+  const accessLine = `  Diffs: on-demand via read_snapshot_diff  \u2022  Files: ${snapshot.changedFiles.length} changed`;
 
   container.addChild(new Text(theme.fg("dim", accessLine), 1, 0));
   container.addChild(new Spacer(1));

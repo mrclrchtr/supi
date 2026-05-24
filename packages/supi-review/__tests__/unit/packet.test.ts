@@ -74,9 +74,6 @@ describe("buildReviewPacket", () => {
 
   it("does not include large inline diff bodies", () => {
     const packet = buildReviewPacket(snapshot, brief, model);
-    expect(packet.includedFiles).toEqual([]);
-    expect(packet.omittedFiles).toEqual(snapshot.changedFiles);
-    expect(packet.charBudget).toBe(0);
     expect(packet.prompt).not.toContain("```diff");
   });
 
