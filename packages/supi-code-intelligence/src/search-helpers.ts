@@ -80,7 +80,12 @@ export function runRipgrep(
   pattern: string,
   scopePath: string,
   cwd: string,
-  opts?: { maxMatches?: number; contextLines?: number; filterLowSignal?: boolean },
+  opts?: {
+    maxMatches?: number;
+    contextLines?: number;
+    literal?: boolean;
+    filterLowSignal?: boolean;
+  },
 ): RgMatch[] {
   return runRipgrepDetailed(pattern, scopePath, cwd, opts).matches;
 }
@@ -93,7 +98,12 @@ export function runRipgrepDetailed(
   pattern: string,
   scopePath: string,
   cwd: string,
-  opts?: { maxMatches?: number; contextLines?: number; filterLowSignal?: boolean },
+  opts?: {
+    maxMatches?: number;
+    contextLines?: number;
+    literal?: boolean;
+    filterLowSignal?: boolean;
+  },
 ): RipgrepRunResult {
   const filter = opts?.filterLowSignal ?? true;
 
@@ -114,11 +124,14 @@ export function runRipgrepDetailed(
 function buildRipgrepArgs(
   pattern: string,
   scopePath: string,
-  opts?: { maxMatches?: number; contextLines?: number },
+  opts?: { maxMatches?: number; contextLines?: number; literal?: boolean },
 ): string[] {
   const args = ["--json", "-m", String(opts?.maxMatches ?? 30)];
   if ((opts?.contextLines ?? 0) > 0) {
     args.push("-C", String(opts?.contextLines ?? 0));
+  }
+  if (opts?.literal) {
+    args.push("-F");
   }
   args.push("-e", pattern, scopePath);
   return args;

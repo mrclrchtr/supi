@@ -9,15 +9,16 @@ import {
 } from "../pattern-structured.ts";
 import type { CodeQueryParams as ActionParams } from "../query-params.ts";
 import type { RgMatch } from "../search-helpers.ts";
-import {
-  escapeRegex,
-  groupByFile,
-  normalizePath,
-  runRipgrep,
-  runRipgrepDetailed,
-} from "../search-helpers.ts";
+import { groupByFile, normalizePath, runRipgrep, runRipgrepDetailed } from "../search-helpers.ts";
 import type { StructuralSubstrate } from "../substrates/types.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
+
+/** Regex-like characters that suggest a pattern may be intended as regex. */
+const REGEX_HINT_CHARS = /[|.*+?^${}()[\]\\]/;
+
+function hasRegexChars(pattern: string): boolean {
+  return REGEX_HINT_CHARS.test(pattern);
+}
 
 /**
  * Execute the bounded text-search action.
@@ -118,9 +119,10 @@ export async function executePatternAction(
         contextLines,
         summary: params.summary,
       })
-    : runRipgrep(escapeRegex(params.pattern), scopePath, cwd, {
+    : runRipgrep(params.pattern, scopePath, cwd, {
         maxMatches: params.summary ? undefined : maxResults * 3,
         contextLines,
+        literal: true,
         filterLowSignal: true,
       });
 
@@ -145,8 +147,13 @@ export async function executePatternAction(
         ? ["Set `regex: false` for literal matching"]
         : ["Set `regex: true` for regex matching"],
     };
+    const hint = params.regex
+      ? ""
+      : hasRegexChars(params.pattern)
+        ? " — pattern contains regex-like characters; set `regex: true` for regex matching"
+        : " — set `regex: true` for regex matching";
     return {
-      content: `No matches found for \`${params.pattern}\` in \`${relScope}\`.`,
+      content: `No matches found for \`${params.pattern}\` in \`${relScope}\`${hint}.`,
       details: { type: "search", data: emptyDetails },
     };
   }
