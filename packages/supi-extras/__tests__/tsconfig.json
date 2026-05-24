@@ -1,5 +1,6 @@
 {
   "extends": "../../../tsconfig.json",
   "include": ["unit/**/*.ts", "integration/**/*.ts", "../src/**/*.ts"],
-  "exclude": []
+  "exclude": [],
+  "references": [{ "path": "../../supi-core" }]
 }

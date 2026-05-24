@@ -3,3 +3,8 @@ node_modules/
 .DS_Store
 .worktrees
 *.tgz
+
+# TypeScript project references build artifacts
+packages/*/dist/
+packages/*/tsconfig.tsbuildinfo
+packages/*/__tests__/**/tsconfig.tsbuildinfo

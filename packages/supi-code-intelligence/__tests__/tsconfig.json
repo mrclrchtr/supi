@@ -1,5 +1,10 @@
 {
   "extends": "../../../tsconfig.json",
   "include": ["**/*.ts", "../src/**/*.ts"],
-  "exclude": []
+  "exclude": [],
+  "references": [
+    { "path": "../../supi-core" },
+    { "path": "../../supi-lsp" },
+    { "path": "../../supi-tree-sitter" }
+  ]
 }

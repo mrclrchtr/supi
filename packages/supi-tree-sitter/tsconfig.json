@@ -1,5 +1,13 @@
 {
   "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "./dist",
+    "rootDir": "./src"
+  },
   "include": ["src/**/*.ts"],
-  "exclude": ["__tests__"]
+  "exclude": ["__tests__"],
+  "references": [{ "path": "../supi-core" }]
 }

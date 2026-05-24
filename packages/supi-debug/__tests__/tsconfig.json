@@ -7,5 +7,6 @@
     "fixtures/**/*.ts",
     "../src/**/*.ts"
   ],
-  "exclude": []
+  "exclude": [],
+  "references": [{ "path": "../../supi-core" }]
 }
