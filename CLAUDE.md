@@ -132,7 +132,7 @@ node scripts/publish.mjs packages/supi-lsp     # pack + verify
 node scripts/publish.mjs packages/supi-lsp --publish  # pack + verify + publish
 ```
 
-The `pack:check` and `pack:verify` commands in `pnpm verify` run this pipeline for all publishable packages.
+`pack:check` runs this pipeline as a dry-run for all publishable packages. `pack:verify` runs the full pack + tarball verification for all 16 packages via a parallel Node.js runner (`scripts/pack-all.mjs`).
 
 Root cause for the staging pipeline: direct `pnpm pack` on workspace packages produces tarball entries with `../` paths to the root `node_modules`. The staged `cp -RL` + `npm pack` approach avoids this because npm produces correct tarballs from a flat, dereferenced `node_modules`.
 

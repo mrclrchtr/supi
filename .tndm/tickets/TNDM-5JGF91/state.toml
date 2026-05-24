@@ -1,0 +1,26 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T23:23:58.241309Z"
+revision = 20
+
+[document_fingerprints]
+archive = "sha256:2ba32a164f02fe991af21c85c2535d9baf9336cc171784e8763b80a65e9bcb88"
+content = "sha256:3b86ec32306f3199d2453a9f9e5d5219f697b71a43aeb39219516d0b06e57bd8"
+task-01 = "sha256:ff98ff68ba79254da21bdd8f9fabd638f287ce302017c9ca6db7bfb9e03a8164"
+task-02 = "sha256:d569c8e9f42ed025d376694f2fa1681bc041af8b27dc8da84e650a2e3744ed56"
+task-03 = "sha256:d07d9f42d3802f3c9e342ae75572c278318f3c7d09a48f9e8f5fef86c4df4312"
+
+[[tasks]]
+number = 1
+title = "Create scripts/pack-all.mjs — parallel pack runner"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Update package.json scripts: replace pack:verify loop, remove pack:check from verify chain"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update CLAUDE.md: document new pack:verify command"
+status = "done"
