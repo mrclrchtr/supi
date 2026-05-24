@@ -11,7 +11,8 @@
         "The proposed addition is concise (one line)",
         "The addition uses the format `command` — description",
         "The assistant asks for approval before editing",
-        "The addition is specific and actionable"
+        "The addition is specific and actionable",
+        "The assistant does NOT propose adding routine commands like 'npm install', 'npm test', or 'npm run build'"
       ]
     },
     {

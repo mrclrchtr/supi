@@ -1,0 +1,62 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T20:14:52.019028Z"
+revision = 32
+
+[document_fingerprints]
+archive = "sha256:235d7ae48ef0f18c4c72067975884fd66e548f151c4e8c477e6438b992caa63a"
+content = "sha256:0ae4c026be4ca93717cbfef97b2d5c9bf9babbe63b565b95732d4885fa8923ca"
+task-01 = "sha256:de68eeccd150feb0d6448765cb686a3d00606aa1a4d2391b76186128708b068d"
+task-02 = "sha256:9fd6f1cfe3e0a0902bf05f54af757189a424bbd113552c8a04898c068e50ee21"
+task-03 = "sha256:5ac54fdae229b56df70237c6f05c210e1d087711bd520fb33e1f35b44eca68ab"
+task-04 = "sha256:9f43be66708b9f209b49e0e6633dfa316baf07ccc469616c08b2803905c081ba"
+task-05 = "sha256:ca41d5aaaf426b4e6801575f60faa3367d9f80f3a0bea16bb0dee8aa215a3bd1"
+task-06 = "sha256:b00cd1960d5bc15034aa9af226c43ed3c3834c1a3f3994c00362f8500c18ee7b"
+
+[[tasks]]
+number = 1
+title = "Edit all three reference files (improver copy): quality-criteria.md, templates.md, update-guidelines.md"
+status = "done"
+files = ["packages/supi-claude-md/skills/claude-md-improver/references/quality-criteria.md", "packages/supi-claude-md/skills/claude-md-improver/references/templates.md", "packages/supi-claude-md/skills/claude-md-improver/references/update-guidelines.md"]
+verification = "pnpm exec biome check packages/supi-claude-md/skills/claude-md-improver/references/"
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "Sync reference files from improver/ to revision/ — verify byte-identical"
+status = "done"
+files = ["packages/supi-claude-md/skills/claude-md-revision/references/quality-criteria.md", "packages/supi-claude-md/skills/claude-md-revision/references/templates.md", "packages/supi-claude-md/skills/claude-md-revision/references/update-guidelines.md"]
+verification = "pnpm vitest run packages/supi-claude-md/__tests__/unit/skill-references-sync.test.ts"
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "Edit improver SKILL.md to reflect stricter non-obvious-only guidance"
+status = "done"
+files = ["packages/supi-claude-md/skills/claude-md-improver/SKILL.md"]
+verification = "pnpm exec biome check packages/supi-claude-md/skills/claude-md-improver/SKILL.md"
+detail_path = "tasks/task-03.md"
+
+[[tasks]]
+number = 4
+title = "Edit revision SKILL.md to reflect stricter non-obvious-only guidance"
+status = "done"
+files = ["packages/supi-claude-md/skills/claude-md-revision/SKILL.md"]
+verification = "pnpm exec biome check packages/supi-claude-md/skills/claude-md-revision/SKILL.md"
+detail_path = "tasks/task-04.md"
+
+[[tasks]]
+number = 5
+title = "Update evals.json to discourage routine command additions"
+status = "done"
+files = ["packages/supi-claude-md/skills/claude-md-revision/evals/evals.json"]
+verification = "pnpm exec biome check packages/supi-claude-md/skills/claude-md-revision/evals/evals.json"
+detail_path = "tasks/task-05.md"
+
+[[tasks]]
+number = 6
+title = "Full verification: sync test, biome, manual consistency review"
+status = "done"
+files = ["packages/supi-claude-md/__tests__/unit/skill-references-sync.test.ts"]
+verification = "pnpm vitest run packages/supi-claude-md/__tests__/unit/skill-references-sync.test.ts && pnpm exec biome check packages/supi-claude-md/skills/ && pnpm exec biome check packages/supi-claude-md/skills/claude-md-revision/evals/"
+detail_path = "tasks/task-06.md"

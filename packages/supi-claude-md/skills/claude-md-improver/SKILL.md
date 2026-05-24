@@ -41,6 +41,7 @@ Add rows for any additional categories visible in context.
 
 - **Root-level high risk** (already auto-delivered; do NOT recommend for root `./CLAUDE.md`):
   - Package/module inventories (from `supi-code-intelligence`)
+  - Package layout / project structure sections that just list packages with descriptions (from `supi-code-intelligence`)
   - Root directory trees and file counts (from `supi-code-intelligence`)
   - Dependency graphs from manifests (from `supi-code-intelligence`)
   - High-level architecture without project-specific reasoning (from `supi-code-intelligence`)
@@ -49,7 +50,7 @@ Add rows for any additional categories visible in context.
   - Subdirectory CLAUDE.md/AGENTS.md already injected by `supi-claude-md` during this session
 
 - **Low risk** (not auto-delivered; safe to recommend in CLAUDE.md at any scope):
-  - Commands and workflows
+  - Non-obvious commands and workflows (not routine build/test/lint — those are in package.json)
   - Gotchas and non-obvious patterns
   - Cross-package conventions not obvious from manifests
   - Curated "start here" guidance with ownership or boundary reasoning
@@ -108,7 +109,7 @@ For each CLAUDE.md file found in Phase 2, evaluate against quality criteria, inc
 
 | Criterion | Weight | Check |
 |-----------|--------|-------|
-| Commands/workflows documented | High | Are build/test/deploy commands present? |
+| Commands/workflows documented | High | Are non-obvious commands/workflows captured (not routine build/test)? |
 | Architecture clarity | High | Can PI understand the codebase structure? |
 | Non-obvious patterns | Medium | Are gotchas and quirks documented? |
 | Conciseness | Medium | No verbose explanations or obvious info? |
@@ -136,6 +137,9 @@ Format:
 - Files found: X
 - Average score: X/100
 - Files needing update: X
+- Potential token savings: ~X (removing redundant/auto-delivered content)
+
+**Auto-delivered content overlaps are never "minor" or "not worth the churn."** Content that duplicates what SuPi extensions auto-inject wastes tokens every session and MUST be flagged for removal. A single edit that saves ~200 tokens per session pays for itself within a few sessions.
 
 ### File-by-File Assessment
 
@@ -147,6 +151,7 @@ Format:
 - **Fully redundant (package-specific):** [sections already covered by baseline context — applies to that package's `CLAUDE.md`]
 - **Partially redundant:** [sections with overlap plus human-only value]
 - **Unique:** [sections that should stay]
+- **Estimated waste:** ~X tokens (characters ÷ 4) of existing content duplicate auto-delivered context — should be removed
 
 | Criterion | Score | Notes |
 |-----------|-------|-------|
@@ -161,6 +166,9 @@ Format:
 **Issues:**
 - [List specific problems]
 
+**Recommended removals (non-negotiable for auto-delivered content):**
+- [List what MUST be removed or compressed, with estimated token savings. Auto-delivered content is never "minor" or "not worth the churn" — it wastes tokens every session and MUST be removed.]
+
 **Recommended additions:**
 - [List what should be added]
 
@@ -170,24 +178,33 @@ Format:
 
 ### Phase 5: Targeted Updates
 
+**Core principle: every token must earn its place in the instruction file.** If content doesn't save future sessions more time than it costs to read, remove it. No instruction file should exceed 200 lines — above that, every line must fight for its place against removal.
+
 After outputting the quality report, ask user for confirmation before updating.
 
 **Update Guidelines (Critical):**
 
-1. **Propose targeted additions only** - Focus on genuinely useful info:
-   - Commands or workflows discovered during analysis
+1. **Remove or compress unnecessary content first** — Before adding anything, flag sections that MUST be removed or tightened. Never skip removals because of edit churn — a one-time edit that saves tokens every session pays for itself immediately.
+   - Routine command listings (`npm install`, `npm test`, `npm run build`) — remove; they're in package.json
+   - Package/module inventories that duplicate what `code_brief` auto-delivers — MUST be removed (these waste hundreds of tokens every session)
+   - Package layout / project structure sections that just list packages with descriptions — MUST be removed; `code_intelligence` delivers this. Architecture trees that restate what `code_map` or `code_intelligence` auto-deliver are never acceptable.
+   - Verbose explanations where a one-liner suffices — compress
+   - Stale or outdated commands, file references, or architecture descriptions — remove
+
+2. **Then propose targeted additions** — Add only genuinely useful, non-obvious info:
+   - Non-obvious commands or workflows discovered during analysis. Non-obvious means: gotcha flags (`--unsafe`, `--runInBand`), hook behaviors, ordering requirements, cross-tool workflows. Routine commands with scoped paths (`pnpm vitest run packages/<pkg>/path`) are still routine — they're equally discoverable from the file tree.
    - Gotchas or non-obvious patterns found in code
    - Package relationships that weren't clear
    - Testing approaches that work
    - Configuration quirks
 
-2. **Keep it minimal** - Avoid:
+3. **Keep it minimal** - Avoid:
    - Restating what's obvious from the code
    - Generic best practices already covered
    - One-off fixes unlikely to recur
    - Verbose explanations when a one-liner suffices
 
-3. **Show diffs** - For each change, show:
+4. **Show diffs** - For each change, show:
    - Which CLAUDE.md file to update
    - The specific addition (as a diff or quoted block)
    - Brief explanation of why this helps future sessions
@@ -197,15 +214,10 @@ After outputting the quality report, ask user for confirmation before updating.
 ```markdown
 ### Update: ./CLAUDE.md
 
-**Why:** Build command was missing, causing confusion about how to run the project.
+**Why:** The pre-push hook behavior wasn't documented, causing repeated confusion in CI.
 
 ```diff
-+ ## Quick Start
-+
-+ ```bash
-+ npm install
-+ npm run dev  # Start development server on port 3000
-+ ```
++ The pre-push hook runs `pnpm verify` — covers both lint and tests; don't run them separately.
 ```
 ```
 
@@ -219,19 +231,18 @@ See [references/templates.md](references/templates.md) for CLAUDE.md templates b
 
 ## Common Issues to Flag
 
-1. **Stale commands**: Build commands that no longer work
+1. **Stale commands**: Non-obvious commands or flags that no longer work
 2. **Missing dependencies**: Required tools not mentioned
 3. **Outdated architecture**: File structure that's changed
 4. **Missing environment setup**: Required env vars or config
-5. **Broken test commands**: Test scripts that have changed
-6. **Undocumented gotchas**: Non-obvious patterns not captured
+5. **Undocumented gotchas**: Non-obvious patterns not captured
 
 ## User Tips to Share
 
 When presenting recommendations, remind users:
 
 - **Keep it concise**: CLAUDE.md should be human-readable; dense is better than verbose
-- **Actionable commands**: All documented commands should be copy-paste ready
+- **Actionable commands**: All documented commands should be non-obvious and copy-paste ready; skip routine ones
 - **Use `.claude.local.md`**: For personal preferences not shared with team (add to `.gitignore`)
 - **Global defaults**: Put user-wide preferences in `~/.claude/CLAUDE.md`
 
@@ -239,16 +250,16 @@ When presenting recommendations, remind users:
 
 **Key principles:**
 - Concise and human-readable
-- Actionable commands that can be copy-pasted
+- Non-obvious commands and workflows (gotcha flags, ordering, hooks — not routine build/test)
 - Project-specific patterns, not generic advice
 - Non-obvious gotchas and warnings
 
 **Recommended sections** (use only what's relevant):
-- Commands (build, test, dev, lint)
+- Non-Obvious Commands & Workflows (gotcha flags, hook behaviors, ordering)
 - Architecture (directory structure)
 - Key Files (entry points, config)
 - Code Style (project conventions)
 - Environment (required vars, setup)
-- Testing (commands, patterns)
+- Testing (non-obvious patterns and conventions)
 - Gotchas (quirks, common mistakes)
 - Workflow (when to do what)

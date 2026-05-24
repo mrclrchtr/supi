@@ -16,7 +16,7 @@ Review the current session for actionable learnings and update the project's CLA
 Identify what context would have helped this session go smoother. Scan the conversation for learnings worth preserving.
 
 **What TO capture:**
-- **Commands/workflows** discovered or used repeatedly
+- **Non-obvious commands/workflows** discovered or used repeatedly (not routine build/test/lint — those are in package.json)
 - **Gotchas and non-obvious patterns** (deprecated APIs, common pitfalls, tricky behaviors)
 - **Package relationships** or ordering dependencies not obvious from code
 - **Testing approaches** that worked (or didn't)
@@ -26,10 +26,19 @@ Identify what context would have helped this session go smoother. Scan the conve
 - Obvious info already clear from code or naming
 - Generic best practices ("write tests", "use meaningful names")
 - One-off fixes unlikely to recur ("fixed typo on line 42")
+- Routine/easy-to-find commands: `npm install`, `npm test`, `npm run build` — these are in package.json or README and don't earn their place in the context window
 - Verbose explanations — one line per concept; link to docs for detail
 - Content that SuPi extensions already auto-deliver (package tables, module graphs, dependency lists from manifests — see update guidelines)
 
-Filter ruthlessly. CLAUDE.md is part of the prompt — brevity directly improves future sessions.
+Filter ruthlessly. Every token must earn its place in the instruction file — if content doesn't save future sessions more time than it costs to read, remove it.
+
+**Before adding, consider removing.** Scan the file for content that MUST be removed or compressed. Never skip removals because of edit churn — a one-time edit that saves tokens every session pays for itself immediately:
+- Routine command listings that are trivially discoverable from `package.json` — MUST remove (~50–200 tokens saved per session)
+- Sections that duplicate what SuPi extensions auto-deliver (package tables, dependency graphs, project structure that just lists packages with descriptions, architecture trees that restate `code_map` output) — MUST remove; these are never "minor overlaps" — they are unconditional waste (~200–800 tokens saved per session)
+- Verbose explanations where a one-liner suffices — compress (~20–100 tokens saved)
+- Stale commands, paths, or architecture descriptions that no longer match the codebase — remove
+
+Removing unnecessary content is as valuable as adding useful content. Do both.
 
 > See also: [detailed update guidelines](references/update-guidelines.md) and [quality criteria](references/quality-criteria.md)
 
@@ -61,8 +70,8 @@ If no CLAUDE.md exists at the project root and the learnings are team-relevant, 
 Examples:
 
 ```
-`pnpm vitest run packages/<pkg>/` — run tests for a single workspace package
 `os.homedir()` cannot be mocked in ESM — pass `homeDir` parameter for testability
+Pre-push hook runs `pnpm verify` — covers both lint and tests; don't run them separately
 Root context files are never re-injected by extensions; use `/reload` to refresh
 ```
 
@@ -107,14 +116,15 @@ If the user rejects or modifies a proposal, adjust and re-present.
 **Validation checklist** — before finalizing, verify:
 - [ ] Each addition is project-specific, not generic advice
 - [ ] No duplication with existing content (read the file first)
-- [ ] Commands are tested and work
+- [ ] Commands (if any) are non-obvious and tested
 - [ ] File paths are accurate
 - [ ] Team-shared vs. personal-local scope is respected
 - [ ] This is the most concise way to express the info
 
 ## Guidelines
 
-- **Brevity is the priority** — CLAUDE.md content is injected into every prompt. Long files hurt performance.
+- **Every token must earn its place** — if content doesn't save future sessions more time than it costs to read, remove it. CLAUDE.md is injected into every prompt.
+- **200-line hard cap** — no instruction file should exceed 200 lines. Above that, every line must fight for its place against removal. If a file is over 200 lines, prioritize removals over additions.
 - **Actionability** — each line should save future sessions time or prevent a mistake.
 - **No duplication** — read the existing file before adding; merge with existing entries when possible.
 - **Respect scope** — team-shared vs. personal-local. Don't put machine-specific paths in CLAUDE.md.

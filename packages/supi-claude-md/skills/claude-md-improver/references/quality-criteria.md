@@ -2,20 +2,20 @@
 
 ## Scoring Rubric
 
-### 1. Commands/Workflows (15 points)
+### 1. Non-Obvious Commands & Workflows (15 points)
 
-**15 points**: All essential commands documented with context
-- Build, test, lint, deploy commands present
-- Development workflow clear
-- Common operations documented
+**15 points**: Non-obvious commands and workflow patterns captured with context
+- Gotcha commands or required flags documented (e.g. `--unsafe`, `--runInBand`)
+- Hook/pre-push behaviors, ordering requirements, or cross-tool workflows captured
+- Routine install/build/test/lint commands are NOT counted toward this score
 
-**12 points**: Most commands present, some missing context
+**12 points**: Most non-obvious commands/workflows present, some missing context
 
-**8 points**: Basic commands only, no workflow
+**8 points**: Only routine commands listed, no non-obvious patterns
 
-**4 points**: Few commands, many missing
+**4 points**: Few or irrelevant commands
 
-**0 points**: No commands documented
+**0 points**: No commands or workflows documented
 
 ### 2. Architecture Clarity (15 points)
 
@@ -49,16 +49,19 @@
 
 ### 4. Conciseness (15 points)
 
-**15 points**: Dense, valuable content
-- No filler or obvious info
-- Each line adds value
-- No redundancy with code comments
+**Hard cap: no instruction file should exceed 200 lines.** Above 200 lines the score is capped at 5/15 regardless of content quality; above 300 lines the score is 0/15. Every line past 200 must fight for its place against removal.
 
-**10 points**: Mostly concise, some padding
+**15 points**: Every token earns its place — file is ≤200 lines
+- No filler, obvious info, or unnecessary content; every token saves more time than it costs to read
+- Each line adds value that isn't trivially discoverable elsewhere
+- No redundancy with code comments, package.json, or README
+- Routine commands already removed or never present
 
-**5 points**: Verbose in places
+**10 points**: Mostly concise, some padding — file is ≤200 lines
 
-**0 points**: Mostly filler or restates obvious code
+**5 points**: Over 200 lines, or verbose with significant padding
+
+**0 points**: Over 300 lines, or mostly filler / restates obvious code
 
 ### 5. Currency (15 points)
 
@@ -98,7 +101,7 @@ Score this criterion after a **context baseline review**: compare the CLAUDE.md 
 
 **0 points**: Large sections are almost entirely duplicated generated context (module lists with descriptions, dense dependency tables, long root directory trees).
 
-**What is NOT overlap:** Gotchas specific to a package's behavior; cross-package patterns that aren't discoverable from manifests; commands and workflows; human-curated "Start Here" guidance with reasoning; concise structure notes that explain boundaries, ownership, initialization order, or important exceptions; and sections classified as **unique** during the baseline review.
+**What is NOT overlap:** Gotchas specific to a package's behavior; cross-package patterns that aren't discoverable from manifests; non-obvious commands and workflows (gotcha flags, hook behaviors, ordering requirements — not routine npm install/test/build); human-curated "Start Here" guidance with reasoning; concise structure notes that explain boundaries, ownership, initialization order, or important exceptions; and sections classified as **unique** during the baseline review.
 
 **What IS overlap:** Monorepo package tables where every row is `{name, description, path}`; root-level "Modules" or "Packages" sections with >5 entries; the **fully redundant** portion of a section during baseline review; root `## Project structure` / `## Architecture` trees that mostly restate folders, packages, or module layout already visible from `code_brief`; high-level architecture overviews that don't add relationships, gotchas, conventions, or exceptions beyond what's in `package.json`; and dependency graphs that could be generated from `pnpm-workspace.yaml`.
 
