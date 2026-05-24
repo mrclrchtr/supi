@@ -112,10 +112,18 @@ export class JsonRpcClient {
     return promise;
   }
 
-  /** Send a notification (no response expected). */
-  sendNotification(method: string, params?: unknown): void {
-    if (this.closed || !this.connection) return;
-    this.connection.sendNotification(method, params).catch(() => {});
+  /**
+   * Send a notification (no response expected).
+   *
+   * Returns the underlying write promise so ordering-sensitive cleanup paths
+   * can await the final flush. A no-op catch is still attached to prevent
+   * unhandled rejections when callers intentionally fire-and-forget.
+   */
+  sendNotification(method: string, params?: unknown): Promise<void> {
+    if (this.closed || !this.connection) return Promise.resolve();
+    const promise = this.connection.sendNotification(method, params);
+    promise.catch(() => {});
+    return promise;
   }
 
   /** Clean up the connection. */

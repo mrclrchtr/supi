@@ -173,7 +173,8 @@ export class LspClient {
           setTimeout(() => reject(new Error("shutdown timeout")), SHUTDOWN_TIMEOUT_MS),
         ),
       ]);
-      this.rpc.sendNotification("exit");
+      // Flush the final exit notification before disposing the transport.
+      await this.rpc.sendNotification("exit");
     } catch {
       // Timeout or error — force kill
     }
