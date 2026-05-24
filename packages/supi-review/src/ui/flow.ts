@@ -1,3 +1,8 @@
+import { spawn } from "node:child_process";
+import { unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { DynamicBorder, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
 import { getLocalBranches, getRecentCommits } from "../git.ts";
@@ -135,21 +140,60 @@ export async function collectReviewNote(ctx: ExtensionContext): Promise<string |
 
 /** Show the synthesized brief, the actual reviewer prompt preview, and ask for approval. */
 export function previewReviewPlan(ctx: ExtensionContext, plan: ReviewPlan): Promise<boolean> {
-  return ctx.ui.custom<boolean>((_tui, theme, _kb, done) => {
+  return ctx.ui.custom<boolean>((tui, theme, _kb, done) => {
     const container = buildReviewPlanContainer(theme, plan);
+    const pagerState = { running: false };
+
+    function handleInput(data: string) {
+      if (pagerState.running) return;
+      if (data === "\r" || data === "\n" || data === "y" || data === "Y") {
+        done(true);
+      } else if (data === "\x1b" || data === "n" || data === "N") {
+        done(false);
+      } else if (data === "v" || data === "V") {
+        openPromptInPager(plan.packet.prompt, tui, pagerState);
+      }
+    }
 
     return {
       render: (width) => container.render(width),
       invalidate: () => container.invalidate(),
-      handleInput: (data) => {
-        if (data === "\r" || data === "\n" || data === "y" || data === "Y") {
-          done(true);
-        } else if (data === "\x1b" || data === "n" || data === "N") {
-          done(false);
-        }
-      },
+      handleInput,
     };
   });
+}
+
+/** Open the full reviewer prompt in the user's pager for inspection. */
+function openPromptInPager(
+  prompt: string,
+  tui: { requestRender: () => void },
+  pagerState: { running: boolean },
+): void {
+  const tmpFile = join(tmpdir(), `supi-review-prompt-${Date.now()}.txt`);
+  try {
+    writeFileSync(tmpFile, prompt, "utf-8");
+  } catch {
+    return;
+  }
+
+  pagerState.running = true;
+
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    pagerState.running = false;
+    try {
+      unlinkSync(tmpFile);
+    } catch {
+      // best-effort cleanup
+    }
+    tui.requestRender();
+  };
+
+  const pager = spawn("less", ["-R", tmpFile], { stdio: "inherit" });
+  pager.on("exit", cleanup);
+  pager.on("error", cleanup);
 }
 
 /** Build the review plan preview container with all styled sections. */
@@ -250,7 +294,7 @@ function buildReviewPlanContainer(theme: ReviewTheme, plan: ReviewPlan): Contain
   // ── Confirm / Cancel hints ──
   container.addChild(
     new Text(
-      `  ${dim("Enter")} ${theme.fg("success", "Run review")}  ${dim("\u2022")}  ${dim("Esc")} ${theme.fg("muted", "Cancel")}  ${dim("\u2022 y/n")}`,
+      `  ${dim("Enter")} ${theme.fg("success", "Run review")}  ${dim("\u2022")}  ${dim("Esc")} ${theme.fg("muted", "Cancel")}  ${dim("\u2022 y/n")}  ${dim("\u2022")}  ${dim("v")} ${theme.fg("accent", "view full prompt")}`,
       1,
       0,
     ),
