@@ -7,26 +7,19 @@ import { executeMapTool } from "./execute-map.ts";
 import { executePatternTool } from "./execute-pattern.ts";
 import { executeRelationsTool } from "./execute-relations.ts";
 
-const PathParam = Type.String({ description: "Scope or focus path (package, directory, or file)" });
-const FileParam = Type.String({
-  description:
-    "Anchored target file (use with line/character) or a file-level semantic target where supported",
-});
-const LineParam = Type.Number({ description: "1-based line number for anchored target" });
-const CharacterParam = Type.Number({
-  description: "1-based character column (UTF-16) for anchored target",
-});
-const SymbolParam = Type.String({ description: "Symbol name for discovery-based resolution" });
-const PatternParam = Type.String({ description: "Text search pattern" });
-const RegexParam = Type.Boolean({ description: "Use regex semantics instead of literal matching" });
-const ExportedOnlyParam = Type.Boolean({ description: "Limit discovery to exported symbols" });
-const MaxResultsParam = Type.Number({ description: "Maximum results to return" });
-const ContextLinesParam = Type.Number({ description: "Context lines around matches" });
-const SummaryParam = Type.Boolean({
-  description: "Aggregate counts by directory instead of line-level matches",
-});
+const PathParam = Type.String({ description: "Scope path" });
+const FileParam = Type.String({ description: "Target file" });
+const LineParam = Type.Number({ description: "1-based line" });
+const CharacterParam = Type.Number({ description: "1-based UTF-16 column" });
+const SymbolParam = Type.String({ description: "Symbol name" });
+const PatternParam = Type.String({ description: "Search pattern" });
+const RegexParam = Type.Boolean({ description: "Regex search" });
+const ExportedOnlyParam = Type.Boolean({ description: "Exported symbols only" });
+const MaxResultsParam = Type.Number({ description: "Max results" });
+const ContextLinesParam = Type.Number({ description: "Context lines" });
+const SummaryParam = Type.Boolean({ description: "Summarize by directory" });
 const StructuredPatternKindParam = Type.String({
-  description: "Structured pattern kind (`definition` | `export` | `import`)",
+  description: "Structured kind: definition | export | import",
 });
 
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
@@ -57,7 +50,7 @@ const CodeBriefParameters = Type.Object(
 
 const CodeMapParameters = Type.Object(
   {
-    path: Type.Optional(Type.String({ description: "Project, package, or directory path to map" })),
+    path: Type.Optional(Type.String({ description: "Project/package/dir path" })),
   },
   { additionalProperties: false },
 );
@@ -115,12 +108,11 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
   {
     name: "code_brief",
     label: "Code Brief",
-    description:
-      "Code brief tool — interpretive orientation for a project, package, directory, file, or symbol. Use code_brief when you need prioritized context and start-here guidance rather than raw search output.",
-    promptSnippet: "code_brief — interpretive orientation and start-here guidance",
+    description: "Prioritized brief for a project, package, directory, file, or symbol.",
+    promptSnippet: "code_brief — prioritized code orientation",
     basePromptGuidelines: [
-      "Use code_brief for a project, package, directory, file, or symbol overview when you need prioritized context.",
-      "Use code_brief before deeper drill-down when you want a start-here recommendation instead of raw inventory output.",
+      "Use code_brief for prioritized orientation on a project, package, file, or symbol.",
+      "Use code_brief before deeper drill-down when you need a start-here recommendation.",
     ],
     parameters: CodeBriefParameters,
     run: (params, ctx) => executeBriefTool(params as Parameters<typeof executeBriefTool>[0], ctx),
@@ -128,26 +120,19 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
   {
     name: "code_map",
     label: "Code Map",
-    description:
-      "Code map tool — factual inventory for a repo, package, or directory. Use code_map when you want counts, child directories, language mix, and landmark files without interpretive guidance.",
-    promptSnippet: "code_map — factual project, package, or directory inventory",
-    basePromptGuidelines: [
-      "Use code_map for a factual repo, package, or directory map when you need counts, landmark files, and local structure without interpretation.",
-      "Use code_map with `path` for any directory path you want to inventory; code_map should stay factual rather than prioritized.",
-    ],
+    description: "Factual map of a repo, package, or directory.",
+    promptSnippet: "code_map — factual repo or directory map",
+    basePromptGuidelines: ["Use code_map for counts, directories, language mix, and landmarks."],
     parameters: CodeMapParameters,
     run: (params, ctx) => executeMapTool(params as Parameters<typeof executeMapTool>[0], ctx),
   },
   {
     name: "code_relations",
     label: "Code Relations",
-    description:
-      'Code relations tool — trace callers, callees, or implementations for a resolved target. Use code_relations with `kind: "callers" | "callees" | "implementations"` when you need semantic or structural relationships rather than broad search.',
-    promptSnippet: "code_relations — callers, callees, or implementations for a resolved target",
+    description: "Trace callers, callees, or implementations for a resolved target.",
+    promptSnippet: "code_relations — callers, callees, or implementations",
     basePromptGuidelines: [
-      'Use code_relations with `kind: "callers"` to find who invokes a symbol or file-level surface.',
-      'Use code_relations with `kind: "callees"` to inspect outgoing calls from a function or method at a known position.',
-      'Use code_relations with `kind: "implementations"` to find which concrete types implement a declaration.',
+      "Use code_relations(kind) for `callers`, `callees`, or `implementations`.",
     ],
     parameters: CodeRelationsParameters,
     run: (params, ctx) =>
@@ -156,12 +141,10 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
   {
     name: "code_affected",
     label: "Code Affected",
-    description:
-      "Code affected tool — estimate blast radius, downstream impact, and risk for a target. Use code_affected before edits when you need an impact-oriented view rather than a plain relationship list.",
-    promptSnippet: "code_affected — blast radius, downstream impact, and risk",
+    description: "Estimate blast radius and downstream impact for a target.",
+    promptSnippet: "code_affected — blast radius and impact",
     basePromptGuidelines: [
-      "Use code_affected before edits when you need blast radius, downstream impact, and likely follow-up checks.",
-      "Use code_affected after you have a concrete file/position or symbol target to estimate change risk.",
+      "Use code_affected before edits to estimate blast radius and follow-up checks.",
     ],
     parameters: CodeAffectedParameters,
     run: (params, ctx) =>
@@ -170,12 +153,10 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
   {
     name: "code_pattern",
     label: "Code Pattern",
-    description:
-      "Code pattern tool — explicit literal, regex, or structured search within a bounded scope. Use code_pattern when you intentionally want search behavior rather than semantic or structural relationships.",
-    promptSnippet: "code_pattern — explicit literal, regex, or structured search",
+    description: "Run explicit search with literal, regex, or structured matching.",
+    promptSnippet: "code_pattern — explicit code search",
     basePromptGuidelines: [
-      "Use code_pattern for explicit literal or regex search within a bounded path.",
-      'Use code_pattern with `kind: "definition" | "export" | "import"` for structured search instead of plain text matching.',
+      "Use code_pattern for literal, regex, or structured search in a bounded path.",
     ],
     parameters: CodePatternParameters,
     run: (params, ctx) =>

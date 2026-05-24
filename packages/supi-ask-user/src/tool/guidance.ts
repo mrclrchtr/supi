@@ -1,15 +1,13 @@
 // Prompt guidance and tool description for the redesigned ask_user tool.
 
 export const toolDescription =
-  "Ask the user for a focused blocking decision when explicit input is required to proceed safely. Requires an interactive UI with custom overlay support, and only one ask_user form can be active at a time. Use 1-4 related `choice` or `text` questions. Do not use ask_user for open-ended interviews or repo facts you can get yourself. Forms may allow partial submit or discussion handoff.";
+  "Ask the user for a focused blocking decision. Use 1-4 related `choice` or `text` questions, and keep only one ask_user form active at a time.";
 
 export const promptSnippet = "ask_user — request a focused blocking user decision";
 
 export const promptGuidelines = [
-  "Use ask_user only when explicit user input is required to proceed safely; do not use ask_user for open-ended interviews or repo facts.",
+  "Use ask_user only for blocking user input, not open-ended interviews or repo facts.",
   "Use ask_user with 1-4 related questions; prefer one when possible.",
-  'Use ask_user `choice` for fixed options and ask_user `text` for freeform input; model yes/no as `choice` with `{ value: "yes", label: "Yes" }` and `{ value: "no", label: "No" }`.',
-  "Use ask_user `allowOther` only on single-select `choice` questions.",
-  "Use ask_user `allowDiscuss` or `allowPartialSubmit` only when that outcome is actionable.",
-  "Do not call ask_user while another ask_user form is already in flight.",
+  "Use ask_user `choice` for fixed options and ask_user `text` for freeform input; yes/no should be a `choice`.",
+  "Keep one ask_user form active at a time; use `allowOther` only for single-select choice and `allowDiscuss`/`allowPartialSubmit` only when actionable.",
 ];

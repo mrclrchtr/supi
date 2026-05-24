@@ -21,7 +21,7 @@ describe("supi-web guidance", () => {
     expect(promptSnippet).toContain("web_fetch_md");
 
     const guidelines = buildPromptGuidelines();
-    expect(guidelines.length).toBeGreaterThanOrEqual(5);
+    expect(guidelines.length).toBeLessThanOrEqual(4);
     expect(
       guidelines.every(
         (guideline) => guideline.includes("web_fetch_md") || guideline.includes("bash"),

@@ -4,19 +4,18 @@ import { spawnSync } from "node:child_process";
 
 const INLINE_MAX_CHARS = 15_000;
 
-export const toolDescription = `Fetch a web page and convert it to clean Markdown for LLM ingestion.
+export const toolDescription = `Fetch a web page and convert it to Markdown.
 
-Use web_fetch_md when the user provides a public URL or asks you to inspect public web content. Only accepts real \`http://\` or \`https://\` URLs. If the page is access-controlled (login, paywall, private content), stop and ask the user for an allowed source or exported content.
+Use web_fetch_md only for public \`http://\` or \`https://\` URLs. If a page is private or access-controlled, ask for another source.
 
 Output modes:
-- \`auto\` (default): returns Markdown inline if ≤${INLINE_MAX_CHARS.toLocaleString()} characters; otherwise writes to a temporary file and returns the path.
-- \`inline\`: always returns Markdown inline.
-- \`file\`: always writes to a temporary file and returns the path.
+- \`auto\` (default): inline up to ${INLINE_MAX_CHARS.toLocaleString()} chars, otherwise return a temp file path
+- \`inline\`: always inline
+- \`file\`: always return a temp file path
 
-Links and images are absolutized by default. Use \`abs_links: false\` to keep them as-is.`;
+Links and images default to absolute; use \`abs_links: false\` to keep relative paths.`;
 
-export const promptSnippet =
-  "web_fetch_md — fetch a public URL and convert the response to clean Markdown for LLM ingestion";
+export const promptSnippet = "web_fetch_md — fetch a public URL as Markdown";
 
 function isGhAvailable(): boolean {
   try {
@@ -29,11 +28,9 @@ function isGhAvailable(): boolean {
 
 export function buildPromptGuidelines(): string[] {
   const guidelines = [
-    "Use web_fetch_md to fetch a public web page and convert it to clean Markdown for the model.",
-    "Use web_fetch_md only with real `http://` or `https://` URLs; if a page is access-controlled, stop and ask the user for an allowed source or exported content.",
-    "Use web_fetch_md with `output_mode: auto` unless you have a specific reason to force inline output or a temp file path.",
-    "Use web_fetch_md with `output_mode: inline` only when you need the Markdown directly in context, and use web_fetch_md with `output_mode: file` when you explicitly want a saved temp file path.",
-    "Use web_fetch_md with `abs_links: false` only when relative links or images are intentionally desired.",
+    "Use web_fetch_md only for public `http://` or `https://` pages; if a page is private or access-controlled, ask for an allowed source.",
+    "Use web_fetch_md with `output_mode: auto` by default; use `inline` for in-context Markdown and `file` for a temp path.",
+    "Use web_fetch_md with `abs_links: false` only when you want relative links or images.",
   ];
   if (isGhAvailable()) {
     guidelines.push(

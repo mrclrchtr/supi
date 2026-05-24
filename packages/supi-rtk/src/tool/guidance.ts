@@ -6,5 +6,5 @@
 // this guidance will no longer be necessary.
 
 export const promptGuidelines = [
-  "Use bash with `-v` when running test commands (vitest, jest, pytest, cargo test, etc.) because the RTK bash override may compact failure output. Prefix a bash command with `RTK_DISABLED=1` to bypass the RTK bash override entirely and get raw output.",
+  "Use bash with `-v` for test commands because RTK may compact failures. Prefix with `RTK_DISABLED=1` to bypass RTK and get raw output.",
 ];

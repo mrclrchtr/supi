@@ -3,101 +3,92 @@
 import { type Static, Type } from "typebox";
 
 const OptionSchema = Type.Object({
-  value: Type.String({ description: "Stable identifier returned when this option is selected" }),
-  label: Type.String({ description: "Display label shown to the user" }),
+  value: Type.String({ description: "Returned id" }),
+  label: Type.String({ description: "Displayed label" }),
   description: Type.Optional(
     Type.String({
-      description: "Optional clarification shown under the label in richer UIs",
+      description: "Optional note",
     }),
   ),
   preview: Type.Optional(
     Type.String({
-      description: "Optional preview content shown for the currently focused option",
+      description: "Optional preview",
     }),
   ),
 });
 
 const ChoiceQuestionSchema = Type.Object({
   type: Type.Literal("choice"),
-  id: Type.String({ description: "Unique question id within this form" }),
-  header: Type.String({ description: "Short label describing the decision" }),
-  prompt: Type.String({ description: "Full question text shown to the user" }),
+  id: Type.String({ description: "Question id" }),
+  header: Type.String({ description: "Short label" }),
+  prompt: Type.String({ description: "Question text" }),
   options: Type.Array(OptionSchema, {
-    description: "Allowed answers (2-12 distinct options)",
+    description: "Allowed options (2-12)",
   }),
   required: Type.Optional(
     Type.Boolean({
       default: true,
-      description: "Whether this question must be answered for a full submit",
+      description: "Required for full submit",
     }),
   ),
   multi: Type.Optional(
     Type.Boolean({
       default: false,
-      description: "Allow selecting multiple options instead of one",
+      description: "Allow multiple selections",
     }),
   ),
   allowOther: Type.Optional(
     Type.Boolean({
-      description:
-        "Allow a custom freeform answer instead of the listed options. Only valid for single-select choice questions.",
+      description: "Allow a custom option; single-select only",
     }),
   ),
   recommendation: Type.Optional(
     Type.Union([Type.String(), Type.Array(Type.String())], {
-      description:
-        "Recommended option value or values. Use a string for single-select and an array for multi-select.",
+      description: "Recommended value(s)",
     }),
   ),
   initial: Type.Optional(
     Type.Union([Type.String(), Type.Array(Type.String())], {
-      description:
-        "Initial selected option value or values. Use a string for single-select and an array for multi-select.",
+      description: "Initial value(s)",
     }),
   ),
 });
 
 const TextQuestionSchema = Type.Object({
   type: Type.Literal("text"),
-  id: Type.String({ description: "Unique question id within this form" }),
-  header: Type.String({ description: "Short label describing the prompt" }),
-  prompt: Type.String({ description: "Full question text shown to the user" }),
+  id: Type.String({ description: "Question id" }),
+  header: Type.String({ description: "Short label" }),
+  prompt: Type.String({ description: "Question text" }),
   required: Type.Optional(
     Type.Boolean({
       default: true,
-      description: "Whether this question must be answered for a full submit",
+      description: "Required for full submit",
     }),
   ),
-  initial: Type.Optional(Type.String({ description: "Initial value shown in the editor" })),
-  placeholder: Type.Optional(
-    Type.String({ description: "Placeholder shown before the user types" }),
-  ),
+  initial: Type.Optional(Type.String({ description: "Initial text" })),
+  placeholder: Type.Optional(Type.String({ description: "Editor placeholder" })),
 });
 
 const QuestionSchema = Type.Union([ChoiceQuestionSchema, TextQuestionSchema]);
 
 export const AskUserParamsSchema = Type.Object({
-  title: Type.Optional(
-    Type.String({ description: "Optional short title explaining the overall decision" }),
-  ),
+  title: Type.Optional(Type.String({ description: "Optional title" })),
   intro: Type.Optional(
     Type.String({
-      description: "Optional introductory context explaining why the agent is asking",
+      description: "Optional intro for the decision",
     }),
   ),
   questions: Type.Array(QuestionSchema, {
-    description: "Between 1 and 4 focused questions that belong to the same decision",
+    description: "1-4 focused questions for one decision",
   }),
   allowPartialSubmit: Type.Optional(
     Type.Boolean({
-      description:
-        "Allow the user to submit a partial form when some required questions remain unanswered",
+      description: "Allow partial submission",
     }),
   ),
   allowDiscuss: Type.Optional(
     Type.Boolean({
-      description:
-        "Allow the user to switch back into discussion instead of committing to a final answer",
+      description: "Allow discussion handoff",
     }),
   ),
 });

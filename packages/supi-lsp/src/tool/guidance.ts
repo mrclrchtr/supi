@@ -2,7 +2,7 @@
 
 import * as path from "node:path";
 import type { ProjectServerInfo } from "../config/server-config.ts";
-import type { LspToolName } from "./names.ts";
+import { LSP_HOVER_TOOL, type LspToolName } from "./names.ts";
 import { LSP_TOOL_DEFINITION_SPECS } from "./tool-specs.ts";
 
 export interface LspToolPromptSurface {
@@ -28,7 +28,7 @@ export function buildLspToolPromptSurfaces(
         description: spec.description,
         promptSnippet: spec.promptSnippet,
         promptGuidelines:
-          "includeCoverageGuidelines" in spec && spec.includeCoverageGuidelines
+          spec.name === LSP_HOVER_TOOL && coverageGuidelines.length > 0
             ? [...spec.basePromptGuidelines, ...coverageGuidelines]
             : [...spec.basePromptGuidelines],
       } satisfies LspToolPromptSurface,
@@ -43,8 +43,8 @@ function buildCoverageGuidelines(servers: ProjectServerInfo[], cwd: string): str
       const root = displayRoot(server.root, cwd);
       const fileTypes = server.fileTypes.map((entry) => `.${entry}`).join(",");
       const actions = server.supportedActions.join(",");
-      const actionText = actions.length > 0 ? ` | actions: ${actions}` : "";
-      return `lsp server coverage: ${server.name} | root: ${root} | files: ${fileTypes}${actionText}`;
+      const actionText = actions.length > 0 ? ` | actions:${actions}` : "";
+      return `lsp server coverage: ${server.name} | root:${root} | files:${fileTypes}${actionText}`;
     });
 
   const unavailable = servers
@@ -54,7 +54,7 @@ function buildCoverageGuidelines(servers: ProjectServerInfo[], cwd: string): str
   const dynamic = [...active];
   if (unavailable.length > 0) {
     dynamic.push(
-      `lsp server unavailable: ${unavailable.join(",")} — install or enable to extend semantic coverage`,
+      `lsp server unavailable: ${unavailable.join(",")} — install or enable for more coverage`,
     );
   }
 

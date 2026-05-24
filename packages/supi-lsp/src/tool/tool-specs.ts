@@ -28,11 +28,11 @@ import {
 } from "./service-actions.ts";
 
 // Shared parameter builders
-const FileParam = Type.String({ description: "File path (relative or absolute)" });
-const LineParam = Type.Number({ description: "1-based line number", minimum: 1 });
-const CharacterParam = Type.Number({ description: "1-based column number", minimum: 1 });
-const QueryParam = Type.String({ description: "Symbol query string" });
-const NewNameParam = Type.String({ description: "New name for rename" });
+const FileParam = Type.String({ description: "File path" });
+const LineParam = Type.Number({ description: "1-based line", minimum: 1 });
+const CharacterParam = Type.Number({ description: "1-based column", minimum: 1 });
+const QueryParam = Type.String({ description: "Symbol query" });
+const NewNameParam = Type.String({ description: "New name" });
 
 // Parameter schemas
 const PositionParams = Type.Object(
@@ -67,75 +67,57 @@ export interface LspToolDefinitionSpec {
   basePromptGuidelines: string[];
   parameters: TSchema;
   run: (service: SessionLspService, cwd: string, params: unknown) => Promise<string>;
-  includeCoverageGuidelines?: boolean;
 }
 
 export const LSP_TOOL_DEFINITION_SPECS = [
   {
     name: LSP_HOVER_TOOL,
     label: "LSP Hover",
-    description:
-      "Semantic type or symbol information at a known file position. Returns hover content including type annotations, documentation, and signature info for the symbol at the given location.",
-    promptSnippet: "lsp_hover — semantic type information at a given position",
-    basePromptGuidelines: [
-      "Use lsp_hover with `file`, `line`, and `character` for semantic type or symbol information at a known position.",
-    ],
+    description: "Semantic hover/type info at a file position.",
+    promptSnippet: "lsp_hover — hover/type info",
+    basePromptGuidelines: ["Use lsp_hover(file,line,character) for semantic hover/type info."],
     parameters: PositionParams,
     run: (service, cwd, params) =>
       executeHover(service, cwd, params as Parameters<typeof executeHover>[2]),
-    includeCoverageGuidelines: true,
   },
   {
     name: LSP_DEFINITION_TOOL,
     label: "LSP Definition",
-    description:
-      "Navigate to the definition of a symbol at a known file position. Returns the file and location where the symbol is declared.",
-    promptSnippet: "lsp_definition — go to definition at a known position",
+    description: "Jump to a symbol definition at a file position.",
+    promptSnippet: "lsp_definition — jump to definition",
     basePromptGuidelines: [
-      "Use lsp_definition with `file`, `line`, and `character` for semantic navigation to a symbol's definition.",
+      "Use lsp_definition(file,line,character) to jump to a symbol definition.",
     ],
     parameters: PositionParams,
     run: (service, cwd, params) =>
       executeDefinition(service, cwd, params as Parameters<typeof executeDefinition>[2]),
-    includeCoverageGuidelines: true,
   },
   {
     name: LSP_REFERENCES_TOOL,
     label: "LSP References",
-    description:
-      "Find all references to a symbol at a known file position. Returns a list of locations across the project where the symbol is referenced.",
-    promptSnippet: "lsp_references — find all references to a symbol",
-    basePromptGuidelines: [
-      "Use lsp_references with `file`, `line`, and `character` to find all semantic references to a symbol.",
-    ],
+    description: "Find semantic references to a symbol at a file position.",
+    promptSnippet: "lsp_references — semantic references",
+    basePromptGuidelines: ["Use lsp_references(file,line,character) for semantic references."],
     parameters: PositionParams,
     run: (service, cwd, params) =>
       executeReferences(service, cwd, params as Parameters<typeof executeReferences>[2]),
-    includeCoverageGuidelines: true,
   },
   {
     name: LSP_IMPLEMENTATION_TOOL,
     label: "LSP Implementation",
-    description:
-      "Find concrete implementations of an interface, abstract class, or method at a known position. Returns the locations where the declaration is implemented.",
-    promptSnippet: "lsp_implementation — find implementations of an interface or method",
-    basePromptGuidelines: [
-      "Use lsp_implementation with `file`, `line`, and `character` to find which concrete types implement a declaration.",
-    ],
+    description: "Find implementations from a file position.",
+    promptSnippet: "lsp_implementation — implementations",
+    basePromptGuidelines: ["Use lsp_implementation(file,line,character) for implementations."],
     parameters: PositionParams,
     run: (service, cwd, params) =>
       executeImplementation(service, cwd, params as Parameters<typeof executeImplementation>[2]),
-    includeCoverageGuidelines: true,
   },
   {
     name: LSP_DOCUMENT_SYMBOLS_TOOL,
     label: "LSP Document Symbols",
-    description:
-      "List semantic declarations in one supported file. Use lsp_document_symbols when you need a symbol-aware outline rather than raw text structure.",
-    promptSnippet: "lsp_document_symbols — semantic declarations for one supported file",
-    basePromptGuidelines: [
-      "Use lsp_document_symbols(file) for semantic declarations in one supported file.",
-    ],
+    description: "List semantic declarations in one file.",
+    promptSnippet: "lsp_document_symbols — one-file semantic outline",
+    basePromptGuidelines: ["Use lsp_document_symbols(file) for one-file semantic declarations."],
     parameters: DocumentSymbolsParameters,
     run: (service, cwd, params) =>
       executeDocumentSymbols(service, cwd, params as Parameters<typeof executeDocumentSymbols>[2]),
@@ -143,12 +125,9 @@ export const LSP_TOOL_DEFINITION_SPECS = [
   {
     name: LSP_WORKSPACE_SYMBOLS_TOOL,
     label: "LSP Workspace Symbols",
-    description:
-      "Semantic symbol-name lookup across the current project. Use lsp_workspace_symbols to find declarations by name before opening a specific file.",
-    promptSnippet: "lsp_workspace_symbols — semantic symbol-name lookup across the project",
-    basePromptGuidelines: [
-      "Use lsp_workspace_symbols(query) for semantic symbol-name lookup across the current project.",
-    ],
+    description: "Find symbol declarations by name across the project.",
+    promptSnippet: "lsp_workspace_symbols — project symbol lookup",
+    basePromptGuidelines: ["Use lsp_workspace_symbols(query) to find declarations by name."],
     parameters: WorkspaceSymbolsParameters,
     run: (service, cwd, params) =>
       executeWorkspaceSymbols(
@@ -160,12 +139,9 @@ export const LSP_TOOL_DEFINITION_SPECS = [
   {
     name: LSP_DIAGNOSTICS_TOOL,
     label: "LSP Diagnostics",
-    description:
-      "Current diagnostics for one file or a workspace summary. Use lsp_diagnostics for semantic compiler or language-server issues instead of guessing from text alone.",
-    promptSnippet: "lsp_diagnostics — current diagnostics for one file or the workspace",
-    basePromptGuidelines: [
-      "Use lsp_diagnostics(file?) when you need current diagnostics for one file or a workspace-level summary.",
-    ],
+    description: "Show semantic diagnostics for one file or the workspace.",
+    promptSnippet: "lsp_diagnostics — semantic diagnostics",
+    basePromptGuidelines: ["Use lsp_diagnostics(file?) for semantic diagnostics."],
     parameters: DiagnosticsParameters,
     run: (service, cwd, params) =>
       executeDiagnostics(service, cwd, params as Parameters<typeof executeDiagnostics>[2]),
@@ -173,39 +149,32 @@ export const LSP_TOOL_DEFINITION_SPECS = [
   {
     name: LSP_RENAME_TOOL,
     label: "LSP Rename",
-    description:
-      "Semantic rename planning at a known file position. Returns the workspace edits needed to rename a symbol across the project. Requires newName.",
-    promptSnippet: "lsp_rename — semantic rename planning at a known position",
+    description: "Plan a semantic rename from a file position.",
+    promptSnippet: "lsp_rename — semantic rename plan",
     basePromptGuidelines: [
-      "Use lsp_rename with `file`, `line`, `character`, and `newName` for a semantic rename across the workspace.",
+      "Use lsp_rename(file,line,character,newName) to plan a semantic rename.",
     ],
     parameters: RenameParams,
     run: (service, cwd, params) =>
       executeRename(service, cwd, params as Parameters<typeof executeRename>[2]),
-    includeCoverageGuidelines: true,
   },
   {
     name: LSP_CODE_ACTIONS_TOOL,
     label: "LSP Code Actions",
-    description:
-      "Quick-fix suggestions and refactors at a known file position. Returns available code actions including automatic fixes, suggestions, and refactoring options.",
-    promptSnippet: "lsp_code_actions — semantic fixes or refactors at a known position",
-    basePromptGuidelines: [
-      "Use lsp_code_actions with `file`, `line`, and `character` for semantic fixes or refactors.",
-    ],
+    description: "List code fixes/refactors at a file position.",
+    promptSnippet: "lsp_code_actions — quick fixes/refactors",
+    basePromptGuidelines: ["Use lsp_code_actions(file,line,character) for quick fixes/refactors."],
     parameters: PositionParams,
     run: (service, cwd, params) =>
       executeCodeActions(service, cwd, params as Parameters<typeof executeCodeActions>[2]),
-    includeCoverageGuidelines: true,
   },
   {
     name: LSP_RECOVER_TOOL,
     label: "LSP Recover",
-    description:
-      "Refresh diagnostics after workspace changes and stale language-server state. Use lsp_recover when new files, generated types, or config updates leave diagnostics out of sync.",
-    promptSnippet: "lsp_recover — refresh stale diagnostics after workspace changes",
+    description: "Refresh LSP diagnostics after workspace changes.",
+    promptSnippet: "lsp_recover — refresh stale diagnostics",
     basePromptGuidelines: [
-      "Use lsp_recover() when diagnostics look stale after workspace-level changes or generated-file updates.",
+      "Use lsp_recover() when diagnostics look stale after workspace changes.",
     ],
     parameters: RecoverParameters,
     run: (service) => executeRecover(service),

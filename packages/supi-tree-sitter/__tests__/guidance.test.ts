@@ -33,7 +33,7 @@ describe("tree_sitter focused tool guidance", () => {
     }
   });
 
-  it("each tool description mentions its purpose", () => {
+  it("each tool description stays focused on one concise purpose", () => {
     const tools = setupPi();
     const tool = (name: string): RegisteredTool => {
       const t = tools.find((t) => t.name === name);
@@ -47,6 +47,10 @@ describe("tree_sitter focused tool guidance", () => {
     expect(tool("tree_sitter_node_at").description).toContain("node");
     expect(tool("tree_sitter_query").description).toContain("query");
     expect(tool("tree_sitter_callees").description).toContain("callee");
+
+    for (const entry of tools) {
+      expect((entry.description.match(/\./g) ?? []).length).toBeLessThanOrEqual(1);
+    }
   });
 
   it("all promptSnippets reference the tool name", () => {

@@ -9,13 +9,9 @@ describe("LSP tool specs", () => {
   it("defines one registration spec for every public LSP tool", () => {
     expect(LSP_TOOL_DEFINITION_SPECS.map((spec) => spec.name)).toEqual([...LSP_TOOL_NAMES]);
     expect(
-      LSP_TOOL_DEFINITION_SPECS.some(
-        (spec) =>
-          spec.name === LSP_HOVER_TOOL &&
-          "includeCoverageGuidelines" in spec &&
-          spec.includeCoverageGuidelines,
-      ),
-    ).toBe(true);
+      LSP_TOOL_DEFINITION_SPECS.find((spec) => spec.name === LSP_HOVER_TOOL)
+        ?.basePromptGuidelines[0],
+    ).toContain("lsp_hover");
   });
 
   it("derives supported server actions from capabilities", () => {

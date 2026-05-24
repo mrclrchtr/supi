@@ -61,7 +61,7 @@ describe("LSP prompt guidance", () => {
     expect(recover.promptGuidelines[0]).toContain("lsp_recover");
   });
 
-  it("builds lookup guidance with dynamic server coverage lines", () => {
+  it("attaches dynamic server coverage lines only once", () => {
     const surfaces = buildLspToolPromptSurfaces(
       [
         {
@@ -85,28 +85,24 @@ describe("LSP prompt guidance", () => {
     );
 
     const hoverGuidelines = surfaces[LSP_HOVER_TOOL].promptGuidelines;
-    const definitionGuidelines = surfaces[LSP_DEFINITION_TOOL].promptGuidelines;
-    const referencesGuidelines = surfaces[LSP_REFERENCES_TOOL].promptGuidelines;
-    const implementationGuidelines = surfaces[LSP_IMPLEMENTATION_TOOL].promptGuidelines;
-    const renameGuidelines = surfaces[LSP_RENAME_TOOL].promptGuidelines;
-    const codeActionsGuidelines = surfaces[LSP_CODE_ACTIONS_TOOL].promptGuidelines;
 
-    for (const guidelines of [
-      hoverGuidelines,
-      definitionGuidelines,
-      referencesGuidelines,
-      implementationGuidelines,
-      renameGuidelines,
-      codeActionsGuidelines,
-    ]) {
-      expect(guidelines.some((g) => g.startsWith("lsp server coverage:"))).toBe(true);
-    }
     expect(
       hoverGuidelines.some((guideline) => guideline.startsWith("lsp server coverage: typescript")),
     ).toBe(true);
     expect(
       hoverGuidelines.some((guideline) => guideline.startsWith("lsp server unavailable: python")),
     ).toBe(true);
+
+    for (const guidelines of [
+      surfaces[LSP_DEFINITION_TOOL].promptGuidelines,
+      surfaces[LSP_REFERENCES_TOOL].promptGuidelines,
+      surfaces[LSP_IMPLEMENTATION_TOOL].promptGuidelines,
+      surfaces[LSP_RENAME_TOOL].promptGuidelines,
+      surfaces[LSP_CODE_ACTIONS_TOOL].promptGuidelines,
+    ]) {
+      expect(guidelines.some((g) => g.startsWith("lsp server coverage:"))).toBe(false);
+      expect(guidelines.some((g) => g.startsWith("lsp server unavailable:"))).toBe(false);
+    }
   });
 
   it("formats diagnostics as xml extension context", () => {

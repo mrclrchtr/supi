@@ -10,13 +10,13 @@ import { Type } from "typebox";
 
 // ── Shared parameter fragments ─────────────────────────────────────────
 
-const FileParam = Type.String({ description: "File path (relative or absolute)" });
-const LineParam = Type.Number({ description: "1-based line number", minimum: 1 });
+const FileParam = Type.String({ description: "File path" });
+const LineParam = Type.Number({ description: "1-based line", minimum: 1 });
 const CharacterParam = Type.Number({
-  description: "1-based character column (UTF-16)",
+  description: "1-based UTF-16 column",
   minimum: 1,
 });
-const QueryParam = Type.String({ description: "Tree-sitter query string" });
+const QueryParam = Type.String({ description: "Tree-sitter query" });
 
 export const PARAM_SCHEMAS = {
   fileOnly: Type.Object({ file: FileParam }, { additionalProperties: false }),
@@ -57,74 +57,49 @@ export const TREE_SITTER_TOOL_SPECS: readonly TreeSitterToolSpec[] = [
   {
     name: "tree_sitter_outline",
     label: "Tree-sitter Outline",
-    description:
-      "Shallow structural outline of declarations in JavaScript/TypeScript files. " +
-      "Returns top-level declarations plus supported class/interface/enum members.",
-    promptSnippet: "tree_sitter_outline — shallow outline for Js/Ts files",
-    promptGuidelines: [
-      "Use tree_sitter_outline(file) for shallow JavaScript or TypeScript structure without reading the whole file.",
-    ],
+    description: "Shallow JS/TS outline of top-level declarations and supported members.",
+    promptSnippet: "tree_sitter_outline — quick JS/TS outline",
+    promptGuidelines: ["Use tree_sitter_outline(file) for a quick JS/TS outline."],
     paramSchemaKey: "fileOnly",
   },
   {
     name: "tree_sitter_imports",
     label: "Tree-sitter Imports",
-    description:
-      "List all imports in a JavaScript/TypeScript file. " +
-      "Returns each import's module specifier and source location.",
-    promptSnippet: "tree_sitter_imports — list imports for Js/Ts files",
-    promptGuidelines: [
-      "Use tree_sitter_imports(file) to see module dependencies in JavaScript or TypeScript files.",
-    ],
+    description: "List imports in a JS/TS file.",
+    promptSnippet: "tree_sitter_imports — JS/TS imports",
+    promptGuidelines: ["Use tree_sitter_imports(file) to inspect JS/TS dependencies."],
     paramSchemaKey: "fileOnly",
   },
   {
     name: "tree_sitter_exports",
     label: "Tree-sitter Exports",
-    description:
-      "List all exports in a JavaScript/TypeScript file. " +
-      "Returns each export's kind, name, module specifier (if re-exported), and source location.",
-    promptSnippet: "tree_sitter_exports — list exports for Js/Ts files",
-    promptGuidelines: [
-      "Use tree_sitter_exports(file) for interface or export inspection in JavaScript or TypeScript files.",
-    ],
+    description: "List exports in a JS/TS file.",
+    promptSnippet: "tree_sitter_exports — JS/TS exports",
+    promptGuidelines: ["Use tree_sitter_exports(file) to inspect JS/TS exports."],
     paramSchemaKey: "fileOnly",
   },
   {
     name: "tree_sitter_node_at",
     label: "Tree-sitter Node At",
-    description:
-      "Find the exact syntax node and its ancestry at a given position in a file. " +
-      "Works across all supported grammars.",
-    promptSnippet: "tree_sitter_node_at — exact syntax node and ancestry at a known position",
-    promptGuidelines: [
-      "Use tree_sitter_node_at(file, line, character) for the exact syntax node and ancestry at a known position.",
-    ],
+    description: "Show the syntax node and ancestry at a file position.",
+    promptSnippet: "tree_sitter_node_at — syntax node at a position",
+    promptGuidelines: ["Use tree_sitter_node_at(file,line,character) for the exact syntax node."],
     paramSchemaKey: "fileLineChar",
   },
   {
     name: "tree_sitter_query",
     label: "Tree-sitter Query",
-    description:
-      "Run a custom Tree-sitter query against a file. " +
-      "Supports all grammars tree-sitter can parse.",
-    promptSnippet: "tree_sitter_query — custom AST pattern matching across all supported grammars",
-    promptGuidelines: [
-      "Use tree_sitter_query(file, query) for custom Tree-sitter patterns when the built-in actions are not specific enough.",
-    ],
+    description: "Run a custom Tree-sitter query against a file.",
+    promptSnippet: "tree_sitter_query — custom AST query",
+    promptGuidelines: ["Use tree_sitter_query(file,query) for custom AST matching."],
     paramSchemaKey: "fileQuery",
   },
   {
     name: "tree_sitter_callees",
     label: "Tree-sitter Callees",
-    description:
-      "List outgoing function/method callees from the enclosing scope at a given position. " +
-      "Works for many supported grammars.",
-    promptSnippet:
-      "tree_sitter_callees — outgoing calls from a function or method at a known position",
-    promptGuidelines: [
-      "Use tree_sitter_callees(file, line, character) for outgoing calls from the enclosing function or method at a known position.",
-    ],
+    description: "List outgoing callees from the enclosing scope at a file position.",
+    promptSnippet: "tree_sitter_callees — outgoing callees",
+    promptGuidelines: ["Use tree_sitter_callees(file,line,character) for outgoing calls."],
     paramSchemaKey: "fileLineChar",
   },
 ];
