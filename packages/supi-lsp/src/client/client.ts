@@ -174,7 +174,12 @@ export class LspClient {
         ),
       ]);
       // Flush the final exit notification before disposing the transport.
-      await this.rpc.sendNotification("exit");
+      await Promise.race([
+        this.rpc.sendNotification("exit"),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("exit notification timeout")), SHUTDOWN_TIMEOUT_MS),
+        ),
+      ]);
     } catch {
       // Timeout or error — force kill
     }
