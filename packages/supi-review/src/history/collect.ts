@@ -1,112 +1,132 @@
 import type { SessionContext } from "@earendil-works/pi-coding-agent";
-import type { HistoryEvidence, ReviewSnapshot } from "../types.ts";
-
-const INTENT_PATTERN =
-  /\b(fix|refactor|rename|preserve|avoid|should|must|ensure|intended|goal|risk|concern|regression|security|correctness|performance|api|breaking|review)\b/i;
 
 type ResolvedSessionMessage = SessionContext["messages"][number];
 
-/**
- * Extract the highest-signal evidence from the resolved LLM-visible session context.
- *
- * The collector intentionally favors user intent, assistant plans, compaction
- * summaries, and custom extension messages over raw tool chatter.
- */
-export function collectHistoryEvidence(
-  messages: ResolvedSessionMessage[],
-  snapshot: ReviewSnapshot,
-  note?: string,
-): HistoryEvidence[] {
-  const scoringContext = {
-    changedPathTokens: collectPathTokens(snapshot.changedFiles),
-    noteTokens: collectFreeformTokens(note),
-    total: messages.length,
-  };
+const DEFAULT_MAX_CHARS = 8_000;
 
-  const scored = messages
-    .map((message) => toEvidence(message))
-    .filter(
-      (evidence): evidence is Omit<HistoryEvidence, "score" | "reason"> => evidence !== undefined,
-    )
-    .map((evidence, index) => scoreEvidence(evidence, index, scoringContext))
-    .sort((a, b) => b.score - a.score || b.text.length - a.text.length);
-
-  return capEvidence(scored, 10, 4_500);
+export interface SerializeSessionContextOptions {
+  maxChars?: number;
 }
 
-function toEvidence(
+/**
+ * Serialize the resolved LLM-visible session context into a compaction-style
+ * readable transcript for the brief synthesizer.
+ *
+ * This mirrors the overall approach Pi uses for compaction:
+ * - messages are labeled by role and rendered in chronological order
+ * - compaction and branch summaries appear with their own labels
+ * - the output is bounded so the synthesizer stays predictable on long sessions
+ * - no heuristic ranking or scoring is applied
+ */
+export function serializeSessionContext(
+  messages: ResolvedSessionMessage[],
+  options?: SerializeSessionContextOptions,
+): string {
+  const maxChars = options?.maxChars ?? DEFAULT_MAX_CHARS;
+  if (messages.length === 0) return "";
+
+  const entries = messages
+    .map((message) => serializeEntry(message))
+    .filter(
+      (entry): entry is { label: string; text: string; isSummary: boolean } => entry !== undefined,
+    );
+
+  if (entries.length === 0) return "";
+
+  // Separate summary entries (compaction/branch summaries) from regular entries
+  const summaryEntries = entries.filter((e) => e.isSummary);
+  const regularEntries = entries.filter((e) => !e.isSummary);
+
+  // Estimate the total size if we keep everything
+  const allLines = entries.map(formatEntry);
+  const totalSize = measureLines(allLines);
+
+  if (totalSize <= maxChars) {
+    return allLines.join("\n");
+  }
+
+  // Build the output: always include summaries, then as many recent regular entries as fit
+  const summaryLines = summaryEntries.map(formatEntry);
+
+  // Walk regular entries from newest to oldest, keeping as many as fit
+  const keptRegular: typeof regularEntries = [];
+  let size = measureLines(summaryLines);
+
+  for (let i = regularEntries.length - 1; i >= 0; i--) {
+    const line = formatEntry(regularEntries[i]);
+    const lineLen = line.length + 1; // +1 for newline
+    if (keptRegular.length > 0 && size + lineLen > maxChars) {
+      break;
+    }
+    keptRegular.unshift(regularEntries[i]);
+    size += lineLen;
+  }
+
+  // Build final output: summaries first, then kept recent entries
+  const keptLines = [...summaryLines, ...keptRegular.map(formatEntry)];
+
+  // If still nothing fits with summaries alone, truncate the summaries
+  if (keptLines.length > 0) {
+    const output = keptLines.join("\n");
+    if (output.length <= maxChars) return output;
+  }
+
+  // Last resort: truncate the full output
+  return keepFirstLines(keptLines, maxChars);
+}
+
+function formatEntry(entry: { label: string; text: string }): string {
+  return `[${entry.label}]\n${entry.text}`;
+}
+
+function measureLines(lines: string[]): number {
+  return lines.reduce((acc, line) => acc + line.length + 1, 0); // +1 for newline
+}
+
+function keepFirstLines(lines: string[], maxChars: number): string {
+  const kept: string[] = [];
+  let size = 0;
+  for (const line of lines) {
+    const lineLen = line.length + 1;
+    if (size + lineLen > maxChars) break;
+    kept.push(line);
+    size += lineLen;
+  }
+  return kept.join("\n");
+}
+
+function serializeEntry(
   message: ResolvedSessionMessage,
-): Omit<HistoryEvidence, "score" | "reason"> | undefined {
+): { label: string; text: string; isSummary: boolean } | undefined {
   switch (message.role) {
     case "user":
     case "assistant": {
+      const text = normalizeText(extractMessageText(message.content));
+      if (!text) return undefined;
       return {
-        kind: message.role,
-        text: normalizeText(extractMessageText(message.content)),
+        label: message.role === "user" ? "User" : "Assistant",
+        text,
+        isSummary: false,
       };
     }
     case "custom": {
-      return {
-        kind: "custom",
-        text: normalizeText(extractMessageText(message.content)),
-      };
+      const text = normalizeText(extractMessageText(message.content));
+      if (!text) return undefined;
+      return { label: "Custom", text, isSummary: false };
     }
     case "compactionSummary": {
-      return {
-        kind: "compaction",
-        text: normalizeText(message.summary),
-      };
+      const text = normalizeText(message.summary);
+      if (!text) return undefined;
+      return { label: "Compaction summary", text, isSummary: true };
     }
     case "branchSummary": {
-      return {
-        kind: "branch-summary",
-        text: normalizeText(message.summary),
-      };
+      const text = normalizeText(message.summary);
+      if (!text) return undefined;
+      return { label: "Branch summary", text, isSummary: true };
     }
     default:
       return undefined;
   }
-}
-
-function scoreEvidence(
-  evidence: Omit<HistoryEvidence, "score" | "reason">,
-  index: number,
-  context: { total: number; changedPathTokens: string[]; noteTokens: string[] },
-): HistoryEvidence {
-  const recencyBoost = context.total > 0 ? (index / context.total) * 3 : 0;
-  const pathMatches = countTokenMatches(evidence.text, context.changedPathTokens);
-  const noteMatches = countTokenMatches(evidence.text, context.noteTokens);
-  const intentBoost = INTENT_PATTERN.test(evidence.text) ? 4 : 0;
-  const shortTextPenalty = evidence.text.length < 24 ? -2 : 0;
-  const longTextPenalty = evidence.text.length > 900 ? -1 : 0;
-  const score =
-    baseKindScore(evidence.kind) +
-    recencyBoost +
-    pathMatches * 3 +
-    noteMatches * 2 +
-    intentBoost +
-    shortTextPenalty +
-    longTextPenalty;
-
-  return {
-    ...evidence,
-    score,
-    reason: buildReason(pathMatches, noteMatches, intentBoost),
-  };
-}
-
-function buildReason(pathMatches: number, noteMatches: number, intentBoost: number): string {
-  const reasons: string[] = [];
-  if (pathMatches > 0) {
-    reasons.push(`mentions ${pathMatches} changed-path token${pathMatches === 1 ? "" : "s"}`);
-  }
-  if (noteMatches > 0) {
-    reasons.push(`matches ${noteMatches} note token${noteMatches === 1 ? "" : "s"}`);
-  }
-  if (intentBoost > 0) {
-    reasons.push("contains intent/constraint language");
-  }
-  return reasons.join(", ") || "high-signal session context";
 }
 
 function extractMessageText(content: unknown): string {
@@ -130,81 +150,4 @@ function extractMessageText(content: unknown): string {
 
 function normalizeText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
-}
-
-function collectPathTokens(paths: string[]): string[] {
-  const tokens = new Set<string>();
-
-  for (const path of paths) {
-    for (const part of path.split(/[\\/]/)) {
-      addToken(tokens, part);
-      for (const inner of part.split(/[-_.]/)) {
-        addToken(tokens, inner);
-      }
-    }
-    addToken(tokens, path);
-  }
-
-  return Array.from(tokens);
-}
-
-function collectFreeformTokens(text: string | undefined): string[] {
-  if (!text) return [];
-
-  const tokens = new Set<string>();
-  for (const part of text.split(/\W+/)) {
-    addToken(tokens, part);
-  }
-  return Array.from(tokens);
-}
-
-function addToken(tokens: Set<string>, token: string): void {
-  const normalized = token.trim().toLowerCase();
-  if (normalized.length < 3) return;
-  tokens.add(normalized);
-}
-
-function countTokenMatches(text: string, tokens: string[]): number {
-  if (tokens.length === 0 || text.length === 0) return 0;
-  const lower = text.toLowerCase();
-  return tokens.reduce((count, token) => count + (lower.includes(token) ? 1 : 0), 0);
-}
-
-function baseKindScore(kind: HistoryEvidence["kind"]): number {
-  switch (kind) {
-    case "user":
-      return 8;
-    case "assistant":
-      return 5;
-    case "compaction":
-    case "branch-summary":
-      return 6;
-    case "custom":
-      return 4;
-  }
-}
-
-function capEvidence(
-  evidence: HistoryEvidence[],
-  maxItems: number,
-  maxChars: number,
-): HistoryEvidence[] {
-  const kept: HistoryEvidence[] = [];
-  let used = 0;
-
-  for (const item of evidence) {
-    if (kept.length >= maxItems) break;
-    const text = truncate(item.text, 600);
-    const nextUsed = used + text.length;
-    if (kept.length > 0 && nextUsed > maxChars) break;
-    kept.push({ ...item, text });
-    used = nextUsed;
-  }
-
-  return kept;
-}
-
-function truncate(text: string, maxChars: number): string {
-  if (text.length <= maxChars) return text;
-  return `${text.slice(0, maxChars)}…`;
 }

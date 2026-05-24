@@ -1,7 +1,7 @@
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
 import { runBriefSynthesis } from "../tool/brief-runner.ts";
 import type { BriefSynthesisRunResult, ReviewProgress } from "../tool/runner-types.ts";
-import type { HistoryEvidence, ReviewModelSelection, ReviewSnapshot } from "../types.ts";
+import type { ReviewModelSelection, ReviewSnapshot } from "../types.ts";
 
 const DIFF_EXCERPT_CHAR_BUDGET = 12_000;
 
@@ -10,20 +10,21 @@ export interface SynthesizeReviewBriefOptions {
   modelRegistry: ModelRegistry;
   cwd: string;
   snapshot: ReviewSnapshot;
-  evidence: HistoryEvidence[];
+  serializedContext: string;
   note?: string;
   signal?: AbortSignal;
   onProgress?: (progress: ReviewProgress) => void;
 }
 
-/** Synthesize a structured review brief from the current snapshot and session evidence. */
+/** Synthesize a structured review brief from the current snapshot and session context. */
 export function synthesizeReviewBrief(
   options: SynthesizeReviewBriefOptions,
 ): Promise<BriefSynthesisRunResult> {
-  const { model, modelRegistry, cwd, snapshot, evidence, note, signal, onProgress } = options;
+  const { model, modelRegistry, cwd, snapshot, serializedContext, note, signal, onProgress } =
+    options;
 
   return runBriefSynthesis({
-    prompt: buildBriefSynthesisPrompt(snapshot, evidence, note),
+    prompt: buildBriefSynthesisPrompt(snapshot, serializedContext, note),
     model: model.model,
     modelRegistry,
     cwd,
@@ -34,7 +35,7 @@ export function synthesizeReviewBrief(
 
 export function buildBriefSynthesisPrompt(
   snapshot: ReviewSnapshot,
-  evidence: HistoryEvidence[],
+  serializedContext: string,
   note?: string,
 ): string {
   const diffExcerpt = buildDiffExcerpt(snapshot.diffText);
@@ -65,18 +66,11 @@ export function buildBriefSynthesisPrompt(
     parts.push("", "## User note", note.trim());
   }
 
-  parts.push("", "## Session evidence");
-  if (evidence.length === 0) {
-    parts.push(
-      "- No strong session evidence was extracted. Derive a minimal brief from the snapshot only.",
-    );
+  parts.push("", "## Serialized session context");
+  if (serializedContext.trim()) {
+    parts.push(serializedContext.trim());
   } else {
-    parts.push(
-      ...evidence.flatMap((item, index) => [
-        `${index + 1}. [${item.kind}] ${item.reason}`,
-        `   ${item.text}`,
-      ]),
-    );
+    parts.push("No session context was available. Derive the brief from the snapshot only.");
   }
 
   parts.push(

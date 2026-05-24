@@ -64,7 +64,6 @@ describe("supi-review renderer", () => {
         focusAreas: ["Authentication", "Error handling"],
         riskyFiles: ["src/auth.ts"],
         unresolvedQuestions: [],
-        evidenceCount: 2,
       },
       output: {
         findings: [],

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFns = vi.hoisted(() => ({
-  collectHistoryEvidence: vi.fn(() => []),
+  serializeSessionContext: vi.fn(() => "[User]\nTest message"),
   synthesizeReviewBrief: vi.fn(),
   buildReviewPacket: vi.fn(),
   runReviewer: vi.fn(),
@@ -15,7 +15,7 @@ const mockFns = vi.hoisted(() => ({
 }));
 
 vi.mock("../../src/history/collect.ts", () => ({
-  collectHistoryEvidence: mockFns.collectHistoryEvidence,
+  serializeSessionContext: mockFns.serializeSessionContext,
 }));
 
 vi.mock("../../src/history/synthesize.ts", () => ({
@@ -101,7 +101,6 @@ const brief = {
   focusAreas: ["Authentication"],
   riskyFiles: ["src/auth.ts"],
   unresolvedQuestions: [],
-  evidenceCount: 1,
 };
 
 const packet = {
@@ -180,7 +179,7 @@ describe("/supi-review command", () => {
     });
   });
 
-  it("runs the new session-aware review flow", async () => {
+  it("runs the new session-aware review flow with serialized context", async () => {
     const pi = createPi();
     reviewExtension(pi);
     const handler = getHandler(pi);
@@ -190,7 +189,7 @@ describe("/supi-review command", () => {
 
     expect(mockFns.selectTarget).toHaveBeenCalledTimes(1);
     expect(mockFns.selectModel).toHaveBeenCalledTimes(1);
-    expect(mockFns.collectHistoryEvidence).toHaveBeenCalledTimes(1);
+    expect(mockFns.serializeSessionContext).toHaveBeenCalledTimes(1);
     expect(mockFns.synthesizeReviewBrief).toHaveBeenCalledTimes(1);
     expect(mockFns.buildReviewPacket).toHaveBeenCalledWith(
       snapshot,

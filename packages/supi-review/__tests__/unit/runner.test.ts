@@ -52,7 +52,6 @@ const brief = {
   focusAreas: ["Authentication"],
   riskyFiles: ["src/auth.ts"],
   unresolvedQuestions: [],
-  evidenceCount: 1,
 };
 
 const model = {

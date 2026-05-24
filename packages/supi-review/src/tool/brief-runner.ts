@@ -27,8 +27,7 @@ function createSubmitBriefTool(resultHolder: {
     parameters: reviewBriefSchema,
     execute: async (_toolCallId, args) => {
       resultHolder.value = {
-        ...(args as Omit<SynthesizedReviewBrief, "evidenceCount" | "note">),
-        evidenceCount: 0,
+        ...(args as Omit<SynthesizedReviewBrief, "note">),
       };
       return {
         content: [{ type: "text" as const, text: "Review brief submitted successfully." }],

@@ -51,14 +51,6 @@ export interface ReviewSnapshot {
   stats: DiffStats;
 }
 
-/** One evidence item extracted from the active session branch. */
-export interface HistoryEvidence {
-  kind: "user" | "assistant" | "custom" | "compaction" | "branch-summary";
-  text: string;
-  score: number;
-  reason: string;
-}
-
 /** Model picked explicitly for the current review run. */
 export interface ReviewModelSelection {
   canonicalId: string;
@@ -80,7 +72,6 @@ export interface SynthesizedReviewBrief {
   riskyFiles: string[];
   unresolvedQuestions: string[];
   note?: string;
-  evidenceCount: number;
 }
 
 /** Final prompt packet passed to the reviewer child session. */

@@ -20,12 +20,6 @@ export type BriefSynthesisRunResult =
   | { kind: "canceled" }
   | { kind: "timeout"; timeoutMs: number };
 
-export interface BriefSynthesisInput {
-  snapshot: ReviewSnapshot;
-  evidence: Array<{ kind: string; reason: string; text: string }>;
-  note?: string;
-}
-
 export interface BriefSynthesisInvocation {
   prompt: string;
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type

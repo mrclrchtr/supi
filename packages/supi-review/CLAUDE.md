@@ -19,7 +19,7 @@ The `/supi-review` command follows a **history-aware** pipeline:
 2. **Select model** — explicit every run from Pi's scoped model set; current session model is preselected only when it is scoped
 3. **Collect optional note** — user can steer the generated brief
 4. **Resolve snapshot** — concrete changed files + diff/show text
-5. **Collect session evidence** — from the active branch's resolved LLM-visible context
+5. **Serialize session context** — compaction-style transcript of the active branch's resolved LLM-visible context
 6. **Synthesize brief** — child session turns history + snapshot metadata into a structured brief
 7. **Build review packet** — combine brief + snapshot into the final reviewer prompt
 8. **Preview and confirm** — show the synthesized brief and prompt coverage
@@ -31,7 +31,6 @@ The `/supi-review` command follows a **history-aware** pipeline:
 
 - `ReviewTargetSpec` — selected git target (`working-tree` | `branch` | `commit`)
 - `ReviewSnapshot` — fully resolved git snapshot (title, changed files, diff text, stats)
-- `HistoryEvidence` — scored evidence extracted from the active session branch
 - `SynthesizedReviewBrief` — structured intent inferred from the current session
 - `ReviewPacket` — final reviewer prompt plus included/omitted file coverage
 - `ReviewPlan` — model + snapshot + synthesized brief + reviewer packet
@@ -46,7 +45,7 @@ src/
   model.ts              Explicit model-selection helpers
   git.ts                Git diff/commit/branch helpers + snapshot resolution
   history/
-    collect.ts          Active-branch evidence extraction and scoring
+    collect.ts          Compaction-style session-context serialization
     synthesize.ts       Brief synthesis prompt builder + runner orchestration
   target/
     packet.ts           Reviewer prompt packet builder with file-aware diff packing
@@ -71,7 +70,7 @@ __tests__/
 - **No presets/depth UI** — the important input is the current session history, not a generic canned mode
 - **No editable raw prompt step** — the user previews the synthesized brief, not a hand-edited prompt blob
 - **Snapshot first** — review targets are fully resolved before synthesis/review starts; no lazy target hydration
-- **Active branch only** — evidence extraction uses `buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId())` so compaction and branch-summary semantics match the actual LLM-visible context
+- **Active branch only** — session-context serialization uses `buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId())` so compaction and branch-summary semantics match the actual LLM-visible context
 - **Read-only review session** — reviewer tools are restricted to `read`, `grep`, `find`, `ls`, and `submit_review`
 - **Minimal synthesis session** — brief synthesis uses only `submit_review_brief` and no context files/extensions/skills/themes
 
@@ -96,8 +95,7 @@ __tests__/
 ## Gotchas
 
 - `ctx.sessionManager` in extension contexts is read-only; use `getBranch()` and derive any extra views yourself
-- `custom_message` entries remain high-signal session evidence because they survive in the resolved session context as `custom` messages
-- Compaction and branch summaries must be respected through the resolved session context; do not score raw pre-compaction entries directly
+- The session-context serializer operates on the resolved `buildSessionContext(...)` output, so `custom_message` entries, compaction summaries, and branch summaries all appear in the transcript exactly as the LLM would see them
 - `buildBriefSynthesisPrompt()` must include a bounded diff excerpt so the synthesizer can see actual code changes, not just filenames/stats
 - `buildReviewPacket()` is file-aware and explicitly lists omitted files; avoid reintroducing whole-diff middle truncation
 - Review results carry `snapshot`, `brief`, and `modelId`; renderers and plain-text formatting should use those instead of older prompt-centric metadata

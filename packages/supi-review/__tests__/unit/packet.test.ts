@@ -39,7 +39,6 @@ const brief = {
   focusAreas: ["Authentication logic", "Response handling"],
   riskyFiles: ["src/auth.ts"],
   unresolvedQuestions: ["Is anonymous access still allowed?"],
-  evidenceCount: 3,
 };
 
 const model = {

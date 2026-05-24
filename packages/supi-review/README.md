@@ -58,7 +58,8 @@ The generated review prompt is **not** just a static diff wrapper.
 Before the actual review starts, the package:
 
 - resolves the **active session branch into the current LLM-visible context**
-- extracts high-signal user/assistant/custom/compaction context from that resolved view
+- **serializes** that resolved context into a compaction-style transcript
+- feeds the serialized transcript (plus snapshot + optional note) to a dedicated brief synthesizer
 - synthesizes a structured brief with:
   - summary
   - intended outcome
@@ -70,6 +71,8 @@ Before the actual review starts, the package:
 The synthesizer also receives a bounded diff excerpt from the snapshot so it can reason about actual code changes, not just filenames.
 
 That synthesized brief is then combined with the git snapshot into the final reviewer prompt.
+
+The session-transcript approach mirrors how Pi summarizes context for compaction: the entire resolved conversation is rendered in a readable label format and sent to the model as a whole, rather than relying on heuristic excerpt ranking.
 
 ## Model selection
 
@@ -104,7 +107,7 @@ When a successful review contains findings, `supi-review` also injects an agent-
 - `src/review.ts` — command orchestration and interactive flow
 - `src/model.ts` — explicit model selection helpers
 - `src/git.ts` — git snapshot resolution
-- `src/history/collect.ts` — active-branch evidence extraction
+- `src/history/collect.ts` — compaction-style session-context serialization
 - `src/history/synthesize.ts` — brief synthesis orchestration
 - `src/target/packet.ts` — final reviewer packet builder
 - `src/tool/brief-runner.ts` — brief synthesis child session

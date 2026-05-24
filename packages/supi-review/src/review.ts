@@ -1,6 +1,6 @@
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { resolveBranchSnapshot, resolveCommitSnapshot, resolveWorkingTreeSnapshot } from "./git.ts";
-import { collectHistoryEvidence } from "./history/collect.ts";
+import { serializeSessionContext } from "./history/collect.ts";
 import { synthesizeReviewBrief } from "./history/synthesize.ts";
 import { buildReviewPacket } from "./target/packet.ts";
 import { runReviewer } from "./tool/review-runner.ts";
@@ -46,7 +46,7 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
     ctx.sessionManager.getEntries(),
     ctx.sessionManager.getLeafId(),
   );
-  const evidence = collectHistoryEvidence(sessionContext.messages, snapshot, normalizedNote);
+  const serializedContext = serializeSessionContext(sessionContext.messages);
   const synthesis = await runBriefWithLoader({
     snapshot,
     modelId: model.canonicalId,
@@ -58,7 +58,7 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
         modelRegistry: ctx.modelRegistry,
         cwd: ctx.cwd,
         snapshot,
-        evidence,
+        serializedContext,
         note: normalizedNote,
         signal,
         onProgress,
@@ -73,7 +73,6 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
   const brief = {
     ...synthesis.brief,
     note: normalizedNote,
-    evidenceCount: evidence.length,
   };
 
   const packet = buildReviewPacket(snapshot, brief, model);
