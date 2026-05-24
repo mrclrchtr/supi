@@ -1,0 +1,32 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T22:41:55.208129Z"
+revision = 25
+
+[document_fingerprints]
+archive = "sha256:ef9b45e7ef54a3e53e254efdd3f043521db572f3e8666e7ee2496b5f7b3fd0c0"
+content = "sha256:dabf1cf6737e58160fb870369010876fb7fa893639400e457545333633e355fd"
+task-01 = "sha256:3c6f5f648286a947064e485818447749ddcb40fd0f90067bbffcfe9318435e46"
+task-02 = "sha256:d546f16a219b0f5da14af048dbc0125155dcd95f1ce18a76ace1505d556e8eec"
+task-03 = "sha256:4610d6c56f54461fc46a9f7cb39d440148690049b9ce642b0377b3f3515b9509"
+task-04 = "sha256:f47bcfdc4aefbb801d5ca08a4d51b4206c0a435029cbea4be3f661861be37a6b"
+
+[[tasks]]
+number = 1
+title = "Add targeting query/types layer with failing normalization tests"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Extract anchored and symbol resolvers behind a typed target-resolution facade"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Extract file-surface resolution and update code-intelligence actions to use the pipeline"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Do final cleanup, JSDoc pass, and full package verification"
+status = "done"

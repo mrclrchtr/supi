@@ -20,8 +20,14 @@ src/
 ├── brief.ts                # Overview + project brief generation
 ├── brief-focused.ts        # Directory/file/symbol focused brief generation
 ├── git-context.ts          # Git branch, dirty files, last commit helpers
-├── target-resolution.ts    # Symbol → file:position resolution (semantic-first, no heuristic fallback)
-├── resolve-target.ts       # Shared target resolution helpers for semantic/structural actions
+├── resolve-target.ts       # Action-facing target resolution — routes normalized queries, maps typed outcomes
+├── target-resolution.ts    # Facade over the targeting pipeline (backward-compat exports)
+├── targeting/
+│   ├── types.ts               # Normalized query, resolver deps, typed outcomes
+│   ├── query.ts                # Params → NormalizedQuery normalization
+│   ├── resolve-anchored.ts     # File + position resolution (no LSP needed)
+│   ├── resolve-symbol.ts       # Semantic symbol discovery (LSP-only, no text fallback)
+│   └── resolve-file.ts         # File-level target group discovery (LSP+Tree-sitter with fallback)
 ├── search-helpers.ts       # ripgrep wrapper, path normalization, URI helpers
 ├── pattern-structured.ts   # Tree-sitter-based structured pattern search
 ├── prioritization-signals.ts # Diagnostics, coverage, knip unused signals

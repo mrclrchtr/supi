@@ -1,5 +1,13 @@
+/**
+ * Action-facing target resolution — routes normalized queries and
+ * maps typed resolver outcomes to user-facing strings and legacy types.
+ *
+ * This is the thin orchestration layer between tool/action params and
+ * the typed targeting pipeline. Formatting of disambiguation/error
+ * outcomes happens here, at the action boundary.
+ */
+
 import type { CodeQueryParams as ActionParams } from "./query-params.ts";
-import type { SemanticSubstrate } from "./substrates/types.ts";
 import {
   type ResolvedTarget,
   type ResolvedTargetGroup,
@@ -7,33 +15,44 @@ import {
   resolveFileTargetGroup,
   resolveSymbolTarget,
 } from "./target-resolution.ts";
+import { normalizeQuery } from "./targeting/query.ts";
+import type { ResolverDeps, TargetOutcome } from "./targeting/types.ts";
 
 /**
- * Resolve a target from action params. Returns either a target, a file-level target group,
- * or a string error/disambiguation message to return directly.
+ * Resolve a target from action params.
+ *
+ * Returns either a {@link ResolvedTarget}, a {@link ResolvedTargetGroup},
+ * or a user-facing error/disambiguation string.
  */
 export async function resolveTarget(
   params: ActionParams,
   cwd: string,
-  semantic?: SemanticSubstrate,
+  semantic?: import("./substrates/types.ts").SemanticSubstrate,
 ): Promise<ResolvedTarget | ResolvedTargetGroup | string> {
-  if (!params.file && !params.symbol) {
-    return "**Error:** Semantic actions require either anchored coordinates (`file`, `line`, `character`) or a `symbol` for discovery.";
-  }
+  const query = normalizeQuery(params);
 
-  if (params.file && params.line != null && params.character != null) {
-    return resolveAnchored(params.file, params.line, params.character, cwd);
-  }
+  switch (query.kind) {
+    case "anchored":
+      return resolveAnchored(query.file, query.line, query.character, cwd);
 
-  if (params.file && !params.symbol) {
-    return resolveByFile(params.file, cwd);
-  }
+    case "file":
+      return resolveByFile(query.file, cwd);
 
-  if (params.symbol) {
-    return resolveBySymbol(params, cwd, semantic);
-  }
+    case "symbol": {
+      if (!semantic) {
+        return "**Error:** Symbol discovery requires active LSP. Use `file` + coordinates, or enable LSP and retry.";
+      }
+      const deps: ResolverDeps = { cwd, semantic };
+      return resolveBySymbol(query.symbol, deps, {
+        path: query.path,
+        kind: query.symbolKind,
+        exportedOnly: query.exportedOnly,
+      });
+    }
 
-  return "**Error:** Could not resolve target.";
+    case "invalid":
+      return `**Error:** ${query.reason}`;
+  }
 }
 
 function resolveAnchored(
@@ -45,7 +64,7 @@ function resolveAnchored(
   const result = resolveAnchoredTarget(file, line, character, cwd);
   if (result.kind === "error") return result.message;
   if (result.kind === "resolved") return result.target;
-  return "**Error:** Unexpected disambiguation for anchored target.";
+  return "**Error:** Unexpected resolution outcome.";
 }
 
 async function resolveByFile(file: string, cwd: string): Promise<ResolvedTargetGroup | string> {
@@ -55,42 +74,35 @@ async function resolveByFile(file: string, cwd: string): Promise<ResolvedTargetG
 }
 
 async function resolveBySymbol(
-  params: ActionParams,
-  cwd: string,
-  semantic?: SemanticSubstrate,
+  symbol: string,
+  deps: ResolverDeps,
+  options?: { path?: string; kind?: string; exportedOnly?: boolean },
 ): Promise<ResolvedTarget | string> {
-  if (!semantic) {
-    return "**Error:** Symbol discovery requires active LSP. Use `file` + coordinates, or enable LSP and retry.";
+  const outcome: TargetOutcome = await resolveSymbolTarget(
+    symbol,
+    deps.cwd,
+    // biome-ignore lint/style/noNonNullAssertion: semantic is always set for symbol queries
+    deps.semantic!,
+    options,
+  );
+
+  if (outcome.kind === "resolved") {
+    return outcome.target as ResolvedTarget;
   }
-  const result = await resolveSymbolTarget(params.symbol ?? "", cwd, semantic, {
-    path: params.path,
-    kind: params.kind,
-    exportedOnly: params.exportedOnly,
-  });
 
-  if (result.kind === "error") return result.message;
-  if (result.kind === "resolved") return result.target;
+  if (outcome.kind === "error") {
+    return outcome.message;
+  }
 
-  return formatDisambiguation(params, result);
+  return formatDisambiguation(symbol, outcome);
 }
 
 function formatDisambiguation(
-  params: ActionParams,
-  result: {
-    candidates: Array<{
-      name: string;
-      kind: string | null;
-      container: string | null;
-      file: string;
-      line: number;
-      character: number;
-      rank: number;
-    }>;
-    omittedCount: number;
-  },
+  symbol: string,
+  result: Extract<TargetOutcome, { kind: "disambiguation" }>,
 ): string {
   const lines: string[] = [];
-  lines.push(`# Disambiguation needed for \`${params.symbol}\``);
+  lines.push(`# Disambiguation needed for \`${symbol}\``);
   lines.push("");
   const omitNote = result.omittedCount > 0 ? ` (+${result.omittedCount} more)` : "";
   lines.push(

@@ -88,9 +88,14 @@ describe("resolveSymbolTarget", () => {
       reason: "No LSP session initialized for this workspace",
     });
 
-    const _result = await resolveSymbolTarget("Widget", "/project", {
+    const result = await resolveSymbolTarget("Widget", "/project", {
       workspaceSymbols: vi.fn().mockResolvedValue(null),
     } as unknown as SemanticSubstrate);
+
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.message).toContain("requires active LSP");
+    }
   });
 
   it("returns disambiguation from semantic workspace symbols without text-search fallback", async () => {
@@ -144,5 +149,24 @@ describe("resolveSymbolTarget", () => {
       expect(result.candidates).toHaveLength(2);
       expect(result.candidates[0]?.file).toContain("src/");
     }
+  });
+
+  it("returns disambiguation for single rangeless candidate instead of promoting to single match", async () => {
+    // A rangeless candidate has line=0,char=0 (URI-only workspace symbol)
+    const result = await resolveSymbolTarget("Thing", "/project", {
+      workspaceSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "Thing",
+          kind: "Interface",
+          file: "/project/src/types.ts",
+          line: 0,
+          character: 0,
+          container: null,
+        },
+      ]),
+    } as unknown as SemanticSubstrate);
+
+    // Should NOT be resolved (rangeless has no usable position)
+    expect(result.kind).toBe("disambiguation");
   });
 });
