@@ -35,6 +35,17 @@ function expectExplicitSurface(pkg, entries) {
   expect(entries).toContain("package/src/extension.ts");
 }
 
+function expectLibrarySurface(pkg, entries) {
+  expect(pkg.main).toBe("src/api.ts");
+  expect(pkg.exports).toEqual({
+    "./api": "./src/api.ts",
+    "./package.json": "./package.json",
+  });
+  expect(pkg.pi).toBeUndefined();
+  expect(entries).toContain("package/src/api.ts");
+  expect(entries).not.toContain("package/src/extension.ts");
+}
+
 describe("packStaged clean manifest", () => {
   /** @type {string | null} */
   let tarball = null;
@@ -62,39 +73,47 @@ describe("packStaged clean manifest", () => {
     // No devDependencies should leak into publish manifest
     expect(pkg.devDependencies).toBeUndefined();
 
-    // bundledDependencies should remain
-    expect(Array.isArray(pkg.bundledDependencies)).toBe(true);
-    expect(pkg.bundledDependencies.length).toBeGreaterThan(0);
+    // No bundledDependencies for library-only packages
+    expect(pkg.bundledDependencies).toBeUndefined();
+
+    // Library-only surface: api.ts but no extension.ts
+    expect(pkg.main).toBe("src/api.ts");
+    expect(pkg.exports).toEqual({
+      "./api": "./src/api.ts",
+      "./package.json": "./package.json",
+    });
+    expect(pkg.pi).toBeUndefined();
   });
 
-  it("produces npm-compatible bundled sub-package manifests for packages/supi-lsp", {
+  it("produces clean sub-package manifests for packages/supi-lsp (no bundled deps)", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
     tarball = await packStaged("packages/supi-lsp", { outDir });
 
-    // supi-lsp bundles supi-core
-    const corePkg = extractJson(tarball, "package/node_modules/@mrclrchtr/supi-core/package.json");
-    const coreStr = JSON.stringify(corePkg);
-    expect(coreStr).not.toContain("workspace:");
-    expect(corePkg.devDependencies).toBeUndefined();
+    // supi-lsp no longer bundles supi-core — it's a regular npm dependency
+    const entries = listTarballEntries(tarball);
+    const hasBundledCore = entries.some((e) =>
+      e.startsWith("package/node_modules/@mrclrchtr/supi-core/")
+    );
+    expect(hasBundledCore).toBe(false);
   });
 
-  it("does not remove bundledDependencies from manifests", { timeout: SLOW_TIMEOUT }, async () => {
+  it("packages/supi-lsp no longer exports ./extension", { timeout: SLOW_TIMEOUT }, async () => {
     tarball = await packStaged("packages/supi-lsp", { outDir });
 
     const pkg = extractJson(tarball, "package/package.json");
-    expect(pkg.bundledDependencies).toEqual([
-      "@mrclrchtr/supi-core",
-      "vscode-jsonrpc",
-      "vscode-languageserver-protocol",
-      "vscode-languageserver-types",
-    ]);
+    const entries = listTarballEntries(tarball);
+    expectLibrarySurface(pkg, entries);
+  });
 
-    // The bundled sub-package may or may not have its own bundledDependencies,
-    // but if it does they should be preserved
-    const corePkg = extractJson(tarball, "package/node_modules/@mrclrchtr/supi-core/package.json");
-    // supi-core doesn't have bundledDeps in source, so it should stay absent
-    expect(corePkg.bundledDependencies).toBeUndefined();
+  it("packages/supi-tree-sitter exports only ./api as library", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi-tree-sitter", { outDir });
+
+    const pkg = extractJson(tarball, "package/package.json");
+    const entries = listTarballEntries(tarball);
+    expectLibrarySurface(pkg, entries);
   });
 
   it("publishes explicit api and extension subpaths for packages/supi-ask-user", {
@@ -125,5 +144,34 @@ describe("packStaged clean manifest", () => {
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
     expectExplicitSurface(pkg, entries);
+  });
+
+  it("packages/supi-code-intelligence bundles supi-core and exposes explicit surfaces", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi-code-intelligence", { outDir });
+
+    const pkg = extractJson(tarball, "package/package.json");
+    const entries = listTarballEntries(tarball);
+
+    // workspace: protocol must not leak
+    expect(JSON.stringify(pkg)).not.toContain("workspace:");
+
+    // No devDependencies should leak
+    expect(pkg.devDependencies).toBeUndefined();
+
+    // bundledDependencies must include supi-core
+    expect(pkg.bundledDependencies).toEqual(["@mrclrchtr/supi-core"]);
+
+    // supi-lsp and supi-tree-sitter should NOT be bundled (library-only packages)
+    expect(pkg.bundledDependencies).not.toContain("@mrclrchtr/supi-lsp");
+    expect(pkg.bundledDependencies).not.toContain("@mrclrchtr/supi-tree-sitter");
+
+    // Explicit extension surface
+    expectExplicitSurface(pkg, entries);
+
+    // Bundled supi-core must not contain workspace: protocol
+    const corePkg = extractJson(tarball, "package/node_modules/@mrclrchtr/supi-core/package.json");
+    expect(JSON.stringify(corePkg)).not.toContain("workspace:");
   });
 });

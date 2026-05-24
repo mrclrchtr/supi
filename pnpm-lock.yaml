@@ -154,6 +154,9 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.74.0(ws@8.20.1)(zod@4.4.3)
+      '@earendil-works/pi-tui':
+        specifier: '*'
+        version: 0.75.4
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -283,24 +286,12 @@ importers:
 
   packages/supi-lsp:
     dependencies:
-      '@earendil-works/pi-ai':
-        specifier: '*'
-        version: 0.74.0(ws@8.20.1)(zod@4.4.3)
-      '@earendil-works/pi-coding-agent':
-        specifier: '*'
-        version: 0.74.0(ws@8.20.1)(zod@4.4.3)
-      '@earendil-works/pi-tui':
-        specifier: '*'
-        version: 0.74.0
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
       ignore:
         specifier: ^7.0.5
         version: 7.0.5
-      typebox:
-        specifier: '*'
-        version: 1.1.38
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -371,18 +362,9 @@ importers:
 
   packages/supi-tree-sitter:
     dependencies:
-      '@earendil-works/pi-ai':
-        specifier: '*'
-        version: 0.74.0(ws@8.20.1)(zod@4.4.3)
-      '@earendil-works/pi-coding-agent':
-        specifier: '*'
-        version: 0.74.0(ws@8.20.1)(zod@4.4.3)
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
-      typebox:
-        specifier: '*'
-        version: 1.1.38
       web-tree-sitter:
         specifier: ^0.26.8
         version: 0.26.9

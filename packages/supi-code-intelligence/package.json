@@ -24,13 +24,12 @@
     "@mrclrchtr/supi-tree-sitter": "workspace:*"
   },
   "bundledDependencies": [
-    "@mrclrchtr/supi-core",
-    "@mrclrchtr/supi-lsp",
-    "@mrclrchtr/supi-tree-sitter"
+    "@mrclrchtr/supi-core"
   ],
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
@@ -38,6 +37,9 @@
       "optional": true
     },
     "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
       "optional": true
     },
     "typebox": {
@@ -52,9 +54,7 @@
   "pi": {
     "extensions": [
       "./src/extension.ts",
-      "node_modules/@mrclrchtr/supi-lsp/src/extension.ts",
-      "node_modules/@mrclrchtr/supi-core/src/extension.ts",
-      "node_modules/@mrclrchtr/supi-tree-sitter/src/extension.ts"
+      "node_modules/@mrclrchtr/supi-core/src/extension.ts"
     ]
   },
   "main": "src/api.ts",

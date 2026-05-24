@@ -45,7 +45,7 @@ This repo has two install surfaces:
 
 All packages are published independently. There is no meta-package — each package ships its own dependencies directly.
 
-- Packages that depend on other `@mrclrchtr/supi-*` packages must list them in both `dependencies` and `bundledDependencies`.
+- Packages that depend on other `@mrclrchtr/supi-*` packages must list them in both `dependencies` and `bundledDependencies`. This applies to packages that still ship `pi.extensions` (installable pi packages). Library-only packages (no `pi.extensions`, no `./extension` export) are regular npm dependencies and do not need bundling — transitive npm resolution is sufficient for them.
 - Packages that bundle `@mrclrchtr/supi-*` dependencies must reference their extension entrypoints in `pi.extensions`.
 
 New packages should be added to the root `package.json` `pi.extensions` array for development convenience.

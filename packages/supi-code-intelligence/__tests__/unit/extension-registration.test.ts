@@ -3,16 +3,65 @@ import { describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
 
+const LSP_TOOL_COUNT = 10;
+
 describe("focused code intelligence tool registration", () => {
-  it("registers the focused tool set from shared specs", () => {
+  it("registers code_* tools on init (before session_start fires)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const tools = getTools(pi);
-    expect(tools).toHaveLength(CODE_INTELLIGENCE_TOOL_SPECS.length);
-    expect(tools.map((tool) => tool.name)).toEqual(
-      CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => spec.name),
-    );
+    // Code tools are registered synchronously; LSP tools fire on session_start
+    expect(tools.length).toBeGreaterThanOrEqual(CODE_INTELLIGENCE_TOOL_SPECS.length);
+    for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
+      expect(tools.find((t) => t.name === spec.name)).toBeDefined();
+    }
+  });
+
+  it("registers lsp_* tools when session_start fires", async () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const sessionStart = pi.handlers.get("session_start")?.[0];
+    expect(sessionStart).toBeDefined();
+
+    const mockCtx = {
+      cwd: "/tmp/lsp-test-registration",
+      sessionManager: { getBranch: () => [] },
+      ui: { notify: () => {} },
+    };
+
+    // Simulate session_start
+    await sessionStart?.({}, mockCtx);
+
+    const tools = getTools(pi);
+    // After session_start, LSP tools should also be registered
+    const lspTools = tools.filter((t) => t.name.startsWith("lsp_"));
+    expect(lspTools.length).toBe(LSP_TOOL_COUNT);
+  });
+
+  it("registers tree_sitter_* tools when session_start fires", async () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const sessionStartHandlers = pi.handlers.get("session_start");
+    expect(sessionStartHandlers).toBeDefined();
+    expect(sessionStartHandlers?.length).toBeGreaterThanOrEqual(2);
+
+    const mockCtx = {
+      cwd: "/tmp/ts-test-registration",
+      sessionManager: { getBranch: () => [] },
+      ui: { notify: () => {} },
+    };
+
+    // Fire all session_start handlers
+    for (const handler of sessionStartHandlers ?? []) {
+      await handler({}, mockCtx);
+    }
+
+    const tools = getTools(pi);
+    const tsTools = tools.filter((t) => t.name.startsWith("tree_sitter_"));
+    expect(tsTools.length).toBe(6);
   });
 
   it("keeps descriptions focused on each tool contract", () => {
@@ -70,7 +119,7 @@ describe("session lifecycle", () => {
     expect(pi.handlers.has("before_agent_start")).toBe(true);
   });
 
-  it("detects existing overview on branch to prevent duplicates", () => {
+  it("detects existing overview on branch to prevent duplicates", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
@@ -91,7 +140,7 @@ describe("session lifecycle", () => {
       },
     };
 
-    sessionStart?.({}, mockCtx);
+    await sessionStart?.({}, mockCtx);
     // After detecting existing overview, before_agent_start should not inject again
     // (verified indirectly by checking the handler doesn't crash)
   });

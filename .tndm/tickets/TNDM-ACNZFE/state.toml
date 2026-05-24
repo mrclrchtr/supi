@@ -1,0 +1,67 @@
+schema_version = 1
+status = "in_progress"
+updated_at = "2026-05-24T18:08:28.770152Z"
+revision = 29
+
+[document_fingerprints]
+content = "sha256:26d645d05e37432ce95da15c63ec3d83fc4f46fce0e8b759014682858d13a49d"
+task-01 = "sha256:9c6fb9986d0fd4be4a624b34e64478b48c7b3aba253cab47daf47b952f077771"
+task-02 = "sha256:ab40f93270fc1859598375958c57db60302a8c06241e38245afe6b9d10267a9e"
+task-03 = "sha256:8c458848e13990356924f827c1ec9b78e1b195232ee0be2cc71711404b0d4fa8"
+task-04 = "sha256:3692daa4c2afdab50479ff48950789744e7f2dab847b7dcb02bdb1d7c46b7f4b"
+task-05 = "sha256:3fc159b3c8017150f210c23fcaee643136e7e818f2714e70ef38d37c4cd8d46c"
+task-06 = "sha256:4dd1865f4aaa38d327279a4cd40789a87ce6941eb3a4110143709c49a1d86cd4"
+
+[[tasks]]
+number = 1
+title = "Promote stable LSP library APIs for external session orchestration"
+status = "done"
+files = ["packages/supi-lsp/src/api.ts", "packages/supi-lsp/src/index.ts", "packages/supi-lsp/src/session/service-registry.ts", "packages/supi-lsp/src/session/runtime-controller.ts", "packages/supi-lsp/src/config/lsp-settings.ts", "packages/supi-lsp/src/session/settings-registration.ts", "packages/supi-lsp/__tests__/unit/runtime-controller.test.ts", "packages/supi-lsp/__tests__/unit/service-registry.test.ts", "packages/supi-lsp/__tests__/unit/settings-registration.test.ts"]
+verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/runtime-controller.test.ts packages/supi-lsp/__tests__/unit/service-registry.test.ts packages/supi-lsp/__tests__/unit/settings-registration.test.ts && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json"
+notes = "TDD task: write the failing library-controller and settings-helper tests first, then add the new public API without breaking the existing lsp extension yet."
+detail_path = "tasks/task-01.md"
+
+[[tasks]]
+number = 2
+title = "Promote stable Tree-sitter library APIs for external session orchestration"
+status = "done"
+files = ["packages/supi-tree-sitter/src/api.ts", "packages/supi-tree-sitter/src/index.ts", "packages/supi-tree-sitter/src/session/service-registry.ts", "packages/supi-tree-sitter/src/session/session.ts", "packages/supi-tree-sitter/src/session/runtime-controller.ts", "packages/supi-tree-sitter/__tests__/runtime-controller.test.ts", "packages/supi-tree-sitter/__tests__/service-registry.test.ts", "packages/supi-tree-sitter/__tests__/session.test.ts"]
+verification = "pnpm vitest run packages/supi-tree-sitter/__tests__/runtime-controller.test.ts packages/supi-tree-sitter/__tests__/service-registry.test.ts packages/supi-tree-sitter/__tests__/session.test.ts && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json"
+notes = "TDD task: add the failing shared-runtime controller coverage first, then export the controller through the public API while leaving the existing tree-sitter extension intact for the moment."
+detail_path = "tasks/task-02.md"
+
+[[tasks]]
+number = 3
+title = "Re-home the LSP pi adapter and unified semantic UX in supi-code-intelligence"
+status = "done"
+files = ["packages/supi-code-intelligence/src/code-intelligence.ts", "packages/supi-code-intelligence/src/extension.ts", "packages/supi-code-intelligence/src/lsp/runtime-state.ts", "packages/supi-code-intelligence/src/lsp/session-lifecycle.ts", "packages/supi-code-intelligence/src/lsp/tool-specs.ts", "packages/supi-code-intelligence/src/lsp/guidance.ts", "packages/supi-code-intelligence/src/lsp/register-tools.ts", "packages/supi-code-intelligence/src/lsp/tool-actions.ts", "packages/supi-code-intelligence/src/lsp/diagnostic-injection.ts", "packages/supi-code-intelligence/src/lsp/tool-overrides.ts", "packages/supi-code-intelligence/src/lsp/settings.ts", "packages/supi-code-intelligence/src/ui/code-intelligence-status-command.ts", "packages/supi-code-intelligence/src/ui/code-intelligence-status-view.ts", "packages/supi-code-intelligence/src/ui/lsp-message-renderer.ts", "packages/supi-code-intelligence/package.json", "packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts", "packages/supi-code-intelligence/__tests__/unit/guidance.test.ts", "packages/supi-code-intelligence/__tests__/unit/lsp-guidance.test.ts", "packages/supi-code-intelligence/__tests__/unit/lsp-settings.test.ts", "packages/supi-code-intelligence/__tests__/unit/lsp-status-command.test.ts", "packages/supi-code-intelligence/__tests__/unit/lsp-diagnostic-injection.test.ts", "packages/supi-code-intelligence/__tests__/unit/lsp-tool-overrides.test.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/ && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json"
+notes = "TDD task: first make the umbrella extension tests fail by expecting `lsp_*` registration and unified code-intelligence UX from this package, then implement the new adapter on top of the public `@mrclrchtr/supi-lsp/api` surface."
+detail_path = "tasks/task-03.md"
+
+[[tasks]]
+number = 4
+title = "Re-home the Tree-sitter pi adapter and expert structural tools in supi-code-intelligence"
+status = "done"
+files = ["packages/supi-code-intelligence/src/code-intelligence.ts", "packages/supi-code-intelligence/src/tree-sitter/session-lifecycle.ts", "packages/supi-code-intelligence/src/tree-sitter/tool-specs.ts", "packages/supi-code-intelligence/src/tree-sitter/guidance.ts", "packages/supi-code-intelligence/src/tree-sitter/register-tools.ts", "packages/supi-code-intelligence/src/tree-sitter/tool-actions.ts", "packages/supi-code-intelligence/package.json", "packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts", "packages/supi-code-intelligence/__tests__/unit/tree-sitter-guidance.test.ts", "packages/supi-code-intelligence/__tests__/unit/tree-sitter-tool-registration.test.ts"]
+verification = "pnpm vitest run packages/supi-code-intelligence/ packages/supi-tree-sitter/__tests__/runtime-controller.test.ts && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json"
+notes = "TDD task: update the umbrella extension expectations to fail until `tree_sitter_*` registration comes from code-intelligence, then implement the new adapter on top of the public `@mrclrchtr/supi-tree-sitter/api` surface."
+detail_path = "tasks/task-04.md"
+
+[[tasks]]
+number = 5
+title = "Remove obsolete substrate extension surfaces and migrate/delete extension-only tests"
+status = "done"
+files = ["packages/supi-lsp/src/extension.ts", "packages/supi-lsp/src/lsp.ts", "packages/supi-lsp/src/handlers/diagnostic-injection.ts", "packages/supi-lsp/src/handlers/session-lifecycle.ts", "packages/supi-lsp/src/handlers/status-command.ts", "packages/supi-lsp/src/handlers/workspace-recovery.ts", "packages/supi-lsp/src/session/lsp-state.ts", "packages/supi-lsp/src/session/settings-registration.ts", "packages/supi-lsp/src/session/tree-persist.ts", "packages/supi-lsp/src/tool/guidance.ts", "packages/supi-lsp/src/tool/names.ts", "packages/supi-lsp/src/tool/overrides.ts", "packages/supi-lsp/src/tool/register-tools.ts", "packages/supi-lsp/src/tool/service-actions.ts", "packages/supi-lsp/src/tool/tool-specs.ts", "packages/supi-lsp/src/ui/renderer.ts", "packages/supi-lsp/src/ui/ui.ts", "packages/supi-tree-sitter/src/extension.ts", "packages/supi-tree-sitter/src/tree-sitter.ts", "packages/supi-tree-sitter/src/tool/guidance.ts", "packages/supi-tree-sitter/src/tool/register-tools.ts", "packages/supi-tree-sitter/src/tool/tool-specs.ts", "packages/supi-lsp/__tests__/unit/focused-tools.test.ts", "packages/supi-lsp/__tests__/unit/renderer.test.ts", "packages/supi-lsp/__tests__/unit/overrides.test.ts", "packages/supi-lsp/__tests__/unit/overrides-cascade.test.ts", "packages/supi-lsp/__tests__/unit/service-actions.test.ts", "packages/supi-lsp/__tests__/unit/service-actions.recover.test.ts", "packages/supi-lsp/__tests__/unit/service-actions.validation.test.ts", "packages/supi-lsp/__tests__/unit/system-prompt.test.ts", "packages/supi-lsp/__tests__/unit/ui.test.ts", "packages/supi-tree-sitter/__tests__/guidance.test.ts", "packages/supi-tree-sitter/__tests__/tool-focus.test.ts", "packages/supi-tree-sitter/__tests__/tool.test.ts", "packages/supi-tree-sitter/__tests__/smoke.test.ts"]
+verification = "pnpm vitest run packages/supi-lsp/ packages/supi-tree-sitter/ packages/supi-code-intelligence/ && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json"
+notes = "TDD task: once the umbrella adapters are green, delete the old extension-only source files and either migrate or remove the tests that existed only to cover those extension surfaces."
+detail_path = "tasks/task-05.md"
+
+[[tasks]]
+number = 6
+title = "Finalize manifests, docs, and publish verification for the single install surface"
+status = "done"
+files = ["packages/supi-lsp/package.json", "packages/supi-tree-sitter/package.json", "packages/supi-code-intelligence/package.json", "package.json", "README.md", "CLAUDE.md", "docs/package-layout.md", "docs/tool-architecture.md", "packages/supi-lsp/README.md", "packages/supi-lsp/CLAUDE.md", "packages/supi-tree-sitter/README.md", "packages/supi-tree-sitter/CLAUDE.md", "packages/supi-code-intelligence/README.md", "packages/supi-code-intelligence/CLAUDE.md", "scripts/__tests__/pack-staged.test.mjs"]
+verification = "pnpm vitest run scripts/__tests__/pack-staged.test.mjs packages/supi-lsp/ packages/supi-tree-sitter/ packages/supi-code-intelligence/ && pnpm exec biome check README.md CLAUDE.md docs/package-layout.md docs/tool-architecture.md packages/supi-lsp/README.md packages/supi-lsp/CLAUDE.md packages/supi-tree-sitter/README.md packages/supi-tree-sitter/CLAUDE.md packages/supi-code-intelligence/README.md packages/supi-code-intelligence/CLAUDE.md scripts/__tests__/pack-staged.test.mjs && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && node scripts/publish.mjs packages/supi-lsp && node scripts/publish.mjs packages/supi-tree-sitter && node scripts/publish.mjs packages/supi-code-intelligence"
+notes = "Test-backed package-contract task: update manifest expectations first, then land the final package metadata/docs cleanup and verify real tarballs for all three published packages."
+detail_path = "tasks/task-06.md"
