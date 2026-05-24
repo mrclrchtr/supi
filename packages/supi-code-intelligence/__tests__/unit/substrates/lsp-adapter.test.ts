@@ -57,10 +57,12 @@ describe("createSemanticSubstrate", () => {
       const result = await substrate.references("/project/src/index.ts", { line: 0, character: 0 });
 
       expect(result).toHaveLength(2);
-      expect(result![0].uri).toBe("file:///project/src/a.ts");
-      expect(result![0].range.start.line).toBe(1);
-      expect(result![1].uri).toBe("file:///project/src/b.ts");
-      expect(result![1].range.end.character).toBe(8);
+      // biome-ignore lint/style/noNonNullAssertion: verified non-null by toHaveLength
+      const locs = result!;
+      expect(locs[0].uri).toBe("file:///project/src/a.ts");
+      expect(locs[0].range.start.line).toBe(1);
+      expect(locs[1].uri).toBe("file:///project/src/b.ts");
+      expect(locs[1].range.end.character).toBe(8);
       expect(lsp.references).toHaveBeenCalledWith("/project/src/index.ts", {
         line: 0,
         character: 0,
@@ -124,7 +126,9 @@ describe("createSemanticSubstrate", () => {
       const result = await substrate.implementation("/f.ts", { line: 0, character: 0 });
 
       expect(result).toHaveLength(1);
-      expect(result![0].uri).toBe("file:///project/src/impl.ts");
+      // biome-ignore lint/style/noNonNullAssertion: verified non-null by toHaveLength
+      const [loc] = result!;
+      expect(loc.uri).toBe("file:///project/src/impl.ts");
     });
 
     it("returns null when LSP is unavailable", async () => {
@@ -160,7 +164,9 @@ describe("createSemanticSubstrate", () => {
       const result = await substrate.documentSymbols("/f.ts");
 
       expect(result).toHaveLength(2);
-      expect(result![0]).toEqual({
+      // biome-ignore lint/style/noNonNullAssertion: verified non-null by toHaveLength
+      const syms = result!;
+      expect(syms[0]).toEqual({
         name: "MyClass",
         kind: "Class",
         file: "/f.ts",
@@ -168,8 +174,8 @@ describe("createSemanticSubstrate", () => {
         character: 1,
         container: null,
       });
-      expect(result![1].name).toBe("myFunc");
-      expect(result![1].kind).toBe("Function");
+      expect(syms[1].name).toBe("myFunc");
+      expect(syms[1].kind).toBe("Function");
     });
 
     it("returns null when LSP is unavailable", async () => {
@@ -209,9 +215,11 @@ describe("createSemanticSubstrate", () => {
       const result = await substrate.workspaceSymbols("parse");
 
       expect(result).toHaveLength(2);
-      expect(result![0].name).toBe("parseConfig");
-      expect(result![0].kind).toBe("Function");
-      expect(result![0].file).toBe("/project/src/config.ts");
+      // biome-ignore lint/style/noNonNullAssertion: verified non-null by toHaveLength
+      const syms = result!;
+      expect(syms[0].name).toBe("parseConfig");
+      expect(syms[0].kind).toBe("Function");
+      expect(syms[0].file).toBe("/project/src/config.ts");
     });
 
     it("returns null when LSP is unavailable", async () => {

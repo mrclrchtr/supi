@@ -134,8 +134,10 @@ describe("createStructuralSubstrate", () => {
         expect(result.data[0].name).toBe("ClassA");
         expect(result.data[0].startLine).toBe(1);
         expect(result.data[0].children).toHaveLength(1);
-        expect(result.data[0].children![0].name).toBe("methodA");
-        expect(result.data[0].children![0].startLine).toBe(3);
+        // biome-ignore lint/style/noNonNullAssertion: children present in test data
+        const children = result.data[0].children!;
+        expect(children[0].name).toBe("methodA");
+        expect(children[0].startLine).toBe(3);
       }
     });
   });
