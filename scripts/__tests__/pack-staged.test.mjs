@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -34,23 +33,6 @@ function expectExplicitSurface(pkg, entries) {
   expect(pkg.pi?.extensions).toContain("./src/extension.ts");
   expect(entries).toContain("package/src/api.ts");
   expect(entries).toContain("package/src/extension.ts");
-}
-
-function installTarballIntoFreshProject(tarballPath) {
-  const projectDir = mkdtempSync(join(tmpdir(), "supi-install-test-"));
-  execFileSync("npm", ["init", "-y"], { cwd: projectDir, stdio: "ignore" });
-  execFileSync("npm", ["install", tarballPath, "--ignore-scripts"], {
-    cwd: projectDir,
-    stdio: "ignore",
-  });
-  return projectDir;
-}
-
-function expectInstalledRuntimeDeps(projectDir, specs) {
-  for (const { from, dependency } of specs) {
-    const requireFromPackage = createRequire(join(projectDir, from));
-    expect(() => requireFromPackage.resolve(dependency)).not.toThrow();
-  }
 }
 
 describe("packStaged clean manifest", () => {
@@ -95,38 +77,6 @@ describe("packStaged clean manifest", () => {
     const coreStr = JSON.stringify(corePkg);
     expect(coreStr).not.toContain("workspace:");
     expect(corePkg.devDependencies).toBeUndefined();
-  });
-
-  it("produces npm-compatible root manifest for packages/supi (meta-package)", {
-    timeout: SLOW_TIMEOUT,
-  }, async () => {
-    tarball = await packStaged("packages/supi", { outDir });
-
-    const pkg = extractJson(tarball, "package/package.json");
-    const pkgStr = JSON.stringify(pkg);
-    expect(pkgStr).not.toContain("workspace:");
-    expect(pkg.devDependencies).toBeUndefined();
-    expect(Array.isArray(pkg.bundledDependencies)).toBe(true);
-  });
-
-  it("produces npm-compatible bundled sub-package manifests for packages/supi", {
-    timeout: SLOW_TIMEOUT,
-  }, async () => {
-    tarball = await packStaged("packages/supi", { outDir });
-
-    // Check multiple bundled sub-packages
-    const bundlePaths = [
-      "node_modules/@mrclrchtr/supi-lsp/package.json",
-      "node_modules/@mrclrchtr/supi-code-intelligence/package.json",
-      "node_modules/@mrclrchtr/supi-core/package.json",
-    ];
-
-    for (const bp of bundlePaths) {
-      const subPkg = extractJson(tarball, `package/${bp}`);
-      const subStr = JSON.stringify(subPkg);
-      expect(subStr).not.toContain("workspace:");
-      expect(subPkg.devDependencies).toBeUndefined();
-    }
   });
 
   it("does not remove bundledDependencies from manifests", { timeout: SLOW_TIMEOUT }, async () => {
@@ -175,41 +125,5 @@ describe("packStaged clean manifest", () => {
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
     expectExplicitSurface(pkg, entries);
-  });
-
-  it("publishes explicit api and extension subpaths for packages/supi", {
-    timeout: SLOW_TIMEOUT,
-  }, async () => {
-    tarball = await packStaged("packages/supi", { outDir });
-
-    const pkg = extractJson(tarball, "package/package.json");
-    const entries = listTarballEntries(tarball);
-    expectExplicitSurface(pkg, entries);
-  });
-
-  it("exposes bundled packages' external runtime deps after installing packed packages/supi", {
-    timeout: SLOW_TIMEOUT,
-  }, async () => {
-    tarball = await packStaged("packages/supi", { outDir });
-    const projectDir = installTarballIntoFreshProject(tarball);
-
-    try {
-      expectInstalledRuntimeDeps(projectDir, [
-        {
-          from: "node_modules/@mrclrchtr/supi/node_modules/@mrclrchtr/supi-lsp/src/extension.ts",
-          dependency: "typescript",
-        },
-        {
-          from: "node_modules/@mrclrchtr/supi/node_modules/@mrclrchtr/supi-tree-sitter/src/extension.ts",
-          dependency: "web-tree-sitter",
-        },
-        {
-          from: "node_modules/@mrclrchtr/supi/node_modules/@mrclrchtr/supi-extras/src/extension.ts",
-          dependency: "clipboardy",
-        },
-      ]);
-    } finally {
-      rmSync(projectDir, { recursive: true, force: true });
-    }
   });
 });

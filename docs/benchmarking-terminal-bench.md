@@ -169,7 +169,7 @@ mkdir -p "$PI_SUPI_CONFIG"
 cat > "$PI_SUPI_CONFIG/settings.json" <<'JSON'
 {
   "enableInstallTelemetry": false,
-  "packages": ["npm:@mrclrchtr/supi"]
+  "packages": ["git:github.com/mrclrchtr/supi"]
 }
 JSON
 ```

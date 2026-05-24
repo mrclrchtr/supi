@@ -8,7 +8,7 @@ Adds prompt-cache monitoring and cache-regression forensics to the [pi coding ag
 pi install npm:@mrclrchtr/supi-cache
 ```
 
-This is a **beta** package. It is not bundled in `@mrclrchtr/supi`.
+This is a **beta** package. Install individually.
 
 For local development:
 

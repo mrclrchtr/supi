@@ -24,9 +24,9 @@ Command aliases for muscle memory (`/exit`, `/e`). Default bash timeouts so hung
 
 ## Packages
 
-### Production
+### Packages
 
-Included in `@mrclrchtr/supi`. Install the full stack or pick individual packages from the table below.
+Install individual packages from the table below. For the full stack, install from the repo root (see Install section).
 
 | Install | Description |
 |---|---|
@@ -40,9 +40,7 @@ Included in `@mrclrchtr/supi`. Install the full stack or pick individual package
 | `pi install npm:@mrclrchtr/supi-extras` | Command aliases, skill shorthand, tab spinner, prompt stash |
 | `pi install npm:@mrclrchtr/supi-bash-timeout` | Default timeouts on bash tool calls |
 
-### Beta
-
-Not bundled in the meta-package. Install individually.
+### Experimental
 
 | Install | Description |
 |---|---|
@@ -56,14 +54,6 @@ Each package has its own README with full details, configuration, and API docs.
 
 ## Install
 
-### Full stack
-
-```bash
-pi install npm:@mrclrchtr/supi
-```
-
-All production packages, working together.
-
 ### Individual packages
 
 ```bash
@@ -72,14 +62,14 @@ pi install npm:@mrclrchtr/supi-web
 # ... any package from the tables above
 ```
 
-### From git or local path
+### Full stack (from git or local path)
 
 ```bash
 pi install git:github.com/mrclrchtr/supi
-pi install /path/to/SuPi/packages/supi-lsp
+pi install /path/to/SuPi
 ```
 
-When installed from a local path, pi loads the working tree directly; after edits, use `/reload` or restart pi.
+The repo root includes all packages via its `pi.extensions` manifest. When installed from a local path, pi loads the working tree directly; after edits, use `/reload` or restart pi.
 
 ## Maintainer notes
 

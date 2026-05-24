@@ -6,8 +6,7 @@ import { join, resolve } from "node:path";
 // Publish packages that were released by Release Please.
 //
 // Reads the PATHS_RELEASED env var (JSON array of paths like "packages/foo").
-// Publishes in topological order of workspace dependencies, with the meta-package
-// (packages/supi) always last.
+// Publishes in topological order of workspace dependencies.
 //
 // When PATHS_RELEASED includes "." (the single-root release-please config),
 // it is expanded to all non-private workspace packages under packages.
@@ -134,14 +133,6 @@ while (queue.length > 0) {
 if (sorted.length !== pkgMap.size) {
   console.error("Cycle detected in workspace dependencies among released packages.");
   process.exit(1);
-}
-
-// Ensure meta-package is always published last.
-const metaPath = "packages/supi";
-const metaIndex = sorted.indexOf(metaPath);
-if (metaIndex !== -1 && metaIndex !== sorted.length - 1) {
-  sorted.splice(metaIndex, 1);
-  sorted.push(metaPath);
 }
 
 const tarballDir = mkdtempSync(join(tmpdir(), "supi-publish-"));

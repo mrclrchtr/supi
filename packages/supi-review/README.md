@@ -8,7 +8,7 @@ Adds an interactive `/supi-review` command to the [pi coding agent](https://gith
 pi install npm:@mrclrchtr/supi-review
 ```
 
-This is a **beta** package. It is not bundled in `@mrclrchtr/supi`.
+This is a **beta** package. Install individually.
 
 For local development:
 

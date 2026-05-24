@@ -29,7 +29,7 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 - Keep small packages flat; add `config/`, `tool/`, `ui/`, `session/`, or other domain folders only when the package size and responsibilities clearly justify them.
 - Current anchor examples: `supi-lsp` uses the hybrid large-package model; `supi-insights` uses the standard package-level test layout.
 - This convention is the default for new packages and for existing packages when they receive structural work.
-- Packages that should stay flat unless they grow: `supi`, `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-rtk`, `supi-test-utils`.
+- Packages that should stay flat unless they grow: `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-rtk`, `supi-test-utils`.
 - `supi-web` should stay mostly flat, but may use `src/tool/` for per-tool guidance files and other narrowly scoped tool-specific wiring.
 
 ## Commands
@@ -47,42 +47,32 @@ Toolchain versions are pinned in `.mise.toml`.
 
 ## Architecture
 
-This repo has three install surfaces:
+This repo has two install surfaces:
 - repository root `package.json` exposes a `pi` manifest for local-path and git installs — supports `extensions`, `prompts`, `skills`, `themes` keys
-- each `packages/supi-*` which privides features is installable independently
-- `packages/supi/` is the published meta-package bundling the full stack
+- each `packages/supi-*` is installable independently
 
 ## Package tiers
 
-- **Production** packages are bundled in `@mrclrchtr/supi`.
-- **Beta** packages are experimental or niche and stay direct-install only.
+All packages are published independently. There is no meta-package — each package ships its own dependencies directly.
 
-**Promote to Production:** add the package to `dependencies` + `bundledDependencies`, wire it into `packages/supi/src/extension.ts` and `packages/supi/src/api.ts`, update root `package.json` `pi.extensions` if needed, then `pnpm install`.
+- Packages that depend on other `@mrclrchtr/supi-*` packages must list them in both `dependencies` and `bundledDependencies`.
+- Packages that bundle `@mrclrchtr/supi-*` dependencies must reference their extension entrypoints in `pi.extensions`.
 
-**Demote to Beta:** remove it from bundled surfaces and root `pi.extensions` as needed, delete `src/<name>.ts` if present, prune unused external deps, then `pnpm install`.
+New packages should be added to the root `package.json` `pi.extensions` array for development convenience.
 
 ## Packaging conventions
 
 - Every published SuPi package exposes explicit `./api` and `./extension` exports. Do not rely on package-root (`.`) imports or cross-package `src/...` deep imports.
 - `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` manifest entries must remain **real package-relative file paths**. Do not replace them with `exports` aliases.
-- The published meta-package `@mrclrchtr/supi` bundles all Production sub-packages via `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
-- Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`.
-- When a package bundles another `@mrclrchtr/supi-*` package, reference that
-  package's extension in `pi.extensions` via `node_modules/<pkg>/src/extension.ts`.
-  Otherwise, standalone `pi install npm:@mrclrchtr/supi-<name>` won't load the
-  bundled extension — pi only reads the top-level installed package's `pi.extensions`.
-- The meta-package (`@mrclrchtr/supi`) is exempt — it uses its own aggregated
-  extension (`packages/supi/src/extension.ts`) that imports and invokes all
-  sub-package extensions manually rather than relying on pi manifest discovery.
-- Adding bundled extension references breaks `expectExplicitSurface` in
-  `scripts/__tests__/pack-staged.test.mjs` — use `.toContain("./src/extension.ts")`,
-  not `.toEqual(["./src/extension.ts"])`.
+- Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
+- When a package bundles another `@mrclrchtr/supi-*` package, reference that package's extension in `pi.extensions` via `node_modules/<pkg>/src/extension.ts`. Otherwise, standalone `pi install npm:@mrclrchtr/supi-<name>` won't load the bundled extension — pi only reads the top-level installed package's `pi.extensions`.
+- Adding bundled extension references breaks `expectExplicitSurface` in `scripts/__tests__/pack-staged.test.mjs` — use `.toContain("./src/extension.ts")`, not `.toEqual(["./src/extension.ts"])`.
 - Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
 - For the publish pipeline (staging, manifest export, npm pack, verification), see the **Publish pipeline** section.
 
 ## Self-registering resources via `resources_discover`
 
-SuPi extensions self-register their prompts, skills, and themes using the `resources_discover` event rather than relying on static `pi.prompts` / `pi.skills` / `pi.themes` in `package.json`. This ensures resources are discovered regardless of whether the package is installed standalone or consumed through the meta-package (`@mrclrchtr/supi`).
+SuPi extensions self-register their prompts, skills, and themes using the `resources_discover` event rather than relying on static `pi.prompts` / `pi.skills` / `pi.themes` in `package.json`. This ensures resources are discovered regardless of whether the package is installed standalone or consumed through the workspace root.
 
 Pattern:
 ```ts
@@ -124,7 +114,7 @@ registerSettings({
 
 - Call `registerSettings()` during the extension factory function (not in async handlers)
 - The registry stores `SettingItem[]` compatible with pi-tui's `SettingsList`
-- `/supi-settings` (registered by `packages/supi-core/src/extension.ts`, or indirectly by the meta-package aggregated extension) renders all registered sections
+- `/supi-settings` (registered by `packages/supi-core/src/extension.ts`) renders all registered sections
 - Scope toggle (Tab) switches between project/global config; values are strings — extensions handle string↔typed conversion
 - `loadValues(scope, cwd)` should use raw scope reads (`loadSupiConfigForScope()`), while `loadSupiConfig()` is for merged runtime config
 - For config-backed sections, prefer `registerConfigSettings()` in `supi-core` over manual `registerSettings()` + `loadSupiConfigForScope()` + `writeSupiConfig()` wiring
@@ -144,7 +134,6 @@ registerSettings({
 - Pi core peer deps (`@earendil-works/pi-*`, `typebox`) use `"*"` ranges per Pi package docs; do not tighten them.
 - Mark pi-provided peer deps (`@earendil-works/pi-*`, `typebox`) as optional via `peerDependenciesMeta` to prevent `npm install -g` from auto-installing them (which can pull in native addons like koffi that fail on newer Node.js versions).
 - Other runtime imports belong in `dependencies`, not `peerDependencies`.
-- External runtime deps belong to the standalone package that imports them. The meta-package is assembled from packed standalone tarballs, so avoid re-declaring third-party runtime deps in `packages/supi` unless the meta-package imports them directly.
 - `createBashTool` applies `commandPrefix` **before** `spawnHook`; if your hook needs the raw user command, strip the prefix manually and re-apply it to the result.
 - Run `pnpm install` before editing `.ts` files when editing dependencies.
 - Package-local `node_modules/@earendil-works/pi-*` copies can pin older PI typings after an upgrade — if one package “loses” a new PI field, run that package's scoped `tsc` and inspect `packages/<pkg>/node_modules/@earendil-works/pi-*` before assuming the docs are wrong.
@@ -174,20 +163,19 @@ registerSettings({
 
 Published npm tarballs must produce npm-compatible manifests because PI installs packages via `npm install`. The pipeline has four stages:
 
-1. **Standalone staging** — `scripts/pack-staged.mjs` copies a workspace package into a clean staging directory. For ordinary packages this still dereferences workspace symlinks; for `packages/supi` it stages only the meta-package's own files.
+1. **Standalone staging** — `scripts/pack-staged.mjs` copies a workspace package into a clean staging directory, dereferencing workspace symlinks.
 2. **Manifest export** — `scripts/staged-manifests.mjs` uses pnpm's `@pnpm/exportable-manifest` to rewrite staged workspace `package.json` files: `workspace:*` → exact version (`1.5.0`), `workspace:~` → `~1.5.0`, `workspace:^` → `^1.5.0`. It also strips `devDependencies` from publish manifests so private workspace-only test utilities never leak, and preserves `bundledDependencies`.
-3. **Meta-package assembly from real artifacts** — `packages/supi` is assembled from already-packed standalone Production tarballs extracted into `node_modules/`. This makes standalone tarballs the source of truth instead of raw workspace layout.
-4. **npm pack + tarball verification** — The cleaned staged directory is packed with `npm pack`, then `scripts/verify-tarball.mjs` rejects `../` paths and `workspace:` protocol in every packed `package.json` and checks extraction succeeds.
+3. **npm pack + tarball verification** — The cleaned staged directory is packed with `npm pack`, then `scripts/verify-tarball.mjs` rejects `../` paths and `workspace:` protocol in every packed `package.json` and checks extraction succeeds.
 
 Run:
 ```bash
 node scripts/publish.mjs packages/supi-lsp     # pack + verify
-node scripts/publish.mjs packages/supi --publish  # pack + verify + publish
+node scripts/publish.mjs packages/supi-lsp --publish  # pack + verify + publish
 ```
 
 The `pack:check` and `pack:verify` commands in `pnpm verify` run this pipeline for all publishable packages.
 
-Root cause for the staging pipeline: direct `pnpm pack` on the meta-package (`packages/supi`) produces tarball entries with `../` paths to the root `node_modules`. The staged `cp -RL` + `npm pack` approach avoids this because npm produces correct bundled tarballs from a flat, dereferenced `node_modules`.
+Root cause for the staging pipeline: direct `pnpm pack` on workspace packages produces tarball entries with `../` paths to the root `node_modules`. The staged `cp -RL` + `npm pack` approach avoids this because npm produces correct tarballs from a flat, dereferenced `node_modules`.
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli)
 - RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward
 

@@ -60,11 +60,9 @@ describe("packed package import surfaces", () => {
   }, async () => {
     const corePackage = `${SUPI_SCOPE}supi-core`;
     const webPackage = `${SUPI_SCOPE}supi-web`;
-    const metaPackage = `${SUPI_SCOPE}supi`;
     const cases = [
       ["packages/supi-core", corePackage],
       ["packages/supi-web", webPackage],
-      ["packages/supi", metaPackage],
     ];
 
     for (const [packageDir, packageName] of cases) {
@@ -78,7 +76,5 @@ describe("packed package import surfaces", () => {
     expect(() => projectRequire.resolve(`${corePackage}/extension`)).not.toThrow();
     expect(() => projectRequire.resolve(`${webPackage}/api`)).not.toThrow();
     expect(() => projectRequire.resolve(`${webPackage}/extension`)).not.toThrow();
-    expect(() => projectRequire.resolve(`${metaPackage}/api`)).not.toThrow();
-    expect(() => projectRequire.resolve(`${metaPackage}/extension`)).not.toThrow();
   });
 });

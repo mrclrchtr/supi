@@ -13,9 +13,6 @@ function readJson(filePath) {
  * reference their extension entrypoints in pi.extensions via
  * node_modules/<pkg>/src/extension.ts. Without this, standalone
  * pi install of the package won't load the bundled extensions.
- *
- * The meta-package (@mrclrchtr/supi) is exempt — it uses an aggregated
- * extension entrypoint that manually imports all sub-package extensions.
  */
 describe("bundled extension references", () => {
   const packageDirs = readdirSync(PACKAGES_DIR)
@@ -32,7 +29,7 @@ describe("bundled extension references", () => {
   for (const dir of packageDirs) {
     const pkg = readJson(join(dir, "package.json"));
     const name = pkg.name;
-    if (!name || name === "@mrclrchtr/supi") continue;
+    if (!name) continue;
 
     const bundled = (pkg.bundledDependencies ?? []).filter((b) => b.startsWith("@mrclrchtr/"));
     if (bundled.length === 0) continue;

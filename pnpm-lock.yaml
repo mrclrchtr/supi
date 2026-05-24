@@ -55,46 +55,6 @@ importers:
         specifier: 0.26.9
         version: 0.26.9
 
-  packages/supi:
-    dependencies:
-      '@earendil-works/pi-coding-agent':
-        specifier: '*'
-        version: 0.74.0(ws@8.20.1)(zod@4.4.3)
-      '@mrclrchtr/supi-ask-user':
-        specifier: workspace:*
-        version: link:../supi-ask-user
-      '@mrclrchtr/supi-bash-timeout':
-        specifier: workspace:*
-        version: link:../supi-bash-timeout
-      '@mrclrchtr/supi-claude-md':
-        specifier: workspace:*
-        version: link:../supi-claude-md
-      '@mrclrchtr/supi-code-intelligence':
-        specifier: workspace:*
-        version: link:../supi-code-intelligence
-      '@mrclrchtr/supi-context':
-        specifier: workspace:*
-        version: link:../supi-context
-      '@mrclrchtr/supi-core':
-        specifier: workspace:*
-        version: link:../supi-core
-      '@mrclrchtr/supi-debug':
-        specifier: workspace:*
-        version: link:../supi-debug
-      '@mrclrchtr/supi-extras':
-        specifier: workspace:*
-        version: link:../supi-extras
-      '@mrclrchtr/supi-lsp':
-        specifier: workspace:*
-        version: link:../supi-lsp
-      '@mrclrchtr/supi-tree-sitter':
-        specifier: workspace:*
-        version: link:../supi-tree-sitter
-    devDependencies:
-      vitest:
-        specifier: 4.1.7
-        version: 4.1.7(@types/node@25.9.1)(jsdom@29.1.1)(vite@8.0.13(@types/node@25.9.1)(jiti@2.7.0)(yaml@2.9.0))
-
   packages/supi-ask-user:
     dependencies:
       '@earendil-works/pi-coding-agent':

@@ -8,7 +8,7 @@ Adds a `/supi-insights` command to the [pi coding agent](https://github.com/eare
 pi install npm:@mrclrchtr/supi-insights
 ```
 
-This is a **beta** package. It is not bundled in `@mrclrchtr/supi`.
+This is a **beta** package. Install individually.
 
 For local development:
 

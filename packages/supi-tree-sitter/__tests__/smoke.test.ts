@@ -28,11 +28,4 @@ describe("supi-tree-sitter smoke", () => {
       "tree_sitter_query",
     ]);
   });
-
-  it("the meta-package aggregated extension surface is importable", {
-    timeout: 20_000,
-  }, async () => {
-    const metaExtension = await import("../../supi/src/extension.ts");
-    expect(typeof metaExtension.default).toBe("function");
-  });
 });

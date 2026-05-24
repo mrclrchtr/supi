@@ -1,17 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { rewriteStagedManifests } from "./staged-manifests.mjs";
@@ -120,173 +111,6 @@ function stageWorkspacePackage(packageDir, stageDir) {
   execFileSync("cp", ["-RL", `${packageDir}/.`, stageDir]);
 }
 
-function stageMetaPackageSource(packageDir, stageDir) {
-  for (const entry of readdirSync(packageDir, { withFileTypes: true })) {
-    if (entry.name === "node_modules") continue;
-    cpSync(join(packageDir, entry.name), join(stageDir, entry.name), {
-      recursive: true,
-      dereference: true,
-      force: true,
-    });
-  }
-}
-
-function collectWorkspacePackages(packageDir) {
-  const packagesDir = dirname(packageDir);
-  const map = new Map();
-
-  for (const entry of readdirSync(packagesDir, { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const dir = join(packagesDir, entry.name);
-    const manifestPath = join(dir, "package.json");
-    if (!existsSync(manifestPath)) continue;
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-    if (typeof manifest.name === "string") {
-      map.set(manifest.name, { dir, manifest });
-    }
-  }
-
-  return map;
-}
-
-function resolveWorkspaceSpec(spec, version) {
-  if (spec === "workspace:*") return version;
-  if (spec === "workspace:^") return `^${version}`;
-  if (spec === "workspace:~") return `~${version}`;
-  if (spec.startsWith("workspace:")) return spec.slice("workspace:".length);
-  return spec;
-}
-
-function getWorkspacePackageOrThrow(workspacePackages, packageName, context) {
-  const workspacePkg = workspacePackages.get(packageName);
-  if (!workspacePkg) {
-    throw new Error(`Unable to resolve ${context}: ${packageName}`);
-  }
-  return workspacePkg;
-}
-
-function addExternalDependency(collected, depName, depSpec, sourceName) {
-  const existing = collected[depName];
-  if (!existing) {
-    collected[depName] = depSpec;
-    return;
-  }
-  if (existing !== depSpec) {
-    throw new Error(
-      `Conflicting external dependency specs for ${depName}: ${existing} vs ${depSpec} (from ${sourceName})`,
-    );
-  }
-}
-
-function collectManifestExternalDependencies(manifest, collected, sourceName) {
-  for (const [depName, depSpec] of Object.entries(manifest.dependencies ?? {})) {
-    if (typeof depSpec !== "string" || depName.startsWith("@mrclrchtr/")) continue;
-    addExternalDependency(collected, depName, depSpec, sourceName);
-  }
-}
-
-function collectBundledWorkspaceNames(bundledDependencies) {
-  return (bundledDependencies ?? []).filter((packageName) => packageName.startsWith("@mrclrchtr/"));
-}
-
-function collectBundledExternalRuntimeDependencies(workspacePackages, bundledDependencies) {
-  const collected = {};
-  const visited = new Set();
-
-  function visitWorkspacePackage(packageName) {
-    if (visited.has(packageName)) return;
-    visited.add(packageName);
-
-    const workspacePkg = getWorkspacePackageOrThrow(
-      workspacePackages,
-      packageName,
-      "bundled workspace package",
-    );
-    collectManifestExternalDependencies(workspacePkg.manifest, collected, packageName);
-
-    for (const bundledName of collectBundledWorkspaceNames(
-      workspacePkg.manifest.bundledDependencies,
-    )) {
-      visitWorkspacePackage(bundledName);
-    }
-  }
-
-  for (const packageName of collectBundledWorkspaceNames(bundledDependencies)) {
-    visitWorkspacePackage(packageName);
-  }
-
-  return collected;
-}
-
-function resolveMetaWorkspaceDependencies(pkg, workspacePackages) {
-  for (const field of ["dependencies", "peerDependencies", "optionalDependencies"]) {
-    const deps = pkg[field];
-    if (!deps || typeof deps !== "object") continue;
-
-    for (const [depName, depSpec] of Object.entries(deps)) {
-      if (typeof depSpec !== "string" || !depSpec.startsWith("workspace:")) continue;
-      const workspacePkg = getWorkspacePackageOrThrow(
-        workspacePackages,
-        depName,
-        "workspace dependency for meta-package",
-      );
-      deps[depName] = resolveWorkspaceSpec(depSpec, workspacePkg.manifest.version);
-    }
-  }
-}
-
-function rewriteMetaRootManifest(stageDir, workspacePackages, bundledDependencies) {
-  const manifestPath = join(stageDir, "package.json");
-  const pkg = JSON.parse(readFileSync(manifestPath, "utf8"));
-
-  resolveMetaWorkspaceDependencies(pkg, workspacePackages);
-  pkg.dependencies = {
-    ...(pkg.dependencies ?? {}),
-    ...collectBundledExternalRuntimeDependencies(workspacePackages, bundledDependencies),
-  };
-
-  delete pkg.devDependencies;
-  if (pkg.bundledDependencies && !pkg.bundleDependencies) {
-    pkg.bundleDependencies = pkg.bundledDependencies;
-  }
-
-  writeFileSync(manifestPath, `${JSON.stringify(pkg, null, 2)}\n`);
-}
-
-async function installMetaPackageBundles(stageDir, workspacePackages, bundledDependencies) {
-  if (!Array.isArray(bundledDependencies) || bundledDependencies.length === 0) return;
-
-  const tarballDir = mkdtempSync(join(tmpdir(), "supi-meta-bundles-"));
-
-  try {
-    for (const depName of bundledDependencies) {
-      const workspacePkg = workspacePackages.get(depName);
-      if (!workspacePkg) {
-        throw new Error(`Unable to resolve bundled workspace package: ${depName}`);
-      }
-
-      const tarball = await packStaged(workspacePkg.dir, { outDir: tarballDir });
-      const unpackDir = mkdtempSync(join(tmpdir(), "supi-meta-unpack-"));
-      const destDir = join(stageDir, "node_modules", ...depName.split("/"));
-
-      try {
-        execFileSync("tar", ["-xzf", tarball, "-C", unpackDir]);
-        mkdirSync(dirname(destDir), { recursive: true });
-        rmSync(destDir, { recursive: true, force: true });
-        cpSync(join(unpackDir, "package"), destDir, {
-          recursive: true,
-          dereference: true,
-          force: true,
-        });
-      } finally {
-        rmSync(unpackDir, { recursive: true, force: true });
-      }
-    }
-  } finally {
-    rmSync(tarballDir, { recursive: true, force: true });
-  }
-}
-
 export async function packStaged(packageDir, options = {}) {
   const dryRun = options.dryRun ?? false;
   const outDir = resolve(options.outDir ?? process.cwd());
@@ -297,20 +121,13 @@ export async function packStaged(packageDir, options = {}) {
   try {
     mkdirSync(stageDir, { recursive: true });
 
-    if (pkg.name === "@mrclrchtr/supi") {
-      const workspacePackages = collectWorkspacePackages(packageDir);
-      stageMetaPackageSource(packageDir, stageDir);
-      rewriteMetaRootManifest(stageDir, workspacePackages, pkg.bundledDependencies);
-      await installMetaPackageBundles(stageDir, workspacePackages, pkg.bundledDependencies);
-    } else {
-      // cp -RL dereferences symlinks (needed for pnpm workspace symlinks) but
-      // fails on broken symlinks created by pnpm's hoisted linker. Remove
-      // broken symlinks before the copy so cp -RL succeeds.
-      stageWorkspacePackage(packageDir, stageDir);
+    // cp -RL dereferences symlinks (needed for pnpm workspace symlinks) but
+    // fails on broken symlinks created by pnpm's hoisted linker. Remove
+    // broken symlinks before the copy so cp -RL succeeds.
+    stageWorkspacePackage(packageDir, stageDir);
 
-      // Rewrite staged manifests to npm-compatible publish manifests
-      await rewriteStagedManifests(stageDir);
-    }
+    // Rewrite staged manifests to npm-compatible publish manifests
+    await rewriteStagedManifests(stageDir);
 
     if (dryRun) {
       console.log(`Staged pack dry-run: ${pkg.name} (${packageDir})`);

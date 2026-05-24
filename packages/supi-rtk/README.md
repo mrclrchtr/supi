@@ -8,7 +8,7 @@ Adds RTK-backed bash rewriting to the [pi coding agent](https://github.com/earen
 pi install npm:@mrclrchtr/supi-rtk
 ```
 
-This is a **beta** package. It is not bundled in `@mrclrchtr/supi`.
+This is a **beta** package. Install individually.
 
 For local development:
 
