@@ -111,6 +111,87 @@ function stageWorkspacePackage(packageDir, stageDir) {
   execFileSync("cp", ["-RL", `${packageDir}/.`, stageDir]);
 }
 
+/**
+ * Resolve a bundled dependency name (e.g. "vscode-languageserver-protocol"
+ * or "@mrclrchtr/supi-core") to the real absolute path in the workspace
+ * root node_modules. Returns null when the package is not installed.
+ */
+function resolveBundledDepPath(depName) {
+  const rootNm = resolve("node_modules");
+  const candidate = join(rootNm, ...depName.split("/"));
+
+  // For workspace packages the root node_modules entry is a symlink
+  // pointing into packages/<pkg>. Follow it to the real source so
+  // cp -RL dereferences the full package tree.
+  if (existsSync(candidate)) {
+    return candidate;
+  }
+
+  return null;
+}
+
+/**
+ * Ensure a single bundled dependency is present in the staged tree.
+ * Copies it from the workspace root node_modules when missing, then
+ * returns its local path for recursive enqueueing.
+ */
+function ensureBundledDep(localNm, depName, pjPath) {
+  const localPath = join(localNm, ...depName.split("/"));
+
+  if (!existsSync(localPath)) {
+    const sourcePath = resolveBundledDepPath(depName);
+    if (!sourcePath) {
+      console.warn(
+        `Bundled dependency "${depName}" declared in ${pjPath} not found in workspace root — skipping`,
+      );
+      return null;
+    }
+    execFileSync("cp", ["-RL", `${sourcePath}/.`, localPath]);
+  }
+
+  return localPath;
+}
+
+/**
+ * Recursively ensure every bundledDependency declared in a
+ * package.json inside the staging tree is physically present.
+ *
+ * pnpm may hoist a dependency to the workspace root without creating
+ * a local node_modules symlink for it.  cp -RL only copies what is
+ * inside the package directory, so those hoisted deps are missing
+ * from the staged copy.  We resolve them from the root node_modules
+ * and copy them into place so npm pack can include them.
+ */
+function copyMissingBundledDeps(stageDir) {
+  const queue = [stageDir];
+
+  while (queue.length > 0) {
+    const currentDir = queue.shift();
+    const pjPath = join(currentDir, "package.json");
+    if (!existsSync(pjPath)) continue;
+
+    let pkgJson;
+    try {
+      pkgJson = JSON.parse(readFileSync(pjPath, "utf8"));
+    } catch {
+      continue;
+    }
+
+    const bundled = pkgJson.bundledDependencies;
+    if (!Array.isArray(bundled) || bundled.length === 0) continue;
+
+    const localNm = join(currentDir, "node_modules");
+    mkdirSync(localNm, { recursive: true });
+
+    for (const depName of bundled) {
+      const depPath = ensureBundledDep(localNm, depName, pjPath);
+      if (depPath) {
+        queue.push(depPath);
+      }
+    }
+  }
+}
+
 export async function packStaged(packageDir, options = {}) {
   const dryRun = options.dryRun ?? false;
   const outDir = resolve(options.outDir ?? process.cwd());
@@ -125,6 +206,10 @@ export async function packStaged(packageDir, options = {}) {
     // fails on broken symlinks created by pnpm's hoisted linker. Remove
     // broken symlinks before the copy so cp -RL succeeds.
     stageWorkspacePackage(packageDir, stageDir);
+
+    // Resolve any bundledDependencies that pnpm hoisted to the workspace
+    // root without creating local node_modules symlinks.
+    copyMissingBundledDeps(stageDir);
 
     // Rewrite staged manifests to npm-compatible publish manifests
     await rewriteStagedManifests(stageDir);
