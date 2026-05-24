@@ -1,0 +1,27 @@
+schema_version = 1
+id = "TNDM-VEVEXM"
+title = "Remove text-presence tests in tool guidance / descriptions"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "task-01"
+path = "tasks/task-01.md"
+
+[[documents]]
+name = "task-02"
+path = "tasks/task-02.md"
+
+[[documents]]
+name = "task-03"
+path = "tasks/task-03.md"

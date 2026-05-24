@@ -1,11 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildTsToolPromptSurfaces } from "../../src/tree-sitter/guidance.ts";
 import {
   executeExports,
   executeImports,
   executeOutline,
 } from "../../src/tree-sitter/tool-actions.ts";
-import { TS_TOOL_SPECS } from "../../src/tree-sitter/tool-specs.ts";
 
 describe("tree-sitter tool actions — validation", () => {
   it("executeOutline returns unsupported language for non-JS/TS", async () => {
@@ -58,16 +56,5 @@ describe("tree-sitter tool actions — validation", () => {
     expect(result).toContain("foo");
     expect(result).toContain("Bar");
     expect(result).toContain("Outline");
-  });
-});
-
-describe("tree-sitter guidance", () => {
-  it("builds prompt surfaces for all 6 tools", () => {
-    const surfaces = buildTsToolPromptSurfaces();
-    for (const spec of TS_TOOL_SPECS) {
-      const surface = surfaces[spec.name];
-      expect(surface.description.length).toBeGreaterThan(0);
-      expect(surface.promptSnippet).toContain(spec.name);
-    }
   });
 });

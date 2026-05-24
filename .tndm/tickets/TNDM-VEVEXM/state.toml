@@ -1,0 +1,26 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T21:31:03.701554Z"
+revision = 20
+
+[document_fingerprints]
+archive = "sha256:d0f02134bb2207cff4dc7f63ddcf227a4a503ebc4d31ac03842c953497c62ec6"
+content = "sha256:6e36a5b1f499fd9988205d24dd734ccd2e40979ff12fb9116b69dfb6acd4c073"
+task-01 = "sha256:e44b01f63a11b19799ebf1e07a6f70c3d7bce78157ba97dc7bd948dbd496606c"
+task-02 = "sha256:d70557c2e5f2a9af73165b238a38d138e9d274ed285adc64d87f4243db26056d"
+task-03 = "sha256:1bbdd4d4560ded82376b45c14b177565280bb47dd18607392669aa6e7db8403e"
+
+[[tasks]]
+number = 1
+title = "Remove 8 dedicated guidance test files"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Remove embedded text-presence assertion blocks"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Verify all remaining tests pass"
+status = "done"

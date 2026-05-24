@@ -64,23 +64,6 @@ describe("focused code intelligence tool registration", () => {
     expect(tsTools.length).toBe(6);
   });
 
-  it("keeps descriptions focused on each tool contract", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const brief = getTool(pi, "code_brief");
-    const map = getTool(pi, "code_map");
-    const relations = getTool(pi, "code_relations");
-    const affected = getTool(pi, "code_affected");
-    const pattern = getTool(pi, "code_pattern");
-
-    expect(brief.description).toContain("brief");
-    expect(map.description).toContain("map");
-    expect(relations.description).toContain("callers");
-    expect(affected.description).toContain("blast radius");
-    expect(pattern.description).toContain("search");
-  });
-
   it("registers a relation kind parameter on code_relations", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
