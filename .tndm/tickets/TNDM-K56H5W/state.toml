@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-24T22:13:47.88864Z"
+revision = 29
+
+[document_fingerprints]
+archive = "sha256:fff081d7cd7a7852860282c8eb7ed146e69fc67f167a2e0eab6647fe30aa1ce6"
+content = "sha256:54699a5943ac921860a7311cee67caf24c4e39043d868bc3bd520e6d35902825"
+task-01 = "sha256:0f90def32f47cc58d8b2702c7fff16fba6e89b02a0660fa488525507ab711d80"
+task-02 = "sha256:80ef0a0a4690ce27efabeced56a2c474a206551a0fb40ff60ee3ec115b96454d"
+task-03 = "sha256:7b228b7e1c97834b7d28c9a13b1c01657d0e9fd20e5c887b45eb683bc2dc9aae"
+task-04 = "sha256:ec4a665d8e82cad7654e7f4cdb264a30d2f7e87294c306cd49454f3b99dc3aca"
+task-05 = "sha256:5c88f3a20b56b4457ec157efbb6de2001a7ad3a324df36cecbd31b2af0ea1910"
+
+[[tasks]]
+number = 1
+title = "Apply the non-committing revert baseline for 37ed313 and restore package ownership files"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Restore supi-lsp as the owner of the LSP extension surface and its tests"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Restore supi-tree-sitter as the owner of the tree_sitter_* extension surface and tests"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Slim supi-code-intelligence back to code_* orchestration only"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Re-apply independent fixes selectively and finish cross-package packaging verification"
+status = "done"

@@ -30,7 +30,9 @@ Install individual packages from the table below. For the full stack, install fr
 
 | Install | Description |
 |---|---|
-| `pi install npm:@mrclrchtr/supi-code-intelligence` | All-in-one code understanding: architecture briefs, caller/callee analysis, impact assessment, LSP semantic navigation, and structural AST inspection |
+| `pi install npm:@mrclrchtr/supi-lsp` | Go-to-definition, references, rename, hover types, inline diagnostics |
+| `pi install npm:@mrclrchtr/supi-tree-sitter` | AST-level structural analysis — outline, imports, exports, queries |
+| `pi install npm:@mrclrchtr/supi-code-intelligence` | Architecture briefs, caller/callee analysis, impact assessment |
 | `pi install npm:@mrclrchtr/supi-ask-user` | Structured decision forms for agent-user handoff |
 | `pi install npm:@mrclrchtr/supi-claude-md` | Subdirectory context injection + CLAUDE.md maintenance skills |
 | `pi install npm:@mrclrchtr/supi-context` | Context window transparency — see what's eating tokens |
@@ -65,7 +67,7 @@ curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install
 ### Individual packages
 
 ```bash
-pi install npm:@mrclrchtr/supi-code-intelligence
+pi install npm:@mrclrchtr/supi-lsp
 pi install npm:@mrclrchtr/supi-web
 # ... any package from the tables above
 ```
