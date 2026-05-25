@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -101,18 +101,25 @@ describe("packStaged clean manifest", () => {
     tarball = await packStaged("packages/supi-lsp", { outDir });
 
     const pkg = extractJson(tarball, "package/package.json");
-    expect(pkg.bundledDependencies).toEqual([
-      "@mrclrchtr/supi-core",
-      "vscode-jsonrpc",
-      "vscode-languageserver-protocol",
-      "vscode-languageserver-types",
-    ]);
+    const sourcePkg = JSON.parse(
+      readFileSync(join(process.cwd(), "packages/supi-lsp/package.json"), "utf8"),
+    );
+    expect(pkg.bundledDependencies).toEqual(sourcePkg.bundledDependencies);
 
     // The bundled sub-package may or may not have its own bundledDependencies,
     // but if it does they should be preserved
     const corePkg = extractJson(tarball, "package/node_modules/@mrclrchtr/supi-core/package.json");
     // supi-core doesn't have bundledDeps in source, so it should stay absent
     expect(corePkg.bundledDependencies).toBeUndefined();
+  });
+
+  it("packs packages/supi-code-intelligence despite transitive dev-dependency cycles", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi-code-intelligence", { outDir });
+
+    const pkg = extractJson(tarball, "package/package.json");
+    expect(pkg.name).toBe("@mrclrchtr/supi-code-intelligence");
   });
 
   it("publishes explicit api and extension subpaths for packages/supi-ask-user", {

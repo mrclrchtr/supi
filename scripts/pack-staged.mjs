@@ -127,10 +127,14 @@ function removeCyclicDevDepSymlinks(packageDir) {
   }
 }
 
+function copyPackageTree(sourceDir, destDir) {
+  removeKnownBrokenSymlinks(sourceDir);
+  removeCyclicDevDepSymlinks(sourceDir);
+  execFileSync("cp", ["-RL", `${sourceDir}/.`, destDir]);
+}
+
 function stageWorkspacePackage(packageDir, stageDir) {
-  removeKnownBrokenSymlinks(packageDir);
-  removeCyclicDevDepSymlinks(packageDir);
-  execFileSync("cp", ["-RL", `${packageDir}/.`, stageDir]);
+  copyPackageTree(packageDir, stageDir);
 }
 
 /**
@@ -168,7 +172,11 @@ function ensureBundledDep(localNm, depName, pjPath) {
       );
       return null;
     }
-    execFileSync("cp", ["-RL", `${sourcePath}/.`, localPath]);
+    if (depName.startsWith("@mrclrchtr/")) {
+      copyPackageTree(sourcePath, localPath);
+    } else {
+      execFileSync("cp", ["-RL", `${sourcePath}/.`, localPath]);
+    }
   }
 
   return localPath;

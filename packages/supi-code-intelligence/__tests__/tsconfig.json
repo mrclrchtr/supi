@@ -3,8 +3,17 @@
   "include": ["**/*.ts", "../src/**/*.ts"],
   "exclude": [],
   "references": [
-    { "path": "../../supi-core" },
-    { "path": "../../supi-lsp" },
-    { "path": "../../supi-tree-sitter" }
+    {
+      "path": "../../supi-core"
+    },
+    {
+      "path": "../../supi-lsp"
+    },
+    {
+      "path": "../../supi-tree-sitter"
+    },
+    {
+      "path": "../../supi-test-utils"
+    }
   ]
 }

@@ -8,5 +8,12 @@
     "../src/**/*.ts"
   ],
   "exclude": [],
-  "references": [{ "path": "../../supi-core" }]
+  "references": [
+    {
+      "path": "../../supi-core"
+    },
+    {
+      "path": "../../supi-test-utils"
+    }
+  ]
 }
