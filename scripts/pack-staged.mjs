@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -95,36 +95,78 @@ function removeKnownBrokenSymlinks(packageDir) {
  * Remove @mrclrchtr devDependency symlinks that would create cycles.
  *
  * pnpm hoists transitive devDeps into a package's node_modules/@mrclrchtr/.
- * When the package has @mrclrchtr/supi-X as a devDep, and supi-X has
- * this package as a regular dep + bundledDep, cp -RL follows the symlink
+ * When the package has @mrclrchtr/supi-X as a regular dep + bundledDep,
+ * and supi-X has this package as a devDep, cp -RL follows the symlink
  * chain into supi-X, which has a symlink back to this package — a cycle.
+ *
+ * The same cycle can appear at any nesting depth (e.g. A → B → A, where
+ * B is a regular dep of A and A is a devDep of B). This function recurses
+ * into every @mrclrchtr dependency to remove devDep symlinks at every
+ * level, breaking all transitive dev-dependency cycles.
  *
  * DevDependencies are never included in the published tarball, so it is
  * safe to remove them from the source tree before staging.
  */
 function removeCyclicDevDepSymlinks(packageDir) {
-  const pkgPath = join(packageDir, "package.json");
-  if (!existsSync(pkgPath)) return;
+  const visited = new Set();
 
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-  const devDeps = new Set(Object.keys(pkg.devDependencies || {}));
-  const bundled = new Set(pkg.bundledDependencies || []);
-
-  for (const depName of devDeps) {
-    if (!depName.startsWith("@mrclrchtr/")) continue;
-    // Keep bundled deps even if also listed as devDep
-    if (bundled.has(depName)) continue;
-
-    const symlinkPath = join(packageDir, "node_modules", ...depName.split("/"));
+  function cleanDir(dir) {
+    // Resolve the real path so shared workspace symlinks are deduplicated
+    let realDir;
     try {
-      const stat = lstatSync(symlinkPath);
-      if (stat.isSymbolicLink() || stat.isDirectory()) {
-        rmSync(symlinkPath, { recursive: true, force: true });
-      }
+      realDir = realpathSync(dir);
     } catch {
-      // Symlink doesn't exist — nothing to remove
+      return; // Broken symlink — nothing to clean
+    }
+    if (visited.has(realDir)) return;
+    visited.add(realDir);
+
+    const pkgPath = join(dir, "package.json");
+    if (!existsSync(pkgPath)) return;
+
+    let pkg;
+    try {
+      pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+    } catch {
+      return;
+    }
+
+    const devDeps = new Set(Object.keys(pkg.devDependencies || {}));
+    const bundled = new Set(pkg.bundledDependencies || []);
+
+    for (const depName of devDeps) {
+      if (!depName.startsWith("@mrclrchtr/")) continue;
+      // Keep bundled deps even if also listed as devDep
+      if (bundled.has(depName)) continue;
+
+      const symlinkPath = join(dir, "node_modules", ...depName.split("/"));
+      try {
+        const stat = lstatSync(symlinkPath);
+        if (stat.isSymbolicLink() || stat.isDirectory()) {
+          rmSync(symlinkPath, { recursive: true, force: true });
+        }
+      } catch {
+        // Symlink doesn't exist — nothing to remove
+      }
+    }
+
+    // Recurse into remaining @mrclrchtr dependencies to clean their
+    // nested devDep symlinks as well
+    const mrclrchtrDir = join(dir, "node_modules", "@mrclrchtr");
+    let entries;
+    try {
+      entries = readdirSync(mrclrchtrDir, { withFileTypes: true });
+    } catch {
+      return; // Directory doesn't exist — nothing to recurse into
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+      cleanDir(join(mrclrchtrDir, entry.name));
     }
   }
+
+  cleanDir(packageDir);
 }
 
 function copyPackageTree(sourceDir, destDir) {
