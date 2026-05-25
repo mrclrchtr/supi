@@ -1,4 +1,4 @@
-import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/api";
+import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/types";
 import { describe, expect, it } from "vitest";
 
 describe("CodePosition", () => {

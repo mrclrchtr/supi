@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import * as projectRoots from "@mrclrchtr/supi-core/api";
+import * as projectRoots from "@mrclrchtr/supi-core/project";
 import { isGlobMatch } from "../pattern-matcher.ts";
 import { resolveSessionPath } from "../utils.ts";
 

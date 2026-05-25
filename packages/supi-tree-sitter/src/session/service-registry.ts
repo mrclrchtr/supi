@@ -2,7 +2,7 @@
 // Peer extensions can import `getSessionTreeSitterService` from the package API
 // to reuse the active structural runtime without creating duplicate sessions.
 
-import { createSessionStateRegistry } from "@mrclrchtr/supi-core/api";
+import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
 import type { SessionTreeSitterService, SessionTreeSitterServiceState } from "../types.ts";
 
 const registry = createSessionStateRegistry<SessionTreeSitterServiceState>(

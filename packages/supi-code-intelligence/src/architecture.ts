@@ -3,7 +3,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { findProjectRoot, isWithinOrEqual, walkProject } from "@mrclrchtr/supi-core/api";
+import { findProjectRoot, isWithinOrEqual, walkProject } from "@mrclrchtr/supi-core/project";
 
 // ── Types ─────────────────────────────────────────────────────────────
 

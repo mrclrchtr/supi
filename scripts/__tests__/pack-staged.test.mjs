@@ -23,13 +23,32 @@ function listTarballEntries(tarballPath) {
   return listing.trim().split("\n").filter(Boolean);
 }
 
-function expectExplicitSurface(pkg, entries) {
+const CORE_EXPORTS = {
+  "./api": "./src/api.ts",
+  "./config": "./src/config.ts",
+  "./context": "./src/context.ts",
+  "./debug": "./src/debug-registry.ts",
+  "./extension": "./src/extension.ts",
+  "./package.json": "./package.json",
+  "./path": "./src/path.ts",
+  "./project": "./src/project.ts",
+  "./session": "./src/session.ts",
+  "./settings": "./src/settings.ts",
+  "./settings-ui": "./src/settings-ui.ts",
+  "./terminal": "./src/terminal.ts",
+  "./tool-framework": "./src/tool-framework.ts",
+  "./types": "./src/types.ts",
+};
+
+const MINIMAL_EXPORTS = {
+  "./api": "./src/api.ts",
+  "./extension": "./src/extension.ts",
+  "./package.json": "./package.json",
+};
+
+function expectExplicitSurface(pkg, entries, pkgName) {
   expect(pkg.main).toBe("src/api.ts");
-  expect(pkg.exports).toEqual({
-    "./api": "./src/api.ts",
-    "./extension": "./src/extension.ts",
-    "./package.json": "./package.json",
-  });
+  expect(pkg.exports).toEqual(pkgName === "supi-core" ? CORE_EXPORTS : MINIMAL_EXPORTS);
   expect(pkg.pi?.extensions).toContain("./src/extension.ts");
   expect(entries).toContain("package/src/api.ts");
   expect(entries).toContain("package/src/extension.ts");
@@ -104,7 +123,7 @@ describe("packStaged clean manifest", () => {
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
-    expectExplicitSurface(pkg, entries);
+    expectExplicitSurface(pkg, entries, "supi-ask-user");
   });
 
   it("publishes explicit api and extension subpaths for packages/supi-core", {
@@ -114,7 +133,7 @@ describe("packStaged clean manifest", () => {
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
-    expectExplicitSurface(pkg, entries);
+    expectExplicitSurface(pkg, entries, "supi-core");
   });
 
   it("publishes explicit api and extension subpaths for packages/supi-web", {
@@ -124,6 +143,6 @@ describe("packStaged clean manifest", () => {
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
-    expectExplicitSurface(pkg, entries);
+    expectExplicitSurface(pkg, entries, "supi-web");
   });
 });

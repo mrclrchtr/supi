@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/api";
+import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/terminal";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { type AskUserToolResult, buildErrorResult, buildResult } from "./render/result.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render/transcript.ts";

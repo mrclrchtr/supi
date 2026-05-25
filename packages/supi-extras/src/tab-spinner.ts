@@ -10,7 +10,7 @@
  * agent starts or the session shuts down.
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { formatTitle, signalDone } from "@mrclrchtr/supi-core/api";
+import { formatTitle, signalDone } from "@mrclrchtr/supi-core/terminal";
 
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const AGENT_END_SETTLE_MS = 200;

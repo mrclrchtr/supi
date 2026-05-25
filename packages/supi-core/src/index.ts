@@ -1,97 +1,30 @@
 // supi-core — shared infrastructure for SuPi extensions.
 // Provides XML context tag wrapping, unified config system, context-message utilities,
 // settings registry for supi-wide TUI settings, and a shared tool-spec/registration framework.
+//
+// Convenience barrel — re-exports all domain entry points.
+// For lighter imports, use one of the domain subpaths directly
+// (e.g. @mrclrchtr/supi-core/config, @mrclrchtr/supi-core/context).
 
-export type { SupiConfigLocation, SupiConfigOptions } from "./config/config.ts";
-export {
-  loadSupiConfig,
-  loadSupiConfigForScope,
-  readJsonFile,
-  removeSupiConfigKey,
-  writeSupiConfig,
-} from "./config/config.ts";
-export type { ConfigSettingsHelpers, ConfigSettingsOptions } from "./config/config-settings.ts";
-export { registerConfigSettings } from "./config/config-settings.ts";
-export type { ContextMessageLike } from "./context/context-messages.ts";
-export {
-  findLastUserMessageIndex,
-  getContextToken,
-  getPromptContent,
-  pruneAndReorderContextMessages,
-  restorePromptContent,
-} from "./context/context-messages.ts";
-export type { ContextProvider } from "./context/context-provider-registry.ts";
-export {
-  clearRegisteredContextProviders,
-  getRegisteredContextProviders,
-  registerContextProvider,
-} from "./context/context-provider-registry.ts";
-export { wrapExtensionContext } from "./context/context-tag.ts";
-export type {
-  DebugAgentAccess,
-  DebugEvent,
-  DebugEventInput,
-  DebugEventQuery,
-  DebugEventQueryResult,
-  DebugEventView,
-  DebugLevel,
-  DebugNotifyLevel,
-  DebugRegistryConfig,
-  DebugSummary,
-} from "./debug-registry.ts";
-export {
-  clearDebugEvents,
-  configureDebugRegistry,
-  DEBUG_REGISTRY_DEFAULTS,
-  getDebugEvents,
-  getDebugRegistryConfig,
-  getDebugSummary,
-  recordDebugEvent,
-  redactDebugData,
-  resetDebugRegistry,
-} from "./debug-registry.ts";
-export { fileToUri, resolveToolPath, stripToolPathPrefix, uriToFile } from "./path-utils.ts";
-export type { KnownRootEntry } from "./project-roots.ts";
-export {
-  buildKnownRootsMap,
-  byPathDepth,
-  dedupeTopmostRoots,
-  findProjectRoot,
-  isWithin,
-  isWithinOrEqual,
-  mergeKnownRoots,
-  resolveKnownRoot,
-  segmentCount,
-  sortRootsBySpecificity,
-  walkProject,
-} from "./project-roots.ts";
-export { createRegistry, createSessionStateRegistry } from "./registry-utils.ts";
-export { getActiveBranchEntries } from "./session-utils.ts";
-export { registerSettingsCommand } from "./settings/settings-command.ts";
-export type { SettingsScope, SettingsSection } from "./settings/settings-registry.ts";
-export {
-  clearRegisteredSettings,
-  getRegisteredSettings,
-  registerSettings,
-} from "./settings/settings-registry.ts";
-export { createInputSubmenu, openSettingsOverlay } from "./settings/settings-ui.ts";
-export type { CodeLocation, CodePosition } from "./substrate-types.ts";
-export type { TitleTarget } from "./terminal.ts";
-export {
-  DONE_SYMBOL,
-  formatTitle,
-  signalBell,
-  signalDone,
-  signalWaiting,
-  WAITING_SYMBOL,
-} from "./terminal.ts";
-export type { SuiPiToolPromptSurface, SuiPiToolSpec, ToolExecuteFn } from "./tool-framework.ts";
-export {
-  CharacterParam,
-  derivePromptSurface,
-  FileParam,
-  LineParam,
-  MaxResultsParam,
-  registerSuiPiTools,
-  SymbolParam,
-} from "./tool-framework.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./config.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./context.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./debug-registry.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./path.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./project.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./session.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./settings.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./settings-ui.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./terminal.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./tool-framework.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./types.ts";

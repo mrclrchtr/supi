@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { walkProject } from "@mrclrchtr/supi-core/api";
+import { walkProject } from "@mrclrchtr/supi-core/project";
 import type { LspClient } from "../client/client.ts";
 import type {
   DocumentSymbol,

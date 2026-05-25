@@ -1,4 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core/config";
+import { registerContextProvider } from "@mrclrchtr/supi-core/context";
 import {
   clearDebugEvents,
   configureDebugRegistry,
@@ -10,10 +12,7 @@ import {
   type DebugNotifyLevel,
   getDebugEvents,
   getDebugSummary,
-  loadSupiConfig,
-  registerConfigSettings,
-  registerContextProvider,
-} from "@mrclrchtr/supi-core/api";
+} from "@mrclrchtr/supi-core/debug";
 import { Type } from "typebox";
 import { formatDataLines } from "./format.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";

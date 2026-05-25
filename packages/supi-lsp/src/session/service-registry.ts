@@ -2,7 +2,7 @@
 // Peer extensions can import `getSessionLspService` from the package root
 // to reuse the active LSP runtime without starting duplicate servers.
 
-import { createSessionStateRegistry } from "@mrclrchtr/supi-core/api";
+import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
 import type {
   CodeAction,
   Diagnostic,

@@ -1,11 +1,8 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import {
-  clearRegisteredSettings,
-  getRegisteredSettings,
-  loadSupiConfig,
-} from "@mrclrchtr/supi-core/api";
+import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
+import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core/settings";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getLspDisabledMessage,

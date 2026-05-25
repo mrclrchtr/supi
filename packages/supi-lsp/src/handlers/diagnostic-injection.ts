@@ -9,7 +9,7 @@ import type {
   ExtensionAPI,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/api";
+import { pruneAndReorderContextMessages, restorePromptContent } from "@mrclrchtr/supi-core/context";
 import type { Diagnostic } from "../config/types.ts";
 import {
   diagnosticsContextFingerprint,

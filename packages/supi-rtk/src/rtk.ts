@@ -5,12 +5,9 @@ import {
   createLocalBashOperations,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import {
-  loadSupiConfig,
-  recordDebugEvent,
-  registerConfigSettings,
-  registerContextProvider,
-} from "@mrclrchtr/supi-core/api";
+import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core/config";
+import { registerContextProvider } from "@mrclrchtr/supi-core/context";
+import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { shouldBypassRtkRewrite } from "./guards.ts";
 import { type RtkRewriteFailureReason, rtkRewriteDetailed } from "./rewrite.ts";
 import { promptGuidelines } from "./tool/guidance.ts";

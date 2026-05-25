@@ -10,7 +10,16 @@ const mockFns = vi.hoisted(() => ({
   registerContextProvider: vi.fn(),
 }));
 
-vi.mock("@mrclrchtr/supi-core/api", () => ({
+vi.mock("@mrclrchtr/supi-core/config", () => ({
+  loadSupiConfig: mockFns.loadSupiConfig,
+  registerConfigSettings: mockFns.registerConfigSettings,
+}));
+
+vi.mock("@mrclrchtr/supi-core/context", () => ({
+  registerContextProvider: mockFns.registerContextProvider,
+}));
+
+vi.mock("@mrclrchtr/supi-core/debug", () => ({
   clearDebugEvents: mockFns.clearDebugEvents,
   configureDebugRegistry: mockFns.configureDebugRegistry,
   DEBUG_REGISTRY_DEFAULTS: {
@@ -21,9 +30,6 @@ vi.mock("@mrclrchtr/supi-core/api", () => ({
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
-  loadSupiConfig: mockFns.loadSupiConfig,
-  registerConfigSettings: mockFns.registerConfigSettings,
-  registerContextProvider: mockFns.registerContextProvider,
 }));
 
 import { createPiMock } from "@mrclrchtr/supi-test-utils";

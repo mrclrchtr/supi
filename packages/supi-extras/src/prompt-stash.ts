@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { DynamicBorder } from "@earendil-works/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
-import { readJsonFile } from "@mrclrchtr/supi-core/api";
+import { readJsonFile } from "@mrclrchtr/supi-core/config";
 import { copyToClipboard } from "./clipboard.ts";
 
 /** In-memory stash entry. */

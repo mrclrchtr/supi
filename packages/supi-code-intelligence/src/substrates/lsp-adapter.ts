@@ -1,6 +1,6 @@
 // LSP semantic substrate adapter — wraps SessionLspService into SemanticSubstrate.
 
-import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/api";
+import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/types";
 import {
   getSessionLspService,
   type SessionLspService,

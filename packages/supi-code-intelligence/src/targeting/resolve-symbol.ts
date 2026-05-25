@@ -7,7 +7,7 @@
  */
 
 import * as path from "node:path";
-import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
+import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { SemanticSubstrate } from "../substrates/types.ts";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 

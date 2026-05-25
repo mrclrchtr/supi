@@ -1,11 +1,8 @@
 // Claude-MD settings registration for the supi settings registry.
 
 import type { SettingItem } from "@earendil-works/pi-tui";
-import {
-  type ConfigSettingsHelpers,
-  createInputSubmenu,
-  registerConfigSettings,
-} from "@mrclrchtr/supi-core/api";
+import { type ConfigSettingsHelpers, registerConfigSettings } from "@mrclrchtr/supi-core/config";
+import { createInputSubmenu } from "@mrclrchtr/supi-core/settings-ui";
 import { CLAUDE_MD_DEFAULTS, type ClaudeMdConfig } from "./config.ts";
 
 // ── Settings registration ────────────────────────────────────

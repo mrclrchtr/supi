@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
-import type { DebugEventView } from "@mrclrchtr/supi-core/api";
+import type { DebugEventView } from "@mrclrchtr/supi-core/debug";
 import { formatDataLines } from "./format.ts";
 
 const DEBUG_REPORT_TYPE = "supi-debug-report";

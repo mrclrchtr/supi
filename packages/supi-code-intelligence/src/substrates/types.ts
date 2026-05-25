@@ -4,7 +4,7 @@
 // Interfaces are consumer-side: supi-code-intelligence defines what it needs.
 // Concrete adapters wrap supi-lsp / supi-tree-sitter and map their types.
 
-import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/api";
+import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/types";
 
 // ── Discriminated result union (mirrors TreeSitterResult, package-agnostic) ──
 

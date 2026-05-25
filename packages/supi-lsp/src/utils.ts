@@ -7,7 +7,7 @@ export {
   fileToUri,
   resolveToolPath as resolveSessionPath,
   uriToFile,
-} from "@mrclrchtr/supi-core/api";
+} from "@mrclrchtr/supi-core/path";
 
 // ── Language ID Detection ─────────────────────────────────────────────
 

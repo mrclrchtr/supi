@@ -2,7 +2,7 @@
 
 import { execFileSync } from "node:child_process";
 import * as path from "node:path";
-import { resolveToolPath, uriToFile as uriToFileShared } from "@mrclrchtr/supi-core/api";
+import { resolveToolPath, uriToFile as uriToFileShared } from "@mrclrchtr/supi-core/path";
 
 const LOW_SIGNAL_DIRS = new Set([
   "node_modules",

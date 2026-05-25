@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { readJsonFile } from "@mrclrchtr/supi-core/api";
+import { readJsonFile } from "@mrclrchtr/supi-core/config";
 import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 
 export interface PrioritySignalsSummary {

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { dedupeTopmostRoots, walkProject } from "@mrclrchtr/supi-core/api";
+import { dedupeTopmostRoots, walkProject } from "@mrclrchtr/supi-core/project";
 import type {
   DetectedProjectServer,
   LspConfig,

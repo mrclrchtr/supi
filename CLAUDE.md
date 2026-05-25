@@ -60,6 +60,12 @@ New packages should be added to the root `package.json` `pi.extensions` array fo
 - Root `package.json` is `"private": true` — runtime dependencies belong in sub-packages or in root `devDependencies`, not in root `dependencies`.
 - For the publish pipeline (staging, manifest export, npm pack, verification), see the **Publish pipeline** section.
 
+## supi-core entry points
+
+`@mrclrchtr/supi-core` exposes 11 domain subpath exports plus a convenience barrel at `./api`.
+
+Prefer domain entry points when importing from supi-core — they only load the dependencies needed for that domain. Use `./api` when you need symbols from 3+ domains.
+
 ## Self-registering resources via `resources_discover`
 
 SuPi extensions self-register their prompts, skills, and themes using the `resources_discover` event rather than relying on static `pi.prompts` / `pi.skills` / `pi.themes` in `package.json`. This ensures resources are discovered regardless of whether the package is installed standalone or consumed through the workspace root.

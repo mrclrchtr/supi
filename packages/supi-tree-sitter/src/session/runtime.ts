@@ -2,7 +2,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { resolveToolPath } from "@mrclrchtr/supi-core/api";
+import { resolveToolPath } from "@mrclrchtr/supi-core/path";
 import type { Language, Parser, Tree } from "web-tree-sitter";
 import { nodeToRange } from "../coordinates.ts";
 import { detectGrammar, resolveGrammarWasmPath } from "../language.ts";

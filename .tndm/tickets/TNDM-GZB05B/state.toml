@@ -1,0 +1,62 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-25T00:06:23.783444Z"
+revision = 44
+
+[document_fingerprints]
+archive = "sha256:e6d39e870fe0a22fbab87906f95f3962c7b866e47f5cddc3301cfd23b3d55ade"
+content = "sha256:e6a5385d6905de28fd89ef36eabd951e7c4367a3e8157b2a57a5705e514fabb2"
+task-01 = "sha256:ecb44c010796fbf0020430547554b715eabd80baaf4a1660c54090d91a1fffcd"
+task-02 = "sha256:15e1f4f3abd8a3ba745d6fd8b981bb22fc737c8c46f85aa58be4a0ac95bac4d5"
+task-03 = "sha256:72e7ba5fdbd80b55d1743fc9e083e06930379c3ed0d2446288bb70aaa27f512c"
+task-04 = "sha256:e49e769a16e3431004d653c7e894a954e1c42b7669d0b6d814368d757a34da4a"
+task-05 = "sha256:923f98e25efd237d8ede7b0c33a5b1fb3f6cfd8feb46153115123d3a08477adb"
+task-06 = "sha256:44f2167d13aabe6da5535c4c0fca776d7eddad7778aebc7014b8c0f76433055d"
+task-07 = "sha256:bf96a607afe2661eb5210d1dd6e6acce9cda001a944443d3203a29a8063cd2cc"
+task-08 = "sha256:6d64f358c7faa89863dc9adbee15b7f83d06a0692987f20700e9c62860773c9e"
+task-09 = "sha256:7dbdf5f3a73245e82e7ea9b2da476e7a64007e5ee840708223a538461d79372f"
+
+[[tasks]]
+number = 1
+title = "Create 8 domain barrel files in supi-core/src/"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Update api.ts, index.ts, and package.json exports"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Migrate packages using config + settings domains (supi-bash-timeout, supi-cache, supi-claude-md, supi-insights)"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Migrate packages using terminal + context + debug domains (supi-ask-user, supi-context, supi-debug, supi-extras)"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Migrate supi-code-intelligence and supi-tree-sitter (project + path + types + session domains)"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Migrate supi-lsp import sites (multi-domain: config + context + project + session + settings + terminal + path)"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Migrate supi-rtk and remaining stragglers (supi-core internal test + any missed imports)"
+status = "done"
+
+[[tasks]]
+number = 8
+title = "Update CLAUDE.md with new domain entry point conventions"
+status = "done"
+
+[[tasks]]
+number = 9
+title = "Full verification: typecheck, biome, vitest, and pack checks"
+status = "done"

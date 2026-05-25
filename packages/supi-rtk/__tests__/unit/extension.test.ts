@@ -27,15 +27,21 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   },
 }));
 
-vi.mock("@mrclrchtr/supi-core/api", () => ({
-  createInputSubmenu: vi.fn(),
+vi.mock("@mrclrchtr/supi-core/config", () => ({
   loadSupiConfig: mockFns.loadSupiConfig,
-  recordDebugEvent: mockFns.recordDebugEvent,
   registerConfigSettings: mockFns.registerConfigSettings,
+}));
+
+vi.mock("@mrclrchtr/supi-core/context", () => ({
   registerContextProvider: mockFns.registerContextProvider,
 }));
 
-import { registerConfigSettings, registerContextProvider } from "@mrclrchtr/supi-core/api";
+vi.mock("@mrclrchtr/supi-core/debug", () => ({
+  recordDebugEvent: mockFns.recordDebugEvent,
+}));
+
+import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
+import { registerContextProvider } from "@mrclrchtr/supi-core/context";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import rtkExtension from "../../src/rtk.ts";
 import { resetTracking } from "../../src/tracking.ts";

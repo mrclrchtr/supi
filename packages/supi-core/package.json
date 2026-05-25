@@ -41,8 +41,19 @@
   "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",
+    "./config": "./src/config.ts",
+    "./context": "./src/context.ts",
+    "./debug": "./src/debug-registry.ts",
     "./extension": "./src/extension.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./path": "./src/path.ts",
+    "./project": "./src/project.ts",
+    "./session": "./src/session.ts",
+    "./settings": "./src/settings.ts",
+    "./settings-ui": "./src/settings-ui.ts",
+    "./terminal": "./src/terminal.ts",
+    "./tool-framework": "./src/tool-framework.ts",
+    "./types": "./src/types.ts"
   },
   "pi": {
     "extensions": [

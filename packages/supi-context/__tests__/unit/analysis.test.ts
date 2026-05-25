@@ -23,8 +23,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
   formatSkillsForPrompt: mockFns.formatSkillsForPrompt,
 }));
 
-vi.mock("@mrclrchtr/supi-core/api", () => ({
-  createInputSubmenu: vi.fn(),
+vi.mock("@mrclrchtr/supi-core/context", () => ({
   getRegisteredContextProviders: mockFns.getRegisteredContextProviders,
 }));
 

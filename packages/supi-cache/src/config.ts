@@ -8,7 +8,7 @@
 //   "idleThresholdMinutes": 5     // gap in minutes to classify as idle-time regression
 // }
 
-import { loadSupiConfig } from "@mrclrchtr/supi-core/api";
+import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 
 export interface CacheMonitorConfig {
   /** Enable/disable cache monitoring. Default: true */

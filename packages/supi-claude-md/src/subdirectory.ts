@@ -4,7 +4,7 @@
 // and determining whether injection should occur.
 
 import * as fs from "node:fs";
-import { wrapExtensionContext } from "@mrclrchtr/supi-core/api";
+import { wrapExtensionContext } from "@mrclrchtr/supi-core/context";
 import type { DiscoveredContextFile } from "./discovery.ts";
 
 /**
