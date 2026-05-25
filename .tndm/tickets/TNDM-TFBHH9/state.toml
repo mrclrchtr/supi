@@ -1,0 +1,49 @@
+schema_version = 1
+status = "in_progress"
+updated_at = "2026-05-25T08:32:07.076399Z"
+revision = 34
+
+[document_fingerprints]
+content = "sha256:513b5556e309a97315af35967304ef007f1bde0d919eb2d3d7ddcaecf3d63250"
+task-01 = "sha256:867d04481f45b9c8031e6d15d07a6b32f8f160dfabfd29b8e57ac18530ca1ebe"
+task-02 = "sha256:c1afe9de5cecfbe431fd1df64086f74d78704bf561aa720f748d54754548b92e"
+task-03 = "sha256:c06efc78c17b9f5f1a06129535144cb164518c699275d8673cd3d5fb84463842"
+task-04 = "sha256:d6eef6eaa4bb570a66eca273a319f7f5be6228c20098fe0ed04c9afab0592e79"
+task-05 = "sha256:0c90464f2aa9fa2ea8643ca218a79dd937f1c3dc5ad22ad1f3e7efc122546368"
+task-06 = "sha256:bc70460053d8e728c95112bf0413167b0de108417831509e398c4790dd748d9e"
+task-07 = "sha256:b31806c22fbd3f71c90af5a1fd387ec7fa17a9fac28daaab5042eb0c9ef67e5f"
+
+[[tasks]]
+number = 1
+title = "Baseline benchmark — capture current full-suite timing"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Profile imports — enable importDurations, run suite, capture slowest imports"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Apply root vitest.config.ts changes — pool, isolate, cache, timeouts, optimizer scaffold"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Convert vitest.workspace.ts to inline project configs with per-package overrides"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Tune deps.optimizer — add slow packages from profiling data"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Add test.concurrent annotations on independent tests"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Final verification — benchmark, stability, lint, and typecheck"
+status = "done"

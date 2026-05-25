@@ -20,11 +20,11 @@ function makeFinding(overrides: Partial<ForensicsFinding> = {}): ForensicsFindin
 }
 
 describe("findHotspots", () => {
-  it("returns empty array when no findings", () => {
+  it.concurrent("returns empty array when no findings", () => {
     expect(findHotspots([], 0)).toEqual([]);
   });
 
-  it("sorts by drop descending", () => {
+  it.concurrent("sorts by drop descending", () => {
     const findings = [
       makeFinding({ drop: 30 }),
       makeFinding({ drop: 70 }),
@@ -34,7 +34,7 @@ describe("findHotspots", () => {
     expect(result.map((f) => f.drop)).toEqual([70, 50, 30]);
   });
 
-  it("filters by minDrop", () => {
+  it.concurrent("filters by minDrop", () => {
     const findings = [
       makeFinding({ drop: 10 }),
       makeFinding({ drop: 30 }),
@@ -47,7 +47,7 @@ describe("findHotspots", () => {
 });
 
 describe("breakdownCauses", () => {
-  it("tallies all causes", () => {
+  it.concurrent("tallies all causes", () => {
     const findings = [
       makeFinding({ cause: { type: "compaction" } }),
       makeFinding({ cause: { type: "compaction" } }),
@@ -67,7 +67,7 @@ describe("breakdownCauses", () => {
 });
 
 describe("detectIdleRegressions", () => {
-  it("reclassifies unknown with gap >= threshold as idle", () => {
+  it.concurrent("reclassifies unknown with gap >= threshold as idle", () => {
     const findings = [
       makeFinding({ cause: { type: "unknown" }, idleGapMinutes: 10 }),
       makeFinding({ cause: { type: "unknown" }, idleGapMinutes: 3 }),
@@ -77,7 +77,7 @@ describe("detectIdleRegressions", () => {
     expect(findings[1].cause).toEqual({ type: "unknown" });
   });
 
-  it("does not reclassify non-unknown causes", () => {
+  it.concurrent("does not reclassify non-unknown causes", () => {
     const findings = [makeFinding({ cause: { type: "compaction" }, idleGapMinutes: 10 })];
     detectIdleRegressions(findings, 5);
     expect(findings[0].cause).toEqual({ type: "compaction" });

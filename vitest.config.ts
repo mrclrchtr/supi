@@ -21,6 +21,11 @@ function isBenignVscodeJsonRpcShutdownNoise(error: unknown): boolean {
 
 export default defineConfig({
   test: {
+    testTimeout: 2000,
+    hookTimeout: 5000,
+    experimental: {
+      fsModuleCache: true,
+    },
     exclude: ["**/node_modules/**", "**/.worktrees/**", "**/dist/**"],
     onUnhandledError(error) {
       if (isBenignVscodeJsonRpcShutdownNoise(error)) {

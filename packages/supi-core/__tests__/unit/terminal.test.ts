@@ -23,27 +23,27 @@ function makeCtx(): TitleTarget & { getTitles(): string[] } {
 
 describe("terminal utilities", () => {
   describe("formatTitle", () => {
-    it("formats with session name and cwd", () => {
+    it.concurrent("formats with session name and cwd", () => {
       expect(formatTitle("my-session", "/home/projects/foo")).toBe("π - my-session - foo");
     });
 
-    it("formats with cwd only", () => {
+    it.concurrent("formats with cwd only", () => {
       expect(formatTitle(undefined, "/home/projects/bar")).toBe("π - bar");
     });
 
-    it("formats with session name only", () => {
+    it.concurrent("formats with session name only", () => {
       expect(formatTitle("my-session")).toBe("π - my-session");
     });
 
-    it("returns bare π when nothing is given", () => {
+    it.concurrent("returns bare π when nothing is given", () => {
       expect(formatTitle()).toBe("π");
     });
 
-    it("uses the directory basename, not the full path", () => {
+    it.concurrent("uses the directory basename, not the full path", () => {
       expect(formatTitle("sess", "/a/b/c/d")).toBe("π - sess - d");
     });
 
-    it("handles trailing slash in cwd", () => {
+    it.concurrent("handles trailing slash in cwd", () => {
       expect(formatTitle(undefined, "/foo/bar/")).toBe("π - bar");
     });
   });

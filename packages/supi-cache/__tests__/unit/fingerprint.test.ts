@@ -18,7 +18,7 @@ function opts(overrides: Record<string, unknown> = {}): Record<string, unknown> 
 // ── 1.2: computePromptFingerprint —— basic computation ────
 
 describe("computePromptFingerprint", () => {
-  it("returns zero-valued fingerprint for undefined options", () => {
+  it.concurrent("returns zero-valued fingerprint for undefined options", () => {
     const fp = computePromptFingerprint(undefined);
     expect(fp.customPromptHash).toBe(0);
     expect(fp.appendSystemPromptHash).toBe(0);
@@ -29,7 +29,7 @@ describe("computePromptFingerprint", () => {
     expect(fp.skills).toEqual([]);
   });
 
-  it("returns zero-valued fingerprint for empty options", () => {
+  it.concurrent("returns zero-valued fingerprint for empty options", () => {
     const fp = computePromptFingerprint(opts() as never);
     expect(fp.customPromptHash).toBe(0);
     expect(fp.appendSystemPromptHash).toBe(0);
@@ -40,7 +40,7 @@ describe("computePromptFingerprint", () => {
     expect(fp.skills).toEqual([]);
   });
 
-  it("hashes customPrompt", () => {
+  it.concurrent("hashes customPrompt", () => {
     const fp = computePromptFingerprint(
       opts({ customPrompt: "You are a helpful assistant" }) as never,
     );
@@ -49,28 +49,28 @@ describe("computePromptFingerprint", () => {
     expect(fp.contextFiles).toEqual([]);
   });
 
-  it("hashes appendSystemPrompt", () => {
+  it.concurrent("hashes appendSystemPrompt", () => {
     const fp = computePromptFingerprint(
       opts({ appendSystemPrompt: "Always respond in French" }) as never,
     );
     expect(fp.appendSystemPromptHash).not.toBe(0);
   });
 
-  it("hashes promptGuidelines", () => {
+  it.concurrent("hashes promptGuidelines", () => {
     const fp = computePromptFingerprint(
       opts({ promptGuidelines: ["Be concise", "Use bullet points"] }) as never,
     );
     expect(fp.promptGuidelinesHash).not.toBe(0);
   });
 
-  it("hashes selectedTools sorted", () => {
+  it.concurrent("hashes selectedTools sorted", () => {
     const fp = computePromptFingerprint(
       opts({ selectedTools: ["write", "bash", "read"] }) as never,
     );
     expect(fp.selectedToolsHash).not.toBe(0);
   });
 
-  it("hashes toolSnippets sorted by key", () => {
+  it.concurrent("hashes toolSnippets sorted by key", () => {
     const fp = computePromptFingerprint(
       opts({
         toolSnippets: { bash: "Run shell commands", read: "Read files" },
@@ -79,7 +79,7 @@ describe("computePromptFingerprint", () => {
     expect(fp.toolSnippetsHash).not.toBe(0);
   });
 
-  it("hashes each context file content", () => {
+  it.concurrent("hashes each context file content", () => {
     const fp = computePromptFingerprint(
       opts({
         contextFiles: [
@@ -95,7 +95,7 @@ describe("computePromptFingerprint", () => {
     expect(fp.contextFiles[1].hash).not.toBe(0);
   });
 
-  it("hashes each skill", () => {
+  it.concurrent("hashes each skill", () => {
     const fp = computePromptFingerprint(
       opts({
         skills: [
@@ -111,7 +111,7 @@ describe("computePromptFingerprint", () => {
     expect(fp.skills[1].hash).not.toBe(0);
   });
 
-  it("produces same hash for identical selectedTools regardless of order", () => {
+  it.concurrent("produces same hash for identical selectedTools regardless of order", () => {
     const fp1 = computePromptFingerprint(
       opts({ selectedTools: ["write", "bash", "read"] }) as never,
     );
@@ -121,7 +121,7 @@ describe("computePromptFingerprint", () => {
     expect(fp1.selectedToolsHash).toBe(fp2.selectedToolsHash);
   });
 
-  it("produces different hashes for different custom prompts", () => {
+  it.concurrent("produces different hashes for different custom prompts", () => {
     const fp1 = computePromptFingerprint(opts({ customPrompt: "Be concise" }) as never);
     const fp2 = computePromptFingerprint(opts({ customPrompt: "Be detailed" }) as never);
     expect(fp1.customPromptHash).not.toBe(fp2.customPromptHash);
@@ -131,7 +131,7 @@ describe("computePromptFingerprint", () => {
 // ── 1.2: Fingerprint stability ────────────────────────────
 
 describe("fingerprint stability", () => {
-  it("is stable for identical options", () => {
+  it.concurrent("is stable for identical options", () => {
     const options = {
       cwd: "/project",
       customPrompt: "You are a coding assistant",
@@ -147,7 +147,7 @@ describe("fingerprint stability", () => {
     expect(fp1).toEqual(fp2);
   });
 
-  it("produces different fingerprints for different context files", () => {
+  it.concurrent("produces different fingerprints for different context files", () => {
     const options = {
       cwd: "/project",
       contextFiles: [{ path: "AGENTS.md", content: "v1 rules" }],
@@ -160,7 +160,7 @@ describe("fingerprint stability", () => {
     expect(fp1).not.toEqual(fp2);
   });
 
-  it("handles context file order differences", () => {
+  it.concurrent("handles context file order differences", () => {
     const fp1 = computePromptFingerprint(
       opts({
         contextFiles: [
@@ -200,12 +200,12 @@ describe("diffFingerprints", () => {
     };
   }
 
-  it("returns empty array for identical fingerprints", () => {
+  it.concurrent("returns empty array for identical fingerprints", () => {
     const fp = makeFingerprint();
     expect(diffFingerprints(fp, fp)).toEqual([]);
   });
 
-  it("detects added context file", () => {
+  it.concurrent("detects added context file", () => {
     const prev = makeFingerprint({
       contextFiles: [{ path: "a.md", hash: 100 }],
     });
@@ -218,7 +218,7 @@ describe("diffFingerprints", () => {
     expect(diffFingerprints(prev, curr)).toContain("contextFiles (+1)");
   });
 
-  it("detects removed context file", () => {
+  it.concurrent("detects removed context file", () => {
     const prev = makeFingerprint({
       contextFiles: [
         { path: "a.md", hash: 100 },
@@ -231,7 +231,7 @@ describe("diffFingerprints", () => {
     expect(diffFingerprints(prev, curr)).toContain("contextFiles (-1)");
   });
 
-  it("detects modified context file (same path, different hash)", () => {
+  it.concurrent("detects modified context file (same path, different hash)", () => {
     const prev = makeFingerprint({
       contextFiles: [{ path: "a.md", hash: 100 }],
     });
@@ -241,7 +241,7 @@ describe("diffFingerprints", () => {
     expect(diffFingerprints(prev, curr)).toContain("contextFiles (~1)");
   });
 
-  it("detects added skill", () => {
+  it.concurrent("detects added skill", () => {
     const prev = makeFingerprint({
       skills: [{ name: "test", hash: 100 }],
     });
@@ -254,7 +254,7 @@ describe("diffFingerprints", () => {
     expect(diffFingerprints(prev, curr)).toContain("skills (+1)");
   });
 
-  it("detects removed skill", () => {
+  it.concurrent("detects removed skill", () => {
     const prev = makeFingerprint({
       skills: [
         { name: "test", hash: 100 },
@@ -267,7 +267,7 @@ describe("diffFingerprints", () => {
     expect(diffFingerprints(prev, curr)).toContain("skills (-1)");
   });
 
-  it("detects modified skill (same name, different hash)", () => {
+  it.concurrent("detects modified skill (same name, different hash)", () => {
     const prev = makeFingerprint({
       skills: [{ name: "test", hash: 100 }],
     });
@@ -277,37 +277,37 @@ describe("diffFingerprints", () => {
     expect(diffFingerprints(prev, curr)).toContain("skills (~1)");
   });
 
-  it("detects tools change when selectedToolsHash differs", () => {
+  it.concurrent("detects tools change when selectedToolsHash differs", () => {
     const fp1 = makeFingerprint({ selectedToolsHash: 100 });
     const fp2 = makeFingerprint({ selectedToolsHash: 200 });
     expect(diffFingerprints(fp1, fp2)).toContain("tools");
   });
 
-  it("detects tools change when toolSnippetsHash differs", () => {
+  it.concurrent("detects tools change when toolSnippetsHash differs", () => {
     const fp1 = makeFingerprint({ toolSnippetsHash: 100 });
     const fp2 = makeFingerprint({ toolSnippetsHash: 200 });
     expect(diffFingerprints(fp1, fp2)).toContain("tools");
   });
 
-  it("detects guidelines change", () => {
+  it.concurrent("detects guidelines change", () => {
     const fp1 = makeFingerprint({ promptGuidelinesHash: 100 });
     const fp2 = makeFingerprint({ promptGuidelinesHash: 200 });
     expect(diffFingerprints(fp1, fp2)).toContain("guidelines");
   });
 
-  it("detects customPrompt change", () => {
+  it.concurrent("detects customPrompt change", () => {
     const fp1 = makeFingerprint({ customPromptHash: 100 });
     const fp2 = makeFingerprint({ customPromptHash: 200 });
     expect(diffFingerprints(fp1, fp2)).toContain("customPrompt");
   });
 
-  it("detects appendText change", () => {
+  it.concurrent("detects appendText change", () => {
     const fp1 = makeFingerprint({ appendSystemPromptHash: 100 });
     const fp2 = makeFingerprint({ appendSystemPromptHash: 200 });
     expect(diffFingerprints(fp1, fp2)).toContain("appendText");
   });
 
-  it("detects multiple simultaneous changes", () => {
+  it.concurrent("detects multiple simultaneous changes", () => {
     const fp1 = makeFingerprint({
       selectedToolsHash: 100,
       promptGuidelinesHash: 200,
@@ -330,7 +330,7 @@ describe("diffFingerprints", () => {
     expect(diffs).toContain("contextFiles (+1)");
   });
 
-  it("detects replaced context file (different path at same position)", () => {
+  it.concurrent("detects replaced context file (different path at same position)", () => {
     const prev = makeFingerprint({
       contextFiles: [{ path: "a.md", hash: 100 }],
     });
