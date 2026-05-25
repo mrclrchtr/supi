@@ -20,7 +20,7 @@
       "./packages/supi-bash-timeout/src/extension.ts",
       "./packages/supi-claude-md/src/extension.ts",
       "./packages/supi-context/src/extension.ts",
-      "./packages/supi-core/src/extension.ts",
+      "./packages/supi-settings/src/extension.ts",
       "./packages/supi-review/src/extension.ts",
       "./packages/supi-lsp/src/extension.ts",
       "./packages/supi-tree-sitter/src/extension.ts",

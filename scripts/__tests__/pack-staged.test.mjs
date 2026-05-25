@@ -28,7 +28,6 @@ const CORE_EXPORTS = {
   "./config": "./src/config.ts",
   "./context": "./src/context.ts",
   "./debug": "./src/debug-registry.ts",
-  "./extension": "./src/extension.ts",
   "./package.json": "./package.json",
   "./path": "./src/path.ts",
   "./project": "./src/project.ts",
@@ -46,9 +45,9 @@ const MINIMAL_EXPORTS = {
   "./package.json": "./package.json",
 };
 
-function expectExplicitSurface(pkg, entries, pkgName) {
+function expectExplicitSurface(pkg, entries) {
   expect(pkg.main).toBe("src/api.ts");
-  expect(pkg.exports).toEqual(pkgName === "supi-core" ? CORE_EXPORTS : MINIMAL_EXPORTS);
+  expect(pkg.exports).toEqual(MINIMAL_EXPORTS);
   expect(pkg.pi?.extensions).toContain("./src/extension.ts");
   expect(entries).toContain("package/src/api.ts");
   expect(entries).toContain("package/src/extension.ts");
@@ -123,17 +122,23 @@ describe("packStaged clean manifest", () => {
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
-    expectExplicitSurface(pkg, entries, "supi-ask-user");
+    expectExplicitSurface(pkg, entries);
   });
 
-  it("publishes explicit api and extension subpaths for packages/supi-core", {
+  it("publishes library-only surface for packages/supi-core", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
     tarball = await packStaged("packages/supi-core", { outDir });
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
-    expectExplicitSurface(pkg, entries, "supi-core");
+
+    // supi-core is library-only — no pi key, no ./extension export
+    expect(pkg.main).toBe("src/api.ts");
+    expect(pkg.exports).toEqual(CORE_EXPORTS);
+    expect(pkg.pi).toBeUndefined();
+    expect(entries).toContain("package/src/api.ts");
+    expect(entries).not.toContain("package/src/extension.ts");
   });
 
   it("publishes explicit api and extension subpaths for packages/supi-web", {
@@ -143,6 +148,16 @@ describe("packStaged clean manifest", () => {
 
     const pkg = extractJson(tarball, "package/package.json");
     const entries = listTarballEntries(tarball);
-    expectExplicitSurface(pkg, entries, "supi-web");
+    expectExplicitSurface(pkg, entries);
+  });
+
+  it("publishes explicit api and extension subpaths for packages/supi-settings", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    tarball = await packStaged("packages/supi-settings", { outDir });
+
+    const pkg = extractJson(tarball, "package/package.json");
+    const entries = listTarballEntries(tarball);
+    expectExplicitSurface(pkg, entries);
   });
 });

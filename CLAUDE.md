@@ -52,7 +52,8 @@ New packages should be added to the root `package.json` `pi.extensions` array fo
 
 ## Packaging conventions
 
-- Every published SuPi package exposes explicit `./api` and `./extension` exports. Do not rely on package-root (`.`) imports or cross-package `src/...` deep imports.
+- Every published SuPi pi-package exposes explicit `./api` and `./extension` exports. Do not rely on package-root (`.`) imports or cross-package `src/...` deep imports.
+- `supi-core` is the exception — it is a library-only package with no pi extension surface, no `./extension` export, and no `pi.extensions` entry. Other SuPi packages bundle it for the library API only.
 - `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` manifest entries must remain **real package-relative file paths**. Do not replace them with `exports` aliases.
 - Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.
 - When a package bundles another `@mrclrchtr/supi-*` package, reference that package's extension in `pi.extensions` via `node_modules/<pkg>/src/extension.ts`. Otherwise, standalone `pi install npm:@mrclrchtr/supi-<name>` won't load the bundled extension — pi only reads the top-level installed package's `pi.extensions`.
@@ -62,7 +63,7 @@ New packages should be added to the root `package.json` `pi.extensions` array fo
 
 ## supi-core entry points
 
-`@mrclrchtr/supi-core` exposes 11 domain subpath exports plus a convenience barrel at `./api`.
+`@mrclrchtr/supi-core` exposes 12 domain subpath exports plus a convenience barrel at `./api`. It is library-only — the `/supi-settings` command is now registered by `@mrclrchtr/supi-settings`.
 
 Prefer domain entry points when importing from supi-core — they only load the dependencies needed for that domain. Use `./api` when you need symbols from 3+ domains.
 
@@ -94,7 +95,7 @@ Extension packages with prompts/skills:
 Extensions register settings via `registerSettings()` from `@mrclrchtr/supi-core/api`. Call it during the factory function (not async handlers). Prefer `registerConfigSettings()` for config-backed sections over manual `registerSettings()` + scoped-load + write wiring.
 
 - The registry stores `SettingItem[]` compatible with pi-tui's `SettingsList`.
-- `/supi-settings` (from `supi-core`) renders all registered sections.
+- `/supi-settings` (from `supi-settings`) renders all registered sections.
 - Scope toggle (Tab) switches between project/global; values are strings, extensions handle conversion.
 - Submenus use `SettingItem.submenu` returning a pi-tui `Component`; Escape confirms, empty-string done() cancels.
 

@@ -1,7 +1,7 @@
 {
-  "name": "@mrclrchtr/supi-insights",
+  "name": "@mrclrchtr/supi-settings",
   "version": "1.8.0",
-  "description": "SuPi Insights extension — generate usage reports analyzing your PI sessions",
+  "description": "SuPi Settings extension — unified settings command for SuPi extensions via /supi-settings",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,39 +17,36 @@
   ],
   "files": [
     "src/**/*.ts",
-    "!__tests__/**",
-    "src/report.css",
-    "src/report.js",
-    "README.md"
+    "!__tests__"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*",
-    "diff": "^9.0.0"
+    "@mrclrchtr/supi-core": "workspace:*"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"
   ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-ai": "*"
+    "@earendil-works/pi-tui": "*"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-coding-agent": {
       "optional": true
     },
-    "@earendil-works/pi-ai": {
+    "@earendil-works/pi-tui": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.75.4",
+    "@mrclrchtr/supi-test-utils": "workspace:*",
     "@types/node": "25.9.1",
     "vitest": "4.1.7"
   },
   "pi": {
     "extensions": [
       "./src/extension.ts"
-    ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-insights-1.png"
+    ]
   },
   "main": "src/api.ts",
   "exports": {

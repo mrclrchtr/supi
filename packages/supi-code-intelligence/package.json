@@ -52,7 +52,7 @@
   "pi": {
     "extensions": [
       "./src/extension.ts",
-      "node_modules/@mrclrchtr/supi-core/src/extension.ts",
+
       "node_modules/@mrclrchtr/supi-lsp/src/extension.ts",
       "node_modules/@mrclrchtr/supi-tree-sitter/src/extension.ts"
     ],

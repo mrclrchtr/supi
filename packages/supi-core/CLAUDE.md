@@ -2,11 +2,9 @@
 
 ## Scope
 
-`@mrclrchtr/supi-core` now has two explicit surfaces:
-- `src/api.ts` — shared config/context/settings/project-root library helpers, plus the shared tool-spec/registration framework
-- `src/extension.ts` — minimal pi extension registering `/supi-settings`
+`@mrclrchtr/supi-core` is a pure library package. It provides shared config, context, settings, project-root helpers, and the shared tool-spec/registration framework. There is no pi extension — the `/supi-settings` command is now registered by `@mrclrchtr/supi-settings`.
 
-Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/api`. PI discovery still uses the real file path `./src/extension.ts` from `package.json`.
+Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/api`.
 
 ## Source layout (domain-first)
 
@@ -14,7 +12,6 @@ Other SuPi packages should import the library surface via `@mrclrchtr/supi-core/
 src/
   api.ts              — public export surface
   index.ts            — public export surface (identical to api.ts)
-  extension.ts        — minimal pi extension registering /supi-settings
   debug-registry.ts   — debug event registry (flat utility)
   path-utils.ts       — shared tool-path and file-URI normalization helpers
   project-roots.ts    — directory walking, root discovery (flat utility)
@@ -69,7 +66,6 @@ __tests__/
 
 ## Shared behavior gotchas
 
-- `@mrclrchtr/supi-core/extension` registers only `/supi-settings`; the meta-package aggregated extension invokes it as part of the Production bundle.
 - The settings registry lives on `globalThis` with `Symbol.for("@mrclrchtr/supi-core/settings-registry")` so registrations survive jiti/symlinked duplicate module instances.
 - `createSessionStateRegistry()` is the shared helper for workspace-keyed session state; substrate packages should keep package-specific state unions and wait semantics local, and share only the normalized-cwd storage plumbing.
 - Call `registerSettings()` during the extension factory function, not async handlers.

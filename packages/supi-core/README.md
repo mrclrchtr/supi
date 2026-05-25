@@ -11,28 +11,17 @@
 
 Shared infrastructure for SuPi extensions.
 
-This package is mainly for extension authors. It gives you a common config system, settings plumbing, context helpers, registries, and a small extension surface that registers `/supi-settings`.
+This is a **pure library** — it does not register any pi commands or tools. The `/supi-settings` command is now available through `@mrclrchtr/supi-settings`.
 
 ## Install
-
-### As a dependency for another extension
 
 ```bash
 pnpm add @mrclrchtr/supi-core
 ```
 
-### As a pi package
-
-```bash
-pi install npm:@mrclrchtr/supi-core
-```
-
-Installing it as a pi package adds the minimal `/supi-settings` extension surface.
-
 ## Package surfaces
 
 - `@mrclrchtr/supi-core/api` — reusable helpers for other packages and extensions
-- `@mrclrchtr/supi-core/extension` — minimal pi extension that registers `/supi-settings`
 
 ## What you get from the API
 
@@ -110,7 +99,6 @@ const message = wrapExtensionContext("my-extension", "hello", {
 ## Source
 
 - `src/api.ts` — exported library surface
-- `src/extension.ts` — minimal `/supi-settings` entrypoint
 - `src/config.ts` — shared config loading and writing
 - `src/config-settings.ts` — config-backed settings registration helper
 - `src/settings-ui.ts` — shared settings overlay

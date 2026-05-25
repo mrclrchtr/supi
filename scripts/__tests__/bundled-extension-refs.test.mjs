@@ -36,9 +36,21 @@ describe("bundled extension references", () => {
 
     it(`${name} references all bundled pi dependency extensions in pi.extensions`, () => {
       const extensions = pkg.pi?.extensions ?? [];
-      const missing = bundled.filter(
-        (b) => !extensions.includes(`node_modules/${b}/src/extension.ts`),
-      );
+
+      // Only check bundled deps that are themselves pi packages (have pi.extensions)
+      // Library-only deps like supi-core (after it dropped its extension surface)
+      // don't need to be referenced in pi.extensions.
+      const missing = bundled.filter((b) => {
+        // Check if the bundled dep has its own extension entry
+        const depPkgPath = join(dir, "node_modules", b, "package.json");
+        try {
+          const depPkg = readJson(depPkgPath);
+          if (!depPkg.pi?.extensions?.length) return false; // library-only dep
+        } catch {
+          return false; // can't check — skip
+        }
+        return !extensions.includes(`node_modules/${b}/src/extension.ts`);
+      });
 
       expect(
         missing,

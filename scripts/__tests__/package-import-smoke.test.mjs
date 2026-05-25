@@ -55,26 +55,33 @@ describe("packed package import surfaces", () => {
     expect(() => projectRequire.resolve(deepPath)).toThrow();
   });
 
-  it("resolves explicit /api and /extension subpaths for library-only and aggregated packages", {
+  it("resolves explicit /api and /extension subpaths for aggregated package", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
-    const corePackage = `${SUPI_SCOPE}supi-core`;
     const webPackage = `${SUPI_SCOPE}supi-web`;
-    const cases = [
-      ["packages/supi-core", corePackage],
-      ["packages/supi-web", webPackage],
-    ];
-
-    for (const [packageDir, packageName] of cases) {
-      const tarball = await packStaged(packageDir, { outDir });
-      unpackPackage(tarball, packageName, projectDir);
-    }
+    const tarball = await packStaged("packages/supi-web", { outDir });
+    unpackPackage(tarball, webPackage, projectDir);
 
     const projectRequire = createProjectRequire(projectDir);
 
-    expect(() => projectRequire.resolve(`${corePackage}/api`)).not.toThrow();
-    expect(() => projectRequire.resolve(`${corePackage}/extension`)).not.toThrow();
     expect(() => projectRequire.resolve(`${webPackage}/api`)).not.toThrow();
     expect(() => projectRequire.resolve(`${webPackage}/extension`)).not.toThrow();
+    expect(() => projectRequire.resolve(webPackage)).toThrow();
+  });
+
+  it("resolves explicit /api subpath for library-only package and blocks extension and deep imports", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    const corePackage = `${SUPI_SCOPE}supi-core`;
+    const tarball = await packStaged("packages/supi-core", { outDir });
+    unpackPackage(tarball, corePackage, projectDir);
+
+    const projectRequire = createProjectRequire(projectDir);
+    const deepPath = `${corePackage}/src/api.ts`;
+
+    expect(() => projectRequire.resolve(`${corePackage}/api`)).not.toThrow();
+    expect(() => projectRequire.resolve(`${corePackage}/extension`)).toThrow();
+    expect(() => projectRequire.resolve(corePackage)).toThrow();
+    expect(() => projectRequire.resolve(deepPath)).toThrow();
   });
 });

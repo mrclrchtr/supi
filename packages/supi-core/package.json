@@ -44,7 +44,6 @@
     "./config": "./src/config.ts",
     "./context": "./src/context.ts",
     "./debug": "./src/debug-registry.ts",
-    "./extension": "./src/extension.ts",
     "./package.json": "./package.json",
     "./path": "./src/path.ts",
     "./project": "./src/project.ts",
@@ -54,10 +53,5 @@
     "./terminal": "./src/terminal.ts",
     "./tool-framework": "./src/tool-framework.ts",
     "./types": "./src/types.ts"
-  },
-  "pi": {
-    "extensions": [
-      "./src/extension.ts"
-    ]
   }
 }

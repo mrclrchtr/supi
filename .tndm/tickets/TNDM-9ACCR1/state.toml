@@ -1,0 +1,56 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-25T10:31:28.557651Z"
+revision = 40
+
+[document_fingerprints]
+archive = "sha256:0ad358db30a4307f1f6154812899aaf478aada2bac2b659cfa9e3044bbca6c4c"
+content = "sha256:3de30682d801e2f9b14d638427da472ee907f43afd4d654c5add297bedb4ceed"
+task-01 = "sha256:b9ac8acd76d554e04436d4081d80957b9df84c9245d9b56ec5ea526d0cdab31d"
+task-02 = "sha256:da53e702228332ae1a9a2b8224419f1afc1ee56fdf8750bafff32908f351695e"
+task-03 = "sha256:1c33ae85ee729e9209325e045fa63a206c4c1db5069e62c52fa6ee09e3ea20e2"
+task-04 = "sha256:ed917f88dc309115ecc6eac825b23214b3f10fd9ae95ac5ca477f2b23bf02943"
+task-05 = "sha256:1af3c14fc3de64c5968a2776b95b0530a6098cc20d2783bda01b77972132c8ca"
+task-06 = "sha256:7859112916cf80444f0502fd35700b4ee638d25d50eac6cd25a83b13eb91e5d1"
+task-07 = "sha256:22ee6d1cc7c628a091e49d6f9206a3f9b9719dbfcdedeb02bd6aa42c148db9a1"
+task-08 = "sha256:0257ffab2e9d904c525c1c830a382caeff9f0fa9b80470a363472902f2eb78c7"
+
+[[tasks]]
+number = 1
+title = "Create supi-settings package scaffold"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Write supi-settings extension + test"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Library-ify supi-core: remove extension surface"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Remove bundled supi-core extension from all 13 dependent packages"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update root workspace pi.extensions"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Update pack-staged test assertions"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Update documentation"
+status = "done"
+
+[[tasks]]
+number = 8
+title = "Full verification sweep"
+status = "done"
