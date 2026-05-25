@@ -342,7 +342,7 @@ function buildReviewFollowUpInstruction(
       useAskUser,
       "Offer exactly these options: Done, Fix all, Fix selected, Verify findings.",
       "If the user chooses Fix selected, ask a follow-up question listing the findings by number/title.",
-      "If the user chooses Verify findings, verify the findings first and then ask again whether to Fix all or Fix selected.",
+      "If the user chooses Verify findings, re-read the relevant files and diffs to independently confirm or refute each finding, then ask again whether to Fix all or Fix selected.",
     );
     return appendFindings(lines).join("\n");
   }
