@@ -19,11 +19,22 @@ import { join } from "node:path";
  */
 async function rewriteOneManifest(pkgDir, raw) {
   const { createExportableManifest } = await import("@pnpm/exportable-manifest");
-  const publishable = await createExportableManifest(pkgDir, raw, {
+
+  // Strip devDependencies before workspace protocol resolution.
+  // devDeps are removed from the staged tree to avoid cyclic symlinks
+  // (see removeCyclicDevDepSymlinks in pack-staged.mjs), so pnpm's
+  // createExportableManifest can't resolve their workspace: references.
+  // Since devDependencies never appear in the published tarball, it is
+  // safe to exclude them from resolution entirely.
+  const cleaned = { ...raw };
+  delete cleaned.devDependencies;
+
+  const publishable = await createExportableManifest(pkgDir, cleaned, {
     catalogs: {},
   });
 
-  // Remove devDependencies — private workspace test utilities shouldn't ship
+  // Double-check: createExportableManifest may still return devDeps
+  // from peerDep resolution — strip them explicitly
   delete publishable.devDependencies;
 
   // Preserve bundledDependencies (may have been cleaned by exportable logic)

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,22 +83,7 @@ function removeKnownBrokenSymlinks(packageDir) {
   try {
     execFileSync(
       "find",
-      [
-        "-L",
-        packageDir,
-        "-type",
-        "l",
-        "!",
-        "-exec",
-        "test",
-        "-e",
-        "{}",
-        ";",
-        "-exec",
-        "rm",
-        "{}",
-        ";",
-      ],
+      [packageDir, "-type", "l", "!", "-exec", "test", "-e", "{}", ";", "-delete"],
       { stdio: "ignore" },
     );
   } catch {
@@ -106,8 +91,45 @@ function removeKnownBrokenSymlinks(packageDir) {
   }
 }
 
+/**
+ * Remove @mrclrchtr devDependency symlinks that would create cycles.
+ *
+ * pnpm hoists transitive devDeps into a package's node_modules/@mrclrchtr/.
+ * When the package has @mrclrchtr/supi-X as a devDep, and supi-X has
+ * this package as a regular dep + bundledDep, cp -RL follows the symlink
+ * chain into supi-X, which has a symlink back to this package — a cycle.
+ *
+ * DevDependencies are never included in the published tarball, so it is
+ * safe to remove them from the source tree before staging.
+ */
+function removeCyclicDevDepSymlinks(packageDir) {
+  const pkgPath = join(packageDir, "package.json");
+  if (!existsSync(pkgPath)) return;
+
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+  const devDeps = new Set(Object.keys(pkg.devDependencies || {}));
+  const bundled = new Set(pkg.bundledDependencies || []);
+
+  for (const depName of devDeps) {
+    if (!depName.startsWith("@mrclrchtr/")) continue;
+    // Keep bundled deps even if also listed as devDep
+    if (bundled.has(depName)) continue;
+
+    const symlinkPath = join(packageDir, "node_modules", ...depName.split("/"));
+    try {
+      const stat = lstatSync(symlinkPath);
+      if (stat.isSymbolicLink() || stat.isDirectory()) {
+        rmSync(symlinkPath, { recursive: true, force: true });
+      }
+    } catch {
+      // Symlink doesn't exist — nothing to remove
+    }
+  }
+}
+
 function stageWorkspacePackage(packageDir, stageDir) {
   removeKnownBrokenSymlinks(packageDir);
+  removeCyclicDevDepSymlinks(packageDir);
   execFileSync("cp", ["-RL", `${packageDir}/.`, stageDir]);
 }
 
