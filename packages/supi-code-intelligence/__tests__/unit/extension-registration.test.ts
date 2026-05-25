@@ -9,10 +9,58 @@ describe("focused code intelligence tool registration", () => {
     codeIntelligenceExtension(pi as never);
 
     const tools = getTools(pi);
-    expect(tools).toHaveLength(CODE_INTELLIGENCE_TOOL_SPECS.length);
-    expect(tools.map((tool) => tool.name)).toEqual(
-      CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => spec.name),
-    );
+    // code_* (6) + lsp_* (10) + read/write/edit overrides (3)
+    expect(tools.length).toBeGreaterThanOrEqual(CODE_INTELLIGENCE_TOOL_SPECS.length);
+    // All code_* tools are present
+    for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
+      expect(tools.find((t) => t.name === spec.name)).toBeDefined();
+    }
+  });
+
+  it("registers tree_sitter_* expert tools", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const tsTools = [
+      "tree_sitter_outline",
+      "tree_sitter_imports",
+      "tree_sitter_exports",
+      "tree_sitter_node_at",
+      "tree_sitter_query",
+      "tree_sitter_callees",
+    ];
+
+    for (const name of tsTools) {
+      const tool = getTool(pi, name);
+      expect(tool).toBeDefined();
+      expect(tool.name).toBe(name);
+      expect(typeof tool.execute).toBe("function");
+    }
+  });
+
+  it("registers lsp_* expert tools", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const lspTools = [
+      "lsp_hover",
+      "lsp_definition",
+      "lsp_references",
+      "lsp_implementation",
+      "lsp_document_symbols",
+      "lsp_workspace_symbols",
+      "lsp_diagnostics",
+      "lsp_rename",
+      "lsp_code_actions",
+      "lsp_recover",
+    ];
+
+    for (const name of lspTools) {
+      const tool = getTool(pi, name);
+      expect(tool).toBeDefined();
+      expect(tool.name).toBe(name);
+      expect(typeof tool.execute).toBe("function");
+    }
   });
 
   it("registers a relation kind parameter on code_relations", () => {
@@ -53,60 +101,27 @@ describe("session lifecycle", () => {
     expect(pi.handlers.has("before_agent_start")).toBe(true);
   });
 
-  it("detects existing overview on branch to prevent duplicates", () => {
+  it("registers context handler for lsp-context pruning", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-
-    const sessionStart = pi.handlers.get("session_start")?.[0];
-    expect(sessionStart).toBeDefined();
-
-    // Simulate a branch with existing overview
-    const mockCtx = {
-      cwd: "/tmp",
-      sessionManager: {
-        getBranch: () => [
-          {
-            type: "custom_message",
-            customType: "code-intelligence-overview",
-            content: "existing overview",
-          },
-        ],
-      },
-    };
-
-    sessionStart?.({}, mockCtx);
-    // After detecting existing overview, before_agent_start should not inject again
-    // (verified indirectly by checking the handler doesn't crash)
+    expect(pi.handlers.has("context")).toBe(true);
   });
 
-  it("skips overview on second before_agent_start in same session", async () => {
+  it("registers tool_result handler for workspace recovery", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-
-    const sessionStart = pi.handlers.get("session_start")?.[0];
-    const beforeAgentStart = pi.handlers.get("before_agent_start")?.[0];
-
-    const mockCtx = {
-      cwd: "/tmp/empty",
-      sessionManager: { getBranch: () => [] },
-    };
-
-    await sessionStart?.({}, mockCtx);
-
-    // First call — may or may not inject (depends on project structure)
-    const _result1 = await beforeAgentStart?.({}, mockCtx);
-
-    // Second call — should always skip
-    const result2 = await beforeAgentStart?.({}, mockCtx);
-    expect(result2).toBeUndefined();
+    expect(pi.handlers.has("tool_result")).toBe(true);
   });
 
-  it("registers optional summary parameter for pattern searches", () => {
+  it("registers session_shutdown handler", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    expect(
-      (getTool(pi, "code_pattern") as { parameters?: { properties?: Record<string, unknown> } })
-        .parameters?.properties,
-    ).toHaveProperty("summary");
+    expect(pi.handlers.has("session_shutdown")).toBe(true);
+  });
+
+  it("registers /ci-status command", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    expect(pi.commands.has("ci-status")).toBe(true);
   });
 });

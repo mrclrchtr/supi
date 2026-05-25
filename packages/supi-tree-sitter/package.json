@@ -16,7 +16,6 @@
     "access": "public"
   },
   "keywords": [
-    "pi-package",
     "pi",
     "pi-coding-agent",
     "pi-extension",
@@ -88,16 +87,9 @@
     "vitest": "4.1.9",
     "@mrclrchtr/supi-test-utils": "workspace:*"
   },
-  "pi": {
-    "extensions": [
-      "./src/extension.ts"
-    ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-tree-sitter.png"
-  },
   "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",
-    "./extension": "./src/extension.ts",
     "./package.json": "./package.json",
     "./provider/tree-sitter-provider": "./src/provider/tree-sitter-provider.ts"
   }
