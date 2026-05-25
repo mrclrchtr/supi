@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.8.1](https://github.com/mrclrchtr/supi/compare/v1.8.0...v1.8.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* **biome:** resolve CI lint and format errors across packages and scripts ([3aa2bab](https://github.com/mrclrchtr/supi/commit/3aa2bab75eaadec15ada6fb021fee12d8ad4ef9e))
+* **scripts:** handle cyclic devDep symlinks in packaging pipeline ([c5b8c24](https://github.com/mrclrchtr/supi/commit/c5b8c2407194ca7f3d658ff2130a85902bd19ce3))
+* **scripts:** recursively clean nested devDep symlinks to avoid cp cycles ([789e219](https://github.com/mrclrchtr/supi/commit/789e2193f2fe627eb7c37569a760ecbc08d9a8de))
+* **supi-code-intelligence:** fix type errors in test files ([3783f34](https://github.com/mrclrchtr/supi/commit/3783f342b175f90257d6e0c59c303b757d2a2761))
+* **supi:** restore verify for shared test-utils consumers ([34dd420](https://github.com/mrclrchtr/supi/commit/34dd4202e8d78e1e32ee3c7202692272af1477a4))
+
+
+### Performance Improvements
+
+* **supi:** 60% faster vitest suite with threads pool, fs cache, and concurrent tests ([b6a9763](https://github.com/mrclrchtr/supi/commit/b6a9763235bd8bc46273e6b7c720d42ffc31ff7e))
+
 ## [1.8.0](https://github.com/mrclrchtr/supi/compare/v1.7.0...v1.8.0) (2026-05-25)
 
 
