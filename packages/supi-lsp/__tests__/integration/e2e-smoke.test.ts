@@ -472,7 +472,9 @@ describe("SuPi e2e smoke – session lifecycle (all three extensions)", () => {
     expect(pi.handlers.has("session_shutdown")).toBe(true);
   });
 
-  it("session_start runs without error for all three extensions", async () => {
+  // These lifecycle checks start real runtimes/servers, which can exceed Vitest's
+  // 2s default timeout under full-suite parallel load even when behavior is correct.
+  it("session_start runs without error for all three extensions", { timeout: 10_000 }, async () => {
     tmpDir = createTempProjectDir();
     const pi = createPiMock();
     lspExtension(pi);
@@ -489,7 +491,9 @@ describe("SuPi e2e smoke – session lifecycle (all three extensions)", () => {
     expect(caught).toBeUndefined();
   });
 
-  it("session_shutdown runs without error for all three extensions", async () => {
+  it("session_shutdown runs without error for all three extensions", {
+    timeout: 10_000,
+  }, async () => {
     tmpDir = createTempProjectDir();
     const pi = createPiMock();
     lspExtension(pi);
@@ -915,7 +919,9 @@ describe("SuPi e2e smoke – full lifecycle integration", () => {
     if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("full lifecycle: load → session_start → overview → tool exec → shutdown", async () => {
+  it("full lifecycle: load → session_start → overview → tool exec → shutdown", {
+    timeout: 10_000,
+  }, async () => {
     tmpDir = createTempProjectDir();
     const pi = createPiMock();
 
