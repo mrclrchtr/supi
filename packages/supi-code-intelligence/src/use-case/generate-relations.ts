@@ -1,15 +1,15 @@
 // Relations orchestration use-case — dispatches by kind (callers/callees/implementations),
-// coordinates target resolution and substrate access, and returns fully rendered results.
+// coordinates target resolution and provider access, and returns fully rendered results.
 import * as path from "node:path";
 import {
   renderCalleesResult,
   renderCallersResult,
   renderImplementationsResult,
 } from "../presentation/markdown/relations.ts";
+import type { CodeProvider } from "../provider/code-provider.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isInProjectPath, uriToFile } from "../search-helpers.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
-import type { SemanticSubstrate, StructuralSubstrate } from "../substrates/types.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 import { aggregatePerTarget, collectReferences } from "./support/semantic-references.ts";
@@ -26,6 +26,7 @@ export interface RelationsInput {
 type RelationsResolutionParams = Omit<RelationsInput, "kind">;
 export interface RelationsDeps {
   cwd: string;
+  provider: CodeProvider | null;
 }
 export async function executeRelations(
   input: RelationsInput,
@@ -45,9 +46,23 @@ async function executeCallers(
   input: RelationsResolutionParams,
   deps: RelationsDeps,
 ): Promise<CodeIntelResult> {
-  const semantic: SemanticSubstrate = await import("../substrates/lsp-adapter.ts").then((m) =>
-    m.createSemanticSubstrate(deps.cwd),
-  );
+  const semantic = deps.provider;
+  if (!semantic) {
+    return {
+      content:
+        "**Error:** Caller discovery requires an active code provider (LSP). Enable LSP and retry.",
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
   const target = await resolveTarget(input, deps.cwd, semantic);
   if (typeof target === "string") {
     return {
@@ -73,7 +88,7 @@ async function executeSingleCallers(
   target: ResolvedTarget,
   input: RelationsResolutionParams,
   cwd: string,
-  semantic: SemanticSubstrate,
+  semantic: CodeProvider,
 ): Promise<CodeIntelResult> {
   const result = await collectReferences(target, cwd, semantic);
   if (result.refs.length > 0) {
@@ -125,7 +140,7 @@ async function executeFileLevelCallers(
   targetGroup: ResolvedTargetGroup,
   input: RelationsResolutionParams,
   cwd: string,
-  semantic: SemanticSubstrate,
+  semantic: CodeProvider,
 ): Promise<CodeIntelResult> {
   const aggregated = await aggregatePerTarget(targetGroup.targets, (target) =>
     collectReferences(target, cwd, semantic),
@@ -169,15 +184,32 @@ async function executeFileLevelCallers(
       "Use `file` + coordinates to drill into one symbol precisely",
     ],
   };
-  return { content: lines.join("\n"), details: { type: "search" as const, data: details } };
+  return {
+    content: lines.join("\n"),
+    details: { type: "search" as const, data: details },
+  };
 }
 async function executeImplementations(
   input: RelationsResolutionParams,
   deps: RelationsDeps,
 ): Promise<CodeIntelResult> {
-  const semantic: SemanticSubstrate = await import("../substrates/lsp-adapter.ts").then((m) =>
-    m.createSemanticSubstrate(deps.cwd),
-  );
+  const semantic = deps.provider;
+  if (!semantic) {
+    return {
+      content:
+        "**Error:** Implementation discovery requires an active code provider (LSP). Enable LSP and retry.",
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
   const target = await resolveTarget(input, deps.cwd, semantic);
   if (typeof target === "string") {
     return {
@@ -225,7 +257,10 @@ async function executeImplementations(
           "`code_brief` on containing modules for deeper context",
         ],
       };
-      return { content, details: { type: "search" as const, data: searchDetails } };
+      return {
+        content,
+        details: { type: "search" as const, data: searchDetails },
+      };
     }
     return {
       content: target.name
@@ -287,13 +322,24 @@ async function executeCallees(
   input: RelationsResolutionParams,
   deps: RelationsDeps,
 ): Promise<CodeIntelResult> {
-  const semantic: SemanticSubstrate = await import("../substrates/lsp-adapter.ts").then((m) =>
-    m.createSemanticSubstrate(deps.cwd),
-  );
-  const structural: StructuralSubstrate = await import("../substrates/tree-sitter-adapter.ts").then(
-    (m) => m.createStructuralSubstrate(deps.cwd),
-  );
-  const target = await resolveTarget(input, deps.cwd, semantic);
+  const provider = deps.provider;
+  if (!provider) {
+    return {
+      content:
+        "**Error:** Callee discovery requires an active code provider. Enable LSP and tree-sitter and retry.",
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable",
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
+  const target = await resolveTarget(input, deps.cwd, provider);
   if (typeof target === "string") {
     return {
       content: target,
@@ -326,7 +372,7 @@ async function executeCallees(
   }
   const relPath = path.relative(deps.cwd, target.file);
   try {
-    const result = await structural.calleesAt(relPath, target.displayLine, target.displayCharacter);
+    const result = await provider.calleesAt(relPath, target.displayLine, target.displayCharacter);
     if (result.kind !== "success") {
       return {
         content: `No callee data available for ${relPath}:${target.displayLine}:${target.displayCharacter}.\n\nUse \`tree_sitter_callees\` with \`file\`, \`line\`, and \`character\` for structural drill-down.`,

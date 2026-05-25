@@ -10,10 +10,10 @@ import {
   renderStructuredEmptyState,
   renderStructuredMatches,
 } from "../presentation/markdown/pattern.ts";
+import type { CodeProvider } from "../provider/code-provider.ts";
 import type { CodeQueryParams } from "../query-params.ts";
 import type { RgMatch } from "../search-helpers.ts";
 import { normalizePath, runRipgrep, runRipgrepDetailed } from "../search-helpers.ts";
-import type { StructuralSubstrate } from "../substrates/types.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 export interface PatternInput {
@@ -28,7 +28,7 @@ export interface PatternInput {
 
 export interface PatternDeps {
   cwd: string;
-  structural?: StructuralSubstrate;
+  provider: CodeProvider | null;
 }
 
 /** Execute the pattern search use-case. */
@@ -56,7 +56,7 @@ export async function executePattern(
       deps.cwd,
       relScope,
       maxResults,
-      deps.structural,
+      deps.provider,
     );
   }
 
@@ -117,9 +117,9 @@ async function executeStructuredSearch(
   cwd: string,
   relScope: string,
   _maxResults: number,
-  structural?: StructuralSubstrate,
+  provider: CodeProvider | null,
 ): Promise<CodeIntelResult> {
-  if (!structural) {
+  if (!provider) {
     return {
       content: `**Error:** Structured ${kind} search requires tree-sitter, which is not available.`,
       details: undefined,
@@ -131,7 +131,7 @@ async function executeStructuredSearch(
     scopePath,
     cwd,
     relScope,
-    structural,
+    provider,
   );
 
   if (typeof structured === "string") {
@@ -150,7 +150,7 @@ async function executeStructuredSearch(
       input.pattern,
       kind as "definition" | "export" | "import",
       relScope,
-      structural,
+      provider,
       structured ?? undefined,
     );
     return {
@@ -253,7 +253,7 @@ function getRegexMatches(options: {
 export async function executePatternAction(
   params: CodeQueryParams,
   cwd: string,
-  structural?: StructuralSubstrate,
+  provider?: CodeProvider | null,
 ): Promise<CodeIntelResult> {
   return executePattern(
     {
@@ -265,6 +265,6 @@ export async function executePatternAction(
       contextLines: params.contextLines,
       summary: params.summary,
     },
-    { cwd, structural },
+    { cwd, provider: provider ?? null },
   );
 }

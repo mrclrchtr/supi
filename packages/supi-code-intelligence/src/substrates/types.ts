@@ -2,24 +2,23 @@
 // structural (tree-sitter) adapters.
 //
 // These are type aliases for the canonical provider contracts
-// from @mrclrchtr/supi-code-runtime.  Both names are equivalent;
-// use SemanticProvider / StructuralProvider when importing from
-// the runtime package directly.
+// now hosted in supi-code-intelligence.
 
-import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import type { SemanticProvider, StructuralProvider } from "../provider/types.ts";
 
-export type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/types";
+export type { CodeLocation, CodePosition } from "../types.ts";
 
-// ── Provider contracts (aliases for shared runtime types) ────────────
+// ── Provider contracts (aliases for shared provider types) ───────────
 
-/** Canonical provider alias — same as SemanticProvider from @mrclrchtr/supi-code-runtime/api. */
+/** Canonical provider alias — same as SemanticProvider. */
 export type SemanticSubstrate = SemanticProvider;
 
-/** Canonical provider alias — same as StructuralProvider from @mrclrchtr/supi-code-runtime/api. */
+/** Canonical provider alias — same as StructuralProvider. */
 export type StructuralSubstrate = StructuralProvider;
 
-// ── Value types (re-exported from shared runtime) ─────────────────────
+// ── Value types (re-exported from shared types) ───────────────────────
 
+export type { StructuralResult } from "../provider/types.ts";
 export type {
   CalleesData,
   CodeResult,
@@ -28,5 +27,4 @@ export type {
   ImportData,
   NodeAtData,
   OutlineData,
-  StructuralResult,
-} from "@mrclrchtr/supi-code-runtime/api";
+} from "../types.ts";

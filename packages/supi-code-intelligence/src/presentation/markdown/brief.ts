@@ -1,8 +1,8 @@
 // Brief markdown renderer — consumes use-case data and produces markdown content + details metadata.
 
 import * as path from "node:path";
-import type { ArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
-import { findModuleForPath } from "@mrclrchtr/supi-code-runtime/api";
+import type { ArchitectureModel } from "../../model.ts";
+import { findModuleForPath } from "../../model.ts";
 import type { BriefDetails } from "../../types.ts";
 
 // ── Anchored brief ───────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { createStructuralSubstrate } from "../substrates/tree-sitter-adapter.ts";
+import { getCodeProvider } from "../provider/registry.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
 import { validatePatternToolParams } from "./validation.ts";
@@ -23,6 +23,7 @@ export async function executePatternTool(
     return { content: error, details: undefined };
   }
 
-  const structural = createStructuralSubstrate(ctx.cwd);
-  return executePattern(params, { cwd: ctx.cwd, structural });
+  const providerState = getCodeProvider(ctx.cwd);
+  const provider = providerState.kind === "ready" ? providerState.provider : null;
+  return executePattern(params, { cwd: ctx.cwd, provider });
 }

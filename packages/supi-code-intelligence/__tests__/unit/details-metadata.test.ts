@@ -1,13 +1,14 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { buildArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
+import { buildArchitectureModel } from "@mrclrchtr/supi-code-intelligence/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
 import { executeMapTool } from "../../src/tool/execute-map.ts";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
 import { executeAction } from "../helpers/execute-action.ts";
+import { registerMockProvider } from "../helpers/register-mock-provider.ts";
 
 let tmpDir: string;
 
@@ -339,6 +340,15 @@ describe("structured details via tool adapters and action routers", () => {
 
       it("returns details for a function with zero outgoing calls", async () => {
         writeFileSync(path.join(tmpDir, "empty.ts"), "function noCalls() { return 1; }\n");
+        registerMockProvider(tmpDir, {
+          calleesAt: async (_file, _line, _char) => ({
+            kind: "success",
+            data: {
+              enclosingScope: { name: "noCalls", startLine: 1, endLine: 3 },
+              callees: [],
+            },
+          }),
+        });
         const result = await executeAction(
           { action: "callees", file: "empty.ts", line: 1, character: 1 },
           { cwd: tmpDir },

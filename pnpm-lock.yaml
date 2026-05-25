@@ -154,9 +154,6 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.75.4(ws@8.21.0)(zod@4.4.3)
-      '@mrclrchtr/supi-code-runtime':
-        specifier: workspace:*
-        version: link:../supi-code-runtime
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -173,22 +170,6 @@ importers:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
-      '@types/node':
-        specifier: 25.9.1
-        version: 25.9.1
-      vitest:
-        specifier: 4.1.7
-        version: 4.1.7(@types/node@25.9.1)(jsdom@29.1.1)(vite@8.0.14(@types/node@25.9.1)(jiti@2.7.0)(yaml@2.9.0))
-
-  packages/supi-code-runtime:
-    dependencies:
-      '@earendil-works/pi-coding-agent':
-        specifier: '*'
-        version: 0.75.4(ws@8.21.0)(zod@4.4.3)
-      '@mrclrchtr/supi-core':
-        specifier: workspace:*
-        version: link:../supi-core
-    devDependencies:
       '@types/node':
         specifier: 25.9.1
         version: 25.9.1
@@ -311,9 +292,6 @@ importers:
       '@earendil-works/pi-tui':
         specifier: '*'
         version: 0.75.4
-      '@mrclrchtr/supi-code-runtime':
-        specifier: workspace:*
-        version: link:../supi-code-runtime
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -336,6 +314,9 @@ importers:
         specifier: ^3.17.5
         version: 3.17.5
     devDependencies:
+      '@mrclrchtr/supi-code-intelligence':
+        specifier: workspace:*
+        version: link:../supi-code-intelligence
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils
@@ -399,9 +380,6 @@ importers:
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.75.4(ws@8.21.0)(zod@4.4.3)
-      '@mrclrchtr/supi-code-runtime':
-        specifier: workspace:*
-        version: link:../supi-code-runtime
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
@@ -418,6 +396,9 @@ importers:
       '@derekstride/tree-sitter-sql':
         specifier: 0.3.11
         version: 0.3.11
+      '@mrclrchtr/supi-code-intelligence':
+        specifier: workspace:*
+        version: link:../supi-code-intelligence
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
         version: link:../supi-test-utils

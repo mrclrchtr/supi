@@ -63,13 +63,11 @@ Coordinates use **1-based** line and character columns. Character positions use 
 ## Architecture
 
 `@mrclrchtr/supi-tree-sitter` is the **structural provider** in SuPi's
-code-understanding stack.  It depends on `@mrclrchtr/supi-code-runtime` for
-shared provider contracts and canonical code-intelligence types.
+It depends on `@mrclrchtr/supi-core` and provides structural analysis via a
+session-scoped Tree-sitter service.
 
 ```text
-supi-code-runtime  ← shared contracts, types, workspace context
-    ↑
-supi-tree-sitter   ← structural provider (this package)
+supi-tree-sitter   ← Tree-sitter WASM + session-scoped service
 ```
 
 ## Package surfaces

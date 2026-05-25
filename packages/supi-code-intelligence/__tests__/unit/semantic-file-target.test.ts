@@ -1,97 +1,22 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeAction } from "../helpers/execute-action.ts";
-
-const mockLspFns = vi.hoisted(() => ({
-  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
-}));
-
-const mockStructuralFns = vi.hoisted(() => ({
-  getSessionTreeSitterService: vi.fn(),
-  createTreeSitterSession: vi.fn(),
-}));
-
-vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
-  return {
-    ...actual,
-    getSessionLspService: mockLspFns.getSessionLspService,
-  };
-});
-
-vi.mock("@mrclrchtr/supi-tree-sitter/api", () => ({
-  getSessionTreeSitterService: mockStructuralFns.getSessionTreeSitterService,
-  createTreeSitterSession: mockStructuralFns.createTreeSitterSession,
-}));
+import { registerMockProvider } from "../helpers/register-mock-provider.ts";
 
 let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-intel-file-target-"));
-  const dispose = vi.fn();
-  const mockSession = {
-    exports: async (file: string) => getMockExportsResult(tmpDir, file),
-    outline: vi.fn(),
-    imports: vi.fn(),
-    nodeAt: vi.fn(),
-    calleesAt: vi.fn(),
-    dispose,
-  };
-  mockStructuralFns.getSessionTreeSitterService.mockReturnValue({
-    kind: "unavailable",
-    reason: "No tree-sitter session",
-  });
-  mockStructuralFns.createTreeSitterSession.mockReturnValue(mockSession);
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
 function writeJson(dir: string, file: string, data: unknown) {
   writeFileSync(path.join(dir, file), JSON.stringify(data, null, 2));
-}
-
-function getMockExportsResult(cwd: string, file: string) {
-  if (
-    !file.endsWith(".ts") &&
-    !file.endsWith(".tsx") &&
-    !file.endsWith(".js") &&
-    !file.endsWith(".jsx")
-  ) {
-    return {
-      kind: "unsupported-language" as const,
-      file,
-      message: `exports is not supported for ${path.extname(file) || "unknown"} files`,
-    };
-  }
-
-  const absolutePath = path.join(cwd, file);
-  const source = readFileSync(absolutePath, "utf-8");
-  const data = source.split(/\r?\n/).flatMap((line, index) => {
-    const match = line.match(
-      /export\s+(?:const|let|var|function|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/,
-    );
-    if (!match) return [];
-    const symbolStart = line.indexOf(match[1]);
-    return [
-      {
-        name: match[1],
-        kind: "export",
-        range: {
-          startLine: index + 1,
-          startCharacter: symbolStart + 1,
-          endLine: index + 1,
-          endCharacter: symbolStart + match[1].length + 1,
-        },
-      },
-    ];
-  });
-
-  return { kind: "success" as const, data };
 }
 
 describe("file-level semantic targets", () => {
@@ -108,37 +33,52 @@ describe("file-level semantic targets", () => {
       ['import { foo, bar } from "./index";', "console.log(foo);", "bar();"].join("\n"),
     );
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: {
-        documentSymbols: vi.fn().mockResolvedValue(null),
-        references: vi
-          .fn()
-          .mockImplementation(async (_file: string, position: { line: number }) => {
-            if (position.line === 0) {
-              return [
-                {
-                  uri: `file://${indexPath}`,
-                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
-                },
-                {
-                  uri: `file://${consumerPath}`,
-                  range: { start: { line: 1, character: 12 }, end: { line: 1, character: 15 } },
-                },
-              ];
-            }
-
-            return [
-              {
-                uri: `file://${indexPath}`,
-                range: { start: { line: 1, character: 16 }, end: { line: 1, character: 19 } },
-              },
-              {
-                uri: `file://${consumerPath}`,
-                range: { start: { line: 2, character: 0 }, end: { line: 2, character: 3 } },
-              },
-            ];
-          }),
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => null,
+      exports: async (_file) => ({
+        kind: "success",
+        data: [
+          {
+            name: "foo",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 17,
+          },
+          {
+            name: "bar",
+            kind: "function",
+            startLine: 2,
+            startCharacter: 16,
+            endLine: 4,
+            endCharacter: 1,
+          },
+        ],
+      }),
+      references: async (_file, position) => {
+        if (position.line === 0) {
+          return [
+            {
+              uri: `file://${indexPath}`,
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+            },
+            {
+              uri: `file://${consumerPath}`,
+              range: { start: { line: 1, character: 12 }, end: { line: 1, character: 15 } },
+            },
+          ];
+        }
+        return [
+          {
+            uri: `file://${indexPath}`,
+            range: { start: { line: 1, character: 16 }, end: { line: 1, character: 19 } },
+          },
+          {
+            uri: `file://${consumerPath}`,
+            range: { start: { line: 2, character: 0 }, end: { line: 2, character: 3 } },
+          },
+        ];
       },
     });
 
@@ -156,9 +96,22 @@ describe("file-level semantic targets", () => {
     writeJson(tmpDir, "package.json", { name: "test-proj" });
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "unavailable",
-      reason: "No LSP in test env",
+    // No LSP provider registered — getCodeProvider returns unavailable
+    // But we have structural exports available from the mock
+    registerMockProvider(tmpDir, {
+      exports: async (_file) => ({
+        kind: "success",
+        data: [
+          {
+            name: "foo",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 17,
+          },
+        ],
+      }),
     });
 
     const result = await executeAction({ action: "callers", file: "index.ts" }, { cwd: tmpDir });
@@ -184,38 +137,51 @@ describe("file-level semantic targets", () => {
       ['import { foo, bar } from "./index";', "console.log(foo);", "bar();"].join("\n"),
     );
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: {
-        documentSymbols: vi.fn().mockResolvedValue(null),
-        references: vi
-          .fn()
-          .mockImplementation(async (_file: string, position: { line: number }) => {
-            if (position.line === 0) {
-              return [
-                {
-                  uri: `file://${indexPath}`,
-                  range: { start: { line: 0, character: 13 }, end: { line: 0, character: 16 } },
-                },
-                {
-                  uri: `file://${consumerPath}`,
-                  range: { start: { line: 1, character: 12 }, end: { line: 1, character: 15 } },
-                },
-              ];
-            }
-
-            return [
-              {
-                uri: `file://${indexPath}`,
-                range: { start: { line: 1, character: 16 }, end: { line: 1, character: 19 } },
-              },
-              {
-                uri: `file://${consumerPath}`,
-                range: { start: { line: 2, character: 0 }, end: { line: 2, character: 3 } },
-              },
-            ];
-          }),
-        getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
+    registerMockProvider(tmpDir, {
+      exports: async (_file) => ({
+        kind: "success",
+        data: [
+          {
+            name: "foo",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 17,
+          },
+          {
+            name: "bar",
+            kind: "function",
+            startLine: 2,
+            startCharacter: 16,
+            endLine: 4,
+            endCharacter: 1,
+          },
+        ],
+      }),
+      references: async (_file, position) => {
+        if (position.line === 0) {
+          return [
+            {
+              uri: `file://${indexPath}`,
+              range: { start: { line: 0, character: 13 }, end: { line: 0, character: 16 } },
+            },
+            {
+              uri: `file://${consumerPath}`,
+              range: { start: { line: 1, character: 12 }, end: { line: 1, character: 15 } },
+            },
+          ];
+        }
+        return [
+          {
+            uri: `file://${indexPath}`,
+            range: { start: { line: 1, character: 16 }, end: { line: 1, character: 19 } },
+          },
+          {
+            uri: `file://${consumerPath}`,
+            range: { start: { line: 2, character: 0 }, end: { line: 2, character: 3 } },
+          },
+        ];
       },
     });
 
@@ -233,6 +199,8 @@ describe("file-level semantic targets", () => {
     writeJson(tmpDir, "package.json", { name: "test-proj" });
     writeFileSync(path.join(tmpDir, "internal.py"), "def helper():\n    return 1\n");
 
+    // Register a mock provider that can't do anything with .py files
+    registerMockProvider(tmpDir);
     const result = await executeAction({ action: "callers", file: "internal.py" }, { cwd: tmpDir });
 
     expect(result.content).toContain("File-level semantic exploration is not available");
@@ -248,11 +216,22 @@ describe("file-level semantic targets", () => {
       writeFileSync(path.join(tmpDir, file), 'import { foo } from "./index";\nconsole.log(foo);\n');
     }
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: {
-        documentSymbols: vi.fn().mockResolvedValue(null),
-        references: vi.fn().mockResolvedValue([
+    registerMockProvider(tmpDir, {
+      exports: async (_file) => ({
+        kind: "success",
+        data: [
+          {
+            name: "foo",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 17,
+          },
+        ],
+      }),
+      references: async () => {
+        const refs = [
           {
             uri: `file://${indexPath}`,
             range: { start: { line: 0, character: 13 }, end: { line: 0, character: 16 } },
@@ -261,8 +240,8 @@ describe("file-level semantic targets", () => {
             uri: `file://${path.join(tmpDir, file)}`,
             range: { start: { line: 1, character: index }, end: { line: 1, character: index + 3 } },
           })),
-        ]),
-        getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
+        ];
+        return refs;
       },
     });
 

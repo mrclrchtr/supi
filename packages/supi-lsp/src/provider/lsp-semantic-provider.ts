@@ -1,12 +1,12 @@
 // LSP semantic provider adapter — wraps SessionLspService into the shared
-// SemanticProvider contract from @mrclrchtr/supi-code-runtime.
+// SemanticProvider contract from supi-code-intelligence.
 
 import type {
   CodeLocation,
   CodePosition,
   CodeSymbol,
   SemanticProvider,
-} from "@mrclrchtr/supi-code-runtime/api";
+} from "@mrclrchtr/supi-code-intelligence/api";
 import type { DocumentSymbol, Location, LocationLink, SymbolInformation } from "../config/types.ts";
 import type { SessionLspService } from "../session/service-registry.ts";
 

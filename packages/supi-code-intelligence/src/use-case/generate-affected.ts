@@ -3,19 +3,15 @@
 // returns fully rendered content + details metadata.
 
 import * as path from "node:path";
-import {
-  buildArchitectureModel,
-  findModuleForPath,
-  getDependents,
-} from "@mrclrchtr/supi-code-runtime/api";
+import { buildArchitectureModel, findModuleForPath, getDependents } from "../model.ts";
 import {
   renderAffectedFileLevel,
   renderAffectedSingle,
 } from "../presentation/markdown/affected.ts";
 import { summarizePrioritySignalsForFiles } from "../prioritization-signals.ts";
+import type { CodeProvider } from "../provider/code-provider.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
-import type { SemanticSubstrate } from "../substrates/types.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
 import type { AffectedDetails, CodeIntelResult, ConfidenceMode } from "../types.ts";
 import {
@@ -35,6 +31,7 @@ export interface AffectedInput {
 
 export interface AffectedDeps {
   cwd: string;
+  provider: CodeProvider | null;
 }
 
 /** Execute the affected use-case — target resolution, reference collection, analysis, and rendering. */
@@ -42,9 +39,26 @@ export async function executeAffected(
   input: AffectedInput,
   deps: AffectedDeps,
 ): Promise<CodeIntelResult> {
-  const semantic: SemanticSubstrate = await import("../substrates/lsp-adapter.ts").then((m) =>
-    m.createSemanticSubstrate(deps.cwd),
-  );
+  const semantic = deps.provider;
+  if (!semantic) {
+    return {
+      content:
+        "**Error:** Affected analysis requires an active code provider (LSP). Enable LSP and retry.",
+      details: {
+        type: "affected" as const,
+        data: {
+          confidence: "unavailable",
+          directCount: 0,
+          downstreamCount: 0,
+          riskLevel: "low",
+          checkNext: [],
+          likelyTests: [],
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` to resolve the target"],
+        },
+      },
+    };
+  }
   const target = await resolveTarget(input, deps.cwd, semantic);
 
   if (typeof target === "string") {
@@ -94,7 +108,7 @@ async function executeSingleAffected(
   symbolName: string,
   input: AffectedInput,
   cwd: string,
-  semantic: SemanticSubstrate,
+  semantic: CodeProvider,
 ): Promise<CodeIntelResult> {
   const refs = await collectReferences(target, cwd, semantic);
   const model = await buildArchitectureModel(cwd);
@@ -136,7 +150,7 @@ async function executeFileLevelAffected(
   targetGroup: ResolvedTargetGroup,
   input: AffectedInput,
   cwd: string,
-  semantic: SemanticSubstrate,
+  semantic: CodeProvider,
 ): Promise<CodeIntelResult> {
   const perTarget = await Promise.all(
     targetGroup.targets.map(async (t) => ({

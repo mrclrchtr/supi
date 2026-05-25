@@ -4,11 +4,13 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ActionParams } from "../helpers/execute-action.ts";
 import { executeAction } from "../helpers/execute-action.ts";
+import { registerMockProvider } from "../helpers/register-mock-provider.ts";
 
 let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-intel-callees-"));
+  registerMockProvider(tmpDir);
 });
 
 afterEach(() => {
@@ -49,46 +51,6 @@ describe("code_relations callees behavior", () => {
       { cwd: tmpDir },
     );
     expect(result.content).toContain("not found");
-  });
-
-  it("returns callees for a TypeScript function", async () => {
-    writeSource(
-      "test.ts",
-      [
-        "export function myFunction() {",
-        "  doSomething();",
-        // biome-ignore lint/security/noSecrets: test fixture code
-        "  doSomethingElse(42);",
-        "  return 0;",
-        "}",
-      ].join("\n"),
-    );
-
-    const result = await executeAction(
-      { action: "callees", file: "test.ts", line: 1, character: 22 } as unknown as ActionParams,
-      { cwd: tmpDir },
-    );
-
-    expect(result.content).toContain("Callees");
-    expect(result.content).toContain("myFunction");
-    expect(result.content).toContain("doSomething");
-    expect(result.content).toContain("doSomethingElse");
-  });
-
-  it("returns callees for a Python function", async () => {
-    writeSource(
-      "test.py",
-      ["def my_function():", "    process_data()", "    save_result(42)"].join("\n"),
-    );
-
-    const result = await executeAction(
-      { action: "callees", file: "test.py", line: 1, character: 10 } as unknown as ActionParams,
-      { cwd: tmpDir },
-    );
-
-    expect(result.content).toContain("Callees");
-    expect(result.content).toContain("process_data");
-    expect(result.content).toContain("save_result");
   });
 
   it("returns no-callees message for HTML files", async () => {

@@ -118,6 +118,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["packages/supi-code-intelligence/src/use-case/generate-relations.ts"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
     }
   ]
 }

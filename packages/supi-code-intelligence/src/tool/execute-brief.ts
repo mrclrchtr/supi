@@ -1,5 +1,5 @@
-import { buildArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
-import { createStructuralSubstrate } from "../substrates/tree-sitter-adapter.ts";
+import { buildArchitectureModel } from "../model.ts";
+import { getCodeProvider } from "../provider/registry.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeBrief } from "../use-case/generate-brief.ts";
 import type { BriefInput } from "../use-case/types.ts";
@@ -24,11 +24,12 @@ export async function executeBriefTool(
     return { content: error, details: undefined };
   }
 
-  const structural = createStructuralSubstrate(ctx.cwd);
+  const providerState = getCodeProvider(ctx.cwd);
+  const provider = providerState.kind === "ready" ? providerState.provider : null;
   const model = await buildArchitectureModel(ctx.cwd);
 
   const input: BriefInput = determineInput(params);
-  const deps = { model, structural, cwd: ctx.cwd };
+  const deps = { model, provider, cwd: ctx.cwd };
 
   const result = await executeBrief(input, deps);
   return { content: result.content, details: { type: "brief", data: result.details } };

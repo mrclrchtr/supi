@@ -1,22 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { buildArchitectureModel, getDependents } from "@mrclrchtr/supi-code-runtime/api";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { buildArchitectureModel, getDependents } from "@mrclrchtr/supi-code-intelligence/api";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runRipgrep } from "../../src/search-helpers.ts";
 import { executeAction } from "../helpers/execute-action.ts";
-
-const mockLspFns = vi.hoisted(() => ({
-  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
-}));
-
-vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
-  return {
-    ...actual,
-    getSessionLspService: mockLspFns.getSessionLspService,
-  };
-});
+import { registerMockProvider } from "../helpers/register-mock-provider.ts";
 
 let tmpDir: string;
 
@@ -25,7 +14,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -35,20 +23,15 @@ function writeJson(dir: string, file: string, data: unknown) {
 
 describe("shell injection prevention", () => {
   it("handles paths with shell metacharacters safely", () => {
-    // Create a directory with a shell-dangerous name
     const dangerousDir = path.join(tmpDir, "safe-dir");
     mkdirSync(dangerousDir, { recursive: true });
     writeFileSync(path.join(dangerousDir, "test.ts"), "export const x = 1;");
-
-    // This should not execute any shell commands via the path
     const matches = runRipgrep("export", dangerousDir, tmpDir);
-    // Should find the match normally without shell injection
     expect(matches.length).toBeGreaterThanOrEqual(0);
   });
 
   it("handles patterns with special characters safely", () => {
     writeFileSync(path.join(tmpDir, "test.ts"), "const x = foo();");
-    // Pattern with regex-like characters should be treated as-is
     const matches = runRipgrep("foo()", tmpDir, tmpDir);
     expect(matches.length).toBeGreaterThanOrEqual(0);
   });
@@ -59,7 +42,6 @@ describe("transitive downstream impact", () => {
     writeJson(tmpDir, "package.json", { name: "root" });
     writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
 
-    // Create chain: core -> api -> app
     for (const [name, deps] of [
       ["core", {}],
       ["api", { "@t/core": "workspace:*" }],
@@ -73,13 +55,10 @@ describe("transitive downstream impact", () => {
     const model = await buildArchitectureModel(tmpDir);
     expect(model).not.toBeNull();
 
-    // Direct dependents of core: only api
     const directDeps = getDependents(model as NonNullable<typeof model>, "@t/core");
     expect(directDeps.map((m) => m.name)).toContain("@t/api");
     expect(directDeps.map((m) => m.name)).not.toContain("@t/app");
 
-    // But transitive impact should include app via api
-    // Test via the affected action output
     writeFileSync(path.join(tmpDir, "packages", "core", "index.ts"), "export const shared = 1;");
     writeFileSync(
       path.join(tmpDir, "packages", "api", "index.ts"),
@@ -90,31 +69,26 @@ describe("transitive downstream impact", () => {
       "import { api } from '@t/api';",
     );
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: {
-        workspaceSymbol: vi.fn().mockResolvedValue([
-          {
-            name: "shared",
-            kind: 14,
-            location: {
-              uri: `file://${path.join(tmpDir, "packages", "core", "index.ts")}`,
-              range: { start: { line: 0, character: 13 }, end: { line: 0, character: 19 } },
-            },
-          },
-        ]),
-        references: vi.fn().mockResolvedValue([
-          {
-            uri: `file://${path.join(tmpDir, "packages", "core", "index.ts")}`,
-            range: { start: { line: 0, character: 13 }, end: { line: 0, character: 19 } },
-          },
-          {
-            uri: `file://${path.join(tmpDir, "packages", "api", "index.ts")}`,
-            range: { start: { line: 0, character: 9 }, end: { line: 0, character: 15 } },
-          },
-        ]),
-        getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
-      },
+    registerMockProvider(tmpDir, {
+      workspaceSymbols: async () => [
+        {
+          name: "shared",
+          kind: 14,
+          file: path.join(tmpDir, "packages", "core", "index.ts"),
+          line: 1,
+          character: 14,
+        },
+      ],
+      references: async () => [
+        {
+          uri: `file://${path.join(tmpDir, "packages", "core", "index.ts")}`,
+          range: { start: { line: 0, character: 13 }, end: { line: 0, character: 19 } },
+        },
+        {
+          uri: `file://${path.join(tmpDir, "packages", "api", "index.ts")}`,
+          range: { start: { line: 0, character: 9 }, end: { line: 0, character: 15 } },
+        },
+      ],
     });
 
     const result = await executeAction(
@@ -122,8 +96,6 @@ describe("transitive downstream impact", () => {
       { cwd: tmpDir },
     );
 
-    // The result should mention downstream impact beyond just api.
-    // The BFS traversal should find app through api.
     expect(result.content).toContain("Affected");
     expect(result.content).toContain("downstream");
   });
@@ -137,20 +109,29 @@ describe("focused-tool follow-up regressions", () => {
     const widgetPath = path.join(srcDir, "widget.ts");
     writeFileSync(widgetPath, "export function Widget() {\n  return 1;\n}\n");
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: {
-        workspaceSymbol: vi.fn().mockResolvedValue([
+    registerMockProvider(tmpDir, {
+      workspaceSymbols: async () => [
+        {
+          name: "Widget",
+          kind: 12,
+          file: widgetPath,
+          line: 1,
+          character: 17,
+        },
+      ],
+      exports: async (_file) => ({
+        kind: "success",
+        data: [
           {
             name: "Widget",
-            kind: 12,
-            location: {
-              uri: `file://${widgetPath}`,
-              range: { start: { line: 0, character: 16 }, end: { line: 0, character: 22 } },
-            },
+            kind: "function",
+            startLine: 1,
+            startCharacter: 16,
+            endLine: 3,
+            endCharacter: 1,
           },
-        ]),
-      },
+        ],
+      }),
     });
 
     const result = await executeAction({ action: "brief", symbol: "Widget" }, { cwd: tmpDir });
@@ -172,12 +153,8 @@ describe("focused-tool follow-up regressions", () => {
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(path.join(srcDir, "widget.ts"), "export function doThing() {\n  return 1;\n}\n");
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: {
-        references: vi.fn().mockResolvedValue([]),
-        getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
-      },
+    registerMockProvider(tmpDir, {
+      references: async () => [],
     });
 
     const result = await executeAction(
@@ -218,10 +195,7 @@ describe("contextLines in pattern results", () => {
       { cwd: tmpDir },
     );
 
-    // Should contain the match line
     expect(result.content).toContain("TARGET");
-    // With contextLines=1, should also have surrounding content
-    // The context lines appear as indented L<num> entries
     expect(result.content).toContain("L3");
   });
 
@@ -268,8 +242,6 @@ describe("path scoping uses proper containment", () => {
     writeJson(tmpDir, "package.json", { name: "root" });
     writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
 
-    // Create packages/supi and packages/supi-core
-    // scoping to packages/supi should NOT include packages/supi-core
     const supi = path.join(tmpDir, "packages", "supi");
     mkdirSync(supi, { recursive: true });
     writeJson(supi, "package.json", { name: "@t/supi" });
@@ -280,7 +252,6 @@ describe("path scoping uses proper containment", () => {
     writeJson(supiCore, "package.json", { name: "@t/supi-core" });
     writeFileSync(path.join(supiCore, "index.ts"), "export const coreOnly = 1;");
 
-    // Pattern search scoped to packages/supi/ should only find supiOnly
     const result = await executeAction(
       { action: "pattern", pattern: "Only", path: "packages/supi/" },
       { cwd: tmpDir },

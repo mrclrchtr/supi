@@ -1,7 +1,7 @@
 // Shared typed data interfaces between use-case and presentation layers.
 
-import type { ArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
-import type { StructuralSubstrate } from "../substrates/types.ts";
+import type { ArchitectureModel } from "../model.ts";
+import type { CodeProvider } from "../provider/code-provider.ts";
 import type { BriefDetails } from "../types.ts";
 
 // ── Overview use-case ────────────────────────────────────────────────
@@ -33,7 +33,7 @@ export type BriefInput =
 
 export interface BriefDeps {
   model: ArchitectureModel | null;
-  structural: StructuralSubstrate;
+  provider: CodeProvider | null;
   cwd: string;
 }
 

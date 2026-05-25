@@ -6,7 +6,7 @@ import {
   findModuleForPath,
   getDependencies,
   getDependents,
-} from "@mrclrchtr/supi-code-runtime/api";
+} from "@mrclrchtr/supi-code-intelligence/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 let tmpDir: string;

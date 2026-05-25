@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-25T08:27:30.099567Z"
+revision = 32
+
+[document_fingerprints]
+archive = "sha256:ddf1799061fcd13a4447455aec3b759cf6eba82b191114d6ef598a0aae530c2c"
+content = "sha256:15476dec95459398038a6d5dc279483b0769471e5a7d32d677af4c85a6f6aa9d"
+task-01 = "sha256:16e4e5dea384ee449d9e022b9ee60f7e1734591905b3dbc0c36ab5c648ff139b"
+task-02 = "sha256:e53e33567d4c086e48acf06bac8f2ecbe61e67aafac7e6ab716ed5e048ecba06"
+task-03 = "sha256:8bb5e4da664102bf7a89252019a871a798176402e8211d2c349ec1a17bef8ca8"
+task-04 = "sha256:882e9aa6cff7e9f9d5cbba33629db113de20fef58d08dbddf236a11b3ccefeba"
+task-05 = "sha256:9979921096afd610bc0b672e4b14b37e22aef31719d0d7b6cde9eb13a9e9940f"
+task-06 = "sha256:9076af44706267813bef51bbf626023f00fb63176e43f6cef9a96da63f0820d4"
+
+[[tasks]]
+number = 1
+title = "Phase 1: Move canonical types and provider contracts from supi-code-runtime into supi-code-intelligence"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Phase 2: Introduce unified CodeProvider interface and registry in supi-code-intelligence"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Phase 3: Create CodeProvider implementations in supi-lsp and supi-tree-sitter, register at session_start"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Phase 4: Migrate use-cases to unified CodeProvider via DI, delete substrate adapters"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Phase 5: Cleanup — collapse targeting, remove WorkspaceContext, move ArchitectureModel, unify CodeIntelDetails, generate guidance"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Phase 6: Delete supi-code-runtime package, finalize all imports and manifests"
+status = "done"

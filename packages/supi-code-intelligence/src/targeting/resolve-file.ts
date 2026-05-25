@@ -9,9 +9,9 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { getCodeProvider } from "../provider/registry.ts";
 import { normalizePath } from "../search-helpers.ts";
 import { highestConfidence } from "../semantic-action-helpers.ts";
-import { createStructuralSubstrate } from "../substrates/tree-sitter-adapter.ts";
 import type { SemanticSubstrate, StructuralSubstrate } from "../substrates/types.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 
@@ -176,13 +176,10 @@ async function resolveViaStructral(
   }
 }
 
-/** Create a fallback structural substrate from a working directory. */
+/** Create a fallback substrate from a working directory using the unified registry. */
 function createFallbackSubstrate(dir: string): StructuralSubstrate | null {
-  try {
-    return createStructuralSubstrate(dir);
-  } catch {
-    return null;
-  }
+  const state = getCodeProvider(dir);
+  return state.kind === "ready" ? state.provider : null;
 }
 
 function dedupeTargets(targets: ResolvedTargetData[]): ResolvedTargetData[] {

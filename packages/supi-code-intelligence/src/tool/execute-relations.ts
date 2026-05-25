@@ -1,3 +1,4 @@
+import { getCodeProvider } from "../provider/registry.ts";
 import type { CodeIntelResult } from "../types.ts";
 import type { RelationsInput } from "../use-case/generate-relations.ts";
 import { executeRelations } from "../use-case/generate-relations.ts";
@@ -25,6 +26,24 @@ export async function executeRelationsTool(
     return { content: error, details: undefined };
   }
 
+  // Semantic actions (callers, callees, implementations) require file or symbol
+  if (!params.file && !params.symbol) {
+    return {
+      content:
+        "**Error:** Semantic actions require either anchored coordinates (`file`, `line`, `character`) or a `symbol` for discovery.",
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable" as const,
+          scope: params.path ?? null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Provide `file`, `line`, `character` or a `symbol` for discovery"],
+        },
+      },
+    };
+  }
+
   const input: RelationsInput = {
     kind: params.kind,
     path: params.path,
@@ -36,5 +55,7 @@ export async function executeRelationsTool(
     maxResults: params.maxResults,
   };
 
-  return executeRelations(input, { cwd: ctx.cwd });
+  const providerState = getCodeProvider(ctx.cwd);
+  const provider = providerState.kind === "ready" ? providerState.provider : null;
+  return executeRelations(input, { cwd: ctx.cwd, provider });
 }

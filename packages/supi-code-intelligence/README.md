@@ -107,10 +107,10 @@ Results report confidence such as:
 ## Architecture
 
 `@mrclrchtr/supi-code-intelligence` is the **orchestration layer** that consumes
-semantic and structural providers through `@mrclrchtr/supi-code-runtime` contracts.
+semantic and structural providers through shared contracts.
 
 ```text
-supi-code-runtime  ← shared contracts, types, workspace context, project model
+supi-code-intelligence  ← hub: CodeProvider registry, types, model, tools
     ↑         ↑
 supi-lsp    supi-tree-sitter
  (semantic)   (structural)

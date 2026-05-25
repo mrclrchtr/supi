@@ -3,12 +3,12 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
-import { findModuleForPath } from "@mrclrchtr/supi-code-runtime/api";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
+import type { ArchitectureModel } from "../model.ts";
+import { findModuleForPath } from "../model.ts";
 import { renderAnchoredBrief, renderSymbolBrief } from "../presentation/markdown/brief.ts";
+import type { CodeProvider } from "../provider/code-provider.ts";
 import { normalizePath } from "../search-helpers.ts";
-import type { SemanticSubstrate, StructuralSubstrate } from "../substrates/types.ts";
 import type { TargetResolutionResult } from "../target-resolution.ts";
 import { resolveSymbolTarget } from "../target-resolution.ts";
 import type { BriefDeps, BriefInput, BriefUseCaseResult } from "./types.ts";
@@ -100,7 +100,7 @@ async function executeAnchoredBrief(
   }
 
   const relPath = path.relative(deps.cwd, resolvedFile);
-  const context = await gatherTreeSitterContext(deps.structural, relPath, line, character);
+  const context = await gatherTreeSitterContext(deps.provider, relPath, line, character);
 
   const details = {
     confidence: "structural" as const,
@@ -150,9 +150,24 @@ async function executeSymbolBrief(
     };
   }
 
-  const semanticModule = await import("../substrates/lsp-adapter.ts");
-  const semantic: SemanticSubstrate = semanticModule.createSemanticSubstrate(deps.cwd);
-  const resolved = await resolveSymbolTarget(symbol, deps.cwd, semantic, {
+  const provider = deps.provider;
+  if (!provider) {
+    return {
+      content: `**Error:** Symbol discovery requires an active code provider. Use \`file\` + coordinates, or enable LSP and retry.`,
+      details: {
+        confidence: "unavailable",
+        focusTarget: symbol,
+        startHere: [],
+        publicSurfaces: [],
+        dependencySummary: null,
+        omittedCount: 0,
+        nextQueries: [
+          "Use `file` + coordinates for a precise symbol brief, or enable LSP and retry",
+        ],
+      },
+    };
+  }
+  const resolved = await resolveSymbolTarget(symbol, deps.cwd, provider, {
     path: scopePath,
   });
 
@@ -196,7 +211,7 @@ async function executeSymbolBrief(
 
   const mod = findModuleForPath(deps.model, target.file);
   const context = await gatherTreeSitterContext(
-    deps.structural,
+    deps.provider,
     relPath,
     target.displayLine,
     target.displayCharacter,
@@ -233,7 +248,7 @@ async function executeSymbolBrief(
 // ── Helpers ───────────────────────────────────────────────────────────
 
 async function gatherTreeSitterContext(
-  structural: StructuralSubstrate,
+  provider: CodeProvider | null,
   relPath: string,
   line: number,
   character: number,
@@ -243,8 +258,10 @@ async function gatherTreeSitterContext(
   let imports: TreeSitterContext["imports"] = [];
   let exports: TreeSitterContext["exports"] = [];
 
+  if (!provider) return { nodeInfo, outline, imports, exports };
+
   try {
-    const nodeResult = await structural.nodeAt(relPath, line, character);
+    const nodeResult = await provider.nodeAt(relPath, line, character);
     if (nodeResult.kind === "success") {
       nodeInfo = {
         type: nodeResult.data.type,
@@ -254,7 +271,7 @@ async function gatherTreeSitterContext(
       };
     }
 
-    const outlineResult = await structural.outline(relPath);
+    const outlineResult = await provider.outline(relPath);
     if (outlineResult.kind === "success") {
       outline = outlineResult.data.map((item) => ({
         name: item.name,
@@ -264,12 +281,12 @@ async function gatherTreeSitterContext(
       }));
     }
 
-    const importsResult = await structural.imports(relPath);
+    const importsResult = await provider.imports(relPath);
     if (importsResult.kind === "success") {
       imports = importsResult.data;
     }
 
-    const exportsResult = await structural.exports(relPath);
+    const exportsResult = await provider.exports(relPath);
     if (exportsResult.kind === "success") {
       exports = exportsResult.data.map((item) => ({
         name: item.name,
@@ -277,7 +294,7 @@ async function gatherTreeSitterContext(
       }));
     }
   } catch {
-    // Tree-sitter not available
+    // Provider not available
   }
 
   return { nodeInfo, outline, imports, exports };

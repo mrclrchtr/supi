@@ -8,7 +8,6 @@
         "packages/supi-ask-user/package.json",
         "packages/supi-bash-timeout/package.json",
         "packages/supi-cache/package.json",
-        "packages/supi-code-runtime/package.json",
         "packages/supi-claude-md/package.json",
         "packages/supi-code-intelligence/package.json",
         "packages/supi-context/package.json",

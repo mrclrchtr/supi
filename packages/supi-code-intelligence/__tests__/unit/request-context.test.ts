@@ -1,11 +1,7 @@
-import type {
-  SemanticProvider,
-  StructuralProvider,
-  WorkspaceContext,
-} from "@mrclrchtr/supi-code-runtime/api";
+import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-intelligence/api";
 import { describe, expect, it } from "vitest";
 
-describe("WorkspaceContext reuse", () => {
+describe("Provider type compatibility", () => {
   it("SemanticProvider and SemanticSubstrate are compatible", () => {
     // Verify that SemanticProvider can be used where SemanticSubstrate is expected
     const provider: SemanticProvider = {
@@ -29,17 +25,5 @@ describe("WorkspaceContext reuse", () => {
     };
     const substrate: import("../../src/substrates/types.ts").StructuralSubstrate = provider;
     expect(typeof substrate.calleesAt).toBe("function");
-  });
-
-  it("WorkspaceContext carries model, semantic, and structural", () => {
-    const ctx: WorkspaceContext = {
-      cwd: "/project",
-      model: null,
-      semantic: { state: { kind: "unavailable", reason: "" }, provider: null },
-      structural: { state: { kind: "unavailable", reason: "" }, provider: null },
-    };
-    expect(ctx.cwd).toBe("/project");
-    expect(ctx.semantic.state.kind).toBe("unavailable");
-    expect(ctx.structural.state.kind).toBe("unavailable");
   });
 });

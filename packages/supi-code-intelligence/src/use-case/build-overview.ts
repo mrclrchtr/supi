@@ -1,7 +1,7 @@
 // Typed overview data builder from ArchitectureModel.
 
-import type { ArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
 import { formatGitContext, gatherGitContext } from "../git-context.ts";
+import type { ArchitectureModel } from "../model.ts";
 import type { OverviewData, OverviewModule } from "./types.ts";
 
 /**

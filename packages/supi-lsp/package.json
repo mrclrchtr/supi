@@ -21,7 +21,6 @@
     "!__tests__"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "ignore": "^7.0.5",
     "typescript": "6.0.3",
@@ -56,6 +55,7 @@
     }
   },
   "devDependencies": {
+    "@mrclrchtr/supi-code-intelligence": "workspace:*",
     "@mrclrchtr/supi-test-utils": "workspace:*",
     "vitest": "4.1.7"
   },
@@ -70,6 +70,7 @@
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
     "./package.json": "./package.json",
-    "./provider/lsp-semantic-provider": "./src/provider/lsp-semantic-provider.ts"
+    "./provider/lsp-semantic-provider": "./src/provider/lsp-semantic-provider.ts",
+    "./provider/lsp-code-provider": "./src/provider/lsp-code-provider.ts"
   }
 }

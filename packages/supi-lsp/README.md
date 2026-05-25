@@ -64,13 +64,10 @@ Config lives in the standard SuPi config files:
 ## Architecture
 
 `@mrclrchtr/supi-lsp` is the **semantic provider** in SuPi's code-understanding stack.
-It depends on `@mrclrchtr/supi-code-runtime` for shared provider contracts and
-canonical code-intelligence types.
+It depends on `@mrclrchtr/supi-core` and provides a session-scoped LSP service.
 
 ```text
-supi-code-runtime  ← shared contracts, types, workspace context
-    ↑
-supi-lsp           ← semantic provider (this package)
+supi-lsp           ← LSP client + session-scoped service
 ```
 
 ## Package surfaces

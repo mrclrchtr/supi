@@ -1,20 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { CodeProvider } from "../../src/provider/code-provider.ts";
+import { registerCodeProvider } from "../../src/provider/registry.ts";
 import { executeAction } from "../helpers/execute-action.ts";
-
-const mockLspFns = vi.hoisted(() => ({
-  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
-}));
-
-vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
-  return {
-    ...actual,
-    getSessionLspService: mockLspFns.getSessionLspService,
-  };
-});
 
 let tmpDir: string;
 
@@ -23,7 +13,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -34,30 +23,51 @@ function createSourceFile(name: string, content: string): string {
   return filePath;
 }
 
-function mockReadyService(overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {}) {
-  mockLspFns.getSessionLspService.mockReturnValue({
-    kind: "ready",
-    service: {
-      workspaceSymbol: vi.fn().mockResolvedValue([]),
-      documentSymbols: vi.fn().mockResolvedValue(null),
-      references: vi.fn().mockResolvedValue(null),
-      implementation: vi.fn().mockResolvedValue(null),
-      getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
-      ...overrides,
-    },
-  });
+function createMockProvider(
+  overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {},
+): CodeProvider {
+  // We don't have vi here at runtime — this is a static mock
+  const noop = async () => null;
+  return {
+    references: noop,
+    implementation: noop,
+    documentSymbols: noop,
+    workspaceSymbols: noop,
+    calleesAt: async (_file) => ({
+      kind: "unsupported-language" as const,
+      file: _file,
+      message: "unavailable",
+    }),
+    exports: async (_file) => ({
+      kind: "unsupported-language" as const,
+      file: _file,
+      message: "unavailable",
+    }),
+    outline: async (_file) => ({
+      kind: "unsupported-language" as const,
+      file: _file,
+      message: "unavailable",
+    }),
+    imports: async (_file) => ({
+      kind: "unsupported-language" as const,
+      file: _file,
+      message: "unavailable",
+    }),
+    nodeAt: async (_file, _l, _c) => ({
+      kind: "unsupported-language" as const,
+      file: _file,
+      message: "unavailable",
+    }),
+    ...overrides,
+  };
 }
 
 describe("callers action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "unavailable",
-      reason: "No LSP in test env",
-    });
-
+    // No provider registered — getCodeProvider returns unavailable
     const result = await executeAction({ action: "callers", symbol: "myFunc" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("requires active LSP");
+    expect(result.content).toContain("requires an active code provider");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -70,18 +80,22 @@ describe("callers action without heuristic fallback", () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
     createSourceFile("src/caller.ts", "import { target } from './module';\ntarget();\n");
 
-    mockReadyService({
-      references: vi.fn().mockResolvedValue([
-        {
-          uri: `file://${sourcePath}`,
-          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
-        },
-        {
-          uri: `file://${path.join(tmpDir, "src", "caller.ts")}`,
-          range: { start: { line: 1, character: 0 }, end: { line: 1, character: 6 } },
-        },
-      ]),
+    // Register a provider that returns caller references
+    const refResult = [
+      {
+        uri: `file://${sourcePath}`,
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
+      },
+      {
+        uri: `file://${path.join(tmpDir, "src", "caller.ts")}`,
+        range: { start: { line: 1, character: 0 }, end: { line: 1, character: 6 } },
+      },
+    ];
+
+    const provider = createMockProvider({
+      references: async () => refResult,
     });
+    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction(
       { action: "callers", file: "src/module.ts", line: 1, character: 1 },
@@ -99,19 +113,19 @@ describe("callers action without heuristic fallback", () => {
   it("does not fall back to heuristic when semantic caller lookup finds no refs", async () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
 
-    mockReadyService({
-      workspaceSymbol: vi.fn().mockResolvedValue([
+    const provider = createMockProvider({
+      workspaceSymbols: async () => [
         {
           name: "target",
           kind: 6,
-          location: {
-            uri: `file://${sourcePath}`,
-            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
-          },
+          file: sourcePath,
+          line: 1,
+          character: 1,
         },
-      ]),
-      references: vi.fn().mockResolvedValue([]),
+      ],
+      references: async () => [],
     });
+    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction({ action: "callers", symbol: "target" }, { cwd: tmpDir });
 
@@ -127,20 +141,12 @@ describe("callers action without heuristic fallback", () => {
 
 describe("implementations action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "inactive",
-      service: {
-        workspaceSymbol: vi.fn(),
-        implementation: vi.fn(),
-      },
-    });
-
     const result = await executeAction(
       { action: "implementations", symbol: "Drawable" },
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain("requires active LSP");
+    expect(result.content).toContain("requires an active code provider");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -152,14 +158,16 @@ describe("implementations action without heuristic fallback", () => {
     const ifacePath = createSourceFile("src/iface.ts", "export interface Drawable {}\n");
     createSourceFile("src/circle.ts", "export class Circle implements Drawable {}\n");
 
-    mockReadyService({
-      implementation: vi.fn().mockResolvedValue([
+    const provider = createMockProvider({
+      implementation: async () => [
         {
           uri: `file://${path.join(tmpDir, "src", "circle.ts")}`,
+          targetUri: `file://${path.join(tmpDir, "src", "circle.ts")}`,
           range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
         },
-      ]),
+      ],
     });
+    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction(
       { action: "implementations", file: path.relative(tmpDir, ifacePath), line: 1, character: 1 },
@@ -177,19 +185,19 @@ describe("implementations action without heuristic fallback", () => {
   it("keeps semantic confidence when implementation lookup returns no matches", async () => {
     const ifacePath = createSourceFile("src/iface.ts", "export interface Solo {}\n");
 
-    mockReadyService({
-      workspaceSymbol: vi.fn().mockResolvedValue([
+    const provider = createMockProvider({
+      workspaceSymbols: async () => [
         {
           name: "Solo",
           kind: 11,
-          location: {
-            uri: `file://${ifacePath}`,
-            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 4 } },
-          },
+          file: ifacePath,
+          line: 1,
+          character: 1,
         },
-      ]),
-      implementation: vi.fn().mockResolvedValue([]),
+      ],
+      implementation: async () => [],
     });
+    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction(
       { action: "implementations", symbol: "Solo" },
@@ -208,14 +216,9 @@ describe("implementations action without heuristic fallback", () => {
 
 describe("affected action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "unavailable",
-      reason: "No LSP in test env",
-    });
-
     const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("requires active LSP");
+    expect(result.content).toContain("requires an active code provider");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("affected");
     if (result.details?.type === "affected") {
@@ -227,19 +230,19 @@ describe("affected action without heuristic fallback", () => {
   it("keeps semantic confidence when affected reference gathering finds no refs", async () => {
     const targetPath = createSourceFile("src/widget.ts", "export interface Widget {}\n");
 
-    mockReadyService({
-      workspaceSymbol: vi.fn().mockResolvedValue([
+    const provider = createMockProvider({
+      workspaceSymbols: async () => [
         {
           name: "Widget",
           kind: 11,
-          location: {
-            uri: `file://${targetPath}`,
-            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
-          },
+          file: targetPath,
+          line: 1,
+          character: 1,
         },
-      ]),
-      references: vi.fn().mockResolvedValue([]),
+      ],
+      references: async () => [],
     });
+    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
 
