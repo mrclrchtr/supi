@@ -10,6 +10,15 @@
     {
       "groupName": "earendil-works",
       "matchPackageNames": ["@earendil-works/{/,}**"]
+    },
+    {
+      "description": "Pi core peer deps use '*' ranges and must not be auto-updated by Renovate",
+      "enabled": false,
+      "matchPackageNames": [
+        "@earendil-works/pi-ai",
+        "@earendil-works/pi-coding-agent",
+        "@earendil-works/pi-tui"
+      ]
     }
   ]
 }
