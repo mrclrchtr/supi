@@ -49,7 +49,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-insights-1.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-insights/assets/logo.png"
   },
   "main": "src/api.ts",
   "exports": {

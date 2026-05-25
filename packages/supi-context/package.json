@@ -45,7 +45,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-context.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-context/assets/logo.png"
   },
   "main": "src/api.ts",
   "exports": {

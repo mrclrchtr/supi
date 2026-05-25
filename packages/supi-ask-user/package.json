@@ -50,7 +50,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/logo.png"
   },
   "exports": {
     "./api": "./src/api.ts",

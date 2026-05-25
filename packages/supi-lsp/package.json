@@ -63,7 +63,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-lsp-status.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-lsp/assets/logo.png"
   },
   "main": "src/api.ts",
   "exports": {

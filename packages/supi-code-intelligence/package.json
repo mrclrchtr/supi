@@ -52,11 +52,10 @@
   "pi": {
     "extensions": [
       "./src/extension.ts",
-
       "node_modules/@mrclrchtr/supi-lsp/src/extension.ts",
       "node_modules/@mrclrchtr/supi-tree-sitter/src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-code-intelligence/assets/logo.png"
   },
   "main": "src/api.ts",
   "exports": {

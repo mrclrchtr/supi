@@ -52,7 +52,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-web.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-web/assets/logo.png"
   },
   "main": "src/api.ts",
   "exports": {

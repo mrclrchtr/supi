@@ -1,0 +1,26 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-25T12:07:58.501095Z"
+revision = 20
+
+[document_fingerprints]
+archive = "sha256:5724fa033d0b01493737ca4f60836bd029c4ec7ee8ad16f3eba6b80248b2f5d0"
+content = "sha256:fd6f4c6b4feb5350d0c31671f9e7085e9e0552288493a50b8a67885adc51c254"
+task-01 = "sha256:41df09853c362aa69f0c27648bbceb12356a92bdf09df42b47b26f6fa8475057"
+task-02 = "sha256:6d47dbe00529a1e3c74967bf0cc1c8bc5aa90bc8ab3aa5d69035cc721f5dc80e"
+task-03 = "sha256:9f2bc3e55dfe1fa6263414819b165fdc9f0a0f942434ee1be1157805e7e8a2c1"
+
+[[tasks]]
+number = 1
+title = "Create scripts/generate-logos.mjs — SVG template substitution + ImageMagick PNG conversion"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Add logo image to all 16 package README headers"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update pi.image in 15 package.json files to point to logo PNG"
+status = "done"

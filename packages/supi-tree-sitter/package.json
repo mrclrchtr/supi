@@ -75,7 +75,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-tree-sitter.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-tree-sitter/assets/logo.png"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"

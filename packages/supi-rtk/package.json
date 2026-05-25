@@ -40,7 +40,8 @@
   "pi": {
     "extensions": [
       "./src/extension.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-rtk/assets/logo.png"
   },
   "main": "src/api.ts",
   "exports": {
