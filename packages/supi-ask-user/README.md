@@ -1,4 +1,10 @@
-![SuPi](assets/logo.png)
+<div align="center">
+  <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-ask-user">
+    <picture>
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/logo.png" alt="SuPi" width="50%">
+    </picture>
+  </a>
+</div>
 
 # @mrclrchtr/supi-ask-user
 

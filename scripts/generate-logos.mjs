@@ -27,6 +27,7 @@ const SUBTITLES = {
   "supi-cache": "Cache",
   "supi-claude-md": "Claude.md",
   "supi-code-intelligence": "Code Intelligence",
+  "supi-code-runtime": "Code Runtime",
   "supi-context": "Context",
   "supi-core": "Core",
   "supi-debug": "Debug",
@@ -89,7 +90,7 @@ function main() {
         "--export-height",
         "512",
       ]);
-      console.log(`  ${pkgDir}/assets/logo.png`);
+      console.log(`  ${pkgDir}/assets/logo.png (generated from centralized assets/supi-logo.svg)`);
       generated++;
     } catch (err) {
       console.error(`  FAILED ${pkgDir}: ${err.message}`);

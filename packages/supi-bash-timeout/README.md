@@ -1,4 +1,10 @@
-![SuPi](assets/logo.png)
+<div align="center">
+  <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-bash-timeout">
+    <picture>
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-bash-timeout/assets/logo.png" alt="SuPi" width="50%">
+    </picture>
+  </a>
+</div>
 
 # @mrclrchtr/supi-bash-timeout
 
