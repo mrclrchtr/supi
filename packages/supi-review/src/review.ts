@@ -65,6 +65,8 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
       }),
   });
 
+  notifyBriefDone(pi, synthesis, snapshot, model.canonicalId);
+
   if (synthesis.kind !== "success") {
     notifySynthesisFailure(synthesis, ctx);
     return;
@@ -82,6 +84,8 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
   if (!approved) return;
 
   const result = await runReviewWithLoader(plan, ctx, pi);
+
+  notifyReviewDone(pi, result);
   injectReviewMessage(pi, result);
 }
 
@@ -221,6 +225,44 @@ function notifySynthesisFailure(
       ctx.ui.notify("Review canceled", "warning");
       break;
   }
+}
+
+/** Ring the terminal bell so the user knows to check back. */
+function ringBell(): void {
+  process.stdout.write("\x07");
+}
+
+/**
+ * Emit a `supi:review:brief-done` event and ring the terminal bell after
+ * brief synthesis completes (success, failure, cancel, or timeout).
+ */
+function notifyBriefDone(
+  pi: ExtensionAPI,
+  result: BriefSynthesisRunResult,
+  snapshot: ReviewSnapshot,
+  modelId: string,
+): void {
+  pi.events.emit("supi:review:brief-done", {
+    kind: result.kind,
+    snapshot: snapshot.title,
+    modelId,
+    brief: result.kind === "success" ? result.brief : undefined,
+  });
+  ringBell();
+}
+
+/**
+ * Emit a `supi:review:review-done` event and ring the terminal bell after
+ * the review child session completes.
+ */
+function notifyReviewDone(pi: ExtensionAPI, result: ReviewResult): void {
+  pi.events.emit("supi:review:review-done", {
+    kind: result.kind,
+    snapshot: result.snapshot.title,
+    modelId: result.modelId,
+    findingsCount: result.kind === "success" ? result.output.findings.length : 0,
+  });
+  ringBell();
 }
 
 function injectReviewMessage(pi: ExtensionAPI, result: ReviewResult): void {

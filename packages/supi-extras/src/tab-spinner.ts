@@ -15,6 +15,18 @@ import { formatTitle, signalDone } from "@mrclrchtr/supi-core/terminal";
 const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const AGENT_END_SETTLE_MS = 200;
 
+/** Icons shown in the terminal title when a review phase completes. */
+const BRIEF_DONE_ICON = "\u{1F4CB}"; // 📋 clipboard
+const REVIEW_DONE_ICON = "\u{1F50D}"; // 🔍 magnifying glass
+const REVIEW_FAILED_ICON = "\u2717"; // ✗ ballot x
+
+type ReviewTitleState =
+  | { kind: "none" }
+  | { kind: "brief-done" }
+  | { kind: "brief-failed" }
+  | { kind: "review-done" }
+  | { kind: "review-failed" };
+
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: spinner state and event wiring are intentionally colocated
 export default function tabSpinner(pi: ExtensionAPI) {
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -24,6 +36,7 @@ export default function tabSpinner(pi: ExtensionAPI) {
   let hasActiveAgent = false;
   let pendingAgentEnd = false;
   let askUserActive = 0;
+  let reviewTitleState: ReviewTitleState = { kind: "none" };
   let currentCtx: ExtensionContext | undefined;
   let cachedSessionName: string | undefined;
   let cachedCwd: string | undefined;
@@ -32,6 +45,39 @@ export default function tabSpinner(pi: ExtensionAPI) {
   /** Build the current base title from cached cwd plus the latest safe session name lookup. */
   function title() {
     return formatTitle(getSessionNameSafe(), cachedCwd);
+  }
+
+  /** Set the terminal title to the review-phase icon if one is active. */
+  function applyReviewTitle(): boolean {
+    if (timer) return false; // spinner is active, don't override
+
+    const baseTitle = title();
+    const icon = reviewTitleIcon();
+    if (!icon) return false;
+
+    safelySetTitle(`${icon} ${baseTitle}`);
+    return true;
+  }
+
+  /** Return the appropriate review title icon, or empty string when idle. */
+  function reviewTitleIcon(): string {
+    switch (reviewTitleState.kind) {
+      case "brief-done":
+        return BRIEF_DONE_ICON;
+      case "brief-failed":
+        return REVIEW_FAILED_ICON;
+      case "review-done":
+        return REVIEW_DONE_ICON;
+      case "review-failed":
+        return REVIEW_FAILED_ICON;
+      case "none":
+        return "";
+    }
+  }
+
+  /** Clear any active review title state and let normal title logic resume. */
+  function clearReviewTitle() {
+    reviewTitleState = { kind: "none" };
   }
 
   function clearPendingAgentEnd() {
@@ -85,24 +131,24 @@ export default function tabSpinner(pi: ExtensionAPI) {
     }
   }
 
-  /** Restore the base title immediately. */
+  /** Restore the base title, or show the review icon if one is active. */
   function stop() {
     clearPendingAgentEnd();
     clearSpinnerTimer();
     frame = 0;
-    const baseTitle = title();
-    safelySetTitle(baseTitle);
+    if (applyReviewTitle()) return;
+    safelySetTitle(title());
   }
 
-  /** Show the ✓ done symbol in the title and play the terminal bell. */
+  /** Show the ✓ done symbol, or the review icon if one is active. */
   function showDone() {
     clearPendingAgentEnd();
     clearSpinnerTimer();
     frame = 0;
-    const baseTitle = title();
     if (!currentCtx) return;
+    if (applyReviewTitle()) return;
     try {
-      signalDone(currentCtx, baseTitle);
+      signalDone(currentCtx, title());
     } catch {
       handleStaleContext();
     }
@@ -172,6 +218,7 @@ export default function tabSpinner(pi: ExtensionAPI) {
   });
 
   pi.on("agent_start", async (_event, ctx) => {
+    clearReviewTitle();
     if (pendingAgentEnd) {
       resumePendingAgent(ctx);
       return;
@@ -191,6 +238,7 @@ export default function tabSpinner(pi: ExtensionAPI) {
 
   pi.on("session_shutdown", async (_event, ctx) => {
     unregisterEvents();
+    clearReviewTitle();
     activeCount = 0;
     rememberContext(ctx);
     stop();
@@ -215,6 +263,24 @@ export default function tabSpinner(pi: ExtensionAPI) {
     pi.events.on("supi:ask-user:end", () => {
       askUserActive = Math.max(0, askUserActive - 1);
       if (askUserActive === 0 && activeCount > 0) start();
+    }),
+  );
+
+  unregisterBusHandlers.push(
+    pi.events.on("supi:review:brief-done", (payload: unknown) => {
+      const data = payload as { kind: string };
+      reviewTitleState =
+        data.kind === "success" ? { kind: "brief-done" } : { kind: "brief-failed" };
+      applyReviewTitle();
+    }),
+  );
+
+  unregisterBusHandlers.push(
+    pi.events.on("supi:review:review-done", (payload: unknown) => {
+      const data = payload as { kind: string };
+      reviewTitleState =
+        data.kind === "success" ? { kind: "review-done" } : { kind: "review-failed" };
+      applyReviewTitle();
     }),
   );
 }
