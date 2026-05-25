@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/mrclrchtr/supi/compare/v1.9.1...v1.10.0) (2026-05-25)
+
+
+### Features
+
+* **supi:** add planner-backed code_refactor workflow ([3ff0f48](https://github.com/mrclrchtr/supi/commit/3ff0f488eed563dc2067f6401e0e420347f841fa))
+
 ## [1.9.1](https://github.com/mrclrchtr/supi/compare/v1.9.0...v1.9.1) (2026-05-25)
 
 
