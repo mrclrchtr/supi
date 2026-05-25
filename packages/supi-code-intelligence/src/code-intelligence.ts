@@ -2,7 +2,7 @@
 // Provides architecture briefs, project maps, relationship tracing, impact assessment, and pattern search.
 
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { buildArchitectureModel } from "./architecture.ts";
+import { buildArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
 import { renderOverview } from "./presentation/markdown/overview.ts";
 import { registerCodeIntelligenceTools } from "./tool/register-tools.ts";
 import { buildOverviewData } from "./use-case/build-overview.ts";

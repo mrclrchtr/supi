@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { buildArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildArchitectureModel } from "../../src/architecture.ts";
 import { generateFocusedBrief, generateOverview, generateProjectBrief } from "../../src/brief.ts";
 
 let tmpDir: string;

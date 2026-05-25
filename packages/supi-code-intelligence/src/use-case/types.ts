@@ -1,6 +1,6 @@
 // Shared typed data interfaces between use-case and presentation layers.
 
-import type { ArchitectureModel } from "../architecture.ts";
+import type { ArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
 import type { StructuralSubstrate } from "../substrates/types.ts";
 import type { BriefDetails } from "../types.ts";
 

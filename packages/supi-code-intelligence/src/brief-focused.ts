@@ -3,8 +3,12 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ArchitectureModel } from "./architecture.ts";
-import { findModuleForPath, getDependencies, getDependents } from "./architecture.ts";
+import type { ArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  findModuleForPath,
+  getDependencies,
+  getDependents,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { formatGitContext, gatherGitContext } from "./git-context.ts";
 import {
   appendPrioritySignalsSection,

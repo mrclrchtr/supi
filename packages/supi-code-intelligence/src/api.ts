@@ -1,12 +1,16 @@
 // Reusable architecture and target-resolution helpers for peer extensions.
 
-export type { ArchitectureModel, DependencyEdge, ModuleInfo } from "./architecture.ts";
+export type {
+  ArchitectureModel,
+  DependencyEdge,
+  ModuleInfo,
+} from "@mrclrchtr/supi-code-runtime/api";
 export {
   buildArchitectureModel,
   findModuleForPath,
   getDependencies,
   getDependents,
-} from "./architecture.ts";
+} from "@mrclrchtr/supi-code-runtime/api";
 
 export { generateFocusedBrief, generateOverview, generateProjectBrief } from "./brief.ts";
 export { createSemanticSubstrate } from "./substrates/lsp-adapter.ts";

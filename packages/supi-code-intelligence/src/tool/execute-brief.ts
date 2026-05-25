@@ -1,4 +1,4 @@
-import { buildArchitectureModel } from "../architecture.ts";
+import { buildArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
 import { createStructuralSubstrate } from "../substrates/tree-sitter-adapter.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeBrief } from "../use-case/generate-brief.ts";

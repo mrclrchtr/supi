@@ -3,8 +3,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { ArchitectureModel } from "../architecture.ts";
-import { findModuleForPath } from "../architecture.ts";
+import type { ArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
+import { findModuleForPath } from "@mrclrchtr/supi-code-runtime/api";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import { renderAnchoredBrief, renderSymbolBrief } from "../presentation/markdown/brief.ts";
 import { normalizePath } from "../search-helpers.ts";

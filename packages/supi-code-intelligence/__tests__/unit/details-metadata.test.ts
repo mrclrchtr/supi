@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { buildArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { buildArchitectureModel } from "../../src/architecture.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
 import { executeMapTool } from "../../src/tool/execute-map.ts";

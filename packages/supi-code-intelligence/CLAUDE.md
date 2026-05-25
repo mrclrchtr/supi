@@ -16,7 +16,6 @@ src/
 ├── code-intelligence.ts    # Extension factory — overview injection + focused tool registration
 ├── index.ts                # Public API exports for programmatic consumers
 ├── types.ts                # Result metadata types (BriefDetails, MapDetails, SearchDetails, etc.)
-├── architecture.ts         # Project model builder (workspace scan, module detection)
 ├── brief.ts                # Public facade for brief/overview helpers (delegates to use-case + presentation)
 ├── brief-focused.ts        # Directory/file/symbol focused brief generation
 ├── git-context.ts          # Git branch, dirty files, last commit helpers

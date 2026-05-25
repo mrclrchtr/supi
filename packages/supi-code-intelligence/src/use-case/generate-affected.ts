@@ -3,7 +3,11 @@
 // returns fully rendered content + details metadata.
 
 import * as path from "node:path";
-import { buildArchitectureModel, findModuleForPath, getDependents } from "../architecture.ts";
+import {
+  buildArchitectureModel,
+  findModuleForPath,
+  getDependents,
+} from "@mrclrchtr/supi-code-runtime/api";
 import {
   renderAffectedFileLevel,
   renderAffectedSingle,

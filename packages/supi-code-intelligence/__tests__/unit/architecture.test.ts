@@ -1,13 +1,13 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   buildArchitectureModel,
   findModuleForPath,
   getDependencies,
   getDependents,
-} from "../../src/architecture.ts";
+} from "@mrclrchtr/supi-code-runtime/api";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 let tmpDir: string;
 

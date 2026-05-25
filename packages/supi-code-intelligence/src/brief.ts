@@ -1,8 +1,8 @@
 // Public facade — delegates to the new use-case and presentation layers.
 // Existing callers (api.ts, index.ts, code-intelligence.ts) remain compatible.
 
-import type { ArchitectureModel } from "./architecture.ts";
-import { getDependents } from "./architecture.ts";
+import type { ArchitectureModel } from "@mrclrchtr/supi-code-runtime/api";
+import { getDependents } from "@mrclrchtr/supi-code-runtime/api";
 import { formatGitContext, gatherGitContext } from "./git-context.ts";
 import { renderOverview } from "./presentation/markdown/overview.ts";
 import type { BriefDetails, ConfidenceMode } from "./types.ts";
