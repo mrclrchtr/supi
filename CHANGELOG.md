@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/mrclrchtr/supi/compare/v1.9.0...v1.9.1) (2026-05-25)
+
+
+### Bug Fixes
+
+* **supi-lsp:** bundle typescript and ignore in published tarball ([c301a41](https://github.com/mrclrchtr/supi/commit/c301a41fa6bca0a353e64dd9682d65ae6a3bd60d))
+
 ## [1.9.0](https://github.com/mrclrchtr/supi/compare/v1.8.1...v1.9.0) (2026-05-25)
 
 
