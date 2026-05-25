@@ -13,8 +13,6 @@ elif [[ -n "${1:-}" ]]; then
 fi
 
 PACKAGES=(
-  supi-lsp
-  supi-tree-sitter
   supi-code-intelligence
   supi-ask-user
   supi-claude-md
