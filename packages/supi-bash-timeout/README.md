@@ -16,8 +16,6 @@ For local development:
 pi install ./packages/supi-bash-timeout
 ```
 
-After editing the source, run `/reload`.
-
 ## What you get
 
 After install, every `bash` tool call is checked before execution:

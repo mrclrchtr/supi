@@ -18,8 +18,6 @@ For local development:
 pi install ./packages/supi-insights
 ```
 
-After editing the source, run `/reload`.
-
 ![Insights CLI](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-insights-cli.png)
 
 ![Insights HTML report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-insights-1.png)

@@ -16,8 +16,6 @@ For local development:
 pi install ./packages/supi-lsp
 ```
 
-After editing the source, run `/reload`.
-
 ## What you get
 
 After install, pi gets **10 focused expert tools** for semantic language-server analysis:

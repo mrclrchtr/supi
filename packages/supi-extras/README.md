@@ -16,8 +16,6 @@ For local development:
 pi install ./packages/supi-extras
 ```
 
-After editing the source, run `/reload`.
-
 ![Stash picker overlay](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-extras-stash.png)
 
 ## What you get

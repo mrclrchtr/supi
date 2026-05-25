@@ -18,8 +18,6 @@ For local development:
 pi install ./packages/supi-cache
 ```
 
-After editing the source, run `/reload`.
-
 ## What you get
 
 After install, the package does two things:

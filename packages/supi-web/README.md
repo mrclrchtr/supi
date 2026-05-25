@@ -16,8 +16,6 @@ For local development:
 pi install ./packages/supi-web
 ```
 
-After editing the source, run `/reload`.
-
 ![Web tools in action](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-web.png)
 
 ## What you get

@@ -18,8 +18,6 @@ For local development:
 pi install ./packages/supi-claude-md
 ```
 
-After editing the source, run `/reload`.
-
 ## What you get
 
 When the agent touches a file or directory inside the project, this package can inject nearby subdirectory context files into the conversation.

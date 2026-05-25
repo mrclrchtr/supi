@@ -18,8 +18,6 @@ For local development:
 pi install ./packages/supi-rtk
 ```
 
-After editing the source, run `/reload`.
-
 ## What you get
 
 After install, the package intercepts bash execution in two places:

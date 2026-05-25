@@ -16,8 +16,6 @@ For local development:
 pi install ./packages/supi-debug
 ```
 
-After editing the source, run `/reload`.
-
 ![Debug event report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-debug.png)
 
 ## What you get

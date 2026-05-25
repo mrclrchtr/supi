@@ -18,8 +18,6 @@ For local development:
 pi install ./packages/supi-review
 ```
 
-After editing the source, run `/reload`.
-
 ## What you get
 
 After install, pi gets one command:

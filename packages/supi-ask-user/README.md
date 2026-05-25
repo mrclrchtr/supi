@@ -16,8 +16,6 @@ For local development:
 pi install ./packages/supi-ask-user
 ```
 
-After editing the source, run `/reload`.
-
 ![ask_user overlay](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user.png)
 
 ![ask_user choice with preview](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user-2.png)
