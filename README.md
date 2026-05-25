@@ -1,3 +1,13 @@
+```
+      _______  __    __  .______    __
+     /       ||  |  |  | |   _  \  |  |
+    |   (----`|  |  |  | |  |_)  | |  |
+     \   \    |  |  |  | |   ___/  |  |
+ .----)   |   |  `--'  | |  |      |  |
+ |_______/     \______/  | _|      |__|
+   [=== Curated Extension Stack ===]
+```
+
 # SuPi (Super Pi)
 
 *Is my curated extension stack for PI, I use in every project, shared in case they help you too.*
