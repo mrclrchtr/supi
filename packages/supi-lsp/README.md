@@ -67,11 +67,15 @@ Config lives in the standard SuPi config files:
 
 ## Architecture
 
-`@mrclrchtr/supi-lsp` is the **semantic provider** in SuPi's code-understanding stack.
-It depends on `@mrclrchtr/supi-core` and provides a session-scoped LSP service.
+`@mrclrchtr/supi-lsp` is the **semantic substrate** in SuPi's code-understanding stack.
+It depends on `@mrclrchtr/supi-core` and `@mrclrchtr/supi-code-runtime` for shared
+contracts, and provides a session-scoped LSP service that publishes semantic and
+diagnostic capabilities into the shared workspace runtime.
 
 ```text
-supi-lsp           ← LSP client + session-scoped service
+supi-code-runtime  ← shared contracts + workspace runtime
+    ↑
+supi-lsp           ← LSP client + session-scoped service + runtime capabilities
 ```
 
 ## Package surfaces

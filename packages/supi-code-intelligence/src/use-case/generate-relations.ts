@@ -6,12 +6,12 @@ import {
   renderCallersResult,
   renderImplementationsResult,
 } from "../presentation/markdown/relations.ts";
-import type { CodeProvider } from "../provider/code-provider.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isInProjectPath, uriToFile } from "../search-helpers.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
+import type { CodeProvider } from "../workspace/request-context.ts";
 import { aggregatePerTarget, collectReferences } from "./support/semantic-references.ts";
 export interface RelationsInput {
   kind: "callers" | "callees" | "implementations";

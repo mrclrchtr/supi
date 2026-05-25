@@ -2,9 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { CodeProvider } from "../../src/provider/code-provider.ts";
-import { registerCodeProvider } from "../../src/provider/registry.ts";
 import { executeAction } from "../helpers/execute-action.ts";
+import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
 
@@ -13,6 +12,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearMockRuntime();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -21,43 +21,6 @@ function createSourceFile(name: string, content: string): string {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, content, "utf-8");
   return filePath;
-}
-
-function createMockProvider(overrides: Partial<CodeProvider> = {}): CodeProvider {
-  // We don't have vi here at runtime — this is a static mock
-  const noop = async () => null;
-  return {
-    references: noop,
-    implementation: noop,
-    documentSymbols: noop,
-    workspaceSymbols: noop,
-    calleesAt: async (_file) => ({
-      kind: "unsupported-language" as const,
-      file: _file,
-      message: "unavailable",
-    }),
-    exports: async (_file) => ({
-      kind: "unsupported-language" as const,
-      file: _file,
-      message: "unavailable",
-    }),
-    outline: async (_file) => ({
-      kind: "unsupported-language" as const,
-      file: _file,
-      message: "unavailable",
-    }),
-    imports: async (_file) => ({
-      kind: "unsupported-language" as const,
-      file: _file,
-      message: "unavailable",
-    }),
-    nodeAt: async (_file, _l, _c) => ({
-      kind: "unsupported-language" as const,
-      file: _file,
-      message: "unavailable",
-    }),
-    ...overrides,
-  };
 }
 
 describe("callers action without heuristic fallback", () => {
@@ -90,10 +53,9 @@ describe("callers action without heuristic fallback", () => {
       },
     ];
 
-    const provider = createMockProvider({
+    registerMockProvider(tmpDir, {
       references: async () => refResult,
     });
-    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction(
       { action: "callers", file: "src/module.ts", line: 1, character: 1 },
@@ -111,7 +73,7 @@ describe("callers action without heuristic fallback", () => {
   it("does not fall back to heuristic when semantic caller lookup finds no refs", async () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
 
-    const provider = createMockProvider({
+    registerMockProvider(tmpDir, {
       workspaceSymbols: async () => [
         {
           name: "target",
@@ -123,7 +85,6 @@ describe("callers action without heuristic fallback", () => {
       ],
       references: async () => [],
     });
-    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction({ action: "callers", symbol: "target" }, { cwd: tmpDir });
 
@@ -156,7 +117,7 @@ describe("implementations action without heuristic fallback", () => {
     const ifacePath = createSourceFile("src/iface.ts", "export interface Drawable {}\n");
     createSourceFile("src/circle.ts", "export class Circle implements Drawable {}\n");
 
-    const provider = createMockProvider({
+    registerMockProvider(tmpDir, {
       implementation: async () => [
         {
           uri: `file://${path.join(tmpDir, "src", "circle.ts")}`,
@@ -165,8 +126,6 @@ describe("implementations action without heuristic fallback", () => {
         },
       ],
     });
-    registerCodeProvider(tmpDir, provider);
-
     const result = await executeAction(
       { action: "implementations", file: path.relative(tmpDir, ifacePath), line: 1, character: 1 },
       { cwd: tmpDir },
@@ -183,7 +142,7 @@ describe("implementations action without heuristic fallback", () => {
   it("keeps semantic confidence when implementation lookup returns no matches", async () => {
     const ifacePath = createSourceFile("src/iface.ts", "export interface Solo {}\n");
 
-    const provider = createMockProvider({
+    registerMockProvider(tmpDir, {
       workspaceSymbols: async () => [
         {
           name: "Solo",
@@ -195,7 +154,6 @@ describe("implementations action without heuristic fallback", () => {
       ],
       implementation: async () => [],
     });
-    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction(
       { action: "implementations", symbol: "Solo" },
@@ -228,7 +186,7 @@ describe("affected action without heuristic fallback", () => {
   it("keeps semantic confidence when affected reference gathering finds no refs", async () => {
     const targetPath = createSourceFile("src/widget.ts", "export interface Widget {}\n");
 
-    const provider = createMockProvider({
+    registerMockProvider(tmpDir, {
       workspaceSymbols: async () => [
         {
           name: "Widget",
@@ -240,7 +198,6 @@ describe("affected action without heuristic fallback", () => {
       ],
       references: async () => [],
     });
-    registerCodeProvider(tmpDir, provider);
 
     const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
 

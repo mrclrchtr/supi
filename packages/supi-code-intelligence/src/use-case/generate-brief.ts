@@ -7,10 +7,10 @@ import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import type { ArchitectureModel } from "../model.ts";
 import { findModuleForPath } from "../model.ts";
 import { renderAnchoredBrief, renderSymbolBrief } from "../presentation/markdown/brief.ts";
-import type { CodeProvider } from "../provider/code-provider.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { TargetResolutionResult } from "../target-resolution.ts";
 import { resolveSymbolTarget } from "../target-resolution.ts";
+import type { CodeProvider } from "../workspace/request-context.ts";
 import type { BriefDeps, BriefInput, BriefUseCaseResult } from "./types.ts";
 
 // ── TreeSitterContext is an intermediate data shape from the use-case ──

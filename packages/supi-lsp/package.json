@@ -21,6 +21,7 @@
     "!__tests__"
   ],
   "dependencies": {
+    "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "ignore": "^7.0.5",
     "typescript": "6.0.3",
@@ -29,6 +30,7 @@
     "vscode-languageserver-types": "^3.17.5"
   },
   "bundledDependencies": [
+    "@mrclrchtr/supi-code-runtime",
     "@mrclrchtr/supi-core",
     "vscode-jsonrpc",
     "vscode-languageserver-protocol",
@@ -70,7 +72,6 @@
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
     "./package.json": "./package.json",
-    "./provider/lsp-semantic-provider": "./src/provider/lsp-semantic-provider.ts",
-    "./provider/lsp-code-provider": "./src/provider/lsp-code-provider.ts"
+    "./provider/lsp-semantic-provider": "./src/provider/lsp-semantic-provider.ts"
   }
 }

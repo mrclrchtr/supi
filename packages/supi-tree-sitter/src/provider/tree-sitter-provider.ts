@@ -1,5 +1,5 @@
 // Structural provider adapter — wraps TreeSitterService into the shared
-// StructuralProvider contract from supi-code-intelligence.
+// StructuralProvider contract from supi-code-runtime.
 
 import type {
   CalleesData,
@@ -9,7 +9,7 @@ import type {
   NodeAtData,
   OutlineData,
   StructuralProvider,
-} from "@mrclrchtr/supi-code-intelligence/api";
+} from "@mrclrchtr/supi-code-runtime/api";
 import type {
   CalleesAtResult,
   ExportRecord,

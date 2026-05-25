@@ -64,12 +64,16 @@ Coordinates use **1-based** line and character columns. Character positions use 
 
 ## Architecture
 
-`@mrclrchtr/supi-tree-sitter` is the **structural provider** in SuPi's
-It depends on `@mrclrchtr/supi-core` and provides structural analysis via a
-session-scoped Tree-sitter service.
+`@mrclrchtr/supi-tree-sitter` is the **structural substrate** in SuPi's
+code-understanding stack. It depends on `@mrclrchtr/supi-core` and
+`@mrclrchtr/supi-code-runtime` for shared contracts, and provides structural
+analysis via a session-scoped Tree-sitter service that publishes its
+capabilities into the shared workspace runtime.
 
 ```text
-supi-tree-sitter   ← Tree-sitter WASM + session-scoped service
+supi-code-runtime  ← shared contracts + workspace runtime
+    ↑
+supi-tree-sitter  ← Tree-sitter WASM + session-scoped service + runtime capabilities
 ```
 
 ## Package surfaces

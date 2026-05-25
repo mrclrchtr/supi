@@ -8,6 +8,7 @@ import type {
   ExtensionContext,
   SessionStartEvent,
 } from "@earendil-works/pi-coding-agent";
+import type { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { loadConfig, resolveLanguageAlias } from "../config/config.ts";
 import { clearTsconfigCache } from "../config/tsconfig-scope.ts";
 import { scanWorkspaceSentinels } from "../diagnostics/workspace-sentinels.ts";
@@ -18,6 +19,10 @@ import {
   type LspRuntimeState,
   refreshProjectServers,
 } from "../session/lsp-state.ts";
+import {
+  registerLspCapabilities,
+  unregisterLspCapabilities,
+} from "../session/runtime-registration.ts";
 import {
   scanMissingServers,
   scanProjectCapabilities,
@@ -38,11 +43,15 @@ import { updateLspUi } from "../ui/ui.ts";
  * Register session lifecycle handlers (start, shutdown, and agent-end cleanup).
  *
  * - `session_start`: initialises the LspManager, starts detected servers, wires
- *   dynamic tool guidance, and syncs UI state.
+ *   dynamic tool guidance, publishes runtime capabilities, and syncs UI state.
  * - `session_shutdown`: tears down the manager and clears runtime state.
  * - `agent_end`: refreshes project-server info and updates the LSP status UI.
  */
-export function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRuntimeState): void {
+export function registerSessionLifecycleHandlers(
+  pi: ExtensionAPI,
+  state: LspRuntimeState,
+  runtime: WorkspaceRuntime,
+): void {
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: session_start orchestrates setup, server detection, settings, and persistence.
   pi.on("session_start", async (_event: SessionStartEvent, ctx: ExtensionContext) => {
     if (state.manager) {
@@ -100,10 +109,9 @@ export function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRun
     state.lastDiagnosticsFingerprint = null;
     state.currentContextToken = null;
     state.lspActive = true;
-    setSessionLspServiceState(cwd, {
-      kind: "ready",
-      service: new SessionLspService(state.manager),
-    });
+    const service = new SessionLspService(state.manager);
+    setSessionLspServiceState(cwd, { kind: "ready", service });
+    registerLspCapabilities(runtime, cwd, service);
     registerLspTools(pi, buildLspToolPromptSurfaces(state.projectServers, cwd));
     ensureLspToolsActive(pi);
     persistLspActiveState(pi, state);
@@ -113,7 +121,9 @@ export function registerSessionLifecycleHandlers(pi: ExtensionAPI, state: LspRun
   pi.on("session_shutdown", async () => {
     clearTsconfigCache();
     if (state.manager) {
-      clearSessionLspService(state.manager.getCwd());
+      const cwd = state.manager.getCwd();
+      unregisterLspCapabilities(runtime, cwd);
+      clearSessionLspService(cwd);
       await state.manager.shutdownAll();
       state.manager = null;
     }

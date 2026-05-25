@@ -1,7 +1,7 @@
-import { getCodeProvider } from "../provider/registry.ts";
 import type { CodeIntelResult } from "../types.ts";
 import type { RelationsInput } from "../use-case/generate-relations.ts";
 import { executeRelations } from "../use-case/generate-relations.ts";
+import { getCodeProvider } from "../workspace/request-context.ts";
 import type { CodeRelationsKind } from "./tool-specs.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 

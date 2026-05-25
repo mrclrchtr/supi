@@ -31,6 +31,7 @@
     "check:sql-wasm": "node scripts/generate-sql-wasm.mjs --check"
   },
   "dependencies": {
+    "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "web-tree-sitter": "^0.26.8"
   },
@@ -78,6 +79,7 @@
     "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-tree-sitter/assets/logo.png"
   },
   "bundledDependencies": [
+    "@mrclrchtr/supi-code-runtime",
     "@mrclrchtr/supi-core"
   ],
   "main": "src/api.ts",
@@ -85,7 +87,6 @@
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
     "./package.json": "./package.json",
-    "./provider/tree-sitter-provider": "./src/provider/tree-sitter-provider.ts",
-    "./provider/tree-sitter-code-provider": "./src/provider/tree-sitter-code-provider.ts"
+    "./provider/tree-sitter-provider": "./src/provider/tree-sitter-provider.ts"
   }
 }

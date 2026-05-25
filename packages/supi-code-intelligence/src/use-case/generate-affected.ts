@@ -9,11 +9,11 @@ import {
   renderAffectedSingle,
 } from "../presentation/markdown/affected.ts";
 import { summarizePrioritySignalsForFiles } from "../prioritization-signals.ts";
-import type { CodeProvider } from "../provider/code-provider.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
 import type { AffectedDetails, CodeIntelResult, ConfidenceMode } from "../types.ts";
+import type { CodeProvider } from "../workspace/request-context.ts";
 import {
   aggregatePerTarget,
   collectReferences,

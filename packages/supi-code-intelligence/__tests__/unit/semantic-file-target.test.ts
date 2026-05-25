@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeAction } from "../helpers/execute-action.ts";
-import { registerMockProvider } from "../helpers/register-mock-provider.ts";
+import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
 

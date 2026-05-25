@@ -1,0 +1,31 @@
+/**
+ * Package-root re-export surface for @mrclrchtr/supi-code-runtime.
+ *
+ * Prefer importing from `@mrclrchtr/supi-code-runtime/api` for explicit
+ * access to the shared contracts and workspace primitives.
+ */
+
+export type {
+  CalleesData,
+  CapabilityState,
+  CodeLocation,
+  CodePosition,
+  CodeResult,
+  CodeSymbol,
+  ConfidenceMode,
+  ExportData,
+  ImportData,
+  NodeAtData,
+  OutlineData,
+  SemanticProvider,
+  SourceRange,
+  StructuralProvider,
+  StructuralResult,
+  WorkspaceCapabilities,
+  WorkspaceContext,
+} from "./api.ts";
+export {
+  createWorkspaceContext,
+  getDefaultWorkspaceRuntime,
+  WorkspaceRuntime,
+} from "./api.ts";

@@ -1,6 +1,6 @@
-import { getCodeProvider } from "../provider/registry.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
+import { getCodeProvider } from "../workspace/request-context.ts";
 import { validatePatternToolParams } from "./validation.ts";
 
 export interface CodePatternToolParams {

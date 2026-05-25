@@ -1,8 +1,8 @@
 // Shared typed data interfaces between use-case and presentation layers.
 
 import type { ArchitectureModel } from "../model.ts";
-import type { CodeProvider } from "../provider/code-provider.ts";
 import type { BriefDetails } from "../types.ts";
+import type { CodeProvider } from "../workspace/request-context.ts";
 
 // ── Overview use-case ────────────────────────────────────────────────
 

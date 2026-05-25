@@ -1,6 +1,6 @@
-import { getCodeProvider } from "../provider/registry.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeAffected } from "../use-case/generate-affected.ts";
+import { getCodeProvider } from "../workspace/request-context.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeAffectedToolParams {

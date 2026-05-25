@@ -8,7 +8,7 @@ import { executeBriefTool } from "../../src/tool/execute-brief.ts";
 import { executeMapTool } from "../../src/tool/execute-map.ts";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
 import { executeAction } from "../helpers/execute-action.ts";
-import { registerMockProvider } from "../helpers/register-mock-provider.ts";
+import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
 

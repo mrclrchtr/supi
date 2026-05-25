@@ -10,11 +10,11 @@ import {
   renderStructuredEmptyState,
   renderStructuredMatches,
 } from "../presentation/markdown/pattern.ts";
-import type { CodeProvider } from "../provider/code-provider.ts";
 import type { CodeQueryParams } from "../query-params.ts";
 import type { RgMatch } from "../search-helpers.ts";
 import { normalizePath, runRipgrep, runRipgrepDetailed } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
+import type { CodeProvider } from "../workspace/request-context.ts";
 
 export interface PatternInput {
   pattern: string;

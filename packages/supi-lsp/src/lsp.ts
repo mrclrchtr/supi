@@ -3,6 +3,7 @@
 // modules so each orchestration concern lives in its own file.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { registerDiagnosticInjectionHandlers } from "./handlers/diagnostic-injection.ts";
 import { registerSessionLifecycleHandlers } from "./handlers/session-lifecycle.ts";
 import { registerLspStatusCommand } from "./handlers/status-command.ts";
@@ -18,6 +19,7 @@ import { registerLspMessageRenderer } from "./ui/renderer.ts";
 export default function lspExtension(pi: ExtensionAPI) {
   registerLspSettings();
   const state = createRuntimeState();
+  const runtime = getDefaultWorkspaceRuntime();
 
   registerLspAwareToolOverrides(pi, {
     getInlineSeverity: () => state.inlineSeverity,
@@ -26,7 +28,7 @@ export default function lspExtension(pi: ExtensionAPI) {
   });
 
   registerLspTools(pi, defaultLspToolPromptSurfaces);
-  registerSessionLifecycleHandlers(pi, state);
+  registerSessionLifecycleHandlers(pi, state, runtime);
   registerDiagnosticInjectionHandlers(pi, state);
   registerWorkspaceRecoveryHandler(pi, state);
   registerTreePersistHandlers(pi, state);

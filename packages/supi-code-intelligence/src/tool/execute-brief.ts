@@ -1,8 +1,8 @@
 import { buildArchitectureModel } from "../model.ts";
-import { getCodeProvider } from "../provider/registry.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeBrief } from "../use-case/generate-brief.ts";
 import type { BriefInput } from "../use-case/types.ts";
+import { getCodeProvider } from "../workspace/request-context.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeBriefToolParams {

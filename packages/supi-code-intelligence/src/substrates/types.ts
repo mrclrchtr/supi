@@ -2,9 +2,9 @@
 // structural (tree-sitter) adapters.
 //
 // These are type aliases for the canonical provider contracts
-// now hosted in supi-code-intelligence.
+// now hosted in @mrclrchtr/supi-code-runtime.
 
-import type { SemanticProvider, StructuralProvider } from "../provider/types.ts";
+import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
 
 export type { CodeLocation, CodePosition } from "../types.ts";
 
@@ -18,7 +18,7 @@ export type StructuralSubstrate = StructuralProvider;
 
 // ── Value types (re-exported from shared types) ───────────────────────
 
-export type { StructuralResult } from "../provider/types.ts";
+export type { StructuralResult } from "@mrclrchtr/supi-code-runtime/api";
 export type {
   CalleesData,
   CodeResult,

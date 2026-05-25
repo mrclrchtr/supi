@@ -1,6 +1,12 @@
 // Reusable architecture and target-resolution helpers for peer extensions.
-// Canonical types and provider contracts for the code-understanding stack.
+// Non-provider contracts for the code-understanding stack.
 
+// Provider contracts re-exported from the shared runtime for convenience.
+export type {
+  SemanticProvider,
+  StructuralProvider,
+  StructuralResult,
+} from "@mrclrchtr/supi-code-runtime/api";
 export { generateFocusedBrief, generateOverview, generateProjectBrief } from "./brief.ts";
 // Architecture model hosted locally in supi-code-intelligence.
 export type {
@@ -14,22 +20,6 @@ export {
   getDependencies,
   getDependents,
 } from "./model.ts";
-// Unified CodeProvider interface and registry
-export type { CodeProvider } from "./provider/code-provider.ts";
-export type { CodeProviderState } from "./provider/registry.ts";
-export {
-  clearCodeProvider,
-  getCodeProvider,
-  registerCodeProvider,
-} from "./provider/registry.ts";
-// Provider contracts
-export type {
-  SemanticProvider,
-  StructuralProvider,
-  StructuralResult,
-} from "./provider/types.ts";
-// Adapters removed in Phase 4 of the code-intelligence redesign.
-// Use getCodeProvider from ./provider/registry.ts instead.
 // Substrate adapters (type aliases for provider contracts)
 export type {
   SemanticSubstrate,
@@ -63,3 +53,6 @@ export type {
   SearchDetails,
   SourceRange,
 } from "./types.ts";
+// Code provider — reads capabilities from the shared workspace runtime.
+export type { CodeProvider, CodeProviderState } from "./workspace/request-context.ts";
+export { getCodeProvider } from "./workspace/request-context.ts";

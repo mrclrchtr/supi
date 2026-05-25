@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-25T12:52:31.309404Z"
+revision = 28
+
+[document_fingerprints]
+archive = "sha256:1f26da854b8dfa5c302237e3815602d771442bc1a20e0c511d23a50baa53d4c2"
+content = "sha256:d63e3e0b4b5aa042e066b9688e9d37a64e8c07a8d4c505084d14bc4f5896535b"
+task-01 = "sha256:82bbe248b5f88f7faff82c9cf15706c715c2bae37ea35548af368dfb2fe91d45"
+task-02 = "sha256:04fd4b1f2a795574459547138bd730fe4d11f4b0368c2a0cd02cb01e91dea95e"
+task-03 = "sha256:34eb7a4d454376a53bfd7b0af734ea4fa32114dc36949cbd101411c0a27ac224"
+task-04 = "sha256:6f9a41b54545f53b2a98f0068faaf510c6a28daf7a487adcc432b86a883e5f29"
+task-05 = "sha256:12c634ed17a762d6661171789e3b6bc8e1e3eb7d642d320e10f919f2d41fe897"
+
+[[tasks]]
+number = 1
+title = "Reintroduce `packages/supi-code-runtime/` as the shared library-only runtime layer"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Migrate `packages/supi-lsp/` to publish semantic and diagnostic capabilities through `supi-code-runtime`"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Migrate `packages/supi-tree-sitter/` to publish structural capabilities through `supi-code-runtime`"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Refactor `packages/supi-code-intelligence/` to consume shared workspace runtime instead of owning a provider registry"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update repo docs and release metadata for the restored runtime layer, then run full stack verification"
+status = "done"

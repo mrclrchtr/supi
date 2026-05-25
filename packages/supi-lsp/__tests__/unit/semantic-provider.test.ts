@@ -1,4 +1,4 @@
-import type { SemanticProvider } from "@mrclrchtr/supi-code-intelligence/api";
+import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
 import type { SessionLspService } from "../../src/session/service-registry.ts";

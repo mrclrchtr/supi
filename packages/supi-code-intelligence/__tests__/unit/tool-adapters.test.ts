@@ -2,9 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { CodeProvider } from "../../src/provider/code-provider.ts";
-import { registerCodeProvider } from "../../src/provider/registry.ts";
 import { executeAction } from "../helpers/execute-action.ts";
+import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
 
@@ -13,54 +12,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearMockRuntime();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function registerMockProvider(cwd: string): void {
-  const mockProvider: CodeProvider = {
-    references: async () => [],
-    implementation: async () => [],
-    documentSymbols: async () => [
-      { name: "x", kind: "Variable", file: "", line: 1, character: 14 },
-    ],
-    workspaceSymbols: async () => [],
-    calleesAt: async (_file, _line, _char) => ({
-      kind: "unsupported-language",
-      file: _file,
-      message: "mock",
-    }),
-    exports: async (_file) => ({
-      kind: "success",
-      data: [
-        {
-          name: "x",
-          kind: "const",
-          startLine: 1,
-          startCharacter: 14,
-          endLine: 1,
-          endCharacter: 25,
-          moduleSpecifier: undefined,
-        },
-      ],
-    }),
-    outline: async (_file) => ({
-      kind: "unsupported-language",
-      file: _file,
-      message: "mock",
-    }),
-    imports: async (_file) => ({
-      kind: "unsupported-language",
-      file: _file,
-      message: "mock",
-    }),
-    nodeAt: async (_file, _line, _char) => ({
-      kind: "unsupported-language",
-      file: _file,
-      message: "mock",
-    }),
-  };
-  registerCodeProvider(cwd, mockProvider);
-}
+// registerMockProvider is now imported from the shared test helper
 
 function writeJson(dir: string, file: string, data: unknown) {
   writeFileSync(path.join(dir, file), JSON.stringify(data, null, 2));
@@ -115,7 +71,25 @@ describe("executeAction validation", () => {
 
   it("supports file-only callers for exported file surfaces", async () => {
     writeFileSync(path.join(tmpDir, "test.ts"), "export const x = 1;");
-    registerMockProvider(tmpDir);
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => [
+        { name: "x", kind: "Variable", file: "", line: 1, character: 14 },
+      ],
+      exports: async (_file) => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "x",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 25,
+            moduleSpecifier: undefined,
+          },
+        ],
+      }),
+    });
     const result = await executeAction({ action: "callers", file: "test.ts" }, { cwd: tmpDir });
     expect(result.content).toContain("Callers in `test.ts`");
     expect(result.content).not.toContain("Error");

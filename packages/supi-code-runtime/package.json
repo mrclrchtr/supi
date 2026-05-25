@@ -1,0 +1,44 @@
+{
+  "name": "@mrclrchtr/supi-code-runtime",
+  "version": "1.8.0",
+  "description": "SuPi code-runtime — shared workspace context, capability contracts, and canonical types for the code-understanding stack",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi",
+    "pi-coding-agent"
+  ],
+  "files": [
+    "src/**/*.ts",
+    "!__tests__"
+  ],
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.1",
+    "vitest": "4.1.7"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    }
+  },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
+  "main": "src/api.ts",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./package.json": "./package.json"
+  }
+}

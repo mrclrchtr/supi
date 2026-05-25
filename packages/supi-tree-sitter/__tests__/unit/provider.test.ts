@@ -1,4 +1,4 @@
-import type { StructuralProvider } from "@mrclrchtr/supi-code-intelligence/api";
+import type { StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it } from "vitest";
 import { createTreeSitterProvider } from "../../src/provider/tree-sitter-provider.ts";
 import type {

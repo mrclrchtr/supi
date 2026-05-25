@@ -10,6 +10,7 @@
         "packages/supi-cache/package.json",
         "packages/supi-claude-md/package.json",
         "packages/supi-code-intelligence/package.json",
+        "packages/supi-code-runtime/package.json",
         "packages/supi-context/package.json",
         "packages/supi-core/package.json",
         "packages/supi-debug/package.json",
