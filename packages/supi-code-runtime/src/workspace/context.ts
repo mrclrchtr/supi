@@ -19,7 +19,11 @@ export interface WorkspaceContext {
   /** The working directory this context is scoped to. */
   cwd: string;
   /** Semantic analysis capability state and provider. */
-  semantic: { state: CapabilityState; provider: SemanticProvider | null };
+  semantic: {
+    state: CapabilityState;
+    provider: SemanticProvider | null;
+    refactorAvailable: boolean;
+  };
   /** Structural analysis capability state and provider. */
   structural: { state: CapabilityState; provider: StructuralProvider | null };
 }

@@ -28,7 +28,7 @@ describe("callers action without heuristic fallback", () => {
     // No provider registered — getCodeProvider returns unavailable
     const result = await executeAction({ action: "callers", symbol: "myFunc" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("requires an active code provider");
+    expect(result.content).toContain("No semantic analysis provider");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -105,7 +105,7 @@ describe("implementations action without heuristic fallback", () => {
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain("requires an active code provider");
+    expect(result.content).toContain("No semantic analysis provider");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -174,7 +174,7 @@ describe("affected action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
     const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("requires an active code provider");
+    expect(result.content).toContain("No semantic analysis provider is available");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("affected");
     if (result.details?.type === "affected") {

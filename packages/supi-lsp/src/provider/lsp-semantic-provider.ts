@@ -5,9 +5,18 @@ import type {
   CodeLocation,
   CodePosition,
   CodeSymbol,
+  RefactorResult,
   SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { DocumentSymbol, Location, LocationLink, SymbolInformation } from "../config/types.ts";
+import type {
+  DocumentSymbol,
+  Location,
+  LocationLink,
+  SymbolInformation,
+  TextDocumentEdit,
+  TextEdit,
+  WorkspaceEdit,
+} from "../config/types.ts";
 import type { SessionLspService } from "../session/service-registry.ts";
 
 /**
@@ -50,7 +59,136 @@ export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvi
       if (!results) return null;
       return results.map((sym) => toCodeSymbol(sym as SymbolInformation));
     },
+
+    async rename(file: string, position: CodePosition, newName: string): Promise<RefactorResult> {
+      const edit = await lsp.rename(file, position, newName);
+      return convertLspWorkspaceEdit(edit);
+    },
+
+    async codeActions(file: string, position: CodePosition): Promise<RefactorResult[]> {
+      const actions = await lsp.codeActions(file, position);
+      if (!actions) return [];
+
+      const results: RefactorResult[] = [];
+      for (const action of actions) {
+        const edit = action.edit;
+        if (!edit) {
+          results.push({
+            kind: "unavailable",
+            reason: `Code action "${action.title}" has no edit`,
+          });
+          continue;
+        }
+        const converted = convertLspWorkspaceEdit(edit);
+        if (converted.kind === "precise") {
+          results.push(converted);
+        } else {
+          results.push({
+            kind: "unavailable",
+            reason: `Code action "${action.title}" could not produce precise edits`,
+          });
+        }
+      }
+      return results;
+    },
   };
+}
+
+// ── LSP WorkspaceEdit converter ─────────────────────────────────────
+
+/**
+ * Convert an LSP WorkspaceEdit to the shared RefactorResult type.
+ *
+ * LSP WorkspaceEdit can use:
+ * - `documentChanges` (preferred, with TextDocumentEdit)
+ * - `changes` (legacy, URI → TextEdit[] map)
+ *
+ * Returns `unavailable` when both are missing or both produce zero edits.
+ */
+function resolveFileFromUri(uri: string): string {
+  if (!uri.startsWith("file://")) return uri;
+  try {
+    return decodeURIComponent(uri.slice(7));
+  } catch {
+    return uri;
+  }
+}
+
+function collectDocumentChangeEdits(
+  docChanges: NonNullable<WorkspaceEdit["documentChanges"]>,
+): Array<{
+  file: string;
+  range: { start: { line: number; character: number }; end: { line: number; character: number } };
+  newText: string;
+}> {
+  const out: Array<{
+    file: string;
+    range: { start: { line: number; character: number }; end: { line: number; character: number } };
+    newText: string;
+  }> = [];
+  for (const change of docChanges) {
+    const tdEdit = change as TextDocumentEdit;
+    if (!tdEdit.textDocument || !tdEdit.edits) continue;
+    const file = resolveFileFromUri(tdEdit.textDocument.uri);
+    for (const singleEdit of tdEdit.edits) {
+      const te = singleEdit as TextEdit;
+      out.push({
+        file,
+        range: {
+          start: { line: te.range.start.line, character: te.range.start.character },
+          end: { line: te.range.end.line, character: te.range.end.character },
+        },
+        newText: te.newText,
+      });
+    }
+  }
+  return out;
+}
+
+function collectChangesEdits(changes: NonNullable<WorkspaceEdit["changes"]>): Array<{
+  file: string;
+  range: { start: { line: number; character: number }; end: { line: number; character: number } };
+  newText: string;
+}> {
+  const out: Array<{
+    file: string;
+    range: { start: { line: number; character: number }; end: { line: number; character: number } };
+    newText: string;
+  }> = [];
+  for (const [uri, textEdits] of Object.entries(changes)) {
+    if (!textEdits || textEdits.length === 0) continue;
+    const file = resolveFileFromUri(uri);
+    for (const te of textEdits) {
+      out.push({
+        file,
+        range: {
+          start: { line: te.range.start.line, character: te.range.start.character },
+          end: { line: te.range.end.line, character: te.range.end.character },
+        },
+        newText: te.newText,
+      });
+    }
+  }
+  return out;
+}
+
+function convertLspWorkspaceEdit(edit: WorkspaceEdit | null): RefactorResult {
+  if (!edit) {
+    return { kind: "unavailable", reason: "LSP server returned no edit" };
+  }
+
+  let fileEdits = edit.documentChanges?.length
+    ? collectDocumentChangeEdits(edit.documentChanges)
+    : [];
+  if (fileEdits.length === 0 && edit.changes) {
+    fileEdits = collectChangesEdits(edit.changes);
+  }
+
+  if (fileEdits.length === 0) {
+    return { kind: "unavailable", reason: "Workspace edit contains no file edits" };
+  }
+
+  return { kind: "precise", edits: { edits: fileEdits } };
 }
 
 // ── Type conversion helpers ───────────────────────────────────────────

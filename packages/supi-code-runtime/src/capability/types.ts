@@ -14,6 +14,7 @@ import type {
   ImportData,
   NodeAtData,
   OutlineData,
+  RefactorResult,
 } from "../types.ts";
 
 // ── Availability state ─────────────────────────────────────────────────
@@ -47,6 +48,18 @@ export interface SemanticProvider {
   implementation(filePath: string, position: CodePosition): Promise<CodeLocation[] | null>;
   documentSymbols(filePath: string): Promise<CodeSymbol[] | null>;
   workspaceSymbols(query: string): Promise<CodeSymbol[] | null>;
+
+  /**
+   * Optional rename capability. When present, the provider supports
+   * precise semantic rename operations.
+   */
+  rename?(file: string, position: CodePosition, newName: string): Promise<RefactorResult>;
+
+  /**
+   * Optional code actions capability. When present, the provider
+   * supports code-action-based refactors.
+   */
+  codeActions?(file: string, position: CodePosition): Promise<RefactorResult[]>;
 }
 
 /**

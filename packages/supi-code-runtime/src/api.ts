@@ -21,11 +21,15 @@ export type {
   CodeResult,
   CodeSymbol,
   ConfidenceMode,
+  DisambiguationCandidate,
   ExportData,
+  FileEdit,
   ImportData,
   NodeAtData,
   OutlineData,
+  RefactorResult,
   SourceRange,
+  WorkspaceEdit,
 } from "./types.ts";
 export type { WorkspaceContext } from "./workspace/context.ts";
 // Workspace context

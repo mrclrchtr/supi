@@ -25,6 +25,7 @@ const EXPECTED_SUPI_TOOLS = [
   "code_relations",
   "code_affected",
   "code_pattern",
+  "code_refactor",
   "supi_debug",
 ];
 const EXPECTED_SUPI_COMMANDS = [

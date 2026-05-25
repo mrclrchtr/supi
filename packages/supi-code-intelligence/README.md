@@ -33,6 +33,7 @@ After install, pi gets:
 - `code_relations` — callers, callees, or implementations for a resolved target
 - `code_affected` — blast radius, downstream impact, and risk for a target
 - `code_pattern` — explicit literal, regex, or structured search
+- `code_refactor` — direct-apply semantic rename with safety gates
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - **all `lsp_*` expert tools** from `@mrclrchtr/supi-lsp` (hover, definition, references, implementation, diagnostics, rename, code actions, recover, document/workspace symbols)
 - **all `tree_sitter_*` expert tools** from `@mrclrchtr/supi-tree-sitter` (outline, imports, exports, node-at, query, callees)
@@ -115,15 +116,16 @@ Results report confidence such as:
 ## Architecture
 
 `@mrclrchtr/supi-code-intelligence` is the **orchestration layer** that consumes
-semantic and structural providers through shared contracts.
+semantic and structural providers through the shared workspace broker and routes
+user intents through a planner.
 
 ```text
-supi-code-intelligence  ← hub: CodeProvider registry, types, model, tools
-    ↑         ↑
-supi-lsp    supi-tree-sitter
+supi-code-runtime      ← shared broker + canonical provider/result contracts
+        ↑
+supi-lsp / supi-tree-sitter
  (semantic)   (structural)
-    ↑         ↑
-    └──supi-code-intelligence──┘  ← orchestration, presentation, code_* tools
+        ↑
+supi-code-intelligence ← planner, presentation, code_* tools, code_refactor
 ```
 
 ## Package surfaces

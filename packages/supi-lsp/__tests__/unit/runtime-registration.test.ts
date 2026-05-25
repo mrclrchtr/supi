@@ -101,6 +101,44 @@ describe("LSP runtime registration", () => {
     const result = await provider.references("test.ts", { line: 0, character: 0 });
     expect(result).toEqual(mockLocations);
   });
+
+  describe("refactor readiness", () => {
+    it("reports refactorAvailable=true when LSP service supports rename", () => {
+      const service = createMockLspService({
+        rename: vi.fn().mockResolvedValue({
+          changes: { "file:///src/index.ts": [] },
+        }),
+      });
+
+      registerLspCapabilities(runtime, "/project", service);
+
+      const ws = runtime.getWorkspace("/project");
+      expect(ws.semantic.refactorAvailable).toBe(true);
+    });
+
+    it("reports refactorAvailable=true when LSP service supports code actions", () => {
+      const service = createMockLspService({
+        codeActions: vi.fn().mockResolvedValue([]),
+      });
+
+      registerLspCapabilities(runtime, "/project", service);
+
+      const ws = runtime.getWorkspace("/project");
+      expect(ws.semantic.refactorAvailable).toBe(true);
+    });
+
+    it("reports refactorAvailable=true even when LSP rename returns null (capability is method-presence-based)", () => {
+      const service = createMockLspService({
+        rename: vi.fn().mockResolvedValue(null),
+      });
+
+      registerLspCapabilities(runtime, "/project", service);
+
+      const ws = runtime.getWorkspace("/project");
+      // SessionLspService always has rename and codeActions → adapter always exposes them → refactorAvailable is true
+      expect(ws.semantic.refactorAvailable).toBe(true);
+    });
+  });
 });
 
 function createMockLspService(overrides?: Partial<SessionLspService>): SessionLspService {

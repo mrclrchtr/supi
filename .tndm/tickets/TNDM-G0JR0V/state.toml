@@ -1,0 +1,50 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-25T17:02:32.600763Z"
+revision = 54
+
+[document_fingerprints]
+archive = "sha256:2fd11fc574b7fe81f8cfb18e35b9c6d607fc01c5dd9663142f35f0bac2ea7fd3"
+content = "sha256:59ea46d1e1c417bf9d812ed2d6c271c5213e1bbfec8cf17a18aedf2fc1e7e9fc"
+task-01 = "sha256:b961ecfe3e600d3cdf4325dcbc79f1e20966459e06fe60de7ba6530d0dc616e3"
+task-02 = "sha256:71964de8c535603a699c37f2837c7c4d1a2f16b82468911bf405ed141c3d5936"
+task-03 = "sha256:8318e1f2f30e289e073d742896bc782e98ce3579e49925805f504b5df26d51ab"
+task-04 = "sha256:46ce04cf8a6c660f5f4335cd9f33fac430c50e91edb2db5842e9188b34791d9c"
+task-05 = "sha256:06b621e6d29b1199bbeb1ec9590302e2a9eb00f8554c5c345d09dc3e76e74225"
+task-06 = "sha256:31b82f4db338763d1f8fb4f88fd1d4317a3701be49a7e41beb6a83e46f7a30f3"
+task-07 = "sha256:7429d1166fd5b77bc7e11b90a1855ba17a1bfd1be12afd2ad443839c962b231b"
+
+[[tasks]]
+number = 1
+title = "Introduce a shared capability broker and canonical refactor-capable contracts in supi-code-runtime"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Publish semantic and optional refactor capabilities from supi-lsp into the shared broker"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Publish structural capability metadata from supi-tree-sitter into the shared broker"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Introduce a shared planner behind the existing read-only code_* tools"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Add code_refactor with direct-apply safety gates and precise semantic workspace edits"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Update docs, tests, scripts, and skills to match the planner-backed surface and new code_refactor tool"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Fix post-verification gaps in refactor safety, path resolution, planner usage, and compatibility tests"
+status = "done"

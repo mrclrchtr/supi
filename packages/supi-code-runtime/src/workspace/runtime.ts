@@ -20,7 +20,12 @@ import type { CapabilityState, SemanticProvider, StructuralProvider } from "../c
  * provider instance (null when not ready).
  */
 export interface WorkspaceCapabilities {
-  semantic: { state: CapabilityState; provider: SemanticProvider | null };
+  semantic: {
+    state: CapabilityState;
+    provider: SemanticProvider | null;
+    /** Whether the semantic provider supports precise refactoring operations */
+    refactorAvailable: boolean;
+  };
   structural: { state: CapabilityState; provider: StructuralProvider | null };
 }
 
@@ -33,12 +38,17 @@ function createDefaultCapabilities(): WorkspaceCapabilities {
     semantic: {
       state: { kind: "unavailable", reason: DEFAULT_UNAVAILABLE_REASON },
       provider: null,
+      refactorAvailable: false,
     },
     structural: {
       state: { kind: "unavailable", reason: DEFAULT_UNAVAILABLE_REASON },
       provider: null,
     },
   };
+}
+
+function hasRefactorCapability(provider: SemanticProvider | null): boolean {
+  return !!(provider && (provider.rename !== undefined || provider.codeActions !== undefined));
 }
 
 // ── Runtime ────────────────────────────────────────────────────────────
@@ -73,12 +83,13 @@ export class WorkspaceRuntime {
    * without affecting the structural provider.
    */
   registerSemantic(cwd: string, provider: SemanticProvider): void {
+    const refactorAvailable = hasRefactorCapability(provider);
     const existing = this.#workspaces.get(cwd);
     if (existing) {
-      existing.semantic = { state: { kind: "ready" }, provider };
+      existing.semantic = { state: { kind: "ready" }, provider, refactorAvailable };
     } else {
       this.#workspaces.set(cwd, {
-        semantic: { state: { kind: "ready" }, provider },
+        semantic: { state: { kind: "ready" }, provider, refactorAvailable },
         structural: createDefaultCapabilities().structural,
       });
     }

@@ -62,8 +62,8 @@ up existing execution or service modules.
 Use this when one public tool exposes multiple actions through an `action`
 parameter.
 
-Typical examples:
-- `tree_sitter`
+Typical historical examples:
+- the old `tree_sitter` mega-tool before the focused `tree_sitter_*` split
 
 The spec module should own the ordered public action list and any action-level
 metadata needed by guidance or validation.
@@ -191,7 +191,7 @@ creating a fresh owned session for every operation.
 ### `packages/supi-code-intelligence`
 
 Uses `src/tool/tool-specs.ts` as the single source of truth for:
-- public focused-tool names (`code_brief`, `code_map`, `code_relations`, `code_affected`, `code_pattern`)
+- public focused-tool names (`code_brief`, `code_map`, `code_relations`, `code_affected`, `code_pattern`, `code_refactor`)
 - descriptions, snippets, and base guidance
 - parameter schemas for each public tool
 
@@ -218,7 +218,7 @@ In the SuPi code-understanding stack, tool ownership follows a clear rule:
 - **`supi-lsp`** owns the semantic substrate, the diagnostics lifecycle, and all `lsp_*` expert tools.
 - **`supi-code-intelligence`** owns the high-level `code_*` tools and may add **cross-family orchestration guidance** —
   for example, steering the model toward `lsp_*` for semantic navigation, `tree_sitter_*` for structural inspection,
-  and `code_pattern` for explicit search.
+  and `code_pattern` for explicit search, and `code_refactor` for direct-apply semantic rename.
 
 Cross-family orchestration guidance is intentional coupling at the prompt level, not at the code level.
 Each package still owns its own metadata and rendering. `supi-code-intelligence` does not re-own substrate

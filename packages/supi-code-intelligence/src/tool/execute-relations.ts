@@ -1,3 +1,4 @@
+import { routeFor } from "../planner/planner.ts";
 import type { CodeIntelResult } from "../types.ts";
 import type { RelationsInput } from "../use-case/generate-relations.ts";
 import { executeRelations } from "../use-case/generate-relations.ts";
@@ -16,7 +17,7 @@ export interface CodeRelationsToolParams {
   maxResults?: number;
 }
 
-/** Execute the public code_relations tool through the relations use-case. */
+/** Execute the public code_relations tool through the planner-backed routing. */
 export async function executeRelationsTool(
   params: CodeRelationsToolParams,
   ctx: { cwd: string },
@@ -26,11 +27,11 @@ export async function executeRelationsTool(
     return { content: error, details: undefined };
   }
 
-  // Semantic actions (callers, callees, implementations) require file or symbol
+  // Semantic actions (callers, implementations) or structural (callees) require file or symbol
   if (!params.file && !params.symbol) {
     return {
       content:
-        "**Error:** Semantic actions require either anchored coordinates (`file`, `line`, `character`) or a `symbol` for discovery.",
+        "**Error:** Relations require either anchored coordinates (`file`, `line`, `character`) or a `symbol` for discovery.",
       details: {
         type: "search" as const,
         data: {
@@ -39,6 +40,23 @@ export async function executeRelationsTool(
           candidateCount: 0,
           omittedCount: 0,
           nextQueries: ["Provide `file`, `line`, `character` or a `symbol` for discovery"],
+        },
+      },
+    };
+  }
+
+  const route = routeFor(ctx.cwd, "code_relations", params.kind);
+  if (route.preferred === "unavailable") {
+    return {
+      content: `**Error:** No ${params.kind === "callees" ? "structural" : "semantic"} analysis provider is available for this workspace. Use tree_sitter_callees or lsp_* tools directly if needed.`,
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable" as const,
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Check LSP and tree-sitter configuration"],
         },
       },
     };

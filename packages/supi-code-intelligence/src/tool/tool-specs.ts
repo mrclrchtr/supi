@@ -5,6 +5,7 @@ import { executeAffectedTool } from "./execute-affected.ts";
 import { executeBriefTool } from "./execute-brief.ts";
 import { executeMapTool } from "./execute-map.ts";
 import { executePatternTool } from "./execute-pattern.ts";
+import { executeRefactorTool } from "./execute-refactor.ts";
 import { executeRelationsTool } from "./execute-relations.ts";
 
 const PathParam = Type.String({ description: "Scope path" });
@@ -28,6 +29,7 @@ export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_relations",
   "code_affected",
   "code_pattern",
+  "code_refactor",
 ] as const;
 export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[number];
 
@@ -90,6 +92,17 @@ const CodePatternParameters = Type.Object(
     maxResults: Type.Optional(MaxResultsParam),
     contextLines: Type.Optional(ContextLinesParam),
     summary: Type.Optional(SummaryParam),
+  },
+  { additionalProperties: false },
+);
+
+const CodeRefactorParameters = Type.Object(
+  {
+    operation: Type.String({ description: "Refactor operation: rename" }),
+    file: FileParam,
+    line: LineParam,
+    character: CharacterParam,
+    newName: Type.String({ description: "New name for rename operation" }),
   },
   { additionalProperties: false },
 );
@@ -161,5 +174,17 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodePatternParameters,
     run: (params, ctx) =>
       executePatternTool(params as Parameters<typeof executePatternTool>[0], ctx),
+  },
+  {
+    name: "code_refactor",
+    label: "Code Refactor",
+    description: "Apply a precise semantic refactor (rename) with direct-apply safety checks.",
+    promptSnippet: "code_refactor — semantic refactor with direct apply",
+    basePromptGuidelines: [
+      "Use code_refactor for safe semantic rename operations with precise workspace edits.",
+    ],
+    parameters: CodeRefactorParameters,
+    run: (params, ctx) =>
+      executeRefactorTool(params as Parameters<typeof executeRefactorTool>[0], ctx),
   },
 ] as const satisfies readonly CodeIntelligenceToolDefinitionSpec[];

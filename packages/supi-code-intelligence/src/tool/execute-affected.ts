@@ -1,3 +1,4 @@
+import { routeFor } from "../planner/planner.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeAffected } from "../use-case/generate-affected.ts";
 import { getCodeProvider } from "../workspace/request-context.ts";
@@ -38,6 +39,27 @@ export async function executeAffectedTool(
           likelyTests: [],
           omittedCount: 0,
           nextQueries: ["Provide `file`, `line`, `character` or a `symbol` for discovery"],
+        },
+      },
+    };
+  }
+
+  const route = routeFor(ctx.cwd, "code_affected");
+  if (route.preferred === "unavailable") {
+    return {
+      content:
+        "**Error:** No semantic analysis provider is available for this workspace. Use lsp_* tools directly if needed.",
+      details: {
+        type: "affected" as const,
+        data: {
+          confidence: "unavailable" as const,
+          directCount: 0,
+          downstreamCount: 0,
+          riskLevel: "low" as const,
+          checkNext: [],
+          likelyTests: [],
+          omittedCount: 0,
+          nextQueries: ["Check LSP configuration for this workspace"],
         },
       },
     };

@@ -104,6 +104,51 @@ export interface NodeAtData {
   }>;
 }
 
+// ── Refactor types ───────────────────────────────────────────────────
+
+/**
+ * A single file edit within a workspace edit.
+ */
+export interface FileEdit {
+  /** Absolute file path */
+  file: string;
+  /** The source range to replace */
+  range: SourceRange;
+  /** The new text to insert */
+  newText: string;
+}
+
+/**
+ * A precise workspace edit — one or more file edits to apply atomically.
+ */
+export interface WorkspaceEdit {
+  edits: FileEdit[];
+}
+
+/**
+ * A disambiguation candidate when a refactor target is ambiguous.
+ */
+export interface DisambiguationCandidate {
+  description: string;
+  file?: string;
+  line?: number;
+  character?: number;
+}
+
+/**
+ * Result of a refactor operation.
+ *
+ * - `precise`: exact edits available for safe direct apply
+ * - `ambiguous`: multiple candidates, caller must disambiguate
+ * - `unavailable`: refactoring not possible
+ */
+export type RefactorResult =
+  | { kind: "precise"; edits: WorkspaceEdit }
+  | { kind: "ambiguous"; candidates: DisambiguationCandidate[] }
+  | { kind: "unavailable"; reason: string };
+
+// ── Structural data shapes (value types, range-flattened) ──────────────
+
 export interface CalleesData {
   enclosingScope: { name: string; startLine: number; endLine: number };
   callees: Array<{ name: string; startLine: number }>;

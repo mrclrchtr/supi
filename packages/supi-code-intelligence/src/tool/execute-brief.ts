@@ -1,4 +1,5 @@
 import { buildArchitectureModel } from "../model.ts";
+import { routeFor } from "../planner/planner.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeBrief } from "../use-case/generate-brief.ts";
 import type { BriefInput } from "../use-case/types.ts";
@@ -14,7 +15,7 @@ export interface CodeBriefToolParams {
   maxResults?: number;
 }
 
-/** Execute the public code_brief tool through the use-case/presentation layers. */
+/** Execute the public code_brief tool through the planner-backed use-case layers. */
 export async function executeBriefTool(
   params: CodeBriefToolParams,
   ctx: { cwd: string },
@@ -24,8 +25,14 @@ export async function executeBriefTool(
     return { content: error, details: undefined };
   }
 
+  const route = routeFor(ctx.cwd, "code_brief");
   const providerState = getCodeProvider(ctx.cwd);
-  const provider = providerState.kind === "ready" ? providerState.provider : null;
+  let provider = providerState.kind === "ready" ? providerState.provider : null;
+
+  if (route.preferred === "unavailable") {
+    // code_brief can still work with model-only data even without providers
+    provider = null;
+  }
   const model = await buildArchitectureModel(ctx.cwd);
 
   const input: BriefInput = determineInput(params);

@@ -79,6 +79,38 @@ describe("Tree-sitter runtime registration", () => {
     expect(ws.structural.state.kind).toBe("unavailable");
     expect(ws.semantic.state.kind).toBe("ready");
   });
+
+  describe("structural readiness with the shared broker", () => {
+    it("preserves semantic capability slot when registering structural independently", () => {
+      const runtime = new WorkspaceRuntime();
+      const lspProvider = createMockSemanticProvider();
+      runtime.registerSemantic("/project", lspProvider);
+
+      registerTreeSitterCapabilities(runtime, "/project", createMockTsService());
+
+      const ws = runtime.getWorkspace("/project");
+      expect(ws.structural.state.kind).toBe("ready");
+      expect(ws.semantic.state.kind).toBe("ready");
+    });
+
+    it("structural slot reports unavailable after unregister", () => {
+      const runtime = new WorkspaceRuntime();
+      registerTreeSitterCapabilities(runtime, "/project", createMockTsService());
+      expect(runtime.getWorkspace("/project").structural.state.kind).toBe("ready");
+
+      unregisterTreeSitterCapabilities(runtime, "/project");
+      expect(runtime.getWorkspace("/project").structural.state.kind).toBe("unavailable");
+    });
+
+    it("structural registration does not add refactorAvailable to semantic slot", () => {
+      const runtime = new WorkspaceRuntime();
+      registerTreeSitterCapabilities(runtime, "/project", createMockTsService());
+
+      const ws = runtime.getWorkspace("/project");
+      expect(ws.semantic.state.kind).toBe("unavailable");
+      expect(ws.semantic.refactorAvailable).toBe(false);
+    });
+  });
 });
 
 function createMockTsService(): TreeSitterService {

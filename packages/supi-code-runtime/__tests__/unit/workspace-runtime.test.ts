@@ -112,6 +112,17 @@ describe("WorkspaceRuntime", () => {
     });
   });
 
+  describe("refactor availability", () => {
+    it("semantic slot exposes refactorAvailable indicator", () => {
+      runtime = new WorkspaceRuntime();
+      const provider = createMockSemanticProvider();
+      runtime.registerSemantic("/project", provider);
+      const ws = runtime.getWorkspace("/project");
+      // refactorAvailable must exist and be boolean
+      expect(typeof ws.semantic.refactorAvailable).toBe("boolean");
+    });
+  });
+
   describe("re-registration", () => {
     it("replaces an existing semantic provider on re-registration", () => {
       runtime = new WorkspaceRuntime();

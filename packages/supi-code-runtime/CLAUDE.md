@@ -7,10 +7,10 @@
 ## Key files
 
 - `src/api.ts` — explicit public API surface
-- `src/types.ts` — canonical shared value/result types
-- `src/capability/types.ts` — capability interfaces and availability states
-- `src/workspace/runtime.ts` — workspace-scoped capability registry
-- `src/workspace/context.ts` — typed request context helper for consumers
+- `src/types.ts` — canonical shared value/result types (includes refactor types: `RefactorResult`, `WorkspaceEdit`, `FileEdit`, `DisambiguationCandidate`)
+- `src/capability/types.ts` — capability interfaces (`SemanticProvider`, `StructuralProvider`) and availability states (`CapabilityState`)
+- `src/workspace/runtime.ts` — workspace-scoped capability broker; one instance per `Symbol.for` global singleton, manages both semantic (with refactor metadata) and structural slots
+- `src/workspace/context.ts` — typed request context helper for consumers, includes `refactorAvailable` on semantic slot
 
 ## Guidelines
 
@@ -19,6 +19,8 @@
 - Capability interfaces should be stable interfaces, not classes.
 - Availability states must distinguish pending, ready, inactive, disabled, and unavailable.
 - When adding new capability types, add them to the registry and context helper.
+- `SemanticProvider` may optionally expose `rename` and `codeActions` methods. The broker computes `refactorAvailable` automatically from provider method existence — do not introduce a third independent broker slot for refactoring.
+- `RefactorResult` is a discriminated union: `precise` edits for safe direct apply, `ambiguous` candidates for disambiguation, and `unavailable` for when no refactor is possible.
 
 ## No pi extension
 
