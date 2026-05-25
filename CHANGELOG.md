@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.8.0](https://github.com/mrclrchtr/supi/compare/v1.7.0...v1.8.0) (2026-05-25)
+
+
+### Features
+
+* **code-intelligence:** add substrate adapters ([f9d1df3](https://github.com/mrclrchtr/supi/commit/f9d1df339fcf1cfd4f1bedca475e4bfc92370386))
+* **supi-review:** add v key to view full reviewer prompt in pager ([94c7dc0](https://github.com/mrclrchtr/supi/commit/94c7dc0fbf5bdc864a14c8eb394e2597928a9d1f))
+* **supi-review:** replace bulk inline diffs with compact packet and on-demand snapshot tools ([45ffb02](https://github.com/mrclrchtr/supi/commit/45ffb02596d7e5451fc679271a37fcaaba5e93ba))
+* **supi:** add install-all script with global and project-local support ([2b58c6b](https://github.com/mrclrchtr/supi/commit/2b58c6bdb9ef891c6f3c51aa371bcf392d8e8e8c))
+
+
+### Bug Fixes
+
+* **ask-user:** wrap long form text instead of crashing on overwidth lines ([c6d89b8](https://github.com/mrclrchtr/supi/commit/c6d89b873b5b6ef008b03d65c461279a9fdf851a))
+* **code-intelligence:** use ripgrep -F for literal pattern search, surface regex hint on no-match ([f97187f](https://github.com/mrclrchtr/supi/commit/f97187fb02e7083216107e4aa2549b80ecec4f40))
+* **pack-staged:** resolve bundled deps missing from pnpm-hoisted node_modules ([b4ced84](https://github.com/mrclrchtr/supi/commit/b4ced841dc3923b11589029dc5915939e34f628b))
+* **supi-lsp:** align e2e-smoke test expectations with tool descriptions ([b8d8a67](https://github.com/mrclrchtr/supi/commit/b8d8a67767cd2a192372377f923780cd05ff997b))
+* **supi-review:** populate ReviewPacket fields after interface restoration ([2f7555a](https://github.com/mrclrchtr/supi/commit/2f7555aae9eab91792498bb55bba5058e5a42888))
+* **supi-review:** sync consumers with simplified ReviewPacket type ([095c453](https://github.com/mrclrchtr/supi/commit/095c453b3ed2cf0940f47e6381466604bb3949ee))
+
 ## [1.7.0](https://github.com/mrclrchtr/supi/compare/v1.6.0...v1.7.0) (2026-05-24)
 
 
