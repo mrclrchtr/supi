@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/mrclrchtr/supi/compare/v1.8.1...v1.9.0) (2026-05-25)
+
+
+### Features
+
+* **supi-review:** emit events and show title icons on brief/review completion ([2b932a0](https://github.com/mrclrchtr/supi/commit/2b932a02a852d8724bffa87fb7571cb5dc25ff09))
+
 ## [1.8.1](https://github.com/mrclrchtr/supi/compare/v1.8.0...v1.8.1) (2026-05-25)
 
 
