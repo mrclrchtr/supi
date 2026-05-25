@@ -73,7 +73,7 @@ describe("transitive downstream impact", () => {
       workspaceSymbols: async () => [
         {
           name: "shared",
-          kind: 14,
+          kind: "Variable",
           file: path.join(tmpDir, "packages", "core", "index.ts"),
           line: 1,
           character: 14,
@@ -113,7 +113,7 @@ describe("focused-tool follow-up regressions", () => {
       workspaceSymbols: async () => [
         {
           name: "Widget",
-          kind: 12,
+          kind: "Function",
           file: widgetPath,
           line: 1,
           character: 17,

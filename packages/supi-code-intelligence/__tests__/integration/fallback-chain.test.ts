@@ -23,9 +23,7 @@ function createSourceFile(name: string, content: string): string {
   return filePath;
 }
 
-function createMockProvider(
-  overrides: Partial<Record<string, ReturnType<typeof vi.fn>>> = {},
-): CodeProvider {
+function createMockProvider(overrides: Partial<CodeProvider> = {}): CodeProvider {
   // We don't have vi here at runtime — this is a static mock
   const noop = async () => null;
   return {
@@ -117,7 +115,7 @@ describe("callers action without heuristic fallback", () => {
       workspaceSymbols: async () => [
         {
           name: "target",
-          kind: 6,
+          kind: "Function",
           file: sourcePath,
           line: 1,
           character: 1,
@@ -189,7 +187,7 @@ describe("implementations action without heuristic fallback", () => {
       workspaceSymbols: async () => [
         {
           name: "Solo",
-          kind: 11,
+          kind: "Interface",
           file: ifacePath,
           line: 1,
           character: 1,
@@ -234,7 +232,7 @@ describe("affected action without heuristic fallback", () => {
       workspaceSymbols: async () => [
         {
           name: "Widget",
-          kind: 11,
+          kind: "Interface",
           file: targetPath,
           line: 1,
           character: 1,
