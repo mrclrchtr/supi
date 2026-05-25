@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">SuPi / Super Pi logo</title>
+  <rect width="512" height="512" fill="#24273a"/>
+  <g fill="#cad3f5">
+    <rect x="72" y="76" width="368" height="76" rx="10"/>
+    <rect x="104" y="136" width="68" height="212" rx="10"/>
+    <rect x="340" y="136" width="68" height="212" rx="10"/>
+  </g>
+  <text x="256" y="414" fill="#cad3f5" font-family="SFMono-Regular,ui-monospace,Menlo,Monaco,Consolas,'Liberation Mono',monospace" font-size="50" font-weight="700" text-anchor="middle">SuPi</text>
+  <text x="256" y="448" fill="#a5adcb" font-family="SFMono-Regular,ui-monospace,Menlo,Monaco,Consolas,'Liberation Mono',monospace" font-size="14" font-weight="500" letter-spacing="1.2" text-anchor="middle">Curated Extension Stack</text>
+</svg>
