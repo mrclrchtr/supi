@@ -33,6 +33,8 @@ After install, the package does two things:
    - groups findings into a few built-in query patterns
    - keeps agent-facing results redacted to structural fingerprints instead of raw command text or file paths
 
+![Cache history report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-history.png)
+
 ## Commands and tool
 
 ### `/supi-cache-history`
@@ -63,6 +65,8 @@ Useful flags:
 - `--since 7d`
 - `--pattern breakdown`
 - `--min-drop 20`
+
+![Cache forensics report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-forensics.png)
 
 ### `supi_cache_forensics`
 

@@ -16,6 +16,8 @@ pi install ./packages/supi-debug
 
 After editing the source, run `/reload`.
 
+![Debug event report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-debug.png)
+
 ## What you get
 
 After install, this package wires the shared debug registry into three user-facing surfaces:
@@ -33,7 +35,21 @@ It also registers a **Debug** provider section for `/supi-context`.
 - if debug capture is disabled, no events are retained
 - agent-facing access is blocked, sanitized, or raw depending on settings
 
-Rendered events include:
+## Rendering
+
+`/supi-debug` uses a custom TUI message renderer that shows two levels of detail:
+
+- **Collapsed** (default) — a one-line summary:
+
+  ```
+  3 events — rtk/rewrite +2 more
+  ```
+
+- **Expanded** — full details with timestamp, level, source/category, message, cwd,
+  and data for each event. **Click/expand the collapsed message** in the TUI to reveal
+  the full output.
+
+Rendered fields per event:
 
 - timestamp
 - level
@@ -42,6 +58,16 @@ Rendered events include:
 - optional `cwd`
 - optional `data`
 - optional `rawData`
+
+### Why collapsed by default
+
+Event payloads can be large (full command strings, structured data). Collapsing
+keeps the conversation focused; expand only when you need the details.
+
+### Seeing full details without expanding
+
+The agent-facing `supi_debug` tool always returns the expanded plain-text
+representation, which is useful for automated troubleshooting flows.
 
 ## Filters
 

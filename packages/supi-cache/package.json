@@ -53,7 +53,8 @@
     "extensions": [
       "./src/extension.ts",
       "node_modules/@mrclrchtr/supi-core/src/extension.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-cache-history.png"
   },
   "main": "src/api.ts",
   "exports": {

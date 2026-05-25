@@ -16,6 +16,8 @@ pi install ./packages/supi-code-intelligence
 
 After editing the source, run `/reload`.
 
+![Code brief in action](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.png)
+
 ## What you get
 
 After install, pi gets:

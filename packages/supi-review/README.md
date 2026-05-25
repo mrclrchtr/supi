@@ -29,6 +29,14 @@ The reviewer runs in managed child agent sessions:
 - a **brief synthesizer** creates a structured review brief from the active session branch
 - a **read-only reviewer** inspects the selected snapshot (without receiving bulk inline diffs) and submits structured findings
 
+![Review target selection](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-1.png)
+
+![Review brief preview](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-2.png)
+
+![Review result](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-3.png)
+
+![Review progress](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-4.png)
+
 ## Review flow
 
 `/supi-review` walks you through:

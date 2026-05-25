@@ -16,6 +16,8 @@ pi install ./packages/supi-tree-sitter
 
 After editing the source, run `/reload`.
 
+![Tree-sitter outline in action](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-tree-sitter.png)
+
 ## What you get
 
 After install, pi gets **6 focused tools** for parser-based structural analysis:

@@ -16,6 +16,8 @@ pi install ./packages/supi-context
 
 After editing the source, run `/reload`.
 
+![Context usage report](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-context.png)
+
 ## What you get
 
 After install, pi gets one command:

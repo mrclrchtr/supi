@@ -32,6 +32,10 @@ After install, pi gets **10 focused expert tools** for semantic language-server 
 - `lsp_recover` — refresh stale diagnostics after workspace changes
 - `/lsp-status` — inspect detected servers, roots, open files, and diagnostics
 
+![LSP status overlay](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-lsp-status.png)
+
+![LSP hover in action](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-lsp-hover.png)
+
 Coordinates use **1-based** line and character positions.
 
 ## Automatic behavior

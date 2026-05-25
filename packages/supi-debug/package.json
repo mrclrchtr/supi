@@ -49,7 +49,8 @@
     "extensions": [
       "./src/extension.ts",
       "node_modules/@mrclrchtr/supi-core/src/extension.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-debug.png"
   },
   "main": "src/api.ts",
   "exports": {
