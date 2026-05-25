@@ -1,3 +1,12 @@
+```
+                 _       _                           _ _   _
+ ___ _   _ _ __ (_)     | |_ _ __ ___  ___       ___(_) |_| |_ ___ _ __
+/ __| | | | '_ \| |_____| __| '__/ _ \/ _ \_____/ __| | __| __/ _ \ '__|
+\__ \ |_| | |_) | |_____| |_| | |  __/  __/_____\__ \ | |_| ||  __/ |
+|___/\__,_| .__/|_|      \__|_|  \___|\___|     |___/_|\__|\__\___|_|
+          |_|
+```
+
 # @mrclrchtr/supi-tree-sitter
 
 Adds focused structural code analysis tools to the [pi coding agent](https://github.com/earendil-works/pi) using Tree-sitter parsers.

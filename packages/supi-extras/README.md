@@ -1,3 +1,12 @@
+```
+                 _                 _
+ ___ _   _ _ __ (_)       _____  _| |_ _ __ __ _ ___
+/ __| | | | '_ \| |_____ / _ \ \/ / __| '__/ _` / __|
+\__ \ |_| | |_) | |_____|  __/>  <| |_| | | (_| \__ \
+|___/\__,_| .__/|_|      \___/_/\_\\__|_|  \__,_|___/
+          |_|
+```
+
 # @mrclrchtr/supi-extras
 
 Adds a bundle of small quality-of-life features to the [pi coding agent](https://github.com/earendil-works/pi).

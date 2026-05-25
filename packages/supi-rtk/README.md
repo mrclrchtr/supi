@@ -1,3 +1,12 @@
+```
+                 _            _   _
+ ___ _   _ _ __ (_)      _ __| |_| | __
+/ __| | | | '_ \| |_____| '__| __| |/ /
+\__ \ |_| | |_) | |_____| |  | |_|   <
+|___/\__,_| .__/|_|     |_|   \__|_|\_\
+          |_|
+```
+
 # @mrclrchtr/supi-rtk
 
 Adds RTK-backed bash rewriting to the [pi coding agent](https://github.com/earendil-works/pi).

@@ -1,3 +1,12 @@
+```
+                 _                   _
+ ___ _   _ _ __ (_)    __      _____| |__
+/ __| | | | '_ \| |____\ \ /\ / / _ \ '_ \
+\__ \ |_| | |_) | |_____\ V  V /  __/ |_) |
+|___/\__,_| .__/|_|      \_/\_/ \___|_.__/
+          |_|
+```
+
 # @mrclrchtr/supi-web
 
 Adds web-page fetching and library-documentation lookup tools to the [pi coding agent](https://github.com/earendil-works/pi).

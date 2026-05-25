@@ -1,3 +1,12 @@
+```
+                 _           _      _
+ ___ _   _ _ __ (_)       __| | ___| |__  _   _  __ _
+/ __| | | | '_ \| |_____ / _` |/ _ \ '_ \| | | |/ _` |
+\__ \ |_| | |_) | |_____| (_| |  __/ |_) | |_| | (_| |
+|___/\__,_| .__/|_|      \__,_|\___|_.__/ \__,_|\__, |
+          |_|                                   |___/
+```
+
 # @mrclrchtr/supi-debug
 
 Adds shared debug-event capture and inspection for SuPi extensions in the [pi coding agent](https://github.com/earendil-works/pi).
