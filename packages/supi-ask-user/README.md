@@ -1,14 +1,5 @@
 ![SuPi](assets/logo.png)
 
-```
-                 _                 _
- ___ _   _ _ __ (_)       __ _ ___| | __     _   _ ___  ___ _ __
-/ __| | | | '_ \| |_____ / _` / __| |/ /____| | | / __|/ _ \ '__|
-\__ \ |_| | |_) | |_____| (_| \__ \   <_____| |_| \__ \  __/ |
-|___/\__,_| .__/|_|      \__,_|___/_|\_\     \__,_|___/\___|_|
-          |_|
-```
-
 # @mrclrchtr/supi-ask-user
 
 Adds a redesigned `ask_user` tool to the [pi coding agent](https://github.com/earendil-works/pi). It lets the model pause and request a small decision form when explicit human input is required.

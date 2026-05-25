@@ -1,14 +1,5 @@
 ![SuPi](assets/logo.png)
 
-```
-                 _       _
- ___ _   _ _ __ (_)     | |___ _ __
-/ __| | | | '_ \| |_____| / __| '_ \
-\__ \ |_| | |_) | |_____| \__ \ |_) |
-|___/\__,_| .__/|_|     |_|___/ .__/
-          |_|                 |_|
-```
-
 # @mrclrchtr/supi-lsp
 
 Adds Language Server Protocol support to the [pi coding agent](https://github.com/earendil-works/pi).

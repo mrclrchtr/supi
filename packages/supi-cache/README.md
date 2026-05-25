@@ -1,14 +1,5 @@
 ![SuPi](assets/logo.png)
 
-```
-                 _                      _
- ___ _   _ _ __ (_)       ___ __ _  ___| |__   ___
-/ __| | | | '_ \| |_____ / __/ _` |/ __| '_ \ / _ \
-\__ \ |_| | |_) | |_____| (_| (_| | (__| | | |  __/
-|___/\__,_| .__/|_|      \___\__,_|\___|_| |_|\___|
-          |_|
-```
-
 # @mrclrchtr/supi-cache
 
 Adds prompt-cache monitoring and cache-regression forensics to the [pi coding agent](https://github.com/earendil-works/pi).

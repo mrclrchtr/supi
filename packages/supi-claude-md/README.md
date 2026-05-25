@@ -1,14 +1,5 @@
 ![SuPi](assets/logo.png)
 
-```
-                 _            _                 _                          _
- ___ _   _ _ __ (_)       ___| | __ _ _   _  __| | ___       _ __ ___   __| |
-/ __| | | | '_ \| |_____ / __| |/ _` | | | |/ _` |/ _ \_____| '_ ` _ \ / _` |
-\__ \ |_| | |_) | |_____| (__| | (_| | |_| | (_| |  __/_____| | | | | | (_| |
-|___/\__,_| .__/|_|      \___|_|\__,_|\__,_|\__,_|\___|     |_| |_| |_|\__,_|
-          |_|
-```
-
 # @mrclrchtr/supi-claude-md
 
 Adds subdirectory context-file discovery to the [pi coding agent](https://github.com/earendil-works/pi).

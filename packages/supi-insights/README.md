@@ -1,14 +1,5 @@
 ![SuPi](assets/logo.png)
 
-```
-                 _       _           _       _     _
- ___ _   _ _ __ (_)     (_)_ __  ___(_) __ _| |__ | |_ ___
-/ __| | | | '_ \| |_____| | '_ \/ __| |/ _` | '_ \| __/ __|
-\__ \ |_| | |_) | |_____| | | | \__ \ | (_| | | | | |_\__ \
-|___/\__,_| .__/|_|     |_|_| |_|___/_|\__, |_| |_|\__|___/
-          |_|                          |___/
-```
-
 # @mrclrchtr/supi-insights
 
 Adds a `/supi-insights` command to the [pi coding agent](https://github.com/earendil-works/pi) that analyzes your historical pi sessions and writes a shareable HTML report.

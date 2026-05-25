@@ -1,14 +1,5 @@
 ![SuPi](assets/logo.png)
 
-```
-                 _                      _
- ___ _   _ _ __ (_)      _ __ _____   _(_) _____      __
-/ __| | | | '_ \| |_____| '__/ _ \ \ / / |/ _ \ \ /\ / /
-\__ \ |_| | |_) | |_____| | |  __/\ V /| |  __/\ V  V /
-|___/\__,_| .__/|_|     |_|  \___| \_/ |_|\___| \_/\_/
-          |_|
-```
-
 # @mrclrchtr/supi-review
 
 Adds an interactive `/supi-review` command to the [pi coding agent](https://github.com/earendil-works/pi) for session-aware code review.

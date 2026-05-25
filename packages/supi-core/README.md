@@ -1,14 +1,5 @@
 ![SuPi](assets/logo.png)
 
-```
-                 _
- ___ _   _ _ __ (_)       ___ ___  _ __ ___
-/ __| | | | '_ \| |_____ / __/ _ \| '__/ _ \
-\__ \ |_| | |_) | |_____| (_| (_) | | |  __/
-|___/\__,_| .__/|_|      \___\___/|_|  \___|
-          |_|
-```
-
 # @mrclrchtr/supi-core
 
 Shared infrastructure for SuPi extensions.
