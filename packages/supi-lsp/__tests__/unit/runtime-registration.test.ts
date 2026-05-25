@@ -95,7 +95,9 @@ describe("LSP runtime registration", () => {
 
     registerLspCapabilities(runtime, "/project", service);
 
-    const provider = runtime.getWorkspace("/project").semantic.provider!;
+    const ws = runtime.getWorkspace("/project");
+    expect(ws.semantic.provider).not.toBeNull();
+    const provider = ws.semantic.provider as NonNullable<typeof ws.semantic.provider>;
     const result = await provider.references("test.ts", { line: 0, character: 0 });
     expect(result).toEqual(mockLocations);
   });

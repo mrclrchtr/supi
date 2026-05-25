@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -110,6 +119,53 @@ function removeKnownBrokenSymlinks(packageDir) {
 function removeCyclicDevDepSymlinks(packageDir) {
   const visited = new Set();
 
+  /**
+   * Remove devDependency symlinks pointing to @mrclrchtr packages
+   * from the given package directory, excluding bundled dependencies.
+   */
+  function removeMrclrchtrSymlink(dir, depName) {
+    const symlinkPath = join(dir, "node_modules", ...depName.split("/"));
+    let stat;
+    try {
+      stat = lstatSync(symlinkPath);
+    } catch {
+      return; // Symlink doesn't exist — nothing to remove
+    }
+    if (stat.isSymbolicLink() || stat.isDirectory()) {
+      rmSync(symlinkPath, { recursive: true, force: true });
+    }
+  }
+
+  function removeMrclrchtrDevDepSymlinks(dir, pkg) {
+    const devDeps = Object.keys(pkg.devDependencies || {});
+    const bundled = new Set(pkg.bundledDependencies || []);
+
+    for (const depName of devDeps) {
+      if (depName.startsWith("@mrclrchtr/") && !bundled.has(depName)) {
+        removeMrclrchtrSymlink(dir, depName);
+      }
+    }
+  }
+
+  /**
+   * Recurse into remaining @mrclrchtr dependencies to clean their
+   * nested devDep symlinks as well.
+   */
+  function recurseIntoMrclrchtrDeps(dir) {
+    const mrclrchtrDir = join(dir, "node_modules", "@mrclrchtr");
+    let entries;
+    try {
+      entries = readdirSync(mrclrchtrDir, { withFileTypes: true });
+    } catch {
+      return; // Directory doesn't exist — nothing to recurse into
+    }
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+      cleanDir(join(mrclrchtrDir, entry.name));
+    }
+  }
+
   function cleanDir(dir) {
     // Resolve the real path so shared workspace symlinks are deduplicated
     let realDir;
@@ -131,39 +187,8 @@ function removeCyclicDevDepSymlinks(packageDir) {
       return;
     }
 
-    const devDeps = new Set(Object.keys(pkg.devDependencies || {}));
-    const bundled = new Set(pkg.bundledDependencies || []);
-
-    for (const depName of devDeps) {
-      if (!depName.startsWith("@mrclrchtr/")) continue;
-      // Keep bundled deps even if also listed as devDep
-      if (bundled.has(depName)) continue;
-
-      const symlinkPath = join(dir, "node_modules", ...depName.split("/"));
-      try {
-        const stat = lstatSync(symlinkPath);
-        if (stat.isSymbolicLink() || stat.isDirectory()) {
-          rmSync(symlinkPath, { recursive: true, force: true });
-        }
-      } catch {
-        // Symlink doesn't exist — nothing to remove
-      }
-    }
-
-    // Recurse into remaining @mrclrchtr dependencies to clean their
-    // nested devDep symlinks as well
-    const mrclrchtrDir = join(dir, "node_modules", "@mrclrchtr");
-    let entries;
-    try {
-      entries = readdirSync(mrclrchtrDir, { withFileTypes: true });
-    } catch {
-      return; // Directory doesn't exist — nothing to recurse into
-    }
-
-    for (const entry of entries) {
-      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
-      cleanDir(join(mrclrchtrDir, entry.name));
-    }
+    removeMrclrchtrDevDepSymlinks(dir, pkg);
+    recurseIntoMrclrchtrDeps(dir);
   }
 
   cleanDir(packageDir);

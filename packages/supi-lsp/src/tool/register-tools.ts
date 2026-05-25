@@ -47,7 +47,6 @@ function createToolExecutor(
     params: unknown,
   ) => Promise<string>,
 ) {
-  // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
   return async (
     _toolCallId: string,
     params: unknown,

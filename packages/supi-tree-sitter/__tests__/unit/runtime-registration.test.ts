@@ -59,7 +59,9 @@ describe("Tree-sitter runtime registration", () => {
     const outlineSpy = vi.spyOn(service, "outline");
 
     registerTreeSitterCapabilities(runtime, "/project", service);
-    const provider = runtime.getWorkspace("/project").structural.provider!;
+    const ws = runtime.getWorkspace("/project");
+    expect(ws.structural.provider).not.toBeNull();
+    const provider = ws.structural.provider as NonNullable<typeof ws.structural.provider>;
 
     await provider.outline("test.ts");
     expect(outlineSpy).toHaveBeenCalledWith("test.ts");
