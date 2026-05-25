@@ -32,6 +32,8 @@
   "bundledDependencies": [
     "@mrclrchtr/supi-code-runtime",
     "@mrclrchtr/supi-core",
+    "ignore",
+    "typescript",
     "vscode-jsonrpc",
     "vscode-languageserver-protocol",
     "vscode-languageserver-types"
