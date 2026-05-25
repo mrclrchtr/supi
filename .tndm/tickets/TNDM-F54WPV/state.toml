@@ -1,0 +1,50 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-25T00:55:35.749064Z"
+revision = 36
+
+[document_fingerprints]
+archive = "sha256:4adda93a40afcbf2b7d058293eaa97e6b462ad5c5ed0143720d6a2494c3f7fc8"
+content = "sha256:9b8d4f054a7ce8f176747a03f44065e08fed3a6a6d12cacb7fc334106bf06ebf"
+task-01 = "sha256:cc31efb070b246480bb08dbfee983c56420f64b28e10b8f710997abb07a27cda"
+task-02 = "sha256:3f9f30c88f6d00206897121bf5747e4a96d42afb1c3c9b2ff9b494e15577e1f3"
+task-03 = "sha256:286aced2aa5393c5ef897d1a2e15e9fa923333f7db2d8bc7ac42a9bb54e452e9"
+task-04 = "sha256:3001e82862c847e073dc9b424baef2ce8dbbea6761e589709cc4f9586ea1f8d3"
+task-05 = "sha256:0d01ae3bf630342d15f29098aaeb2e4272fb89ad97dd13622dc97eacc88e5b4b"
+task-06 = "sha256:78cb60d10c41473af0ff7345aadd04c305d656968b15c8d57c995ab45207d80d"
+task-07 = "sha256:01118d9f4e7b561757dd80ba0a95db6610468d9f85ca164b4e1f2e00b8bd3c88"
+
+[[tasks]]
+number = 1
+title = "Create the architecture doc and scaffold packages/supi-code-runtime"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Implement canonical shared runtime contracts in packages/supi-code-runtime"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Migrate supi-tree-sitter to the shared structural-provider contract"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Split supi-lsp manager responsibilities and expose a shared semantic provider"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Extract shared project-model and workspace-context ownership into supi-code-runtime"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Refactor supi-code-intelligence to use shared workspace context and provider contracts"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Update docs, release wiring, and packaging verification for the new architecture"
+status = "done"

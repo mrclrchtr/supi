@@ -19,6 +19,7 @@
     "src/**/*.ts"
   ],
   "dependencies": {
+    "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
     "@mrclrchtr/supi-tree-sitter": "workspace:*"

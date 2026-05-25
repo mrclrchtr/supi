@@ -271,7 +271,9 @@ describe("createStructuralSubstrate", () => {
       const substrate = createStructuralSubstrate("/project");
       await substrate.exports("/f.ts");
 
-      expect(dispose).toHaveBeenCalledOnce();
+      // The fallback session is kept alive for the lifetime of the provider;
+      // the provider wrapper does not auto-dispose owned sessions.
+      expect(dispose).not.toHaveBeenCalled();
     });
   });
 

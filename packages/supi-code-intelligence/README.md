@@ -104,6 +104,20 @@ Results report confidence such as:
 
 `heuristic` is now primarily a `code_pattern` concern. The other tools prefer explicit unavailable states over silent search fallbacks.
 
+## Architecture
+
+`@mrclrchtr/supi-code-intelligence` is the **orchestration layer** that consumes
+semantic and structural providers through `@mrclrchtr/supi-code-runtime` contracts.
+
+```text
+supi-code-runtime  ← shared contracts, types, workspace context, project model
+    ↑         ↑
+supi-lsp    supi-tree-sitter
+ (semantic)   (structural)
+    ↑         ↑
+    └──supi-code-intelligence──┘  ← orchestration, presentation, code_* tools
+```
+
 ## Package surfaces
 
 - `@mrclrchtr/supi-code-intelligence/api` — reusable architecture, brief, and target-resolution helpers

@@ -60,10 +60,23 @@ Coordinates use **1-based** line and character columns. Character positions use 
 - R (`.r`)
 - SQL (`.sql`)
 
+## Architecture
+
+`@mrclrchtr/supi-tree-sitter` is the **structural provider** in SuPi's
+code-understanding stack.  It depends on `@mrclrchtr/supi-code-runtime` for
+shared provider contracts and canonical code-intelligence types.
+
+```text
+supi-code-runtime  ← shared contracts, types, workspace context
+    ↑
+supi-tree-sitter   ← structural provider (this package)
+```
+
 ## Package surfaces
 
 - `@mrclrchtr/supi-tree-sitter/api` — reusable parsing session factory, shared session-scoped structural service access, and shared result types
 - `@mrclrchtr/supi-tree-sitter/extension` — pi extension entrypoint
+- `@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider` — shared StructuralProvider adapter
 
 Owned session example:
 

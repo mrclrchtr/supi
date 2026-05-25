@@ -21,6 +21,7 @@
     "!__tests__"
   ],
   "dependencies": {
+    "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "ignore": "^7.0.5",
     "typescript": "6.0.3",
@@ -68,6 +69,7 @@
   "exports": {
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./provider/lsp-semantic-provider": "./src/provider/lsp-semantic-provider.ts"
   }
 }

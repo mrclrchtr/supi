@@ -61,10 +61,23 @@ Config lives in the standard SuPi config files:
 - global: `~/.pi/agent/supi/config.json`
 - project: `.pi/supi/config.json`
 
+## Architecture
+
+`@mrclrchtr/supi-lsp` is the **semantic provider** in SuPi's code-understanding stack.
+It depends on `@mrclrchtr/supi-code-runtime` for shared provider contracts and
+canonical code-intelligence types.
+
+```text
+supi-code-runtime  ← shared contracts, types, workspace context
+    ↑
+supi-lsp           ← semantic provider (this package)
+```
+
 ## Package surfaces
 
 - `@mrclrchtr/supi-lsp/api` — reusable session-scoped LSP service and related types
 - `@mrclrchtr/supi-lsp/extension` — pi extension entrypoint
+- `@mrclrchtr/supi-lsp/provider/lsp-semantic-provider` — shared SemanticProvider adapter
 
 Example:
 
