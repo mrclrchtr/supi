@@ -4,7 +4,11 @@ title = "Modularize supi-code-intelligence internals under the single-extension 
 type = "feature"
 priority = "p2"
 depends_on = ["TNDM-ACNZFE"]
-tags = ["architecture", "code-intelligence", "flow:planned", "refactor"]
+tags = ["architecture", "code-intelligence", "flow:done", "refactor"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
 
 [[documents]]
 name = "content"

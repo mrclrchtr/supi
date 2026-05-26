@@ -1,5 +1,16 @@
 // Public tree-sitter session factory, shared session service access, and shared types.
+//
+// This package is library-only — no pi extension surface.
+// Exports structured runtime/service APIs only.
+// Tool handler string-formatting lives in @mrclrchtr/supi-code-intelligence.
 
+// Language detection helpers
+export {
+  detectGrammar,
+  getSupportedExtension,
+  isJsTsGrammar,
+  isSupportedFile,
+} from "./language.ts";
 export { TreeSitterRuntime } from "./session/runtime.ts";
 export type {
   TsControllerState,
@@ -8,15 +19,15 @@ export type {
 export { TreeSitterRuntimeController } from "./session/runtime-controller.ts";
 export { getSessionTreeSitterService } from "./session/service-registry.ts";
 export { createTreeSitterSession } from "./session/session.ts";
-// Tool handler functions and registration — exported for umbrella adapter consumption
-export {
-  handleCallees,
-  handleExports,
-  handleImports,
-  handleNodeAt,
-  handleOutline,
-  handleQuery,
-} from "./tool/handlers.ts";
+
+// Structural extraction services (consumed by supi-code-intelligence tool execution)
+export { lookupCalleesAt } from "./tool/callees.ts";
+export { extractExports } from "./tool/exports.ts";
+export { extractImports } from "./tool/imports.ts";
+export { lookupNodeAt } from "./tool/node-at.ts";
+export { collectOutline } from "./tool/outline.ts";
+
+// Shared types
 export type {
   CalleesAtResult,
   ExportRecord,

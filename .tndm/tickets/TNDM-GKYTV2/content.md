@@ -239,3 +239,32 @@ The refactor changes package ownership and internal structure, so the implementa
 - Do not create a new package just to host internal analysis modules.
 - Do not widen the scope into unrelated LSP or Tree-sitter feature work beyond what is needed to cleanly enforce the new boundaries.
 - Do not replace the shared capability broker in `@mrclrchtr/supi-code-runtime` with a second registry inside `supi-code-intelligence`.
+
+### Implementation hints
+
+#### Task sizing
+Tasks 3 and 4 each touch 40–50+ files. Within each task, follow this order of operations to stay incremental:
+1. Write the RED tests first.
+2. Create the new analysis/presentation/tool modules.
+3. Wire the new modules into the app composition root.
+4. Reduce old entrypoints to forwarders.
+5. Update remaining test files.
+6. Run the full per-task verification command.
+
+#### pnpm install after structural changes
+When files move directories (especially Task 4 reorganizing `src/lsp/*`, `src/tree-sitter/*`, `src/tool/*`) or when files are deleted (Task 5 removing `supi-tree-sitter/src/tool/handlers.ts` and `formatting.ts`), run `pnpm install` afterward to keep the workspace module graph consistent.
+
+#### Test files and stale mock factories
+When deleting source files (Task 4 reducing old `src/lsp/*` / `src/tree-sitter/*` / `src/tool/*` to forwarders or removing them; Task 5 deleting `handlers.ts` and `formatting.ts`), audit every test file with `vi.mock` references to the deleted path. Per CLAUDE.md: *Deleting a source file breaks every test with `vi.mock("../<file>")` referencing it.* After any file deletion, sweep all `__tests__/` directories in `supi-code-intelligence` and `supi-tree-sitter` for stale mock factories.
+
+#### Task 6 documentation gate
+Task 6 (docs update) is sequenced after Task 5, but the stale-reference grep check can only pass once Tasks 1–5 are fully complete. If forwarders or old paths are still present as compatibility shims, the grep check must account for those — adjust the grep pattern to accept forwarder references or whitelist known shim paths.
+
+#### Substrate adapter state ownership
+`workspace-session.ts` (Task 1) holds references to semantic/structural adapter state. `substrate/semantic/state.ts` and `substrate/structural/state.ts` (Task 4) own the adapter instances and lifecycle. Clarify during implementation: `workspace-session` stores a lightweight handle/reference to the adapter state; the `substrate/*/state.ts` modules own the actual instance lifecycle (init, teardown, capability publishing into `supi-code-runtime`).
+
+#### Refactor module forwarders
+`src/refactor/safety.ts` and `src/refactor/apply-workspace-edit.ts` move under `src/analysis/refactor/` in Task 3. Before reducing the old paths to forwarders, check whether any callers **outside** `supi-code-intelligence` (e.g. in `supi-lsp` tool overrides) import from these paths. If so, keep the forwarders until those callers are migrated.
+
+#### Lower-level debug surfaces
+`tree_sitter_query` and `tree_sitter_node_at` are also expert debug surfaces alongside `lsp_references`, `lsp_implementation`, and `tree_sitter_callees`. They stay available during this refactor — the non-goals list covers the explicit trio, but the same principle applies to all lower-level `lsp_*` and `tree_sitter_*` tools.

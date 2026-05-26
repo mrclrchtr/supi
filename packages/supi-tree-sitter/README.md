@@ -8,18 +8,15 @@
 
 # @mrclrchtr/supi-tree-sitter
 
-Adds focused structural code analysis tools to the [pi coding agent](https://github.com/earendil-works/pi) using Tree-sitter parsers.
+Tree-sitter structural code analysis library for the [pi coding agent](https://github.com/earendil-works/pi).
+
+This is a **library-only** package — it has no pi extension surface. Use `@mrclrchtr/supi-code-intelligence`
+to activate the `tree_sitter_*` tool family in pi.
 
 ## Install
 
 ```bash
-pi install npm:@mrclrchtr/supi-tree-sitter
-```
-
-For local development:
-
-```bash
-pi install ./packages/supi-tree-sitter
+npm install @mrclrchtr/supi-tree-sitter
 ```
 
 ![Tree-sitter outline in action](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-tree-sitter.png)
@@ -85,8 +82,9 @@ supi-tree-sitter  ← Tree-sitter WASM + session-scoped service + runtime capabi
 ## Package surfaces
 
 - `@mrclrchtr/supi-tree-sitter/api` — reusable parsing session factory, shared session-scoped structural service access, and shared result types
-- `@mrclrchtr/supi-tree-sitter/extension` — pi extension entrypoint
 - `@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider` — shared StructuralProvider adapter
+
+This is a **library-only** package. Tool registration (`tree_sitter_*` tools) and pi event handlers belong to `@mrclrchtr/supi-code-intelligence`.
 
 Owned session example:
 

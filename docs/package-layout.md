@@ -118,7 +118,7 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-bash-timeout` | stay flat unless it grows |
 | `supi-cache` | domain-first: `forensics/`, `monitor/`, `report/`; optional `config/` later |
 | `supi-claude-md` | mostly flat; optional `config/` or `session/` if runtime state grows |
-| `supi-code-intelligence` | hybrid: root surfaces + `tool/` + `presentation/` + `use-case/` + `workspace/` |
+| `supi-code-intelligence` | hybrid: root surfaces + `app/` + `substrate/` + `analysis/` + `tool/` + `presentation/` + `ui/` |
 | `supi-code-runtime` | library-only: flat source with `capability/` + `workspace/`; no pi extension |
 | `supi-context` | stay flat unless it grows |
 | `supi-core` | domain-first if reorganized: `config/`, `context/`, `settings/` |

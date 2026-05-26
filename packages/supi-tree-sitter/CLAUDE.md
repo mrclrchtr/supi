@@ -3,7 +3,7 @@
 ## Scope
 
 `@mrclrchtr/supi-tree-sitter` is a **library-only** package with one explicit surface:
-- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports `createTreeSitterSession()`, `getSessionTreeSitterService()`, handler functions (`handleOutline`, `handleCallees`, etc.), and shared types for other SuPi packages
+- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports structured runtime/service APIs (`createTreeSitterSession()`, `getSessionTreeSitterService()`), structural extraction services (`lookupCalleesAt`, `collectOutline`, `extractExports`, etc.), language detection helpers, and shared types for other SuPi packages. Tool-handler formatting functions live in `@mrclrchtr/supi-code-intelligence/src/tool/families/tree-sitter/`.
 
 This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Tool registration (`tree_sitter_outline`, `tree_sitter_imports`, etc.) and session lifecycle handlers live in `@mrclrchtr/supi-code-intelligence`. The package does not depend on `supi-lsp` and must remain correct when installed independently.
 
@@ -25,7 +25,7 @@ Vendored WASM metadata (`.wasm.json`) tracks the source npm package version and 
 
 ```text
 src/
-  api.ts              # public API surface
+  api.ts              # public API surface (library-only, no pi extension)
   index.ts            # re-export surface
   types.ts            # shared type definitions
   coordinates.ts      # 1-based UTF-16 coordinate conversion
@@ -33,15 +33,13 @@ src/
   syntax-node.ts      # syntax node interface
   session/
     runtime.ts        # grammar initialization, parser reuse, parse/query services
-    service-registry.ts # shared session-scoped structural service registry (backed by the core helper)
+    service-registry.ts # shared session-scoped structural service registry (backed by core helper)
     session.ts        # runtime-backed service helpers and owned session factory
     runtime-controller.ts # Tree-sitter runtime lifecycle controller
     runtime-registration.ts # Runtime registration helpers
   tool/
     callees.ts        # callee extraction
     exports.ts        # export extraction
-    formatting.ts     # tool output formatting and caps
-    handlers.ts       # per-action handler functions (consumed by supi-code-intelligence)
     imports.ts        # import extraction
     node-at.ts        # node_at action
     outline.ts        # outline extraction
@@ -56,8 +54,7 @@ src/
 - `src/session/runtime.ts` — grammar initialization, parser reuse, parse/query services
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/session/session.ts` — runtime-backed service helpers and owned session factory
-- `src/tool/handlers.ts` — per-action handler functions (consumed by supi-code-intelligence)
-- `src/provider/tree-sitter-provider.ts` — StructuralProvider impl
+- `src/provider/tree-sitter-provider.ts` — StructuralProvider impl (string formatting lives in `supi-code-intelligence/src/tool/families/tree-sitter/`)
 - `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source
 - `scripts/generate-sql-wasm.mjs` — builds SQL WASM from source
 

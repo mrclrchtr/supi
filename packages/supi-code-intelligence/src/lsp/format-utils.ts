@@ -1,6 +1,6 @@
-// LSP tool result formatting helpers — interim port from supi-lsp's format.ts.
+// LSP tool result formatting helpers.
 //
-// Simplifies tool-actions.ts by keeping formatting logic separate.
+// The canonical re-export surface is src/tool/families/lsp/format.ts.
 
 export function formatHover(contents: unknown): string {
   if (!contents) return "No hover information available.";

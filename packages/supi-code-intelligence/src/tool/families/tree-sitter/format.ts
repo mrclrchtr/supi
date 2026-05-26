@@ -1,16 +1,15 @@
-// Formatting helpers for tree_sitter tool output.
+/**
+ * Tree-sitter expert tool formatting — markdown rendering for structural analysis results.
+ *
+ * Handles outline, imports, exports, node-at, query, and callee rendering.
+ * All string formatting for tree_sitter_* tools lives here.
+ */
 
-import type { OutlineItem, TreeSitterResult } from "../types.ts";
+import type { OutlineItem } from "@mrclrchtr/supi-tree-sitter/api";
 
 export const MAX_ITEMS = 100;
 
-export function validationError(message: string): string {
-  return `**Validation error:** ${message}`;
-}
-
-export function formatNonSuccess(
-  result: Exclude<TreeSitterResult<unknown>, { kind: "success" }>,
-): string {
+export function formatNonSuccess(result: { kind: string; message?: string }): string {
   switch (result.kind) {
     case "unsupported-language":
       return `**Unsupported language:** ${result.message}`;
@@ -20,6 +19,8 @@ export function formatNonSuccess(
       return `**Validation error:** ${result.message}`;
     case "runtime-error":
       return `**Runtime error:** ${result.message}`;
+    default:
+      return `**Error:** ${result.message ?? result.kind}`;
   }
 }
 
@@ -44,13 +45,6 @@ interface OutlineFormatContext {
   omitted: number;
 }
 
-/**
- * Append outline items to `lines` while enforcing a recursive item cap.
- *
- * The cap counts every printed declaration, including nested methods and other
- * children. This keeps generated or deeply nested files from bypassing the
- * `tree_sitter` tool's agent-facing result limit.
- */
 export function formatOutlineItemsCapped(
   items: OutlineItem[],
   lines: string[],
@@ -59,15 +53,6 @@ export function formatOutlineItemsCapped(
   const context: OutlineFormatContext = { lines, max, emitted: 0, omitted: 0 };
   appendOutlineItems(items, context, 0);
   return { emitted: context.emitted, omitted: context.omitted };
-}
-
-/** Append outline items without a cap. Prefer `formatOutlineItemsCapped` for tool output. */
-export function formatOutlineItems(items: OutlineItem[], lines: string[], depth: number): void {
-  appendOutlineItems(
-    items,
-    { lines, max: Number.POSITIVE_INFINITY, emitted: 0, omitted: 0 },
-    depth,
-  );
 }
 
 function appendOutlineItems(
@@ -80,10 +65,8 @@ function appendOutlineItems(
       context.omitted += countOutlineItems(item);
       continue;
     }
-
     appendOutlineItem(item, context, depth);
     context.emitted++;
-
     if (item.children?.length) {
       appendOutlineItems(item.children, context, depth + 1);
     }

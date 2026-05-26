@@ -1,7 +1,6 @@
-// Tree-sitter tool names and specs — owned by the umbrella adapter.
+// Tree-sitter tool names and specs.
 //
-// Tool metadata is replicated from supi-tree-sitter's tool-specs.ts to avoid
-// importing internal modules. Future cleanup can consolidate.
+// The canonical re-export surface is src/tool/families/tree-sitter/specs.ts.
 
 import { Type } from "typebox";
 

@@ -1,10 +1,11 @@
 schema_version = 1
-status = "todo"
-updated_at = "2026-05-26T07:01:05.758673Z"
-revision = 48
+status = "done"
+updated_at = "2026-06-01T23:33:04.813132Z"
+revision = 70
 
 [document_fingerprints]
-content = "sha256:d8e23676c4bd935ada02658c9757d428751909c22419a0195c00d626eccd46cb"
+archive = "sha256:363c1f9645fbcd2c54226fcbd0763bdb4c883f5acc391fd07c72a927a7f81ffb"
+content = "sha256:e0ef5b6471f67eeb2cc7f1fa9607a43530b96aa80468f4b55be7feeca5216375"
 task-01 = "sha256:63c20051f57c3853fcaf64709d7db33cb44d22ce6461232cd8d2dc8312a1fdb0"
 task-02 = "sha256:5d8eec135f139017c8f84e5a51499106e9e8d3bfd76fa837bc76d12ab0f9e069"
 task-03 = "sha256:4bd6b105d1fe2e0816a441038fbfedb9d98009821072c796bb1d043a176abc71"
@@ -16,34 +17,34 @@ task-07 = "sha256:4b1a927f4b71550dd75ccaf299e358a1b8ef1c8ce22b3cf06c9f332cf6efbf
 [[tasks]]
 number = 1
 title = "Add app/workspace-session scaffolding and a thin composition root for code-intelligence"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 2
 title = "Move model/planner/targeting into analysis services with explicit request context and model caching"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 3
 title = "Refactor code_* orchestration into typed analysis services plus thin render adapters"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 4
 title = "Reorganize tool families under src/tool, move substrate wiring under src/substrate, and relocate shared UI/override surfaces"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 5
 title = "Remove tree-sitter tool-edge handler APIs so the substrate stays library-only"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 6
 title = "Update repo and package docs to match the modular single-extension design"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 7
 title = "Run final cross-package verification for the modular code-intelligence refactor"
-status = "todo"
+status = "done"

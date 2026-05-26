@@ -1,11 +1,22 @@
-// Per-action handler functions for the focused tree_sitter tool surface.
-//
-// Each handler receives only the parameters it needs (no action dispatch).
-// Handlers are shared between the extension factory (tree-sitter.ts) and the
-// tool registration layer (register-tools.ts).
+/**
+ * Tree-sitter expert tool execution adapters.
+ *
+ * These functions consume the structured runtime from @mrclrchtr/supi-tree-sitter/api
+ * and return markdown-formatted string results.
+ * All string formatting lives in ./format.ts.
+ */
 
-import { detectGrammar, isJsTsGrammar } from "../language.ts";
-import type { TreeSitterRuntime } from "../session/runtime.ts";
+import type { TreeSitterRuntime } from "@mrclrchtr/supi-tree-sitter/api";
+import {
+  collectOutline,
+  detectGrammar,
+  extractExports,
+  extractImports,
+  isJsTsGrammar,
+  lookupCalleesAt,
+  lookupNodeAt,
+} from "@mrclrchtr/supi-tree-sitter/api";
+
 import {
   formatNonSuccess,
   formatOutlineItemsCapped,
@@ -13,13 +24,9 @@ import {
   truncate,
   truncatedNotice,
   truncateText,
-} from "./formatting.ts";
-import { collectOutline } from "./outline.ts";
-import { extractExports, extractImports, lookupCalleesAt, lookupNodeAt } from "./structure.ts";
+} from "./format.ts";
 
-// ---------------------------------------------------------------------------
-// Outline — JS/TS only
-// ---------------------------------------------------------------------------
+// ── Outline — JS/TS only ─────────────────────────────────────────────
 
 export async function handleOutline(runtime: TreeSitterRuntime, file: string): Promise<string> {
   const parseResult = await runtime.parseFile(file);
@@ -44,9 +51,7 @@ export async function handleOutline(runtime: TreeSitterRuntime, file: string): P
   return lines.join("\n");
 }
 
-// ---------------------------------------------------------------------------
-// Imports — JS/TS only
-// ---------------------------------------------------------------------------
+// ── Imports — JS/TS only ─────────────────────────────────────────────
 
 export async function handleImports(runtime: TreeSitterRuntime, file: string): Promise<string> {
   const grammarId = detectGrammar(file);
@@ -69,9 +74,7 @@ export async function handleImports(runtime: TreeSitterRuntime, file: string): P
   return lines.join("\n");
 }
 
-// ---------------------------------------------------------------------------
-// Exports — JS/TS only
-// ---------------------------------------------------------------------------
+// ── Exports — JS/TS only ─────────────────────────────────────────────
 
 export async function handleExports(runtime: TreeSitterRuntime, file: string): Promise<string> {
   const grammarId = detectGrammar(file);
@@ -95,9 +98,7 @@ export async function handleExports(runtime: TreeSitterRuntime, file: string): P
   return lines.join("\n");
 }
 
-// ---------------------------------------------------------------------------
-// Node at position — all supported grammars
-// ---------------------------------------------------------------------------
+// ── Node at position — all supported grammars ────────────────────────
 
 export async function handleNodeAt(
   runtime: TreeSitterRuntime,
@@ -131,9 +132,7 @@ export async function handleNodeAt(
   return lines.join("\n");
 }
 
-// ---------------------------------------------------------------------------
-// Query — all supported grammars
-// ---------------------------------------------------------------------------
+// ── Query — all supported grammars ───────────────────────────────────
 
 export async function handleQuery(
   runtime: TreeSitterRuntime,
@@ -159,9 +158,7 @@ export async function handleQuery(
   return lines.join("\n");
 }
 
-// ---------------------------------------------------------------------------
-// Callees — many supported grammars
-// ---------------------------------------------------------------------------
+// ── Callees — many supported grammars ────────────────────────────────
 
 export async function handleCallees(
   runtime: TreeSitterRuntime,

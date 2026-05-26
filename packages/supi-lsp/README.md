@@ -8,18 +8,15 @@
 
 # @mrclrchtr/supi-lsp
 
-Adds Language Server Protocol support to the [pi coding agent](https://github.com/earendil-works/pi).
+Language Server Protocol runtime library for the [pi coding agent](https://github.com/earendil-works/pi).
+
+This is a **library-only** package — it has no pi extension surface. Use `@mrclrchtr/supi-code-intelligence`
+to activate the `lsp_*` tool family in pi.
 
 ## Install
 
 ```bash
-pi install npm:@mrclrchtr/supi-lsp
-```
-
-For local development:
-
-```bash
-pi install ./packages/supi-lsp
+npm install @mrclrchtr/supi-lsp
 ```
 
 ## What you get
@@ -87,8 +84,9 @@ supi-lsp           ← LSP client + session-scoped service + runtime capabilitie
 ## Package surfaces
 
 - `@mrclrchtr/supi-lsp/api` — reusable session-scoped LSP service and related types
-- `@mrclrchtr/supi-lsp/extension` — pi extension entrypoint
 - `@mrclrchtr/supi-lsp/provider/lsp-semantic-provider` — shared SemanticProvider adapter
+
+This is a **library-only** package. Tool registration (`lsp_*` tools) and pi event handlers belong to `@mrclrchtr/supi-code-intelligence`.
 
 Example:
 

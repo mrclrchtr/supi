@@ -1,6 +1,6 @@
-// LSP settings registration for the supi-code-intelligence umbrella.
+// LSP settings registration for the code-intelligence umbrella extension.
 //
-// Ported from supi-lsp's settings-registration.ts.
+// The canonical re-export surface is src/substrate/semantic/settings.ts.
 
 import { CONFIG_DIR_NAME, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import type { SettingItem } from "@earendil-works/pi-tui";

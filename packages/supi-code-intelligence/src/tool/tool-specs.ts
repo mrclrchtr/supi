@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
+import { CODE_RELATION_KIND_NAMES, type CodeIntelligenceToolName } from "../intent/types.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeAffectedTool } from "./execute-affected.ts";
 import { executeBriefTool } from "./execute-brief.ts";
@@ -22,19 +23,6 @@ const SummaryParam = Type.Boolean({ description: "Summarize by directory" });
 const StructuredPatternKindParam = Type.String({
   description: "Structured kind: definition | export | import",
 });
-
-export const CODE_INTELLIGENCE_TOOL_NAMES = [
-  "code_brief",
-  "code_map",
-  "code_relations",
-  "code_affected",
-  "code_pattern",
-  "code_refactor",
-] as const;
-export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[number];
-
-export const CODE_RELATION_KIND_NAMES = ["callers", "callees", "implementations"] as const;
-export type CodeRelationsKind = (typeof CODE_RELATION_KIND_NAMES)[number];
 
 const CodeRelationsKindEnum = StringEnum(CODE_RELATION_KIND_NAMES);
 

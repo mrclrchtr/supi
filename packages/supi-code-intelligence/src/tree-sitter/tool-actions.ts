@@ -1,6 +1,7 @@
-// Tree-sitter tool execution adapters — delegates to supi-tree-sitter's handler functions.
+// Tree-sitter tool execution adapters — delegates to the family execute module.
 //
-// Consumed from @mrclrchtr/supi-tree-sitter/api.
+// All formatting lives in src/tool/families/tree-sitter/format.ts.
+// The library @mrclrchtr/supi-tree-sitter/api exposes only structured runtime APIs.
 
 import type { TreeSitterRuntime } from "@mrclrchtr/supi-tree-sitter/api";
 import {
@@ -10,7 +11,7 @@ import {
   handleNodeAt,
   handleOutline,
   handleQuery,
-} from "@mrclrchtr/supi-tree-sitter/api";
+} from "../tool/families/tree-sitter/execute.ts";
 
 /** Execute a tree-sitter tool by name against a runtime. */
 export async function executeTsTool(

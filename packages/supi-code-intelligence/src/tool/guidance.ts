@@ -4,7 +4,8 @@
 // Additional cross-family orchestration guidelines are appended to help the
 // model choose between code_*, lsp_*, and tree_sitter_* tools.
 
-import { CODE_INTELLIGENCE_TOOL_SPECS, type CodeIntelligenceToolName } from "./tool-specs.ts";
+import type { CodeIntelligenceToolName } from "../intent/types.ts";
+import { CODE_INTELLIGENCE_TOOL_SPECS } from "./tool-specs.ts";
 
 export interface CodeIntelligenceToolPromptSurface {
   description: string;

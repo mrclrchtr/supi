@@ -1,7 +1,6 @@
-// Umbrella LSP tool definitions — tool metadata for lsp_* tool registration.
+// LSP tool definitions — tool metadata for lsp_* tool registration.
 //
-// In the interim phase, tool names and specs are owned locally so the umbrella
-// does not need to reach into supi-lsp internals. Future cleanup can consolidate.
+// The canonical re-export surface is src/tool/families/lsp/specs.ts.
 
 import { type TSchema, Type } from "typebox";
 

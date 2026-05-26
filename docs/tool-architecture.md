@@ -214,18 +214,18 @@ Uses `src/tool/tool-specs.ts` as the single source of truth for:
 
 In the SuPi code-understanding stack, tool ownership follows a clear rule:
 
-- **`supi-tree-sitter`** owns the structural substrate and all `tree_sitter_*` expert tools.
-- **`supi-lsp`** owns the semantic substrate, the diagnostics lifecycle, and all `lsp_*` expert tools.
-- **`supi-code-intelligence`** owns the high-level `code_*` tools and may add **cross-family orchestration guidance** —
-  for example, steering the model toward `lsp_*` for semantic navigation, `tree_sitter_*` for structural inspection,
-  and `code_pattern` for explicit search, and `code_refactor` for direct-apply semantic rename.
+- **`supi-code-intelligence`** is the **sole pi extension exposer** for the code-understanding stack. It owns
+  all three tool families (`code_*`, `lsp_*`, `tree_sitter_*`), the substrate wiring (LSP session lifecycle,
+  diagnostics, recovery, settings, and tool overrides), and all cross-family orchestration guidance.
+- **`supi-lsp`** is a **library-only** package — no pi extension surface. It provides the semantic runtime/
+  service/provider APIs that power `lsp_*` tool execution. Tool registration and all pi event handlers
+  live in `supi-code-intelligence`.
+- **`supi-tree-sitter`** is a **library-only** package — no pi extension surface. It provides the structured
+  runtime/service APIs (parse, query, outline) that power `tree_sitter_*` tool execution. Tool registration
+  and all pi event handlers live in `supi-code-intelligence`.
 
-Cross-family orchestration guidance is intentional coupling at the prompt level, not at the code level.
-Each package still owns its own metadata and rendering. `supi-code-intelligence` does not re-own substrate
-metadata; it only adds strategy-level prompt guidelines.
-
-Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. Each tool family
-is independently installed and documented from its home package.
+Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. The substrate packages
+are transitive dependencies, not standalone pi installations.
 
 ## Anti-patterns
 
