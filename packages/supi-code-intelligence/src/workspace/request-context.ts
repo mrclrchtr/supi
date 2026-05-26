@@ -10,15 +10,19 @@
  */
 
 import {
+  type CalleesData,
   type CodeLocation,
   type CodePosition,
   type CodeResult,
   type CodeSymbol,
+  type ExportData,
   getDefaultWorkspaceRuntime,
+  type ImportData,
+  type NodeAtData,
+  type OutlineData,
   type SemanticProvider,
   type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { CalleesData, ExportData, ImportData, NodeAtData, OutlineData } from "../types.ts";
 
 /**
  * Unified code analysis provider combining semantic (LSP-backed) and

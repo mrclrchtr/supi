@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeQueryParams as ActionParams } from "./query-params.ts";
-import type { StructuralSubstrate } from "./substrates/types.ts";
 
 export const STRUCTURED_PATTERN_FILE_CAP = 200;
 const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;

@@ -2,11 +2,13 @@
 // Moved from src/actions/semantic-references.ts into the use-case support layer.
 
 import * as path from "node:path";
+import type {
+  ConfidenceMode,
+  SemanticProvider as SemanticSubstrate,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { filterOutDeclaration, isInProjectPath, uriToFile } from "../../search-helpers.ts";
 import { dedupeFileLineRefs, highestConfidence } from "../../semantic-action-helpers.ts";
-import type { SemanticSubstrate } from "../../substrates/types.ts";
 import type { ResolvedTarget } from "../../target-resolution.ts";
-import type { ConfidenceMode } from "../../types.ts";
 
 export interface FileLineRef {
   file: string;

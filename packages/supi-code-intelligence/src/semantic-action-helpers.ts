@@ -1,5 +1,5 @@
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { ResolvedTarget, ResolvedTargetGroup } from "./target-resolution.ts";
-import type { ConfidenceMode } from "./types.ts";
 
 interface FileLineRef {
   file: string;

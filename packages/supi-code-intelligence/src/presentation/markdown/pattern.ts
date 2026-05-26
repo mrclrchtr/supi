@@ -1,9 +1,9 @@
 // Pattern search markdown renderer — all formatting for literal, regex, and structured search results.
 
+import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import type { StructuredMatch, StructuredPatternResult } from "../../pattern-structured.ts";
 import type { RgMatch } from "../../search-helpers.ts";
 import { groupByFile } from "../../search-helpers.ts";
-import type { StructuralSubstrate } from "../../substrates/types.ts";
 
 // ── Structured search formatting ─────────────────────────────────────
 

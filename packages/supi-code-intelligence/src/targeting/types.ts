@@ -6,7 +6,10 @@
  * and keep action-facing code focused on routing, not string building.
  */
 
-import type { SemanticSubstrate, StructuralSubstrate } from "../substrates/types.ts";
+import type {
+  SemanticProvider as SemanticSubstrate,
+  StructuralProvider as StructuralSubstrate,
+} from "@mrclrchtr/supi-code-runtime/api";
 
 // ── Normalized query ──────────────────────────────────────────────────
 

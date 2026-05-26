@@ -7,6 +7,7 @@
  * outcomes happens here, at the action boundary.
  */
 
+import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeQueryParams as ActionParams } from "./query-params.ts";
 import {
   type ResolvedTarget,
@@ -27,7 +28,7 @@ import type { ResolverDeps, TargetOutcome } from "./targeting/types.ts";
 export async function resolveTarget(
   params: ActionParams,
   cwd: string,
-  semantic?: import("./substrates/types.ts").SemanticSubstrate,
+  semantic?: SemanticSubstrate,
 ): Promise<ResolvedTarget | ResolvedTargetGroup | string> {
   const query = normalizeQuery(params);
 

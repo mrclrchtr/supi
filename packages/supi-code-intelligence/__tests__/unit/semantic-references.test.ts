@@ -1,9 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SemanticSubstrate } from "../../src/substrates/types.ts";
 import type { ResolvedTarget } from "../../src/target-resolution.ts";
 
 let tmpDir: string;

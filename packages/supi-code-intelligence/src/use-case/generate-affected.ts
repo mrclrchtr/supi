@@ -3,6 +3,7 @@
 // returns fully rendered content + details metadata.
 
 import * as path from "node:path";
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../model.ts";
 import {
   renderAffectedFileLevel,
@@ -12,7 +13,7 @@ import { summarizePrioritySignalsForFiles } from "../prioritization-signals.ts";
 import { resolveTarget } from "../resolve-target.ts";
 import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
-import type { AffectedDetails, CodeIntelResult, ConfidenceMode } from "../types.ts";
+import type { AffectedDetails, CodeIntelResult } from "../types.ts";
 import type { CodeProvider } from "../workspace/request-context.ts";
 import {
   aggregatePerTarget,

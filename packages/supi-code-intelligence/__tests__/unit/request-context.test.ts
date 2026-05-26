@@ -11,7 +11,7 @@ describe("Provider type compatibility", () => {
       workspaceSymbols: async () => null,
     };
     // The code-intelligence SemanticSubstrate has the same shape
-    const substrate: import("../../src/substrates/types.ts").SemanticSubstrate = provider;
+    const substrate: import("@mrclrchtr/supi-code-runtime/api").SemanticProvider = provider;
     expect(typeof substrate.references).toBe("function");
   });
 
@@ -23,7 +23,7 @@ describe("Provider type compatibility", () => {
       imports: async () => ({ kind: "unavailable" as const, message: "" }),
       nodeAt: async () => ({ kind: "unavailable" as const, message: "" }),
     };
-    const substrate: import("../../src/substrates/types.ts").StructuralSubstrate = provider;
+    const substrate: import("@mrclrchtr/supi-code-runtime/api").StructuralProvider = provider;
     expect(typeof substrate.calleesAt).toBe("function");
   });
 });

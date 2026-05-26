@@ -1,10 +1,25 @@
 // Package root exports for @mrclrchtr/supi-code-intelligence.
 // Peer extensions can import these APIs for programmatic access.
 
-// Provider contracts re-exported from the shared runtime for convenience.
+// Provider contracts and shared canonical types from the shared runtime.
+// Provider contracts also available as substrate type aliases for backward compat.
 export type {
+  CalleesData,
+  CapabilityState,
+  CodeLocation,
+  CodePosition,
+  CodeResult,
+  CodeSymbol,
+  ConfidenceMode,
+  ExportData,
+  ImportData,
+  NodeAtData,
+  OutlineData,
   SemanticProvider,
+  SemanticProvider as SemanticSubstrate,
+  SourceRange,
   StructuralProvider,
+  StructuralProvider as StructuralSubstrate,
   StructuralResult,
 } from "@mrclrchtr/supi-code-runtime/api";
 export { generateFocusedBrief, generateOverview, generateProjectBrief } from "./brief.ts";
@@ -19,11 +34,6 @@ export {
   getDependencies,
   getDependents,
 } from "./model.ts";
-// Substrate adapters (type aliases for provider contracts)
-export type {
-  SemanticSubstrate,
-  StructuralSubstrate,
-} from "./substrates/types.ts";
 export type { ResolvedTarget, TargetResolutionResult } from "./target-resolution.ts";
 export {
   normalizePath,
@@ -31,26 +41,14 @@ export {
   resolveSymbolTarget,
   toZeroBased,
 } from "./target-resolution.ts";
-// Shared canonical types
+// Code-intelligence-specific types (not shared with the runtime)
 export type {
   AffectedDetails,
   BriefDetails,
-  CalleesData,
   CodeIntelResult,
-  CodeLocation,
-  CodePosition,
-  CodeResult,
-  CodeSymbol,
-  ConfidenceMode,
   DisambiguationCandidate,
-  ExportData,
-  ImportData,
   MapDetails,
-  NodeAtData,
-  OutlineData,
-  ProviderAvailability,
   SearchDetails,
-  SourceRange,
 } from "./types.ts";
 // Code provider — reads capabilities from the shared workspace runtime.
 export type { CodeProvider, CodeProviderState } from "./workspace/request-context.ts";

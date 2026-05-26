@@ -9,9 +9,12 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type {
+  SemanticProvider as SemanticSubstrate,
+  StructuralProvider as StructuralSubstrate,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { normalizePath } from "../search-helpers.ts";
 import { highestConfidence } from "../semantic-action-helpers.ts";
-import type { SemanticSubstrate, StructuralSubstrate } from "../substrates/types.ts";
 import { getCodeProvider } from "../workspace/request-context.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 

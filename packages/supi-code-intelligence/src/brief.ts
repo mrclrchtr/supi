@@ -1,11 +1,12 @@
 // Public facade — delegates to the new use-case and presentation layers.
 // Existing callers (api.ts, index.ts, code-intelligence.ts) remain compatible.
 
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import { formatGitContext, gatherGitContext } from "./git-context.ts";
 import type { ArchitectureModel } from "./model.ts";
 import { getDependents } from "./model.ts";
 import { renderOverview } from "./presentation/markdown/overview.ts";
-import type { BriefDetails, ConfidenceMode } from "./types.ts";
+import type { BriefDetails } from "./types.ts";
 import { buildOverviewData } from "./use-case/build-overview.ts";
 
 // Re-export focused brief generation

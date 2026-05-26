@@ -3,6 +3,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import { formatGitContext, gatherGitContext } from "./git-context.ts";
 import type { ArchitectureModel } from "./model.ts";
 import { findModuleForPath, getDependencies, getDependents } from "./model.ts";
@@ -10,7 +11,7 @@ import {
   appendPrioritySignalsSection,
   summarizePrioritySignalsForFiles,
 } from "./prioritization-signals.ts";
-import type { BriefDetails, ConfidenceMode } from "./types.ts";
+import type { BriefDetails } from "./types.ts";
 
 /**
  * Generate a focused brief for a specific path (directory or file).

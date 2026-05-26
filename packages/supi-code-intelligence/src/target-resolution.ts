@@ -5,13 +5,17 @@
  * New code should import from `./targeting/` directly.
  */
 
+import type {
+  ConfidenceMode,
+  SemanticProvider as SemanticSubstrate,
+  StructuralProvider as StructuralSubstrate,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { type Position, toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { normalizePath } from "./search-helpers.ts";
-import type { SemanticSubstrate, StructuralSubstrate } from "./substrates/types.ts";
 import { resolveAnchoredTarget as resolveAnchored } from "./targeting/resolve-anchored.ts";
 import { resolveFileTargetGroup as resolveFile } from "./targeting/resolve-file.ts";
 import { resolveSymbolTarget as resolveSymbol } from "./targeting/resolve-symbol.ts";
-import type { ConfidenceMode, DisambiguationCandidate } from "./types.ts";
+import type { DisambiguationCandidate } from "./types.ts";
 
 // ── Re-exported legacy types ──────────────────────────────────────────
 

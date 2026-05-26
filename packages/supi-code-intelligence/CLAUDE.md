@@ -70,10 +70,6 @@ src/
 │   ├── execute-pattern.ts     # code_pattern adapter
 │   ├── execute-refactor.ts    # code_refactor — reads broker, calls semantic rename, validates, applies
 │   └── validation.ts          # Shared parameter validation
-└── substrates/
-    ├── types.ts             # Substrate interface aliases (SemanticSubstrate, StructuralSubstrate)
-    ├── lsp-adapter.ts       # Session-scoped LSP access via SemanticSubstrate
-    └── tree-sitter-adapter.ts # Shared Tree-sitter service access via StructuralSubstrate
 ```
 
 ## Public tool contracts

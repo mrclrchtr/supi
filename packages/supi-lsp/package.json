@@ -51,7 +51,6 @@
   ],
 
   "devDependencies": {
-    "@mrclrchtr/supi-code-intelligence": "workspace:*",
     "@mrclrchtr/supi-test-utils": "workspace:*",
     "vitest": "4.1.9"
   },

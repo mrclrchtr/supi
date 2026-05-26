@@ -1,6 +1,6 @@
 import * as path from "node:path";
+import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
-import type { SemanticSubstrate } from "../../src/substrates/types.ts";
 import {
   normalizePath,
   resolveAnchoredTarget,

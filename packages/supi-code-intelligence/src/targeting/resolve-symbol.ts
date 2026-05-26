@@ -7,8 +7,8 @@
  */
 
 import * as path from "node:path";
+import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
-import type { SemanticSubstrate } from "../substrates/types.ts";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
 const MAX_CANDIDATES = 8;
