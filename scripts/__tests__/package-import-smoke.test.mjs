@@ -39,7 +39,7 @@ describe("packed package import surfaces", () => {
     if (projectDir) rmSync(projectDir, { recursive: true, force: true });
   });
 
-  it("resolves explicit /api and /extension subpaths for a standalone package and blocks root/deep imports", {
+  it("resolves explicit /api subpath for supi-lsp library package and blocks extension and deep imports", {
     timeout: SLOW_TIMEOUT,
   }, async () => {
     const lspPackage = `${SUPI_SCOPE}supi-lsp`;
@@ -50,7 +50,7 @@ describe("packed package import surfaces", () => {
     const deepPath = `${lspPackage}/src/lsp.ts`;
 
     expect(() => projectRequire.resolve(`${lspPackage}/api`)).not.toThrow();
-    expect(() => projectRequire.resolve(`${lspPackage}/extension`)).not.toThrow();
+    expect(() => projectRequire.resolve(`${lspPackage}/extension`)).toThrow();
     expect(() => projectRequire.resolve(lspPackage)).toThrow();
     expect(() => projectRequire.resolve(deepPath)).toThrow();
   });
