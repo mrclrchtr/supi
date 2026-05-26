@@ -1,9 +1,10 @@
 schema_version = 1
-status = "in_progress"
-updated_at = "2026-06-01T23:32:46.971708Z"
-revision = 38
+status = "done"
+updated_at = "2026-06-01T23:32:50.764642Z"
+revision = 41
 
 [document_fingerprints]
+archive = "sha256:e000399bffa8b4152c342886a7343abf582b4c420a12facc20f3bdce2f900c76"
 content = "sha256:26d645d05e37432ce95da15c63ec3d83fc4f46fce0e8b759014682858d13a49d"
 task-01 = "sha256:9c6fb9986d0fd4be4a624b34e64478b48c7b3aba253cab47daf47b952f077771"
 task-02 = "sha256:ab40f93270fc1859598375958c57db60302a8c06241e38245afe6b9d10267a9e"

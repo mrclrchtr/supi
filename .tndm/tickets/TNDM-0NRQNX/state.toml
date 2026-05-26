@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-26T00:49:29.043963Z"
+revision = 28
+
+[document_fingerprints]
+archive = "sha256:0bbfdee749eb13dcb790a4d6c140a8c88ba3f4b2879792247790567edb96b55b"
+content = "sha256:a00c4afde8db208513bd7af807fc9ee832fc6bf51306772b0196100910906777"
+task-01 = "sha256:179fe3a8b76fe2c70cd6878a4e03f81b9812438ed07068a9116e34a894da955e"
+task-02 = "sha256:07d32a05d06077c320f267ef881d5de161c848df4629d3a0e6f10ad68eebdeff"
+task-03 = "sha256:bcb6fbccd1f25932ceecfef69f7e2a225334eb432e83590863a0bbb7eeef4271"
+task-04 = "sha256:550f698b51b77610a5677b66561a48f0fb345e8d4855c9bb3012dce5c92d9f97"
+task-05 = "sha256:e9b8b013ba85ac4eddebce67b4ad64ae09e2b606a6197676c96c53319efd4be0"
+
+[[tasks]]
+number = 1
+title = "Map exact consumers of each duplicate type and ProviderAvailability"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Delete duplicate types from code-intelligence/types.ts, re-import from code-runtime"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Delete substrates/types.ts, inline remaining aliases"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Remove unused devDeps from supi-lsp and supi-tree-sitter"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Full verification: all tests, types, lint, pnpm verify"
+status = "done"
