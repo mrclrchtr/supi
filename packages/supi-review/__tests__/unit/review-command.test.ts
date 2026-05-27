@@ -276,7 +276,7 @@ describe("/supi-review command", () => {
     expect(mockFns.synthesizeReviewBrief).not.toHaveBeenCalled();
   });
 
-  describe("follow-up instruction branching by severity", () => {
+  describe("severity-aware follow-up instructions", () => {
     async function runWithFindings(findings: Array<Record<string, unknown>>) {
       const pi = createPi();
       reviewExtension(pi);
@@ -320,12 +320,14 @@ describe("/supi-review command", () => {
     const minorFinding = { ...baseFinding, priority: 1 };
     const infoFinding = { ...baseFinding, priority: 0 };
 
-    it("produces urgent message when findings include critical priority", async () => {
+    it("adds a critical urgency note while keeping the standard options", async () => {
       const content = await runWithFindings([criticalFinding]);
       expect(content).toContain("⚠");
       expect(content).toContain("critical");
       expect(content).toContain("Fix all");
-      expect(content).toContain("Fix critical only");
+      expect(content).toContain("Fix selected");
+      expect(content).toContain("Verify findings");
+      expect(content).not.toContain("Fix critical only");
     });
 
     it("produces standard message for major findings without critical", async () => {
@@ -336,10 +338,13 @@ describe("/supi-review command", () => {
       expect(content).not.toContain("⚠");
     });
 
-    it("produces light message for minor/info-only findings", async () => {
+    it("keeps the standard options for minor/info-only findings without a severity note", async () => {
       const content = await runWithFindings([minorFinding, infoFinding]);
-      expect(content).toContain("minor/info");
-      expect(content).not.toContain("Fix selected");
+      expect(content).toContain("Fix all");
+      expect(content).toContain("Fix selected");
+      expect(content).toContain("Verify findings");
+      expect(content).not.toContain("critical finding(s)");
+      expect(content).not.toContain("major finding(s)");
     });
 
     function findFollowUpMessage(sendMessage: ReturnType<typeof vi.fn>) {
@@ -349,7 +354,7 @@ describe("/supi-review command", () => {
       );
     }
 
-    it("notes contradiction when patch is marked correct but issues exist", async () => {
+    it("does not add a contradiction note when a correct verdict still has findings", async () => {
       const pi = createPi();
       reviewExtension(pi);
       const handler = getHandler(pi);
@@ -372,11 +377,14 @@ describe("/supi-review command", () => {
       const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
       const followUpCall = findFollowUpMessage(sendMessage);
       const content = (followUpCall?.[0] as Record<string, unknown>)?.content as string;
-      expect(content).toContain("correct");
-      expect(content).toContain("issues");
+      expect(content).toContain("Fix all");
+      expect(content).toContain("Fix selected");
+      expect(content).toContain("Verify findings");
+      expect(content).not.toContain("Minor suggestion only");
+      expect(content).not.toContain("PATCH IS CORRECT");
     });
 
-    it("notes contradiction even with major findings", async () => {
+    it("keeps the major-severity note without a contradiction note", async () => {
       const pi = createPi();
       reviewExtension(pi);
       const handler = getHandler(pi);
@@ -399,10 +407,11 @@ describe("/supi-review command", () => {
       const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
       const followUpCall = findFollowUpMessage(sendMessage);
       const content = (followUpCall?.[0] as Record<string, unknown>)?.content as string;
-      expect(content).toContain("correct");
-      expect(content).toContain("issues");
-      // Should still offer standard options even with contradiction
+      expect(content).toContain("major finding(s)");
       expect(content).toContain("Fix selected");
+      expect(content).toContain("Verify findings");
+      expect(content).not.toContain("Contradictory");
+      expect(content).not.toContain("PATCH IS CORRECT");
     });
 
     it("skips follow-up when there are no findings", async () => {
