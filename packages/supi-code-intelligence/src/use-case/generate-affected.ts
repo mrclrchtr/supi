@@ -293,6 +293,6 @@ function buildAffectedNextQueries(
   const relPath = path.relative(cwd, target.file);
   return [
     `\`code_brief\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for deeper context around ${symbolName}`,
-    `\`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for call sites`,
+    `\`code_references\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
   ];
 }

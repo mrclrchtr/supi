@@ -110,7 +110,7 @@ async function executeAnchoredBrief(
     dependencySummary: null as { moduleCount: number; edgeCount: number } | null,
     omittedCount: 0,
     nextQueries: [
-      `\`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for call sites`,
+      `\`code_references\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
       `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for impact analysis`,
     ],
   };
@@ -225,7 +225,7 @@ async function executeSymbolBrief(
     dependencySummary: mod ? { moduleCount: 1, edgeCount: mod.internalDeps.length } : null,
     omittedCount: 0,
     nextQueries: [
-      `\`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for call sites`,
+      `\`code_references\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
       `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for impact analysis`,
     ],
   };

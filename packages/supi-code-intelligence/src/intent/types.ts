@@ -9,14 +9,20 @@
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_brief",
   "code_map",
-  "code_relations",
+  "code_references",
+  "code_calls",
+  "code_implementations",
   "code_affected",
   "code_pattern",
-  "code_refactor",
+  "code_refactor_plan",
+  "code_refactor_apply",
 ] as const;
 export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[number];
 
-/** Canonical relation kind names. */
+/**
+ * Relation kind names — no longer used in the high-level code_* surface.
+ * Kept for legacy compatibility in substrate routing code.
+ */
 export const CODE_RELATION_KIND_NAMES = ["callers", "callees", "implementations"] as const;
 export type CodeRelationsKind = (typeof CODE_RELATION_KIND_NAMES)[number];
 

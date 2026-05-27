@@ -30,10 +30,13 @@ After install, pi gets:
 
 - `code_brief` — interpretive orientation for a project, package, directory, file, or symbol
 - `code_map` — factual repo/package/directory inventory
-- `code_relations` — callers, callees, or implementations for a resolved target
+- `code_references` — semantic references/usages for a resolved target
+- `code_calls` — structural outgoing calls from an enclosing function or method
+- `code_implementations` — semantic implementation lookup for an interface, class, or method
 - `code_affected` — blast radius, downstream impact, and risk for a target
 - `code_pattern` — explicit literal, regex, or structured search
-- `code_refactor` — direct-apply semantic rename with safety gates
+- `code_refactor_plan` — preview a semantic rename without mutating files
+- `code_refactor_apply` — apply a previously generated refactor plan
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - **all `lsp_*` expert tools** from `@mrclrchtr/supi-lsp` (hover, definition, references, implementation, diagnostics, rename, code actions, recover, document/workspace symbols)
 - **all `tree_sitter_*` expert tools** from `@mrclrchtr/supi-tree-sitter` (outline, imports, exports, node-at, query, callees)
@@ -44,8 +47,9 @@ Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families
 This package is for questions like:
 
 - what is in this package or directory?
-- who calls this symbol?
+- where is this symbol referenced?
 - what does this function call?
+- what are the implementations of this interface?
 - what is the likely blast radius of a change?
 - where is this pattern defined, imported, or exported?
 
@@ -61,13 +65,14 @@ Interpretive orientation. Use for prioritized context, start-here guidance, and 
 ### `code_map`
 Strictly factual inventory. Accepts the repo root, a package root, or **any directory path**. Rejects file paths.
 
-### `code_relations`
-Relationship tracing tool with:
-- `kind: "callers"`
-- `kind: "callees"`
-- `kind: "implementations"`
+### `code_references`
+Semantic usages of a resolved target. Uses LSP references. Reports references, not call sites.
 
-`callers` and `implementations` are semantic-only. `callees` is structural-only.
+### `code_calls`
+Structural outgoing calls from the enclosing function or method. Requires anchored coordinates (`file`, `line`, `character`).
+
+### `code_implementations`
+Semantic implementation lookup for an interface, class, or abstract method.
 
 ### `code_affected`
 Semantic blast-radius analysis for a concrete target. This tool no longer falls back to grep-style guesses.
@@ -125,7 +130,7 @@ supi-code-runtime      ← shared broker + canonical provider/result contracts
 supi-lsp / supi-tree-sitter
  (semantic)   (structural)
         ↑
-supi-code-intelligence ← planner, presentation, code_* tools, code_refactor
+supi-code-intelligence ← planner, presentation, code_* tools
 ```
 
 ## Package surfaces

@@ -31,9 +31,19 @@ const INTENT_GUIDELINES: Record<CodeIntelligenceToolName, string[]> = {
     "After code_brief, use lsp_hover/lsp_definition/lsp_references for deeper semantic detail or tree_sitter_* for quick structural context.",
   ],
   code_map: ["Use code_brief instead when you need prioritized guidance."],
-  code_relations: [
-    "The planner routes callers/implementations to semantic (LSP) analysis and callees to structural (tree-sitter) analysis.",
-    "Follow caller results with lsp_references/lsp_definition for additional context; use tree_sitter_callees for structural outgoing calls as a debug surface.",
+  code_references: [
+    "Reports semantic references/usages of a symbol. Does not report callers specifically.",
+    "Requires an active LSP server. Does not fall back to text search.",
+    "Follow up with lsp_hover for type info on individual reference sites.",
+  ],
+  code_calls: [
+    "Reports structural outgoing calls from the enclosing function or method.",
+    "V1 supports outgoing calls only — does not claim true incoming callers.",
+    "Requires tree-sitter for the file type.",
+  ],
+  code_implementations: [
+    "Finds semantic implementations of an interface, class, or abstract method.",
+    "Requires an LSP server. Does not fall back to text search.",
   ],
   code_affected: [
     "Uses semantic evidence for blast-radius assessment. Does not fall back to heuristic text search.",
@@ -42,9 +52,15 @@ const INTENT_GUIDELINES: Record<CodeIntelligenceToolName, string[]> = {
   code_pattern: [
     "The only code_* tool that uses heuristic/text search behavior. For structured or semantic precision, use tree_sitter_query or lsp_hover/lsp_definition instead.",
   ],
-  code_refactor: [
-    "Uses semantic provider for precise rename/code-action operations with safety checks.",
-    "Does not fall back to heuristic text replacement — if the provider cannot produce precise edits, the tool reports unavailable.",
+  code_refactor_plan: [
+    "Preview-only semantic rename operation. Does not mutate files.",
+    "Returns a plan ID. Use code_refactor_apply to execute the plan.",
+    "Requires an LSP server with rename support.",
+  ],
+  code_refactor_apply: [
+    "Applies a previously generated refactor plan by plan ID.",
+    "Rejects stale, missing, or invalid plans.",
+    "Applies through safe file mutation.",
   ],
 };
 

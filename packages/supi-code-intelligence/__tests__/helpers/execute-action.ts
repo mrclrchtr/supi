@@ -1,16 +1,22 @@
 import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
+import { executeCallsTool } from "../../src/tool/execute-calls.ts";
+import { executeImplementationsTool } from "../../src/tool/execute-implementations.ts";
 import { executePatternTool } from "../../src/tool/execute-pattern.ts";
-import { executeRelationsTool } from "../../src/tool/execute-relations.ts";
+import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
+import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
+import { executeReferencesTool } from "../../src/tool/execute-references.ts";
 import type { CodeIntelResult } from "../../src/types.ts";
 
 export type TestAction =
   | "brief"
-  | "callers"
-  | "callees"
+  | "references"
+  | "calls"
   | "implementations"
   | "affected"
-  | "pattern";
+  | "pattern"
+  | "refactor_plan"
+  | "refactor_apply";
 
 export interface ActionParams {
   action?: string;
@@ -26,15 +32,20 @@ export interface ActionParams {
   maxResults?: number;
   contextLines?: number;
   summary?: boolean;
+  operation?: string;
+  newName?: string;
+  planId?: string;
 }
 
 const SUPPORTED_ACTIONS = [
   "brief",
-  "callers",
-  "callees",
+  "references",
+  "calls",
   "implementations",
   "affected",
   "pattern",
+  "refactor_plan",
+  "refactor_apply",
 ] as const satisfies readonly TestAction[];
 
 /**
@@ -58,16 +69,20 @@ export async function executeAction(
   switch (action) {
     case "brief":
       return executeBriefTool(rest, ctx);
-    case "callers":
-      return executeRelationsTool({ ...rest, kind: "callers" }, ctx);
-    case "callees":
-      return executeRelationsTool({ ...rest, kind: "callees" }, ctx);
+    case "references":
+      return executeReferencesTool(rest, ctx);
+    case "calls":
+      return executeCallsTool(rest as Parameters<typeof executeCallsTool>[0], ctx);
     case "implementations":
-      return executeRelationsTool({ ...rest, kind: "implementations" }, ctx);
+      return executeImplementationsTool(rest, ctx);
     case "affected":
       return executeAffectedTool(rest, ctx);
     case "pattern":
       return executePatternTool({ ...rest, pattern: rest.pattern ?? "" }, ctx);
+    case "refactor_plan":
+      return executeRefactorPlanTool(rest as Parameters<typeof executeRefactorPlanTool>[0], ctx);
+    case "refactor_apply":
+      return executeRefactorApplyTool(rest as Parameters<typeof executeRefactorApplyTool>[0], ctx);
     default:
       return {
         content: `**Error:** Unknown action \`${action satisfies never}\`.`,

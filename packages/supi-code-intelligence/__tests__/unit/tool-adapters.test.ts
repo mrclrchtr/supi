@@ -33,7 +33,7 @@ describe("executeAction validation", () => {
 
   it("rejects line/character with path instead of file", async () => {
     const result = await executeAction(
-      { action: "callers", path: "src/", line: 1, character: 1 },
+      { action: "references", path: "src/", line: 1, character: 1 },
       { cwd: tmpDir },
     );
     expect(result.content).toContain("Error");
@@ -42,7 +42,7 @@ describe("executeAction validation", () => {
 
   it("rejects line/character without file", async () => {
     const result = await executeAction(
-      { action: "callers", line: 1, character: 1 },
+      { action: "references", line: 1, character: 1 },
       { cwd: tmpDir },
     );
     expect(result.content).toContain("Error");
@@ -52,13 +52,13 @@ describe("executeAction validation", () => {
   it("rejects file pointing to directory", async () => {
     const subDir = path.join(tmpDir, "sub");
     mkdirSync(subDir);
-    const result = await executeAction({ action: "callers", file: "sub" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "references", file: "sub" }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
     expect(result.content).toContain("directory");
   });
 
   it("rejects semantic action without file or symbol", async () => {
-    const result = await executeAction({ action: "callers" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "references" }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
     expect(result.content).toContain("anchored coordinates");
   });
@@ -69,7 +69,7 @@ describe("executeAction validation", () => {
     expect(result.content).toContain("pattern");
   });
 
-  it("supports file-only callers for exported file surfaces", async () => {
+  it("supports file-only references for exported file surfaces", async () => {
     writeFileSync(path.join(tmpDir, "test.ts"), "export const x = 1;");
     registerMockProvider(tmpDir, {
       documentSymbols: async () => [
@@ -90,8 +90,8 @@ describe("executeAction validation", () => {
         ],
       }),
     });
-    const result = await executeAction({ action: "callers", file: "test.ts" }, { cwd: tmpDir });
-    expect(result.content).toContain("Callers in `test.ts`");
+    const result = await executeAction({ action: "references", file: "test.ts" }, { cwd: tmpDir });
+    expect(result.content).toContain("References of `test.ts");
     expect(result.content).not.toContain("Error");
   });
 });

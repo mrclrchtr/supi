@@ -45,7 +45,10 @@ export async function executeRelationsTool(
     };
   }
 
-  const route = routeFor(ctx.cwd, "code_relations", params.kind);
+  // Transitional bridge: map old relation kind to new tool name for routing
+  const toolName =
+    params.kind === "callees" ? ("code_calls" as const) : ("code_references" as const);
+  const route = routeFor(ctx.cwd, toolName);
   if (route.preferred === "unavailable") {
     return {
       content: `**Error:** No ${params.kind === "callees" ? "structural" : "semantic"} analysis provider is available for this workspace. Use tree_sitter_callees or lsp_* tools directly if needed.`,

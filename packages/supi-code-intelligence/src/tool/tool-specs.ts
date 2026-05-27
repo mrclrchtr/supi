@@ -1,13 +1,15 @@
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
-import { CODE_RELATION_KIND_NAMES, type CodeIntelligenceToolName } from "../intent/types.ts";
+import type { CodeIntelligenceToolName } from "../intent/types.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeAffectedTool } from "./execute-affected.ts";
 import { executeBriefTool } from "./execute-brief.ts";
+import { executeCallsTool } from "./execute-calls.ts";
+import { executeImplementationsTool } from "./execute-implementations.ts";
 import { executeMapTool } from "./execute-map.ts";
 import { executePatternTool } from "./execute-pattern.ts";
-import { executeRefactorTool } from "./execute-refactor.ts";
-import { executeRelationsTool } from "./execute-relations.ts";
+import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
+import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
+import { executeReferencesTool } from "./execute-references.ts";
 
 const PathParam = Type.String({ description: "Scope path" });
 const FileParam = Type.String({ description: "Target file" });
@@ -23,8 +25,9 @@ const SummaryParam = Type.Boolean({ description: "Summarize by directory" });
 const StructuredPatternKindParam = Type.String({
   description: "Structured kind: definition | export | import",
 });
-
-const CodeRelationsKindEnum = StringEnum(CODE_RELATION_KIND_NAMES);
+const NewNameParam = Type.String({ description: "New name for rename operation" });
+const OperationParam = Type.String({ description: "Refactor operation: rename" });
+const PlanIdParam = Type.String({ description: "Plan ID from a previous code_refactor_plan call" });
 
 const CodeBriefParameters = Type.Object(
   {
@@ -45,15 +48,35 @@ const CodeMapParameters = Type.Object(
   { additionalProperties: false },
 );
 
-const CodeRelationsParameters = Type.Object(
+const CodeReferencesParameters = Type.Object(
   {
-    kind: CodeRelationsKindEnum,
-    path: Type.Optional(PathParam),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
     character: Type.Optional(CharacterParam),
     symbol: Type.Optional(SymbolParam),
-    exportedOnly: Type.Optional(ExportedOnlyParam),
+    path: Type.Optional(PathParam),
+    maxResults: Type.Optional(MaxResultsParam),
+  },
+  { additionalProperties: false },
+);
+
+const CodeCallsParameters = Type.Object(
+  {
+    file: FileParam,
+    line: LineParam,
+    character: CharacterParam,
+    maxResults: Type.Optional(MaxResultsParam),
+  },
+  { additionalProperties: false },
+);
+
+const CodeImplementationsParameters = Type.Object(
+  {
+    file: Type.Optional(FileParam),
+    line: Type.Optional(LineParam),
+    character: Type.Optional(CharacterParam),
+    symbol: Type.Optional(SymbolParam),
+    path: Type.Optional(PathParam),
     maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
@@ -84,13 +107,20 @@ const CodePatternParameters = Type.Object(
   { additionalProperties: false },
 );
 
-const CodeRefactorParameters = Type.Object(
+const CodeRefactorPlanParameters = Type.Object(
   {
-    operation: Type.String({ description: "Refactor operation: rename" }),
+    operation: OperationParam,
     file: FileParam,
     line: LineParam,
     character: CharacterParam,
-    newName: Type.String({ description: "New name for rename operation" }),
+    newName: NewNameParam,
+  },
+  { additionalProperties: false },
+);
+
+const CodeRefactorApplyParameters = Type.Object(
+  {
+    planId: PlanIdParam,
   },
   { additionalProperties: false },
 );
@@ -104,6 +134,8 @@ export interface CodeIntelligenceToolDefinitionSpec {
   parameters: TSchema;
   run: (params: unknown, ctx: { cwd: string }) => Promise<CodeIntelResult> | CodeIntelResult;
 }
+
+// Stubs removed — real executors from execute-refactor-plan.ts and execute-refactor-apply.ts are used below
 
 export const CODE_INTELLIGENCE_TOOL_SPECS = [
   {
@@ -128,16 +160,41 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     run: (params, ctx) => executeMapTool(params as Parameters<typeof executeMapTool>[0], ctx),
   },
   {
-    name: "code_relations",
-    label: "Code Relations",
-    description: "Trace callers, callees, or implementations for a resolved target.",
-    promptSnippet: "code_relations — callers, callees, or implementations",
+    name: "code_references",
+    label: "Code References",
+    description: "Semantic usages of a resolved target.",
+    promptSnippet: "code_references — semantic references/usages",
     basePromptGuidelines: [
-      "Use code_relations(kind) for `callers`, `callees`, or `implementations`.",
+      "Use code_references to find all semantic usages/references of a symbol.",
+      "Returns references/usages grouped by file, not caller sites.",
     ],
-    parameters: CodeRelationsParameters,
+    parameters: CodeReferencesParameters,
     run: (params, ctx) =>
-      executeRelationsTool(params as Parameters<typeof executeRelationsTool>[0], ctx),
+      executeReferencesTool(params as Parameters<typeof executeReferencesTool>[0], ctx),
+  },
+  {
+    name: "code_calls",
+    label: "Code Calls",
+    description: "Structural outgoing calls from the enclosing scope at a position.",
+    promptSnippet: "code_calls — outgoing calls from a function/method",
+    basePromptGuidelines: [
+      "Use code_calls to find outgoing structural calls from an enclosing function or method.",
+      "V1 supports outgoing calls only; does not claim incoming callers.",
+    ],
+    parameters: CodeCallsParameters,
+    run: (params, ctx) => executeCallsTool(params as Parameters<typeof executeCallsTool>[0], ctx),
+  },
+  {
+    name: "code_implementations",
+    label: "Code Implementations",
+    description: "Semantic implementation lookup for a resolved target.",
+    promptSnippet: "code_implementations — semantic implementations",
+    basePromptGuidelines: [
+      "Use code_implementations to find semantic implementations of an interface, class, or method.",
+    ],
+    parameters: CodeImplementationsParameters,
+    run: (params, ctx) =>
+      executeImplementationsTool(params as Parameters<typeof executeImplementationsTool>[0], ctx),
   },
   {
     name: "code_affected",
@@ -164,15 +221,29 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       executePatternTool(params as Parameters<typeof executePatternTool>[0], ctx),
   },
   {
-    name: "code_refactor",
-    label: "Code Refactor",
-    description: "Apply a precise semantic refactor (rename) with direct-apply safety checks.",
-    promptSnippet: "code_refactor — semantic refactor with direct apply",
+    name: "code_refactor_plan",
+    label: "Code Refactor Plan",
+    description: "Preview a semantic rename without mutating files.",
+    promptSnippet: "code_refactor_plan — preview a rename plan",
     basePromptGuidelines: [
-      "Use code_refactor for safe semantic rename operations with precise workspace edits.",
+      "Use code_refactor_plan to preview a rename before applying it.",
+      "Does not mutate files; returns a plan ID for later use with code_refactor_apply.",
     ],
-    parameters: CodeRefactorParameters,
+    parameters: CodeRefactorPlanParameters,
     run: (params, ctx) =>
-      executeRefactorTool(params as Parameters<typeof executeRefactorTool>[0], ctx),
+      executeRefactorPlanTool(params as Parameters<typeof executeRefactorPlanTool>[0], ctx),
+  },
+  {
+    name: "code_refactor_apply",
+    label: "Code Refactor Apply",
+    description: "Apply a previously generated refactor plan.",
+    promptSnippet: "code_refactor_apply — apply a rename plan",
+    basePromptGuidelines: [
+      "Use code_refactor_apply to execute a plan generated by code_refactor_plan.",
+      "Requires a valid planId; rejects stale or missing plans.",
+    ],
+    parameters: CodeRefactorApplyParameters,
+    run: (params, ctx) =>
+      executeRefactorApplyTool(params as Parameters<typeof executeRefactorApplyTool>[0], ctx),
   },
 ] as const satisfies readonly CodeIntelligenceToolDefinitionSpec[];

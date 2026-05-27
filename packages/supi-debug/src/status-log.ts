@@ -22,10 +22,13 @@ const EXPECTED_SUPI_TOOLS = [
   "tree_sitter_query",
   "code_brief",
   "code_map",
-  "code_relations",
+  "code_references",
+  "code_calls",
+  "code_implementations",
   "code_affected",
   "code_pattern",
-  "code_refactor",
+  "code_refactor_plan",
+  "code_refactor_apply",
   "supi_debug",
 ];
 const EXPECTED_SUPI_COMMANDS = [

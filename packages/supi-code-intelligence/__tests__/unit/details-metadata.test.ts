@@ -212,8 +212,8 @@ describe("structured details via tool adapters and action routers", () => {
   });
 
   describe("semantic actions — target resolution error returns details", () => {
-    it("callers target error returns search details with unavailable confidence", async () => {
-      const result = await executeAction({ action: "callers" }, { cwd: tmpDir });
+    it("references target error returns search details with unavailable confidence", async () => {
+      const result = await executeAction({ action: "references" }, { cwd: tmpDir });
       expect(result.details).toBeDefined();
       expect(result.details?.type).toBe("search");
       if (result.details?.type === "search") {
@@ -231,8 +231,11 @@ describe("structured details via tool adapters and action routers", () => {
       }
     });
 
-    it("callers symbol lookup without LSP stays unavailable rather than heuristic", async () => {
-      const result = await executeAction({ action: "callers", symbol: "Widget" }, { cwd: tmpDir });
+    it("references symbol lookup without LSP stays unavailable rather than heuristic", async () => {
+      const result = await executeAction(
+        { action: "references", symbol: "Widget" },
+        { cwd: tmpDir },
+      );
       expect(result.details).toBeDefined();
       expect(result.details?.type).toBe("search");
       if (result.details?.type === "search") {
@@ -315,20 +318,17 @@ describe("structured details via tool adapters and action routers", () => {
       });
     });
 
-    describe("callees action — no-result detail states", () => {
-      it("returns details for target resolution error", async () => {
-        const result = await executeAction({ action: "callees" }, { cwd: tmpDir });
-        expect(result.details).toBeDefined();
-        expect(result.details?.type).toBe("search");
-        if (result.details?.type === "search") {
-          expect(result.details.data.confidence).toBe("unavailable");
-        }
+    describe("calls action — no-result detail states", () => {
+      it("returns error for missing file param", async () => {
+        const result = await executeAction({ action: "calls" }, { cwd: tmpDir });
+        expect(result.content).toContain("required for code_calls");
+        expect(result.details).toBeUndefined();
       });
 
       it("returns details for tree-sitter unsuccessful on unsupported file type", async () => {
         writeFileSync(path.join(tmpDir, "notes.txt"), "some content\n");
         const result = await executeAction(
-          { action: "callees", file: "notes.txt", line: 1, character: 1 },
+          { action: "calls", file: "notes.txt", line: 1, character: 1 },
           { cwd: tmpDir },
         );
         expect(result.details).toBeDefined();
@@ -350,7 +350,7 @@ describe("structured details via tool adapters and action routers", () => {
           }),
         });
         const result = await executeAction(
-          { action: "callees", file: "empty.ts", line: 1, character: 1 },
+          { action: "calls", file: "empty.ts", line: 1, character: 1 },
           { cwd: tmpDir },
         );
         expect(result.details).toBeDefined();

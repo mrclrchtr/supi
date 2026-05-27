@@ -3,7 +3,7 @@
 Architecture briefs, factual code maps, relationship tracing, impact assessment, explicit search, and direct-apply semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_map`, `code_relations`, `code_affected`, `code_pattern`, `code_refactor`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_map`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_pattern`, `code_refactor_plan`, `code_refactor_apply`)
 - May include cross-family orchestration guidance that steers the model between `code_*`, `lsp_*`, and `tree_sitter_*` tools; guidance routes by user intent first, substrate family second
 - Installing this package activates all three tool families (`code_*`, `lsp_*`, `tree_sitter_*`)
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
@@ -94,7 +94,7 @@ src/
 │   │   └── validation.ts       # Shared validation primitives
 │   └── families/
 │       ├── code/
-│       │   └── execute-relations.ts  # code_relations tool edge
+│       │   └── execute-relations.ts  # code_relations tool edge (transitional)
 │       ├── lsp/
 │       │   ├── execute.ts      # LSP tool execution adapters
 │       │   └── format.ts       # LSP tool formatting
@@ -123,10 +123,14 @@ Interpretive orientation tool. The planner selects the best provider (semantic o
 ### `code_map`
 Strictly factual inventory tool. Accepts the repo root, a package root, or **any directory path**. Rejects file paths.
 
-### `code_relations`
-Relationship tracing tool with `kind: "callers" | "callees" | "implementations"`.
-- `callers` and `implementations` — semantic-only, routed by the planner
-- `callees` — structural-only, routed by the planner
+### `code_references`
+Semantic references/usages for a resolved target. Uses LSP internally.
+
+### `code_calls`
+Structural outgoing calls from the enclosing function or method. Uses tree-sitter internally.
+
+### `code_implementations`
+Semantic implementation lookup for an interface, class, or method. Uses LSP internally.
 
 ### `code_affected`
 Semantic blast-radius tool. Uses semantic evidence. Does not fall back to heuristic search.
@@ -134,25 +138,30 @@ Semantic blast-radius tool. Uses semantic evidence. Does not fall back to heuris
 ### `code_pattern`
 Explicit search tool. This is the only tool in the family that intentionally exposes heuristic/text-search behavior.
 
-### `code_refactor`
-Direct-apply semantic refactoring. Supports `rename` operations. Reads capability state from the shared broker, validates workspace edits through safety gates, applies deterministically, and reports results. Does not fall back to heuristic text replacement when precise edits are unavailable.
+### `code_refactor_plan`
+Preview-only semantic rename planning. Reads capability state from the shared broker, calls LSP rename, validates the workspace edit, computes file fingerprints for staleness detection, and returns a preview with a plan ID. Does not mutate files.
+
+### `code_refactor_apply`
+Apply a previously generated refactor plan by plan ID. Retrieves the plan from the in-memory store, rechecks file fingerprints, re-validates ranges and overlap, applies deterministically through safety gates, and reports results. Rejects stale, missing, or invalid plans.
 
 ## Key gotchas
 
 ### Planner routing
 - The `planner.ts` central router reads capability state from the shared broker and returns `PlannerRoute` for each tool intent.
-- `code_refactor` checks `refactorAvailable` from the semantic capability slot (no separate broker slot needed).
+- `code_refactor_plan` checks `refactorAvailable` from the semantic capability slot.
+- `code_refactor_apply` does not require a live semantic provider — plan validity is enforced through fingerprint comparison in the executor.
 - When no capability is available, the planner returns `preferred: "unavailable"` and the execute function returns an explicit error message.
 
 ### Public-surface split
 - `code_map` must stay factual. Do not add prioritized "start here" guidance there.
 - `code_pattern` is the sole heuristic/search-oriented tool.
-- `code_relations` and `code_affected` should prefer explicit unavailable states over text-search guesses.
+- `code_references`, `code_calls`, `code_implementations`, and `code_affected` should prefer explicit unavailable states over text-search guesses.
 
 ### Param validation
 - `line`/`character` require `file`, **not** `path`.
 - `code_map` should reject file paths.
-- `code_refactor` requires `file`, `line`, `character`, `operation`, and `newName`.
+- `code_refactor_plan` requires `file`, `line`, `character`, `operation`, and `newName`.
+- `code_refactor_apply` requires `planId`.
 
 ### Target resolution
 - Symbol discovery is semantic-only for non-search tools.
@@ -166,7 +175,8 @@ Direct-apply semantic refactoring. Supports `rename` operations. Reads capabilit
 
 ### Refactor safety
 - `validateEdit()` rejects empty edits and invalid ranges before filesystem apply.
-- `code_refactor` refuses to apply when the provider returns `unavailable` or `ambiguous` results.
+- `code_refactor_plan` validates the edit before generating a plan; returns `unavailable` or `ambiguous` if the provider cannot produce precise edits.
+- `code_refactor_apply` rejects stale plans by comparing stored SHA-256 file fingerprints to current contents, and re-validates ranges before applying.
 - No heuristic text fallback.
 
 ## Dependencies

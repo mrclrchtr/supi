@@ -164,8 +164,8 @@ describe("code_refactor safety", () => {
     });
   });
 
-  describe("planner route for code_refactor", () => {
-    it("routes code_refactor to semantic-preferred when refactorAvailable is true", async () => {
+  describe("planner route for code_refactor_plan", () => {
+    it("routes code_refactor_plan to semantic-preferred when refactorAvailable is true", async () => {
       const runtime = getDefaultWorkspaceRuntime();
       const provider: SemanticProvider = {
         references: async () => null,
@@ -177,14 +177,14 @@ describe("code_refactor safety", () => {
       runtime.registerSemantic("/project", provider);
 
       const { routeFor } = await import("../../src/planner/planner.ts");
-      const route = routeFor("/project", "code_refactor");
+      const route = routeFor("/project", "code_refactor_plan");
       expect(route.refactorAvailable).toBe(true);
       expect(route.preferred).toBe("semantic");
     });
 
-    it("routes code_refactor to unavailable when no semantic refactor is available", async () => {
+    it("routes code_refactor_plan to unavailable when no semantic refactor is available", async () => {
       const { routeFor } = await import("../../src/planner/planner.ts");
-      const route = routeFor("/project", "code_refactor");
+      const route = routeFor("/project", "code_refactor_plan");
       expect(route.preferred).toBe("unavailable");
     });
   });

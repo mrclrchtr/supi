@@ -165,7 +165,7 @@ function appendNextQueries(
 ): void {
   lines.push("## Next");
   lines.push(
-    `- \`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for call sites`,
+    `- \`code_references\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
   );
   lines.push(
     `- \`code_affected\` with \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for impact analysis`,

@@ -38,40 +38,44 @@ describe("Planner routing", () => {
       expect(route.preferred).toBe("structural");
     });
 
-    it("routes code_relations callers to semantic-preferred", async () => {
+    it("routes code_references to semantic-preferred", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/planner/planner.ts");
-      const route = routeFor("/project", "code_relations", "callers");
+      const route = routeFor("/project", "code_references" as any);
       expect(route.preferred).toBe("semantic");
     });
 
-    it("routes code_relations callees to structural-preferred", async () => {
+    it("routes code_calls to structural-preferred", async () => {
       registerStructural();
       const { routeFor } = await import("../../src/planner/planner.ts");
-      const route = routeFor("/project", "code_relations", "callees");
+      const route = routeFor("/project", "code_calls" as any);
       expect(route.preferred).toBe("structural");
     });
 
-    it("routes code_relations implementations to semantic-preferred", async () => {
+    it("routes code_implementations to semantic-preferred", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/planner/planner.ts");
-      const route = routeFor("/project", "code_relations", "implementations");
+      const route = routeFor("/project", "code_implementations" as any);
       expect(route.preferred).toBe("semantic");
     });
 
-    it("returns unavailable for semantic-only relations when only structural is available", async () => {
+    it("returns unavailable for code_references when only structural is available", async () => {
       registerStructural();
       const { routeFor } = await import("../../src/planner/planner.ts");
-      expect(routeFor("/project", "code_relations", "callers").preferred).toBe("unavailable");
-      expect(routeFor("/project", "code_relations", "implementations").preferred).toBe(
-        "unavailable",
-      );
+      expect(routeFor("/project", "code_references" as any).preferred).toBe("unavailable");
     });
 
-    it("returns unavailable for structural-only callees when only semantic is available", async () => {
+    it("returns unavailable for code_calls when only semantic is available", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/planner/planner.ts");
-      expect(routeFor("/project", "code_relations", "callees").preferred).toBe("unavailable");
+      expect(routeFor("/project", "code_calls" as any).preferred).toBe("unavailable");
+    });
+
+    it("routes code_refactor_plan to semantic-preferred when refactor-capable semantic is available", async () => {
+      registerSemanticWithRename();
+      const { routeFor } = await import("../../src/planner/planner.ts");
+      const route = routeFor("/project", "code_refactor_plan" as any);
+      expect(route.preferred).toBe("semantic");
     });
 
     it("routes code_affected to semantic-preferred", async () => {
@@ -79,6 +83,12 @@ describe("Planner routing", () => {
       const { routeFor } = await import("../../src/planner/planner.ts");
       const route = routeFor("/project", "code_affected");
       expect(route.preferred).toBe("semantic");
+    });
+
+    it("returns unavailable for code_references when refactor is needed but only structural is available", async () => {
+      registerStructural();
+      const { routeFor } = await import("../../src/planner/planner.ts");
+      expect(routeFor("/project", "code_references" as any).preferred).toBe("unavailable");
     });
 
     it("returns unavailable for code_affected when semantic analysis is unavailable", async () => {
@@ -119,6 +129,25 @@ function createMockSemanticProvider(): SemanticProvider {
     documentSymbols: async () => [],
     workspaceSymbols: async () => [],
   };
+}
+
+function createMockSemanticProviderWithRename(): SemanticProvider {
+  return {
+    references: async () => null,
+    implementation: async () => null,
+    documentSymbols: async () => [],
+    workspaceSymbols: async () => [],
+    rename: async (_file, _pos, _newName) => ({
+      kind: "precise" as const,
+      edits: { edits: [] },
+    }),
+    codeActions: async (_file, _pos) => [],
+  };
+}
+
+function registerSemanticWithRename() {
+  const runtime = getDefaultWorkspaceRuntime();
+  runtime.registerSemantic("/project", createMockSemanticProviderWithRename());
 }
 
 function createMockStructuralProvider(): StructuralProvider {

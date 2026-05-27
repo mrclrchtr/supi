@@ -9,12 +9,41 @@ describe("focused code intelligence tool registration", () => {
     codeIntelligenceExtension(pi as never);
 
     const tools = getTools(pi);
-    // code_* (6) + lsp_* (10) + read/write/edit overrides (3)
+    // code_* (9) + lsp_* (10) + read/write/edit overrides (3)
     expect(tools.length).toBeGreaterThanOrEqual(CODE_INTELLIGENCE_TOOL_SPECS.length);
     // All code_* tools are present
     for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
       expect(tools.find((t) => t.name === spec.name)).toBeDefined();
     }
+  });
+
+  it("registers the new high-level code tools (references, calls, implementations, refactor_plan, refactor_apply)", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const newTools = [
+      "code_references",
+      "code_calls",
+      "code_implementations",
+      "code_refactor_plan",
+      "code_refactor_apply",
+    ];
+
+    for (const name of newTools) {
+      const tool = getTool(pi, name);
+      expect(tool).toBeDefined();
+      expect(tool.name).toBe(name);
+      expect(typeof tool.execute).toBe("function");
+    }
+  });
+
+  it("no longer registers code_relations or code_refactor", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const names = getTools(pi).map((t: { name: string }) => t.name);
+    expect(names).not.toContain("code_relations");
+    expect(names).not.toContain("code_refactor");
   });
 
   it("registers tree_sitter_* expert tools", () => {
@@ -63,14 +92,25 @@ describe("focused code intelligence tool registration", () => {
     }
   });
 
-  it("registers a relation kind parameter on code_relations", () => {
+  it("registers refactor_plan and refactor_apply with correct parameter shapes", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    expect(
-      (getTool(pi, "code_relations") as { parameters?: { properties?: Record<string, unknown> } })
-        .parameters?.properties,
-    ).toHaveProperty("kind");
+    const planTool = getTool(pi, "code_refactor_plan") as {
+      parameters?: { properties?: Record<string, unknown> };
+    };
+    expect(planTool).toBeDefined();
+    expect(planTool.parameters?.properties).toHaveProperty("operation");
+    expect(planTool.parameters?.properties).toHaveProperty("file");
+    expect(planTool.parameters?.properties).toHaveProperty("line");
+    expect(planTool.parameters?.properties).toHaveProperty("character");
+    expect(planTool.parameters?.properties).toHaveProperty("newName");
+
+    const applyTool = getTool(pi, "code_refactor_apply") as {
+      parameters?: { properties?: Record<string, unknown> };
+    };
+    expect(applyTool).toBeDefined();
+    expect(applyTool.parameters?.properties).toHaveProperty("planId");
   });
 
   it("registers regex and kind parameters on code_pattern", () => {

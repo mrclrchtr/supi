@@ -245,7 +245,7 @@ async function executeRename(
   try {
     const result = await service.rename(p.file, toZeroBased(p.line, p.character), p.newName);
     if (!result) return "Rename not supported.";
-    return "Rename planned — use code_refactor to apply.";
+    return "Rename planned — use code_refactor_apply with the returned planId to apply.";
   } catch (error: unknown) {
     return formatUnexpectedFailure("lsp_rename", error);
   }

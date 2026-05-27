@@ -335,7 +335,7 @@ function generateFileBrief(
   }
 
   nextQueries.push(
-    `\`code_relations\` with \`kind: "callers"\`, \`file: "${relPath}"\`, and a line/character for call-site analysis`,
+    `\`code_references\`, \`file: "${relPath}"\`, and a line/character for call-site analysis`,
   );
   if (mod) {
     nextQueries.push(

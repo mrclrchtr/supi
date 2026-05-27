@@ -31,7 +31,7 @@ export async function executeRefactorTool(
   params: CodeRefactorToolParams,
   ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
-  const route = routeFor(ctx.cwd, "code_refactor");
+  const route = routeFor(ctx.cwd, "code_refactor_plan");
   if (route.preferred === "unavailable") {
     return {
       content:

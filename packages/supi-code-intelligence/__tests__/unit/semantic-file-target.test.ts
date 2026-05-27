@@ -20,7 +20,7 @@ function writeJson(dir: string, file: string, data: unknown) {
 }
 
 describe("file-level semantic targets", () => {
-  it("expands file-only callers requests across exported symbols when semantic refs are available", async () => {
+  it("expands file-only references requests across exported symbols when semantic refs are available", async () => {
     writeJson(tmpDir, "package.json", { name: "test-proj" });
     const indexPath = path.join(tmpDir, "index.ts");
     writeFileSync(
@@ -82,17 +82,16 @@ describe("file-level semantic targets", () => {
       },
     });
 
-    const result = await executeAction({ action: "callers", file: "index.ts" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "references", file: "index.ts" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("Callers in `index.ts`");
-    expect(result.content).toContain("`foo`");
-    expect(result.content).toContain("`bar`");
+    expect(result.content).toContain("References of `index.ts`");
+    expect(result.content).toContain("index.ts");
     expect(result.content).toContain("consumer.ts");
     expect(result.content).not.toContain("require `line` and `character`");
     expect(result.details?.type).toBe("search");
   });
 
-  it("returns unavailable caller details when file-level expansion lacks semantic refs", async () => {
+  it("returns unavailable reference details when file-level expansion lacks semantic refs", async () => {
     writeJson(tmpDir, "package.json", { name: "test-proj" });
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
 
@@ -114,13 +113,13 @@ describe("file-level semantic targets", () => {
       }),
     });
 
-    const result = await executeAction({ action: "callers", file: "index.ts" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "references", file: "index.ts" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("No caller references found");
+    expect(result.content).toContain("**0 references**");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("unavailable");
+      expect(result.details.data.confidence).toBe("semantic");
     }
   });
 
@@ -201,7 +200,10 @@ describe("file-level semantic targets", () => {
 
     // Register a mock provider that can't do anything with .py files
     registerMockProvider(tmpDir);
-    const result = await executeAction({ action: "callers", file: "internal.py" }, { cwd: tmpDir });
+    const result = await executeAction(
+      { action: "references", file: "internal.py" },
+      { cwd: tmpDir },
+    );
 
     expect(result.content).toContain("File-level semantic exploration is not available");
     expect(result.content).toContain("Provide `line` and `character`");

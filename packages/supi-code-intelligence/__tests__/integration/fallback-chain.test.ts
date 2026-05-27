@@ -23,10 +23,10 @@ function createSourceFile(name: string, content: string): string {
   return filePath;
 }
 
-describe("callers action without heuristic fallback", () => {
+describe("references action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
     // No provider registered — getCodeProvider returns unavailable
-    const result = await executeAction({ action: "callers", symbol: "myFunc" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "references", symbol: "myFunc" }, { cwd: tmpDir });
 
     expect(result.content).toContain("No semantic analysis provider");
     expect(result.content).not.toContain("heuristic");
@@ -37,11 +37,10 @@ describe("callers action without heuristic fallback", () => {
     }
   });
 
-  it("returns semantic confidence when LSP returns caller references", async () => {
+  it("returns semantic confidence when LSP returns reference results", async () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
     createSourceFile("src/caller.ts", "import { target } from './module';\ntarget();\n");
 
-    // Register a provider that returns caller references
     const refResult = [
       {
         uri: `file://${sourcePath}`,
@@ -58,7 +57,7 @@ describe("callers action without heuristic fallback", () => {
     });
 
     const result = await executeAction(
-      { action: "callers", file: "src/module.ts", line: 1, character: 1 },
+      { action: "references", file: "src/module.ts", line: 1, character: 1 },
       { cwd: tmpDir },
     );
 
@@ -70,7 +69,7 @@ describe("callers action without heuristic fallback", () => {
     }
   });
 
-  it("does not fall back to heuristic when semantic caller lookup finds no refs", async () => {
+  it("does not fall back to heuristic when semantic reference lookup finds no refs", async () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
 
     registerMockProvider(tmpDir, {
@@ -86,9 +85,9 @@ describe("callers action without heuristic fallback", () => {
       references: async () => [],
     });
 
-    const result = await executeAction({ action: "callers", symbol: "target" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "references", symbol: "target" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("No references found for `target` (semantic)");
+    expect(result.content).toContain("0 references");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -160,7 +159,8 @@ describe("implementations action without heuristic fallback", () => {
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain("No implementations found for `Solo`.");
+    expect(result.content).toContain("Implementations");
+    expect(result.content).toContain("Solo");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {

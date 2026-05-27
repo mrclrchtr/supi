@@ -11,11 +11,7 @@
  */
 
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type {
-  CodeIntelligenceToolName,
-  CodeRelationsKind,
-  PlannerRoute,
-} from "../../intent/types.ts";
+import type { CodeIntelligenceToolName, PlannerRoute } from "../../intent/types.ts";
 
 interface RouteAvailability {
   semanticAvailable: boolean;
@@ -59,29 +55,34 @@ function briefPreferred(availability: RouteAvailability): PlannerRoute["preferre
 /**
  * Get the routing decision for a tool intent in a workspace.
  */
-export function routeFor(
-  cwd: string,
-  tool: CodeIntelligenceToolName,
-  relationsKind?: CodeRelationsKind,
-): PlannerRoute {
+export function routeFor(cwd: string, tool: CodeIntelligenceToolName): PlannerRoute {
   const availability = readAvailability(cwd);
 
   if (tool === "code_pattern") {
     return withPreferred(availability, "search");
   }
 
-  if (tool === "code_relations") {
-    const preferred =
-      relationsKind === "callees" ? structuralOnly(availability) : semanticOnly(availability);
-    return withPreferred(availability, preferred);
+  if (tool === "code_references" || tool === "code_implementations") {
+    return withPreferred(availability, semanticOnly(availability));
+  }
+
+  if (tool === "code_calls") {
+    return withPreferred(availability, structuralOnly(availability));
   }
 
   if (tool === "code_affected") {
     return withPreferred(availability, semanticOnly(availability));
   }
 
-  if (tool === "code_refactor") {
+  if (tool === "code_refactor_plan") {
     return withPreferred(availability, availability.refactorAvailable ? "semantic" : "unavailable");
+  }
+
+  if (tool === "code_refactor_apply") {
+    // Plan application does not require a live semantic provider — validity
+    // is enforced through fingerprint comparison in the executor.
+    // Return semantic-preferred so the route check never blocks valid plans.
+    return withPreferred(availability, "semantic");
   }
 
   return withPreferred(availability, briefPreferred(availability));
