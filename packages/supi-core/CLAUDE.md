@@ -13,12 +13,14 @@ src/
   api.ts              — public export surface
   index.ts            — public export surface (identical to api.ts)
   debug-registry.ts   — debug event registry (flat utility)
+  llm.ts              — shared LLM utilities (withRetry, callWithJsonResponse)
   path-utils.ts       — shared tool-path and file-URI normalization helpers
+  progress-widget.ts  — generic TUI progress widget
   project-roots.ts    — directory walking, root discovery (flat utility)
   registry-utils.ts   — globalThis-backed shared registries, including session-state helpers (flat utility)
   session-utils.ts    — session utilities (flat utility)
   terminal.ts         — terminal formatting utilities (flat utility)
-  tool-framework.ts   — shared tool-spec/registration framework for SuPi tool packages
+  tool-framework.ts   — shared tool-spec/registration framework + runWithProgressWidget
   config/
     config.ts         — loadSupiConfig*(), writeSupiConfig(), removeSupiConfigKey()
     config-settings.ts — registerConfigSettings() helper
@@ -54,7 +56,9 @@ __tests__/
 - `api.ts`, `index.ts` — public export surface; keep the shared API deliberate and small
 - `path-utils.ts` — preferred shared location for leading `@` stripping, cwd resolution, and file URI conversion used across SuPi tool packages
 - `registry-utils.ts` — preferred shared location for global registries and normalized-cwd session-state registries used by peer substrate packages
-- `tool-framework.ts` — shared `SuiPiToolSpec`, `SuiPiToolPromptSurface`, `derivePromptSurface()`, `registerSuiPiTools()`, and shared TypeBox param builders (`FileParam`, `LineParam`, etc.) for SuPi tool packages; packages keep their own execute logic
+- `llm.ts` — shared LLM utilities: `withRetry()` (exponential-backoff retry with AbortSignal), `extractJsonFromResponse()`, `callWithJsonResponse()` (model resolution → completion → JSON extraction → TypeBox validation)
+- `progress-widget.ts` — generic `ProgressWidget` for long-running TUI operations (used by `runWithProgressWidget`)
+- `tool-framework.ts` — shared `SuiPiToolSpec`, `SuiPiToolPromptSurface`, `derivePromptSurface()`, `registerSuiPiTools()`, `runWithProgressWidget()`, and shared TypeBox param builders (`FileParam`, `LineParam`, etc.) for SuPi tool packages; packages keep their own execute logic
 
 ## Config gotchas
 

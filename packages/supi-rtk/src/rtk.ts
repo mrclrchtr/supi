@@ -76,6 +76,7 @@ function registerRtkSettings(): void {
         description: "Enable/disable RTK bash command rewriting",
         currentValue: settings.enabled ? "on" : "off",
         values: ["on", "off"],
+        configType: "boolean" as const,
       },
       {
         id: "rewriteTimeout",
@@ -83,17 +84,9 @@ function registerRtkSettings(): void {
         description: "Timeout in ms for rtk rewrite calls",
         currentValue: String(settings.rewriteTimeout),
         values: ["1000", "3000", "5000", "10000"],
+        configType: "number" as const,
       },
     ],
-    // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
-    persistChange: (_scope, _cwd, settingId, value, helpers) => {
-      if (settingId === "enabled") {
-        helpers.set("enabled", value === "on");
-      } else if (settingId === "rewriteTimeout") {
-        const num = Number.parseInt(value, 10);
-        helpers.set("rewriteTimeout", Number.isNaN(num) ? 5000 : num);
-      }
-    },
   });
 }
 

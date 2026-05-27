@@ -48,9 +48,10 @@ src/
     snapshot-tools.ts   Snapshot-aware diff/file tools for the reviewer session
   ui/
     flow.ts             TUI selection + preview steps
-    progress-widget.ts  Live progress widget for child sessions
     renderer.ts         Custom message rendering with brief context
     format-content.ts   Plain-text message content for LLM context
+    (ProgressWidget migrated to @mrclrchtr/supi-core/progress-widget;
+     runWithProgressWidget lives in @mrclrchtr/supi-core/tool-framework)
 __tests__/
   unit/
 ```

@@ -19,6 +19,12 @@
     "src/**/*.ts",
     "README.md"
   ],
+  "dependencies": {
+    "@mrclrchtr/supi-core": "workspace:*"
+  },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",

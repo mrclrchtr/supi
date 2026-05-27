@@ -2,8 +2,26 @@
 
 import { complete } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { callWithJsonResponse } from "@mrclrchtr/supi-core/llm";
+import { Type } from "typebox";
 import type { SessionFacets } from "./types.ts";
-import { withRetry } from "./utils.ts";
+
+// ── TypeBox schema for facet extraction response ──────────────────────────
+
+const FacetSchema = Type.Object({
+  underlyingGoal: Type.String(),
+  goalCategories: Type.Record(Type.String(), Type.Number()),
+  outcome: Type.String(),
+  userSatisfactionCounts: Type.Record(Type.String(), Type.Number()),
+  claudeHelpfulness: Type.String(),
+  sessionType: Type.String(),
+  frictionCounts: Type.Record(Type.String(), Type.Number()),
+  frictionDetail: Type.String(),
+  primarySuccess: Type.String(),
+  briefSummary: Type.String(),
+});
+
+// ── Prompts ───────────────────────────────────────────────────────────────
 
 const FACET_EXTRACTION_PROMPT = `Analyze this PI coding agent session and extract structured facets.
 
@@ -30,6 +48,20 @@ CRITICAL GUIDELINES:
 
 4. If very short or just warmup, use warmup_minimal for goal_category
 
+RESPOND WITH ONLY A VALID JSON OBJECT matching this schema:
+{
+  "underlyingGoal": "What the user fundamentally wanted to achieve",
+  "goalCategories": {"category_name": count, ...},
+  "outcome": "fully_achieved|mostly_achieved|partially_achieved|not_achieved|unclear_from_transcript",
+  "userSatisfactionCounts": {"level": count, ...},
+  "claudeHelpfulness": "unhelpful|slightly_helpful|moderately_helpful|very_helpful|essential",
+  "sessionType": "single_task|multi_task|iterative_refinement|exploration|quick_question",
+  "frictionCounts": {"friction_type": count, ...},
+  "frictionDetail": "One sentence describing friction or empty",
+  "primarySuccess": "none|fast_accurate_search|correct_code_edits|good_explanations|proactive_help|multi_file_changes|good_debugging",
+  "briefSummary": "One sentence: what user wanted and whether they got it"
+}
+
 SESSION:
 `;
 
@@ -44,85 +76,33 @@ Keep it concise - 3-5 sentences. Preserve specific details like file names, erro
 TRANSCRIPT CHUNK:
 `;
 
+// ── Public API ─────────────────────────────────────────────────────────────
+
 export async function extractFacets(
   transcript: string,
   sessionId: string,
   ctx: ExtensionContext,
 ): Promise<SessionFacets | null> {
-  // Resolve model: prefer active model, fall back to any available configured model
-  const model = ctx.model ?? ctx.modelRegistry.getAvailable()[0];
-  if (!model) return null;
-
-  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok || !auth.apiKey) return null;
-
   // For long transcripts, summarize in chunks first
   const processedTranscript =
     transcript.length > 30000 ? await summarizeTranscript(transcript, ctx) : transcript;
 
-  const jsonPrompt = `${FACET_EXTRACTION_PROMPT}${processedTranscript}
-
-RESPOND WITH ONLY A VALID JSON OBJECT matching this schema:
-{
-  "underlyingGoal": "What the user fundamentally wanted to achieve",
-  "goalCategories": {"category_name": count, ...},
-  "outcome": "fully_achieved|mostly_achieved|partially_achieved|not_achieved|unclear_from_transcript",
-  "userSatisfactionCounts": {"level": count, ...},
-  "claudeHelpfulness": "unhelpful|slightly_helpful|moderately_helpful|very_helpful|essential",
-  "sessionType": "single_task|multi_task|iterative_refinement|exploration|quick_question",
-  "frictionCounts": {"friction_type": count, ...},
-  "frictionDetail": "One sentence describing friction or empty",
-  "primarySuccess": "none|fast_accurate_search|correct_code_edits|good_explanations|proactive_help|multi_file_changes|good_debugging",
-  "briefSummary": "One sentence: what user wanted and whether they got it"
-}`;
-
-  // Attempt the LLM call with up to 2 retries
-  const response = await withRetry(
-    async () => {
-      const res = await complete(
-        model,
-        {
-          systemPrompt: "",
-          messages: [
-            {
-              role: "user",
-              content: [{ type: "text", text: jsonPrompt }],
-              timestamp: Date.now(),
-            },
-          ],
-        },
-        {
-          apiKey: auth.apiKey,
-          headers: auth.headers,
-          signal: ctx.signal,
-          maxTokens: 4096,
-        },
-      );
-      return res;
+  const result = await callWithJsonResponse(
+    ctx,
+    {
+      prompt: `${FACET_EXTRACTION_PROMPT}${processedTranscript}`,
+      maxTokens: 4096,
+      retries: 2,
     },
-    2,
-    1000,
+    FacetSchema,
   );
 
-  if (!response) return null;
+  if (!result) return null;
 
-  try {
-    const text = response.content
-      .filter((c): c is { type: "text"; text: string } => c.type === "text")
-      .map((c) => c.text)
-      .join("");
-
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    const parsed = JSON.parse(jsonMatch[0]) as unknown;
-    if (!isValidSessionFacets(parsed)) return null;
-
-    return { ...parsed, sessionId };
-  } catch {
-    return null;
-  }
+  return { ...result.parsed, sessionId } as unknown as SessionFacets;
 }
+
+// ── Transcript chunking ───────────────────────────────────────────────────
 
 async function summarizeTranscript(transcript: string, ctx: ExtensionContext): Promise<string> {
   const model = ctx.model ?? ctx.modelRegistry.getAvailable()[0];
@@ -170,20 +150,4 @@ async function summarizeTranscript(transcript: string, ctx: ExtensionContext): P
   );
 
   return summaries.join("\n\n---\n\n");
-}
-
-function isValidSessionFacets(obj: unknown): obj is Omit<SessionFacets, "sessionId"> {
-  if (!obj || typeof obj !== "object") return false;
-  const o = obj as Record<string, unknown>;
-  return (
-    typeof o.underlyingGoal === "string" &&
-    typeof o.outcome === "string" &&
-    typeof o.briefSummary === "string" &&
-    o.goalCategories !== null &&
-    typeof o.goalCategories === "object" &&
-    o.userSatisfactionCounts !== null &&
-    typeof o.userSatisfactionCounts === "object" &&
-    o.frictionCounts !== null &&
-    typeof o.frictionCounts === "object"
-  );
 }
