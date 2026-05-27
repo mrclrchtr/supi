@@ -1,5 +1,5 @@
 import type { ChangeId, GraphNodeId, SpanId, TargetId } from "./ids.ts";
-import type { WorkflowCodeToolName } from "./surface.ts";
+import type { WorkflowCodeToolName } from "./names.ts";
 
 /** Evidence family used to produce one item or summary. */
 export type WorkflowProvenanceSource =

@@ -1,4 +1,6 @@
 export type { ChangeId, GraphNodeId, PlanId, SpanId, TargetId } from "./ids.ts";
+export type { WorkflowCodeToolName } from "./names.ts";
+export { WORKFLOW_CODE_TOOL_NAMES } from "./names.ts";
 export type {
   WorkflowConfidence,
   WorkflowItem,
@@ -21,12 +23,8 @@ export {
   WORKFLOW_CODE_TOOL_SCHEMAS,
 } from "./schemas.ts";
 export type {
-  WorkflowCodeToolName,
   WorkflowCodeToolSpec,
   WorkflowPhase,
   WorkflowSubstrate,
 } from "./surface.ts";
-export {
-  WORKFLOW_CODE_TOOL_NAMES,
-  WORKFLOW_CODE_TOOL_SPECS,
-} from "./surface.ts";
+export { WORKFLOW_CODE_TOOL_SPECS } from "./surface.ts";

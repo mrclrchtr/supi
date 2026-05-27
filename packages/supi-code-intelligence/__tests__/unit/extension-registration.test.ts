@@ -10,7 +10,7 @@ describe("focused code intelligence tool registration", () => {
     codeIntelligenceExtension(pi as never);
 
     const tools = getTools(pi);
-    // code_* (9) + lsp_* (10) + read/write/edit overrides (3)
+    // code_* (8) + lsp_* (10) + tree_sitter_* (6) + read/write/edit overrides (3)
     expect(tools.length).toBeGreaterThanOrEqual(CODE_INTELLIGENCE_TOOL_SPECS.length);
     // All code_* tools are present
     for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {

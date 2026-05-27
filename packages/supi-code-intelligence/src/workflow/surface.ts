@@ -1,3 +1,4 @@
+import type { WorkflowCodeToolName } from "./names.ts";
 import type { WorkflowCodeToolSchemaKey } from "./schemas.ts";
 
 /** Future implementation substrate families used by the workflow-oriented V2 surface. */
@@ -6,33 +7,14 @@ export type WorkflowSubstrate = "semantic" | "structural" | "search" | "git" | "
 /** Future roadmap phase that is expected to introduce or activate one tool. */
 export type WorkflowPhase = "phase-1" | "phase-2" | "phase-3" | "phase-4" | "phase-5" | "phase-6";
 
-/**
- * Canonical planned V2 workflow tool names.
- *
- * Phase 0 note: this is design metadata only. The current registered public tool
- * surface still lives in `src/tool/tool-specs.ts`, `src/lsp/tool-specs.ts`, and
- * `src/tree-sitter/tool-specs.ts` until later migration phases replace it.
- */
-export const WORKFLOW_CODE_TOOL_NAMES = [
-  "code_resolve",
-  "code_context",
-  "code_find",
-  "code_graph",
-  "code_impact",
-  "code_refactor",
-  "code_apply",
-  "code_health",
-] as const;
-
-export type WorkflowCodeToolName = (typeof WORKFLOW_CODE_TOOL_NAMES)[number];
-
 /** Planned metadata for one V2 workflow tool. */
 export interface WorkflowCodeToolSpec {
   name: WorkflowCodeToolName;
   purpose: string;
   schemaKey: WorkflowCodeToolSchemaKey;
   schemaDocs: string;
-  absorbs: string[];
+  absorbsTools: string[];
+  absorbsBehaviors: string[];
   substrates: WorkflowSubstrate[];
   phase: WorkflowPhase;
   nonGoals: string[];
@@ -43,7 +25,7 @@ export interface WorkflowCodeToolSpec {
  *
  * Each entry captures:
  * - the workflow intent
- * - which current public tools/behaviors it is expected to absorb
+ * - which current public tools and public-facing behaviors it is expected to absorb
  * - which substrate families will likely power the implementation
  * - a concise schema summary for future maintainers and tests
  */
@@ -55,7 +37,8 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_resolve",
     schemaDocs:
       "Accepts a query or file-based anchor plus optional scope/kind/maxResults. Later phases validate that line/character require file.",
-    absorbs: [],
+    absorbsTools: [],
+    absorbsBehaviors: [],
     substrates: ["semantic", "search"],
     phase: "phase-1",
     nonGoals: [
@@ -70,7 +53,8 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_context",
     schemaDocs:
       "Accepts optional task, targetId, scope, budget, include sections, and maxResults. It is the planned workflow successor to orientation-style briefs.",
-    absorbs: ["code_brief"],
+    absorbsTools: ["code_brief"],
+    absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search", "diagnostics"],
     phase: "phase-2",
     nonGoals: [
@@ -85,7 +69,8 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_find",
     schemaDocs:
       "Requires query and supports scope, mode, kind, contextLines, and maxResults. Phase 0 excludes speculative natural-language mode.",
-    absorbs: ["code_pattern"],
+    absorbsTools: ["code_pattern"],
+    absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search"],
     phase: "phase-2",
     nonGoals: [
@@ -100,7 +85,8 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_graph",
     schemaDocs:
       "Accepts targetId plus relations, direction, depth, and maxNodes. The Phase 0 contract uses references rather than misleading callers labels.",
-    absorbs: ["code_references", "code_calls", "code_implementations"],
+    absorbsTools: ["code_references", "code_calls", "code_implementations"],
+    absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search"],
     phase: "phase-3",
     nonGoals: [
@@ -115,7 +101,8 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_impact",
     schemaDocs:
       "Accepts targetId, change, or changedFiles plus baseRef/includeTests/maxResults. Runtime validation later requires at least one primary subject.",
-    absorbs: ["code_affected"],
+    absorbsTools: ["code_affected"],
+    absorbsBehaviors: [],
     substrates: ["semantic", "search", "git", "diagnostics"],
     phase: "phase-4",
     nonGoals: [
@@ -130,7 +117,8 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_refactor",
     schemaDocs:
       "Uses a scoped operation enum with target/file coordinates and operation-specific options. This is the only intentional operation-style schema in the V2 skeleton.",
-    absorbs: ["code_refactor_plan"],
+    absorbsTools: ["code_refactor_plan"],
+    absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search"],
     phase: "phase-5",
     nonGoals: [
@@ -144,7 +132,8 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_apply",
     schemaDocs:
       "Requires a planId and optional apply mode. Later phases must enforce stale-plan rejection, validation, and rollback semantics.",
-    absorbs: ["code_refactor_apply"],
+    absorbsTools: ["code_refactor_apply"],
+    absorbsBehaviors: [],
     substrates: ["semantic", "search", "git"],
     phase: "phase-5",
     nonGoals: [
@@ -159,7 +148,8 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_health",
     schemaDocs:
       "Accepts scope, refresh, include sections, and detail level. It is the planned replacement for direct public diagnostic and recovery substrate access.",
-    absorbs: ["lsp_diagnostics", "lsp_recover", "ci-status summary"],
+    absorbsTools: ["lsp_diagnostics", "lsp_recover"],
+    absorbsBehaviors: ["ci-status summary"],
     substrates: ["semantic", "search", "git", "diagnostics"],
     phase: "phase-6",
     nonGoals: [

@@ -64,18 +64,20 @@ function collectStringValues(schema: unknown): string[] {
   return [...values];
 }
 
+const EXPECTED_WORKFLOW_TOOL_NAMES = [
+  "code_resolve",
+  "code_context",
+  "code_find",
+  "code_graph",
+  "code_impact",
+  "code_refactor",
+  "code_apply",
+  "code_health",
+] as const;
+
 describe("workflow surface skeleton", () => {
   it("defines the approved V2 workflow tool names exactly", () => {
-    expect(WORKFLOW_CODE_TOOL_NAMES).toEqual([
-      "code_resolve",
-      "code_context",
-      "code_find",
-      "code_graph",
-      "code_impact",
-      "code_refactor",
-      "code_apply",
-      "code_health",
-    ]);
+    expect(WORKFLOW_CODE_TOOL_NAMES).toEqual(EXPECTED_WORKFLOW_TOOL_NAMES);
   });
 
   it("keeps planned workflow tool names free of lsp_ and tree_sitter_ prefixes", () => {
@@ -85,15 +87,22 @@ describe("workflow surface skeleton", () => {
     }
   });
 
-  it("documents every planned tool with purpose, schema docs, absorbed tools, phase, and non-goals", () => {
+  it("documents every planned tool with purpose, schema docs, absorbed tools/behaviors, phase, and non-goals", () => {
     expect(WORKFLOW_CODE_TOOL_SPECS).toHaveLength(WORKFLOW_CODE_TOOL_NAMES.length);
 
+    const specNames = WORKFLOW_CODE_TOOL_SPECS.map((spec) => spec.name);
+    expect(new Set(specNames).size).toBe(WORKFLOW_CODE_TOOL_NAMES.length);
+    expect([...specNames].sort()).toEqual([...WORKFLOW_CODE_TOOL_NAMES].sort());
+    expect(Object.keys(WORKFLOW_CODE_TOOL_SCHEMAS).sort()).toEqual(
+      [...WORKFLOW_CODE_TOOL_NAMES].sort(),
+    );
+
     for (const spec of WORKFLOW_CODE_TOOL_SPECS) {
-      expect(WORKFLOW_CODE_TOOL_NAMES).toContain(spec.name);
       expect(spec.purpose.trim().length).toBeGreaterThan(0);
       expect(spec.schemaDocs.trim().length).toBeGreaterThan(0);
       expect(spec.phase.trim().length).toBeGreaterThan(0);
-      expect(Array.isArray(spec.absorbs)).toBe(true);
+      expect(Array.isArray(spec.absorbsTools)).toBe(true);
+      expect(Array.isArray(spec.absorbsBehaviors)).toBe(true);
       expect(Array.isArray(spec.nonGoals)).toBe(true);
       expect(spec.nonGoals.length).toBeGreaterThan(0);
       expect(Object.hasOwn(WORKFLOW_CODE_TOOL_SCHEMAS, spec.schemaKey)).toBe(true);

@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
+import type { WorkflowCodeToolName } from "./names.ts";
 
 const ScopeParam = Type.String({
   description: "Workspace-relative path, package, or directory scope for the workflow query.",
@@ -126,6 +127,9 @@ export const CodeFindParameters = Type.Object(
  *
  * Phase 0 uses `references` rather than `callers` so the public contract stays honest
  * until a true incoming-call hierarchy exists.
+ *
+ * Runtime rule for future executors:
+ * - require `targetId`
  */
 export const CodeGraphParameters = Type.Object(
   {
@@ -193,6 +197,11 @@ export const CodeImpactParameters = Type.Object(
  *
  * `operation` is the only intentional operation-style enum in the V2 skeleton.
  * Phase 0 does not introduce a generic action mega-tool.
+ *
+ * Runtime rules for future executors:
+ * - require `targetId` or anchored `file` + `line` + `character`
+ * - `rename_symbol` and `rename_file` require `newName`
+ * - `move_file` requires `destination`
  */
 export const CodeRefactorParameters = Type.Object(
   {
@@ -268,6 +277,8 @@ export const CodeHealthParameters = Type.Object(
   { additionalProperties: false },
 );
 
+export type WorkflowCodeToolSchemaKey = WorkflowCodeToolName;
+
 /** Planned V2 schemas keyed by future public tool name. */
 export const WORKFLOW_CODE_TOOL_SCHEMAS = {
   code_resolve: CodeResolveParameters,
@@ -278,6 +289,4 @@ export const WORKFLOW_CODE_TOOL_SCHEMAS = {
   code_refactor: CodeRefactorParameters,
   code_apply: CodeApplyParameters,
   code_health: CodeHealthParameters,
-} as const satisfies Record<string, TSchema>;
-
-export type WorkflowCodeToolSchemaKey = keyof typeof WORKFLOW_CODE_TOOL_SCHEMAS;
+} as const satisfies Record<WorkflowCodeToolSchemaKey, TSchema>;

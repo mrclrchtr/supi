@@ -85,10 +85,11 @@ src/
 │   ├── execute-refactor-plan.ts  # code_refactor_plan tool executor
 │   └── execute-refactor-apply.ts # code_refactor_apply tool executor
 ├── workflow/
+│   ├── names.ts               # Canonical planned V2 workflow tool names
 │   ├── ids.ts                 # Planned V2 workflow handle contracts (TargetId, PlanId, etc.)
 │   ├── results.ts             # Shared structured result envelope and provenance types
 │   ├── schemas.ts             # Planned V2 workflow tool parameter schemas
-│   ├── surface.ts             # Canonical planned V2 tool names and metadata
+│   ├── surface.ts             # Canonical planned V2 tool metadata
 │   └── index.ts               # Internal barrel for workflow skeleton consumers/tests
 ├── presentation/markdown/
 │   ├── overview.ts             # Hidden overview markdown renderer
