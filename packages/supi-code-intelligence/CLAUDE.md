@@ -3,16 +3,19 @@
 Architecture briefs with structural enrichment, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_pattern`, `code_refactor_plan`, `code_refactor_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_pattern`, `code_refactor_plan`, `code_refactor_apply`, `code_resolve`)
 - May include cross-family orchestration guidance that steers the model between `code_*`, `lsp_*`, and `tree_sitter_*` tools; guidance routes by user intent first, substrate family second
 - Installing this package activates all three tool families (`code_*`, `lsp_*`, `tree_sitter_*`)
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
 - `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
 
-## V2 workflow skeleton (Phase 0)
+## V2 workflow — Phase 1 activation
 
-- `src/workflow/` is an internal design skeleton for the planned workflow-oriented V2 surface; it contains docs, shared handle/result contracts, and TypeBox schemas only.
-- Phase 0 does **not** register `code_resolve`, `code_context`, `code_find`, `code_graph`, `code_impact`, `code_refactor`, `code_apply`, or `code_health` yet.
+Phase 1 activates `code_resolve` as the first active V2 workflow tool. Remaining V2 tools stay unregistered.
+
+- `code_resolve` is registered and accepts `query`, `scope`, `kind`, `file`, `line`, `character`, and `maxResults`.
+- Returns `targetId` and `spanId` handles that are stable within the current session.
+- `code_context`, `code_find`, `code_graph`, `code_impact`, `code_refactor`, `code_apply`, and `code_health` remain unregistered.
 - Future phases must keep `src/workflow/` consistent with `__tests__/unit/workflow-surface.test.ts`.
 - Do **not** remove public `lsp_*` or `tree_sitter_*` tools until `code_context`, `code_find`, `code_graph`, `code_refactor`/`code_apply`, and `code_health` provide the intended replacements.
 - Keep implementation phased: one ticket per phase, fresh verification per task, user review, then commit before the next phase.
@@ -48,7 +51,8 @@ src/
 ├── analysis/
 │   ├── context/
 │   │   └── request-context.ts  # Explicit analysis context over shared broker
-│   ├── architecture/
+│   ├── resolve/
+│   │   └── service.ts          # code_resolve business logic (Phase 1)
 │   ├── routing/
 │   │   └── planner.ts          # Central capability router (canonical)
 │   ├── targeting/
@@ -76,12 +80,14 @@ src/
 │   ├── guidance.ts             # Intent-first prompt surfaces from specs
 │   ├── register-tools.ts       # Focused Pi tool registration (iterates over specs)
 │   ├── validation.ts           # Shared parameter validation
+│   ├── target-id-params.ts     # targetId expansion helper (Phase 1)
 │   ├── execute-brief.ts        # code_brief tool executor
 │   ├── execute-references.ts   # code_references tool executor
 │   ├── execute-calls.ts        # code_calls tool executor
 │   ├── execute-implementations.ts # code_implementations tool executor
 │   ├── execute-affected.ts     # code_affected tool executor
 │   ├── execute-pattern.ts      # code_pattern tool executor
+│   ├── execute-resolve.ts      # code_resolve tool executor (Phase 1)
 │   ├── execute-refactor-plan.ts  # code_refactor_plan tool executor
 │   └── execute-refactor-apply.ts # code_refactor_apply tool executor
 ├── workflow/
@@ -90,6 +96,7 @@ src/
 │   ├── results.ts             # Shared structured result envelope and provenance types
 │   ├── schemas.ts             # Planned V2 workflow tool parameter schemas
 │   ├── surface.ts             # Canonical planned V2 tool metadata
+│   ├── target-store.ts        # Session-scoped target/span handle registry (Phase 1)
 │   └── index.ts               # Internal barrel for workflow skeleton consumers/tests
 ├── presentation/markdown/
 │   ├── overview.ts             # Hidden overview markdown renderer
@@ -97,7 +104,8 @@ src/
 │   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
 │   ├── affected.ts             # Affected markdown renderer
 │   ├── pattern.ts              # Pattern search markdown renderer
-│   └── refactor.ts             # Refactor result markdown renderer
+│   ├── refactor.ts             # Refactor result markdown renderer
+│   └── resolve.ts              # code_resolve markdown renderer (Phase 1)
 └── ui/
     ├── code-intelligence-status-command.ts  # /ci-status command
     ├── code-intelligence-status-view.ts     # TUI status surface
@@ -140,8 +148,11 @@ Semantic blast-radius tool. Uses semantic evidence. Does not fall back to heuris
 ### `code_pattern`
 Explicit search tool. This is the only tool in the family that intentionally exposes heuristic/text-search behavior.
 
+### `code_resolve`
+Resolve human or code references into precise file/range/symbol targets with stable handles. Supports anchored (file + line + character), file-only, and query/symbol inputs. Returns `targetId` and `spanId` for follow-up calls.
+
 ### `code_refactor_plan`
-Preview-only semantic rename planning. Reads capability state from the shared broker, calls LSP rename, validates the workspace edit, computes file fingerprints for staleness detection, and returns a preview with a plan ID. Does not mutate files.
+Preview-only semantic rename planning. Reads capability state from the shared broker, calls LSP rename, validates the workspace edit, computes file fingerprints for staleness detection, and returns a preview with a plan ID. Does not mutate files. May accept `targetId` in place of file/line/character.
 
 ### `code_refactor_apply`
 Apply a previously generated refactor plan by plan ID. Retrieves the plan from the in-memory store, rechecks file fingerprints, re-validates ranges and overlap, applies deterministically through safety gates, and reports results. Rejects stale, missing, or invalid plans.
@@ -160,13 +171,19 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 
 ### Param validation
 - `line`/`character` require `file`, **not** `path`.
-- `code_refactor_plan` requires `file`, `line`, `character`, `operation`, and `newName`.
+- `code_refactor_plan` requires `operation` and `newName` plus either `targetId` or `file` + `line` + `character`.
 - `code_refactor_apply` requires `planId`.
+- `code_calls` requires either `targetId` or `file` + `line` + `character`.
+- `code_brief`, `code_references`, `code_implementations`, and `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
 
-### Target resolution
+### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.
 - File-level target expansion is allowed only when the required substrate can support it.
 - The planner delegates to the existing targeting pipeline (`resolve-target.ts` and `src/targeting/*`).
+- `code_resolve` registers targets in a session-scoped in-memory store (`src/workflow/target-store.ts`).
+- Target IDs (`tg-*`) and span IDs (`sp-*`) are deterministic and stable while the backing file fingerprint is unchanged.
+- Unknown or stale target IDs return explicit unavailable messages rather than silent fallthrough.
+- No cross-session persistence — target handles live only as long as the current process.
 
 ### First-turn overview
 - Injected via `before_agent_start` on the first turn; deduplicated via `hasInjectedOverview`.

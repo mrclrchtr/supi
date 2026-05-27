@@ -25,6 +25,12 @@ export type CodeIntelligenceToolPromptSurfaceMap = Record<
 // described as expert follow-up surfaces, not the primary choice.
 
 const INTENT_GUIDELINES: Record<CodeIntelligenceToolName, string[]> = {
+  code_resolve: [
+    "Use code_resolve to resolve a symbol, file, or anchored reference into a precise target with stable handles.",
+    "Returns targetId and spanId that can be used in code_references, code_calls, code_affected, and code_refactor_plan.",
+    "Supports anchored (file + line + character), file-only, and query/symbol inputs.",
+    "Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates.",
+  ],
   code_brief: [
     "Use code_brief for prioritized orientation on a project, package, file, or symbol.",
     "The planner selects the best provider (semantic or structural) automatically.",

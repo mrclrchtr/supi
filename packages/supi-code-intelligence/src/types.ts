@@ -66,11 +66,42 @@ export interface DisambiguationCandidate {
   rank: number;
 }
 
+/** Structured details metadata for code_resolve results. */
+export interface ResolveDetails {
+  confidence: ConfidenceMode;
+  targetCount: number;
+  omittedCount: number;
+  targets: Array<{
+    targetId: string;
+    spanId: string;
+    file: string;
+    displayLine: number;
+    displayCharacter: number;
+    name: string | null;
+    kind: string | null;
+    confidence: ConfidenceMode;
+    provenance: string;
+  }>;
+  candidates?: Array<{
+    targetId: string;
+    name: string;
+    kind: string | null;
+    container: string | null;
+    file: string;
+    line: number;
+    character: number;
+    reason: string;
+    rank: number;
+  }>;
+  nextQueries: string[];
+}
+
 /** Tool result shape returned by executeAction. */
 export interface CodeIntelResult {
   content: string;
   details?:
     | { type: "brief"; data: BriefDetails }
     | { type: "search"; data: SearchDetails }
-    | { type: "affected"; data: AffectedDetails };
+    | { type: "affected"; data: AffectedDetails }
+    | { type: "resolve"; data: ResolveDetails };
 }

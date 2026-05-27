@@ -1,0 +1,50 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:32.588743Z"
+revision = 38
+
+[document_fingerprints]
+archive = "sha256:99017a79d86595422038e05722570e17b8b7b9de290f9f7206945d1135900c0e"
+content = "sha256:9960b0a15e2e747a64a0d5405dd9edff66eeea07fec6fa6b0e4d5774da2654a6"
+task-01 = "sha256:3ef2f353f3231a76e7f5e0e8a52b2aa3347bed92d1ad9dbcaabfe17f61dbef94"
+task-02 = "sha256:701478e1a7c66195f2e8c18c6e03f75f6176d9ba55f524cb64fa44a5129c3982"
+task-03 = "sha256:a4f107e8dc6f475c737b2a66144bb194d688997fd474e21cb924188a1d0d6d6d"
+task-04 = "sha256:91772ba886d2b46808b233e8bc0af0c916a9f520b20b9d0db728264df8f872eb"
+task-05 = "sha256:b8174bc3dff13f59758ba0d0e276303b9720f6565fb278ae84c713475a01cfc9"
+task-06 = "sha256:48de422f31b1b6d980c59ccb7c1b8978041b1e151017d76ced551b04d6741e14"
+task-07 = "sha256:ba60f9d953789e57f8573e8348531b5fe687e316cc68832cb147cd5b42c89ac1"
+
+[[tasks]]
+number = 1
+title = "Fix file-only resolve to pass both semantic and structural provider halves"
+status = "done"
+
+[[tasks]]
+number = 2
+title = 'Fix kind mapping: "symbol" must not filter, "export" maps to exportedOnly, "command"/"setting" rejected'
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Align public code_resolve schema with workflow schema (enum kind, minimum line/character)"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Thread maxResults through disambiguation and file-only resolution"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Fix target store: re-fingerprint unfingerprinted entries on lookup, handle missing files"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Fix disambiguation markdown: drop unregistered code_context suggestion"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Final verification: full package tests, typecheck, Biome, manual resolve smoke test"
+status = "done"

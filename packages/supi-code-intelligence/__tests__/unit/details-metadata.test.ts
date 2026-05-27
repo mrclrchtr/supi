@@ -311,7 +311,7 @@ describe("structured details via tool adapters and action routers", () => {
     describe("calls action — no-result detail states", () => {
       it("returns error for missing file param", async () => {
         const result = await executeAction({ action: "calls" }, { cwd: tmpDir });
-        expect(result.content).toContain("required for code_calls");
+        expect(result.content).toContain("requires a file");
         expect(result.details).toBeUndefined();
       });
 

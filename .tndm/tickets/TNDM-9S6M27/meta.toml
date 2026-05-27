@@ -1,0 +1,39 @@
+schema_version = 1
+id = "TNDM-9S6M27"
+title = "Code Intelligence V2 Phase 1: code_resolve target handles"
+type = "feature"
+priority = "p2"
+depends_on = ["TNDM-JSDGJP"]
+tags = ["code-intelligence", "flow:done", "phase-1", "resolve", "v2"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "task-01"
+path = "tasks/task-01.md"
+
+[[documents]]
+name = "task-02"
+path = "tasks/task-02.md"
+
+[[documents]]
+name = "task-03"
+path = "tasks/task-03.md"
+
+[[documents]]
+name = "task-04"
+path = "tasks/task-04.md"
+
+[[documents]]
+name = "task-05"
+path = "tasks/task-05.md"
+
+[[documents]]
+name = "task-06"
+path = "tasks/task-06.md"

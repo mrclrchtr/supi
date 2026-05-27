@@ -9,9 +9,11 @@ import { collectServiceImplementations } from "../analysis/implementations/servi
 import { routeFor } from "../analysis/routing/planner.ts";
 import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeImplementationsToolParams {
+  targetId?: string;
   file?: string;
   line?: number;
   character?: number;
@@ -24,6 +26,29 @@ export async function executeImplementationsTool(
   params: CodeImplementationsToolParams,
   ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
+  // Expand targetId if provided (takes precedence over raw coords)
+  const expansion = expandTargetId(params, ctx.cwd);
+  if (expansion.kind === "error") {
+    return {
+      content: expansion.message,
+      details: {
+        type: "search" as const,
+        data: {
+          confidence: "unavailable" as const,
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: ["Use `code_resolve` to resolve a target first"],
+        },
+      },
+    };
+  }
+  if (expansion.kind === "ok") {
+    params.file = expansion.file;
+    params.line = expansion.line;
+    params.character = expansion.character;
+  }
+
   const error = validateFocusedToolParams(params, ctx.cwd);
   if (error) {
     return { content: error, details: undefined };

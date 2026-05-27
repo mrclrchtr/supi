@@ -28,3 +28,15 @@ export type {
   WorkflowSubstrate,
 } from "./surface.ts";
 export { WORKFLOW_CODE_TOOL_SPECS } from "./surface.ts";
+export type {
+  TargetLookupResult,
+  TargetRegistrationInput,
+  TargetRegistrationOutput,
+  TargetStoreEntry,
+} from "./target-store.ts";
+export {
+  clearAllWorkflowTargets,
+  clearWorkflowTargets,
+  getWorkflowTarget,
+  registerWorkflowTarget,
+} from "./target-store.ts";

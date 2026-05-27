@@ -2,9 +2,11 @@ import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeAffected } from "../use-case/generate-affected.ts";
+import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeAffectedToolParams {
+  targetId?: string;
   file?: string;
   line?: number;
   character?: number;
@@ -18,6 +20,32 @@ export async function executeAffectedTool(
   params: CodeAffectedToolParams,
   ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
+  // Expand targetId if provided (takes precedence over raw coords)
+  const expansion = expandTargetId(params, ctx.cwd);
+  if (expansion.kind === "error") {
+    return {
+      content: expansion.message,
+      details: {
+        type: "affected" as const,
+        data: {
+          confidence: "unavailable" as const,
+          directCount: 0,
+          downstreamCount: 0,
+          riskLevel: "low" as const,
+          checkNext: [],
+          likelyTests: [],
+          omittedCount: 0,
+          nextQueries: ["Use `code_resolve` to resolve a target first"],
+        },
+      },
+    };
+  }
+  if (expansion.kind === "ok") {
+    params.file = expansion.file;
+    params.line = expansion.line;
+    params.character = expansion.character;
+  }
+
   const error = validateFocusedToolParams(params, ctx.cwd);
   if (error) {
     return { content: error, details: undefined };

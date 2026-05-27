@@ -4,9 +4,11 @@ import { buildArchitectureModel } from "../model.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeBrief } from "../use-case/generate-brief.ts";
 import type { BriefInput } from "../use-case/types.ts";
+import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeBriefToolParams {
+  targetId?: string;
   path?: string;
   file?: string;
   line?: number;
@@ -20,6 +22,17 @@ export async function executeBriefTool(
   params: CodeBriefToolParams,
   ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
+  // Expand targetId if provided (takes precedence over raw coords)
+  const expansion = expandTargetId(params, ctx.cwd);
+  if (expansion.kind === "error") {
+    return { content: expansion.message, details: undefined };
+  }
+  if (expansion.kind === "ok") {
+    params.file = expansion.file;
+    params.line = expansion.line;
+    params.character = expansion.character;
+  }
+
   const error = validateFocusedToolParams(params, ctx.cwd);
   if (error) {
     return { content: error, details: undefined };

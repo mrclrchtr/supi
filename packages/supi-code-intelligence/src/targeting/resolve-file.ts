@@ -136,14 +136,21 @@ async function resolveViaSemantic(
       }));
 
     if (topLevel.length === 0) return structuralTargets;
+
+    // Semantic symbols are available — prefer them over structural exports.
+    // Only fall back to structural targets that have no semantic counterpart
+    // (different position).
     if (!structuralTargets || structuralTargets.length === 0) return dedupeTargets(topLevel);
 
-    const matched = structuralTargets.map((target) => {
-      const byName = topLevel.find((candidate) => candidate.name === target.name);
-      return byName ?? target;
-    });
-
-    return dedupeTargets(matched);
+    // Build a position-based dedup: for each position, prefer the semantic entry.
+    const byPos = new Map<string, ResolvedTargetData>();
+    for (const t of structuralTargets) {
+      byPos.set(`${t.position.line}:${t.position.character}`, t);
+    }
+    for (const t of topLevel) {
+      byPos.set(`${t.position.line}:${t.position.character}`, t);
+    }
+    return [...byPos.values()];
   } catch {
     return structuralTargets;
   }

@@ -27,7 +27,7 @@ describe("code_calls behavior", () => {
       cwd: tmpDir,
     });
     expect(result.content).toContain("Error");
-    expect(result.content).toContain("required for code_calls");
+    expect(result.content).toContain("requires a file");
   });
 
   it("rejects calls with file but no line/character", async () => {

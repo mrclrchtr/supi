@@ -36,6 +36,7 @@ After install, pi gets:
 - `code_pattern` — explicit literal, regex, or structured search
 - `code_refactor_plan` — preview a semantic rename without mutating files
 - `code_refactor_apply` — apply a previously generated refactor plan
+- `code_resolve` — resolve human/code references into precise targets with stable target handles for follow-up calls
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - **all `lsp_*` expert tools** from `@mrclrchtr/supi-lsp` (hover, definition, references, implementation, diagnostics, rename, code actions, recover, document/workspace symbols)
 - **all `tree_sitter_*` expert tools** from `@mrclrchtr/supi-tree-sitter` (outline, imports, exports, node-at, query, callees)
@@ -45,20 +46,20 @@ Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families
 
 ## V2 workflow roadmap
 
-Phase 0 adds an internal design skeleton only. **The current runtime tool surface remains unchanged in Phase 0.**
+Phase 1 activates `code_resolve` as the first active V2 workflow tool.
 
-Planned future workflow-oriented `code_*` surface:
+The current public surface now includes:
 
-- `code_resolve`
-- `code_context`
-- `code_find`
-- `code_graph`
-- `code_impact`
-- `code_refactor`
-- `code_apply`
-- `code_health`
+- `code_resolve` — **active** (Phase 1)
+- `code_context` — planned (Phase 2)
+- `code_find` — planned (Phase 2)
+- `code_graph` — planned (Phase 3)
+- `code_impact` — planned (Phase 4)
+- `code_refactor` — planned (Phase 5)
+- `code_apply` — planned (Phase 5)
+- `code_health` — planned (Phase 6)
 
-The design source of truth for that future surface now lives in `src/workflow/`. It contains types, schemas, and metadata for later phases, but it does **not** register active tools yet.
+The design source of truth lives in `src/workflow/` with types, schemas, and metadata.
 
 Until later replacement phases land, raw `lsp_*` and `tree_sitter_*` tools remain public and install exactly as they do today.
 
@@ -121,6 +122,7 @@ Depending on the tool, inputs may include:
 Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `path`
+- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_brief`, and `code_refactor_plan`
 - a leading `@` is stripped from `path` and `file`
 - non-search tools do **not** silently fall back to heuristic grep behavior
 
@@ -174,4 +176,9 @@ const overview = generateOverview(model);
 - `src/tool/register-tools.ts` — focused tool registration wiring
 - `src/tool/guidance.ts` — prompt surfaces derived from tool specs
 - `src/tool/execute-*.ts` — thin adapters that validate params and route to use-case/presentation layers
-- `src/workflow/` — Phase 0 V2 skeleton: planned workflow tool schemas, handle/result contracts, and future-surface metadata (not active registration)
+- `src/workflow/target-store.ts` — session-scoped target/span handle registry with file-fingerprint staleness detection
+- `src/analysis/resolve/service.ts` — `code_resolve` business logic
+- `src/tool/execute-resolve.ts` — `code_resolve` public tool executor
+- `src/tool/target-id-params.ts` — shared helper for expanding `targetId` into anchored tool params
+- `src/presentation/markdown/resolve.ts` — markdown renderer for `code_resolve` results
+- `src/workflow/` — Phase 0+ V2 skeleton: planned workflow tool schemas, handle/result contracts, and future-surface metadata

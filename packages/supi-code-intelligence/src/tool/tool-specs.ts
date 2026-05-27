@@ -1,3 +1,4 @@
+import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import type { CodeIntelligenceToolName } from "../intent/types.ts";
 import type { CodeIntelResult } from "../types.ts";
@@ -9,11 +10,12 @@ import { executePatternTool } from "./execute-pattern.ts";
 import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
 import { executeReferencesTool } from "./execute-references.ts";
+import { executeResolveTool } from "./execute-resolve.ts";
 
 const PathParam = Type.String({ description: "Scope path" });
 const FileParam = Type.String({ description: "Target file" });
-const LineParam = Type.Number({ description: "1-based line" });
-const CharacterParam = Type.Number({ description: "1-based UTF-16 column" });
+const LineParam = Type.Number({ description: "1-based line", minimum: 1 });
+const CharacterParam = Type.Number({ description: "1-based UTF-16 column", minimum: 1 });
 const SymbolParam = Type.String({ description: "Symbol name" });
 const PatternParam = Type.String({ description: "Search pattern" });
 const RegexParam = Type.Boolean({ description: "Regex search" });
@@ -27,9 +29,14 @@ const StructuredPatternKindParam = Type.String({
 const NewNameParam = Type.String({ description: "New name for rename operation" });
 const OperationParam = Type.String({ description: "Refactor operation: rename" });
 const PlanIdParam = Type.String({ description: "Plan ID from a previous code_refactor_plan call" });
+const TargetIdParam = Type.String({
+  description:
+    "Resolved target handle from `code_resolve`. Takes precedence over file/line/character/symbol.",
+});
 
 const CodeBriefParameters = Type.Object(
   {
+    targetId: Type.Optional(TargetIdParam),
     path: Type.Optional(PathParam),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
@@ -42,6 +49,7 @@ const CodeBriefParameters = Type.Object(
 
 const CodeReferencesParameters = Type.Object(
   {
+    targetId: Type.Optional(TargetIdParam),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
     character: Type.Optional(CharacterParam),
@@ -54,9 +62,10 @@ const CodeReferencesParameters = Type.Object(
 
 const CodeCallsParameters = Type.Object(
   {
-    file: FileParam,
-    line: LineParam,
-    character: CharacterParam,
+    targetId: Type.Optional(TargetIdParam),
+    file: Type.Optional(FileParam),
+    line: Type.Optional(LineParam),
+    character: Type.Optional(CharacterParam),
     maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
@@ -64,6 +73,7 @@ const CodeCallsParameters = Type.Object(
 
 const CodeImplementationsParameters = Type.Object(
   {
+    targetId: Type.Optional(TargetIdParam),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
     character: Type.Optional(CharacterParam),
@@ -76,6 +86,7 @@ const CodeImplementationsParameters = Type.Object(
 
 const CodeAffectedParameters = Type.Object(
   {
+    targetId: Type.Optional(TargetIdParam),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
     character: Type.Optional(CharacterParam),
@@ -101,10 +112,11 @@ const CodePatternParameters = Type.Object(
 
 const CodeRefactorPlanParameters = Type.Object(
   {
+    targetId: Type.Optional(TargetIdParam),
     operation: OperationParam,
-    file: FileParam,
-    line: LineParam,
-    character: CharacterParam,
+    file: Type.Optional(FileParam),
+    line: Type.Optional(LineParam),
+    character: Type.Optional(CharacterParam),
     newName: NewNameParam,
   },
   { additionalProperties: false },
@@ -113,6 +125,38 @@ const CodeRefactorPlanParameters = Type.Object(
 const CodeRefactorApplyParameters = Type.Object(
   {
     planId: PlanIdParam,
+  },
+  { additionalProperties: false },
+);
+
+const CodeResolveParameters = Type.Object(
+  {
+    query: Type.Optional(Type.String({ description: "Human or code reference to resolve." })),
+    scope: Type.Optional(
+      Type.String({
+        description: "Workspace-relative path, package, or directory scope for the resolve query.",
+      }),
+    ),
+    kind: Type.Optional(
+      StringEnum(
+        [
+          "symbol",
+          "function",
+          "class",
+          "interface",
+          "type",
+          "file",
+          "export",
+          "command",
+          "setting",
+        ],
+        { description: "Preferred target kind when disambiguating the query." },
+      ),
+    ),
+    file: Type.Optional(FileParam),
+    line: Type.Optional(LineParam),
+    character: Type.Optional(CharacterParam),
+    maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
 );
@@ -130,6 +174,22 @@ export interface CodeIntelligenceToolDefinitionSpec {
 // Stubs removed — real executors from execute-refactor-plan.ts and execute-refactor-apply.ts are used below
 
 export const CODE_INTELLIGENCE_TOOL_SPECS = [
+  {
+    name: "code_resolve",
+    label: "Code Resolve",
+    description:
+      "Resolve human or code references into precise file/range/symbol targets and stable target handles.",
+    promptSnippet: "code_resolve — resolve references into precise targets and target handles",
+    basePromptGuidelines: [
+      "Use code_resolve when a symbol, file, or code reference is ambiguous and needs precise resolution.",
+      "Returns targetId and spanId handles that can be passed to other code_* tools.",
+      "Supports anchored (file + line + character), file-only, and query/symbol inputs.",
+      "Ambiguous results include ranked candidates with target IDs for every shown item.",
+    ],
+    parameters: CodeResolveParameters,
+    run: (params, ctx) =>
+      executeResolveTool(params as Parameters<typeof executeResolveTool>[0], ctx),
+  },
   {
     name: "code_brief",
     label: "Code Brief",

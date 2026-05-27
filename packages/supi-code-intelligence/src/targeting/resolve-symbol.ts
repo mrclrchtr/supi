@@ -11,7 +11,7 @@ import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
-const MAX_CANDIDATES = 8;
+const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided
 const NON_EXPORTED_KINDS = new Set(["Variable", "Field", "Property"]);
 
 /**
@@ -31,6 +31,7 @@ export async function resolveSymbolTarget(
     path?: string;
     kind?: string;
     exportedOnly?: boolean;
+    maxResults?: number;
   },
 ): Promise<TargetOutcome> {
   const results = await semantic.workspaceSymbols(symbol);
@@ -91,7 +92,8 @@ export async function resolveSymbolTarget(
   }
 
   // Multiple candidates — return disambiguation
-  const candidatesOut = candidates.slice(0, MAX_CANDIDATES).map((c, idx) => ({
+  const cap = options?.maxResults ?? MAX_CANDIDATES;
+  const candidatesOut = candidates.slice(0, cap).map((c, idx) => ({
     name: c.name,
     kind: c.kind,
     container: c.container ?? null,

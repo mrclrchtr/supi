@@ -18,12 +18,14 @@ import { routeFor } from "../analysis/routing/planner.ts";
 import { renderRefactorPlanResult } from "../presentation/markdown/refactor.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { expandTargetId } from "./target-id-params.ts";
 
 export interface CodeRefactorPlanToolParams {
+  targetId?: string;
   operation: string;
-  file: string;
-  line: number;
-  character: number;
+  file?: string;
+  line?: number;
+  character?: number;
   newName: string;
 }
 
@@ -34,6 +36,33 @@ export async function executeRefactorPlanTool(
   if (params.operation !== "rename") {
     return {
       content: `**Error:** Unsupported refactor operation: "${params.operation}". Currently only "rename" is supported.`,
+      details: undefined,
+    };
+  }
+
+  // Expand targetId if provided (takes precedence over raw coords)
+  const expansion = expandTargetId(params, ctx.cwd);
+  if (expansion.kind === "error") {
+    return { content: expansion.message, details: undefined };
+  }
+  if (expansion.kind === "ok") {
+    params.file = expansion.file;
+    params.line = expansion.line;
+    params.character = expansion.character;
+  }
+
+  // Validate file + coordinates after targetId expansion
+  if (!params.file) {
+    return {
+      content:
+        "**Error:** `code_refactor_plan` requires a `file`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
+      details: undefined,
+    };
+  }
+  if (params.line == null || params.character == null) {
+    return {
+      content:
+        "**Error:** `code_refactor_plan` requires `line` and `character`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
       details: undefined,
     };
   }

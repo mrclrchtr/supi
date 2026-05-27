@@ -47,12 +47,36 @@ describe("focused code intelligence tool registration", () => {
     expect(names).not.toContain("code_refactor");
   });
 
-  it("does not register planned V2 workflow tools during Phase 0", () => {
+  it("registers code_resolve as the first active V2 workflow tool", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const tool = getTool(pi, "code_resolve");
+    expect(tool).toBeDefined();
+    expect(tool.name).toBe("code_resolve");
+    expect(typeof tool.execute).toBe("function");
+
+    // Schema shape: line/character have minimum: 1, kind is a StringEnum
+    const props = (tool as { parameters?: { properties?: Record<string, unknown> } }).parameters
+      ?.properties;
+    expect(props).toBeDefined();
+    const lineParam = props?.line as { minimum?: number } | undefined;
+    expect(lineParam?.minimum).toBe(1);
+    const charParam = props?.character as { minimum?: number } | undefined;
+    expect(charParam?.minimum).toBe(1);
+    const kindParam = props?.kind as { enum?: string[] } | undefined;
+    expect(kindParam?.enum).toBeDefined();
+    expect(kindParam?.enum).toContain("symbol");
+    expect(kindParam?.enum).toContain("command");
+  });
+
+  it("does not register inactive V2 workflow tools (code_context, code_find, code_graph, code_impact, code_refactor, code_apply, code_health)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
-    for (const name of WORKFLOW_CODE_TOOL_NAMES) {
+    const inactive = WORKFLOW_CODE_TOOL_NAMES.filter((n) => n !== "code_resolve");
+    for (const name of inactive) {
       expect(names).not.toContain(name);
     }
   });

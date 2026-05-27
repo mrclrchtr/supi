@@ -42,7 +42,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     substrates: ["semantic", "search"],
     phase: "phase-1",
     nonGoals: [
-      "Does not register a public tool in Phase 0.",
+      "Phase 1 registers code_resolve as the first active workflow tool.",
       "Does not persist target handles across sessions yet.",
     ],
   },
