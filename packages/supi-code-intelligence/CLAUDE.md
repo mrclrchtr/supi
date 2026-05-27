@@ -9,6 +9,14 @@ Surfaces:
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
 - `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
 
+## V2 workflow skeleton (Phase 0)
+
+- `src/workflow/` is an internal design skeleton for the planned workflow-oriented V2 surface; it contains docs, shared handle/result contracts, and TypeBox schemas only.
+- Phase 0 does **not** register `code_resolve`, `code_context`, `code_find`, `code_graph`, `code_impact`, `code_refactor`, `code_apply`, or `code_health` yet.
+- Future phases must keep `src/workflow/` consistent with `__tests__/unit/workflow-surface.test.ts`.
+- Do **not** remove public `lsp_*` or `tree_sitter_*` tools until `code_context`, `code_find`, `code_graph`, `code_refactor`/`code_apply`, and `code_health` provide the intended replacements.
+- Keep implementation phased: one ticket per phase, fresh verification per task, user review, then commit before the next phase.
+
 ## Architecture
 
 ```text
@@ -64,7 +72,7 @@ src/
 │       ├── apply-workspace-edit.ts # File mutation
 │       └── plan-store.ts       # Two-step refactor plan storage
 ├── tool/
-│   ├── tool-specs.ts           # Single source of truth for public tool metadata
+│   ├── tool-specs.ts           # Single source of truth for current public tool metadata
 │   ├── guidance.ts             # Intent-first prompt surfaces from specs
 │   ├── register-tools.ts       # Focused Pi tool registration (iterates over specs)
 │   ├── validation.ts           # Shared parameter validation
@@ -76,6 +84,12 @@ src/
 │   ├── execute-pattern.ts      # code_pattern tool executor
 │   ├── execute-refactor-plan.ts  # code_refactor_plan tool executor
 │   └── execute-refactor-apply.ts # code_refactor_apply tool executor
+├── workflow/
+│   ├── ids.ts                 # Planned V2 workflow handle contracts (TargetId, PlanId, etc.)
+│   ├── results.ts             # Shared structured result envelope and provenance types
+│   ├── schemas.ts             # Planned V2 workflow tool parameter schemas
+│   ├── surface.ts             # Canonical planned V2 tool names and metadata
+│   └── index.ts               # Internal barrel for workflow skeleton consumers/tests
 ├── presentation/markdown/
 │   ├── overview.ts             # Hidden overview markdown renderer
 │   ├── brief.ts                # Brief markdown renderer

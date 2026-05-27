@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:23.773116Z"
+revision = 29
+
+[document_fingerprints]
+archive = "sha256:352e3ef3bfe8205e8e429807055e78ccb1cf7b1fae1fb5ed505786243eba22cf"
+content = "sha256:18e16d160807a2959378f728ac3a202899fed546564285358b33593fa1647530"
+task-01 = "sha256:e04cb55e1d6fd2fb6a0fdfb544b21409c62dccc730bc2c4266bc6e83a4f0c029"
+task-02 = "sha256:98e0b46e2e49504725c7215f77e6a669a9ad09b2b74cacce5e648c299cb1eeff"
+task-03 = "sha256:81e4bb0980f2601c258ffbe95aa22438a40733be6c5d79a64afdd4e7ea4ea527"
+task-04 = "sha256:a7b77d195af2248e27b19c371a4dcbc21a1f40341c1274c36a5483d259afa8f7"
+task-05 = "sha256:ecec9142ef8cdecb7eca49bcc9a3834ea24d1d703a5b80d756f4f9f73b620b78"
+
+[[tasks]]
+number = 1
+title = "RED: Lock the Phase 0 workflow skeleton contract in tests"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: Add internal workflow skeleton, schemas, handles, and result contracts"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Document the V2 skeleton and phase boundaries in package docs"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Guard Phase 0 against accidental runtime surface changes"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Final verification and phase handoff"
+status = "done"

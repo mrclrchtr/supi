@@ -2,6 +2,7 @@ import { createPiMock, getTool, getTools } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
+import { WORKFLOW_CODE_TOOL_NAMES } from "../../src/workflow/index.ts";
 
 describe("focused code intelligence tool registration", () => {
   it("registers the focused tool set from shared specs", () => {
@@ -44,6 +45,16 @@ describe("focused code intelligence tool registration", () => {
     const names = getTools(pi).map((t: { name: string }) => t.name);
     expect(names).not.toContain("code_relations");
     expect(names).not.toContain("code_refactor");
+  });
+
+  it("does not register planned V2 workflow tools during Phase 0", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const names = getTools(pi).map((t: { name: string }) => t.name);
+    for (const name of WORKFLOW_CODE_TOOL_NAMES) {
+      expect(names).not.toContain(name);
+    }
   });
 
   it("registers tree_sitter_* expert tools", () => {

@@ -43,6 +43,25 @@ After install, pi gets:
 
 Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. Each family is owned and documented by its own package:
 
+## V2 workflow roadmap
+
+Phase 0 adds an internal design skeleton only. **The current runtime tool surface remains unchanged in Phase 0.**
+
+Planned future workflow-oriented `code_*` surface:
+
+- `code_resolve`
+- `code_context`
+- `code_find`
+- `code_graph`
+- `code_impact`
+- `code_refactor`
+- `code_apply`
+- `code_health`
+
+The design source of truth for that future surface now lives in `src/workflow/`. It contains types, schemas, and metadata for later phases, but it does **not** register active tools yet.
+
+Until later replacement phases land, raw `lsp_*` and `tree_sitter_*` tools remain public and install exactly as they do today.
+
 This package is for questions like:
 
 - what is in this package or directory?
@@ -151,7 +170,8 @@ const overview = generateOverview(model);
 - `src/use-case/` — typed orchestration modules for brief, relations, affected, and pattern
 - `src/presentation/markdown/` — markdown renderers that format use-case results
 - `src/targeting/` — typed target-resolution pipeline
-- `src/tool/tool-specs.ts` — single source of truth for the public tool surface
+- `src/tool/tool-specs.ts` — single source of truth for the current public tool surface
 - `src/tool/register-tools.ts` — focused tool registration wiring
 - `src/tool/guidance.ts` — prompt surfaces derived from tool specs
 - `src/tool/execute-*.ts` — thin adapters that validate params and route to use-case/presentation layers
+- `src/workflow/` — Phase 0 V2 skeleton: planned workflow tool schemas, handle/result contracts, and future-surface metadata (not active registration)

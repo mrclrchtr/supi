@@ -4,7 +4,11 @@ import {
   type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it } from "vitest";
-import type { PlannerRoute } from "../../src/intent/types.ts";
+import type { CodeIntelligenceToolName, PlannerRoute } from "../../src/intent/types.ts";
+
+function asToolName(name: CodeIntelligenceToolName): CodeIntelligenceToolName {
+  return name;
+}
 
 describe("Planner routing", () => {
   afterEach(() => {
@@ -41,40 +45,40 @@ describe("Planner routing", () => {
     it("routes code_references to semantic-preferred", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", "code_references" as any);
+      const route = routeFor("/project", asToolName("code_references"));
       expect(route.preferred).toBe("semantic");
     });
 
     it("routes code_calls to structural-preferred", async () => {
       registerStructural();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", "code_calls" as any);
+      const route = routeFor("/project", asToolName("code_calls"));
       expect(route.preferred).toBe("structural");
     });
 
     it("routes code_implementations to semantic-preferred", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", "code_implementations" as any);
+      const route = routeFor("/project", asToolName("code_implementations"));
       expect(route.preferred).toBe("semantic");
     });
 
     it("returns unavailable for code_references when only structural is available", async () => {
       registerStructural();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      expect(routeFor("/project", "code_references" as any).preferred).toBe("unavailable");
+      expect(routeFor("/project", asToolName("code_references")).preferred).toBe("unavailable");
     });
 
     it("returns unavailable for code_calls when only semantic is available", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      expect(routeFor("/project", "code_calls" as any).preferred).toBe("unavailable");
+      expect(routeFor("/project", asToolName("code_calls")).preferred).toBe("unavailable");
     });
 
     it("routes code_refactor_plan to semantic-preferred when refactor-capable semantic is available", async () => {
       registerSemanticWithRename();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", "code_refactor_plan" as any);
+      const route = routeFor("/project", asToolName("code_refactor_plan"));
       expect(route.preferred).toBe("semantic");
     });
 
@@ -88,7 +92,7 @@ describe("Planner routing", () => {
     it("returns unavailable for code_references when refactor is needed but only structural is available", async () => {
       registerStructural();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      expect(routeFor("/project", "code_references" as any).preferred).toBe("unavailable");
+      expect(routeFor("/project", asToolName("code_references")).preferred).toBe("unavailable");
     });
 
     it("returns unavailable for code_affected when semantic analysis is unavailable", async () => {
