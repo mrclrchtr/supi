@@ -4,6 +4,7 @@
 
 import type { ImplementationEntry } from "../../analysis/implementations/service.ts";
 
+// biome-ignore lint/complexity/useMaxParams: render function with independent display parameters
 export function renderImplementationsResult(
   impls: ImplementationEntry[],
   externalCount: number,

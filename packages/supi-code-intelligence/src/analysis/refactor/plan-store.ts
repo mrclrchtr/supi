@@ -35,6 +35,7 @@ export function computeFileFingerprint(file: string): string {
 }
 
 /** Generate a stable plan id from operation details. */
+// biome-ignore lint/complexity/useMaxParams: plan id construction needs all positional args
 export function generatePlanId(
   operation: string,
   file: string,

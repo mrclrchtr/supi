@@ -31,6 +31,7 @@ export interface ReferencesResult {
  * Filters out the declaration position from LSP results
  * so references reports usages, not the definition itself.
  */
+// biome-ignore lint/complexity/useMaxParams: service wrapper matching underlying provider contract
 export async function collectReferences(
   targetFile: string,
   targetPosition: { line: number; character: number },

@@ -20,6 +20,7 @@ export interface CodeReferencesToolParams {
   maxResults?: number;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestrator with multi-branch resolution logic
 export async function executeReferencesTool(
   params: CodeReferencesToolParams,
   ctx: { cwd: string },

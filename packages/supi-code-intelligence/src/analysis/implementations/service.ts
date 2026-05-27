@@ -26,6 +26,7 @@ export interface ImplementationsResult {
 /**
  * Collect semantic implementations for a target file/position.
  */
+// biome-ignore lint/complexity/useMaxParams: service wrapper matching underlying provider contract
 export async function collectServiceImplementations(
   targetFile: string,
   targetPosition: { line: number; character: number },

@@ -26,6 +26,7 @@ export interface CallsResult {
 /**
  * Collect structural outgoing calls at a target file/position.
  */
+// biome-ignore lint/complexity/useMaxParams: service wrapper matching underlying provider contract
 export async function collectOutgoingCalls(
   targetFile: string,
   targetLine: number,

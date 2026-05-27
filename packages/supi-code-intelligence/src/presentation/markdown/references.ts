@@ -5,6 +5,7 @@
 import type { ReferenceEntry } from "../../analysis/references/service.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
 
+// biome-ignore lint/complexity/useMaxParams: render function with independent display parameters
 export function renderReferencesResult(
   symbolName: string,
   refs: ReferenceEntry[],
