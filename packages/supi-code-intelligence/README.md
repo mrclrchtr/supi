@@ -28,8 +28,7 @@ pi install ./packages/supi-code-intelligence
 
 After install, pi gets:
 
-- `code_brief` — interpretive orientation for a project, package, directory, file, or symbol
-- `code_map` — factual repo/package/directory inventory
+- `code_brief` — interpretive orientation with structural enrichment for a project, package, directory, file, or symbol
 - `code_references` — semantic references/usages for a resolved target
 - `code_calls` — structural outgoing calls from an enclosing function or method
 - `code_implementations` — semantic implementation lookup for an interface, class, or method
@@ -60,12 +59,9 @@ This package is for questions like:
 ## Tool overview
 
 ### `code_brief`
-Interpretive orientation. Use for prioritized context, start-here guidance, and project/package/directory/file/symbol overview.
+Interpretive orientation with structural enrichment. Use for prioritized context, start-here guidance, and project/package/directory/file/symbol overview.
 
-When a code provider is available, file briefs include structural context (outline, imports, exports) from tree-sitter and inline diagnostics from LSP. Module briefs show aggregate diagnostics across source files. `maxResults` controls section caps.
-
-### `code_map`
-Strictly factual inventory. Accepts the repo root, a package root, or **any directory path**. Rejects file paths.
+When a code provider is available, file briefs include structural context (outline, imports, exports) from tree-sitter and inline diagnostics from LSP. Directory and module briefs include extension breakdown and landmark files. Module briefs show aggregate diagnostics across source files. `maxResults` controls section caps.
 
 ### `code_references`
 Semantic usages of a resolved target. Uses LSP references. Reports references, not call sites.
@@ -152,7 +148,7 @@ const overview = generateOverview(model);
 ## Source
 
 - `src/code-intelligence.ts` — extension entry point: overview injection and tool registration
-- `src/use-case/` — typed orchestration modules for brief, map, relations, affected, and pattern
+- `src/use-case/` — typed orchestration modules for brief, relations, affected, and pattern
 - `src/presentation/markdown/` — markdown renderers that format use-case results
 - `src/targeting/` — typed target-resolution pipeline
 - `src/tool/tool-specs.ts` — single source of truth for the public tool surface

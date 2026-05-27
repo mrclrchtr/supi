@@ -2,12 +2,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeMapTool } from "../../src/tool/execute-map.ts";
+import { executeBriefTool } from "../../src/tool/execute-brief.ts";
 
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-map-"));
+  tmpDir = mkdtempSync(path.join(os.tmpdir(), "brief-enrich-"));
 });
 
 afterEach(() => {
@@ -20,55 +20,56 @@ function writeFile(relativePath: string, content: string) {
   writeFileSync(fullPath, content, "utf-8");
 }
 
-describe("executeMapTool", () => {
-  it("returns a factual repo map for the workspace root", async () => {
+describe("directory brief enrichment", () => {
+  it("includes extension breakdown and landmarks for workspace root module", async () => {
     writeFile("package.json", "{}");
     writeFile("src/app.ts", "export const app = 1;");
     writeFile("src/lib/util.ts", "export const util = 2;");
     writeFile("src/routes/home.tsx", "export default () => {};");
     writeFile("docs/readme.md", "# Docs");
 
-    const result = await executeMapTool({}, { cwd: tmpDir });
+    const result = await executeBriefTool({ path: "." }, { cwd: tmpDir });
 
-    expect(result.content).toContain("# Code Map: .");
     expect(result.content).toContain("TypeScript: 2");
     expect(result.content).toContain("TSX: 1");
-    expect(result.content).toContain("src/ (3 files)");
-    expect(result.content).toContain("docs/ (1 file)");
+    expect(result.content).toContain("Markdown: 1");
     expect(result.content).toContain("Landmark files");
     expect(result.content).toContain("package.json");
     expect(result.content).not.toContain("startHere");
   });
 
-  it("accepts a package directory path", async () => {
+  it("includes extension breakdown for a nested package directory", async () => {
+    writeFile("package.json", "{}");
     writeFile("packages/app/package.json", "{}");
     writeFile("packages/app/src/main.ts", "export default function main() {}");
     writeFile("packages/app/src/routes/home.ts", "export const home = 1;");
 
-    const result = await executeMapTool({ path: "packages/app" }, { cwd: tmpDir });
+    const result = await executeBriefTool({ path: "packages/app" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("# Code Map: packages/app");
-    expect(result.content).toContain("src/ (2 files)");
+    expect(result.content).toContain("TypeScript: 2");
+    expect(result.content).toContain("JSON: 1");
+    expect(result.content).toContain("`src/` — 2 files");
+    expect(result.content).toContain("Landmark files");
     expect(result.content).toContain("package.json");
   });
 
-  it("accepts any nested directory path", async () => {
+  it("includes extension breakdown for any nested directory", async () => {
+    writeFile("package.json", "{}");
     writeFile("packages/app/src/main.ts", "export default function main() {}");
     writeFile("packages/app/src/lib/util.ts", "export const util = 1;");
     writeFile("packages/app/src/lib/more.ts", "export const more = 2;");
 
-    const result = await executeMapTool({ path: "packages/app/src" }, { cwd: tmpDir });
+    const result = await executeBriefTool({ path: "packages/app/src" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("# Code Map: packages/app/src");
-    expect(result.content).toContain("lib/ (2 files)");
+    expect(result.content).toContain("TypeScript: 3");
   });
 
-  it("rejects file paths", async () => {
-    writeFile("packages/app/package.json", "{}");
+  it("handles file paths gracefully", async () => {
+    writeFile("src/index.ts", "export const x = 1;");
 
-    const result = await executeMapTool({ path: "packages/app/package.json" }, { cwd: tmpDir });
+    const result = await executeBriefTool({ file: "src/index.ts" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("**Error:** code_map requires a directory path");
-    expect(result.details).toBeUndefined();
+    expect(result.content).not.toContain("code_map");
+    expect(result.content).toContain("index.ts");
   });
 });

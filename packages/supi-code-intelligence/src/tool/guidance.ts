@@ -30,7 +30,6 @@ const INTENT_GUIDELINES: Record<CodeIntelligenceToolName, string[]> = {
     "The planner selects the best provider (semantic or structural) automatically.",
     "After code_brief, use lsp_hover/lsp_definition/lsp_references for deeper semantic detail or tree_sitter_* for quick structural context.",
   ],
-  code_map: ["Use code_brief instead when you need prioritized guidance."],
   code_references: [
     "Reports semantic references/usages of a symbol. Does not report callers specifically.",
     "Requires an active LSP server. Does not fall back to text search.",

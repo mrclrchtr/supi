@@ -1,9 +1,9 @@
 # @mrclrchtr/supi-code-intelligence
 
-Architecture briefs, factual code maps, relationship tracing, impact assessment, explicit search, and direct-apply semantic refactoring for pi.
+Architecture briefs with structural enrichment, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_map`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_pattern`, `code_refactor_plan`, `code_refactor_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_pattern`, `code_refactor_plan`, `code_refactor_apply`)
 - May include cross-family orchestration guidance that steers the model between `code_*`, `lsp_*`, and `tree_sitter_*` tools; guidance routes by user intent first, substrate family second
 - Installing this package activates all three tool families (`code_*`, `lsp_*`, `tree_sitter_*`)
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
@@ -17,7 +17,7 @@ src/
 ├── extension.ts            # Re-exports code-intelligence.ts for pi extension discovery
 ├── index.ts                # Public API exports for programmatic consumers
 ├── api.ts                  # Re-export surface for @mrclrchtr/supi-code-intelligence/api
-├── types.ts                # Result metadata types (BriefDetails, MapDetails, SearchDetails, etc.)
+├── types.ts                # Result metadata types (BriefDetails, SearchDetails, AffectedDetails, etc.)
 ├── brief.ts                # Public facade for brief/overview helpers (compatibility shim)
 ├── brief-focused.ts        # Directory/file/symbol focused brief generation
 ├── git-context.ts          # Git branch, dirty files, last commit helpers
@@ -69,7 +69,6 @@ src/
 │   ├── register-tools.ts       # Focused Pi tool registration (iterates over specs)
 │   ├── validation.ts           # Shared parameter validation
 │   ├── execute-brief.ts        # code_brief tool executor
-│   ├── execute-map.ts          # code_map tool executor
 │   ├── execute-references.ts   # code_references tool executor
 │   ├── execute-calls.ts        # code_calls tool executor
 │   ├── execute-implementations.ts # code_implementations tool executor
@@ -80,7 +79,6 @@ src/
 ├── presentation/markdown/
 │   ├── overview.ts             # Hidden overview markdown renderer
 │   ├── brief.ts                # Brief markdown renderer
-│   ├── map.ts                  # Factual map markdown renderer
 │   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
 │   ├── affected.ts             # Affected markdown renderer
 │   ├── pattern.ts              # Pattern search markdown renderer
@@ -106,8 +104,11 @@ Interpretive orientation tool. The planner selects the best provider (semantic o
 
 **`maxResults`** — Controls section caps: outline items (default 15), imports (default 10), exports (default 10), diagnostic messages (default 5), source file listings (default 10). When omitted, defaults apply.
 
-### `code_map`
-Strictly factual inventory tool. Accepts the repo root, a package root, or **any directory path**. Rejects file paths.
+**Directory brief enrichment** — When targeting a directory, briefs include:
+- **Extension breakdown** — per-extension file counts across the full tree
+- **Landmark files** — well-known project configuration files (`package.json`, `tsconfig.json`, etc.)
+
+**Module brief enrichment** — Module root briefs include the same extension breakdown and landmarks as directory briefs, plus aggregate diagnostics across source files when LSP is active.
 
 ### `code_references`
 Semantic references/usages for a resolved target. Uses LSP internally.
@@ -139,13 +140,11 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 - When no capability is available, the planner returns `preferred: "unavailable"` and the execute function returns an explicit error message.
 
 ### Public-surface split
-- `code_map` must stay factual. Do not add prioritized "start here" guidance there.
 - `code_pattern` is the sole heuristic/search-oriented tool.
 - `code_references`, `code_calls`, `code_implementations`, and `code_affected` should prefer explicit unavailable states over text-search guesses.
 
 ### Param validation
 - `line`/`character` require `file`, **not** `path`.
-- `code_map` should reject file paths.
 - `code_refactor_plan` requires `file`, `line`, `character`, `operation`, and `newName`.
 - `code_refactor_apply` requires `planId`.
 

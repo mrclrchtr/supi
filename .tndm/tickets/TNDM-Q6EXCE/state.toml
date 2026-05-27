@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:21.538118Z"
+revision = 33
+
+[document_fingerprints]
+archive = "sha256:e793f702c84c4273784bc10f6d0b39d15e83e954a7d3832a981bd0ea1d28f5e4"
+content = "sha256:7349ef046b677ee16a6723868cda91f5fe1faea72a5e9031d10141241dc0fd41"
+task-01 = "sha256:955403b19406a4b3bf5ab9ebdc7116903ccfd20c570325041ed73ac2e7f78213"
+task-02 = "sha256:81bd1758fa5268fdf06765b4cfa7dd461149850ebf1b68c0c6d289bf717c2b0b"
+task-03 = "sha256:ea13da9acb29f967fb929983ddc43064122a29f000055fff46e32616b3a193ea"
+task-04 = "sha256:c010ce28be5914f5f14659803f93eb14b0902b23eba3e764811d2f4181754a53"
+task-05 = "sha256:194cf1153ba06cfb5fad464b189b9625c91b07d8079253caf9dc959aa0487a89"
+task-06 = "sha256:3319d5b171ef2a7056020dfe2811da29268ec2df0bd550e040254c2f61c04b18"
+
+[[tasks]]
+number = 1
+title = "Task 1 (RED): Rewrite map-action tests for directory brief enrichment"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Task 2 (GREEN): Remove code_map from public tool surface"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Task 3 (GREEN): Enrich directory brief with factual inventory"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Task 4 (GREEN): Delete dead files and MapDetails type"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Task 5: Update docs"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Task 6: Final verification — typecheck, tests, stale reference scan"
+status = "done"

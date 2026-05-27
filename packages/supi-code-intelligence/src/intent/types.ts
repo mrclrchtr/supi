@@ -8,7 +8,6 @@
 /** Canonical code-intelligence tool names. */
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_brief",
-  "code_map",
   "code_references",
   "code_calls",
   "code_implementations",

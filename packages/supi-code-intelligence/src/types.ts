@@ -32,15 +32,6 @@ export interface BriefDetails {
   prioritySignals?: PrioritySignalsSummary | null;
 }
 
-/** Structured details metadata for factual map results. */
-export interface MapDetails {
-  scope: string | null;
-  totalFiles: number;
-  childDirectoryCount: number;
-  landmarkCount: number;
-  nextQueries: string[];
-}
-
 /** Structured details metadata for relationship and pattern results. */
 export interface SearchDetails {
   confidence: ConfidenceMode;
@@ -80,7 +71,6 @@ export interface CodeIntelResult {
   content: string;
   details?:
     | { type: "brief"; data: BriefDetails }
-    | { type: "map"; data: MapDetails }
     | { type: "search"; data: SearchDetails }
     | { type: "affected"; data: AffectedDetails };
 }

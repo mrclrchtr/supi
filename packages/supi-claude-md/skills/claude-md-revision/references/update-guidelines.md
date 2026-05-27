@@ -105,7 +105,7 @@ Remove:
 These sections MUST be removed — they duplicate what SuPi extensions already inject and waste tokens every session:
 - Package/module tables that match `code_brief` output
 - Package layout / project structure sections that just list packages with descriptions
-- Architecture trees that restate what `code_map` or `code_intelligence` auto-deliver
+- Architecture trees that restate what `code_brief` or `code_intelligence` auto-deliver
 - Dependency graphs derivable from workspace manifests
 - Root directory trees that just restate the folder layout
 

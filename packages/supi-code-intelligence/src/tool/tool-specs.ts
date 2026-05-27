@@ -5,7 +5,6 @@ import { executeAffectedTool } from "./execute-affected.ts";
 import { executeBriefTool } from "./execute-brief.ts";
 import { executeCallsTool } from "./execute-calls.ts";
 import { executeImplementationsTool } from "./execute-implementations.ts";
-import { executeMapTool } from "./execute-map.ts";
 import { executePatternTool } from "./execute-pattern.ts";
 import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
@@ -37,13 +36,6 @@ const CodeBriefParameters = Type.Object(
     character: Type.Optional(CharacterParam),
     symbol: Type.Optional(SymbolParam),
     maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-const CodeMapParameters = Type.Object(
-  {
-    path: Type.Optional(Type.String({ description: "Project/package/dir path" })),
   },
   { additionalProperties: false },
 );
@@ -149,15 +141,6 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     ],
     parameters: CodeBriefParameters,
     run: (params, ctx) => executeBriefTool(params as Parameters<typeof executeBriefTool>[0], ctx),
-  },
-  {
-    name: "code_map",
-    label: "Code Map",
-    description: "Factual map of a repo, package, or directory.",
-    promptSnippet: "code_map — factual repo or directory map",
-    basePromptGuidelines: ["Use code_map for counts, directories, language mix, and landmarks."],
-    parameters: CodeMapParameters,
-    run: (params, ctx) => executeMapTool(params as Parameters<typeof executeMapTool>[0], ctx),
   },
   {
     name: "code_references",

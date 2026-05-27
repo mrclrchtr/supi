@@ -5,7 +5,6 @@ import { buildArchitectureModel } from "@mrclrchtr/supi-code-intelligence/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
-import { executeMapTool } from "../../src/tool/execute-map.ts";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
@@ -185,18 +184,6 @@ describe("structured details via tool adapters and action routers", () => {
       expect(result.details.data.confidence).toBe("structural");
       expect(result.details.data.focusTarget).toBeNull();
       expect(result.details.data.dependencySummary?.moduleCount).toBe(3);
-    }
-  });
-
-  it("returns dedicated map details for the code_map tool", async () => {
-    setupWorkspace();
-    const result = await executeMapTool({}, { cwd: tmpDir });
-    expect(result.details).toBeDefined();
-    expect(result.details?.type).toBe("map");
-    if (result.details?.type === "map") {
-      expect(result.details.data.scope).toBe(".");
-      expect(result.details.data.totalFiles).toBeGreaterThan(0);
-      expect(result.details.data.childDirectoryCount).toBeGreaterThanOrEqual(1);
     }
   });
 
