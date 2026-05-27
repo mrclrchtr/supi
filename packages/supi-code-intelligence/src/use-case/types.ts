@@ -1,8 +1,8 @@
 // Shared typed data interfaces between use-case and presentation layers.
 
+import type { CodeProvider } from "../analysis/context/request-context.ts";
 import type { ArchitectureModel } from "../model.ts";
 import type { BriefDetails } from "../types.ts";
-import type { CodeProvider } from "../workspace/request-context.ts";
 
 // ── Overview use-case ────────────────────────────────────────────────
 
@@ -25,11 +25,11 @@ export interface OverviewData {
 // ── Brief use-case ───────────────────────────────────────────────────
 
 export type BriefInput =
-  | { kind: "project" }
-  | { kind: "path"; path: string }
-  | { kind: "file"; file: string }
-  | { kind: "anchored"; file: string; line: number; character: number }
-  | { kind: "symbol"; symbol: string; path?: string };
+  | { kind: "project"; maxResults?: number }
+  | { kind: "path"; path: string; maxResults?: number }
+  | { kind: "file"; file: string; maxResults?: number }
+  | { kind: "anchored"; file: string; line: number; character: number; maxResults?: number }
+  | { kind: "symbol"; symbol: string; path?: string; maxResults?: number };
 
 export interface BriefDeps {
   model: ArchitectureModel | null;

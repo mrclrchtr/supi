@@ -70,7 +70,10 @@ export async function createAnalysisBriefService(
     case "path":
     case "file": {
       const focusPath = input.path ?? input.file ?? input.cwd;
-      const result = generateFocusedBrief(model, focusPath);
+      const result = await generateFocusedBrief(model, focusPath, {
+        provider: null,
+        cwd: input.cwd,
+      });
       return { content: result.content, details: result.details };
     }
     default: {

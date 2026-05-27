@@ -11,14 +11,14 @@
  * This session coordinates local state *around* it.
  */
 
-import type { LspAdapterState } from "../substrate/semantic/state.ts";
-import type { TsAdapterState } from "../substrate/structural/state.ts";
+import type { LspAdapterState } from "../lsp/runtime-state.ts";
+import type { TsAdapterState } from "../tree-sitter/session-lifecycle.ts";
 
 /**
  * Adapter state slots that workspace-session coordinates.
  *
  * The actual lifecycle (init, teardown, capability publishing) is
- * owned by `substrate/semantic/state.ts` and `substrate/structural/state.ts`.
+ * owned by `lsp/runtime-state.ts` and `tree-sitter/session-lifecycle.ts`.
  * The workspace session holds references to those adapter instances.
  */
 export interface AdapterStateSlots {

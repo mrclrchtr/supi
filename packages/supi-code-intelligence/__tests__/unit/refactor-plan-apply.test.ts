@@ -52,7 +52,7 @@ describe("code_refactor_plan", () => {
       createSemanticProvider(async () => ({ kind: "precise", edits: { edits: [] } })),
     );
 
-    const { routeFor } = await import("../../src/planner/planner.ts");
+    const { routeFor } = await import("../../src/analysis/routing/planner.ts");
     const route = routeFor("/project", "code_refactor_plan");
     expect(route.preferred).toBe("semantic");
     expect(route.refactorAvailable).toBe(true);

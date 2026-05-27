@@ -2,6 +2,7 @@
 // Coordinates ripgrep literal/regex search and structured tree-sitter search,
 // returning fully rendered content + details metadata.
 
+import type { CodeProvider } from "../analysis/context/request-context.ts";
 import { getStructuredPatternMatches, isStructuredPatternKind } from "../pattern-structured.ts";
 import {
   renderPatternResults,
@@ -14,7 +15,6 @@ import type { CodeQueryParams } from "../query-params.ts";
 import type { RgMatch } from "../search-helpers.ts";
 import { normalizePath, runRipgrep, runRipgrepDetailed } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
-import type { CodeProvider } from "../workspace/request-context.ts";
 
 export interface PatternInput {
   pattern: string;

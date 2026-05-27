@@ -62,6 +62,8 @@ This package is for questions like:
 ### `code_brief`
 Interpretive orientation. Use for prioritized context, start-here guidance, and project/package/directory/file/symbol overview.
 
+When a code provider is available, file briefs include structural context (outline, imports, exports) from tree-sitter and inline diagnostics from LSP. Module briefs show aggregate diagnostics across source files. `maxResults` controls section caps.
+
 ### `code_map`
 Strictly factual inventory. Accepts the repo root, a package root, or **any directory path**. Rejects file paths.
 

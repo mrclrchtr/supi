@@ -3,6 +3,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { CodeProvider } from "../analysis/context/request-context.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import type { ArchitectureModel } from "../model.ts";
 import { findModuleForPath } from "../model.ts";
@@ -10,7 +11,6 @@ import { renderAnchoredBrief, renderSymbolBrief } from "../presentation/markdown
 import { normalizePath } from "../search-helpers.ts";
 import type { TargetResolutionResult } from "../target-resolution.ts";
 import { resolveSymbolTarget } from "../target-resolution.ts";
-import type { CodeProvider } from "../workspace/request-context.ts";
 import type { BriefDeps, BriefInput, BriefUseCaseResult } from "./types.ts";
 
 // ── TreeSitterContext is an intermediate data shape from the use-case ──
@@ -35,9 +35,9 @@ export async function executeBrief(
       }
       return noModelResult();
     case "path":
-      return executePathBrief(input.path, deps);
+      return executePathBrief(input.path, deps, input);
     case "file":
-      return executeFileBrief(input.file, deps);
+      return executeFileBrief(input.file, deps, input);
     case "anchored":
       return executeAnchoredBrief(input, deps);
     case "symbol":
@@ -57,21 +57,41 @@ function executeProjectBrief(model: ArchitectureModel): BriefUseCaseResult {
 
 // ── Path / file briefs ────────────────────────────────────────────────
 
-function executePathBrief(requestPath: string, deps: BriefDeps): BriefUseCaseResult {
+async function executePathBrief(
+  requestPath: string,
+  deps: BriefDeps,
+  input: BriefInput,
+): Promise<BriefUseCaseResult> {
   if (!deps.model) {
     return noModelResult();
   }
   const resolved = normalizePath(requestPath, deps.cwd);
-  const result = generateFocusedBrief(deps.model, resolved);
+  const maxResults =
+    "maxResults" in input ? (input as { maxResults?: number }).maxResults : undefined;
+  const result = await generateFocusedBrief(deps.model, resolved, {
+    provider: deps.provider,
+    cwd: deps.cwd,
+    maxResults,
+  });
   return { content: result.content, details: result.details };
 }
 
-function executeFileBrief(file: string, deps: BriefDeps): BriefUseCaseResult {
+async function executeFileBrief(
+  file: string,
+  deps: BriefDeps,
+  input: BriefInput,
+): Promise<BriefUseCaseResult> {
   if (!deps.model) {
     return noModelResult();
   }
   const resolved = normalizePath(file, deps.cwd);
-  const result = generateFocusedBrief(deps.model, resolved);
+  const maxResults =
+    "maxResults" in input ? (input as { maxResults?: number }).maxResults : undefined;
+  const result = await generateFocusedBrief(deps.model, resolved, {
+    provider: deps.provider,
+    cwd: deps.cwd,
+    maxResults,
+  });
   return { content: result.content, details: result.details };
 }
 

@@ -43,15 +43,4 @@ describe("relations service", () => {
 
     expect(result.kind).toBe("callees");
   });
-
-  it("dispatches through service.ts", async () => {
-    const { executeRelationsService } = await import("../../../src/analysis/relations/service.ts");
-
-    const result = await executeRelationsService(
-      { kind: "callers", cwd: "/project" },
-      { cwd: "/project", provider: null },
-    );
-
-    expect(result).toBeDefined();
-  });
 });

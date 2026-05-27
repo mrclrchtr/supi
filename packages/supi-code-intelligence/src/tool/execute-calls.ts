@@ -7,11 +7,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { collectOutgoingCalls } from "../analysis/calls/service.ts";
-import { routeFor } from "../planner/planner.ts";
+import { getCodeProvider } from "../analysis/context/request-context.ts";
+import { routeFor } from "../analysis/routing/planner.ts";
 import { renderCallsResult } from "../presentation/markdown/calls.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
-import { getCodeProvider } from "../workspace/request-context.ts";
 
 export interface CodeCallsToolParams {
   file: string;

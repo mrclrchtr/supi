@@ -51,14 +51,14 @@ describe("code_refactor_plan routing", () => {
       createSemanticProvider(async () => ({ kind: "precise", edits: { edits: [] } })),
     );
 
-    const { routeFor } = await import("../../src/planner/planner.ts");
+    const { routeFor } = await import("../../src/analysis/routing/planner.ts");
     const route = routeFor("/project", "code_refactor_plan");
     expect(route.preferred).toBe("semantic");
     expect(route.refactorAvailable).toBe(true);
   });
 
   it("routes code_refactor_plan to unavailable when no refactor-capable provider exists", async () => {
-    const { routeFor } = await import("../../src/planner/planner.ts");
+    const { routeFor } = await import("../../src/analysis/routing/planner.ts");
     const route = routeFor("/project", "code_refactor_plan");
     expect(route.preferred).toBe("unavailable");
     expect(route.refactorAvailable).toBe(false);
@@ -71,7 +71,7 @@ describe("code_refactor_plan routing", () => {
       createSemanticProvider(async () => ({ kind: "precise", edits: { edits: [] } })),
     );
 
-    const { routeFor } = await import("../../src/planner/planner.ts");
+    const { routeFor } = await import("../../src/analysis/routing/planner.ts");
     const route = routeFor("/project", "code_refactor_apply");
     expect(route.semanticAvailable).toBe(true);
   });

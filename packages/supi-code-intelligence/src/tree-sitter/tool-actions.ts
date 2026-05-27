@@ -11,7 +11,7 @@ import {
   handleNodeAt,
   handleOutline,
   handleQuery,
-} from "../tool/families/tree-sitter/execute.ts";
+} from "./execute.ts";
 
 /** Execute a tree-sitter tool by name against a runtime. */
 export async function executeTsTool(

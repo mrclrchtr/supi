@@ -99,7 +99,7 @@ describe("focused brief details metadata", () => {
   it("includes confidence for module brief", async () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
-    const { details } = generateFocusedBrief(
+    const { details } = await generateFocusedBrief(
       model as NonNullable<typeof model>,
       path.join(tmpDir, "packages", "core"),
     );
@@ -111,7 +111,7 @@ describe("focused brief details metadata", () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
     const appDir = path.join(tmpDir, "packages", "app");
-    const { details } = generateFocusedBrief(model as NonNullable<typeof model>, appDir);
+    const { details } = await generateFocusedBrief(model as NonNullable<typeof model>, appDir);
     expect(details.dependencySummary).not.toBeNull();
     expect(details.dependencySummary?.moduleCount).toBe(1);
   });
@@ -119,7 +119,10 @@ describe("focused brief details metadata", () => {
   it("reports unavailable confidence for missing path", async () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
-    const { details } = generateFocusedBrief(model as NonNullable<typeof model>, "/does/not/exist");
+    const { details } = await generateFocusedBrief(
+      model as NonNullable<typeof model>,
+      "/does/not/exist",
+    );
     expect(details.confidence).toBe("unavailable");
   });
 
@@ -127,7 +130,7 @@ describe("focused brief details metadata", () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
     const appDir = path.join(tmpDir, "packages", "app");
-    const { details } = generateFocusedBrief(model as NonNullable<typeof model>, appDir);
+    const { details } = await generateFocusedBrief(model as NonNullable<typeof model>, appDir);
     expect(details.startHere.length).toBeGreaterThan(0);
     expect(details.startHere[0].reason).toContain("entrypoint");
   });
@@ -136,7 +139,7 @@ describe("focused brief details metadata", () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
     const coreDir = path.join(tmpDir, "packages", "core");
-    const { details } = generateFocusedBrief(model as NonNullable<typeof model>, coreDir);
+    const { details } = await generateFocusedBrief(model as NonNullable<typeof model>, coreDir);
     expect(details.nextQueries.length).toBeGreaterThan(0);
     const affectedHint = details.nextQueries.find((q) => q.includes("affected"));
     expect(affectedHint).toBeDefined();
@@ -163,7 +166,7 @@ describe("focused brief details metadata", () => {
 
     const model = await buildArchitectureModel(tmpDir);
     const coreFile = path.join(tmpDir, "packages", "core", "index.ts");
-    const { details } = generateFocusedBrief(model as NonNullable<typeof model>, coreFile);
+    const { details } = await generateFocusedBrief(model as NonNullable<typeof model>, coreFile);
 
     expect(details.prioritySignals).not.toBeNull();
     expect(details.prioritySignals?.lowCoverageCount).toBe(1);

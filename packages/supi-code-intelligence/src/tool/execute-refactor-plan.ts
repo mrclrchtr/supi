@@ -14,7 +14,7 @@ import {
   storePlan,
 } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
-import { routeFor } from "../planner/planner.ts";
+import { routeFor } from "../analysis/routing/planner.ts";
 import { renderRefactorPlanResult } from "../presentation/markdown/refactor.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";

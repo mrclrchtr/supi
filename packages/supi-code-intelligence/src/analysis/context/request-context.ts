@@ -77,6 +77,9 @@ export function getCodeProviderState(cwd: string): CodeProviderState {
   };
 }
 
+/** Alias for getCodeProviderState — kept for backward compatibility. */
+export const getCodeProvider = getCodeProviderState;
+
 /**
  * Create a single CodeProvider that delegates semantic methods to the
  * semantic (LSP) provider and structural methods to the structural

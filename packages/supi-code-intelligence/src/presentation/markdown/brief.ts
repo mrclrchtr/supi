@@ -157,6 +157,141 @@ function getOutlinePrefix(kind: string): string {
   return "·";
 }
 
+// ── File brief ───────────────────────────────────────────────────────
+
+interface FileBriefInput {
+  relPath: string;
+  lineCount: number;
+  isEntrypoint: boolean;
+  moduleName: string | null;
+  moduleRelativePath: string | null;
+  enrichment: {
+    outline: Array<{ name: string; kind: string; startLine: number; endLine: number }>;
+    imports: Array<{ moduleSpecifier: string }>;
+    exports: Array<{ name: string; kind: string }>;
+    diagnostics: Array<{ line: number; severity: number; message: string }>;
+  };
+  maxResults?: number;
+}
+
+export function renderFileBrief(input: FileBriefInput): string {
+  const lines: string[] = [];
+  lines.push(`# File: ${input.relPath}`);
+  lines.push("");
+
+  if (input.moduleName) {
+    lines.push(`_Module: ${input.moduleName} (\`${input.moduleRelativePath}\`)_`);
+    lines.push("");
+  }
+
+  if (input.isEntrypoint) {
+    lines.push("**This file is a module entrypoint.**");
+    lines.push("");
+  }
+
+  lines.push(`- Lines: ${input.lineCount}`);
+  lines.push("");
+
+  // Diagnostics section (inline first diagnostic messages)
+  appendDiagnosticsSection(lines, input.enrichment.diagnostics, input.maxResults);
+
+  // Structural context (outline, imports, exports)
+  if (input.enrichment.outline.length > 0) {
+    lines.push("## File Outline");
+    const shown = input.enrichment.outline;
+    for (const item of shown) {
+      const prefix = getOutlinePrefix(item.kind);
+      lines.push(`- ${prefix} \`${item.name}\` (${item.kind}) L${item.startLine}`);
+    }
+    lines.push("");
+  }
+
+  if (input.enrichment.imports.length > 0) {
+    lines.push("## Imports");
+    for (const imp of input.enrichment.imports) {
+      lines.push(`- \`${imp.moduleSpecifier}\``);
+    }
+    lines.push("");
+  }
+
+  if (input.enrichment.exports.length > 0) {
+    lines.push("## Exports");
+    for (const exp of input.enrichment.exports) {
+      lines.push(`- \`${exp.name}\` (${exp.kind})`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Next");
+  lines.push(
+    `- \`code_references\`, \`file: "${input.relPath}"\`, and a line/character for reference sites`,
+  );
+  if (input.moduleRelativePath) {
+    lines.push(
+      `- \`code_brief\` with \`path: "${input.moduleRelativePath}"\` for the containing module overview`,
+    );
+  }
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+// ── Module brief diagnostics section ─────────────────────────────────
+
+export function renderModuleDiagnostics(
+  fileDiagnostics: Array<{ file: string; errors: number; warnings: number }>,
+  maxResults?: number,
+): string | null {
+  if (fileDiagnostics.length === 0) return null;
+
+  const lines: string[] = [];
+  lines.push("## Diagnostics");
+  const cap = maxResults ?? 5;
+  for (const entry of fileDiagnostics.slice(0, cap)) {
+    const parts: string[] = [];
+    if (entry.errors > 0) parts.push(`${entry.errors} error${entry.errors > 1 ? "s" : ""}`);
+    if (entry.warnings > 0) parts.push(`${entry.warnings} warning${entry.warnings > 1 ? "s" : ""}`);
+    lines.push(`- \`${entry.file}\` — ${parts.join(", ")}`);
+  }
+  if (fileDiagnostics.length > cap) {
+    lines.push(`- _+${fileDiagnostics.length - cap} more files_`);
+  }
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+// ── Diagnostics section (inline) ─────────────────────────────────────
+
+function severityLabel(severity: number): string {
+  switch (severity) {
+    case 1:
+      return "Error";
+    case 2:
+      return "Warning";
+    case 3:
+      return "Info";
+    case 4:
+      return "Hint";
+    default:
+      return "Diagnostic";
+  }
+}
+
+function appendDiagnosticsSection(
+  lines: string[],
+  diagnostics: Array<{ line: number; severity: number; message: string }>,
+  _maxResults?: number,
+): void {
+  if (diagnostics.length === 0) return;
+
+  lines.push("## Diagnostics");
+  for (const d of diagnostics) {
+    lines.push(`- L${d.line}: ${severityLabel(d.severity)}: ${d.message}`);
+  }
+  lines.push("");
+}
+
 function appendNextQueries(
   lines: string[],
   relPath: string,

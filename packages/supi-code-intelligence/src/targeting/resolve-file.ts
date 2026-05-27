@@ -13,9 +13,9 @@ import type {
   SemanticProvider as SemanticSubstrate,
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { normalizePath } from "../search-helpers.ts";
 import { highestConfidence } from "../semantic-action-helpers.ts";
-import { getCodeProvider } from "../workspace/request-context.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 
 const BINARY_EXTENSIONS = new Set([

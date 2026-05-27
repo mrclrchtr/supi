@@ -4,22 +4,31 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 import { formatGitContext, gatherGitContext } from "./git-context.ts";
 import type { ArchitectureModel } from "./model.ts";
 import { findModuleForPath, getDependencies, getDependents } from "./model.ts";
+import { renderFileBrief, renderModuleDiagnostics } from "./presentation/markdown/brief.ts";
 import {
   appendPrioritySignalsSection,
   summarizePrioritySignalsForFiles,
 } from "./prioritization-signals.ts";
 import type { BriefDetails } from "./types.ts";
+import { gatherBriefEnrichment } from "./use-case/brief-enrich.ts";
+import type { BriefOpts } from "./use-case/brief-models.ts";
 
 /**
  * Generate a focused brief for a specific path (directory or file).
+ *
+ * When opts.provider is available, file briefs include structural
+ * context (outline, imports, exports) and inline diagnostics.
+ * Module briefs include aggregated diagnostics across source files.
  */
-export function generateFocusedBrief(
+export async function generateFocusedBrief(
   model: ArchitectureModel,
   focusPath: string,
-): { content: string; details: BriefDetails } {
+  opts?: BriefOpts,
+): Promise<{ content: string; details: BriefDetails }> {
   const resolvedPath = path.resolve(focusPath);
 
   if (!fs.existsSync(resolvedPath)) {
@@ -40,17 +49,18 @@ export function generateFocusedBrief(
   const stat = fs.statSync(resolvedPath);
 
   if (stat.isDirectory()) {
-    return generateDirectoryBrief(model, resolvedPath, focusPath);
+    return await generateDirectoryBrief(model, resolvedPath, focusPath, opts);
   }
 
-  return generateFileBrief(model, resolvedPath, focusPath);
+  return await generateFileBriefWithEnrichment(model, resolvedPath, focusPath, opts);
 }
 
-function generateDirectoryBrief(
+async function generateDirectoryBrief(
   model: ArchitectureModel,
   resolvedPath: string,
   originalPath: string,
-): { content: string; details: BriefDetails } {
+  opts?: BriefOpts,
+): Promise<{ content: string; details: BriefDetails }> {
   const mod = findModuleForPath(model, resolvedPath);
   const lines: string[] = [];
   const confidence: ConfidenceMode = "structural";
@@ -59,7 +69,19 @@ function generateDirectoryBrief(
   const nextQueries: string[] = [];
 
   if (mod && mod.root === resolvedPath) {
-    formatModuleBrief({ mod, model, lines, startHere, publicSurfaces, nextQueries, resolvedPath });
+    formatModuleBrief({
+      mod,
+      model,
+      lines,
+      startHere,
+      publicSurfaces,
+      nextQueries,
+      resolvedPath,
+      maxResults: opts?.maxResults ?? 10,
+    });
+
+    // Add aggregated diagnostics for module source files
+    await enrichModuleWithDiagnostics(lines, resolvedPath, opts);
   } else {
     formatNonModuleDir({
       model,
@@ -69,6 +91,7 @@ function generateDirectoryBrief(
       lines,
       publicSurfaces,
       nextQueries,
+      maxResults: opts?.maxResults ?? 10,
     });
   }
 
@@ -116,6 +139,7 @@ interface ModuleBriefContext {
   publicSurfaces: string[];
   nextQueries: string[];
   resolvedPath: string;
+  maxResults: number;
 }
 
 function formatModuleBrief(ctx: ModuleBriefContext): void {
@@ -139,7 +163,7 @@ function formatModuleBrief(ctx: ModuleBriefContext): void {
 
   addDependenciesSection(model, mod, lines);
   addDependentsSection(model, mod, lines, nextQueries);
-  addSourceFilesSection(resolvedPath, lines);
+  addSourceFilesSection(resolvedPath, lines, ctx.maxResults);
 }
 
 function addDependenciesSection(
@@ -195,17 +219,21 @@ function addDependentsSection(
   }
 }
 
-function addSourceFilesSection(resolvedPath: string, lines: string[]): void {
+function addSourceFilesSection(
+  resolvedPath: string,
+  lines: string[],
+  maxResults: number = 10,
+): void {
   const files = listSourceFiles(resolvedPath);
   if (files.length > 0) {
-    const shown = files.slice(0, 10);
+    const shown = files.slice(0, maxResults);
     lines.push("");
     lines.push("## Source Files");
     for (const f of shown) {
       lines.push(`- \`${f}\``);
     }
-    if (files.length > 10) {
-      lines.push(`- _+${files.length - 10} more files_`);
+    if (files.length > maxResults) {
+      lines.push(`- _+${files.length - maxResults} more files_`);
     }
   }
 }
@@ -218,11 +246,13 @@ interface NonModuleDirContext {
   lines: string[];
   publicSurfaces: string[];
   nextQueries: string[];
+  maxResults: number;
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: nested-directory brief formatting is clearer as one staged formatter than as many tiny helpers
 function formatNonModuleDir(ctx: NonModuleDirContext): void {
-  const { model, mod, resolvedPath, originalPath, lines, publicSurfaces, nextQueries } = ctx;
+  const { model, mod, resolvedPath, originalPath, lines, publicSurfaces, nextQueries, maxResults } =
+    ctx;
   const relPath = path.relative(model.root, resolvedPath);
   lines.push(`# Directory: ${relPath || originalPath}`);
   lines.push("");
@@ -236,11 +266,11 @@ function formatNonModuleDir(ctx: NonModuleDirContext): void {
   const summary = summarizeDirectoryRecursively(resolvedPath);
   if (summary.directFiles.length > 0) {
     lines.push("## Source Files");
-    for (const f of summary.directFiles.slice(0, 10)) {
+    for (const f of summary.directFiles.slice(0, maxResults)) {
       lines.push(`- \`${f}\``);
     }
-    if (summary.directFiles.length > 10) {
-      lines.push(`- _+${summary.directFiles.length - 10} more files_`);
+    if (summary.directFiles.length > maxResults) {
+      lines.push(`- _+${summary.directFiles.length - maxResults} more files_`);
     }
     lines.push("");
   }
@@ -286,56 +316,69 @@ function formatNonModuleDir(ctx: NonModuleDirContext): void {
   }
 }
 
-function generateFileBrief(
+async function generateFileBriefWithEnrichment(
   model: ArchitectureModel,
   resolvedPath: string,
   originalPath: string,
-): { content: string; details: BriefDetails } {
+  opts?: BriefOpts,
+): Promise<{ content: string; details: BriefDetails }> {
   const mod = findModuleForPath(model, resolvedPath);
-  const lines: string[] = [];
-  const confidence: ConfidenceMode = "structural";
   const publicSurfaces: string[] = [];
   const nextQueries: string[] = [];
 
   const fileName = path.basename(resolvedPath);
   const relPath = path.relative(model.root, resolvedPath);
 
-  lines.push(`# File: ${relPath || fileName}`);
-  lines.push("");
-
-  if (mod) {
-    const shortName = mod.name.replace(/^@[^/]+\//, "");
-    lines.push(`_Module: ${shortName} (\`${mod.relativePath}\`)_`);
-    lines.push("");
-
-    const isEntrypoint = mod.entrypoints.some((ep) => {
-      const epResolved = path.resolve(mod.root, ep);
-      return epResolved === resolvedPath;
-    });
-    if (isEntrypoint) {
-      lines.push("**This file is a module entrypoint.**");
-      lines.push("");
-      publicSurfaces.push(`${shortName} entrypoint`);
-    }
-  }
-
+  let lineCount = 0;
   try {
-    const content = fs.readFileSync(resolvedPath, "utf-8");
-    const lineCount = content.split("\n").length;
-    lines.push(`- Lines: ${lineCount}`);
-    lines.push(`- Extension: \`${path.extname(resolvedPath)}\``);
+    const fileContent = fs.readFileSync(resolvedPath, "utf-8");
+    lineCount = fileContent.split("\n").length;
   } catch {
-    lines.push("_Could not read file contents._");
+    // Leave 0
   }
+
+  const isEntrypoint =
+    mod?.entrypoints.some((ep) => path.resolve(mod.root, ep) === resolvedPath) ?? false;
+
+  const enrichment = await gatherBriefEnrichment(
+    opts?.provider ?? null,
+    opts?.cwd ?? model.root,
+    relPath,
+    opts?.maxResults,
+  );
+
+  const renderedContent = renderFileBrief({
+    relPath: relPath || fileName,
+    lineCount,
+    isEntrypoint,
+    moduleName: mod ? mod.name.replace(/^@[^/]+\//, "") : null,
+    moduleRelativePath: mod ? mod.relativePath : null,
+    enrichment,
+    maxResults: opts?.maxResults,
+  });
 
   const prioritySignals = summarizePrioritySignalsForFiles(model.root, [resolvedPath]);
+  const extraLines: string[] = [];
   if (prioritySignals) {
-    lines.push("");
-    appendPrioritySignalsSection(lines, prioritySignals);
+    appendPrioritySignalsSection(extraLines, prioritySignals);
   }
 
+  const gitCtx = gatherGitContext(model.root);
+  if (gitCtx) {
+    extraLines.push(formatGitContext(gitCtx));
+  }
+
+  const extraStr = extraLines.filter((l) => l.trim()).join("\n");
+  const combinedContent = extraStr ? `${renderedContent.trim()}\n\n${extraStr}\n` : renderedContent;
+
+  if (isEntrypoint) {
+    const shortName = mod?.name.replace(/^@[^/]+\//, "") ?? "";
+    publicSurfaces.push(`${shortName} entrypoint`);
+  }
+
+  // Populate nextQueries to match the rendered "Next" section
   nextQueries.push(
-    `\`code_references\`, \`file: "${relPath}"\`, and a line/character for call-site analysis`,
+    `\`code_references\`, \`file: "${relPath}"\`, and a line/character for reference sites`,
   );
   if (mod) {
     nextQueries.push(
@@ -343,25 +386,10 @@ function generateFileBrief(
     );
   }
 
-  if (nextQueries.length > 0) {
-    lines.push("");
-    lines.push("## Next");
-    for (const q of nextQueries.slice(0, 2)) {
-      lines.push(`- ${q}`);
-    }
-  }
-
-  const gitCtx = gatherGitContext(model.root);
-  if (gitCtx) {
-    lines.push(formatGitContext(gitCtx));
-  }
-
-  lines.push("");
-
   return {
-    content: lines.join("\n"),
+    content: combinedContent,
     details: {
-      confidence,
+      confidence: "structural",
       focusTarget: originalPath,
       startHere: [],
       publicSurfaces,
@@ -373,6 +401,64 @@ function generateFileBrief(
   };
 }
 
+// ── Module diagnostics helpers ────────────────────────────────────────
+
+/**
+ * Enrich a module brief with aggregated diagnostics for all source files.
+ * Extracted into a helper to keep generateDirectoryBrief complexity manageable.
+ */
+async function enrichModuleWithDiagnostics(
+  lines: string[],
+  dirPath: string,
+  opts?: BriefOpts,
+): Promise<void> {
+  const sourceFiles = listSourceFiles(dirPath);
+  if (sourceFiles.length === 0 || !opts?.cwd) return;
+
+  const enrichmentDiags = await gatherModuleDiagnostics(
+    sourceFiles,
+    dirPath,
+    opts.cwd,
+    opts.maxResults,
+  );
+  if (enrichmentDiags) {
+    lines.push(enrichmentDiags);
+  }
+}
+
+async function gatherModuleDiagnostics(
+  sourceFiles: string[],
+  dirPath: string,
+  cwd: string,
+  maxResults?: number,
+): Promise<string | null> {
+  try {
+    const lspState = getSessionLspService(cwd);
+    if (lspState.kind !== "ready") return null;
+
+    const fileDiags: Array<{ file: string; errors: number; warnings: number }> = [];
+    for (const basename of sourceFiles) {
+      const fullPath = path.join(dirPath, basename);
+      const relPath = path.relative(cwd, fullPath);
+      try {
+        const diags = await lspState.service.fileDiagnostics(relPath, 2);
+        if (!diags || diags.length === 0) continue;
+        const errors = diags.filter((d) => (d.severity ?? 1) === 1).length;
+        const warnings = diags.filter((d) => (d.severity ?? 1) === 2).length;
+        if (errors > 0 || warnings > 0) {
+          fileDiags.push({ file: basename, errors, warnings });
+        }
+      } catch {
+        // Skip file
+      }
+    }
+
+    if (fileDiags.length === 0) return null;
+    return renderModuleDiagnostics(fileDiags, maxResults) ?? null;
+  } catch {
+    return null;
+  }
+}
 // ── Helpers ───────────────────────────────────────────────────────────
 
 const SOURCE_EXTENSIONS = new Set([

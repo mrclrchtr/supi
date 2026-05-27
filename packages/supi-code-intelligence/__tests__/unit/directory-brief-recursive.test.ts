@@ -54,7 +54,11 @@ describe("recursive directory briefs", () => {
     );
 
     const model = await buildArchitectureModel(tmpDir);
-    const { content } = generateFocusedBrief(model as NonNullable<typeof model>, featuresDir);
+    const { content } = await generateFocusedBrief(
+      model as NonNullable<typeof model>,
+      featuresDir,
+      { provider: null, cwd: tmpDir },
+    );
 
     expect(content).toContain("Inside module: app");
     expect(content).toContain("Descendant Source Files");
@@ -65,5 +69,31 @@ describe("recursive directory briefs", () => {
     expect(content).toContain("PaymentCard");
     expect(content).toContain("Import / Export Summary");
     expect(content).not.toContain("No recognized source files in this directory.");
+  });
+
+  it("respects maxResults for source file listing", async () => {
+    const appDir = path.join(tmpDir, "packages", "app");
+    mkdirSync(appDir, { recursive: true });
+    writeJson(tmpDir, "package.json", { name: "test" });
+    writeJson(appDir, "package.json", { name: "@t/app" });
+    // Add multiple source files
+    for (let i = 0; i < 15; i++) {
+      writeFileSync(path.join(appDir, `file${i}.ts`), `export const x${i} = ${i};\n`);
+    }
+
+    const model = await buildArchitectureModel(tmpDir);
+    const { content: capped } = await generateFocusedBrief(
+      model as NonNullable<typeof model>,
+      appDir,
+      { provider: null, cwd: tmpDir, maxResults: 5 },
+    );
+
+    expect(capped).toContain("## Source Files");
+    // Source Files section should show at most 5 files due to maxResults=5
+    const beforePublic = capped.split("## Public Surfaces")[0];
+    const sectionMatches = beforePublic.match(/`file\d+\.ts`/g);
+    expect(sectionMatches).not.toBeNull();
+    expect(sectionMatches?.length).toBeLessThanOrEqual(5);
+    expect(capped).toContain("more files");
   });
 });

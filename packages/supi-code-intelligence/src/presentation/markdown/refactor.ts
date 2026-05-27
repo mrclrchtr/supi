@@ -2,8 +2,8 @@
  * Markdown renderer for refactor results.
  */
 
+import type { ApplyResult } from "../../analysis/refactor/apply-workspace-edit.ts";
 import type { RefactorPlan } from "../../analysis/refactor/plan-store.ts";
-import type { ApplyResult } from "../../refactor/apply-workspace-edit.ts";
 
 export interface RefactorRenderInput {
   result: ApplyResult;

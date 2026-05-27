@@ -3,19 +3,21 @@
 
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createCodeIntelligenceApp } from "./app/create-code-intelligence-app.ts";
+import { registerDiagnosticInjectionHandlers } from "./lsp/diagnostic-injection.ts";
+import { defaultLspToolPromptSurfaces } from "./lsp/guidance.ts";
+import { registerLspTools } from "./lsp/register-tools.ts";
+import { createLspAdapterState } from "./lsp/runtime-state.ts";
+import { registerLspSessionLifecycle } from "./lsp/session-lifecycle.ts";
+import { registerLspSettings } from "./lsp/settings.ts";
+import { registerLspAwareToolOverrides } from "./lsp/tool-overrides.ts";
+import { registerWorkspaceRecoveryHandler } from "./lsp/workspace-recovery.ts";
 import { buildArchitectureModel } from "./model.ts";
 import { renderOverview } from "./presentation/markdown/overview.ts";
-import { registerDiagnosticInjectionHandlers } from "./substrate/semantic/diagnostics.ts";
-import { registerLspSessionLifecycle } from "./substrate/semantic/lifecycle.ts";
-import { registerLspAwareToolOverrides } from "./substrate/semantic/overrides.ts";
-import { registerWorkspaceRecoveryHandler } from "./substrate/semantic/recovery.ts";
-import { registerLspSettings } from "./substrate/semantic/settings.ts";
-import { createLspAdapterState } from "./substrate/semantic/state.ts";
-import { registerTsSessionLifecycle } from "./substrate/structural/lifecycle.ts";
-import { createTsAdapterState } from "./substrate/structural/state.ts";
-import { registerCodeIntelligenceTools } from "./tool/families/code/register.ts";
-import { defaultLspToolPromptSurfaces } from "./tool/families/lsp/guidance.ts";
-import { registerLspTools } from "./tool/families/lsp/register.ts";
+import { registerCodeIntelligenceTools } from "./tool/register-tools.ts";
+import {
+  createTsAdapterState,
+  registerTsSessionLifecycle,
+} from "./tree-sitter/session-lifecycle.ts";
 import { registerCiStatusCommand } from "./ui/code-intelligence-status-command.ts";
 import { registerLspMessageRenderer } from "./ui/lsp-message-renderer.ts";
 import { buildOverviewData } from "./use-case/build-overview.ts";

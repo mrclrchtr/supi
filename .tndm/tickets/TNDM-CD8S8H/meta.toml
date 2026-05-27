@@ -1,0 +1,35 @@
+schema_version = 1
+id = "TNDM-CD8S8H"
+title = "Clean internal layering — delete 40 dead/forwarder files in supi-code-intelligence"
+type = "chore"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "task-01"
+path = "tasks/task-01.md"
+
+[[documents]]
+name = "task-02"
+path = "tasks/task-02.md"
+
+[[documents]]
+name = "task-03"
+path = "tasks/task-03.md"
+
+[[documents]]
+name = "task-04"
+path = "tasks/task-04.md"
+
+[[documents]]
+name = "task-05"
+path = "tasks/task-05.md"

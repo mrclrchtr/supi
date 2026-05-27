@@ -22,6 +22,9 @@ export type {
   StructuralProvider as StructuralSubstrate,
   StructuralResult,
 } from "@mrclrchtr/supi-code-runtime/api";
+// Code provider — reads capabilities from the shared workspace runtime.
+export type { CodeProvider, CodeProviderState } from "./analysis/context/request-context.ts";
+export { getCodeProvider } from "./analysis/context/request-context.ts";
 export { generateFocusedBrief, generateOverview, generateProjectBrief } from "./brief.ts";
 export type {
   ArchitectureModel,
@@ -50,6 +53,3 @@ export type {
   MapDetails,
   SearchDetails,
 } from "./types.ts";
-// Code provider — reads capabilities from the shared workspace runtime.
-export type { CodeProvider, CodeProviderState } from "./workspace/request-context.ts";
-export { getCodeProvider } from "./workspace/request-context.ts";

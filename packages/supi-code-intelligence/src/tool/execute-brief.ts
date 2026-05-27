@@ -1,9 +1,9 @@
+import { getCodeProvider } from "../analysis/context/request-context.ts";
+import { routeFor } from "../analysis/routing/planner.ts";
 import { buildArchitectureModel } from "../model.ts";
-import { routeFor } from "../planner/planner.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeBrief } from "../use-case/generate-brief.ts";
 import type { BriefInput } from "../use-case/types.ts";
-import { getCodeProvider } from "../workspace/request-context.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeBriefToolParams {
@@ -44,16 +44,27 @@ export async function executeBriefTool(
 
 function determineInput(params: CodeBriefToolParams): BriefInput {
   if (params.file && params.line != null && params.character != null) {
-    return { kind: "anchored", file: params.file, line: params.line, character: params.character };
+    return {
+      kind: "anchored",
+      file: params.file,
+      line: params.line,
+      character: params.character,
+      maxResults: params.maxResults,
+    };
   }
   if (params.symbol) {
-    return { kind: "symbol", symbol: params.symbol, path: params.path };
+    return {
+      kind: "symbol",
+      symbol: params.symbol,
+      path: params.path,
+      maxResults: params.maxResults,
+    };
   }
   if (params.path) {
-    return { kind: "path", path: params.path };
+    return { kind: "path", path: params.path, maxResults: params.maxResults };
   }
   if (params.file) {
-    return { kind: "file", file: params.file };
+    return { kind: "file", file: params.file, maxResults: params.maxResults };
   }
-  return { kind: "project" };
+  return { kind: "project", maxResults: params.maxResults };
 }

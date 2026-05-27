@@ -27,7 +27,9 @@ describe("applyWorkspaceEdit", () => {
   }
 
   it("applies a single-file single-edit replacement", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     write("a.ts", "hello old goodbye");
 
@@ -50,7 +52,9 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("applies multi-file edits atomically", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     write("a.ts", "apple");
     write("b.ts", "banana");
@@ -76,7 +80,9 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("does not partially commit when a later write fails", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     write("a.ts", "old-a");
     const lockedDir = absPath("locked");
@@ -112,7 +118,9 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("applies edits in descending offset order on the same line", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     write("a.ts", "foo bar baz");
 
@@ -136,7 +144,9 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("applies multi-line edits correctly", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     write("a.ts", "line1\nline2\nline3");
 
@@ -155,7 +165,9 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("returns error for out-of-range line indices", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     write("a.ts", "short");
 
@@ -178,7 +190,9 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("returns error for character positions beyond the actual line length", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     write("a.ts", "abc\n");
 
@@ -197,7 +211,9 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("returns error when a source file does not exist", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     const result = applyWorkspaceEdit({
       edits: [
@@ -213,7 +229,9 @@ describe("applyWorkspaceEdit", () => {
   });
 
   it("handles nested file paths correctly", async () => {
-    const { applyWorkspaceEdit } = await import("../../src/refactor/apply-workspace-edit.ts");
+    const { applyWorkspaceEdit } = await import(
+      "../../src/analysis/refactor/apply-workspace-edit.ts"
+    );
 
     const nestedFile = absPath("nested/src/index.ts");
     mkdirSync(path.dirname(nestedFile), { recursive: true });

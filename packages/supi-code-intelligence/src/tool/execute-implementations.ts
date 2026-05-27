@@ -4,11 +4,11 @@
  * Resolves a target and finds semantic implementations.
  */
 
+import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { collectServiceImplementations } from "../analysis/implementations/service.ts";
-import { routeFor } from "../planner/planner.ts";
+import { routeFor } from "../analysis/routing/planner.ts";
 import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
 import type { CodeIntelResult } from "../types.ts";
-import { getCodeProvider } from "../workspace/request-context.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeImplementationsToolParams {
@@ -65,7 +65,7 @@ export async function executeImplementationsTool(
   const providerState = getCodeProvider(ctx.cwd);
   const provider = providerState.kind === "ready" ? providerState.provider : null;
 
-  const { resolveTarget } = await import("../resolve-target.ts");
+  const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
   const target = await resolveTarget(params, ctx.cwd, provider ?? undefined);
   if (typeof target === "string") {
     return {

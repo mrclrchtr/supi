@@ -1,7 +1,7 @@
-import { routeFor } from "../planner/planner.ts";
+import { getCodeProvider } from "../analysis/context/request-context.ts";
+import { routeFor } from "../analysis/routing/planner.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeAffected } from "../use-case/generate-affected.ts";
-import { getCodeProvider } from "../workspace/request-context.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeAffectedToolParams {

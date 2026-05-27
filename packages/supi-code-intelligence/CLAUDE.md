@@ -22,7 +22,6 @@ src/
 ├── brief-focused.ts        # Directory/file/symbol focused brief generation
 ├── git-context.ts          # Git branch, dirty files, last commit helpers
 ├── model.ts                # Project model builder for auto-injected overviews
-├── resolve-target.ts       # Compatibility shim → analysis/targeting/resolve-target.ts
 ├── target-resolution.ts    # Backward-compat facade over targeting pipeline
 ├── search-helpers.ts       # ripgrep wrapper, path normalization, URI helpers
 ├── pattern-structured.ts   # Tree-sitter-based structured pattern search
@@ -30,38 +29,18 @@ src/
 ├── semantic-action-helpers.ts # Shared confidence/resolution helpers
 ├── intent/
 │   └── types.ts            # Normalized intent and routing contracts (PlannerRoute, etc.)
-├── planner/
-│   └── planner.ts          # Compatibility shim → analysis/routing/planner.ts
-├── refactor/
-│   ├── safety.ts           # Forwarder → analysis/refactor/safety.ts
-│   └── apply-workspace-edit.ts # Forwarder → analysis/refactor/apply-workspace-edit.ts
 ├── targeting/              # Canonical targeting pipeline (normalize-query, resolve-*, types)
-├── use-case/               # Compatibility forwarders or transitional orchestration
-├── lsp/                    # LSP tool action adapters, specs, guidance (transitional → tool/families/lsp)
-├── tree-sitter/            # TS tool action adapters, specs, guidance (transitional → tool/families/tree-sitter)
-├── workspace/
-│   └── request-context.ts  # Compatibility shim → analysis/context/request-context.ts
+├── use-case/               # Typed orchestration modules (build-overview, generate-*)
+├── lsp/                    # LSP tool actions, specs, guidance, lifecycle, diagnostics
+├── tree-sitter/            # TS tool actions, specs, guidance, execute, format, lifecycle
 ├── app/
 │   ├── create-code-intelligence-app.ts  # App composition root — wires pi events
 │   ├── workspace-manager.ts  # Per-cwd workspace session lifecycle
 │   └── workspace-session.ts  # Session-scoped state (overview injection, model cache, adapter refs)
-├── substrate/
-│   ├── semantic/
-│   │   ├── state.ts        # LspAdapterState forwarder
-│   │   ├── lifecycle.ts    # LSP session lifecycle forwarder
-│   │   ├── diagnostics.ts  # Diagnostic injection forwarder
-│   │   ├── recovery.ts     # Workspace recovery forwarder
-│   │   ├── settings.ts     # LSP settings forwarder
-│   │   └── overrides.ts    # LSP-aware tool overrides forwarder
-│   └── structural/
-│       ├── state.ts        # TsAdapterState forwarder
-│       └── lifecycle.ts    # Tree-sitter session lifecycle forwarder
 ├── analysis/
 │   ├── context/
 │   │   └── request-context.ts  # Explicit analysis context over shared broker
 │   ├── architecture/
-│   │   ├── model-service.ts    # Canonical architecture model service
-│   │   └── model-cache.ts      # Session/workspace model cache
 │   ├── routing/
 │   │   └── planner.ts          # Central capability router (canonical)
 │   ├── targeting/
@@ -69,38 +48,35 @@ src/
 │   │   ├── normalize-query.ts  # Re-exported query normalization
 │   │   ├── resolve-target.ts   # Unified target resolution facade
 │   │   └── disambiguation.ts   # Disambiguation formatting
-│   ├── brief/service.ts        # Typed brief analysis service
-│   ├── map/service.ts          # Typed map analysis service
+│   ├── references/             # Semantic reference collection service
+│   │   └── service.ts
+│   ├── calls/                  # Structural outgoing call service
+│   │   └── service.ts
+│   ├── implementations/        # Semantic implementation service
+│   │   └── service.ts
 │   ├── relations/
-│   │   ├── types.ts            # Typed relation result/evidence shapes
-│   │   ├── service.ts          # Relations dispatcher by kind
-│   │   ├── callers.ts          # Semantic caller collection
+│   │   ├── types.ts            # Shared types (CallerEvidence, RelationsServiceDeps)
+│   │   ├── callers.ts          # Semantic caller (reference) collection
 │   │   ├── implementations.ts  # Semantic implementation lookup
 │   │   └── callees.ts          # Structural callee lookup
-│   ├── affected/service.ts     # Typed affected analysis service
-│   ├── pattern/service.ts      # Typed pattern search service
 │   └── refactor/
-│       ├── service.ts          # Typed refactor service
 │       ├── safety.ts           # Edit validation
-│       └── apply-workspace-edit.ts # File mutation
+│       ├── apply-workspace-edit.ts # File mutation
+│       └── plan-store.ts       # Two-step refactor plan storage
 ├── tool/
 │   ├── tool-specs.ts           # Single source of truth for public tool metadata
 │   ├── guidance.ts             # Intent-first prompt surfaces from specs
 │   ├── register-tools.ts       # Focused Pi tool registration (iterates over specs)
-│   ├── validation.ts           # Shared parameter validation (forwarder → common/validation)
-│   ├── execute-*.ts            # Tool executors (transitional forwarders)
-│   ├── common/
-│   │   ├── register-family.ts  # Shared registration helper
-│   │   └── validation.ts       # Shared validation primitives
-│   └── families/
-│       ├── code/
-│       │   └── execute-relations.ts  # code_relations tool edge (transitional)
-│       ├── lsp/
-│       │   ├── execute.ts      # LSP tool execution adapters
-│       │   └── format.ts       # LSP tool formatting
-│       └── tree-sitter/
-│           ├── execute.ts      # Tree-sitter tool execution adapters
-│           └── format.ts       # Tree-sitter tool formatting
+│   ├── validation.ts           # Shared parameter validation
+│   ├── execute-brief.ts        # code_brief tool executor
+│   ├── execute-map.ts          # code_map tool executor
+│   ├── execute-references.ts   # code_references tool executor
+│   ├── execute-calls.ts        # code_calls tool executor
+│   ├── execute-implementations.ts # code_implementations tool executor
+│   ├── execute-affected.ts     # code_affected tool executor
+│   ├── execute-pattern.ts      # code_pattern tool executor
+│   ├── execute-refactor-plan.ts  # code_refactor_plan tool executor
+│   └── execute-refactor-apply.ts # code_refactor_apply tool executor
 ├── presentation/markdown/
 │   ├── overview.ts             # Hidden overview markdown renderer
 │   ├── brief.ts                # Brief markdown renderer
@@ -119,6 +95,16 @@ src/
 
 ### `code_brief`
 Interpretive orientation tool. The planner selects the best provider (semantic or structural) automatically. For deeper semantic detail, follow up with `lsp_hover`/`lsp_definition`/`lsp_references`.
+
+**Enriched file briefs** — When a code provider is available, `code_brief` with `file:` shows:
+- **Outline** — top-level declarations (functions, classes, interfaces) from tree-sitter
+- **Imports** — module dependencies from tree-sitter
+- **Exports** — exported names with kinds from tree-sitter
+- **Diagnostics** — LSP errors and warnings (first 5 messages inline)
+
+**Enriched module briefs** — When LSP is active, `code_brief` with `path:` targeting a package root shows aggregate diagnostics across all source files.
+
+**`maxResults`** — Controls section caps: outline items (default 15), imports (default 10), exports (default 10), diagnostic messages (default 5), source file listings (default 10). When omitted, defaults apply.
 
 ### `code_map`
 Strictly factual inventory tool. Accepts the repo root, a package root, or **any directory path**. Rejects file paths.

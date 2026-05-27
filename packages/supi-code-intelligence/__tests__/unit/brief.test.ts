@@ -3,12 +3,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { buildArchitectureModel } from "@mrclrchtr/supi-code-intelligence/api";
+import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getCodeProvider } from "../../src/analysis/context/request-context.ts";
 import { generateFocusedBrief, generateOverview, generateProjectBrief } from "../../src/brief.ts";
+import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
 
 beforeEach(() => {
+  getDefaultWorkspaceRuntime().clearAll();
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-intel-brief-"));
 });
 
@@ -16,16 +20,16 @@ afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
-function writeJson(dir: string, file: string, data: unknown) {
-  writeFileSync(path.join(dir, file), JSON.stringify(data, null, 2));
-}
-
 function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next = { ...env };
   for (const key of Object.keys(next)) {
     if (key.startsWith("GIT_")) delete next[key];
   }
   return next;
+}
+
+function writeJson(dir: string, file: string, data: unknown) {
+  writeFileSync(path.join(dir, file), JSON.stringify(data, null, 2));
 }
 
 function execGit(dir: string, args: string[]) {
@@ -172,7 +176,7 @@ describe("generateFocusedBrief", () => {
   it("returns error for missing path", async () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
-    const { content, details } = generateFocusedBrief(
+    const { content, details } = await generateFocusedBrief(
       model as NonNullable<typeof model>,
       "/nonexistent/path",
     );
@@ -185,7 +189,10 @@ describe("generateFocusedBrief", () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
     const pkgDir = path.join(tmpDir, "packages", "app");
-    const { content, details } = generateFocusedBrief(model as NonNullable<typeof model>, pkgDir);
+    const { content, details } = await generateFocusedBrief(
+      model as NonNullable<typeof model>,
+      pkgDir,
+    );
     expect(content).toContain("Module: app");
     expect(content).toContain("Main app");
     expect(content).toContain("Entrypoints");
@@ -199,7 +206,7 @@ describe("generateFocusedBrief", () => {
 
     // core has dependents (app)
     const coreDir = path.join(tmpDir, "packages", "core");
-    const { content: coreContent } = generateFocusedBrief(
+    const { content: coreContent } = await generateFocusedBrief(
       model as NonNullable<typeof model>,
       coreDir,
     );
@@ -208,7 +215,7 @@ describe("generateFocusedBrief", () => {
 
     // app has dependencies (core)
     const appDir = path.join(tmpDir, "packages", "app");
-    const { content: appContent } = generateFocusedBrief(
+    const { content: appContent } = await generateFocusedBrief(
       model as NonNullable<typeof model>,
       appDir,
     );
@@ -220,7 +227,10 @@ describe("generateFocusedBrief", () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
     const filePath = path.join(tmpDir, "packages", "core", "index.ts");
-    const { content, details } = generateFocusedBrief(model as NonNullable<typeof model>, filePath);
+    const { content, details } = await generateFocusedBrief(
+      model as NonNullable<typeof model>,
+      filePath,
+    );
     expect(content).toContain("File:");
     expect(content).toContain("Module: core");
     expect(details.confidence).toBe("structural");
@@ -233,7 +243,7 @@ describe("generateFocusedBrief", () => {
     writeFileSync(path.join(subDir, "helper.ts"), "export const h = 1;");
 
     const model = await buildArchitectureModel(tmpDir);
-    const { content } = generateFocusedBrief(model as NonNullable<typeof model>, subDir);
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, subDir);
     expect(content).toContain("Inside module: core");
     expect(content).toContain("helper.ts");
   });
@@ -242,7 +252,7 @@ describe("generateFocusedBrief", () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
     const coreDir = path.join(tmpDir, "packages", "core");
-    const { content } = generateFocusedBrief(model as NonNullable<typeof model>, coreDir);
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, coreDir);
     expect(content).toContain("Source Files");
     expect(content).toContain("index.ts");
   });
@@ -256,10 +266,138 @@ describe("generateFocusedBrief", () => {
     writeFileSync(path.join(langDir, "server.go"), "package main");
 
     const model = await buildArchitectureModel(tmpDir);
-    const { content } = generateFocusedBrief(model as NonNullable<typeof model>, langDir);
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, langDir);
     expect(content).toContain("Source Files");
     expect(content).toContain("main.py");
     expect(content).toContain("lib.rs");
     expect(content).toContain("server.go");
+  });
+
+  // ── Enriched output tests (mock provider) ────────────────────────────
+  //
+  // These tests call generateFocusedBrief with a mocked structural provider
+  // and verify enrichment sections appear in the output.
+
+  it("file brief with provider shows outline section", async () => {
+    setupWorkspace();
+    registerMockProvider(tmpDir, {
+      outline: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "x",
+            kind: "variable",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 25,
+            children: [],
+          },
+        ],
+      }),
+    });
+    const model = await buildArchitectureModel(tmpDir);
+    const filePath = path.join(tmpDir, "packages", "core", "index.ts");
+    const state = getCodeProvider(tmpDir);
+    const provider = state.kind === "ready" ? state.provider : null;
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, filePath, {
+      provider,
+      cwd: tmpDir,
+      maxResults: 15,
+    });
+    expect(content).toContain("## File Outline");
+  });
+
+  it("file brief with provider shows exports", async () => {
+    setupWorkspace();
+    registerMockProvider(tmpDir, {
+      exports: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "x",
+            kind: "variable",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 25,
+          },
+        ],
+      }),
+    });
+    const model = await buildArchitectureModel(tmpDir);
+    const filePath = path.join(tmpDir, "packages", "core", "index.ts");
+    const state = getCodeProvider(tmpDir);
+    const provider = state.kind === "ready" ? state.provider : null;
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, filePath, {
+      provider,
+      cwd: tmpDir,
+      maxResults: 15,
+    });
+    expect(content).toContain("## Exports");
+  });
+
+  it("file brief without provider omits enrichment sections", async () => {
+    setupWorkspace();
+    const model = await buildArchitectureModel(tmpDir);
+    const filePath = path.join(tmpDir, "packages", "core", "index.ts");
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, filePath, {
+      provider: null,
+      cwd: tmpDir,
+    });
+    expect(content).not.toContain("## File Outline");
+    expect(content).not.toContain("## Exports");
+  });
+
+  it("file brief respects maxResults for outline", async () => {
+    setupWorkspace();
+    registerMockProvider(tmpDir, {
+      outline: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "a",
+            kind: "variable",
+            startLine: 1,
+            startCharacter: 1,
+            endLine: 1,
+            endCharacter: 2,
+          },
+        ],
+      }),
+    });
+    const model = await buildArchitectureModel(tmpDir);
+    const filePath = path.join(tmpDir, "packages", "core", "index.ts");
+    const state = getCodeProvider(tmpDir);
+    const provider = state.kind === "ready" ? state.provider : null;
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, filePath, {
+      provider,
+      cwd: tmpDir,
+      maxResults: 1,
+    });
+    expect(content).toContain("## File Outline");
+  });
+
+  it("module brief shows diagnostics section", async () => {
+    setupWorkspace();
+    const model = await buildArchitectureModel(tmpDir);
+    const pkgDir = path.join(tmpDir, "packages", "app");
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, pkgDir, {
+      provider: null,
+      cwd: tmpDir,
+    });
+    // When no diagnostics, the section is omitted gracefully
+    expect(content).not.toContain("## Diagnostics");
+  });
+
+  it("file brief without provider omits import section", async () => {
+    setupWorkspace();
+    const model = await buildArchitectureModel(tmpDir);
+    const filePath = path.join(tmpDir, "packages", "core", "index.ts");
+    const { content } = await generateFocusedBrief(model as NonNullable<typeof model>, filePath, {
+      provider: null,
+      cwd: tmpDir,
+    });
+    expect(content).not.toContain("## Imports");
   });
 });

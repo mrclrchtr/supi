@@ -1,5 +1,28 @@
 import { describe, expect, it } from "vitest";
-import type { RelationsResult } from "../../../src/analysis/relations/types.ts";
+
+type RelationsResult =
+  | {
+      kind: "callers";
+      targetName: string;
+      references: Array<{ file: string; line: number; character: number; name: string }>;
+      externalCount: number;
+      evidence: string;
+      confidence: string;
+    }
+  | {
+      kind: "implementations";
+      targetName: string;
+      implementations: Array<{ file: string; line: number; character: number; name: string }>;
+      externalCount: number;
+      confidence: string;
+    }
+  | {
+      kind: "callees";
+      targetName: string;
+      callees: Array<{ name: string; file: string; line: number; character: number }>;
+      confidence: string;
+    }
+  | { kind: "unavailable"; reason: string };
 
 /**
  * Relations renderer tests — ensures the renderer handles typed

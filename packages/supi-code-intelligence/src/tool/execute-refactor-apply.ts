@@ -8,7 +8,7 @@
 import { applyWorkspaceEdit } from "../analysis/refactor/apply-workspace-edit.ts";
 import { getPlan, isPlanFresh, removePlan } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
-import { routeFor } from "../planner/planner.ts";
+import { routeFor } from "../analysis/routing/planner.ts";
 import { renderRefactorApplyResult } from "../presentation/markdown/refactor.ts";
 import type { CodeIntelResult } from "../types.ts";
 

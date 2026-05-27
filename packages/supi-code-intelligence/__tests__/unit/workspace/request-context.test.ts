@@ -1,7 +1,7 @@
 import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getCodeProvider } from "../../../src/workspace/request-context.ts";
+import { getCodeProvider } from "../../../src/analysis/context/request-context.ts";
 import { clearMockRuntime, registerMockProvider } from "../../helpers/register-mock-runtime.ts";
 
 describe("request-context", () => {

@@ -7,7 +7,7 @@
  */
 
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { CodeProvider } from "../../src/workspace/request-context.ts";
+import type { CodeProvider } from "../../src/analysis/context/request-context.ts";
 
 /**
  * Register a mock CodeProvider's worth of capabilities for cwd.
