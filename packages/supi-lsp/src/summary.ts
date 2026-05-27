@@ -112,6 +112,8 @@ export function isProjectSource(filePath: string, cwd: string): boolean {
 }
 
 export function shouldIgnoreLspPath(filePath: string, cwd: string): boolean {
+  if (!isInProjectTree(filePath, cwd)) return true;
+
   const normalized = normalizeRelevantPath(filePath);
   if (
     normalized === "node_modules" ||

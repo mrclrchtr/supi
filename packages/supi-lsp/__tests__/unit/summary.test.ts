@@ -80,8 +80,8 @@ describe("shouldIgnoreLspPath", () => {
     expect(shouldIgnoreLspPath(path.join(tmpDir, "src", "app.ts"), tmpDir)).toBe(false);
   });
 
-  it("returns false for tracked out-of-tree files", () => {
-    expect(shouldIgnoreLspPath("/other/project/file.ts", tmpDir)).toBe(false);
+  it("returns true for out-of-tree files (outside project root)", () => {
+    expect(shouldIgnoreLspPath("/other/project/file.ts", tmpDir)).toBe(true);
   });
 
   it("returns true for node_modules", () => {
