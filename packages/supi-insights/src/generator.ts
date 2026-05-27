@@ -1,13 +1,105 @@
 // Insight generator — produce narrative insights from aggregated data via LLM calls.
 
-import { complete } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { callWithJsonResponse } from "@mrclrchtr/supi-core/llm";
+import { Type } from "typebox";
 import type { AggregatedData, InsightResults, SessionFacets } from "./types.ts";
-import { withRetry } from "./utils.ts";
+
+// ── TypeBox schemas for each insight section ───────────────────────────────
+
+const ProjectAreasSchema = Type.Object({
+  areas: Type.Array(
+    Type.Object({
+      name: Type.String(),
+      sessionCount: Type.Number(),
+      description: Type.String(),
+    }),
+  ),
+});
+
+const InteractionStyleSchema = Type.Object({
+  narrative: Type.String(),
+  keyPattern: Type.String(),
+});
+
+const WhatWorksSchema = Type.Object({
+  intro: Type.String(),
+  impressiveWorkflows: Type.Array(
+    Type.Object({
+      title: Type.String(),
+      description: Type.String(),
+    }),
+  ),
+});
+
+const FrictionAnalysisSchema = Type.Object({
+  intro: Type.String(),
+  categories: Type.Array(
+    Type.Object({
+      category: Type.String(),
+      description: Type.String(),
+      examples: Type.Array(Type.String()),
+    }),
+  ),
+});
+
+const SuggestionsSchema = Type.Object({
+  claudeMdAdditions: Type.Array(
+    Type.Object({
+      addition: Type.String(),
+      why: Type.String(),
+      promptScaffold: Type.String(),
+    }),
+  ),
+  featuresToTry: Type.Array(
+    Type.Object({
+      feature: Type.String(),
+      oneLiner: Type.String(),
+      whyForYou: Type.String(),
+      exampleCode: Type.String(),
+    }),
+  ),
+  usagePatterns: Type.Array(
+    Type.Object({
+      title: Type.String(),
+      suggestion: Type.String(),
+      detail: Type.String(),
+      copyablePrompt: Type.String(),
+    }),
+  ),
+});
+
+const OnTheHorizonSchema = Type.Object({
+  intro: Type.String(),
+  opportunities: Type.Array(
+    Type.Object({
+      title: Type.String(),
+      whatsPossible: Type.String(),
+      howToTry: Type.String(),
+      copyablePrompt: Type.String(),
+    }),
+  ),
+});
+
+const FunEndingSchema = Type.Object({
+  headline: Type.String(),
+  detail: Type.String(),
+});
+
+const AtAGlanceSchema = Type.Object({
+  whatsWorking: Type.String(),
+  whatsHindering: Type.String(),
+  quickWins: Type.String(),
+  ambitiousWorkflows: Type.String(),
+});
+
+// ── Section definitions ──────────────────────────────────────────────────
 
 type InsightSection = {
   name: keyof InsightResults;
   prompt: string;
+  // biome-ignore lint/suspicious/noExplicitAny: TypeBox schema union
+  schema: ReturnType<typeof Type.Object<any>>;
   maxTokens: number;
 };
 
@@ -24,6 +116,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Include 4-5 areas.`,
+    schema: ProjectAreasSchema,
     maxTokens: 4096,
   },
   {
@@ -35,6 +128,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
   "narrative": "2-3 paragraphs analyzing HOW the user interacts with PI. Use second person 'you'. Describe patterns: iterate quickly vs detailed upfront specs? Interrupt often or let the agent run? Include specific examples. Use **bold** for key insights.",
   "keyPattern": "One sentence summary of most distinctive interaction style"
 }`,
+    schema: InteractionStyleSchema,
     maxTokens: 4096,
   },
   {
@@ -50,6 +144,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Include 3 impressive workflows.`,
+    schema: WhatWorksSchema,
     maxTokens: 4096,
   },
   {
@@ -65,6 +160,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Include 3 friction categories with 2 examples each.`,
+    schema: FrictionAnalysisSchema,
     maxTokens: 4096,
   },
   {
@@ -85,6 +181,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 IMPORTANT: PRIORITIZE instructions that appear MULTIPLE TIMES in the user data.`,
+    schema: SuggestionsSchema,
     maxTokens: 4096,
   },
   {
@@ -100,6 +197,7 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Include 3 opportunities. Think BIG - autonomous workflows, parallel agents, iterating against tests.`,
+    schema: OnTheHorizonSchema,
     maxTokens: 4096,
   },
   {
@@ -113,9 +211,12 @@ RESPOND WITH ONLY A VALID JSON OBJECT:
 }
 
 Find something genuinely interesting or amusing from the session summaries.`,
+    schema: FunEndingSchema,
     maxTokens: 2048,
   },
 ];
+
+// ── Public API ─────────────────────────────────────────────────────────────
 
 export async function generateInsights(
   data: AggregatedData,
@@ -145,70 +246,25 @@ export async function generateInsights(
   return insights;
 }
 
-async function resolveModel(ctx: ExtensionContext): Promise<{
-  model: NonNullable<ExtensionContext["model"]>;
-  apiKey: string;
-  headers: Record<string, string>;
-} | null> {
-  const model = ctx.model ?? ctx.modelRegistry.getAvailable()[0] ?? null;
-  if (!model) return null;
-  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok || !auth.apiKey) return null;
-  return { model, apiKey: auth.apiKey, headers: auth.headers ?? {} };
-}
+// ── Section generators ────────────────────────────────────────────────────
 
 async function generateSectionInsight(
   section: InsightSection,
   dataContext: string,
   ctx: ExtensionContext,
 ): Promise<{ name: keyof InsightResults; result: unknown }> {
-  const resolved = await resolveModel(ctx);
-  if (!resolved) return { name: section.name, result: null };
-
-  const { model, apiKey, headers } = resolved;
-
-  const response = await withRetry(
-    async () => {
-      const res = await complete(
-        model,
-        {
-          systemPrompt: "",
-          messages: [
-            {
-              role: "user",
-              content: [{ type: "text", text: `${section.prompt}\n\nDATA:\n${dataContext}` }],
-              timestamp: Date.now(),
-            },
-          ],
-        },
-        {
-          apiKey,
-          headers,
-          signal: ctx.signal,
-          maxTokens: section.maxTokens,
-        },
-      );
-      return res;
+  const result = await callWithJsonResponse(
+    ctx,
+    {
+      prompt: section.prompt,
+      dataContext,
+      maxTokens: section.maxTokens,
+      retries: 2,
     },
-    2,
-    1000,
+    section.schema,
   );
 
-  if (!response) return { name: section.name, result: null };
-
-  const text = response.content
-    .filter((c): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("");
-
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return { name: section.name, result: null };
-
-  try {
-    return { name: section.name, result: JSON.parse(jsonMatch[0]) };
-  } catch {
-    return { name: section.name, result: null };
-  }
+  return { name: section.name, result: result?.parsed ?? null };
 }
 
 async function generateAtAGlance(
@@ -302,54 +358,20 @@ ${featuresText}
 ## On the Horizon
 ${horizonText}`;
 
-  const resolved = await resolveModel(ctx);
-  if (!resolved) return null;
-
-  const { model, apiKey, headers } = resolved;
-
-  const response = await withRetry(
-    async () => {
-      const res = await complete(
-        model,
-        {
-          systemPrompt: "",
-          messages: [
-            {
-              role: "user",
-              content: [{ type: "text", text: prompt }],
-              timestamp: Date.now(),
-            },
-          ],
-        },
-        {
-          apiKey,
-          headers,
-          signal: ctx.signal,
-          maxTokens: 4096,
-        },
-      );
-      return res;
+  const result = await callWithJsonResponse(
+    ctx,
+    {
+      prompt,
+      maxTokens: 4096,
+      retries: 2,
     },
-    2,
-    1000,
+    AtAGlanceSchema,
   );
 
-  if (!response) return null;
-
-  const text = response.content
-    .filter((c): c is { type: "text"; text: string } => c.type === "text")
-    .map((c) => c.text)
-    .join("");
-
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return null;
-
-  try {
-    return JSON.parse(jsonMatch[0]);
-  } catch {
-    return null;
-  }
+  return result?.parsed ?? null;
 }
+
+// ── Data context ──────────────────────────────────────────────────────────
 
 function buildDataContext(data: AggregatedData, facets: Map<string, SessionFacets>): string {
   const facetSummaries = Array.from(facets.values())

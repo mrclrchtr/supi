@@ -8,9 +8,11 @@ import type {
   AgentToolResult,
   AgentToolUpdateCallback,
   ExtensionAPI,
+  ExtensionCommandContext,
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { type TSchema, Type } from "typebox";
+import { ProgressWidget, type WidgetProgress } from "./progress-widget.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -114,3 +116,67 @@ export const SymbolParam = Type.String({
 
 /** Maximum results to return. */
 export const MaxResultsParam = Type.Number({ description: "Maximum results to return" });
+
+// ---------------------------------------------------------------------------
+// Progress widget runner
+// ---------------------------------------------------------------------------
+
+/**
+ * Run an async operation with a live TUI progress widget.
+ *
+ * Automatically manages:
+ * - The {@link ProgressWidget} lifecycle
+ * - `supi:working:start` / `supi:working:end` events for tab-spinner integration
+ * - Abort signal handling
+ * - Error catching (returns `null` on failure)
+ *
+ * Falls back to running without a widget when `ctx.hasUI` is false.
+ *
+ * @param pi - The extension API (for event emission).
+ * @param ctx - The command context (for UI access and hasUI check).
+ * @param title - The progress widget title.
+ * @param runner - Async function that receives (signal, onProgress).
+ * @returns The runner result, or `null` on cancel/error.
+ */
+export async function runWithProgressWidget<T>(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  title: string,
+  runner: (signal: AbortSignal, onProgress: (p: WidgetProgress) => void) => Promise<T>,
+): Promise<T | null> {
+  if (!ctx.hasUI) {
+    // No UI — run without progress widget but still emit working events
+    pi.events.emit("supi:working:start", { source: "supi-core" });
+    try {
+      return await runner(new AbortController().signal, () => {});
+    } catch {
+      return null;
+    } finally {
+      pi.events.emit("supi:working:end", { source: "supi-core" });
+    }
+  }
+
+  return ctx.ui.custom<T | null>((tui, theme, _kb, done) => {
+    const widget = new ProgressWidget(tui, theme, title);
+    let finished = false;
+
+    const finish = (result: T | null) => {
+      if (finished) return;
+      finished = true;
+      pi.events.emit("supi:working:end", { source: "supi-core" });
+      widget.dispose();
+      done(result);
+    };
+
+    widget.onAbort = () => {
+      // Widget handles abort signal; runner resolves with cancel/error.
+    };
+
+    pi.events.emit("supi:working:start", { source: "supi-core" });
+    runner(widget.signal, (progress) => widget.updateProgress(progress))
+      .then((result) => finish(result))
+      .catch(() => finish(null));
+
+    return widget;
+  });
+}

@@ -91,26 +91,23 @@ export default function insightsExtension(pi: ExtensionAPI) {
         label: "Enable insights",
         currentValue: settings.enabled ? "on" : "off",
         values: ["on", "off"],
+        configType: "boolean" as const,
       },
       {
         id: "maxSessions",
         label: "Max sessions to analyze",
         currentValue: String(settings.maxSessions),
         values: ["50", "100", "200", "500"],
+        configType: "number" as const,
       },
       {
         id: "maxFacets",
         label: "Max facet extractions",
         currentValue: String(settings.maxFacets),
         values: ["20", "50", "100"],
+        configType: "number" as const,
       },
     ],
-    // biome-ignore lint/complexity/useMaxParams: registerConfigSettings defines this callback shape.
-    persistChange: (_scope, _cwd, settingId, value, helpers) => {
-      const numSettings = new Set(["maxSessions", "maxFacets"]);
-      const finalValue = numSettings.has(settingId) ? Number(value) : value === "on";
-      helpers.set(settingId, finalValue);
-    },
   });
 
   // ── /supi-insights command ──────────────────────────────────
@@ -128,7 +125,9 @@ export default function insightsExtension(pi: ExtensionAPI) {
       ctx.ui.setWorkingMessage("Analyzing sessions...");
 
       try {
+        pi.events.emit("supi:working:start", { source: "supi-insights" });
         const report = await generateReport(ctx, config);
+        pi.events.emit("supi:working:end", { source: "supi-insights" });
         ctx.ui.setWorkingMessage();
 
         if (!report) {
@@ -183,6 +182,7 @@ export default function insightsExtension(pi: ExtensionAPI) {
 
         ctx.ui.notify(`Insights report saved: ${htmlPath}`, "info");
       } catch (err) {
+        pi.events.emit("supi:working:end", { source: "supi-insights" });
         ctx.ui.setWorkingMessage();
         const message = err instanceof Error ? err.message : String(err);
         ctx.ui.notify(`Insights generation failed: ${message}`, "error");

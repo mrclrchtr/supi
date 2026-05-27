@@ -1,0 +1,62 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-27T01:58:04.858941Z"
+revision = 44
+
+[document_fingerprints]
+archive = "sha256:2363ae1dbaa4bb54ea469b7f647e20f199f21da60558597a08d3e4009c468df6"
+content = "sha256:e4d1d0eeb230896906b681ee809bdfb5f90a3dc7b9b142f28d099b050107282b"
+task-01 = "sha256:dba0d2e0bc8f8fbc37b7d3dad71f0e5f9b878d9420919f1693030b648040404b"
+task-02 = "sha256:8f6409ad7fbe766b8e40c85c5377c47787baf81c08124c73bb29b6a67ec6ebf5"
+task-03 = "sha256:67ca004f5e39c930c8fa74ff71752df8480e03bea617e68bbd174c9cafed1b28"
+task-04 = "sha256:d82e106a04479699ca8e504e70fe3a16026b7207fc20fb4c26bd8fd7b9a8e1a4"
+task-05 = "sha256:f536c423a872994946df999d1706276a151f5926dc819ce1abbcaed7ab1c0fee"
+task-06 = "sha256:ddca69e82a025f95b811ab12b8425ea10a7e99534a9589a75dbb97326243375d"
+task-07 = "sha256:68da93ade595b268ee0bf0e8c3c337d6ae2207a7a8d31a289b5e2c5394aeca0e"
+task-08 = "sha256:0726371ba35f218c42e3d51a42a95f79f0202f78b0f1bc132e9f2d72a8084d19"
+task-09 = "sha256:4a03e946182955a1dfadf410dd1a9394456c7b9487db08df88203bdd8104f642"
+
+[[tasks]]
+number = 1
+title = "supi-core: add withRetry to new src/llm.ts"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "supi-core: add callWithJsonResponse to src/llm.ts"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "supi-core: add loadSectionConfig shorthand to config"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "supi-core: add declarative persistChange to config-settings"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "supi-core: add runWithProgressWidget + move ReviewProgressWidget"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "supi-core: wire exports (llm subpath, api.ts re-export)"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "supi-insights: migrate to shared helpers (callWithJsonResponse, runWithProgressWidget)"
+status = "done"
+
+[[tasks]]
+number = 8
+title = "Consumer migration: supi-review + declarative persistChange (5 packages)"
+status = "done"
+
+[[tasks]]
+number = 9
+title = "Verify: full test suite + typecheck + lint across all modified packages"
+status = "done"

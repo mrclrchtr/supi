@@ -1,4 +1,6 @@
 import { buildSessionContext, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { WidgetProgress } from "@mrclrchtr/supi-core/progress-widget";
+import { runWithProgressWidget } from "@mrclrchtr/supi-core/tool-framework";
 import { resolveBranchSnapshot, resolveCommitSnapshot, resolveWorkingTreeSnapshot } from "./git.ts";
 import { serializeSessionContext } from "./history/collect.ts";
 import { synthesizeReviewBrief } from "./history/synthesize.ts";
@@ -8,7 +10,6 @@ import type { BriefSynthesisRunResult } from "./tool/runner-types.ts";
 import type { ReviewPlan, ReviewResult, ReviewSnapshot, ReviewTargetSpec } from "./types.ts";
 import { collectReviewNote, previewReviewPlan, selectModel, selectTarget } from "./ui/flow.ts";
 import { formatReviewContent } from "./ui/format-content.ts";
-import { ReviewProgressWidget } from "./ui/progress-widget.ts";
 import { registerReviewRenderer } from "./ui/renderer.ts";
 
 type CommandContext = Parameters<Parameters<ExtensionAPI["registerCommand"]>[1]["handler"]>[1];
@@ -47,12 +48,11 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
     ctx.sessionManager.getLeafId(),
   );
   const serializedContext = serializeSessionContext(sessionContext.messages);
-  const synthesis = await runBriefWithLoader({
-    snapshot,
-    modelId: model.canonicalId,
-    ctx,
+  const synthesis = await runWithProgressWidget(
     pi,
-    run: (signal, onProgress) =>
+    ctx,
+    "Synthesizing review brief…",
+    (signal: AbortSignal, onProgress: (p: WidgetProgress) => void) =>
       synthesizeReviewBrief({
         model,
         modelRegistry: ctx.modelRegistry,
@@ -63,7 +63,21 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
         signal,
         onProgress,
       }),
-  });
+  );
+
+  if (!synthesis) {
+    notifyBriefDone(
+      pi,
+      {
+        kind: "failed",
+        reason: "Brief synthesis encountered an unexpected error",
+      } as BriefSynthesisRunResult,
+      snapshot,
+      model.canonicalId,
+    );
+    ctx.ui.notify("Brief synthesis was canceled or failed", "warning");
+    return;
+  }
 
   notifyBriefDone(pi, synthesis, snapshot, model.canonicalId);
 
@@ -83,7 +97,34 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
   const approved = await previewReviewPlan(ctx, plan);
   if (!approved) return;
 
-  const result = await runReviewWithLoader(plan, ctx, pi);
+  const result = await runWithProgressWidget(
+    pi,
+    ctx,
+    "Running code review…",
+    (signal: AbortSignal, onProgress: (p: WidgetProgress) => void) =>
+      runReviewer({
+        prompt: plan.packet.prompt,
+        model: plan.model,
+        modelRegistry: ctx.modelRegistry,
+        cwd: ctx.cwd,
+        signal,
+        snapshot: plan.snapshot,
+        brief: plan.brief,
+        onProgress,
+      }),
+  );
+
+  if (!result) {
+    notifyReviewDone(pi, {
+      kind: "failed",
+      reason: "Review encountered an unexpected error",
+      snapshot,
+      brief,
+      modelId: model.canonicalId,
+    } as ReviewResult);
+    ctx.ui.notify("Review was canceled or failed", "warning");
+    return;
+  }
 
   notifyReviewDone(pi, result);
   injectReviewMessage(pi, result);
@@ -117,94 +158,6 @@ async function resolveReviewSnapshot(
   }
 
   return undefined;
-}
-
-async function runBriefWithLoader(options: {
-  snapshot: ReviewSnapshot;
-  modelId: string;
-  ctx: CommandContext;
-  pi: ExtensionAPI;
-  run: (
-    signal: AbortSignal,
-    onProgress: (progress: Parameters<ReviewProgressWidget["updateProgress"]>[0]) => void,
-  ) => Promise<BriefSynthesisRunResult>;
-}): Promise<BriefSynthesisRunResult> {
-  const { snapshot, modelId, ctx, pi, run } = options;
-  return ctx.ui.custom<BriefSynthesisRunResult>((tui, theme, _kb, done) => {
-    const widget = new ReviewProgressWidget(tui, theme, "Synthesizing review brief…");
-    let finished = false;
-
-    const finish = (result: BriefSynthesisRunResult) => {
-      if (finished) return;
-      finished = true;
-      pi.events.emit("supi:working:end", { source: "supi-review" });
-      widget.dispose();
-      done(result);
-    };
-
-    widget.onAbort = () => {
-      // The widget aborts its signal; the runner resolves with `canceled`.
-    };
-
-    pi.events.emit("supi:working:start", { source: "supi-review" });
-    run(widget.signal, (progress) => widget.updateProgress(progress))
-      .then((result) => finish(result))
-      .catch((error) => {
-        finish({
-          kind: "failed",
-          reason: `Brief synthesis failed for ${snapshot.title} on ${modelId}: ${error instanceof Error ? error.message : String(error)}`,
-        });
-      });
-
-    return widget;
-  });
-}
-
-async function runReviewWithLoader(
-  plan: ReviewPlan,
-  ctx: CommandContext,
-  pi: ExtensionAPI,
-): Promise<ReviewResult> {
-  return ctx.ui.custom<ReviewResult>((tui, theme, _kb, done) => {
-    const widget = new ReviewProgressWidget(tui, theme, "Running code review…");
-    let finished = false;
-
-    const finish = (result: ReviewResult) => {
-      if (finished) return;
-      finished = true;
-      pi.events.emit("supi:working:end", { source: "supi-review" });
-      widget.dispose();
-      done(result);
-    };
-
-    widget.onAbort = () => {
-      // The widget aborts its signal; the runner resolves with `canceled`.
-    };
-
-    pi.events.emit("supi:working:start", { source: "supi-review" });
-    runReviewer({
-      prompt: plan.packet.prompt,
-      model: plan.model,
-      modelRegistry: ctx.modelRegistry,
-      cwd: ctx.cwd,
-      signal: widget.signal,
-      snapshot: plan.snapshot,
-      brief: plan.brief,
-      onProgress: (progress) => widget.updateProgress(progress),
-    })
-      .then((result) => finish(result))
-      .catch((error) => {
-        finish({
-          kind: "failed",
-          reason: error instanceof Error ? error.message : String(error),
-          snapshot: plan.snapshot,
-          brief: plan.brief,
-          modelId: plan.model.canonicalId,
-        });
-      });
-
-    return widget;
-  });
 }
 
 function notifySynthesisFailure(

@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  loadSectionConfig,
   loadSupiConfig,
   loadSupiConfigForScope,
   removeSupiConfigKey,
@@ -285,5 +286,60 @@ describe("removeSupiConfigKey", () => {
         "rereadInterval",
       ),
     ).not.toThrow();
+  });
+});
+
+describe("loadSectionConfig", () => {
+  let tmpDir: string;
+  let warnSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    tmpDir = makeTempDir();
+    warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns defaults when no config files exist", () => {
+    const result = loadSectionConfig(
+      "my-ext",
+      tmpDir,
+      { settingA: 1, settingB: "default" },
+      opts(tmpDir),
+    );
+    expect(result).toEqual({ settingA: 1, settingB: "default" });
+  });
+
+  it("loads merged config from global and project scopes", () => {
+    const globalDir = path.join(tmpDir, ".pi/agent/supi");
+    fs.mkdirSync(globalDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(globalDir, "config.json"),
+      JSON.stringify({ "my-ext": { settingA: 5 } }),
+    );
+
+    const projectDir = path.join(tmpDir, ".pi/supi");
+    fs.mkdirSync(projectDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectDir, "config.json"),
+      JSON.stringify({ "my-ext": { settingB: "project" } }),
+    );
+
+    const result = loadSectionConfig(
+      "my-ext",
+      tmpDir,
+      { settingA: 1, settingB: "default" },
+      opts(tmpDir),
+    );
+    // Global overrides defaults, project overrides global
+    expect(result).toEqual({ settingA: 5, settingB: "project" });
+  });
+
+  it("works without options", () => {
+    const result = loadSectionConfig("my-ext", tmpDir, { enabled: true });
+    expect(result).toEqual({ enabled: true });
   });
 });

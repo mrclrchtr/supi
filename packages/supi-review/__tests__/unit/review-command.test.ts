@@ -43,23 +43,11 @@ vi.mock("../../src/ui/flow.ts", () => ({
   previewReviewPlan: mockFns.previewReviewPlan,
 }));
 
-vi.mock("../../src/ui/progress-widget.ts", () => ({
-  ReviewProgressWidget: class MockReviewProgressWidget {
-    private controller = new AbortController();
-    onAbort: (() => void) | undefined;
-
-    get signal() {
-      return this.controller.signal;
-    }
-
-    updateProgress() {}
-    dispose() {}
-    render() {
-      return ["running..."];
-    }
-    invalidate() {}
-    handleInput() {}
-  },
+vi.mock("@mrclrchtr/supi-core/tool-framework", () => ({
+  runWithProgressWidget: vi.fn((_pi, _ctx, _title, runner) => {
+    const controller = new AbortController();
+    return runner(controller.signal, () => {});
+  }),
 }));
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

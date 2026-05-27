@@ -184,3 +184,23 @@ function extractSection(
   }
   return null;
 }
+
+/**
+ * Shorthand for {@link loadSupiConfig} that infers the return type from defaults.
+ *
+ * Reduces boilerplate when a package only needs the merged runtime config.
+ *
+ * @example
+ * ```ts
+ * const config = loadSectionConfig("my-ext", cwd, { enabled: true, timeout: 30 });
+ * // config is typed as { enabled: boolean; timeout: number }
+ * ```
+ */
+export function loadSectionConfig<T extends Record<string, unknown>>(
+  section: string,
+  cwd: string,
+  defaults: T,
+  options?: SupiConfigOptions,
+): T {
+  return loadSupiConfig(section, cwd, defaults, options);
+}
