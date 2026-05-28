@@ -83,6 +83,18 @@ describe("focused code intelligence tool registration", () => {
     }
   });
 
+  it("does not register any lsp_* or tree_sitter_* substrate tools", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const names = getTools(pi).map((t: { name: string }) => t.name);
+    const substratePrefixes = ["lsp_", "tree_sitter_"];
+    const substrateTools = names.filter((n) =>
+      substratePrefixes.some((prefix) => n.startsWith(prefix)),
+    );
+    expect(substrateTools).toEqual([]);
+  });
+
   it("registers code_health tool", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);

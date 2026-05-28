@@ -10,7 +10,9 @@ import {
   syncWorkspaceSentinelSnapshot,
 } from "@mrclrchtr/supi-lsp/api";
 import type { LspAdapterState } from "./runtime-state.ts";
-import { LSP_TOOL_NAMES } from "./tool-specs.ts";
+
+// LSP_TOOL_NAMES removed — lsp_* tools are no longer registered (TNDM-A9AQF4)
+const LSP_TOOL_NAMES: readonly string[] = [];
 
 export function registerDiagnosticInjectionHandlers(
   pi: ExtensionAPI,

@@ -153,7 +153,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     substrates: ["semantic", "search", "git", "diagnostics"],
     phase: "phase-6",
     nonGoals: [
-      "Does not remove public lsp_* or tree_sitter_* tools in Phase 0.",
+      "Removed public lsp_* and tree_sitter_* tools in Phase 1.5 (TNDM-A9AQF4).",
       "Does not act as a generic verification/test runner.",
     ],
   },

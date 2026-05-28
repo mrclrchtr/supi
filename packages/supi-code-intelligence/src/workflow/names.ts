@@ -1,9 +1,8 @@
 /**
  * Canonical planned V2 workflow tool names.
  *
- * Phase 0 note: this is design metadata only. The current registered public tool
- * surface still lives in `src/tool/tool-specs.ts`, `src/lsp/tool-specs.ts`, and
- * `src/tree-sitter/tool-specs.ts` until later migration phases replace it.
+ * Phase 1.5 note: `code_resolve` and `code_health` are active. Remaining names
+ * are design metadata for future phases.
  */
 export const WORKFLOW_CODE_TOOL_NAMES = [
   "code_resolve",

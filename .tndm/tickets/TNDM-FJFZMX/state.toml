@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:38.720651Z"
+revision = 30
+
+[document_fingerprints]
+archive = "sha256:47d837e4771d792db2c0a8ffa8c7221203e76b2559356db68ccee098db1329ed"
+content = "sha256:36799792f926aac06ee8c3889def64eec78fe4a26f6060d6a15765f40869ab6a"
+task-01 = "sha256:c15a616e8707b3e551adac3094c488ec8d445d46199db05ad2202889331d3b74"
+task-02 = "sha256:55cf06aef49474048057afb2db0ac42aa53af20419b458e78efeb6d7c4915617"
+task-03 = "sha256:31b7af56a4cea299d2290815f41403b9bb4b09a2b923bbcdbaa7d93a4fc5bfe7"
+task-04 = "sha256:857daf2166d6f9dd58a8237f836f2bb72f1786c317356d5d717c5a1fb19537f8"
+task-05 = "sha256:9500674d0e4d803857c072ea087b67397226278df4c0dbb1ecc6973e18cb32f1"
+
+[[tasks]]
+number = 1
+title = "Delete 8 dead modules in src/lsp/ and src/tree-sitter/"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Fix stale V2 workflow comments in surface.ts and names.ts"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Add explicit absent-substrate-tool assertions to registration test"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Update CLAUDE.md: fix architecture diagram + document absorption gaps"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Full verification — typecheck, lint, test suite, dead-code audit"
+status = "done"
