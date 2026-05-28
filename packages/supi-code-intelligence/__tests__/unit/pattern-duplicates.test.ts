@@ -23,7 +23,7 @@ describe.skip("pattern duplicate reporting", () => {
     writeFileSync(path.join(srcDir, "b.ts"), "export const SPECIES_OPTIONS = ['pine'];\n");
 
     const result = await executeAction(
-      { action: "pattern", pattern: "SPECIES_OPTIONS", kind: "definition", path: "src" },
+      { action: "find", query: "SPECIES_OPTIONS", kind: "definition", path: "src" },
       { cwd: tmpDir },
     );
 

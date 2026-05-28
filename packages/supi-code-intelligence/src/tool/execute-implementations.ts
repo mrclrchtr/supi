@@ -73,7 +73,8 @@ export async function executeImplementationsTool(
   const route = routeFor(ctx.cwd, "code_implementations");
   if (route.preferred === "unavailable") {
     return {
-      content: "**Error:** No semantic analysis provider is available. Use lsp_* tools directly.",
+      content:
+        "**Error:** No semantic analysis provider is available. Check `code_health` for LSP status or enable an LSP server for this workspace.",
       details: {
         type: "search" as const,
         data: {

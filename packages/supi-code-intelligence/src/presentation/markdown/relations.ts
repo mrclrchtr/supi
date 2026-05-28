@@ -83,7 +83,7 @@ export function renderImplementationsResult(
   }
 
   lines.push(
-    "_Semantic analysis. Use `code_pattern` only when you explicitly want text-search hints for likely implementations._",
+    "_Semantic analysis. Use `code_find` (text mode) only when you explicitly want text-search hints for likely implementations._",
   );
   lines.push("");
 

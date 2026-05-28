@@ -83,7 +83,7 @@ export async function executeCallsTool(
   if (route.preferred === "unavailable") {
     return {
       content:
-        "**Error:** No structural analysis provider is available. Use tree_sitter_* tools directly if needed.",
+        "**Error:** No structural analysis provider is available. Check `code_health` for provider status or ensure tree-sitter is enabled for this workspace.",
       details: {
         type: "search" as const,
         data: {

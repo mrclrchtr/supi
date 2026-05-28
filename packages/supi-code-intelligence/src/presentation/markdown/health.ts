@@ -21,6 +21,14 @@ export interface HealthDiagnosticEntry {
   warnings: number;
 }
 
+/** A suggested code action at a specific diagnostic location. */
+export interface CodeActionSuggestion {
+  file: string;
+  line: number;
+  title: string;
+  kind?: string;
+}
+
 export interface HealthData {
   lspAvailable: boolean;
   lspStatus: string;
@@ -30,6 +38,8 @@ export interface HealthData {
   gitContext: GitContext | null;
   scopeFilter: string | null;
   level: "summary" | "detailed";
+  /** Code action suggestions collected from LSP (only populated in detailed mode). */
+  codeActions: CodeActionSuggestion[] | null;
 }
 
 export function renderHealthResult(data: HealthData, cwd: string): string {
@@ -62,6 +72,11 @@ function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string
   } else {
     renderDiagnosticDetails(lines, data, cwd);
   }
+
+  // Code actions can appear even when summary-level diagnostics are empty,
+  // because they're collected from a different LSP source (outstanding diagnostics)
+  renderCodeActionsSection(lines, data, cwd);
+
   lines.push("");
 }
 
@@ -82,6 +97,23 @@ function renderDiagnosticDetails(lines: string[], data: HealthData, cwd: string)
     lines.push(
       `- \`${relPath}\` — ${entry.errors} error${s(entry.errors)}, ${entry.warnings} warning${s(entry.warnings)}`,
     );
+  }
+}
+
+function renderCodeActionsSection(lines: string[], data: HealthData, cwd: string): void {
+  // Code actions are only meaningful in detailed mode
+  if (data.level !== "detailed") return;
+  if (!data.codeActions || data.codeActions.length === 0) return;
+
+  lines.push("");
+  lines.push("### Code Actions");
+  lines.push("");
+  lines.push("Available fixes (suggestions only — not applied):");
+  lines.push("");
+  for (const action of data.codeActions) {
+    const relPath = makeRelative(cwd, action.file);
+    const kindLabel = action.kind ? ` (${action.kind})` : "";
+    lines.push(`- \`${relPath}:${action.line}\` — "${action.title}"${kindLabel}`);
   }
 }
 

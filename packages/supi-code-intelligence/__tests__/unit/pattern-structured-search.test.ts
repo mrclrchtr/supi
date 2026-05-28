@@ -33,8 +33,8 @@ describe.skip("pattern structured search", () => {
 
     const result = await executeAction(
       {
-        action: "pattern",
-        pattern: "Payment|payment",
+        action: "find",
+        query: "Payment|payment",
         regex: true,
         kind: "definition",
         path: "src",
@@ -64,7 +64,7 @@ describe.skip("pattern structured search", () => {
     );
 
     const result = await executeAction(
-      { action: "pattern", pattern: "payment", kind: "export", path: "src" },
+      { action: "find", query: "payment", kind: "export", path: "src" },
       { cwd: tmpDir },
     );
 
@@ -82,7 +82,7 @@ describe.skip("pattern structured search", () => {
     }
 
     const result = await executeAction(
-      { action: "pattern", pattern: "target", kind: "definition", path: "src" },
+      { action: "find", query: "target", kind: "definition", path: "src" },
       { cwd: tmpDir },
     );
 

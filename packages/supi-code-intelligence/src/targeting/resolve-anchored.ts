@@ -61,7 +61,7 @@ export function resolveAnchoredTarget(
   if (isBinaryFile(file)) {
     return {
       kind: "error",
-      message: `File type not supported for semantic analysis: \`${file}\`. Use \`code_pattern\` for explicit text search.`,
+      message: `File type not supported for semantic analysis: \`${file}\`. Use \`code_find\` with \`mode: "text"\` for explicit text search.`,
     };
   }
 

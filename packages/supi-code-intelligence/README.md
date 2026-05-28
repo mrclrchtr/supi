@@ -33,7 +33,8 @@ After install, pi gets:
 - `code_calls` — structural outgoing calls from an enclosing function or method
 - `code_implementations` — semantic implementation lookup for an interface, class, or method
 - `code_affected` — blast radius, downstream impact, and risk for a target
-- `code_pattern` — explicit literal, regex, or structured search
+- `code_find` — unified ranked search (text, regex, AST, semantic)
+- `code_health` — diagnostics, server status, and workspace health
 - `code_refactor_plan` — preview a semantic rename without mutating files
 - `code_refactor_apply` — apply a previously generated refactor plan
 - `code_resolve` — resolve human/code references into precise targets with stable target handles for follow-up calls
@@ -51,17 +52,15 @@ Phase 1 activates `code_resolve` as the first active V2 workflow tool.
 The current public surface now includes:
 
 - `code_resolve` — **active** (Phase 1)
+- `code_find` — **active** (Phase 2a, supersedes code_pattern)
+- `code_health` — **active** (Phase 1.5)
 - `code_context` — planned (Phase 2)
-- `code_find` — planned (Phase 2)
 - `code_graph` — planned (Phase 3)
 - `code_impact` — planned (Phase 4)
 - `code_refactor` — planned (Phase 5)
 - `code_apply` — planned (Phase 5)
-- `code_health` — planned (Phase 6)
 
 The design source of truth lives in `src/workflow/` with types, schemas, and metadata.
-
-Until later replacement phases land, raw `lsp_*` and `tree_sitter_*` tools remain public and install exactly as they do today.
 
 This package is for questions like:
 
@@ -95,13 +94,14 @@ Semantic implementation lookup for an interface, class, or abstract method.
 ### `code_affected`
 Semantic blast-radius analysis for a concrete target. This tool no longer falls back to grep-style guesses.
 
-### `code_pattern`
-Explicit search tool for:
-- literal search
-- regex search (`regex: true`)
-- structured search (`kind: "definition" | "export" | "import"`)
+### `code_find`
+Unified ranked search tool for:
+- literal text search (default mode)
+- regex search (`mode: "regex"`)
+- AST structured search (`mode: "ast"` with `kind`)
+- LSP semantic workspace symbol search (`mode: "semantic"`)
 
-This is the only tool in the family that intentionally returns heuristic/text-search results.
+Supports `query` (required), `scope`, `mode`, `kind`, `contextLines`, and `maxResults`.
 
 ## Shared input conventions
 
@@ -112,12 +112,9 @@ Depending on the tool, inputs may include:
 - `character`
 - `symbol`
 - `kind`
-- `pattern`
-- `regex`
 - `exportedOnly`
 - `maxResults`
 - `contextLines`
-- `summary`
 
 Notes:
 - line and character positions are **1-based**
@@ -135,7 +132,7 @@ Results report confidence such as:
 - `heuristic`
 - `unavailable`
 
-`heuristic` is now primarily a `code_pattern` concern. The other tools prefer explicit unavailable states over silent search fallbacks.
+`heuristic` results may appear from `code_find` in text/regex modes. The other tools prefer explicit unavailable states over silent search fallbacks.
 
 ## Architecture
 

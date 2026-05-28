@@ -63,10 +63,10 @@ describe("executeAction validation", () => {
     expect(result.content).toContain("anchored coordinates");
   });
 
-  it("rejects pattern action without pattern param", async () => {
-    const result = await executeAction({ action: "pattern" }, { cwd: tmpDir });
+  it("rejects find action without query param", async () => {
+    const result = await executeAction({ action: "find" }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
-    expect(result.content).toContain("pattern");
+    expect(result.content).toContain("query");
   });
 
   it("supports file-only references for exported file surfaces", async () => {
@@ -128,13 +128,13 @@ describe("affected action", () => {
   });
 });
 
-describe("pattern action", () => {
+describe("find action", () => {
   it("finds matches in files", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
     writeFileSync(path.join(tmpDir, "index.ts"), "export const hello = 'world';");
     writeFileSync(path.join(tmpDir, "other.ts"), "import { hello } from './index';");
 
-    const result = await executeAction({ action: "pattern", pattern: "hello" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "find", query: "hello" }, { cwd: tmpDir });
     expect(result.content).toContain("Pattern:");
     expect(result.content).toContain("hello");
     expect(result.content).toContain("match");
@@ -145,7 +145,7 @@ describe("pattern action", () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "export const x = 1;");
 
     const result = await executeAction(
-      { action: "pattern", pattern: "nonexistent_symbol_xyz" },
+      { action: "find", query: "nonexistent_symbol_xyz" },
       { cwd: tmpDir },
     );
     expect(result.content).toContain("No matches");
@@ -159,7 +159,7 @@ describe("pattern action", () => {
     writeFileSync(path.join(tmpDir, "b.ts"), "export const target = 2;");
 
     const result = await executeAction(
-      { action: "pattern", pattern: "target", path: "src/" },
+      { action: "find", query: "target", path: "src/" },
       { cwd: tmpDir },
     );
     expect(result.content).toContain("src/");
@@ -170,10 +170,7 @@ describe("pattern action", () => {
     writeJson(tmpDir, "package.json", { name: "test" });
     writeFileSync(path.join(tmpDir, "index.ts"), "const x = sendMessage({ ok: true });");
 
-    const result = await executeAction(
-      { action: "pattern", pattern: "sendMessage({" },
-      { cwd: tmpDir },
-    );
+    const result = await executeAction({ action: "find", query: "sendMessage({" }, { cwd: tmpDir });
 
     expect(result.content).toContain("sendMessage({");
     expect(result.content).not.toContain("No matches");
@@ -187,7 +184,7 @@ describe("pattern action", () => {
     );
 
     const result = await executeAction(
-      { action: "pattern", pattern: "register(Settings|Config)", regex: true },
+      { action: "find", query: "register(Settings|Config)", regex: true },
       { cwd: tmpDir },
     );
 
@@ -200,7 +197,7 @@ describe("pattern action", () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "const x = sendMessage({ ok: true });");
 
     const result = await executeAction(
-      { action: "pattern", pattern: "sendMessage(", regex: true },
+      { action: "find", query: "sendMessage(", regex: true },
       { cwd: tmpDir },
     );
 

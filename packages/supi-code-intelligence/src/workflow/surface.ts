@@ -75,7 +75,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     phase: "phase-2",
     nonGoals: [
       "Does not activate natural-language retrieval without a real implementation.",
-      "Does not remove code_pattern in Phase 0.",
+      "Removed code_pattern in Phase 2b (TNDM-057XHJ).",
     ],
   },
   {

@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
-import { executeAction } from "../helpers/execute-action.ts";
 
 let tmpDir: string;
 
@@ -153,38 +152,32 @@ describe("pattern summary via executePatternAction", () => {
 // Summary via executeAction (full validation + routing path)
 // ---------------------------------------------------------------------------
 
-describe("pattern summary via executeAction", () => {
-  it("routes summary=true through executeAction", async () => {
+describe("pattern summary via executePatternAction", () => {
+  it("routes summary=true through executePatternAction", async () => {
     writeFileSync(join(tmpDir, "a.ts"), "const foo = 1;");
     writeFileSync(join(tmpDir, "b.ts"), "const foo = 2;");
     writeFileSync(join(tmpDir, "c.ts"), "const bar = 3;");
 
-    const result = await executeAction(
-      { action: "pattern", pattern: "foo", summary: true },
-      { cwd: tmpDir },
-    );
+    const result = await executePatternAction({ pattern: "foo", summary: true }, tmpDir);
 
     expect(result.content).toContain("Pattern Summary");
     expect(result.content).toContain("2 files");
     expect(result.content).not.toContain("L1:");
   });
 
-  it("returns line-level output when summary is not set via executeAction", async () => {
+  it("returns line-level output when summary is not set via executePatternAction", async () => {
     writeFileSync(join(tmpDir, "a.ts"), "const foo = 1;");
 
-    const result = await executeAction({ action: "pattern", pattern: "foo" }, { cwd: tmpDir });
+    const result = await executePatternAction({ pattern: "foo" }, tmpDir);
     expect(result.content).toContain("Pattern:");
     expect(result.content).toContain("L1:");
     expect(result.content).not.toContain("Pattern Summary");
   });
 
-  it("returns line-level output when summary=false via executeAction", async () => {
+  it("returns line-level output when summary=false via executePatternAction", async () => {
     writeFileSync(join(tmpDir, "a.ts"), "const foo = 1;");
 
-    const result = await executeAction(
-      { action: "pattern", pattern: "foo", summary: false },
-      { cwd: tmpDir },
-    );
+    const result = await executePatternAction({ pattern: "foo", summary: false }, tmpDir);
     expect(result.content).toContain("L1:");
     expect(result.content).not.toContain("Pattern Summary");
   });

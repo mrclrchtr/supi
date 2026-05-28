@@ -1,8 +1,8 @@
 import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
 import { executeCallsTool } from "../../src/tool/execute-calls.ts";
+import { executeFindTool } from "../../src/tool/execute-find.ts";
 import { executeImplementationsTool } from "../../src/tool/execute-implementations.ts";
-import { executePatternTool } from "../../src/tool/execute-pattern.ts";
 import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
 import { executeReferencesTool } from "../../src/tool/execute-references.ts";
@@ -14,7 +14,7 @@ export type TestAction =
   | "calls"
   | "implementations"
   | "affected"
-  | "pattern"
+  | "find"
   | "refactor_plan"
   | "refactor_apply";
 
@@ -26,6 +26,7 @@ export interface ActionParams {
   character?: number;
   symbol?: string;
   pattern?: string;
+  query?: string;
   regex?: boolean;
   kind?: string;
   exportedOnly?: boolean;
@@ -43,7 +44,7 @@ const SUPPORTED_ACTIONS = [
   "calls",
   "implementations",
   "affected",
-  "pattern",
+  "find",
   "refactor_plan",
   "refactor_apply",
 ] as const satisfies readonly TestAction[];
@@ -77,8 +78,25 @@ export async function executeAction(
       return executeImplementationsTool(rest, ctx);
     case "affected":
       return executeAffectedTool(rest, ctx);
-    case "pattern":
-      return executePatternTool({ ...rest, pattern: rest.pattern ?? "" }, ctx);
+    case "find":
+      return executeFindTool(
+        {
+          query: rest.query ?? rest.pattern ?? "",
+          scope: rest.path,
+          mode: rest.regex ? "regex" : "text",
+          kind: rest.kind as
+            | "definition"
+            | "import"
+            | "export"
+            | "call"
+            | "type"
+            | "test"
+            | undefined,
+          maxResults: rest.maxResults,
+          contextLines: rest.contextLines,
+        } as Parameters<typeof executeFindTool>[0],
+        ctx,
+      );
     case "refactor_plan":
       return executeRefactorPlanTool(rest as Parameters<typeof executeRefactorPlanTool>[0], ctx);
     case "refactor_apply":

@@ -2,13 +2,13 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import type { CodeIntelligenceToolName } from "../intent/types.ts";
 import type { CodeIntelResult } from "../types.ts";
-import { CodeHealthParameters } from "../workflow/schemas.ts";
+import { CodeFindParameters, CodeHealthParameters } from "../workflow/schemas.ts";
 import { executeAffectedTool } from "./execute-affected.ts";
 import { executeBriefTool } from "./execute-brief.ts";
 import { executeCallsTool } from "./execute-calls.ts";
+import { executeFindTool } from "./execute-find.ts";
 import { executeHealthTool } from "./execute-health.ts";
 import { executeImplementationsTool } from "./execute-implementations.ts";
-import { executePatternTool } from "./execute-pattern.ts";
 import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
 import { executeReferencesTool } from "./execute-references.ts";
@@ -19,13 +19,13 @@ const FileParam = Type.String({ description: "Target file" });
 const LineParam = Type.Number({ description: "1-based line", minimum: 1 });
 const CharacterParam = Type.Number({ description: "1-based UTF-16 column", minimum: 1 });
 const SymbolParam = Type.String({ description: "Symbol name" });
-const PatternParam = Type.String({ description: "Search pattern" });
-const RegexParam = Type.Boolean({ description: "Regex search" });
+const _PatternParam = Type.String({ description: "Search pattern" });
+const _RegexParam = Type.Boolean({ description: "Regex search" });
 const ExportedOnlyParam = Type.Boolean({ description: "Exported symbols only" });
 const MaxResultsParam = Type.Number({ description: "Max results" });
-const ContextLinesParam = Type.Number({ description: "Context lines" });
-const SummaryParam = Type.Boolean({ description: "Summarize by directory" });
-const StructuredPatternKindParam = Type.String({
+const _ContextLinesParam = Type.Number({ description: "Context lines" });
+const _SummaryParam = Type.Boolean({ description: "Summarize by directory" });
+const _StructuredPatternKindParam = Type.String({
   description: "Structured kind: definition | export | import",
 });
 const NewNameParam = Type.String({ description: "New name for rename operation" });
@@ -95,19 +95,6 @@ const CodeAffectedParameters = Type.Object(
     symbol: Type.Optional(SymbolParam),
     exportedOnly: Type.Optional(ExportedOnlyParam),
     maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-const CodePatternParameters = Type.Object(
-  {
-    path: Type.Optional(PathParam),
-    pattern: PatternParam,
-    regex: Type.Optional(RegexParam),
-    kind: Type.Optional(StructuredPatternKindParam),
-    maxResults: Type.Optional(MaxResultsParam),
-    contextLines: Type.Optional(ContextLinesParam),
-    summary: Type.Optional(SummaryParam),
   },
   { additionalProperties: false },
 );
@@ -262,18 +249,19 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       executeAffectedTool(params as Parameters<typeof executeAffectedTool>[0], ctx),
   },
   {
-    name: "code_pattern",
-    label: "Code Pattern",
+    name: "code_find",
+    label: "Code Find",
     description:
-      "Run explicit search with literal, regex, or structured matching in a bounded path. This is the only code_* tool that uses heuristic/text search. For structured or semantic precision, prefer code_resolve or code_brief.",
-    promptSnippet: "code_pattern — explicit code search",
+      "Unified ranked code search with mode dispatch: text (literal ripgrep), regex (ripgrep regex), ast (tree-sitter structured), semantic (LSP workspace symbols). Defaults to text mode. Supports optional kind filtering for result ranking.",
+    promptSnippet: "code_find — unified ranked code search",
     basePromptGuidelines: [
-      "Use code_pattern for literal, regex, or structured search in a bounded path.",
-      "For structured or semantic precision, prefer code_resolve or code_brief over code_pattern.",
+      "Use code_find for text, regex, AST-level, or semantic workspace symbol search.",
+      "Default mode is text (literal ripgrep). Use mode: 'regex' for regex, mode: 'ast' with kind for structured search, mode: 'semantic' for LSP workspace symbols.",
+      "Use kind for advisory filtering or ranking. In text/regex modes kind is advisory-only (no filtering applied). In ast/semantic modes, supported kinds (definition, import, export) are applied directly; call, type, test return not-yet-implemented.",
+      "code_find is the sole code search tool — use it for all text, regex, AST, and semantic searches.",
     ],
-    parameters: CodePatternParameters,
-    run: (params, ctx) =>
-      executePatternTool(params as Parameters<typeof executePatternTool>[0], ctx),
+    parameters: CodeFindParameters,
+    run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
   },
   {
     name: "code_refactor_plan",

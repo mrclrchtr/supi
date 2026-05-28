@@ -76,7 +76,7 @@ export async function resolveFileTargetGroup(
   if (isBinaryFile(resolvedFile)) {
     return {
       kind: "error",
-      message: `File type not supported for semantic analysis: \`${file}\`. Use \`code_pattern\` for explicit text search.`,
+      message: `File type not supported for semantic analysis: \`${file}\`. Use \`code_find\` with \`mode: "text"\` for explicit text search.`,
     };
   }
 

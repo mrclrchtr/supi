@@ -37,7 +37,7 @@ export function renderImplementationsResult(
   }
 
   lines.push(
-    "_Semantic analysis. Use `code_pattern` only when you explicitly want text-search hints._",
+    "_Semantic analysis. Use `code_find` (text mode) only when you explicitly want text-search hints._",
   );
   lines.push("");
   return lines.join("\n");

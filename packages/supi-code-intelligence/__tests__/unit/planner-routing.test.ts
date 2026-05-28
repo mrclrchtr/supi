@@ -114,12 +114,6 @@ describe("Planner routing", () => {
       expect(result.content).toContain("No semantic analysis provider is available");
     });
 
-    it("routes code_pattern to search-preferred regardless of capability state", async () => {
-      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", "code_pattern");
-      expect(route.preferred).toBe("search");
-    });
-
     it("returns unavailable when no capability is registered", async () => {
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
       const route = routeFor("/project", "code_brief");

@@ -76,7 +76,7 @@ export async function executeAffectedTool(
   if (route.preferred === "unavailable") {
     return {
       content:
-        "**Error:** No semantic analysis provider is available for this workspace. Use lsp_* tools directly if needed.",
+        "**Error:** No semantic analysis provider is available for this workspace. Check `code_health` for LSP status or enable an LSP server.",
       details: {
         type: "affected" as const,
         data: {

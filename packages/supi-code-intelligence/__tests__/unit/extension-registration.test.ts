@@ -70,13 +70,38 @@ describe("focused code intelligence tool registration", () => {
     expect(kindParam?.enum).toContain("command");
   });
 
-  it("does not register inactive V2 workflow tools (code_context, code_find, code_graph, code_impact, code_refactor, code_apply)", () => {
+  it("registers code_find with correct parameter shape", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const tool = getTool(pi, "code_find");
+    expect(tool).toBeDefined();
+    expect(tool.name).toBe("code_find");
+    expect(typeof tool.execute).toBe("function");
+
+    const props = (tool as { parameters?: { properties?: Record<string, unknown> } }).parameters
+      ?.properties;
+    expect(props).toBeDefined();
+    expect(props).toHaveProperty("query");
+    expect(props).toHaveProperty("scope");
+    expect(props).toHaveProperty("mode");
+    expect(props).toHaveProperty("kind");
+    expect(props).toHaveProperty("contextLines");
+    expect(props).toHaveProperty("maxResults");
+
+    // mode enum check
+    const modeParam = props?.mode as { enum?: string[] } | undefined;
+    expect(modeParam?.enum).toBeDefined();
+    expect(modeParam?.enum).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
+  });
+
+  it("does not register inactive V2 workflow tools (code_context, code_graph, code_impact, code_refactor, code_apply)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
     const inactive = WORKFLOW_CODE_TOOL_NAMES.filter(
-      (n) => n !== "code_resolve" && n !== "code_health",
+      (n) => n !== "code_resolve" && n !== "code_health" && n !== "code_find",
     );
     for (const name of inactive) {
       expect(names).not.toContain(name);
@@ -132,20 +157,6 @@ describe("focused code intelligence tool registration", () => {
     };
     expect(applyTool).toBeDefined();
     expect(applyTool.parameters?.properties).toHaveProperty("planId");
-  });
-
-  it("registers regex and kind parameters on code_pattern", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    expect(
-      (getTool(pi, "code_pattern") as { parameters?: { properties?: Record<string, unknown> } })
-        .parameters?.properties,
-    ).toHaveProperty("regex");
-    expect(
-      (getTool(pi, "code_pattern") as { parameters?: { properties?: Record<string, unknown> } })
-        .parameters?.properties,
-    ).toHaveProperty("kind");
   });
 });
 

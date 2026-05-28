@@ -58,10 +58,6 @@ function briefPreferred(availability: RouteAvailability): PlannerRoute["preferre
 export function routeFor(cwd: string, tool: CodeIntelligenceToolName): PlannerRoute {
   const availability = readAvailability(cwd);
 
-  if (tool === "code_pattern") {
-    return withPreferred(availability, "search");
-  }
-
   if (tool === "code_references" || tool === "code_implementations") {
     return withPreferred(availability, semanticOnly(availability));
   }

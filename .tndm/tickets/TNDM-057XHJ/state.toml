@@ -1,0 +1,50 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:45.729232Z"
+revision = 38
+
+[document_fingerprints]
+archive = "sha256:375d306669c46cdc300bbd9264142c59174e033c68377a4c6feb41d13f40274b"
+content = "sha256:df2a3618c86bbc736e7dea5c33fe1e82bfbaf4882b40b12ebf726bfc0daa74ef"
+task-01 = "sha256:c685b834aa437c96444033be3e0ab8a7f4539d3cac687747626047afee472731"
+task-02 = "sha256:c39f4e566a51ee57332a9f0c6197130f6f75c2512a75e8364c43be81a4b30a5f"
+task-03 = "sha256:75e03d5c74b5ae8778d8b783cb88e250218fd99dcaa6c90d7cc30165e3c79660"
+task-04 = "sha256:ba7eae44cf6cc7e0f27d702c1202aced643d88908fadfad1fda90b6d878fd9bb"
+task-05 = "sha256:c5f1a8ed5d60584bf8bce7ee00c69f00285dce1e0f07f7376ff4e26d61e72b03"
+task-06 = "sha256:287eca9c7e00b40b2b7018b97dda637af70d6aae62378f289b23f531e1943da1"
+task-07 = "sha256:13770684ec0b8977ad553f30a66664054627251b74b5fb3ef13900bf035c30e2"
+
+[[tasks]]
+number = 1
+title = "Remove code_pattern from tool specs, types, routing, and validation"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Delete execute-pattern.ts tool executor"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update source-level code_pattern references to code_find"
+status = "done"
+
+[[tasks]]
+number = 4
+title = 'Update test helper and all test files from "pattern" to "find" action'
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Remove code_pattern-specific tests from registration and routing suites"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Update CLAUDE.md and README.md — remove code_pattern docs"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Full workspace verification — typecheck, lint, test suite, grep audit"
+status = "done"

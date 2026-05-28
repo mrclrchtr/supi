@@ -2,8 +2,6 @@ import * as fs from "node:fs";
 import type { CodeQueryParams } from "../query-params.ts";
 import { normalizePath } from "../search-helpers.ts";
 
-const STRUCTURED_PATTERN_KINDS = new Set(["definition", "export", "import"]);
-
 /** Shared validation for focused tool inputs that can anchor into files. */
 export function validateFocusedToolParams(
   params: Pick<CodeQueryParams, "path" | "file" | "line" | "character">,
@@ -22,21 +20,6 @@ export function validateFocusedToolParams(
 
   if ((params.line != null || params.character != null) && !params.file) {
     return "**Error:** `line` and `character` require `file`.";
-  }
-
-  return null;
-}
-
-/** Shared validation for explicit pattern-tool input. */
-export function validatePatternToolParams(
-  params: Pick<CodeQueryParams, "path" | "file" | "line" | "character" | "kind">,
-  cwd: string,
-): string | null {
-  const commonError = validateFocusedToolParams(params, cwd);
-  if (commonError) return commonError;
-
-  if (params.kind && !STRUCTURED_PATTERN_KINDS.has(params.kind)) {
-    return "**Error:** `code_pattern` `kind` must be one of `definition`, `export`, or `import`.";
   }
 
   return null;

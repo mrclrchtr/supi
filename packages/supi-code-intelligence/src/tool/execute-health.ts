@@ -9,7 +9,11 @@ import { resolve } from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import { getSessionLspService, type SessionLspService } from "@mrclrchtr/supi-lsp/api";
 import { gatherGitContext } from "../git-context.ts";
-import { type HealthData, renderHealthResult } from "../presentation/markdown/health.ts";
+import {
+  type CodeActionSuggestion,
+  type HealthData,
+  renderHealthResult,
+} from "../presentation/markdown/health.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
 
@@ -47,6 +51,12 @@ export async function executeHealthTool(
   const servers = collectServers(service, included);
   const gitContext = included.includes("dirty") ? gatherGitContext(cwd) : null;
 
+  // Code actions only in detailed mode to avoid unnecessary LSP calls
+  const codeActions =
+    level === "detailed" && included.includes("diagnostics")
+      ? await collectCodeActions(service, scopeFilter, cwd)
+      : null;
+
   const data: HealthData = {
     lspAvailable: service !== null,
     lspStatus,
@@ -56,6 +66,7 @@ export async function executeHealthTool(
     gitContext,
     scopeFilter: params.scope ? scopeFilter : null,
     level,
+    codeActions,
   };
 
   const content = renderHealthResult(data, cwd);
@@ -132,6 +143,109 @@ async function collectDiagnostics(
     result.push({ file: filePath, errors: entry.errors, warnings: entry.warnings });
   }
   return result;
+}
+
+/** Max files to query for code actions in detailed health mode. */
+const MAX_CODE_ACTION_FILES = 5;
+/** Max total code action suggestions to return. */
+const MAX_CODE_ACTION_SUGGESTIONS = 10;
+
+async function collectCodeActions(
+  service: SessionLspService | null,
+  scopeFilter: string | null,
+  cwd: string,
+): Promise<CodeActionSuggestion[]> {
+  if (!service) return [];
+
+  try {
+    const outstanding = service.getOutstandingDiagnostics(1);
+    const suggestions = await collectFromOutstanding(service, outstanding, scopeFilter, cwd);
+    return suggestions.slice(0, MAX_CODE_ACTION_SUGGESTIONS);
+  } catch {
+    return [];
+  }
+}
+
+async function collectFromOutstanding(
+  service: SessionLspService,
+  outstanding: ReturnType<SessionLspService["getOutstandingDiagnostics"]>,
+  scopeFilter: string | null,
+  cwd: string,
+): Promise<CodeActionSuggestion[]> {
+  const suggestions: CodeActionSuggestion[] = [];
+  let filesQueried = 0;
+
+  for (const entry of outstanding) {
+    if (suggestions.length >= MAX_CODE_ACTION_SUGGESTIONS) break;
+    if (filesQueried >= MAX_CODE_ACTION_FILES) break;
+    if (scopeFilter && !isWithinScope(scopeFilter, entry.file, cwd)) continue;
+
+    const newSuggestions = await collectFileCodeActions(service, entry);
+    if (newSuggestions.length === 0) continue;
+
+    filesQueried++;
+    mergeSuggestions(suggestions, newSuggestions);
+  }
+
+  return suggestions;
+}
+
+function mergeSuggestions(
+  existing: CodeActionSuggestion[],
+  incoming: CodeActionSuggestion[],
+): void {
+  const seen = new Set(existing.map((s) => `${s.file}:${s.title}`));
+  for (const s of incoming) {
+    const key = `${s.file}:${s.title}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      existing.push(s);
+    }
+  }
+}
+
+async function collectFileCodeActions(
+  service: SessionLspService,
+  entry: {
+    file: string;
+    diagnostics: Array<{
+      severity?: number;
+      range: {
+        start: { line: number; character: number };
+        end: { line: number; character: number };
+      };
+    }>;
+  },
+): Promise<CodeActionSuggestion[]> {
+  const errorDiag = entry.diagnostics.find((d) => (d.severity ?? 1) <= 1);
+  if (!errorDiag) return [];
+
+  try {
+    const actions = await service.codeActions(entry.file, {
+      line: errorDiag.range.start.line,
+      character: errorDiag.range.start.character,
+    });
+    if (!actions || actions.length === 0) return [];
+
+    const result: CodeActionSuggestion[] = [];
+    for (const a of actions) {
+      if (!a.title) continue;
+      result.push({
+        file: entry.file,
+        line: errorDiag.range.start.line + 1,
+        title: a.title,
+        kind: a.kind ?? undefined,
+      });
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+function isWithinScope(scopeFilter: string, file: string, cwd: string): boolean {
+  const absPath = resolve(cwd, file);
+  return isWithinOrEqual(scopeFilter, absPath);
 }
 
 function collectServers(

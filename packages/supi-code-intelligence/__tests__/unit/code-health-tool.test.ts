@@ -1,27 +1,50 @@
 /**
- * RED tests for the code_health tool (Phase 1.5).
+ * Tests for the code_health tool (Phase 1.5).
  *
- * Tests will fail initially because code_health is not yet registered
- * or the executor is not implemented.
+ * Covers diagnostic summary, server status, dirty workspace, code action
+ * suggestions (detailed mode), and the health renderer.
  */
 
 import { mkdtempSync, rmSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
+import {
+  type CodeActionSuggestion,
+  type HealthData,
+  renderHealthResult,
+} from "../../src/presentation/markdown/health.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
+
+const mockLspFns = vi.hoisted(() => ({
+  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
+}));
+
+vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
+  return {
+    ...actual,
+    getSessionLspService: mockLspFns.getSessionLspService,
+  };
+});
 
 let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-health-"));
+  // Default: LSP unavailable for existing tests
+  mockLspFns.getSessionLspService.mockReturnValue({
+    kind: "unavailable",
+    reason: "no active session",
+  });
 });
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
   clearMockRuntime();
+  vi.clearAllMocks();
 });
 
 describe("code_health tool", () => {
@@ -258,5 +281,252 @@ describe("code_health tool", () => {
 
     // Refresh should trigger recovery, which should be reflected in output
     expect(result.content[0].text).not.toContain("**Error");
+  });
+});
+
+describe("renderHealthResult code actions", () => {
+  function makeBaseData(overrides: Partial<HealthData>): HealthData {
+    return {
+      lspAvailable: false,
+      lspStatus: "unavailable",
+      recovered: false,
+      diagnostics: [],
+      servers: [],
+      gitContext: null,
+      scopeFilter: null,
+      level: "detailed",
+      codeActions: null,
+      ...overrides,
+    };
+  }
+
+  it("renders code actions section when codeActions is populated", () => {
+    const actions: CodeActionSuggestion[] = [
+      { file: "/tmp/src/file.ts", line: 12, title: "Remove unused import", kind: "quickfix" },
+      { file: "/tmp/src/file.ts", line: 42, title: "Add missing return type", kind: "quickfix" },
+    ];
+
+    const data = makeBaseData({
+      diagnostics: [{ file: "/tmp/src/file.ts", errors: 2, warnings: 0 }],
+      codeActions: actions,
+    });
+
+    const result = renderHealthResult(data, "/tmp");
+
+    expect(result).toContain("### Code Actions");
+    expect(result).toContain("Remove unused import");
+    expect(result).toContain("Add missing return type");
+    expect(result).toContain("quickfix");
+    expect(result).toContain("suggestions only");
+  });
+
+  it("does not render code actions section when codeActions is null", () => {
+    const data = makeBaseData({
+      diagnostics: [{ file: "/tmp/src/file.ts", errors: 2, warnings: 0 }],
+      codeActions: null,
+    });
+
+    const result = renderHealthResult(data, "/tmp");
+
+    expect(result).not.toContain("### Code Actions");
+    expect(result).not.toContain("suggestions only");
+  });
+
+  it("does not render code actions section when codeActions is empty", () => {
+    const data = makeBaseData({
+      diagnostics: [{ file: "/tmp/src/file.ts", errors: 2, warnings: 0 }],
+      codeActions: [],
+    });
+
+    const result = renderHealthResult(data, "/tmp");
+
+    expect(result).not.toContain("### Code Actions");
+  });
+
+  it("does not render code actions section in summary level even when populated", () => {
+    const actions: CodeActionSuggestion[] = [
+      { file: "/tmp/src/file.ts", line: 12, title: "Remove unused import", kind: "quickfix" },
+    ];
+
+    // Summary level with code actions — the executor shouldn't set codeActions
+    // in summary mode anyway, but the renderer should handle it gracefully
+    const data = makeBaseData({
+      level: "summary",
+      diagnostics: [{ file: "/tmp/src/file.ts", errors: 1, warnings: 0 }],
+      codeActions: actions,
+    });
+
+    const result = renderHealthResult(data, "/tmp");
+
+    // Summary mode doesn't call renderDiagnosticDetails, so no code actions section
+    expect(result).not.toContain("### Code Actions");
+  });
+});
+
+describe("code_health detailed mode with code actions", () => {
+  beforeEach(() => {
+    registerMockProvider(tmpDir);
+  });
+
+  it("includes code action titles when LSP returns actions in detailed mode", async () => {
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "ready",
+      service: {
+        codeActions: vi.fn().mockResolvedValue([
+          { title: "Remove unused import", kind: "quickfix" },
+          { title: "Fix all auto-fixable problems", kind: "source.fixAll" },
+        ]),
+        getOutstandingDiagnostics: vi.fn().mockReturnValue([
+          {
+            file: "src/file.ts",
+            diagnostics: [
+              {
+                severity: 1,
+                range: { start: { line: 11, character: 0 }, end: { line: 11, character: 20 } },
+                message: "'x' is declared but never used",
+              },
+            ],
+          },
+        ]),
+        getProjectServers: vi.fn().mockReturnValue([]),
+        getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
+        fileDiagnostics: vi.fn().mockResolvedValue(null),
+        recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
+      },
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-ca-1",
+      { level: "detailed", include: ["diagnostics"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).toContain("### Code Actions");
+    expect(result.content[0].text).toContain("Remove unused import");
+    expect(result.content[0].text).toContain("Fix all auto-fixable problems");
+    expect(result.content[0].text).toContain("12"); // line 12 (0-based 11 → 1-based 12)
+  });
+
+  it("does not include code actions in summary mode", async () => {
+    const codeActionsSpy = vi.fn().mockResolvedValue([]);
+
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "ready",
+      service: {
+        codeActions: codeActionsSpy,
+        getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+        getProjectServers: vi.fn().mockReturnValue([]),
+        getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
+        fileDiagnostics: vi.fn().mockResolvedValue(null),
+        recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
+      },
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    await tool.execute(
+      "test-ca-2",
+      { level: "summary" },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    );
+
+    // codeActions should NOT be called in summary mode
+    expect(codeActionsSpy).not.toHaveBeenCalled();
+  });
+
+  it("handles codeActions returning null gracefully", async () => {
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "ready",
+      service: {
+        codeActions: vi.fn().mockResolvedValue(null),
+        getOutstandingDiagnostics: vi.fn().mockReturnValue([
+          {
+            file: "src/file.ts",
+            diagnostics: [
+              {
+                severity: 1,
+                range: { start: { line: 5, character: 0 }, end: { line: 5, character: 10 } },
+                message: "error",
+              },
+            ],
+          },
+        ]),
+        getProjectServers: vi.fn().mockReturnValue([]),
+        getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
+        fileDiagnostics: vi.fn().mockResolvedValue(null),
+        recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
+      },
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-ca-3",
+      { level: "detailed", include: ["diagnostics"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    // Should not crash — "Code Actions" section absent since null means no actions
+    expect(result.content[0].text).not.toContain("### Code Actions");
+  });
+
+  it("handles codeActions throwing gracefully", async () => {
+    mockLspFns.getSessionLspService.mockReturnValue({
+      kind: "ready",
+      service: {
+        codeActions: vi.fn().mockRejectedValue(new Error("LSP timeout")),
+        getOutstandingDiagnostics: vi.fn().mockReturnValue([
+          {
+            file: "src/file.ts",
+            diagnostics: [
+              {
+                severity: 1,
+                range: { start: { line: 3, character: 0 }, end: { line: 3, character: 10 } },
+                message: "error",
+              },
+            ],
+          },
+        ]),
+        getProjectServers: vi.fn().mockReturnValue([]),
+        getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
+        fileDiagnostics: vi.fn().mockResolvedValue(null),
+        recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
+      },
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-ca-4",
+      { level: "detailed", include: ["diagnostics"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    // Should not crash on exceptions — diagnostic section still present
+    expect(result.content[0].text).toContain("### Diagnostics");
   });
 });

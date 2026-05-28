@@ -313,7 +313,7 @@ function formatNonModuleDir(ctx: NonModuleDirContext): void {
     lines.push(`- Exports: ${summary.exportCount}`);
     lines.push("");
     nextQueries.push(
-      `\`code_pattern\` with \`path: "${relPath || originalPath}"\` to inspect a specific nested symbol`,
+      `\`code_find\` with \`query: "..."\` and \`scope: "${relPath || originalPath}"\` to inspect a specific nested symbol`,
     );
   }
 

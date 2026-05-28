@@ -76,7 +76,7 @@ export async function executeReferencesTool(
   if (route.preferred === "unavailable") {
     return {
       content:
-        "**Error:** No semantic analysis provider is available. Use lsp_* tools directly if needed.",
+        "**Error:** No semantic analysis provider is available. Check `code_health` for LSP status or enable an LSP server for this workspace.",
       details: {
         type: "search" as const,
         data: {

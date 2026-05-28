@@ -3,26 +3,11 @@
 Architecture briefs with structural enrichment, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_brief`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_pattern`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_brief`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
 - Substrate `lsp_*` and `tree_sitter_*` tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
 - `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
-
-## V2 workflow — Phase 1.5
-
-Phase 1 activated `code_resolve`. Phase 1.5 removes public `lsp_*` and `tree_sitter_*` tools and adds `code_health`. Phase 2 absorbs `lsp_hover` into `code_brief` (anchored mode) as best-effort LSP type/signature info.
-
-- `code_resolve` and `code_health` are registered as active V2 workflow tools.
-- Public `lsp_*` and `tree_sitter_*` tools are removed. Their capabilities are absorbed by the `code_*` surface: `lsp_hover` → `code_brief` (anchored), `lsp_definition` → `code_resolve`/`code_brief`, `lsp_references` → `code_references`, `lsp_diagnostics`/`lsp_recover` → `code_health`, `tree_sitter_*` → `code_brief`/`code_calls`. The LSP and tree-sitter libraries remain as internal substrates.
-- `code_context`, `code_find`, `code_graph`, `code_impact`, `code_refactor`, and `code_apply` remain unregistered for future phases.
-- Future phases must keep `src/workflow/` consistent with `__tests__/unit/workflow-surface.test.ts`.
-- Keep implementation phased: one ticket per phase, fresh verification per task, user review, then commit before the next phase.
-
-### Known absorption gaps
-
-- **lsp_code_actions**: code action suggestions are deferred. No `code_*` tool surfaces them yet.
-- **lsp_definition**: partially absorbed — `code_resolve` resolves references to target handles, and `code_brief` shows enclosing symbols, but exact go-to-definition results across files are not surfaced.
 
 ## Architecture
 
@@ -90,7 +75,7 @@ src/
 │   ├── execute-calls.ts        # code_calls tool executor
 │   ├── execute-implementations.ts # code_implementations tool executor
 │   ├── execute-affected.ts     # code_affected tool executor
-│   ├── execute-pattern.ts      # code_pattern tool executor
+│   ├── execute-find.ts         # code_find tool executor
 │   ├── execute-resolve.ts      # code_resolve tool executor (Phase 1)
 │   ├── execute-refactor-plan.ts  # code_refactor_plan tool executor
 │   └── execute-refactor-apply.ts # code_refactor_apply tool executor
@@ -107,7 +92,7 @@ src/
 │   ├── brief.ts                # Brief markdown renderer
 │   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
 │   ├── affected.ts             # Affected markdown renderer
-│   ├── pattern.ts              # Pattern search markdown renderer
+│   ├── pattern.ts              # Pattern/find search markdown renderer
 │   ├── refactor.ts             # Refactor result markdown renderer
 │   └── resolve.ts              # code_resolve markdown renderer (Phase 1)
 │   └── health.ts               # code_health markdown renderer (Phase 1.5)
@@ -150,8 +135,14 @@ Semantic implementation lookup for an interface, class, or method. Uses LSP inte
 ### `code_affected`
 Semantic blast-radius tool. Uses semantic evidence. Does not fall back to heuristic search.
 
-### `code_pattern`
-Explicit search tool. This is the only tool in the family that intentionally exposes heuristic/text-search behavior.
+### `code_find`
+Unified ranked code search with mode dispatch — the sole search tool.
+- `query` (required) — search pattern or symbol query
+- `mode?` — `text` (ripgrep literal, default), `regex` (ripgrep regex), `ast` (tree-sitter structured), `semantic` (LSP workspace symbols with text fallback)
+- `kind?` — result filtering/ranking: `definition`, `import`, `export`, `call`, `type`, `test`. Advisory-only in text/regex modes (no filtering applied); supported kinds (`definition`, `export`, `import`) are applied directly in ast/semantic modes; `call`/`type`/`test` return "not yet implemented" for ast/semantic modes.
+- `scope?` — workspace-relative path, package, or directory to limit search
+- `contextLines?` — context lines around matches (default 1)
+- `maxResults?` — result cap (default 8)
 
 ### `code_health`
 Diagnostic health summary. Replaces `lsp_diagnostics` and `lsp_recover`.
@@ -178,7 +169,7 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 - When no capability is available, the planner returns `preferred: "unavailable"` and the execute function returns an explicit error message.
 
 ### Public-surface split
-- `code_pattern` is the sole heuristic/search-oriented tool.
+- `code_find` is the sole search tool, supporting text, regex, AST, and semantic modes.
 - `code_references`, `code_calls`, `code_implementations`, and `code_affected` should prefer explicit unavailable states over text-search guesses.
 
 ### Param validation

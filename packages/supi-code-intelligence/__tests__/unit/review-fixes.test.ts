@@ -191,7 +191,7 @@ describe("contextLines in pattern results", () => {
     );
 
     const result = await executeAction(
-      { action: "pattern", pattern: "TARGET", contextLines: 1 },
+      { action: "find", query: "TARGET", contextLines: 1 },
       { cwd: tmpDir },
     );
 
@@ -204,7 +204,7 @@ describe("contextLines in pattern results", () => {
     writeFileSync(path.join(tmpDir, "sample.ts"), "export const X = 1;\nexport const Y = 2;");
 
     const result = await executeAction(
-      { action: "pattern", pattern: "X", contextLines: 0 },
+      { action: "find", query: "X", contextLines: 0 },
       { cwd: tmpDir },
     );
 
@@ -225,7 +225,7 @@ describe("contextLines in pattern results", () => {
     );
 
     const result = await executeAction(
-      { action: "pattern", pattern: "TARGET", contextLines: 1 },
+      { action: "find", query: "TARGET", contextLines: 1 },
       { cwd: tmpDir },
     );
 
@@ -253,7 +253,7 @@ describe("path scoping uses proper containment", () => {
     writeFileSync(path.join(supiCore, "index.ts"), "export const coreOnly = 1;");
 
     const result = await executeAction(
-      { action: "pattern", pattern: "Only", path: "packages/supi/" },
+      { action: "find", query: "Only", path: "packages/supi/" },
       { cwd: tmpDir },
     );
 
