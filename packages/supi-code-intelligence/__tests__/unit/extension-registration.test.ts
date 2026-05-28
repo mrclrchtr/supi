@@ -10,7 +10,7 @@ describe("focused code intelligence tool registration", () => {
     codeIntelligenceExtension(pi as never);
 
     const tools = getTools(pi);
-    // code_* (8) + lsp_* (10) + tree_sitter_* (6) + read/write/edit overrides (3)
+    // code_* (10) + read/write/edit overrides (3)
     expect(tools.length).toBeGreaterThanOrEqual(CODE_INTELLIGENCE_TOOL_SPECS.length);
     // All code_* tools are present
     for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
@@ -70,61 +70,35 @@ describe("focused code intelligence tool registration", () => {
     expect(kindParam?.enum).toContain("command");
   });
 
-  it("does not register inactive V2 workflow tools (code_context, code_find, code_graph, code_impact, code_refactor, code_apply, code_health)", () => {
+  it("does not register inactive V2 workflow tools (code_context, code_find, code_graph, code_impact, code_refactor, code_apply)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
-    const inactive = WORKFLOW_CODE_TOOL_NAMES.filter((n) => n !== "code_resolve");
+    const inactive = WORKFLOW_CODE_TOOL_NAMES.filter(
+      (n) => n !== "code_resolve" && n !== "code_health",
+    );
     for (const name of inactive) {
       expect(names).not.toContain(name);
     }
   });
 
-  it("registers tree_sitter_* expert tools", () => {
+  it("registers code_health tool", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const tsTools = [
-      "tree_sitter_outline",
-      "tree_sitter_imports",
-      "tree_sitter_exports",
-      "tree_sitter_node_at",
-      "tree_sitter_query",
-      "tree_sitter_callees",
-    ];
+    const tool = getTool(pi, "code_health");
+    expect(tool).toBeDefined();
+    expect(tool.name).toBe("code_health");
+    expect(typeof tool.execute).toBe("function");
 
-    for (const name of tsTools) {
-      const tool = getTool(pi, name);
-      expect(tool).toBeDefined();
-      expect(tool.name).toBe(name);
-      expect(typeof tool.execute).toBe("function");
-    }
-  });
-
-  it("registers lsp_* expert tools", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const lspTools = [
-      "lsp_hover",
-      "lsp_definition",
-      "lsp_references",
-      "lsp_implementation",
-      "lsp_document_symbols",
-      "lsp_workspace_symbols",
-      "lsp_diagnostics",
-      "lsp_rename",
-      "lsp_code_actions",
-      "lsp_recover",
-    ];
-
-    for (const name of lspTools) {
-      const tool = getTool(pi, name);
-      expect(tool).toBeDefined();
-      expect(tool.name).toBe(name);
-      expect(typeof tool.execute).toBe("function");
-    }
+    const props = (tool as { parameters?: { properties?: Record<string, unknown> } }).parameters
+      ?.properties;
+    expect(props).toBeDefined();
+    expect(props).toHaveProperty("scope");
+    expect(props).toHaveProperty("refresh");
+    expect(props).toHaveProperty("include");
+    expect(props).toHaveProperty("level");
   });
 
   it("registers refactor_plan and refactor_apply with correct parameter shapes", () => {

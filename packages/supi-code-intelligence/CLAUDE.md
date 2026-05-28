@@ -3,21 +3,20 @@
 Architecture briefs with structural enrichment, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused tool surface (`code_brief`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_pattern`, `code_refactor_plan`, `code_refactor_apply`, `code_resolve`)
-- May include cross-family orchestration guidance that steers the model between `code_*`, `lsp_*`, and `tree_sitter_*` tools; guidance routes by user intent first, substrate family second
-- Installing this package activates all three tool families (`code_*`, `lsp_*`, `tree_sitter_*`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_brief`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_pattern`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
+- Substrate `lsp_*` and `tree_sitter_*` tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
+- Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
 - `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
 
-## V2 workflow — Phase 1 activation
+## V2 workflow — Phase 1.5
 
-Phase 1 activates `code_resolve` as the first active V2 workflow tool. Remaining V2 tools stay unregistered.
+Phase 1 activated `code_resolve`. Phase 1.5 removes public `lsp_*` and `tree_sitter_*` tools and adds `code_health`.
 
-- `code_resolve` is registered and accepts `query`, `scope`, `kind`, `file`, `line`, `character`, and `maxResults`.
-- Returns `targetId` and `spanId` handles that are stable within the current session.
-- `code_context`, `code_find`, `code_graph`, `code_impact`, `code_refactor`, `code_apply`, and `code_health` remain unregistered.
+- `code_resolve` and `code_health` are registered as active V2 workflow tools.
+- Public `lsp_*` and `tree_sitter_*` tools are removed. Their capabilities are absorbed by the `code_*` surface: `lsp_hover`/`lsp_definition` → `code_resolve`/`code_brief`, `lsp_references` → `code_references`, `lsp_diagnostics`/`lsp_recover` → `code_health`, `tree_sitter_*` → `code_brief`/`code_calls`. The LSP and tree-sitter libraries remain as internal substrates.
+- `code_context`, `code_find`, `code_graph`, `code_impact`, `code_refactor`, and `code_apply` remain unregistered for future phases.
 - Future phases must keep `src/workflow/` consistent with `__tests__/unit/workflow-surface.test.ts`.
-- Do **not** remove public `lsp_*` or `tree_sitter_*` tools until `code_context`, `code_find`, `code_graph`, `code_refactor`/`code_apply`, and `code_health` provide the intended replacements.
 - Keep implementation phased: one ticket per phase, fresh verification per task, user review, then commit before the next phase.
 
 ## Architecture
@@ -106,6 +105,7 @@ src/
 │   ├── pattern.ts              # Pattern search markdown renderer
 │   ├── refactor.ts             # Refactor result markdown renderer
 │   └── resolve.ts              # code_resolve markdown renderer (Phase 1)
+│   └── health.ts               # code_health markdown renderer (Phase 1.5)
 └── ui/
     ├── code-intelligence-status-command.ts  # /ci-status command
     ├── code-intelligence-status-view.ts     # TUI status surface
@@ -115,7 +115,7 @@ src/
 ## Public tool contracts
 
 ### `code_brief`
-Interpretive orientation tool. The planner selects the best provider (semantic or structural) automatically. For deeper semantic detail, follow up with `lsp_hover`/`lsp_definition`/`lsp_references`.
+Interpretive orientation tool. The planner selects the best provider (semantic or structural) automatically. For deeper detail, follow up with `code_references` or `code_calls`.
 
 **Enriched file briefs** — When a code provider is available, `code_brief` with `file:` shows:
 - **Outline** — top-level declarations (functions, classes, interfaces) from tree-sitter
@@ -147,6 +147,13 @@ Semantic blast-radius tool. Uses semantic evidence. Does not fall back to heuris
 
 ### `code_pattern`
 Explicit search tool. This is the only tool in the family that intentionally exposes heuristic/text-search behavior.
+
+### `code_health`
+Diagnostic health summary. Replaces `lsp_diagnostics` and `lsp_recover`.
+- `scope?` — filter to a file or package path
+- `refresh?` — recover stale diagnostics before checking
+- `include?` — sections: diagnostics, servers, dirty
+- `level?` — summary (counts) vs detailed (per-file)
 
 ### `code_resolve`
 Resolve human or code references into precise file/range/symbol targets with stable handles. Supports anchored (file + line + character), file-only, and query/symbol inputs. Returns `targetId` and `spanId` for follow-up calls.

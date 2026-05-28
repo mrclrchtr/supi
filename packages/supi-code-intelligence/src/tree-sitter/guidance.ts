@@ -2,6 +2,9 @@
 //
 // Derived from tool-specs.ts.
 
+// NOTE: As of Phase 1.5, tree_sitter_* tools are no longer registered on the
+// public surface. This guidance is kept for library use.
+
 import { TREE_SITTER_TOOL_SPECS, type TreeSitterToolName } from "./tool-specs.ts";
 
 export interface TsToolPromptSurface {

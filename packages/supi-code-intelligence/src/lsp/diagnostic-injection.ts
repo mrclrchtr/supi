@@ -201,7 +201,7 @@ function buildInjectionContent(
   if (totalErrors > 0) {
     parts.push("");
     parts.push(`Found ${totalErrors} errors across the workspace.`);
-    parts.push("Use lsp_diagnostics() to inspect issues.");
+    parts.push("Use code_health to inspect issues.");
   }
 
   return parts.join("\n");

@@ -1,0 +1,50 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:36.29059Z"
+revision = 38
+
+[document_fingerprints]
+archive = "sha256:569bbfc05a00eef40f9612ff281363890114d839d3c564ac313fd1a0f29135b0"
+content = "sha256:34153e69eab4b67a5369db1325215d7a399fc4297556d713b910d699896671a7"
+task-01 = "sha256:a1b89fac62bb5c898a88bba5dab130f883c76d049d3a786a0a4416783e245b0e"
+task-02 = "sha256:6e910e65568d9f363dd422b7450c8415372ff5baa451538146ba1819b4247ce4"
+task-03 = "sha256:efbbef73bc33c33e14f48a295e40325266900960fc621465914f99cc7166b5f8"
+task-04 = "sha256:3e61aaa796cc98c96bc06ff06d01e5e6ea16bd2bebd1274c3763090cb3456480"
+task-05 = "sha256:a5363cbf89e82b33733ad60467afe0c8a653f1e5e1258b75a4d2eab62ebe4d44"
+task-06 = "sha256:50a9a1fa39617762604de8eba26737be5bd8039e43a4813546a301f96ccf99e3"
+task-07 = "sha256:27b25d225a191873ec937f995d53da18741875933eb7d43c1d2c9bfaa5d119e0"
+
+[[tasks]]
+number = 1
+title = "[TDD RED] Write failing tests for code_health tool registration and execution"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "[TDD GREEN] Implement code_health tool spec, executor, renderer, routing, and guidance"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Remove lsp_* and tree_sitter_* tool registration from extension wiring"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Clean up code_* guidance to remove substrate tool cross-references"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update extension registration and planner tests for substrate removal + code_health"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Update CLAUDE.md for Phase 1.5 substrate removal and code_health"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Full workspace verification — typecheck, lint, test suite, manual smoke test"
+status = "done"

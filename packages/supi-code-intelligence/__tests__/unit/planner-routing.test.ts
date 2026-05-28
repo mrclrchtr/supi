@@ -125,6 +125,12 @@ describe("Planner routing", () => {
       const route = routeFor("/project", "code_brief");
       expect(route.preferred).toBe("unavailable");
     });
+
+    it("routes code_health with search-preferred regardless of capability state", async () => {
+      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
+      const route = routeFor("/project", asToolName("code_health"));
+      expect(route.preferred).toBe("search");
+    });
   });
 });
 

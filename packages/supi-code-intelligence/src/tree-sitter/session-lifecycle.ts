@@ -3,8 +3,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { TreeSitterRuntimeController } from "@mrclrchtr/supi-tree-sitter/api";
-import { defaultTsToolPromptSurfaces } from "./guidance.ts";
-import { registerTsTools } from "./register-tools.ts";
 
 /**
  * Tree-sitter adapter state for the umbrella extension.
@@ -24,13 +22,6 @@ export function createTsAdapterState(): TsAdapterState {
  * - session_shutdown: shuts down the controller
  */
 export function registerTsSessionLifecycle(pi: ExtensionAPI, state: TsAdapterState): void {
-  function getRuntime() {
-    return state.controller?.runtime ?? undefined;
-  }
-
-  // Register tools eagerly with a thunk for the runtime
-  registerTsTools(pi, getRuntime, defaultTsToolPromptSurfaces);
-
   pi.on("session_start", async (_event, ctx: ExtensionContext) => {
     const cwd = ctx.cwd;
     const runtime = getDefaultWorkspaceRuntime();

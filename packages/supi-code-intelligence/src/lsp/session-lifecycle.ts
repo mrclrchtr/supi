@@ -10,10 +10,7 @@ import {
   loadLspSettings,
   scanWorkspaceSentinels,
 } from "@mrclrchtr/supi-lsp/api";
-import { buildLspToolPromptSurfaces } from "./guidance.ts";
-import { registerLspTools } from "./register-tools.ts";
 import type { LspAdapterState } from "./runtime-state.ts";
-import { LSP_TOOL_NAMES } from "./tool-specs.ts";
 
 export function registerLspSessionLifecycle(pi: ExtensionAPI, state: LspAdapterState): void {
   pi.on("session_start", async (_event, ctx: ExtensionContext) => {
@@ -40,16 +37,6 @@ export function registerLspSessionLifecycle(pi: ExtensionAPI, state: LspAdapterS
       state.controller = controller;
       state.lspActive = true;
       state.sentinelSnapshot = scanWorkspaceSentinels(cwd);
-
-      const projectServers = controller.projectServers;
-      const promptSurfaces = buildLspToolPromptSurfaces(projectServers, cwd);
-      registerLspTools(pi, promptSurfaces);
-
-      const activeTools = pi.getActiveTools();
-      const missing = LSP_TOOL_NAMES.filter((name) => !activeTools.includes(name));
-      if (missing.length > 0) {
-        pi.setActiveTools([...activeTools, ...missing]);
-      }
     } else {
       resetDiagnosticContext(state);
       state.lspActive = false;

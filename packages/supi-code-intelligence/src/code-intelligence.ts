@@ -4,8 +4,6 @@
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createCodeIntelligenceApp } from "./app/create-code-intelligence-app.ts";
 import { registerDiagnosticInjectionHandlers } from "./lsp/diagnostic-injection.ts";
-import { defaultLspToolPromptSurfaces } from "./lsp/guidance.ts";
-import { registerLspTools } from "./lsp/register-tools.ts";
 import { createLspAdapterState } from "./lsp/runtime-state.ts";
 import { registerLspSessionLifecycle } from "./lsp/session-lifecycle.ts";
 import { registerLspSettings } from "./lsp/settings.ts";
@@ -40,7 +38,6 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
 
   // ── Tool registration ─────────────────────────────────────────────
   registerCodeIntelligenceTools(pi);
-  registerLspTools(pi, defaultLspToolPromptSurfaces);
 
   // ── UI registration ───────────────────────────────────────────────
   registerLspMessageRenderer(pi);

@@ -96,6 +96,15 @@ export interface ResolveDetails {
   nextQueries: string[];
 }
 
+/** Structured details metadata for code_health results. */
+export interface HealthDetails {
+  lspAvailable: boolean;
+  lspStatus: string;
+  recovered: boolean;
+  diagnosticFileCount: number;
+  serverCount: number;
+}
+
 /** Tool result shape returned by executeAction. */
 export interface CodeIntelResult {
   content: string;
@@ -103,5 +112,6 @@ export interface CodeIntelResult {
     | { type: "brief"; data: BriefDetails }
     | { type: "search"; data: SearchDetails }
     | { type: "affected"; data: AffectedDetails }
-    | { type: "resolve"; data: ResolveDetails };
+    | { type: "resolve"; data: ResolveDetails }
+    | { type: "health"; data: HealthDetails };
 }

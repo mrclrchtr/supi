@@ -85,5 +85,11 @@ export function routeFor(cwd: string, tool: CodeIntelligenceToolName): PlannerRo
     return withPreferred(availability, "semantic");
   }
 
+  if (tool === "code_health") {
+    // code_health reads diagnostics and server state from the LSP service
+    // directly; it does not require live semantic/structural providers.
+    return withPreferred(availability, "search");
+  }
+
   return withPreferred(availability, briefPreferred(availability));
 }

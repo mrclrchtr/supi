@@ -126,7 +126,7 @@ export async function executeCallsTool(
         scope: null,
         candidateCount: result.calls.length,
         omittedCount: 0,
-        nextQueries: ["Use `lsp_hover` for type info on individual callees"],
+        nextQueries: ["Use `code_brief` for type info on individual callees"],
       },
     },
   };

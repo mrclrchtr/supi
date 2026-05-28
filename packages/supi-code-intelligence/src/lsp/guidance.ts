@@ -1,3 +1,6 @@
+// NOTE: As of Phase 1.5, lsp_* tools are no longer registered on the public
+// surface. This guidance is kept for library use (tests, internal tooling).
+
 import type { ProjectServerInfo } from "@mrclrchtr/supi-lsp/api";
 import { LSP_HOVER_TOOL, LSP_TOOL_DEFINITION_SPECS, type LspToolName } from "./tool-specs.ts";
 

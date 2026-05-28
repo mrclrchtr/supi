@@ -79,7 +79,7 @@ export async function executeRefactorApplyTool(
         scope: null,
         candidateCount: applyResult.kind === "applied" ? applyResult.totalEdits : 0,
         omittedCount: 0,
-        nextQueries: ["`lsp_diagnostics` to check for new issues after the rename"],
+        nextQueries: ["`code_health` to check for new issues after the rename"],
       },
     },
   };
