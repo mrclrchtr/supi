@@ -11,17 +11,16 @@ Surfaces:
 
 ## V2 workflow — Phase 1.5
 
-Phase 1 activated `code_resolve`. Phase 1.5 removes public `lsp_*` and `tree_sitter_*` tools and adds `code_health`.
+Phase 1 activated `code_resolve`. Phase 1.5 removes public `lsp_*` and `tree_sitter_*` tools and adds `code_health`. Phase 2 absorbs `lsp_hover` into `code_brief` (anchored mode) as best-effort LSP type/signature info.
 
 - `code_resolve` and `code_health` are registered as active V2 workflow tools.
-- Public `lsp_*` and `tree_sitter_*` tools are removed. Their capabilities are absorbed by the `code_*` surface: `lsp_hover` (partial, see gaps below) /`lsp_definition` → `code_resolve`/`code_brief`, `lsp_references` → `code_references`, `lsp_diagnostics`/`lsp_recover` → `code_health`, `tree_sitter_*` → `code_brief`/`code_calls`. The LSP and tree-sitter libraries remain as internal substrates.
+- Public `lsp_*` and `tree_sitter_*` tools are removed. Their capabilities are absorbed by the `code_*` surface: `lsp_hover` → `code_brief` (anchored), `lsp_definition` → `code_resolve`/`code_brief`, `lsp_references` → `code_references`, `lsp_diagnostics`/`lsp_recover` → `code_health`, `tree_sitter_*` → `code_brief`/`code_calls`. The LSP and tree-sitter libraries remain as internal substrates.
 - `code_context`, `code_find`, `code_graph`, `code_impact`, `code_refactor`, and `code_apply` remain unregistered for future phases.
 - Future phases must keep `src/workflow/` consistent with `__tests__/unit/workflow-surface.test.ts`.
 - Keep implementation phased: one ticket per phase, fresh verification per task, user review, then commit before the next phase.
 
 ### Known absorption gaps
 
-- **lsp_hover**: type/signature hover info is not currently absorbed by any `code_*` tool. `code_brief` (anchored) shows tree-sitter node info and enclosing symbols but no LSP hover data. Planned for a future phase (likely `code_context` or `code_inspect`).
 - **lsp_code_actions**: code action suggestions are deferred. No `code_*` tool surfaces them yet.
 - **lsp_definition**: partially absorbed — `code_resolve` resolves references to target handles, and `code_brief` shows enclosing symbols, but exact go-to-definition results across files are not surfaced.
 

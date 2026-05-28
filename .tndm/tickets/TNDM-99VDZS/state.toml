@@ -1,0 +1,56 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:43.582735Z"
+revision = 42
+
+[document_fingerprints]
+archive = "sha256:e6e57e0a5791fb11fd926cc35044b404361ec175c3ddca2b4fed2edac5cd81c4"
+content = "sha256:982081ab1c97cd6998e6df976b724525b5b38491429e5485d74297c8fe3d4da9"
+task-01 = "sha256:3f54c33e6738f64e9d69bd12ad4b368ad5a97619a6c1e2a4491d337ea18c0688"
+task-02 = "sha256:e2973437b1ac48cf7e0e46ae34115869fdcaa8805d0c35ecf99c1957476d0c47"
+task-03 = "sha256:3da33c86e14e51d558520f2a6c433e231fdfdd66db99730e72be8e77c3863f00"
+task-04 = "sha256:6e5e201da80536ad77043d77afbfb5cc205170f5761d5b8b6928ab135e8b2e25"
+task-05 = "sha256:228da631d15cfd6a684e6882714f1a69c692c2cd5ca5e1f18ddcaf3000075733"
+task-06 = "sha256:966ff53ff50c447d9fa50dd5ffc38d9c8b14a30bb7f688949130c696d07674a1"
+task-07 = "sha256:a494b9be5f9117bed6e31620d5faaf3eed721f929883e7c4a44d87364d192068"
+task-08 = "sha256:12b402319a916ffd07ab05aa02eea6de5cbcb67c812aff640463e1d34a7d6965"
+
+[[tasks]]
+number = 1
+title = "Add hover to SemanticProvider interface (supi-code-runtime)"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Implement hover in LSP SemanticProvider adapter (supi-lsp)"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Forward hover in CodeProvider composite (supi-code-intelligence)"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Gather hover data in anchored brief use-case (supi-code-intelligence)"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Render hover in anchored brief markdown (supi-code-intelligence)"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Add and update tests for hover absorption"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Update CLAUDE.md — remove lsp_hover from known absorption gaps"
+status = "done"
+
+[[tasks]]
+number = 8
+title = "Final verification — typecheck, lint, full test suite, manual smoke test"
+status = "done"

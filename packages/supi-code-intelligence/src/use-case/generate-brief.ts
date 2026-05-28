@@ -3,6 +3,7 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import type { ArchitectureModel } from "../model.ts";
@@ -20,6 +21,8 @@ export interface TreeSitterContext {
   outline: Array<{ name: string; kind: string; startLine: number; endLine: number }>;
   imports: Array<{ moduleSpecifier: string }>;
   exports: Array<{ name: string; kind: string }>;
+  /** Best-effort LSP hover info at the anchored position. `null` when unavailable. */
+  hover: { contents: string; range?: SourceRange } | null;
 }
 
 // ── Public entrypoint ─────────────────────────────────────────────────
@@ -277,8 +280,9 @@ async function gatherTreeSitterContext(
   let outline: TreeSitterContext["outline"] = [];
   let imports: TreeSitterContext["imports"] = [];
   let exports: TreeSitterContext["exports"] = [];
+  let hover: TreeSitterContext["hover"] = null;
 
-  if (!provider) return { nodeInfo, outline, imports, exports };
+  if (!provider) return { nodeInfo, outline, imports, exports, hover };
 
   try {
     const nodeResult = await provider.nodeAt(relPath, line, character);
@@ -313,11 +317,24 @@ async function gatherTreeSitterContext(
         kind: item.kind,
       }));
     }
+
+    // Best-effort hover — LSP expects 0-based coordinates
+    if (provider.hover) {
+      try {
+        const hoverResult = await provider.hover(relPath, {
+          line: line - 1,
+          character: character - 1,
+        });
+        if (hoverResult) hover = hoverResult;
+      } catch {
+        // hover failed — continue without it
+      }
+    }
   } catch {
     // Provider not available
   }
 
-  return { nodeInfo, outline, imports, exports };
+  return { nodeInfo, outline, imports, exports, hover };
 }
 
 function noModelResult(): BriefUseCaseResult {

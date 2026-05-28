@@ -7,11 +7,14 @@ import type {
   CodeSymbol,
   RefactorResult,
   SemanticProvider,
+  SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   DocumentSymbol,
+  Hover,
   Location,
   LocationLink,
+  MarkupContent,
   SymbolInformation,
   TextDocumentEdit,
   TextEdit,
@@ -25,6 +28,15 @@ import type { SessionLspService } from "../session/service-registry.ts";
  */
 export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvider {
   return {
+    async hover(
+      filePath: string,
+      position: CodePosition,
+    ): Promise<{ contents: string; range?: SourceRange } | null> {
+      const result = await lsp.hover(filePath, position);
+      if (!result) return null;
+      return convertLspHover(result);
+    },
+
     async references(filePath: string, position: CodePosition): Promise<CodeLocation[] | null> {
       const refResult = await lsp.references(filePath, position);
       if (!refResult) return null;
@@ -291,4 +303,37 @@ function toCodeSymbol(sym: SymbolInformation): CodeSymbol {
     character: start ? start.character + 1 : 0,
     container: sym.containerName ?? null,
   };
+}
+
+// ── Hover conversion helpers ─────────────────────────────────────────
+
+/**
+ * Convert an LSP Hover result into a simplified runtime shape.
+ * Extracts text from MarkupContent, MarkedString[], or plain string,
+ * and converts the optional LSP Range to a SourceRange.
+ */
+function convertLspHover(hover: Hover): { contents: string; range?: SourceRange } {
+  const contents = extractHoverText(hover.contents);
+  const result: { contents: string; range?: SourceRange } = { contents };
+  if (hover.range) {
+    result.range = {
+      start: { line: hover.range.start.line, character: hover.range.start.character },
+      end: { line: hover.range.end.line, character: hover.range.end.character },
+    };
+  }
+  return result;
+}
+
+function extractHoverText(contents: Hover["contents"]): string {
+  if (typeof contents === "string") return contents;
+  if (Array.isArray(contents)) {
+    return contents
+      .map((item) => {
+        if (typeof item === "string") return item;
+        return item.value;
+      })
+      .join("\n");
+  }
+  // MarkupContent
+  return (contents as MarkupContent).value ?? "";
 }

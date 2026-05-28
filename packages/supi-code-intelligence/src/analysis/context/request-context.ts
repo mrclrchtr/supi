@@ -102,6 +102,9 @@ function createCompositeProvider(
     async workspaceSymbols(query: string) {
       return semantic?.workspaceSymbols(query) ?? null;
     },
+    async hover(filePath: string, position: { line: number; character: number }) {
+      return semantic?.hover?.(filePath, position) ?? null;
+    },
     async calleesAt(file: string, line: number, character: number) {
       return (
         structural?.calleesAt(file, line, character) ?? {

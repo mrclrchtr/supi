@@ -1,6 +1,7 @@
 // Brief markdown renderer — consumes use-case data and produces markdown content + details metadata.
 
 import * as path from "node:path";
+import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
 import type { ArchitectureModel } from "../../model.ts";
 import { findModuleForPath } from "../../model.ts";
 import type { BriefDetails } from "../../types.ts";
@@ -12,6 +13,8 @@ interface TreeSitterContext {
   outline: Array<{ name: string; kind: string; startLine: number; endLine: number }>;
   imports: Array<{ moduleSpecifier: string }>;
   exports: Array<{ name: string; kind: string }>;
+  /** Best-effort LSP hover info at the anchored position. `null` when unavailable. */
+  hover: { contents: string; range?: SourceRange } | null;
 }
 
 export function renderAnchoredBrief(params: {
@@ -101,6 +104,15 @@ function appendTreeSitterContext(
       lines.push(node.text);
       lines.push("```");
     }
+    lines.push("");
+  }
+
+  // Best-effort LSP hover — type/signature info at the position
+  if (context.hover?.contents) {
+    lines.push("## Hover");
+    lines.push("```");
+    lines.push(context.hover.contents);
+    lines.push("```");
     lines.push("");
   }
 

@@ -15,6 +15,7 @@ import type {
   NodeAtData,
   OutlineData,
   RefactorResult,
+  SourceRange,
 } from "../types.ts";
 
 // ── Availability state ─────────────────────────────────────────────────
@@ -48,6 +49,17 @@ export interface SemanticProvider {
   implementation(filePath: string, position: CodePosition): Promise<CodeLocation[] | null>;
   documentSymbols(filePath: string): Promise<CodeSymbol[] | null>;
   workspaceSymbols(query: string): Promise<CodeSymbol[] | null>;
+
+  /**
+   * Optional hover capability. Returns a simplified type/signature info
+   * shape that does not depend on vscode-languageserver-types. When the
+   * provider cannot produce hover info (unavailable, unsupported file,
+   * no result at the given position), returns `null`.
+   */
+  hover?(
+    filePath: string,
+    position: CodePosition,
+  ): Promise<{ contents: string; range?: SourceRange } | null>;
 
   /**
    * Optional rename capability. When present, the provider supports

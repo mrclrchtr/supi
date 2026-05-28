@@ -26,6 +26,7 @@ export function registerMockProvider(cwd: string, overrides: Partial<CodeProvide
     implementation: overrides.implementation ?? noopSemantic,
     documentSymbols: overrides.documentSymbols ?? noopSemantic,
     workspaceSymbols: overrides.workspaceSymbols ?? noopSemantic,
+    hover: overrides.hover,
   });
 
   // Register structural provider
