@@ -118,6 +118,7 @@ A completed form returns a result with `details.status` set to one of:
 - Only one `ask_user` form may be active at a time; calling `ask_user` while another form is in flight returns an error
 - Cancellation or abort stops the current agent turn
 - Completed forms are summarized in the session tree
+- In pi's normal chat history, completed `ask_user` results can be expanded into a read-only review with `Ctrl+O`; this does not reopen the live form and is separate from `/tree`
 - Do not use `ask_user` for open-ended interviews or repo facts the agent can discover on its own
 
 ## Tool guidance

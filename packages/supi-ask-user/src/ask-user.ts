@@ -39,7 +39,7 @@ export default function askUserExtension(pi: ExtensionAPI): void {
       return executeAskUser(params, signal, ctx, lock, pi);
     },
     renderCall: (args, theme) => renderAskUserCall(args, theme),
-    renderResult: (result, _options, theme) => renderAskUserResult(result, theme),
+    renderResult: (result, options, theme) => renderAskUserResult(result, theme, options),
   });
 }
 

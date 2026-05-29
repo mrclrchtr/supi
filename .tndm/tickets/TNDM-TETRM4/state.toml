@@ -1,0 +1,32 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-29T11:32:00.628693Z"
+revision = 26
+
+[document_fingerprints]
+archive = "sha256:767ccc49f0e753e3ffdaa65ad943f4153da1ff5ab82d2fb2056c7da5069df08c"
+content = "sha256:62acc2a7e3f3e105a9a40a6447578e19698e75569edb44d43c1ee982f5957ae0"
+task-01 = "sha256:76679e0bf327b202f60290e12793156c5b4a0eae47c3b7e53310bb53c43e500b"
+task-02 = "sha256:568bcde5409af9c814a18e788824e466b8ec5e9f0889ac81544c94ad208ab5b3"
+task-03 = "sha256:bfd3a07dd1eca73aefcac8a87e8f3df8f4728e2f914f6c72a1e8444603679e5e"
+task-04 = "sha256:d1bb6e7695150a21e0cca728d586b461874089d25d30bc3ab9fb808bce68f669"
+
+[[tasks]]
+number = 1
+title = "Add failing transcript tests for collapsed and expanded ask_user history rendering"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Implement compact summary and expanded review rendering for ask_user transcript cards"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Document chat-history ask_user review behavior in the package README"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Run full supi-ask-user verification and an interactive chat-history smoke test"
+status = "done"
