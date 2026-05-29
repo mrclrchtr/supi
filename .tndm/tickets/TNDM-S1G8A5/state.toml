@@ -1,0 +1,20 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:51.849024Z"
+revision = 19
+
+[document_fingerprints]
+archive = "sha256:71a1c593698e9e20e72d10be6cb62f10d115517701aef4f921430ad4931b9c62"
+content = "sha256:a8e06361b8496b79f1d19191e6e913f792eb711cc32c04934d5dac5dc31cd401"
+task-01 = "sha256:b12c44c76dcc65f083334745d53aa2148b14e52bbcf973660dcf6b910c8737c9"
+task-02 = "sha256:abd6c5633769aca22f8b3706b31b104df63d03f1b1597ad56838b4367ee0a1e3"
+
+[[tasks]]
+number = 1
+title = "Add definition to code_brief anchored output"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Add per-position code actions to code_brief anchored output"
+status = "done"

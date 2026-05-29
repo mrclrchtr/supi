@@ -28,6 +28,18 @@ import type { SessionLspService } from "../session/service-registry.ts";
  */
 export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvider {
   return {
+    async definition(filePath: string, position: CodePosition): Promise<CodeLocation[] | null> {
+      const result = await lsp.definition(filePath, position);
+      if (!result) return null;
+      const normalized = Array.isArray(result) ? result : [result];
+      const mapped: CodeLocation[] = [];
+      for (const item of normalized) {
+        const loc = toCodeLocation(item);
+        if (loc) mapped.push(loc);
+      }
+      return mapped;
+    },
+
     async hover(
       filePath: string,
       position: CodePosition,
@@ -102,6 +114,17 @@ export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvi
         }
       }
       return results;
+    },
+
+    async codeActionTitles(
+      file: string,
+      position: CodePosition,
+    ): Promise<Array<{ title: string; kind?: string }> | null> {
+      const actions = await lsp.codeActions(file, position);
+      if (!actions) return null;
+      return actions
+        .filter((a) => a.title)
+        .map((a) => ({ title: a.title, kind: a.kind ?? undefined }));
     },
   };
 }

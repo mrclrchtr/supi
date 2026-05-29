@@ -65,7 +65,7 @@ export function renderAffectedSingle(params: RenderSingleParams): string {
     `- \`code_brief\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for deeper context around ${symbolName}`,
   );
   lines.push(
-    `- \`code_references\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
+    `- \`code_graph\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
   );
   lines.push("");
 

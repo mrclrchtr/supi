@@ -1,0 +1,62 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:51.820753Z"
+revision = 46
+
+[document_fingerprints]
+archive = "sha256:32d6e1e807fb0fa0edeeb219948d92a5c1737960c2b465e9e44b8088c1a2c737"
+content = "sha256:84def683246ab1912537b70002f7ff3578c10e88717617f3aeaa50d388cf0625"
+task-01 = "sha256:08c1ea7da464d1bb1187d569b5bfe240914578decda1d8681358ca0164be0209"
+task-02 = "sha256:b989781c6af4bfea9485af971befa4c17f4226ac14cd35ac7f99f4374aa352a1"
+task-03 = "sha256:67fcdabbe236abcfecadd8ad2f8d7d5f4dd5d9ea9c9d5b4adf3d96d38b5af1a5"
+task-04 = "sha256:3d87cd43a43da00b1f7f98f0fe6e9f456ffaae635090688191e288501d9e069b"
+task-05 = "sha256:9b9e0d0de5560935d0d247c4e8678ba0cbbe6500fe8fba852ee945c3e17f6ed8"
+task-06 = "sha256:ae21268aa1971c31440d9e1fbc9ac1986a768128356889ae7a12422a5eff3ad0"
+task-07 = "sha256:ed14bfe32e7ae9dab8fe7382231910b28aa0c4a3f09bcffa21f84f9dc7adf2b1"
+task-08 = "sha256:a237b19426d00d53aa358b1b4505f66674279e6d2d16b009e5f1c2793ac0c612"
+task-09 = "sha256:abf7b52a66706ae1489b6386978511d29bfb2e6f71089cdd0eaaa604d8623142"
+
+[[tasks]]
+number = 1
+title = "Update CodeIntelligenceToolName enum: add code_graph, remove old three"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Add code_graph routing in planner, remove old tool routes"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Create execute-graph.ts unified executor"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Add code_graph to tool specs, remove old three specs"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Delete old execute-references, execute-calls, execute-implementations"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Add renderGraphResult() to relations presentation renderer"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Update tests for code_graph, remove old tool tests"
+status = "done"
+
+[[tasks]]
+number = 8
+title = "Update CLAUDE.md documentation for code_graph"
+status = "done"
+
+[[tasks]]
+number = 9
+title = "Full verification: typecheck, lint, test, audit"
+status = "done"

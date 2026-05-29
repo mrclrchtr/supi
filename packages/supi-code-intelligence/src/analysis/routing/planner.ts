@@ -42,10 +42,6 @@ function semanticOnly(availability: RouteAvailability): PlannerRoute["preferred"
   return availability.semanticAvailable ? "semantic" : "unavailable";
 }
 
-function structuralOnly(availability: RouteAvailability): PlannerRoute["preferred"] {
-  return availability.structuralAvailable ? "structural" : "unavailable";
-}
-
 function briefPreferred(availability: RouteAvailability): PlannerRoute["preferred"] {
   if (availability.semanticAvailable) return "semantic";
   if (availability.structuralAvailable) return "structural";
@@ -58,12 +54,12 @@ function briefPreferred(availability: RouteAvailability): PlannerRoute["preferre
 export function routeFor(cwd: string, tool: CodeIntelligenceToolName): PlannerRoute {
   const availability = readAvailability(cwd);
 
-  if (tool === "code_references" || tool === "code_implementations") {
-    return withPreferred(availability, semanticOnly(availability));
-  }
-
-  if (tool === "code_calls") {
-    return withPreferred(availability, structuralOnly(availability));
+  if (tool === "code_graph") {
+    // code_graph dispatches per-relation at execution time. Return the best
+    // available preference; the executor handles per-relation unavailability.
+    if (availability.semanticAvailable) return withPreferred(availability, "semantic");
+    if (availability.structuralAvailable) return withPreferred(availability, "structural");
+    return withPreferred(availability, "unavailable");
   }
 
   if (tool === "code_affected") {

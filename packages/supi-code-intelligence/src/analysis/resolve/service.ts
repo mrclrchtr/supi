@@ -211,8 +211,8 @@ function resolveAnchoredInput(
       confidence: entry.confidence,
       omittedCount: 0,
       nextQueries: [
-        "`code_references` for usages of this target",
-        "`code_calls` for outgoing calls from this target",
+        "`code_graph` for usages of this target",
+        "`code_graph` for outgoing calls from this target",
         "`code_affected` for blast radius",
       ],
     };
@@ -252,7 +252,7 @@ async function resolveFileOnlyInput(
     confidence: outcome.group.confidence,
     omittedCount: Math.max(0, outcome.group.targets.length - maxResults),
     nextQueries: [
-      "Use `targetId` with `code_references` for reference tracking",
+      "Use `targetId` with `code_graph` for reference tracking",
       "Use `targetId` with `code_affected` for blast radius",
     ],
   };
@@ -282,7 +282,7 @@ async function resolvePathQuery(
     confidence: outcome.group.confidence,
     omittedCount: Math.max(0, outcome.group.targets.length - maxResults),
     nextQueries: [
-      "Use `targetId` with `code_references` for reference tracking",
+      "Use `targetId` with `code_graph` for reference tracking",
       "Use `targetId` with `code_affected` for blast radius",
     ],
   };
@@ -330,8 +330,8 @@ async function resolveQueryTarget(opts: {
       confidence: entry.confidence,
       omittedCount: 0,
       nextQueries: [
-        "`code_references` for usages of this target",
-        "`code_calls` for outgoing calls from this target",
+        "`code_graph` for usages of this target",
+        "`code_graph` for outgoing calls from this target",
         "`code_affected` for blast radius",
       ],
     };

@@ -203,7 +203,7 @@ describe("structured details via tool adapters and action routers", () => {
 
   describe("semantic actions — target resolution error returns details", () => {
     it("references target error returns search details with unavailable confidence", async () => {
-      const result = await executeAction({ action: "references" }, { cwd: tmpDir });
+      const result = await executeAction({ action: "graph" }, { cwd: tmpDir });
       expect(result.details).toBeDefined();
       expect(result.details?.type).toBe("search");
       if (result.details?.type === "search") {
@@ -213,7 +213,10 @@ describe("structured details via tool adapters and action routers", () => {
     });
 
     it("implementations target error returns search details with unavailable confidence", async () => {
-      const result = await executeAction({ action: "implementations" }, { cwd: tmpDir });
+      const result = await executeAction(
+        { action: "graph", relations: ["implements"] },
+        { cwd: tmpDir },
+      );
       expect(result.details).toBeDefined();
       expect(result.details?.type).toBe("search");
       if (result.details?.type === "search") {
@@ -222,10 +225,7 @@ describe("structured details via tool adapters and action routers", () => {
     });
 
     it("references symbol lookup without LSP stays unavailable rather than heuristic", async () => {
-      const result = await executeAction(
-        { action: "references", symbol: "Widget" },
-        { cwd: tmpDir },
-      );
+      const result = await executeAction({ action: "graph", symbol: "Widget" }, { cwd: tmpDir });
       expect(result.details).toBeDefined();
       expect(result.details?.type).toBe("search");
       if (result.details?.type === "search") {
@@ -236,7 +236,7 @@ describe("structured details via tool adapters and action routers", () => {
 
     it("implementations symbol lookup without LSP stays unavailable rather than heuristic", async () => {
       const result = await executeAction(
-        { action: "implementations", symbol: "Widget" },
+        { action: "graph", relations: ["implements"], symbol: "Widget" },
         { cwd: tmpDir },
       );
       expect(result.details).toBeDefined();
@@ -310,15 +310,19 @@ describe("structured details via tool adapters and action routers", () => {
 
     describe("calls action — no-result detail states", () => {
       it("returns error for missing file param", async () => {
-        const result = await executeAction({ action: "calls" }, { cwd: tmpDir });
-        expect(result.content).toContain("requires a file");
-        expect(result.details).toBeUndefined();
+        const result = await executeAction(
+          { action: "graph", relations: ["callees"] },
+          { cwd: tmpDir },
+        );
+        expect(result.content).toContain("requires a target");
+        expect(result.details).toBeDefined();
+        expect(result.details?.type).toBe("search");
       });
 
       it("returns details for tree-sitter unsuccessful on unsupported file type", async () => {
         writeFileSync(path.join(tmpDir, "notes.txt"), "some content\n");
         const result = await executeAction(
-          { action: "calls", file: "notes.txt", line: 1, character: 1 },
+          { action: "graph", relations: ["callees"], file: "notes.txt", line: 1, character: 1 },
           { cwd: tmpDir },
         );
         expect(result.details).toBeDefined();
@@ -340,7 +344,7 @@ describe("structured details via tool adapters and action routers", () => {
           }),
         });
         const result = await executeAction(
-          { action: "calls", file: "empty.ts", line: 1, character: 1 },
+          { action: "graph", relations: ["callees"], file: "empty.ts", line: 1, character: 1 },
           { cwd: tmpDir },
         );
         expect(result.details).toBeDefined();

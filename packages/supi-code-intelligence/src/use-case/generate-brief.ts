@@ -1,10 +1,5 @@
-// Brief orchestration use-case — dispatches by mode, coordinates substrate access,
-// and returns fully rendered markdown content + details metadata.
-
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
-import type { CodeProvider } from "../analysis/context/request-context.ts";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import type { ArchitectureModel } from "../model.ts";
 import { findModuleForPath } from "../model.ts";
@@ -12,18 +7,8 @@ import { renderAnchoredBrief, renderSymbolBrief } from "../presentation/markdown
 import { normalizePath } from "../search-helpers.ts";
 import type { TargetResolutionResult } from "../target-resolution.ts";
 import { resolveSymbolTarget } from "../target-resolution.ts";
+import { gatherTreeSitterContext } from "./gather-context.ts";
 import type { BriefDeps, BriefInput, BriefUseCaseResult } from "./types.ts";
-
-// ── TreeSitterContext is an intermediate data shape from the use-case ──
-
-export interface TreeSitterContext {
-  nodeInfo: { type: string; text: string; startLine: number; startCharacter: number } | null;
-  outline: Array<{ name: string; kind: string; startLine: number; endLine: number }>;
-  imports: Array<{ moduleSpecifier: string }>;
-  exports: Array<{ name: string; kind: string }>;
-  /** Best-effort LSP hover info at the anchored position. `null` when unavailable. */
-  hover: { contents: string; range?: SourceRange } | null;
-}
 
 // ── Public entrypoint ─────────────────────────────────────────────────
 
@@ -133,7 +118,7 @@ async function executeAnchoredBrief(
     dependencySummary: null as { moduleCount: number; edgeCount: number } | null,
     omittedCount: 0,
     nextQueries: [
-      `\`code_references\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
+      `\`code_graph\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
       `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for impact analysis`,
     ],
   };
@@ -248,7 +233,7 @@ async function executeSymbolBrief(
     dependencySummary: mod ? { moduleCount: 1, edgeCount: mod.internalDeps.length } : null,
     omittedCount: 0,
     nextQueries: [
-      `\`code_references\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
+      `\`code_graph\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
       `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for impact analysis`,
     ],
   };
@@ -269,73 +254,6 @@ async function executeSymbolBrief(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
-
-async function gatherTreeSitterContext(
-  provider: CodeProvider | null,
-  relPath: string,
-  line: number,
-  character: number,
-): Promise<TreeSitterContext> {
-  let nodeInfo: TreeSitterContext["nodeInfo"] = null;
-  let outline: TreeSitterContext["outline"] = [];
-  let imports: TreeSitterContext["imports"] = [];
-  let exports: TreeSitterContext["exports"] = [];
-  let hover: TreeSitterContext["hover"] = null;
-
-  if (!provider) return { nodeInfo, outline, imports, exports, hover };
-
-  try {
-    const nodeResult = await provider.nodeAt(relPath, line, character);
-    if (nodeResult.kind === "success") {
-      nodeInfo = {
-        type: nodeResult.data.type,
-        text: nodeResult.data.text,
-        startLine: nodeResult.data.startLine,
-        startCharacter: nodeResult.data.startCharacter,
-      };
-    }
-
-    const outlineResult = await provider.outline(relPath);
-    if (outlineResult.kind === "success") {
-      outline = outlineResult.data.map((item) => ({
-        name: item.name,
-        kind: item.kind,
-        startLine: item.startLine,
-        endLine: item.endLine,
-      }));
-    }
-
-    const importsResult = await provider.imports(relPath);
-    if (importsResult.kind === "success") {
-      imports = importsResult.data;
-    }
-
-    const exportsResult = await provider.exports(relPath);
-    if (exportsResult.kind === "success") {
-      exports = exportsResult.data.map((item) => ({
-        name: item.name,
-        kind: item.kind,
-      }));
-    }
-
-    // Best-effort hover — LSP expects 0-based coordinates
-    if (provider.hover) {
-      try {
-        const hoverResult = await provider.hover(relPath, {
-          line: line - 1,
-          character: character - 1,
-        });
-        if (hoverResult) hover = hoverResult;
-      } catch {
-        // hover failed — continue without it
-      }
-    }
-  } catch {
-    // Provider not available
-  }
-
-  return { nodeInfo, outline, imports, exports, hover };
-}
 
 function noModelResult(): BriefUseCaseResult {
   return {

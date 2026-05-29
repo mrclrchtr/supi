@@ -1,0 +1,23 @@
+schema_version = 1
+id = "TNDM-S1G8A5"
+title = "Close absorption gaps: add definition + per-position code actions to code_brief anchored output"
+type = "feature"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "task-01"
+path = "tasks/task-01.md"
+
+[[documents]]
+name = "task-02"
+path = "tasks/task-02.md"

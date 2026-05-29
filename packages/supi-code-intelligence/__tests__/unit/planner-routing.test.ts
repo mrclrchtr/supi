@@ -42,37 +42,33 @@ describe("Planner routing", () => {
       expect(route.preferred).toBe("structural");
     });
 
-    it("routes code_references to semantic-preferred", async () => {
+    it("routes code_graph to semantic-preferred when semantic is available", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", asToolName("code_references"));
+      const route = routeFor("/project", asToolName("code_graph"));
       expect(route.preferred).toBe("semantic");
     });
 
-    it("routes code_calls to structural-preferred", async () => {
+    it("routes code_graph to structural-preferred when only structural is available", async () => {
       registerStructural();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", asToolName("code_calls"));
+      const route = routeFor("/project", asToolName("code_graph"));
       expect(route.preferred).toBe("structural");
     });
 
-    it("routes code_implementations to semantic-preferred", async () => {
-      registerSemantic();
+    it("routes code_graph to unavailable when neither provider is available", async () => {
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", asToolName("code_implementations"));
-      expect(route.preferred).toBe("semantic");
+      const route = routeFor("/project", asToolName("code_graph"));
+      expect(route.preferred).toBe("unavailable");
     });
 
-    it("returns unavailable for code_references when only structural is available", async () => {
+    it("returns unavailable for code_graph when only structural is available but semantic is needed", async () => {
       registerStructural();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      expect(routeFor("/project", asToolName("code_references")).preferred).toBe("unavailable");
-    });
-
-    it("returns unavailable for code_calls when only semantic is available", async () => {
-      registerSemantic();
-      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      expect(routeFor("/project", asToolName("code_calls")).preferred).toBe("unavailable");
+      // With only structural, code_graph returns structural-preferred
+      // (callees can use structural; references/implements cannot)
+      const route = routeFor("/project", asToolName("code_graph"));
+      expect(route.preferred).toBe("structural");
     });
 
     it("routes code_refactor_plan to semantic-preferred when refactor-capable semantic is available", async () => {
@@ -87,12 +83,6 @@ describe("Planner routing", () => {
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
       const route = routeFor("/project", "code_affected");
       expect(route.preferred).toBe("semantic");
-    });
-
-    it("returns unavailable for code_references when refactor is needed but only structural is available", async () => {
-      registerStructural();
-      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      expect(routeFor("/project", asToolName("code_references")).preferred).toBe("unavailable");
     });
 
     it("returns unavailable for code_affected when semantic analysis is unavailable", async () => {

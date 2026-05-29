@@ -5,13 +5,11 @@ import type { CodeIntelResult } from "../types.ts";
 import { CodeFindParameters, CodeHealthParameters } from "../workflow/schemas.ts";
 import { executeAffectedTool } from "./execute-affected.ts";
 import { executeBriefTool } from "./execute-brief.ts";
-import { executeCallsTool } from "./execute-calls.ts";
 import { executeFindTool } from "./execute-find.ts";
+import { executeGraphTool } from "./execute-graph.ts";
 import { executeHealthTool } from "./execute-health.ts";
-import { executeImplementationsTool } from "./execute-implementations.ts";
 import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
-import { executeReferencesTool } from "./execute-references.ts";
 import { executeResolveTool } from "./execute-resolve.ts";
 
 const PathParam = Type.String({ description: "Scope path" });
@@ -49,43 +47,6 @@ const CodeBriefParameters = Type.Object(
   { additionalProperties: false },
 );
 
-const CodeReferencesParameters = Type.Object(
-  {
-    targetId: Type.Optional(TargetIdParam),
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
-    symbol: Type.Optional(SymbolParam),
-    path: Type.Optional(PathParam),
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-const CodeCallsParameters = Type.Object(
-  {
-    targetId: Type.Optional(TargetIdParam),
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-const CodeImplementationsParameters = Type.Object(
-  {
-    targetId: Type.Optional(TargetIdParam),
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
-    symbol: Type.Optional(SymbolParam),
-    path: Type.Optional(PathParam),
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
 const CodeAffectedParameters = Type.Object(
   {
     targetId: Type.Optional(TargetIdParam),
@@ -114,6 +75,39 @@ const CodeRefactorPlanParameters = Type.Object(
 const CodeRefactorApplyParameters = Type.Object(
   {
     planId: PlanIdParam,
+  },
+  { additionalProperties: false },
+);
+
+const CodeGraphExtendedParameters = Type.Object(
+  {
+    targetId: Type.Optional(TargetIdParam),
+    file: Type.Optional(FileParam),
+    line: Type.Optional(LineParam),
+    character: Type.Optional(CharacterParam),
+    symbol: Type.Optional(SymbolParam),
+    path: Type.Optional(PathParam),
+    relations: Type.Optional(
+      Type.Array(
+        StringEnum(["references", "callees", "imports", "exports", "implements", "tests"], {
+          description: "Relation families to include in the graph.",
+        }),
+        {
+          description: 'Requested relation families. Defaults to ["references"] when omitted.',
+          uniqueItems: true,
+        },
+      ),
+    ),
+    direction: Type.Optional(
+      StringEnum(["in", "out", "both"], {
+        description: "Graph traversal direction (future).",
+      }),
+    ),
+    depth: Type.Optional(Type.Number({ description: "Traversal depth (future).", minimum: 1 })),
+    maxNodes: Type.Optional(
+      Type.Number({ description: "Maximum graph nodes to return (future).", minimum: 1 }),
+    ),
+    maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
 );
@@ -167,7 +161,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_resolve",
     label: "Code Resolve",
     description:
-      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_references, code_calls, code_affected, and code_refactor_plan. Supports anchored (file + line + character), file-only, and query/symbol inputs. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
+      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_affected, and code_refactor_plan. Supports anchored (file + line + character), file-only, and query/symbol inputs. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
     promptSnippet: "code_resolve — resolve references into precise targets and target handles",
     basePromptGuidelines: [
       "Use code_resolve when a symbol, file, or code reference is ambiguous and needs precise resolution.",
@@ -182,67 +176,43 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_brief",
     label: "Code Brief",
     description:
-      "Prioritized code orientation for a project, package, directory, file, or symbol. Use before deeper drill-down when you need a start-here recommendation. Returns a structured overview: for files, shows outline, imports, exports, and diagnostics; for packages, shows module graph and entry points. After code_brief, use code_references for usages or code_calls for outgoing calls.",
+      'Prioritized code orientation for a project, package, directory, file, or symbol. Use before deeper drill-down when you need a start-here recommendation. Returns a structured overview: for files, shows outline, imports, exports, and diagnostics; for packages, shows module graph and entry points. After code_brief, use code_graph for references/usages or code_graph with relations: ["callees"] for outgoing calls.',
     promptSnippet: "code_brief — prioritized code orientation",
     basePromptGuidelines: [
       "Use code_brief for prioritized orientation on a project, package, file, or symbol.",
       "Use code_brief before deeper drill-down when you need a start-here recommendation.",
-      "After code_brief, drill deeper with code_references (usages) or code_calls (outgoing calls).",
+      'After code_brief, drill deeper with code_graph (usages/references) or code_graph with relations: ["callees"] (outgoing calls).',
     ],
     parameters: CodeBriefParameters,
     run: (params, ctx) => executeBriefTool(params as Parameters<typeof executeBriefTool>[0], ctx),
   },
   {
-    name: "code_references",
-    label: "Code References",
+    name: "code_graph",
+    label: "Code Graph",
     description:
-      "Find all semantic usages/references of a symbol. Returns references grouped by file. For callers specifically, use code_calls instead. Requires an active language server; does not fall back to text search. Follow up with code_brief on individual reference sites for type/definition context.",
-    promptSnippet: "code_references — semantic references/usages",
+      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Use code_resolve first to get a targetId, then pass it to code_graph.',
+    promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
-      "Use code_references to find all semantic usages/references of a symbol.",
-      "code_references returns usages grouped by file, not caller sites — use code_calls for outgoing call analysis.",
-      "After code_references, follow up with code_brief on individual reference sites for type or definition context.",
+      "Use code_graph to find references, outgoing calls, and implementations for a target.",
+      "Prefer `targetId` from `code_resolve` over raw file/line/character coordinates.",
+      'Default `relations` is ["references"] — use `relations: ["callees"]` for outgoing calls or `relations: ["implements"]` for implementations.',
+      'Use `relations: ["references", "callees"]` to query multiple relation families in one call.',
+      '`imports`, `exports`, `tests` relations return "not yet implemented" gracefully.',
+      "`direction`, `depth`, `maxNodes` are accepted but reserved for future use.",
+      "After code_graph, follow up with code_brief on individual results for type or definition context.",
     ],
-    parameters: CodeReferencesParameters,
-    run: (params, ctx) =>
-      executeReferencesTool(params as Parameters<typeof executeReferencesTool>[0], ctx),
-  },
-  {
-    name: "code_calls",
-    label: "Code Calls",
-    description:
-      "List outgoing structural calls from the enclosing function or method at a file position. Supports outgoing calls only — does not report incoming callers. Use code_references for incoming usage analysis.",
-    promptSnippet: "code_calls — outgoing calls from a function/method",
-    basePromptGuidelines: [
-      "Use code_calls to find outgoing structural calls from an enclosing function or method.",
-      "code_calls reports outgoing calls only — for incoming usages, use code_references.",
-    ],
-    parameters: CodeCallsParameters,
-    run: (params, ctx) => executeCallsTool(params as Parameters<typeof executeCallsTool>[0], ctx),
-  },
-  {
-    name: "code_implementations",
-    label: "Code Implementations",
-    description:
-      "Find semantic implementations of an interface, class, or abstract method. Requires an active language server. Does not fall back to text search.",
-    promptSnippet: "code_implementations — semantic implementations",
-    basePromptGuidelines: [
-      "Use code_implementations to find semantic implementations of an interface, class, or abstract method.",
-      "Use code_resolve first to get a targetId, then pass it to code_implementations.",
-    ],
-    parameters: CodeImplementationsParameters,
-    run: (params, ctx) =>
-      executeImplementationsTool(params as Parameters<typeof executeImplementationsTool>[0], ctx),
+    parameters: CodeGraphExtendedParameters,
+    run: (params, ctx) => executeGraphTool(params as Parameters<typeof executeGraphTool>[0], ctx),
   },
   {
     name: "code_affected",
     label: "Code Affected",
     description:
-      "Estimate blast radius and downstream impact for a target before making edits. Uses semantic evidence for impact assessment. Does not fall back to heuristic text search. Use code_references when you only need a plain reference list without impact analysis.",
+      "Estimate blast radius and downstream impact for a target before making edits. Uses semantic evidence for impact assessment. Does not fall back to heuristic text search. Use code_graph when you only need a plain reference list without impact analysis.",
     promptSnippet: "code_affected — blast radius and impact",
     basePromptGuidelines: [
       "Use code_affected before edits to estimate blast radius and follow-up checks.",
-      "Use code_references instead of code_affected when you only need a plain reference list without impact analysis.",
+      "Use code_graph instead of code_affected when you only need a plain reference list without impact analysis.",
     ],
     parameters: CodeAffectedParameters,
     run: (params, ctx) =>

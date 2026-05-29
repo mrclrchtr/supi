@@ -82,21 +82,22 @@ describe("file-level semantic targets", () => {
       },
     });
 
-    const result = await executeAction({ action: "references", file: "index.ts" }, { cwd: tmpDir });
+    const result = await executeAction(
+      { action: "graph", file: "index.ts", line: 1, character: 14 },
+      { cwd: tmpDir },
+    );
 
-    expect(result.content).toContain("References of `index.ts`");
+    expect(result.content).toContain("Graph of");
     expect(result.content).toContain("index.ts");
     expect(result.content).toContain("consumer.ts");
-    expect(result.content).not.toContain("require `line` and `character`");
+    expect(result.content).not.toContain("require `line`");
     expect(result.details?.type).toBe("search");
   });
 
-  it("returns unavailable reference details when file-level expansion lacks semantic refs", async () => {
+  it("rejects file-only graph requests with a clear error", async () => {
     writeJson(tmpDir, "package.json", { name: "test-proj" });
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
 
-    // No LSP provider registered — getCodeProvider returns unavailable
-    // But we have structural exports available from the mock
     registerMockProvider(tmpDir, {
       exports: async (_file) => ({
         kind: "success",
@@ -113,14 +114,9 @@ describe("file-level semantic targets", () => {
       }),
     });
 
-    const result = await executeAction({ action: "references", file: "index.ts" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "graph", file: "index.ts" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("**0 references**");
-    expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("semantic");
-    }
+    expect(result.content).toContain("requires a precise target");
   });
 
   it("expands file-only affected requests across exported symbols when semantic refs are available", async () => {
@@ -200,10 +196,7 @@ describe("file-level semantic targets", () => {
 
     // Register a mock provider that can't do anything with .py files
     registerMockProvider(tmpDir);
-    const result = await executeAction(
-      { action: "references", file: "internal.py" },
-      { cwd: tmpDir },
-    );
+    const result = await executeAction({ action: "graph", file: "internal.py" }, { cwd: tmpDir });
 
     expect(result.content).toContain("File-level semantic exploration is not available");
     expect(result.content).toContain("Provide `line` and `character`");

@@ -595,7 +595,7 @@ describe("code_resolve targetId follow-up", () => {
   it("rejects an unknown targetId with a clear error", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_references");
+    const tool = getTool(pi, "code_graph");
 
     const result = (await tool.execute(
       "fup-1",
@@ -610,7 +610,7 @@ describe("code_resolve targetId follow-up", () => {
     expect(result.content[0].text).toContain("workspace");
   });
 
-  it("resolves and follows up with code_references using targetId", async () => {
+  it("resolves and follows up with code_graph using targetId", async () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
     registerMockProvider(tmpDir, {
       exports: async (_file) => ({
@@ -661,8 +661,8 @@ describe("code_resolve targetId follow-up", () => {
     expect(targetId).toBeDefined();
     if (!targetId) return;
 
-    // Step 2: use targetId with code_references — should not error
-    const refTool = getTool(pi, "code_references");
+    // Step 2: use targetId with code_graph — should not error
+    const refTool = getTool(pi, "code_graph");
     const refResult = (await refTool.execute(
       "fup-3",
       { targetId },

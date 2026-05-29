@@ -1,18 +1,15 @@
 import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
-import { executeCallsTool } from "../../src/tool/execute-calls.ts";
 import { executeFindTool } from "../../src/tool/execute-find.ts";
-import { executeImplementationsTool } from "../../src/tool/execute-implementations.ts";
+import type { GraphRelation } from "../../src/tool/execute-graph.ts";
+import { executeGraphTool } from "../../src/tool/execute-graph.ts";
 import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
-import { executeReferencesTool } from "../../src/tool/execute-references.ts";
 import type { CodeIntelResult } from "../../src/types.ts";
 
 export type TestAction =
   | "brief"
-  | "references"
-  | "calls"
-  | "implementations"
+  | "graph"
   | "affected"
   | "find"
   | "refactor_plan"
@@ -33,6 +30,7 @@ export interface ActionParams {
   maxResults?: number;
   contextLines?: number;
   summary?: boolean;
+  relations?: string[];
   operation?: string;
   newName?: string;
   planId?: string;
@@ -40,9 +38,7 @@ export interface ActionParams {
 
 const SUPPORTED_ACTIONS = [
   "brief",
-  "references",
-  "calls",
-  "implementations",
+  "graph",
   "affected",
   "find",
   "refactor_plan",
@@ -70,12 +66,19 @@ export async function executeAction(
   switch (action) {
     case "brief":
       return executeBriefTool(rest, ctx);
-    case "references":
-      return executeReferencesTool(rest, ctx);
-    case "calls":
-      return executeCallsTool(rest as Parameters<typeof executeCallsTool>[0], ctx);
-    case "implementations":
-      return executeImplementationsTool(rest, ctx);
+    case "graph":
+      return executeGraphTool(
+        {
+          file: rest.file,
+          line: rest.line,
+          character: rest.character,
+          symbol: rest.symbol,
+          path: rest.path,
+          relations: rest.relations as GraphRelation[] | undefined,
+          maxResults: rest.maxResults,
+        },
+        ctx,
+      );
     case "affected":
       return executeAffectedTool(rest, ctx);
     case "find":

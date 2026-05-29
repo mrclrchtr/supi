@@ -167,7 +167,7 @@ describe("focused-tool follow-up regressions", () => {
     expect(result.details?.type).toBe("affected");
     if (result.details?.type === "affected") {
       const callersQuery = result.details.data.nextQueries.find((query) =>
-        query.includes("code_references"),
+        query.includes("code_graph"),
       );
       expect(callersQuery).toContain('file: "src/widget.ts"');
       expect(callersQuery).toContain("line: 1");

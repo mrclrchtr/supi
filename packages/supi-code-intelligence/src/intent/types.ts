@@ -8,15 +8,13 @@
 /** Canonical code-intelligence tool names. */
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_brief",
-  "code_references",
-  "code_calls",
-  "code_implementations",
   "code_affected",
   "code_find",
-  "code_refactor_plan",
-  "code_refactor_apply",
-  "code_resolve",
+  "code_graph",
   "code_health",
+  "code_refactor_apply",
+  "code_refactor_plan",
+  "code_resolve",
 ] as const;
 export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[number];
 

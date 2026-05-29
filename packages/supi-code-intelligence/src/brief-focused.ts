@@ -390,7 +390,7 @@ async function generateFileBriefWithEnrichment(
 
   // Populate nextQueries to match the rendered "Next" section
   nextQueries.push(
-    `\`code_references\`, \`file: "${relPath}"\`, and a line/character for reference sites`,
+    `\`code_graph\`, \`file: "${relPath}"\`, and a line/character for reference sites`,
   );
   if (mod) {
     nextQueries.push(

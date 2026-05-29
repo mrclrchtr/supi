@@ -18,24 +18,32 @@ describe("focused code intelligence tool registration", () => {
     }
   });
 
-  it("registers the new high-level code tools (references, calls, implementations, refactor_plan, refactor_apply)", () => {
+  it("registers the code_graph tool with correct parameter shape", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const newTools = [
-      "code_references",
-      "code_calls",
-      "code_implementations",
-      "code_refactor_plan",
-      "code_refactor_apply",
-    ];
+    const tool = getTool(pi, "code_graph");
+    expect(tool).toBeDefined();
+    expect(tool.name).toBe("code_graph");
+    expect(typeof tool.execute).toBe("function");
 
-    for (const name of newTools) {
-      const tool = getTool(pi, name);
-      expect(tool).toBeDefined();
-      expect(tool.name).toBe(name);
-      expect(typeof tool.execute).toBe("function");
-    }
+    const props = (tool as { parameters?: { properties?: Record<string, unknown> } }).parameters
+      ?.properties;
+    expect(props).toBeDefined();
+    expect(props).toHaveProperty("targetId");
+    expect(props).toHaveProperty("relations");
+    expect(props).toHaveProperty("file");
+    expect(props).toHaveProperty("maxResults");
+  });
+
+  it("no longer registers code_references, code_calls, or code_implementations", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const names = getTools(pi).map((t: { name: string }) => t.name);
+    expect(names).not.toContain("code_references");
+    expect(names).not.toContain("code_calls");
+    expect(names).not.toContain("code_implementations");
   });
 
   it("no longer registers code_relations or code_refactor", () => {
@@ -95,13 +103,13 @@ describe("focused code intelligence tool registration", () => {
     expect(modeParam?.enum).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
   });
 
-  it("does not register inactive V2 workflow tools (code_context, code_graph, code_impact, code_refactor, code_apply)", () => {
+  it("does not register inactive V2 workflow tools (code_context, code_impact, code_refactor, code_apply)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
     const inactive = WORKFLOW_CODE_TOOL_NAMES.filter(
-      (n) => n !== "code_resolve" && n !== "code_health" && n !== "code_find",
+      (n) => n !== "code_resolve" && n !== "code_health" && n !== "code_find" && n !== "code_graph",
     );
     for (const name of inactive) {
       expect(names).not.toContain(name);

@@ -51,6 +51,13 @@ export interface SemanticProvider {
   workspaceSymbols(query: string): Promise<CodeSymbol[] | null>;
 
   /**
+   * Optional definition capability. Returns the definition location(s) for
+   * the symbol at the given position. When the provider cannot produce
+   * definition info, returns `null`.
+   */
+  definition?(filePath: string, position: CodePosition): Promise<CodeLocation[] | null>;
+
+  /**
    * Optional hover capability. Returns a simplified type/signature info
    * shape that does not depend on vscode-languageserver-types. When the
    * provider cannot produce hover info (unavailable, unsupported file,
@@ -72,6 +79,16 @@ export interface SemanticProvider {
    * supports code-action-based refactors.
    */
   codeActions?(file: string, position: CodePosition): Promise<RefactorResult[]>;
+
+  /**
+   * Optional lightweight code action titles for display purposes.
+   * Returns simplified title/kind pairs at the given position.
+   * When the provider cannot produce code actions, returns `null`.
+   */
+  codeActionTitles?(
+    file: string,
+    position: CodePosition,
+  ): Promise<Array<{ title: string; kind?: string }> | null>;
 }
 
 /**

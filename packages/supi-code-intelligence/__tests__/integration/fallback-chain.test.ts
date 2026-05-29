@@ -26,9 +26,9 @@ function createSourceFile(name: string, content: string): string {
 describe("references action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
     // No provider registered — getCodeProvider returns unavailable
-    const result = await executeAction({ action: "references", symbol: "myFunc" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "graph", symbol: "myFunc" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("No semantic analysis provider");
+    expect(result.content).toContain("No analysis provider is available");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -57,7 +57,7 @@ describe("references action without heuristic fallback", () => {
     });
 
     const result = await executeAction(
-      { action: "references", file: "src/module.ts", line: 1, character: 1 },
+      { action: "graph", file: "src/module.ts", line: 1, character: 1 },
       { cwd: tmpDir },
     );
 
@@ -85,7 +85,7 @@ describe("references action without heuristic fallback", () => {
       references: async () => [],
     });
 
-    const result = await executeAction({ action: "references", symbol: "target" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "graph", symbol: "target" }, { cwd: tmpDir });
 
     expect(result.content).toContain("0 references");
     expect(result.content).not.toContain("heuristic");
@@ -100,11 +100,11 @@ describe("references action without heuristic fallback", () => {
 describe("implementations action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
     const result = await executeAction(
-      { action: "implementations", symbol: "Drawable" },
+      { action: "graph", relations: ["implements"], symbol: "Drawable" },
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain("No semantic analysis provider");
+    expect(result.content).toContain("No analysis provider is available");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -126,7 +126,13 @@ describe("implementations action without heuristic fallback", () => {
       ],
     });
     const result = await executeAction(
-      { action: "implementations", file: path.relative(tmpDir, ifacePath), line: 1, character: 1 },
+      {
+        action: "graph",
+        relations: ["implements"],
+        file: path.relative(tmpDir, ifacePath),
+        line: 1,
+        character: 1,
+      },
       { cwd: tmpDir },
     );
 
@@ -155,7 +161,7 @@ describe("implementations action without heuristic fallback", () => {
     });
 
     const result = await executeAction(
-      { action: "implementations", symbol: "Solo" },
+      { action: "graph", relations: ["implements"], symbol: "Solo" },
       { cwd: tmpDir },
     );
 

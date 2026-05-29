@@ -3,7 +3,7 @@
 Architecture briefs with structural enrichment, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_brief`, `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_brief`, `code_graph`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
 - Substrate `lsp_*` and `tree_sitter_*` tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
@@ -71,9 +71,7 @@ src/
 │   ├── validation.ts           # Shared parameter validation
 │   ├── target-id-params.ts     # targetId expansion helper (Phase 1)
 │   ├── execute-brief.ts        # code_brief tool executor
-│   ├── execute-references.ts   # code_references tool executor
-│   ├── execute-calls.ts        # code_calls tool executor
-│   ├── execute-implementations.ts # code_implementations tool executor
+│   ├── execute-graph.ts        # code_graph tool executor (unified relations)
 │   ├── execute-affected.ts     # code_affected tool executor
 │   ├── execute-find.ts         # code_find tool executor
 │   ├── execute-resolve.ts      # code_resolve tool executor (Phase 1)
@@ -105,13 +103,20 @@ src/
 ## Public tool contracts
 
 ### `code_brief`
-Interpretive orientation tool. The planner selects the best provider (semantic or structural) automatically. For deeper detail, follow up with `code_references` or `code_calls`.
+Interpretive orientation tool. The planner selects the best provider (semantic or structural) automatically. For deeper detail, follow up with `code_graph`.
 
 **Enriched file briefs** — When a code provider is available, `code_brief` with `file:` shows:
 - **Outline** — top-level declarations (functions, classes, interfaces) from tree-sitter
 - **Imports** — module dependencies from tree-sitter
 - **Exports** — exported names with kinds from tree-sitter
 - **Diagnostics** — LSP errors and warnings (first 5 messages inline)
+
+**Anchored briefs** — When `code_brief` is called with `file:` + `line:` + `character:`, additional best-effort LSP sections appear at the position:
+- **Node** — tree-sitter syntax node at the position
+- **Hover** — type/signature info from LSP hover
+- **Definition** — go-to-definition targets from LSP
+- **Code Actions** — available fix titles from LSP (suggestions only, not applied)
+- **Enclosing symbol** — the function/class/method containing the position
 
 **Enriched module briefs** — When LSP is active, `code_brief` with `path:` targeting a package root shows aggregate diagnostics across all source files.
 
@@ -123,14 +128,17 @@ Interpretive orientation tool. The planner selects the best provider (semantic o
 
 **Module brief enrichment** — Module root briefs include the same extension breakdown and landmarks as directory briefs, plus aggregate diagnostics across source files when LSP is active.
 
-### `code_references`
-Semantic references/usages for a resolved target. Uses LSP internally.
+### `code_graph`
+Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_implementations`.
 
-### `code_calls`
-Structural outgoing calls from the enclosing function or method. Uses tree-sitter internally.
-
-### `code_implementations`
-Semantic implementation lookup for an interface, class, or method. Uses LSP internally.
+- **targetId** (preferred from `code_resolve`) or file+line+character or symbol
+- **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
+- **direction**, **depth**, **maxNodes** accepted but reserved for future use
+- **maxResults** caps per-relation output
+- Each relation dispatched to appropriate substrate (semantic for references/implements, structural for callees)
+- Best-effort per relation: unavailable substrates skip with a note rather than failing the entire call
+- `imports`, `exports`, `tests` return "not yet implemented" gracefully
+- File-level expansion not supported — requires precise target (anchored coords or targetId)
 
 ### `code_affected`
 Semantic blast-radius tool. Uses semantic evidence. Does not fall back to heuristic search.
@@ -170,14 +178,14 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 
 ### Public-surface split
 - `code_find` is the sole search tool, supporting text, regex, AST, and semantic modes.
-- `code_references`, `code_calls`, `code_implementations`, and `code_affected` should prefer explicit unavailable states over text-search guesses.
+- `code_graph` dispatches each relation to the appropriate substrate. Unavailable substrates skip with a note rather than failing.
 
 ### Param validation
 - `line`/`character` require `file`, **not** `path`.
 - `code_refactor_plan` requires `operation` and `newName` plus either `targetId` or `file` + `line` + `character`.
 - `code_refactor_apply` requires `planId`.
-- `code_calls` requires either `targetId` or `file` + `line` + `character`.
-- `code_brief`, `code_references`, `code_implementations`, and `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
+- `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
+- `code_brief`, `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
 
 ### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.

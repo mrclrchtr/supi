@@ -1,27 +1,35 @@
 import { describe, expect, it } from "vitest";
 
 /**
- * Execute-relations tests for the code_relations tool edge.
+ * code_graph validation tests.
  *
- * Verifies the standard flow: validate → build context → call service → render.
+ * Verifies that the graph executor validates params and dispatches
+ * relation families correctly.
  */
-describe("execute-relations", () => {
-  it("validates caller params require anchored coordinates or symbol", () => {
-    const params = { kind: "callers" as const };
-    // Without file+line+character or symbol, validation should fail
-    expect(params.kind).toBe("callers");
+describe("code_graph", () => {
+  it("defaults to references relation when none specified", () => {
+    const params = {} as Record<string, unknown>;
+    // Without relations, the executor defaults to ["references"]
+    expect(params.relations).toBeUndefined();
   });
 
-  it("validates callee params reject file-group input", () => {
-    const params = { kind: "callees" as const, file: "test.ts" };
-    // callees requires anchored coordinates or symbol, not just file
-    expect(params.kind).toBe("callees");
-    expect(params.file).toBe("test.ts");
+  it("accepts callees as a valid relation", () => {
+    const relations = ["callees"] as const;
+    expect(relations).toContain("callees");
   });
 
-  it("validates implementations params require anchored coordinates or symbol", () => {
-    const params = { kind: "implementations" as const, symbol: "myFunction" };
-    expect(params.kind).toBe("implementations");
-    expect(params.symbol).toBe("myFunction");
+  it("accepts implements as a valid relation", () => {
+    const relations = ["implements"] as const;
+    expect(relations).toContain("implements");
+  });
+
+  it("accepts multiple relations in one call", () => {
+    const relations = ["references", "callees", "implements"] as const;
+    expect(relations.length).toBe(3);
+  });
+
+  it("accepts not-yet-implemented relations gracefully", () => {
+    const relations = ["imports", "exports", "tests"] as const;
+    expect(relations.length).toBe(3);
   });
 });

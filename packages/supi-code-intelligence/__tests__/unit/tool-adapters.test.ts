@@ -33,7 +33,7 @@ describe("executeAction validation", () => {
 
   it("rejects line/character with path instead of file", async () => {
     const result = await executeAction(
-      { action: "references", path: "src/", line: 1, character: 1 },
+      { action: "graph", path: "src/", line: 1, character: 1 },
       { cwd: tmpDir },
     );
     expect(result.content).toContain("Error");
@@ -41,10 +41,7 @@ describe("executeAction validation", () => {
   });
 
   it("rejects line/character without file", async () => {
-    const result = await executeAction(
-      { action: "references", line: 1, character: 1 },
-      { cwd: tmpDir },
-    );
+    const result = await executeAction({ action: "graph", line: 1, character: 1 }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
     expect(result.content).toContain("require `file`");
   });
@@ -52,15 +49,15 @@ describe("executeAction validation", () => {
   it("rejects file pointing to directory", async () => {
     const subDir = path.join(tmpDir, "sub");
     mkdirSync(subDir);
-    const result = await executeAction({ action: "references", file: "sub" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "graph", file: "sub" }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
     expect(result.content).toContain("directory");
   });
 
   it("rejects semantic action without file or symbol", async () => {
-    const result = await executeAction({ action: "references" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "graph" }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
-    expect(result.content).toContain("anchored coordinates");
+    expect(result.content).toContain("requires a target");
   });
 
   it("rejects find action without query param", async () => {
@@ -69,29 +66,24 @@ describe("executeAction validation", () => {
     expect(result.content).toContain("query");
   });
 
-  it("supports file-only references for exported file surfaces", async () => {
+  it("supports anchored references for exported symbols", async () => {
     writeFileSync(path.join(tmpDir, "test.ts"), "export const x = 1;");
     registerMockProvider(tmpDir, {
-      documentSymbols: async () => [
-        { name: "x", kind: "Variable", file: "", line: 1, character: 14 },
-      ],
-      exports: async (_file) => ({
-        kind: "success" as const,
-        data: [
-          {
-            name: "x",
-            kind: "const",
-            startLine: 1,
-            startCharacter: 14,
-            endLine: 1,
-            endCharacter: 25,
-            moduleSpecifier: undefined,
+      references: async () => [
+        {
+          uri: `file://${tmpDir}/test.ts`,
+          range: {
+            start: { line: 0, character: 17 },
+            end: { line: 0, character: 18 },
           },
-        ],
-      }),
+        },
+      ],
     });
-    const result = await executeAction({ action: "references", file: "test.ts" }, { cwd: tmpDir });
-    expect(result.content).toContain("References of `test.ts");
+    const result = await executeAction(
+      { action: "graph", file: "test.ts", line: 1, character: 18 },
+      { cwd: tmpDir },
+    );
+    expect(result.content).toContain("Graph of");
     expect(result.content).not.toContain("Error");
   });
 });

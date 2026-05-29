@@ -29,9 +29,7 @@ pi install ./packages/supi-code-intelligence
 After install, pi gets:
 
 - `code_brief` — interpretive orientation with structural enrichment for a project, package, directory, file, or symbol
-- `code_references` — semantic references/usages for a resolved target
-- `code_calls` — structural outgoing calls from an enclosing function or method
-- `code_implementations` — semantic implementation lookup for an interface, class, or method
+- `code_graph` — unified relation graph (references, callees, implementations) from a resolved target
 - `code_affected` — blast radius, downstream impact, and risk for a target
 - `code_find` — unified ranked search (text, regex, AST, semantic)
 - `code_health` — diagnostics, server status, and workspace health
@@ -39,8 +37,6 @@ After install, pi gets:
 - `code_refactor_apply` — apply a previously generated refactor plan
 - `code_resolve` — resolve human/code references into precise targets with stable target handles for follow-up calls
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
-- **all `lsp_*` expert tools** from `@mrclrchtr/supi-lsp` (hover, definition, references, implementation, diagnostics, rename, code actions, recover, document/workspace symbols)
-- **all `tree_sitter_*` expert tools** from `@mrclrchtr/supi-tree-sitter` (outline, imports, exports, node-at, query, callees)
 - bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
 
 Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. Each family is owned and documented by its own package:
@@ -55,7 +51,8 @@ The current public surface now includes:
 - `code_find` — **active** (Phase 2a, supersedes code_pattern)
 - `code_health` — **active** (Phase 1.5)
 - `code_context` — planned (Phase 2)
-- `code_graph` — planned (Phase 3)
+- `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
+- `code_context` — planned (Phase 2)
 - `code_impact` — planned (Phase 4)
 - `code_refactor` — planned (Phase 5)
 - `code_apply` — planned (Phase 5)
@@ -82,14 +79,13 @@ Interpretive orientation with structural enrichment. Use for prioritized context
 
 When a code provider is available, file briefs include structural context (outline, imports, exports) from tree-sitter and inline diagnostics from LSP. Directory and module briefs include extension breakdown and landmark files. Module briefs show aggregate diagnostics across source files. `maxResults` controls section caps.
 
-### `code_references`
-Semantic usages of a resolved target. Uses LSP references. Reports references, not call sites.
+### `code_graph`
+Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code_implementations`. Resolves one target and dispatches to the appropriate substrate per requested relation.
 
-### `code_calls`
-Structural outgoing calls from the enclosing function or method. Requires anchored coordinates (`file`, `line`, `character`).
-
-### `code_implementations`
-Semantic implementation lookup for an interface, class, or abstract method.
+- **targetId** (preferred from `code_resolve`) or file+line+character or symbol
+- **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
+- Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
+- `imports`, `exports`, `tests` return "not yet implemented" gracefully
 
 ### `code_affected`
 Semantic blast-radius analysis for a concrete target. This tool no longer falls back to grep-style guesses.
@@ -119,7 +115,7 @@ Depending on the tool, inputs may include:
 Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `path`
-- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_references`, `code_calls`, `code_implementations`, `code_affected`, `code_brief`, and `code_refactor_plan`
+- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_graph`, `code_affected`, `code_brief`, and `code_refactor_plan`
 - a leading `@` is stripped from `path` and `file`
 - non-search tools do **not** silently fall back to heuristic grep behavior
 

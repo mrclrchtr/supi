@@ -15,6 +15,10 @@ interface TreeSitterContext {
   exports: Array<{ name: string; kind: string }>;
   /** Best-effort LSP hover info at the anchored position. `null` when unavailable. */
   hover: { contents: string; range?: SourceRange } | null;
+  /** Best-effort LSP definition targets at the anchored position. `null` when unavailable. */
+  definition: Array<{ uri: string; range: SourceRange }> | null;
+  /** Best-effort code action titles at the anchored position. `null` when unavailable. */
+  codeActions: Array<{ title: string; kind?: string }> | null;
 }
 
 export function renderAnchoredBrief(params: {
@@ -113,6 +117,32 @@ function appendTreeSitterContext(
     lines.push("```");
     lines.push(context.hover.contents);
     lines.push("```");
+    lines.push("");
+  }
+
+  // Best-effort LSP definition — go-to-definition targets at the position
+  if (context.definition && context.definition.length > 0) {
+    lines.push("## Definition");
+    for (const def of context.definition) {
+      const uriPath = def.uri.startsWith("file://")
+        ? decodeURIComponent(def.uri.slice(7))
+        : def.uri;
+      const startLine = def.range.start.line + 1; // 0-based → 1-based
+      const startChar = def.range.start.character + 1;
+      lines.push(`- \`${uriPath}:${startLine}:${startChar}\``);
+    }
+    lines.push("");
+  }
+
+  // Best-effort code actions — available fix titles at the position
+  if (context.codeActions && context.codeActions.length > 0) {
+    lines.push("## Code Actions");
+    lines.push("Available fixes (suggestions only — not applied):");
+    lines.push("");
+    for (const action of context.codeActions) {
+      const kindLabel = action.kind ? ` (${action.kind})` : "";
+      lines.push(`- "${action.title}"${kindLabel}`);
+    }
     lines.push("");
   }
 
@@ -236,7 +266,7 @@ export function renderFileBrief(input: FileBriefInput): string {
 
   lines.push("## Next");
   lines.push(
-    `- \`code_references\`, \`file: "${input.relPath}"\`, and a line/character for reference sites`,
+    `- \`code_graph\`, \`file: "${input.relPath}"\`, and a line/character for reference sites`,
   );
   if (input.moduleRelativePath) {
     lines.push(
@@ -312,7 +342,7 @@ function appendNextQueries(
 ): void {
   lines.push("## Next");
   lines.push(
-    `- \`code_references\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
+    `- \`code_graph\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
   );
   lines.push(
     `- \`code_affected\` with \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for impact analysis`,

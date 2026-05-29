@@ -105,6 +105,27 @@ function createCompositeProvider(
     async hover(filePath: string, position: { line: number; character: number }) {
       return semantic?.hover?.(filePath, position) ?? null;
     },
+    async definition(filePath: string, position: { line: number; character: number }) {
+      return semantic?.definition?.(filePath, position) ?? null;
+    },
+    async codeActions(file: string, position: { line: number; character: number }) {
+      return semantic?.codeActions?.(file, position) ?? [];
+    },
+    async codeActionTitles(
+      file: string,
+      position: { line: number; character: number },
+    ): Promise<Array<{ title: string; kind?: string }> | null> {
+      return semantic?.codeActionTitles?.(file, position) ?? null;
+    },
+    async rename(file: string, position: { line: number; character: number }, newName: string) {
+      const result = await semantic?.rename?.(file, position, newName);
+      return (
+        result ?? {
+          kind: "unavailable" as const,
+          reason: "Rename not available",
+        }
+      );
+    },
     async calleesAt(file: string, line: number, character: number) {
       return (
         structural?.calleesAt(file, line, character) ?? {
