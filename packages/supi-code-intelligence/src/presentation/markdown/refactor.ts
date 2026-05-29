@@ -33,55 +33,76 @@ export function renderRefactorResult(input: RefactorRenderInput): string {
  */
 export function renderRefactorPlanResult(plan: RefactorPlan): string {
   const lines: string[] = [];
-  lines.push(`# Refactor Plan: ${plan.operation} \`${plan.newName}\``);
+  const changedFiles = collectChangedFiles(plan);
+  const fileCount = changedFiles.length;
+
+  lines.push(`# Refactor Plan: ${plan.operation}`);
   lines.push("");
   lines.push(`**Plan ID:** \`${plan.id}\``);
+  lines.push(`**Operation:** \`${plan.operation}\``);
   lines.push(`**Target:** \`${plan.targetFile}\`:${plan.targetLine}:${plan.targetCharacter}`);
-  lines.push(
-    `**Files to change:** ${plan.edits.edits.length} file${plan.edits.edits.length !== 1 ? "s" : ""}`,
-  );
+  if (plan.newName) {
+    lines.push(`**New name:** \`${plan.newName}\``);
+  }
+  if (plan.destination) {
+    lines.push(`**Destination:** \`${plan.destination}\``);
+  }
+  lines.push(`**Files to change:** ${fileCount} file${fileCount !== 1 ? "s" : ""}`);
   lines.push(`**Total edits:** ${plan.edits.edits.length}`);
   lines.push("");
 
-  const changedFiles = new Set(plan.edits.edits.map((e) => e.file));
   lines.push("## Files");
-  for (const file of changedFiles) {
-    const fileEdits = plan.edits.edits.filter((e) => e.file === file);
-    lines.push(`- \`${file}\` — ${fileEdits.length} edit${fileEdits.length !== 1 ? "s" : ""}`);
+  for (const [file, count] of changedFiles) {
+    lines.push(`- \`${file}\` — ${count} edit${count !== 1 ? "s" : ""}`);
   }
   lines.push("");
   lines.push("## Preview");
   lines.push("");
   for (const edit of plan.edits.edits.slice(0, 5)) {
-    const r = edit.range;
+    const range = edit.range;
     lines.push(
-      `- \`${plan.targetFile}\` L${r.start.line + 1}:${r.start.character} → L${r.end.line + 1}:${r.end.character}`,
+      `- \`${edit.file}\` L${range.start.line + 1}:${range.start.character} → L${range.end.line + 1}:${range.end.character}`,
     );
-    lines.push(`  \`\`\``);
+    lines.push("  ```");
     lines.push(`  ${edit.newText.slice(0, 80).split("\n").join("\n  ")}`);
-    lines.push(`  \`\`\``);
+    lines.push("  ```");
   }
   if (plan.edits.edits.length > 5) {
     lines.push(`_+${plan.edits.edits.length - 5} more edits_`);
   }
   lines.push("");
   lines.push("**This is a preview. No files were changed.**");
-  lines.push(`Use code_refactor_apply with planId: "${plan.id}" to apply this rename.`);
+  lines.push(`Use code_refactor_apply with planId: "${plan.id}" to apply this refactor.`);
   return lines.join("\n");
 }
 
 /**
  * Render a refactor apply result.
  */
-export function renderRefactorApplyResult(applyResult: ApplyResult, planId: string): string {
+export function renderRefactorApplyResult(applyResult: ApplyResult, plan: RefactorPlan): string {
   if (applyResult.kind === "error") {
     return `**Refactor apply failed:** ${applyResult.reason}`;
   }
-  return [
-    `**Refactor applied successfully.** Plan: \`${planId}\``,
+  const lines = [
+    `**Refactor applied successfully.** Plan: \`${plan.id}\``,
+    `- Operation: \`${plan.operation}\``,
     `- Files changed: ${applyResult.filesChanged}`,
     `- Total edits: ${applyResult.totalEdits}`,
-    "",
-    "Verify the changes before continuing with other work.",
-  ].join("\n");
+  ];
+  if (plan.newName) {
+    lines.push(`- New name: \`${plan.newName}\``);
+  }
+  if (plan.destination) {
+    lines.push(`- Destination: \`${plan.destination}\``);
+  }
+  lines.push("", "Verify the changes before continuing with other work.");
+  return lines.join("\n");
+}
+
+function collectChangedFiles(plan: RefactorPlan): Array<[file: string, count: number]> {
+  const counts = new Map<string, number>();
+  for (const edit of plan.edits.edits) {
+    counts.set(edit.file, (counts.get(edit.file) ?? 0) + 1);
+  }
+  return [...counts.entries()];
 }

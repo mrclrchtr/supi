@@ -126,6 +126,41 @@ export interface WorkspaceEdit {
 }
 
 /**
+ * Supported refactor operation names for the current semantic planning path.
+ *
+ * `rename` is kept as a legacy alias for the public rename-only surface.
+ */
+export type RefactorOperation =
+  | "rename"
+  | "rename_symbol"
+  | "rename_file"
+  | "move_file"
+  | "update_imports"
+  | "delete_dead_code";
+
+/** Normalize legacy refactor aliases to their canonical operation names. */
+export function normalizeRefactorOperation(
+  operation: RefactorOperation,
+): Exclude<RefactorOperation, "rename"> {
+  return operation === "rename" ? "rename_symbol" : operation;
+}
+
+/**
+ * Operation-aware refactor planning request.
+ *
+ * Consumers provide a target file/position plus operation-specific options.
+ * File/resource operations remain requestable so providers can reject them
+ * explicitly and honestly until shared workspace-edit resource ops exist.
+ */
+export interface RefactorRequest {
+  operation: RefactorOperation;
+  file: string;
+  position: CodePosition;
+  newName?: string;
+  destination?: string;
+}
+
+/**
  * A disambiguation candidate when a refactor target is ambiguous.
  */
 export interface DisambiguationCandidate {

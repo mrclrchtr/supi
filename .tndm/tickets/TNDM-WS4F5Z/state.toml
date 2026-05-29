@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:34:04.979728Z"
+revision = 33
+
+[document_fingerprints]
+archive = "sha256:81f568b03d659b7c0805785969ab64b7ae7dc76ecb8d632661cc17e34caef5e6"
+content = "sha256:641ed0e630d142516f2df578b04616923f98fadee5398dd90610938b56baf86e"
+task-01 = "sha256:a6479f99187edc2b461b0fb22562c768cdc1109fae0f62c5b62d3c1f7a9ff282"
+task-02 = "sha256:5946b2b1384fa82b16179421aeb0a80a0ab1c0ecdadae935c4ca3ec29afc21c0"
+task-03 = "sha256:a4a02273865109ecb25c93e11b0dcd49bae4ac0acca6644ab130a7dc3148382c"
+task-04 = "sha256:6a1b8c96c013a813391fd99239f269a1e9173edc4335a9061d1d41760518b50e"
+task-05 = "sha256:10d6062885fc5d414540a085e09e41efa3a943e6cf20e2af540fdc1456f54322"
+
+[[tasks]]
+number = 1
+title = "[TDD RED] Lock the first-wave operation-aware refactor contract and explicit unavailable file ops"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "[TDD GREEN] Add shared operation-aware refactor request types and LSP operation selection"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "[TDD GREEN] Generalize code_refactor_plan/apply to multi-operation text-edit plans"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Update docs and maintainer guidance for first-wave operation-aware refactors"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Final verification — tests, typecheck, lint, and rename-only wording audit"
+status = "done"

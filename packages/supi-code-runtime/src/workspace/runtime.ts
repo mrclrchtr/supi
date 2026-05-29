@@ -48,7 +48,12 @@ function createDefaultCapabilities(): WorkspaceCapabilities {
 }
 
 function hasRefactorCapability(provider: SemanticProvider | null): boolean {
-  return !!(provider && (provider.rename !== undefined || provider.codeActions !== undefined));
+  return !!(
+    provider &&
+    (provider.refactor !== undefined ||
+      provider.rename !== undefined ||
+      provider.codeActions !== undefined)
+  );
 }
 
 // ── Runtime ────────────────────────────────────────────────────────────

@@ -5,11 +5,17 @@
 `@mrclrchtr/supi-lsp` is a **library-only** package with one explicit surface:
 - `@mrclrchtr/supi-lsp/api` → `src/api.ts` → reusable library surface (`getSessionLspService`, `waitForSessionLspService`, `SessionLspService`, LSP types, provider interfaces, and exported semantic/diagnostic result types)
 
-This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Tool registration (`lsp_hover`, `lsp_definition`, etc.) and all pi event handlers live in `@mrclrchtr/supi-code-intelligence`.
+This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Public substrate-named tools were removed from the surface; `@mrclrchtr/supi-code-intelligence` now exposes only intent-level `code_*` tools backed by this library.
 
-## Tool actions (registered by supi-code-intelligence)
+## Semantic substrate role
 
-This package does not register pi tools. The `lsp_*` tools (`lsp_hover`, `lsp_definition`, `lsp_references`, `lsp_implementation`, `lsp_document_symbols`, `lsp_workspace_symbols`, `lsp_diagnostics`, `lsp_rename`, `lsp_code_actions`, `lsp_recover`) are registered by `@mrclrchtr/supi-code-intelligence` via `src/lsp/register-tools.ts`, which calls `SessionLspService` methods from this library.
+This package does not register pi tools. It provides the `SessionLspService` and `SemanticProvider` implementation consumed by `@mrclrchtr/supi-code-intelligence`.
+
+For first-wave refactors, `src/provider/lsp-semantic-provider.ts` maps:
+- `rename_symbol` (and legacy `rename`) → `textDocument/rename`
+- `update_imports` → precise organize-imports/source actions only
+- `delete_dead_code` → precise quickfix/refactor-rewrite actions only
+- `rename_file` / `move_file` → explicit unavailable results for now
 
 Diagnostic severity: Error (`1`), Warning (`2`), Information (`3`), Hint (`4`). The default threshold is `1` (errors only).
 
@@ -44,7 +50,7 @@ Keep summary and relevance formatting out of `manager.ts`; use focused helpers s
 
 `loadConfig()` reads server definitions from supi config (`~/.pi/agent/supi/config.json` and `.pi/supi/config.json`) under `lsp.servers`. `.pi-lsp.json` is no longer read. Keys are language names such as `typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, and `kotlin`, not server binary names. Each language entry merges independently against built-in defaults, and omitted fields fall back to the code default for that language. The active-server allowlist is stored under `lsp.active` and applied in `session_start` after config load.
 
-User exclusion patterns live under `lsp.exclude` as gitignore-style glob strings. They are loaded in `session_start`, stored on `LspManager` through `setExcludePatterns()`, and applied only by diagnostic and coverage collection methods; explicit expert LSP operations (`lsp_hover`, `lsp_definition`, `lsp_references`, `lsp_implementation`, `lsp_document_symbols`, `lsp_workspace_symbols`, `lsp_diagnostics`, `lsp_rename`, `lsp_code_actions`, `lsp_recover`) are not filtered. `isGlobMatch()` in `pattern-matcher.ts` supports leading `/` for anchored matches, trailing `/` for directory-only matches, `**` for recursive wildcards, and `*` for single-segment wildcards.
+User exclusion patterns live under `lsp.exclude` as gitignore-style glob strings. They are loaded in `session_start`, stored on `LspManager` through `setExcludePatterns()`, and applied only by diagnostic and coverage collection methods; explicit semantic requests issued through the public `code_*` tools are not filtered. `isGlobMatch()` in `pattern-matcher.ts` supports leading `/` for anchored matches, trailing `/` for directory-only matches, `**` for recursive wildcards, and `*` for single-segment wildcards.
 
 ## Integration test coverage
 

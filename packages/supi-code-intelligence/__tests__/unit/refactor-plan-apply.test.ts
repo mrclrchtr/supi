@@ -1,15 +1,9 @@
-/**
- * RED tests for two-step refactor plan/apply behavior.
- *
- * These tests will fail until Task 6 implements the real plan/apply executors.
- * They test through the executeAction helper which currently maps to stub responses.
- */
-
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import {
   getDefaultWorkspaceRuntime,
+  type RefactorResult,
   type SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it } from "vitest";
@@ -34,14 +28,39 @@ function createProjectFile(content = "oldName();\n"): { projectDir: string; file
   return { projectDir, file };
 }
 
-function createSemanticProvider(rename: SemanticProvider["rename"]): SemanticProvider {
+function extractPlanId(content: string): string {
+  const match = content.match(/\*\*Plan ID:\*\* `([^`]+)`/);
+  if (!match) {
+    throw new Error(`Plan ID not found in content:\n${content}`);
+  }
+  return match[1];
+}
+
+type RefactorRequest = {
+  operation: string;
+  file: string;
+  position: { line: number; character: number };
+  newName?: string;
+  destination?: string;
+};
+
+type OperationAwareSemanticProvider = SemanticProvider & {
+  refactor?: (request: RefactorRequest) => Promise<RefactorResult>;
+};
+
+function createSemanticProvider(
+  overrides: Partial<Pick<SemanticProvider, "rename">> & {
+    refactor?: OperationAwareSemanticProvider["refactor"];
+  } = {},
+): SemanticProvider {
   return {
     references: async () => null,
     implementation: async () => null,
     documentSymbols: async () => [],
     workspaceSymbols: async () => [],
-    rename,
-  };
+    rename: overrides.rename,
+    ...(overrides.refactor ? { refactor: overrides.refactor } : {}),
+  } as SemanticProvider;
 }
 
 describe("code_refactor_plan", () => {
@@ -49,7 +68,9 @@ describe("code_refactor_plan", () => {
     const runtime = getDefaultWorkspaceRuntime();
     runtime.registerSemantic(
       "/project",
-      createSemanticProvider(async () => ({ kind: "precise", edits: { edits: [] } })),
+      createSemanticProvider({
+        rename: async () => ({ kind: "precise", edits: { edits: [] } }),
+      }),
     );
 
     const { routeFor } = await import("../../src/analysis/routing/planner.ts");
@@ -58,28 +79,31 @@ describe("code_refactor_plan", () => {
     expect(route.refactorAvailable).toBe(true);
   });
 
-  it("returns a plan result without mutating files", async () => {
+  it("returns a rename_symbol plan result without mutating files", async () => {
     const { projectDir, file } = createProjectFile();
     const runtime = getDefaultWorkspaceRuntime();
     runtime.registerSemantic(
       projectDir,
-      createSemanticProvider(async () => ({
-        kind: "precise",
-        edits: {
-          edits: [
-            {
-              file,
-              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
-              newText: "newName",
-            },
-          ],
-        },
-      })),
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
     );
 
     const result = await executeAction(
       {
         action: "refactor_plan",
+        operation: "rename_symbol",
         file: "src/index.ts",
         line: 1,
         character: 1,
@@ -88,16 +112,72 @@ describe("code_refactor_plan", () => {
       { cwd: projectDir },
     );
 
-    // RED: should fail because the stub returns "not implemented"
-    expect(result.content).not.toContain("not implemented");
+    expect(result.content).toContain("Plan ID");
+    expect(result.content).toContain("rename_symbol");
+  });
+
+  it("canonicalizes the legacy rename alias to rename_symbol in the preview", async () => {
+    const { projectDir, file } = createProjectFile();
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const result = await executeAction(
+      {
+        action: "refactor_plan",
+        operation: "rename",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+      } as unknown as ActionParams,
+      { cwd: projectDir },
+    );
+
+    expect(result.content).toContain("rename_symbol");
+    expect(result.content).not.toContain("Refactor Plan: rename `");
   });
 
   it("does not mutate files during planning", async () => {
     const { projectDir, file } = createProjectFile("oldName();\n");
-    // Call plan through the stub
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
     const result = await executeAction(
       {
         action: "refactor_plan",
+        operation: "rename_symbol",
         file: "src/index.ts",
         line: 1,
         character: 1,
@@ -106,12 +186,117 @@ describe("code_refactor_plan", () => {
       { cwd: projectDir },
     );
 
-    // File should remain unchanged
     const { readFileSync } = await import("node:fs");
     expect(readFileSync(file, "utf-8")).toBe("oldName();\n");
+    expect(result.content).toContain("Plan ID");
+  });
 
-    // RED failure: content says "not implemented" but plan should have more details
-    expect(result.content).not.toContain("not implemented");
+  it("plans update_imports when the semantic provider can return precise edits", async () => {
+    const { projectDir, file } = createProjectFile('import { unused } from "./dep";\n');
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        refactor: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 31 } },
+                newText: "",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const result = await executeAction(
+      {
+        action: "refactor_plan",
+        operation: "update_imports",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+      } as unknown as ActionParams,
+      { cwd: projectDir },
+    );
+
+    expect(result.content).toContain("Plan ID");
+    expect(result.content).toContain("update_imports");
+  });
+
+  it("plans delete_dead_code when the semantic provider can return precise edits", async () => {
+    const { projectDir, file } = createProjectFile("const unused = 1;\n");
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        refactor: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 17 } },
+                newText: "",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const result = await executeAction(
+      {
+        action: "refactor_plan",
+        operation: "delete_dead_code",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+      } as unknown as ActionParams,
+      { cwd: projectDir },
+    );
+
+    expect(result.content).toContain("Plan ID");
+    expect(result.content).toContain("delete_dead_code");
+  });
+
+  it("returns an explicit unavailable result for rename_file", async () => {
+    const { projectDir } = createProjectFile();
+    const result = await executeAction(
+      {
+        action: "refactor_plan",
+        operation: "rename_file",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "src/renamed.ts",
+      } as unknown as ActionParams,
+      { cwd: projectDir },
+    );
+
+    expect(result.content).toContain("Refactor unavailable");
+    expect(result.content).not.toContain("Unsupported refactor operation");
+  });
+
+  it("returns an explicit unavailable result for move_file", async () => {
+    const { projectDir } = createProjectFile();
+    const result = await executeAction(
+      {
+        action: "refactor_plan",
+        operation: "move_file",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        destination: "src/renamed.ts",
+      } as unknown as ActionParams,
+      { cwd: projectDir },
+    );
+
+    expect(result.content).toContain("Refactor unavailable");
+    expect(result.content).not.toContain("Unsupported refactor operation");
   });
 });
 
@@ -130,7 +315,9 @@ describe("code_refactor_apply", () => {
     const runtime = getDefaultWorkspaceRuntime();
     runtime.registerSemantic(
       projectDir,
-      createSemanticProvider(async () => ({ kind: "precise", edits: { edits: [] } })),
+      createSemanticProvider({
+        rename: async () => ({ kind: "precise", edits: { edits: [] } }),
+      }),
     );
     const result = await executeAction(
       { action: "refactor_apply", planId: "nonexistent-plan" } as unknown as ActionParams,
@@ -140,26 +327,27 @@ describe("code_refactor_apply", () => {
     expect(result.content).toContain("not found");
   });
 
-  it("applies a valid plan and reports files changed", async () => {
+  it("applies a valid rename alias plan and reports files changed", async () => {
     const { projectDir, file } = createProjectFile("oldName();\n");
     const runtime = getDefaultWorkspaceRuntime();
     runtime.registerSemantic(
       projectDir,
-      createSemanticProvider(async () => ({
-        kind: "precise",
-        edits: {
-          edits: [
-            {
-              file,
-              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
-              newText: "newName",
-            },
-          ],
-        },
-      })),
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
     );
 
-    // First generate a plan
     const planResult = await executeAction(
       {
         action: "refactor_plan",
@@ -173,14 +361,11 @@ describe("code_refactor_apply", () => {
     );
     expect(planResult.content).toContain("Plan ID");
 
-    // Extract the planId
-    const planIdMatch = planResult.content.match(/"([^"]+)"/);
-    expect(planIdMatch).not.toBeNull();
-    const planId = planIdMatch?.[1];
-
-    // Now apply the plan
     const result = await executeAction(
-      { action: "refactor_apply", planId } as unknown as ActionParams,
+      {
+        action: "refactor_apply",
+        planId: extractPlanId(planResult.content),
+      } as unknown as ActionParams,
       { cwd: projectDir },
     );
 

@@ -26,8 +26,15 @@ const _SummaryParam = Type.Boolean({ description: "Summarize by directory" });
 const _StructuredPatternKindParam = Type.String({
   description: "Structured kind: definition | export | import",
 });
-const NewNameParam = Type.String({ description: "New name for rename operation" });
-const OperationParam = Type.String({ description: "Refactor operation: rename" });
+const NewNameParam = Type.String({ description: "New symbol or file name for rename operations" });
+const DestinationParam = Type.String({ description: "Destination path for move operations" });
+const OperationParam = StringEnum(
+  ["rename", "rename_symbol", "rename_file", "move_file", "update_imports", "delete_dead_code"],
+  {
+    description:
+      "Refactor operation to preview. `rename` is kept as a legacy alias for `rename_symbol`.",
+  },
+);
 const PlanIdParam = Type.String({ description: "Plan ID from a previous code_refactor_plan call" });
 const TargetIdParam = Type.String({
   description:
@@ -67,7 +74,8 @@ const CodeRefactorPlanParameters = Type.Object(
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
     character: Type.Optional(CharacterParam),
-    newName: NewNameParam,
+    newName: Type.Optional(NewNameParam),
+    destination: Type.Optional(DestinationParam),
   },
   { additionalProperties: false },
 );
@@ -237,10 +245,12 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_refactor_plan",
     label: "Code Refactor Plan",
     description:
-      "Preview a semantic rename without mutating files. Returns a plan ID for later use with code_refactor_apply. Requires a language server with rename support. Accepts targetId from code_resolve in place of file/line/character.",
-    promptSnippet: "code_refactor_plan — preview a rename plan",
+      'Preview an operation-aware semantic refactor plan without mutating files. Returns a plan ID for later use with code_refactor_apply. Supports rename_symbol, update_imports, and delete_dead_code when the semantic provider can produce precise edits. Accepts targetId from code_resolve in place of file/line/character. Legacy `operation: "rename"` remains a compatibility alias for rename_symbol.',
+    promptSnippet: "code_refactor_plan — preview an operation-aware refactor plan",
     basePromptGuidelines: [
-      "Use code_refactor_plan to preview a rename before applying it.",
+      "Use code_refactor_plan to preview a precise semantic refactor before applying it.",
+      'Use `operation: "rename_symbol"` for symbol renames; `operation: "rename"` remains a legacy alias.',
+      'Use `operation: "update_imports"` or `operation: "delete_dead_code"` only when the semantic provider can return precise edits.',
       "code_refactor_plan does not mutate files — it returns a plan ID. Use code_refactor_apply with that planId to execute.",
     ],
     parameters: CodeRefactorPlanParameters,

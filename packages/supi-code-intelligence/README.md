@@ -33,13 +33,13 @@ After install, pi gets:
 - `code_affected` — blast radius, downstream impact, and risk for a target
 - `code_find` — unified ranked search (text, regex, AST, semantic)
 - `code_health` — diagnostics, server status, and workspace health
-- `code_refactor_plan` — preview a semantic rename without mutating files
-- `code_refactor_apply` — apply a previously generated refactor plan
+- `code_refactor_plan` — preview an operation-aware semantic refactor plan without mutating files
+- `code_refactor_apply` — apply a previously generated, validated precise text-edit refactor plan
 - `code_resolve` — resolve human/code references into precise targets with stable target handles for follow-up calls
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
 
-Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. Each family is owned and documented by its own package:
+Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface.
 
 ## V2 workflow roadmap
 
@@ -52,7 +52,6 @@ The current public surface now includes:
 - `code_health` — **active** (Phase 1.5)
 - `code_context` — planned (Phase 2)
 - `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
-- `code_context` — planned (Phase 2)
 - `code_impact` — planned (Phase 4)
 - `code_refactor` — planned (Phase 5)
 - `code_apply` — planned (Phase 5)
@@ -68,9 +67,9 @@ This package is for questions like:
 - what is the likely blast radius of a change?
 - where is this pattern defined, imported, or exported?
 
-- `@mrclrchtr/supi-lsp` owns the semantic `lsp_*` tools
-- `@mrclrchtr/supi-tree-sitter` owns the structural `tree_sitter_*` tools
-- `@mrclrchtr/supi-code-intelligence` owns the analysis `code_*` tools and provides cross-family orchestration guidance
+- `@mrclrchtr/supi-lsp` provides the semantic library substrate used by the public `code_*` tools
+- `@mrclrchtr/supi-tree-sitter` provides the structural library substrate used by the public `code_*` tools
+- `@mrclrchtr/supi-code-intelligence` owns the public `code_*` tool surface and the orchestration layer above those substrates
 
 ## Tool overview
 
@@ -98,6 +97,29 @@ Unified ranked search tool for:
 - LSP semantic workspace symbol search (`mode: "semantic"`)
 
 Supports `query` (required), `scope`, `mode`, `kind`, `contextLines`, and `maxResults`.
+
+### `code_refactor_plan`
+Preview-only operation-aware refactor planning.
+
+First-wave supported operations:
+- `rename_symbol`
+- `update_imports`
+- `delete_dead_code`
+- legacy `rename` alias → `rename_symbol`
+
+Notes:
+- `rename_file` and `move_file` remain explicit unavailable outcomes for now
+- only precise semantic text edits become plans
+- no files are changed during planning
+- `targetId` from `code_resolve` can replace raw file + line + character targeting
+
+### `code_refactor_apply`
+Applies a previously generated refactor plan by `planId`.
+
+- applies only stored, validated, precise text-edit plans
+- rejects stale plans using file fingerprints
+- re-validates ranges and overlap before mutation
+- does not yet apply file/resource operations such as `rename_file` or `move_file`
 
 ## Shared input conventions
 

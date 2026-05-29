@@ -14,6 +14,7 @@ import type {
   ImportData,
   NodeAtData,
   OutlineData,
+  RefactorRequest,
   RefactorResult,
   SourceRange,
 } from "../types.ts";
@@ -69,14 +70,29 @@ export interface SemanticProvider {
   ): Promise<{ contents: string; range?: SourceRange } | null>;
 
   /**
+   * Optional operation-aware refactor capability.
+   *
+   * This is the preferred planning entrypoint for higher-level tools because it
+   * lets the provider choose the honest substrate path per operation (rename,
+   * organize imports, dead-code cleanup, etc.) without exposing that branching
+   * to callers.
+   */
+  refactor?(request: RefactorRequest): Promise<RefactorResult>;
+
+  /**
    * Optional rename capability. When present, the provider supports
-   * precise semantic rename operations.
+   * precise semantic symbol-rename operations.
+   *
+   * Kept as a low-level substrate helper for compatibility while the public
+   * tool surface still exposes a legacy `rename` alias.
    */
   rename?(file: string, position: CodePosition, newName: string): Promise<RefactorResult>;
 
   /**
    * Optional code actions capability. When present, the provider
    * supports code-action-based refactors.
+   *
+   * Kept as a low-level substrate helper and for lightweight introspection.
    */
   codeActions?(file: string, position: CodePosition): Promise<RefactorResult[]>;
 

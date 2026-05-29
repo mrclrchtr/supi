@@ -151,6 +151,19 @@ describe("capability-broker", () => {
       expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(true);
     });
 
+    it("reports refactorAvailable=true when semantic provider has refactor", () => {
+      runtime = new WorkspaceRuntime();
+      const refactorProvider: SemanticProvider = {
+        references: async () => null,
+        implementation: async () => null,
+        documentSymbols: async () => [],
+        workspaceSymbols: async () => [],
+        refactor: async (_request) => ({ kind: "precise" as const, edits: { edits: [] } }),
+      };
+      runtime.registerSemantic("/project", refactorProvider);
+      expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(true);
+    });
+
     it("refactorAvailable is false when no semantic provider is registered", () => {
       runtime = new WorkspaceRuntime();
       expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(false);

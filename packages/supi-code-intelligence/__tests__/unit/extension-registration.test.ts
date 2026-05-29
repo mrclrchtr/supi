@@ -160,6 +160,19 @@ describe("focused code intelligence tool registration", () => {
     expect(planTool.parameters?.properties).toHaveProperty("character");
     expect(planTool.parameters?.properties).toHaveProperty("newName");
 
+    const operationParam = planTool.parameters?.properties?.operation as
+      | { enum?: string[] }
+      | undefined;
+    expect(operationParam?.enum).toEqual(
+      expect.arrayContaining([
+        "rename_symbol",
+        "rename_file",
+        "move_file",
+        "update_imports",
+        "delete_dead_code",
+      ]),
+    );
+
     const applyTool = getTool(pi, "code_refactor_apply") as {
       parameters?: { properties?: Record<string, unknown> };
     };

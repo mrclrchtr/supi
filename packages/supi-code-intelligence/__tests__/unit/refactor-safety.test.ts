@@ -3,9 +3,21 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   getDefaultWorkspaceRuntime,
+  type RefactorResult,
   type SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it } from "vitest";
+
+type RefactorRequest = {
+  operation: string;
+  file: string;
+  position: { line: number; character: number };
+  newName?: string;
+};
+
+type OperationAwareSemanticProvider = SemanticProvider & {
+  refactor?: (request: RefactorRequest) => Promise<RefactorResult>;
+};
 
 describe("code_refactor safety", () => {
   afterEach(() => {
@@ -175,6 +187,23 @@ describe("code_refactor safety", () => {
         rename: async () => ({ kind: "precise" as const, edits: { edits: [] } }),
       };
       runtime.registerSemantic("/project", provider);
+
+      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
+      const route = routeFor("/project", "code_refactor_plan");
+      expect(route.refactorAvailable).toBe(true);
+      expect(route.preferred).toBe("semantic");
+    });
+
+    it("treats a generic operation-aware refactor provider as refactor-capable", async () => {
+      const runtime = getDefaultWorkspaceRuntime();
+      const provider: OperationAwareSemanticProvider = {
+        references: async () => null,
+        implementation: async () => null,
+        documentSymbols: async () => [],
+        workspaceSymbols: async () => [],
+        refactor: async () => ({ kind: "precise", edits: { edits: [] } }),
+      };
+      runtime.registerSemantic("/project", provider as SemanticProvider);
 
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
       const route = routeFor("/project", "code_refactor_plan");

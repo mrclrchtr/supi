@@ -8,12 +8,13 @@
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import type { WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
+import type { RefactorOperation, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
 
 export interface RefactorPlan {
   id: string;
-  operation: string;
-  newName: string;
+  operation: Exclude<RefactorOperation, "rename">;
+  newName?: string;
+  destination?: string;
   targetFile: string;
   targetLine: number;
   targetCharacter: number;
@@ -41,10 +42,10 @@ export function generatePlanId(
   file: string,
   line: number,
   character: number,
-  newName: string,
+  discriminator: string = "",
 ): string {
   const hash = createHash("sha256")
-    .update(`${operation}:${file}:${line}:${character}:${newName}:${Date.now()}`)
+    .update(`${operation}:${file}:${line}:${character}:${discriminator}:${Date.now()}`)
     .digest("hex")
     .slice(0, 12);
   return `plan-${hash}`;

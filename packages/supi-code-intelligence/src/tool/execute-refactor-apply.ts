@@ -68,7 +68,7 @@ export async function executeRefactorApplyTool(
   const applyResult = applyWorkspaceEdit(plan.edits);
   removePlan(plan.id);
 
-  const content = renderRefactorApplyResult(applyResult, plan.id);
+  const content = renderRefactorApplyResult(applyResult, plan);
 
   return {
     content,
@@ -79,7 +79,7 @@ export async function executeRefactorApplyTool(
         scope: null,
         candidateCount: applyResult.kind === "applied" ? applyResult.totalEdits : 0,
         omittedCount: 0,
-        nextQueries: ["`code_health` to check for new issues after the rename"],
+        nextQueries: ["`code_health` to check for new issues after the refactor"],
       },
     },
   };

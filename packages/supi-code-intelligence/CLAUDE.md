@@ -4,7 +4,7 @@ Architecture briefs with structural enrichment, reference/usages tracing, outgoi
 
 Surfaces:
 - `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_brief`, `code_graph`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
-- Substrate `lsp_*` and `tree_sitter_*` tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
+- Historical substrate-named tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
 - `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
@@ -163,16 +163,29 @@ Diagnostic health summary. Replaces `lsp_diagnostics` and `lsp_recover`.
 Resolve human or code references into precise file/range/symbol targets with stable handles. Supports anchored (file + line + character), file-only, and query/symbol inputs. Returns `targetId` and `spanId` for follow-up calls.
 
 ### `code_refactor_plan`
-Preview-only semantic rename planning. Reads capability state from the shared broker, calls LSP rename, validates the workspace edit, computes file fingerprints for staleness detection, and returns a preview with a plan ID. Does not mutate files. May accept `targetId` in place of file/line/character.
+Preview-only operation-aware semantic refactor planning. Reads capability state from the shared broker, calls the semantic provider's operation-aware refactor entrypoint when available, validates the resulting precise workspace edit, computes file fingerprints for staleness detection, and returns a preview with a plan ID. Does not mutate files. May accept `targetId` in place of file/line/character.
+
+First-wave supported operations:
+- `rename_symbol`
+- `update_imports`
+- `delete_dead_code`
+- legacy `rename` alias → `rename_symbol`
+
+Deferred for a follow-up ticket:
+- `rename_file`
+- `move_file`
+
+These deferred file/resource operations must stay explicit unavailable outcomes until the shared runtime supports real resource edits and rollback semantics.
 
 ### `code_refactor_apply`
-Apply a previously generated refactor plan by plan ID. Retrieves the plan from the in-memory store, rechecks file fingerprints, re-validates ranges and overlap, applies deterministically through safety gates, and reports results. Rejects stale, missing, or invalid plans.
+Apply a previously generated refactor plan by plan ID. Retrieves the plan from the in-memory store, rechecks file fingerprints, re-validates ranges and overlap, applies deterministically through safety gates, and reports results. Rejects stale, missing, or invalid plans. In this phase it applies only stored, validated, precise text-edit plans.
 
 ## Key gotchas
 
 ### Planner routing
 - The `planner.ts` central router reads capability state from the shared broker and returns `PlannerRoute` for each tool intent.
 - `code_refactor_plan` checks `refactorAvailable` from the semantic capability slot.
+- The semantic provider prefers its generic `refactor(request)` entrypoint; rename-only fallback exists only for compatibility with older provider shapes.
 - `code_refactor_apply` does not require a live semantic provider — plan validity is enforced through fingerprint comparison in the executor.
 - When no capability is available, the planner returns `preferred: "unavailable"` and the execute function returns an explicit error message.
 
@@ -182,7 +195,9 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 
 ### Param validation
 - `line`/`character` require `file`, **not** `path`.
-- `code_refactor_plan` requires `operation` and `newName` plus either `targetId` or `file` + `line` + `character`.
+- `code_refactor_plan` requires `operation` plus either `targetId` or `file` + `line` + `character`.
+- `newName` is required for `rename_symbol` (and the legacy `rename` alias), but not for `update_imports` or `delete_dead_code`.
+- `rename_file` / `move_file` are accepted at the schema level so the tool can return an explicit unavailable result rather than a misleading validation error.
 - `code_refactor_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
 - `code_brief`, `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
@@ -204,6 +219,7 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 ### Refactor safety
 - `validateEdit()` rejects empty edits and invalid ranges before filesystem apply.
 - `code_refactor_plan` validates the edit before generating a plan; returns `unavailable` or `ambiguous` if the provider cannot produce precise edits.
+- `code_refactor_apply` remains text-edit-only in this phase — do not extend it to file/resource operations until shared runtime support exists.
 - `code_refactor_apply` rejects stale plans by comparing stored SHA-256 file fingerprints to current contents, and re-validates ranges before applying.
 - No heuristic text fallback.
 
