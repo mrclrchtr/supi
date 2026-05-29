@@ -5,7 +5,7 @@
  * suggestions (detailed mode), and the health renderer.
  */
 
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -46,6 +46,64 @@ afterEach(() => {
   clearMockRuntime();
   vi.clearAllMocks();
 });
+
+function mockReadyLsp(
+  overrides: Partial<{
+    codeActions: ReturnType<typeof vi.fn>;
+    getOutstandingDiagnostics: ReturnType<typeof vi.fn>;
+    getProjectServers: ReturnType<typeof vi.fn>;
+    getWorkspaceDiagnosticSummary: ReturnType<typeof vi.fn>;
+    fileDiagnostics: ReturnType<typeof vi.fn>;
+    recoverDiagnostics: ReturnType<typeof vi.fn>;
+  }> = {},
+) {
+  const service = {
+    codeActions: vi.fn().mockResolvedValue([]),
+    getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
+    getProjectServers: vi
+      .fn()
+      .mockReturnValue([
+        { name: "typescript", root: tmpDir, fileTypes: ["ts"], status: "running" },
+      ]),
+    getWorkspaceDiagnosticSummary: vi.fn().mockReturnValue([]),
+    fileDiagnostics: vi.fn().mockResolvedValue(null),
+    recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
+    ...overrides,
+  };
+
+  mockLspFns.getSessionLspService.mockReturnValue({
+    kind: "ready",
+    service,
+  });
+
+  return service;
+}
+
+function writeCoverageSummary(
+  entries: Record<string, { lines: number; statements: number }>,
+): void {
+  mkdirSync(path.join(tmpDir, "coverage"), { recursive: true });
+  const coverageSummary = {
+    total: { lines: { pct: 90 }, statements: { pct: 90 } },
+    ...Object.fromEntries(
+      Object.entries(entries).map(([file, pct]) => [
+        file,
+        { lines: { pct: pct.lines }, statements: { pct: pct.statements } },
+      ]),
+    ),
+  };
+  writeFileSync(
+    path.join(tmpDir, "coverage", "coverage-summary.json"),
+    JSON.stringify(coverageSummary, null, 2),
+  );
+}
+
+function writeKnipSummary(content: {
+  files?: string[];
+  exports?: Array<{ file: string; name: string }>;
+}) {
+  writeFileSync(path.join(tmpDir, "knip.json"), JSON.stringify(content, null, 2));
+}
 
 describe("code_health tool", () => {
   it("is registered as an active public tool", () => {
@@ -182,6 +240,7 @@ describe("code_health tool", () => {
 
   it("defaults to diagnostics + servers when include is omitted", async () => {
     registerMockProvider(tmpDir);
+    mockReadyLsp();
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
@@ -197,8 +256,107 @@ describe("code_health tool", () => {
       content: Array<{ type: string; text: string }>;
     };
 
-    // Default includes diagnostics
-    expect(result.content[0].text).toContain("Diagnostics");
+    expect(result.content[0].text).toContain("### Diagnostics");
+    expect(result.content[0].text).toContain("### Servers");
+  });
+
+  it("renders only the requested sections when include is provided", async () => {
+    registerMockProvider(tmpDir);
+    mockReadyLsp();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-6b",
+      { include: ["servers"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).toContain("### Servers");
+    expect(result.content[0].text).not.toContain("### Diagnostics");
+  });
+
+  it("renders a real coverage section when coverage is requested", async () => {
+    registerMockProvider(tmpDir);
+    mockReadyLsp();
+    writeCoverageSummary({ "src/payment.ts": { lines: 10, statements: 15 } });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-6c",
+      { include: ["coverage"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).toContain("### Coverage");
+    expect(result.content[0].text).toContain("src/payment.ts");
+    expect(result.content[0].text).not.toContain("### Diagnostics");
+  });
+
+  it("renders a real unused section when unused is requested", async () => {
+    registerMockProvider(tmpDir);
+    mockReadyLsp();
+    writeKnipSummary({
+      files: ["src/unused.ts"],
+      exports: [{ file: "src/payment.ts", name: "paymentLoader" }],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-6d",
+      { include: ["unused"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).toContain("### Unused");
+    expect(result.content[0].text).toContain("src/unused.ts");
+    expect(result.content[0].text).toContain("paymentLoader");
+    expect(result.content[0].text).not.toContain("### Diagnostics");
+  });
+
+  it("reports missing coverage and unused artifacts explicitly when requested", async () => {
+    registerMockProvider(tmpDir);
+    mockReadyLsp();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-6e",
+      { include: ["coverage", "unused"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).toContain("### Coverage");
+    expect(result.content[0].text).toContain("No coverage report");
+    expect(result.content[0].text).toContain("### Unused");
+    expect(result.content[0].text).toContain("No unused report");
+    expect(result.content[0].text).not.toContain("### Diagnostics");
   });
 
   it("accepts level: summary", async () => {
@@ -287,6 +445,7 @@ describe("code_health tool", () => {
 describe("renderHealthResult code actions", () => {
   function makeBaseData(overrides: Partial<HealthData>): HealthData {
     return {
+      includedSections: ["diagnostics"],
       lspAvailable: false,
       lspStatus: "unavailable",
       recovered: false,
@@ -296,6 +455,8 @@ describe("renderHealthResult code actions", () => {
       scopeFilter: null,
       level: "detailed",
       codeActions: null,
+      coverage: null,
+      unused: null,
       ...overrides,
     };
   }

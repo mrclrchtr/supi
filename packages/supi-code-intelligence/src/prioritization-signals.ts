@@ -9,7 +9,7 @@ export interface PrioritySignalsSummary {
   warnings: string[];
 }
 
-interface LoadedSignals {
+export interface LoadedSignals {
   diagnostics: Array<{ file: string; total: number; errors: number; warnings: number }>;
   coverageByFile: Map<string, number>;
   unusedFiles: Set<string>;
@@ -95,6 +95,7 @@ function loadDiagnostics(
 ): Array<{ file: string; total: number; errors: number; warnings: number }> {
   const lspState = getSessionLspService(cwd);
   if (lspState.kind !== "ready") return [];
+  if (typeof lspState.service.getOutstandingDiagnosticSummary !== "function") return [];
 
   return lspState.service.getOutstandingDiagnosticSummary(2).map((entry) => ({
     file: path.resolve(cwd, entry.file),

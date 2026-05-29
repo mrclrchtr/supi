@@ -170,6 +170,16 @@ describe("extractPathFromToolEvent", () => {
     expect(extractPathFromToolEvent("tree_sitter_outline", { file: "ast.ts" })).toBe("ast.ts");
   });
 
+  it("extracts file from an active code tool", () => {
+    expect(extractPathFromToolEvent("code_brief", { file: "brief.ts" })).toBe("brief.ts");
+  });
+
+  it("extracts path from a code tool that accepts path inputs", () => {
+    expect(
+      extractPathFromToolEvent("code_brief", { path: "packages/supi-code-intelligence" }),
+    ).toBe("packages/supi-code-intelligence");
+  });
+
   it("returns null for bash tool", () => {
     expect(extractPathFromToolEvent("bash", { command: "cat foo.ts" })).toBeNull();
   });

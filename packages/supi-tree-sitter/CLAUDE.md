@@ -3,9 +3,9 @@
 ## Scope
 
 `@mrclrchtr/supi-tree-sitter` is a **library-only** package with one explicit surface:
-- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports structured runtime/service APIs (`createTreeSitterSession()`, `getSessionTreeSitterService()`), structural extraction services (`lookupCalleesAt`, `collectOutline`, `extractExports`, etc.), language detection helpers, and shared types for other SuPi packages. Tool-handler formatting functions live in `@mrclrchtr/supi-code-intelligence/src/tool/families/tree-sitter/`.
+- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` / `src/index.ts` → exports structured runtime/service APIs (`createTreeSitterSession()`, `getSessionTreeSitterService()`), structural extraction services (`lookupCalleesAt`, `collectOutline`, `extractExports`, etc.), language detection helpers, and shared types for other SuPi packages.
 
-This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Tool registration (`tree_sitter_outline`, `tree_sitter_imports`, etc.) and session lifecycle handlers live in `@mrclrchtr/supi-code-intelligence`. The package does not depend on `supi-lsp` and must remain correct when installed independently.
+This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Public tool registration and session lifecycle handlers live in `@mrclrchtr/supi-code-intelligence`. The package does not depend on `supi-lsp` and must remain correct when installed independently.
 
 ## WASM vendoring strategy
 

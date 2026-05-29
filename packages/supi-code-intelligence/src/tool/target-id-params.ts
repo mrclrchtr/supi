@@ -11,7 +11,15 @@ import { getWorkflowTarget } from "../workflow/target-store.ts";
 
 /** Result of attempting to expand a targetId into tool params. */
 export type TargetIdExpansionResult =
-  | { kind: "ok"; file: string; line: number; character: number; entry: TargetStoreEntry }
+  | {
+      kind: "ok";
+      file: string;
+      line: number;
+      character: number;
+      targetName: string | null;
+      targetKind: string | null;
+      entry: TargetStoreEntry;
+    }
   | { kind: "not-provided" }
   | { kind: "error"; message: string };
 
@@ -65,6 +73,8 @@ export function expandTargetId(
     file: entry.file,
     line: entry.displayLine,
     character: entry.displayCharacter,
+    targetName: entry.name,
+    targetKind: entry.kind,
     entry,
   };
 }

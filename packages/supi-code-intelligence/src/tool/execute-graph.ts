@@ -54,6 +54,7 @@ export async function executeGraphTool(
 ): Promise<CodeIntelResult> {
   // ── 1. Expand targetId ──────────────────────────────────────────────
   const expansion = expandTargetId(params, ctx.cwd);
+  const expandedTargetName = expansion.kind === "ok" ? expansion.targetName : null;
   if (expansion.kind === "error") {
     return errorResult(expansion.message);
   }
@@ -128,7 +129,8 @@ export async function executeGraphTool(
 
   const resolvedFile = target.file;
   const resolvedPosition = target.position;
-  const displayName = target.name ?? `symbol at ${resolvedFile}:${target.displayLine}`;
+  const displayName =
+    target.name ?? expandedTargetName ?? `symbol at ${resolvedFile}:${target.displayLine}`;
 
   // ── 6. Collect results per relation ─────────────────────────────────
   const sections: GraphSection[] = [];

@@ -11,9 +11,13 @@ import { getSessionLspService, type SessionLspService } from "@mrclrchtr/supi-ls
 import { gatherGitContext } from "../git-context.ts";
 import {
   type CodeActionSuggestion,
+  type HealthCoverageData,
   type HealthData,
+  type HealthSection,
+  type HealthUnusedData,
   renderHealthResult,
 } from "../presentation/markdown/health.ts";
+import { type LoadedSignals, loadPrioritizationSignals } from "../prioritization-signals.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
 
@@ -24,14 +28,16 @@ export interface CodeHealthToolParams {
   level?: "summary" | "detailed";
 }
 
-const DEFAULT_INCLUDE: string[] = ["diagnostics", "servers"];
+const DEFAULT_INCLUDE: HealthSection[] = ["diagnostics", "servers"];
 
 export async function executeHealthTool(
   params: CodeHealthToolParams,
   ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
   const cwd = ctx.cwd;
-  const included = params.include && params.include.length > 0 ? params.include : DEFAULT_INCLUDE;
+  const included = (
+    params.include && params.include.length > 0 ? params.include : DEFAULT_INCLUDE
+  ) as HealthSection[];
   const level = params.level ?? "summary";
 
   const scopeFilter = resolveScope(params.scope, cwd);
@@ -50,6 +56,15 @@ export async function executeHealthTool(
   const diagnostics = await collectDiagnostics(service, included, scopeFilter, cwd);
   const servers = collectServers(service, included);
   const gitContext = included.includes("dirty") ? gatherGitContext(cwd) : null;
+  const prioritizationSignals = needsPrioritizationSignals(included)
+    ? loadPrioritizationSignals(cwd)
+    : null;
+  const coverage = included.includes("coverage")
+    ? collectCoverageSection(prioritizationSignals, cwd, scopeFilter)
+    : null;
+  const unused = included.includes("unused")
+    ? collectUnusedSection(prioritizationSignals, cwd, scopeFilter)
+    : null;
 
   // Code actions only in detailed mode to avoid unnecessary LSP calls
   const codeActions =
@@ -58,6 +73,7 @@ export async function executeHealthTool(
       : null;
 
   const data: HealthData = {
+    includedSections: included,
     lspAvailable: service !== null,
     lspStatus,
     recovered,
@@ -67,6 +83,8 @@ export async function executeHealthTool(
     scopeFilter: params.scope ? scopeFilter : null,
     level,
     codeActions,
+    coverage,
+    unused,
   };
 
   const content = renderHealthResult(data, cwd);
@@ -83,6 +101,52 @@ export async function executeHealthTool(
       },
     },
   };
+}
+
+function needsPrioritizationSignals(included: HealthSection[]): boolean {
+  return included.includes("coverage") || included.includes("unused");
+}
+
+function collectCoverageSection(
+  loaded: LoadedSignals | null,
+  cwd: string,
+  scopeFilter: string | null,
+): HealthCoverageData {
+  const reportPath = resolve(cwd, "coverage", "coverage-summary.json");
+  if (!existsSync(reportPath) || !loaded) {
+    return { available: false, entries: [] };
+  }
+
+  const entries = [...loaded.coverageByFile.entries()]
+    .filter(([file, pct]) => pct < 50 && isWithinOptionalScope(scopeFilter, file))
+    .sort((left, right) => left[1] - right[1] || left[0].localeCompare(right[0]))
+    .map(([file, pct]) => ({ file, pct }));
+
+  return { available: true, entries };
+}
+
+function collectUnusedSection(
+  loaded: LoadedSignals | null,
+  cwd: string,
+  scopeFilter: string | null,
+): HealthUnusedData {
+  const reportPath = resolve(cwd, "knip.json");
+  if (!existsSync(reportPath) || !loaded) {
+    return { available: false, files: [], exports: [] };
+  }
+
+  const files = [...loaded.unusedFiles]
+    .filter((file) => isWithinOptionalScope(scopeFilter, file))
+    .sort((left, right) => left.localeCompare(right));
+  const exports = loaded.unusedExports
+    .filter((entry) => isWithinOptionalScope(scopeFilter, entry.file))
+    .sort((left, right) => left.name.localeCompare(right.name));
+
+  return { available: true, files, exports };
+}
+
+function isWithinOptionalScope(scopeFilter: string | null, file: string): boolean {
+  return !scopeFilter || isWithinOrEqual(scopeFilter, file);
 }
 
 function resolveScope(scope: string | undefined, cwd: string): string | null {

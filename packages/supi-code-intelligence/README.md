@@ -32,7 +32,7 @@ After install, pi gets:
 - `code_graph` — unified relation graph (references, callees, implementations) from a resolved target
 - `code_affected` — blast radius, downstream impact, and risk for a target
 - `code_find` — unified ranked search (text, regex, AST, semantic)
-- `code_health` — diagnostics, server status, and workspace health
+- `code_health` — diagnostics, server status, dirty workspace, coverage, and unused-code health signals
 - `code_refactor_plan` — preview an operation-aware semantic refactor plan without mutating files
 - `code_refactor_apply` — apply a previously generated, validated precise text-edit refactor plan
 - `code_resolve` — resolve human/code references into precise targets with stable target handles for follow-up calls
@@ -97,6 +97,15 @@ Unified ranked search tool for:
 - LSP semantic workspace symbol search (`mode: "semantic"`)
 
 Supports `query` (required), `scope`, `mode`, `kind`, `contextLines`, and `maxResults`.
+
+### `code_health`
+Health/status summary for the current workspace or a scoped path.
+
+- defaults to diagnostics + servers when `include` is omitted
+- `include` can request `diagnostics`, `servers`, `dirty`, `coverage`, and `unused`
+- `coverage` reads `coverage/coverage-summary.json` when present and reports low-coverage files
+- `unused` reads `knip.json` when present and reports unused files/exports
+- when a requested coverage/unused report is missing, the result says so explicitly instead of silently falling back to diagnostics
 
 ### `code_refactor_plan`
 Preview-only operation-aware refactor planning.

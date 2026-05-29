@@ -81,9 +81,9 @@ describe("workflow surface skeleton", () => {
   });
 
   it("keeps planned workflow tool names free of lsp_ and tree_sitter_ prefixes", () => {
+    const disallowedPrefixes = ["lsp_", "tree_sitter_"] as const;
     for (const name of WORKFLOW_CODE_TOOL_NAMES) {
-      expect(name.startsWith("lsp_")).toBe(false);
-      expect(name.startsWith("tree_sitter_")).toBe(false);
+      expect(disallowedPrefixes.some((prefix) => name.startsWith(prefix))).toBe(false);
     }
   });
 

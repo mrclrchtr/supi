@@ -7,12 +7,59 @@
  */
 
 import * as path from "node:path";
-import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
+import type {
+  CodeSymbol,
+  SemanticProvider as SemanticSubstrate,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
 const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided
 const NON_EXPORTED_KINDS = new Set(["Variable", "Field", "Property"]);
+
+function normalizeContainer(container: string | null | undefined): string | null {
+  return container ?? null;
+}
+
+function isExactDocumentSymbolMatch(candidate: CodeSymbol, workspaceSymbol: CodeSymbol): boolean {
+  return (
+    candidate.name === workspaceSymbol.name &&
+    candidate.kind === workspaceSymbol.kind &&
+    normalizeContainer(candidate.container) === normalizeContainer(workspaceSymbol.container)
+  );
+}
+
+/**
+ * Prefer a document-symbol anchor when it provides one unambiguous exact match
+ * for the already-selected workspace symbol.
+ */
+async function refineResolvedSymbolAnchor(
+  workspaceSymbol: CodeSymbol,
+  semantic: SemanticSubstrate,
+): Promise<CodeSymbol> {
+  try {
+    const documentSymbols = await semantic.documentSymbols(workspaceSymbol.file);
+    if (!documentSymbols || documentSymbols.length === 0) {
+      return workspaceSymbol;
+    }
+
+    const exactMatches = documentSymbols.filter((candidate) =>
+      isExactDocumentSymbolMatch(candidate, workspaceSymbol),
+    );
+    if (exactMatches.length !== 1) {
+      return workspaceSymbol;
+    }
+
+    const refined = exactMatches[0];
+    if (refined.line <= 0 && refined.character <= 0) {
+      return workspaceSymbol;
+    }
+
+    return refined;
+  } catch {
+    return workspaceSymbol;
+  }
+}
 
 /**
  * Resolve a symbol via the semantic substrate.
@@ -68,7 +115,7 @@ export async function resolveSymbolTarget(
   const ranged = candidates.filter((s) => s.line > 0 || s.character > 0);
 
   if (ranged.length === 1) {
-    const c = ranged[0];
+    const c = await refineResolvedSymbolAnchor(ranged[0], semantic);
     return {
       kind: "resolved",
       target: {

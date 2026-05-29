@@ -275,13 +275,15 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_health",
     label: "Code Health",
     description:
-      "Summarize diagnostics, language server status, and dirty workspace signals. Pass refresh: true to recover stale diagnostics before checking. Use scope to narrow to a specific file or package. Use include to request specific sections: diagnostics, servers, dirty. Defaults to summary level (counts); use level: detailed for per-file listings.",
-    promptSnippet: "code_health — diagnostics, server status, and workspace health",
+      "Summarize diagnostics, language server status, dirty workspace signals, coverage, and unused-code findings. Pass refresh: true to recover stale diagnostics before checking. Use scope to narrow to a specific file or package. Use include to request specific sections: diagnostics, servers, dirty, coverage, unused. Defaults to summary level (counts); use level: detailed for per-file listings.",
+    promptSnippet:
+      "code_health — diagnostics, server status, coverage, unused-code, and workspace health",
     basePromptGuidelines: [
-      "Use code_health to check for diagnostics, language server status, or dirty workspace state.",
+      "Use code_health to check for diagnostics, language server status, dirty workspace state, coverage, or unused-code signals.",
       "Pass `refresh: true` to code_health to recover stale diagnostics before checking.",
       "Use `scope` with code_health to narrow diagnostics to a specific file or package.",
-      "Use `include` with code_health to request specific sections: diagnostics, servers, dirty.",
+      "Use `include` with code_health to request specific sections: diagnostics, servers, dirty, coverage, unused.",
+      'Use `include: ["coverage"]` or `include: ["unused"]` with code_health to check for low-coverage files or unused code.',
       'Use `level: "detailed"` with code_health for per-file diagnostic listings.',
     ],
     parameters: CodeHealthParameters,

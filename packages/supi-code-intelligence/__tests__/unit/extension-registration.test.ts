@@ -132,18 +132,30 @@ describe("focused code intelligence tool registration", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const tool = getTool(pi, "code_health");
+    const tool = getTool(pi, "code_health") as {
+      name: string;
+      execute?: unknown;
+      description?: string;
+      promptSnippet?: string;
+      promptGuidelines?: string[];
+      parameters?: { properties?: Record<string, unknown> };
+    };
     expect(tool).toBeDefined();
     expect(tool.name).toBe("code_health");
     expect(typeof tool.execute).toBe("function");
 
-    const props = (tool as { parameters?: { properties?: Record<string, unknown> } }).parameters
-      ?.properties;
+    const props = tool.parameters?.properties;
     expect(props).toBeDefined();
     expect(props).toHaveProperty("scope");
     expect(props).toHaveProperty("refresh");
     expect(props).toHaveProperty("include");
     expect(props).toHaveProperty("level");
+
+    expect(tool.description).toContain("coverage");
+    expect(tool.description).toContain("unused");
+    expect(tool.promptSnippet).toContain("coverage");
+    expect(tool.promptGuidelines?.join("\n")).toContain("coverage");
+    expect(tool.promptGuidelines?.join("\n")).toContain("unused");
   });
 
   it("registers refactor_plan and refactor_apply with correct parameter shapes", () => {

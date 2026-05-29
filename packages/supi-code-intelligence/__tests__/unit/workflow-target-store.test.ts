@@ -95,6 +95,11 @@ describe("workflow target store", () => {
       expect(lookup.entry.targetId).toBe(result.targetId);
       expect(lookup.entry.file).toContain("index.ts");
       expect(lookup.entry.confidence).toBe("semantic");
+      expect(lookup.entry.name).toBe("foo");
+      expect(lookup.entry.kind).toBe("const");
+      expect(lookup.entry.displayLine).toBe(1);
+      expect(lookup.entry.displayCharacter).toBe(15);
+      expect(lookup.entry.provenance).toBe("anchored");
     }
   });
 
@@ -147,6 +152,10 @@ describe("workflow target store", () => {
     // The old targetId should now be stale
     const stale = getWorkflowTarget(tmpDir, r1.targetId);
     expect(stale.kind).toBe("unavailable");
+    if (stale.kind === "unavailable") {
+      expect(stale.reason).toContain("foo");
+      expect(stale.reason).toContain("stale");
+    }
   });
 
   it("clears all targets for a cwd without affecting unrelated cwds", () => {

@@ -156,7 +156,10 @@ Unified ranked code search with mode dispatch — the sole search tool.
 Diagnostic health summary. Replaces `lsp_diagnostics` and `lsp_recover`.
 - `scope?` — filter to a file or package path
 - `refresh?` — recover stale diagnostics before checking
-- `include?` — sections: diagnostics, servers, dirty
+- `include?` — sections: diagnostics, servers, dirty, coverage, unused
+- `coverage` reads `coverage/coverage-summary.json` when requested and reports low-coverage files
+- `unused` reads `knip.json` when requested and reports unused files/exports
+- missing requested coverage/unused reports are reported explicitly instead of silently falling back to diagnostics
 - `level?` — summary (counts) vs detailed (per-file)
 
 ### `code_resolve`

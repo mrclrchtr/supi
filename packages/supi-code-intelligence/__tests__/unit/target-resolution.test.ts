@@ -169,4 +169,118 @@ describe("resolveSymbolTarget", () => {
     // Should NOT be resolved (rangeless has no usable position)
     expect(result.kind).toBe("disambiguation");
   });
+
+  it("falls back to the workspace-symbol anchor when document symbols have multiple exact matches", async () => {
+    const result = await resolveSymbolTarget("Thing", "/project", {
+      workspaceSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "Thing",
+          kind: "Function",
+          file: "/project/src/types.ts",
+          line: 2,
+          character: 3,
+          container: null,
+        },
+      ]),
+      documentSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "Thing",
+          kind: "Function",
+          file: "/project/src/types.ts",
+          line: 10,
+          character: 5,
+          container: null,
+        },
+        {
+          name: "Thing",
+          kind: "Function",
+          file: "/project/src/types.ts",
+          line: 20,
+          character: 7,
+          container: null,
+        },
+      ]),
+    } as unknown as SemanticSubstrate);
+
+    expect(result.kind).toBe("resolved");
+    if (result.kind === "resolved") {
+      expect(result.target.displayLine).toBe(2);
+      expect(result.target.displayCharacter).toBe(3);
+    }
+  });
+
+  it("falls back to the workspace-symbol anchor when the refined document symbol is rangeless", async () => {
+    const result = await resolveSymbolTarget("Thing", "/project", {
+      workspaceSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "Thing",
+          kind: "Function",
+          file: "/project/src/types.ts",
+          line: 2,
+          character: 3,
+          container: null,
+        },
+      ]),
+      documentSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "Thing",
+          kind: "Function",
+          file: "/project/src/types.ts",
+          line: 0,
+          character: 0,
+          container: null,
+        },
+      ]),
+    } as unknown as SemanticSubstrate);
+
+    expect(result.kind).toBe("resolved");
+    if (result.kind === "resolved") {
+      expect(result.target.displayLine).toBe(2);
+      expect(result.target.displayCharacter).toBe(3);
+    }
+  });
+
+  it("falls back to the workspace-symbol anchor when document symbol lookup throws", async () => {
+    const result = await resolveSymbolTarget("Thing", "/project", {
+      workspaceSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "Thing",
+          kind: "Function",
+          file: "/project/src/types.ts",
+          line: 2,
+          character: 3,
+          container: null,
+        },
+      ]),
+      documentSymbols: vi.fn().mockRejectedValue(new Error("LSP failed")),
+    } as unknown as SemanticSubstrate);
+
+    expect(result.kind).toBe("resolved");
+    if (result.kind === "resolved") {
+      expect(result.target.displayLine).toBe(2);
+      expect(result.target.displayCharacter).toBe(3);
+    }
+  });
+
+  it("falls back to the workspace-symbol anchor when document symbol lookup is empty", async () => {
+    const result = await resolveSymbolTarget("Thing", "/project", {
+      workspaceSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "Thing",
+          kind: "Function",
+          file: "/project/src/types.ts",
+          line: 2,
+          character: 3,
+          container: null,
+        },
+      ]),
+      documentSymbols: vi.fn().mockResolvedValue([]),
+    } as unknown as SemanticSubstrate);
+
+    expect(result.kind).toBe("resolved");
+    if (result.kind === "resolved") {
+      expect(result.target.displayLine).toBe(2);
+      expect(result.target.displayCharacter).toBe(3);
+    }
+  });
 });

@@ -2,11 +2,13 @@
  * Markdown renderer for code_health results.
  *
  * Renders structured health data from the code_health executor into
- * readable markdown sections keyed by `include` value.
+ * readable markdown sections keyed by requested `include` values.
  */
 
 import type { GitContext } from "../../git-context.ts";
 import { formatGitContext } from "../../git-context.ts";
+
+export type HealthSection = "diagnostics" | "servers" | "dirty" | "coverage" | "unused";
 
 export interface HealthServerInfo {
   name: string;
@@ -21,6 +23,27 @@ export interface HealthDiagnosticEntry {
   warnings: number;
 }
 
+export interface HealthCoverageEntry {
+  file: string;
+  pct: number;
+}
+
+export interface HealthCoverageData {
+  available: boolean;
+  entries: HealthCoverageEntry[];
+}
+
+export interface HealthUnusedExportEntry {
+  file: string;
+  name: string;
+}
+
+export interface HealthUnusedData {
+  available: boolean;
+  files: string[];
+  exports: HealthUnusedExportEntry[];
+}
+
 /** A suggested code action at a specific diagnostic location. */
 export interface CodeActionSuggestion {
   file: string;
@@ -30,6 +53,7 @@ export interface CodeActionSuggestion {
 }
 
 export interface HealthData {
+  includedSections: HealthSection[];
   lspAvailable: boolean;
   lspStatus: string;
   recovered: boolean;
@@ -40,15 +64,30 @@ export interface HealthData {
   level: "summary" | "detailed";
   /** Code action suggestions collected from LSP (only populated in detailed mode). */
   codeActions: CodeActionSuggestion[] | null;
+  coverage: HealthCoverageData | null;
+  unused: HealthUnusedData | null;
 }
 
 export function renderHealthResult(data: HealthData, cwd: string): string {
   const lines: string[] = ["## Code Health", ""];
 
   renderStatusLine(lines, data);
-  renderDiagnosticsSection(lines, data, cwd);
-  renderServersSection(lines, data);
-  renderDirtySection(lines, data);
+
+  if (data.includedSections.includes("diagnostics")) {
+    renderDiagnosticsSection(lines, data, cwd);
+  }
+  if (data.includedSections.includes("coverage")) {
+    renderCoverageSection(lines, data, cwd);
+  }
+  if (data.includedSections.includes("unused")) {
+    renderUnusedSection(lines, data, cwd);
+  }
+  if (data.includedSections.includes("servers")) {
+    renderServersSection(lines, data);
+  }
+  if (data.includedSections.includes("dirty")) {
+    renderDirtySection(lines, data);
+  }
 
   return lines.join("\n");
 }
@@ -73,10 +112,7 @@ function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string
     renderDiagnosticDetails(lines, data, cwd);
   }
 
-  // Code actions can appear even when summary-level diagnostics are empty,
-  // because they're collected from a different LSP source (outstanding diagnostics)
   renderCodeActionsSection(lines, data, cwd);
-
   lines.push("");
 }
 
@@ -101,7 +137,6 @@ function renderDiagnosticDetails(lines: string[], data: HealthData, cwd: string)
 }
 
 function renderCodeActionsSection(lines: string[], data: HealthData, cwd: string): void {
-  // Code actions are only meaningful in detailed mode
   if (data.level !== "detailed") return;
   if (!data.codeActions || data.codeActions.length === 0) return;
 
@@ -117,11 +152,63 @@ function renderCodeActionsSection(lines: string[], data: HealthData, cwd: string
   }
 }
 
-function renderServersSection(lines: string[], data: HealthData): void {
-  if (data.servers.length === 0) return;
+function renderCoverageSection(lines: string[], data: HealthData, cwd: string): void {
+  lines.push("### Coverage");
+  lines.push("");
 
+  if (!data.coverage?.available) {
+    lines.push("No coverage report found.");
+    lines.push("");
+    return;
+  }
+
+  if (data.coverage.entries.length === 0) {
+    lines.push("No low-coverage files found.");
+    lines.push("");
+    return;
+  }
+
+  for (const entry of data.coverage.entries) {
+    lines.push(`- \`${makeRelative(cwd, entry.file)}\` — ${entry.pct.toFixed(0)}%`);
+  }
+  lines.push("");
+}
+
+function renderUnusedSection(lines: string[], data: HealthData, cwd: string): void {
+  lines.push("### Unused");
+  lines.push("");
+
+  if (!data.unused?.available) {
+    lines.push("No unused report found.");
+    lines.push("");
+    return;
+  }
+
+  if (data.unused.files.length === 0 && data.unused.exports.length === 0) {
+    lines.push("No unused files or exports reported.");
+    lines.push("");
+    return;
+  }
+
+  for (const file of data.unused.files) {
+    lines.push(`- Unused file: \`${makeRelative(cwd, file)}\``);
+  }
+  for (const entry of data.unused.exports) {
+    lines.push(`- Unused export: \`${entry.name}\` in \`${makeRelative(cwd, entry.file)}\``);
+  }
+  lines.push("");
+}
+
+function renderServersSection(lines: string[], data: HealthData): void {
   lines.push("### Servers");
   lines.push("");
+
+  if (data.servers.length === 0) {
+    lines.push("No servers found.");
+    lines.push("");
+    return;
+  }
+
   for (const server of data.servers) {
     const statusIcon = server.status === "running" ? "✓" : "✗";
     const types = server.fileTypes.join(", ");

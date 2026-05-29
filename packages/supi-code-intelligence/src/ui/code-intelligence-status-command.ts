@@ -43,10 +43,7 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
 
       // Available tools
       const tools = pi.getActiveTools();
-      const ciTools = tools.filter(
-        (t: string) =>
-          t.startsWith("code_") || t.startsWith("lsp_") || t.startsWith("tree_sitter_"),
-      );
+      const ciTools = tools.filter((t: string) => t.startsWith("code_"));
       if (ciTools.length > 0) {
         lines.push(`\n**Active tools:** ${ciTools.join(", ")}`);
       }

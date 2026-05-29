@@ -675,6 +675,95 @@ describe("code_resolve targetId follow-up", () => {
     expect(refResult.content[0].text).not.toContain("**Error");
   });
 
+  it("uses a symbol-resolved targetId for callee follow-up without losing the stronger anchor or symbol name", async () => {
+    writeFileSync(
+      path.join(tmpDir, "index.ts"),
+      ["function foo() { bar(); }", "function bar() {}"].join("\n"),
+    );
+    registerMockProvider(tmpDir, {
+      workspaceSymbols: async () => [
+        {
+          name: "foo",
+          kind: "Function",
+          file: path.join(tmpDir, "index.ts"),
+          line: 1,
+          character: 1,
+          container: null,
+        },
+      ],
+      documentSymbols: async () => [
+        {
+          name: "foo",
+          kind: "Function",
+          file: path.join(tmpDir, "index.ts"),
+          line: 1,
+          character: 10,
+          container: null,
+        },
+      ],
+      calleesAt: async (_file, line, character) => {
+        if (line === 1 && character === 10) {
+          return {
+            kind: "success" as const,
+            data: {
+              enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
+              callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+            },
+          };
+        }
+        return {
+          kind: "unsupported-language" as const,
+          file: _file,
+          message: `no callees at ${line}:${character}`,
+        };
+      },
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const graphTool = getTool(pi, "code_graph");
+
+    const anchoredResult = (await graphTool.execute(
+      "fup-anchored",
+      { file: "index.ts", line: 1, character: 10, relations: ["callees"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(anchoredResult.content[0].text).toContain("bar");
+    expect(anchoredResult.content[0].text).not.toContain("Unavailable");
+
+    const resolveTool = getTool(pi, "code_resolve");
+    const resolveResult = (await resolveTool.execute(
+      "fup-2b",
+      { query: "foo", kind: "function" },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: {
+        data: { targets: Array<{ targetId: string }> };
+      };
+    };
+
+    const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
+    expect(targetId).toBeDefined();
+    if (!targetId) return;
+
+    const targetIdResult = (await graphTool.execute(
+      "fup-2c",
+      { targetId, relations: ["callees"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(targetIdResult.content[0].text).toContain("bar");
+    expect(targetIdResult.content[0].text).toContain("foo");
+    expect(targetIdResult.content[0].text).not.toContain("symbol at");
+  });
+
   it("resolves and follows up with code_affected using targetId", async () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
     registerMockProvider(tmpDir, {
