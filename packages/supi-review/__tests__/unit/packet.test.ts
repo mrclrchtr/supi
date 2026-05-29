@@ -1,10 +1,33 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildReviewPacket,
   classifySkipCategory,
   getPacketCharBudget,
   splitDiffSections,
 } from "../../src/target/packet.ts";
-import type { ReviewModelSelection } from "../../src/types.ts";
+import type {
+  ReviewModelSelection,
+  ReviewSnapshot,
+  SynthesizedReviewBrief,
+} from "../../src/types.ts";
+
+const snapshot: ReviewSnapshot = {
+  target: { kind: "working-tree" },
+  title: "Working tree changes",
+  changedFiles: ["packages/supi-code-intelligence/src/tool/tool-specs.ts"],
+  diffText:
+    'diff --git a/packages/supi-code-intelligence/src/tool/tool-specs.ts b/packages/supi-code-intelligence/src/tool/tool-specs.ts\n- "code_calls"\n+ "code_graph"',
+  stats: { files: 1, additions: 1, deletions: 1 },
+};
+
+const brief: SynthesizedReviewBrief = {
+  summary: "Merge relation tools into a single public surface.",
+  intendedOutcome: "Replace stale public tool names with one unified graph tool.",
+  constraints: ["Keep the packet compact."],
+  focusAreas: ["Tool names", "Docs", "User-facing strings"],
+  riskyFiles: ["packages/supi-code-intelligence/src/tool/tool-specs.ts"],
+  unresolvedQuestions: [],
+};
 
 const model = {
   canonicalId: "anthropic/claude-sonnet-4",
@@ -163,6 +186,15 @@ describe("splitDiffSections", () => {
     expect(sections[0]?.file).toBe("src/new.ts");
     expect(sections[0]?.additions).toBe(0);
     expect(sections[0]?.deletions).toBe(0);
+  });
+});
+
+describe("buildReviewPacket", () => {
+  it("includes a concise audit-hints section in the review packet", () => {
+    const packet = buildReviewPacket(snapshot, brief, model);
+
+    expect(packet.prompt).toContain("## Audit hints");
+    expect(packet.prompt).toContain("Public-surface / rename / merge audit");
   });
 });
 

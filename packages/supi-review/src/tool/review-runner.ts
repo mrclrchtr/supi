@@ -8,7 +8,7 @@ import {
   defineTool,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { ReviewOutputEvent, ReviewResult } from "../types.ts";
+import type { RawReviewResult, ReviewOutputEvent } from "../types.ts";
 import type { ReviewInvocation, ReviewProgress } from "./runner-types.ts";
 import { reviewOutputSchema } from "./schemas.ts";
 import { createSnapshotDiffTool, createSnapshotFileTool } from "./snapshot-tools.ts";
@@ -75,6 +75,11 @@ export function buildReviewerSystemPrompt(): string {
     '- "This doesn\'t match the codebase style" only counts when you can point to',
     "  the real convention in the codebase.",
     "",
+    "--- Audit hints from the prompt packet ---",
+    "- The prompt packet may include audit hints for this review.",
+    "- Treat any supplied audit hints as mandatory checks for this run.",
+    "- If an audit hint applies, explicitly sweep that class of issues before submitting.",
+    "",
     "--- What counts as a finding ---",
     "Report only issues that meet ALL of these criteria:",
     "1. It meaningfully impacts correctness, security, performance, or maintainability.",
@@ -102,27 +107,37 @@ export function buildReviewerSystemPrompt(): string {
     "- Dead or unreachable code introduced by this change.",
     "- Breaking changes — removed exports, changed signatures, config format changes.",
     "",
-    "--- Finding calibration ---",
-    "Priority:",
-    "  0 (info): style nits, naming suggestions, non-functional improvements without real impact",
-    "  1 (minor): unlikely edge cases, minor perf concerns without benchmarks, missing comments",
-    "  2 (major): logic errors, incorrect error handling, API contract violations, race conditions",
-    "  3 (critical): security vulnerabilities, data loss/corruption, crashes, breaking changes",
+    "--- Review item calibration ---",
+    "recommended_action:",
+    "  must-fix: blocks merge or should be fixed before the change is accepted",
+    "  should-fix: worthwhile follow-up that meaningfully improves the patch",
+    "  consider: optional cleanup, docs, tests, or maintainer-oriented improvement worth surfacing",
+    "impact:",
+    "  high: leaving it unfixed has a clear meaningful downside",
+    "  medium: real downside, but not release-blocking on its own",
+    "  low: narrow or limited downside",
+    "effort:",
+    "  low: focused fix in one small pass",
+    "  medium: non-trivial but still well-bounded",
+    "  high: invasive or multi-part follow-up",
     "Confidence:",
-    "  0.8-1.0: you verified the issue by reading surrounding code or grepping the codebase",
-    "  0.5-0.8: suspected from the diff, plausible but not fully verified",
-    "  <0.5: do not report — too uncertain; either verify further or drop it",
+    "  0.8-1.0: you verified the item by reading surrounding code or grepping the codebase",
+    "  0.5-0.8: plausible and supported by the patch, but not fully verified",
+    "  <0.5: do not report — either verify further or drop it",
+    "Categories:",
+    "  correctness, security, performance, api, test-gap, docs, cleanup, maintainer",
     "",
-    "--- Verdict ---",
-    "PATCH IS CORRECT: no P2 (major) or P3 (critical) findings. Info/minor suggestions",
-    "  (P0/P1) that are non-blocking do not prevent this verdict.",
-    "PATCH HAS ISSUES: one or more P2 or P3 findings exist. These should block merge.",
-    "Explain the verdict in overall_explanation.",
+    "--- Overall assessment ---",
+    "Explain the overall review assessment in overall_explanation.",
+    "The host derives the final PATCH IS CORRECT / PATCH HAS ISSUES verdict from your submitted items.",
     "",
-    "--- Finding format ---",
+    "--- Review item format ---",
     '- Title: concise and specific imperative (e.g. "Guard null token path").',
-    "- Body: what's wrong, why it matters, and a concrete fix direction. One paragraph.",
-    "- code_location: 1-based inclusive line range.",
+    "- Body: what's wrong, why it matters, and the evidence. One paragraph.",
+    "- category / impact / effort / recommended_action: choose the closest structured values.",
+    "- suggested_fix: concrete repair direction the author can apply next.",
+    "- verification_hint: how to confirm the fix worked.",
+    "- code_location: 1-based inclusive line range when a concrete location exists.",
     "",
     "--- Tool strategy ---",
     "- Start by fetching the diff for each changed file using read_snapshot_diff.",
@@ -221,8 +236,8 @@ interface RunnerContext {
   progress: ReviewProgress;
   session: AgentSession;
   invocation: ReviewInvocation;
-  resolve: (result: ReviewResult) => void;
-  cleanup: (result: ReviewResult) => ReviewResult;
+  resolve: (result: RawReviewResult) => void;
+  cleanup: (result: RawReviewResult) => RawReviewResult;
   resultHolder: { value: ReviewOutputEvent | undefined };
   signal?: AbortSignal;
   state: { settled: boolean };
@@ -361,7 +376,7 @@ function truncateText(text: string, maxLen: number): string {
 
 /** Run the read-only reviewer child session. */
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: lifecycle + timeout wiring belongs together here
-export async function runReviewer(invocation: ReviewInvocation): Promise<ReviewResult> {
+export async function runReviewer(invocation: ReviewInvocation): Promise<RawReviewResult> {
   if (invocation.signal?.aborted) {
     return {
       kind: "canceled",
@@ -398,7 +413,7 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<ReviewR
   const state = { settled: false };
   let cancelTeardown: (() => void) | undefined;
 
-  const cleanup = (result: ReviewResult): ReviewResult => {
+  const cleanup = (result: RawReviewResult): RawReviewResult => {
     if (state.settled) return result;
     state.settled = true;
     cancelTeardown?.();
@@ -406,7 +421,7 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<ReviewR
     return result;
   };
 
-  return new Promise<ReviewResult>((resolve) => {
+  return new Promise<RawReviewResult>((resolve) => {
     const timeoutRef = {
       steered: false,
       graceTurnsRemaining: undefined as number | undefined,

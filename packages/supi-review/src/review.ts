@@ -4,10 +4,17 @@ import { runWithProgressWidget } from "@mrclrchtr/supi-core/tool-framework";
 import { resolveBranchSnapshot, resolveCommitSnapshot, resolveWorkingTreeSnapshot } from "./git.ts";
 import { serializeSessionContext } from "./history/collect.ts";
 import { synthesizeReviewBrief } from "./history/synthesize.ts";
+import { normalizeReviewResult } from "./review-result.ts";
 import { buildReviewPacket } from "./target/packet.ts";
 import { runReviewer } from "./tool/review-runner.ts";
 import type { BriefSynthesisRunResult } from "./tool/runner-types.ts";
-import type { ReviewPlan, ReviewResult, ReviewSnapshot, ReviewTargetSpec } from "./types.ts";
+import type {
+  RawReviewResult,
+  ReviewPlan,
+  ReviewResult,
+  ReviewSnapshot,
+  ReviewTargetSpec,
+} from "./types.ts";
 import { collectReviewNote, previewReviewPlan, selectModel, selectTarget } from "./ui/flow.ts";
 import { formatReviewContent } from "./ui/format-content.ts";
 import { registerReviewRenderer } from "./ui/renderer.ts";
@@ -97,7 +104,7 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
   const approved = await previewReviewPlan(ctx, plan);
   if (!approved) return;
 
-  const result = await runWithProgressWidget(
+  const rawResult = await runWithProgressWidget(
     pi,
     ctx,
     "Running code review…",
@@ -114,7 +121,7 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
       }),
   );
 
-  if (!result) {
+  if (!rawResult) {
     notifyReviewDone(pi, {
       kind: "failed",
       reason: "Review encountered an unexpected error",
@@ -126,6 +133,7 @@ async function handleInteractive(ctx: CommandContext, pi: ExtensionAPI): Promise
     return;
   }
 
+  const result = normalizeReviewResult(rawResult as RawReviewResult);
   notifyReviewDone(pi, result);
   injectReviewMessage(pi, result);
 }
@@ -213,7 +221,7 @@ function notifyReviewDone(pi: ExtensionAPI, result: ReviewResult): void {
     kind: result.kind,
     snapshot: result.snapshot.title,
     modelId: result.modelId,
-    findingsCount: result.kind === "success" ? result.output.findings.length : 0,
+    itemCount: result.kind === "success" ? result.output.items.length : 0,
   });
   ringBell();
 }
@@ -230,7 +238,7 @@ function injectReviewMessage(pi: ExtensionAPI, result: ReviewResult): void {
 }
 
 function maybeQueueReviewFollowUp(pi: ExtensionAPI, result: ReviewResult): void {
-  if (result.kind !== "success" || result.output.findings.length === 0) {
+  if (result.kind !== "success" || result.output.items.length === 0) {
     return;
   }
 
@@ -240,10 +248,12 @@ function maybeQueueReviewFollowUp(pi: ExtensionAPI, result: ReviewResult): void 
       content: buildReviewFollowUpInstruction(result),
       display: false,
       details: {
-        findingCount: result.output.findings.length,
-        findings: result.output.findings.map((finding, index) => ({
+        itemCount: result.output.items.length,
+        actionSummary: result.output.summary.actions,
+        items: result.output.items.map((item, index) => ({
           number: index + 1,
-          title: finding.title,
+          title: item.title,
+          recommended_action: item.recommended_action,
         })),
       },
     },
@@ -254,11 +264,10 @@ function maybeQueueReviewFollowUp(pi: ExtensionAPI, result: ReviewResult): void 
 function buildReviewFollowUpInstruction(
   result: Extract<ReviewResult, { kind: "success" }>,
 ): string {
-  const { findings } = result.output;
-  const criticalCount = findings.filter((f) => f.priority === 3).length;
-  const majorCount = findings.filter((f) => f.priority === 2).length;
-
-  const findingList = findings.map((f, i) => `- #${i + 1}: ${f.title}`);
+  const { items, summary } = result.output;
+  const itemList = items.map(
+    (item, index) => `- #${index + 1}: ${item.title} (${item.recommended_action})`,
+  );
 
   const header =
     "A code review just completed and the result is available in the preceding `supi-review` message.";
@@ -266,26 +275,29 @@ function buildReviewFollowUpInstruction(
   const useAskUser = "If the `ask_user` tool is available, use it for this decision.";
 
   const lines: string[] = [header];
+  lines.push(
+    `Action summary: ${summary.actions.mustFix} must-fix, ${summary.actions.shouldFix} should-fix, ${summary.actions.consider} consider.`,
+  );
 
-  // Severity-aware urgency note.
-  if (criticalCount > 0) {
-    lines.push(`⚠️ ${criticalCount} critical finding(s) — urge the user to fix before merging.`);
-  } else if (majorCount > 0) {
-    lines.push(`${majorCount} major finding(s) — review carefully before proceeding.`);
+  if (summary.actions.mustFix > 0) {
+    lines.push(`${summary.actions.mustFix} must-fix item(s) — fix before merging.`);
+  } else if (summary.actions.shouldFix > 0) {
+    lines.push(
+      `${summary.actions.shouldFix} should-fix item(s) — review carefully before proceeding.`,
+    );
+  } else if (summary.actions.consider > 0) {
+    lines.push(`${summary.actions.consider} consider item(s) — optional follow-ups to review.`);
   }
 
-  // Always offer the same core options.
   lines.push(noFixing, useAskUser);
   lines.push("Offer these options: Fix all, Fix selected, Verify findings, Skip.");
   lines.push(
-    "If the user chooses Fix selected, ask a follow-up question listing the findings by number/title.",
+    "If the user chooses Fix selected, ask a follow-up question listing the review items by number/title.",
   );
   lines.push(
-    "If the user chooses Verify findings, re-read the relevant files and diffs to independently confirm or refute each finding, then present the verified results and ask again.",
+    "If the user chooses Verify findings, re-read the relevant files and diffs to independently confirm or refute each review item, then present the verified results and ask again.",
   );
-
-  // Always append the findings list.
-  lines.push("", "Current findings:", ...findingList);
+  lines.push("", "Current review items:", ...itemList);
 
   return lines.join("\n");
 }

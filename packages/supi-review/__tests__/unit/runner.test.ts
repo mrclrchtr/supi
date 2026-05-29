@@ -31,13 +31,15 @@ vi.mock("typebox", () => ({
     Object: vi.fn((schema) => schema),
     Array: vi.fn((schema) => schema),
     String: vi.fn(() => ({})),
-    Number: vi.fn(() => ({})),
+    Number: vi.fn((options) => options ?? {}),
     Union: vi.fn((options) => ({ type: "union", options })),
     Literal: vi.fn((value) => ({ type: "literal", value })),
+    Optional: vi.fn((schema) => ({ optional: schema })),
   },
 }));
 
-import { runReviewer } from "../../src/tool/review-runner.ts";
+import { buildReviewerSystemPrompt, runReviewer } from "../../src/tool/review-runner.ts";
+import * as reviewSchemas from "../../src/tool/schemas.ts";
 
 const snapshot = {
   target: { kind: "working-tree" as const },
@@ -115,6 +117,36 @@ describe("runReviewer", () => {
     vi.clearAllMocks();
   });
 
+  it("defines structured review items with fix guidance and no legacy priority field", () => {
+    const reviewItemSchema = (reviewSchemas as Record<string, unknown>).reviewItemSchema as
+      | Record<string, unknown>
+      | undefined;
+    const reviewOutputSchema = reviewSchemas.reviewOutputSchema as unknown as Record<
+      string,
+      unknown
+    >;
+
+    expect(reviewItemSchema).toBeDefined();
+    expect(reviewOutputSchema).toHaveProperty("items");
+    expect(reviewOutputSchema).not.toHaveProperty("findings");
+    expect(reviewItemSchema).toHaveProperty("category");
+    expect(reviewItemSchema).toHaveProperty("impact");
+    expect(reviewItemSchema).toHaveProperty("effort");
+    expect(reviewItemSchema).toHaveProperty("recommended_action");
+    expect(reviewItemSchema).toHaveProperty("suggested_fix");
+    expect(reviewItemSchema).toHaveProperty("verification_hint");
+    expect(reviewItemSchema).toHaveProperty("confidence_score");
+    expect(reviewItemSchema?.confidence_score).toMatchObject({ minimum: 0, maximum: 1 });
+    expect(reviewItemSchema).not.toHaveProperty("priority");
+  });
+
+  it("tells the reviewer to treat packet audit hints as mandatory checks", () => {
+    const prompt = buildReviewerSystemPrompt();
+
+    expect(prompt).toContain("audit hints");
+    expect(prompt).toContain("mandatory");
+  });
+
   it("returns canceled immediately when the signal is already aborted", async () => {
     const controller = new AbortController();
     controller.abort();
@@ -162,14 +194,13 @@ describe("runReviewer", () => {
       "read_snapshot_diff",
       "read_snapshot_file",
     ]);
-    // Verify custom tools include snapshot tools
     const customToolNames = callOpts.customTools?.map((t: { name: string }) => t.name) ?? [];
     expect(customToolNames).toContain("read_snapshot_diff");
     expect(customToolNames).toContain("read_snapshot_file");
     expect(customToolNames).toContain("submit_review");
   });
 
-  it("returns success when submit_review is called", async () => {
+  it("returns success when submit_review is called with structured review items", async () => {
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
       setTimeout(() => listener({ type: "agent_end", messages: [] }), 10);
       return vi.fn();
@@ -188,9 +219,20 @@ describe("runReviewer", () => {
     expect(submitTool).toBeDefined();
 
     await submitTool.execute("toolcall-1", {
-      findings: [],
-      overall_correctness: "patch is correct",
-      overall_explanation: "Looks good",
+      items: [
+        {
+          title: "Missing guard",
+          body: "Null token path is not checked.",
+          category: "correctness",
+          impact: "high",
+          effort: "low",
+          recommended_action: "must-fix",
+          confidence_score: 0.92,
+          suggested_fix: "Add an early null guard before using the token.",
+          verification_hint: "Run the auth-path tests and confirm null input fails cleanly.",
+        },
+      ],
+      overall_explanation: "One must-fix item remains.",
       overall_confidence_score: 0.8,
     });
 
@@ -202,6 +244,8 @@ describe("runReviewer", () => {
       expect(result.snapshot).toEqual(snapshot);
       expect(result.brief?.summary).toBe("Refactor auth flow");
       expect(result.modelId).toBe(model.canonicalId);
+      expect((result.output as unknown as Record<string, unknown>).items).toBeDefined();
+      expect((result.output as unknown as Record<string, unknown>).findings).toBeUndefined();
     }
   });
 

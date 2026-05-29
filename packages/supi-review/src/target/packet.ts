@@ -4,6 +4,7 @@ import type {
   ReviewSnapshot,
   SynthesizedReviewBrief,
 } from "../types.ts";
+import { deriveAuditHints, type ReviewAuditHint } from "./audit-hints.ts";
 
 export interface DiffSection {
   file: string;
@@ -24,6 +25,7 @@ export function buildReviewPacket(
   model: ReviewModelSelection,
 ): ReviewPacket {
   const { preamble, sections } = splitDiffSections(snapshot.diffText);
+  const auditHints = deriveAuditHints(snapshot);
 
   const parts: string[] = [
     "# Review Task",
@@ -52,9 +54,13 @@ export function buildReviewPacket(
     "",
     "## Changed files manifest",
     ...snapshot.changedFiles.map((file) => `- ${file}`),
-    "",
-    buildFileOverviewTable(snapshot.changedFiles, sections),
   ];
+
+  if (auditHints.length > 0) {
+    parts.push("", "## Audit hints", ...formatAuditHints(auditHints));
+  }
+
+  parts.push("", buildFileOverviewTable(snapshot.changedFiles, sections));
 
   if (preamble.trim()) {
     parts.push("", "## Snapshot notes", truncate(preamble.trim(), 1_500));
@@ -254,6 +260,10 @@ function buildFileOverviewTable(changedFiles: string[], sections: DiffSection[])
   const rows = changedFiles.map((file) => formatOverviewRow(file, statsMap, binaryFiles));
 
   return [`## File overview`, "", header, separator, ...rows].join("\n");
+}
+
+function formatAuditHints(hints: ReviewAuditHint[]): string[] {
+  return hints.map((hint) => `- ${hint.title}: ${hint.instruction}`);
 }
 
 function toBullets(items: string[], fallback: string): string[] {
