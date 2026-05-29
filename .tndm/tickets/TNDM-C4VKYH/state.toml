@@ -1,0 +1,43 @@
+schema_version = 1
+status = "in_progress"
+updated_at = "2026-05-29T10:21:16.442171Z"
+revision = 30
+
+[document_fingerprints]
+content = "sha256:c0c94c682e8946cb3ab9fa2e82f2308d3fbc253a5bc71e9f19249166bd6c298e"
+task-01 = "sha256:d78e1969900e9a1d6271eefb6335951d55ce352b9dbfaacd0f264f5381ba7860"
+task-02 = "sha256:349229bec0155b1246391f5d0483526323f1cb476ce33ee58803ab91a05d7bb1"
+task-03 = "sha256:aa863ba156206e35367512a446d207717b2ad4e9471105880b572e06079a9988"
+task-04 = "sha256:5e8ae884a1b4d6207263245217ec0d84986304f7d50352913a052e3c5f0fdcb3"
+task-05 = "sha256:280fbf7f1e042d1915f078144477953a6244c7dda09e71c31025350776bc55c6"
+task-06 = "sha256:d907a5fc90a6b8937849485fdcad2442a0a76b28c84569b895982c2b3a1294e0"
+
+[[tasks]]
+number = 1
+title = "RED: codify the new review-item contract, derived verdict, and triage-driven follow-up"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: implement the structured review-item contract and host-side normalization"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "RED: lock deterministic audit-hint triggers and packet/prompt integration"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "GREEN: implement deterministic audit hints and thread them into the reviewer packet"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update supi-review docs for the new triage model and deterministic audits"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Full package verification and manual review smoke test"
+status = "done"

@@ -33,7 +33,7 @@ After install, pi gets one command:
 The reviewer runs in managed child agent sessions:
 
 - a **brief synthesizer** creates a structured review brief from the active session branch
-- a **read-only reviewer** inspects the selected snapshot (without receiving bulk inline diffs) and submits structured findings
+- a **read-only reviewer** inspects the selected snapshot (without receiving bulk inline diffs) and submits structured review items
 
 ![Review target selection](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-1.png)
 
@@ -54,8 +54,8 @@ The reviewer runs in managed child agent sessions:
 5. synthesize a review brief from the current session history
 6. preview the synthesized brief + compact prompt preview
 7. the reviewer fetches per-file diffs on demand via snapshot-aware tools; live progress widget shows activity
-8. show the structured result as a custom message
-9. if findings exist, hand off to the main agent so it can ask what to do next
+8. normalize the submitted review items into a host-derived verdict + structured result
+9. if review items exist, hand off to the main agent so it can ask what to do next with fixed options (`Fix all`, `Fix selected`, `Verify findings`, `Skip`)
 
 ## Review targets
 
@@ -84,7 +84,7 @@ Before the actual review starts, the package:
 
 The synthesizer also receives a bounded diff excerpt from the snapshot so it can reason about actual code changes, not just filenames.
 
-That synthesized brief is then combined with the git snapshot into a compact reviewer prompt. The prompt contains the brief, file manifest, and per-file overview, but no large inline diffs. Instead, the reviewer session gets snapshot-aware tools (`read_snapshot_diff`, `read_snapshot_file`) to fetch exact per-file diffs and before/after file contents on demand.
+That synthesized brief is then combined with the git snapshot into a compact reviewer prompt. The prompt contains the brief, file manifest, per-file overview, and deterministic **audit hints** for certain change shapes, but no large inline diffs. Instead, the reviewer session gets snapshot-aware tools (`read_snapshot_diff`, `read_snapshot_file`) to fetch exact per-file diffs and before/after file contents on demand.
 
 The session-transcript approach mirrors how Pi summarizes context for compaction: the entire resolved conversation is rendered in a readable label format and sent to the model as a whole, rather than relying on heuristic excerpt ranking.
 
@@ -101,20 +101,35 @@ Every `/supi-review` run asks you to choose the reviewer model.
 
 A successful review includes:
 
-- overall correctness verdict
+- a host-derived binary verdict:
+  - `PATCH IS CORRECT`
+  - `PATCH HAS ISSUES`
 - overall explanation
 - overall confidence score
-- structured findings with title, body, priority, confidence score, and code location
+- normalized action/category summary counts
+- structured review items with:
+  - title
+  - body
+  - category
+  - impact
+  - effort
+  - recommended action
+  - confidence score
+  - suggested fix
+  - verification hint
+  - optional code location
 - the synthesized brief that drove the review
 
 The renderer also handles failed, canceled, and timed-out reviews.
 
-When a successful review contains findings, `supi-review` also injects an agent-visible hidden follow-up message that asks the main agent to decide the next step with the user. If `ask_user` is available, the main agent is instructed to use it and offer:
+The reviewer model does **not** decide the final binary verdict directly. It submits review items plus overall explanation/confidence, then the host derives the verdict from the normalized items (`must-fix` items => `PATCH HAS ISSUES`).
 
-- Done
+When a successful review contains review items, `supi-review` also injects an agent-visible hidden follow-up message that asks the main agent to decide the next step with the user. If `ask_user` is available, the main agent is instructed to use it and offer:
+
 - Fix all
 - Fix selected
 - Verify findings
+- Skip
 
 ## Source
 
@@ -123,6 +138,8 @@ When a successful review contains findings, `supi-review` also injects an agent-
 - `src/git.ts` — git snapshot resolution
 - `src/history/collect.ts` — compaction-style session-context serialization
 - `src/history/synthesize.ts` — brief synthesis orchestration
+- `src/review-result.ts` — review-item normalization, verdict derivation, and summary counts
+- `src/target/audit-hints.ts` — deterministic audit-hint derivation from snapshot shape
 - `src/target/packet.ts` — final reviewer packet builder
 - `src/tool/brief-runner.ts` — brief synthesis child session
 - `src/tool/review-runner.ts` — read-only reviewer child session with snapshot-aware tools

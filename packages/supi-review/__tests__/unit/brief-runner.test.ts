@@ -31,6 +31,9 @@ vi.mock("typebox", () => ({
     Array: vi.fn((schema) => schema),
     String: vi.fn(() => ({})),
     Number: vi.fn(() => ({})),
+    Union: vi.fn((options) => ({ type: "union", options })),
+    Literal: vi.fn((value) => ({ type: "literal", value })),
+    Optional: vi.fn((schema) => ({ optional: schema })),
   },
 }));
 

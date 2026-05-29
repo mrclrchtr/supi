@@ -11,6 +11,52 @@ const snapshot = {
   stats: { files: 1, additions: 1, deletions: 0 },
 };
 
+function buildReviewItem(overrides: Record<string, unknown> = {}) {
+  return {
+    title: "Missing guard",
+    body: "Null token path is not checked.",
+    category: "correctness",
+    impact: "high",
+    effort: "low",
+    recommended_action: "must-fix",
+    confidence_score: 0.92,
+    suggested_fix: "Add an early null guard before using the token.",
+    verification_hint: "Run the auth-path tests and confirm null input fails cleanly.",
+    code_location: {
+      absolute_file_path: "/project/src/auth.ts",
+      line_range: { start: 4, end: 5 },
+    },
+    ...overrides,
+  };
+}
+
+function createSuccessResult(overrides: Record<string, unknown> = {}): ReviewResult {
+  return {
+    kind: "success",
+    snapshot,
+    modelId: "anthropic/claude-sonnet-4",
+    brief: {
+      summary: "Refactor auth flow",
+      intendedOutcome: "Preserve auth semantics",
+      constraints: ["Keep the public API stable"],
+      focusAreas: ["Authentication", "Error handling"],
+      riskyFiles: ["src/auth.ts"],
+      unresolvedQuestions: [],
+    },
+    output: {
+      items: [],
+      overall_correctness: "PATCH IS CORRECT",
+      overall_explanation: "Looks good",
+      overall_confidence_score: 0.9,
+      summary: {
+        actions: { mustFix: 0, shouldFix: 0, consider: 0 },
+        categories: {},
+      },
+      ...overrides,
+    },
+  } as unknown as ReviewResult;
+}
+
 function createPiWithRenderer() {
   const renderers = new Map<string, (...args: unknown[]) => unknown>();
   const pi = {
@@ -52,47 +98,73 @@ function renderReview(result: ReviewResult, expanded = false): string {
 }
 
 describe("supi-review renderer", () => {
-  it("shows success output with synthesized-brief metadata", () => {
-    const output = renderReview({
-      kind: "success",
-      snapshot,
-      modelId: "anthropic/claude-sonnet-4",
-      brief: {
-        summary: "Refactor auth flow",
-        intendedOutcome: "Preserve auth semantics",
-        constraints: ["Keep the public API stable"],
-        focusAreas: ["Authentication", "Error handling"],
-        riskyFiles: ["src/auth.ts"],
-        unresolvedQuestions: [],
-      },
-      output: {
-        findings: [],
-        overall_correctness: "patch is correct",
-        overall_explanation: "Looks good",
-        overall_confidence_score: 0.9,
-      },
-    });
+  it("shows success output with synthesized-brief metadata and the derived verdict", () => {
+    const output = renderReview(createSuccessResult());
 
     expect(output).toContain("Model: anthropic/claude-sonnet-4");
     expect(output).toContain("Summary: Refactor auth flow");
     expect(output).toContain("Outcome: Preserve auth semantics");
+    expect(output).toContain("PATCH IS CORRECT");
   });
 
-  it("shows incorrect verdicts as warnings instead of success", () => {
-    const output = renderReview({
-      kind: "success",
-      snapshot,
-      modelId: "anthropic/claude-sonnet-4",
-      output: {
-        findings: [],
-        overall_correctness: "patch is incorrect",
-        overall_explanation: "Found a bug",
-        overall_confidence_score: 0.9,
-      },
-    });
+  it("shows expanded review items with triage, fix guidance, and verification hints", () => {
+    const output = renderReview(
+      createSuccessResult({
+        items: [buildReviewItem()],
+        overall_correctness: "PATCH HAS ISSUES",
+        overall_explanation: "One review item remains.",
+        summary: {
+          actions: { mustFix: 1, shouldFix: 0, consider: 0 },
+          categories: { correctness: 1 },
+        },
+      }),
+      true,
+    );
+
+    expect(output).toContain("Review Items (1)");
+    expect(output).toContain("correctness");
+    expect(output).toContain("must-fix");
+    expect(output).toContain("high / low");
+    expect(output).toContain("Add an early null guard before using the token.");
+    expect(output).toContain("Run the auth-path tests and confirm null input fails cleanly.");
+  });
+
+  it("renders must-fix items more urgently than should-fix items", () => {
+    const output = renderReview(
+      createSuccessResult({
+        items: [
+          buildReviewItem({ title: "Missing guard", recommended_action: "must-fix" }),
+          buildReviewItem({
+            title: "Expand test coverage",
+            category: "test-gap",
+            impact: "medium",
+            recommended_action: "should-fix",
+          }),
+        ],
+        overall_correctness: "PATCH HAS ISSUES",
+        overall_explanation: "Two review items remain.",
+        summary: {
+          actions: { mustFix: 1, shouldFix: 1, consider: 0 },
+          categories: { correctness: 1, "test-gap": 1 },
+        },
+      }),
+      true,
+    );
+
+    expect(output).toContain("[error]●[/error] [text]Missing guard[/text]");
+    expect(output).toContain("[warning]●[/warning] [text]Expand test coverage[/text]");
+  });
+
+  it("shows has-issues verdicts as warnings instead of success", () => {
+    const output = renderReview(
+      createSuccessResult({
+        overall_correctness: "PATCH HAS ISSUES",
+        overall_explanation: "Found a must-fix item.",
+      }),
+    );
 
     expect(output).toContain("[warning]●[/warning]");
-    expect(output).toContain("[warning]patch is incorrect[/warning]");
+    expect(output).toContain("[warning]PATCH HAS ISSUES[/warning]");
   });
 
   it("shows timeout with partial output", () => {

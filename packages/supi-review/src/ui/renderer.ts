@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
-import type { ReviewFinding, ReviewResult } from "../types.ts";
+import type { ReviewItem, ReviewResult } from "../types.ts";
 
 /** Register the custom TUI renderer for `supi-review` messages. */
 export function registerReviewRenderer(pi: ExtensionAPI): void {
@@ -44,15 +44,21 @@ function renderSuccess(
   }
 
   const normalizedVerdict = output.overall_correctness.toLowerCase();
-  const verdictColor = normalizedVerdict.includes("incorrect")
-    ? "warning"
-    : normalizedVerdict.includes("correct")
-      ? "success"
-      : "warning";
+  const verdictColor = normalizedVerdict.includes("issues") ? "warning" : "success";
   container.addChild(
     new Text(
       `${theme.fg(verdictColor, "●")} ${theme.fg(verdictColor, output.overall_correctness)}` +
         theme.fg("dim", `  (confidence: ${(output.overall_confidence_score * 100).toFixed(0)}%)`),
+      1,
+      0,
+    ),
+  );
+  container.addChild(
+    new Text(
+      theme.fg(
+        "dim",
+        `Summary: ${output.summary.actions.mustFix} must-fix, ${output.summary.actions.shouldFix} should-fix, ${output.summary.actions.consider} consider`,
+      ),
       1,
       0,
     ),
@@ -66,14 +72,14 @@ function renderSuccess(
   if (expanded) {
     container.addChild(new Spacer(1));
 
-    if (output.findings.length === 0) {
-      container.addChild(new Text(theme.fg("success", "✓ No issues found"), 1, 0));
+    if (output.items.length === 0) {
+      container.addChild(new Text(theme.fg("success", "✓ No review items"), 1, 0));
     } else {
       container.addChild(
-        new Text(theme.fg("accent", `Findings (${output.findings.length})`), 1, 0),
+        new Text(theme.fg("accent", `Review Items (${output.items.length})`), 1, 0),
       );
-      for (const finding of output.findings) {
-        container.addChild(renderFinding(finding, theme));
+      for (const item of output.items) {
+        container.addChild(renderReviewItem(item, theme));
       }
     }
   }
@@ -100,35 +106,44 @@ function renderBriefContext(
   }
 }
 
-function renderFinding(
-  finding: ReviewFinding,
+function renderReviewItem(
+  item: ReviewItem,
   theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
 ): Container {
   const container = new Container();
-  const priorityColor = priorityColorName(finding.priority);
-  const priorityLabel = priorityText(finding.priority);
-  const location = finding.code_location;
-  const locationText =
-    location.absolute_file_path +
-    (location.line_range.start === location.line_range.end
-      ? `:${location.line_range.start}`
-      : `:${location.line_range.start}-${location.line_range.end}`);
+  const actionColor = actionColorName(item.recommended_action);
+  const locationText = item.code_location
+    ? formatLocation(
+        item.code_location.absolute_file_path,
+        item.code_location.line_range.start,
+        item.code_location.line_range.end,
+      )
+    : undefined;
 
   container.addChild(new Spacer(1));
   container.addChild(
     new Text(
-      `${theme.fg(priorityColor, "●")} ${theme.fg("text", finding.title)}  ${theme.fg("dim", priorityLabel)}`,
+      `${theme.fg(actionColor, "●")} ${theme.fg("text", item.title)}  ${theme.fg("dim", `${item.recommended_action} / ${item.category}`)}`,
       1,
       0,
     ),
   );
-  container.addChild(new Text(theme.fg("dim", locationText), 2, 0));
+  container.addChild(
+    new Text(theme.fg("dim", `Impact / effort: ${item.impact} / ${item.effort}`), 2, 0),
+  );
 
-  if (finding.body) {
-    const box = new Box(1, 0);
-    box.addChild(new Text(theme.fg("text", finding.body), 0, 0));
-    container.addChild(box);
+  if (locationText) {
+    container.addChild(new Text(theme.fg("dim", locationText), 2, 0));
   }
+
+  if (item.body) {
+    const body = new Box(1, 0);
+    body.addChild(new Text(theme.fg("text", item.body), 0, 0));
+    container.addChild(body);
+  }
+
+  container.addChild(new Text(theme.fg("dim", `Suggested fix: ${item.suggested_fix}`), 2, 0));
+  container.addChild(new Text(theme.fg("dim", `Verification: ${item.verification_hint}`), 2, 0));
 
   return container;
 }
@@ -180,31 +195,21 @@ function renderCanceled(
   return container;
 }
 
-function priorityColorName(priority: number): "success" | "warning" | "error" {
-  switch (priority) {
-    case 0:
-    case 1:
-      return "success";
-    case 2:
-      return "warning";
-    case 3:
-      return "error";
-    default:
-      return "success";
-  }
+function formatLocation(file: string, startLine: number, endLine: number): string {
+  return `${file}:${startLine === endLine ? startLine : `${startLine}-${endLine}`}`;
 }
 
-function priorityText(priority: number): string {
-  switch (priority) {
-    case 0:
-      return "info";
-    case 1:
-      return "minor";
-    case 2:
-      return "major";
-    case 3:
-      return "critical";
+function actionColorName(
+  action: ReviewItem["recommended_action"],
+): "success" | "warning" | "error" {
+  switch (action) {
+    case "must-fix":
+      return "error";
+    case "should-fix":
+      return "warning";
+    case "consider":
+      return "success";
     default:
-      return "info";
+      return "success";
   }
 }

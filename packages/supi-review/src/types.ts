@@ -12,21 +12,55 @@ export interface ReviewCodeLocation {
   line_range: ReviewLineRange;
 }
 
-/** Structured finding returned by the reviewer session. */
-export interface ReviewFinding {
+export type ReviewItemCategory =
+  | "correctness"
+  | "security"
+  | "performance"
+  | "api"
+  | "test-gap"
+  | "docs"
+  | "cleanup"
+  | "maintainer";
+
+export type ReviewItemImpact = "low" | "medium" | "high";
+export type ReviewItemEffort = "low" | "medium" | "high";
+export type ReviewItemRecommendedAction = "must-fix" | "should-fix" | "consider";
+export type ReviewOverallCorrectness = "PATCH IS CORRECT" | "PATCH HAS ISSUES";
+
+/** Structured review item returned by the reviewer session. */
+export interface ReviewItem {
   title: string;
   body: string;
+  category: ReviewItemCategory;
+  impact: ReviewItemImpact;
+  effort: ReviewItemEffort;
+  recommended_action: ReviewItemRecommendedAction;
   confidence_score: number;
-  priority: 0 | 1 | 2 | 3;
-  code_location: ReviewCodeLocation;
+  suggested_fix: string;
+  verification_hint: string;
+  code_location?: ReviewCodeLocation;
 }
 
-/** Final review payload submitted by the reviewer child session. */
+/** Raw review payload submitted by the reviewer child session. */
 export interface ReviewOutputEvent {
-  findings: ReviewFinding[];
-  overall_correctness: string;
+  items: ReviewItem[];
   overall_explanation: string;
   overall_confidence_score: number;
+}
+
+export interface ReviewSummary {
+  actions: {
+    mustFix: number;
+    shouldFix: number;
+    consider: number;
+  };
+  categories: Partial<Record<ReviewItemCategory, number>>;
+}
+
+/** Host-normalized review payload used for rendering and follow-up flow. */
+export interface NormalizedReviewOutput extends ReviewOutputEvent {
+  overall_correctness: ReviewOverallCorrectness;
+  summary: ReviewSummary;
 }
 
 /** User-selected review target. */
@@ -90,8 +124,8 @@ export interface ReviewPlan {
   packet: ReviewPacket;
 }
 
-/** Result of the review child session. */
-export type ReviewResult =
+/** Raw result of the review child session. */
+export type RawReviewResult =
   | {
       kind: "success";
       output: ReviewOutputEvent;
@@ -120,3 +154,14 @@ export type ReviewResult =
       brief?: SynthesizedReviewBrief;
       modelId: string;
     };
+
+/** Normalized result used by rendering and follow-up logic. */
+export type ReviewResult =
+  | {
+      kind: "success";
+      output: NormalizedReviewOutput;
+      snapshot: ReviewSnapshot;
+      brief?: SynthesizedReviewBrief;
+      modelId: string;
+    }
+  | Extract<RawReviewResult, { kind: "failed" | "canceled" | "timeout" }>;

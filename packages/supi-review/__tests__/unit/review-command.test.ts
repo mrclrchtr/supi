@@ -95,6 +95,33 @@ const packet = {
   prompt: "# Review Task",
 };
 
+function buildReviewItem(overrides: Record<string, unknown> = {}) {
+  return {
+    title: "Missing guard",
+    body: "Null token path is not checked",
+    category: "correctness",
+    impact: "high",
+    effort: "low",
+    recommended_action: "must-fix",
+    confidence_score: 0.9,
+    suggested_fix: "Add an early null guard before using the token.",
+    verification_hint: "Run the auth-path tests and confirm null token input fails cleanly.",
+    code_location: {
+      absolute_file_path: "/project/src/auth.ts",
+      line_range: { start: 4, end: 5 },
+    },
+    ...overrides,
+  };
+}
+
+function createRawReviewOutput(items: Array<Record<string, unknown>> = []) {
+  return {
+    items,
+    overall_explanation: items.length > 0 ? "See review items" : "Looks good",
+    overall_confidence_score: 0.85,
+  };
+}
+
 function createPi(): ExtensionAPI {
   return {
     registerCommand: vi.fn(),
@@ -140,6 +167,13 @@ function makeCtx(overrides?: Record<string, unknown>) {
   };
 }
 
+function findFollowUpMessage(sendMessage: ReturnType<typeof vi.fn>) {
+  return sendMessage.mock.calls.find(
+    (call: unknown[]) =>
+      (call[0] as Record<string, unknown>)?.customType === "supi-review-followup",
+  );
+}
+
 describe("/supi-review command", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -155,22 +189,17 @@ describe("/supi-review command", () => {
       snapshot,
       brief,
       modelId: modelSelection.canonicalId,
-      output: {
-        findings: [],
-        overall_correctness: "PATCH IS CORRECT",
-        overall_explanation: "Looks good",
-        overall_confidence_score: 0.9,
-      },
+      output: createRawReviewOutput(),
     });
   });
 
-  it("runs the new session-aware review flow with serialized context", async () => {
+  it("runs the session-aware review flow and renders normalized review output", async () => {
     const pi = createPi();
     reviewExtension(pi);
     const handler = getHandler(pi);
     if (!handler) throw new Error("Handler not registered");
 
-    await handler("", makeCtx({ cwd: "/project" }));
+    await expect(handler("", makeCtx({ cwd: "/project" }))).resolves.toBeUndefined();
 
     expect(mockFns.selectTarget).toHaveBeenCalledTimes(1);
     expect(mockFns.selectModel).toHaveBeenCalledTimes(1);
@@ -194,7 +223,7 @@ describe("/supi-review command", () => {
     );
   });
 
-  it("queues an agent follow-up when the review finds issues", async () => {
+  it("queues an agent follow-up when the normalized review has actionable items", async () => {
     const pi = createPi();
     reviewExtension(pi);
     const handler = getHandler(pi);
@@ -205,34 +234,27 @@ describe("/supi-review command", () => {
       snapshot,
       brief,
       modelId: modelSelection.canonicalId,
-      output: {
-        findings: [
-          {
-            title: "Missing guard",
-            body: "Null token path is not checked",
-            confidence_score: 0.9,
-            priority: 2,
-            code_location: {
-              absolute_file_path: "/project/src/auth.ts",
-              line_range: { start: 4, end: 5 },
-            },
-          },
-        ],
-        overall_correctness: "PATCH HAS ISSUES",
-        overall_explanation: "One issue remains",
-        overall_confidence_score: 0.8,
-      },
+      output: createRawReviewOutput([buildReviewItem()]),
     });
 
-    await handler("", makeCtx());
+    await expect(handler("", makeCtx())).resolves.toBeUndefined();
 
     const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
     expect(sendMessage).toHaveBeenCalledTimes(2);
     expect(sendMessage.mock.calls[1]?.[0]).toMatchObject({
       customType: "supi-review-followup",
       display: false,
+      details: {
+        itemCount: 1,
+        actionSummary: { mustFix: 1, shouldFix: 0, consider: 0 },
+        items: [{ number: 1, title: "Missing guard", recommended_action: "must-fix" }],
+      },
     });
-    expect(sendMessage.mock.calls[1]?.[0]?.content).toContain("ask_user");
+    expect(sendMessage.mock.calls[1]?.[0]?.content).toContain("must-fix");
+    expect(sendMessage.mock.calls[1]?.[0]?.content).toContain("Fix all");
+    expect(sendMessage.mock.calls[1]?.[0]?.content).toContain("Fix selected");
+    expect(sendMessage.mock.calls[1]?.[0]?.content).toContain("Verify findings");
+    expect(sendMessage.mock.calls[1]?.[0]?.content).toContain("Skip");
     expect(sendMessage.mock.calls[1]?.[1]).toMatchObject({ triggerTurn: true });
   });
 
@@ -264,8 +286,8 @@ describe("/supi-review command", () => {
     expect(mockFns.synthesizeReviewBrief).not.toHaveBeenCalled();
   });
 
-  describe("severity-aware follow-up instructions", () => {
-    async function runWithFindings(findings: Array<Record<string, unknown>>) {
+  describe("follow-up triage branching by recommended_action", () => {
+    async function runWithItems(items: Array<Record<string, unknown>>) {
       const pi = createPi();
       reviewExtension(pi);
       const handler = getHandler(pi);
@@ -276,103 +298,65 @@ describe("/supi-review command", () => {
         snapshot,
         brief,
         modelId: modelSelection.canonicalId,
-        output: {
-          findings,
-          overall_correctness: "PATCH HAS ISSUES",
-          overall_explanation: "See findings",
-          overall_confidence_score: 0.7,
-        },
+        output: createRawReviewOutput(items),
       });
 
-      await handler("", makeCtx());
-      const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
-      const followUpCall = sendMessage.mock.calls.find(
-        (call: unknown[]) =>
-          (call[0] as Record<string, unknown>)?.customType === "supi-review-followup",
-      );
-      return (followUpCall?.[0] as Record<string, unknown>)?.content as string | undefined;
-    }
-
-    const baseFinding = {
-      title: "Missing null check",
-      body: "Null token path is not checked",
-      confidence_score: 0.9,
-      code_location: {
-        absolute_file_path: "/project/src/auth.ts",
-        line_range: { start: 4, end: 5 },
-      },
-    };
-
-    const criticalFinding = { ...baseFinding, priority: 3 };
-    const majorFinding = { ...baseFinding, priority: 2 };
-    const minorFinding = { ...baseFinding, priority: 1 };
-    const infoFinding = { ...baseFinding, priority: 0 };
-
-    it("adds a critical urgency note while keeping the standard options", async () => {
-      const content = await runWithFindings([criticalFinding]);
-      expect(content).toContain("⚠");
-      expect(content).toContain("critical");
-      expect(content).toContain("Fix all");
-      expect(content).toContain("Fix selected");
-      expect(content).toContain("Verify findings");
-      expect(content).not.toContain("Fix critical only");
-    });
-
-    it("produces standard message for major findings without critical", async () => {
-      const content = await runWithFindings([majorFinding]);
-      expect(content).toContain("Fix all");
-      expect(content).toContain("Fix selected");
-      expect(content).toContain("Verify findings");
-      expect(content).not.toContain("⚠");
-    });
-
-    it("keeps the standard options for minor/info-only findings without a severity note", async () => {
-      const content = await runWithFindings([minorFinding, infoFinding]);
-      expect(content).toContain("Fix all");
-      expect(content).toContain("Fix selected");
-      expect(content).toContain("Verify findings");
-      expect(content).not.toContain("critical finding(s)");
-      expect(content).not.toContain("major finding(s)");
-    });
-
-    function findFollowUpMessage(sendMessage: ReturnType<typeof vi.fn>) {
-      return sendMessage.mock.calls.find(
-        (call: unknown[]) =>
-          (call[0] as Record<string, unknown>)?.customType === "supi-review-followup",
-      );
-    }
-
-    it("does not add a contradiction note when a correct verdict still has findings", async () => {
-      const pi = createPi();
-      reviewExtension(pi);
-      const handler = getHandler(pi);
-      if (!handler) throw new Error("Handler not registered");
-
-      mockFns.runReviewer.mockResolvedValue({
-        kind: "success",
-        snapshot,
-        brief,
-        modelId: modelSelection.canonicalId,
-        output: {
-          findings: [minorFinding],
-          overall_correctness: "PATCH IS CORRECT",
-          overall_explanation: "Minor suggestion only",
-          overall_confidence_score: 0.9,
-        },
-      });
-
-      await handler("", makeCtx());
+      await expect(handler("", makeCtx())).resolves.toBeUndefined();
       const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
       const followUpCall = findFollowUpMessage(sendMessage);
-      const content = (followUpCall?.[0] as Record<string, unknown>)?.content as string;
-      expect(content).toContain("Fix all");
-      expect(content).toContain("Fix selected");
-      expect(content).toContain("Verify findings");
-      expect(content).not.toContain("Minor suggestion only");
-      expect(content).not.toContain("PATCH IS CORRECT");
+      return {
+        content: (followUpCall?.[0] as Record<string, unknown>)?.content as string | undefined,
+        details: (followUpCall?.[0] as Record<string, unknown>)?.details as
+          | Record<string, unknown>
+          | undefined,
+      };
+    }
+
+    it("highlights must-fix items in the follow-up summary", async () => {
+      const { content, details } = await runWithItems([buildReviewItem()]);
+
+      expect(content).toContain("1 must-fix");
+      expect(content).toContain("Current review items");
+      expect(details).toMatchObject({
+        actionSummary: { mustFix: 1, shouldFix: 0, consider: 0 },
+      });
     });
 
-    it("keeps the major-severity note without a contradiction note", async () => {
+    it("highlights should-fix items without must-fix urgency", async () => {
+      const { content, details } = await runWithItems([
+        buildReviewItem({
+          title: "Expand test coverage",
+          category: "test-gap",
+          impact: "medium",
+          recommended_action: "should-fix",
+        }),
+      ]);
+
+      expect(content).toContain("1 should-fix");
+      expect(content).not.toContain("1 must-fix");
+      expect(details).toMatchObject({
+        actionSummary: { mustFix: 0, shouldFix: 1, consider: 0 },
+      });
+    });
+
+    it("still queues follow-up for consider-only items", async () => {
+      const { content, details } = await runWithItems([
+        buildReviewItem({
+          title: "Maintainer note",
+          category: "maintainer",
+          impact: "low",
+          recommended_action: "consider",
+        }),
+      ]);
+
+      expect(content).toContain("1 consider");
+      expect(content).toContain("Fix selected");
+      expect(details).toMatchObject({
+        actionSummary: { mustFix: 0, shouldFix: 0, consider: 1 },
+      });
+    });
+
+    it("skips follow-up when there are no review items", async () => {
       const pi = createPi();
       reviewExtension(pi);
       const handler = getHandler(pi);
@@ -383,45 +367,10 @@ describe("/supi-review command", () => {
         snapshot,
         brief,
         modelId: modelSelection.canonicalId,
-        output: {
-          findings: [majorFinding],
-          overall_correctness: "PATCH IS CORRECT",
-          overall_explanation: "Contradictory",
-          overall_confidence_score: 0.5,
-        },
+        output: createRawReviewOutput([]),
       });
 
-      await handler("", makeCtx());
-      const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
-      const followUpCall = findFollowUpMessage(sendMessage);
-      const content = (followUpCall?.[0] as Record<string, unknown>)?.content as string;
-      expect(content).toContain("major finding(s)");
-      expect(content).toContain("Fix selected");
-      expect(content).toContain("Verify findings");
-      expect(content).not.toContain("Contradictory");
-      expect(content).not.toContain("PATCH IS CORRECT");
-    });
-
-    it("skips follow-up when there are no findings", async () => {
-      const pi = createPi();
-      reviewExtension(pi);
-      const handler = getHandler(pi);
-      if (!handler) throw new Error("Handler not registered");
-
-      mockFns.runReviewer.mockResolvedValue({
-        kind: "success",
-        snapshot,
-        brief,
-        modelId: modelSelection.canonicalId,
-        output: {
-          findings: [],
-          overall_correctness: "PATCH IS CORRECT",
-          overall_explanation: "All good",
-          overall_confidence_score: 0.95,
-        },
-      });
-
-      await handler("", makeCtx());
+      await expect(handler("", makeCtx())).resolves.toBeUndefined();
       const sendMessage = pi.sendMessage as ReturnType<typeof vi.fn>;
       const followUpCall = findFollowUpMessage(sendMessage);
       expect(followUpCall).toBeUndefined();

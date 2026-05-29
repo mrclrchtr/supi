@@ -1,19 +1,4 @@
-import type { ReviewResult } from "../types.ts";
-
-function priorityLabel(priority: number): string {
-  switch (priority) {
-    case 0:
-      return "info";
-    case 1:
-      return "minor";
-    case 2:
-      return "major";
-    case 3:
-      return "critical";
-    default:
-      return "info";
-  }
-}
+import type { ReviewItem, ReviewResult } from "../types.ts";
 
 /** Format review results for the LLM-visible custom message content. */
 export function formatReviewContent(result: ReviewResult): string {
@@ -61,28 +46,41 @@ function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>
   }
 
   lines.push("", `Verdict: ${output.overall_correctness} (confidence: ${confidencePercent}%)`);
+  lines.push(
+    `Summary: ${output.summary.actions.mustFix} must-fix, ${output.summary.actions.shouldFix} should-fix, ${output.summary.actions.consider} consider`,
+  );
 
-  if (output.findings.length > 0) {
-    lines.push("", "### Findings", "", ...formatFindings(output.findings));
+  if (output.items.length > 0) {
+    lines.push("", "### Review Items", "", ...formatReviewItems(output.items));
   }
 
   lines.push("", `Overall: ${output.overall_explanation}`);
   return lines.join("\n");
 }
 
-function formatFindings(
-  findings: Extract<ReviewResult, { kind: "success" }>["output"]["findings"],
-): string[] {
-  return findings.flatMap((finding, index) => {
-    const location = finding.code_location;
-    const lineRange =
-      location.line_range.start === location.line_range.end
-        ? String(location.line_range.start)
-        : `${location.line_range.start}-${location.line_range.end}`;
-    return [
-      `#${index + 1} [${priorityLabel(finding.priority)}] ${finding.title}`,
-      `   ${location.absolute_file_path}:${lineRange}`,
-      `   ${finding.body}`,
+function formatReviewItems(items: ReviewItem[]): string[] {
+  return items.flatMap((item, index) => {
+    const location = item.code_location
+      ? `   ${formatLocation(item.code_location.absolute_file_path, item.code_location.line_range.start, item.code_location.line_range.end)}`
+      : undefined;
+
+    const lines = [
+      `#${index + 1} [${item.recommended_action}][${item.category}] ${item.title}`,
+      `   Impact / effort: ${item.impact} / ${item.effort}`,
     ];
+
+    if (location) {
+      lines.push(location);
+    }
+
+    lines.push(`   ${item.body}`);
+    lines.push(`   Suggested fix: ${item.suggested_fix}`);
+    lines.push(`   Verification: ${item.verification_hint}`);
+    return lines;
   });
+}
+
+function formatLocation(file: string, startLine: number, endLine: number): string {
+  const lineRange = startLine === endLine ? String(startLine) : `${startLine}-${endLine}`;
+  return `${file}:${lineRange}`;
 }
