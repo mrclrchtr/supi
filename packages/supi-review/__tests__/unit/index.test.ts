@@ -57,7 +57,10 @@ describe("formatReviewContent", () => {
     expect(content).toContain("**Model:** anthropic/claude-sonnet-4");
     expect(content).toContain("### Session-derived Brief");
     expect(content).toContain("Refactor auth flow");
-    expect(content).toContain("#1 [must-fix][correctness] Missing guard");
+    expect(content).toContain("   #1 Missing guard [must-fix]");
+    expect(content).toContain("      Category: correctness");
+    expect(content).toContain("      Impact: High");
+    expect(content).toContain("      Effort: Low");
   });
 
   it("formats timeout output with partial assistant text", () => {

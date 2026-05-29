@@ -122,9 +122,11 @@ describe("supi-review renderer", () => {
     );
 
     expect(output).toContain("Review Items (1)");
-    expect(output).toContain("correctness");
-    expect(output).toContain("must-fix");
-    expect(output).toContain("high / low");
+    expect(output).toContain("#1 Missing guard");
+    expect(output).toContain("[error][must-fix][/error]");
+    expect(output).toContain("Category: correctness");
+    expect(output).toContain("Impact: High");
+    expect(output).toContain("Effort: Low");
     expect(output).toContain("Add an early null guard before using the token.");
     expect(output).toContain("Run the auth-path tests and confirm null input fails cleanly.");
   });
@@ -151,8 +153,10 @@ describe("supi-review renderer", () => {
       true,
     );
 
-    expect(output).toContain("[error]●[/error] [text]Missing guard[/text]");
-    expect(output).toContain("[warning]●[/warning] [text]Expand test coverage[/text]");
+    expect(output).toContain("[text]#1 Missing guard[/text] [error][must-fix][/error]");
+    expect(output).toContain(
+      "[text]#2 Expand test coverage[/text] [warning][should-fix][/warning]",
+    );
   });
 
   it("shows has-issues verdicts as warnings instead of success", () => {

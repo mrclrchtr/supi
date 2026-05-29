@@ -61,23 +61,29 @@ function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>
 function formatReviewItems(items: ReviewItem[]): string[] {
   return items.flatMap((item, index) => {
     const location = item.code_location
-      ? `   ${formatLocation(item.code_location.absolute_file_path, item.code_location.line_range.start, item.code_location.line_range.end)}`
+      ? `      ${formatLocation(item.code_location.absolute_file_path, item.code_location.line_range.start, item.code_location.line_range.end)}`
       : undefined;
 
     const lines = [
-      `#${index + 1} [${item.recommended_action}][${item.category}] ${item.title}`,
-      `   Impact / effort: ${item.impact} / ${item.effort}`,
+      `   #${index + 1} ${item.title} [${item.recommended_action}]`,
+      `      Category: ${item.category}`,
+      `      Impact: ${formatLevel(item.impact)}`,
+      `      Effort: ${formatLevel(item.effort)}`,
     ];
 
     if (location) {
       lines.push(location);
     }
 
-    lines.push(`   ${item.body}`);
-    lines.push(`   Suggested fix: ${item.suggested_fix}`);
-    lines.push(`   Verification: ${item.verification_hint}`);
+    lines.push(`      ${item.body}`);
+    lines.push(`      Suggested fix: ${item.suggested_fix}`);
+    lines.push(`      Verification: ${item.verification_hint}`);
     return lines;
   });
+}
+
+function formatLevel(value: ReviewItem["impact"] | ReviewItem["effort"]): string {
+  return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
 }
 
 function formatLocation(file: string, startLine: number, endLine: number): string {

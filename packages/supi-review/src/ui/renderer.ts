@@ -78,9 +78,9 @@ function renderSuccess(
       container.addChild(
         new Text(theme.fg("accent", `Review Items (${output.items.length})`), 1, 0),
       );
-      for (const item of output.items) {
-        container.addChild(renderReviewItem(item, theme));
-      }
+      output.items.forEach((item, index) => {
+        container.addChild(renderReviewItem(item, index, theme));
+      });
     }
   }
 
@@ -108,6 +108,7 @@ function renderBriefContext(
 
 function renderReviewItem(
   item: ReviewItem,
+  index: number,
   theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
 ): Container {
   const container = new Container();
@@ -123,21 +124,21 @@ function renderReviewItem(
   container.addChild(new Spacer(1));
   container.addChild(
     new Text(
-      `${theme.fg(actionColor, "●")} ${theme.fg("text", item.title)}  ${theme.fg("dim", `${item.recommended_action} / ${item.category}`)}`,
+      `${theme.fg("text", `#${index + 1} ${item.title}`)} ${theme.fg(actionColor, `[${item.recommended_action}]`)}`,
       1,
       0,
     ),
   );
-  container.addChild(
-    new Text(theme.fg("dim", `Impact / effort: ${item.impact} / ${item.effort}`), 2, 0),
-  );
+  container.addChild(new Text(theme.fg("dim", `Category: ${item.category}`), 2, 0));
+  container.addChild(new Text(theme.fg("dim", `Impact: ${formatLevel(item.impact)}`), 2, 0));
+  container.addChild(new Text(theme.fg("dim", `Effort: ${formatLevel(item.effort)}`), 2, 0));
 
   if (locationText) {
     container.addChild(new Text(theme.fg("dim", locationText), 2, 0));
   }
 
   if (item.body) {
-    const body = new Box(1, 0);
+    const body = new Box(2, 0);
     body.addChild(new Text(theme.fg("text", item.body), 0, 0));
     container.addChild(body);
   }
@@ -193,6 +194,10 @@ function renderCanceled(
   const container = new Container();
   container.addChild(new Text(theme.fg("warning", "◆ Review Canceled"), 1, 0));
   return container;
+}
+
+function formatLevel(value: ReviewItem["impact"] | ReviewItem["effort"]): string {
+  return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
 }
 
 function formatLocation(file: string, startLine: number, endLine: number): string {
