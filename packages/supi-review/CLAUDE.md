@@ -11,7 +11,7 @@ The `/supi-review` command follows a **history-aware** pipeline:
 5. **Serialize session context** — compaction-style transcript of the active branch's resolved LLM-visible context
 6. **Synthesize brief** — child session turns history + snapshot metadata into a structured brief
 7. **Build review packet** — compact prompt with brief + file metadata + deterministic audit hints; no bulk diffs; reviewer fetches diffs on demand
-8. **Preview and confirm** — show the synthesized brief and compact prompt preview
+8. **Preview and confirm** — show the synthesized brief and compact prompt preview; `v` opens the in-app inspector (Overview first, Raw Prompt via `tab`, export via `e`)
 9. **Run reviewer** — read-only child session inspects the code and submits structured review items
 10. **Normalize + render results** — host derives the verdict, sorts review items, computes summary counts, and renders the result
 11. **Main-agent handoff** — if review items exist, inject a hidden follow-up instruction so the main agent asks the user what to do next
@@ -43,7 +43,7 @@ src/
     synthesize.ts       Brief synthesis prompt builder + runner orchestration
   target/
     audit-hints.ts      Deterministic audit-hint derivation from snapshot shape/diff metadata
-    packet.ts           Compact review packet builder (no inline diffs)
+    packet.ts           Compact review packet builder + shared preview-data derivation
   tool/
     brief-runner.ts     Brief synthesis child session
     review-runner.ts    Read-only reviewer child session
@@ -51,7 +51,9 @@ src/
     schemas.ts          TypeBox schemas for submit_review[_brief]
     snapshot-tools.ts   Snapshot-aware diff/file tools for the reviewer session
   ui/
-    flow.ts             TUI selection + preview steps
+    flow.ts             TUI selection + review flow entry points
+    review-plan-inspector.ts
+                         In-app summary/inspector preview with Overview + Raw Prompt modes
     renderer.ts         Custom message rendering with normalized review items
     format-content.ts   Plain-text message content for LLM context
     (ProgressWidget migrated to @mrclrchtr/supi-core/progress-widget;
@@ -65,7 +67,8 @@ __tests__/
 - **No review settings surface** — no `/supi-settings` integration, no persisted review model
 - **Model selection is mandatory per run** — the user chooses the model every time from Pi's scoped `enabledModels` set
 - **No presets/depth UI** — the important input is the current session history, not a generic canned mode
-- **No editable raw prompt step** — the user previews the synthesized brief, not a hand-edited prompt blob
+- **No editable raw prompt step** — the user can inspect the raw prompt in-app, but not edit a prompt blob
+- **In-app preview inspector** — full preview stays inside Pi; no external pager is required for the primary path
 - **Snapshot first** — review targets are fully resolved before synthesis/review starts; no lazy target hydration
 - **Active branch only** — session-context serialization uses `buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId())` so compaction and branch-summary semantics match the actual LLM-visible context
 - **Read-only review session** — reviewer tools include `read`, `grep`, `find`, `ls`, `submit_review`, and snapshot-aware `read_snapshot_diff` / `read_snapshot_file` for on-demand inspection
@@ -114,6 +117,7 @@ These hints are deterministic host guidance threaded through the compact packet.
 - The session-context serializer operates on the resolved `buildSessionContext(...)` output, so `custom_message` entries, compaction summaries, and branch summaries all appear in the transcript exactly as the LLM would see them
 - `buildBriefSynthesisPrompt()` must include a bounded diff excerpt so the synthesizer can see actual code changes, not just filenames/stats
 - `buildReviewPacket()` stays compact: brief, manifest, overview, audit hints, and on-demand snapshot inspection instructions. Do not reintroduce bulk diff embedding.
+- Full preview no longer shells out to `less`; export-to-temp-file is a debugging fallback only.
 - `src/review-result.ts` is the single source of truth for verdict derivation, action/category summary counts, and review-item ordering
 - `ReviewResult` success payloads are normalized before rendering; renderers and plain-text formatting should use normalized review items instead of assuming raw reviewer output
 - The visible `supi-review` custom message is followed by a hidden `supi-review-followup` custom message when review items exist; its content instructs the main agent to ask the user what to do next, preferably via `ask_user`, with the fixed options `Fix all`, `Fix selected`, `Verify findings`, `Skip`

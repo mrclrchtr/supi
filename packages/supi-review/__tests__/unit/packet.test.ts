@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildReviewPacket,
+  buildReviewPacketPreviewData,
   classifySkipCategory,
   getPacketCharBudget,
   splitDiffSections,
@@ -186,6 +187,46 @@ describe("splitDiffSections", () => {
     expect(sections[0]?.file).toBe("src/new.ts");
     expect(sections[0]?.additions).toBe(0);
     expect(sections[0]?.deletions).toBe(0);
+  });
+});
+
+describe("buildReviewPacketPreviewData", () => {
+  it("derives structured overview data for the review-plan inspector", () => {
+    const longNotes = `=== Snapshot notes ===\n${"review context ".repeat(140)}`;
+    const preview = buildReviewPacketPreviewData({
+      target: { kind: "working-tree" },
+      title: "Working tree changes",
+      changedFiles: ["packages/supi-code-intelligence/src/tool/tool-specs.ts", "pnpm-lock.yaml"],
+      diffText: [
+        longNotes,
+        "diff --git a/packages/supi-code-intelligence/src/tool/tool-specs.ts b/packages/supi-code-intelligence/src/tool/tool-specs.ts",
+        "--- a/packages/supi-code-intelligence/src/tool/tool-specs.ts",
+        "+++ b/packages/supi-code-intelligence/src/tool/tool-specs.ts",
+        "@@ -1 +1 @@",
+        '- "code_calls"',
+        '+ "code_graph"',
+      ].join("\n"),
+      stats: { files: 2, additions: 1, deletions: 1 },
+    });
+
+    expect(preview.auditHints).toHaveLength(1);
+    expect(preview.auditHints[0]?.title).toBe("Public-surface / rename / merge audit");
+    expect(preview.fileOverview).toEqual([
+      {
+        file: "packages/supi-code-intelligence/src/tool/tool-specs.ts",
+        additions: 1,
+        deletions: 1,
+        annotations: ["trivial"],
+      },
+      {
+        file: "pnpm-lock.yaml",
+        additions: null,
+        deletions: null,
+        annotations: ["skip — lockfile"],
+      },
+    ]);
+    expect(preview.snapshotNotes).toContain("=== Snapshot notes ===");
+    expect(preview.snapshotNotes).toContain("[... truncated ...]");
   });
 });
 

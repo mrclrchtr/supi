@@ -1,14 +1,9 @@
-import { spawn } from "node:child_process";
-import { unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { DynamicBorder, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, type SelectItem, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
+import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
 import { getLocalBranches, getRecentCommits } from "../git.ts";
 import { getSelectableReviewModels } from "../model.ts";
 import type { ReviewModelSelection, ReviewPlan, ReviewTargetSpec } from "../types.ts";
-import type { ReviewTheme } from "./theme-type.ts";
+import { ReviewPlanPreviewComponent } from "./review-plan-inspector.ts";
 
 interface SelectFromListOptions<T> {
   items: SelectItem[];
@@ -140,166 +135,15 @@ export async function collectReviewNote(ctx: ExtensionContext): Promise<string |
 
 /** Show the synthesized brief, the actual reviewer prompt preview, and ask for approval. */
 export function previewReviewPlan(ctx: ExtensionContext, plan: ReviewPlan): Promise<boolean> {
-  return ctx.ui.custom<boolean>((tui, theme, _kb, done) => {
-    const container = buildReviewPlanContainer(theme, plan);
-    const pagerState = { running: false };
-
-    function handleInput(data: string) {
-      if (pagerState.running) return;
-      if (data === "\r" || data === "\n" || data === "y" || data === "Y") {
-        done(true);
-      } else if (data === "\x1b" || data === "n" || data === "N") {
-        done(false);
-      } else if (data === "v" || data === "V") {
-        openPromptInPager(plan.packet.prompt, tui, pagerState);
-      }
-    }
-
-    return {
-      render: (width) => container.render(width),
-      invalidate: () => container.invalidate(),
-      handleInput,
-    };
-  });
-}
-
-/** Open the full reviewer prompt in the user's pager for inspection. */
-function openPromptInPager(
-  prompt: string,
-  tui: { requestRender: () => void },
-  pagerState: { running: boolean },
-): void {
-  const tmpFile = join(tmpdir(), `supi-review-prompt-${Date.now()}.txt`);
-  try {
-    writeFileSync(tmpFile, prompt, "utf-8");
-  } catch {
-    return;
-  }
-
-  pagerState.running = true;
-
-  let cleanedUp = false;
-  const cleanup = () => {
-    if (cleanedUp) return;
-    cleanedUp = true;
-    pagerState.running = false;
-    try {
-      unlinkSync(tmpFile);
-    } catch {
-      // best-effort cleanup
-    }
-    tui.requestRender();
-  };
-
-  const pager = spawn("less", ["-R", tmpFile], { stdio: "inherit" });
-  pager.on("exit", cleanup);
-  pager.on("error", cleanup);
-}
-
-/** Build the review plan preview container with all styled sections. */
-function buildReviewPlanContainer(theme: ReviewTheme, plan: ReviewPlan): Container {
-  const { model, snapshot, brief, packet } = plan;
-  const container = new Container();
-
-  const accent = (s: string) => theme.fg("accent", s);
-  const dim = (s: string) => theme.fg("dim", s);
-  const bold = (s: string) => theme.bold(s);
-
-  // ── Top border ──
-  container.addChild(new DynamicBorder((s: string) => accent(s)));
-  container.addChild(new Spacer(1));
-
-  // ── Title ──
-  container.addChild(new Text(accent(bold("  Review Plan")), 1, 0));
-  container.addChild(new Spacer(1));
-
-  // ── Metadata section ──
-  const kind = snapshot.target.kind;
-  const targetLabel =
-    kind === "working-tree"
-      ? "Working tree"
-      : kind === "branch"
-        ? `${snapshot.target.base} \u2190 current`
-        : `commit ${snapshot.target.sha.slice(0, 7)}`;
-
-  container.addChild(new Text(accent(bold("  \u2500\u2500 Metadata \u2500\u2500")), 1, 0));
-  container.addChild(
-    new Text(
-      [
-        `  ${dim("Model:")}   ${model.canonicalId}`,
-        `  ${dim("Target:")}  ${snapshot.title}`,
-        `  ${dim("Kind:")}    ${targetLabel}`,
-        `  ${dim("Files:")}   ${snapshot.changedFiles.length} changed  ${theme.fg("toolDiffAdded", `+${snapshot.stats.additions}`)}/${theme.fg("toolDiffRemoved", `-${snapshot.stats.deletions}`)}`,
-      ].join("\n"),
-      1,
-      0,
-    ),
+  return ctx.ui.custom<boolean>(
+    (tui, theme, _kb, done) =>
+      new ReviewPlanPreviewComponent({
+        plan,
+        theme,
+        onDone: done,
+        requestRender: () => tui.requestRender(),
+      }),
   );
-  container.addChild(new Spacer(1));
-
-  // ── Brief section ──
-  container.addChild(
-    new Text(accent(bold("  \u2500\u2500 Session-derived Brief \u2500\u2500")), 1, 0),
-  );
-  const briefParts = [
-    `  ${dim("Summary:")}  ${brief.summary}`,
-    `  ${dim("Outcome:")}  ${brief.intendedOutcome}`,
-  ];
-  if (brief.constraints.length > 0) {
-    briefParts.push(`  ${dim("Constraints:")}  ${brief.constraints.join("; ")}`);
-  }
-  if (brief.focusAreas.length > 0) {
-    briefParts.push(`  ${dim("Focus:")}  ${brief.focusAreas.join("; ")}`);
-  }
-  if (brief.riskyFiles.length > 0) {
-    briefParts.push(`  ${dim("Risky:")}  ${brief.riskyFiles.join(", ")}`);
-  }
-  if (brief.unresolvedQuestions.length > 0) {
-    briefParts.push(`  ${dim("Questions:")}  ${brief.unresolvedQuestions.join("; ")}`);
-  }
-  container.addChild(new Text(briefParts.join("\n"), 1, 0));
-  container.addChild(new Spacer(1));
-
-  // ── Reviewer Prompt preview ──
-  const totalChars = packet.prompt.length;
-  const maxPreview = 2000;
-  const previewText =
-    totalChars > maxPreview
-      ? `${packet.prompt.slice(0, maxPreview)}\n\n${theme.fg("warning", `[Preview truncated \u2014 showing ${maxPreview.toLocaleString()} of ${totalChars.toLocaleString()} total chars]`)}`
-      : packet.prompt;
-
-  container.addChild(
-    new Text(
-      accent(
-        bold(`  \u2500\u2500 Reviewer Prompt (${totalChars.toLocaleString()} chars) \u2500\u2500`),
-      ),
-      1,
-      0,
-    ),
-  );
-  container.addChild(new Text(previewText, 1, 0));
-  container.addChild(new Spacer(1));
-
-  // ── Snapshot access line ──
-  const accessLine = `  Diffs: on-demand via read_snapshot_diff  \u2022  Files: ${snapshot.changedFiles.length} changed`;
-
-  container.addChild(new Text(theme.fg("dim", accessLine), 1, 0));
-  container.addChild(new Spacer(1));
-
-  // ── Confirm / Cancel hints ──
-  container.addChild(
-    new Text(
-      `  ${dim("Enter")} ${theme.fg("success", "Run review")}  ${dim("\u2022")}  ${dim("Esc")} ${theme.fg("muted", "Cancel")}  ${dim("\u2022 y/n")}  ${dim("\u2022")}  ${dim("v")} ${theme.fg("accent", "view full prompt")}`,
-      1,
-      0,
-    ),
-  );
-  container.addChild(new Spacer(1));
-
-  // ── Bottom border ──
-  container.addChild(new DynamicBorder((s: string) => accent(s)));
-
-  return container;
 }
 
 export async function selectBranch(ctx: ExtensionContext): Promise<string | undefined> {
