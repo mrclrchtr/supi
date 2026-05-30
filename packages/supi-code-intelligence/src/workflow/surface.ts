@@ -21,7 +21,11 @@ export interface WorkflowCodeToolSpec {
 }
 
 /**
- * Planned V2 workflow surface.
+ * Canonical V2 workflow surface metadata.
+ *
+ * Some entries are already active on the public surface (`code_resolve`,
+ * `code_context`, `code_find`, `code_graph`, `code_health`); the remaining
+ * entries stay here as roadmap metadata until later phases land.
  *
  * Each entry captures:
  * - the workflow intent
@@ -52,13 +56,13 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
       "Provide task-focused context bundles with prioritized definitions, relationships, tests, docs, and diagnostics.",
     schemaKey: "code_context",
     schemaDocs:
-      "Accepts optional task, targetId, scope, budget, include sections, and maxResults. It is the planned workflow successor to orientation-style briefs.",
+      "Accepts optional task, targetId, scope, budget, include sections, and maxResults. Phase 2 activates it additively alongside code_brief, which remains the compatibility/orientation tool for now.",
     absorbsTools: ["code_brief"],
     absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search", "diagnostics"],
     phase: "phase-2",
     nonGoals: [
-      "Does not replace code_brief in Phase 0.",
+      "Phase 2 keeps code_brief registered as the compatibility/orientation surface.",
       "Does not promise arbitrary natural-language planning or edit generation.",
     ],
   },

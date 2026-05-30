@@ -51,6 +51,9 @@ function renderResolved(
 
     // Follow-up suggestions
     lines.push("**Next steps — use the target ID with:**");
+    lines.push(
+      `- \`code_context\` { targetId: "${t.targetId}", task: "..." } — task-focused context`,
+    );
     lines.push(`- \`code_graph\` { targetId: "${t.targetId}" } — find usages`);
     lines.push(`- \`code_graph\` { targetId: "${t.targetId}" } — outgoing calls`);
     lines.push(`- \`code_affected\` { targetId: "${t.targetId}" } — blast radius`);
@@ -74,7 +77,7 @@ function renderResolved(
 
     lines.push("");
     lines.push(
-      "**Use a `targetId` with** `code_graph`, `code_affected`, `code_brief`, or `code_refactor_plan`.",
+      "**Use a `targetId` with** `code_context`, `code_graph`, `code_affected`, `code_brief`, or `code_refactor_plan`.",
     );
   }
 
@@ -110,7 +113,7 @@ function renderDisambiguation(
       `1. Rerun \`code_resolve\` with anchored coords: \`{ file: "${first.file}", line: ${first.line}, character: ${first.character} }\``,
     );
     lines.push(
-      `2. Or use a candidate's \`targetId\` directly with \`code_graph\`, \`code_brief\`, etc.`,
+      `2. Or use a candidate's \`targetId\` directly with \`code_context\`, \`code_graph\`, \`code_brief\`, etc.`,
     );
   }
 

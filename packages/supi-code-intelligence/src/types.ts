@@ -96,6 +96,17 @@ export interface ResolveDetails {
   nextQueries: string[];
 }
 
+/** Structured details metadata for code_context results. */
+export interface ContextDetails {
+  confidence: ConfidenceMode;
+  task: string | null;
+  focusTarget: string | null;
+  requestedSections: string[];
+  renderedSections: string[];
+  omittedCount: number;
+  nextQueries: string[];
+}
+
 /** Structured details metadata for code_health results. */
 export interface HealthDetails {
   lspAvailable: boolean;
@@ -110,6 +121,7 @@ export interface CodeIntelResult {
   content: string;
   details?:
     | { type: "brief"; data: BriefDetails }
+    | { type: "context"; data: ContextDetails }
     | { type: "search"; data: SearchDetails }
     | { type: "affected"; data: AffectedDetails }
     | { type: "resolve"; data: ResolveDetails }

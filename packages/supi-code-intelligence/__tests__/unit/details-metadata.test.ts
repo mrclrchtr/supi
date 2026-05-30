@@ -2,8 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { buildArchitectureModel } from "@mrclrchtr/supi-code-intelligence/api";
+import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
+import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
 import { executeAction } from "../helpers/execute-action.ts";
@@ -355,5 +357,175 @@ describe("structured details via tool adapters and action routers", () => {
         }
       });
     });
+  });
+});
+
+describe("code_context details metadata", () => {
+  async function resolveTargetId(pi: ReturnType<typeof createPiMock>): Promise<string> {
+    const resolveTool = getTool(pi, "code_resolve");
+    const resolveResult = (await resolveTool.execute(
+      "details-context-resolve",
+      { file: "packages/core/index.ts", line: 1, character: 17 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: {
+        data?: { targets?: Array<{ targetId: string }> };
+      };
+    };
+
+    const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
+    expect(targetId).toBeDefined();
+    return targetId as string;
+  }
+
+  it("returns dedicated context details for orientation-style output when task is omitted", async () => {
+    setupWorkspace();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "details-context-project",
+      {},
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: {
+        type: string;
+        data: {
+          task: string | null;
+          focusTarget: string | null;
+          renderedSections: string[];
+          requestedSections: string[];
+          omittedCount: number;
+          nextQueries: string[];
+        };
+      };
+    };
+
+    expect(result.details).toBeDefined();
+    expect(result.details?.type).toBe("context");
+    if (result.details?.type === "context") {
+      expect(result.details.data.task).toBeNull();
+      expect(result.details.data.focusTarget).toBeNull();
+      expect(result.details.data.renderedSections.length).toBeGreaterThan(0);
+      expect(result.details.data.requestedSections).toEqual([]);
+      expect(result.details.data.omittedCount).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("returns unavailable confidence for defs-only task context without a precise target", async () => {
+    setupWorkspace();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "details-context-no-target-defs",
+      {
+        task: "understand the surrounding definitions",
+        include: ["defs"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: {
+        type: string;
+        data: {
+          confidence: string;
+          task: string | null;
+          focusTarget: string | null;
+          renderedSections: string[];
+          requestedSections: string[];
+          omittedCount: number;
+          nextQueries: string[];
+        };
+      };
+    };
+
+    expect(result.details).toBeDefined();
+    expect(result.details?.type).toBe("context");
+    if (result.details?.type === "context") {
+      expect(result.details.data.confidence).toBe("unavailable");
+      expect(result.details.data.requestedSections).toEqual(["defs"]);
+      expect(result.details.data.renderedSections).toEqual(["defs"]);
+    }
+  });
+
+  it("returns dedicated context details for a targeted task bundle", async () => {
+    setupWorkspace();
+    writeFileSync(
+      path.join(tmpDir, "packages/core/index.ts"),
+      ["export function targetFn() { helper(); }", "export function helper() { return 1; }"]
+        .join("\n")
+        .concat("\n"),
+    );
+
+    registerMockProvider(tmpDir, {
+      references: async () => [
+        {
+          uri: `file://${path.join(tmpDir, "packages/app/main.ts")}`,
+          range: {
+            start: { line: 0, character: 0 },
+            end: { line: 0, character: 8 },
+          },
+        },
+      ],
+      calleesAt: async () => ({
+        kind: "success",
+        data: {
+          enclosingScope: { name: "targetFn", startLine: 1, endLine: 1 },
+          callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        },
+      }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "details-context-targeted",
+      {
+        task: "rename targetFn safely",
+        targetId,
+        include: ["defs", "references", "callees"],
+        maxResults: 2,
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: {
+        type: string;
+        data: {
+          task: string | null;
+          focusTarget: string | null;
+          renderedSections: string[];
+          requestedSections: string[];
+          omittedCount: number;
+          nextQueries: string[];
+        };
+      };
+    };
+
+    expect(result.details).toBeDefined();
+    expect(result.details?.type).toBe("context");
+    if (result.details?.type === "context") {
+      expect(result.details.data.task).toBe("rename targetFn safely");
+      expect(result.details.data.focusTarget).not.toBeNull();
+      expect(result.details.data.requestedSections).toEqual(["defs", "references", "callees"]);
+      expect(result.details.data.renderedSections).toEqual(
+        expect.arrayContaining(["defs", "references", "callees"]),
+      );
+      expect(result.details.data.nextQueries.length).toBeGreaterThan(0);
+    }
   });
 });

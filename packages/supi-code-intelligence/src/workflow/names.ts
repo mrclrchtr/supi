@@ -1,8 +1,9 @@
 /**
- * Canonical planned V2 workflow tool names.
+ * Canonical V2 workflow tool names.
  *
- * Phase 1.5 note: `code_resolve` and `code_health` are active. Remaining names
- * are design metadata for future phases.
+ * Active workflow-aligned tools: `code_resolve`, `code_context`, `code_find`,
+ * `code_graph`, and `code_health`. Remaining names stay as roadmap metadata for
+ * later phases.
  */
 export const WORKFLOW_CODE_TOOL_NAMES = [
   "code_resolve",

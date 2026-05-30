@@ -103,13 +103,42 @@ describe("focused code intelligence tool registration", () => {
     expect(modeParam?.enum).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
   });
 
-  it("does not register inactive V2 workflow tools (code_context, code_impact, code_refactor, code_apply)", () => {
+  it("registers code_context with the workflow schema shape while keeping code_brief", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const contextTool = getTool(pi, "code_context");
+    const briefTool = getTool(pi, "code_brief");
+
+    expect(contextTool).toBeDefined();
+    expect(contextTool.name).toBe("code_context");
+    expect(briefTool).toBeDefined();
+    expect(briefTool.name).toBe("code_brief");
+    expect(typeof contextTool.execute).toBe("function");
+
+    const props = (contextTool as { parameters?: { properties?: Record<string, unknown> } })
+      .parameters?.properties;
+    expect(props).toBeDefined();
+    expect(props).toHaveProperty("task");
+    expect(props).toHaveProperty("targetId");
+    expect(props).toHaveProperty("scope");
+    expect(props).toHaveProperty("budget");
+    expect(props).toHaveProperty("include");
+    expect(props).toHaveProperty("maxResults");
+  });
+
+  it("does not register inactive V2 workflow tools (code_impact, code_refactor, code_apply)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
     const inactive = WORKFLOW_CODE_TOOL_NAMES.filter(
-      (n) => n !== "code_resolve" && n !== "code_health" && n !== "code_find" && n !== "code_graph",
+      (n) =>
+        n !== "code_resolve" &&
+        n !== "code_context" &&
+        n !== "code_health" &&
+        n !== "code_find" &&
+        n !== "code_graph",
     );
     for (const name of inactive) {
       expect(names).not.toContain(name);

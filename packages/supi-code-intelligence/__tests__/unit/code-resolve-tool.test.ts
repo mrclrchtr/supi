@@ -140,6 +140,7 @@ describe("code_resolve tool", () => {
     expect(result.content[0].text).toContain("Span ID:");
     expect(result.content[0].text).toContain("index.ts");
     expect(result.content[0].text).toContain("Next steps");
+    expect(result.content[0].text).toContain("code_context");
   });
 
   it("resolves file-only request to exported targets with target IDs", async () => {
@@ -343,8 +344,7 @@ describe("code_resolve tool", () => {
     expect(result.content[0].text).toContain("targetId");
     // Should not claim a single match when ambiguous
     expect(result.content[0].text).not.toContain("resolved to `Widget`");
-    // Phase 1: must not suggest unregistered code_context tool
-    expect(result.content[0].text).not.toContain("code_context");
+    expect(result.content[0].text).toContain("code_context");
   });
 
   it("does not fall back to text search for missing semantic query results", async () => {

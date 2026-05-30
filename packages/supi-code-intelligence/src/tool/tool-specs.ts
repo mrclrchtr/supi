@@ -2,9 +2,14 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import type { CodeIntelligenceToolName } from "../intent/types.ts";
 import type { CodeIntelResult } from "../types.ts";
-import { CodeFindParameters, CodeHealthParameters } from "../workflow/schemas.ts";
+import {
+  CodeContextParameters,
+  CodeFindParameters,
+  CodeHealthParameters,
+} from "../workflow/schemas.ts";
 import { executeAffectedTool } from "./execute-affected.ts";
 import { executeBriefTool } from "./execute-brief.ts";
+import { executeContextTool } from "./execute-context.ts";
 import { executeFindTool } from "./execute-find.ts";
 import { executeGraphTool } from "./execute-graph.ts";
 import { executeHealthTool } from "./execute-health.ts";
@@ -179,6 +184,21 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeResolveParameters,
     run: (params, ctx) =>
       executeResolveTool(params as Parameters<typeof executeResolveTool>[0], ctx),
+  },
+  {
+    name: "code_context",
+    label: "Code Context",
+    description:
+      "Task-focused context bundle for a change, question, or resolved target. Use when you want prioritized definitions, relationships, diagnostics, docs, and tests gathered into one coding-oriented context result. In this additive phase, code_context complements code_brief rather than replacing it.",
+    promptSnippet: "code_context — task-focused coding context bundle",
+    basePromptGuidelines: [
+      "Use code_context when you want task-focused coding context instead of a neutral orientation brief.",
+      "Prefer `targetId` from `code_resolve` when you already resolved the symbol or anchor you care about.",
+      "Use `include` to request only the sections you need, and keep `code_brief` for pure orientation/start-here summaries.",
+    ],
+    parameters: CodeContextParameters,
+    run: (params, ctx) =>
+      executeContextTool(params as Parameters<typeof executeContextTool>[0], ctx),
   },
   {
     name: "code_brief",

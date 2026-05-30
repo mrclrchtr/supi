@@ -3,7 +3,7 @@
 Architecture briefs with structural enrichment, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_brief`, `code_graph`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_context`, `code_brief`, `code_graph`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
 - Historical substrate-named tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
@@ -17,7 +17,7 @@ src/
 ├── extension.ts            # Re-exports code-intelligence.ts for pi extension discovery
 ├── index.ts                # Public API exports for programmatic consumers
 ├── api.ts                  # Re-export surface for @mrclrchtr/supi-code-intelligence/api
-├── types.ts                # Result metadata types (BriefDetails, SearchDetails, AffectedDetails, etc.)
+├── types.ts                # Result metadata types (BriefDetails, ContextDetails, SearchDetails, etc.)
 ├── brief.ts                # Public facade for brief/overview helpers (compatibility shim)
 ├── brief-focused.ts        # Directory/file/symbol focused brief generation
 ├── git-context.ts          # Git branch, dirty files, last commit helpers
@@ -70,6 +70,7 @@ src/
 │   ├── register-tools.ts       # Focused Pi tool registration (iterates over specs)
 │   ├── validation.ts           # Shared parameter validation
 │   ├── target-id-params.ts     # targetId expansion helper (Phase 1)
+│   ├── execute-context.ts      # code_context tool executor
 │   ├── execute-brief.ts        # code_brief tool executor
 │   ├── execute-graph.ts        # code_graph tool executor (unified relations)
 │   ├── execute-affected.ts     # code_affected tool executor
@@ -78,15 +79,16 @@ src/
 │   ├── execute-refactor-plan.ts  # code_refactor_plan tool executor
 │   └── execute-refactor-apply.ts # code_refactor_apply tool executor
 ├── workflow/
-│   ├── names.ts               # Canonical planned V2 workflow tool names
+│   ├── names.ts               # Canonical V2 workflow tool names (active + roadmap)
 │   ├── ids.ts                 # Planned V2 workflow handle contracts (TargetId, PlanId, etc.)
 │   ├── results.ts             # Shared structured result envelope and provenance types
 │   ├── schemas.ts             # Planned V2 workflow tool parameter schemas
-│   ├── surface.ts             # Canonical planned V2 tool metadata
+│   ├── surface.ts             # Canonical V2 tool metadata (active + roadmap)
 │   ├── target-store.ts        # Session-scoped target/span handle registry (Phase 1)
 │   └── index.ts               # Internal barrel for workflow skeleton consumers/tests
 ├── presentation/markdown/
 │   ├── overview.ts             # Hidden overview markdown renderer
+│   ├── context.ts              # code_context markdown renderer
 │   ├── brief.ts                # Brief markdown renderer
 │   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
 │   ├── affected.ts             # Affected markdown renderer
@@ -101,6 +103,15 @@ src/
 ```
 
 ## Public tool contracts
+
+### `code_context`
+Task-focused context bundle. In Phase 2 it is active **alongside** `code_brief`, which remains the compatibility/orientation tool.
+
+- accepts `task`, `targetId`, `scope`, `budget`, `include`, and `maxResults`
+- when `task` is omitted, falls back to orientation-style output instead of erroring
+- when `task` is present, renders only the requested sections and reports unavailable sections honestly
+- `targetId` from `code_resolve` is the preferred precise anchor for task-focused follow-up
+- first-wave docs/tests/diagnostics sections are best-effort and must stay explicit when empty or unavailable
 
 ### `code_brief`
 Interpretive orientation tool. The planner selects the best provider (semantic or structural) automatically. For deeper detail, follow up with `code_graph`.
@@ -187,12 +198,14 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 
 ### Planner routing
 - The `planner.ts` central router reads capability state from the shared broker and returns `PlannerRoute` for each tool intent.
+- `code_context` uses the same semantic/structural preference model as `code_brief`, but falls back to orientation-style output when `task` is omitted.
 - `code_refactor_plan` checks `refactorAvailable` from the semantic capability slot.
 - The semantic provider prefers its generic `refactor(request)` entrypoint; rename-only fallback exists only for compatibility with older provider shapes.
 - `code_refactor_apply` does not require a live semantic provider — plan validity is enforced through fingerprint comparison in the executor.
 - When no capability is available, the planner returns `preferred: "unavailable"` and the execute function returns an explicit error message.
 
 ### Public-surface split
+- `code_context` is now active as the task-focused workflow surface, while `code_brief` remains the compatibility/orientation tool.
 - `code_find` is the sole search tool, supporting text, regex, AST, and semantic modes.
 - `code_graph` dispatches each relation to the appropriate substrate. Unavailable substrates skip with a note rather than failing.
 
@@ -203,7 +216,7 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 - `rename_file` / `move_file` are accepted at the schema level so the tool can return an explicit unavailable result rather than a misleading validation error.
 - `code_refactor_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
-- `code_brief`, `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
+- `code_context`, `code_brief`, and `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
 
 ### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.

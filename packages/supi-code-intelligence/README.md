@@ -28,6 +28,7 @@ pi install ./packages/supi-code-intelligence
 
 After install, pi gets:
 
+- `code_context` — task-focused context bundles for a change, question, or resolved target
 - `code_brief` — interpretive orientation with structural enrichment for a project, package, directory, file, or symbol
 - `code_graph` — unified relation graph (references, callees, implementations) from a resolved target
 - `code_affected` — blast radius, downstream impact, and risk for a target
@@ -43,14 +44,14 @@ Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*
 
 ## V2 workflow roadmap
 
-Phase 1 activates `code_resolve` as the first active V2 workflow tool.
+The workflow-oriented surface is rolling out incrementally.
 
 The current public surface now includes:
 
 - `code_resolve` — **active** (Phase 1)
+- `code_context` — **active** (Phase 2, additive alongside `code_brief`)
 - `code_find` — **active** (Phase 2a, supersedes code_pattern)
 - `code_health` — **active** (Phase 1.5)
-- `code_context` — planned (Phase 2)
 - `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
 - `code_impact` — planned (Phase 4)
 - `code_refactor` — planned (Phase 5)
@@ -72,6 +73,15 @@ This package is for questions like:
 - `@mrclrchtr/supi-code-intelligence` owns the public `code_*` tool surface and the orchestration layer above those substrates
 
 ## Tool overview
+
+### `code_context`
+Task-focused context bundle for a change, question, or resolved target.
+
+- accepts `task`, `targetId`, `scope`, `budget`, `include`, and `maxResults`
+- when `task` is omitted, falls back to orientation-style output instead of erroring
+- when `task` is present, renders requested sections such as `defs`, `references`, `callees`, `docs`, `tests`, and `diagnostics`
+- requested but unavailable sections are called out explicitly instead of being silently omitted
+- in this first implementation wave, `code_context` is additive: `code_brief` still exists as the compatibility/orientation tool
 
 ### `code_brief`
 Interpretive orientation with structural enrichment. Use for prioritized context, start-here guidance, and project/package/directory/file/symbol overview.
@@ -146,7 +156,7 @@ Depending on the tool, inputs may include:
 Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `path`
-- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_graph`, `code_affected`, `code_brief`, and `code_refactor_plan`
+- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_context`, `code_graph`, `code_affected`, `code_brief`, and `code_refactor_plan`
 - a leading `@` is stripped from `path` and `file`
 - non-search tools do **not** silently fall back to heuristic grep behavior
 
@@ -193,8 +203,8 @@ const overview = generateOverview(model);
 ## Source
 
 - `src/code-intelligence.ts` — extension entry point: overview injection and tool registration
-- `src/use-case/` — typed orchestration modules for brief, relations, affected, and pattern
-- `src/presentation/markdown/` — markdown renderers that format use-case results
+- `src/use-case/` — typed orchestration modules for brief, context, relations, affected, and pattern
+- `src/presentation/markdown/` — markdown renderers that format use-case results, including task-focused context bundles
 - `src/targeting/` — typed target-resolution pipeline
 - `src/tool/tool-specs.ts` — single source of truth for the current public tool surface
 - `src/tool/register-tools.ts` — focused tool registration wiring
