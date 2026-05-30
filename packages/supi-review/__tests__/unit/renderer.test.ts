@@ -179,22 +179,36 @@ describe("supi-review renderer", () => {
       modelId: "anthropic/claude-sonnet-4",
       timeoutMs: 900_000,
       partialOutput: "I reviewed the code and found issues with...",
+      debug: {
+        turns: 2,
+        toolUses: 1,
+        recentEvents: ["tool:start:read_snapshot_diff", "agent:end"],
+      },
     });
 
     expect(output).toContain("[warning]◆ Review Timed Out[/warning]");
     expect(output).toContain("Partial output:");
+    expect(output).toContain("Turns: 2 · Tool uses: 1");
   });
 
-  it("shows failed result details", () => {
+  it("shows failed result details with debug context", () => {
     const output = renderReview({
       kind: "failed",
       reason: "Reviewer session error: API rate limit",
       snapshot,
       modelId: "anthropic/claude-sonnet-4",
+      debug: {
+        turns: 3,
+        toolUses: 2,
+        recentEvents: ["tool:start:read", "tool:end:read:error", "agent:end"],
+        lastAssistantStopReason: "error",
+      },
     });
 
     expect(output).toContain("[error]◆ Review Failed[/error]");
     expect(output).toContain("API rate limit");
+    expect(output).toContain("Turns: 3 · Tool uses: 2");
+    expect(output).toContain("Last assistant stop: error");
   });
 
   it("shows canceled result", () => {

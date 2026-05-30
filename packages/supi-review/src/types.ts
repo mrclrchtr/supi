@@ -123,6 +123,23 @@ export interface ReviewPacket {
   charBudget: number;
 }
 
+/** Lightweight diagnostics attached to non-success review runs. */
+export interface ReviewFailureDebugInfo {
+  turns: number;
+  toolUses: number;
+  activities?: string[];
+  tokens?: {
+    input: number;
+    output: number;
+    total: number;
+  };
+  recentEvents?: string[];
+  lastAssistantText?: string;
+  lastAssistantStopReason?: string;
+  lastAssistantErrorMessage?: string;
+  lastAssistantToolCalls?: string[];
+}
+
 /** Fully prepared review run. */
 export interface ReviewPlan {
   model: ReviewModelSelection;
@@ -146,12 +163,14 @@ export type RawReviewResult =
       snapshot: ReviewSnapshot;
       brief?: SynthesizedReviewBrief;
       modelId: string;
+      debug?: ReviewFailureDebugInfo;
     }
   | {
       kind: "canceled";
       snapshot: ReviewSnapshot;
       brief?: SynthesizedReviewBrief;
       modelId: string;
+      debug?: ReviewFailureDebugInfo;
     }
   | {
       kind: "timeout";
@@ -160,6 +179,7 @@ export type RawReviewResult =
       partialOutput?: string;
       brief?: SynthesizedReviewBrief;
       modelId: string;
+      debug?: ReviewFailureDebugInfo;
     };
 
 /** Normalized result used by rendering and follow-up logic. */

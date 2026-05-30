@@ -1,4 +1,4 @@
-import type { ReviewItem, ReviewResult } from "../types.ts";
+import type { ReviewFailureDebugInfo, ReviewItem, ReviewResult } from "../types.ts";
 
 /** Format review results for the LLM-visible custom message content. */
 export function formatReviewContent(result: ReviewResult): string {
@@ -6,12 +6,24 @@ export function formatReviewContent(result: ReviewResult): string {
     case "success":
       return formatSuccessContent(result);
     case "failed":
-      return `Review failed: ${result.reason}`;
+      return formatFailureContent(result);
     case "canceled":
-      return "Review canceled";
+      return formatCanceledContent(result);
     case "timeout":
       return formatTimeoutContent(result);
   }
+}
+
+function formatFailureContent(result: Extract<ReviewResult, { kind: "failed" }>): string {
+  const parts = [`Review failed: ${result.reason}`];
+  appendDebugContent(parts, result.debug);
+  return parts.join("\n");
+}
+
+function formatCanceledContent(result: Extract<ReviewResult, { kind: "canceled" }>): string {
+  const parts = ["Review canceled"];
+  appendDebugContent(parts, result.debug);
+  return parts.join("\n");
 }
 
 function formatTimeoutContent(result: Extract<ReviewResult, { kind: "timeout" }>): string {
@@ -19,6 +31,7 @@ function formatTimeoutContent(result: Extract<ReviewResult, { kind: "timeout" }>
   if (result.partialOutput) {
     parts.push("", "Partial output:", result.partialOutput);
   }
+  appendDebugContent(parts, result.debug);
   return parts.join("\n");
 }
 
@@ -56,6 +69,37 @@ function formatSuccessContent(result: Extract<ReviewResult, { kind: "success" }>
 
   lines.push("", `Overall: ${output.overall_explanation}`);
   return lines.join("\n");
+}
+
+function appendDebugContent(parts: string[], debug: ReviewFailureDebugInfo | undefined): void {
+  if (!debug) return;
+
+  const lines = [
+    `- Turns: ${debug.turns}`,
+    `- Tool uses: ${debug.toolUses}`,
+    debug.activities && debug.activities.length > 0
+      ? `- Active: ${debug.activities.join(", ")}`
+      : undefined,
+    debug.tokens
+      ? `- Tokens: ${debug.tokens.input} in / ${debug.tokens.output} out / ${debug.tokens.total} total`
+      : undefined,
+    debug.recentEvents && debug.recentEvents.length > 0
+      ? `- Recent events: ${debug.recentEvents.join(" → ")}`
+      : undefined,
+    debug.lastAssistantStopReason
+      ? `- Last assistant stop: ${debug.lastAssistantStopReason}`
+      : undefined,
+    debug.lastAssistantToolCalls && debug.lastAssistantToolCalls.length > 0
+      ? `- Last assistant tools: ${debug.lastAssistantToolCalls.join(", ")}`
+      : undefined,
+    debug.lastAssistantErrorMessage
+      ? `- Last assistant error: ${debug.lastAssistantErrorMessage}`
+      : undefined,
+  ].filter((line): line is string => !!line);
+
+  if (lines.length === 0) return;
+
+  parts.push("", "Debug:", ...lines);
 }
 
 function formatReviewItems(items: ReviewItem[]): string[] {

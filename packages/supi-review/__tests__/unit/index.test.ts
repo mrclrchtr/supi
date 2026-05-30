@@ -71,10 +71,35 @@ describe("formatReviewContent", () => {
       modelId: "anthropic/claude-sonnet-4",
       timeoutMs: 60_000,
       partialOutput: "I still need to verify the auth flow.",
+      debug: {
+        turns: 2,
+        toolUses: 1,
+        recentEvents: ["tool:start:read_snapshot_diff", "agent:end"],
+      },
     });
 
     expect(content).toContain("Review timed out");
     expect(content).toContain("Partial output:");
+    expect(content).toContain("Debug:");
+    expect(content).toContain("- Turns: 2");
+  });
+
+  it("formats failed output with debug details", () => {
+    const content = formatReviewContent({
+      kind: "failed",
+      reason: "Reviewer session error: API rate limit",
+      snapshot,
+      modelId: "anthropic/claude-sonnet-4",
+      debug: {
+        turns: 1,
+        toolUses: 0,
+        lastAssistantStopReason: "error",
+      },
+    });
+
+    expect(content).toContain("Review failed: Reviewer session error: API rate limit");
+    expect(content).toContain("Debug:");
+    expect(content).toContain("- Last assistant stop: error");
   });
 });
 

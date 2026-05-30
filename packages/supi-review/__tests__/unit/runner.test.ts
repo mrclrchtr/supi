@@ -6,7 +6,7 @@ const mockSession = {
   steer: vi.fn(),
   abort: vi.fn(),
   dispose: vi.fn(),
-  messages: [] as Array<{ role: string; content: string | Array<{ type: string; text: string }> }>,
+  messages: [] as Array<Record<string, unknown>>,
   getSessionStats: vi.fn(),
 };
 
@@ -251,12 +251,31 @@ describe("runReviewer", () => {
     }
   });
 
-  it("returns failed when the reviewer never submits a result", async () => {
+  it("attaches debug details when the reviewer never submits a result", async () => {
+    mockSession.getSessionStats.mockReturnValue({
+      tokens: { input: 120, output: 45, total: 165 },
+    });
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
-      setTimeout(() => listener({ type: "agent_end", messages: [] }), 10);
+      setTimeout(() => {
+        listener({
+          type: "message_end",
+          message: {
+            role: "assistant",
+            content: "I forgot to submit the review.",
+            stopReason: "stop",
+          },
+        });
+        listener({ type: "agent_end", messages: [] });
+      }, 10);
       return vi.fn();
     });
-    mockSession.messages = [{ role: "assistant", content: "I forgot to submit the review." }];
+    mockSession.messages = [
+      {
+        role: "assistant",
+        content: "I forgot to submit the review.",
+        stopReason: "stop",
+      },
+    ];
 
     const resultPromise = runReviewer({
       prompt: "review this",
@@ -272,6 +291,17 @@ describe("runReviewer", () => {
     expect(result.kind).toBe("failed");
     if (result.kind === "failed") {
       expect(result.reason).toContain("did not call submit_review");
+      expect(result.debug).toEqual({
+        turns: 0,
+        toolUses: 0,
+        tokens: { input: 120, output: 45, total: 165 },
+        recentEvents: ["assistant:end:stop", "agent:end"],
+        lastAssistantText: "I forgot to submit the review.",
+        lastAssistantStopReason: "stop",
+        lastAssistantErrorMessage: undefined,
+        lastAssistantToolCalls: undefined,
+        activities: undefined,
+      });
     }
   });
 
