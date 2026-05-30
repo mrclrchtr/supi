@@ -21,6 +21,7 @@ pnpm add @mrclrchtr/supi-core
 ## Package surfaces
 
 - `@mrclrchtr/supi-core/api` — reusable helpers for other packages and extensions
+- `@mrclrchtr/supi-core/report` — shared text/report rendering helpers for TUI and plain-text summaries
 
 ## What you get from the API
 
@@ -71,6 +72,14 @@ The built-in settings UI supports:
 - active-branch session helper: `getActiveBranchEntries()`
 - terminal helpers such as `formatTitle()`, `signalWaiting()`, and `signalDone()`
 
+### Report helpers
+
+- `clampReportWidth()` — enforce a minimum readable report width
+- `formatReportTitle()` / `formatSectionHeader()` — shared themed headers
+- `formatDimLine()` / `formatKeyValueLine()` — common summary rows
+- `formatOverflowHint()` — consistent preview-overflow hints
+- `wrapReportText()` — ANSI-aware wrapped report blocks with optional indentation
+
 ## Example
 
 ```ts
@@ -101,3 +110,4 @@ const message = wrapExtensionContext("my-extension", "hello", {
 - `src/config.ts` — shared config loading and writing
 - `src/config-settings.ts` — config-backed settings registration helper
 - `src/settings-ui.ts` — shared settings overlay
+- `src/report.ts` — shared text/report rendering helpers

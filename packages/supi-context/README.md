@@ -81,7 +81,10 @@ This package does not add a model-callable tool; it adds a user command only.
 
 - `src/context.ts` — command registration, cached prompt-option handling, and renderer wiring
 - `src/analysis.ts` — token accounting, attribution, and report data assembly
-- `src/format.ts` — formatted report output for the TUI view
+- `src/format.ts` — report orchestration for the TUI view
+- `src/format-helpers.ts` — shared numeric and category helpers for report rendering
+- `src/format-summary.ts` — summary, usage bar, category, and composition sections
+- `src/format-sections.ts` — instruction file, context file, skill, guideline, tool, compaction, and provider sections
 - `src/prompt-inference.ts` — fallback recovery of context files, skills, and guideline sections from the live system prompt
 - `src/renderer.ts` — custom renderer for `supi-context` messages
 - `src/utils.ts` — token and plural-format helpers

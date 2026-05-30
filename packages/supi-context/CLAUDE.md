@@ -13,7 +13,10 @@ Detailed context usage report for pi via `/supi-context`.
 src/
 ├── context.ts          # Extension entry — registers /supi-context command
 ├── analysis.ts         # Context token breakdown (system, messages, tools, extensions)
-├── format.ts           # Token formatting + bar chart generation
+├── format.ts           # Report orchestration
+├── format-helpers.ts   # Shared local numeric/category helpers for report rendering
+├── format-summary.ts   # Summary, usage bar, category, and composition sections
+├── format-sections.ts  # File, skill, guideline, tool, compaction, and provider sections
 ├── prompt-inference.ts # Model-specific context window detection
 ├── renderer.ts         # Custom message renderer for TUI display
 └── utils.ts            # Token formatting helpers
@@ -27,6 +30,8 @@ __tests__/
 ```
 
 On `/supi-context`, analyzes the current system prompt and calculates token usage breakdowns. Results are sent as a `supi-context` custom message with a TUI-visible summary in `content` and detailed analysis in `details`.
+
+Rendering uses the shared `@mrclrchtr/supi-core/report` helpers for common themed report primitives so other SuPi packages can reuse the same header, row, overflow-hint, and wrapped-text behavior.
 
 ## Gotchas
 
