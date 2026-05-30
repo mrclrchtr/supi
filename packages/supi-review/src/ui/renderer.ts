@@ -1,6 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
-import type { ReviewItem, ReviewResult } from "../types.ts";
+import type { ReviewFailureDebugInfo, ReviewItem, ReviewResult } from "../types.ts";
 
 /** Register the custom TUI renderer for `supi-review` messages. */
 export function registerReviewRenderer(pi: ExtensionAPI): void {
@@ -16,7 +16,7 @@ export function registerReviewRenderer(pi: ExtensionAPI): void {
       case "failed":
         return renderFailed(result, theme);
       case "canceled":
-        return renderCanceled(theme);
+        return renderCanceled(result, theme);
       case "timeout":
         return renderTimeout(result, theme);
       default:
@@ -160,6 +160,7 @@ function renderFailed(
   container.addChild(new Text(theme.fg("muted", `Snapshot: ${result.snapshot.title}`), 1, 0));
   container.addChild(new Spacer(1));
   container.addChild(new Text(theme.fg("error", result.reason), 1, 0));
+  renderFailureDebug(container, result.debug, theme);
   return container;
 }
 
@@ -185,15 +186,56 @@ function renderTimeout(
     container.addChild(new Text(theme.fg("dim", "Partial output:"), 1, 0));
     container.addChild(new Text(theme.fg("dim", result.partialOutput.slice(0, 500)), 1, 0));
   }
+  renderFailureDebug(container, result.debug, theme);
   return container;
 }
 
 function renderCanceled(
+  result: Extract<ReviewResult, { kind: "canceled" }>,
   theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
 ): Container {
   const container = new Container();
   container.addChild(new Text(theme.fg("warning", "◆ Review Canceled"), 1, 0));
+  renderFailureDebug(container, result.debug, theme);
   return container;
+}
+
+function renderFailureDebug(
+  container: Container,
+  debug: ReviewFailureDebugInfo | undefined,
+  theme: Parameters<Parameters<ExtensionAPI["registerMessageRenderer"]>[1]>[2],
+): void {
+  if (!debug) return;
+
+  const lines = [
+    `Turns: ${debug.turns} · Tool uses: ${debug.toolUses}`,
+    debug.activities && debug.activities.length > 0
+      ? `Active: ${debug.activities.join(", ")}`
+      : undefined,
+    debug.tokens
+      ? `Tokens: ${debug.tokens.input} in / ${debug.tokens.output} out / ${debug.tokens.total} total`
+      : undefined,
+    debug.recentEvents && debug.recentEvents.length > 0
+      ? `Recent events: ${debug.recentEvents.join(" → ")}`
+      : undefined,
+    debug.lastAssistantStopReason
+      ? `Last assistant stop: ${debug.lastAssistantStopReason}`
+      : undefined,
+    debug.lastAssistantToolCalls && debug.lastAssistantToolCalls.length > 0
+      ? `Last assistant tools: ${debug.lastAssistantToolCalls.join(", ")}`
+      : undefined,
+    debug.lastAssistantErrorMessage
+      ? `Last assistant error: ${debug.lastAssistantErrorMessage}`
+      : undefined,
+  ].filter((line): line is string => !!line);
+
+  if (lines.length === 0) return;
+
+  container.addChild(new Spacer(1));
+  container.addChild(new Text(theme.fg("dim", "Debug:"), 1, 0));
+  for (const line of lines) {
+    container.addChild(new Text(theme.fg("dim", line), 1, 0));
+  }
 }
 
 function formatLevel(value: ReviewItem["impact"] | ReviewItem["effort"]): string {
