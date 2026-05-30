@@ -13,6 +13,19 @@ export interface DiffSection {
   deletions: number;
 }
 
+export interface ReviewPacketPreviewFileRow {
+  file: string;
+  additions: number | null;
+  deletions: number | null;
+  annotations: string[];
+}
+
+export interface ReviewPacketPreviewData {
+  auditHints: ReviewAuditHint[];
+  fileOverview: ReviewPacketPreviewFileRow[];
+  snapshotNotes?: string;
+}
+
 /** Build a compact review packet for the reviewer child session.
  *
  * The packet contains only the session-derived brief, target metadata, and a
@@ -24,8 +37,7 @@ export function buildReviewPacket(
   brief: SynthesizedReviewBrief,
   model: ReviewModelSelection,
 ): ReviewPacket {
-  const { preamble, sections } = splitDiffSections(snapshot.diffText);
-  const auditHints = deriveAuditHints(snapshot);
+  const previewData = buildReviewPacketPreviewData(snapshot);
 
   const parts: string[] = [
     "# Review Task",
@@ -56,14 +68,14 @@ export function buildReviewPacket(
     ...snapshot.changedFiles.map((file) => `- ${file}`),
   ];
 
-  if (auditHints.length > 0) {
-    parts.push("", "## Audit hints", ...formatAuditHints(auditHints));
+  if (previewData.auditHints.length > 0) {
+    parts.push("", "## Audit hints", ...formatAuditHints(previewData.auditHints));
   }
 
-  parts.push("", buildFileOverviewTable(snapshot.changedFiles, sections));
+  parts.push("", buildFileOverviewTable(previewData.fileOverview));
 
-  if (preamble.trim()) {
-    parts.push("", "## Snapshot notes", truncate(preamble.trim(), 1_500));
+  if (previewData.snapshotNotes) {
+    parts.push("", "## Snapshot notes", previewData.snapshotNotes);
   }
 
   parts.push(
@@ -208,11 +220,24 @@ export function classifySkipCategory(file: string): string | undefined {
   return undefined;
 }
 
-function formatOverviewRow(
+export function buildReviewPacketPreviewData(snapshot: ReviewSnapshot): ReviewPacketPreviewData {
+  const { preamble, sections } = splitDiffSections(snapshot.diffText);
+  const { statsMap, binaryFiles } = buildDiffSectionStats(sections);
+
+  return {
+    auditHints: deriveAuditHints(snapshot),
+    fileOverview: snapshot.changedFiles.map((file) =>
+      buildPreviewFileRow(file, statsMap, binaryFiles),
+    ),
+    snapshotNotes: preamble.trim() ? truncate(preamble.trim(), 1_500) : undefined,
+  };
+}
+
+function buildPreviewFileRow(
   file: string,
   statsMap: Map<string, { additions: number; deletions: number }>,
   binaryFiles: Set<string>,
-): string {
+): ReviewPacketPreviewFileRow {
   const stats = statsMap.get(file);
   const skipCategory = classifySkipCategory(file);
   const annotations: string[] = [];
@@ -222,28 +247,34 @@ function formatOverviewRow(
     // This happens for untracked files in working-tree snapshots, which
     // have no diff section to parse. Do not guess 0/0 or mark as trivial.
     if (skipCategory) annotations.push(`skip — ${skipCategory}`);
-    const annotation = annotations.length > 0 ? ` (${annotations.join(", ")})` : "";
-    return `| ${file} | ? | ?${annotation} |`;
+    return { file, additions: null, deletions: null, annotations };
   }
 
   if (binaryFiles.has(file)) {
     // Binary diffs have no diffable +/- lines. Show unknown stats.
     if (skipCategory) annotations.push(`skip — ${skipCategory}`);
     annotations.push("binary");
-    const annotation = annotations.length > 0 ? ` (${annotations.join(", ")})` : "";
-    return `| ${file} | ? | ?${annotation} |`;
+    return { file, additions: null, deletions: null, annotations };
   }
 
   const total = stats.additions + stats.deletions;
   if (total < 5) annotations.push("trivial");
   if (skipCategory) annotations.push(`skip — ${skipCategory}`);
-  const annotation = annotations.length > 0 ? ` (${annotations.join(", ")})` : "";
-  return `| ${file} | ${stats.additions} | ${stats.deletions}${annotation} |`;
+  return {
+    file,
+    additions: stats.additions,
+    deletions: stats.deletions,
+    annotations,
+  };
 }
 
-function buildFileOverviewTable(changedFiles: string[], sections: DiffSection[]): string {
+function buildDiffSectionStats(sections: DiffSection[]): {
+  statsMap: Map<string, { additions: number; deletions: number }>;
+  binaryFiles: Set<string>;
+} {
   const statsMap = new Map<string, { additions: number; deletions: number }>();
   const binaryFiles = new Set<string>();
+
   for (const section of sections) {
     const existing = statsMap.get(section.file);
     statsMap.set(section.file, {
@@ -255,11 +286,22 @@ function buildFileOverviewTable(changedFiles: string[], sections: DiffSection[])
     }
   }
 
+  return { statsMap, binaryFiles };
+}
+
+function formatOverviewRow(row: ReviewPacketPreviewFileRow): string {
+  const annotation = row.annotations.length > 0 ? ` (${row.annotations.join(", ")})` : "";
+  const additions = row.additions === null ? "?" : String(row.additions);
+  const deletions = row.deletions === null ? "?" : String(row.deletions);
+  return `| ${row.file} | ${additions} | ${deletions}${annotation} |`;
+}
+
+function buildFileOverviewTable(rows: ReviewPacketPreviewFileRow[]): string {
   const header = "| File | +Add | -Del |";
   const separator = "|---|---|---|";
-  const rows = changedFiles.map((file) => formatOverviewRow(file, statsMap, binaryFiles));
+  const tableRows = rows.map((row) => formatOverviewRow(row));
 
-  return [`## File overview`, "", header, separator, ...rows].join("\n");
+  return [`## File overview`, "", header, separator, ...tableRows].join("\n");
 }
 
 function formatAuditHints(hints: ReviewAuditHint[]): string[] {
