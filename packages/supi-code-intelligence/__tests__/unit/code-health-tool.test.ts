@@ -260,6 +260,33 @@ describe("code_health tool", () => {
     expect(result.content[0].text).toContain("### Servers");
   });
 
+  it("ignores workspace diagnostic summary entries with zero errors and warnings", async () => {
+    registerMockProvider(tmpDir);
+    mockReadyLsp({
+      getWorkspaceDiagnosticSummary: vi
+        .fn()
+        .mockReturnValue([{ file: "src/clean.ts", errors: 0, warnings: 0 }]),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-6-zero-counts",
+      { include: ["diagnostics"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).toContain("No diagnostics found.");
+    expect(result.content[0].text).not.toContain("1 file with issues: 0 errors, 0 warnings");
+    expect(result.content[0].text).not.toContain("src/clean.ts");
+  });
+
   it("renders only the requested sections when include is provided", async () => {
     registerMockProvider(tmpDir);
     mockReadyLsp();

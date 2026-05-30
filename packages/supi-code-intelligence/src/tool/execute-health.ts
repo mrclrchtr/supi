@@ -185,28 +185,55 @@ async function collectDiagnostics(
 ): Promise<HealthData["diagnostics"]> {
   if (!included.includes("diagnostics") || !service) return [];
 
-  if (scopeFilter && existsSync(scopeFilter) && !isDirectory(scopeFilter)) {
-    const diags = await service.fileDiagnostics(scopeFilter, 4);
-    if (diags && diags.length > 0) {
-      return [
-        {
-          file: scopeFilter,
-          errors: diags.filter((d) => (d.severity ?? 1) === 1).length,
-          warnings: diags.filter((d) => (d.severity ?? 1) === 2).length,
-        },
-      ];
-    }
+  if (isScopedFile(scopeFilter)) {
+    return collectScopedFileDiagnostics(service, scopeFilter);
+  }
+
+  return collectWorkspaceDiagnostics(service, scopeFilter, cwd);
+}
+
+function isScopedFile(scopeFilter: string | null): scopeFilter is string {
+  return scopeFilter !== null && existsSync(scopeFilter) && !isDirectory(scopeFilter);
+}
+
+async function collectScopedFileDiagnostics(
+  service: SessionLspService,
+  scopeFilter: string,
+): Promise<HealthData["diagnostics"]> {
+  const diags = await service.fileDiagnostics(scopeFilter, 4);
+  if (!diags || diags.length === 0) {
     return [];
   }
 
+  const errors = diags.filter((d) => (d.severity ?? 1) === 1).length;
+  const warnings = diags.filter((d) => (d.severity ?? 1) === 2).length;
+  if (!hasIssueCounts(errors, warnings)) {
+    return [];
+  }
+
+  return [{ file: scopeFilter, errors, warnings }];
+}
+
+function collectWorkspaceDiagnostics(
+  service: SessionLspService,
+  scopeFilter: string | null,
+  cwd: string,
+): HealthData["diagnostics"] {
   const summary = service.getWorkspaceDiagnosticSummary();
   const result: HealthData["diagnostics"] = [];
+
   for (const entry of summary) {
     const filePath = resolve(cwd, entry.file);
     if (scopeFilter && !isWithinOrEqual(scopeFilter, filePath)) continue;
+    if (!hasIssueCounts(entry.errors, entry.warnings)) continue;
     result.push({ file: filePath, errors: entry.errors, warnings: entry.warnings });
   }
+
   return result;
+}
+
+function hasIssueCounts(errors: number, warnings: number): boolean {
+  return errors > 0 || warnings > 0;
 }
 
 /** Max files to query for code actions in detailed health mode. */

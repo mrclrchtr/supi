@@ -178,15 +178,13 @@ runtime details.
 
 ### `packages/supi-tree-sitter`
 
-Uses `src/tool/tool-specs.ts` as the single source of truth for:
-- public focused-tool names (`tree_sitter_outline`, `tree_sitter_imports`, `tree_sitter_exports`, `tree_sitter_node_at`, `tree_sitter_query`, `tree_sitter_callees`)
-- descriptions, labels, prompt snippets, and prompt guidelines
-- parameter schema keys for each tool
+This package is now **library-only**. It provides the shared session-scoped
+structural service via `getSessionTreeSitterService(cwd)` so peer packages can
+reuse parsers instead of creating a fresh owned session for every operation.
 
-`src/tool/guidance.ts` and `src/tool/register-tools.ts` derive from those specs.
-The extension also publishes a shared session-scoped structural service via
-`getSessionTreeSitterService(cwd)` so peer packages can reuse parsers instead of
-creating a fresh owned session for every operation.
+If substrate metadata modules such as `src/tool/tool-specs.ts` remain in the
+package, treat them as **internal substrate plumbing**, not a public model-facing
+surface. Public `tree_sitter_*` tools are no longer registered.
 
 ### `packages/supi-code-intelligence`
 
@@ -202,32 +200,28 @@ Uses `src/tool/tool-specs.ts` as the single source of truth for:
 
 ### `packages/supi-lsp`
 
-Uses `src/tool/tool-specs.ts` as the single source of truth for:
-- split-tool metadata
-- parameter schemas
-- base guidance
-- service-action bindings
-- displayed server capability labels
+This package is now **library-only**. It provides the shared semantic runtime,
+service, and provider APIs consumed by `supi-code-intelligence`.
 
-`src/tool/guidance.ts`, `src/tool/register-tools.ts`, and
-`src/manager/manager-project-info.ts` derive from those specs.
+If substrate metadata modules such as `src/tool/tool-specs.ts` remain in the
+package, treat them as **internal substrate plumbing**, not a public model-facing
+surface. Public `lsp_*` tools are no longer registered.
 
 ## Package ownership and cross-family orchestration
 
 In the SuPi code-understanding stack, tool ownership follows a clear rule:
 
 - **`supi-code-intelligence`** is the **sole pi extension exposer** for the code-understanding stack. It owns
-  all three tool families (`code_*`, `lsp_*`, `tree_sitter_*`), the substrate wiring (LSP session lifecycle,
-  diagnostics, recovery, settings, and tool overrides), and all cross-family orchestration guidance.
+  the public `code_*` tool surface, the substrate wiring (LSP session lifecycle, diagnostics, recovery,
+  settings, and tool overrides), and the cross-family orchestration guidance above the semantic and
+  structural libraries.
 - **`supi-lsp`** is a **library-only** package — no pi extension surface. It provides the semantic runtime/
-  service/provider APIs that power `lsp_*` tool execution. Tool registration and all pi event handlers
-  live in `supi-code-intelligence`.
+  service/provider APIs that power the semantic parts of the public `code_*` tools.
 - **`supi-tree-sitter`** is a **library-only** package — no pi extension surface. It provides the structured
-  runtime/service APIs (parse, query, outline) that power `tree_sitter_*` tool execution. Tool registration
-  and all pi event handlers live in `supi-code-intelligence`.
+  runtime/service APIs that power the structural parts of the public `code_*` tools.
 
-Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. The substrate packages
-are transitive dependencies, not standalone pi installations.
+Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tools. The substrate
+packages are transitive dependencies, not standalone pi installations.
 
 ## Anti-patterns
 
