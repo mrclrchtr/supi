@@ -10,6 +10,10 @@ function asToolName(name: CodeIntelligenceToolName): CodeIntelligenceToolName {
   return name;
 }
 
+function asPlannedToolName(name: string): CodeIntelligenceToolName {
+  return name as CodeIntelligenceToolName;
+}
+
 describe("Planner routing", () => {
   afterEach(() => {
     getDefaultWorkspaceRuntime().clearAll();
@@ -98,6 +102,20 @@ describe("Planner routing", () => {
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
       const route = routeFor("/project", asToolName("code_refactor_plan"));
       expect(route.preferred).toBe("semantic");
+    });
+
+    it("routes code_impact to semantic-preferred", async () => {
+      registerSemantic();
+      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
+      const route = routeFor("/project", asPlannedToolName("code_impact"));
+      expect(route.preferred).toBe("semantic");
+    });
+
+    it("returns unavailable for code_impact when semantic analysis is unavailable", async () => {
+      registerStructural();
+      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
+      const route = routeFor("/project", asPlannedToolName("code_impact"));
+      expect(route.preferred).toBe("unavailable");
     });
 
     it("routes code_affected to semantic-preferred", async () => {

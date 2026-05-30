@@ -54,6 +54,15 @@ export interface AffectedDetails {
   prioritySignals?: PrioritySignalsSummary | null;
 }
 
+/**
+ * Structured details metadata for workflow-oriented impact analysis results.
+ *
+ * Currently structurally identical to `AffectedDetails`. When adding own fields,
+ * audit callers in `generate-impact.ts` that construct `{ type: "impact", data }`
+ * so they return `ImpactDetails`, not just `AffectedDetails`.
+ */
+export interface ImpactDetails extends AffectedDetails {}
+
 /** Disambiguation candidate for ambiguous symbol resolution. */
 export interface DisambiguationCandidate {
   name: string;
@@ -123,6 +132,7 @@ export interface CodeIntelResult {
     | { type: "brief"; data: BriefDetails }
     | { type: "context"; data: ContextDetails }
     | { type: "search"; data: SearchDetails }
+    | { type: "impact"; data: ImpactDetails }
     | { type: "affected"; data: AffectedDetails }
     | { type: "resolve"; data: ResolveDetails }
     | { type: "health"; data: HealthDetails };

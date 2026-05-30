@@ -127,7 +127,31 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("maxResults");
   });
 
-  it("does not register inactive V2 workflow tools (code_impact, code_refactor, code_apply)", () => {
+  it("registers code_impact as the active workflow impact tool while keeping code_affected", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const impactTool = getTool(pi, "code_impact");
+    const affectedTool = getTool(pi, "code_affected");
+
+    expect(impactTool).toBeDefined();
+    expect(impactTool.name).toBe("code_impact");
+    expect(typeof impactTool.execute).toBe("function");
+    expect(affectedTool).toBeDefined();
+    expect(affectedTool.name).toBe("code_affected");
+
+    const props = (impactTool as { parameters?: { properties?: Record<string, unknown> } })
+      .parameters?.properties;
+    expect(props).toBeDefined();
+    expect(props).toHaveProperty("targetId");
+    expect(props).toHaveProperty("change");
+    expect(props).toHaveProperty("changedFiles");
+    expect(props).toHaveProperty("baseRef");
+    expect(props).toHaveProperty("includeTests");
+    expect(props).toHaveProperty("maxResults");
+  });
+
+  it("does not register inactive V2 workflow tools (code_refactor, code_apply)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
@@ -138,7 +162,8 @@ describe("focused code intelligence tool registration", () => {
         n !== "code_context" &&
         n !== "code_health" &&
         n !== "code_find" &&
-        n !== "code_graph",
+        n !== "code_graph" &&
+        n !== "code_impact",
     );
     for (const name of inactive) {
       expect(names).not.toContain(name);

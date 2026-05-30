@@ -287,6 +287,87 @@ describe("structured details via tool adapters and action routers", () => {
       }
     });
 
+    it("code_impact target error returns impact details with unavailable confidence and resolve-first guidance", async () => {
+      const pi = createPiMock();
+      codeIntelligenceExtension(pi as never);
+      const tool = getTool(pi, "code_impact");
+
+      const result = (await tool.execute(
+        "details-impact-error",
+        {},
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as {
+        details?: {
+          type: string;
+          data: {
+            confidence: string;
+            directCount: number;
+            downstreamCount: number;
+            riskLevel: string;
+            nextQueries: string[];
+          };
+        };
+      };
+
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("impact");
+      if (result.details?.type === "impact") {
+        expect(result.details.data.confidence).toBe("unavailable");
+        expect(result.details.data.directCount).toBe(0);
+        expect(result.details.data.downstreamCount).toBe(0);
+        expect(result.details.data.riskLevel).toBe("low");
+        expect(result.details.data.nextQueries).toEqual(
+          expect.arrayContaining([expect.stringContaining("code_resolve")]),
+        );
+      }
+    });
+
+    it("code_impact changedFiles input returns impact details with diff-aware next queries", async () => {
+      setupWorkspace();
+      writeFileSync(path.join(tmpDir, "packages/core/index.ts"), "export const changed = 1;\n");
+      writeFileSync(
+        path.join(tmpDir, "packages/core/index.test.ts"),
+        "import { changed } from './index';\nvoid changed;\n",
+      );
+
+      const pi = createPiMock();
+      codeIntelligenceExtension(pi as never);
+      const tool = getTool(pi, "code_impact");
+
+      const result = (await tool.execute(
+        "details-impact-changed-files",
+        {
+          changedFiles: ["packages/core/index.ts"],
+          baseRef: "main",
+          includeTests: true,
+        },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as {
+        details?: {
+          type: string;
+          data: {
+            confidence: string;
+            nextQueries: string[];
+            likelyTests: string[];
+          };
+        };
+      };
+
+      expect(result.details).toBeDefined();
+      expect(result.details?.type).toBe("impact");
+      if (result.details?.type === "impact") {
+        expect(result.details.data.confidence).not.toBe("unavailable");
+        expect(result.details.data.likelyTests.length).toBeGreaterThan(0);
+        expect(result.details.data.nextQueries).toEqual(
+          expect.arrayContaining([expect.stringContaining("code_brief")]),
+        );
+      }
+    });
+
     describe("pattern action — no-result detail states", () => {
       it("returns details for regex error", async () => {
         const result = await executePatternAction({ pattern: "[invalid", regex: true }, tmpDir);

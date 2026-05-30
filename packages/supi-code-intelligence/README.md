@@ -31,7 +31,8 @@ After install, pi gets:
 - `code_context` — task-focused context bundles for a change, question, or resolved target
 - `code_brief` — interpretive orientation with structural enrichment for a project, package, directory, file, or symbol
 - `code_graph` — unified relation graph (references, callees, implementations) from a resolved target
-- `code_affected` — blast radius, downstream impact, and risk for a target
+- `code_impact` — preferred workflow-oriented blast radius, downstream impact, and diff-aware changed-file analysis
+- `code_affected` — compatibility alias for the older target-based impact surface
 - `code_find` — unified ranked search (text, regex, AST, semantic)
 - `code_health` — diagnostics, server status, dirty workspace, coverage, and unused-code health signals
 - `code_refactor_plan` — preview an operation-aware semantic refactor plan without mutating files
@@ -53,7 +54,7 @@ The current public surface now includes:
 - `code_find` — **active** (Phase 2a, supersedes code_pattern)
 - `code_health` — **active** (Phase 1.5)
 - `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
-- `code_impact` — planned (Phase 4)
+- `code_impact` — **active** (Phase 4, preferred workflow impact tool; `code_affected` remains as a compatibility alias)
 - `code_refactor` — planned (Phase 5)
 - `code_apply` — planned (Phase 5)
 
@@ -96,8 +97,16 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
 - `imports`, `exports`, `tests` return "not yet implemented" gracefully
 
+### `code_impact`
+Preferred workflow-oriented impact analysis.
+
+- supports the existing target-based path (`targetId`, anchored coords, symbol)
+- adds diff-aware entry points for `changedFiles`, optional `baseRef`, and explicit `includeTests`
+- `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing
+- uses real workspace/git evidence only; no heuristic grep fallback
+
 ### `code_affected`
-Semantic blast-radius analysis for a concrete target. This tool no longer falls back to grep-style guesses.
+Compatibility alias for the older target-based blast-radius surface. Prefer `code_impact` for new calls.
 
 ### `code_find`
 Unified ranked search tool for:
@@ -156,7 +165,7 @@ Depending on the tool, inputs may include:
 Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `path`
-- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_context`, `code_graph`, `code_affected`, `code_brief`, and `code_refactor_plan`
+- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_context`, `code_graph`, `code_impact`, `code_affected`, `code_brief`, and `code_refactor_plan`
 - a leading `@` is stripped from `path` and `file`
 - non-search tools do **not** silently fall back to heuristic grep behavior
 

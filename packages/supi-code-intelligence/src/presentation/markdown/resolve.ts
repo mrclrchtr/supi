@@ -56,7 +56,7 @@ function renderResolved(
     );
     lines.push(`- \`code_graph\` { targetId: "${t.targetId}" } — find usages`);
     lines.push(`- \`code_graph\` { targetId: "${t.targetId}" } — outgoing calls`);
-    lines.push(`- \`code_affected\` { targetId: "${t.targetId}" } — blast radius`);
+    lines.push(`- \`code_impact\` { targetId: "${t.targetId}" } — blast radius`);
     lines.push(
       `- \`code_refactor_plan\` { targetId: "${t.targetId}", operation: "rename", newName: "..." }`,
     );
@@ -77,7 +77,7 @@ function renderResolved(
 
     lines.push("");
     lines.push(
-      "**Use a `targetId` with** `code_context`, `code_graph`, `code_affected`, `code_brief`, or `code_refactor_plan`.",
+      "**Use a `targetId` with** `code_context`, `code_graph`, `code_impact`, `code_brief`, or `code_refactor_plan`.",
     );
   }
 

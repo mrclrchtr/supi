@@ -3,7 +3,7 @@
 Architecture briefs with structural enrichment, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_context`, `code_brief`, `code_graph`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_context`, `code_brief`, `code_graph`, `code_impact`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
 - Historical substrate-named tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
@@ -73,7 +73,8 @@ src/
 │   ├── execute-context.ts      # code_context tool executor
 │   ├── execute-brief.ts        # code_brief tool executor
 │   ├── execute-graph.ts        # code_graph tool executor (unified relations)
-│   ├── execute-affected.ts     # code_affected tool executor
+│   ├── execute-impact.ts       # code_impact tool executor (preferred impact surface)
+│   ├── execute-affected.ts     # code_affected compatibility executor
 │   ├── execute-find.ts         # code_find tool executor
 │   ├── execute-resolve.ts      # code_resolve tool executor (Phase 1)
 │   ├── execute-refactor-plan.ts  # code_refactor_plan tool executor
@@ -91,7 +92,8 @@ src/
 │   ├── context.ts              # code_context markdown renderer
 │   ├── brief.ts                # Brief markdown renderer
 │   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
-│   ├── affected.ts             # Affected markdown renderer
+│   ├── impact.ts               # Preferred workflow impact markdown renderer
+│   ├── affected.ts             # code_affected compatibility markdown renderer
 │   ├── pattern.ts              # Pattern/find search markdown renderer
 │   ├── refactor.ts             # Refactor result markdown renderer
 │   └── resolve.ts              # code_resolve markdown renderer (Phase 1)
@@ -151,8 +153,16 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_imp
 - `imports`, `exports`, `tests` return "not yet implemented" gracefully
 - File-level expansion not supported — requires precise target (anchored coords or targetId)
 
+### `code_impact`
+Preferred workflow-oriented blast-radius tool.
+
+- supports target-based impact analysis plus diff-aware `changedFiles` input
+- optional `baseRef` and explicit `includeTests`
+- `change`-only requests return an explicit insufficient-evidence result instead of heuristic guessing
+- does not fall back to heuristic search
+
 ### `code_affected`
-Semantic blast-radius tool. Uses semantic evidence. Does not fall back to heuristic search.
+Compatibility alias for the older target-based blast-radius tool. Prefer `code_impact` for new calls.
 
 ### `code_find`
 Unified ranked code search with mode dispatch — the sole search tool.
@@ -206,6 +216,7 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 
 ### Public-surface split
 - `code_context` is now active as the task-focused workflow surface, while `code_brief` remains the compatibility/orientation tool.
+- `code_impact` is now active as the preferred workflow impact surface; `code_affected` remains as a temporary compatibility alias.
 - `code_find` is the sole search tool, supporting text, regex, AST, and semantic modes.
 - `code_graph` dispatches each relation to the appropriate substrate. Unavailable substrates skip with a note rather than failing.
 
@@ -216,7 +227,7 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 - `rename_file` / `move_file` are accepted at the schema level so the tool can return an explicit unavailable result rather than a misleading validation error.
 - `code_refactor_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
-- `code_context`, `code_brief`, and `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
+- `code_context`, `code_brief`, `code_impact`, and `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
 
 ### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.

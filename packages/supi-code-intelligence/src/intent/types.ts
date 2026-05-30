@@ -9,6 +9,7 @@
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_brief",
   "code_context",
+  "code_impact",
   "code_affected",
   "code_find",
   "code_graph",

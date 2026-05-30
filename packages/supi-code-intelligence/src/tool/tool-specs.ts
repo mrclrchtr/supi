@@ -6,6 +6,7 @@ import {
   CodeContextParameters,
   CodeFindParameters,
   CodeHealthParameters,
+  CodeImpactParameters,
 } from "../workflow/schemas.ts";
 import { executeAffectedTool } from "./execute-affected.ts";
 import { executeBriefTool } from "./execute-brief.ts";
@@ -13,6 +14,7 @@ import { executeContextTool } from "./execute-context.ts";
 import { executeFindTool } from "./execute-find.ts";
 import { executeGraphTool } from "./execute-graph.ts";
 import { executeHealthTool } from "./execute-health.ts";
+import { executeImpactTool } from "./execute-impact.ts";
 import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
 import { executeResolveTool } from "./execute-resolve.ts";
@@ -233,13 +235,28 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     run: (params, ctx) => executeGraphTool(params as Parameters<typeof executeGraphTool>[0], ctx),
   },
   {
+    name: "code_impact",
+    label: "Code Impact",
+    description:
+      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for impact assessment and does not fall back to heuristic text search.",
+    promptSnippet: "code_impact — blast radius and impact",
+    basePromptGuidelines: [
+      "Use code_impact before edits to estimate blast radius and follow-up checks.",
+      "Prefer `targetId` from `code_resolve` when you already resolved the target you want to analyze.",
+      "Use code_graph instead of code_impact when you only need a plain reference list without impact analysis.",
+      "`code_affected` remains available as a temporary compatibility alias, but `code_impact` is the preferred workflow surface.",
+    ],
+    parameters: CodeImpactParameters,
+    run: (params, ctx) => executeImpactTool(params as Parameters<typeof executeImpactTool>[0], ctx),
+  },
+  {
     name: "code_affected",
     label: "Code Affected",
     description:
-      "Estimate blast radius and downstream impact for a target before making edits. Uses semantic evidence for impact assessment. Does not fall back to heuristic text search. Use code_graph when you only need a plain reference list without impact analysis.",
-    promptSnippet: "code_affected — blast radius and impact",
+      "Compatibility alias for impact analysis. Prefer `code_impact` for the workflow-oriented surface. Uses semantic evidence for impact assessment and does not fall back to heuristic text search.",
+    promptSnippet: "code_affected — compatibility impact alias",
     basePromptGuidelines: [
-      "Use code_affected before edits to estimate blast radius and follow-up checks.",
+      "Prefer `code_impact` for new impact-analysis calls; `code_affected` remains for compatibility.",
       "Use code_graph instead of code_affected when you only need a plain reference list without impact analysis.",
     ],
     parameters: CodeAffectedParameters,

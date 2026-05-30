@@ -24,8 +24,8 @@ export interface WorkflowCodeToolSpec {
  * Canonical V2 workflow surface metadata.
  *
  * Some entries are already active on the public surface (`code_resolve`,
- * `code_context`, `code_find`, `code_graph`, `code_health`); the remaining
- * entries stay here as roadmap metadata until later phases land.
+ * `code_context`, `code_find`, `code_graph`, `code_impact`, `code_health`);
+ * the remaining entries stay here as roadmap metadata until later phases land.
  *
  * Each entry captures:
  * - the workflow intent
@@ -110,7 +110,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     substrates: ["semantic", "search", "git", "diagnostics"],
     phase: "phase-4",
     nonGoals: [
-      "Does not rename or replace code_affected in Phase 0.",
+      "Phase 4 activates code_impact while keeping code_affected as a compatibility alias.",
       "Does not guarantee perfect downstream impact inference without substrate evidence.",
     ],
   },

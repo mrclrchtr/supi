@@ -19,6 +19,9 @@ export interface ImpactAnalysis {
   externalRefs: number;
 }
 
+export const AFFECTED_COMPATIBILITY_NOTE =
+  "Compatibility alias — prefer `code_impact` for new workflow-oriented impact analysis.";
+
 interface RenderSingleParams {
   symbolName: string;
   refs: ReferenceCollection;
@@ -37,6 +40,8 @@ export function renderAffectedSingle(params: RenderSingleParams): string {
   const lines: string[] = [];
 
   lines.push(`# Affected: \`${symbolName}\``);
+  lines.push("");
+  lines.push(`_${AFFECTED_COMPATIBILITY_NOTE}_`);
   lines.push("");
 
   const refSummary =
@@ -93,6 +98,8 @@ export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
 
   const lines: string[] = [];
   lines.push(`# Affected: \`${targetGroup.displayName}\``);
+  lines.push("");
+  lines.push(`_${AFFECTED_COMPATIBILITY_NOTE}_`);
   lines.push("");
   lines.push(
     `**Risk: ${analysis.riskLevel.toUpperCase()}** | ${targetGroup.targets.length} exported target${targetGroup.targets.length !== 1 ? "s" : ""} | ${refSummary} | ${analysis.affectedFiles.size} file${analysis.affectedFiles.size !== 1 ? "s" : ""} | ${analysis.affectedModules.size} module${analysis.affectedModules.size !== 1 ? "s" : ""} | ${analysis.downstreamCount} downstream (${analysis.confidence})`,

@@ -141,6 +141,7 @@ describe("code_resolve tool", () => {
     expect(result.content[0].text).toContain("index.ts");
     expect(result.content[0].text).toContain("Next steps");
     expect(result.content[0].text).toContain("code_context");
+    expect(result.content[0].text).toContain("code_impact");
   });
 
   it("resolves file-only request to exported targets with target IDs", async () => {
