@@ -28,6 +28,7 @@ const brief: SynthesizedReviewBrief = {
   focusAreas: ["Tool names", "Docs", "User-facing strings"],
   riskyFiles: ["packages/supi-code-intelligence/src/tool/tool-specs.ts"],
   unresolvedQuestions: [],
+  reviewInstructionBlockIds: [],
 };
 
 const model = {
@@ -193,24 +194,27 @@ describe("splitDiffSections", () => {
 describe("buildReviewPacketPreviewData", () => {
   it("derives structured overview data for the review-plan inspector", () => {
     const longNotes = `=== Snapshot notes ===\n${"review context ".repeat(140)}`;
-    const preview = buildReviewPacketPreviewData({
-      target: { kind: "working-tree" },
-      title: "Working tree changes",
-      changedFiles: ["packages/supi-code-intelligence/src/tool/tool-specs.ts", "pnpm-lock.yaml"],
-      diffText: [
-        longNotes,
-        "diff --git a/packages/supi-code-intelligence/src/tool/tool-specs.ts b/packages/supi-code-intelligence/src/tool/tool-specs.ts",
-        "--- a/packages/supi-code-intelligence/src/tool/tool-specs.ts",
-        "+++ b/packages/supi-code-intelligence/src/tool/tool-specs.ts",
-        "@@ -1 +1 @@",
-        '- "code_calls"',
-        '+ "code_graph"',
-      ].join("\n"),
-      stats: { files: 2, additions: 1, deletions: 1 },
-    });
+    const preview = buildReviewPacketPreviewData(
+      {
+        target: { kind: "working-tree" },
+        title: "Working tree changes",
+        changedFiles: ["packages/supi-code-intelligence/src/tool/tool-specs.ts", "pnpm-lock.yaml"],
+        diffText: [
+          longNotes,
+          "diff --git a/packages/supi-code-intelligence/src/tool/tool-specs.ts b/packages/supi-code-intelligence/src/tool/tool-specs.ts",
+          "--- a/packages/supi-code-intelligence/src/tool/tool-specs.ts",
+          "+++ b/packages/supi-code-intelligence/src/tool/tool-specs.ts",
+          "@@ -1 +1 @@",
+          '- "code_calls"',
+          '+ "code_graph"',
+        ].join("\n"),
+        stats: { files: 2, additions: 1, deletions: 1 },
+      },
+      ["public-surface"],
+    );
 
-    expect(preview.auditHints).toHaveLength(1);
-    expect(preview.auditHints[0]?.title).toBe("Public-surface / rename / merge audit");
+    expect(preview.reviewInstructionBlocks).toHaveLength(1);
+    expect(preview.reviewInstructionBlocks[0]?.title).toBe("Public-surface / rename / merge audit");
     expect(preview.fileOverview).toEqual([
       {
         file: "packages/supi-code-intelligence/src/tool/tool-specs.ts",
@@ -231,11 +235,35 @@ describe("buildReviewPacketPreviewData", () => {
 });
 
 describe("buildReviewPacket", () => {
-  it("includes a concise audit-hints section in the review packet", () => {
-    const packet = buildReviewPacket(snapshot, brief, model);
+  it("renders mandatory review instructions from selected block ids", () => {
+    const packet = buildReviewPacket(
+      snapshot,
+      {
+        ...brief,
+        reviewInstructionBlockIds: ["public-surface"],
+      },
+      model,
+    );
 
-    expect(packet.prompt).toContain("## Audit hints");
+    expect(packet.prompt).toContain("## Mandatory review instructions");
     expect(packet.prompt).toContain("Public-surface / rename / merge audit");
+    expect(packet.prompt).toContain(
+      "Sweep source, tests, docs, user-facing strings, and debug/status lists for stale public names after renames, removals, or merges.",
+    );
+  });
+
+  it("omits the mandatory review instructions section when the brief selects no block ids", () => {
+    const packet = buildReviewPacket(
+      snapshot,
+      {
+        ...brief,
+        reviewInstructionBlockIds: [],
+      },
+      model,
+    );
+
+    expect(packet.prompt).not.toContain("## Mandatory review instructions");
+    expect(packet.prompt).not.toContain("Public-surface / rename / merge audit");
   });
 });
 

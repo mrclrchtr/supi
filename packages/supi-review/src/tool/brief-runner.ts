@@ -41,7 +41,7 @@ function createSubmitBriefTool(resultHolder: {
 function buildBriefSystemPrompt(): string {
   return [
     "You synthesize a compact review brief from session history and snapshot metadata.",
-    "Infer the likely intent, constraints, focus areas, risky files, and unresolved questions.",
+    "Infer the likely intent, constraints, focus areas, risky files, unresolved questions, and applicable review instruction blocks.",
     "Use only the supplied input. Do not invent requirements or files.",
     "If the input is thin, produce a conservative brief instead of guessing.",
     "Call submit_review_brief with the structured result. Do not emit freeform JSON.",

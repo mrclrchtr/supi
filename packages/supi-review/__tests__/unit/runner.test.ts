@@ -56,6 +56,7 @@ const brief = {
   focusAreas: ["Authentication"],
   riskyFiles: ["src/auth.ts"],
   unresolvedQuestions: [],
+  reviewInstructionBlockIds: [],
 };
 
 const model = {
@@ -140,10 +141,11 @@ describe("runReviewer", () => {
     expect(reviewItemSchema).not.toHaveProperty("priority");
   });
 
-  it("tells the reviewer to treat packet audit hints as mandatory checks", () => {
+  it("tells the reviewer to treat packet mandatory review instructions as required checks", () => {
     const prompt = buildReviewerSystemPrompt();
 
-    expect(prompt).toContain("audit hints");
+    expect(prompt).toContain("mandatory review instructions");
+    expect(prompt).not.toContain("audit hints");
     expect(prompt).toContain("mandatory");
   });
 

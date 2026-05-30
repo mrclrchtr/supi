@@ -38,6 +38,7 @@ vi.mock("typebox", () => ({
 }));
 
 import { runBriefSynthesis } from "../../src/tool/brief-runner.ts";
+import * as reviewSchemas from "../../src/tool/schemas.ts";
 
 const model = {
   provider: "anthropic",
@@ -88,7 +89,16 @@ describe("runBriefSynthesis", () => {
     vi.clearAllMocks();
   });
 
-  it("returns success when submit_review_brief is called", async () => {
+  it("requires reviewInstructionBlockIds in the brief schema and returns them on success", async () => {
+    const reviewBriefSchema = (reviewSchemas as Record<string, unknown>).reviewBriefSchema as
+      | Record<string, unknown>
+      | undefined;
+
+    const reviewInstructionBlockIdsKey = "reviewInstruction" + "BlockIds";
+
+    expect(reviewBriefSchema).toBeDefined();
+    expect(reviewBriefSchema).toHaveProperty(reviewInstructionBlockIdsKey);
+
     mockSession.subscribe.mockImplementation((listener: (event: unknown) => void) => {
       setTimeout(() => listener({ type: "agent_end", messages: [] }), 10);
       return vi.fn();
@@ -111,6 +121,7 @@ describe("runBriefSynthesis", () => {
       focusAreas: ["Authentication"],
       riskyFiles: ["src/auth.ts"],
       unresolvedQuestions: [],
+      reviewInstructionBlockIds: ["public-surface"],
     });
 
     await vi.advanceTimersByTimeAsync(20);
@@ -119,6 +130,9 @@ describe("runBriefSynthesis", () => {
     expect(result.kind).toBe("success");
     if (result.kind === "success") {
       expect(result.brief.summary).toBe("Refactor auth flow");
+      expect(
+        (result.brief as { reviewInstructionBlockIds?: string[] }).reviewInstructionBlockIds,
+      ).toEqual(["public-surface"]);
     }
   });
 

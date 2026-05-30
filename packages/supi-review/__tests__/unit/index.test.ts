@@ -24,6 +24,7 @@ describe("formatReviewContent", () => {
         focusAreas: ["Authentication", "Error handling"],
         riskyFiles: ["src/auth.ts"],
         unresolvedQuestions: [],
+        reviewInstructionBlockIds: [],
       },
       output: {
         items: [

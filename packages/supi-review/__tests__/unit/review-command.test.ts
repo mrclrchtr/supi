@@ -89,6 +89,7 @@ const brief = {
   focusAreas: ["Authentication"],
   riskyFiles: ["src/auth.ts"],
   unresolvedQuestions: [],
+  reviewInstructionBlockIds: [],
 };
 
 const packet = {
