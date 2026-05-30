@@ -1,0 +1,31 @@
+schema_version = 1
+id = "TNDM-SA72H8"
+title = "Simplify supi-review instruction-block selection by moving it into brief synthesis"
+type = "task"
+priority = "p2"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "task-01"
+path = "tasks/task-01.md"
+
+[[documents]]
+name = "task-02"
+path = "tasks/task-02.md"
+
+[[documents]]
+name = "task-03"
+path = "tasks/task-03.md"
+
+[[documents]]
+name = "task-04"
+path = "tasks/task-04.md"

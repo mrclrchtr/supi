@@ -1,10 +1,14 @@
 import type {
+  ReviewInstructionBlockId,
   ReviewModelSelection,
   ReviewPacket,
   ReviewSnapshot,
   SynthesizedReviewBrief,
 } from "../types.ts";
-import { deriveAuditHints, type ReviewAuditHint } from "./audit-hints.ts";
+import {
+  type ReviewInstructionBlock,
+  resolveReviewInstructionBlocks,
+} from "./review-instruction-blocks.ts";
 
 export interface DiffSection {
   file: string;
@@ -21,7 +25,7 @@ export interface ReviewPacketPreviewFileRow {
 }
 
 export interface ReviewPacketPreviewData {
-  auditHints: ReviewAuditHint[];
+  reviewInstructionBlocks: ReviewInstructionBlock[];
   fileOverview: ReviewPacketPreviewFileRow[];
   snapshotNotes?: string;
 }
@@ -37,7 +41,7 @@ export function buildReviewPacket(
   brief: SynthesizedReviewBrief,
   model: ReviewModelSelection,
 ): ReviewPacket {
-  const previewData = buildReviewPacketPreviewData(snapshot);
+  const previewData = buildReviewPacketPreviewData(snapshot, brief.reviewInstructionBlockIds);
 
   const parts: string[] = [
     "# Review Task",
@@ -68,8 +72,12 @@ export function buildReviewPacket(
     ...snapshot.changedFiles.map((file) => `- ${file}`),
   ];
 
-  if (previewData.auditHints.length > 0) {
-    parts.push("", "## Audit hints", ...formatAuditHints(previewData.auditHints));
+  if (previewData.reviewInstructionBlocks.length > 0) {
+    parts.push(
+      "",
+      "## Mandatory review instructions",
+      ...formatReviewInstructionBlocks(previewData.reviewInstructionBlocks),
+    );
   }
 
   parts.push("", buildFileOverviewTable(previewData.fileOverview));
@@ -110,7 +118,7 @@ function countDiffLines(lines: string[]): { additions: number; deletions: number
   let additions = 0;
   let deletions = 0;
   for (const line of lines) {
-    // Skip diff header lines (e.g. "--- a/file", "+++ b/file").
+    // Skip diff header lines (e.g. "--- a/file", "+ + + b/file").
     // The trailing space ensures we do not skip content lines whose first
     // characters happen to be "+++" or "---".
     if (line.startsWith("--- ") || line.startsWith("+++ ")) continue;
@@ -220,12 +228,16 @@ export function classifySkipCategory(file: string): string | undefined {
   return undefined;
 }
 
-export function buildReviewPacketPreviewData(snapshot: ReviewSnapshot): ReviewPacketPreviewData {
+/** Derive structured preview data shared by the packet builder and inspector UI. */
+export function buildReviewPacketPreviewData(
+  snapshot: ReviewSnapshot,
+  reviewInstructionBlockIds: readonly ReviewInstructionBlockId[] = [],
+): ReviewPacketPreviewData {
   const { preamble, sections } = splitDiffSections(snapshot.diffText);
   const { statsMap, binaryFiles } = buildDiffSectionStats(sections);
 
   return {
-    auditHints: deriveAuditHints(snapshot),
+    reviewInstructionBlocks: resolveReviewInstructionBlocks(reviewInstructionBlockIds),
     fileOverview: snapshot.changedFiles.map((file) =>
       buildPreviewFileRow(file, statsMap, binaryFiles),
     ),
@@ -304,8 +316,8 @@ function buildFileOverviewTable(rows: ReviewPacketPreviewFileRow[]): string {
   return [`## File overview`, "", header, separator, ...tableRows].join("\n");
 }
 
-function formatAuditHints(hints: ReviewAuditHint[]): string[] {
-  return hints.map((hint) => `- ${hint.title}: ${hint.instruction}`);
+function formatReviewInstructionBlocks(blocks: ReviewInstructionBlock[]): string[] {
+  return blocks.map((block) => `- ${block.title}: ${block.instruction}`);
 }
 
 function toBullets(items: string[], fallback: string): string[] {

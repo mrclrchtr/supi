@@ -81,10 +81,11 @@ Before the actual review starts, the package:
   - focus areas
   - risky files
   - unresolved questions
+  - `reviewInstructionBlockIds` selected from a fixed host-owned catalog
 
 The synthesizer also receives a bounded diff excerpt from the snapshot so it can reason about actual code changes, not just filenames.
 
-That synthesized brief is then combined with the git snapshot into a compact reviewer prompt. The prompt contains the brief, file manifest, per-file overview, and deterministic **audit hints** for certain change shapes, but no large inline diffs. Instead, the reviewer session gets snapshot-aware tools (`read_snapshot_diff`, `read_snapshot_file`) to fetch exact per-file diffs and before/after file contents on demand.
+That synthesized brief is then combined with the git snapshot into a compact reviewer prompt. The host owns a fixed catalog of review instruction blocks, and the brief selects zero or more block IDs from that catalog when extra review guidance is warranted. The resulting prompt contains the brief, file manifest, per-file overview, and any brief-selected **mandatory review instructions**, but no large inline diffs. Instead, the reviewer session gets snapshot-aware tools (`read_snapshot_diff`, `read_snapshot_file`) to fetch exact per-file diffs and before/after file contents on demand.
 
 The session-transcript approach mirrors how Pi summarizes context for compaction: the entire resolved conversation is rendered in a readable label format and sent to the model as a whole, rather than relying on heuristic excerpt ranking.
 
@@ -99,7 +100,7 @@ Before the reviewer runs, the plan preview stays inside Pi:
 - `q` or `esc` returns to the summary preview without canceling the review
 - `e` exports the raw prompt to a temp file as a debugging fallback
 
-The Overview mode uses the same structured packet data that feeds the reviewer prompt: audit hints, file overview rows, and truncated snapshot notes all come from shared packet derivation rather than re-parsing the raw prompt text.
+The Overview mode uses the same structured packet data that feeds the reviewer prompt: mandatory review instructions, file overview rows, and truncated snapshot notes all come from shared packet derivation rather than re-parsing the raw prompt text.
 
 ## Model selection
 
@@ -152,7 +153,7 @@ When a successful review contains review items, `supi-review` also injects an ag
 - `src/history/collect.ts` — compaction-style session-context serialization
 - `src/history/synthesize.ts` — brief synthesis orchestration
 - `src/review-result.ts` — review-item normalization, verdict derivation, and summary counts
-- `src/target/audit-hints.ts` — deterministic audit-hint derivation from snapshot shape
+- `src/target/review-instruction-blocks.ts` — fixed catalog of host-owned review instruction blocks
 - `src/target/packet.ts` — final reviewer packet builder + shared preview-data derivation for the inspector
 - `src/tool/brief-runner.ts` — brief synthesis child session
 - `src/tool/review-runner.ts` — read-only reviewer child session with snapshot-aware tools

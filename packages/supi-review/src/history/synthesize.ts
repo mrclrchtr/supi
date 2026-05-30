@@ -1,4 +1,5 @@
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
+import { listReviewInstructionBlocks } from "../target/review-instruction-blocks.ts";
 import { runBriefSynthesis } from "../tool/brief-runner.ts";
 import type { BriefSynthesisRunResult, ReviewProgress } from "../tool/runner-types.ts";
 import type { ReviewModelSelection, ReviewSnapshot } from "../types.ts";
@@ -39,6 +40,7 @@ export function buildBriefSynthesisPrompt(
   note?: string,
 ): string {
   const diffExcerpt = buildDiffExcerpt(snapshot.diffText);
+  const instructionBlocks = listReviewInstructionBlocks();
   const parts: string[] = [
     "# Review Brief Synthesis Input",
     "",
@@ -60,6 +62,14 @@ export function buildBriefSynthesisPrompt(
     if (diffExcerpt.truncated) {
       parts.push(`> Note: diff excerpt truncated to ${diffExcerpt.text.length} characters.`);
     }
+  }
+
+  if (instructionBlocks.length > 0) {
+    parts.push(
+      "",
+      "## Available review instruction blocks",
+      ...instructionBlocks.map((block) => `- ${block.id}: ${block.title} — ${block.instruction}`),
+    );
   }
 
   if (note?.trim()) {
@@ -85,6 +95,9 @@ export function buildBriefSynthesisPrompt(
     "  Prioritize files touching auth, data handling, core logic, error handling, or public APIs.",
     "  Include only files from the changed-files list above.",
     "- unresolvedQuestions: ambiguities or concerns that remain unclear",
+    "- reviewInstructionBlockIds: zero or more IDs from the available review instruction block catalog",
+    "  Select only blocks that are clearly supported by the supplied session/snapshot evidence.",
+    "  Prefer omission over guessing. Do not invent new IDs.",
   );
 
   return parts.join("\n");

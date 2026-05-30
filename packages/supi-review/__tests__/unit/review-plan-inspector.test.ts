@@ -55,6 +55,7 @@ function createPlan(overrides: PlanOverrides = {}): ReviewPlan {
       focusAreas: ["Authentication"],
       riskyFiles: ["src/auth.ts"],
       unresolvedQuestions: [],
+      reviewInstructionBlockIds: [],
     },
     packet: {
       prompt: Array.from(
@@ -120,6 +121,7 @@ describe("ReviewPlanPreviewComponent", () => {
         brief: {
           focusAreas: ["Tool names"],
           riskyFiles: ["packages/supi-code-intelligence/src/tool/tool-specs.ts"],
+          reviewInstructionBlockIds: ["public-surface"],
         },
       }),
     });
@@ -162,7 +164,7 @@ describe("ReviewPlanPreviewComponent", () => {
     expect(output).toContain("No explicit constraints extracted.");
     expect(output).toContain("Review overall correctness and consistency.");
     expect(output).toContain("No risky files explicitly called out.");
-    expect(output).not.toContain("Audit hints");
+    expect(output).not.toContain("Mandatory review instructions");
     expect(output).not.toContain("Snapshot notes");
   });
 

@@ -304,7 +304,7 @@ function buildInspectorBodyLines(
     return wrapInspectorLines(plan.packet.prompt.split("\n"), width);
   }
 
-  const preview = buildReviewPacketPreviewData(plan.snapshot);
+  const preview = buildReviewPacketPreviewData(plan.snapshot, plan.brief.reviewInstructionBlockIds);
   const lines = [
     theme.fg("accent", theme.bold("Summary")),
     `Summary: ${plan.brief.summary}`,
@@ -334,9 +334,11 @@ function buildInspectorBodyLines(
       ...toBulletLines(plan.brief.unresolvedQuestions, "No unresolved questions identified."),
     );
   }
-  if (preview.auditHints.length > 0) {
-    lines.push("", theme.fg("accent", theme.bold("Audit hints")));
-    lines.push(...preview.auditHints.map((hint) => `- ${hint.title}: ${hint.instruction}`));
+  if (preview.reviewInstructionBlocks.length > 0) {
+    lines.push("", theme.fg("accent", theme.bold("Mandatory review instructions")));
+    lines.push(
+      ...preview.reviewInstructionBlocks.map((block) => `- ${block.title}: ${block.instruction}`),
+    );
   }
 
   lines.push("", theme.fg("accent", theme.bold("File overview")));

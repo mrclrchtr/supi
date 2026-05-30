@@ -1,0 +1,32 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-05-30T20:47:46.998304Z"
+revision = 25
+
+[document_fingerprints]
+archive = "sha256:d1a97f3e387e0a4dc1ea8a72d454554ee0da2ff9bf63a073a0bbdf804cb5404f"
+content = "sha256:84f95f5bcede7361f7ae81829a31af650dd11e3f2760cb3cbba788904dd846e3"
+task-01 = "sha256:23959a0544d0b6c064f9a7db0e66b035918985a4fa2883df7602dcef75fb698a"
+task-02 = "sha256:ba925847d2a0d43644c5afde43fb68ecdedb41c5e8b5c59e63961751f3aa9c8d"
+task-03 = "sha256:59d4d41d5cade441cff585f2a569a020021415952d6695f0e7a06b25af385530"
+task-04 = "sha256:6420b2308df4c9e891bf1d9c11b3df07b351ca839002d8c6e6300ad8d0736204"
+
+[[tasks]]
+number = 1
+title = "RED: encode brief-selected instruction blocks in supi-review unit tests"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: implement brief-selected review instruction blocks and remove snapshot heuristics"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update supi-review docs for brief-selected mandatory review instructions"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Final verification — full package checks and interactive /supi-review smoke test"
+status = "done"

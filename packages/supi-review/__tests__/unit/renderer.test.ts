@@ -42,6 +42,7 @@ function createSuccessResult(overrides: Record<string, unknown> = {}): ReviewRes
       focusAreas: ["Authentication", "Error handling"],
       riskyFiles: ["src/auth.ts"],
       unresolvedQuestions: [],
+      reviewInstructionBlockIds: [],
     },
     output: {
       items: [],

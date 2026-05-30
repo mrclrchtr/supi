@@ -29,6 +29,13 @@ const reviewItemRecommendedActionSchema = Type.Union([
   Type.Literal("consider"),
 ]);
 
+const reviewInstructionBlockIdSchema = Type.Union([
+  Type.Literal("public-surface"),
+  Type.Literal("cross-layer"),
+  Type.Literal("schema-widening"),
+  Type.Literal("cleanup"),
+]);
+
 export const reviewItemSchema = Type.Object({
   title: Type.String(),
   body: Type.String(),
@@ -63,4 +70,5 @@ export const reviewBriefSchema = Type.Object({
   focusAreas: Type.Array(Type.String()),
   riskyFiles: Type.Array(Type.String()),
   unresolvedQuestions: Type.Array(Type.String()),
+  reviewInstructionBlockIds: Type.Array(reviewInstructionBlockIdSchema),
 });

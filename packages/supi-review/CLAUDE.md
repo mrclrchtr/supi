@@ -10,7 +10,7 @@ The `/supi-review` command follows a **history-aware** pipeline:
 4. **Resolve snapshot** — concrete changed files + diff/show text
 5. **Serialize session context** — compaction-style transcript of the active branch's resolved LLM-visible context
 6. **Synthesize brief** — child session turns history + snapshot metadata into a structured brief
-7. **Build review packet** — compact prompt with brief + file metadata + deterministic audit hints; no bulk diffs; reviewer fetches diffs on demand
+7. **Build review packet** — compact prompt with brief + file metadata + brief-selected mandatory review instructions; no bulk diffs; reviewer fetches diffs on demand
 8. **Preview and confirm** — show the synthesized brief and compact prompt preview; `v` opens the in-app inspector (Overview first, Raw Prompt via `tab`, export via `e`)
 9. **Run reviewer** — read-only child session inspects the code and submits structured review items
 10. **Normalize + render results** — host derives the verdict, sorts review items, computes summary counts, and renders the result
@@ -26,7 +26,7 @@ The `/supi-review` command follows a **history-aware** pipeline:
 - `NormalizedReviewOutput` — host-owned review output with derived `overall_correctness` and summary counts
 - `RawReviewResult` — raw child-session result before normalization
 - `ReviewResult` — normalized success / failed / canceled / timeout result for the rendered review run
-- `ReviewPacket` — compact reviewer prompt with brief + file manifest + audit hints; no inline diffs
+- `ReviewPacket` — compact reviewer prompt with brief + file manifest + mandatory review instructions; no inline diffs
 - `ReviewPlan` — model + snapshot + synthesized brief + reviewer packet
 
 ### Package structure
@@ -42,8 +42,8 @@ src/
     collect.ts          Compaction-style session-context serialization
     synthesize.ts       Brief synthesis prompt builder + runner orchestration
   target/
-    audit-hints.ts      Deterministic audit-hint derivation from snapshot shape/diff metadata
-    packet.ts           Compact review packet builder + shared preview-data derivation
+    review-instruction-blocks.ts  Fixed host-owned review instruction block catalog
+    packet.ts                     Compact review packet builder + shared preview-data derivation
   tool/
     brief-runner.ts     Brief synthesis child session
     review-runner.ts    Read-only reviewer child session
@@ -73,12 +73,12 @@ __tests__/
 - **Active branch only** — session-context serialization uses `buildSessionContext(ctx.sessionManager.getEntries(), ctx.sessionManager.getLeafId())` so compaction and branch-summary semantics match the actual LLM-visible context
 - **Read-only review session** — reviewer tools include `read`, `grep`, `find`, `ls`, `submit_review`, and snapshot-aware `read_snapshot_diff` / `read_snapshot_file` for on-demand inspection
 - **Host-owned verdict** — the reviewer submits review items plus explanation/confidence; `src/review-result.ts` derives the final binary verdict from normalized `recommended_action` values
-- **Deterministic audit hints** — `src/target/audit-hints.ts` adds bounded, rule-based audits for high-risk change shapes instead of running a second reviewer pass
+- **Brief-selected instruction blocks** — `src/target/review-instruction-blocks.ts` defines a fixed host-owned catalog, while the brief synthesizer selects the relevant block IDs for each run
 - **Minimal synthesis session** — brief synthesis uses only `submit_review_brief` and no context files/extensions/skills/themes
 
-## Deterministic audit families
+## Review instruction block catalog
 
-`src/target/audit-hints.ts` produces only four audit families:
+`src/target/review-instruction-blocks.ts` defines a fixed catalog of four review instruction blocks:
 
 1. **Public-surface / rename / merge audit**
    - sweep source, tests, docs, user-facing strings, and debug/status lists for stale public names
@@ -89,7 +89,7 @@ __tests__/
 4. **Cleanup / deletion / orphan audit**
    - audit orphan files, dead imports or re-exports, stale comments, and outdated expectations
 
-These hints are deterministic host guidance threaded through the compact packet. They are not a second model pass.
+The brief synthesizer chooses zero or more block IDs from this catalog and the packet builder renders them as mandatory review instructions. The host no longer infers block selection from snapshot heuristics.
 
 ## Child-session design
 
@@ -98,7 +98,7 @@ These hints are deterministic host guidance threaded through the compact packet.
 - created with `createAgentSession()` + `SessionManager.inMemory()`
 - tools: `submit_review_brief` only
 - resource loader disables extensions, skills, prompt templates, themes, and context files
-- output schema: summary, intendedOutcome, constraints, focusAreas, riskyFiles, unresolvedQuestions
+- output schema: summary, intendedOutcome, constraints, focusAreas, riskyFiles, unresolvedQuestions, reviewInstructionBlockIds
 - timeout returns `kind: "timeout"`; no graceful wrap-up phase
 
 ### Review session
@@ -107,7 +107,7 @@ These hints are deterministic host guidance threaded through the compact packet.
 - tools: `read`, `grep`, `find`, `ls`, `submit_review`, `read_snapshot_diff`, `read_snapshot_file`
 - resource loader keeps project context files enabled so the reviewer inherits repo guidance
 - snapshot tools (`read_snapshot_diff`, `read_snapshot_file`) are scoped to the selected snapshot's changed-files list and are the primary way the reviewer inspects per-file diffs
-- the prompt packet may include audit hints; reviewer instructions treat supplied audit hints as mandatory checks for that run
+- the prompt packet may include mandatory review instructions; reviewer instructions treat supplied instructions as required checks for that run
 - live progress comes from `session.subscribe()` events (turns, tool activity, token stats)
 - soft timeout steers the model to finish, then aborts after grace turns if needed
 
@@ -116,7 +116,7 @@ These hints are deterministic host guidance threaded through the compact packet.
 - `ctx.sessionManager` in extension contexts is read-only; use `getBranch()` and derive any extra views yourself
 - The session-context serializer operates on the resolved `buildSessionContext(...)` output, so `custom_message` entries, compaction summaries, and branch summaries all appear in the transcript exactly as the LLM would see them
 - `buildBriefSynthesisPrompt()` must include a bounded diff excerpt so the synthesizer can see actual code changes, not just filenames/stats
-- `buildReviewPacket()` stays compact: brief, manifest, overview, audit hints, and on-demand snapshot inspection instructions. Do not reintroduce bulk diff embedding.
+- `buildReviewPacket()` stays compact: brief, manifest, overview, mandatory review instructions, and on-demand snapshot inspection instructions. Do not reintroduce bulk diff embedding.
 - Full preview no longer shells out to `less`; export-to-temp-file is a debugging fallback only.
 - `src/review-result.ts` is the single source of truth for verdict derivation, action/category summary counts, and review-item ordering
 - `ReviewResult` success payloads are normalized before rendering; renderers and plain-text formatting should use normalized review items instead of assuming raw reviewer output

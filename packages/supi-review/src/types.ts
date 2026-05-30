@@ -98,6 +98,12 @@ export interface ReviewModelSelection {
 }
 
 /** Structured brief synthesized from the current session history. */
+export type ReviewInstructionBlockId =
+  | "public-surface"
+  | "cross-layer"
+  | "schema-widening"
+  | "cleanup";
+
 export interface SynthesizedReviewBrief {
   summary: string;
   intendedOutcome: string;
@@ -105,6 +111,7 @@ export interface SynthesizedReviewBrief {
   focusAreas: string[];
   riskyFiles: string[];
   unresolvedQuestions: string[];
+  reviewInstructionBlockIds: ReviewInstructionBlockId[];
   note?: string;
 }
 
