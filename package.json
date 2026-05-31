@@ -44,13 +44,18 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "typecheck": "tsc -b packages/*/tsconfig.json packages/*/__tests__/tsconfig.json",
+    "typecheck:ai": "tsc -b --pretty false packages/*/tsconfig.json packages/*/__tests__/tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ai": "vitest run --reporter=agent",
     "pack:check": "for p in packages/supi*; do [ -f \"$p/package.json\" ] || continue; node scripts/pack-staged.mjs \"$p\" --dry-run || exit 1; done",
     "pack:verify": "node scripts/pack-all.mjs",
-    "check": "pnpm biome",
+    "check:fast": "pnpm biome",
+    "check": "pnpm biome && pnpm typecheck && pnpm test",
+    "check:ai": "pnpm biome:ai && pnpm typecheck:ai && pnpm test:ai",
     "check:fix": "pnpm biome:fix",
-    "verify": "pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && pnpm typecheck && pnpm biome:ai && pnpm test && pnpm pack:verify",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "verify": "pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && pnpm check && pnpm pack:verify",
+    "verify:ai": "pnpm --filter @mrclrchtr/supi-tree-sitter check:kotlin-wasm && pnpm --filter @mrclrchtr/supi-tree-sitter check:sql-wasm && pnpm check:ai && pnpm pack:verify"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
