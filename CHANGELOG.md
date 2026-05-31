@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.11.0](https://github.com/mrclrchtr/supi/compare/v1.10.0...v1.11.0) (2026-05-31)
+
+
+### Features
+
+* **supi-review, TNDM-40PB8Y:** add in-app preview inspector ([7486716](https://github.com/mrclrchtr/supi/commit/7486716794fcace44f03235372c688afa7633ba5))
+* **supi-review, TNDM-C4VKYH:** redesign review triage contract ([976763f](https://github.com/mrclrchtr/supi/commit/976763f92a9a95ca2c2f07cac2e62595527d2b41))
+* **supi-review, TNDM-SA72H8:** brief-select instruction blocks ([223c7be](https://github.com/mrclrchtr/supi/commit/223c7be4e5c8e1d79956f95c5331f609d8a51587))
+* **TNDM-TETRM4:** add expandable ask_user history review ([ec129ca](https://github.com/mrclrchtr/supi/commit/ec129ca77869e80952380384a056115909bfc056))
+
+
+### Bug Fixes
+
+* **supi-review:** add review failure diagnostics ([89fb8ac](https://github.com/mrclrchtr/supi/commit/89fb8ac437768130ed2646ae07a82f226cf7b805))
+* **supi-review:** clarify Verify findings instruction for code reinspection ([18bfd89](https://github.com/mrclrchtr/supi/commit/18bfd8964c679e798f21bb08b9f245848c00d9eb))
+* **supi-review:** format review item fields consistently ([7698fa9](https://github.com/mrclrchtr/supi/commit/7698fa9575715f8b5c1ee44f190207417c040f4d))
+
 ## [1.10.0](https://github.com/mrclrchtr/supi/compare/v1.9.1...v1.10.0) (2026-05-25)
 
 
