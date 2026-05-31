@@ -5,7 +5,7 @@
  * tool layer (specs) so they live here to avoid circular dependencies.
  */
 
-/** Canonical code-intelligence tool names. */
+/** Canonical code-intelligence tool names, including internal compatibility aliases. */
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_brief",
   "code_context",
@@ -14,11 +14,27 @@ export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_find",
   "code_graph",
   "code_health",
+  "code_refactor",
+  "code_apply",
   "code_refactor_apply",
   "code_refactor_plan",
   "code_resolve",
 ] as const;
 export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[number];
+
+/** Public/model-facing tool names registered on the extension surface. */
+export const PUBLIC_CODE_INTELLIGENCE_TOOL_NAMES = [
+  "code_brief",
+  "code_context",
+  "code_impact",
+  "code_find",
+  "code_graph",
+  "code_health",
+  "code_refactor",
+  "code_apply",
+  "code_resolve",
+] as const;
+export type PublicCodeIntelligenceToolName = (typeof PUBLIC_CODE_INTELLIGENCE_TOOL_NAMES)[number];
 
 /**
  * Relation kind names — no longer used in the high-level code_* surface.

@@ -62,7 +62,15 @@ export interface RelationsServiceDeps {
       character: number,
     ) => Promise<{
       kind: string;
-      data?: { callees: Array<{ name: string; file?: string; location?: string }> };
+      data?: {
+        callees: Array<{
+          name: string;
+          file?: string;
+          location?: string;
+          startLine?: number;
+          startCharacter?: number;
+        }>;
+      };
       message?: string;
     }>;
   } | null;

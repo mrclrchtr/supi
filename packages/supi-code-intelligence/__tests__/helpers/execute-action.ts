@@ -1,8 +1,10 @@
 import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
+import { executeApplyTool } from "../../src/tool/execute-apply.ts";
 import { executeBriefTool } from "../../src/tool/execute-brief.ts";
 import { executeFindTool } from "../../src/tool/execute-find.ts";
 import type { GraphRelation } from "../../src/tool/execute-graph.ts";
 import { executeGraphTool } from "../../src/tool/execute-graph.ts";
+import { executeRefactorTool } from "../../src/tool/execute-refactor.ts";
 import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
 import type { CodeIntelResult } from "../../src/types.ts";
@@ -12,6 +14,8 @@ export type TestAction =
   | "graph"
   | "affected"
   | "find"
+  | "refactor"
+  | "apply"
   | "refactor_plan"
   | "refactor_apply";
 
@@ -34,6 +38,7 @@ export interface ActionParams {
   operation?: string;
   newName?: string;
   planId?: string;
+  mode?: "apply" | "apply-and-format" | "apply-and-verify";
 }
 
 const SUPPORTED_ACTIONS = [
@@ -41,6 +46,8 @@ const SUPPORTED_ACTIONS = [
   "graph",
   "affected",
   "find",
+  "refactor",
+  "apply",
   "refactor_plan",
   "refactor_apply",
 ] as const satisfies readonly TestAction[];
@@ -100,6 +107,10 @@ export async function executeAction(
         } as Parameters<typeof executeFindTool>[0],
         ctx,
       );
+    case "refactor":
+      return executeRefactorTool(rest as Parameters<typeof executeRefactorTool>[0], ctx);
+    case "apply":
+      return executeApplyTool(rest as Parameters<typeof executeApplyTool>[0], ctx);
     case "refactor_plan":
       return executeRefactorPlanTool(rest as Parameters<typeof executeRefactorPlanTool>[0], ctx);
     case "refactor_apply":

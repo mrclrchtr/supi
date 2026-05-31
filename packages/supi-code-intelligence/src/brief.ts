@@ -169,7 +169,7 @@ function buildNextQueries(model: ArchitectureModel, publicSurfaces: string[]): s
     );
   }
   if (publicSurfaces.length > 0) {
-    nextQueries.push("`code_affected` before modifying shared exports");
+    nextQueries.push("`code_impact` before modifying shared exports");
   }
   return nextQueries;
 }

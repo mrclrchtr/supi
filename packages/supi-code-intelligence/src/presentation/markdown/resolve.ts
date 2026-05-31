@@ -55,10 +55,12 @@ function renderResolved(
       `- \`code_context\` { targetId: "${t.targetId}", task: "..." } — task-focused context`,
     );
     lines.push(`- \`code_graph\` { targetId: "${t.targetId}" } — find usages`);
-    lines.push(`- \`code_graph\` { targetId: "${t.targetId}" } — outgoing calls`);
+    lines.push(
+      `- \`code_graph\` { targetId: "${t.targetId}", relations: ["callees"] } — outgoing calls`,
+    );
     lines.push(`- \`code_impact\` { targetId: "${t.targetId}" } — blast radius`);
     lines.push(
-      `- \`code_refactor_plan\` { targetId: "${t.targetId}", operation: "rename", newName: "..." }`,
+      `- \`code_refactor\` { targetId: "${t.targetId}", operation: "rename_symbol", newName: "..." } — preview a safe rename plan`,
     );
     lines.push(`- \`code_brief\` { targetId: "${t.targetId}" } — orientation`);
   } else {
@@ -77,7 +79,7 @@ function renderResolved(
 
     lines.push("");
     lines.push(
-      "**Use a `targetId` with** `code_context`, `code_graph`, `code_impact`, `code_brief`, or `code_refactor_plan`.",
+      "**Use a `targetId` with** `code_context`, `code_graph`, `code_impact`, `code_brief`, or `code_refactor`.",
     );
   }
 
@@ -113,7 +115,7 @@ function renderDisambiguation(
       `1. Rerun \`code_resolve\` with anchored coords: \`{ file: "${first.file}", line: ${first.line}, character: ${first.character} }\``,
     );
     lines.push(
-      `2. Or use a candidate's \`targetId\` directly with \`code_context\`, \`code_graph\`, \`code_brief\`, etc.`,
+      `2. Or use a candidate's \`targetId\` directly with \`code_context\`, \`code_graph\`, \`code_refactor\`, etc.`,
     );
   }
 

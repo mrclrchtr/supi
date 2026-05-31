@@ -3,6 +3,7 @@
  */
 
 import type { ReferenceEntry } from "../../analysis/references/service.ts";
+import { toDisplayPath } from "../../search-helpers.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
 
 // biome-ignore lint/complexity/useMaxParams: render function with independent display parameters
@@ -24,7 +25,7 @@ export function renderReferencesResult(
   lines.push("");
 
   const refLines: Array<{ file: string; line: number }> = refs.map((r) => ({
-    file: r.file,
+    file: toDisplayPath(cwd, r.file),
     line: r.line,
   }));
   formatReferenceList(lines, refLines, maxResults, cwd);

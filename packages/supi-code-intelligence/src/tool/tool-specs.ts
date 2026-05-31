@@ -1,22 +1,23 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
-import type { CodeIntelligenceToolName } from "../intent/types.ts";
+import type { PublicCodeIntelligenceToolName } from "../intent/types.ts";
 import type { CodeIntelResult } from "../types.ts";
 import {
+  CodeApplyParameters,
   CodeContextParameters,
   CodeFindParameters,
   CodeHealthParameters,
   CodeImpactParameters,
+  CodeRefactorParameters,
 } from "../workflow/schemas.ts";
-import { executeAffectedTool } from "./execute-affected.ts";
+import { executeApplyTool } from "./execute-apply.ts";
 import { executeBriefTool } from "./execute-brief.ts";
 import { executeContextTool } from "./execute-context.ts";
 import { executeFindTool } from "./execute-find.ts";
 import { executeGraphTool } from "./execute-graph.ts";
 import { executeHealthTool } from "./execute-health.ts";
 import { executeImpactTool } from "./execute-impact.ts";
-import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
-import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
+import { executeRefactorTool } from "./execute-refactor.ts";
 import { executeResolveTool } from "./execute-resolve.ts";
 
 const PathParam = Type.String({ description: "Scope path" });
@@ -26,23 +27,12 @@ const CharacterParam = Type.Number({ description: "1-based UTF-16 column", minim
 const SymbolParam = Type.String({ description: "Symbol name" });
 const _PatternParam = Type.String({ description: "Search pattern" });
 const _RegexParam = Type.Boolean({ description: "Regex search" });
-const ExportedOnlyParam = Type.Boolean({ description: "Exported symbols only" });
 const MaxResultsParam = Type.Number({ description: "Max results" });
 const _ContextLinesParam = Type.Number({ description: "Context lines" });
 const _SummaryParam = Type.Boolean({ description: "Summarize by directory" });
 const _StructuredPatternKindParam = Type.String({
   description: "Structured kind: definition | export | import",
 });
-const NewNameParam = Type.String({ description: "New symbol or file name for rename operations" });
-const DestinationParam = Type.String({ description: "Destination path for move operations" });
-const OperationParam = StringEnum(
-  ["rename", "rename_symbol", "rename_file", "move_file", "update_imports", "delete_dead_code"],
-  {
-    description:
-      "Refactor operation to preview. `rename` is kept as a legacy alias for `rename_symbol`.",
-  },
-);
-const PlanIdParam = Type.String({ description: "Plan ID from a previous code_refactor_plan call" });
 const TargetIdParam = Type.String({
   description:
     "Resolved target handle from `code_resolve`. Takes precedence over file/line/character/symbol.",
@@ -57,39 +47,6 @@ const CodeBriefParameters = Type.Object(
     character: Type.Optional(CharacterParam),
     symbol: Type.Optional(SymbolParam),
     maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-const CodeAffectedParameters = Type.Object(
-  {
-    targetId: Type.Optional(TargetIdParam),
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
-    symbol: Type.Optional(SymbolParam),
-    exportedOnly: Type.Optional(ExportedOnlyParam),
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-const CodeRefactorPlanParameters = Type.Object(
-  {
-    targetId: Type.Optional(TargetIdParam),
-    operation: OperationParam,
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
-    newName: Type.Optional(NewNameParam),
-    destination: Type.Optional(DestinationParam),
-  },
-  { additionalProperties: false },
-);
-
-const CodeRefactorApplyParameters = Type.Object(
-  {
-    planId: PlanIdParam,
   },
   { additionalProperties: false },
 );
@@ -136,20 +93,9 @@ const CodeResolveParameters = Type.Object(
       }),
     ),
     kind: Type.Optional(
-      StringEnum(
-        [
-          "symbol",
-          "function",
-          "class",
-          "interface",
-          "type",
-          "file",
-          "export",
-          "command",
-          "setting",
-        ],
-        { description: "Preferred target kind when disambiguating the query." },
-      ),
+      StringEnum(["symbol", "function", "class", "interface", "type", "file", "export"], {
+        description: "Preferred target kind when disambiguating the query.",
+      }),
     ),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
@@ -160,7 +106,7 @@ const CodeResolveParameters = Type.Object(
 );
 
 export interface CodeIntelligenceToolDefinitionSpec {
-  name: CodeIntelligenceToolName;
+  name: PublicCodeIntelligenceToolName;
   label: string;
   description: string;
   promptSnippet: string;
@@ -176,7 +122,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_resolve",
     label: "Code Resolve",
     description:
-      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_affected, and code_refactor_plan. Supports anchored (file + line + character), file-only, and query/symbol inputs. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
+      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_impact, and code_refactor. Supports anchored (file + line + character), file-only, and query/symbol inputs. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
     promptSnippet: "code_resolve — resolve references into precise targets and target handles",
     basePromptGuidelines: [
       "Use code_resolve when a symbol, file, or code reference is ambiguous and needs precise resolution.",
@@ -244,24 +190,9 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       "Use code_impact before edits to estimate blast radius and follow-up checks.",
       "Prefer `targetId` from `code_resolve` when you already resolved the target you want to analyze.",
       "Use code_graph instead of code_impact when you only need a plain reference list without impact analysis.",
-      "`code_affected` remains available as a temporary compatibility alias, but `code_impact` is the preferred workflow surface.",
     ],
     parameters: CodeImpactParameters,
     run: (params, ctx) => executeImpactTool(params as Parameters<typeof executeImpactTool>[0], ctx),
-  },
-  {
-    name: "code_affected",
-    label: "Code Affected",
-    description:
-      "Compatibility alias for impact analysis. Prefer `code_impact` for the workflow-oriented surface. Uses semantic evidence for impact assessment and does not fall back to heuristic text search.",
-    promptSnippet: "code_affected — compatibility impact alias",
-    basePromptGuidelines: [
-      "Prefer `code_impact` for new impact-analysis calls; `code_affected` remains for compatibility.",
-      "Use code_graph instead of code_affected when you only need a plain reference list without impact analysis.",
-    ],
-    parameters: CodeAffectedParameters,
-    run: (params, ctx) =>
-      executeAffectedTool(params as Parameters<typeof executeAffectedTool>[0], ctx),
   },
   {
     name: "code_find",
@@ -279,34 +210,35 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
   },
   {
-    name: "code_refactor_plan",
-    label: "Code Refactor Plan",
+    name: "code_refactor",
+    label: "Code Refactor",
     description:
-      'Preview an operation-aware semantic refactor plan without mutating files. Returns a plan ID for later use with code_refactor_apply. Supports rename_symbol, update_imports, and delete_dead_code when the semantic provider can produce precise edits. Accepts targetId from code_resolve in place of file/line/character. Legacy `operation: "rename"` remains a compatibility alias for rename_symbol.',
-    promptSnippet: "code_refactor_plan — preview an operation-aware refactor plan",
+      'Preferred workflow refactor surface. Previews an operation-aware semantic refactor plan without mutating files and returns a plan ID for later use with code_apply. In this phase it wraps the existing plan store/executor and stays preview-only. Supports rename_symbol, update_imports, and delete_dead_code when the semantic provider can produce precise edits. Legacy `operation: "rename"` is accepted as a compatibility alias for `rename_symbol`.',
+    promptSnippet: "code_refactor — preview a precise workflow refactor",
     basePromptGuidelines: [
-      "Use code_refactor_plan to preview a precise semantic refactor before applying it.",
-      'Use `operation: "rename_symbol"` for symbol renames; `operation: "rename"` remains a legacy alias.',
+      "Use code_refactor as the preferred workflow refactor surface.",
+      'Use `operation: "rename_symbol"` for symbol renames. Legacy `operation: "rename"` is accepted as a compatibility alias.',
       'Use `operation: "update_imports"` or `operation: "delete_dead_code"` only when the semantic provider can return precise edits.',
-      "code_refactor_plan does not mutate files — it returns a plan ID. Use code_refactor_apply with that planId to execute.",
+      "code_refactor is preview-only in this phase — it returns a plan ID. Use `code_apply` with that planId to execute.",
+      "`preview: false` is not yet supported; retry with `preview: true` or omit `preview`.",
     ],
-    parameters: CodeRefactorPlanParameters,
+    parameters: CodeRefactorParameters,
     run: (params, ctx) =>
-      executeRefactorPlanTool(params as Parameters<typeof executeRefactorPlanTool>[0], ctx),
+      executeRefactorTool(params as Parameters<typeof executeRefactorTool>[0], ctx),
   },
   {
-    name: "code_refactor_apply",
-    label: "Code Refactor Apply",
+    name: "code_apply",
+    label: "Code Apply",
     description:
-      "Apply a previously generated refactor plan by plan ID. Rejects stale, missing, or invalid plans. Applies through safe file mutation with fingerprint checks.",
-    promptSnippet: "code_refactor_apply — apply a rename plan",
+      'Preferred workflow plan-application surface. Applies a previously stored plan by plan ID with fingerprint checks and safety validation. In this phase, `mode: "apply"` is supported; format/verify modes return explicit unavailable results.',
+    promptSnippet: "code_apply — apply a stored workflow plan",
     basePromptGuidelines: [
-      "Use code_refactor_apply to execute a plan generated by code_refactor_plan.",
-      "code_refactor_apply requires a valid planId; it rejects stale or missing plans.",
+      "Use code_apply to execute a plan generated by code_refactor.",
+      'Use `mode: "apply"` or omit `mode` in this phase.',
+      "`apply-and-format` and `apply-and-verify` are not yet implemented and return explicit unavailable results.",
     ],
-    parameters: CodeRefactorApplyParameters,
-    run: (params, ctx) =>
-      executeRefactorApplyTool(params as Parameters<typeof executeRefactorApplyTool>[0], ctx),
+    parameters: CodeApplyParameters,
+    run: (params, ctx) => executeApplyTool(params as Parameters<typeof executeApplyTool>[0], ctx),
   },
   {
     name: "code_health",

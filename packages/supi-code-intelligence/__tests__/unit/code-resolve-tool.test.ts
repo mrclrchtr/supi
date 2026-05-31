@@ -13,6 +13,8 @@ import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
+import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
+import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -141,7 +143,9 @@ describe("code_resolve tool", () => {
     expect(result.content[0].text).toContain("index.ts");
     expect(result.content[0].text).toContain("Next steps");
     expect(result.content[0].text).toContain("code_context");
+    expect(result.content[0].text).toContain('relations: ["callees"]');
     expect(result.content[0].text).toContain("code_impact");
+    expect(result.content[0].text).toContain("code_refactor");
   });
 
   it("resolves file-only request to exported targets with target IDs", async () => {
@@ -460,8 +464,8 @@ describe("code_resolve tool", () => {
       makeCtx({ cwd: tmpDir }),
     )) as { content: Array<{ type: string; text: string }> };
 
-    expect(result.content[0].text).toContain("not currently supported");
-    expect(result.content[0].text).toContain("kind");
+    expect(result.content[0].text).toContain("Unsupported `kind`");
+    expect(result.content[0].text).toContain("command");
   });
 
   it("rejects kind: 'setting' with an unsupported-kind error", async () => {
@@ -479,8 +483,8 @@ describe("code_resolve tool", () => {
       makeCtx({ cwd: tmpDir }),
     )) as { content: Array<{ type: string; text: string }> };
 
-    expect(result.content[0].text).toContain("not currently supported");
-    expect(result.content[0].text).toContain("kind");
+    expect(result.content[0].text).toContain("Unsupported `kind`");
+    expect(result.content[0].text).toContain("setting");
   });
 
   // ── maxResults with disambiguation ─────────────────────────────────
@@ -765,7 +769,7 @@ describe("code_resolve targetId follow-up", () => {
     expect(targetIdResult.content[0].text).not.toContain("symbol at");
   });
 
-  it("resolves and follows up with code_affected using targetId", async () => {
+  it("resolves and follows up with the internal affected executor using targetId", async () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
     registerMockProvider(tmpDir, {
       exports: async (_file) => ({
@@ -800,21 +804,14 @@ describe("code_resolve targetId follow-up", () => {
     expect(targetId).toBeDefined();
     if (!targetId) return;
 
-    const affTool = getTool(pi, "code_affected");
-    const affResult = (await affTool.execute(
-      "fup-5",
-      { targetId },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as { content: Array<{ type: string; text: string }> };
+    const affResult = await executeAffectedTool({ targetId }, { cwd: tmpDir });
 
     // targetId was expanded; no "Error" prefix
-    expect(affResult.content[0].text).not.toContain("**Error");
-    expect(affResult.content[0].text).toContain("Affected");
+    expect(affResult.content).not.toContain("**Error");
+    expect(affResult.content).toContain("Affected");
   });
 
-  it("resolves and follows up with code_refactor_plan using targetId", async () => {
+  it("resolves and follows up with the internal refactor-plan executor using targetId", async () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
     registerMockProvider(tmpDir, {
       exports: async (_file) => ({
@@ -848,17 +845,13 @@ describe("code_resolve targetId follow-up", () => {
     expect(targetId).toBeDefined();
     if (!targetId) return;
 
-    const refPlanTool = getTool(pi, "code_refactor_plan");
-    const refPlanResult = (await refPlanTool.execute(
-      "fup-7",
+    const refPlanResult = await executeRefactorPlanTool(
       { targetId, operation: "rename", newName: "bar" },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as { content: Array<{ type: string; text: string }> };
+      { cwd: tmpDir },
+    );
 
     // Expected: only no LSP provider available, not a targetId error
-    expect(refPlanResult.content[0].text).toContain("provider");
-    expect(refPlanResult.content[0].text).not.toContain("not found");
+    expect(refPlanResult.content).toContain("provider");
+    expect(refPlanResult.content).not.toContain("not found");
   });
 });

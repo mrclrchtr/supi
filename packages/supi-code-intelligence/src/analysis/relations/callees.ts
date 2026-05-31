@@ -45,8 +45,8 @@ export async function collectCallees(
   const callees: CalleeEntry[] = result.data.callees.slice(0, maxResults ?? 8).map((c) => ({
     name: c.name,
     file: c.file ?? c.location ?? targetFile,
-    line: 0,
-    character: 0,
+    line: c.startLine ?? targetLine,
+    character: c.startCharacter ?? targetCharacter,
   }));
 
   return {

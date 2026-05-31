@@ -433,7 +433,7 @@ function buildNextQueries(target: ContextTarget | null | undefined, cwd: string)
   const relPath = path.relative(cwd, target.file) || target.file;
   return [
     `\`code_graph\` with \`file: "${relPath}"\`, \`line: ${target.line}\`, and \`character: ${target.character}\` for deeper relation follow-up`,
-    `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${target.line}\`, and \`character: ${target.character}\` for blast-radius analysis`,
+    `\`code_impact\` with \`file: "${relPath}"\`, \`line: ${target.line}\`, and \`character: ${target.character}\` for blast-radius analysis`,
   ];
 }
 

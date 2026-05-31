@@ -95,6 +95,14 @@ export function validateResolveParams(params: ResolveServiceParams): string | nu
   if ((hasLine || hasCharacter) && !hasFile) {
     return "**Error:** `line` and `character` require `file`.";
   }
+  if (
+    params.kind &&
+    !new Set(["symbol", "function", "class", "interface", "type", "file", "File", "export"]).has(
+      params.kind,
+    )
+  ) {
+    return `**Error:** Unsupported \`kind\` \`${params.kind}\`. Use \`"symbol"\`, \`"function"\`, \`"class"\`, \`"interface"\`, \`"type"\`, \`"file"\`, or \`"export"\`.`;
+  }
   return null;
 }
 // ── Registration helper ───────────────────────────────────────────────
@@ -212,8 +220,8 @@ function resolveAnchoredInput(
       omittedCount: 0,
       nextQueries: [
         "`code_graph` for usages of this target",
-        "`code_graph` for outgoing calls from this target",
-        "`code_affected` for blast radius",
+        '`code_graph` with `relations: ["callees"]` for outgoing calls from this target',
+        "`code_impact` for blast radius",
       ],
     };
   }
@@ -253,7 +261,7 @@ async function resolveFileOnlyInput(
     omittedCount: Math.max(0, outcome.group.targets.length - maxResults),
     nextQueries: [
       "Use `targetId` with `code_graph` for reference tracking",
-      "Use `targetId` with `code_affected` for blast radius",
+      "Use `targetId` with `code_impact` for blast radius",
     ],
   };
 }
@@ -283,7 +291,7 @@ async function resolvePathQuery(
     omittedCount: Math.max(0, outcome.group.targets.length - maxResults),
     nextQueries: [
       "Use `targetId` with `code_graph` for reference tracking",
-      "Use `targetId` with `code_affected` for blast radius",
+      "Use `targetId` with `code_impact` for blast radius",
     ],
   };
 }
@@ -300,15 +308,6 @@ async function resolveQueryTarget(opts: {
 
   // Map public kind to internal options for resolveSymbol.
   // "symbol" means "any kind" (no filter). "export" maps to exportedOnly.
-  // "command" / "setting" are unsupported in Phase 1.
-  const unsupportedKinds = new Set(["command", "setting"]);
-  if (kind && unsupportedKinds.has(kind)) {
-    return {
-      kind: "error",
-      message: `**Error:** kind \`"${kind}"\` is not currently supported by \`code_resolve\`. Use \`"symbol"\`, \`"function"\`, \`"class"\`, \`"interface"\`, \`"type"\`, \`"file"\`, or \`"export"\`.`,
-    };
-  }
-
   const scopePath = scope ? resolve(cwd, scope) : undefined;
   const symbolKind = kind !== undefined && kind !== "symbol" ? kind : undefined;
   const exportedOnly = kind === "export" ? true : undefined;
@@ -331,8 +330,8 @@ async function resolveQueryTarget(opts: {
       omittedCount: 0,
       nextQueries: [
         "`code_graph` for usages of this target",
-        "`code_graph` for outgoing calls from this target",
-        "`code_affected` for blast radius",
+        '`code_graph` with `relations: ["callees"]` for outgoing calls from this target',
+        "`code_impact` for blast radius",
       ],
     };
   }

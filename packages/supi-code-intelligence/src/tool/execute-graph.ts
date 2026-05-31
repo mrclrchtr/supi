@@ -23,6 +23,7 @@ import {
   type GraphSection,
   renderGraphResult,
 } from "../presentation/markdown/relations.ts";
+import { toDisplayPath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
@@ -129,8 +130,9 @@ export async function executeGraphTool(
 
   const resolvedFile = target.file;
   const resolvedPosition = target.position;
+  const resolvedDisplayFile = toDisplayPath(ctx.cwd, resolvedFile);
   const displayName =
-    target.name ?? expandedTargetName ?? `symbol at ${resolvedFile}:${target.displayLine}`;
+    target.name ?? expandedTargetName ?? `symbol at ${resolvedDisplayFile}:${target.displayLine}`;
 
   // ── 6. Collect results per relation ─────────────────────────────────
   const sections: GraphSection[] = [];
@@ -150,7 +152,7 @@ export async function executeGraphTool(
   }
 
   // ── 7. Render combined output ───────────────────────────────────────
-  const content = renderGraphResult(displayName, sections, resolvedFile);
+  const content = renderGraphResult(displayName, sections, resolvedDisplayFile);
 
   // Derive confidence from the highest-capability successful section
   const hasStructural = sections.some((s) => s.kind === "ok" && s.rel === "callees");
@@ -177,7 +179,7 @@ export async function executeGraphTool(
         omittedCount: 0,
         nextQueries: [
           "`code_brief` on individual results for deeper context",
-          "`code_affected` for impact analysis",
+          "`code_impact` for impact analysis",
         ],
       },
     },
@@ -242,7 +244,7 @@ async function collectRelation(
         const calleeContent = renderCallsResult(
           result.enclosingScopeName,
           result.calls,
-          file,
+          toDisplayPath(cwd, file),
           maxResults,
         );
         return { kind: "ok", rel, count: result.calls.length, content: calleeContent };

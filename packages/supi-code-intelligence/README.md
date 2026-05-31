@@ -32,16 +32,15 @@ After install, pi gets:
 - `code_brief` — interpretive orientation with structural enrichment for a project, package, directory, file, or symbol
 - `code_graph` — unified relation graph (references, callees, implementations) from a resolved target
 - `code_impact` — preferred workflow-oriented blast radius, downstream impact, and diff-aware changed-file analysis
-- `code_affected` — compatibility alias for the older target-based impact surface
 - `code_find` — unified ranked search (text, regex, AST, semantic)
 - `code_health` — diagnostics, server status, dirty workspace, coverage, and unused-code health signals
-- `code_refactor_plan` — preview an operation-aware semantic refactor plan without mutating files
-- `code_refactor_apply` — apply a previously generated, validated precise text-edit refactor plan
+- `code_refactor` — preferred workflow refactor surface; preview an operation-aware semantic refactor plan without mutating files
+- `code_apply` — preferred workflow apply surface; apply a previously stored, validated plan by `planId`
 - `code_resolve` — resolve human/code references into precise targets with stable target handles for follow-up calls
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
 
-Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface.
+Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface. Historical compatibility executors remain in the source tree for migration/tests, but are no longer registered as public tools.
 
 ## V2 workflow roadmap
 
@@ -54,9 +53,9 @@ The current public surface now includes:
 - `code_find` — **active** (Phase 2a, supersedes code_pattern)
 - `code_health` — **active** (Phase 1.5)
 - `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
-- `code_impact` — **active** (Phase 4, preferred workflow impact tool; `code_affected` remains as a compatibility alias)
-- `code_refactor` — planned (Phase 5)
-- `code_apply` — planned (Phase 5)
+- `code_impact` — **active** (Phase 4, preferred workflow impact tool)
+- `code_refactor` — **active** (Phase 5, preferred workflow refactor surface)
+- `code_apply` — **active** (Phase 5, preferred workflow apply surface)
 
 The design source of truth lives in `src/workflow/` with types, schemas, and metadata.
 
@@ -105,9 +104,6 @@ Preferred workflow-oriented impact analysis.
 - `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing
 - uses real workspace/git evidence only; no heuristic grep fallback
 
-### `code_affected`
-Compatibility alias for the older target-based blast-radius surface. Prefer `code_impact` for new calls.
-
 ### `code_find`
 Unified ranked search tool for:
 - literal text search (default mode)
@@ -126,28 +122,37 @@ Health/status summary for the current workspace or a scoped path.
 - `unused` reads `knip.json` when present and reports unused files/exports
 - when a requested coverage/unused report is missing, the result says so explicitly instead of silently falling back to diagnostics
 
-### `code_refactor_plan`
-Preview-only operation-aware refactor planning.
+### `code_refactor`
+Preferred workflow refactor surface.
 
-First-wave supported operations:
+- previews a precise semantic refactor plan without mutating files
+- returns a `planId` for follow-up `code_apply`
+- uses the workflow schema (`operation`, target/file coords, operation-specific fields)
+- legacy `operation: "rename"` is accepted as a compatibility alias for `rename_symbol`
+- `preview: false` is not yet supported; `code_refactor` remains preview-only in this phase
+- in this phase it intentionally wraps the proven `code_refactor_plan` machinery
+
+Supported operations in this phase:
 - `rename_symbol`
 - `update_imports`
 - `delete_dead_code`
-- legacy `rename` alias → `rename_symbol`
 
 Notes:
 - `rename_file` and `move_file` remain explicit unavailable outcomes for now
 - only precise semantic text edits become plans
-- no files are changed during planning
 - `targetId` from `code_resolve` can replace raw file + line + character targeting
 
-### `code_refactor_apply`
-Applies a previously generated refactor plan by `planId`.
+### `code_apply`
+Preferred workflow apply surface.
 
-- applies only stored, validated, precise text-edit plans
-- rejects stale plans using file fingerprints
-- re-validates ranges and overlap before mutation
-- does not yet apply file/resource operations such as `rename_file` or `move_file`
+- applies a previously stored plan by `planId`
+- supports `mode: "apply"` in this phase
+- `apply-and-format` and `apply-and-verify` remain explicit unavailable outcomes for now
+- rejects stale plans using file fingerprints and re-validates ranges/overlap before mutation
+
+## Internal compatibility paths
+
+The legacy compatibility executors (`code_affected`, `code_refactor_plan`, `code_refactor_apply`) remain in the source tree for migration/tests, but are no longer registered on the public tool surface.
 
 ## Shared input conventions
 
@@ -165,7 +170,7 @@ Depending on the tool, inputs may include:
 Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `path`
-- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_context`, `code_graph`, `code_impact`, `code_affected`, `code_brief`, and `code_refactor_plan`
+- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_context`, `code_graph`, `code_impact`, `code_brief`, and `code_refactor`
 - a leading `@` is stripped from `path` and `file`
 - non-search tools do **not** silently fall back to heuristic grep behavior
 
@@ -218,7 +223,7 @@ const overview = generateOverview(model);
 - `src/tool/tool-specs.ts` — single source of truth for the current public tool surface
 - `src/tool/register-tools.ts` — focused tool registration wiring
 - `src/tool/guidance.ts` — prompt surfaces derived from tool specs
-- `src/tool/execute-*.ts` — thin adapters that validate params and route to use-case/presentation layers
+- `src/tool/execute-*.ts` — thin adapters that validate params and route to use-case/presentation layers, including the Phase 5 workflow wrappers `execute-refactor.ts` and `execute-apply.ts`
 - `src/workflow/target-store.ts` — session-scoped target/span handle registry with file-fingerprint staleness detection
 - `src/analysis/resolve/service.ts` — `code_resolve` business logic
 - `src/tool/execute-resolve.ts` — `code_resolve` public tool executor

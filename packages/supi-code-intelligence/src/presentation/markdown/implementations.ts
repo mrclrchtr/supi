@@ -3,12 +3,13 @@
  */
 
 import type { ImplementationEntry } from "../../analysis/implementations/service.ts";
+import { toDisplayPath } from "../../search-helpers.ts";
 
 // biome-ignore lint/complexity/useMaxParams: render function with independent display parameters
 export function renderImplementationsResult(
   impls: ImplementationEntry[],
   externalCount: number,
-  _cwd: string,
+  cwd: string,
   maxResults: number,
   targetName?: string,
 ): string {
@@ -24,7 +25,7 @@ export function renderImplementationsResult(
     lines.push("");
     const shown = impls.slice(0, maxResults);
     for (const impl of shown) {
-      lines.push(`- \`${impl.file}:${impl.line}\``);
+      lines.push(`- \`${toDisplayPath(cwd, impl.file)}:${impl.line}\``);
     }
     lines.push("");
   }

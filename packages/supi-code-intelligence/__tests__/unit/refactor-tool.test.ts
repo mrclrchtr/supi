@@ -1,38 +1,17 @@
 /**
- * RED tests for code_refactor_plan routing and behavior.
- *
- * These tests define the new two-step refactor surface.
- * Some will fail until Task 6 implements the real plan executors.
+ * Routing tests for the workflow refactor surfaces and their compatibility aliases.
  */
 
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import {
   getDefaultWorkspaceRuntime,
   type SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it } from "vitest";
 
-describe("code_refactor_plan routing", () => {
-  let tmpDir: string | null = null;
-
+describe("refactor workflow routing", () => {
   afterEach(() => {
     getDefaultWorkspaceRuntime().clearAll();
-    if (tmpDir) {
-      rmSync(tmpDir, { recursive: true, force: true });
-      tmpDir = null;
-    }
   });
-
-  function _createProjectFile() {
-    tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-refactor-plan-route-"));
-    const projectDir = path.join(tmpDir, "project");
-    const file = path.join(projectDir, "src", "index.ts");
-    mkdirSync(path.dirname(file), { recursive: true });
-    writeFileSync(file, "oldName();\n", "utf-8");
-    return { projectDir, file };
-  }
 
   function createSemanticProvider(rename: SemanticProvider["rename"]): SemanticProvider {
     return {
@@ -44,7 +23,7 @@ describe("code_refactor_plan routing", () => {
     };
   }
 
-  it("routes code_refactor_plan to semantic-preferred when refactor-capable provider is registered", async () => {
+  it("routes code_refactor and code_refactor_plan to semantic-preferred when refactor-capable provider is registered", async () => {
     const runtime = getDefaultWorkspaceRuntime();
     runtime.registerSemantic(
       "/project",
@@ -52,27 +31,26 @@ describe("code_refactor_plan routing", () => {
     );
 
     const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-    const route = routeFor("/project", "code_refactor_plan");
-    expect(route.preferred).toBe("semantic");
-    expect(route.refactorAvailable).toBe(true);
+    const workflowRoute = routeFor("/project", "code_refactor");
+    expect(workflowRoute.preferred).toBe("semantic");
+    expect(workflowRoute.refactorAvailable).toBe(true);
+
+    const compatibilityRoute = routeFor("/project", "code_refactor_plan");
+    expect(compatibilityRoute.preferred).toBe("semantic");
+    expect(compatibilityRoute.refactorAvailable).toBe(true);
   });
 
-  it("routes code_refactor_plan to unavailable when no refactor-capable provider exists", async () => {
+  it("routes code_refactor and code_refactor_plan to unavailable when no refactor-capable provider exists", async () => {
     const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-    const route = routeFor("/project", "code_refactor_plan");
-    expect(route.preferred).toBe("unavailable");
-    expect(route.refactorAvailable).toBe(false);
+    expect(routeFor("/project", "code_refactor").preferred).toBe("unavailable");
+    expect(routeFor("/project", "code_refactor").refactorAvailable).toBe(false);
+    expect(routeFor("/project", "code_refactor_plan").preferred).toBe("unavailable");
+    expect(routeFor("/project", "code_refactor_plan").refactorAvailable).toBe(false);
   });
 
-  it("routes code_refactor_apply to semantic-preferred when semantic is available", async () => {
-    const runtime = getDefaultWorkspaceRuntime();
-    runtime.registerSemantic(
-      "/project",
-      createSemanticProvider(async () => ({ kind: "precise", edits: { edits: [] } })),
-    );
-
+  it("routes code_apply and code_refactor_apply to semantic-preferred", async () => {
     const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-    const route = routeFor("/project", "code_refactor_apply");
-    expect(route.semanticAvailable).toBe(true);
+    expect(routeFor("/project", "code_apply").preferred).toBe("semantic");
+    expect(routeFor("/project", "code_refactor_apply").preferred).toBe("semantic");
   });
 });

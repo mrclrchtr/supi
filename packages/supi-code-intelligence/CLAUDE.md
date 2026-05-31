@@ -3,7 +3,7 @@
 Architecture briefs with structural enrichment, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused code-only tool surface (`code_context`, `code_brief`, `code_graph`, `code_impact`, `code_affected`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused public code-only tool surface (`code_context`, `code_brief`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_resolve`, `code_refactor`, `code_apply`)
 - Historical substrate-named tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
@@ -77,14 +77,16 @@ src/
 │   ├── execute-affected.ts     # code_affected compatibility executor
 │   ├── execute-find.ts         # code_find tool executor
 │   ├── execute-resolve.ts      # code_resolve tool executor (Phase 1)
-│   ├── execute-refactor-plan.ts  # code_refactor_plan tool executor
-│   └── execute-refactor-apply.ts # code_refactor_apply tool executor
+│   ├── execute-refactor.ts     # code_refactor workflow wrapper (Phase 5)
+│   ├── execute-apply.ts        # code_apply workflow wrapper (Phase 5)
+│   ├── execute-refactor-plan.ts  # code_refactor_plan compatibility executor
+│   └── execute-refactor-apply.ts # code_refactor_apply compatibility executor
 ├── workflow/
-│   ├── names.ts               # Canonical V2 workflow tool names (active + roadmap)
+│   ├── names.ts               # Canonical V2 workflow tool names (all active)
 │   ├── ids.ts                 # Planned V2 workflow handle contracts (TargetId, PlanId, etc.)
 │   ├── results.ts             # Shared structured result envelope and provenance types
 │   ├── schemas.ts             # Planned V2 workflow tool parameter schemas
-│   ├── surface.ts             # Canonical V2 tool metadata (active + roadmap)
+│   ├── surface.ts             # Canonical V2 tool metadata (all active)
 │   ├── target-store.ts        # Session-scoped target/span handle registry (Phase 1)
 │   └── index.ts               # Internal barrel for workflow skeleton consumers/tests
 ├── presentation/markdown/
@@ -161,9 +163,6 @@ Preferred workflow-oriented blast-radius tool.
 - `change`-only requests return an explicit insufficient-evidence result instead of heuristic guessing
 - does not fall back to heuristic search
 
-### `code_affected`
-Compatibility alias for the older target-based blast-radius tool. Prefer `code_impact` for new calls.
-
 ### `code_find`
 Unified ranked code search with mode dispatch — the sole search tool.
 - `query` (required) — search pattern or symbol query
@@ -186,48 +185,53 @@ Diagnostic health summary. Replaces `lsp_diagnostics` and `lsp_recover`.
 ### `code_resolve`
 Resolve human or code references into precise file/range/symbol targets with stable handles. Supports anchored (file + line + character), file-only, and query/symbol inputs. Returns `targetId` and `spanId` for follow-up calls.
 
-### `code_refactor_plan`
-Preview-only operation-aware semantic refactor planning. Reads capability state from the shared broker, calls the semantic provider's operation-aware refactor entrypoint when available, validates the resulting precise workspace edit, computes file fingerprints for staleness detection, and returns a preview with a plan ID. Does not mutate files. May accept `targetId` in place of file/line/character.
+### `code_refactor`
+Preferred workflow refactor surface. Thin Phase 5 wrapper over the preview-only planning path.
 
-First-wave supported operations:
-- `rename_symbol`
-- `update_imports`
-- `delete_dead_code`
-- legacy `rename` alias → `rename_symbol`
+- returns a preview plan with a plan ID; does not mutate files directly
+- accepts the workflow schema (`operation`, optional `targetId`, anchored coords, and operation-specific fields)
+- supported operations in this phase: `rename_symbol`, `update_imports`, `delete_dead_code`
+- legacy `operation: "rename"` is accepted as a compatibility alias for `rename_symbol`
+- `preview: false` is not yet supported; `code_refactor` remains preview-only in this phase
+- `rename_file` and `move_file` remain explicit unavailable outcomes until shared resource-edit support exists
 
-Deferred for a follow-up ticket:
-- `rename_file`
-- `move_file`
+### `code_apply`
+Preferred workflow apply surface. Thin Phase 5 wrapper over the stored-plan application path.
 
-These deferred file/resource operations must stay explicit unavailable outcomes until the shared runtime supports real resource edits and rollback semantics.
+- applies a previously generated plan by `planId`
+- supports only `mode: "apply"` in this phase
+- `apply-and-format` and `apply-and-verify` remain explicit unavailable outcomes for now
+- rechecks fingerprints and re-validates edit safety before mutation
 
-### `code_refactor_apply`
-Apply a previously generated refactor plan by plan ID. Retrieves the plan from the in-memory store, rechecks file fingerprints, re-validates ranges and overlap, applies deterministically through safety gates, and reports results. Rejects stale, missing, or invalid plans. In this phase it applies only stored, validated, precise text-edit plans.
+## Internal compatibility executors
+
+The legacy compatibility executors (`code_affected`, `code_refactor_plan`, `code_refactor_apply`) remain in the source tree for migration/tests, but are no longer registered on the public tool surface.
 
 ## Key gotchas
 
 ### Planner routing
 - The `planner.ts` central router reads capability state from the shared broker and returns `PlannerRoute` for each tool intent.
 - `code_context` uses the same semantic/structural preference model as `code_brief`, but falls back to orientation-style output when `task` is omitted.
-- `code_refactor_plan` checks `refactorAvailable` from the semantic capability slot.
+- `code_refactor` and `code_refactor_plan` check `refactorAvailable` from the semantic capability slot.
 - The semantic provider prefers its generic `refactor(request)` entrypoint; rename-only fallback exists only for compatibility with older provider shapes.
-- `code_refactor_apply` does not require a live semantic provider — plan validity is enforced through fingerprint comparison in the executor.
+- `code_apply` and `code_refactor_apply` do not require a live semantic provider — plan validity is enforced through fingerprint comparison in the executor.
 - When no capability is available, the planner returns `preferred: "unavailable"` and the execute function returns an explicit error message.
 
 ### Public-surface split
 - `code_context` is now active as the task-focused workflow surface, while `code_brief` remains the compatibility/orientation tool.
-- `code_impact` is now active as the preferred workflow impact surface; `code_affected` remains as a temporary compatibility alias.
+- `code_impact` is now active as the preferred workflow impact surface.
 - `code_find` is the sole search tool, supporting text, regex, AST, and semantic modes.
 - `code_graph` dispatches each relation to the appropriate substrate. Unavailable substrates skip with a note rather than failing.
+- `code_refactor` / `code_apply` are now active as the preferred workflow refactor/apply surfaces.
 
 ### Param validation
 - `line`/`character` require `file`, **not** `path`.
-- `code_refactor_plan` requires `operation` plus either `targetId` or `file` + `line` + `character`.
-- `newName` is required for `rename_symbol` (and the legacy `rename` alias), but not for `update_imports` or `delete_dead_code`.
+- `code_refactor` requires `operation` plus either `targetId` or `file` + `line` + `character`.
+- `newName` is required for `rename_symbol` (and for the legacy `rename` alias on `code_refactor`), but not for `update_imports` or `delete_dead_code`.
 - `rename_file` / `move_file` are accepted at the schema level so the tool can return an explicit unavailable result rather than a misleading validation error.
-- `code_refactor_apply` requires `planId`.
+- `code_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
-- `code_context`, `code_brief`, `code_impact`, and `code_affected` accept optional `targetId` that takes precedence over raw coordinates.
+- `code_context`, `code_brief`, `code_impact`, and `code_refactor` accept optional `targetId` that takes precedence over raw coordinates.
 
 ### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.
@@ -245,9 +249,9 @@ Apply a previously generated refactor plan by plan ID. Retrieves the plan from t
 
 ### Refactor safety
 - `validateEdit()` rejects empty edits and invalid ranges before filesystem apply.
-- `code_refactor_plan` validates the edit before generating a plan; returns `unavailable` or `ambiguous` if the provider cannot produce precise edits.
-- `code_refactor_apply` remains text-edit-only in this phase — do not extend it to file/resource operations until shared runtime support exists.
-- `code_refactor_apply` rejects stale plans by comparing stored SHA-256 file fingerprints to current contents, and re-validates ranges before applying.
+- `code_refactor` / `code_refactor_plan` validate the edit before generating a plan; they return `unavailable` or `ambiguous` if the provider cannot produce precise edits.
+- `code_apply` / `code_refactor_apply` remain text-edit-only in this phase — do not extend them to file/resource operations until shared runtime support exists.
+- `code_apply` / `code_refactor_apply` reject stale plans by comparing stored SHA-256 file fingerprints to current contents, and re-validate ranges before applying.
 - No heuristic text fallback.
 
 ## Dependencies

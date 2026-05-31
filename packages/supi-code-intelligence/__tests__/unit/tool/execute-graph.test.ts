@@ -95,7 +95,10 @@ describe("execute-graph (code_graph tool)", () => {
       );
 
       expect(result.content).toContain("Graph of");
+      expect(result.content).toContain("_File: `test.ts`_");
       expect(result.content).toContain("outgoing call");
+      expect(result.content).toContain("`bar` (L1)");
+      expect(result.content).not.toContain("L0");
       expect(result.content).toContain("callees");
     });
   });

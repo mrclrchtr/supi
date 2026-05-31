@@ -70,11 +70,11 @@ export function routeFor(cwd: string, tool: CodeIntelligenceToolName): PlannerRo
     return withPreferred(availability, semanticOnly(availability));
   }
 
-  if (tool === "code_refactor_plan") {
+  if (tool === "code_refactor" || tool === "code_refactor_plan") {
     return withPreferred(availability, availability.refactorAvailable ? "semantic" : "unavailable");
   }
 
-  if (tool === "code_refactor_apply") {
+  if (tool === "code_apply" || tool === "code_refactor_apply") {
     // Plan application does not require a live semantic provider — validity
     // is enforced through fingerprint comparison in the executor.
     // Return semantic-preferred so the route check never blocks valid plans.

@@ -119,7 +119,7 @@ async function executeAnchoredBrief(
     omittedCount: 0,
     nextQueries: [
       `\`code_graph\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
-      `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for impact analysis`,
+      `\`code_impact\` with \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for impact analysis`,
     ],
   };
 
@@ -234,7 +234,7 @@ async function executeSymbolBrief(
     omittedCount: 0,
     nextQueries: [
       `\`code_graph\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
-      `\`code_affected\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for impact analysis`,
+      `\`code_impact\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for impact analysis`,
     ],
   };
 

@@ -142,8 +142,8 @@ describe("focused brief details metadata", () => {
     const coreDir = path.join(tmpDir, "packages", "core");
     const { details } = await generateFocusedBrief(model as NonNullable<typeof model>, coreDir);
     expect(details.nextQueries.length).toBeGreaterThan(0);
-    const affectedHint = details.nextQueries.find((q) => q.includes("affected"));
-    expect(affectedHint).toBeDefined();
+    const impactHint = details.nextQueries.find((q) => q.includes("code_impact"));
+    expect(impactHint).toBeDefined();
   });
 
   it("includes optional priority signals when artifacts exist", async () => {

@@ -4,6 +4,7 @@
 
 import type { ApplyResult } from "../../analysis/refactor/apply-workspace-edit.ts";
 import type { RefactorPlan } from "../../analysis/refactor/plan-store.ts";
+import { toDisplayPath } from "../../search-helpers.ts";
 
 export interface RefactorRenderInput {
   result: ApplyResult;
@@ -31,7 +32,7 @@ export function renderRefactorResult(input: RefactorRenderInput): string {
 /**
  * Render a refactor plan preview.
  */
-export function renderRefactorPlanResult(plan: RefactorPlan): string {
+export function renderRefactorPlanResult(plan: RefactorPlan, cwd: string): string {
   const lines: string[] = [];
   const changedFiles = collectChangedFiles(plan);
   const fileCount = changedFiles.length;
@@ -40,7 +41,9 @@ export function renderRefactorPlanResult(plan: RefactorPlan): string {
   lines.push("");
   lines.push(`**Plan ID:** \`${plan.id}\``);
   lines.push(`**Operation:** \`${plan.operation}\``);
-  lines.push(`**Target:** \`${plan.targetFile}\`:${plan.targetLine}:${plan.targetCharacter}`);
+  lines.push(
+    `**Target:** \`${toDisplayPath(cwd, plan.targetFile)}\`:${plan.targetLine}:${plan.targetCharacter}`,
+  );
   if (plan.newName) {
     lines.push(`**New name:** \`${plan.newName}\``);
   }
@@ -53,7 +56,7 @@ export function renderRefactorPlanResult(plan: RefactorPlan): string {
 
   lines.push("## Files");
   for (const [file, count] of changedFiles) {
-    lines.push(`- \`${file}\` — ${count} edit${count !== 1 ? "s" : ""}`);
+    lines.push(`- \`${toDisplayPath(cwd, file)}\` — ${count} edit${count !== 1 ? "s" : ""}`);
   }
   lines.push("");
   lines.push("## Preview");
@@ -61,7 +64,7 @@ export function renderRefactorPlanResult(plan: RefactorPlan): string {
   for (const edit of plan.edits.edits.slice(0, 5)) {
     const range = edit.range;
     lines.push(
-      `- \`${edit.file}\` L${range.start.line + 1}:${range.start.character} → L${range.end.line + 1}:${range.end.character}`,
+      `- \`${toDisplayPath(cwd, edit.file)}\` L${range.start.line + 1}:${range.start.character} → L${range.end.line + 1}:${range.end.character}`,
     );
     lines.push("  ```");
     lines.push(`  ${edit.newText.slice(0, 80).split("\n").join("\n  ")}`);
@@ -72,7 +75,7 @@ export function renderRefactorPlanResult(plan: RefactorPlan): string {
   }
   lines.push("");
   lines.push("**This is a preview. No files were changed.**");
-  lines.push(`Use code_refactor_apply with planId: "${plan.id}" to apply this refactor.`);
+  lines.push(`Use code_apply with planId: "${plan.id}" to apply this refactor.`);
   return lines.join("\n");
 }
 

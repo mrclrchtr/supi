@@ -208,7 +208,7 @@ function addDependentsSection(
       const depShort = dep.name.replace(/^@[^/]+\//, "");
       lines.push(`- ${depShort} (\`${dep.relativePath}\`)`);
     }
-    nextQueries.push("`code_affected` before modifying exports from this module");
+    nextQueries.push("`code_impact` before modifying exports from this module");
   }
 
   if (mod.entrypoints.length > 0) {

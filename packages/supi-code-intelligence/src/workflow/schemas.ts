@@ -31,20 +31,9 @@ export const CodeResolveParameters = Type.Object(
     query: Type.Optional(QueryParam),
     scope: Type.Optional(ScopeParam),
     kind: Type.Optional(
-      StringEnum(
-        [
-          "symbol",
-          "function",
-          "class",
-          "interface",
-          "type",
-          "file",
-          "export",
-          "command",
-          "setting",
-        ],
-        { description: "Preferred target kind when disambiguating the query." },
-      ),
+      StringEnum(["symbol", "function", "class", "interface", "type", "file", "export"], {
+        description: "Preferred target kind when disambiguating the query.",
+      }),
     ),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
@@ -200,15 +189,16 @@ export const CodeImpactParameters = Type.Object(
  *
  * Runtime rules for future executors:
  * - require `targetId` or anchored `file` + `line` + `character`
- * - `rename_symbol` and `rename_file` require `newName`
+ * - `rename` (legacy alias), `rename_symbol`, and `rename_file` require `newName`
  * - `move_file` requires `destination`
  */
 export const CodeRefactorParameters = Type.Object(
   {
     operation: StringEnum(
-      ["rename_symbol", "rename_file", "move_file", "update_imports", "delete_dead_code"],
+      ["rename", "rename_symbol", "rename_file", "move_file", "update_imports", "delete_dead_code"],
       {
-        description: "Precise refactor operation to preview or plan.",
+        description:
+          "Precise refactor operation to preview or plan. `rename` is accepted as a compatibility alias for `rename_symbol`.",
       },
     ),
     targetId: Type.Optional(

@@ -52,6 +52,23 @@ export function normalizePath(input: string, cwd: string): string {
   return resolveToolPath(cwd, input);
 }
 
+/** Render a file path relative to cwd when it is inside the workspace. */
+export function toDisplayPath(cwd: string, filePath: string): string {
+  if (!path.isAbsolute(filePath)) {
+    return filePath.replaceAll("\\", "/");
+  }
+
+  const relativePath = path.relative(cwd, filePath);
+  if (!relativePath || relativePath === ".") {
+    return filePath;
+  }
+  if (relativePath.startsWith(`..${path.sep}`) || relativePath === "..") {
+    return filePath;
+  }
+
+  return relativePath.replaceAll("\\", "/");
+}
+
 export interface RgMatch {
   file: string;
   line: number;

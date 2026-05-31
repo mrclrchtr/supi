@@ -23,9 +23,9 @@ export interface WorkflowCodeToolSpec {
 /**
  * Canonical V2 workflow surface metadata.
  *
- * Some entries are already active on the public surface (`code_resolve`,
- * `code_context`, `code_find`, `code_graph`, `code_impact`, `code_health`);
- * the remaining entries stay here as roadmap metadata until later phases land.
+ * All entries in this metadata table are now active on the public surface.
+ * The metadata remains here as the durable design source of truth for tests,
+ * docs, and future follow-on work.
  *
  * Each entry captures:
  * - the workflow intent
@@ -127,7 +127,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     phase: "phase-5",
     nonGoals: [
       "Does not introduce a broad action mega-tool.",
-      "Does not apply edits directly in Phase 0.",
+      "Phase 5 keeps code_refactor preview-only; it does not mutate files directly.",
     ],
   },
   {
@@ -141,7 +141,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     substrates: ["semantic", "search", "git"],
     phase: "phase-5",
     nonGoals: [
-      "Does not register or mutate anything in Phase 0.",
+      'Phase 5 supports only `mode: "apply"`; format/verify modes remain explicit unavailable outcomes.',
       "Does not bypass plan validation or fingerprint checks.",
     ],
   },

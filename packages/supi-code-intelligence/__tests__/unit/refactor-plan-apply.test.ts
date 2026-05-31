@@ -114,6 +114,8 @@ describe("code_refactor_plan", () => {
 
     expect(result.content).toContain("Plan ID");
     expect(result.content).toContain("rename_symbol");
+    expect(result.content).toContain("`src/index.ts`");
+    expect(result.content).not.toContain(projectDir);
   });
 
   it("canonicalizes the legacy rename alias to rename_symbol in the preview", async () => {

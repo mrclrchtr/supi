@@ -10,7 +10,7 @@ describe("focused code intelligence tool registration", () => {
     codeIntelligenceExtension(pi as never);
 
     const tools = getTools(pi);
-    // code_* (10) + read/write/edit overrides (3)
+    // code_* surface + read/write/edit overrides
     expect(tools.length).toBeGreaterThanOrEqual(CODE_INTELLIGENCE_TOOL_SPECS.length);
     // All code_* tools are present
     for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
@@ -46,13 +46,12 @@ describe("focused code intelligence tool registration", () => {
     expect(names).not.toContain("code_implementations");
   });
 
-  it("no longer registers code_relations or code_refactor", () => {
+  it("no longer registers code_relations", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
     expect(names).not.toContain("code_relations");
-    expect(names).not.toContain("code_refactor");
   });
 
   it("registers code_resolve as the first active V2 workflow tool", () => {
@@ -75,7 +74,8 @@ describe("focused code intelligence tool registration", () => {
     const kindParam = props?.kind as { enum?: string[] } | undefined;
     expect(kindParam?.enum).toBeDefined();
     expect(kindParam?.enum).toContain("symbol");
-    expect(kindParam?.enum).toContain("command");
+    expect(kindParam?.enum).not.toContain("command");
+    expect(kindParam?.enum).not.toContain("setting");
   });
 
   it("registers code_find with correct parameter shape", () => {
@@ -127,18 +127,15 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("maxResults");
   });
 
-  it("registers code_impact as the active workflow impact tool while keeping code_affected", () => {
+  it("registers code_impact as the active workflow impact tool", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const impactTool = getTool(pi, "code_impact");
-    const affectedTool = getTool(pi, "code_affected");
 
     expect(impactTool).toBeDefined();
     expect(impactTool.name).toBe("code_impact");
     expect(typeof impactTool.execute).toBe("function");
-    expect(affectedTool).toBeDefined();
-    expect(affectedTool.name).toBe("code_affected");
 
     const props = (impactTool as { parameters?: { properties?: Record<string, unknown> } })
       .parameters?.properties;
@@ -151,30 +148,25 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("maxResults");
   });
 
-  it("does not register inactive V2 workflow tools (code_refactor, code_apply)", () => {
+  it("registers all workflow tool names on the public surface", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
-    const inactive = WORKFLOW_CODE_TOOL_NAMES.filter(
-      (n) =>
-        n !== "code_resolve" &&
-        n !== "code_context" &&
-        n !== "code_health" &&
-        n !== "code_find" &&
-        n !== "code_graph" &&
-        n !== "code_impact",
-    );
-    for (const name of inactive) {
-      expect(names).not.toContain(name);
+    for (const name of WORKFLOW_CODE_TOOL_NAMES) {
+      expect(names).toContain(name);
     }
   });
 
-  it("does not register any lsp_* or tree_sitter_* substrate tools", () => {
+  it("does not register public compatibility aliases or substrate tools", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
+    expect(names).not.toContain("code_affected");
+    expect(names).not.toContain("code_refactor_plan");
+    expect(names).not.toContain("code_refactor_apply");
+
     const substratePrefixes = ["lsp_", "tree_sitter_"];
     const substrateTools = names.filter((n) =>
       substratePrefixes.some((prefix) => n.startsWith(prefix)),
@@ -212,25 +204,28 @@ describe("focused code intelligence tool registration", () => {
     expect(tool.promptGuidelines?.join("\n")).toContain("unused");
   });
 
-  it("registers refactor_plan and refactor_apply with correct parameter shapes", () => {
+  it("registers refactor workflow tools with correct parameter shapes", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const planTool = getTool(pi, "code_refactor_plan") as {
+    const workflowRefactorTool = getTool(pi, "code_refactor") as {
       parameters?: { properties?: Record<string, unknown> };
     };
-    expect(planTool).toBeDefined();
-    expect(planTool.parameters?.properties).toHaveProperty("operation");
-    expect(planTool.parameters?.properties).toHaveProperty("file");
-    expect(planTool.parameters?.properties).toHaveProperty("line");
-    expect(planTool.parameters?.properties).toHaveProperty("character");
-    expect(planTool.parameters?.properties).toHaveProperty("newName");
+    expect(workflowRefactorTool).toBeDefined();
+    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("operation");
+    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("targetId");
+    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("file");
+    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("line");
+    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("character");
+    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("newName");
+    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("preview");
 
-    const operationParam = planTool.parameters?.properties?.operation as
+    const workflowOperationParam = workflowRefactorTool.parameters?.properties?.operation as
       | { enum?: string[] }
       | undefined;
-    expect(operationParam?.enum).toEqual(
+    expect(workflowOperationParam?.enum).toEqual(
       expect.arrayContaining([
+        "rename",
         "rename_symbol",
         "rename_file",
         "move_file",
@@ -239,11 +234,12 @@ describe("focused code intelligence tool registration", () => {
       ]),
     );
 
-    const applyTool = getTool(pi, "code_refactor_apply") as {
+    const workflowApplyTool = getTool(pi, "code_apply") as {
       parameters?: { properties?: Record<string, unknown> };
     };
-    expect(applyTool).toBeDefined();
-    expect(applyTool.parameters?.properties).toHaveProperty("planId");
+    expect(workflowApplyTool).toBeDefined();
+    expect(workflowApplyTool.parameters?.properties).toHaveProperty("planId");
+    expect(workflowApplyTool.parameters?.properties).toHaveProperty("mode");
   });
 });
 

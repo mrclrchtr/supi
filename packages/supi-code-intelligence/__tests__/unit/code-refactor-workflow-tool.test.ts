@@ -1,0 +1,343 @@
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import {
+  getDefaultWorkspaceRuntime,
+  type RefactorResult,
+  type SemanticProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
+import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { afterEach, describe, expect, it } from "vitest";
+import codeIntelligenceExtension from "../../src/code-intelligence.ts";
+import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
+import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
+
+let tmpDir: string | null = null;
+
+afterEach(() => {
+  getDefaultWorkspaceRuntime().clearAll();
+  if (tmpDir) {
+    rmSync(tmpDir, { recursive: true, force: true });
+    tmpDir = null;
+  }
+});
+
+function createProjectFile(content = "oldName();\n"): { projectDir: string; file: string } {
+  tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-refactor-workflow-"));
+  const projectDir = path.join(tmpDir, "project");
+  const file = path.join(projectDir, "src", "index.ts");
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, content, "utf-8");
+  return { projectDir, file };
+}
+
+function extractPlanId(content: string): string {
+  const match = content.match(/\*\*Plan ID:\*\* `([^`]+)`/);
+  if (!match) {
+    throw new Error(`Plan ID not found in content:\n${content}`);
+  }
+  return match[1];
+}
+
+type RefactorRequest = {
+  operation: string;
+  file: string;
+  position: { line: number; character: number };
+  newName?: string;
+};
+
+type OperationAwareSemanticProvider = SemanticProvider & {
+  refactor?: (request: RefactorRequest) => Promise<RefactorResult>;
+};
+
+function createSemanticProvider(
+  overrides: Partial<Pick<SemanticProvider, "rename">> & {
+    refactor?: OperationAwareSemanticProvider["refactor"];
+  } = {},
+): SemanticProvider {
+  return {
+    references: async () => null,
+    implementation: async () => null,
+    documentSymbols: async () => [],
+    workspaceSymbols: async () => [],
+    rename: overrides.rename,
+    ...(overrides.refactor ? { refactor: overrides.refactor } : {}),
+  } as SemanticProvider;
+}
+
+describe("code_refactor / code_apply workflow wrappers", () => {
+  it("registers and executes code_refactor as the preferred workflow wrapper", async () => {
+    const { projectDir, file } = createProjectFile();
+    getDefaultWorkspaceRuntime().registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_refactor");
+
+    const result = (await tool.execute(
+      "workflow-refactor-1",
+      {
+        operation: "rename_symbol",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("Plan ID");
+    expect(result.content[0].text).toContain("rename_symbol");
+    expect(result.content[0].text).toContain("code_apply");
+    expect(result.content[0].text).not.toContain(projectDir);
+  });
+
+  it("rejects preview: false explicitly because code_refactor is preview-only", async () => {
+    const { projectDir } = createProjectFile();
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_refactor");
+
+    const result = (await tool.execute(
+      "workflow-refactor-preview-false",
+      {
+        operation: "rename_symbol",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+        preview: false,
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("Preview mode unavailable");
+    expect(result.content[0].text).toContain("preview: false");
+  });
+
+  it("accepts the legacy rename alias on code_refactor and canonicalizes it", async () => {
+    const { projectDir, file } = createProjectFile();
+    getDefaultWorkspaceRuntime().registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_refactor");
+
+    const result = (await tool.execute(
+      "workflow-refactor-rename-alias",
+      {
+        operation: "rename",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("Plan ID");
+    expect(result.content[0].text).toContain("rename_symbol");
+    expect(result.content[0].text).not.toContain("Unsupported refactor operation");
+  });
+
+  it("applies a workflow plan via code_apply", async () => {
+    const { projectDir, file } = createProjectFile();
+    getDefaultWorkspaceRuntime().registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const refactorTool = getTool(pi, "code_refactor");
+    const planResult = (await refactorTool.execute(
+      "workflow-refactor-2",
+      {
+        operation: "rename_symbol",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    const applyTool = getTool(pi, "code_apply");
+    const applyResult = (await applyTool.execute(
+      "workflow-apply-1",
+      { planId: extractPlanId(planResult.content[0].text) },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(applyResult.content[0].text).toContain("applied");
+    expect(readFileSync(file, "utf-8")).toBe("newName();\n");
+  });
+
+  it("applies a plan generated by code_refactor_plan via code_apply", async () => {
+    const { projectDir, file } = createProjectFile();
+    getDefaultWorkspaceRuntime().registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const planResult = await executeRefactorPlanTool(
+      {
+        operation: "rename",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+      },
+      { cwd: projectDir },
+    );
+
+    const applyTool = getTool(pi, "code_apply");
+    const applyResult = (await applyTool.execute(
+      "workflow-cross-compat-2",
+      { planId: extractPlanId(planResult.content) },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(applyResult.content[0].text).toContain("applied");
+    expect(readFileSync(file, "utf-8")).toBe("newName();\n");
+  });
+
+  it("applies a plan generated by code_refactor via code_refactor_apply", async () => {
+    const { projectDir, file } = createProjectFile();
+    getDefaultWorkspaceRuntime().registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const refactorTool = getTool(pi, "code_refactor");
+    const planResult = (await refactorTool.execute(
+      "workflow-cross-compat-3",
+      {
+        operation: "rename_symbol",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    const applyResult = await executeRefactorApplyTool(
+      { planId: extractPlanId(planResult.content[0].text) },
+      { cwd: projectDir },
+    );
+
+    expect(applyResult.content).toContain("applied");
+    expect(readFileSync(file, "utf-8")).toBe("newName();\n");
+  });
+
+  it("reports unsupported code_apply modes explicitly", async () => {
+    const { projectDir } = createProjectFile();
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_apply");
+
+    const result = (await tool.execute(
+      "workflow-apply-2",
+      { planId: "plan-test", mode: "apply-and-format" },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("Apply mode unavailable");
+    expect(result.content[0].text).toContain("apply-and-format");
+  });
+});

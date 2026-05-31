@@ -2,8 +2,9 @@
  * Shared helper for expanding targetId into existing target-oriented tool params.
  *
  * Current target-oriented tools (code_context, code_graph,
- * code_impact, code_affected, code_brief, code_refactor_plan) accept optional
- * targetId that takes precedence over raw file/line/character/symbol.
+ * code_impact, code_affected, code_brief, code_refactor, code_refactor_plan)
+ * accept optional targetId that takes precedence over raw
+ * file/line/character/symbol.
  */
 
 import type { TargetStoreEntry } from "../workflow/target-store.ts";

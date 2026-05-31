@@ -1,8 +1,7 @@
 /**
- * Tool executor for code_refactor_plan.
- *
- * Preview-only operation-aware semantic refactor planning. Does not mutate files.
- * Returns a plan ID for later use with code_refactor_apply.
+ * Tool executor for the preview-only refactor planning path shared by
+ * code_refactor (preferred) and code_refactor_plan (compatibility alias).
+ * Does not mutate files and returns a plan ID for later use with code_apply.
  */
 
 import {
@@ -41,6 +40,7 @@ type CanonicalRefactorOperation = Exclude<RefactorOperation, "rename">;
 export async function executeRefactorPlanTool(
   params: CodeRefactorPlanToolParams,
   ctx: { cwd: string },
+  invokedAs: "code_refactor" | "code_refactor_plan" = "code_refactor_plan",
 ): Promise<CodeIntelResult> {
   const normalizedOperation = normalizeRequestedOperation(params.operation);
   if (normalizedOperation.kind === "error") {
@@ -66,14 +66,14 @@ export async function executeRefactorPlanTool(
   if (!params.file) {
     return {
       content:
-        "**Error:** `code_refactor_plan` requires a `file`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
+        "**Error:** Refactor preview requires a `file`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
       details: undefined,
     };
   }
   if (params.line == null || params.character == null) {
     return {
       content:
-        "**Error:** `code_refactor_plan` requires `line` and `character`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
+        "**Error:** Refactor preview requires `line` and `character`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
       details: undefined,
     };
   }
@@ -89,12 +89,12 @@ export async function executeRefactorPlanTool(
 
   if (operation === "rename_symbol" && !params.newName) {
     return {
-      content: "**Error:** `code_refactor_plan` requires `newName` for `rename_symbol`.",
+      content: "**Error:** Refactor preview requires `newName` for `rename_symbol`.",
       details: undefined,
     };
   }
 
-  const route = routeFor(ctx.cwd, "code_refactor_plan");
+  const route = routeFor(ctx.cwd, invokedAs);
   if (route.preferred === "unavailable") {
     return {
       content:
@@ -168,7 +168,7 @@ export async function executeRefactorPlanTool(
   };
   storePlan(plan);
 
-  const content = renderRefactorPlanResult(plan);
+  const content = renderRefactorPlanResult(plan, ctx.cwd);
 
   return {
     content,
@@ -179,7 +179,7 @@ export async function executeRefactorPlanTool(
         scope: null,
         candidateCount: refactorResult.edits.edits.length,
         omittedCount: 0,
-        nextQueries: [`Use code_refactor_apply with planId: "${planId}" to apply this refactor`],
+        nextQueries: [`Use code_apply with planId: "${planId}" to apply this refactor`],
       },
     },
   };

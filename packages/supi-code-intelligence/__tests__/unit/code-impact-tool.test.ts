@@ -1,9 +1,10 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
+import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -67,7 +68,7 @@ describe("code_impact tool", () => {
     expect(props).toHaveProperty("maxResults");
   });
 
-  it("runs impact analysis from a resolved targetId while keeping code_affected as a compatibility alias", async () => {
+  it("runs impact analysis from a resolved targetId while keeping the internal affected executor available", async () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
     registerMockProvider(tmpDir, {
       exports: async () => ({
@@ -89,10 +90,10 @@ describe("code_impact tool", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const affectedTool = getTool(pi, "code_affected");
-    expect(affectedTool).toBeDefined();
-
     const targetId = await resolveTargetId(pi);
+    const affectedResult = await executeAffectedTool({ targetId }, { cwd: tmpDir });
+    expect(affectedResult.content).toContain("Affected");
+
     const impactTool = getTool(pi, "code_impact");
     const result = (await impactTool.execute(
       "impact-target-id",
@@ -191,19 +192,11 @@ describe("code_impact tool", () => {
     }
   });
 
-  it("keeps code_affected on the narrower target-based surface", () => {
+  it("does not register code_affected on the public tool surface", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const tool = getTool(pi, "code_affected") as {
-      parameters?: { properties?: Record<string, unknown> };
-    };
-
-    const props = tool.parameters?.properties;
-    expect(props).toBeDefined();
-    expect(props).not.toHaveProperty("change");
-    expect(props).not.toHaveProperty("changedFiles");
-    expect(props).not.toHaveProperty("baseRef");
-    expect(props).not.toHaveProperty("includeTests");
+    const names = getTools(pi).map((tool) => tool.name);
+    expect(names).not.toContain("code_affected");
   });
 });

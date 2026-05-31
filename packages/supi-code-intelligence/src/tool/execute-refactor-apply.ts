@@ -1,14 +1,12 @@
 /**
- * Tool executor for code_refactor_apply.
- *
- * Finds a previously generated plan by ID, revalidates it,
- * and applies the workspace edit through safety gates.
+ * Tool executor for the stored-plan application path shared by
+ * code_apply (preferred) and code_refactor_apply (compatibility alias).
+ * Revalidates the plan and applies the workspace edit through safety gates.
  */
 
 import { applyWorkspaceEdit } from "../analysis/refactor/apply-workspace-edit.ts";
 import { getPlan, isPlanFresh, removePlan } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
-import { routeFor } from "../analysis/routing/planner.ts";
 import { renderRefactorApplyResult } from "../presentation/markdown/refactor.ts";
 import type { CodeIntelResult } from "../types.ts";
 
@@ -18,21 +16,11 @@ export interface CodeRefactorApplyToolParams {
 
 export async function executeRefactorApplyTool(
   params: CodeRefactorApplyToolParams,
-  ctx: { cwd: string },
+  _ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
   if (!params.planId) {
     return {
-      content: "**Error:** `planId` is required for code_refactor_apply.",
-      details: undefined,
-    };
-  }
-
-  // Route check (optional since a plan may have been generated earlier)
-  const route = routeFor(ctx.cwd, "code_refactor_apply");
-  if (route.preferred === "unavailable") {
-    return {
-      content:
-        "**Error:** No semantic analysis provider is available. Regenerate the plan with code_refactor_plan after enabling LSP.",
+      content: "**Error:** `planId` is required.",
       details: undefined,
     };
   }
@@ -41,7 +29,7 @@ export async function executeRefactorApplyTool(
   const plan = getPlan(params.planId);
   if (!plan) {
     return {
-      content: `**Error:** Plan "${params.planId}" not found. The plan may have expired or was generated in a different session. Use code_refactor_plan to generate a new plan.`,
+      content: `**Error:** Plan "${params.planId}" not found. The plan may have expired or was generated in a different session. Use code_refactor to generate a new plan.`,
       details: undefined,
     };
   }
@@ -59,7 +47,7 @@ export async function executeRefactorApplyTool(
   const validation = validateEdit(plan.edits);
   if (!validation.safe) {
     return {
-      content: `**Safety check failed:** ${validation.reason}. Regenerate the plan with code_refactor_plan.`,
+      content: `**Safety check failed:** ${validation.reason}. Regenerate the plan with code_refactor.`,
       details: undefined,
     };
   }

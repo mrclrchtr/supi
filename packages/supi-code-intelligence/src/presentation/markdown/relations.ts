@@ -194,7 +194,7 @@ export function renderGraphResult(
   lines.push("---");
   lines.push("");
   lines.push(
-    "_Use `code_brief` on individual results for type or definition context. Use `code_affected` for impact analysis._",
+    "_Use `code_brief` on individual results for type or definition context. Use `code_impact` for impact analysis._",
   );
 
   return lines.join("\n");
