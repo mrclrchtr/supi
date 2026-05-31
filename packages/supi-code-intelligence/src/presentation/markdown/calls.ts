@@ -27,7 +27,7 @@ export function renderCallsResult(
   }
   lines.push("");
   lines.push(
-    "_Structural analysis — may include unresolved or qualified names. Use `code_brief` with `file`, `line`, and `character` for precise type information._",
+    "_Structural analysis — may include unresolved or qualified names. Use `code_inspect` with `file`, `line`, and `character` for point facts, or `code_brief` with `file` for broader orientation._",
   );
   lines.push("");
   return lines.join("\n");

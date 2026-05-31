@@ -662,6 +662,7 @@ describe("code_resolve targetId follow-up", () => {
     };
 
     expect(resolveResult.content[0].text).toContain("Target ID:");
+    expect(resolveResult.content[0].text).toContain("code_inspect");
     const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
     expect(targetId).toBeDefined();
     if (!targetId) return;

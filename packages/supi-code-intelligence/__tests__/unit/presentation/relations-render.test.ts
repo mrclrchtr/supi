@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import {
+  renderCalleesResult,
+  renderGraphResult,
+} from "../../../src/presentation/markdown/relations.ts";
 
 type RelationsResult =
   | {
@@ -83,5 +87,37 @@ describe("relations render", () => {
     };
 
     expect(result.kind).toBe("unavailable");
+  });
+
+  it("renders structural callee follow-up guidance toward code_inspect", () => {
+    const content = renderCalleesResult(
+      {
+        enclosingScope: { name: "widget" },
+        callees: [{ name: "helper", startLine: 5 }],
+      },
+      "src/widget.ts",
+      8,
+    );
+
+    expect(content).toContain("code_inspect");
+    expect(content).not.toContain("code_brief` with `file`, `line`, and `character`");
+  });
+
+  it("renders combined graph follow-up guidance with both orientation and point inspection", () => {
+    const content = renderGraphResult(
+      "widget",
+      [
+        {
+          kind: "ok",
+          rel: "references",
+          count: 1,
+          content: "# References of `widget`\n\n- src/widget.ts:2",
+        },
+      ],
+      "src/widget.ts",
+    );
+
+    expect(content).toContain("code_brief");
+    expect(content).toContain("code_inspect");
   });
 });

@@ -24,6 +24,11 @@ export type TargetIdExpansionResult =
   | { kind: "not-provided" }
   | { kind: "error"; message: string };
 
+export type TargetIdLookupResult =
+  | { kind: "ok"; entry: TargetStoreEntry }
+  | { kind: "not-provided" }
+  | { kind: "error"; message: string };
+
 /**
  * Expand an optional targetId into anchored file/line/character params.
  *
@@ -52,23 +57,10 @@ export function expandTargetId(
   },
   cwd: string,
 ): TargetIdExpansionResult {
-  // No targetId — nothing to expand
-  if (params.targetId === undefined || params.targetId === null) {
-    return { kind: "not-provided" };
-  }
+  const lookup = lookupTargetId(params, cwd);
+  if (lookup.kind !== "ok") return lookup;
 
-  // Look up in store
-  const result = getWorkflowTarget(cwd, params.targetId);
-  if (result.kind === "unavailable") {
-    return { kind: "error", message: `**Error:** ${result.reason}` };
-  }
-
-  const { entry } = result;
-
-  // If the caller also provided raw coordinates that disagree,
-  // targetId takes precedence so we silently override.
-  // (No need to warn — the model chose to use targetId.)
-
+  const { entry } = lookup;
   return {
     kind: "ok",
     file: entry.file,
@@ -78,4 +70,17 @@ export function expandTargetId(
     targetKind: entry.kind,
     entry,
   };
+}
+
+export function lookupTargetId(params: { targetId?: string }, cwd: string): TargetIdLookupResult {
+  if (params.targetId === undefined || params.targetId === null) {
+    return { kind: "not-provided" };
+  }
+
+  const result = getWorkflowTarget(cwd, params.targetId);
+  if (result.kind === "unavailable") {
+    return { kind: "error", message: `**Error:** ${result.reason}` };
+  }
+
+  return { kind: "ok", entry: result.entry };
 }

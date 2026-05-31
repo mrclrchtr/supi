@@ -43,6 +43,17 @@ export const CodeResolveParameters = Type.Object(
   { additionalProperties: false },
 );
 
+/** Planned `code_inspect` parameters. Requires a precise point in one file. */
+export const CodeInspectParameters = Type.Object(
+  {
+    file: FileParam,
+    line: LineParam,
+    character: CharacterParam,
+    maxResults: Type.Optional(MaxResultsParam),
+  },
+  { additionalProperties: false },
+);
+
 /**
  * Planned `code_context` parameters.
  *
@@ -272,6 +283,7 @@ export type WorkflowCodeToolSchemaKey = WorkflowCodeToolName;
 /** Planned V2 schemas keyed by future public tool name. */
 export const WORKFLOW_CODE_TOOL_SCHEMAS = {
   code_resolve: CodeResolveParameters,
+  code_inspect: CodeInspectParameters,
   code_context: CodeContextParameters,
   code_find: CodeFindParameters,
   code_graph: CodeGraphParameters,

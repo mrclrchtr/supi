@@ -67,7 +67,7 @@ export function renderAffectedSingle(params: RenderSingleParams): string {
   const relPath = target.file ? pathRelative(cwd, target.file) : "";
   lines.push("## Next");
   lines.push(
-    `- \`code_brief\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for deeper context around ${symbolName}`,
+    `- \`code_inspect\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for point facts around ${symbolName}`,
   );
   lines.push(
     `- \`code_graph\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
@@ -121,7 +121,9 @@ export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
   addTestsSection(lines, analysis.likelyTests);
   lines.push("## Next");
   lines.push("- `code_brief` on the most-affected module for deeper context");
-  lines.push("- Use `file` + coordinates to inspect one exported target precisely");
+  lines.push(
+    "- Use `code_inspect` with file + line + character to inspect one exported target precisely",
+  );
   lines.push("");
 
   return lines.join("\n");

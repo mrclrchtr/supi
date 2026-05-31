@@ -2,7 +2,7 @@
 
 import type { CodeProvider } from "../analysis/context/request-context.ts";
 import type { ArchitectureModel } from "../model.ts";
-import type { BriefDetails, ContextDetails } from "../types.ts";
+import type { BriefDetails, ContextDetails, InspectDetails } from "../types.ts";
 
 // ── Overview use-case ────────────────────────────────────────────────
 
@@ -28,7 +28,6 @@ export type BriefInput =
   | { kind: "project"; maxResults?: number }
   | { kind: "path"; path: string; maxResults?: number }
   | { kind: "file"; file: string; maxResults?: number }
-  | { kind: "anchored"; file: string; line: number; character: number; maxResults?: number }
   | { kind: "symbol"; symbol: string; path?: string; maxResults?: number };
 
 export interface BriefDeps {
@@ -40,6 +39,25 @@ export interface BriefDeps {
 export interface BriefUseCaseResult {
   content: string;
   details: BriefDetails;
+}
+
+// ── Inspect use-case ─────────────────────────────────────────────────
+
+export interface InspectInput {
+  file: string;
+  line: number;
+  character: number;
+  maxResults?: number;
+}
+
+export interface InspectDeps {
+  provider: CodeProvider | null;
+  cwd: string;
+}
+
+export interface InspectUseCaseResult {
+  content: string;
+  details: InspectDetails;
 }
 
 // ── Context use-case ─────────────────────────────────────────────────

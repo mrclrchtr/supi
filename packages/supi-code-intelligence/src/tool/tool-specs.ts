@@ -8,6 +8,7 @@ import {
   CodeFindParameters,
   CodeHealthParameters,
   CodeImpactParameters,
+  CodeInspectParameters,
   CodeRefactorParameters,
 } from "../workflow/schemas.ts";
 import { executeApplyTool } from "./execute-apply.ts";
@@ -17,6 +18,7 @@ import { executeFindTool } from "./execute-find.ts";
 import { executeGraphTool } from "./execute-graph.ts";
 import { executeHealthTool } from "./execute-health.ts";
 import { executeImpactTool } from "./execute-impact.ts";
+import { executeInspectTool } from "./execute-inspect.ts";
 import { executeRefactorTool } from "./execute-refactor.ts";
 import { executeResolveTool } from "./execute-resolve.ts";
 
@@ -43,8 +45,6 @@ const CodeBriefParameters = Type.Object(
     targetId: Type.Optional(TargetIdParam),
     path: Type.Optional(PathParam),
     file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
     symbol: Type.Optional(SymbolParam),
     maxResults: Type.Optional(MaxResultsParam),
   },
@@ -132,6 +132,22 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeResolveParameters,
     run: (params, ctx) =>
       executeResolveTool(params as Parameters<typeof executeResolveTool>[0], ctx),
+  },
+  {
+    name: "code_inspect",
+    label: "Code Inspect",
+    description:
+      "Inspect one precise point in a file and return factual syntax, symbol, hover, definition, diagnostics, and code-action information. Use when you need to understand exactly what is at a position without choosing between provider-specific substrate tools.",
+    promptSnippet: "code_inspect — factual point inspection",
+    basePromptGuidelines: [
+      "Use code_inspect for factual point inspection at one precise file position.",
+      "Provide `file`, `line`, and `character` — code_inspect is intentionally point-based in this phase.",
+      "Use code_inspect when you want syntax node, enclosing symbol, hover/type info, definitions, nearby diagnostics, and available code-action titles gathered together.",
+      "When some providers are unavailable, code_inspect returns best-effort sections and explicit unavailable notes instead of heuristic guesses.",
+    ],
+    parameters: CodeInspectParameters,
+    run: (params, ctx) =>
+      executeInspectTool(params as Parameters<typeof executeInspectTool>[0], ctx),
   },
   {
     name: "code_context",

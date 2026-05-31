@@ -51,6 +51,22 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     ],
   },
   {
+    name: "code_inspect",
+    purpose:
+      "Inspect one precise point in code with best-effort syntax, symbol, hover, definition, diagnostics, and code-action facts.",
+    schemaKey: "code_inspect",
+    schemaDocs:
+      "Requires file, line, and character plus optional maxResults. It is the explicit replacement for point-inspection behavior previously reached through anchored code_brief.",
+    absorbsTools: [],
+    absorbsBehaviors: ["anchored code_brief inspection"],
+    substrates: ["semantic", "structural", "diagnostics"],
+    phase: "phase-2",
+    nonGoals: [
+      "Does not accept targetId in this first pass; inspection stays point-based.",
+      "Does not apply code actions.",
+    ],
+  },
+  {
     name: "code_context",
     purpose:
       "Provide task-focused context bundles with prioritized definitions, relationships, tests, docs, and diagnostics.",

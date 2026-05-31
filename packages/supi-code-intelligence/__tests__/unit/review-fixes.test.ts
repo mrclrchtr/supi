@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { buildArchitectureModel, getDependents } from "@mrclrchtr/supi-code-intelligence/api";
+import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runRipgrep } from "../../src/search-helpers.ts";
 import { executeAction } from "../helpers/execute-action.ts";
@@ -15,6 +16,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
+  getDefaultWorkspaceRuntime().clearAll();
 });
 
 function writeJson(dir: string, file: string, data: unknown) {
@@ -102,14 +104,18 @@ describe("transitive downstream impact", () => {
 });
 
 describe("focused-tool follow-up regressions", () => {
-  it("uses symbol input for code_brief instead of falling back to a project brief", async () => {
+  it("uses symbol input for code_brief without leaking inspect-style sections", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
     const srcDir = path.join(tmpDir, "src");
     mkdirSync(srcDir, { recursive: true });
     const widgetPath = path.join(srcDir, "widget.ts");
     writeFileSync(widgetPath, "export function Widget() {\n  return 1;\n}\n");
 
-    registerMockProvider(tmpDir, {
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemantic(tmpDir, {
+      references: async () => [],
+      implementation: async () => [],
+      documentSymbols: async () => [],
       workspaceSymbols: async () => [
         {
           name: "Widget",
@@ -119,8 +125,52 @@ describe("focused-tool follow-up regressions", () => {
           character: 17,
         },
       ],
+      hover: async () => ({ contents: "function Widget(): number" }),
+      definition: async () => [
+        {
+          uri: `file://${widgetPath}`,
+          range: {
+            start: { line: 0, character: 16 },
+            end: { line: 2, character: 1 },
+          },
+        },
+      ],
+      codeActionTitles: async () => [{ title: "Add explicit return type", kind: "quickfix" }],
+    });
+    runtime.registerStructural(tmpDir, {
+      calleesAt: async () => ({
+        kind: "unavailable" as const,
+        message: "not needed for symbol brief test",
+      }),
+      nodeAt: async () => ({
+        kind: "success" as const,
+        data: {
+          type: "identifier",
+          text: "Widget",
+          startLine: 1,
+          startCharacter: 17,
+          endLine: 1,
+          endCharacter: 23,
+          ancestry: [],
+        },
+      }),
+      outline: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "Widget",
+            kind: "function",
+            startLine: 1,
+            startCharacter: 1,
+            endLine: 3,
+            endCharacter: 1,
+            children: [],
+          },
+        ],
+      }),
+      imports: async () => ({ kind: "success" as const, data: [] }),
       exports: async (_file) => ({
-        kind: "success",
+        kind: "success" as const,
         data: [
           {
             name: "Widget",
@@ -137,9 +187,12 @@ describe("focused-tool follow-up regressions", () => {
     const result = await executeAction({ action: "brief", symbol: "Widget" }, { cwd: tmpDir });
 
     expect(result.content).toContain("Symbol Brief: Widget");
-    expect(result.content).toContain("Resolved to:");
     expect(result.content).toContain("src/widget.ts");
+    expect(result.content).toContain("## File Outline");
     expect(result.content).not.toContain("Project Brief");
+    expect(result.content).not.toContain("## Hover");
+    expect(result.content).not.toContain("## Definition");
+    expect(result.content).not.toContain("## Code Actions");
     expect(result.details?.type).toBe("brief");
     if (result.details?.type === "brief") {
       expect(result.details.data.confidence).toBe("semantic");

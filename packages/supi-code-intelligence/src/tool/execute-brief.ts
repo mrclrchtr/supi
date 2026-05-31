@@ -4,15 +4,13 @@ import { buildArchitectureModel } from "../model.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeBrief } from "../use-case/generate-brief.ts";
 import type { BriefInput } from "../use-case/types.ts";
-import { expandTargetId } from "./target-id-params.ts";
+import { lookupTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeBriefToolParams {
   targetId?: string;
   path?: string;
   file?: string;
-  line?: number;
-  character?: number;
   symbol?: string;
   maxResults?: number;
 }
@@ -22,15 +20,16 @@ export async function executeBriefTool(
   params: CodeBriefToolParams,
   ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
-  // Expand targetId if provided (takes precedence over raw coords)
-  const expansion = expandTargetId(params, ctx.cwd);
-  if (expansion.kind === "error") {
-    return { content: expansion.message, details: undefined };
+  // Resolve targetId for orientation-only follow-up. Unlike graph/impact/refactor,
+  // brief does not expand the handle back into anchored inspection coordinates.
+  const targetLookup = lookupTargetId(params, ctx.cwd);
+  if (targetLookup.kind === "error") {
+    return { content: targetLookup.message, details: undefined };
   }
-  if (expansion.kind === "ok") {
-    params.file = expansion.file;
-    params.line = expansion.line;
-    params.character = expansion.character;
+  if (targetLookup.kind === "ok") {
+    params.file = targetLookup.entry.file;
+    params.symbol = undefined;
+    params.path = undefined;
   }
 
   const error = validateFocusedToolParams(params, ctx.cwd);
@@ -56,15 +55,6 @@ export async function executeBriefTool(
 }
 
 function determineInput(params: CodeBriefToolParams): BriefInput {
-  if (params.file && params.line != null && params.character != null) {
-    return {
-      kind: "anchored",
-      file: params.file,
-      line: params.line,
-      character: params.character,
-      maxResults: params.maxResults,
-    };
-  }
   if (params.symbol) {
     return {
       kind: "symbol",

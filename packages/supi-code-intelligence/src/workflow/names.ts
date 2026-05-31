@@ -6,6 +6,7 @@
  */
 export const WORKFLOW_CODE_TOOL_NAMES = [
   "code_resolve",
+  "code_inspect",
   "code_context",
   "code_find",
   "code_graph",

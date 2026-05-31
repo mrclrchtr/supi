@@ -50,5 +50,6 @@ export type {
   BriefDetails,
   CodeIntelResult,
   DisambiguationCandidate,
+  InspectDetails,
   SearchDetails,
 } from "./types.ts";

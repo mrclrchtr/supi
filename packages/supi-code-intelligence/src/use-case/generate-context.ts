@@ -227,10 +227,8 @@ function buildStaticSection(
 function toBriefInput(input: ContextInput): BriefInput {
   if (input.target) {
     return {
-      kind: "anchored",
+      kind: "file",
       file: input.target.file,
-      line: input.target.line,
-      character: input.target.character,
       maxResults: input.maxResults,
     };
   }

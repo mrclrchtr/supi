@@ -51,6 +51,7 @@ function briefPreferred(availability: RouteAvailability): PlannerRoute["preferre
 /**
  * Get the routing decision for a tool intent in a workspace.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: explicit tool-by-tool routing is the clearest way to audit public-surface behavior
 export function routeFor(cwd: string, tool: CodeIntelligenceToolName): PlannerRoute {
   const availability = readAvailability(cwd);
 
@@ -62,7 +63,7 @@ export function routeFor(cwd: string, tool: CodeIntelligenceToolName): PlannerRo
     return withPreferred(availability, "unavailable");
   }
 
-  if (tool === "code_context") {
+  if (tool === "code_context" || tool === "code_inspect") {
     return withPreferred(availability, briefPreferred(availability));
   }
 

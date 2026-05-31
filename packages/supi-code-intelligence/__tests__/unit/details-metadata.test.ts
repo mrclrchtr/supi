@@ -260,18 +260,34 @@ describe("structured details via tool adapters and action routers", () => {
       }
     });
 
-    it("returns details for anchored brief", async () => {
+    it("returns structured inspect details for code_inspect", async () => {
       setupWorkspace();
       writeFileSync(path.join(tmpDir, "packages/core/index.ts"), "export const x = 1;\n");
-      const result = await executeAction(
-        { action: "brief", file: "packages/core/index.ts", line: 1, character: 1 },
-        { cwd: tmpDir },
-      );
+
+      const pi = createPiMock();
+      codeIntelligenceExtension(pi as never);
+      const tool = getTool(pi, "code_inspect");
+
+      const result = (await tool.execute(
+        "details-inspect",
+        { file: "packages/core/index.ts", line: 1, character: 14 },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as {
+        details?: {
+          type: string;
+          data?: { confidence?: string; nextQueries?: string[] };
+        };
+      };
+
       expect(result.details).toBeDefined();
-      expect(result.details?.type).toBe("brief");
-      if (result.details?.type === "brief") {
-        expect(result.details.data.confidence).toBe("structural");
-        expect(result.details.data.focusTarget).not.toBeNull();
+      expect(result.details?.type).toBe("inspect");
+      if (result.details?.type === "inspect") {
+        expect(result.details.data?.confidence).toBeDefined();
+        expect(result.details.data?.nextQueries).toEqual(
+          expect.arrayContaining([expect.stringContaining("code_graph")]),
+        );
       }
     });
 

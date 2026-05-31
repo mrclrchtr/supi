@@ -103,12 +103,36 @@ describe("focused code intelligence tool registration", () => {
     expect(modeParam?.enum).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
   });
 
+  it("registers code_inspect as the factual point-inspection tool", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const tool = getTool(pi, "code_inspect");
+    expect(tool).toBeDefined();
+    expect(tool.name).toBe("code_inspect");
+    expect(typeof tool.execute).toBe("function");
+
+    const props = (tool as { parameters?: { properties?: Record<string, unknown> } }).parameters
+      ?.properties;
+    expect(props).toBeDefined();
+    expect(props).toHaveProperty("file");
+    expect(props).toHaveProperty("line");
+    expect(props).toHaveProperty("character");
+    expect(props).toHaveProperty("maxResults");
+    expect(props).not.toHaveProperty("targetId");
+    expect(props).not.toHaveProperty("symbol");
+    expect(props).not.toHaveProperty("path");
+  });
+
   it("registers code_context with the workflow schema shape while keeping code_brief", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const contextTool = getTool(pi, "code_context");
-    const briefTool = getTool(pi, "code_brief");
+    const briefTool = getTool(pi, "code_brief") as {
+      name: string;
+      parameters?: { properties?: Record<string, unknown> };
+    };
 
     expect(contextTool).toBeDefined();
     expect(contextTool.name).toBe("code_context");
@@ -125,6 +149,9 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("budget");
     expect(props).toHaveProperty("include");
     expect(props).toHaveProperty("maxResults");
+
+    expect(briefTool.parameters?.properties).not.toHaveProperty("line");
+    expect(briefTool.parameters?.properties).not.toHaveProperty("character");
   });
 
   it("registers code_impact as the active workflow impact tool", () => {
@@ -156,6 +183,7 @@ describe("focused code intelligence tool registration", () => {
     for (const name of WORKFLOW_CODE_TOOL_NAMES) {
       expect(names).toContain(name);
     }
+    expect(names).toContain("code_inspect");
   });
 
   it("does not register public compatibility aliases or substrate tools", () => {

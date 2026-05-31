@@ -1,9 +1,8 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
 import type { ArchitectureModel } from "../model.ts";
 import { findModuleForPath } from "../model.ts";
-import { renderAnchoredBrief, renderSymbolBrief } from "../presentation/markdown/brief.ts";
+import { renderSymbolBrief } from "../presentation/markdown/brief.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { TargetResolutionResult } from "../target-resolution.ts";
 import { resolveSymbolTarget } from "../target-resolution.ts";
@@ -26,8 +25,6 @@ export async function executeBrief(
       return executePathBrief(input.path, deps, input);
     case "file":
       return executeFileBrief(input.file, deps, input);
-    case "anchored":
-      return executeAnchoredBrief(input, deps);
     case "symbol":
       return executeSymbolBrief(input.symbol, input.path, deps);
   }
@@ -83,59 +80,6 @@ async function executeFileBrief(
   return { content: result.content, details: result.details };
 }
 
-// ── Anchored brief ────────────────────────────────────────────────────
-
-async function executeAnchoredBrief(
-  input: { file: string; line: number; character: number },
-  deps: BriefDeps,
-): Promise<BriefUseCaseResult> {
-  const { file, line, character } = input;
-  const resolvedFile = normalizePath(file, deps.cwd);
-
-  if (!fs.existsSync(resolvedFile)) {
-    return {
-      content: `**Error:** File not found: \`${file}\``,
-      details: {
-        confidence: "unavailable",
-        focusTarget: `${file}:${line}:${character}`,
-        startHere: [],
-        publicSurfaces: [],
-        dependencySummary: null,
-        omittedCount: 0,
-        nextQueries: [],
-      },
-    };
-  }
-
-  const relPath = path.relative(deps.cwd, resolvedFile);
-  const context = await gatherTreeSitterContext(deps.provider, relPath, line, character);
-
-  const details = {
-    confidence: "structural" as const,
-    focusTarget: `${relPath}:${line}:${character}`,
-    startHere: [] as Array<{ target: string; reason: string }>,
-    publicSurfaces: [] as string[],
-    dependencySummary: null as { moduleCount: number; edgeCount: number } | null,
-    omittedCount: 0,
-    nextQueries: [
-      `\`code_graph\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
-      `\`code_impact\` with \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for impact analysis`,
-    ],
-  };
-
-  const rendered = renderAnchoredBrief({
-    relPath,
-    line,
-    character,
-    context,
-    model: deps.model ?? null,
-    details,
-    cwd: deps.cwd,
-  });
-
-  return rendered;
-}
-
 // ── Symbol brief ──────────────────────────────────────────────────────
 
 async function executeSymbolBrief(
@@ -161,7 +105,8 @@ async function executeSymbolBrief(
   const provider = deps.provider;
   if (!provider) {
     return {
-      content: `**Error:** Symbol discovery requires an active code provider. Use \`file\` + coordinates, or enable LSP and retry.`,
+      content:
+        "**Error:** Symbol discovery requires an active code provider. Use `code_brief` with `file` for file orientation, or use `code_inspect` with `file` + coordinates for point facts.",
       details: {
         confidence: "unavailable",
         focusTarget: symbol,
@@ -170,7 +115,7 @@ async function executeSymbolBrief(
         dependencySummary: null,
         omittedCount: 0,
         nextQueries: [
-          "Use `file` + coordinates for a precise symbol brief, or enable LSP and retry",
+          "Use `code_brief` with `file` for file orientation, or `code_inspect` with file + coordinates for point facts",
         ],
       },
     };
@@ -190,7 +135,7 @@ async function executeSymbolBrief(
         dependencySummary: null,
         omittedCount: 0,
         nextQueries: [
-          "Use `file` + coordinates for a precise symbol brief, or enable LSP and retry",
+          "Use `code_brief` with `file` for file orientation, or `code_inspect` with file + coordinates for point facts",
         ],
       },
     };
@@ -208,7 +153,7 @@ async function executeSymbolBrief(
         dependencySummary: null,
         omittedCount: resolved.omittedCount,
         nextQueries: [
-          "Use `file` + coordinates for a precise symbol brief, or enable LSP and retry",
+          "Use `code_brief` with `file` for file orientation, or `code_inspect` with file + coordinates for point facts",
         ],
       },
     };
@@ -233,6 +178,7 @@ async function executeSymbolBrief(
     dependencySummary: mod ? { moduleCount: 1, edgeCount: mod.internalDeps.length } : null,
     omittedCount: 0,
     nextQueries: [
+      `\`code_inspect\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for point facts`,
       `\`code_graph\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
       `\`code_impact\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for impact analysis`,
     ],

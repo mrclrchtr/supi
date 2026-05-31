@@ -29,7 +29,8 @@ pi install ./packages/supi-code-intelligence
 After install, pi gets:
 
 - `code_context` — task-focused context bundles for a change, question, or resolved target
-- `code_brief` — interpretive orientation with structural enrichment for a project, package, directory, file, or symbol
+- `code_brief` — orientation-only overview for a project, package, directory, file, or symbol
+- `code_inspect` — factual point inspection for one precise file position
 - `code_graph` — unified relation graph (references, callees, implementations) from a resolved target
 - `code_impact` — preferred workflow-oriented blast radius, downstream impact, and diff-aware changed-file analysis
 - `code_find` — unified ranked search (text, regex, AST, semantic)
@@ -49,6 +50,7 @@ The workflow-oriented surface is rolling out incrementally.
 The current public surface now includes:
 
 - `code_resolve` — **active** (Phase 1)
+- `code_inspect` — **active** (explicit point inspection tool)
 - `code_context` — **active** (Phase 2, additive alongside `code_brief`)
 - `code_find` — **active** (Phase 2a, supersedes code_pattern)
 - `code_health` — **active** (Phase 1.5)
@@ -84,9 +86,19 @@ Task-focused context bundle for a change, question, or resolved target.
 - in this first implementation wave, `code_context` is additive: `code_brief` still exists as the compatibility/orientation tool
 
 ### `code_brief`
-Interpretive orientation with structural enrichment. Use for prioritized context, start-here guidance, and project/package/directory/file/symbol overview.
+Interpretive orientation tool. Use for prioritized context, start-here guidance, and project/package/directory/file/symbol overview.
 
-When a code provider is available, file briefs include structural context (outline, imports, exports) from tree-sitter and inline diagnostics from LSP. Directory and module briefs include extension breakdown and landmark files. Module briefs show aggregate diagnostics across source files. `maxResults` controls section caps.
+`code_brief` is now **orientation-only**. It no longer exposes public point-inspection inputs. Use `code_inspect` when you need syntax node, enclosing symbol, hover/type info, definitions, nearby diagnostics, or code-action titles for one precise position.
+
+When a code provider is available, file briefs include structural context (outline, imports, exports) from tree-sitter and inline diagnostics from LSP. Directory and module briefs include extension breakdown and landmark files. Module briefs show aggregate diagnostics across source files. `maxResults` controls section caps. `targetId` remains supported for orientation-only follow-up from `code_resolve`.
+
+### `code_inspect`
+Factual point-inspection tool for one precise file position.
+
+- requires `file`, `line`, and `character`
+- returns best-effort syntax, enclosing symbol, hover/type info, definition target(s), nearby diagnostics, and code-action titles
+- stays honest when providers are missing by rendering explicit unavailable sections instead of heuristic guesses
+- keeps diagnostics summary/refresh on `code_health`; `code_inspect` only reports local facts near the inspected point
 
 ### `code_graph`
 Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code_implementations`. Resolves one target and dispatches to the appropriate substrate per requested relation.
@@ -170,7 +182,8 @@ Depending on the tool, inputs may include:
 Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `path`
-- `targetId` (from `code_resolve`) can replace `file` + `line` + `character` in `code_context`, `code_graph`, `code_impact`, `code_brief`, and `code_refactor`
+- `code_inspect` is the public point-inspection tool for `file` + `line` + `character`
+- `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, `code_brief`, and `code_refactor`, but `code_brief` uses it for orientation-only follow-up
 - a leading `@` is stripped from `path` and `file`
 - non-search tools do **not** silently fall back to heuristic grep behavior
 
@@ -217,8 +230,8 @@ const overview = generateOverview(model);
 ## Source
 
 - `src/code-intelligence.ts` — extension entry point: overview injection and tool registration
-- `src/use-case/` — typed orchestration modules for brief, context, relations, affected, and pattern
-- `src/presentation/markdown/` — markdown renderers that format use-case results, including task-focused context bundles
+- `src/use-case/` — typed orchestration modules for brief, inspect, context, relations, affected, and pattern
+- `src/presentation/markdown/` — markdown renderers that format use-case results, including inspect and task-focused context bundles
 - `src/targeting/` — typed target-resolution pipeline
 - `src/tool/tool-specs.ts` — single source of truth for the current public tool surface
 - `src/tool/register-tools.ts` — focused tool registration wiring

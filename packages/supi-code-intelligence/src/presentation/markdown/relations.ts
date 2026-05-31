@@ -114,7 +114,7 @@ export function renderCalleesResult(
   }
   lines.push("");
   lines.push(
-    "_Structural analysis — may include unresolved or qualified names. Use `code_brief` with `file`, `line`, and `character` for precise type information._",
+    "_Structural analysis — may include unresolved or qualified names. Use `code_inspect` with `file`, `line`, and `character` for point facts, or `code_brief` with `file` for broader orientation._",
   );
   lines.push("");
   return lines.join("\n");
@@ -194,7 +194,7 @@ export function renderGraphResult(
   lines.push("---");
   lines.push("");
   lines.push(
-    "_Use `code_brief` on individual results for type or definition context. Use `code_impact` for impact analysis._",
+    "_Use `code_brief` on individual results for orientation, `code_inspect` with file/line/character for point facts, and `code_impact` for impact analysis._",
   );
 
   return lines.join("\n");

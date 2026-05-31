@@ -18,6 +18,7 @@ export {
   CodeGraphParameters,
   CodeHealthParameters,
   CodeImpactParameters,
+  CodeInspectParameters,
   CodeRefactorParameters,
   CodeResolveParameters,
   WORKFLOW_CODE_TOOL_SCHEMAS,

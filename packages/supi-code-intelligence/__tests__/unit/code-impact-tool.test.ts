@@ -115,7 +115,10 @@ describe("code_impact tool", () => {
     if (result.details?.type === "impact") {
       expect(result.details.data?.confidence).toBe("semantic");
       expect(result.details.data?.nextQueries).toEqual(
-        expect.arrayContaining([expect.stringContaining("code_brief")]),
+        expect.arrayContaining([expect.stringContaining("code_inspect")]),
+      );
+      expect(result.details.data?.nextQueries).not.toEqual(
+        expect.arrayContaining([expect.stringContaining("`code_brief` with `file:")]),
       );
     }
   });

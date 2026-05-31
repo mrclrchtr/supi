@@ -1,54 +1,15 @@
 // Brief markdown renderer — consumes use-case data and produces markdown content + details metadata.
 
 import * as path from "node:path";
-import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
 import type { ArchitectureModel } from "../../model.ts";
 import { findModuleForPath } from "../../model.ts";
 import type { BriefDetails } from "../../types.ts";
 
-// ── Anchored brief ───────────────────────────────────────────────────
-
 interface TreeSitterContext {
-  nodeInfo: { type: string; text: string; startLine: number; startCharacter: number } | null;
+  nodeInfo: unknown;
   outline: Array<{ name: string; kind: string; startLine: number; endLine: number }>;
   imports: Array<{ moduleSpecifier: string }>;
   exports: Array<{ name: string; kind: string }>;
-  /** Best-effort LSP hover info at the anchored position. `null` when unavailable. */
-  hover: { contents: string; range?: SourceRange } | null;
-  /** Best-effort LSP definition targets at the anchored position. `null` when unavailable. */
-  definition: Array<{ uri: string; range: SourceRange }> | null;
-  /** Best-effort code action titles at the anchored position. `null` when unavailable. */
-  codeActions: Array<{ title: string; kind?: string }> | null;
-}
-
-export function renderAnchoredBrief(params: {
-  relPath: string;
-  line: number;
-  character: number;
-  context: TreeSitterContext;
-  model: ArchitectureModel | null;
-  details: BriefDetails;
-  cwd: string;
-}): { content: string; details: BriefDetails } {
-  const lines: string[] = [];
-  lines.push(`# Anchored Brief: ${params.relPath}:${params.line}:${params.character}`);
-  lines.push("");
-
-  appendTreeSitterContext(lines, params.context, params.relPath, params.line, params.cwd);
-
-  if (params.model) {
-    const resolvedFile = path.resolve(params.cwd, params.relPath);
-    const mod = findModuleForPath(params.model, resolvedFile);
-    if (mod) {
-      const shortName = mod.name.replace(/^@[^/]+\//, "");
-      lines.push(`_Module: ${shortName} (\`${mod.relativePath}\`)_`);
-      lines.push("");
-    }
-  }
-
-  appendNextQueries(lines, params.relPath, params.line, params.character);
-
-  return { content: lines.join("\n"), details: params.details };
 }
 
 // ── Symbol brief ──────────────────────────────────────────────────────
@@ -72,7 +33,7 @@ export function renderSymbolBrief(params: {
   );
   lines.push("");
 
-  appendTreeSitterContext(lines, params.context, params.relPath, params.targetLine, params.cwd);
+  appendFileOrientationContext(lines, params.context);
 
   if (params.model) {
     const resolvedFile = path.resolve(params.cwd, params.relPath);
@@ -89,73 +50,14 @@ export function renderSymbolBrief(params: {
   return { content: lines.join("\n"), details: params.details };
 }
 
-// ── Tree-sitter context rendering ─────────────────────────────────────
+function getOutlinePrefix(kind: string): string {
+  if (kind === "function" || kind === "method") return "ƒ";
+  if (kind === "class") return "◆";
+  return "·";
+}
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: tree-sitter context rendering with node/outline/imports/exports sections kept together for readability
-// biome-ignore lint/complexity/useMaxParams: options-object refactor would reduce clarity for this rendering helper
-function appendTreeSitterContext(
-  lines: string[],
-  context: TreeSitterContext,
-  relPath: string,
-  line: number,
-  _cwd: string,
-): void {
-  if (context.nodeInfo) {
-    const node = context.nodeInfo;
-    lines.push(`**Node:** \`${node.type}\` at ${relPath}:${node.startLine}:${node.startCharacter}`);
-    if (node.text && node.text.length <= 200) {
-      lines.push("```");
-      lines.push(node.text);
-      lines.push("```");
-    }
-    lines.push("");
-  }
-
-  // Best-effort LSP hover — type/signature info at the position
-  if (context.hover?.contents) {
-    lines.push("## Hover");
-    lines.push("```");
-    lines.push(context.hover.contents);
-    lines.push("```");
-    lines.push("");
-  }
-
-  // Best-effort LSP definition — go-to-definition targets at the position
-  if (context.definition && context.definition.length > 0) {
-    lines.push("## Definition");
-    for (const def of context.definition) {
-      const uriPath = def.uri.startsWith("file://")
-        ? decodeURIComponent(def.uri.slice(7))
-        : def.uri;
-      const startLine = def.range.start.line + 1; // 0-based → 1-based
-      const startChar = def.range.start.character + 1;
-      lines.push(`- \`${uriPath}:${startLine}:${startChar}\``);
-    }
-    lines.push("");
-  }
-
-  // Best-effort code actions — available fix titles at the position
-  if (context.codeActions && context.codeActions.length > 0) {
-    lines.push("## Code Actions");
-    lines.push("Available fixes (suggestions only — not applied):");
-    lines.push("");
-    for (const action of context.codeActions) {
-      const kindLabel = action.kind ? ` (${action.kind})` : "";
-      lines.push(`- "${action.title}"${kindLabel}`);
-    }
-    lines.push("");
-  }
-
+function appendFileOrientationContext(lines: string[], context: TreeSitterContext): void {
   if (context.outline.length > 0) {
-    const enclosing = context.outline.find(
-      (item) => item.startLine <= line && item.endLine >= line,
-    );
-    if (enclosing) {
-      lines.push(`**Enclosing symbol:** \`${enclosing.name}\` (${enclosing.kind})`);
-      lines.push(`- Range: ${relPath}:${enclosing.startLine}–${enclosing.endLine}`);
-      lines.push("");
-    }
-
     lines.push("## File Outline");
     const shown = context.outline.slice(0, 15);
     for (const item of shown) {
@@ -191,12 +93,6 @@ function appendTreeSitterContext(
     }
     lines.push("");
   }
-}
-
-function getOutlinePrefix(kind: string): string {
-  if (kind === "function" || kind === "method") return "ƒ";
-  if (kind === "class") return "◆";
-  return "·";
 }
 
 // ── File brief ───────────────────────────────────────────────────────

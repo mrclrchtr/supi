@@ -1,0 +1,31 @@
+schema_version = 1
+status = "in_progress"
+updated_at = "2026-06-01T23:34:23.057789Z"
+revision = 23
+
+[document_fingerprints]
+content = "sha256:d9c3f8e64c7a9dbbd8bb233c440752a60f4f52a4869db7b90de237ffefd63d16"
+task-01 = "sha256:da966e56835874f3e5e7cddcf5e9c8a5cde79158bc165af90b625d4c1179ab12"
+task-02 = "sha256:b8fcf11d2a4d8cb0752014f82d215083ca0b0cbb6eae9eb1caae50e458d7c519"
+task-03 = "sha256:3a637e8de3ebf14a6138172d9ccaf3b2b940c874fc6ee0cf008d5c4b19bbf9fa"
+task-04 = "sha256:b1953dc4322da0d02a0987662718ae2643455b6e0018dea965c70ac483db243f"
+
+[[tasks]]
+number = 1
+title = "RED: codify the `code_inspect` contract and the orientation-only `code_brief` split"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: implement `code_inspect` and make `code_brief` orientation-only"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update package docs for `code_inspect` and the narrowed `code_brief` contract"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Final verification: package checks and PI smoke test for the new inspect flow"
+status = "done"

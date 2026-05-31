@@ -1,15 +1,29 @@
 /**
- * Substrate context gathering for anchored and symbol briefs.
+ * Substrate context gathering for symbol briefs and point inspection (code_inspect).
  *
  * Extracted from generate-brief.ts to keep the file within the
  * noExcessiveLinesPerFile threshold.
  */
 
+import { resolve } from "node:path";
 import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
+import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
 
 export interface TreeSitterContext {
-  nodeInfo: { type: string; text: string; startLine: number; startCharacter: number } | null;
+  nodeInfo: {
+    type: string;
+    text: string;
+    startLine: number;
+    startCharacter: number;
+    ancestry: Array<{
+      type: string;
+      startLine: number;
+      startCharacter: number;
+      endLine: number;
+      endCharacter: number;
+    }>;
+  } | null;
   outline: Array<{ name: string; kind: string; startLine: number; endLine: number }>;
   imports: Array<{ moduleSpecifier: string }>;
   exports: Array<{ name: string; kind: string }>;
@@ -47,6 +61,7 @@ export async function gatherTreeSitterContext(
         text: nodeResult.data.text,
         startLine: nodeResult.data.startLine,
         startCharacter: nodeResult.data.startCharacter,
+        ancestry: nodeResult.data.ancestry ?? [],
       };
     }
 
@@ -126,4 +141,35 @@ export async function gatherTreeSitterContext(
   }
 
   return { nodeInfo, outline, imports, exports, hover, definition, codeActions };
+}
+
+export interface NearbyDiagnostic {
+  line: number;
+  severity: number;
+  message: string;
+}
+
+export async function gatherNearbyDiagnostics(
+  cwd: string,
+  file: string,
+  line: number,
+  maxResults = 5,
+): Promise<NearbyDiagnostic[]> {
+  const lspState = getSessionLspService(cwd);
+  if (lspState.kind !== "ready") return [];
+
+  try {
+    const diagnostics = await lspState.service.fileDiagnostics(resolve(cwd, file), 4);
+    if (!diagnostics || diagnostics.length === 0) return [];
+
+    const nearby = diagnostics.filter((d) => Math.abs(d.range.start.line + 1 - line) <= 2);
+    const chosen = nearby.length > 0 ? nearby : diagnostics;
+    return chosen.slice(0, maxResults).map((d) => ({
+      line: d.range.start.line + 1,
+      severity: d.severity ?? 1,
+      message: d.message,
+    }));
+  } catch {
+    return [];
+  }
 }

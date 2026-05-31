@@ -68,6 +68,28 @@ describe("Planner routing", () => {
       expect(route.preferred).toBe("unavailable");
     });
 
+    it("routes code_inspect to semantic-preferred when semantic is available", async () => {
+      registerSemantic();
+      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
+      const route = routeFor("/project", asPlannedToolName("code_inspect"));
+      expect(route.semanticAvailable).toBe(true);
+      expect(route.preferred).toBe("semantic");
+    });
+
+    it("routes code_inspect to structural-preferred when only structural is available", async () => {
+      registerStructural();
+      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
+      const route = routeFor("/project", asPlannedToolName("code_inspect"));
+      expect(route.structuralAvailable).toBe(true);
+      expect(route.preferred).toBe("structural");
+    });
+
+    it("routes code_inspect to unavailable when no capability is registered", async () => {
+      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
+      const route = routeFor("/project", asPlannedToolName("code_inspect"));
+      expect(route.preferred).toBe("unavailable");
+    });
+
     it("routes code_graph to semantic-preferred when semantic is available", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");

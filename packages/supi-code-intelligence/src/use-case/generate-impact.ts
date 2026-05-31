@@ -238,7 +238,7 @@ async function executeFileLevelImpact(
     computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, input),
     [
       "`code_brief` on the most-affected module for deeper context",
-      "Use `file` + coordinates to inspect one exported target precisely",
+      "Use `code_inspect` with file + line + character to inspect one exported target precisely",
     ],
     prioritySignals,
   );
@@ -479,7 +479,7 @@ function computeOmittedCount(
 function buildTargetNextQueries(target: ResolvedTarget, symbolName: string, cwd: string): string[] {
   const relPath = path.relative(cwd, target.file);
   return [
-    `\`code_brief\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for deeper context around ${symbolName}`,
+    `\`code_inspect\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for point facts around ${symbolName}`,
     `\`code_graph\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
   ];
 }

@@ -60,6 +60,9 @@ function renderResolved(
     );
     lines.push(`- \`code_impact\` { targetId: "${t.targetId}" } — blast radius`);
     lines.push(
+      `- \`code_inspect\` { file: "${t.file}", line: ${t.displayLine}, character: ${t.displayCharacter} } — factual point inspection`,
+    );
+    lines.push(
       `- \`code_refactor\` { targetId: "${t.targetId}", operation: "rename_symbol", newName: "..." } — preview a safe rename plan`,
     );
     lines.push(`- \`code_brief\` { targetId: "${t.targetId}" } — orientation`);
@@ -79,7 +82,7 @@ function renderResolved(
 
     lines.push("");
     lines.push(
-      "**Use a `targetId` with** `code_context`, `code_graph`, `code_impact`, `code_brief`, or `code_refactor`.",
+      "**Use a `targetId` with** `code_context`, `code_graph`, `code_impact`, `code_brief`, or `code_refactor`, and use `code_inspect` with file + line + character for point facts.",
     );
   }
 
