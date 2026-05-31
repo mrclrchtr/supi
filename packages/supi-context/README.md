@@ -8,7 +8,7 @@
 
 # @mrclrchtr/supi-context
 
-Adds a `/supi-context` command to the [pi coding agent](https://github.com/earendil-works/pi) so you can see where your context window is going.
+Adds a `/supi-context` command to the [pi coding agent](https://github.com/earendil-works/pi) so you can inspect how the current session is spending its context window.
 
 ## Install
 
@@ -26,41 +26,64 @@ pi install ./packages/supi-context
 
 ## What you get
 
-After install, pi gets one command:
+After install, pi gets one user command:
 
 - `/supi-context` — render a detailed context-usage report for the current session
+- `/supi-context full` — render the same report with the full guideline and tool-definition lists instead of previews
 
-The report includes:
+The command sends a custom `supi-context` message, and this package registers a dedicated renderer so the report shows up as a structured TUI view instead of plain text.
 
-- model name and context-window size
-- estimated or scaled total token usage
-- a visual grid of used space, free space, and autocompact buffer
-- token usage by category: system prompt, user messages, assistant messages, tool calls, tool results, and other
-- system-prompt breakdown for context files, skills, guidelines, tool snippets, and append text
+## What the report shows
 
-  - **Guidelines attribution** — breaks down guideline bullets by source: PI built-in defaults, known built-in tools (`read`, `write`, `edit`), and other (extensions/custom tools). Each source shows its token count and bullet count.
-  - **Tool snippet breakdown** — shows per-tool one-line snippet tokens alongside definition tokens in the tool definitions section.
+The report is meant to answer questions like:
 
-- injected subdirectory context files from `supi-claude-md`, including turn number and token cost
-- active skills and their token cost
-- tool-definition count and token cost, with per-tool snippet token column
-- guideline source summary (e.g., "2 bullets from default · 1 bullet from read · 3 bullets from edit")
-- compaction summary when older turns were summarized
-- extra provider sections from extensions registered through the shared context-provider registry
+- what is taking up space in the current context window?
+- how much room is left before compaction pressure gets worse?
+- which instruction files, context files, skills, guidelines, or tools are expensive?
+- what extra context was injected by other SuPi extensions?
+
+It includes:
+
+- model name, context-window size, and total token usage
+- approximation or pending-usage notes when exact usage data is not available yet
+- a visual usage bar for system prompt, user messages, assistant messages, tool calls, tool results, other, autocompact buffer, and free space
+- a category breakdown table for the same usage buckets
+- a system-prompt composition breakdown for:
+  - base prompt content
+  - instruction files (`AGENTS.md`, `CLAUDE.md`, etc.)
+  - other context files loaded into the system prompt
+  - active skills
+  - guidelines
+  - tool snippets
+  - append text
+- instruction-file details with token cost, line count, and detected origin (`project` vs `global`)
+- injected subdirectory context files from `supi-claude-md`, including turn number, line count, and token cost
+- active skill names with per-skill token counts
+- guideline bullet previews, plus source attribution for PI defaults, known built-in tools (`read`, `write`, `edit`), and `other`
+- active tool definitions with per-tool definition token counts and snippet-token columns when available
+- a compaction note when older turns were summarized
+- extra provider sections from extensions registered through the shared context-provider registry in `@mrclrchtr/supi-core`
+
+## Configuration
+
+No settings are required.
+
+This package does not add a model-callable tool; it adds a user command only.
 
 ## Notes
 
-- The command uses the latest cached `systemPromptOptions` captured before an agent run.
-- When exact usage data is not available yet, the report falls back to estimated token counts and shows an approximation note.
-- The command does not add a model-callable tool; it is a user command only.
+- The command uses the latest cached `systemPromptOptions` captured during `before_agent_start`.
+- If those prompt options are missing or incomplete, the package backfills context files and skills by re-parsing the current system prompt.
+- Exact totals come from pi's current context-usage data when available. Otherwise the report falls back to rough estimates and/or scales estimated category totals to the latest measured total.
+- If no model is selected yet, the report can still render, but the context-window bar cannot show capacity.
 
 ## Source
 
-- `src/context.ts` — command registration and cached prompt-option handling
-- `src/analysis.ts` — token accounting and report data
-- `src/format.ts` — formatted report output
-- `src/prompt-inference.ts` — model-specific context window detection
-- `src/renderer.ts` — custom message renderer for the report
-- `src/utils.ts` — token formatting helpers
+- `src/context.ts` — command registration, cached prompt-option handling, and renderer wiring
+- `src/analysis.ts` — token accounting, attribution, and report data assembly
+- `src/format.ts` — formatted report output for the TUI view
+- `src/prompt-inference.ts` — fallback recovery of context files, skills, and guideline sections from the live system prompt
+- `src/renderer.ts` — custom renderer for `supi-context` messages
+- `src/utils.ts` — token and plural-format helpers
 
 Tests live under `__tests__/unit/`.
