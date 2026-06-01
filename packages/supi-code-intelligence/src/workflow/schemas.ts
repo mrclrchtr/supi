@@ -18,6 +18,11 @@ const MaxResultsParam = Type.Number({
   description: "Maximum number of ranked results.",
   minimum: 1,
 });
+const SymbolParam = Type.String({ description: "Symbol name" });
+const TargetIdParam = Type.String({
+  description:
+    "Resolved target handle from `code_resolve`. Takes precedence over file/line/character/symbol.",
+});
 
 /**
  * Planned `code_resolve` parameters.
@@ -123,39 +128,43 @@ export const CodeFindParameters = Type.Object(
 );
 
 /**
- * Planned `code_graph` parameters.
+ * `code_graph` parameters.
  *
  * Phase 0 uses `references` rather than `callers` so the public contract stays honest
  * until a true incoming-call hierarchy exists.
  *
  * Runtime rule for future executors:
- * - require `targetId`
+ * - require `targetId`, `file` + `line` + `character`, `symbol`, or `path`
  */
 export const CodeGraphParameters = Type.Object(
   {
-    targetId: Type.Optional(
-      Type.String({ description: "Resolved target handle from `code_resolve`." }),
-    ),
+    targetId: Type.Optional(TargetIdParam),
+    file: Type.Optional(FileParam),
+    line: Type.Optional(LineParam),
+    character: Type.Optional(CharacterParam),
+    symbol: Type.Optional(SymbolParam),
+    path: Type.Optional(ScopeParam),
     relations: Type.Optional(
       Type.Array(
         StringEnum(["references", "callees", "imports", "exports", "implements", "tests"], {
           description: "Relation families to include in the graph.",
         }),
         {
-          description: "Requested relation families.",
+          description: 'Requested relation families. Defaults to ["references"] when omitted.',
           uniqueItems: true,
         },
       ),
     ),
     direction: Type.Optional(
       StringEnum(["in", "out", "both"], {
-        description: "Graph traversal direction.",
+        description: "Graph traversal direction (future).",
       }),
     ),
-    depth: Type.Optional(Type.Number({ description: "Traversal depth.", minimum: 1 })),
+    depth: Type.Optional(Type.Number({ description: "Traversal depth (future).", minimum: 1 })),
     maxNodes: Type.Optional(
-      Type.Number({ description: "Maximum graph nodes to return.", minimum: 1 }),
+      Type.Number({ description: "Maximum graph nodes to return (future).", minimum: 1 }),
     ),
+    maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
 );

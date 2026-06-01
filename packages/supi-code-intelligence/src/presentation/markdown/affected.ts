@@ -120,7 +120,7 @@ export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
   lines.push("## Next");
-  lines.push("- `code_brief` on the most-affected module for deeper context");
+  lines.push("- `code_context` on the most-affected module for deeper context");
   lines.push(
     "- Use `code_inspect` with file + line + character to inspect one exported target precisely",
   );

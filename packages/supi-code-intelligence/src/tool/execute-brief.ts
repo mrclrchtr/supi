@@ -15,7 +15,7 @@ export interface CodeBriefToolParams {
   maxResults?: number;
 }
 
-/** Execute the public code_brief tool through the planner-backed use-case layers. */
+/** Execute the internal code_brief orientation substrate (used by code_context's orientation fallback). */
 export async function executeBriefTool(
   params: CodeBriefToolParams,
   ctx: { cwd: string },

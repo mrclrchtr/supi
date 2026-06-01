@@ -124,21 +124,19 @@ describe("focused code intelligence tool registration", () => {
     expect(props).not.toHaveProperty("path");
   });
 
-  it("registers code_context with the workflow schema shape while keeping code_brief", () => {
+  it("registers code_context with the workflow schema shape (code_brief removed from public surface)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const contextTool = getTool(pi, "code_context");
-    const briefTool = getTool(pi, "code_brief") as {
-      name: string;
-      parameters?: { properties?: Record<string, unknown> };
-    };
 
     expect(contextTool).toBeDefined();
     expect(contextTool.name).toBe("code_context");
-    expect(briefTool).toBeDefined();
-    expect(briefTool.name).toBe("code_brief");
     expect(typeof contextTool.execute).toBe("function");
+
+    // code_brief should NOT be registered on the public surface
+    const toolNames = getTools(pi).map((t: { name: string }) => t.name);
+    expect(toolNames).not.toContain("code_brief");
 
     const props = (contextTool as { parameters?: { properties?: Record<string, unknown> } })
       .parameters?.properties;
@@ -149,9 +147,6 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("budget");
     expect(props).toHaveProperty("include");
     expect(props).toHaveProperty("maxResults");
-
-    expect(briefTool.parameters?.properties).not.toHaveProperty("line");
-    expect(briefTool.parameters?.properties).not.toHaveProperty("character");
   });
 
   it("registers code_impact as the active workflow impact tool", () => {

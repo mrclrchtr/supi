@@ -166,7 +166,7 @@ export function renderFileBrief(input: FileBriefInput): string {
   );
   if (input.moduleRelativePath) {
     lines.push(
-      `- \`code_brief\` with \`path: "${input.moduleRelativePath}"\` for the containing module overview`,
+      `- \`code_context\` with \`path: "${input.moduleRelativePath}"\` for the containing module overview`,
     );
   }
   lines.push("");

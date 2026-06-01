@@ -178,7 +178,7 @@ export async function executeGraphTool(
         }, 0),
         omittedCount: 0,
         nextQueries: [
-          "`code_brief` on individual results for deeper context",
+          "`code_context` on individual results for deeper context",
           "`code_impact` for impact analysis",
         ],
       },

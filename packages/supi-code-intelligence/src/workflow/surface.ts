@@ -56,9 +56,9 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
       "Inspect one precise point in code with best-effort syntax, symbol, hover, definition, diagnostics, and code-action facts.",
     schemaKey: "code_inspect",
     schemaDocs:
-      "Requires file, line, and character plus optional maxResults. It is the explicit replacement for point-inspection behavior previously reached through anchored code_brief.",
+      "Requires file, line, and character plus optional maxResults. It is the explicit replacement for point-inspection behavior previously reached through anchored code_context.",
     absorbsTools: [],
-    absorbsBehaviors: ["anchored code_brief inspection"],
+    absorbsBehaviors: ["anchored orientation inspection"],
     substrates: ["semantic", "structural", "diagnostics"],
     phase: "phase-2",
     nonGoals: [
@@ -72,15 +72,12 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
       "Provide task-focused context bundles with prioritized definitions, relationships, tests, docs, and diagnostics.",
     schemaKey: "code_context",
     schemaDocs:
-      "Accepts optional task, targetId, scope, budget, include sections, and maxResults. Phase 2 activates it additively alongside code_brief, which remains the compatibility/orientation tool for now.",
+      "Accepts optional task, targetId, scope, budget, include sections, and maxResults. When called without a task, returns a neutral orientation brief — it is now the sole surface for both orientation and task-focused context. code_brief has been merged into code_context.",
     absorbsTools: ["code_brief"],
     absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search", "diagnostics"],
     phase: "phase-2",
-    nonGoals: [
-      "Phase 2 keeps code_brief registered as the compatibility/orientation surface.",
-      "Does not promise arbitrary natural-language planning or edit generation.",
-    ],
+    nonGoals: ["Does not promise arbitrary natural-language planning or edit generation."],
   },
   {
     name: "code_find",

@@ -1,0 +1,50 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:34:28.778601Z"
+revision = 38
+
+[document_fingerprints]
+archive = "sha256:f774f24daa59bb742e1fcf0418e1eae585cf5942d24069679649e8225a85f034"
+content = "sha256:40bce29c17b692c276c8136736adcc5aa167b366ab7dd13923df60019f9e1fb4"
+task-01 = "sha256:cf9e20c26dccc979d69c098f1b4a12e30d9aee0355b07a6e7425b37d64b14959"
+task-02 = "sha256:df667e42129d02bd5966478053f058f6155e371fb315d02c5170f4fade7cb6dc"
+task-03 = "sha256:cde6b2c397ae682005d6fe574c275f107206b7df29b2a0479db6a05119b4a48f"
+task-04 = "sha256:a4035b8389be091d983ba73a22851630a9a2f385bca29e9b7f1d6eda96d161b3"
+task-05 = "sha256:e5689c49bee8f84d92b3f1740f7e089b807666214638761115f2bb61d217c21b"
+task-06 = "sha256:87ffdc33e9d8b51630c9a05f1e08831eb96528848a22e2522277c53f44b3c4bb"
+task-07 = "sha256:9f209a717df6d92715398e88cfc7269dd56b000529ad93e046a9255b2099a946"
+
+[[tasks]]
+number = 1
+title = "Remove code_brief from public tool registration"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Update all follow-up tool suggestions to replace code_brief with code_context"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Fix hover truncation in code_context buildDefinitionLines"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Converge CodeGraphParameters schema with active CodeGraphExtendedParameters"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update tests for removed code_brief registration"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Update CLAUDE.md and README.md"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Run full verify (typecheck + tests + lint)"
+status = "done"

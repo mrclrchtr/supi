@@ -25,7 +25,6 @@ export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[num
 
 /** Public/model-facing tool names registered on the extension surface. */
 export const PUBLIC_CODE_INTELLIGENCE_TOOL_NAMES = [
-  "code_brief",
   "code_inspect",
   "code_context",
   "code_impact",

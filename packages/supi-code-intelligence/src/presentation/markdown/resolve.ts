@@ -65,7 +65,7 @@ function renderResolved(
     lines.push(
       `- \`code_refactor\` { targetId: "${t.targetId}", operation: "rename_symbol", newName: "..." } — preview a safe rename plan`,
     );
-    lines.push(`- \`code_brief\` { targetId: "${t.targetId}" } — orientation`);
+    lines.push(`- \`code_context\` { targetId: "${t.targetId}" } — orientation`);
   } else {
     lines.push(
       `Resolved ${targets.length} target(s)${omittedCount > 0 ? ` (${omittedCount} omitted)` : ""}:`,
@@ -82,7 +82,7 @@ function renderResolved(
 
     lines.push("");
     lines.push(
-      "**Use a `targetId` with** `code_context`, `code_graph`, `code_impact`, `code_brief`, or `code_refactor`, and use `code_inspect` with file + line + character for point facts.",
+      "**Use a `targetId` with** `code_context`, `code_graph`, `code_impact`, or `code_refactor`, and use `code_inspect` with file + line + character for point facts.",
     );
   }
 

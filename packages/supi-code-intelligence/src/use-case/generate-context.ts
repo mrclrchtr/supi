@@ -289,10 +289,15 @@ function buildDefinitionLines(
     lines.push(`- Node: \`${treeContext.nodeInfo.type}\``);
   }
   if (treeContext?.hover?.contents) {
-    const firstLine =
-      treeContext.hover.contents.trim().split("\n")[0] ?? treeContext.hover.contents;
-    if (firstLine.length > 0) {
-      lines.push(`- Hover: ${firstLine}`);
+    const trimmed = treeContext.hover.contents.trim();
+    const hoverLines = trimmed.split("\n");
+    const maxHoverLines = 5;
+    if (hoverLines.length <= maxHoverLines) {
+      lines.push(`- Hover: ${trimmed}`);
+    } else {
+      const truncated = hoverLines.slice(0, maxHoverLines).join("\n");
+      lines.push(`- Hover: ${truncated}`);
+      lines.push(`  _... ${hoverLines.length - maxHoverLines} more line(s) omitted_`);
     }
   }
   return lines;
@@ -425,7 +430,7 @@ function formatFocusTarget(target: ContextTarget, cwd: string): string {
 
 function buildNextQueries(target: ContextTarget | null | undefined, cwd: string): string[] {
   if (!target) {
-    return ["Use `code_brief` for a neutral orientation summary."];
+    return ["Use `code_context` for a neutral orientation summary."];
   }
 
   const relPath = path.relative(cwd, target.file) || target.file;

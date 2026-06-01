@@ -28,8 +28,7 @@ pi install ./packages/supi-code-intelligence
 
 After install, pi gets:
 
-- `code_context` — task-focused context bundles for a change, question, or resolved target
-- `code_brief` — orientation-only overview for a project, package, directory, file, or symbol
+- `code_context` — task-focused context bundles for a change, question, or resolved target; also serves orientation overviews for projects, packages, directories, files, or symbols (`code_brief` has been merged into it)
 - `code_inspect` — factual point inspection for one precise file position
 - `code_graph` — unified relation graph (references, callees, implementations) from a resolved target
 - `code_impact` — preferred workflow-oriented blast radius, downstream impact, and diff-aware changed-file analysis
@@ -51,7 +50,7 @@ The current public surface now includes:
 
 - `code_resolve` — **active** (Phase 1)
 - `code_inspect` — **active** (explicit point inspection tool)
-- `code_context` — **active** (Phase 2, additive alongside `code_brief`)
+- `code_context` — **active** (solo surface for both orientation and task-focused context; `code_brief` merged)
 - `code_find` — **active** (Phase 2a, supersedes code_pattern)
 - `code_health` — **active** (Phase 1.5)
 - `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
@@ -83,14 +82,7 @@ Task-focused context bundle for a change, question, or resolved target.
 - when `task` is omitted, falls back to orientation-style output instead of erroring
 - when `task` is present, renders requested sections such as `defs`, `references`, `callees`, `docs`, `tests`, and `diagnostics`
 - requested but unavailable sections are called out explicitly instead of being silently omitted
-- in this first implementation wave, `code_context` is additive: `code_brief` still exists as the compatibility/orientation tool
-
-### `code_brief`
-Interpretive orientation tool. Use for prioritized context, start-here guidance, and project/package/directory/file/symbol overview.
-
-`code_brief` is now **orientation-only**. It no longer exposes public point-inspection inputs. Use `code_inspect` when you need syntax node, enclosing symbol, hover/type info, definitions, nearby diagnostics, or code-action titles for one precise position.
-
-When a code provider is available, file briefs include structural context (outline, imports, exports) from tree-sitter and inline diagnostics from LSP. Directory and module briefs include extension breakdown and landmark files. Module briefs show aggregate diagnostics across source files. `maxResults` controls section caps. `targetId` remains supported for orientation-only follow-up from `code_resolve`.
+- in this first implementation wave, `code_context` is the solo surface: `code_brief` has been removed from the public surface
 
 ### `code_inspect`
 Factual point-inspection tool for one precise file position.
@@ -183,7 +175,7 @@ Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `path`
 - `code_inspect` is the public point-inspection tool for `file` + `line` + `character`
-- `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, `code_brief`, and `code_refactor`, but `code_brief` uses it for orientation-only follow-up
+- `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, and `code_refactor`
 - a leading `@` is stripped from `path` and `file`
 - non-search tools do **not** silently fall back to heuristic grep behavior
 

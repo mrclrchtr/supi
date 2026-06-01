@@ -176,7 +176,7 @@ describe("focused brief details metadata", () => {
 });
 
 describe("structured details via tool adapters and action routers", () => {
-  it("returns project-level brief details for code_brief when called without a target", async () => {
+  it("returns project-level orientation details when called without a target", async () => {
     setupWorkspace();
     const result = await executeBriefTool({}, { cwd: tmpDir });
     expect(result.content).toContain("Project Brief");
@@ -379,7 +379,7 @@ describe("structured details via tool adapters and action routers", () => {
         expect(result.details.data.confidence).not.toBe("unavailable");
         expect(result.details.data.likelyTests.length).toBeGreaterThan(0);
         expect(result.details.data.nextQueries).toEqual(
-          expect.arrayContaining([expect.stringContaining("code_brief")]),
+          expect.arrayContaining([expect.stringContaining("code_context")]),
         );
       }
     });

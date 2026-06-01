@@ -214,7 +214,7 @@ function addDependentsSection(
   if (mod.entrypoints.length > 0) {
     const ep = mod.entrypoints[0];
     nextQueries.push(
-      `\`code_brief\` with \`file: "${mod.relativePath}/${ep.replace(/^\.\//, "")}"\` for entrypoint details`,
+      `\`code_context\` with \`file: "${mod.relativePath}/${ep.replace(/^\.\//, "")}"\` for entrypoint details`,
     );
   }
 }
@@ -394,7 +394,7 @@ async function generateFileBriefWithEnrichment(
   );
   if (mod) {
     nextQueries.push(
-      `\`code_brief\` with \`path: "${mod.relativePath}"\` for the containing module overview`,
+      `\`code_context\` with \`path: "${mod.relativePath}"\` for the containing module overview`,
     );
   }
 

@@ -165,7 +165,7 @@ function buildNextQueries(model: ArchitectureModel, publicSurfaces: string[]): s
   if (model.modules.length > 0) {
     const firstMod = model.modules[0];
     nextQueries.push(
-      `\`code_brief\` with \`path: "${firstMod.relativePath}"\` for a focused module brief`,
+      `\`code_context\` with \`path: "${firstMod.relativePath}"\` for a focused module brief`,
     );
   }
   if (publicSurfaces.length > 0) {

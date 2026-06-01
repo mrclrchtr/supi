@@ -104,7 +104,7 @@ describe("transitive downstream impact", () => {
 });
 
 describe("focused-tool follow-up regressions", () => {
-  it("uses symbol input for code_brief without leaking inspect-style sections", async () => {
+  it("uses symbol input for orientation without leaking inspect-style sections", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
     const srcDir = path.join(tmpDir, "src");
     mkdirSync(srcDir, { recursive: true });

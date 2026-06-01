@@ -159,7 +159,7 @@ describe("code_impact tool", () => {
     expect(result.details?.type).toBe("impact");
     if (result.details?.type === "impact") {
       expect(result.details.data?.nextQueries).toEqual(
-        expect.arrayContaining([expect.stringContaining("code_brief")]),
+        expect.arrayContaining([expect.stringContaining("code_context")]),
       );
     }
   });

@@ -117,7 +117,7 @@ describe("relations render", () => {
       "src/widget.ts",
     );
 
-    expect(content).toContain("code_brief");
+    expect(content).toContain("code_context");
     expect(content).toContain("code_inspect");
   });
 });

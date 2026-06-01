@@ -53,7 +53,7 @@ export function renderOverview(data: OverviewData): string {
     lines.push(data.gitContextOverview);
   }
 
-  lines.push("_Use `code_brief` for deeper context on any module or file._");
+  lines.push("_Use `code_context` for deeper context on any module or file._");
 
   return lines.join("\n");
 }

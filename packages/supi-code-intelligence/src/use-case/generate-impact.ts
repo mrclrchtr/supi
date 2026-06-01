@@ -237,7 +237,7 @@ async function executeFileLevelImpact(
     aggregated.refs.length,
     computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, input),
     [
-      "`code_brief` on the most-affected module for deeper context",
+      "`code_context` on the most-affected module for deeper context",
       "Use `code_inspect` with file + line + character to inspect one exported target precisely",
     ],
     prioritySignals,
@@ -492,11 +492,11 @@ function buildChangedFilesNextQueries(
   const next: string[] = [];
   if (firstFile) {
     next.push(
-      `\`code_brief\` with \`file: "${firstFile}"\` for focused context on the changed file`,
+      `\`code_context\` with \`file: "${firstFile}"\` for focused context on the changed file`,
     );
   }
   if (analysis.checkNext.length > 0) {
-    next.push("`code_brief` on the most-affected module for broader context");
+    next.push("`code_context` on the most-affected module for broader context");
   }
   return next;
 }

@@ -3,7 +3,7 @@
 Architecture briefs with structural enrichment, factual point inspection, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused public code-only tool surface (`code_context`, `code_brief`, `code_inspect`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_resolve`, `code_refactor`, `code_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused public code-only tool surface (`code_context`, `code_inspect`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_resolve`, `code_refactor`, `code_apply`)
 - Historical substrate-named tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
@@ -111,38 +111,21 @@ src/
 ## Public tool contracts
 
 ### `code_context`
-Task-focused context bundle. In Phase 2 it is active **alongside** `code_brief`, which remains the compatibility/orientation tool.
+Task-focused context bundle. It is the solo surface for both orientation and task-focused coding context — `code_brief` has been merged into it.
 
 - accepts `task`, `targetId`, `scope`, `budget`, `include`, and `maxResults`
-- when `task` is omitted, falls back to orientation-style output instead of erroring
+- when `task` is omitted, returns a neutral orientation brief (project, package, directory, file, or symbol overview)
 - when `task` is present, renders only the requested sections and reports unavailable sections honestly
 - `targetId` from `code_resolve` is the preferred precise anchor for task-focused follow-up
 - first-wave docs/tests/diagnostics sections are best-effort and must stay explicit when empty or unavailable
 
-### `code_brief`
-Interpretive orientation tool. The planner selects the best provider (semantic or structural) automatically. For deeper point facts, follow up with `code_inspect`; for relationships, follow up with `code_graph`.
-
-`code_brief` is now **orientation-only**. Its public contract does not expose positional point-inspection inputs.
-
-**Enriched file briefs** — When a code provider is available, `code_brief` with `file:` shows:
-- **Outline** — top-level declarations (functions, classes, interfaces) from tree-sitter
-- **Imports** — module dependencies from tree-sitter
-- **Exports** — exported names with kinds from tree-sitter
-- **Diagnostics** — LSP errors and warnings (first 5 messages inline)
-
-**Enriched module briefs** — When LSP is active, `code_brief` with `path:` targeting a package root shows aggregate diagnostics across all source files.
-
-**`targetId` follow-up** — `code_brief` still accepts `targetId` from `code_resolve`, but uses it for orientation-only file/symbol follow-up rather than hidden point inspection.
-
-**Symbol briefs** — `code_brief` with `symbol:` remains available, but symbol briefs stay orientation-focused instead of emitting inspect-style node/hover/definition/code-action sections.
+**Orientation briefs** — When called without `task`:
+- **Enriched file briefs** — outline (top-level declarations), imports, exports, diagnostics
+- **Enriched module briefs** — aggregate diagnostics across source files when LSP is active
+- **Directory brief enrichment** — extension breakdown, landmark files
+- **Symbol briefs** — orientation-focused, not inspect-style
 
 **`maxResults`** — Controls section caps: outline items (default 15), imports (default 10), exports (default 10), diagnostic messages (default 5), source file listings (default 10). When omitted, defaults apply.
-
-**Directory brief enrichment** — When targeting a directory, briefs include:
-- **Extension breakdown** — per-extension file counts across the full tree
-- **Landmark files** — well-known project configuration files (`package.json`, `tsconfig.json`, etc.)
-
-**Module brief enrichment** — Module root briefs include the same extension breakdown and landmarks as directory briefs, plus aggregate diagnostics across source files when LSP is active.
 
 ### `code_inspect`
 Factual point-inspection tool for one precise file position.
@@ -227,9 +210,8 @@ The legacy compatibility executors (`code_affected`, `code_refactor_plan`, `code
 - When no capability is available, the planner returns `preferred: "unavailable"` and the execute function returns an explicit error message.
 
 ### Public-surface split
-- `code_context` is now active as the task-focused workflow surface, while `code_brief` remains the compatibility/orientation tool.
+- `code_context` is now active as the solo task-focused and orientation surface; `code_brief` has been removed from the public surface.
 - `code_inspect` is the explicit public point-inspection tool.
-- `code_brief` is orientation-only; do not route point inspection through it.
 - `code_impact` is now active as the preferred workflow impact surface.
 - `code_find` is the sole search tool, supporting text, regex, AST, and semantic modes.
 - `code_graph` dispatches each relation to the appropriate substrate. Unavailable substrates skip with a note rather than failing.
@@ -244,7 +226,7 @@ The legacy compatibility executors (`code_affected`, `code_refactor_plan`, `code
 - `code_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
 - `code_context`, `code_impact`, and `code_refactor` accept optional `targetId` that takes precedence over raw coordinates.
-- `code_brief` accepts optional `targetId` for orientation-only follow-up; it no longer expands target handles into anchored inspection.
+- `code_context` accepts optional `targetId` for orientation-only follow-up.
 
 ### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.
