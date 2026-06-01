@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.1](https://github.com/mrclrchtr/supi/compare/v1.11.0...v1.11.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **supi-review:** auto-steer reviewer when it stops without calling submit_review ([a588ff4](https://github.com/mrclrchtr/supi/commit/a588ff4f422b6ec6453de6656b3526f766923ef2))
+
 ## [1.11.0](https://github.com/mrclrchtr/supi/compare/v1.10.0...v1.11.0) (2026-05-31)
 
 
