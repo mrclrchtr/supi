@@ -94,6 +94,9 @@ export function buildReviewPacket(
     "These tools are scoped to the snapshot's changed-files list — request a file from the manifest above.",
     "",
     "Combine snapshot inspection with read/grep/find/ls for broader codebase context.",
+    "",
+    "## Delivery",
+    "Call **submit_review** to submit your review.",
   );
 
   const includedFiles = snapshot.changedFiles.filter((f) => !classifySkipCategory(f));

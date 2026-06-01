@@ -18,6 +18,8 @@ const GRACE_TURNS = 3;
 const RECENT_EVENTS_MAX = 10;
 const LAST_ASSISTANT_TEXT_DEBUG_MAX = 2_000;
 const STEER_MESSAGE = "Time limit reached. Wrap up and submit your review now.";
+const STEER_SUBMIT_MESSAGE =
+  "You stopped without calling submit_review. Call submit_review now with your findings.";
 
 /** Maps tool names to human-readable activity descriptions. */
 function toolNameToActivity(name: string, phase: "start" | "end"): string {
@@ -60,6 +62,8 @@ export function buildReviewerSystemPrompt(): string {
     "You are a rigorous code reviewer. Your task already includes session-derived intent",
     "and a concrete list of changed files. Use the prompt packet as the primary brief,",
     "then inspect code with the available read-only tools before drawing conclusions.",
+    "",
+    "CRITICAL: Call submit_review to deliver results. Never output review text directly.",
     "",
     "--- Guardrails ---",
     "- You have read-only tools only. Do NOT modify files or propose running write/edit/bash commands.",
@@ -159,7 +163,7 @@ export function buildReviewerSystemPrompt(): string {
     "- Focus on application source and test code.",
     "",
     "--- Output ---",
-    "Do NOT output JSON directly — call submit_review with the structured result.",
+    "Call submit_review. Never output review text directly.",
   ].join("\n");
 }
 
@@ -347,6 +351,7 @@ interface RunnerContext {
   resultHolder: { value: ReviewOutputEvent | undefined };
   signal?: AbortSignal;
   state: { settled: boolean };
+  submitSteered: boolean;
   timeout: { steered: boolean; graceTurnsRemaining: number | undefined; aborting?: boolean };
   debug: { recentEvents: string[] };
 }
@@ -411,6 +416,19 @@ function handleToolEnd(
   emitProgress(ctx);
 }
 
+function handleMessageEnd(
+  event: Extract<AgentSessionEvent, { type: "message_end" }>,
+  ctx: RunnerContext,
+): void {
+  if (ctx.state.settled || ctx.submitSteered || ctx.resultHolder.value) return;
+
+  const msg = event.message as { role?: string; stopReason?: string };
+  if (msg.role !== "assistant" || msg.stopReason !== "stop") return;
+
+  ctx.submitSteered = true;
+  ctx.session.steer(STEER_SUBMIT_MESSAGE).catch(() => {});
+}
+
 function handleAgentEnd(
   event: Extract<AgentSessionEvent, { type: "agent_end" }>,
   ctx: RunnerContext,
@@ -460,6 +478,10 @@ function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext): void 
     case "tool_execution_end":
       handleToolEnd(event, ctx);
       break;
+    case "message_end": {
+      handleMessageEnd(event, ctx);
+      break;
+    }
     case "agent_end":
       handleAgentEnd(event, ctx);
       break;
@@ -543,6 +565,7 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<RawRevi
       resultHolder,
       signal: invocation.signal,
       state,
+      submitSteered: false,
       timeout: timeoutRef,
       debug: { recentEvents: [] },
     };
