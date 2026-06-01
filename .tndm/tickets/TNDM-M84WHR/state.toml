@@ -1,0 +1,26 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:34:31.65661Z"
+revision = 23
+
+[document_fingerprints]
+archive = "sha256:c5ba2b4e60df995d633872b99228a414b628e0660c4ca8ff0d8cdda16f384f83"
+content = "sha256:d795ae43a5bdd7cd3236e2269c30c3fad696229205a922338b43172c406dab84"
+task-01 = "sha256:ff6cd4ee5b21d33207d34a797e9c19aad282d937cabfcf74b8555e8da6242b7a"
+task-02 = "sha256:ca986d350c7114a2aa362ef6337e134c8ddb9ac7e17d86cd54d1c79bff3ebaf5"
+task-03 = "sha256:ca45b571fba4683dc72898db8a5c3dc42a2efd58b5e3875ee24de446b3cb730a"
+
+[[tasks]]
+number = 1
+title = "Delete legacy execute-brief.ts and execute-affected.ts, migrate tests"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Relax code_graph validation for file-level relations"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Implement code_find ast mode call/type/test kinds"
+status = "done"

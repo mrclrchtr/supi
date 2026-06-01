@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
@@ -119,7 +120,7 @@ describe("file-level semantic targets", () => {
     expect(result.content).toContain("requires a precise target");
   });
 
-  it("expands file-only affected requests across exported symbols when semantic refs are available", async () => {
+  it("runs impact analysis from an anchored target when semantic refs are available", async () => {
     writeJson(tmpDir, "package.json", { name: "test-proj" });
     const indexPath = path.join(tmpDir, "index.ts");
     writeFileSync(
@@ -180,14 +181,14 @@ describe("file-level semantic targets", () => {
       },
     });
 
-    const result = await executeAction({ action: "affected", file: "index.ts" }, { cwd: tmpDir });
+    const result = await executeImpactTool(
+      { file: "index.ts", line: 1, character: 14 },
+      { cwd: tmpDir },
+    );
 
-    expect(result.content).toContain("Affected: `index.ts`");
-    expect(result.content).toContain("`foo`");
-    expect(result.content).toContain("`bar`");
+    expect(result.content).toContain("Impact");
     expect(result.content).toContain("consumer.ts");
-    expect(result.content).not.toContain("require `line` and `character`");
-    expect(result.details?.type).toBe("affected");
+    expect(result.details?.type).toBe("impact");
   });
 
   it("returns an explicit unsupported message when file-level target discovery is unavailable", async () => {
@@ -240,13 +241,13 @@ describe("file-level semantic targets", () => {
       },
     });
 
-    const result = await executeAction(
-      { action: "affected", file: "index.ts", maxResults: 1 },
+    const result = await executeImpactTool(
+      { file: "index.ts", line: 1, character: 14, maxResults: 1 },
       { cwd: tmpDir },
     );
 
-    expect(result.details?.type).toBe("affected");
-    if (result.details?.type === "affected") {
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
       expect(result.details.data.omittedCount).toBe(2);
     }
   });

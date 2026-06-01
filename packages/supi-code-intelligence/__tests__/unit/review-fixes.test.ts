@@ -5,6 +5,8 @@ import { buildArchitectureModel, getDependents } from "@mrclrchtr/supi-code-inte
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runRipgrep } from "../../src/search-helpers.ts";
+import { executeContextTool } from "../../src/tool/execute-context.ts";
+import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
@@ -93,12 +95,9 @@ describe("transitive downstream impact", () => {
       ],
     });
 
-    const result = await executeAction(
-      { action: "affected", symbol: "shared", path: "packages/" },
-      { cwd: tmpDir },
-    );
+    const result = await executeImpactTool({ symbol: "shared" }, { cwd: tmpDir });
 
-    expect(result.content).toContain("Affected");
+    expect(result.content).toContain("Impact");
     expect(result.content).toContain("downstream");
   });
 });
@@ -184,19 +183,20 @@ describe("focused-tool follow-up regressions", () => {
       }),
     });
 
-    const result = await executeAction({ action: "brief", symbol: "Widget" }, { cwd: tmpDir });
+    const result = await executeContextTool(
+      { file: "src/widget.ts", line: 1, character: 17 },
+      { cwd: tmpDir },
+    );
 
-    expect(result.content).toContain("Symbol Brief: Widget");
     expect(result.content).toContain("src/widget.ts");
     expect(result.content).toContain("## File Outline");
     expect(result.content).not.toContain("Project Brief");
     expect(result.content).not.toContain("## Hover");
     expect(result.content).not.toContain("## Definition");
     expect(result.content).not.toContain("## Code Actions");
-    expect(result.details?.type).toBe("brief");
-    if (result.details?.type === "brief") {
-      expect(result.details.data.confidence).toBe("semantic");
-      expect(result.details.data.focusTarget).toContain("Widget");
+    expect(result.details?.type).toBe("context");
+    if (result.details?.type === "context") {
+      expect(result.details.data.focusTarget).toContain("widget.ts");
     }
   });
 
@@ -210,16 +210,16 @@ describe("focused-tool follow-up regressions", () => {
       references: async () => [],
     });
 
-    const result = await executeAction(
-      { action: "affected", file: "src/widget.ts", line: 1, character: 1 },
+    const result = await executeImpactTool(
+      { file: "src/widget.ts", line: 1, character: 1 },
       { cwd: tmpDir },
     );
 
     expect(result.content).toContain('file: "src/widget.ts"');
     expect(result.content).not.toContain('symbol: "symbol at src/widget.ts:1"');
-    expect(result.details?.type).toBe("affected");
-    if (result.details?.type === "affected") {
-      const callersQuery = result.details.data.nextQueries.find((query) =>
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
+      const callersQuery = result.details.data.nextQueries.find((query: string) =>
         query.includes("code_graph"),
       );
       expect(callersQuery).toContain('file: "src/widget.ts"');

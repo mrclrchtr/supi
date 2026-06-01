@@ -13,7 +13,7 @@ import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
-import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
+import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
@@ -805,11 +805,11 @@ describe("code_resolve targetId follow-up", () => {
     expect(targetId).toBeDefined();
     if (!targetId) return;
 
-    const affResult = await executeAffectedTool({ targetId }, { cwd: tmpDir });
+    const impactResult = await executeImpactTool({ targetId }, { cwd: tmpDir });
 
     // targetId was expanded; no "Error" prefix
-    expect(affResult.content).not.toContain("**Error");
-    expect(affResult.content).toContain("Affected");
+    expect(impactResult.content).not.toContain("**Error");
+    expect(impactResult.content).toContain("Impact");
   });
 
   it("resolves and follows up with the internal refactor-plan executor using targetId", async () => {

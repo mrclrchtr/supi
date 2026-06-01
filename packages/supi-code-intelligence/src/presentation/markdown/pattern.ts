@@ -1,7 +1,11 @@
 // Pattern search markdown renderer — all formatting for literal, regex, and structured search results.
 
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
-import type { StructuredMatch, StructuredPatternResult } from "../../pattern-structured.ts";
+import type {
+  StructuredMatch,
+  StructuredPatternKind,
+  StructuredPatternResult,
+} from "../../pattern-structured.ts";
 import type { RgMatch } from "../../search-helpers.ts";
 import { groupByFile } from "../../search-helpers.ts";
 
@@ -10,7 +14,7 @@ import { groupByFile } from "../../search-helpers.ts";
 // biome-ignore lint/complexity/useMaxParams: structured empty-state with optional result parameter keeps partial-warning logic together
 export function renderStructuredEmptyState(
   pattern: string,
-  kind: "definition" | "export" | "import",
+  kind: StructuredPatternKind,
   relScope: string,
   _structural?: StructuralSubstrate,
   result?: StructuredPatternResult,
@@ -31,9 +35,10 @@ export function renderStructuredEmptyState(
   return lines.join("\n");
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pattern search rendering groups matches by file and adds summaries — each branch stays linear
 export function renderStructuredMatches(
   pattern: string,
-  kind: "definition" | "export" | "import",
+  kind: StructuredPatternKind,
   relScope: string,
   result: StructuredPatternResult,
 ): string {
@@ -45,7 +50,17 @@ export function renderStructuredMatches(
   }
 
   const kindLabel =
-    kind === "definition" ? "Definitions" : kind === "export" ? "Exports" : "Imports";
+    kind === "definition"
+      ? "Definitions"
+      : kind === "export"
+        ? "Exports"
+        : kind === "import"
+          ? "Imports"
+          : kind === "call"
+            ? "Calls"
+            : kind === "type"
+              ? "Types"
+              : "Tests";
   const lines: string[] = [];
   lines.push(`# Pattern ${kindLabel}: \`${pattern}\``);
   lines.push("");

@@ -24,7 +24,7 @@ export interface CodeFindToolParams {
 }
 
 /** Structured pattern kinds supported by tree-sitter. */
-const STRUCTURED_KINDS = new Set(["definition", "export", "import"]);
+const STRUCTURED_KINDS = new Set(["definition", "export", "import", "call", "type", "test"]);
 
 export async function executeFindTool(
   params: CodeFindToolParams,
@@ -114,10 +114,10 @@ async function executeAstMode(
   _scopePath: string | null,
   cwd: string,
 ): Promise<CodeIntelResult> {
-  // Check for unsupported kind values first
+  // Check for unsupported kind values
   if (params.kind && !STRUCTURED_KINDS.has(params.kind)) {
     return {
-      content: `**Error:** Structured \`kind: "${params.kind}"\` is not yet implemented. Supported kinds for \`mode: "ast"\`: \`definition\`, \`export\`, \`import\`.`,
+      content: `**Error:** Structured \`kind: "${params.kind}"\` is not yet implemented. Supported kinds for \`mode: "ast"\`: \`definition\`, \`export\`, \`import\`, \`call\`, \`type\`, \`test\`.`,
       details: undefined,
     };
   }

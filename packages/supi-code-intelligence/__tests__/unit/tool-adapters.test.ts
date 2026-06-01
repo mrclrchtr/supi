@@ -2,6 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { executeContextTool } from "../../src/tool/execute-context.ts";
+import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
@@ -28,7 +30,7 @@ describe("executeAction validation", () => {
     const result = await executeAction({ action: "unknown" as any }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
     expect(result.content).toContain("Unknown action");
-    expect(result.content).toContain("brief");
+    expect(result.content).toContain("context");
   });
 
   it("rejects line/character with path instead of file", async () => {
@@ -88,32 +90,32 @@ describe("executeAction validation", () => {
   });
 });
 
-describe("brief action", () => {
-  it("returns project brief for no-path call", async () => {
+describe("context action", () => {
+  it("returns project brief for no-arg call", async () => {
     writeJson(tmpDir, "package.json", { name: "test-proj", description: "Test" });
-    const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
+    const result = await executeContextTool({}, { cwd: tmpDir });
     expect(result.content).toContain("Project Brief");
     expect(result.content).toContain("test-proj");
   });
 
   it("returns error for non-existent path", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
-    const result = await executeAction({ action: "brief", path: "nonexistent/" }, { cwd: tmpDir });
+    const result = await executeContextTool({ scope: "nonexistent/" }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
     expect(result.content).toContain("not found");
   });
 
   it("returns no-structure message for empty dir", async () => {
-    const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
+    const result = await executeContextTool({}, { cwd: tmpDir });
     expect(result.content).toContain("No project structure");
   });
 });
 
-describe("affected action", () => {
-  it("keeps unavailable confidence for affected symbol requests without semantic support", async () => {
-    const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
-    expect(result.details?.type).toBe("affected");
-    if (result.details?.type === "affected") {
+describe("impact action", () => {
+  it("keeps unavailable confidence for impact symbol requests without semantic support", async () => {
+    const result = await executeImpactTool({ symbol: "Widget" }, { cwd: tmpDir });
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
       expect(result.details.data.confidence).toBe("unavailable");
     }
     expect(result.content).not.toContain("heuristic");

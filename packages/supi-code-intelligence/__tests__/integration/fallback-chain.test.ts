@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
@@ -176,20 +177,20 @@ describe("implementations action without heuristic fallback", () => {
   });
 });
 
-describe("affected action without heuristic fallback", () => {
+describe("impact action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
+    const result = await executeImpactTool({ symbol: "Widget" }, { cwd: tmpDir });
 
     expect(result.content).toContain("No semantic analysis provider is available");
     expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("affected");
-    if (result.details?.type === "affected") {
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
       expect(result.details.data.confidence).toBe("unavailable");
       expect(result.details.data.directCount).toBe(0);
     }
   });
 
-  it("keeps semantic confidence when affected reference gathering finds no refs", async () => {
+  it("keeps semantic confidence when impact reference gathering finds no refs", async () => {
     const targetPath = createSourceFile("src/widget.ts", "export interface Widget {}\n");
 
     registerMockProvider(tmpDir, {
@@ -205,12 +206,12 @@ describe("affected action without heuristic fallback", () => {
       references: async () => [],
     });
 
-    const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
+    const result = await executeImpactTool({ symbol: "Widget" }, { cwd: tmpDir });
 
     expect(result.content).toContain("(semantic)");
     expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("affected");
-    if (result.details?.type === "affected") {
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
       expect(result.details.data.confidence).toBe("semantic");
       expect(result.details.data.directCount).toBe(0);
     }

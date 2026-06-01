@@ -6,7 +6,7 @@ import type { CodeQueryParams as ActionParams } from "./query-params.ts";
 export const STRUCTURED_PATTERN_FILE_CAP = 200;
 const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;
 
-export type StructuredPatternKind = "definition" | "export" | "import";
+export type StructuredPatternKind = "definition" | "export" | "import" | "call" | "type" | "test";
 
 export interface StructuredMatch {
   file: string;
@@ -22,7 +22,14 @@ export interface StructuredPatternResult {
 }
 
 export function isStructuredPatternKind(kind: string | undefined): kind is StructuredPatternKind {
-  return kind === "definition" || kind === "export" || kind === "import";
+  return (
+    kind === "definition" ||
+    kind === "export" ||
+    kind === "import" ||
+    kind === "call" ||
+    kind === "type" ||
+    kind === "test"
+  );
 }
 
 // biome-ignore lint/complexity/useMaxParams: substrate injection keeps related inputs explicit for readability
@@ -97,16 +104,39 @@ async function collectMatchesForFile(
     return;
   }
 
-  const importsResult = await structural.imports(relFile);
-  if (importsResult.kind !== "success") return;
-  for (const item of importsResult.data) {
-    if (!matcher(item.moduleSpecifier)) continue;
-    matches.push({
-      file: relFile,
-      name: item.moduleSpecifier,
-      kind: "import",
-      line: item.startLine,
-    });
+  if (kind === "import") {
+    const importsResult = await structural.imports(relFile);
+    if (importsResult.kind !== "success") return;
+    for (const item of importsResult.data) {
+      if (!matcher(item.moduleSpecifier)) continue;
+      matches.push({
+        file: relFile,
+        name: item.moduleSpecifier,
+        kind: "import",
+        line: item.startLine,
+      });
+    }
+    return;
+  }
+
+  // ── call / type / test — use outline with kind-specific filters ────
+
+  if (kind === "call" || kind === "type" || kind === "test") {
+    const outline = await structural.outline(relFile);
+    if (outline.kind !== "success") return;
+    for (const item of outline.data) {
+      if (kind === "call" && !isCallLikeKind(item.kind)) continue;
+      if (kind === "type" && !isTypeLikeKind(item.kind)) continue;
+      if (kind === "test") {
+        // Match by name: test functions, describe/it blocks, or files with test/spec in name
+        const isTestName =
+          /^(test|it|describe|spec)\b/.test(item.name) ||
+          /\b(test|spec|Test|Spec)\b/.test(item.name);
+        if (!isTestName && !matcher(item.name)) continue;
+      }
+      if (!matcher(item.name)) continue;
+      matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
+    }
   }
 }
 
@@ -168,6 +198,20 @@ function isStructuredFile(file: string): boolean {
   return [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"].includes(
     path.extname(file),
   );
+}
+
+/** Outline kind values that represent callable declarations (as normalized by the outline extractor). */
+const CALL_LIKE_KINDS = new Set(["function", "method"]);
+
+function isCallLikeKind(kind: string): boolean {
+  return CALL_LIKE_KINDS.has(kind);
+}
+
+/** Outline kind values that represent type declarations (as normalized by the outline extractor). */
+const TYPE_LIKE_KINDS = new Set(["class", "interface", "type", "enum"]);
+
+function isTypeLikeKind(kind: string): boolean {
+  return TYPE_LIKE_KINDS.has(kind);
 }
 
 function createStructuredMatcher(

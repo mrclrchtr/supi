@@ -71,17 +71,15 @@ src/
 │   ├── validation.ts           # Shared parameter validation
 │   ├── target-id-params.ts     # targetId expansion/lookup helpers (Phase 1)
 │   ├── execute-context.ts      # code_context tool executor
-│   ├── execute-brief.ts        # code_brief tool executor
 │   ├── execute-inspect.ts      # code_inspect point-inspection executor
 │   ├── execute-graph.ts        # code_graph tool executor (unified relations)
 │   ├── execute-impact.ts       # code_impact tool executor (preferred impact surface)
-│   ├── execute-affected.ts     # code_affected compatibility executor
 │   ├── execute-find.ts         # code_find tool executor
 │   ├── execute-resolve.ts      # code_resolve tool executor (Phase 1)
 │   ├── execute-refactor.ts     # code_refactor workflow wrapper (Phase 5)
 │   ├── execute-apply.ts        # code_apply workflow wrapper (Phase 5)
-│   ├── execute-refactor-plan.ts  # code_refactor_plan compatibility executor
-│   └── execute-refactor-apply.ts # code_refactor_apply compatibility executor
+│   ├── execute-refactor-plan.ts  # preview refactor plan executor (internal substrate)
+│   └── execute-refactor-apply.ts # plan application executor (internal substrate)
 ├── workflow/
 │   ├── names.ts               # Canonical V2 workflow tool names (all active)
 │   ├── ids.ts                 # Planned V2 workflow handle contracts (TargetId, PlanId, etc.)
@@ -197,7 +195,7 @@ Preferred workflow apply surface. Thin Phase 5 wrapper over the stored-plan appl
 
 ## Internal compatibility executors
 
-The legacy compatibility executors (`code_affected`, `code_refactor_plan`, `code_refactor_apply`) remain in the source tree for migration/tests, but are no longer registered on the public tool surface.
+The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`) remain as internal substrates for `code_refactor` and `code_apply` respectively, but are no longer registered on the public tool surface.
 
 ## Key gotchas
 

@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
-import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
+import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -68,7 +68,7 @@ describe("code_impact tool", () => {
     expect(props).toHaveProperty("maxResults");
   });
 
-  it("runs impact analysis from a resolved targetId while keeping the internal affected executor available", async () => {
+  it("runs impact analysis from a resolved targetId", async () => {
     writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
     registerMockProvider(tmpDir, {
       exports: async () => ({
@@ -91,8 +91,8 @@ describe("code_impact tool", () => {
     codeIntelligenceExtension(pi as never);
 
     const targetId = await resolveTargetId(pi);
-    const affectedResult = await executeAffectedTool({ targetId }, { cwd: tmpDir });
-    expect(affectedResult.content).toContain("Affected");
+    const impactResult = await executeImpactTool({ targetId }, { cwd: tmpDir });
+    expect(impactResult.content).toContain("Impact");
 
     const impactTool = getTool(pi, "code_impact");
     const result = (await impactTool.execute(

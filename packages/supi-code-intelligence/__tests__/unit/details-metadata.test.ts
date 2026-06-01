@@ -6,7 +6,7 @@ import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
-import { executeBriefTool } from "../../src/tool/execute-brief.ts";
+import { executeContextTool } from "../../src/tool/execute-context.ts";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
@@ -178,14 +178,13 @@ describe("focused brief details metadata", () => {
 describe("structured details via tool adapters and action routers", () => {
   it("returns project-level orientation details when called without a target", async () => {
     setupWorkspace();
-    const result = await executeBriefTool({}, { cwd: tmpDir });
+    const result = await executeContextTool({}, { cwd: tmpDir });
     expect(result.content).toContain("Project Brief");
     expect(result.details).toBeDefined();
-    expect(result.details?.type).toBe("brief");
-    if (result.details?.type === "brief") {
+    expect(result.details?.type).toBe("context");
+    if (result.details?.type === "context") {
       expect(result.details.data.confidence).toBe("structural");
       expect(result.details.data.focusTarget).toBeNull();
-      expect(result.details.data.dependencySummary?.moduleCount).toBe(3);
     }
   });
 
@@ -252,10 +251,10 @@ describe("structured details via tool adapters and action routers", () => {
 
   describe("brief action — no-result detail states", () => {
     it("returns details for no project model", async () => {
-      const result = await executeAction({ action: "brief" }, { cwd: tmpDir });
+      const result = await executeContextTool({}, { cwd: tmpDir });
       expect(result.details).toBeDefined();
-      expect(result.details?.type).toBe("brief");
-      if (result.details?.type === "brief") {
+      expect(result.details?.type).toBe("context");
+      if (result.details?.type === "context") {
         expect(result.details.data.confidence).toBe("unavailable");
       }
     });
@@ -291,11 +290,11 @@ describe("structured details via tool adapters and action routers", () => {
       }
     });
 
-    it("affected target error returns affected details with unavailable confidence", async () => {
-      const result = await executeAction({ action: "affected" }, { cwd: tmpDir });
+    it("impact target error returns impact details with unavailable confidence", async () => {
+      const result = await executeAction({ action: "impact" }, { cwd: tmpDir });
       expect(result.details).toBeDefined();
-      expect(result.details?.type).toBe("affected");
-      if (result.details?.type === "affected") {
+      expect(result.details?.type).toBe("impact");
+      if (result.details?.type === "impact") {
         expect(result.details.data.confidence).toBe("unavailable");
         expect(result.details.data.directCount).toBe(0);
         expect(result.details.data.downstreamCount).toBe(0);

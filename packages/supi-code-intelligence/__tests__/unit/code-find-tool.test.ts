@@ -214,13 +214,15 @@ describe("code_find tool", () => {
       expect(text).toContain("Error");
     });
 
-    it("returns unavailable for unsupported kind call", async () => {
+    it("accepts kind call for ast search without error", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
+
       const pi = createPiMock();
       codeIntelligenceExtension(pi as never);
       const tool = getTool(pi, "code_find");
 
       const result = (await tool.execute(
-        "test-ast-unsupported-kind",
+        "test-ast-kind-call",
         { query: "foo", mode: "ast", kind: "call" },
         undefined,
         undefined,
@@ -230,18 +232,19 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
-      expect(text).toContain("not yet implemented");
-      expect(text).toContain("call");
+      expect(text).not.toContain("not yet implemented");
     });
 
-    it("returns unavailable for unsupported kind type", async () => {
+    it("accepts kind type for ast search without error", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "type Foo = string;\n");
+
       const pi = createPiMock();
       codeIntelligenceExtension(pi as never);
       const tool = getTool(pi, "code_find");
 
       const result = (await tool.execute(
-        "test-ast-unsupported-kind-type",
-        { query: "foo", mode: "ast", kind: "type" },
+        "test-ast-kind-type",
+        { query: "Foo", mode: "ast", kind: "type" },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -250,18 +253,19 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
-      expect(text).toContain("not yet implemented");
-      expect(text).toContain("type");
+      expect(text).not.toContain("not yet implemented");
     });
 
-    it("returns unavailable for unsupported kind test", async () => {
+    it("accepts kind test for ast search without error", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "function testFoo() {}\n");
+
       const pi = createPiMock();
       codeIntelligenceExtension(pi as never);
       const tool = getTool(pi, "code_find");
 
       const result = (await tool.execute(
-        "test-ast-unsupported-kind-test",
-        { query: "foo", mode: "ast", kind: "test" },
+        "test-ast-kind-test",
+        { query: "test", mode: "ast", kind: "test" },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -270,8 +274,7 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
-      expect(text).toContain("not yet implemented");
-      expect(text).toContain("test");
+      expect(text).not.toContain("not yet implemented");
     });
   });
 
@@ -337,13 +340,15 @@ describe("code_find tool", () => {
       expect(text).toContain("myFunc");
     });
 
-    it("returns not yet implemented for unsupported kind in semantic mode", async () => {
+    it("does not error for kind call in semantic mode (falls back to text)", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
+
       const pi = createPiMock();
       codeIntelligenceExtension(pi as never);
       const tool = getTool(pi, "code_find");
 
       const result = (await tool.execute(
-        "test-semantic-unsupported-kind",
+        "test-semantic-kind-call",
         { query: "foo", mode: "semantic", kind: "call" },
         undefined,
         undefined,
@@ -353,9 +358,8 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
-      expect(text).toContain("not yet implemented");
-      expect(text).toContain("call");
-      expect(text).toContain("semantic");
+      expect(text).not.toContain("not yet implemented");
+      expect(text).toContain("fell back to text search");
     });
   });
 

@@ -154,12 +154,12 @@ describe("Planner routing", () => {
       expect(route.preferred).toBe("unavailable");
     });
 
-    it("keeps code_affected execution unavailable when only structural analysis is registered", {
+    it("keeps code_impact execution unavailable when only structural analysis is registered", {
       timeout: 5000,
     }, async () => {
       registerStructural();
-      const { executeAffectedTool } = await import("../../src/tool/execute-affected.ts");
-      const result = await executeAffectedTool(
+      const { executeImpactTool } = await import("../../src/tool/execute-impact.ts");
+      const result = await executeImpactTool(
         { file: "src/index.ts", line: 1, character: 1 },
         { cwd: "/project" },
       );

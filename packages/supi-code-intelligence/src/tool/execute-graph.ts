@@ -51,6 +51,7 @@ export interface CodeGraphToolParams {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestration with multi-stage resolution, relation dispatch, and confidence derivation
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: file-level relation gate added — compact extraction would scatter related logic
 export async function executeGraphTool(
   params: CodeGraphToolParams,
   ctx: { cwd: string },
@@ -73,15 +74,20 @@ export async function executeGraphTool(
     return errorResult(error);
   }
 
-  // Must have targetId, anchored coords, or symbol
+  // Must have targetId, anchored coords, or symbol (file-level relations only need file)
   if (!params.file && !params.symbol) {
     return errorResult(
-      "**Error:** `code_graph` requires a target. Provide `targetId` (from `code_resolve`), `file` + `line` + `character`, or a `symbol`.",
+      "**Error:** `code_graph` requires a target. Provide `targetId` (from `code_resolve`), `file` + `line` + `character`, or a `symbol`. For `imports`/`exports` relations only, a bare `file` is sufficient.",
     );
   }
 
   // ── 3. Normalize relations ──────────────────────────────────────────
   const relations = params.relations ?? DEFAULT_RELATIONS;
+
+  // File-level relations (imports/exports) don't need a position — bare `file` is sufficient.
+  const FILE_LEVEL_RELATIONS: GraphRelation[] = ["imports", "exports"];
+  const allFileLevel =
+    relations.length > 0 && relations.every((r) => FILE_LEVEL_RELATIONS.includes(r));
 
   // ── 4. Check provider availability ──────────────────────────────────
   const route = routeFor(ctx.cwd, "code_graph");
@@ -105,36 +111,51 @@ export async function executeGraphTool(
   const providerState = getCodeProvider(ctx.cwd);
   const provider = providerState.kind === "ready" ? providerState.provider : null;
 
-  // ── 5. Resolve target once ──────────────────────────────────────────
-  const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
-  const target = await resolveTarget(params, ctx.cwd, provider ?? undefined);
-  if (typeof target === "string") {
-    return { content: target, details: undefined };
-  }
+  // ── 5. Resolve target once (skip for file-level-only relations) ─────
+  let resolvedFile: string;
+  let resolvedPosition: { line: number; character: number };
+  let displayName: string;
 
-  // File-level disambiguation — not supported for graph
-  if ("targets" in target) {
-    return {
-      content:
-        "**Error:** `code_graph` requires a precise target. Use anchored coordinates (`file`, `line`, `character`) or pass a `targetId` from `code_resolve`.",
-      details: {
-        type: "search" as const,
-        data: {
-          confidence: "unavailable" as const,
-          scope: null,
-          candidateCount: 0,
-          omittedCount: 0,
-          nextQueries: [],
+  if (allFileLevel) {
+    // File-level relations only need the file path — no position or symbol resolution.
+    // biome-ignore lint/style/noNonNullAssertion: guarded by allFileLevel and prior !params.file check
+    resolvedFile = params.file!;
+    resolvedPosition = { line: 1, character: 1 };
+    displayName = expandedTargetName ?? `symbol at ${toDisplayPath(ctx.cwd, resolvedFile)}:1`;
+  } else {
+    const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
+    const target = await resolveTarget(params, ctx.cwd, provider ?? undefined);
+    if (typeof target === "string") {
+      return { content: target, details: undefined };
+    }
+
+    // File-level disambiguation — not supported for graph
+    if ("targets" in target) {
+      return {
+        content:
+          "**Error:** `code_graph` requires a precise target. Use anchored coordinates (`file`, `line`, `character`) or pass a `targetId` from `code_resolve`.",
+        details: {
+          type: "search" as const,
+          data: {
+            confidence: "unavailable" as const,
+            scope: null,
+            candidateCount: 0,
+            omittedCount: 0,
+            nextQueries: [],
+          },
         },
-      },
-    };
+      };
+    }
+
+    resolvedFile = target.file;
+    resolvedPosition = target.position;
+    displayName =
+      target.name ??
+      expandedTargetName ??
+      `symbol at ${toDisplayPath(ctx.cwd, resolvedFile)}:${target.displayLine}`;
   }
 
-  const resolvedFile = target.file;
-  const resolvedPosition = target.position;
   const resolvedDisplayFile = toDisplayPath(ctx.cwd, resolvedFile);
-  const displayName =
-    target.name ?? expandedTargetName ?? `symbol at ${resolvedDisplayFile}:${target.displayLine}`;
 
   // ── 6. Collect results per relation ─────────────────────────────────
   const sections: GraphSection[] = [];

@@ -1,18 +1,18 @@
-import { executeAffectedTool } from "../../src/tool/execute-affected.ts";
 import { executeApplyTool } from "../../src/tool/execute-apply.ts";
-import { executeBriefTool } from "../../src/tool/execute-brief.ts";
+import { executeContextTool } from "../../src/tool/execute-context.ts";
 import { executeFindTool } from "../../src/tool/execute-find.ts";
 import type { GraphRelation } from "../../src/tool/execute-graph.ts";
 import { executeGraphTool } from "../../src/tool/execute-graph.ts";
+import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeRefactorTool } from "../../src/tool/execute-refactor.ts";
 import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
 import type { CodeIntelResult } from "../../src/types.ts";
 
 export type TestAction =
-  | "brief"
   | "graph"
-  | "affected"
+  | "context"
+  | "impact"
   | "find"
   | "refactor"
   | "apply"
@@ -42,9 +42,9 @@ export interface ActionParams {
 }
 
 const SUPPORTED_ACTIONS = [
-  "brief",
   "graph",
-  "affected",
+  "context",
+  "impact",
   "find",
   "refactor",
   "apply",
@@ -71,8 +71,10 @@ export async function executeAction(
   const rest = stripAction(params);
 
   switch (action) {
-    case "brief":
-      return executeBriefTool(rest, ctx);
+    case "context":
+      return executeContextTool(rest, ctx);
+    case "impact":
+      return executeImpactTool(rest, ctx);
     case "graph":
       return executeGraphTool(
         {
@@ -86,8 +88,6 @@ export async function executeAction(
         },
         ctx,
       );
-    case "affected":
-      return executeAffectedTool(rest, ctx);
     case "find":
       return executeFindTool(
         {

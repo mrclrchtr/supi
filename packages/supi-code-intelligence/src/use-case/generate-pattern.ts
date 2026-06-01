@@ -3,7 +3,11 @@
 // returning fully rendered content + details metadata.
 
 import type { CodeProvider } from "../analysis/context/request-context.ts";
-import { getStructuredPatternMatches, isStructuredPatternKind } from "../pattern-structured.ts";
+import {
+  getStructuredPatternMatches,
+  isStructuredPatternKind,
+  type StructuredPatternKind,
+} from "../pattern-structured.ts";
 import {
   renderPatternResults,
   renderPatternSummary,
@@ -112,7 +116,7 @@ export async function executePattern(
 // biome-ignore lint/complexity/useMaxParams: structured-search parameters are clearer as positional when linking input, scope, and substrate
 async function executeStructuredSearch(
   input: PatternInput,
-  kind: "definition" | "export" | "import",
+  kind: StructuredPatternKind,
   scopePath: string,
   cwd: string,
   relScope: string,
@@ -148,7 +152,7 @@ async function executeStructuredSearch(
   if (!structured || structured.matches.length === 0) {
     const content = renderStructuredEmptyState(
       input.pattern,
-      kind as "definition" | "export" | "import",
+      kind,
       relScope,
       provider,
       structured ?? undefined,
