@@ -98,7 +98,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **targetId** (preferred from `code_resolve`) or file+line+character or symbol
 - **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
-- `imports`, `exports`, `tests` return "not yet implemented" gracefully
+- `imports` and `exports` use file-level tree-sitter analysis; `tests` returns "not yet implemented" gracefully
 
 ### `code_impact`
 Preferred workflow-oriented impact analysis.

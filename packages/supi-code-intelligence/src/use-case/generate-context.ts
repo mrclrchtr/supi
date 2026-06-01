@@ -250,11 +250,11 @@ function resolveResultLimit(
 
   switch (budget) {
     case "small":
-      return 1;
-    case "large":
-      return 5;
-    default:
       return 3;
+    case "large":
+      return 15;
+    default:
+      return 8;
   }
 }
 

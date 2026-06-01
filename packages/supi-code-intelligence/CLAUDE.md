@@ -144,7 +144,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_imp
 - **maxResults** caps per-relation output
 - Each relation dispatched to appropriate substrate (semantic for references/implements, structural for callees)
 - Best-effort per relation: unavailable substrates skip with a note rather than failing the entire call
-- `imports`, `exports`, `tests` return "not yet implemented" gracefully
+- `imports` and `exports` use file-level tree-sitter analysis; `tests` returns "not yet implemented" gracefully
 - File-level expansion not supported — requires precise target (anchored coords or targetId)
 
 ### `code_impact`

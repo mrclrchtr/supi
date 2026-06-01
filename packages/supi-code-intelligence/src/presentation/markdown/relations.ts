@@ -120,6 +120,73 @@ export function renderCalleesResult(
   return lines.join("\n");
 }
 
+// ── Imports ─────────────────────────────────────────────────────────
+
+/**
+ * Render imports for a file as a graph section.
+ *
+ * Imports are file-level structural results from tree-sitter — they show
+ * every module specifier that the target file imports.
+ */
+export function renderImportsResult(
+  displayName: string,
+  imports: Array<{ moduleSpecifier: string; startLine: number }>,
+  relPath: string,
+  maxResults: number,
+): string {
+  const lines: string[] = [];
+  lines.push(`# Imports of \`${displayName}\` (structural)`);
+  lines.push("");
+  lines.push(`**${imports.length} import${imports.length !== 1 ? "s" : ""}** in \`${relPath}\``);
+  lines.push("");
+
+  const shown = imports.slice(0, maxResults);
+  for (const entry of shown) {
+    lines.push(`- \`${entry.moduleSpecifier}\` (L${entry.startLine})`);
+  }
+  if (imports.length > maxResults) {
+    lines.push(`- _+${imports.length - maxResults} more_`);
+  }
+  lines.push("");
+  lines.push("_Structural analysis — shows module-level import statements._");
+  lines.push("");
+  return lines.join("\n");
+}
+
+// ── Exports ─────────────────────────────────────────────────────────
+
+/**
+ * Render exports for a file as a graph section.
+ *
+ * Exports are file-level structural results from tree-sitter — they show
+ * every named export from the target file.
+ */
+export function renderExportsResult(
+  displayName: string,
+  exports: Array<{ name: string; kind: string; startLine: number }>,
+  relPath: string,
+  maxResults: number,
+): string {
+  const lines: string[] = [];
+  lines.push(`# Exports of \`${displayName}\` (structural)`);
+  lines.push("");
+  lines.push(`**${exports.length} export${exports.length !== 1 ? "s" : ""}** in \`${relPath}\``);
+  lines.push("");
+
+  const shown = exports.slice(0, maxResults);
+  for (const entry of shown) {
+    const kindLabel = entry.kind ? ` (${entry.kind})` : "";
+    lines.push(`- \`${entry.name}\`${kindLabel} (L${entry.startLine})`);
+  }
+  if (exports.length > maxResults) {
+    lines.push(`- _+${exports.length - maxResults} more_`);
+  }
+  lines.push("");
+  lines.push("_Structural analysis — shows top-level named exports._");
+  lines.push("");
+  return lines.join("\n");
+}
+
 // ── Combined graph ───────────────────────────────────────────────────
 
 /** Relation families accepted by code_graph. */

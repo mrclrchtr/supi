@@ -132,7 +132,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       "Prefer `targetId` from `code_resolve` over raw file/line/character coordinates when using code_graph.",
       'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for outgoing calls or `relations: ["implements"]` for implementations.',
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
-      'In code_graph, `imports`, `exports`, `tests` relations return "not yet implemented" gracefully.',
+      'In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` returns "not yet implemented" gracefully.',
       "In code_graph, `direction`, `depth`, `maxNodes` are accepted but reserved for future use.",
       "After code_graph, follow up with code_context on individual results for type or definition context.",
     ],

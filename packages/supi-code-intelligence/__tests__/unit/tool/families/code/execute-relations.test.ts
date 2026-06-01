@@ -28,7 +28,7 @@ describe("code_graph", () => {
     expect(relations.length).toBe(3);
   });
 
-  it("accepts not-yet-implemented relations gracefully", () => {
+  it("accepts imports, exports, and tests as valid graph relation kinds", () => {
     const relations = ["imports", "exports", "tests"] as const;
     expect(relations.length).toBe(3);
   });

@@ -142,9 +142,26 @@ describe("execute-graph (code_graph tool)", () => {
     });
   });
 
-  describe("not-implemented relations", () => {
-    it("returns not-implemented note for imports", async () => {
-      writeSource("test.ts", "export function foo() { return 1; }\n");
+  describe("imports and exports relations", () => {
+    it("reports file imports", async () => {
+      writeSource(
+        "test.ts",
+        "import { foo } from './other';\nexport function bar() { return foo(); }\n",
+      );
+      registerMockProvider(tmpDir, {
+        imports: async (_file) => ({
+          kind: "success",
+          data: [
+            {
+              moduleSpecifier: "./other",
+              startLine: 1,
+              startCharacter: 1,
+              endLine: 1,
+              endCharacter: 24,
+            },
+          ],
+        }),
+      });
 
       const result = await executeAction(
         {
@@ -157,12 +174,38 @@ describe("execute-graph (code_graph tool)", () => {
         { cwd: tmpDir },
       );
 
-      expect(result.content).toContain("Not yet implemented");
-      expect(result.content).toContain("imports");
+      expect(result.content).toContain("Graph of");
+      expect(result.content).toContain("Imports");
+      expect(result.content).toContain("./other");
+      expect(result.content).toContain("import");
+      expect(result.content).not.toContain("Not yet implemented");
     });
 
-    it("returns not-implemented note for exports", async () => {
-      writeSource("test.ts", "export function foo() { return 1; }\n");
+    it("reports file exports", async () => {
+      writeSource("test.ts", "export function foo() { return 1; }\nexport const bar = 2;\n");
+      registerMockProvider(tmpDir, {
+        exports: async (_file) => ({
+          kind: "success",
+          data: [
+            {
+              name: "foo",
+              kind: "function",
+              startLine: 1,
+              startCharacter: 1,
+              endLine: 1,
+              endCharacter: 32,
+            },
+            {
+              name: "bar",
+              kind: "const",
+              startLine: 2,
+              startCharacter: 1,
+              endLine: 2,
+              endCharacter: 18,
+            },
+          ],
+        }),
+      });
 
       const result = await executeAction(
         {
@@ -175,10 +218,52 @@ describe("execute-graph (code_graph tool)", () => {
         { cwd: tmpDir },
       );
 
-      expect(result.content).toContain("Not yet implemented");
-      expect(result.content).toContain("exports");
+      expect(result.content).toContain("Graph of");
+      expect(result.content).toContain("Exports");
+      expect(result.content).toContain("`foo`");
+      expect(result.content).toContain("`bar`");
+      expect(result.content).toContain("export");
+      expect(result.content).not.toContain("Not yet implemented");
     });
 
+    it("reports unavailable when imports provider returns non-success", async () => {
+      writeSource("test.ts", "import { x } from './y';\n");
+      // Default mock returns unsupported-language, so this tests the unavailable path
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 1,
+          relations: ["imports"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("Unavailable");
+      expect(result.content).toContain("imports");
+    });
+
+    it("reports unavailable when exports provider returns non-success", async () => {
+      writeSource("test.ts", "export const x = 1;\n");
+      // Default mock returns unsupported-language, so this tests the unavailable path
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 1,
+          relations: ["exports"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("Unavailable");
+      expect(result.content).toContain("exports");
+    });
+  });
+
+  describe("not-implemented relations", () => {
     it("returns not-implemented note for tests", async () => {
       writeSource("test.ts", "export function foo() { return 1; }\n");
 

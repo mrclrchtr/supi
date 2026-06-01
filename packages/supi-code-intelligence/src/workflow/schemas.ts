@@ -77,7 +77,8 @@ export const CodeContextParameters = Type.Object(
     scope: Type.Optional(ScopeParam),
     budget: Type.Optional(
       StringEnum(["small", "medium", "large"], {
-        description: "Context budget: smaller values prefer fewer, higher-signal items.",
+        description:
+          "Context budget: small=3, medium=8, large=15 results per section. Smaller values prefer fewer, higher-signal items.",
       }),
     ),
     include: Type.Optional(

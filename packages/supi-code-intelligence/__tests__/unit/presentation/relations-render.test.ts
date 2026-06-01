@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   renderCalleesResult,
+  renderExportsResult,
   renderGraphResult,
+  renderImportsResult,
 } from "../../../src/presentation/markdown/relations.ts";
 
 type RelationsResult =
@@ -119,5 +121,76 @@ describe("relations render", () => {
 
     expect(content).toContain("code_context");
     expect(content).toContain("code_inspect");
+  });
+
+  it("renders imports result with module specifiers and line numbers", () => {
+    const content = renderImportsResult(
+      "widget",
+      [
+        { moduleSpecifier: "./helper", startLine: 1 },
+        { moduleSpecifier: "react", startLine: 2 },
+      ],
+      "src/widget.ts",
+      8,
+    );
+
+    expect(content).toContain("# Imports");
+    expect(content).toContain("structural");
+    expect(content).toContain("./helper");
+    expect(content).toContain("react");
+    expect(content).toContain("(L1)");
+    expect(content).toContain("(L2)");
+    expect(content).toContain("2 imports");
+  });
+
+  it("renders imports result with truncation", () => {
+    const imports = Array.from({ length: 10 }, (_, i) => ({
+      moduleSpecifier: `./module-${i}`,
+      startLine: i + 1,
+    }));
+
+    const content = renderImportsResult("widget", imports, "src/widget.ts", 3);
+
+    expect(content).toContain("10 imports");
+    expect(content).toContain("./module-0");
+    expect(content).toContain("./module-2");
+    expect(content).toContain("+7 more");
+  });
+
+  it("renders exports result with names, kinds, and line numbers", () => {
+    const content = renderExportsResult(
+      "widget",
+      [
+        { name: "foo", kind: "function", startLine: 1 },
+        { name: "BAR", kind: "const", startLine: 5 },
+      ],
+      "src/widget.ts",
+      8,
+    );
+
+    expect(content).toContain("# Exports");
+    expect(content).toContain("structural");
+    expect(content).toContain("`foo`");
+    expect(content).toContain("`BAR`");
+    expect(content).toContain("(function)");
+    expect(content).toContain("(const)");
+    expect(content).toContain("(L1)");
+    expect(content).toContain("(L5)");
+    expect(content).toContain("2 exports");
+  });
+
+  it("renders exports result with truncation", () => {
+    const exports = Array.from({ length: 8 }, (_, i) => ({
+      name: `sym${i}`,
+      kind: "const",
+      startLine: i + 1,
+    }));
+
+    const content = renderExportsResult("widget", exports, "src/widget.ts", 3);
+
+    expect(content).toContain("8 exports");
+    expect(content).toContain("sym0");
+    expect(content).toContain("sym2");
+    expect(content).toContain("+5 more");
   });
 });

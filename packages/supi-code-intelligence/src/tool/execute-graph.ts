@@ -21,7 +21,9 @@ import { renderReferencesResult } from "../presentation/markdown/references.ts";
 import {
   type GraphRelationKind,
   type GraphSection,
+  renderExportsResult,
   renderGraphResult,
+  renderImportsResult,
 } from "../presentation/markdown/relations.ts";
 import { toDisplayPath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
@@ -155,7 +157,9 @@ export async function executeGraphTool(
   const content = renderGraphResult(displayName, sections, resolvedDisplayFile);
 
   // Derive confidence from the highest-capability successful section
-  const hasStructural = sections.some((s) => s.kind === "ok" && s.rel === "callees");
+  const hasStructural = sections.some(
+    (s) => s.kind === "ok" && (s.rel === "callees" || s.rel === "imports" || s.rel === "exports"),
+  );
   const hasSemantic = sections.some(
     (s) => s.kind === "ok" && (s.rel === "references" || s.rel === "implements"),
   );
@@ -274,8 +278,49 @@ async function collectRelation(
         return { kind: "ok", rel, count: result.implementations.length, content };
       }
 
-      case "imports":
-      case "exports":
+      case "imports": {
+        if (!provider?.imports) {
+          return { kind: "unavailable", rel, message: "No structural provider for imports" };
+        }
+        const importResult = await provider.imports(file);
+        if (importResult.kind !== "success") {
+          return { kind: "unavailable", rel, message: `Imports unavailable: ${importResult.kind}` };
+        }
+        const flatImports = importResult.data.map((entry) => ({
+          moduleSpecifier: entry.moduleSpecifier,
+          startLine: entry.startLine,
+        }));
+        const importContent = renderImportsResult(
+          displayName,
+          flatImports,
+          toDisplayPath(cwd, file),
+          maxResults,
+        );
+        return { kind: "ok", rel, count: flatImports.length, content: importContent };
+      }
+
+      case "exports": {
+        if (!provider?.exports) {
+          return { kind: "unavailable", rel, message: "No structural provider for exports" };
+        }
+        const exportResult = await provider.exports(file);
+        if (exportResult.kind !== "success") {
+          return { kind: "unavailable", rel, message: `Exports unavailable: ${exportResult.kind}` };
+        }
+        const flatExports = exportResult.data.map((entry) => ({
+          name: entry.name,
+          kind: entry.kind,
+          startLine: entry.startLine,
+        }));
+        const exportContent = renderExportsResult(
+          displayName,
+          flatExports,
+          toDisplayPath(cwd, file),
+          maxResults,
+        );
+        return { kind: "ok", rel, count: flatExports.length, content: exportContent };
+      }
+
       case "tests":
         return {
           kind: "not-implemented" as const,
