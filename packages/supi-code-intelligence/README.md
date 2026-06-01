@@ -104,7 +104,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 Preferred workflow-oriented impact analysis.
 
 - supports the existing target-based path (`targetId`, anchored coords, symbol)
-- adds diff-aware entry points for `changedFiles`, optional `baseRef`, and explicit `includeTests`
+- adds diff-aware entry points for `changedFiles` and explicit `includeTests`
 - `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing
 - uses real workspace/git evidence only; no heuristic grep fallback
 
@@ -136,13 +136,10 @@ Preferred workflow refactor surface.
 - `preview: false` is not yet supported; `code_refactor` remains preview-only in this phase
 - in this phase it intentionally wraps the proven `code_refactor_plan` machinery
 
-Supported operations in this phase:
+Supported operation in this phase:
 - `rename_symbol`
-- `update_imports`
-- `delete_dead_code`
 
 Notes:
-- `rename_file` and `move_file` remain explicit unavailable outcomes for now
 - only precise semantic text edits become plans
 - `targetId` from `code_resolve` can replace raw file + line + character targeting
 
@@ -151,7 +148,6 @@ Preferred workflow apply surface.
 
 - applies a previously stored plan by `planId`
 - supports `mode: "apply"` in this phase
-- `apply-and-format` and `apply-and-verify` remain explicit unavailable outcomes for now
 - rejects stale plans using file fingerprints and re-validates ranges/overlap before mutation
 
 ## Internal compatibility paths

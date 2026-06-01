@@ -10,6 +10,7 @@
 
 import { existsSync } from "node:fs";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
+import { collectCallSitesInFile } from "../analysis/relations/call-sites.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
@@ -23,7 +24,7 @@ export interface CodeFindToolParams {
   maxResults?: number;
 }
 
-/** Structured pattern kinds supported by tree-sitter. */
+/** All valid structured pattern kind values (subset not yet implemented in AST mode). */
 const STRUCTURED_KINDS = new Set(["definition", "export", "import", "call", "type", "test"]);
 
 export async function executeFindTool(
@@ -117,9 +118,22 @@ async function executeAstMode(
   // Check for unsupported kind values
   if (params.kind && !STRUCTURED_KINDS.has(params.kind)) {
     return {
-      content: `**Error:** Structured \`kind: "${params.kind}"\` is not yet implemented. Supported kinds for \`mode: "ast"\`: \`definition\`, \`export\`, \`import\`, \`call\`, \`type\`, \`test\`.`,
+      content: `**Error:** Unknown \`kind: "${params.kind}"\`. Valid kinds for \`mode: "ast"\`: \`definition\`, \`export\`, \`import\`, \`call\`. \`type\` and \`test\` are not yet available.`,
       details: undefined,
     };
+  }
+
+  // type/test are not yet implemented for AST mode
+  if (params.kind === "type" || params.kind === "test") {
+    return {
+      content: `**Not yet implemented:** AST \`kind: "${params.kind}"\` is not yet available. Supported AST kinds: \`definition\`, \`export\`, \`import\`, \`call\`. Use \`mode: "text"\` or \`mode: "semantic"\` as alternatives.`,
+      details: undefined,
+    };
+  }
+
+  // call uses ripgrep + heuristic filtering — no tree-sitter needed
+  if (params.kind === "call") {
+    return executeCallSiteSearch(query, params, cwd);
   }
 
   const kind = params.kind ?? "definition";
@@ -182,6 +196,123 @@ function resolveScope(scope: string | undefined, cwd: string): string | null {
 function getEffectiveProvider(cwd: string) {
   const state = getCodeProvider(cwd);
   return state.kind === "ready" ? state.provider : null;
+}
+
+/**
+ * Call-site search using shared regex-based matching.
+ * Does not require tree-sitter — walks files and matches identifiers
+ * followed by `(` using the shared `collectCallSitesInFile` helper.
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: call-site search naturally spans file collection, matching, and result rendering
+async function executeCallSiteSearch(
+  query: string,
+  params: CodeFindToolParams,
+  cwd: string,
+): Promise<CodeIntelResult> {
+  const { statSync, readdirSync } = await import("node:fs");
+  const path = await import("node:path");
+
+  const scopePath = resolveScope(params.scope, cwd) ?? cwd;
+  const maxResults = params.maxResults ?? 8;
+
+  const sourceFiles = collectSourceFiles(scopePath, statSync, readdirSync, path);
+  const matches: Array<{ file: string; name: string; line: number }> = [];
+
+  for (const absPath of sourceFiles) {
+    if (matches.length >= maxResults) break;
+    const callSites = collectCallSitesInFile(absPath, (word) => word === query);
+    const relFile = path.relative(cwd, absPath);
+    for (const cs of callSites) {
+      if (matches.length >= maxResults) break;
+      matches.push({ file: relFile, name: cs.name, line: cs.line });
+    }
+  }
+
+  if (matches.length === 0) {
+    return {
+      content: `**Call-site search** — \`${query}\`\n\nNo call sites found in \`${params.scope ?? "."}\`.`,
+      details: {
+        type: "search",
+        data: {
+          confidence: "structural",
+          scope: params.scope ?? null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: [
+            'Use `mode: "text"` for all occurrences, including declarations and imports.',
+          ],
+        } satisfies SearchDetails,
+      },
+    };
+  }
+
+  const lines = [
+    `**Call-site search** — \`${query}\` (${matches.length} call site${matches.length !== 1 ? "s" : ""} found)`,
+  ];
+  for (const m of matches) {
+    lines.push(`- \`${m.file}\`:${m.line} — \`${m.name}()\``);
+  }
+
+  return {
+    content: lines.join("\n"),
+    details: {
+      type: "search",
+      data: {
+        confidence: "structural",
+        scope: params.scope ?? null,
+        candidateCount: matches.length,
+        omittedCount: 0,
+        nextQueries: ["Use `code_context` with the file for deeper context."],
+      } satisfies SearchDetails,
+    },
+  };
+}
+
+/** Collect source files from a directory (recursive, with skip-dirs). */
+function collectSourceFiles(
+  scopePath: string,
+  statSync: typeof import("node:fs").statSync,
+  readdirSync: typeof import("node:fs").readdirSync,
+  path: typeof import("node:path"),
+): string[] {
+  const files: string[] = [];
+  const skipDirs = new Set(["node_modules", ".git", "dist", "build", "coverage"]);
+  const MAX_FILES = 200;
+  const SOURCE_EXTS = [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"];
+
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: file-walk naturally spans stat/dir/recursion branches
+  function walk(currentPath: string) {
+    if (files.length >= MAX_FILES) return;
+    let stat: ReturnType<typeof statSync>;
+    try {
+      stat = statSync(currentPath);
+    } catch {
+      return;
+    }
+    if (stat.isFile()) {
+      if (SOURCE_EXTS.includes(path.extname(currentPath))) {
+        files.push(currentPath);
+      }
+      return;
+    }
+    let entries: Array<{ name: string; isDirectory: () => boolean }>;
+    try {
+      entries = readdirSync(currentPath, { withFileTypes: true }) as Array<{
+        name: string;
+        isDirectory: () => boolean;
+      }>;
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".")) continue;
+      if (entry.isDirectory() && skipDirs.has(entry.name)) continue;
+      walk(path.join(currentPath, entry.name));
+    }
+  }
+
+  walk(scopePath);
+  return files;
 }
 
 /** Advisory note for text/regex mode when kind is set — no filtering is applied. */

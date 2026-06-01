@@ -38,7 +38,7 @@ export interface ActionParams {
   operation?: string;
   newName?: string;
   planId?: string;
-  mode?: "apply" | "apply-and-format" | "apply-and-verify";
+  mode?: "apply";
 }
 
 const SUPPORTED_ACTIONS = [

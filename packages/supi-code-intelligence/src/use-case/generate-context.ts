@@ -1,11 +1,15 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: context orchestration is kept together to share local section helpers
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
+import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 import { collectOutgoingCalls } from "../analysis/calls/service.ts";
 import { collectReferences } from "../analysis/references/service.ts";
+import { extractTestFunctions, findTestCompanionFiles } from "../analysis/relations/tests.ts";
 import {
   type RenderedContextSection,
   renderContextResult,
 } from "../presentation/markdown/context.ts";
+import { toDisplayPath } from "../search-helpers.ts";
 import type { ConfidenceMode, ContextDetails } from "../types.ts";
 import { gatherTreeSitterContext } from "./gather-context.ts";
 import { executeBrief } from "./generate-brief.ts";
@@ -87,6 +91,38 @@ async function executeTaskContext(
     : (input.scope ?? null);
   const nextQueries = buildNextQueries(input.target, deps.cwd);
   const sections: RenderedContextSection[] = [];
+
+  // ── No-target guard ──────────────────────────────────────────
+  if (!input.target) {
+    const guidanceMessage = [
+      "**No target provided for task-focused context.**",
+      "",
+      `Task: "${input.task ?? "(none)"}"`,
+      "",
+      "To use task-focused context, first resolve a target:",
+      "1. Use `code_resolve` with a `query` that matches your task to find the relevant symbol, file, or function",
+      "2. Pass the returned `targetId` to `code_context`",
+      "",
+      "Example:",
+      '  `code_resolve` { query: "function name from your task", kind: "function" }',
+      '  `code_context` { targetId: "...", task: "your task here" }',
+    ];
+
+    const details: ContextDetails = {
+      confidence: "unavailable",
+      task: input.task ?? null,
+      focusTarget: null,
+      requestedSections: requestedSections,
+      renderedSections: [],
+      omittedCount: 0,
+      nextQueries: ["Use `code_resolve` to resolve a target first"],
+    };
+
+    return {
+      content: guidanceMessage.join("\n"),
+      details,
+    };
+  }
 
   let omittedCount = 0;
   let hasStructural = false;
@@ -196,32 +232,269 @@ async function buildRequestedSection(options: {
       };
     }
     case "docs": {
-      return buildStaticSection(section, ["No docs context found."]);
+      const result = await buildDocsSection(input.target, deps, limit);
+      return {
+        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
+        omittedCount: 0,
+        hasStructuralEvidence: result.hasStructuralEvidence,
+        hasSemanticEvidence: false,
+      };
     }
     case "tests": {
-      return buildStaticSection(section, ["No test context found."]);
+      const result = await buildTestsSection(input.target, deps, limit);
+      return {
+        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
+        omittedCount: 0,
+        hasStructuralEvidence: result.hasStructuralEvidence,
+        hasSemanticEvidence: false,
+      };
     }
     case "diagnostics": {
-      return buildStaticSection(section, ["No diagnostics found."]);
+      const result = await buildDiagnosticsSection(input.target, deps, limit);
+      return {
+        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
+        omittedCount: 0,
+        hasStructuralEvidence: false,
+        hasSemanticEvidence: result.hasSemanticEvidence,
+      };
     }
   }
 }
 
-function buildStaticSection(
-  section: ContextSection,
-  lines: string[],
-): {
-  section: RenderedContextSection;
-  omittedCount: number;
-  hasStructuralEvidence: boolean;
-  hasSemanticEvidence: boolean;
-} {
-  return {
-    section: { key: section, title: SECTION_TITLES[section], lines },
-    omittedCount: 0,
-    hasStructuralEvidence: false,
-    hasSemanticEvidence: false,
-  };
+// ── Real section builders for previously-stubbed sections ───────────
+
+/**
+ * Build the `tests` section: find companion test files and their test functions.
+ */
+async function buildTestsSection(
+  target: ContextTarget | null | undefined,
+  deps: ContextDeps,
+  limit: number,
+): Promise<{ lines: string[]; hasStructuralEvidence: boolean }> {
+  if (!target) {
+    return {
+      lines: ["Tests unavailable without a precise target."],
+      hasStructuralEvidence: false,
+    };
+  }
+
+  if (!deps.provider?.outline) {
+    return {
+      lines: ["Tests unavailable — no active provider."],
+      hasStructuralEvidence: false,
+    };
+  }
+
+  const targetAbs = path.resolve(deps.cwd, target.file);
+  if (!existsSync(targetAbs)) {
+    return {
+      lines: ["Tests unavailable — target file not found."],
+      hasStructuralEvidence: false,
+    };
+  }
+
+  const found = findTestCompanionFiles(targetAbs);
+
+  if (found.length === 0) {
+    return {
+      lines: ["No test companion files found for this target."],
+      hasStructuralEvidence: false,
+    };
+  }
+
+  // Use outline to extract test function names
+  const lines: string[] = [];
+  let hasStructuralEvidence = false;
+  const filesToScan = found.slice(0, Math.min(found.length, 3));
+  for (const testFile of filesToScan) {
+    const relTestFile = toDisplayPath(deps.cwd, testFile);
+    lines.push(`- \`${relTestFile}\``);
+    if (deps.provider?.outline) {
+      const result = await extractTestFunctions(
+        testFile,
+        deps.cwd,
+        { outline: deps.provider.outline },
+        limit,
+      );
+      for (const name of result.names) {
+        lines.push(`  - \`${name}\``);
+      }
+      hasStructuralEvidence = hasStructuralEvidence || result.hasStructuralEvidence;
+    }
+  }
+
+  return { lines, hasStructuralEvidence };
+}
+
+/**
+ * Build the `diagnostics` section: pull LSP diagnostics near the target.
+ */
+async function buildDiagnosticsSection(
+  target: ContextTarget | null | undefined,
+  deps: ContextDeps,
+  limit: number,
+): Promise<{ lines: string[]; hasSemanticEvidence: boolean }> {
+  if (!target) {
+    return {
+      lines: ["Diagnostics unavailable without a precise target."],
+      hasSemanticEvidence: false,
+    };
+  }
+
+  const lspState = getSessionLspService(deps.cwd);
+  if (lspState.kind !== "ready") {
+    return {
+      lines: [
+        "LSP not available — diagnostics require a live language server. Use `code_health` to check server status.",
+      ],
+      hasSemanticEvidence: false,
+    };
+  }
+
+  try {
+    const targetFile = path.resolve(deps.cwd, target.file);
+    const diags = await lspState.service.fileDiagnostics(targetFile, 4);
+    if (!diags || diags.length === 0) {
+      return {
+        lines: ["No diagnostics found near this target."],
+        hasSemanticEvidence: true,
+      };
+    }
+
+    const lines: string[] = [];
+    const nearby = diags.filter((d) => Math.abs((d.range.start.line ?? 0) + 1 - target.line) <= 5);
+    const chosen = nearby.length > 0 ? nearby : diags;
+    for (const d of chosen.slice(0, limit)) {
+      const severity = (d.severity ?? 1) === 1 ? "ERROR" : "WARN";
+      const line = (d.range.start.line ?? 0) + 1;
+      lines.push(`- **${severity}** (L${line}): ${d.message}`);
+    }
+    return { lines, hasSemanticEvidence: true };
+  } catch {
+    return {
+      lines: ["Diagnostics failed to load."],
+      hasSemanticEvidence: false,
+    };
+  }
+}
+
+/**
+ * Build the `docs` section: extract JSDoc/TSDoc comment preceding the target symbol.
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: JSDoc parsing naturally has state-machine complexity
+async function buildDocsSection(
+  target: ContextTarget | null | undefined,
+  deps: ContextDeps,
+  limit: number,
+): Promise<{ lines: string[]; hasStructuralEvidence: boolean }> {
+  if (!target) {
+    return {
+      lines: ["Docs unavailable without a precise target."],
+      hasStructuralEvidence: false,
+    };
+  }
+
+  const targetFile = path.resolve(deps.cwd, target.file);
+  if (!existsSync(targetFile)) {
+    return {
+      lines: ["Docs unavailable — target file not found."],
+      hasStructuralEvidence: false,
+    };
+  }
+
+  try {
+    const content = readFileSync(targetFile, "utf-8");
+    const lines = content.split("\n");
+
+    // Scan backward from target.line for a /** ... */ JSDoc comment
+    // LSP/pi use 1-based lines, so target.line is 1-based
+    const startIdx = Math.max(0, target.line - 2); // 0-based
+    let jsdocStart = -1;
+    let jsdocEnd = -1;
+
+    for (let i = startIdx; i >= 0; i--) {
+      const line = lines[i].trim();
+
+      // Single-line JSDoc: /** Description */
+      if (line.startsWith("/**") && line.endsWith("*/")) {
+        jsdocStart = i;
+        jsdocEnd = i;
+        break;
+      }
+
+      if (line === "*/") {
+        jsdocEnd = i;
+        continue;
+      }
+
+      // If we already found `*/` and are now scanning for `/**`
+      if (jsdocEnd !== -1) {
+        if (line.startsWith("/**")) {
+          jsdocStart = i;
+          break;
+        }
+        // Allow JSDoc body lines: *, @param, @return, etc.
+        if (line.startsWith("*") || line.startsWith("@")) {
+          continue;
+        }
+        // Hit non-JSDoc line before finding opening — no valid JSDoc
+        if (line !== "") {
+          jsdocStart = -1;
+          jsdocEnd = -1;
+          break;
+        }
+        continue;
+      }
+
+      // Haven't found `*/` yet — skip over JSDoc body lines or break on unrelated lines
+      if (line.startsWith("*") || line.startsWith("/**")) {
+        continue;
+      }
+      if (line !== "" && !line.startsWith("//")) {
+        // Hit non-comment line before finding any JSDoc markers
+        break;
+      }
+    }
+
+    if (jsdocStart === -1 || jsdocEnd === -1) {
+      return {
+        lines: ["No JSDoc/TSDoc comment found for this symbol."],
+        hasStructuralEvidence: false,
+      };
+    }
+
+    const startIdx2 = jsdocStart;
+    const endIdx = jsdocEnd;
+
+    // Extract the doc text
+    const docLines = lines
+      .slice(startIdx2, endIdx + 1)
+      .map((l) =>
+        l
+          .replace(/^\s*\*\s?/, "")
+          .replace(/^\s*\/\*\*\s?/, "")
+          .replace(/\s*\*\/\s*$/, ""),
+      )
+      .filter((l) => l.trim() !== "")
+      .slice(0, limit);
+
+    if (docLines.length === 0) {
+      return {
+        lines: ["No JSDoc/TSDoc comment found for this symbol."],
+        hasStructuralEvidence: false,
+      };
+    }
+
+    return {
+      lines: ["```ts", ...docLines, "```"],
+      hasStructuralEvidence: true,
+    };
+  } catch {
+    return {
+      lines: ["Docs extraction failed."],
+      hasStructuralEvidence: false,
+    };
+  }
 }
 
 function toBriefInput(input: ContextInput): BriefInput {

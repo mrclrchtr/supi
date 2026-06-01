@@ -156,15 +156,6 @@ export const CodeGraphParameters = Type.Object(
         },
       ),
     ),
-    direction: Type.Optional(
-      StringEnum(["in", "out", "both"], {
-        description: "Graph traversal direction (future).",
-      }),
-    ),
-    depth: Type.Optional(Type.Number({ description: "Traversal depth (future).", minimum: 1 })),
-    maxNodes: Type.Optional(
-      Type.Number({ description: "Maximum graph nodes to return (future).", minimum: 1 }),
-    ),
     maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
@@ -191,9 +182,6 @@ export const CodeImpactParameters = Type.Object(
         uniqueItems: true,
       }),
     ),
-    baseRef: Type.Optional(
-      Type.String({ description: "Base Git ref, for example `main`, for diff-aware analysis." }),
-    ),
     includeTests: Type.Optional(
       Type.Boolean({ description: "Whether likely tests should be included in the impact set." }),
     ),
@@ -210,30 +198,21 @@ export const CodeImpactParameters = Type.Object(
  *
  * Runtime rules for future executors:
  * - require `targetId` or anchored `file` + `line` + `character`
- * - `rename` (legacy alias), `rename_symbol`, and `rename_file` require `newName`
- * - `move_file` requires `destination`
+ * - `rename` (legacy alias) and `rename_symbol` require `newName`
  */
 export const CodeRefactorParameters = Type.Object(
   {
-    operation: StringEnum(
-      ["rename", "rename_symbol", "rename_file", "move_file", "update_imports", "delete_dead_code"],
-      {
-        description:
-          "Precise refactor operation to preview or plan. `rename` is accepted as a compatibility alias for `rename_symbol`.",
-      },
-    ),
+    operation: StringEnum(["rename", "rename_symbol"], {
+      description:
+        "Precise refactor operation to preview or plan. `rename` is accepted as a compatibility alias for `rename_symbol`.",
+    }),
     targetId: Type.Optional(
       Type.String({ description: "Resolved target handle from `code_resolve`." }),
     ),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
     character: Type.Optional(CharacterParam),
-    newName: Type.Optional(
-      Type.String({ description: "New symbol or file name for rename operations." }),
-    ),
-    destination: Type.Optional(
-      Type.String({ description: "Destination path for move operations." }),
-    ),
+    newName: Type.Optional(Type.String({ description: "New symbol name for rename operations." })),
     preview: Type.Optional(
       Type.Boolean({ description: "Whether to return a preview-only plan when supported." }),
     ),
@@ -248,8 +227,8 @@ export const CodeApplyParameters = Type.Object(
       description: "Stored plan identifier returned by a previous refactor/plan step.",
     }),
     mode: Type.Optional(
-      StringEnum(["apply", "apply-and-format", "apply-and-verify"], {
-        description: "Application mode for a stored plan.",
+      StringEnum(["apply"], {
+        description: "Application mode for a stored plan. Only `apply` is supported in this phase.",
       }),
     ),
   },

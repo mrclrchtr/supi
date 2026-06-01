@@ -263,8 +263,8 @@ describe("execute-graph (code_graph tool)", () => {
     });
   });
 
-  describe("not-implemented relations", () => {
-    it("returns not-implemented note for tests", async () => {
+  describe("tests relation", () => {
+    it("reports no companion test files when none exist", async () => {
       writeSource("test.ts", "export function foo() { return 1; }\n");
 
       const result = await executeAction(
@@ -278,8 +278,30 @@ describe("execute-graph (code_graph tool)", () => {
         { cwd: tmpDir },
       );
 
-      expect(result.content).toContain("Not yet implemented");
+      expect(result.content).toContain("no companion test files found");
+    });
+
+    it("finds companion test files when they exist", async () => {
+      writeSource("test.ts", "export function foo() { return 1; }\n");
+      // Create a companion test file in __tests__/
+      const { mkdirSync } = await import("node:fs");
+      const testDir = path.join(tmpDir, "__tests__");
+      mkdirSync(testDir, { recursive: true });
+      writeSource("__tests__/test.test.ts", "import { foo } from '../test';\nvoid foo;\n");
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 1,
+          relations: ["tests"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
       expect(result.content).toContain("tests");
+      expect(result.content).toContain("__tests__/test.test.ts");
     });
   });
 });

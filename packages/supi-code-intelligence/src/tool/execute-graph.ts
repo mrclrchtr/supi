@@ -1,3 +1,5 @@
+// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: relation dispatch for 7 relation kinds stays together
+// biome-ignore-all lint/complexity/noExcessiveLinesPerFunction: relation dispatch naturally spans cases — pre-existing, split in later phase
 /**
  * Tool executor for code_graph.
  *
@@ -14,6 +16,7 @@ import {
   type ImplementationsResult,
 } from "../analysis/implementations/service.ts";
 import { collectReferences, type ReferencesResult } from "../analysis/references/service.ts";
+import { extractTestFunctions, findTestCompanionFiles } from "../analysis/relations/tests.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import { renderCallsResult } from "../presentation/markdown/calls.ts";
 import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
@@ -44,9 +47,6 @@ export interface CodeGraphToolParams {
   symbol?: string;
   path?: string;
   relations?: GraphRelation[];
-  direction?: "in" | "out" | "both";
-  depth?: number;
-  maxNodes?: number;
   maxResults?: number;
 }
 
@@ -342,12 +342,43 @@ async function collectRelation(
         return { kind: "ok", rel, count: flatExports.length, content: exportContent };
       }
 
-      case "tests":
+      case "tests": {
+        const testFiles = findTestCompanionFiles(file);
+        if (testFiles.length === 0) {
+          return {
+            kind: "ok",
+            rel,
+            count: 0,
+            content: `**Tests** — no companion test files found.\n`,
+          };
+        }
+
+        const testLines: string[] = [];
+        const filesToScan = testFiles.slice(0, Math.min(testFiles.length, 3));
+        for (const testFile of filesToScan) {
+          const relTestFile = testFile.startsWith(cwd) ? testFile.slice(cwd.length + 1) : testFile;
+          testLines.push(`- \`${relTestFile}\``);
+          if (provider?.outline) {
+            const result = await extractTestFunctions(
+              testFile,
+              cwd,
+              { outline: provider.outline },
+              maxResults,
+            );
+            for (const name of result.names) {
+              testLines.push(`  - \`${name}\``);
+            }
+          }
+        }
+
+        const content = `**Tests** (${testFiles.length} companion file${testFiles.length !== 1 ? "s" : ""})\n\n${testLines.join("\n")}\n`;
         return {
-          kind: "not-implemented" as const,
+          kind: "ok",
           rel,
-          message: `\`${rel}\` relation is not yet implemented.`,
+          count: testFiles.length,
+          content,
         };
+      }
 
       default:
         return { kind: "not-implemented", rel, message: `Unknown relation: ${rel}` };

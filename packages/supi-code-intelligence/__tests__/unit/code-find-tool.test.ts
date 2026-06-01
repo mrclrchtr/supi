@@ -214,8 +214,8 @@ describe("code_find tool", () => {
       expect(text).toContain("Error");
     });
 
-    it("accepts kind call for ast search without error", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
+    it("finds call sites for kind call in ast mode", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\nconst x = foo();\n");
 
       const pi = createPiMock();
       codeIntelligenceExtension(pi as never);
@@ -232,10 +232,34 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
-      expect(text).not.toContain("not yet implemented");
+      // Should find the call site: `foo()` on line 2
+      expect(text).not.toContain("Not yet implemented");
+      expect(text).toContain("foo");
     });
 
-    it("accepts kind type for ast search without error", async () => {
+    it("does not match declarations as call sites", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
+
+      const pi = createPiMock();
+      codeIntelligenceExtension(pi as never);
+      const tool = getTool(pi, "code_find");
+
+      const result = (await tool.execute(
+        "test-ast-call-no-sites",
+        { query: "foo", mode: "ast", kind: "call" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as {
+        content: Array<{ type: string; text: string }>;
+      };
+
+      const text = result.content[0].text;
+      // No call sites — should report no matches
+      expect(text).toContain("No"); // "No matches" or similar
+    });
+
+    it("returns not-yet-implemented for kind type in ast mode", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "type Foo = string;\n");
 
       const pi = createPiMock();
@@ -253,10 +277,11 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
-      expect(text).not.toContain("not yet implemented");
+      expect(text).toContain("Not yet implemented");
+      expect(text).toContain("type");
     });
 
-    it("accepts kind test for ast search without error", async () => {
+    it("returns not-yet-implemented for kind test in ast mode", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "function testFoo() {}\n");
 
       const pi = createPiMock();
@@ -274,7 +299,8 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
-      expect(text).not.toContain("not yet implemented");
+      expect(text).toContain("Not yet implemented");
+      expect(text).toContain("test");
     });
   });
 

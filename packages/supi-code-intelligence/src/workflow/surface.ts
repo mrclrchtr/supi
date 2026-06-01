@@ -45,10 +45,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     absorbsBehaviors: [],
     substrates: ["semantic", "search"],
     phase: "phase-1",
-    nonGoals: [
-      "Phase 1 registers code_resolve as the first active workflow tool.",
-      "Does not persist target handles across sessions yet.",
-    ],
+    nonGoals: ["Target handles do not persist across sessions."],
   },
   {
     name: "code_inspect",
@@ -101,7 +98,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
       "Show the graph of relationships touching a target, including references, callees, imports, exports, implementations, and tests.",
     schemaKey: "code_graph",
     schemaDocs:
-      "Accepts targetId plus relations, direction, depth, and maxNodes. The Phase 0 contract uses references rather than misleading callers labels.",
+      "Accepts targetId plus relations and maxResults (per-relation result cap). The Phase 0 contract uses references rather than misleading callers labels.",
     absorbsTools: ["code_references", "code_calls", "code_implementations"],
     absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search"],
@@ -117,13 +114,12 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
       "Estimate blast radius for a target, dirty files, or a proposed change description, including likely tests and docs.",
     schemaKey: "code_impact",
     schemaDocs:
-      "Accepts targetId, change, or changedFiles plus baseRef/includeTests/maxResults. Runtime validation later requires at least one primary subject.",
+      "Accepts targetId, change, or changedFiles plus includeTests/maxResults. Runtime validation later requires at least one primary subject.",
     absorbsTools: ["code_affected"],
     absorbsBehaviors: [],
     substrates: ["semantic", "search", "git", "diagnostics"],
     phase: "phase-4",
     nonGoals: [
-      "Phase 4 activates code_impact while keeping code_affected as a compatibility alias.",
       "Does not guarantee perfect downstream impact inference without substrate evidence.",
     ],
   },
@@ -140,7 +136,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     phase: "phase-5",
     nonGoals: [
       "Does not introduce a broad action mega-tool.",
-      "Phase 5 keeps code_refactor preview-only; it does not mutate files directly.",
+      "code_refactor is preview-only; use code_apply to execute stored plans.",
     ],
   },
   {
@@ -154,7 +150,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     substrates: ["semantic", "search", "git"],
     phase: "phase-5",
     nonGoals: [
-      'Phase 5 supports only `mode: "apply"`; format/verify modes remain explicit unavailable outcomes.',
+      'Only `mode: "apply"` is implemented; format/verify modes return explicit unavailable outcomes.',
       "Does not bypass plan validation or fingerprint checks.",
     ],
   },
@@ -170,7 +166,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     substrates: ["semantic", "search", "git", "diagnostics"],
     phase: "phase-6",
     nonGoals: [
-      "Removed public lsp_* and tree_sitter_* tools in Phase 1.5 (TNDM-A9AQF4).",
+      "Public lsp_* and tree_sitter_* tools were removed; only code_* tools remain on the public surface.",
       "Does not act as a generic verification/test runner.",
     ],
   },

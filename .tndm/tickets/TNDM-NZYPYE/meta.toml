@@ -1,0 +1,19 @@
+schema_version = 1
+id = "TNDM-NZYPYE"
+title = "Fix code review findings for unbrittle surface changes"
+type = "task"
+priority = "p1"
+depends_on = []
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "task-01"
+path = "tasks/task-01.md"

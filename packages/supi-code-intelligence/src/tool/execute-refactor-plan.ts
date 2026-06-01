@@ -204,7 +204,7 @@ function normalizeRequestedOperation(
 
   return {
     kind: "error",
-    message: `**Error:** Unsupported refactor operation: "${operation}". Supported operations: "rename", "rename_symbol", "rename_file", "move_file", "update_imports", "delete_dead_code".`,
+    message: `**Error:** Unsupported refactor operation: "${operation}". The public \`code_refactor\` tool currently supports: "rename", "rename_symbol".`,
   };
 }
 

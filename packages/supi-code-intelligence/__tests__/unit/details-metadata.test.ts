@@ -355,7 +355,6 @@ describe("structured details via tool adapters and action routers", () => {
         "details-impact-changed-files",
         {
           changedFiles: ["packages/core/index.ts"],
-          baseRef: "main",
           includeTests: true,
         },
         undefined,
@@ -549,8 +548,13 @@ describe("code_context details metadata", () => {
     expect(result.details?.type).toBe("context");
     if (result.details?.type === "context") {
       expect(result.details.data.confidence).toBe("unavailable");
+      // Phase 6: no-target guard returns early with empty renderedSections
+      // and explicit guidance to use code_resolve first
       expect(result.details.data.requestedSections).toEqual(["defs"]);
-      expect(result.details.data.renderedSections).toEqual(["defs"]);
+      expect(result.details.data.renderedSections).toEqual([]);
+      expect(result.details.data.nextQueries).toEqual(
+        expect.arrayContaining([expect.stringContaining("code_resolve")]),
+      );
     }
   });
 

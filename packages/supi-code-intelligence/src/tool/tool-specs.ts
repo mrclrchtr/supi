@@ -133,7 +133,6 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for outgoing calls or `relations: ["implements"]` for implementations.',
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
       'In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` returns "not yet implemented" gracefully.',
-      "In code_graph, `direction`, `depth`, `maxNodes` are accepted but reserved for future use.",
       "After code_graph, follow up with code_context on individual results for type or definition context.",
     ],
     parameters: CodeGraphParameters,
@@ -143,7 +142,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_impact",
     label: "Code Impact",
     description:
-      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for impact assessment and does not fall back to heuristic text search.",
+      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for impact assessment and does not fall back to heuristic text search. Supports target-based analysis and changedFiles-based analysis.",
     promptSnippet: "code_impact — blast radius and impact",
     basePromptGuidelines: [
       "Use code_impact before edits to estimate blast radius and follow-up checks.",
@@ -157,12 +156,12 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_find",
     label: "Code Find",
     description:
-      "Unified ranked code search with mode dispatch: text (literal ripgrep), regex (ripgrep regex), ast (tree-sitter structured), semantic (LSP workspace symbols). Defaults to text mode. Supports optional kind filtering for result ranking.",
+      "Unified ranked code search with mode dispatch: text (literal ripgrep), regex (ripgrep regex), ast (tree-sitter structured: definition, export, import, call), semantic (LSP workspace symbols). Defaults to text mode. In text/regex modes, kind is advisory-only (no filtering).",
     promptSnippet: "code_find — unified ranked code search",
     basePromptGuidelines: [
       "Use code_find for text, regex, AST-level, or semantic workspace symbol search.",
       "code_find defaults to text mode (literal ripgrep). Use code_find with mode: 'regex' for regex, mode: 'ast' with kind for structured search, mode: 'semantic' for LSP workspace symbols.",
-      "Use kind with code_find for advisory filtering or ranking. In text/regex modes kind is advisory-only (no filtering applied). In ast/semantic modes, supported kinds (definition, import, export) are applied directly; call, type, test return not-yet-implemented.",
+      "In AST mode, supported kinds are: 'definition', 'export', 'import', and 'call' (call-site matching via ripgrep + heuristic filtering). Use kind for advisory filtering in text/regex modes (no filtering applied).",
       "code_find is the sole code search tool — use code_find for all text, regex, AST, and semantic searches.",
     ],
     parameters: CodeFindParameters,
@@ -172,14 +171,12 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_refactor",
     label: "Code Refactor",
     description:
-      'Preferred workflow refactor surface. Previews an operation-aware semantic refactor plan without mutating files and returns a plan ID for later use with code_apply. In this phase it wraps the existing plan store/executor and stays preview-only. Supports rename_symbol, update_imports, and delete_dead_code when the semantic provider can produce precise edits. Legacy `operation: "rename"` is accepted as a compatibility alias for `rename_symbol`.',
+      'Preferred workflow refactor surface. Previews a semantic rename plan without mutating files and returns a plan ID for later use with code_apply. Supports only rename_symbol in this phase. Legacy `operation: "rename"` is accepted as a compatibility alias.',
     promptSnippet: "code_refactor — preview a precise workflow refactor",
     basePromptGuidelines: [
       "Use code_refactor as the preferred workflow refactor surface.",
       'Use `operation: "rename_symbol"` with code_refactor for symbol renames. Legacy `operation: "rename"` is accepted as a compatibility alias.',
-      'Use `operation: "update_imports"` or `operation: "delete_dead_code"` with code_refactor only when the semantic provider can return precise edits.',
-      "code_refactor is preview-only in this phase — it returns a plan ID. Use `code_apply` with that planId to execute.",
-      "In code_refactor, `preview: false` is not yet supported; retry with `preview: true` or omit `preview`.",
+      "code_refactor is preview-only — it returns a plan ID. Use `code_apply` with that planId to execute.",
     ],
     parameters: CodeRefactorParameters,
     run: (params, ctx) =>
@@ -193,8 +190,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     promptSnippet: "code_apply — apply a stored workflow plan",
     basePromptGuidelines: [
       "Use code_apply to execute a plan generated by code_refactor.",
-      'In code_apply, use `mode: "apply"` or omit `mode` in this phase.',
-      "In code_apply, `apply-and-format` and `apply-and-verify` are not yet implemented and return explicit unavailable results.",
+      'In code_apply, use `mode: "apply"` or omit `mode` — it is the only supported mode.',
     ],
     parameters: CodeApplyParameters,
     run: (params, ctx) => executeApplyTool(params as Parameters<typeof executeApplyTool>[0], ctx),

@@ -138,18 +138,17 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_imp
 
 - **targetId** (preferred from `code_resolve`) or file+line+character or symbol
 - **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
-- **direction**, **depth**, **maxNodes** accepted but reserved for future use
 - **maxResults** caps per-relation output
 - Each relation dispatched to appropriate substrate (semantic for references/implements, structural for callees)
 - Best-effort per relation: unavailable substrates skip with a note rather than failing the entire call
-- `imports` and `exports` use file-level tree-sitter analysis; `tests` returns "not yet implemented" gracefully
+- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files via naming conventions
 - File-level expansion not supported — requires precise target (anchored coords or targetId)
 
 ### `code_impact`
 Preferred workflow-oriented blast-radius tool.
 
 - supports target-based impact analysis plus diff-aware `changedFiles` input
-- optional `baseRef` and explicit `includeTests`
+- explicit `includeTests` for companion test file discovery
 - `change`-only requests return an explicit insufficient-evidence result instead of heuristic guessing
 - does not fall back to heuristic search
 
@@ -157,7 +156,7 @@ Preferred workflow-oriented blast-radius tool.
 Unified ranked code search with mode dispatch — the sole search tool.
 - `query` (required) — search pattern or symbol query
 - `mode?` — `text` (ripgrep literal, default), `regex` (ripgrep regex), `ast` (tree-sitter structured), `semantic` (LSP workspace symbols with text fallback)
-- `kind?` — result filtering/ranking: `definition`, `import`, `export`, `call`, `type`, `test`. Advisory-only in text/regex modes (no filtering applied); supported kinds (`definition`, `export`, `import`) are applied directly in ast/semantic modes; `call`/`type`/`test` return "not yet implemented" for ast/semantic modes.
+- `kind?` — result filtering/ranking: `definition`, `import`, `export`, `call`, `type`, `test`. Advisory-only in text/regex modes (no filtering applied). In AST mode: `definition`/`export`/`import` use tree-sitter; `call` uses ripgrep-based call-site matching; `type`/`test` return "not yet implemented". In semantic mode: supported kinds (`definition`, `export`, `import`) are applied directly.
 - `scope?` — workspace-relative path, package, or directory to limit search
 - `contextLines?` — context lines around matches (default 1)
 - `maxResults?` — result cap (default 8)
@@ -180,17 +179,15 @@ Preferred workflow refactor surface. Thin Phase 5 wrapper over the preview-only 
 
 - returns a preview plan with a plan ID; does not mutate files directly
 - accepts the workflow schema (`operation`, optional `targetId`, anchored coords, and operation-specific fields)
-- supported operations in this phase: `rename_symbol`, `update_imports`, `delete_dead_code`
+- supported operation in this phase: `rename_symbol`
 - legacy `operation: "rename"` is accepted as a compatibility alias for `rename_symbol`
 - `preview: false` is not yet supported; `code_refactor` remains preview-only in this phase
-- `rename_file` and `move_file` remain explicit unavailable outcomes until shared resource-edit support exists
 
 ### `code_apply`
 Preferred workflow apply surface. Thin Phase 5 wrapper over the stored-plan application path.
 
 - applies a previously generated plan by `planId`
 - supports only `mode: "apply"` in this phase
-- `apply-and-format` and `apply-and-verify` remain explicit unavailable outcomes for now
 - rechecks fingerprints and re-validates edit safety before mutation
 
 ## Internal compatibility executors
@@ -219,8 +216,7 @@ The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`)
 - `code_inspect` requires `file` + `line` + `character`.
 - `line`/`character` require `file`, **not** `path`.
 - `code_refactor` requires `operation` plus either `targetId` or `file` + `line` + `character`.
-- `newName` is required for `rename_symbol` (and for the legacy `rename` alias on `code_refactor`), but not for `update_imports` or `delete_dead_code`.
-- `rename_file` / `move_file` are accepted at the schema level so the tool can return an explicit unavailable result rather than a misleading validation error.
+- `newName` is required for `rename_symbol` (and for the legacy `rename` alias on `code_refactor`).
 - `code_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
 - `code_context`, `code_impact`, and `code_refactor` accept optional `targetId` that takes precedence over raw coordinates.

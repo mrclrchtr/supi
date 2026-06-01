@@ -38,7 +38,6 @@ export interface ImpactInput {
   maxResults?: number;
   change?: string;
   changedFiles?: string[];
-  baseRef?: string;
   includeTests?: boolean;
 }
 
@@ -285,14 +284,12 @@ async function executeChangedFilesImpact(
     surface === "impact"
       ? renderChangedFilesImpact({
           changedFiles: changedFiles.map((entry) => entry.relPath),
-          baseRef: input.baseRef ?? null,
           analysis,
           nextQueries,
           prioritySignals,
         })
       : renderChangedFilesImpact({
           changedFiles: changedFiles.map((entry) => entry.relPath),
-          baseRef: input.baseRef ?? null,
           analysis,
           nextQueries,
           prioritySignals,
@@ -323,7 +320,7 @@ function analyzeReferenceImpact(
   cwd: string,
   includeTests: boolean,
 ): ImpactAnalysis {
-  const affectedFiles = new Set(result.refs.map((r) => r.file));
+  const affectedFiles = new Set(result.refs.map((r) => path.resolve(cwd, r.file)));
   const { affectedModules, checkNext, downstreamCount } = analyzeModelImpact(
     affectedFiles,
     model,
@@ -336,7 +333,7 @@ function analyzeReferenceImpact(
     affectedModules,
     downstreamCount,
     checkNext,
-    likelyTests: includeTests ? findLikelyTests(affectedFiles) : [],
+    likelyTests: includeTests ? findLikelyTests(affectedFiles, cwd).map((t) => t.path) : [],
     riskLevel: assessRisk(
       result.refs.length + result.externalCount,
       affectedModules.size,
@@ -424,14 +421,61 @@ function normalizeChangedFiles(files: string[], cwd: string): ChangedFileEntry[]
   return result;
 }
 
-function findLikelyTests(affectedFiles: Set<string>): string[] {
-  const tests: string[] = [];
+/** Boundary-aware regex for test-file detection.
+ *  Matches: .test.<ext>, .spec.<ext>, /__tests__/ in path
+ *  Does NOT match: contest.ts, testing.ts, latest.ts, tool-specs.ts
+ */
+const TEST_FILE_RE = /\.test\.|\.spec\.|\/__tests__\//;
+
+/** One detected test file with provenance. */
+export interface LikelyTest {
+  path: string;
+  provenance: "name heuristic" | "companion file";
+}
+
+/** Maximum number of test files to return. */
+const LIKELY_TESTS_CAP = 3;
+
+/**
+ * Identify likely test files among affected files.
+ *
+ * Uses a boundary-aware regex to avoid false positives on words like
+ * "contest" or "tool-specs". Falls back to companion-file discovery
+ * (same basename with .test.<ext> or .spec.<ext> suffix) for affected
+ * files that don't match the regex.
+ */
+export function findLikelyTests(affectedFiles: Set<string>, cwd: string): LikelyTest[] {
+  const seen = new Set<string>();
+  const results: LikelyTest[] = [];
+
+  // Pass 1: boundary-aware regex on affected file paths
   for (const file of affectedFiles) {
-    if (file.includes("test") || file.includes("spec") || file.includes("__tests__")) {
-      tests.push(file);
+    if (TEST_FILE_RE.test(file)) {
+      seen.add(file);
+      results.push({ path: file, provenance: "name heuristic" });
     }
   }
-  return tests.slice(0, 3);
+
+  // Pass 2: companion-file discovery for affected files without test-like names
+  const remaining = [...affectedFiles].filter((f) => !seen.has(f));
+  if (remaining.length > 0) {
+    const companions = findTestCompanions(
+      remaining.map((absPath) => ({ absPath, relPath: path.relative(cwd, absPath) })),
+      cwd,
+    );
+    // Re-resolve companion relative paths back to absolute paths for consistent output
+    for (const relCompanion of companions) {
+      const absCompanion = path.resolve(cwd, relCompanion);
+      if (!seen.has(absCompanion)) {
+        seen.add(absCompanion);
+        results.push({ path: absCompanion, provenance: "companion file" });
+      }
+    }
+  }
+
+  // Sort by path for deterministic output, then cap
+  results.sort((a, b) => a.path.localeCompare(b.path));
+  return results.slice(0, LIKELY_TESTS_CAP);
 }
 
 function findTestCompanions(changedFiles: ChangedFileEntry[], cwd: string): string[] {

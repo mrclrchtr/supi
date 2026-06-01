@@ -34,6 +34,10 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("relations");
     expect(props).toHaveProperty("file");
     expect(props).toHaveProperty("maxResults");
+    // Phase 6: unimplemented no-op params removed from schema
+    expect(props).not.toHaveProperty("direction");
+    expect(props).not.toHaveProperty("depth");
+    expect(props).not.toHaveProperty("maxNodes");
   });
 
   it("no longer registers code_references, code_calls, or code_implementations", () => {
@@ -165,7 +169,6 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("targetId");
     expect(props).toHaveProperty("change");
     expect(props).toHaveProperty("changedFiles");
-    expect(props).toHaveProperty("baseRef");
     expect(props).toHaveProperty("includeTests");
     expect(props).toHaveProperty("maxResults");
   });
@@ -246,16 +249,7 @@ describe("focused code intelligence tool registration", () => {
     const workflowOperationParam = workflowRefactorTool.parameters?.properties?.operation as
       | { enum?: string[] }
       | undefined;
-    expect(workflowOperationParam?.enum).toEqual(
-      expect.arrayContaining([
-        "rename",
-        "rename_symbol",
-        "rename_file",
-        "move_file",
-        "update_imports",
-        "delete_dead_code",
-      ]),
-    );
+    expect(workflowOperationParam?.enum).toEqual(["rename", "rename_symbol"]);
 
     const workflowApplyTool = getTool(pi, "code_apply") as {
       parameters?: { properties?: Record<string, unknown> };

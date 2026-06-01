@@ -1,10 +1,11 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
+import { findLikelyTests } from "../../src/use-case/generate-impact.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -63,7 +64,6 @@ describe("code_impact tool", () => {
     expect(props).toHaveProperty("targetId");
     expect(props).toHaveProperty("change");
     expect(props).toHaveProperty("changedFiles");
-    expect(props).toHaveProperty("baseRef");
     expect(props).toHaveProperty("includeTests");
     expect(props).toHaveProperty("maxResults");
   });
@@ -123,7 +123,7 @@ describe("code_impact tool", () => {
     }
   });
 
-  it("accepts changedFiles with optional baseRef and includeTests without requiring an anchored target", async () => {
+  it("accepts changedFiles with includeTests without requiring an anchored target", async () => {
     writeFileSync(path.join(tmpDir, "src.ts"), "export const changed = true;\n");
     writeFileSync(
       path.join(tmpDir, "src.test.ts"),
@@ -138,7 +138,6 @@ describe("code_impact tool", () => {
       "impact-changed-files",
       {
         changedFiles: ["src.ts"],
-        baseRef: "main",
         includeTests: true,
       },
       undefined,
@@ -201,5 +200,97 @@ describe("code_impact tool", () => {
 
     const names = getTools(pi).map((tool) => tool.name);
     expect(names).not.toContain("code_affected");
+  });
+});
+
+describe("findLikelyTests boundary awareness", () => {
+  function pathSet(...files: string[]): Set<string> {
+    return new Set(files.map((f) => path.resolve(tmpDir, f)));
+  }
+
+  it("does not match tool-specs.ts as a test file (regression for substring bug)", () => {
+    const affected = pathSet("packages/supi-code-intelligence/src/tool/tool-specs.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.map((t) => t.path)).not.toContain(
+      path.resolve(tmpDir, "packages/supi-code-intelligence/src/tool/tool-specs.ts"),
+    );
+  });
+
+  it("does not match contest.ts (test substring in middle of regular word)", () => {
+    const affected = pathSet("src/contest.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.map((t) => t.path)).not.toContain(path.resolve(tmpDir, "src/contest.ts"));
+  });
+
+  it("does not match testing.ts (no .test. boundary)", () => {
+    const affected = pathSet("src/testing.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.map((t) => t.path)).not.toContain(path.resolve(tmpDir, "src/testing.ts"));
+  });
+
+  it("matches myModule.test.ts via .test. boundary", () => {
+    const affected = pathSet("src/myModule.test.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.map((t) => t.path)).toContain(path.resolve(tmpDir, "src/myModule.test.ts"));
+    expect(
+      tests.find((t) => t.path === path.resolve(tmpDir, "src/myModule.test.ts"))?.provenance,
+    ).toBe("name heuristic");
+  });
+
+  it("matches myModule.spec.ts via .spec. boundary", () => {
+    const affected = pathSet("src/myModule.spec.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.map((t) => t.path)).toContain(path.resolve(tmpDir, "src/myModule.spec.ts"));
+  });
+
+  it("matches __tests__/myModule.ts via /__tests__/ directory", () => {
+    const affected = pathSet("src/__tests__/myModule.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.map((t) => t.path)).toContain(path.resolve(tmpDir, "src/__tests__/myModule.ts"));
+  });
+
+  it("includes companion test files as fallback for non-test-named affected files", () => {
+    // Create source file and companion test file
+    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src/myModule.ts"), "export const x = 1;\n");
+    writeFileSync(path.join(tmpDir, "src/myModule.test.ts"), "test('x', () => {});\n");
+
+    const affected = pathSet("src/myModule.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.map((t) => t.path)).toContain(path.resolve(tmpDir, "src/myModule.test.ts"));
+    expect(
+      tests.find((t) => t.path === path.resolve(tmpDir, "src/myModule.test.ts"))?.provenance,
+    ).toBe("companion file");
+  });
+
+  it("deduplicates when regex and companions find the same file", () => {
+    // Create both: affected file is a test file itself AND has a companion
+    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src/myModule.ts"), "export const x = 1;\n");
+    writeFileSync(path.join(tmpDir, "src/myModule.test.ts"), "test('x', () => {});\n");
+
+    // Include both the source and the test in affected files
+    const affected = pathSet("src/myModule.ts", "src/myModule.test.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+
+    const testFilePath = path.resolve(tmpDir, "src/myModule.test.ts");
+    const occurrences = tests.filter((t) => t.path === testFilePath).length;
+    expect(occurrences).toBe(1);
+  });
+
+  it("returns up to 3 test files, sorted by path", () => {
+    writeFileSync(path.join(tmpDir, "a.test.ts"), "");
+    writeFileSync(path.join(tmpDir, "b.spec.ts"), "");
+    writeFileSync(path.join(tmpDir, "c.test.ts"), "");
+    writeFileSync(path.join(tmpDir, "d.test.ts"), "");
+
+    const affected = pathSet("a.test.ts", "b.spec.ts", "c.test.ts", "d.test.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.length).toBeLessThanOrEqual(3);
+  });
+
+  it("returns empty array for empty affected files", () => {
+    const tests = findLikelyTests(new Set(), tmpDir);
+    expect(tests).toEqual([]);
   });
 });

@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:41:49.392149Z"
+revision = 35
+
+[document_fingerprints]
+archive = "sha256:17e67bac42fb5a649a75d7a70a53880d6bc9ded0fcd86a084a495266fdae1959"
+content = "sha256:7177975f98d2c23e77837608cba2cf37ba782b47bcc6a1516820b488e4942f7c"
+task-01 = "sha256:19f0005369fc2c79627351e86999ad8762e06cb79e2f11d86a954d29db24ead0"
+task-02 = "sha256:168ffe12f8d25126f2a75a128ca3dbfe4450f1eff520d0cca2ddf6bd2bd23ec0"
+task-03 = "sha256:ac592f2c727f8978a3ee19c0a3e6e1db5f387d24188f3bb667c8da4dd2c9d426"
+task-04 = "sha256:e6a9448b0accc5552edbdd5593dd7a4a9b69f2155a008fb099462d3c58b73b8c"
+task-05 = "sha256:024f56c6c291aadaabd49bab39fd5878412edd03766f2703209794bb22be7e91"
+task-06 = "sha256:2ce0c2d807338479d6eb6a8d865af9fda643c076253b50ac3130b87ddfbb82f8"
+
+[[tasks]]
+number = 1
+title = 'Wave 1a: Fix code_find AST kind call/type/test — return "not yet implemented"'
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Wave 1b: Remove baseRef from code_impact"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Wave 1c: Narrow code_refactor operations to rename_symbol only"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Wave 1d: Remove unsupported code_apply modes"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Wave 2a: Implement code_graph tests relation"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Wave 2b: Implement code_find AST call-site matching (call expressions)"
+status = "done"

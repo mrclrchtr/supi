@@ -21,7 +21,6 @@ export function renderImpactFileLevel(
 
 export function renderChangedFilesImpact(params: {
   changedFiles: string[];
-  baseRef: string | null;
   analysis: ImpactAnalysis;
   nextQueries: string[];
   prioritySignals: PrioritySignalsSummary | null;
@@ -33,10 +32,6 @@ export function renderChangedFilesImpact(params: {
 
   lines.push(`# ${heading}: changed files`);
   lines.push("");
-  if (params.baseRef) {
-    lines.push(`_Base ref: \`${params.baseRef}\`_`);
-    lines.push("");
-  }
   if (params.compatibilityNote) {
     lines.push(`_${params.compatibilityNote}_`);
     lines.push("");

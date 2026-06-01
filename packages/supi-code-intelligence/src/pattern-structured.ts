@@ -1,6 +1,7 @@
-import * as fs from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import * as path from "node:path";
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
+import { collectCallSitesInFile } from "./analysis/relations/call-sites.ts";
 import type { CodeQueryParams as ActionParams } from "./query-params.ts";
 
 export const STRUCTURED_PATTERN_FILE_CAP = 200;
@@ -62,7 +63,7 @@ export async function getStructuredPatternMatches(
         break;
       }
       const relFile = path.relative(cwd, file);
-      await collectMatchesForFile(matches, structural, relFile, params.kind, matcher);
+      await collectMatchesForFile(matches, structural, file, relFile, params.kind, matcher);
     }
 
     return {
@@ -80,6 +81,7 @@ export async function getStructuredPatternMatches(
 async function collectMatchesForFile(
   matches: StructuredMatch[],
   structural: StructuralSubstrate,
+  absFile: string,
   relFile: string,
   kind: StructuredPatternKind,
   matcher: (value: string) => boolean,
@@ -119,13 +121,22 @@ async function collectMatchesForFile(
     return;
   }
 
-  // ── call / type / test — use outline with kind-specific filters ────
+  // ── call — ripgrep-based call-site matching ────────────────────────
 
-  if (kind === "call" || kind === "type" || kind === "test") {
+  if (kind === "call") {
+    const callSites = collectCallSitesInFile(absFile, matcher);
+    for (const cs of callSites) {
+      matches.push({ file: relFile, name: cs.name, kind: "call", line: cs.line });
+    }
+    return;
+  }
+
+  // ── type / test — use outline with kind-specific filters ────────────
+
+  if (kind === "type" || kind === "test") {
     const outline = await structural.outline(relFile);
     if (outline.kind !== "success") return;
     for (const item of outline.data) {
-      if (kind === "call" && !isCallLikeKind(item.kind)) continue;
       if (kind === "type" && !isTypeLikeKind(item.kind)) continue;
       if (kind === "test") {
         // Match by name: test functions, describe/it blocks, or files with test/spec in name
@@ -157,9 +168,9 @@ function collectStructuredFiles(
       return;
     }
 
-    let stat: fs.Stats;
+    let stat: ReturnType<typeof statSync>;
     try {
-      stat = fs.statSync(currentPath);
+      stat = statSync(currentPath);
     } catch {
       return;
     }
@@ -175,9 +186,12 @@ function collectStructuredFiles(
       return;
     }
 
-    let entries: fs.Dirent[];
+    let entries: Array<{ name: string; isDirectory: () => boolean }>;
     try {
-      entries = fs.readdirSync(currentPath, { withFileTypes: true });
+      entries = readdirSync(currentPath, { withFileTypes: true }) as Array<{
+        name: string;
+        isDirectory: () => boolean;
+      }>;
     } catch {
       return;
     }
@@ -198,13 +212,6 @@ function isStructuredFile(file: string): boolean {
   return [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"].includes(
     path.extname(file),
   );
-}
-
-/** Outline kind values that represent callable declarations (as normalized by the outline extractor). */
-const CALL_LIKE_KINDS = new Set(["function", "method"]);
-
-function isCallLikeKind(kind: string): boolean {
-  return CALL_LIKE_KINDS.has(kind);
 }
 
 /** Outline kind values that represent type declarations (as normalized by the outline extractor). */

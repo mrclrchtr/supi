@@ -15,7 +15,6 @@ export interface CodeImpactToolParams {
   maxResults?: number;
   change?: string;
   changedFiles?: string[];
-  baseRef?: string;
   includeTests?: boolean;
 }
 

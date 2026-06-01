@@ -11,7 +11,7 @@ import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
 
 export interface CodeApplyToolParams {
   planId: string;
-  mode?: "apply" | "apply-and-format" | "apply-and-verify";
+  mode?: "apply";
 }
 
 export async function executeApplyTool(
