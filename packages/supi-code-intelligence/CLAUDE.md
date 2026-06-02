@@ -102,7 +102,6 @@ src/
 │   └── health.ts               # code_health markdown renderer (Phase 1.5)
 └── ui/
     ├── code-intelligence-status-command.ts  # /ci-status command
-    ├── code-intelligence-status-view.ts     # TUI status surface
     └── lsp-message-renderer.ts              # lsp-context custom message renderer
 ```
 

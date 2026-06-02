@@ -35,7 +35,7 @@ First-wave refactor mapping in the semantic provider:
 - `delete_dead_code` → precise quickfix/refactor-rewrite actions only
 - `rename_file` / `move_file` → explicit unavailable results for now
 
-![LSP status overlay](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-lsp-status.png)
+The historical LSP status overlay is no longer part of this package. Substrate-owned status UX now lives in `@mrclrchtr/supi-code-intelligence` as the `/ci-status` command.
 
 ## Startup performance
 
