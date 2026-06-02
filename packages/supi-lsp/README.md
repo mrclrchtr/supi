@@ -37,6 +37,28 @@ First-wave refactor mapping in the semantic provider:
 
 ![LSP status overlay](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-lsp-status.png)
 
+## Startup performance
+
+Language servers start automatically when a PI session opens. By default, every server with matching source files in the project is started **concurrently** — in polyglot repos or monorepos with multiple language footprints, this parallel startup can cause a significant CPU spike.
+
+**To reduce startup overhead:**
+
+- **Limit to the servers you actually use** via the `active` allowlist:
+
+  ```json
+  { "lsp": { "active": ["typescript"] } }
+  ```
+
+  Add this to `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global). Only the listed servers will start.
+
+- **Disable LSP entirely** if you don't need semantic code intelligence:
+
+  ```json
+  { "lsp": { "enabled": false } }
+  ```
+
+  Server discovery walks the project tree at depth 3 (skipping `node_modules`, `.git`, `.pnpm`). Without an `active` allowlist, every detected language server starts in parallel via `Promise.all`.
+
 ## Architecture
 
 `@mrclrchtr/supi-lsp` is the **semantic substrate** in SuPi's code-understanding stack.

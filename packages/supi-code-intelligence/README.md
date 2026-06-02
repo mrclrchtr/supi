@@ -42,6 +42,28 @@ After install, pi gets:
 
 Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface. Historical compatibility executors remain in the source tree for migration/tests, but are no longer registered as public tools.
 
+## Startup performance
+
+LSP language servers start automatically on session open. By default, every server with matching source files in the project is started **concurrently** — in polyglot repos or monorepos with multiple language footprints, this parallel startup can cause a significant CPU spike.
+
+**If you experience high CPU on startup:**
+
+1. **Limit to the servers you actually use** via the `active` allowlist:
+
+   ```json
+   { "lsp": { "active": ["typescript"] } }
+   ```
+
+   Add this to `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global). Only the listed servers will start.
+
+2. **Disable LSP entirely** if you don't use the `code_*` tools:
+
+   ```json
+   { "lsp": { "enabled": false } }
+   ```
+
+   Tree-sitter structural analysis (`code_find` ast mode, `code_graph` imports/exports) still works without LSP.
+
 ## V2 workflow roadmap
 
 The workflow-oriented surface is rolling out incrementally.
