@@ -82,7 +82,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     promptSnippet: "code_resolve — resolve references into precise targets and target handles",
     basePromptGuidelines: [
       "Use code_resolve when a symbol, file, or code reference is ambiguous and needs precise resolution.",
-      "Prefer code_resolve as the entry point before other code_* tools so you can pass targetId instead of repeating fragile file/line/character coordinates.",
+      "Prefer code_resolve as the entry point before code_context, code_graph, code_impact, or code_refactor — its targetId replaces fragile file/line/character coordinates.",
       "When code_resolve returns ambiguous results with ranked candidates, pick one and use file + line + character for follow-up resolution.",
     ],
     parameters: CodeResolveParameters,
@@ -114,7 +114,6 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     basePromptGuidelines: [
       "Use code_context for both task-focused coding context and neutral orientation overviews.",
       "Omit `task` in code_context to get a neutral project/package/file orientation brief.",
-      "Prefer `targetId` from `code_resolve` in code_context when you already resolved the symbol or anchor you care about.",
       "Use `include` in code_context to request only the sections you need.",
     ],
     parameters: CodeContextParameters,
@@ -129,10 +128,9 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
       "Use code_graph to find references, outgoing calls, and implementations for a target.",
-      "Prefer `targetId` from `code_resolve` over raw file/line/character coordinates when using code_graph.",
       'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for outgoing calls or `relations: ["implements"]` for implementations.',
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
-      'In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` returns "not yet implemented" gracefully.',
+      "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test function names.",
       "After code_graph, follow up with code_context on individual results for type or definition context.",
     ],
     parameters: CodeGraphParameters,
@@ -146,7 +144,6 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     promptSnippet: "code_impact — blast radius and impact",
     basePromptGuidelines: [
       "Use code_impact before edits to estimate blast radius and follow-up checks.",
-      "Prefer `targetId` from `code_resolve` in code_impact when you already resolved the target you want to analyze.",
       "Use code_graph instead of code_impact when you only need a plain reference list without impact analysis.",
     ],
     parameters: CodeImpactParameters,
@@ -174,7 +171,6 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       'Preferred workflow refactor surface. Previews a semantic rename plan without mutating files and returns a plan ID for later use with code_apply. Supports only rename_symbol in this phase. Legacy `operation: "rename"` is accepted as a compatibility alias.',
     promptSnippet: "code_refactor — preview a precise workflow refactor",
     basePromptGuidelines: [
-      "Use code_refactor as the preferred workflow refactor surface.",
       'Use `operation: "rename_symbol"` with code_refactor for symbol renames. Legacy `operation: "rename"` is accepted as a compatibility alias.',
       "code_refactor is preview-only — it returns a plan ID. Use `code_apply` with that planId to execute.",
     ],
@@ -205,10 +201,6 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     basePromptGuidelines: [
       "Use code_health to check for diagnostics, language server status, dirty workspace state, coverage, or unused-code signals.",
       "Pass `refresh: true` to code_health to recover stale diagnostics before checking.",
-      "Use `scope` with code_health to narrow diagnostics to a specific file or package.",
-      "Use `include` with code_health to request specific sections: diagnostics, servers, dirty, coverage, unused.",
-      'Use `include: ["coverage"]` or `include: ["unused"]` with code_health to check for low-coverage files or unused code.',
-      'Use `level: "detailed"` with code_health for per-file diagnostic listings.',
     ],
     parameters: CodeHealthParameters,
     run: (params, ctx) => executeHealthTool(params as Parameters<typeof executeHealthTool>[0], ctx),
