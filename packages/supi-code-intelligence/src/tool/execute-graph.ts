@@ -51,7 +51,6 @@ export interface CodeGraphToolParams {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestration with multi-stage resolution, relation dispatch, and confidence derivation
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: file-level relation gate added — compact extraction would scatter related logic
 export async function executeGraphTool(
   params: CodeGraphToolParams,
   ctx: { cwd: string },
