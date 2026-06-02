@@ -17,7 +17,7 @@ import {
 } from "../presentation/markdown/pattern.ts";
 import type { CodeQueryParams } from "../query-params.ts";
 import type { RgMatch } from "../search-helpers.ts";
-import { normalizePath, runRipgrep, runRipgrepDetailed } from "../search-helpers.ts";
+import { normalizePath, runRipgrep, runRipgrepDetailed, toDisplayPath } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 export interface PatternInput {
@@ -95,9 +95,14 @@ export async function executePattern(
     return formatEmptyResult(input, relScope);
   }
 
+  const displayMatches = matches.map((m) => ({
+    ...m,
+    file: toDisplayPath(deps.cwd, m.file),
+  }));
+
   const content = input.summary
-    ? renderPatternSummary(input.pattern, relScope, matches, maxResults)
-    : renderPatternResults(input.pattern, relScope, matches, maxResults);
+    ? renderPatternSummary(input.pattern, relScope, displayMatches, maxResults)
+    : renderPatternResults(input.pattern, relScope, displayMatches, maxResults);
 
   const details: SearchDetails = {
     confidence: "heuristic",

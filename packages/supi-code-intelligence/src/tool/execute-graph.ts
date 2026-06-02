@@ -288,14 +288,20 @@ async function collectRelation(
         if (result.confidence === "unavailable") {
           return { kind: "unavailable", rel, message: "No implementations available" };
         }
+        // Filter self-references: LSP returns the declaration itself as an
+        // "implementation" for non-interface symbols. Drop the target location.
+        const targetLine = position.line + 1;
+        const filtered = result.implementations.filter(
+          (impl) => !(impl.file === file && impl.line === targetLine),
+        );
         const content = renderImplementationsResult(
-          result.implementations,
+          filtered,
           result.externalCount,
           cwd,
           maxResults,
           displayName,
         );
-        return { kind: "ok", rel, count: result.implementations.length, content };
+        return { kind: "ok", rel, count: filtered.length, content };
       }
 
       case "imports": {

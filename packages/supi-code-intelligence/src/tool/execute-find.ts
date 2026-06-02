@@ -319,7 +319,7 @@ function collectSourceFiles(
 function maybeAppendKindNote(result: CodeIntelResult, params: CodeFindToolParams): CodeIntelResult {
   if (!params.kind) return result;
 
-  const note = `\n\n_Kind (\`${params.kind}\`) is advisory-only in text/regex mode — results are unfiltered text matches. Use \`mode: "ast"\` with \`kind\` for precise structural filtering, or \`mode: "semantic"\` for LSP symbol results._`;
+  const note = `\n\n_Note: \`kind\` is ignored in text/regex mode. Use \`mode: "ast"\` or \`mode: "semantic"\` for kind-filtered results._`;
   return {
     content: result.content + note,
     details: result.details,

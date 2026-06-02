@@ -137,8 +137,15 @@ function renderDiagnosticDetails(lines: string[], data: HealthData, cwd: string)
 }
 
 function renderCodeActionsSection(lines: string[], data: HealthData, cwd: string): void {
-  if (data.level !== "detailed") return;
   if (!data.codeActions || data.codeActions.length === 0) return;
+
+  if (data.level === "summary") {
+    const count = data.codeActions.length;
+    lines.push(
+      `_${count} suggested fix${count !== 1 ? "es" : ""} available. Use \`level: "detailed"\` to see them._`,
+    );
+    return;
+  }
 
   lines.push("");
   lines.push("### Code Actions");

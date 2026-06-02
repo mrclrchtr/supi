@@ -36,9 +36,25 @@ export const CodeResolveParameters = Type.Object(
     query: Type.Optional(QueryParam),
     scope: Type.Optional(ScopeParam),
     kind: Type.Optional(
-      StringEnum(["symbol", "function", "class", "interface", "type", "file", "export"], {
-        description: "Preferred target kind when disambiguating the query.",
-      }),
+      StringEnum(
+        [
+          "symbol",
+          "function",
+          "class",
+          "interface",
+          "type",
+          "file",
+          "export",
+          "variable",
+          "method",
+          "const",
+          "let",
+          "enum",
+        ],
+        {
+          description: "Preferred target kind when disambiguating the query.",
+        },
+      ),
     ),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),

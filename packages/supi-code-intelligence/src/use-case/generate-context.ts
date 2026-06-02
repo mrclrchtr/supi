@@ -46,8 +46,12 @@ export async function executeContext(
   input: ContextInput,
   deps: ContextDeps,
 ): Promise<ContextUseCaseResult> {
-  if (!input.task) {
-    return executeOrientationContext(input, deps);
+  if (!input.task || !input.target) {
+    const result = await executeOrientationContext(input, deps);
+    if (input.task && !input.target) {
+      result.content = `_Note: task-focused sections require a precise target. Falling back to orientation overview._\n\n${result.content}`;
+    }
+    return result;
   }
 
   return executeTaskContext(input, deps);
@@ -57,7 +61,7 @@ async function executeOrientationContext(
   input: ContextInput,
   deps: ContextDeps,
 ): Promise<ContextUseCaseResult> {
-  const briefInput = toBriefInput(input);
+  const briefInput = toBriefInput(input, deps);
   const result = await executeBrief(briefInput, {
     model: deps.model,
     provider: deps.provider,
@@ -91,38 +95,6 @@ async function executeTaskContext(
     : (input.scope ?? null);
   const nextQueries = buildNextQueries(input.target, deps.cwd);
   const sections: RenderedContextSection[] = [];
-
-  // ── No-target guard ──────────────────────────────────────────
-  if (!input.target) {
-    const guidanceMessage = [
-      "**No target provided for task-focused context.**",
-      "",
-      `Task: "${input.task ?? "(none)"}"`,
-      "",
-      "To use task-focused context, first resolve a target:",
-      "1. Use `code_resolve` with a `query` that matches your task to find the relevant symbol, file, or function",
-      "2. Pass the returned `targetId` to `code_context`",
-      "",
-      "Example:",
-      '  `code_resolve` { query: "function name from your task", kind: "function" }',
-      '  `code_context` { targetId: "...", task: "your task here" }',
-    ];
-
-    const details: ContextDetails = {
-      confidence: "unavailable",
-      task: input.task ?? null,
-      focusTarget: null,
-      requestedSections: requestedSections,
-      renderedSections: [],
-      omittedCount: 0,
-      nextQueries: ["Use `code_resolve` to resolve a target first"],
-    };
-
-    return {
-      content: guidanceMessage.join("\n"),
-      details,
-    };
-  }
 
   let omittedCount = 0;
   let hasStructural = false;
@@ -497,8 +469,16 @@ async function buildDocsSection(
   }
 }
 
-function toBriefInput(input: ContextInput): BriefInput {
+function toBriefInput(input: ContextInput, deps: ContextDeps): BriefInput {
   if (input.target) {
+    if (input.target.name && deps.provider) {
+      return {
+        kind: "symbol",
+        symbol: input.target.name,
+        path: input.target.file,
+        maxResults: input.maxResults,
+      };
+    }
     return {
       kind: "file",
       file: input.target.file,

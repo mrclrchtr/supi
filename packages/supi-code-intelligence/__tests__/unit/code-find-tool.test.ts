@@ -137,8 +137,8 @@ describe("code_find tool", () => {
       // Should still return matches
       expect(text).toContain("foo");
       expect(text).toContain("a.ts");
-      // Should include advisory-only note
-      expect(text).toContain("advisory-only");
+      // Should include ignored note
+      expect(text).toContain("ignored");
     });
   });
 

@@ -49,9 +49,25 @@ const CodeResolveParameters = Type.Object(
       }),
     ),
     kind: Type.Optional(
-      StringEnum(["symbol", "function", "class", "interface", "type", "file", "export"], {
-        description: "Preferred target kind when disambiguating the query.",
-      }),
+      StringEnum(
+        [
+          "symbol",
+          "function",
+          "class",
+          "interface",
+          "type",
+          "file",
+          "export",
+          "variable",
+          "method",
+          "const",
+          "let",
+          "enum",
+        ],
+        {
+          description: "Preferred target kind when disambiguating the query.",
+        },
+      ),
     ),
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
@@ -100,6 +116,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       "Provide `file`, `line`, and `character` — code_inspect is intentionally point-based in this phase.",
       "Use code_inspect when you want syntax node, enclosing symbol, hover/type info, definitions, nearby diagnostics, and available code-action titles gathered together.",
       "When some providers are unavailable, code_inspect returns best-effort sections and explicit unavailable notes instead of heuristic guesses.",
+      "Code action titles from code_inspect are advisory only — there is no tool to execute them yet.",
     ],
     parameters: CodeInspectParameters,
     run: (params, ctx) =>
@@ -158,7 +175,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     basePromptGuidelines: [
       "Use code_find for text, regex, AST-level, or semantic workspace symbol search.",
       "code_find defaults to text mode (literal ripgrep). Use code_find with mode: 'regex' for regex, mode: 'ast' with kind for structured search, mode: 'semantic' for LSP workspace symbols.",
-      "In AST mode, supported kinds are: 'definition', 'export', 'import', and 'call' (call-site matching via ripgrep + heuristic filtering). Use kind for advisory filtering in text/regex modes (no filtering applied).",
+      "In code_find AST mode, supported kinds are: 'definition', 'export', 'import', and 'call' (call-site matching via ripgrep + heuristic filtering). In code_find text/regex mode, `kind` is ignored — use `mode: \"ast\"` or `mode: \"semantic\"` for filtered results.",
       "code_find is the sole code search tool — use code_find for all text, regex, AST, and semantic searches.",
     ],
     parameters: CodeFindParameters,

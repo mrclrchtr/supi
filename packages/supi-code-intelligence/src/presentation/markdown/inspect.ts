@@ -74,9 +74,7 @@ export function renderInspectResult(input: InspectRenderInput): string {
 
   if (input.hover) {
     lines.push("## Hover");
-    lines.push("```ts");
     lines.push(input.hover);
-    lines.push("```");
     lines.push("");
   }
 

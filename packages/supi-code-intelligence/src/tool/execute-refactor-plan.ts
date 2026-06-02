@@ -188,14 +188,7 @@ export async function executeRefactorPlanTool(
 function normalizeRequestedOperation(
   operation: string,
 ): { kind: "ok"; operation: CanonicalRefactorOperation } | { kind: "error"; message: string } {
-  if (
-    operation === "rename" ||
-    operation === "rename_symbol" ||
-    operation === "rename_file" ||
-    operation === "move_file" ||
-    operation === "update_imports" ||
-    operation === "delete_dead_code"
-  ) {
+  if (operation === "rename" || operation === "rename_symbol") {
     return {
       kind: "ok",
       operation: normalizeRefactorOperation(operation as RefactorOperation),

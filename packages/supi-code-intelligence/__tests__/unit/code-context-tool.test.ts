@@ -501,8 +501,8 @@ describe("code_context real-data sections", () => {
   });
 });
 
-describe("code_context no-target guidance", () => {
-  it("returns explicit resolve-first guidance when task is provided but no target", async () => {
+describe("code_context no-target fallback", () => {
+  it("falls back to orientation overview when task is provided but no target", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     const tool = getTool(pi, "code_context");
@@ -524,23 +524,9 @@ describe("code_context no-target guidance", () => {
       };
     };
 
-    // Should not pretend to render sections
-    expect(result.content[0].text).not.toContain("## Definitions");
-    expect(result.content[0].text).not.toContain("## References");
-    // Should explain what's needed
-    expect(result.content[0].text).toContain("No target provided");
-    // Should guide to code_resolve
-    expect(result.content[0].text).toContain("code_resolve");
-    expect(result.content[0].text).toContain("targetId");
-    // Should echo the task so the user can verify
-    expect(result.content[0].text).toContain("rename something safely");
-    // Details should reflect unavailable confidence
+    // Should show fallback note
+    expect(result.content[0].text).toContain("Falling back to orientation");
+    // Details should reflect brief confidence (not task-mode unavailable)
     expect(result.details?.type).toBe("context");
-    if (result.details?.type === "context") {
-      expect(result.details.data?.confidence).toBe("unavailable");
-      expect(result.details.data?.nextQueries).toEqual(
-        expect.arrayContaining([expect.stringContaining("code_resolve")]),
-      );
-    }
   });
 });

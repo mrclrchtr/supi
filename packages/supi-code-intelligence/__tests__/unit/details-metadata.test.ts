@@ -513,7 +513,7 @@ describe("code_context details metadata", () => {
     }
   });
 
-  it("returns unavailable confidence for defs-only task context without a precise target", async () => {
+  it("falls back to orientation for defs-only task context without a precise target", async () => {
     setupWorkspace();
 
     const pi = createPiMock();
@@ -547,14 +547,10 @@ describe("code_context details metadata", () => {
     expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("context");
     if (result.details?.type === "context") {
+      // Falls back to orientation overview, not task-mode unavailable
       expect(result.details.data.confidence).toBe("unavailable");
-      // Phase 6: no-target guard returns early with empty renderedSections
-      // and explicit guidance to use code_resolve first
-      expect(result.details.data.requestedSections).toEqual(["defs"]);
-      expect(result.details.data.renderedSections).toEqual([]);
-      expect(result.details.data.nextQueries).toEqual(
-        expect.arrayContaining([expect.stringContaining("code_resolve")]),
-      );
+      // Orientation mode has different section semantics
+      expect(result.details.data.renderedSections).toContain("orientation");
     }
   });
 
