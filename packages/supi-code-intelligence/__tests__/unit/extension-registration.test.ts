@@ -291,9 +291,9 @@ describe("session lifecycle", () => {
     expect(pi.handlers.has("session_shutdown")).toBe(true);
   });
 
-  it("registers /ci-status command", () => {
+  it("registers /supi-ci-status command", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    expect(pi.commands.has("ci-status")).toBe(true);
+    expect(pi.commands.has("supi-ci-status")).toBe(true);
   });
 });

@@ -1,0 +1,31 @@
+schema_version = 1
+status = "in_progress"
+updated_at = "2026-06-02T08:20:03.749441Z"
+revision = 23
+
+[document_fingerprints]
+content = "sha256:230007c072b0e3294bc423a6f08eb7c7d2b44df1914e9ac81766eeac8633328e"
+task-01 = "sha256:0e8819179db2d668fee46c930f49d1b76b51c9e20c15ba8cf4d942484b6f7e11"
+task-02 = "sha256:eb6751810800dac3a08e4db814ebe1a04452339cf2adf7102f24845b0657269d"
+task-03 = "sha256:5a9d45c7ecc387d9113d9a04366d688a3d5ab2e54f684e523406d875f45197a4"
+task-04 = "sha256:8cb5a2a6464f9d1416d09545759cb6d97aef16cc5dc7dd3aabbaf25091a0d66e"
+
+[[tasks]]
+number = 1
+title = "Write failing tests for CiStatusDialog overlay component"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Implement CiStatusDialog overlay component"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update /ci-status command to use overlay with status bar and widget"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "End-to-end verification: tests, types, lint, smoke test"
+status = "done"

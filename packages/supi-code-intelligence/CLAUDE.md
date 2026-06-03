@@ -101,7 +101,7 @@ src/
 │   └── resolve.ts              # code_resolve markdown renderer (Phase 1)
 │   └── health.ts               # code_health markdown renderer (Phase 1.5)
 └── ui/
-    ├── code-intelligence-status-command.ts  # /ci-status command
+    ├── code-intelligence-status-command.ts  # /supi-ci-status command
     └── lsp-message-renderer.ts              # lsp-context custom message renderer
 ```
 

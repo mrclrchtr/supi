@@ -19,7 +19,7 @@ const EXPECTED_SUPI_COMMANDS = [
   "supi-debug",
   "supi-context",
   "supi-cache",
-  "ci-status",
+  "supi-ci-status",
   "supi-review",
 ];
 

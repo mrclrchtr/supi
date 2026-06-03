@@ -128,6 +128,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["packages/supi-code-intelligence/src/ui/code-intelligence-status-overlay.ts"],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
     }
   ]
 }

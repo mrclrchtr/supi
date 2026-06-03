@@ -1,5 +1,5 @@
 // Code Intelligence extension entry point — registers the focused code-intelligence tools,
-// the LSP adapter with diagnostics, overrides, and settings, and the unified /ci-status command.
+// the LSP adapter with diagnostics, overrides, and settings, and the unified /supi-ci-status command.
 
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createCodeIntelligenceApp } from "./app/create-code-intelligence-app.ts";
