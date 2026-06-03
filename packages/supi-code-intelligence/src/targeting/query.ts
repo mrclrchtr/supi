@@ -24,9 +24,10 @@ export interface QueryInput {
  *
  * Priority order:
  * 1. anchored: file + line + character
- * 2. file: file without coordinates
- * 3. symbol: symbol without file
- * 4. invalid: neither file nor symbol
+ * 2. scoped symbol: file + symbol (without coordinates) — uses file as path scope for symbol discovery
+ * 3. file: file without coordinates or symbol
+ * 4. symbol: symbol without file
+ * 5. invalid: neither file nor symbol
  */
 export function normalizeQuery(input: QueryInput): NormalizedQuery {
   if (input.file && input.line != null && input.character != null) {
@@ -35,6 +36,19 @@ export function normalizeQuery(input: QueryInput): NormalizedQuery {
       file: input.file,
       line: input.line,
       character: input.character,
+    };
+  }
+
+  // Scoped symbol: both file and symbol present, no line/character.
+  // The file acts as a path scope for symbol discovery — resolves to a
+  // precise target within that file rather than a file-level group.
+  if (input.file && input.symbol) {
+    return {
+      kind: "symbol",
+      symbol: input.symbol,
+      path: input.file,
+      symbolKind: input.kind,
+      exportedOnly: input.exportedOnly,
     };
   }
 

@@ -76,4 +76,30 @@ describe("normalizeQuery", () => {
     });
     expect(result.kind).toBe("anchored");
   });
+
+  it("returns symbol query scoped to file when file + symbol are present without coordinates", () => {
+    const result = normalizeQuery({
+      file: "src/index.ts",
+      symbol: "Widget",
+    });
+    expect(result.kind).toBe("symbol");
+    if (result.kind === "symbol") {
+      expect(result.symbol).toBe("Widget");
+      expect(result.path).toContain("index.ts");
+    }
+  });
+
+  it("uses symbol path when file + symbol + path are all present without coordinates", () => {
+    const result = normalizeQuery({
+      file: "src/index.ts",
+      symbol: "Widget",
+      path: "src/components/",
+    });
+    expect(result.kind).toBe("symbol");
+    if (result.kind === "symbol") {
+      expect(result.symbol).toBe("Widget");
+      // file overrides the explicit path as the scope
+      expect(result.path).toContain("index.ts");
+    }
+  });
 });
