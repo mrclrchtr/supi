@@ -43,7 +43,7 @@
     }
   },
   "devDependencies": {
-    "vitest": "4.1.7",
+    "vitest": "4.1.8",
     "@types/jsdom": "28.0.3",
     "@types/turndown": "5.0.6",
     "@mrclrchtr/supi-test-utils": "workspace:*"
