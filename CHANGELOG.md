@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.2](https://github.com/mrclrchtr/supi/compare/v1.11.1...v1.11.2) (2026-06-06)
+
+
+### Bug Fixes
+
+* **deps:** update dependency vscode-jsonrpc to v9 ([7c0ca28](https://github.com/mrclrchtr/supi/commit/7c0ca289a2564f6ee51a606926265413bd5e0f13))
+
 ## [1.11.1](https://github.com/mrclrchtr/supi/compare/v1.11.0...v1.11.1) (2026-06-01)
 
 
