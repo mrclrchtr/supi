@@ -6,7 +6,7 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { RawReviewResult, ReviewInvocation, ReviewOutputEvent } from "../types.ts";
-import { buildFailureDebug, extractLastAssistantText } from "./review-debug.ts";
+import { buildFailureDebug, extractLastAssistantDebug } from "./review-debug.ts";
 import {
   createSubmitReviewTool,
   handleSessionEvent,
@@ -142,7 +142,7 @@ function doFinalAbortFromLifecycle(
     .abort()
     .catch(() => {})
     .finally(() => {
-      const partialText = extractLastAssistantText(lcCtx.session);
+      const partialText = extractLastAssistantDebug(lcCtx.session)?.text;
       lcCtx.resolve(
         lcCtx.cleanup({
           kind: "timeout" as const,
