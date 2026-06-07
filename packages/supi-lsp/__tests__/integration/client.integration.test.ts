@@ -68,6 +68,11 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     client = new LspClient("typescript-language-server", TS_SERVER_CONFIG, tmpDir);
     await client.start();
     expect(client.status).toBe("running");
+
+    // Readiness: server should become ready within the 2s no-progress
+    // window (small project, tsserver finishes indexing quickly).
+    await client.getReady();
+    expect(client.ready).toBe(true);
   }, 15_000);
 
   it("opens a document and tracks it", () => {

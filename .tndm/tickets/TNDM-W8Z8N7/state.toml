@@ -1,0 +1,67 @@
+schema_version = 1
+status = "in_progress"
+updated_at = "2026-06-07T10:12:59.536065Z"
+revision = 69
+
+[document_fingerprints]
+content = "sha256:7f10b966283771ea33c7e0a0ded851132c9e5f59ff35dd20cb6109af227ddb25"
+task-01 = "sha256:c5b4540fd6c8087f924480db33f49aad3febb32bf57b3b6ba815b57fe23102b8"
+task-02 = "sha256:3e0794c556e01a1fc461cea1c18cef81c2c0f093ed36240ebf759964d0622536"
+task-03 = "sha256:0190a512c1f7d29141af1eb186f063b466253aed1e55faae5a53247670155675"
+task-04 = "sha256:eccd738e1979be6b30ce617a89b678585c3f99ec23ebeec5460ed659a01184f4"
+task-05 = "sha256:6fa3b4e403f131dd594aeb243221afb89d09632f4fa58d44b6381118d12307b2"
+task-06 = "sha256:153f0d1b590bf29bd86bacd52b87f0c0cb6ebf7ba487111a9751aa0e6f03b7c0"
+task-07 = "sha256:5377ea85425594ed7096913c9a24891b8daf5138c02fc026d7ddc67ee06e4217"
+task-08 = "sha256:7c22380a8a806dc810ee90256de1f7ea08109fb6221dd992b7f8dbfee3aa8dde"
+task-09 = "sha256:216e68ff5a00b9751a877416b5a225b81ee1a6cb1e206ced6a965cb971f269b2"
+task-10 = "sha256:b8c668276e03e5e1c7bc57235d4e10a7a5aeed6432aa6fc601c159070903df0b"
+
+[[tasks]]
+number = 1
+title = "Add window.workDoneProgress to CLIENT_CAPABILITIES"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Extend ServerConfig and ProjectServerInfo with readiness types"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Write unit tests for LspClient readiness state machine (TDD — RED)"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Implement readiness state machine in LspClient (TDD — GREEN)"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Gate LspClient.request() and pullDiagnosticsForUri on readiness"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Thread LspClient.ready through to ProjectServerInfo.ready"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Remove the 5× retry loop from workspaceSymbol() and clean up readiness state on restart"
+status = "done"
+
+[[tasks]]
+number = 8
+title = "Update integration tests: remove retry band-aid, add readiness + pull-diagnostics assertions"
+status = "done"
+
+[[tasks]]
+number = 9
+title = "Update downstream test mocks for new ProjectServerInfo.ready field"
+status = "done"
+
+[[tasks]]
+number = 10
+title = "Full end-to-end verification: test suite, typecheck, lint"
+status = "done"

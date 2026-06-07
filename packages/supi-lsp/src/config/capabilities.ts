@@ -53,6 +53,9 @@ export const CLIENT_CAPABILITIES: ClientCapabilities = {
       relatedDocumentSupport: true,
     },
   },
+  window: {
+    workDoneProgress: true,
+  },
   workspace: {
     workspaceFolders: false,
     diagnostics: {

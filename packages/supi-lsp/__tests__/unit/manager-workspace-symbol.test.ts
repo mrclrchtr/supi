@@ -52,7 +52,7 @@ describe("findWorkspaceSymbolWarmTargets", () => {
 });
 
 describe("LspManager.workspaceSymbol cold warm-up", () => {
-  it("warms a cold workspace-symbol client and retries once", async () => {
+  it("warms a cold workspace-symbol client and returns warmed results", async () => {
     const root = makeTempRoot();
     const manager = new LspManager(
       {

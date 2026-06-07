@@ -580,13 +580,8 @@ export class LspManager {
       query,
     );
     if (warmed.results) return warmed.results;
-    if (!warmed.warmedAny) return initial.results;
 
-    return this.retryWorkspaceSymbolAfterWarmup(
-      helper.collectWorkspaceSymbols,
-      query,
-      initial.results,
-    );
+    return initial.results;
   }
   async ensureFileOpen(filePath: string): Promise<LspClient | null> {
     const resolvedPath = resolveSessionPath(this.cwd, filePath);
@@ -664,30 +659,6 @@ export class LspManager {
     }
 
     return { warmedAny, results: null };
-  }
-
-  private async retryWorkspaceSymbolAfterWarmup(
-    collect: (
-      clients: Iterable<LspClient>,
-      query: string,
-    ) => Promise<{ results: (SymbolInformation | WorkspaceSymbol)[]; hasSupport: boolean }>,
-    query: string,
-    fallbackResults: (SymbolInformation | WorkspaceSymbol)[],
-  ): Promise<(SymbolInformation | WorkspaceSymbol)[]> {
-    const attempts = 5;
-    const delayMs = 50;
-
-    for (let attempt = 0; attempt < attempts; attempt++) {
-      if (attempt > 0) {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-      const retried = await collect(this.clients.values(), query);
-      if (!retried.hasSupport || retried.results.length > 0) {
-        return retried.hasSupport ? retried.results : fallbackResults;
-      }
-    }
-
-    return fallbackResults;
   }
 
   private hasOpenFileInProject(client: LspClient, projectRoot: string): boolean {

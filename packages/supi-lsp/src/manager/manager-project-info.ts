@@ -31,5 +31,6 @@ export function buildProjectServerInfo(
     status,
     supportedActions: getSupportedLspServerActions(input.client?.serverCapabilities),
     openFiles: input.client?.openFiles.map((file) => displayRelativeFilePath(file, cwd)) ?? [],
+    ready: input.client?.ready ?? false,
   };
 }

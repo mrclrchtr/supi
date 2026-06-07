@@ -8,6 +8,8 @@ export interface ServerConfig {
   rootMarkers: string[];
   enabled?: boolean;
   initializationOptions?: unknown;
+  /** Maximum time to wait for a single $/progress cycle, in ms. Default: 10_000. */
+  readinessTimeoutMs?: number;
 }
 
 /** LSP configuration keyed by language name (e.g. `typescript`, `python`). */
@@ -25,6 +27,8 @@ export interface ProjectServerInfo extends DetectedProjectServer {
   status: "running" | "error" | "unavailable";
   supportedActions: string[];
   openFiles: string[];
+  /** Whether the LSP server is currently not indexing and ready to serve queries. */
+  ready: boolean;
 }
 
 /** A language whose source files are present but the server binary is missing. */

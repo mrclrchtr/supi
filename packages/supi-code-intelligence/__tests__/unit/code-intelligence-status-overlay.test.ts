@@ -17,6 +17,7 @@ const mockServers: ProjectServerInfo[] = [
     fileTypes: ["ts", "tsx", "js", "jsx"],
     supportedActions: ["hover", "definition"],
     openFiles: ["src/index.ts", "src/utils.ts"],
+    ready: true,
   },
   {
     name: "bash",
@@ -25,6 +26,7 @@ const mockServers: ProjectServerInfo[] = [
     fileTypes: ["sh", "bash"],
     supportedActions: ["hover"],
     openFiles: [],
+    ready: true,
   },
 ];
 

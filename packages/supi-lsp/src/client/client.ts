@@ -5,6 +5,8 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
+import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
+import type { ProgressToken } from "vscode-languageserver-protocol";
 import { CLIENT_CAPABILITIES } from "../config/capabilities.ts";
 import type {
   CodeAction,
@@ -68,6 +70,15 @@ export class LspClient {
   /** Listeners waiting for diagnostics on a specific uri */
   private diagnosticWaiters = new Map<string, Array<() => void>>();
 
+  // ── Readiness (work-done-progress) ──────────────────────────────────
+  private trackedTokens = new Map<ProgressToken, "begin-seen" | "ended">();
+  private _readyPromise: Promise<void> | null = null;
+  private _readyResolve: (() => void) | undefined;
+  private _readyReject: ((err: Error) => void) | undefined;
+  private _isReady = false;
+  private noProgressTimer: ReturnType<typeof setTimeout> | null = null;
+  private tokenTimeouts = new Map<ProgressToken, ReturnType<typeof setTimeout>>();
+
   constructor(
     name: string,
     private readonly config: ServerConfig,
@@ -87,6 +98,11 @@ export class LspClient {
 
   get serverCapabilities(): ServerCapabilities | null {
     return this.capabilities;
+  }
+
+  /** Whether the server is currently not indexing and ready to serve queries. */
+  get ready(): boolean {
+    return this._isReady;
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────
@@ -118,6 +134,8 @@ export class LspClient {
     this.rpc.onNotification((method, params) => {
       if (method === "textDocument/publishDiagnostics") {
         this.handlePublishDiagnostics(params as PublishDiagnosticsParams);
+      } else if (method === "$/progress") {
+        this.handleProgress(params as { token: ProgressToken; value: { kind: string } });
       }
     });
     this.rpc.onRequest((method, params) => this.handleServerRequest(method, params));
@@ -126,6 +144,8 @@ export class LspClient {
     this.process.on("exit", (_code) => {
       if (this._status !== "shutdown") {
         this._status = "error";
+        this.cancelNoProgressTimer();
+        this.rejectReady(new Error("Client crashed"));
       }
       this.rpc?.dispose();
     });
@@ -133,6 +153,7 @@ export class LspClient {
     this.process.on("error", (_err) => {
       if (this._status !== "shutdown") {
         this._status = "error";
+        this.rejectReady(new Error("Client process error"));
       }
     });
 
@@ -151,6 +172,8 @@ export class LspClient {
       this.capabilities = result.capabilities;
       this.rpc.sendNotification("initialized", {});
       this._status = "running";
+
+      this.armNoProgressTimer();
     } catch (err) {
       this._status = "error";
       this.process.kill();
@@ -203,6 +226,15 @@ export class LspClient {
     this.openDocs.clear();
     this.diagnosticStore.clear();
     this.releaseAllDiagnosticWaiters();
+
+    // Clear readiness state
+    if (this.noProgressTimer) {
+      clearTimeout(this.noProgressTimer);
+      this.noProgressTimer = null;
+    }
+    for (const timer of this.tokenTimeouts.values()) clearTimeout(timer);
+    this.tokenTimeouts.clear();
+    this.rejectReady(new Error("Client shutdown"));
   }
 
   // ── Document Synchronization ────────────────────────────────────────
@@ -468,6 +500,7 @@ export class LspClient {
   private async request<T>(method: string, params: unknown): Promise<T | null> {
     if (!this.rpc || this._status !== "running") return null;
     try {
+      await this.getReady();
       return (await this.rpc.sendRequest(method, params)) as T;
     } catch {
       return null;
@@ -482,8 +515,21 @@ export class LspClient {
         return [{ uri: fileToUri(this.root), name: path.basename(this.root) || this.root }];
       case "client/registerCapability":
       case "client/unregisterCapability":
-      case "window/workDoneProgress/create":
         return null;
+      case "window/workDoneProgress/create": {
+        const token = (params as { token: ProgressToken }).token;
+        this.trackedTokens.set(token, "begin-seen");
+        this.cancelNoProgressTimer();
+        this._isReady = false;
+        if (!this._readyPromise) {
+          this._readyPromise = new Promise<void>((resolve, reject) => {
+            this._readyResolve = resolve;
+            this._readyReject = reject;
+          });
+        }
+        this.startTokenTimeout(token);
+        return null;
+      }
       default:
         throw new JsonRpcRequestError(-32601, `Method not found: ${method}`);
     }
@@ -568,5 +614,195 @@ export class LspClient {
 
     this.diagnosticWaiters.delete(uri);
     for (const waiter of waiters) waiter();
+  }
+
+  // ── Readiness (work-done-progress) ──────────────────────────────────
+
+  /**
+   * Wait for the server to be ready to serve queries.
+   * Returns immediately if already ready; returns the ongoing promise
+   * if one is pending; creates and returns a new one otherwise.
+   */
+  async getReady(): Promise<void> {
+    if (this._isReady) return;
+    if (this._readyPromise !== null) return this._readyPromise;
+    // If no progress timer was ever armed and no tokens are tracked,
+    // the server was either never started with a real process (test scenario)
+    // or completed before any progress tracking began. Resolve immediately
+    // only when the client is still running — a crash or shutdown clears
+    // both fields but must not report the client as ready.
+    if (this.noProgressTimer === null && this.trackedTokens.size === 0) {
+      if (this._status === "running") this._isReady = true;
+      return;
+    }
+    this._readyPromise = new Promise<void>((resolve, reject) => {
+      this._readyResolve = resolve;
+      this._readyReject = reject;
+    });
+    return this._readyPromise;
+  }
+
+  /** Handle the $/progress notification from the server. */
+  private handleProgress(params: { token: ProgressToken; value: { kind: string } }): void {
+    const { token, value } = params;
+    // Defensive: guard against malformed notifications without a value.
+    if (!value || typeof value.kind !== "string") return;
+
+    if (value.kind === "begin") {
+      recordDebugEvent({
+        source: "lsp",
+        level: "debug",
+        category: "readiness.progress-begin",
+        message: `Readiness progress begin for token ${token}`,
+        data: { token },
+      });
+      // Cancel the 2s no-progress grace timer — a server that sends
+      // begin without a prior create is spec-deviant but valid.
+      this.cancelNoProgressTimer();
+      this.trackedTokens.set(token, "begin-seen");
+      this._isReady = false;
+      // Re-arm readiness promise if not already pending
+      if (!this._readyPromise) {
+        this._readyPromise = new Promise<void>((resolve, reject) => {
+          this._readyResolve = resolve;
+          this._readyReject = reject;
+        });
+      }
+      this.startTokenTimeout(token);
+    } else if (value.kind === "end") {
+      recordDebugEvent({
+        source: "lsp",
+        level: "debug",
+        category: "readiness.progress-end",
+        message: `Readiness progress end for token ${token}`,
+        data: { token },
+      });
+      this.trackedTokens.set(token, "ended");
+      this.clearTokenTimeout(token);
+      this.checkAllTokensEnded();
+    }
+    // kind: "report" — intentionally no-op
+  }
+
+  /** Check whether all tracked tokens have ended and resolve readiness. */
+  private checkAllTokensEnded(): void {
+    if (this.trackedTokens.size === 0) return;
+    for (const state of this.trackedTokens.values()) {
+      if (state !== "ended") return;
+    }
+    this.trackedTokens.clear();
+    this.resolveReady();
+  }
+
+  /** Resolve the current readiness promise (if any) and mark the client ready. */
+  private resolveReady(): void {
+    if (this._readyResolve) {
+      this._readyResolve();
+      this._readyPromise = null;
+      this._readyResolve = undefined;
+      this._readyReject = undefined;
+    }
+    this._isReady = true;
+    recordDebugEvent({
+      source: "lsp",
+      level: "info",
+      category: "readiness.resolved",
+      message: `LSP client ${this.name} is ready (cwd: ${this.root})`,
+    });
+  }
+
+  /**
+   * Reject the current readiness promise (if any) and mark the client
+   * not ready. Called on shutdown, crash, or restart.
+   */
+  private rejectReady(reason: Error): void {
+    if (this._readyReject) {
+      this._readyReject(reason);
+      this._readyPromise = null;
+      this._readyResolve = undefined;
+      this._readyReject = undefined;
+    }
+    this._isReady = false;
+    this.trackedTokens.clear();
+    for (const timer of this.tokenTimeouts.values()) clearTimeout(timer);
+    this.tokenTimeouts.clear();
+    recordDebugEvent({
+      source: "lsp",
+      level: this._status === "shutdown" ? "debug" : "warning",
+      category: "readiness.rejected",
+      message: `LSP client ${this.name} readiness rejected: ${reason.message}`,
+      data: { status: this._status },
+    });
+  }
+
+  /**
+   * Start a per-token timeout. If the token never receives an "end",
+   * force-end it after `readinessTimeoutMs` (default 10s).
+   */
+  private startTokenTimeout(token: ProgressToken): void {
+    // Clear any existing timeout for this token (e.g., if both
+    // window/workDoneProgress/create and $/progress begin fire).
+    this.clearTokenTimeout(token);
+    const timeoutMs = this.config.readinessTimeoutMs ?? 10_000;
+    const timer = setTimeout(() => {
+      this.trackedTokens.set(token, "ended");
+      this.tokenTimeouts.delete(token);
+      recordDebugEvent({
+        source: "lsp",
+        level: "debug",
+        category: "readiness.token-timeout",
+        message: `Readiness per-token timeout fired for token ${token} after ${timeoutMs}ms`,
+        data: { token, timeoutMs },
+      });
+      this.checkAllTokensEnded();
+    }, timeoutMs);
+    this.tokenTimeouts.set(token, timer);
+  }
+
+  /** Clear the per-token timeout for a completed token. */
+  private clearTokenTimeout(token: ProgressToken): void {
+    const timer = this.tokenTimeouts.get(token);
+    if (timer) {
+      clearTimeout(timer);
+      this.tokenTimeouts.delete(token);
+    }
+  }
+
+  /** Cancel the 2s no-progress grace timer. */
+  private cancelNoProgressTimer(): void {
+    if (this.noProgressTimer) {
+      clearTimeout(this.noProgressTimer);
+      this.noProgressTimer = null;
+      recordDebugEvent({
+        source: "lsp",
+        level: "debug",
+        category: "readiness.no-progress-cancelled",
+        message: `No-progress grace timer cancelled for ${this.name}`,
+      });
+    }
+  }
+
+  /**
+   * Arm the 2s no-progress grace timer. If no server-initiated
+   * progress token arrives within this window, the server is treated
+   * as immediately ready (small project or non-progress-supporting server).
+   *
+   * A server that sends its first $/progress begin after 2s causes
+   * a brief false-ready window — the steady-state re-entrancy in
+   * handleProgress() flips isReady back to false when the begin arrives.
+   */
+  private armNoProgressTimer(): void {
+    this.noProgressTimer = setTimeout(() => {
+      if (this.trackedTokens.size === 0 && this._status === "running") {
+        recordDebugEvent({
+          source: "lsp",
+          level: "debug",
+          category: "readiness.no-progress-resolved",
+          message: `No-progress grace timer resolved for ${this.name}`,
+        });
+        this.resolveReady();
+      }
+      this.noProgressTimer = null;
+    }, 2_000);
   }
 }
