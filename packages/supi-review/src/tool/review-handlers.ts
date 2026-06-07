@@ -11,7 +11,7 @@ import type {
 } from "../types.ts";
 import {
   buildFailureDebug,
-  extractLastAssistantText,
+  extractLastAssistantDebug,
   pushRecentEvent,
   summarizeSessionEvent,
 } from "./review-debug.ts";
@@ -161,7 +161,7 @@ export function handleAgentEnd(
     return;
   }
 
-  const lastText = extractLastAssistantText(ctx.session);
+  const lastText = extractLastAssistantDebug(ctx.session)?.text;
   ctx.resolve(
     ctx.cleanup({
       kind: "failed",
@@ -220,7 +220,7 @@ function doFinalAbort(ctx: RunnerContext): void {
     .abort()
     .catch(() => {})
     .finally(() => {
-      const partialText = extractLastAssistantText(ctx.session);
+      const partialText = extractLastAssistantDebug(ctx.session)?.text;
       ctx.resolve(
         ctx.cleanup({
           kind: "timeout" as const,

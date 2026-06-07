@@ -45,11 +45,6 @@ export function extractLastAssistantDebug(
   );
 }
 
-export function extractLastAssistantText(session: AgentSession): string | undefined {
-  const debug = extractLastAssistantDebug(session);
-  return debug?.text;
-}
-
 function extractAssistantToolCalls(content: unknown): string[] {
   if (!Array.isArray(content)) return [];
 
