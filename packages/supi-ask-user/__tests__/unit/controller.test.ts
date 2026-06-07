@@ -6,7 +6,6 @@ const questionnaire: NormalizedQuestionnaire = {
   title: "Formatter",
   intro: "Need one explicit choice.",
   allowPartialSubmit: true,
-  allowDiscuss: true,
   questions: [
     {
       type: "choice",
@@ -38,7 +37,6 @@ const multiQuestionnaire: NormalizedQuestionnaire = {
   title: "Checks",
   intro: "Pick all required checks.",
   allowPartialSubmit: false,
-  allowDiscuss: false,
   questions: [
     {
       type: "choice",

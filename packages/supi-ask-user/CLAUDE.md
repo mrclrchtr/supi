@@ -36,7 +36,6 @@ Entrypoint: `src/ask-user.ts`
 ## Tool contract notes
 
 - `allowOther` is only valid on single-select choice questions.
-- `allowDiscuss` is form-level, not per-question.
 - `allowPartialSubmit` is form-level and only meaningful when partial progress is actionable.
 - Cancellation and abort call `ctx.abort()` from `ask-user.ts`.
 - A session-scoped lock prevents concurrent `ask_user` interactions.

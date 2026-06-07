@@ -40,7 +40,6 @@ export interface NormalizedQuestionnaire {
   intro?: string;
   questions: NormalizedQuestion[];
   allowPartialSubmit: boolean;
-  allowDiscuss: boolean;
 }
 
 /**

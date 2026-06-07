@@ -7,7 +7,6 @@ describe("normalizeQuestionnaire", () => {
       title: " Formatter ",
       intro: " Need one explicit answer ",
       allowPartialSubmit: true,
-      allowDiscuss: true,
       questions: [
         {
           type: "choice",
@@ -36,7 +35,6 @@ describe("normalizeQuestionnaire", () => {
       title: "Formatter",
       intro: "Need one explicit answer",
       allowPartialSubmit: true,
-      allowDiscuss: true,
       questions: [
         {
           type: "choice",

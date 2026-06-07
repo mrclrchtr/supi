@@ -50,7 +50,6 @@ export function normalizeQuestionnaire(params: AskUserParams): NormalizedQuestio
     ...(intro ? { intro } : {}),
     questions,
     allowPartialSubmit: params.allowPartialSubmit ?? false,
-    allowDiscuss: params.allowDiscuss ?? false,
   };
 }
 
