@@ -245,7 +245,6 @@ describe("code_inspect tool", () => {
     };
 
     expect(result.content[0].text).toContain("Unavailable");
-    expect(result.content[0].text).toContain("code_health");
     expect(result.content[0].text).not.toContain("heuristic");
   });
 });

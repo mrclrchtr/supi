@@ -10,7 +10,7 @@ export interface RenderContextParams {
   task: string;
   focusTarget: string | null;
   sections: RenderedContextSection[];
-  nextQueries: string[];
+  nextQueries?: string[];
 }
 
 /** Render a task-focused code_context bundle into markdown. */
@@ -27,15 +27,6 @@ export function renderContextResult(params: RenderContextParams): string {
     lines.push(`## ${section.title}`);
     if (section.lines.length > 0) {
       lines.push(...section.lines);
-    }
-    lines.push("");
-  }
-
-  if (params.nextQueries.length > 0) {
-    lines.push("## Next");
-    lines.push("");
-    for (const query of params.nextQueries) {
-      lines.push(`- ${query}`);
     }
     lines.push("");
   }

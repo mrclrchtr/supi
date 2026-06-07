@@ -158,8 +158,7 @@ describe("generateProjectBrief", () => {
   it("includes next-query hints", async () => {
     setupWorkspace();
     const model = await buildArchitectureModel(tmpDir);
-    const { content, details } = generateProjectBrief(model as NonNullable<typeof model>);
-    expect(content).toContain("Next");
+    const { details } = generateProjectBrief(model as NonNullable<typeof model>);
     expect(details.nextQueries.length).toBeGreaterThan(0);
   });
 

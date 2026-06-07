@@ -22,7 +22,6 @@ export function renderImpactFileLevel(
 export function renderChangedFilesImpact(params: {
   changedFiles: string[];
   analysis: ImpactAnalysis;
-  nextQueries: string[];
   prioritySignals: PrioritySignalsSummary | null;
   heading?: "Impact" | "Affected";
   compatibilityNote?: string;
@@ -65,12 +64,6 @@ export function renderChangedFilesImpact(params: {
   }
 
   appendPrioritySignalsSection(lines, params.prioritySignals);
-
-  lines.push("## Next");
-  for (const query of params.nextQueries) {
-    lines.push(`- ${query}`);
-  }
-  lines.push("");
 
   return lines.join("\n");
 }

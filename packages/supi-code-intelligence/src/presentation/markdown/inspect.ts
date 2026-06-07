@@ -32,7 +32,6 @@ export interface InspectRenderInput {
   diagnostics: Array<{ line: number; severity: number | string; message: string }>;
   codeActions: Array<{ title: string; kind?: string }>;
   unavailableSections: string[];
-  nextQueries: string[];
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: inspect rendering keeps section ordering and unavailable-state handling explicit
@@ -109,14 +108,6 @@ export function renderInspectResult(input: InspectRenderInput): string {
     lines.push("## Unavailable");
     for (const section of input.unavailableSections) {
       lines.push(`- ${section}`);
-    }
-    lines.push("");
-  }
-
-  if (input.nextQueries.length > 0) {
-    lines.push("## Next");
-    for (const query of input.nextQueries) {
-      lines.push(`- ${query}`);
     }
     lines.push("");
   }

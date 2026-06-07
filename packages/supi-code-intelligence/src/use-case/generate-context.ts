@@ -38,14 +38,21 @@ const SECTION_TITLES: Record<ContextSection, string> = {
 /**
  * Build a code_context result.
  *
- * When `task` is omitted, this falls back to the existing orientation-style brief flow.
- * When `task` is present, it assembles an explicit task bundle from the currently
- * available semantic/structural evidence.
+ * Three modes:
+ * 1. **Section mode** — `include` without `task`: renders only the requested sections.
+ * 2. **Orientation mode** — no `task`/`target`: returns a module/directory/file overview.
+ * 3. **Task mode** — `task` + `target`: assembles an explicit task-focused context bundle.
  */
 export async function executeContext(
   input: ContextInput,
   deps: ContextDeps,
 ): Promise<ContextUseCaseResult> {
+  // Section mode: honor include without task
+  if (input.include && input.include.length > 0 && !input.task) {
+    return executeSectionMode(input, deps);
+  }
+
+  // Orientation mode: full brief fallback
   if (!input.task || !input.target) {
     const result = await executeOrientationContext(input, deps);
     if (input.task && !input.target) {
@@ -54,6 +61,7 @@ export async function executeContext(
     return result;
   }
 
+  // Task mode: explicit bundle
   return executeTaskContext(input, deps);
 }
 
@@ -80,6 +88,65 @@ async function executeOrientationContext(
 
   return {
     content: result.content,
+    details,
+  };
+}
+
+/**
+ * Execute section mode — honor `include` without `task`.
+ *
+ * Builds a compact header and renders only the requested sections.
+ * Sections that need a precise target return honest "unavailable" messages.
+ */
+async function executeSectionMode(
+  input: ContextInput,
+  deps: ContextDeps,
+): Promise<ContextUseCaseResult> {
+  const requestedSections = input.include ?? [];
+  const limit = resolveResultLimit(input.budget, input.maxResults);
+  const focusTarget = input.scope ?? null;
+  const sections: RenderedContextSection[] = [];
+
+  let omittedCount = 0;
+  let hasStructural = false;
+  let hasSemantic = false;
+
+  for (const section of requestedSections) {
+    const built = await buildRequestedSection({
+      section,
+      input,
+      deps,
+      limit,
+      treeContext: null,
+    });
+    sections.push(built.section);
+    omittedCount += built.omittedCount;
+    hasStructural = hasStructural || built.hasStructuralEvidence;
+    hasSemantic = hasSemantic || built.hasSemanticEvidence;
+  }
+
+  const confidence: ConfidenceMode = hasSemantic
+    ? "semantic"
+    : hasStructural
+      ? "structural"
+      : "unavailable";
+
+  const details: ContextDetails = {
+    confidence,
+    task: null,
+    focusTarget,
+    requestedSections,
+    renderedSections: sections.map((s) => s.key),
+    omittedCount,
+    nextQueries: [],
+  };
+
+  return {
+    content: renderContextResult({
+      task: "Section mode",
+      focusTarget,
+      sections,
+    }),
     details,
   };
 }
@@ -137,7 +204,6 @@ async function executeTaskContext(
       task: input.task ?? "",
       focusTarget,
       sections,
-      nextQueries,
     }),
     details,
   };

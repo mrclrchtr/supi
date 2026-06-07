@@ -76,7 +76,6 @@ export function generateProjectBrief(model: ArchitectureModel): {
   addStartHereSection(lines, topStartHere);
 
   const nextQueries = buildNextQueries(model, publicSurfaces);
-  addNextSection(lines, nextQueries);
 
   return {
     content: lines.join("\n"),
@@ -172,14 +171,4 @@ function buildNextQueries(model: ArchitectureModel, publicSurfaces: string[]): s
     nextQueries.push("`code_impact` before modifying shared exports");
   }
   return nextQueries;
-}
-
-function addNextSection(lines: string[], nextQueries: string[]): void {
-  if (nextQueries.length === 0) return;
-  lines.push("## Next");
-  lines.push("");
-  for (const q of nextQueries.slice(0, 2)) {
-    lines.push(`- ${q}`);
-  }
-  lines.push("");
 }

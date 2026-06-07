@@ -95,14 +95,6 @@ async function generateDirectoryBrief(
     });
   }
 
-  if (nextQueries.length > 0) {
-    lines.push("");
-    lines.push("## Next");
-    for (const q of nextQueries.slice(0, 2)) {
-      lines.push(`- ${q}`);
-    }
-  }
-
   const prioritySignals = summarizePrioritySignalsForFiles(
     model.root,
     summarizeDirectoryRecursively(resolvedPath).allFiles,

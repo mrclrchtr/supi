@@ -285,13 +285,11 @@ async function executeChangedFilesImpact(
       ? renderChangedFilesImpact({
           changedFiles: changedFiles.map((entry) => entry.relPath),
           analysis,
-          nextQueries,
           prioritySignals,
         })
       : renderChangedFilesImpact({
           changedFiles: changedFiles.map((entry) => entry.relPath),
           analysis,
-          nextQueries,
           prioritySignals,
           heading: "Affected",
           compatibilityNote: AFFECTED_COMPATIBILITY_NOTE,

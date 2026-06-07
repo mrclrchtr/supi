@@ -257,12 +257,5 @@ export function renderGraphResult(
     }
   }
 
-  // Footer
-  lines.push("---");
-  lines.push("");
-  lines.push(
-    "_Use `code_context` on individual results for orientation, `code_inspect` with file/line/character for point facts, and `code_impact` for impact analysis._",
-  );
-
   return lines.join("\n");
 }

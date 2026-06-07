@@ -54,9 +54,6 @@ describe("renderInspectResult", () => {
     expect(result).toContain("Cannot assign to 'foo'");
     expect(result).toContain("## Code Actions");
     expect(result).toContain("Remove unused import");
-    expect(result).toContain("## Next");
-    expect(result).toContain("code_graph");
-    expect(result).toContain("code_health");
   });
 
   it("renders explicit unavailable sections when provider data is missing", async () => {
@@ -75,7 +72,6 @@ describe("renderInspectResult", () => {
       diagnostics: [],
       codeActions: [],
       unavailableSections: ["syntax", "hover", "definition", "diagnostics", "codeActions"],
-      nextQueries: ["Use `code_health` to inspect provider state"],
     });
 
     expect(result).toContain("# Inspect: src/index.ts:2:10");
@@ -85,7 +81,6 @@ describe("renderInspectResult", () => {
     expect(result).toContain("definition");
     expect(result).toContain("diagnostics");
     expect(result).toContain("codeActions");
-    expect(result).toContain("code_health");
     expect(result).not.toContain("heuristic");
   });
 });

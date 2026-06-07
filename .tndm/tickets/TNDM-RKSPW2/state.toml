@@ -1,0 +1,32 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-07T23:36:50.149974Z"
+revision = 25
+
+[document_fingerprints]
+archive = "sha256:a734f4ea83b1acd56021da2577cdb53d5f2779ddd01f3c3eab16c5e559fb1a39"
+content = "sha256:7e406a391653a1acebfc356152da68925525aaade69de9415bc6b24db3b1f945"
+task-01 = "sha256:c438fd665fb79dc7343d77b82a6d94574673f08873e385cda96b7353fac20117"
+task-02 = "sha256:78cb122159b8aaf3d09d92e30a1cb3ec28698089dd6c8804c0d34700a46b7f69"
+task-03 = "sha256:2004c76ef5e528b2323681bdcfb36e3851ed75543443a4c5f32afbd1830446c4"
+task-04 = "sha256:6f12ba3cdf8474e14159ea4a9ffc6a3f4e8cb007d55ebffa62bff5d25d9f0720"
+
+[[tasks]]
+number = 1
+title = "Add executeSectionMode() for include-without-task path"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Remove Next-steps from presentation markdown renderers"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update use-case generators to stop passing nextQueries to renderers"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Verify end-to-end: include works, Next-steps gone, no regressions"
+status = "done"

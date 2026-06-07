@@ -105,7 +105,7 @@ describe("relations render", () => {
     expect(content).not.toContain("code_brief` with `file`, `line`, and `character`");
   });
 
-  it("renders combined graph follow-up guidance with both orientation and point inspection", () => {
+  it("renders graph result with references section and no footer", () => {
     const content = renderGraphResult(
       "widget",
       [
@@ -119,8 +119,10 @@ describe("relations render", () => {
       "src/widget.ts",
     );
 
-    expect(content).toContain("code_context");
-    expect(content).toContain("code_inspect");
+    expect(content).toContain("# Graph of `widget`");
+    expect(content).toContain("# References of `widget`");
+    expect(content).not.toContain("code_context");
+    expect(content).not.toContain("code_inspect");
   });
 
   it("renders imports result with module specifiers and line numbers", () => {

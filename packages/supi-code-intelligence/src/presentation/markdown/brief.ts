@@ -45,8 +45,6 @@ export function renderSymbolBrief(params: {
     }
   }
 
-  appendNextQueries(lines, params.relPath, params.targetLine, params.targetCharacter);
-
   return { content: lines.join("\n"), details: params.details };
 }
 
@@ -160,17 +158,6 @@ export function renderFileBrief(input: FileBriefInput): string {
     lines.push("");
   }
 
-  lines.push("## Next");
-  lines.push(
-    `- \`code_graph\`, \`file: "${input.relPath}"\`, and a line/character for reference sites`,
-  );
-  if (input.moduleRelativePath) {
-    lines.push(
-      `- \`code_context\` with \`path: "${input.moduleRelativePath}"\` for the containing module overview`,
-    );
-  }
-  lines.push("");
-
   return lines.join("\n");
 }
 
@@ -227,21 +214,5 @@ function appendDiagnosticsSection(
   for (const d of diagnostics) {
     lines.push(`- L${d.line}: ${severityLabel(d.severity)}: ${d.message}`);
   }
-  lines.push("");
-}
-
-function appendNextQueries(
-  lines: string[],
-  relPath: string,
-  line: number,
-  character: number,
-): void {
-  lines.push("## Next");
-  lines.push(
-    `- \`code_graph\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for reference sites`,
-  );
-  lines.push(
-    `- \`code_impact\` with \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for impact analysis`,
-  );
   lines.push("");
 }

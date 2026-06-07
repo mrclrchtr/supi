@@ -215,7 +215,6 @@ describe("focused-tool follow-up regressions", () => {
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain('file: "src/widget.ts"');
     expect(result.content).not.toContain('symbol: "symbol at src/widget.ts:1"');
     expect(result.details?.type).toBe("impact");
     if (result.details?.type === "impact") {

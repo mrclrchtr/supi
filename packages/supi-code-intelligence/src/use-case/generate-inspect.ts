@@ -101,7 +101,6 @@ export async function executeInspect(
     diagnostics,
     codeActions: context.codeActions ?? [],
     unavailableSections: dedupe(unavailableSections),
-    nextQueries,
   });
 
   return {

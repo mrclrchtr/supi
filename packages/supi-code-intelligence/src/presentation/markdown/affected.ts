@@ -35,7 +35,7 @@ interface RenderSingleParams {
 // ── Single target renderer ───────────────────────────────────────────
 
 export function renderAffectedSingle(params: RenderSingleParams): string {
-  const { symbolName, refs, analysis, maxResults, prioritySignals, target, cwd } = params;
+  const { symbolName, refs, analysis, maxResults, prioritySignals, cwd } = params;
   const totalRefs = refs.refs.length + analysis.externalRefs;
   const lines: string[] = [];
 
@@ -63,16 +63,6 @@ export function renderAffectedSingle(params: RenderSingleParams): string {
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
-
-  const relPath = target.file ? pathRelative(cwd, target.file) : "";
-  lines.push("## Next");
-  lines.push(
-    `- \`code_inspect\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for point facts around ${symbolName}`,
-  );
-  lines.push(
-    `- \`code_graph\`, \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for reference sites`,
-  );
-  lines.push("");
 
   return lines.join("\n");
 }
@@ -119,12 +109,6 @@ export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
-  lines.push("## Next");
-  lines.push("- `code_context` on the most-affected module for deeper context");
-  lines.push(
-    "- Use `code_inspect` with file + line + character to inspect one exported target precisely",
-  );
-  lines.push("");
 
   return lines.join("\n");
 }
@@ -167,13 +151,4 @@ function addTestsSection(lines: string[], tests: string[]): void {
     lines.push(`- \`${t}\``);
   }
   lines.push("");
-}
-
-function pathRelative(cwd: string, file: string): string {
-  // Simple relative path computation
-  if (file.startsWith(cwd)) {
-    const rel = file.slice(cwd.length).replace(/^[/\\]/, "");
-    return rel || ".";
-  }
-  return file;
 }
