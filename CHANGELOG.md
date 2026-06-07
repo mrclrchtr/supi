@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.0](https://github.com/mrclrchtr/supi/compare/v1.11.3...v1.12.0) (2026-06-07)
+
+
+### Features
+
+* **supi-ask-user:** increase max questions from 4 to 10 ([58b04c8](https://github.com/mrclrchtr/supi/commit/58b04c80d5ce99b7734d855f815bbfef7930350a))
+* **supi-ask-user:** make discuss always available with text input ([a6bc44e](https://github.com/mrclrchtr/supi/commit/a6bc44ed6d548bfebc08e719844aee35e7f002b1))
+
 ## [1.11.3](https://github.com/mrclrchtr/supi/compare/v1.11.2...v1.11.3) (2026-06-07)
 
 
