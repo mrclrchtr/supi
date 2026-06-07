@@ -12,6 +12,15 @@
       "matchPackageNames": ["@earendil-works/{/,}**"]
     },
     {
+      "description": "vscode-languageserver-node monorepo",
+      "groupName": "vscode-languageserver-node",
+      "matchPackageNames": [
+        "vscode-jsonrpc",
+        "vscode-languageserver-protocol",
+        "vscode-languageserver-types"
+      ]
+    },
+    {
       "description": "Pi core peer deps use '*' ranges and must not be auto-updated by Renovate",
       "enabled": false,
       "matchPackageNames": [
