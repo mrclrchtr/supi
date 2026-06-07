@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { DynamicBorder } from "@earendil-works/pi-coding-agent";
+import { DynamicBorder, type Theme } from "@earendil-works/pi-coding-agent";
 import {
   Container,
   Key,
@@ -14,7 +14,6 @@ import {
 } from "@earendil-works/pi-tui";
 import { buildReviewPacketPreviewData } from "../target/packet.ts";
 import type { ReviewPlan } from "../types.ts";
-import type { ReviewTheme } from "./theme-type.ts";
 
 type PreviewScreen = "summary" | "inspector";
 type InspectorMode = "overview" | "raw";
@@ -27,7 +26,7 @@ interface PreviewNotice {
 
 export interface ReviewPlanPreviewComponentArgs {
   plan: ReviewPlan;
-  theme: ReviewTheme;
+  theme: Theme;
   onDone: (approved: boolean) => void;
   requestRender: () => void;
   exportPrompt?: (prompt: string) => string;
@@ -201,11 +200,7 @@ export function exportReviewPromptToTempFile(prompt: string): string {
   return path;
 }
 
-function buildSummaryContainer(
-  theme: ReviewTheme,
-  plan: ReviewPlan,
-  notice?: PreviewNotice,
-): Container {
+function buildSummaryContainer(theme: Theme, plan: ReviewPlan, notice?: PreviewNotice): Container {
   const { model, snapshot, brief, packet } = plan;
   const container = new Container();
   const accent = (s: string) => theme.fg("accent", s);
@@ -281,14 +276,14 @@ function buildSummaryContainer(
   return container;
 }
 
-function buildPromptPreviewHeader(theme: ReviewTheme, prompt: string): string {
+function buildPromptPreviewHeader(theme: Theme, prompt: string): string {
   return theme.fg(
     "accent",
     theme.bold(`  ── Reviewer Prompt (${prompt.length.toLocaleString()} chars) ──`),
   );
 }
 
-function buildPromptPreviewBody(theme: ReviewTheme, prompt: string): string {
+function buildPromptPreviewBody(theme: Theme, prompt: string): string {
   const maxPreview = 2_000;
   if (prompt.length <= maxPreview) return prompt;
   return `${prompt.slice(0, maxPreview)}\n\n${theme.fg("warning", `[Preview truncated — showing ${maxPreview.toLocaleString()} of ${prompt.length.toLocaleString()} total chars]`)}`;
@@ -296,7 +291,7 @@ function buildPromptPreviewBody(theme: ReviewTheme, prompt: string): string {
 
 function buildInspectorBodyLines(
   width: number,
-  theme: ReviewTheme,
+  theme: Theme,
   plan: ReviewPlan,
   mode: InspectorMode,
 ): string[] {

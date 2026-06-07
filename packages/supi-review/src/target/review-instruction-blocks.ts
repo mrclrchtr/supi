@@ -33,10 +33,6 @@ const REVIEW_INSTRUCTION_BLOCKS: readonly ReviewInstructionBlock[] = [
   },
 ];
 
-const reviewInstructionBlockMap = new Map<ReviewInstructionBlockId, ReviewInstructionBlock>(
-  REVIEW_INSTRUCTION_BLOCKS.map((block) => [block.id, block]),
-);
-
 /** Return the full fixed catalog of review instruction blocks. */
 export function listReviewInstructionBlocks(): readonly ReviewInstructionBlock[] {
   return REVIEW_INSTRUCTION_BLOCKS;
@@ -52,7 +48,7 @@ export function resolveReviewInstructionBlocks(
   for (const id of ids) {
     if (seen.has(id)) continue;
     seen.add(id);
-    const block = reviewInstructionBlockMap.get(id);
+    const block = REVIEW_INSTRUCTION_BLOCKS.find((b) => b.id === id);
     if (block) resolved.push(block);
   }
 

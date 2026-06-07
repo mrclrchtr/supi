@@ -33,7 +33,8 @@ packages/<pkg>/
 ```
 
 Notes:
-- `src/api.ts` exists when the package exposes a reusable `/api` surface.
+- `src/api.ts` exists **only** when the package exposes a reusable `/api` surface — omit it for packages with no library API.
+  When present, it must re-export actual API symbols (types, utilities), never the extension factory function.
 - `src/index.ts` is the package-root re-export surface.
 - `src/extension.ts` exists when the package installs into pi.
 - `<main>.ts` is the package centerpiece, usually named after the package or primary tool.

@@ -56,7 +56,7 @@ New packages should be added to the root `package.json` `pi.extensions` array fo
 
 ## Packaging conventions
 
-- Every published SuPi pi-package exposes explicit `./api` and `./extension` exports. Do not rely on package-root (`.`) imports or cross-package `src/...` deep imports.
+- Every published SuPi pi-package exposes an explicit `./extension` export. Packages with a reusable library API expose an explicit `./api` export (optional — omit when there is no library surface). Do not rely on package-root (`.`) imports or cross-package `src/...` deep imports.
 - `supi-core` is the exception — it is a library-only package with no pi extension surface, no `./extension` export, and no `pi.extensions` entry. Other SuPi packages bundle it for the library API only.
 - `pi.extensions` / `pi.prompts` / `pi.skills` / `pi.themes` manifest entries must remain **real package-relative file paths**. Do not replace them with `exports` aliases.
 - Any SuPi package that depends on another `@mrclrchtr/supi-*` package must list it in both `dependencies` and `bundledDependencies`. Per [pi packages docs](https://github.com/earendil-works/pi/blob/main/docs/packages.md), pi packages that depend on other pi packages must be bundled in the tarball — npm transitive dependency resolution is not guaranteed by pi's module isolation.

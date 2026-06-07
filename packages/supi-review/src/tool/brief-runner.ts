@@ -8,6 +8,7 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { SynthesizedReviewBrief } from "../types.ts";
+import { buildProgressTokens, extractLastAssistantText } from "./runner-helpers.ts";
 import type {
   BriefSynthesisInvocation,
   BriefSynthesisRunResult,
@@ -78,50 +79,8 @@ async function createBriefSession(
   return session;
 }
 
-function extractLastAssistantText(session: AgentSession): string | undefined {
-  const messages = session.messages;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i];
-    if (message?.role !== "assistant") continue;
-    const text = extractAssistantText(message.content);
-    if (text) return text;
-  }
-  return undefined;
-}
-
-function extractAssistantText(content: unknown): string | undefined {
-  if (typeof content === "string") {
-    return content.length > 0 ? content : undefined;
-  }
-
-  if (!Array.isArray(content)) {
-    return undefined;
-  }
-
-  const texts = content
-    .map((part) => {
-      if (typeof part !== "object" || !part) return "";
-      const text = (part as { text?: unknown }).text;
-      return typeof text === "string" ? text : "";
-    })
-    .filter((value) => value.length > 0);
-
-  return texts.length > 0 ? texts.join("\n") : undefined;
-}
-
 function emitProgress(session: AgentSession, progress: ReviewProgress): ReviewProgress {
-  try {
-    const stats = session.getSessionStats();
-    progress.tokens = stats?.tokens
-      ? {
-          input: stats.tokens.input ?? 0,
-          output: stats.tokens.output ?? 0,
-          total: stats.tokens.total ?? 0,
-        }
-      : undefined;
-  } catch {
-    // ignore missing stats
-  }
+  progress.tokens = buildProgressTokens(() => session.getSessionStats());
   return { ...progress, activities: [...progress.activities] };
 }
 
@@ -140,7 +99,7 @@ function handleAgentEnd(options: {
   if (brief) {
     return cleanup({ kind: "success", brief });
   }
-  const lastText = extractLastAssistantText(session);
+  const lastText = extractLastAssistantText(session.messages);
   return cleanup({
     kind: "failed",
     reason: lastText
