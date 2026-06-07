@@ -46,7 +46,8 @@ export function formatDiagnostic(diag: Diagnostic): string {
   const col = diag.range.start.character + 1;
   const source = diag.source ? ` [${diag.source}]` : "";
   const code = diag.code !== undefined ? ` (${diag.code})` : "";
-  return `${icon} ${sev}${source}${code} (${line}:${col}): ${diag.message}`;
+  const msg = typeof diag.message === "string" ? diag.message : diag.message.value;
+  return `${icon} ${sev}${source}${code} (${line}:${col}): ${msg}`;
 }
 
 /**

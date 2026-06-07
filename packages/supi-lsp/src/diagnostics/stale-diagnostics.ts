@@ -43,5 +43,7 @@ export function isLikelyStaleDiagnostic(diagnostic: Diagnostic): boolean {
     }
   }
 
-  return MODULE_RESOLUTION_MESSAGE.test(diagnostic.message);
+  const message =
+    typeof diagnostic.message === "string" ? diagnostic.message : diagnostic.message.value;
+  return MODULE_RESOLUTION_MESSAGE.test(message);
 }

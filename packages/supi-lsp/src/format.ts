@@ -2,6 +2,7 @@
 
 import * as path from "node:path";
 import type {
+  AnnotatedTextEdit,
   CodeAction,
   DocumentSymbol,
   Hover,
@@ -9,7 +10,9 @@ import type {
   LocationLink,
   MarkedString,
   MarkupContent,
+  SnippetTextEdit,
   SymbolInformation,
+  TextEdit,
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "./config/types.ts";
@@ -179,9 +182,27 @@ export function formatSymbolInformation(symbols: SymbolInformation[], cwd: strin
 
 // ── Workspace Edits ───────────────────────────────────────────────────
 
+interface DisplayEdit {
+  range: { start: { line: number } };
+  newText: string;
+}
+
 interface EditEntry {
   file: string;
-  edits: Array<{ range: { start: { line: number } }; newText: string }>;
+  edits: DisplayEdit[];
+}
+
+/**
+ * Normalize a TextEdit/AnnotatedTextEdit/SnippetTextEdit to a display-friendly form.
+ *
+ * @since 3.18.0 — vscode-languageserver-types widened TextDocumentEdit.edits to include
+ * SnippetTextEdit (guarded by `workspace.workspaceEdit.snippetEditSupport` client capability).
+ */
+function editToDisplay(edit: TextEdit | AnnotatedTextEdit | SnippetTextEdit): DisplayEdit {
+  if ("snippet" in edit) {
+    return { range: edit.range, newText: edit.snippet.value };
+  }
+  return { range: edit.range, newText: edit.newText };
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pre-existing — not introduced by this change
@@ -196,7 +217,10 @@ function partitionWorkspaceEdit(
     for (const [uri, edits] of Object.entries(edit.changes)) {
       const filePath = uriToFile(uri);
       if (isProjectSource(filePath, cwd)) {
-        projectChanges.push({ file: relPath(filePath, cwd), edits });
+        projectChanges.push({
+          file: relPath(filePath, cwd),
+          edits: edits.map(editToDisplay),
+        });
       } else {
         externalCount++;
       }
@@ -208,7 +232,10 @@ function partitionWorkspaceEdit(
       if (!("textDocument" in dc)) continue;
       const filePath = uriToFile(dc.textDocument.uri);
       if (isProjectSource(filePath, cwd)) {
-        projectChanges.push({ file: relPath(filePath, cwd), edits: dc.edits });
+        projectChanges.push({
+          file: relPath(filePath, cwd),
+          edits: dc.edits.map(editToDisplay),
+        });
       } else {
         externalCount++;
       }

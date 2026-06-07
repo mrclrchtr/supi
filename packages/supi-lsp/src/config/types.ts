@@ -21,6 +21,7 @@ export {
 } from "vscode-languageserver-protocol";
 // ── Core data types from vscode-languageserver-types ─────────────────
 export {
+  AnnotatedTextEdit,
   CodeAction,
   type CodeActionContext,
   Command,
@@ -35,6 +36,8 @@ export {
   MarkupContent,
   Position,
   Range,
+  SnippetTextEdit,
+  type StringValue,
   SymbolInformation,
   SymbolKind,
   TextDocumentEdit,
