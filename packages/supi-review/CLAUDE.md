@@ -45,17 +45,19 @@ src/
     review-instruction-blocks.ts  Fixed host-owned review instruction block catalog
     packet.ts                     Compact review packet builder + shared preview-data derivation
   tool/
-    brief-runner.ts     Brief synthesis child session
-    review-runner.ts    Read-only reviewer child session
-    runner-types.ts     Shared runner progress/result types
-    schemas.ts          TypeBox schemas for submit_review[_brief]
-    snapshot-tools.ts   Snapshot-aware diff/file tools for the reviewer session
+    brief-runner.ts        Brief synthesis child session
+    review-runner.ts       Read-only reviewer child session
+    runner-helpers.ts      Shared runner helpers (extractLastAssistantText, etc.)
+    runner-types.ts        Shared runner progress/result types
+    schemas.ts             TypeBox schemas for submit_review[_brief]
+    snapshot-tools.ts      Snapshot-aware diff/file tools for the reviewer session
   ui/
     flow.ts             TUI selection + review flow entry points
     review-plan-inspector.ts
                          In-app summary/inspector preview with Overview + Raw Prompt modes
     renderer.ts         Custom message rendering with normalized review items
     format-content.ts   Plain-text message content for LLM context
+    format-helpers.ts   Shared formatLevel/formatLocation utilities
     (ProgressWidget migrated to @mrclrchtr/supi-core/progress-widget;
      runWithProgressWidget lives in @mrclrchtr/supi-core/tool-framework)
 __tests__/

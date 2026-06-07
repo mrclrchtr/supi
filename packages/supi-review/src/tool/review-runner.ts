@@ -9,6 +9,7 @@ import {
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import type { RawReviewResult, ReviewFailureDebugInfo, ReviewOutputEvent } from "../types.ts";
+import { buildProgressTokens, extractAssistantText } from "./runner-helpers.ts";
 import type { ReviewInvocation, ReviewProgress } from "./runner-types.ts";
 import { reviewOutputSchema } from "./schemas.ts";
 import { createSnapshotDiffTool, createSnapshotFileTool } from "./snapshot-tools.ts";
@@ -207,8 +208,12 @@ async function createReviewerSession(
   return session;
 }
 
-function extractLastAssistantText(session: AgentSession): string | undefined {
+function extractLastAssistantTextFromSession(session: AgentSession): string | undefined {
   return extractLastAssistantDebug(session)?.text;
+}
+
+function extractLastAssistantText(session: AgentSession): string | undefined {
+  return extractLastAssistantTextFromSession(session);
 }
 
 interface LastAssistantDebugInfo {
@@ -218,8 +223,10 @@ interface LastAssistantDebugInfo {
   toolCalls?: string[];
 }
 
-function extractLastAssistantDebug(session: AgentSession): LastAssistantDebugInfo | undefined {
-  const messages = session.messages as unknown as Array<Record<string, unknown>>;
+function extractLastAssistantDebugFromMessages(
+  messages: ArrayLike<Record<string, unknown>> | undefined,
+): LastAssistantDebugInfo | undefined {
+  if (!messages) return undefined;
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
     if (message?.role !== "assistant") continue;
@@ -241,24 +248,10 @@ function extractLastAssistantDebug(session: AgentSession): LastAssistantDebugInf
   return undefined;
 }
 
-function extractAssistantText(content: unknown): string | undefined {
-  if (typeof content === "string") {
-    return content || undefined;
-  }
-
-  if (!Array.isArray(content)) {
-    return undefined;
-  }
-
-  const texts = content
-    .map((part) => {
-      if (typeof part !== "object" || !part) return "";
-      const text = (part as { text?: unknown }).text;
-      return typeof text === "string" ? text : "";
-    })
-    .filter((text) => text.length > 0);
-
-  return texts.length > 0 ? texts.join("\n") : undefined;
+function extractLastAssistantDebug(session: AgentSession): LastAssistantDebugInfo | undefined {
+  return extractLastAssistantDebugFromMessages(
+    session.messages as unknown as Array<Record<string, unknown>>,
+  );
 }
 
 function extractAssistantToolCalls(content: unknown): string[] {
@@ -311,18 +304,7 @@ function pushRecentEvent(recentEvents: string[], summary: string | undefined): v
 }
 
 function refreshProgressTokens(ctx: RunnerContext): void {
-  try {
-    const stats = ctx.session.getSessionStats();
-    ctx.progress.tokens = stats?.tokens
-      ? {
-          input: stats.tokens.input ?? 0,
-          output: stats.tokens.output ?? 0,
-          total: stats.tokens.total ?? 0,
-        }
-      : undefined;
-  } catch {
-    // Session stats are optional early in the run.
-  }
+  ctx.progress.tokens = buildProgressTokens(() => ctx.session.getSessionStats());
 }
 
 function buildFailureDebug(ctx: RunnerContext): ReviewFailureDebugInfo {

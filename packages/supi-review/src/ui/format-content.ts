@@ -1,4 +1,5 @@
 import type { ReviewFailureDebugInfo, ReviewItem, ReviewResult } from "../types.ts";
+import { formatLevel, formatLocation } from "./format-helpers.ts";
 
 /** Format review results for the LLM-visible custom message content. */
 export function formatReviewContent(result: ReviewResult): string {
@@ -124,13 +125,4 @@ function formatReviewItems(items: ReviewItem[]): string[] {
     lines.push(`      Verification: ${item.verification_hint}`);
     return lines;
   });
-}
-
-function formatLevel(value: ReviewItem["impact"] | ReviewItem["effort"]): string {
-  return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
-}
-
-function formatLocation(file: string, startLine: number, endLine: number): string {
-  const lineRange = startLine === endLine ? String(startLine) : `${startLine}-${endLine}`;
-  return `${file}:${lineRange}`;
 }

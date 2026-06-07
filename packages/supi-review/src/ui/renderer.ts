@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
 import type { ReviewFailureDebugInfo, ReviewItem, ReviewResult } from "../types.ts";
+import { formatLevel, formatLocation } from "./format-helpers.ts";
 
 /** Register the custom TUI renderer for `supi-review` messages. */
 export function registerReviewRenderer(pi: ExtensionAPI): void {
@@ -236,14 +237,6 @@ function renderFailureDebug(
   for (const line of lines) {
     container.addChild(new Text(theme.fg("dim", line), 1, 0));
   }
-}
-
-function formatLevel(value: ReviewItem["impact"] | ReviewItem["effort"]): string {
-  return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
-}
-
-function formatLocation(file: string, startLine: number, endLine: number): string {
-  return `${file}:${startLine === endLine ? startLine : `${startLine}-${endLine}`}`;
 }
 
 function actionColorName(
