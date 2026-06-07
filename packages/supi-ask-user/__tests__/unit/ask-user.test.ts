@@ -103,7 +103,7 @@ describe("ask_user tool", () => {
       makeUnsupportedCtx(),
     )) as { content: { type: string; text: string }[]; details: { kind?: string } };
 
-    expect(result.content[0]?.text).toContain("supports 1-4 questions only");
+    expect(result.content[0]?.text).toContain("supports 1-10 questions only");
     expect(result.details.kind).toBe("error");
   });
 
