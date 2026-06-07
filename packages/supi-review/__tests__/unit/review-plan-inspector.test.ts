@@ -1,4 +1,5 @@
 import { readFileSync, unlinkSync } from "node:fs";
+import { Theme } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 import type { ReviewPlan } from "../../src/types.ts";
 import {
@@ -6,11 +7,67 @@ import {
   ReviewPlanPreviewComponent,
 } from "../../src/ui/review-plan-inspector.ts";
 
-function createTheme() {
-  return {
-    fg: (_color: string, text: string) => text,
-    bold: (text: string) => text,
-  };
+/** All ThemeColor keys mapped to a sentinel value so we can construct a Theme. */
+const ALL_FG_COLORS = {
+  accent: 0,
+  border: 0,
+  borderAccent: 0,
+  borderMuted: 0,
+  success: 0,
+  error: 0,
+  warning: 0,
+  muted: 0,
+  dim: 0,
+  text: 0,
+  thinkingText: 0,
+  userMessageText: 0,
+  customMessageText: 0,
+  customMessageLabel: 0,
+  toolTitle: 0,
+  toolOutput: 0,
+  mdHeading: 0,
+  mdLink: 0,
+  mdLinkUrl: 0,
+  mdCode: 0,
+  mdCodeBlock: 0,
+  mdCodeBlockBorder: 0,
+  mdQuote: 0,
+  mdQuoteBorder: 0,
+  mdHr: 0,
+  mdListBullet: 0,
+  toolDiffAdded: 0,
+  toolDiffRemoved: 0,
+  toolDiffContext: 0,
+  syntaxComment: 0,
+  syntaxKeyword: 0,
+  syntaxFunction: 0,
+  syntaxVariable: 0,
+  syntaxString: 0,
+  syntaxNumber: 0,
+  syntaxType: 0,
+  syntaxOperator: 0,
+  syntaxPunctuation: 0,
+  thinkingOff: 0,
+  thinkingMinimal: 0,
+  thinkingLow: 0,
+  thinkingMedium: 0,
+  thinkingHigh: 0,
+  thinkingXhigh: 0,
+  bashMode: 0,
+} as const;
+
+/** All ThemeBg keys mapped to a sentinel value. */
+const ALL_BG_COLORS = {
+  selectedBg: 0,
+  userMessageBg: 0,
+  customMessageBg: 0,
+  toolPendingBg: 0,
+  toolSuccessBg: 0,
+  toolErrorBg: 0,
+} as const;
+
+function createTheme(): Theme {
+  return new Theme(ALL_FG_COLORS, ALL_BG_COLORS, "truecolor");
 }
 
 type PlanOverrides = {
