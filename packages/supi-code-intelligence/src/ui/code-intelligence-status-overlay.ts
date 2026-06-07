@@ -16,6 +16,7 @@ import type {
   OutstandingDiagnosticSummaryEntry,
   ProjectServerInfo,
 } from "@mrclrchtr/supi-lsp/api";
+import { diagnosticMessageString } from "../lsp/diagnostic-utils.ts";
 
 /**
  * Minimal theme contract used by the dialog. Matches the public `theme.fg()` /
@@ -409,10 +410,7 @@ export class CiStatusDialog {
       const lineNum = diag.range.start.line + 1;
       const colNum = diag.range.start.character + 1;
       const sevColor = diag.severity === 1 ? "error" : "warning";
-      const messageText = truncateTextForInline(
-        typeof diag.message === "string" ? diag.message : diag.message.value,
-        width - 14,
-      );
+      const messageText = truncateTextForInline(diagnosticMessageString(diag), width - 14);
       const msg = `    ${t.fg(sevColor, "└")} ${lineNum}:${colNum}  ${t.fg("dim", messageText)}`;
       container.addChild(new Text(msg, 0, 0));
     }

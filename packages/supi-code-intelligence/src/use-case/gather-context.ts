@@ -9,6 +9,7 @@ import { resolve } from "node:path";
 import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
 import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
+import { diagnosticMessageString } from "../lsp/diagnostic-utils.ts";
 
 export interface TreeSitterContext {
   nodeInfo: {
@@ -167,7 +168,7 @@ export async function gatherNearbyDiagnostics(
     return chosen.slice(0, maxResults).map((d) => ({
       line: d.range.start.line + 1,
       severity: d.severity ?? 1,
-      message: typeof d.message === "string" ? d.message : d.message.value,
+      message: diagnosticMessageString(d),
     }));
   } catch {
     return [];

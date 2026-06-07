@@ -7,6 +7,7 @@
 
 import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
+import { diagnosticMessageString } from "../lsp/diagnostic-utils.ts";
 import type { BriefDiagnostic, BriefEnrichment } from "./brief-models.ts";
 
 // ── Default caps ─────────────────────────────────────────────────────
@@ -120,7 +121,7 @@ export async function enrichDiagnosticContext(
     const mapped: BriefDiagnostic[] = diags.map((d) => ({
       line: d.range.start.line + 1,
       severity: d.severity ?? 1,
-      message: typeof d.message === "string" ? d.message : d.message.value,
+      message: diagnosticMessageString(d),
     }));
 
     return { diagnostics: mapped.slice(0, capN) };

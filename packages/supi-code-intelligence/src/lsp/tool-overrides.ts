@@ -13,6 +13,7 @@ import type {
   WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
 import { createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-coding-agent";
+import { diagnosticMessageString } from "./diagnostic-utils.ts";
 import type { LspAdapterState } from "./runtime-state.ts";
 
 export function registerLspAwareToolOverrides(pi: ExtensionAPI, state: LspAdapterState): void {
@@ -107,7 +108,7 @@ async function appendInlineDiagnostics<T extends { content: unknown[]; details: 
       ...entries.flatMap((entry) =>
         entry.diagnostics.map(
           (d) =>
-            `  ${entry.file}:${d.range.start.line + 1}: ${typeof d.message === "string" ? d.message : d.message.value}`,
+            `  ${entry.file}:${d.range.start.line + 1}: ${diagnosticMessageString(d)}`,
         ),
       ),
       "If these errors are unexpected or appear across multiple files, fix the root cause before editing more.",

@@ -9,6 +9,7 @@ import {
   isLikelyStaleDiagnostic,
   syncWorkspaceSentinelSnapshot,
 } from "@mrclrchtr/supi-lsp/api";
+import { diagnosticMessageString } from "./diagnostic-utils.ts";
 import type { LspAdapterState } from "./runtime-state.ts";
 
 // LSP_TOOL_NAMES removed — lsp_* tools are no longer registered (TNDM-A9AQF4)
@@ -66,7 +67,7 @@ export function registerDiagnosticInjectionHandlers(
         file: entry.file,
         diagnostics: entry.diagnostics.map((d) => ({
           range: d.range,
-          message: typeof d.message === "string" ? d.message : d.message.value,
+          message: diagnosticMessageString(d),
         })),
       }));
 
