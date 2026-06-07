@@ -66,7 +66,8 @@ function appendDetailLines(lines: string[], details?: Diagnostic[]): void {
     const line = d.range.start.line + 1;
     const char = d.range.start.character + 1;
     const source = d.source ? ` ${d.source}` : "";
-    lines.push(`  L${line} C${char}${source}: ${d.message}`);
+    const msg = typeof d.message === "string" ? d.message : d.message.value;
+    lines.push(`  L${line} C${char}${source}: ${msg}`);
   }
   if (details.length > MAX_DETAIL_LINES_PER_FILE) {
     const extra = details.length - MAX_DETAIL_LINES_PER_FILE;

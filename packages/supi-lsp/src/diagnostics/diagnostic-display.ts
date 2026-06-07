@@ -58,7 +58,8 @@ function buildDisplayDetailLines(
     for (const d of entry.diagnostics.slice(0, 3)) {
       const line = d.range.start.line + 1;
       const source = d.source ? ` ${d.source}` : "";
-      lines.push(`   ${entry.file} L${line}${source}: ${d.message}`);
+      const msg = typeof d.message === "string" ? d.message : d.message.value;
+      lines.push(`   ${entry.file} L${line}${source}: ${msg}`);
     }
     if (entry.diagnostics.length > 3) {
       lines.push(`   +${entry.diagnostics.length - 3} more`);

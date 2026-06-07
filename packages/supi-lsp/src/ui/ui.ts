@@ -282,6 +282,7 @@ function buildOverlayServerLines(
   });
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pre-existing — v3.18.0 MarkupContent extraction pushes it over
 function buildOverlayDiagnosticLines(
   theme: ExtensionContext["ui"]["theme"],
   diagnostics: OutstandingDiagnosticSummaryEntry[],
@@ -307,7 +308,8 @@ function buildOverlayDiagnosticLines(
       const line = diag.range.start.line + 1;
       const col = diag.range.start.character + 1;
       const sevColor = diag.severity === DiagnosticSeverity.Error ? "error" : "warning";
-      const message = truncate(diag.message, maxMessageLen);
+      const messageText = typeof diag.message === "string" ? diag.message : diag.message.value;
+      const message = truncate(messageText, maxMessageLen);
       lines.push(`  ${theme.fg(sevColor, "└")} ${line}:${col} ${theme.fg("dim", message)}`);
     }
 

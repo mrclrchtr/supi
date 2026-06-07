@@ -4,7 +4,9 @@ const SUPPRESSION_WARNING_SEVERITY = 2;
 
 /** Detect diagnostics that represent stale suppression comments. */
 export function isStaleSuppressionDiagnostic(diagnostic: Diagnostic): boolean {
-  const message = diagnostic.message.toLowerCase();
+  const rawMessage =
+    typeof diagnostic.message === "string" ? diagnostic.message : diagnostic.message.value;
+  const message = rawMessage.toLowerCase();
 
   if (message.includes("unused '@ts-expect-error' directive")) {
     return true;
