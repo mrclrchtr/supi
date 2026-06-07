@@ -1,178 +1,32 @@
-// biome-ignore lint/nursery/noExcessiveLinesPerFile: runner wires session lifecycle, timeout handling, and tool submission
 import { clampThinkingLevel } from "@earendil-works/pi-ai";
 import {
   type AgentSession,
-  type AgentSessionEvent,
   createAgentSession,
   DefaultResourceLoader,
-  defineTool,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { RawReviewResult, ReviewFailureDebugInfo, ReviewOutputEvent } from "../types.ts";
-import { buildProgressTokens, extractAssistantText } from "./runner-helpers.ts";
-import type { ReviewInvocation, ReviewProgress } from "./runner-types.ts";
-import { reviewOutputSchema } from "./schemas.ts";
+import type { RawReviewResult, ReviewOutputEvent } from "../types.ts";
+import { buildFailureDebug, extractLastAssistantText } from "./review-debug.ts";
+import {
+  createSubmitReviewTool,
+  handleSessionEvent,
+  type RunnerContext,
+} from "./review-handlers.ts";
+import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
+import type { ReviewInvocation } from "./runner-types.ts";
+import { type LifecycleCtx, runWithLifecycle } from "./session-lifecycle.ts";
 import { createSnapshotDiffTool, createSnapshotFileTool } from "./snapshot-tools.ts";
 
 const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
 const GRACE_TURNS = 3;
-const RECENT_EVENTS_MAX = 10;
-const LAST_ASSISTANT_TEXT_DEBUG_MAX = 2_000;
 const STEER_MESSAGE = "Time limit reached. Wrap up and submit your review now.";
-const STEER_SUBMIT_MESSAGE =
-  "You stopped without calling submit_review. Call submit_review now with your findings.";
-
-/** Maps tool names to human-readable activity descriptions. */
-function toolNameToActivity(name: string, phase: "start" | "end"): string {
-  if (phase === "end") return "";
-  const map: Record<string, string> = {
-    read: "reading",
-    grep: "searching",
-    find: "finding files",
-    ls: "listing files",
-    submit_review: "submitting review",
-    read_snapshot_diff: "reading diff",
-    read_snapshot_file: "reading file",
-  };
-  return map[name] ?? name;
-}
-
-function createSubmitReviewTool(resultHolder: {
-  value: ReviewOutputEvent | undefined;
-}): ReturnType<typeof defineTool> {
-  return defineTool({
-    name: "submit_review",
-    label: "Submit Review",
-    description:
-      "Submit the final structured review result after you finish investigating the changes.",
-    parameters: reviewOutputSchema,
-    execute: async (_toolCallId, args) => {
-      resultHolder.value = args as ReviewOutputEvent;
-      return {
-        content: [{ type: "text" as const, text: "Review submitted successfully." }],
-        details: args,
-        terminate: true,
-      };
-    },
-  });
-}
-
-/** Build the reviewer system prompt used by the read-only child session. */
-export function buildReviewerSystemPrompt(): string {
-  return [
-    "You are a rigorous code reviewer. Your task already includes session-derived intent",
-    "and a concrete list of changed files. Use the prompt packet as the primary brief,",
-    "then inspect code with the available read-only tools before drawing conclusions.",
-    "",
-    "CRITICAL: Call submit_review to deliver results. Never output review text directly.",
-    "",
-    "--- Guardrails ---",
-    "- You have read-only tools only. Do NOT modify files or propose running write/edit/bash commands.",
-    "",
-    "--- Depth ---",
-    "- Read the full changed file, not just the diff. The diff shows what changed;",
-    "  surrounding code shows whether it still makes sense.",
-    "- For high-risk files, also read immediate callers and callees (use grep / find / read",
-    "  to trace references). Without surrounding context you miss broken call sites,",
-    "  stale comments, and silent convention violations.",
-    "",
-    "--- Convention awareness ---",
-    "- Before flagging a style or convention issue, read CLAUDE.md, AGENTS.md, and",
-    "  sibling files in the same directory.",
-    '- "This doesn\'t match the codebase style" only counts when you can point to',
-    "  the real convention in the codebase.",
-    "",
-    "--- Mandatory review instructions from the prompt packet ---",
-    "- The prompt packet may include mandatory review instructions for this review.",
-    "- Treat any supplied mandatory review instructions as required checks for this run.",
-    "- If a mandatory review instruction applies, explicitly sweep that class of issues before submitting.",
-    "",
-    "--- What counts as a finding ---",
-    "Report only issues that meet ALL of these criteria:",
-    "1. It meaningfully impacts correctness, security, performance, or maintainability.",
-    "2. It was introduced by this change — pre-existing issues are out of scope",
-    "   unless the change makes them worse.",
-    "3. It is discrete and actionable — the author can fix it in one focused pass.",
-    "4. It does not require assuming unstated intent or speculative downstream effects.",
-    "5. It does not demand a level of rigor not present in the rest of the codebase.",
-    "6. The author would likely fix it if they were made aware of it.",
-    "7. It is not clearly an intentional change by the original author.",
-    "",
-    "--- Do not flag ---",
-    "- Trivial style issues unless they obscure meaning or violate documented standards.",
-    "- Pre-existing bugs unrelated to this change.",
-    '- Things that "might" break without an identified concrete code path.',
-    "- Hypothetical issues without a concrete scenario.",
-    "- Speculative downstream effects — identify the specific affected code.",
-    "",
-    "--- Review checklist ---",
-    "Check for:",
-    "- Logic bugs — wrong condition, off-by-one, missing null/undefined check, race condition.",
-    "- Security — injection, authz bypass, secret exposure.",
-    "- Convention violations — only when you can cite the convention.",
-    "- Missing or weak tests — new behavior without test coverage.",
-    "- Dead or unreachable code introduced by this change.",
-    "- Breaking changes — removed exports, changed signatures, config format changes.",
-    "",
-    "--- Review item calibration ---",
-    "recommended_action:",
-    "  must-fix: blocks merge or should be fixed before the change is accepted",
-    "  should-fix: worthwhile follow-up that meaningfully improves the patch",
-    "  consider: optional cleanup, docs, tests, or maintainer-oriented improvement worth surfacing",
-    "impact:",
-    "  high: leaving it unfixed has a clear meaningful downside",
-    "  medium: real downside, but not release-blocking on its own",
-    "  low: narrow or limited downside",
-    "effort:",
-    "  low: focused fix in one small pass",
-    "  medium: non-trivial but still well-bounded",
-    "  high: invasive or multi-part follow-up",
-    "Confidence:",
-    "  0.8-1.0: you verified the item by reading surrounding code or grepping the codebase",
-    "  0.5-0.8: plausible and supported by the patch, but not fully verified",
-    "  <0.5: do not report — either verify further or drop it",
-    "Categories:",
-    "  correctness, security, performance, api, test-gap, docs, cleanup, maintainer",
-    "",
-    "--- Overall assessment ---",
-    "Explain the overall review assessment in overall_explanation.",
-    "The host derives the final PATCH IS CORRECT / PATCH HAS ISSUES verdict from your submitted items.",
-    "",
-    "--- Review item format ---",
-    '- Title: concise and specific imperative (e.g. "Guard null token path").',
-    "- Body: what's wrong, why it matters, and the evidence. One paragraph.",
-    "- category / impact / effort / recommended_action: choose the closest structured values.",
-    "- suggested_fix: concrete repair direction the author can apply next.",
-    "- verification_hint: how to confirm the fix worked.",
-    "- code_location: 1-based inclusive line range when a concrete location exists.",
-    "",
-    "--- Tool strategy ---",
-    "- Start by fetching the diff for each changed file using read_snapshot_diff.",
-    "- Use read_snapshot_file <file> before|after to inspect file contents on either side of the change.",
-    "- Use read to inspect full files when the inline diff lacks context.",
-    "- Use grep to verify patterns across the codebase.",
-    "- Use find to locate related files quickly.",
-    "- Use ls when you need a quick directory overview.",
-    "",
-    "--- Large diffs ---",
-    "- If the diff spans many files, prioritize high-risk files (core logic, auth, data handling).",
-    "- Note in overall_explanation which files you reviewed deeply vs. skimmed.",
-    "",
-    "--- Skipped files ---",
-    "- Skip reviewing: lockfiles, generated/bundled code (dist/, .next/, __generated__/),",
-    "  vendored dependencies, changelogs, snapshot files, minified bundles, and binary files.",
-    "- Focus on application source and test code.",
-    "",
-    "--- Output ---",
-    "Call submit_review. Never output review text directly.",
-  ].join("\n");
-}
+const HARD_ABORT_GRACE_MS = 120_000;
 
 async function createReviewerSession(
   invocation: ReviewInvocation,
-  submitReviewTool: ReturnType<typeof defineTool>,
-  snapshotDiffTool: ReturnType<typeof defineTool>,
-  snapshotFileTool: ReturnType<typeof defineTool>,
+  submitReviewTool: ReturnType<typeof createSubmitReviewTool>,
+  snapshotDiffTool: ReturnType<typeof createSnapshotDiffTool>,
+  snapshotFileTool: ReturnType<typeof createSnapshotFileTool>,
 ): Promise<AgentSession> {
   const resourceLoader = new DefaultResourceLoader({
     cwd: invocation.cwd,
@@ -208,277 +62,175 @@ async function createReviewerSession(
   return session;
 }
 
-function extractLastAssistantTextFromSession(session: AgentSession): string | undefined {
-  return extractLastAssistantDebug(session)?.text;
-}
+// ---------------------------------------------------------------------------
+// Result factories (need RunnerContext built at abort/timeout time)
+// ---------------------------------------------------------------------------
 
-function extractLastAssistantText(session: AgentSession): string | undefined {
-  return extractLastAssistantTextFromSession(session);
-}
-
-interface LastAssistantDebugInfo {
-  text?: string;
-  stopReason?: string;
-  errorMessage?: string;
-  toolCalls?: string[];
-}
-
-function extractLastAssistantDebugFromMessages(
-  messages: ArrayLike<Record<string, unknown>> | undefined,
-): LastAssistantDebugInfo | undefined {
-  if (!messages) return undefined;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const message = messages[i];
-    if (message?.role !== "assistant") continue;
-
-    const text = extractAssistantText(message.content);
-    const stopReason =
-      typeof message.stopReason === "string" ? (message.stopReason as string) : undefined;
-    const errorMessage =
-      typeof message.errorMessage === "string" ? (message.errorMessage as string) : undefined;
-    const toolCalls = extractAssistantToolCalls(message.content);
-
-    return {
-      text: text ? truncateText(text, LAST_ASSISTANT_TEXT_DEBUG_MAX) : undefined,
-      stopReason,
-      errorMessage,
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-    };
-  }
-  return undefined;
-}
-
-function extractLastAssistantDebug(session: AgentSession): LastAssistantDebugInfo | undefined {
-  return extractLastAssistantDebugFromMessages(
-    session.messages as unknown as Array<Record<string, unknown>>,
-  );
-}
-
-function extractAssistantToolCalls(content: unknown): string[] {
-  if (!Array.isArray(content)) return [];
-
-  return content
-    .map((part) => {
-      if (typeof part !== "object" || !part) return undefined;
-      const toolPart = part as { type?: unknown; name?: unknown };
-      return toolPart.type === "toolCall" && typeof toolPart.name === "string"
-        ? toolPart.name
-        : undefined;
-    })
-    .filter((name): name is string => !!name);
-}
-
-function summarizeSessionEvent(event: AgentSessionEvent): string | undefined {
-  switch (event.type) {
-    case "message_end": {
-      const message = event.message as unknown as Record<string, unknown>;
-      if (message.role !== "assistant") return undefined;
-      const stopReason =
-        typeof message.stopReason === "string" ? String(message.stopReason) : undefined;
-      const suffix = stopReason ? `:${stopReason}` : "";
-      return `assistant:end${suffix}`;
-    }
-    case "tool_execution_start":
-      return `tool:start:${event.toolName}`;
-    case "tool_execution_end":
-      return `tool:end:${event.toolName}${event.isError ? ":error" : ""}`;
-    case "turn_end":
-      return "turn:end";
-    case "agent_end":
-      return `agent:end${event.willRetry ? ":retry" : ""}`;
-    case "auto_retry_start":
-      return `retry:start:${event.attempt}/${event.maxAttempts}`;
-    case "auto_retry_end":
-      return `retry:end:${event.success ? "success" : "failed"}`;
-    default:
-      return undefined;
-  }
-}
-
-function pushRecentEvent(recentEvents: string[], summary: string | undefined): void {
-  if (!summary) return;
-  recentEvents.push(summary);
-  if (recentEvents.length > RECENT_EVENTS_MAX) {
-    recentEvents.splice(0, recentEvents.length - RECENT_EVENTS_MAX);
-  }
-}
-
-function refreshProgressTokens(ctx: RunnerContext): void {
-  ctx.progress.tokens = buildProgressTokens(() => ctx.session.getSessionStats());
-}
-
-function buildFailureDebug(ctx: RunnerContext): ReviewFailureDebugInfo {
-  refreshProgressTokens(ctx);
-  const lastAssistant = extractLastAssistantDebug(ctx.session);
-
+function buildTimeoutResult(
+  lcCtx: LifecycleCtx<RawReviewResult>,
+  runner: ReviewerRunnerState,
+): RawReviewResult {
   return {
-    turns: ctx.progress.turns,
-    toolUses: ctx.progress.toolUses,
-    activities: ctx.progress.activities.length > 0 ? [...ctx.progress.activities] : undefined,
-    tokens: ctx.progress.tokens,
-    recentEvents: ctx.debug.recentEvents.length > 0 ? [...ctx.debug.recentEvents] : undefined,
-    lastAssistantText: lastAssistant?.text,
-    lastAssistantStopReason: lastAssistant?.stopReason,
-    lastAssistantErrorMessage: lastAssistant?.errorMessage,
-    lastAssistantToolCalls: lastAssistant?.toolCalls,
+    kind: "timeout" as const,
+    snapshot: runner.invocation.snapshot,
+    timeoutMs: runner.invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    brief: runner.invocation.brief,
+    modelId: runner.invocation.model.canonicalId,
+    debug: buildFailureDebug({
+      progress: lcCtx.progress,
+      session: lcCtx.session,
+      recentEvents: runner.debug.recentEvents,
+    }),
   };
 }
 
-interface RunnerContext {
-  progress: ReviewProgress;
-  session: AgentSession;
-  invocation: ReviewInvocation;
-  resolve: (result: RawReviewResult) => void;
-  cleanup: (result: RawReviewResult) => RawReviewResult;
+function buildCanceledResult(
+  lcCtx: LifecycleCtx<RawReviewResult>,
+  runner: ReviewerRunnerState,
+): RawReviewResult {
+  return {
+    kind: "canceled" as const,
+    snapshot: runner.invocation.snapshot,
+    brief: runner.invocation.brief,
+    modelId: runner.invocation.model.canonicalId,
+    debug: buildFailureDebug({
+      progress: lcCtx.progress,
+      session: lcCtx.session,
+      recentEvents: runner.debug.recentEvents,
+    }),
+  };
+}
+
+function buildFailedResult(
+  reason: string,
+  lcCtx: LifecycleCtx<RawReviewResult>,
+  runner: ReviewerRunnerState,
+): RawReviewResult {
+  return {
+    kind: "failed" as const,
+    reason,
+    snapshot: runner.invocation.snapshot,
+    brief: runner.invocation.brief,
+    modelId: runner.invocation.model.canonicalId,
+    debug: buildFailureDebug({
+      progress: lcCtx.progress,
+      session: lcCtx.session,
+      recentEvents: runner.debug.recentEvents,
+    }),
+  };
+}
+
+interface ReviewerRunnerState {
   resultHolder: { value: ReviewOutputEvent | undefined };
-  signal?: AbortSignal;
-  state: { settled: boolean };
+  invocation: ReviewInvocation;
   submitSteered: boolean;
-  timeout: { steered: boolean; graceTurnsRemaining: number | undefined; aborting?: boolean };
+  timeoutSteered: boolean;
+  graceTurnsRemaining: number | undefined;
   debug: { recentEvents: string[] };
 }
 
-function emitProgress(ctx: RunnerContext): void {
-  refreshProgressTokens(ctx);
-  ctx.invocation.onProgress?.({ ...ctx.progress, activities: [...ctx.progress.activities] });
-}
+// ---------------------------------------------------------------------------
+// Steer / abort helpers
+// ---------------------------------------------------------------------------
 
-function handleTurnEnd(ctx: RunnerContext): void {
-  ctx.progress.turns++;
-  ctx.progress.activities = [];
-
-  if (!ctx.state.settled && ctx.timeout.steered && ctx.timeout.graceTurnsRemaining !== undefined) {
-    ctx.timeout.graceTurnsRemaining--;
-    if (ctx.timeout.graceTurnsRemaining <= 0) {
-      ctx.timeout.aborting = true;
-      void ctx.session
-        .abort()
-        .catch(() => {})
-        .finally(() => {
-          const partialText = extractLastAssistantText(ctx.session);
-          ctx.resolve(
-            ctx.cleanup({
-              kind: "timeout",
-              snapshot: ctx.invocation.snapshot,
-              timeoutMs: ctx.invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-              partialOutput: partialText,
-              brief: ctx.invocation.brief,
-              modelId: ctx.invocation.model.canonicalId,
-              debug: buildFailureDebug(ctx),
-            }),
-          );
-        });
-    }
-  }
-
-  emitProgress(ctx);
-}
-
-function handleToolStart(
-  event: Extract<AgentSessionEvent, { type: "tool_execution_start" }>,
-  ctx: RunnerContext,
+/** Abort the session and resolve with a timeout result (from lifecycle context). */
+function doFinalAbortFromLifecycle(
+  lcCtx: LifecycleCtx<RawReviewResult>,
+  runner: ReviewerRunnerState,
 ): void {
-  ctx.progress.toolUses++;
-  const activity = toolNameToActivity(event.toolName, "start");
-  if (activity) ctx.progress.activities.push(activity);
-  ctx.invocation.onToolActivity?.({ toolName: event.toolName, phase: "start" });
-  emitProgress(ctx);
+  lcCtx.state.aborting = true;
+  void lcCtx.session
+    .abort()
+    .catch(() => {})
+    .finally(() => {
+      const partialText = extractLastAssistantText(lcCtx.session);
+      lcCtx.resolve(
+        lcCtx.cleanup({
+          kind: "timeout" as const,
+          snapshot: runner.invocation.snapshot,
+          timeoutMs: runner.invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+          partialOutput: partialText,
+          brief: runner.invocation.brief,
+          modelId: runner.invocation.model.canonicalId,
+          debug: buildFailureDebug({
+            progress: lcCtx.progress,
+            session: lcCtx.session,
+            recentEvents: runner.debug.recentEvents,
+          }),
+        }),
+      );
+    });
 }
 
-function handleToolEnd(
-  event: Extract<AgentSessionEvent, { type: "tool_execution_end" }>,
-  ctx: RunnerContext,
+/**
+ * Build the custom `onTimeout` handler for the review runner.
+ *
+ * When the soft timeout fires, the handler:
+ * 1. Steers the reviewer session to wrap up
+ * 2. Starts a grace timer (hard abort after GRACE_TURNS or HARD_ABORT_GRACE_MS)
+ * 3. If steer fails, immediately hard-aborts
+ */
+function buildReviewTimeoutHandler(
+  runner: ReviewerRunnerState,
+  lcCtx: LifecycleCtx<RawReviewResult>,
 ): void {
-  const activity = toolNameToActivity(event.toolName, "start");
-  if (activity) {
-    const index = ctx.progress.activities.indexOf(activity);
-    if (index !== -1) ctx.progress.activities.splice(index, 1);
-  }
-  ctx.invocation.onToolActivity?.({ toolName: event.toolName, phase: "end" });
-  emitProgress(ctx);
+  runner.timeoutSteered = true;
+  runner.graceTurnsRemaining = GRACE_TURNS;
+
+  const hardAbortTimer = setTimeout(() => {
+    if (lcCtx.state.settled) return;
+    doFinalAbortFromLifecycle(lcCtx, runner);
+  }, HARD_ABORT_GRACE_MS);
+  hardAbortTimer.unref?.();
+  lcCtx.addTeardown(() => clearTimeout(hardAbortTimer));
+
+  lcCtx.session.steer(STEER_MESSAGE).catch(() => {
+    clearTimeout(hardAbortTimer);
+    doFinalAbortFromLifecycle(lcCtx, runner);
+  });
 }
 
-function handleMessageEnd(
-  event: Extract<AgentSessionEvent, { type: "message_end" }>,
+// ---------------------------------------------------------------------------
+// Context sync helpers
+// ---------------------------------------------------------------------------
+
+function buildRunnerCtx(runner: ReviewerRunnerState): RunnerContext {
+  const ctx = {} as RunnerContext;
+  ctx.resultHolder = runner.resultHolder;
+  ctx.invocation = runner.invocation;
+  ctx.submitSteered = runner.submitSteered;
+  ctx.timeoutSteered = runner.timeoutSteered;
+  ctx.graceTurnsRemaining = runner.graceTurnsRemaining;
+  ctx.debug = runner.debug;
+  return ctx;
+}
+
+function syncCtxFromLifecycle(
   ctx: RunnerContext,
+  lcCtx: LifecycleCtx<RawReviewResult>,
+  runner: ReviewerRunnerState,
 ): void {
-  if (ctx.state.settled || ctx.submitSteered || ctx.resultHolder.value) return;
-
-  const msg = event.message as { role?: string; stopReason?: string };
-  if (msg.role !== "assistant" || msg.stopReason !== "stop") return;
-
-  ctx.submitSteered = true;
-  ctx.session.steer(STEER_SUBMIT_MESSAGE).catch(() => {});
+  ctx.progress = lcCtx.progress;
+  ctx.session = lcCtx.session;
+  ctx.resolve = lcCtx.resolve;
+  ctx.cleanup = lcCtx.cleanup;
+  ctx.state = lcCtx.state;
+  ctx.submitSteered = runner.submitSteered;
+  ctx.timeoutSteered = runner.timeoutSteered;
+  ctx.graceTurnsRemaining = runner.graceTurnsRemaining;
 }
 
-function handleAgentEnd(
-  event: Extract<AgentSessionEvent, { type: "agent_end" }>,
-  ctx: RunnerContext,
-): void {
-  if (ctx.state.settled || ctx.signal?.aborted || ctx.timeout.aborting) return;
-  const retryAwareEvent = event as typeof event & { willRetry?: boolean };
-  if (retryAwareEvent.willRetry) return;
-
-  if (ctx.resultHolder.value) {
-    ctx.resolve(
-      ctx.cleanup({
-        kind: "success",
-        output: ctx.resultHolder.value,
-        snapshot: ctx.invocation.snapshot,
-        brief: ctx.invocation.brief,
-        modelId: ctx.invocation.model.canonicalId,
-      }),
-    );
-    return;
-  }
-
-  const lastText = extractLastAssistantText(ctx.session);
-  ctx.resolve(
-    ctx.cleanup({
-      kind: "failed",
-      reason: lastText
-        ? `Reviewer did not call submit_review. Assistant said: ${truncateText(lastText, 400)}`
-        : "Reviewer did not produce any output.",
-      snapshot: ctx.invocation.snapshot,
-      brief: ctx.invocation.brief,
-      modelId: ctx.invocation.model.canonicalId,
-      debug: buildFailureDebug(ctx),
-    }),
-  );
+function syncRunnerFromCtx(ctx: RunnerContext, runner: ReviewerRunnerState): void {
+  runner.submitSteered = ctx.submitSteered;
+  runner.timeoutSteered = ctx.timeoutSteered;
+  runner.graceTurnsRemaining = ctx.graceTurnsRemaining;
 }
 
-function handleSessionEvent(event: AgentSessionEvent, ctx: RunnerContext): void {
-  pushRecentEvent(ctx.debug.recentEvents, summarizeSessionEvent(event));
-
-  switch (event.type) {
-    case "turn_end":
-      handleTurnEnd(ctx);
-      break;
-    case "tool_execution_start":
-      handleToolStart(event, ctx);
-      break;
-    case "tool_execution_end":
-      handleToolEnd(event, ctx);
-      break;
-    case "message_end": {
-      handleMessageEnd(event, ctx);
-      break;
-    }
-    case "agent_end":
-      handleAgentEnd(event, ctx);
-      break;
-    default:
-      break;
-  }
-}
-
-function truncateText(text: string, maxLen: number): string {
-  if (text.length <= maxLen) return text;
-  return `${text.slice(0, maxLen)}... (${text.length - maxLen} more chars)`;
-}
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 /** Run the read-only reviewer child session. */
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: lifecycle + timeout wiring belongs together here
 export async function runReviewer(invocation: ReviewInvocation): Promise<RawReviewResult> {
   if (invocation.signal?.aborted) {
     return {
@@ -512,130 +264,30 @@ export async function runReviewer(invocation: ReviewInvocation): Promise<RawRevi
     };
   }
 
-  const progress: ReviewProgress = { turns: 0, toolUses: 0, activities: [], tokens: undefined };
-  const state = { settled: false };
-  let cancelTeardown: (() => void) | undefined;
-
-  const cleanup = (result: RawReviewResult): RawReviewResult => {
-    if (state.settled) return result;
-    state.settled = true;
-    cancelTeardown?.();
-    session.dispose();
-    return result;
+  const runner: ReviewerRunnerState = {
+    resultHolder,
+    invocation,
+    submitSteered: false,
+    timeoutSteered: false,
+    graceTurnsRemaining: undefined,
+    debug: { recentEvents: [] },
   };
 
-  return new Promise<RawReviewResult>((resolve) => {
-    const timeoutRef = {
-      steered: false,
-      graceTurnsRemaining: undefined as number | undefined,
-      hardAbortTimer: undefined as ReturnType<typeof setTimeout> | undefined,
-    };
+  const ctx = buildRunnerCtx(runner);
 
-    const clearHardAbort = () => {
-      if (timeoutRef.hardAbortTimer) {
-        clearTimeout(timeoutRef.hardAbortTimer);
-        timeoutRef.hardAbortTimer = undefined;
-      }
-    };
-
-    const ctx: RunnerContext = {
-      progress,
-      session,
-      invocation,
-      resolve,
-      cleanup,
-      resultHolder,
-      signal: invocation.signal,
-      state,
-      submitSteered: false,
-      timeout: timeoutRef,
-      debug: { recentEvents: [] },
-    };
-
-    session.subscribe((event: AgentSessionEvent) => handleSessionEvent(event, ctx));
-
-    const onAbort = () => {
-      if (state.settled) return;
-      clearHardAbort();
-      void session
-        .abort()
-        .catch(() => {})
-        .finally(() => {
-          resolve(
-            cleanup({
-              kind: "canceled",
-              snapshot: invocation.snapshot,
-              brief: invocation.brief,
-              modelId: invocation.model.canonicalId,
-              debug: buildFailureDebug(ctx),
-            }),
-          );
-        });
-    };
-    invocation.signal?.addEventListener("abort", onAbort, { once: true });
-
-    const hardAbort = () => {
-      if (state.settled) return;
-      emitProgress(ctx);
-      void session
-        .abort()
-        .catch(() => {})
-        .finally(() => {
-          const partialText = extractLastAssistantText(session);
-          resolve(
-            cleanup({
-              kind: "timeout",
-              snapshot: invocation.snapshot,
-              timeoutMs: invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-              partialOutput: partialText,
-              brief: invocation.brief,
-              modelId: invocation.model.canonicalId,
-              debug: buildFailureDebug(ctx),
-            }),
-          );
-        });
-    };
-
-    const HARD_ABORT_GRACE_MS = 120_000;
-    const onTimeout = () => {
-      if (state.settled) return;
-      timeoutRef.steered = true;
-      timeoutRef.graceTurnsRemaining = GRACE_TURNS;
-      timeoutRef.hardAbortTimer = setTimeout(hardAbort, HARD_ABORT_GRACE_MS);
-      timeoutRef.hardAbortTimer.unref?.();
-      session.steer(STEER_MESSAGE).catch(() => {
-        clearHardAbort();
-        hardAbort();
-      });
-    };
-
-    const timeoutId = setTimeout(onTimeout, invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-    timeoutId.unref?.();
-
-    cancelTeardown = () => {
-      invocation.signal?.removeEventListener("abort", onAbort);
-      clearTimeout(timeoutId);
-      clearHardAbort();
-    };
-
-    if (invocation.signal?.aborted) {
-      onAbort();
-      return;
-    }
-
-    session.prompt(invocation.prompt).catch((error: unknown) => {
-      if (!state.settled) {
-        resolve(
-          cleanup({
-            kind: "failed",
-            reason: `Reviewer session error: ${error instanceof Error ? error.message : String(error)}`,
-            snapshot: invocation.snapshot,
-            brief: invocation.brief,
-            modelId: invocation.model.canonicalId,
-            debug: buildFailureDebug(ctx),
-          }),
-        );
-      }
-    });
+  return runWithLifecycle<RawReviewResult>({
+    session,
+    prompt: invocation.prompt,
+    signal: invocation.signal,
+    timeoutMs: invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    onEvent: (event, lcCtx) => {
+      syncCtxFromLifecycle(ctx, lcCtx, runner);
+      handleSessionEvent(event, ctx);
+      syncRunnerFromCtx(ctx, runner);
+    },
+    onTimeout: (lcCtx) => buildReviewTimeoutHandler(runner, lcCtx),
+    canceledResult: (lcCtx) => buildCanceledResult(lcCtx, runner),
+    failedResult: (reason, lcCtx) => buildFailedResult(reason, lcCtx, runner),
+    timeoutResult: (_, lcCtx) => buildTimeoutResult(lcCtx, runner),
   });
 }

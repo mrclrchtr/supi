@@ -9,12 +9,9 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { SynthesizedReviewBrief } from "../types.ts";
 import { buildProgressTokens, extractLastAssistantText } from "./runner-helpers.ts";
-import type {
-  BriefSynthesisInvocation,
-  BriefSynthesisRunResult,
-  ReviewProgress,
-} from "./runner-types.ts";
+import type { BriefSynthesisInvocation, BriefSynthesisRunResult } from "./runner-types.ts";
 import { reviewBriefSchema } from "./schemas.ts";
+import { type LifecycleCtx, runWithLifecycle } from "./session-lifecycle.ts";
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1_000;
 
@@ -79,9 +76,12 @@ async function createBriefSession(
   return session;
 }
 
-function emitProgress(session: AgentSession, progress: ReviewProgress): ReviewProgress {
-  progress.tokens = buildProgressTokens(() => session.getSessionStats());
-  return { ...progress, activities: [...progress.activities] };
+function emitBriefProgress(
+  ctx: LifecycleCtx<BriefSynthesisRunResult>,
+  invocation: BriefSynthesisInvocation,
+): void {
+  ctx.progress.tokens = buildProgressTokens(() => ctx.session.getSessionStats());
+  invocation.onProgress?.({ ...ctx.progress, activities: [...ctx.progress.activities] });
 }
 
 function handleAgentEnd(options: {
@@ -129,99 +129,50 @@ export async function runBriefSynthesis(
     };
   }
 
-  const progress: ReviewProgress = { turns: 0, toolUses: 0, activities: [], tokens: undefined };
-  const state = { settled: false, aborting: false };
-  let cancelTeardown: (() => void) | undefined;
-
-  const cleanup = (result: BriefSynthesisRunResult): BriefSynthesisRunResult => {
-    if (state.settled) return result;
-    state.settled = true;
-    cancelTeardown?.();
-    session.dispose();
-    return result;
-  };
-
-  const handleEvent = (
-    event: AgentSessionEvent,
-    resolve: (result: BriefSynthesisRunResult) => void,
-  ) => {
-    switch (event.type) {
-      case "turn_end":
-        progress.turns++;
-        invocation.onProgress?.(emitProgress(session, progress));
-        break;
-      case "tool_execution_start":
-        progress.toolUses++;
-        progress.activities = [
-          event.toolName === "submit_review_brief" ? "submitting brief" : event.toolName,
-        ];
-        invocation.onProgress?.(emitProgress(session, progress));
-        break;
-      case "tool_execution_end":
-        progress.activities = [];
-        invocation.onProgress?.(emitProgress(session, progress));
-        break;
-      case "agent_end": {
-        const result = handleAgentEnd({
-          event,
-          session,
-          brief: resultHolder.value,
-          state,
-          cleanup,
-        });
-        if (result) {
-          resolve(result);
+  return runWithLifecycle<BriefSynthesisRunResult>({
+    session,
+    prompt: invocation.prompt,
+    signal: invocation.signal,
+    timeoutMs: invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    onEvent: (event, ctx) => {
+      switch (event.type) {
+        case "turn_end":
+          ctx.progress.turns++;
+          emitBriefProgress(ctx, invocation);
+          break;
+        case "tool_execution_start":
+          ctx.progress.toolUses++;
+          ctx.progress.activities = [
+            event.toolName === "submit_review_brief" ? "submitting brief" : event.toolName,
+          ];
+          emitBriefProgress(ctx, invocation);
+          break;
+        case "tool_execution_end":
+          ctx.progress.activities = [];
+          emitBriefProgress(ctx, invocation);
+          break;
+        case "agent_end": {
+          const result = handleAgentEnd({
+            event,
+            session,
+            brief: resultHolder.value,
+            state: ctx.state,
+            cleanup: ctx.cleanup,
+          });
+          if (result) {
+            ctx.resolve(result);
+          }
+          break;
         }
-        break;
+        default:
+          break;
       }
-      default:
-        break;
-    }
-  };
-
-  return new Promise<BriefSynthesisRunResult>((resolve) => {
-    session.subscribe((event: AgentSessionEvent) => handleEvent(event, resolve));
-
-    const onAbort = () => {
-      if (state.settled) return;
-      state.aborting = true;
-      void session
-        .abort()
-        .catch(() => {})
-        .finally(() => {
-          resolve(cleanup({ kind: "canceled" }));
-        });
-    };
-    invocation.signal?.addEventListener("abort", onAbort, { once: true });
-
-    const timeoutId = setTimeout(() => {
-      if (state.settled) return;
-      state.aborting = true;
-      void session
-        .abort()
-        .catch(() => {})
-        .finally(() => {
-          resolve(
-            cleanup({ kind: "timeout", timeoutMs: invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS }),
-          );
-        });
-    }, invocation.timeoutMs ?? DEFAULT_TIMEOUT_MS);
-    timeoutId.unref?.();
-
-    cancelTeardown = () => {
-      invocation.signal?.removeEventListener("abort", onAbort);
-      clearTimeout(timeoutId);
-    };
-
-    session.prompt(invocation.prompt).catch((error: unknown) => {
-      if (!state.settled) {
-        resolve(
-          cleanup({
-            kind: "failed",
-            reason: `Brief synthesis session error: ${error instanceof Error ? error.message : String(error)}`,
-          }),
-        );
-      }
-    });
+    },
+    canceledResult: () => ({ kind: "canceled" as const }),
+    failedResult: (reason) => ({
+      kind: "failed" as const,
+      reason,
+    }),
+    timeoutResult: (ms) => ({ kind: "timeout" as const, timeoutMs: ms }),
   });
 }
