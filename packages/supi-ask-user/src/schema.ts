@@ -86,11 +86,6 @@ export const AskUserParamsSchema = Type.Object({
       description: "Allow partial submission",
     }),
   ),
-  allowDiscuss: Type.Optional(
-    Type.Boolean({
-      description: "Allow discussion handoff",
-    }),
-  ),
 });
 
 export type AskUserParams = Static<typeof AskUserParamsSchema>;

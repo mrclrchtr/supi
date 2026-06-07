@@ -302,7 +302,7 @@ function buildExceptionalActions(
 ): OverlayAction[] {
   const actions: OverlayAction[] = [];
   if (!required) actions.push("skip");
-  if (controller.questionnaire.allowDiscuss) actions.push("discuss");
+  actions.push("discuss");
   if (controller.canPartialSubmit()) actions.push("partial");
   return actions;
 }

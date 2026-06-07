@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedQuestionnaire } from "../../src/types.ts";
+import type { NormalizedQuestionnaire } from "../../src/index.ts";
 import { runOverlayQuestionnaire } from "../../src/ui/overlay.ts";
 import type { AskUserUiContext } from "../../src/ui/types.ts";
 import { makeOverlayCtx } from "../helpers/index.ts";
@@ -8,7 +8,6 @@ const questionnaire: NormalizedQuestionnaire = {
   title: "Formatter",
   intro: "Need one explicit answer.",
   allowPartialSubmit: true,
-  allowDiscuss: true,
   questions: [
     {
       type: "choice",
@@ -32,7 +31,6 @@ const twoStepQuestionnaire: NormalizedQuestionnaire = {
   title: "Two step",
   intro: "Need two answers.",
   allowPartialSubmit: false,
-  allowDiscuss: false,
   questions: [
     {
       type: "choice",
@@ -71,7 +69,6 @@ const textQuestionnaire: NormalizedQuestionnaire = {
   title: "Reason",
   intro: "Need a short explanation.",
   allowPartialSubmit: true,
-  allowDiscuss: true,
   questions: [
     {
       type: "text",
@@ -89,7 +86,6 @@ const multiQuestionnaire: NormalizedQuestionnaire = {
   title: "Checks",
   intro: "Need all required checks.",
   allowPartialSubmit: false,
-  allowDiscuss: false,
   questions: [
     {
       type: "choice",

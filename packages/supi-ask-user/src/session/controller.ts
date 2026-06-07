@@ -180,7 +180,7 @@ export class AskUserController {
   }
 
   finishDiscuss(message?: string): boolean {
-    if (!this.questionnaire.allowDiscuss || this.isTerminal) return false;
+    if (this.isTerminal) return false;
     this.status = "discuss";
     this.discussMessage = trimOptional(message);
     return true;
