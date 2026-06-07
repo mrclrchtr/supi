@@ -1,10 +1,11 @@
-import { readdirSync, statSync } from "node:fs";
 import * as path from "node:path";
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import { collectCallSitesInFile } from "./analysis/relations/call-sites.ts";
 import type { CodeQueryParams as ActionParams } from "./query-params.ts";
+import { runRipgrep } from "./search-helpers.ts";
 
-export const STRUCTURED_PATTERN_FILE_CAP = 200;
+/** Ripgrep text-match file cap — backstop for degenerate queries that match thousands of files. */
+const RG_PREFILTER_FILE_CAP = 5000;
 const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;
 
 export type StructuredPatternKind = "definition" | "export" | "import" | "call" | "type" | "test";
@@ -42,9 +43,32 @@ export async function getStructuredPatternMatches(
   structural: StructuralSubstrate,
 ): Promise<StructuredPatternResult | string | null> {
   const deadline = Date.now() + STRUCTURED_PATTERN_TIMEOUT_MS;
-  const collected = collectStructuredFiles(scopePath, deadline);
-  if (collected.files.length === 0) {
-    return null;
+
+  // Ripgrep pre-filter: find candidate files by text match, then tree-sitter only those.
+  // This avoids a filesystem walk + cap that silently truncates on repos with >200 source files.
+  const literal = !(params.regex ?? false);
+  const rgMatches = runRipgrep(params.pattern, scopePath, cwd, {
+    literal,
+    filterLowSignal: true,
+  });
+
+  // Deduplicate files and sort for stable processing order.
+  const candidateFiles = [...new Set(rgMatches.map((m) => m.file))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+
+  if (candidateFiles.length === 0) {
+    return {
+      matches: [],
+      omittedCount: 0,
+      partialReason: null,
+    };
+  }
+
+  let omittedCount = 0;
+  const capped = candidateFiles.slice(0, RG_PREFILTER_FILE_CAP);
+  if (candidateFiles.length > RG_PREFILTER_FILE_CAP) {
+    omittedCount = candidateFiles.length - RG_PREFILTER_FILE_CAP;
   }
 
   const matcher = createStructuredMatcher(params.pattern, params.regex ?? false);
@@ -54,22 +78,23 @@ export async function getStructuredPatternMatches(
 
   try {
     const matches: StructuredMatch[] = [];
-    let timedOut = collected.timedOut;
+    let timedOut = false;
 
-    for (const [index, file] of collected.files.entries()) {
+    for (const [index, file] of capped.entries()) {
       if (Date.now() > deadline) {
-        collected.omittedCount += collected.files.length - index;
+        omittedCount += capped.length - index;
         timedOut = true;
         break;
       }
-      const relFile = path.relative(cwd, file);
-      await collectMatchesForFile(matches, structural, file, relFile, params.kind, matcher);
+      const absFile = path.resolve(cwd, file);
+      const relFile = path.relative(cwd, absFile);
+      await collectMatchesForFile(matches, structural, absFile, relFile, params.kind, matcher);
     }
 
     return {
       matches,
-      omittedCount: timedOut ? Math.max(1, collected.omittedCount) : collected.omittedCount,
-      partialReason: timedOut ? "timeout" : collected.omittedCount > 0 ? "file-cap" : null,
+      omittedCount: timedOut ? Math.max(1, omittedCount) : omittedCount,
+      partialReason: timedOut ? "timeout" : omittedCount > 0 ? "file-cap" : null,
     };
   } catch {
     return `No structured ${params.kind} search data available in \`${relScope}\`. Try omitting \`kind\` for plain text search.`;
@@ -149,69 +174,6 @@ async function collectMatchesForFile(
       matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
     }
   }
-}
-
-function collectStructuredFiles(
-  scopePath: string,
-  deadline: number,
-): { files: string[]; omittedCount: number; timedOut: boolean } {
-  const files: string[] = [];
-  let omittedCount = 0;
-  let timedOut = false;
-  const skipDirs = new Set(["node_modules", ".git", "dist", "build", "coverage"]);
-
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: timeout, file, and directory branches stay adjacent for predictable short-circuiting
-  function walk(currentPath: string) {
-    if (timedOut) return;
-    if (Date.now() > deadline) {
-      timedOut = true;
-      return;
-    }
-
-    let stat: ReturnType<typeof statSync>;
-    try {
-      stat = statSync(currentPath);
-    } catch {
-      return;
-    }
-
-    if (stat.isFile()) {
-      if (isStructuredFile(currentPath)) {
-        if (files.length < STRUCTURED_PATTERN_FILE_CAP) {
-          files.push(currentPath);
-        } else {
-          omittedCount++;
-        }
-      }
-      return;
-    }
-
-    let entries: Array<{ name: string; isDirectory: () => boolean }>;
-    try {
-      entries = readdirSync(currentPath, { withFileTypes: true }) as Array<{
-        name: string;
-        isDirectory: () => boolean;
-      }>;
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
-      if (entry.isDirectory() && skipDirs.has(entry.name)) continue;
-      walk(path.join(currentPath, entry.name));
-      if (timedOut) return;
-    }
-  }
-
-  walk(scopePath);
-  return { files: files.sort((a, b) => a.localeCompare(b)), omittedCount, timedOut };
-}
-
-function isStructuredFile(file: string): boolean {
-  return [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"].includes(
-    path.extname(file),
-  );
 }
 
 /** Outline kind values that represent type declarations (as normalized by the outline extractor). */
