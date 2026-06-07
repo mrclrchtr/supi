@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.3](https://github.com/mrclrchtr/supi/compare/v1.11.2...v1.11.3) (2026-06-07)
+
+
+### Bug Fixes
+
+* **supi-lsp:** handle vscode-languageserver-types v3.18.0 type widenings ([493b2a7](https://github.com/mrclrchtr/supi/commit/493b2a76a5d04acc723c45b04290696caee64980))
+
 ## [1.11.2](https://github.com/mrclrchtr/supi/compare/v1.11.1...v1.11.2) (2026-06-06)
 
 
