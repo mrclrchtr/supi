@@ -94,7 +94,7 @@ export type AskUserToolDetails = AskUserDetails | AskUserErrorDetails;
 
 export const ASK_USER_LIMITS = {
   minQuestions: 1,
-  maxQuestions: 4,
+  maxQuestions: 10,
   minChoiceOptions: 2,
   maxChoiceOptions: 12,
   maxHeaderLength: 60,
