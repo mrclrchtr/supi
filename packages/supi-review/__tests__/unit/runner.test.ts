@@ -38,7 +38,8 @@ vi.mock("typebox", () => ({
   },
 }));
 
-import { buildReviewerSystemPrompt, runReviewer } from "../../src/tool/review-runner.ts";
+import { runReviewer } from "../../src/tool/review-runner.ts";
+import { buildReviewerSystemPrompt } from "../../src/tool/review-system-prompt.ts";
 import * as reviewSchemas from "../../src/tool/schemas.ts";
 
 const snapshot = {
