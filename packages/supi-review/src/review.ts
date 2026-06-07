@@ -7,8 +7,8 @@ import { synthesizeReviewBrief } from "./history/synthesize.ts";
 import { normalizeReviewResult } from "./review-result.ts";
 import { buildReviewPacket } from "./target/packet.ts";
 import { runReviewer } from "./tool/review-runner.ts";
-import type { BriefSynthesisRunResult } from "./tool/runner-types.ts";
 import type {
+  BriefSynthesisRunResult,
   RawReviewResult,
   ReviewPlan,
   ReviewResult,

@@ -1,5 +1,5 @@
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { ReviewProgress } from "./runner-types.ts";
+import type { ReviewProgress } from "../types.ts";
 
 /**
  * Context passed to event handlers, timeout callbacks, and result factories.

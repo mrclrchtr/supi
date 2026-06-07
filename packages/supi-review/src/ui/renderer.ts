@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
 import type { ReviewFailureDebugInfo, ReviewItem, ReviewResult } from "../types.ts";
-import { formatLevel, formatLocation } from "./format-helpers.ts";
+import { formatLevel, formatLocation } from "./format-content.ts";
 
 /** Register the custom TUI renderer for `supi-review` messages. */
 export function registerReviewRenderer(pi: ExtensionAPI): void {

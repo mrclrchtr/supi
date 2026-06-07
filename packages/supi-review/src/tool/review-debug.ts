@@ -1,7 +1,6 @@
 import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
-import type { ReviewFailureDebugInfo } from "../types.ts";
+import type { ReviewFailureDebugInfo, ReviewProgress } from "../types.ts";
 import { buildProgressTokens, extractAssistantText } from "./runner-helpers.ts";
-import type { ReviewProgress } from "./runner-types.ts";
 
 export const RECENT_EVENTS_MAX = 10;
 export const LAST_ASSISTANT_TEXT_DEBUG_MAX = 2_000;
