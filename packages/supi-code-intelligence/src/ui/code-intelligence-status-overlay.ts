@@ -409,7 +409,10 @@ export class CiStatusDialog {
       const lineNum = diag.range.start.line + 1;
       const colNum = diag.range.start.character + 1;
       const sevColor = diag.severity === 1 ? "error" : "warning";
-      const messageText = truncateTextForInline(diag.message, width - 14);
+      const messageText = truncateTextForInline(
+        typeof diag.message === "string" ? diag.message : diag.message.value,
+        width - 14,
+      );
       const msg = `    ${t.fg(sevColor, "└")} ${lineNum}:${colNum}  ${t.fg("dim", messageText)}`;
       container.addChild(new Text(msg, 0, 0));
     }

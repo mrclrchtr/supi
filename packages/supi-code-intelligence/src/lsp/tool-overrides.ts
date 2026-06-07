@@ -106,8 +106,8 @@ async function appendInlineDiagnostics<T extends { content: unknown[]; details: 
       "\n\n⚠️ LSP Diagnostics — review before continuing:",
       ...entries.flatMap((entry) =>
         entry.diagnostics.map(
-          (d: { range: { start: { line: number } }; message: string }) =>
-            `  ${entry.file}:${d.range.start.line + 1}: ${d.message}`,
+          (d) =>
+            `  ${entry.file}:${d.range.start.line + 1}: ${typeof d.message === "string" ? d.message : d.message.value}`,
         ),
       ),
       "If these errors are unexpected or appear across multiple files, fix the root cause before editing more.",

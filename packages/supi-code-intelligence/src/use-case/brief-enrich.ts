@@ -120,7 +120,7 @@ export async function enrichDiagnosticContext(
     const mapped: BriefDiagnostic[] = diags.map((d) => ({
       line: d.range.start.line + 1,
       severity: d.severity ?? 1,
-      message: d.message,
+      message: typeof d.message === "string" ? d.message : d.message.value,
     }));
 
     return { diagnostics: mapped.slice(0, capN) };

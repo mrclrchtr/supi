@@ -167,7 +167,7 @@ export async function gatherNearbyDiagnostics(
     return chosen.slice(0, maxResults).map((d) => ({
       line: d.range.start.line + 1,
       severity: d.severity ?? 1,
-      message: d.message,
+      message: typeof d.message === "string" ? d.message : d.message.value,
     }));
   } catch {
     return [];

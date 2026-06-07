@@ -60,13 +60,20 @@ export function registerDiagnosticInjectionHandlers(
 
     state.currentContextToken = `lsp-context-${++state.contextCounter}`;
 
+    const detailedDiagnostics = manager
+      .getOutstandingDiagnostics(state.inlineSeverity)
+      .map((entry) => ({
+        file: entry.file,
+        diagnostics: entry.diagnostics.map((d) => ({
+          range: d.range,
+          message: typeof d.message === "string" ? d.message : d.message.value,
+        })),
+      }));
+
     return {
       message: {
         customType: "lsp-context",
-        content: buildInjectionContent(
-          diagnostics,
-          manager.getOutstandingDiagnostics(state.inlineSeverity),
-        ),
+        content: buildInjectionContent(diagnostics, detailedDiagnostics),
         display: true,
         details: {
           contextToken: state.currentContextToken,
