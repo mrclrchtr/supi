@@ -5,7 +5,7 @@ import {
   DefaultResourceLoader,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { RawReviewResult, ReviewOutputEvent } from "../types.ts";
+import type { RawReviewResult, ReviewInvocation, ReviewOutputEvent } from "../types.ts";
 import { buildFailureDebug, extractLastAssistantText } from "./review-debug.ts";
 import {
   createSubmitReviewTool,
@@ -13,7 +13,6 @@ import {
   type RunnerContext,
 } from "./review-handlers.ts";
 import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
-import type { ReviewInvocation } from "./runner-types.ts";
 import { type LifecycleCtx, runWithLifecycle } from "./session-lifecycle.ts";
 import { createSnapshotDiffTool, createSnapshotFileTool } from "./snapshot-tools.ts";
 

@@ -7,9 +7,12 @@ import {
   defineTool,
   SessionManager,
 } from "@earendil-works/pi-coding-agent";
-import type { SynthesizedReviewBrief } from "../types.ts";
+import type {
+  BriefSynthesisInvocation,
+  BriefSynthesisRunResult,
+  SynthesizedReviewBrief,
+} from "../types.ts";
 import { buildProgressTokens, extractLastAssistantText } from "./runner-helpers.ts";
-import type { BriefSynthesisInvocation, BriefSynthesisRunResult } from "./runner-types.ts";
 import { reviewBriefSchema } from "./schemas.ts";
 import { type LifecycleCtx, runWithLifecycle } from "./session-lifecycle.ts";
 

@@ -1,8 +1,12 @@
 import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import { listReviewInstructionBlocks } from "../target/review-instruction-blocks.ts";
+import { listReviewInstructionBlocks } from "../target/packet.ts";
 import { runBriefSynthesis } from "../tool/brief-runner.ts";
-import type { BriefSynthesisRunResult, ReviewProgress } from "../tool/runner-types.ts";
-import type { ReviewModelSelection, ReviewSnapshot } from "../types.ts";
+import type {
+  BriefSynthesisRunResult,
+  ReviewModelSelection,
+  ReviewProgress,
+  ReviewSnapshot,
+} from "../types.ts";
 
 const DIFF_EXCERPT_CHAR_BUDGET = 12_000;
 

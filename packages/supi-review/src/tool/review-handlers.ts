@@ -3,7 +3,12 @@ import {
   type AgentSessionEvent,
   defineTool,
 } from "@earendil-works/pi-coding-agent";
-import type { RawReviewResult, ReviewOutputEvent } from "../types.ts";
+import type {
+  RawReviewResult,
+  ReviewInvocation,
+  ReviewOutputEvent,
+  ReviewProgress,
+} from "../types.ts";
 import {
   buildFailureDebug,
   extractLastAssistantText,
@@ -11,7 +16,6 @@ import {
   summarizeSessionEvent,
 } from "./review-debug.ts";
 import { buildProgressTokens } from "./runner-helpers.ts";
-import type { ReviewInvocation, ReviewProgress } from "./runner-types.ts";
 import { reviewOutputSchema } from "./schemas.ts";
 
 const STEER_SUBMIT_MESSAGE =

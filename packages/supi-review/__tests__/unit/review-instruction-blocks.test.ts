@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   listReviewInstructionBlocks,
   resolveReviewInstructionBlocks,
-} from "../../src/target/review-instruction-blocks.ts";
+} from "../../src/target/packet.ts";
 
 describe("review instruction block catalog", () => {
   it("lists the fixed instruction block catalog", () => {
