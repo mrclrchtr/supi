@@ -1,4 +1,5 @@
 import type { SessionContext } from "@earendil-works/pi-coding-agent";
+import { extractAssistantText } from "../tool/runner-helpers.ts";
 
 type ResolvedSessionMessage = SessionContext["messages"][number];
 
@@ -101,7 +102,7 @@ function serializeEntry(
   switch (message.role) {
     case "user":
     case "assistant": {
-      const text = normalizeText(extractMessageText(message.content));
+      const text = normalizeText(extractAssistantText(message.content) ?? "");
       if (!text) return undefined;
       return {
         label: message.role === "user" ? "User" : "Assistant",
@@ -110,7 +111,7 @@ function serializeEntry(
       };
     }
     case "custom": {
-      const text = normalizeText(extractMessageText(message.content));
+      const text = normalizeText(extractAssistantText(message.content) ?? "");
       if (!text) return undefined;
       return { label: "Custom", text, isSummary: false };
     }
@@ -127,25 +128,6 @@ function serializeEntry(
     default:
       return undefined;
   }
-}
-
-function extractMessageText(content: unknown): string {
-  if (typeof content === "string") {
-    return content;
-  }
-
-  if (!Array.isArray(content)) {
-    return "";
-  }
-
-  return content
-    .map((part) => {
-      if (typeof part !== "object" || !part) return "";
-      const text = (part as { text?: unknown }).text;
-      return typeof text === "string" ? text : "";
-    })
-    .filter((text) => text.length > 0)
-    .join("\n");
 }
 
 function normalizeText(text: string): string {
