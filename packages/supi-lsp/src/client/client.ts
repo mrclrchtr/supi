@@ -526,6 +526,9 @@ export class LspClient {
             this._readyResolve = resolve;
             this._readyReject = reject;
           });
+          // Prevent unhandled rejection when rejectReady fires before any
+          // consumer is actively awaiting this promise (e.g. during shutdown).
+          this._readyPromise.catch(() => {});
         }
         this.startTokenTimeout(token);
         return null;
@@ -639,6 +642,9 @@ export class LspClient {
       this._readyResolve = resolve;
       this._readyReject = reject;
     });
+    // Prevent unhandled rejection when rejectReady fires before any
+    // consumer is actively awaiting this promise (e.g. during shutdown).
+    this._readyPromise.catch(() => {});
     return this._readyPromise;
   }
 
@@ -667,6 +673,9 @@ export class LspClient {
           this._readyResolve = resolve;
           this._readyReject = reject;
         });
+        // Prevent unhandled rejection when rejectReady fires before any
+        // consumer is actively awaiting this promise (e.g. during shutdown).
+        this._readyPromise.catch(() => {});
       }
       this.startTokenTimeout(token);
     } else if (value.kind === "end") {

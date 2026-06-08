@@ -174,7 +174,9 @@ describe("LspClient readiness state machine", () => {
     const readyPromise = (client as AnyClient).getReady?.();
     if (!readyPromise) throw new Error("getReady is not implemented");
 
-    // Suppress unhandled rejection since we assert it below
+    // getReady() is async, so it returns a new promise that mirrors
+    // _readyPromise — the production .catch() on _readyPromise does not
+    // propagate to this wrapper. Catch it here to prevent unhandled rejection.
     readyPromise.catch(() => {});
 
     // Simulate crash: process exits with error status
@@ -195,7 +197,9 @@ describe("LspClient readiness state machine", () => {
     const readyPromise = (client as AnyClient).getReady?.();
     if (!readyPromise) throw new Error("getReady is not implemented");
 
-    // Suppress unhandled rejection since we assert it below
+    // getReady() is async, so it returns a new promise that mirrors
+    // _readyPromise — the production .catch() on _readyPromise does not
+    // propagate to this wrapper. Catch it here to prevent unhandled rejection.
     readyPromise.catch(() => {});
 
     // Shutdown: clear readiness state
@@ -305,6 +309,9 @@ describe("LspClient readiness state machine", () => {
 
     const readyPromise = (client as AnyClient).getReady?.();
     if (!readyPromise) throw new Error("getReady is not implemented");
+    // getReady() is async, so it returns a new promise that mirrors
+    // _readyPromise — the production .catch() on _readyPromise does not
+    // propagate to this wrapper. Catch it here to prevent unhandled rejection.
     readyPromise.catch(() => {});
 
     // Simulate process error (no exit event)

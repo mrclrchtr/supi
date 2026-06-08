@@ -93,6 +93,10 @@ export class JsonRpcClient {
     const timer = setTimeout(() => tokenSource.cancel(), timeoutMs);
 
     const request = this.connection.sendRequest(method, params, tokenSource.token);
+    // Catch the raw request promise to prevent unhandled rejections when
+    // dispose() cancels the token without a preceding timeout (the raced
+    // promise below covers the timeout-then-dispose path separately).
+    request.catch(() => {});
 
     // Race the request against a timeout so callers don't hang forever.
     // The CancellationToken is also passed to sendRequest so the connection
