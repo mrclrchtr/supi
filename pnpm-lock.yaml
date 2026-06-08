@@ -44,10 +44,10 @@ importers:
         version: 5.3.1
       tree-sitter-javascript:
         specifier: 0.25.0
-        version: 0.25.0
+        version: 0.25.0(tree-sitter@0.21.1)
       tree-sitter-typescript:
         specifier: 0.23.2
-        version: 0.23.2
+        version: 0.23.2(tree-sitter@0.21.1)
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -451,10 +451,10 @@ importers:
     devDependencies:
       '@davisvaughan/tree-sitter-r':
         specifier: 1.2.0
-        version: 1.2.0
+        version: 1.2.0(tree-sitter@0.21.1)
       '@derekstride/tree-sitter-sql':
         specifier: 0.3.11
-        version: 0.3.11
+        version: 0.3.11(tree-sitter@0.21.1)
       '@mrclrchtr/supi-code-intelligence':
         specifier: workspace:*
         version: link:../supi-code-intelligence
@@ -464,45 +464,48 @@ importers:
       '@types/node':
         specifier: 25.9.3
         version: 25.9.3
+      tree-sitter:
+        specifier: ^0.21.0
+        version: 0.21.1
       tree-sitter-bash:
         specifier: 0.25.1
-        version: 0.25.1
+        version: 0.25.1(tree-sitter@0.21.1)
       tree-sitter-c:
         specifier: 0.24.1
-        version: 0.24.1
+        version: 0.24.1(tree-sitter@0.21.1)
       tree-sitter-cli:
         specifier: 0.26.9
         version: 0.26.9
       tree-sitter-cpp:
         specifier: 0.23.4
-        version: 0.23.4
+        version: 0.23.4(tree-sitter@0.21.1)
       tree-sitter-go:
         specifier: 0.25.0
-        version: 0.25.0
+        version: 0.25.0(tree-sitter@0.21.1)
       tree-sitter-html:
         specifier: 0.23.2
-        version: 0.23.2
+        version: 0.23.2(tree-sitter@0.21.1)
       tree-sitter-java:
         specifier: 0.23.5
-        version: 0.23.5
+        version: 0.23.5(tree-sitter@0.21.1)
       tree-sitter-javascript:
         specifier: 0.25.0
-        version: 0.25.0
+        version: 0.25.0(tree-sitter@0.21.1)
       tree-sitter-kotlin:
         specifier: 0.3.8
-        version: 0.3.8
+        version: 0.3.8(tree-sitter@0.21.1)
       tree-sitter-python:
         specifier: 0.25.0
-        version: 0.25.0
+        version: 0.25.0(tree-sitter@0.21.1)
       tree-sitter-ruby:
         specifier: 0.23.1
-        version: 0.23.1
+        version: 0.23.1(tree-sitter@0.21.1)
       tree-sitter-rust:
         specifier: 0.24.0
-        version: 0.24.0
+        version: 0.24.0(tree-sitter@0.21.1)
       tree-sitter-typescript:
         specifier: 0.23.2
-        version: 0.23.2
+        version: 0.23.2(tree-sitter@0.21.1)
       vitest:
         specifier: 4.1.9
         version: 4.1.9(@types/node@25.9.3)(jsdom@29.1.1)(vite@8.0.16(@types/node@25.9.3)(jiti@2.7.0)(yaml@2.9.0))
@@ -2327,6 +2330,9 @@ packages:
       tree-sitter:
         optional: true
 
+  tree-sitter@0.21.1:
+    resolution: {integrity: sha512-7dxoA6kYvtgWw80265MyqJlkRl4yawIjO7S5MigytjELkX43fV2WsAXzsNfO7sBpPPCF5Gp0+XzHk0DwLCq3xQ==}
+
   ts-algebra@2.0.0:
     resolution: {integrity: sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==}
 
@@ -2686,7 +2692,7 @@ snapshots:
       '@aws-sdk/types': 3.973.13
       '@smithy/core': 3.25.0
       '@smithy/fetch-http-handler': 5.5.0
-      '@smithy/node-http-handler': 4.7.3
+      '@smithy/node-http-handler': 4.8.0
       '@smithy/types': 4.15.0
       tslib: 2.8.1
 
@@ -3053,15 +3059,18 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@davisvaughan/tree-sitter-r@1.2.0':
+  '@davisvaughan/tree-sitter-r@1.2.0(tree-sitter@0.21.1)':
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  '@derekstride/tree-sitter-sql@0.3.11':
+  '@derekstride/tree-sitter-sql@0.3.11(tree-sitter@0.21.1)':
     dependencies:
       node-addon-api: 7.1.1
       node-gyp-build: 4.8.4
+      tree-sitter: 0.21.1
 
   '@earendil-works/pi-agent-core@0.79.6(ws@8.21.0)(zod@4.4.3)':
     dependencies:
@@ -4336,79 +4345,111 @@ snapshots:
     dependencies:
       punycode: 2.3.1
 
-  tree-sitter-bash@0.25.1:
+  tree-sitter-bash@0.25.1(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-c@0.23.6:
+  tree-sitter-c@0.23.6(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-c@0.24.1:
+  tree-sitter-c@0.24.1(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
   tree-sitter-cli@0.26.9: {}
 
-  tree-sitter-cpp@0.23.4:
+  tree-sitter-cpp@0.23.4(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
-      tree-sitter-c: 0.23.6
+      tree-sitter-c: 0.23.6(tree-sitter@0.21.1)
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-go@0.25.0:
+  tree-sitter-go@0.25.0(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-html@0.23.2:
+  tree-sitter-html@0.23.2(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-java@0.23.5:
+  tree-sitter-java@0.23.5(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-javascript@0.23.1:
+  tree-sitter-javascript@0.23.1(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-javascript@0.25.0:
+  tree-sitter-javascript@0.25.0(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-kotlin@0.3.8:
+  tree-sitter-kotlin@0.3.8(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 7.1.1
       node-gyp-build: 4.8.4
+      tree-sitter: 0.21.1
 
-  tree-sitter-python@0.25.0:
+  tree-sitter-python@0.25.0(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-ruby@0.23.1:
+  tree-sitter-ruby@0.23.1(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-rust@0.24.0:
+  tree-sitter-rust@0.24.0(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
+    optionalDependencies:
+      tree-sitter: 0.21.1
 
-  tree-sitter-typescript@0.23.2:
+  tree-sitter-typescript@0.23.2(tree-sitter@0.21.1):
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
-      tree-sitter-javascript: 0.23.1
+      tree-sitter-javascript: 0.23.1(tree-sitter@0.21.1)
+    optionalDependencies:
+      tree-sitter: 0.21.1
+
+  tree-sitter@0.21.1:
+    dependencies:
+      node-addon-api: 8.8.0
+      node-gyp-build: 4.8.4
 
   ts-algebra@2.0.0: {}
 

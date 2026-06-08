@@ -2,6 +2,10 @@ packages:
   - "packages/*"
 nodeLinker: hoisted
 
+peerDependencyRules:
+  allowAny:
+    - tree-sitter
+
 allowBuilds:
   tree-sitter: true
   tree-sitter-kotlin: false
