@@ -11,7 +11,7 @@
 import { existsSync } from "node:fs";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { collectCallSitesInFile } from "../analysis/relations/call-sites.ts";
-import { normalizePath } from "../search-helpers.ts";
+import { normalizePath, runRipgrep } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
 
@@ -199,29 +199,43 @@ function getEffectiveProvider(cwd: string) {
 }
 
 /**
- * Call-site search using shared regex-based matching.
- * Does not require tree-sitter — walks files and matches identifiers
- * followed by `(` using the shared `collectCallSitesInFile` helper.
+ * Call-site search using ripgrep pre-filter + shared regex-based matching.
+ *
+ * Uses ripgrep to find candidate files containing the query, then runs
+ * the shared `collectCallSitesInFile` on each candidate to verify actual
+ * call sites. This avoids the arbitrary file-cap problems of a filesystem
+ * walk (the old `collectSourceFiles` approach) and is consistent with how
+ * `getStructuredPatternMatches` pre-filters for tree-sitter search.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: call-site search naturally spans file collection, matching, and result rendering
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: call-site search naturally spans ripgrep pre-filter, file iteration, and result rendering
 async function executeCallSiteSearch(
   query: string,
   params: CodeFindToolParams,
   cwd: string,
 ): Promise<CodeIntelResult> {
-  const { statSync, readdirSync } = await import("node:fs");
   const path = await import("node:path");
 
   const scopePath = resolveScope(params.scope, cwd) ?? cwd;
   const maxResults = params.maxResults ?? 8;
 
-  const sourceFiles = collectSourceFiles(scopePath, statSync, readdirSync, path);
+  // Pre-filter via ripgrep — find files containing the query
+  const rgMatches = runRipgrep(query, scopePath, cwd, {
+    literal: true,
+    filterLowSignal: true,
+    maxMatches: 500,
+  });
+
+  // Deduplicate files and sort for stable processing order
+  const candidateFiles = [...new Set(rgMatches.map((m) => m.file))].sort((a, b) =>
+    a.localeCompare(b),
+  );
+
   const matches: Array<{ file: string; name: string; line: number }> = [];
 
-  for (const absPath of sourceFiles) {
+  for (const relFile of candidateFiles) {
     if (matches.length >= maxResults) break;
-    const callSites = collectCallSitesInFile(absPath, (word) => word === query);
-    const relFile = path.relative(cwd, absPath);
+    const absFile = path.resolve(cwd, relFile);
+    const callSites = collectCallSitesInFile(absFile, (word) => word === query);
     for (const cs of callSites) {
       if (matches.length >= maxResults) break;
       matches.push({ file: relFile, name: cs.name, line: cs.line });
@@ -266,53 +280,6 @@ async function executeCallSiteSearch(
       } satisfies SearchDetails,
     },
   };
-}
-
-/** Collect source files from a directory (recursive, with skip-dirs). */
-function collectSourceFiles(
-  scopePath: string,
-  statSync: typeof import("node:fs").statSync,
-  readdirSync: typeof import("node:fs").readdirSync,
-  path: typeof import("node:path"),
-): string[] {
-  const files: string[] = [];
-  const skipDirs = new Set(["node_modules", ".git", "dist", "build", "coverage"]);
-  const MAX_FILES = 200;
-  const SOURCE_EXTS = [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", ".mjs", ".cjs"];
-
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: file-walk naturally spans stat/dir/recursion branches
-  function walk(currentPath: string) {
-    if (files.length >= MAX_FILES) return;
-    let stat: ReturnType<typeof statSync>;
-    try {
-      stat = statSync(currentPath);
-    } catch {
-      return;
-    }
-    if (stat.isFile()) {
-      if (SOURCE_EXTS.includes(path.extname(currentPath))) {
-        files.push(currentPath);
-      }
-      return;
-    }
-    let entries: Array<{ name: string; isDirectory: () => boolean }>;
-    try {
-      entries = readdirSync(currentPath, { withFileTypes: true }) as Array<{
-        name: string;
-        isDirectory: () => boolean;
-      }>;
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.name.startsWith(".")) continue;
-      if (entry.isDirectory() && skipDirs.has(entry.name)) continue;
-      walk(path.join(currentPath, entry.name));
-    }
-  }
-
-  walk(scopePath);
-  return files;
 }
 
 /** Advisory note for text/regex mode when kind is set — no filtering is applied. */
