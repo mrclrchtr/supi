@@ -25,10 +25,5 @@ export function renderCallsResult(
   if (calls.length > maxResults) {
     lines.push(`- _+${calls.length - maxResults} more_`);
   }
-  lines.push("");
-  lines.push(
-    "_Structural analysis — may include unresolved or qualified names. Use `code_inspect` with `file`, `line`, and `character` for point facts, or `code_context` with `file` for broader orientation._",
-  );
-  lines.push("");
   return lines.join("\n");
 }

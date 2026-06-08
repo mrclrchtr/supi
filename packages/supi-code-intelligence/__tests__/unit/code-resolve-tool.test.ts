@@ -141,9 +141,7 @@ describe("code_resolve tool", () => {
     expect(result.content[0].text).toContain("Target ID:");
     expect(result.content[0].text).toContain("Span ID:");
     expect(result.content[0].text).toContain("index.ts");
-    // Anchored calls get a compact one-liner instead of full Next steps
-    expect(result.content[0].text).toContain("targetId");
-    expect(result.content[0].text).toContain("code_context");
+    expect(result.content[0].text).not.toContain("Next steps");
   });
 
   it("resolves file-only request to exported targets with target IDs", async () => {
@@ -200,7 +198,7 @@ describe("code_resolve tool", () => {
     expect(result.content[0].text).toContain("foo");
     expect(result.content[0].text).toContain("bar");
     expect(result.content[0].text).toContain("Baz");
-    expect(result.content[0].text).toContain("targetId");
+    expect(result.content[0].text).toContain("tg-");
   });
 
   it("prefers semantic document symbols over structural exports for file-only resolve", async () => {
@@ -305,7 +303,7 @@ describe("code_resolve tool", () => {
 
     // Will fail: stub doesn't resolve anything
     expect(result.content[0].text).toContain("Widget");
-    expect(result.content[0].text).toContain("targetId");
+    expect(result.content[0].text).toContain("Target ID");
   });
 
   it("returns disambiguation candidates with target IDs for ambiguous queries", async () => {
@@ -342,12 +340,9 @@ describe("code_resolve tool", () => {
       makeCtx({ cwd: tmpDir }),
     )) as { content: Array<{ type: string; text: string }> };
 
-    // Will fail: stub doesn't disambiguate
-    expect(result.content[0].text).toContain("candidate");
-    expect(result.content[0].text).toContain("targetId");
     // Should not claim a single match when ambiguous
-    expect(result.content[0].text).not.toContain("resolved to `Widget`");
-    expect(result.content[0].text).toContain("code_context");
+    expect(result.content[0].text).not.toContain("Resolved");
+    expect(result.content[0].text).toContain("tg-");
   });
 
   it("does not fall back to text search for missing semantic query results", async () => {
@@ -660,8 +655,7 @@ describe("code_resolve targetId follow-up", () => {
     };
 
     expect(resolveResult.content[0].text).toContain("Target ID:");
-    // Anchored calls get a compact one-liner
-    expect(resolveResult.content[0].text).toContain("targetId");
+    expect(resolveResult.content[0].text).toContain("Span ID:");
     const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
     expect(targetId).toBeDefined();
     if (!targetId) return;

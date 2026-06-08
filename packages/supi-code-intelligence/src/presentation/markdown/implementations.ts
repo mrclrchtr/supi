@@ -37,9 +37,5 @@ export function renderImplementationsResult(
     lines.push("");
   }
 
-  lines.push(
-    "_Semantic analysis. Use `code_find` (text mode) only when you explicitly want text-search hints._",
-  );
-  lines.push("");
   return lines.join("\n");
 }

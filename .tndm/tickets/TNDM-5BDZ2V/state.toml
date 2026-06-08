@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-08T22:27:36.474265Z"
+revision = 35
+
+[document_fingerprints]
+archive = "sha256:2d31d0d44f3090491695cd1a86e83be62d67f30958bb4dd81e17e91b8a5a3630"
+content = "sha256:9ead2387b3d0c187b814faa2d9687b085d20b96f610189784b4694af7b65dfd9"
+task-01 = "sha256:036d21d0001ddeab3444f5ce9331ed80e42a3eb3865555715561b83665f4b1bc"
+task-02 = "sha256:1f5aedc24a5400fd2d40c491d3a569fa97195d3340ba3ab30d77e59332c4ed44"
+task-03 = "sha256:affbf5debfe8387dfd43d68f75f0991f65452cb73b83e25f4a125f098d075e35"
+task-04 = "sha256:9e07bf6cdaeadfe5ad5f01c943f070cdf5ee98b6e5e0cf892164d6cad7e362bc"
+task-05 = "sha256:25e5d5bce75f5eeb423df20d208c01d67ba1a66eb07ea88cf585c6f95a8e327b"
+
+[[tasks]]
+number = 1
+title = 'Remove "Next steps" guidance from code_resolve renderer'
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Remove substrate footer notes from code_graph renderer"
+status = "done"
+
+[[tasks]]
+number = 3
+title = 'Remove "Text search" footer from code_find renderer'
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Gate git context in orientation briefs behind once-per-session flag"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Full verification — typecheck, lint, tests, manual smoke test"
+status = "done"

@@ -91,7 +91,7 @@ describe("relations render", () => {
     expect(result.kind).toBe("unavailable");
   });
 
-  it("renders structural callee follow-up guidance toward code_inspect", () => {
+  it("renders callees with names and line numbers", () => {
     const content = renderCalleesResult(
       {
         enclosingScope: { name: "widget" },
@@ -101,8 +101,9 @@ describe("relations render", () => {
       8,
     );
 
-    expect(content).toContain("code_inspect");
-    expect(content).not.toContain("code_brief` with `file`, `line`, and `character`");
+    expect(content).toContain("widget");
+    expect(content).toContain("helper");
+    expect(content).toContain("L5");
   });
 
   it("renders graph result with references section and no footer", () => {

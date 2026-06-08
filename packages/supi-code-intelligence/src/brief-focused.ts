@@ -101,9 +101,11 @@ async function generateDirectoryBrief(
   );
   appendPrioritySignalsSection(lines, prioritySignals);
 
-  const gitCtx = gatherGitContext(model.root);
-  if (gitCtx) {
-    lines.push(formatGitContext(gitCtx));
+  if (opts?.showGitContext !== false) {
+    const gitCtx = gatherGitContext(model.root);
+    if (gitCtx) {
+      lines.push(formatGitContext(gitCtx));
+    }
   }
 
   lines.push("");
@@ -367,9 +369,11 @@ async function generateFileBriefWithEnrichment(
     appendPrioritySignalsSection(extraLines, prioritySignals);
   }
 
-  const gitCtx = gatherGitContext(model.root);
-  if (gitCtx) {
-    extraLines.push(formatGitContext(gitCtx));
+  if (opts?.showGitContext !== false) {
+    const gitCtx = gatherGitContext(model.root);
+    if (gitCtx) {
+      extraLines.push(formatGitContext(gitCtx));
+    }
   }
 
   const extraStr = extraLines.filter((l) => l.trim()).join("\n");

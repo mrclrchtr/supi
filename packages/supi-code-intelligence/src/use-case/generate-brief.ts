@@ -18,7 +18,7 @@ export async function executeBrief(
   switch (input.kind) {
     case "project":
       if (deps.model) {
-        return executeProjectBrief(deps.model);
+        return executeProjectBrief(deps.model, deps.showGitContext);
       }
       return noModelResult();
     case "path":
@@ -32,11 +32,14 @@ export async function executeBrief(
 
 // ── Project brief ─────────────────────────────────────────────────────
 
-function executeProjectBrief(model: ArchitectureModel): BriefUseCaseResult {
+function executeProjectBrief(
+  model: ArchitectureModel,
+  showGitContext?: boolean,
+): BriefUseCaseResult {
   if (!model) {
     return noModelResult();
   }
-  const result = generateProjectBrief(model);
+  const result = generateProjectBrief(model, { showGitContext });
   return { content: result.content, details: result.details };
 }
 
@@ -57,6 +60,7 @@ async function executePathBrief(
     provider: deps.provider,
     cwd: deps.cwd,
     maxResults,
+    showGitContext: deps.showGitContext ?? true,
   });
   return { content: result.content, details: result.details };
 }
@@ -76,6 +80,7 @@ async function executeFileBrief(
     provider: deps.provider,
     cwd: deps.cwd,
     maxResults,
+    showGitContext: deps.showGitContext ?? true,
   });
   return { content: result.content, details: result.details };
 }

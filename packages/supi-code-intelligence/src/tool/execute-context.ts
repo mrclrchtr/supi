@@ -21,6 +21,9 @@ export interface CodeContextToolParams {
   targetKind?: string | null;
 }
 
+/** Track which cwds have already shown git context in this session. */
+const shownGitContextCwds = new Set<string>();
+
 /** Execute the public code_context tool through the planner-backed use-case layers. */
 export async function executeContextTool(
   params: CodeContextToolParams,
@@ -44,6 +47,15 @@ export async function executeContextTool(
   // Always build the model — orientation mode needs it, and task mode falls back
   // to orientation when no target is provided (e.g., scope-only queries).
   const model = await buildArchitectureModel(ctx.cwd);
+
+  // Git context: show once per session (only for orientation calls)
+  const hasTarget = !!(params.file && params.line != null && params.character != null);
+  const isOrientationCall = !params.task || !hasTarget;
+  const showGitContext = isOrientationCall && !shownGitContextCwds.has(ctx.cwd);
+  if (isOrientationCall) {
+    shownGitContextCwds.add(ctx.cwd);
+  }
+
   const result = await executeContext(
     {
       task: params.task,
@@ -61,6 +73,7 @@ export async function executeContextTool(
       budget: params.budget,
       include: params.include,
       maxResults: params.maxResults,
+      showGitContext,
     },
     {
       model,

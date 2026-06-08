@@ -182,9 +182,6 @@ export function renderPatternResults(
     );
   }
   lines.push("");
-  lines.push("_Text search — results may include comments, strings, or unrelated matches._");
-  lines.push("");
-
   return lines.join("\n");
 }
 
@@ -247,8 +244,5 @@ export function renderPatternSummary(
     lines.push(`- _+${sorted.length - maxResults} more files omitted_`);
   }
   lines.push("");
-  lines.push("_Text search — results may include comments, strings, or unrelated matches._");
-  lines.push("");
-
   return lines.join("\n");
 }

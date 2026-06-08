@@ -82,11 +82,6 @@ export function renderImplementationsResult(
     lines.push("");
   }
 
-  lines.push(
-    "_Semantic analysis. Use `code_find` (text mode) only when you explicitly want text-search hints for likely implementations._",
-  );
-  lines.push("");
-
   return lines.join("\n");
 }
 
@@ -112,10 +107,6 @@ export function renderCalleesResult(
   if (data.callees.length > maxResults) {
     lines.push(`- _+${data.callees.length - maxResults} more_`);
   }
-  lines.push("");
-  lines.push(
-    "_Structural analysis — may include unresolved or qualified names. Use `code_inspect` with `file`, `line`, and `character` for point facts, or `code_context` with `file` for broader orientation._",
-  );
   lines.push("");
   return lines.join("\n");
 }
@@ -147,9 +138,6 @@ export function renderImportsResult(
   if (imports.length > maxResults) {
     lines.push(`- _+${imports.length - maxResults} more_`);
   }
-  lines.push("");
-  lines.push("_Structural analysis — shows module-level import statements._");
-  lines.push("");
   return lines.join("\n");
 }
 
@@ -181,9 +169,6 @@ export function renderExportsResult(
   if (exports.length > maxResults) {
     lines.push(`- _+${exports.length - maxResults} more_`);
   }
-  lines.push("");
-  lines.push("_Structural analysis — shows top-level named exports._");
-  lines.push("");
   return lines.join("\n");
 }
 

@@ -2,7 +2,7 @@
  * Tool executor for code_resolve.
  *
  * Calls the resolve service and renders compact markdown with stable
- * target handles and follow-up suggestions.
+ * target handles.
  */
 
 import { executeResolveService, validateResolveParams } from "../analysis/resolve/service.ts";
@@ -31,9 +31,7 @@ export async function executeResolveTool(
 
   const result = await executeResolveService(params, ctx.cwd);
 
-  // Determine if this was an anchored call (file + line + character provided)
-  const isAnchoredCall = !!(params.file && params.line != null && params.character != null);
-  const content = renderResolveResult(result, ctx.cwd, { isAnchoredCall });
+  const content = renderResolveResult(result, ctx.cwd);
 
   // Build structured details
   if (result.kind === "resolved") {

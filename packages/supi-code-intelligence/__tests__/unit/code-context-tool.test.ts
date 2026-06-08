@@ -541,3 +541,112 @@ describe("code_context no-target fallback", () => {
     expect(result.details?.type).toBe("context");
   });
 });
+
+describe("code_context git context once-per-session", () => {
+  function setupGit(): void {
+    const { execFileSync } = require("node:child_process");
+    const scrub = (env: NodeJS.ProcessEnv) => {
+      const next = { ...env };
+      for (const key of Object.keys(next)) {
+        if (key.startsWith("GIT_")) delete next[key];
+      }
+      return next;
+    };
+    execFileSync("git", ["init"], { cwd: tmpDir, env: scrub(process.env) });
+    execFileSync("git", ["config", "user.email", "test@example.com"], {
+      cwd: tmpDir,
+      env: scrub(process.env),
+    });
+    execFileSync("git", ["config", "user.name", "Test"], { cwd: tmpDir, env: scrub(process.env) });
+    execFileSync("git", ["config", "commit.gpgsign", "false"], {
+      cwd: tmpDir,
+      env: scrub(process.env),
+    });
+    execFileSync("git", ["config", "core.hooksPath", "/dev/null"], {
+      cwd: tmpDir,
+      env: scrub(process.env),
+    });
+    execFileSync("git", ["add", "."], { cwd: tmpDir, env: scrub(process.env) });
+    execFileSync("git", ["commit", "-m", "init"], { cwd: tmpDir, env: scrub(process.env) });
+  }
+
+  it("shows git context on first orientation call and hides on second", async () => {
+    setupGit();
+    writeSource("src/file.ts", "export const x = 1;");
+
+    registerMockProvider(tmpDir, {});
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    // First call — should show git context
+    const result1 = (await tool.execute(
+      "git-ctx-1",
+      {},
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result1.content[0].text).toContain("## Git Context");
+    expect(result1.content[0].text).toContain("Branch:");
+
+    // Second call — should NOT show git context
+    const result2 = (await tool.execute(
+      "git-ctx-2",
+      {},
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result2.content[0].text).not.toContain("## Git Context");
+  });
+
+  it("does not consume git context flag for task-mode calls with a target", async () => {
+    setupGit();
+    writeSource("src/file.ts", "export function doSomething() { return 1; }");
+
+    registerMockProvider(tmpDir, {
+      references: async () => [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    // Resolve a target first
+    const resolveTool = getTool(pi, "code_resolve");
+    const resolveResult = (await resolveTool.execute(
+      "resolve-for-task",
+      { file: "src/file.ts", line: 1, character: 20 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: { type: string; data?: { targets?: Array<{ targetId: string }> } };
+    };
+    const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
+
+    // Task-mode call with a target — should NOT consume the flag
+    const tool = getTool(pi, "code_context");
+    await tool.execute(
+      "git-ctx-task",
+      { task: "do something", targetId, include: ["defs"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    );
+
+    // Orientation call — should still show git context
+    const result = (await tool.execute(
+      "git-ctx-after-task",
+      {},
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("## Git Context");
+  });
+});

@@ -34,6 +34,8 @@ export interface BriefDeps {
   model: ArchitectureModel | null;
   provider: CodeProvider | null;
   cwd: string;
+  /** Show git context in orientation output. Defaults to true. */
+  showGitContext?: boolean;
 }
 
 export interface BriefUseCaseResult {
@@ -87,6 +89,8 @@ export interface ContextInput {
   budget?: "small" | "medium" | "large";
   include?: ContextSection[];
   maxResults?: number;
+  /** Show git context in orientation output. Defaults to true. */
+  showGitContext?: boolean;
 }
 
 export interface ContextDeps {

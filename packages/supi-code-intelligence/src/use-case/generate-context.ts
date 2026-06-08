@@ -74,6 +74,7 @@ async function executeOrientationContext(
     model: deps.model,
     provider: deps.provider,
     cwd: deps.cwd,
+    showGitContext: input.showGitContext ?? true,
   });
 
   const details: ContextDetails = {

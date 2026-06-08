@@ -68,4 +68,6 @@ export interface BriefOpts {
   provider?: import("../analysis/context/request-context.ts").CodeProvider | null;
   maxResults?: number;
   cwd: string;
+  /** Show git context in orientation output. Defaults to true. */
+  showGitContext?: boolean;
 }

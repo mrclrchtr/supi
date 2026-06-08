@@ -31,7 +31,10 @@ export function generateOverview(model: ArchitectureModel): string | null {
 /**
  * Generate a full-project brief from the architecture model.
  */
-export function generateProjectBrief(model: ArchitectureModel): {
+export function generateProjectBrief(
+  model: ArchitectureModel,
+  opts?: { showGitContext?: boolean },
+): {
   content: string;
   details: BriefDetails;
 } {
@@ -46,9 +49,11 @@ export function generateProjectBrief(model: ArchitectureModel): {
     lines.push("");
   }
 
-  const gitCtx = gatherGitContext(model.root);
-  if (gitCtx) {
-    lines.push(formatGitContext(gitCtx));
+  if (opts?.showGitContext !== false) {
+    const gitCtx = gatherGitContext(model.root);
+    if (gitCtx) {
+      lines.push(formatGitContext(gitCtx));
+    }
   }
 
   if (model.modules.length === 0) {
