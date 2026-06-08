@@ -547,8 +547,8 @@ describe("code_context details metadata", () => {
     expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("context");
     if (result.details?.type === "context") {
-      // Falls back to orientation overview, not task-mode unavailable
-      expect(result.details.data.confidence).toBe("unavailable");
+      // Model is now always built, so confidence is structural even for task fallback
+      expect(result.details.data.confidence).toBe("structural");
       // Orientation mode has different section semantics
       expect(result.details.data.renderedSections).toContain("orientation");
     }

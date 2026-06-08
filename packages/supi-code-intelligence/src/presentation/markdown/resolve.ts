@@ -11,11 +11,21 @@ import type {
   ResolveServiceResult,
 } from "../../analysis/resolve/service.ts";
 
+/** Options for rendering resolve results. */
+export interface RenderResolveOptions {
+  /** Whether the caller provided anchored coords (file + line + character). */
+  isAnchoredCall?: boolean;
+}
+
 /** Render a full resolve service result into markdown. */
-export function renderResolveResult(result: ResolveServiceResult, _cwd: string): string {
+export function renderResolveResult(
+  result: ResolveServiceResult,
+  _cwd: string,
+  options?: RenderResolveOptions,
+): string {
   switch (result.kind) {
     case "resolved":
-      return renderResolved(result.targets, result.omittedCount, result.confidence);
+      return renderResolved(result.targets, result.omittedCount, result.confidence, options);
     case "disambiguation":
       return renderDisambiguation(result.candidates, result.omittedCount);
     case "error":
@@ -27,6 +37,7 @@ function renderResolved(
   targets: ResolvedTargetEntry[],
   omittedCount: number,
   confidence: string,
+  options?: RenderResolveOptions,
 ): string {
   if (targets.length === 0) {
     return "No targets resolved.";
@@ -49,23 +60,29 @@ function renderResolved(
     lines.push(`- Provenance: \`${t.provenance}\``);
     lines.push("");
 
-    // Follow-up suggestions
-    lines.push("**Next steps — use the target ID with:**");
-    lines.push(
-      `- \`code_context\` { targetId: "${t.targetId}", task: "..." } — task-focused context`,
-    );
-    lines.push(`- \`code_graph\` { targetId: "${t.targetId}" } — find usages`);
-    lines.push(
-      `- \`code_graph\` { targetId: "${t.targetId}", relations: ["callees"] } — outgoing calls`,
-    );
-    lines.push(`- \`code_impact\` { targetId: "${t.targetId}" } — blast radius`);
-    lines.push(
-      `- \`code_inspect\` { file: "${t.file}", line: ${t.displayLine}, character: ${t.displayCharacter} } — factual point inspection`,
-    );
-    lines.push(
-      `- \`code_refactor\` { targetId: "${t.targetId}", operation: "rename_symbol", newName: "..." } — preview a safe rename plan`,
-    );
-    lines.push(`- \`code_context\` { targetId: "${t.targetId}" } — orientation`);
+    // Follow-up suggestions — omit for anchored calls where the caller already has coordinates
+    if (!options?.isAnchoredCall) {
+      lines.push("**Next steps — use the target ID with:**");
+      lines.push(
+        `- \`code_context\` { targetId: "${t.targetId}", task: "..." } — task-focused context`,
+      );
+      lines.push(`- \`code_graph\` { targetId: "${t.targetId}" } — find usages`);
+      lines.push(
+        `- \`code_graph\` { targetId: "${t.targetId}", relations: ["callees"] } — outgoing calls`,
+      );
+      lines.push(`- \`code_impact\` { targetId: "${t.targetId}" } — blast radius`);
+      lines.push(
+        `- \`code_inspect\` { file: "${t.file}", line: ${t.displayLine}, character: ${t.displayCharacter} } — factual point inspection`,
+      );
+      lines.push(
+        `- \`code_refactor\` { targetId: "${t.targetId}", operation: "rename_symbol", newName: "..." } — preview a safe rename plan`,
+      );
+      lines.push(`- \`code_context\` { targetId: "${t.targetId}" } — orientation`);
+    } else {
+      lines.push(
+        `_Use \`targetId\` with \`code_context\`, \`code_graph\`, \`code_impact\`, or \`code_refactor\`._`,
+      );
+    }
   } else {
     lines.push(
       `Resolved ${targets.length} target(s)${omittedCount > 0 ? ` (${omittedCount} omitted)` : ""}:`,

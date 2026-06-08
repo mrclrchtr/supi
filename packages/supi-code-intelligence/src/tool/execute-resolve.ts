@@ -31,7 +31,9 @@ export async function executeResolveTool(
 
   const result = await executeResolveService(params, ctx.cwd);
 
-  const content = renderResolveResult(result, ctx.cwd);
+  // Determine if this was an anchored call (file + line + character provided)
+  const isAnchoredCall = !!(params.file && params.line != null && params.character != null);
+  const content = renderResolveResult(result, ctx.cwd, { isAnchoredCall });
 
   // Build structured details
   if (result.kind === "resolved") {

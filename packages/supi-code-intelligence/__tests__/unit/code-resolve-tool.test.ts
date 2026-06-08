@@ -141,11 +141,9 @@ describe("code_resolve tool", () => {
     expect(result.content[0].text).toContain("Target ID:");
     expect(result.content[0].text).toContain("Span ID:");
     expect(result.content[0].text).toContain("index.ts");
-    expect(result.content[0].text).toContain("Next steps");
+    // Anchored calls get a compact one-liner instead of full Next steps
+    expect(result.content[0].text).toContain("targetId");
     expect(result.content[0].text).toContain("code_context");
-    expect(result.content[0].text).toContain('relations: ["callees"]');
-    expect(result.content[0].text).toContain("code_impact");
-    expect(result.content[0].text).toContain("code_refactor");
   });
 
   it("resolves file-only request to exported targets with target IDs", async () => {
@@ -662,7 +660,8 @@ describe("code_resolve targetId follow-up", () => {
     };
 
     expect(resolveResult.content[0].text).toContain("Target ID:");
-    expect(resolveResult.content[0].text).toContain("code_inspect");
+    // Anchored calls get a compact one-liner
+    expect(resolveResult.content[0].text).toContain("targetId");
     const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
     expect(targetId).toBeDefined();
     if (!targetId) return;

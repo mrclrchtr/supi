@@ -41,9 +41,9 @@ export async function executeContextTool(
   const providerState = getCodeProvider(ctx.cwd);
   const provider = providerState.kind === "ready" ? providerState.provider : null;
 
-  // Orientation-mode code_context can still work without an active provider as long
-  // as a project model can be built. Task-mode currently does not consume the model.
-  const model = params.task ? null : await buildArchitectureModel(ctx.cwd);
+  // Always build the model — orientation mode needs it, and task mode falls back
+  // to orientation when no target is provided (e.g., scope-only queries).
+  const model = await buildArchitectureModel(ctx.cwd);
   const result = await executeContext(
     {
       task: params.task,
