@@ -348,7 +348,14 @@ async function collectRelation(
       }
 
       case "tests": {
-        const testFiles = findTestCompanionFiles(file);
+        if (!provider?.references) {
+          return {
+            kind: "unavailable",
+            rel,
+            message: "No semantic provider for test discovery",
+          };
+        }
+        const testFiles = await findTestCompanionFiles(file, provider);
         if (testFiles.length === 0) {
           return {
             kind: "ok",

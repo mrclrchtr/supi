@@ -281,13 +281,24 @@ describe("execute-graph (code_graph tool)", () => {
       expect(result.content).toContain("no companion test files found");
     });
 
-    it("finds companion test files when they exist", async () => {
+    it("finds companion test files via import analysis", async () => {
       writeSource("test.ts", "export function foo() { return 1; }\n");
-      // Create a companion test file in __tests__/
       const { mkdirSync } = await import("node:fs");
       const testDir = path.join(tmpDir, "__tests__");
       mkdirSync(testDir, { recursive: true });
       writeSource("__tests__/test.test.ts", "import { foo } from '../test';\nvoid foo;\n");
+
+      registerMockProvider(tmpDir, {
+        references: async () => [
+          {
+            uri: `file://${tmpDir}/__tests__/test.test.ts`,
+            range: {
+              start: { line: 0, character: 17 },
+              end: { line: 0, character: 20 },
+            },
+          },
+        ],
+      });
 
       const result = await executeAction(
         {
@@ -302,6 +313,48 @@ describe("execute-graph (code_graph tool)", () => {
 
       expect(result.content).toContain("tests");
       expect(result.content).toContain("__tests__/test.test.ts");
+    });
+
+    it("finds test via import analysis when naming conventions differ", async () => {
+      // source file
+      const { mkdirSync } = await import("node:fs");
+      const srcDir = path.join(tmpDir, "src", "tool");
+      mkdirSync(srcDir, { recursive: true });
+      writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+
+      // test file with a different name that imports the source
+      const testDir = path.join(tmpDir, "__tests__");
+      mkdirSync(testDir, { recursive: true });
+      writeSource(
+        "__tests__/code-find-tool.test.ts",
+        "import { executeFind } from '../src/tool/execute-find';\nvoid executeFind;\n",
+      );
+
+      registerMockProvider(tmpDir, {
+        references: async () => [
+          {
+            uri: `file://${tmpDir}/__tests__/code-find-tool.test.ts`,
+            range: {
+              start: { line: 0, character: 17 },
+              end: { line: 0, character: 28 },
+            },
+          },
+        ],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "src/tool/execute-find.ts",
+          line: 1,
+          character: 1,
+          relations: ["tests"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("tests");
+      expect(result.content).toContain("__tests__/code-find-tool.test.ts");
     });
   });
 });

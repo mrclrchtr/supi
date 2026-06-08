@@ -331,7 +331,14 @@ async function buildTestsSection(
     };
   }
 
-  const found = findTestCompanionFiles(targetAbs);
+  if (!deps.provider?.references) {
+    return {
+      lines: ["Tests unavailable — no semantic provider for test discovery."],
+      hasStructuralEvidence: false,
+    };
+  }
+
+  const found = await findTestCompanionFiles(targetAbs, deps.provider);
 
   if (found.length === 0) {
     return {

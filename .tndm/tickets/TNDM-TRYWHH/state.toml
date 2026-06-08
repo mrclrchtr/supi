@@ -1,0 +1,32 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-07T21:09:37.773606Z"
+revision = 25
+
+[document_fingerprints]
+archive = "sha256:5aef678cfb36054a8736895099f555c24ab7b31e9ceb67055c5735c7f35ec617"
+content = "sha256:44cc921b471b5c279c24666988deab6cba8fbdd8d927b38796a13ff58b123289"
+task-01 = "sha256:3b01a7fa5fa84724bf66049a4e108b22fa1204476e7607a9eaeb550d5f9ed87a"
+task-02 = "sha256:01833d00c66787d1127a7d3dcabbe5900d1fbe59158b85c3f662fa7f49b37738"
+task-03 = "sha256:2982062ff72dee701f897cf1edd414acfffa559384e8a63314ddbdb3ac61fff8"
+task-04 = "sha256:35db625f6e6fc7ce7c0841ce95e0e64eddf024a03f0a94189c8e8d21cd975f81"
+
+[[tasks]]
+number = 1
+title = "Add language-agnostic test file patterns"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Replace test discovery with import-graph analysis"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Add naming-mismatch test case"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Verify full test suite passes"
+status = "done"

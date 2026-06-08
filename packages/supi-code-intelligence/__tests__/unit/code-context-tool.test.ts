@@ -376,7 +376,18 @@ describe("code_context real-data sections", () => {
       return { kind: "unsupported-language" as const, file: relFile, message: "no outline" };
     });
 
-    registerMockProvider(tmpDir, { outline: outlineSpy });
+    registerMockProvider(tmpDir, {
+      outline: outlineSpy,
+      references: async () => [
+        {
+          uri: `file://${tmpDir}/src/context.test.ts`,
+          range: {
+            start: { line: 0, character: 17 },
+            end: { line: 0, character: 31 },
+          },
+        },
+      ],
+    });
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);

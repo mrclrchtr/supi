@@ -140,7 +140,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_imp
 - **maxResults** caps per-relation output
 - Each relation dispatched to appropriate substrate (semantic for references/implements, structural for callees)
 - Best-effort per relation: unavailable substrates skip with a note rather than failing the entire call
-- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files via naming conventions
+- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files via import-graph analysis using the semantic provider's `references` method
 - File-level expansion not supported — requires precise target (anchored coords or targetId)
 
 ### `code_impact`
