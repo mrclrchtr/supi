@@ -355,7 +355,7 @@ async function collectRelation(
             message: "No semantic provider for test discovery",
           };
         }
-        const testFiles = await findTestCompanionFiles(file, provider);
+        const testFiles = await findTestCompanionFiles(file, provider, position);
         if (testFiles.length === 0) {
           return {
             kind: "ok",

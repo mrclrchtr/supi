@@ -33,9 +33,11 @@ export async function findTestCompanionFiles(
   const refs = await references(targetAbs, position);
   if (!refs) return [];
 
+  const seen = new Set<string>();
   return refs
     .filter((ref) => isTestFile(ref.uri))
-    .map((ref) => (ref.uri.startsWith("file://") ? fileURLToPath(ref.uri) : ref.uri));
+    .map((ref) => (ref.uri.startsWith("file://") ? fileURLToPath(ref.uri) : ref.uri))
+    .filter((abs) => (seen.has(abs) ? false : (seen.add(abs), true)));
 }
 
 /** Language-agnostic patterns for identifying test files. */
