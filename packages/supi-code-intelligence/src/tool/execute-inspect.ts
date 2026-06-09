@@ -28,6 +28,10 @@ export async function executeInspectTool(
 
   const providerState = getCodeProvider(ctx.cwd);
   const provider = providerState.kind === "ready" ? providerState.provider : null;
+  const lspService =
+    providerState.kind === "ready"
+      ? providerState.lspService
+      : { kind: "unavailable" as const, reason: "No provider" };
   const result = await executeInspect(
     {
       file: params.file,
@@ -35,7 +39,7 @@ export async function executeInspectTool(
       character: params.character,
       maxResults: params.maxResults,
     },
-    { provider, cwd: ctx.cwd },
+    { provider, cwd: ctx.cwd, lspService },
   );
 
   return { content: result.content, details: { type: "inspect", data: result.details } };

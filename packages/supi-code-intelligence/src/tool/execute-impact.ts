@@ -57,9 +57,13 @@ export async function executeImpactLikeTool(
 
   const providerState = getCodeProvider(ctx.cwd);
   const provider = providerState.kind === "ready" ? providerState.provider : null;
+  const lspService =
+    providerState.kind === "ready"
+      ? providerState.lspService
+      : { kind: "unavailable" as const, reason: "No provider" };
 
   if (hasDiffInputs) {
-    return executeImpact(params, { cwd: ctx.cwd, provider }, surface);
+    return executeImpact(params, { cwd: ctx.cwd, provider, lspService }, surface);
   }
 
   const route = routeFor(ctx.cwd, preferredTool);
@@ -71,7 +75,7 @@ export async function executeImpactLikeTool(
     );
   }
 
-  return executeImpact(params, { cwd: ctx.cwd, provider }, surface);
+  return executeImpact(params, { cwd: ctx.cwd, provider, lspService }, surface);
 }
 
 /** Execute the preferred public code_impact tool. */

@@ -43,6 +43,10 @@ export async function executeContextTool(
 
   const providerState = getCodeProvider(ctx.cwd);
   const provider = providerState.kind === "ready" ? providerState.provider : null;
+  const lspService =
+    providerState.kind === "ready"
+      ? providerState.lspService
+      : { kind: "unavailable" as const, reason: "No provider" };
 
   // Always build the model — orientation mode needs it, and task mode falls back
   // to orientation when no target is provided (e.g., scope-only queries).
@@ -79,6 +83,7 @@ export async function executeContextTool(
       model,
       provider,
       cwd: ctx.cwd,
+      lspService,
     },
   );
 

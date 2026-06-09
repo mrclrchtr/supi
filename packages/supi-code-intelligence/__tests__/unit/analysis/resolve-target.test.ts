@@ -1,5 +1,6 @@
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { resolveTarget } from "../../../src/analysis/targeting/resolve-target.ts";
 
 /**
  * Resolve-target tests for the new analysis/targeting/resolve-target.ts.
@@ -19,7 +20,6 @@ describe("analysis resolve-target", () => {
 
   describe("resolveTarget", () => {
     it("resolves anchored coordinates", async () => {
-      const { resolveTarget } = await import("../../../src/analysis/targeting/resolve-target.ts");
       const result = await resolveTarget(
         { file: "/project/src/index.ts", line: 10, character: 5 },
         "/project",
@@ -28,13 +28,11 @@ describe("analysis resolve-target", () => {
     });
 
     it("resolves file-only request", async () => {
-      const { resolveTarget } = await import("../../../src/analysis/targeting/resolve-target.ts");
       const result = await resolveTarget({ file: "/project/src/index.ts" }, "/project");
       expect(result).toBeDefined();
     });
 
     it("returns error for invalid input without file or symbol", async () => {
-      const { resolveTarget } = await import("../../../src/analysis/targeting/resolve-target.ts");
       const result = await resolveTarget({}, "/project");
       expect(typeof result).toBe("string");
       expect(result).toContain("Error");

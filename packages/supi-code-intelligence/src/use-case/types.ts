@@ -1,5 +1,6 @@
 // Shared typed data interfaces between use-case and presentation layers.
 
+import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
 import type { ArchitectureModel } from "../model.ts";
 import type { BriefDetails, ContextDetails, InspectDetails } from "../types.ts";
@@ -36,6 +37,8 @@ export interface BriefDeps {
   cwd: string;
   /** Show git context in orientation output. Defaults to true. */
   showGitContext?: boolean;
+  /** LSP service state for diagnostic access. */
+  lspService: SessionLspServiceState;
 }
 
 export interface BriefUseCaseResult {
@@ -55,6 +58,7 @@ export interface InspectInput {
 export interface InspectDeps {
   provider: CodeProvider | null;
   cwd: string;
+  lspService: SessionLspServiceState;
 }
 
 export interface InspectUseCaseResult {
@@ -97,6 +101,7 @@ export interface ContextDeps {
   model: ArchitectureModel | null;
   provider: CodeProvider | null;
   cwd: string;
+  lspService: SessionLspServiceState;
 }
 
 export interface ContextUseCaseResult {

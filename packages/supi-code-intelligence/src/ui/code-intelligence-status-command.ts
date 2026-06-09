@@ -4,8 +4,12 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { OutstandingDiagnosticSummaryEntry, ProjectServerInfo } from "@mrclrchtr/supi-lsp/api";
-import { getSessionLspService, type SessionLspService } from "@mrclrchtr/supi-lsp/api";
+import type {
+  OutstandingDiagnosticSummaryEntry,
+  ProjectServerInfo,
+  SessionLspService,
+} from "@mrclrchtr/supi-lsp/api";
+import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { type CiStatusData, createCiStatusDialog } from "./code-intelligence-status-overlay.ts";
 
 const STATUS_KEY = "code-intelligence";
@@ -49,8 +53,9 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
               done: () => done(undefined),
               tui,
               fetchDetailedDiagnostics: async (maxSeverity) => {
-                const lspState = getSessionLspService(ctx.cwd);
-                if (lspState.kind !== "ready") return [];
+                const ps = getCodeProvider(ctx.cwd);
+                const lspState = ps.kind === "ready" ? ps.lspService : null;
+                if (lspState?.kind !== "ready") return [];
                 return lspState.service.getOutstandingDiagnostics(maxSeverity);
               },
               onRefresh: async () => {
@@ -88,7 +93,8 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
 /** Gather a snapshot of LSP and structural state for the dialog. */
 async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStatusData> {
   const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
-  const lspState = getSessionLspService(cwd);
+  const providerState = getCodeProvider(cwd);
+  const lspState = providerState.kind === "ready" ? providerState.lspService : null;
 
   let servers: ProjectServerInfo[] = [];
   let diagnostics: OutstandingDiagnosticSummaryEntry[] = [];
@@ -96,22 +102,22 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
   let semanticReason: string | undefined;
   let semanticProviderAvailable = false;
 
-  if (lspState.kind === "ready") {
+  if (lspState && lspState.kind === "ready") {
     const service: SessionLspService = lspState.service;
     servers = service.getProjectServers();
     diagnostics = service.getOutstandingDiagnosticSummary(1);
     semanticKind = "ready";
     semanticProviderAvailable = true;
-  } else if (lspState.kind === "pending") {
+  } else if (lspState && lspState.kind === "pending") {
     semanticKind = "pending";
-  } else if (lspState.kind === "inactive") {
+  } else if (lspState && lspState.kind === "inactive") {
     semanticKind = "inactive";
-  } else if (lspState.kind === "disabled") {
+  } else if (lspState && lspState.kind === "disabled") {
     semanticKind = "disabled";
     semanticReason = "LSP is disabled in settings";
   } else {
     semanticKind = "unavailable";
-    semanticReason = lspState.reason;
+    semanticReason = lspState && "reason" in lspState ? lspState.reason : "No LSP service";
   }
 
   // Sort: errors desc, warnings desc, info desc, hints desc

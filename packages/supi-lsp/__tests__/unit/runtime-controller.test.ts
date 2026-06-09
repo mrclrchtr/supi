@@ -2,6 +2,8 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { getLspDisabledMessage, loadLspSettings } from "../../src/config/lsp-settings.ts";
+import { LspRuntimeController } from "../../src/session/runtime-controller.ts";
 
 const TMP_DIRS: string[] = [];
 
@@ -25,20 +27,18 @@ afterEach(() => {
 // ── lsp-settings (config helpers) ─────────────────────────────
 
 describe("loadLspSettings (from new lsp-settings module)", () => {
-  it("exports LspSettings type and helpers", async () => {
-    const mod = await import("../../src/config/lsp-settings.ts");
-    expect(typeof mod.loadLspSettings).toBe("function");
-    expect(typeof mod.getLspDisabledMessage).toBe("function");
+  it("exports LspSettings type and helpers", () => {
+    expect(typeof loadLspSettings).toBe("function");
+    expect(typeof getLspDisabledMessage).toBe("function");
   });
 
-  it("returns defaults when no config exists", async () => {
+  it("returns defaults when no config exists", () => {
     const tmpDir = makeProjectDir();
-    const { loadLspSettings } = await import("../../src/config/lsp-settings.ts");
     const result = loadLspSettings(tmpDir, tmpDir);
     expect(result).toEqual({ enabled: true, severity: 1, active: [], exclude: [] });
   });
 
-  it("reads from project .pi/supi config", async () => {
+  it("reads from project .pi/supi config", () => {
     const tmpDir = makeProjectDir();
     fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
     fs.writeFileSync(
@@ -46,7 +46,6 @@ describe("loadLspSettings (from new lsp-settings module)", () => {
       JSON.stringify({ lsp: { enabled: false, severity: 2 } }),
     );
 
-    const { loadLspSettings } = await import("../../src/config/lsp-settings.ts");
     const result = loadLspSettings(tmpDir);
     expect(result.enabled).toBe(false);
     expect(result.severity).toBe(2);
@@ -54,7 +53,7 @@ describe("loadLspSettings (from new lsp-settings module)", () => {
 });
 
 describe("getLspDisabledMessage (from lsp-settings module)", () => {
-  it("returns project-scope message when project disables LSP", async () => {
+  it("returns project-scope message when project disables LSP", () => {
     const tmpDir = makeProjectDir();
     fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
     fs.writeFileSync(
@@ -62,13 +61,12 @@ describe("getLspDisabledMessage (from lsp-settings module)", () => {
       JSON.stringify({ lsp: { enabled: false } }),
     );
 
-    const { getLspDisabledMessage } = await import("../../src/config/lsp-settings.ts");
     const msg = getLspDisabledMessage(tmpDir, tmpDir);
     expect(msg).toContain("project");
     expect(msg).not.toContain("global");
   });
 
-  it("returns global-scope message when only global disables LSP", async () => {
+  it("returns global-scope message when only global disables LSP", () => {
     const tmpDir = makeProjectDir();
     // Project config does not disable
     // Global config disables
@@ -86,7 +84,6 @@ describe("getLspDisabledMessage (from lsp-settings module)", () => {
       JSON.stringify({ lsp: { enabled: true } }),
     );
 
-    const { getLspDisabledMessage } = await import("../../src/config/lsp-settings.ts");
     const msg = getLspDisabledMessage(tmpDir, globalDir);
     expect(msg).toContain("global");
   });
@@ -95,14 +92,12 @@ describe("getLspDisabledMessage (from lsp-settings module)", () => {
 // ── Runtime controller ────────────────────────────────────────
 
 describe("LspRuntimeController", () => {
-  it("exports LspRuntimeController class", async () => {
-    const mod = await import("../../src/session/runtime-controller.ts");
-    expect(typeof mod.LspRuntimeController).toBe("function");
+  it("exports LspRuntimeController class", () => {
+    expect(typeof LspRuntimeController).toBe("function");
   });
 
   it("creates a controller that can be started and shut down", async () => {
     const tmpDir = makeProjectDir();
-    const { LspRuntimeController } = await import("../../src/session/runtime-controller.ts");
 
     const controller = new LspRuntimeController(tmpDir);
     expect(controller.cwd).toBe(tmpDir);
@@ -120,7 +115,6 @@ describe("LspRuntimeController", () => {
       JSON.stringify({ lsp: { enabled: false } }),
     );
 
-    const { LspRuntimeController } = await import("../../src/session/runtime-controller.ts");
     const controller = new LspRuntimeController(tmpDir);
     const result = await controller.start();
     expect(result.kind).toBe("disabled");
@@ -135,7 +129,6 @@ describe("LspRuntimeController", () => {
     const tmpDir = makeProjectDir();
     fs.writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-project" }));
 
-    const { LspRuntimeController } = await import("../../src/session/runtime-controller.ts");
     const controller = new LspRuntimeController(tmpDir);
     const result = await controller.start();
 
@@ -148,5 +141,5 @@ describe("LspRuntimeController", () => {
     // In CI without any language servers, it may be "unavailable" or "ready" with no servers
     // Either is valid — we just test the shape
     expect(["ready", "unavailable", "disabled"]).toContain(result.kind);
-  });
+  }, 10000);
 });

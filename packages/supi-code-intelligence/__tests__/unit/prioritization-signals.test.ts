@@ -1,33 +1,17 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { summarizePrioritySignalsForFiles } from "../../src/prioritization-signals.ts";
-
-const mockLspFns = vi.hoisted(() => ({
-  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
-}));
-
-vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
-  return {
-    ...actual,
-    getSessionLspService: mockLspFns.getSessionLspService,
-  };
-});
 
 let tmpDir: string;
 
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-intel-priority-signals-"));
-  mockLspFns.getSessionLspService.mockReturnValue({
-    kind: "unavailable",
-    reason: "No LSP in test env",
-  });
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -61,10 +45,11 @@ describe("prioritization signals", () => {
       ),
     );
 
-    const summary = summarizePrioritySignalsForFiles(tmpDir, [
-      path.join(tmpDir, "src", "payment.ts"),
-      path.join(tmpDir, "src", "unused.ts"),
-    ]);
+    const summary = summarizePrioritySignalsForFiles(
+      tmpDir,
+      [path.join(tmpDir, "src", "payment.ts"), path.join(tmpDir, "src", "unused.ts")],
+      { kind: "unavailable", reason: "No LSP in test env" },
+    );
 
     expect(summary).not.toBeNull();
     expect(summary?.lowCoverageCount).toBe(1);
@@ -78,8 +63,8 @@ describe("prioritization signals", () => {
     mkdirSync(path.join(tmpDir, "src"), { recursive: true });
     writeFileSync(path.join(tmpDir, "src", "payment.ts"), "export const paymentLoader = 1;\n");
 
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
+    const lspService = {
+      kind: "ready" as const,
       service: {
         getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([
           {
@@ -92,11 +77,13 @@ describe("prioritization signals", () => {
           },
         ]),
       },
-    });
+    };
 
-    const summary = summarizePrioritySignalsForFiles(tmpDir, [
-      path.join(tmpDir, "src", "payment.ts"),
-    ]);
+    const summary = summarizePrioritySignalsForFiles(
+      tmpDir,
+      [path.join(tmpDir, "src", "payment.ts")],
+      lspService as unknown as SessionLspServiceState,
+    );
 
     expect(summary).not.toBeNull();
     expect(summary?.diagnosticsCount).toBe(2);

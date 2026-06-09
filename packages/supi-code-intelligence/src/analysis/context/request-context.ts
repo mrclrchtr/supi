@@ -15,6 +15,7 @@ import {
   type SemanticProvider,
   type StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { getSessionLspService, type SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 
 /**
  * Unified code analysis provider combining semantic (LSP-backed) and
@@ -24,7 +25,7 @@ export interface CodeProvider extends SemanticProvider, StructuralProvider {}
 
 /** Availability state for the code provider in a workspace. */
 export type CodeProviderState =
-  | { kind: "ready"; provider: CodeProvider }
+  | { kind: "ready"; provider: CodeProvider; lspService: SessionLspServiceState }
   | { kind: "unavailable"; reason: string };
 
 /**
@@ -74,6 +75,7 @@ export function getCodeProviderState(cwd: string): CodeProviderState {
       (hasSemantic ? ws.semantic.provider : null) as SemanticProvider | null,
       (hasStructural ? ws.structural.provider : null) as StructuralProvider | null,
     ),
+    lspService: getSessionLspService(cwd),
   };
 }
 

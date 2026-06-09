@@ -61,6 +61,7 @@ async function executePathBrief(
     cwd: deps.cwd,
     maxResults,
     showGitContext: deps.showGitContext ?? true,
+    lspService: deps.lspService,
   });
   return { content: result.content, details: result.details };
 }
@@ -81,6 +82,7 @@ async function executeFileBrief(
     cwd: deps.cwd,
     maxResults,
     showGitContext: deps.showGitContext ?? true,
+    lspService: deps.lspService,
   });
   return { content: result.content, details: result.details };
 }

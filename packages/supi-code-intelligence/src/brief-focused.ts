@@ -4,7 +4,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
+import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { formatGitContext, gatherGitContext } from "./git-context.ts";
 import type { ArchitectureModel } from "./model.ts";
 import { findModuleForPath, getDependencies, getDependents } from "./model.ts";
@@ -95,9 +95,11 @@ async function generateDirectoryBrief(
     });
   }
 
+  const lspService = opts?.lspService ?? { kind: "unavailable" as const, reason: "No LSP service" };
   const prioritySignals = summarizePrioritySignalsForFiles(
     model.root,
     summarizeDirectoryRecursively(resolvedPath).allFiles,
+    lspService,
   );
   appendPrioritySignalsSection(lines, prioritySignals);
 
@@ -346,11 +348,12 @@ async function generateFileBriefWithEnrichment(
   const isEntrypoint =
     mod?.entrypoints.some((ep) => path.resolve(mod.root, ep) === resolvedPath) ?? false;
 
+  const lspService = opts?.lspService ?? { kind: "unavailable" as const, reason: "No LSP service" };
   const enrichment = await gatherBriefEnrichment(
     opts?.provider ?? null,
-    opts?.cwd ?? model.root,
     relPath,
     opts?.maxResults,
+    lspService,
   );
 
   const renderedContent = renderFileBrief({
@@ -363,7 +366,7 @@ async function generateFileBriefWithEnrichment(
     maxResults: opts?.maxResults,
   });
 
-  const prioritySignals = summarizePrioritySignalsForFiles(model.root, [resolvedPath]);
+  const prioritySignals = summarizePrioritySignalsForFiles(model.root, [resolvedPath], lspService);
   const extraLines: string[] = [];
   if (prioritySignals) {
     appendPrioritySignalsSection(extraLines, prioritySignals);
@@ -427,6 +430,7 @@ async function enrichModuleWithDiagnostics(
     sourceFiles,
     dirPath,
     opts.cwd,
+    opts.lspService ?? { kind: "unavailable" as const, reason: "No LSP service" },
     opts.maxResults,
   );
   if (enrichmentDiags) {
@@ -434,22 +438,23 @@ async function enrichModuleWithDiagnostics(
   }
 }
 
+// biome-ignore lint/complexity/useMaxParams: lspService is a DI seam, not a logic parameter
 async function gatherModuleDiagnostics(
   sourceFiles: string[],
   dirPath: string,
   cwd: string,
+  lspService: SessionLspServiceState,
   maxResults?: number,
 ): Promise<string | null> {
   try {
-    const lspState = getSessionLspService(cwd);
-    if (lspState.kind !== "ready") return null;
+    if (lspService.kind !== "ready") return null;
 
     const fileDiags: Array<{ file: string; errors: number; warnings: number }> = [];
     for (const basename of sourceFiles) {
       const fullPath = path.join(dirPath, basename);
       const relPath = path.relative(cwd, fullPath);
       try {
-        const diags = await lspState.service.fileDiagnostics(relPath, 2);
+        const diags = await lspService.service.fileDiagnostics(relPath, 2);
         if (!diags || diags.length === 0) continue;
         const errors = diags.filter((d) => (d.severity ?? 1) === 1).length;
         const warnings = diags.filter((d) => (d.severity ?? 1) === 2).length;

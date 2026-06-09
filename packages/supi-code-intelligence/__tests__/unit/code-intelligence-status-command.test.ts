@@ -12,6 +12,16 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   };
 });
 
+/** Register a minimal semantic provider so getCodeProvider returns "ready" with the mocked LSP. */
+function registerMinimalSemantic(cwd: string) {
+  getDefaultWorkspaceRuntime().registerSemantic(cwd, {
+    references: async () => [],
+    implementation: async () => [],
+    documentSymbols: async () => [],
+    workspaceSymbols: async () => [],
+  });
+}
+
 describe("/supi-ci-status command", () => {
   afterEach(() => {
     getDefaultWorkspaceRuntime().clearAll();
@@ -79,6 +89,7 @@ describe("/supi-ci-status command", () => {
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
+    registerMinimalSemantic("/project");
     const mockService = {
       getProjectServers: vi.fn(() => [
         {
@@ -122,6 +133,7 @@ describe("/supi-ci-status command", () => {
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
+    registerMinimalSemantic("/project");
     const mockService = {
       getProjectServers: vi.fn(() => []),
       getOutstandingDiagnosticSummary: vi.fn(() => [
@@ -210,6 +222,7 @@ describe("/supi-ci-status command", () => {
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
+    registerMinimalSemantic("/project");
     const mockService = {
       getProjectServers: vi.fn(() => []),
       getOutstandingDiagnosticSummary: vi.fn(() => [

@@ -70,4 +70,6 @@ export interface BriefOpts {
   cwd: string;
   /** Show git context in orientation output. Defaults to true. */
   showGitContext?: boolean;
+  /** LSP service state for diagnostic access. */
+  lspService?: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState;
 }

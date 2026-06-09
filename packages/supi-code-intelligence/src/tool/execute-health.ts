@@ -7,7 +7,8 @@
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
-import { getSessionLspService, type SessionLspService } from "@mrclrchtr/supi-lsp/api";
+import type { SessionLspService, SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { gatherGitContext } from "../git-context.ts";
 import {
   type CodeActionSuggestion,
@@ -48,7 +49,11 @@ export async function executeHealthTool(
     };
   }
 
-  const lspState = getSessionLspService(cwd);
+  const providerState = getCodeProvider(cwd);
+  const lspState: SessionLspServiceState =
+    providerState.kind === "ready"
+      ? providerState.lspService
+      : { kind: "unavailable", reason: "No provider" };
   const service = lspState.kind === "ready" ? lspState.service : null;
 
   const { recovered, lspStatus } = await maybeRecover(service, params.refresh, lspState);
@@ -57,7 +62,7 @@ export async function executeHealthTool(
   const servers = collectServers(service, included);
   const gitContext = included.includes("dirty") ? gatherGitContext(cwd) : null;
   const prioritizationSignals = needsPrioritizationSignals(included)
-    ? loadPrioritizationSignals(cwd)
+    ? loadPrioritizationSignals(cwd, lspState)
     : null;
   const coverage = included.includes("coverage")
     ? collectCoverageSection(prioritizationSignals, cwd, scopeFilter)
@@ -159,7 +164,7 @@ function resolveScope(scope: string | undefined, cwd: string): string | null {
 async function maybeRecover(
   service: SessionLspService | null,
   refresh: boolean | undefined,
-  lspState: ReturnType<typeof getSessionLspService>,
+  lspState: SessionLspServiceState,
 ): Promise<{ recovered: boolean; lspStatus: string }> {
   let recovered = false;
   let lspStatus = describeLspState(lspState);
@@ -353,7 +358,7 @@ function collectServers(
   }));
 }
 
-function describeLspState(state: ReturnType<typeof getSessionLspService>): string {
+function describeLspState(state: SessionLspServiceState): string {
   switch (state.kind) {
     case "ready":
       return "ready";

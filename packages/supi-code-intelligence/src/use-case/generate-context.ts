@@ -1,7 +1,7 @@
 // biome-ignore-all lint/nursery/noExcessiveLinesPerFile: context orchestration is kept together to share local section helpers
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
+
 import { collectOutgoingCalls } from "../analysis/calls/service.ts";
 import { collectReferences } from "../analysis/references/service.ts";
 import { extractTestFunctions, findTestCompanionFiles } from "../analysis/relations/tests.ts";
@@ -75,6 +75,7 @@ async function executeOrientationContext(
     provider: deps.provider,
     cwd: deps.cwd,
     showGitContext: input.showGitContext ?? true,
+    lspService: deps.lspService,
   });
 
   const details: ContextDetails = {
@@ -387,8 +388,7 @@ async function buildDiagnosticsSection(
     };
   }
 
-  const lspState = getSessionLspService(deps.cwd);
-  if (lspState.kind !== "ready") {
+  if (deps.lspService.kind !== "ready") {
     return {
       lines: [
         "LSP not available — diagnostics require a live language server. Use `code_health` to check server status.",
@@ -399,7 +399,7 @@ async function buildDiagnosticsSection(
 
   try {
     const targetFile = path.resolve(deps.cwd, target.file);
-    const diags = await lspState.service.fileDiagnostics(targetFile, 4);
+    const diags = await deps.lspService.service.fileDiagnostics(targetFile, 4);
     if (!diags || diags.length === 0) {
       return {
         lines: ["No diagnostics found near this target."],

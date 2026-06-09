@@ -5,7 +5,7 @@
 // - enrichDiagnosticContext(cwd, file, maxResults) — LSP diagnostics
 // - gatherBriefEnrichment(provider, cwd, file, maxResults) — orchestrates both
 
-import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
+import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
 import { diagnosticMessageString } from "../lsp/diagnostic-utils.ts";
 import type { BriefDiagnostic, BriefEnrichment } from "./brief-models.ts";
@@ -102,19 +102,18 @@ async function tryExports(
  * Returns capped diagnostic entries.
  */
 export async function enrichDiagnosticContext(
-  cwd: string,
-  file?: string,
-  maxResults?: number,
+  file: string | undefined,
+  maxResults: number | undefined,
+  lspService: SessionLspServiceState,
 ): Promise<Pick<BriefEnrichment, "diagnostics">> {
   if (!file) return { diagnostics: [] };
 
   const capN = cap(maxResults, DEFAULT_DIAGNOSTICS_CAP);
 
   try {
-    const lspState = getSessionLspService(cwd);
-    if (lspState.kind !== "ready") return { diagnostics: [] };
+    if (lspService.kind !== "ready") return { diagnostics: [] };
 
-    const diags = await lspState.service.fileDiagnostics(file, 2);
+    const diags = await lspService.service.fileDiagnostics(file, 2);
     if (!diags || diags.length === 0) return { diagnostics: [] };
 
     // Map to our DTO shape (1-based line for display)
@@ -137,9 +136,9 @@ export async function enrichDiagnosticContext(
  */
 export async function gatherBriefEnrichment(
   provider: CodeProvider | null,
-  cwd: string,
   file: string,
-  maxResults?: number,
+  maxResults: number | undefined,
+  lspService: SessionLspServiceState,
 ): Promise<BriefEnrichment> {
   // Structural context (outline, imports, exports) needs a provider
   const structural = provider
@@ -147,7 +146,7 @@ export async function gatherBriefEnrichment(
     : { outline: [], imports: [], exports: [] };
 
   // Diagnostics can work independently of provider (reaches LSP directly)
-  const diagnostic = await enrichDiagnosticContext(cwd, file, maxResults);
+  const diagnostic = await enrichDiagnosticContext(file, maxResults, lspService);
 
   return {
     outline: structural.outline,

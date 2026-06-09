@@ -44,6 +44,7 @@ export interface ImpactInput {
 export interface ImpactDeps {
   cwd: string;
   provider: CodeProvider | null;
+  lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState;
 }
 
 export type ImpactSurface = "impact" | "affected";
@@ -75,7 +76,7 @@ export async function executeImpact(
   const resultType = surfaceResultType(surface);
 
   if (input.changedFiles && input.changedFiles.length > 0) {
-    return executeChangedFilesImpact(input, deps.cwd, surface);
+    return executeChangedFilesImpact(input, deps.cwd, surface, deps.lspService);
   }
 
   if (input.change && !input.file && !input.symbol) {
@@ -109,12 +110,20 @@ export async function executeImpact(
   }
 
   if (isResolvedTargetGroup(target)) {
-    return executeFileLevelImpact(target, input, deps.cwd, semantic, surface);
+    return executeFileLevelImpact(target, input, deps.cwd, semantic, surface, deps.lspService);
   }
 
   const symbolName =
     target.name ?? `symbol at ${path.relative(deps.cwd, target.file)}:${target.displayLine}`;
-  return executeSingleImpact(target, symbolName, input, deps.cwd, semantic, surface);
+  return executeSingleImpact(
+    target,
+    symbolName,
+    input,
+    deps.cwd,
+    semantic,
+    surface,
+    deps.lspService,
+  );
 }
 
 // biome-ignore lint/complexity/useMaxParams: shared impact orchestration keeps substrate inputs explicit
@@ -125,6 +134,7 @@ async function executeSingleImpact(
   cwd: string,
   semantic: CodeProvider,
   surface: ImpactSurface,
+  lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
   const refs = await collectReferences(target, cwd, semantic);
   const model = await buildArchitectureModel(cwd);
@@ -138,6 +148,7 @@ async function executeSingleImpact(
   const prioritySignals = summarizePrioritySignalsForFiles(
     cwd,
     analysis.affectedFiles.size > 0 ? [...analysis.affectedFiles] : [target.file],
+    lspService,
   );
 
   const maxResults = input.maxResults ?? 8;
@@ -186,6 +197,7 @@ async function executeFileLevelImpact(
   cwd: string,
   semantic: CodeProvider,
   surface: ImpactSurface,
+  lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
   const perTarget = await Promise.all(
     targetGroup.targets.map(async (t) => ({
@@ -209,6 +221,7 @@ async function executeFileLevelImpact(
   const prioritySignals = summarizePrioritySignalsForFiles(
     cwd,
     analysis.affectedFiles.size > 0 ? [...analysis.affectedFiles] : [targetGroup.file],
+    lspService,
   );
 
   const maxResults = input.maxResults ?? 8;
@@ -255,6 +268,7 @@ async function executeChangedFilesImpact(
   input: ImpactInput,
   cwd: string,
   surface: ImpactSurface,
+  lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
   const changedFiles = normalizeChangedFiles(input.changedFiles ?? [], cwd);
   if (changedFiles.length === 0) {
@@ -278,6 +292,7 @@ async function executeChangedFilesImpact(
   const prioritySignals = summarizePrioritySignalsForFiles(
     cwd,
     changedFiles.map((entry) => entry.absPath),
+    lspService,
   );
   const nextQueries = buildChangedFilesNextQueries(changedFiles, analysis);
   const content =

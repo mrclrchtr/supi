@@ -274,7 +274,7 @@ describe("code_context tool", () => {
 describe("code_context real-data sections", () => {
   it("returns real diagnostics from LSP when available", async () => {
     writeSource("src/context.ts", "export function contextTarget() { return 1; }\n");
-
+    registerMockProvider(tmpDir, {});
     mockLspService(async (file) => {
       if (file.endsWith("context.ts")) {
         return [

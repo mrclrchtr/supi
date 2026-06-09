@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
+
 import { renderInspectResult } from "../presentation/markdown/inspect.ts";
 import { normalizePath } from "../search-helpers.ts";
 import { gatherNearbyDiagnostics, gatherTreeSitterContext } from "./gather-context.ts";
@@ -32,12 +32,12 @@ export async function executeInspect(
     input.line,
     input.character,
   );
-  const lspState = getSessionLspService(deps.cwd);
   const diagnostics = await gatherNearbyDiagnostics(
     deps.cwd,
     relPath,
     input.line,
     input.maxResults ?? 5,
+    deps.lspService,
   );
   const enclosing = context.outline.find(
     (item) => item.startLine <= input.line && item.endLine >= input.line,
@@ -56,7 +56,7 @@ export async function executeInspect(
   if (!context.hover && deps.provider?.hover == null) unavailableSections.push("hover");
   if (definitions.length === 0 && deps.provider?.definition == null)
     unavailableSections.push("definition");
-  if (diagnostics.length === 0 && lspState.kind !== "ready")
+  if (diagnostics.length === 0 && deps.lspService.kind !== "ready")
     unavailableSections.push("diagnostics");
   if ((context.codeActions?.length ?? 0) === 0 && deps.provider?.codeActionTitles == null) {
     unavailableSections.push("codeActions");

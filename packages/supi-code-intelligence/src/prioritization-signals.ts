@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { readJsonFile } from "@mrclrchtr/supi-core/config";
-import { getSessionLspService } from "@mrclrchtr/supi-lsp/api";
+import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 
 export interface PrioritySignalsSummary {
   diagnosticsCount: number;
@@ -19,8 +19,9 @@ export interface LoadedSignals {
 export function summarizePrioritySignalsForFiles(
   cwd: string,
   files: Iterable<string>,
+  lspService: SessionLspServiceState,
 ): PrioritySignalsSummary | null {
-  const loaded = loadPrioritizationSignals(cwd);
+  const loaded = loadPrioritizationSignals(cwd, lspService);
   const relevantFiles = new Set([...files].map((file) => path.resolve(cwd, file)));
   if (relevantFiles.size === 0) return null;
 
@@ -69,9 +70,12 @@ export function summarizePrioritySignalsForFiles(
     : null;
 }
 
-export function loadPrioritizationSignals(cwd: string): LoadedSignals {
+export function loadPrioritizationSignals(
+  cwd: string,
+  lspService: SessionLspServiceState,
+): LoadedSignals {
   return {
-    diagnostics: loadDiagnostics(cwd),
+    diagnostics: loadDiagnostics(cwd, lspService),
     coverageByFile: loadCoverageSummary(cwd),
     unusedFiles: loadUnusedFiles(cwd),
     unusedExports: loadUnusedExports(cwd),
@@ -92,12 +96,12 @@ export function appendPrioritySignalsSection(
 
 function loadDiagnostics(
   cwd: string,
+  lspService: SessionLspServiceState,
 ): Array<{ file: string; total: number; errors: number; warnings: number }> {
-  const lspState = getSessionLspService(cwd);
-  if (lspState.kind !== "ready") return [];
-  if (typeof lspState.service.getOutstandingDiagnosticSummary !== "function") return [];
+  if (lspService.kind !== "ready") return [];
+  if (typeof lspService.service.getOutstandingDiagnosticSummary !== "function") return [];
 
-  return lspState.service.getOutstandingDiagnosticSummary(2).map((entry) => ({
+  return lspService.service.getOutstandingDiagnosticSummary(2).map((entry) => ({
     file: path.resolve(cwd, entry.file),
     total: entry.total,
     errors: entry.errors,
