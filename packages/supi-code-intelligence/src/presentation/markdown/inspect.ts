@@ -127,7 +127,15 @@ function normalizeAncestry(
       }
   >,
 ): string[] {
-  return ancestry.map((entry) => (typeof entry === "string" ? entry : entry.type));
+  return ancestry.map((entry) => {
+    if (typeof entry === "string") return entry;
+    const start = `L${entry.startLine}:${entry.startCharacter}`;
+    const end =
+      entry.endLine != null && entry.endCharacter != null
+        ? `–L${entry.endLine}:${entry.endCharacter}`
+        : "";
+    return `${entry.type} ${start}${end}`;
+  });
 }
 
 function formatSeverity(severity: number | string): string {

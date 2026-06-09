@@ -247,4 +247,31 @@ describe("code_inspect tool", () => {
     expect(result.content[0].text).toContain("Unavailable");
     expect(result.content[0].text).not.toContain("heuristic");
   });
+
+  it("renders ancestry with positional data instead of collapsing to type names", async () => {
+    registerInspectProviders();
+    mockReadyLsp();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const tool = getTool(pi, "code_inspect");
+    const result = (await tool.execute(
+      "inspect-ancestry-positions",
+      { file: "src/index.ts", line: 2, character: 10 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    const text = result.content[0].text;
+    expect(text).toContain("Ancestry");
+    // Should contain the type name
+    expect(text).toContain("variable_declarator");
+    // Should contain positional data from the structured ancestry entry
+    expect(text).toContain("L2:9");
+    expect(text).toContain("L2:12");
+  });
 });
