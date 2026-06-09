@@ -55,13 +55,11 @@ const CodeResolveParameters = Type.Object(
           "function",
           "class",
           "interface",
-          "type",
           "file",
           "export",
           "variable",
           "method",
           "const",
-          "let",
           "enum",
         ],
         {

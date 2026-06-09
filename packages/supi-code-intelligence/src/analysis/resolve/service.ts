@@ -97,11 +97,20 @@ export function validateResolveParams(params: ResolveServiceParams): string | nu
   }
   if (
     params.kind &&
-    !new Set(["symbol", "function", "class", "interface", "type", "file", "File", "export"]).has(
-      params.kind,
-    )
+    !new Set([
+      "symbol",
+      "function",
+      "class",
+      "interface",
+      "file",
+      "export",
+      "variable",
+      "method",
+      "const",
+      "enum",
+    ]).has(params.kind)
   ) {
-    return `**Error:** Unsupported \`kind\` \`${params.kind}\`. Use \`"symbol"\`, \`"function"\`, \`"class"\`, \`"interface"\`, \`"type"\`, \`"file"\`, or \`"export"\`.`;
+    return `**Error:** Unsupported \`kind\` \`${params.kind}\`. Use \`"symbol"\`, \`"function"\`, \`"class"\`, \`"interface"\`, \`"file"\`, \`"export"\`, \`"variable"\`, \`"method"\`, \`"const"\`, or \`"enum"\`.`;
   }
   return null;
 }
