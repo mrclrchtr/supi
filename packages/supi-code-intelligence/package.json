@@ -47,7 +47,7 @@
     }
   },
   "devDependencies": {
-    "@types/node": "25.9.1",
+    "@types/node": "25.9.2",
     "vitest": "4.1.8",
     "@mrclrchtr/supi-test-utils": "workspace:*"
   },
