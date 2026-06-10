@@ -510,6 +510,82 @@ describe("code_context real-data sections", () => {
     expect(result.content[0].text).toContain("## Docs");
     expect(result.content[0].text).toContain("Returns the sum of a and b");
   });
+
+  it("truncates large hover content in definitions section", async () => {
+    writeSource("src/context.ts", "export function contextTarget() { return 1; }\n");
+
+    // Hover content > 600 chars to trigger truncation
+    const largeHover =
+      "const CODE_INTELLIGENCE_TOOL_SPECS: readonly [{" +
+      'readonly name: "code_resolve"; '.repeat(20) +
+      'readonly label: "Code Resolve"; '.repeat(10) +
+      'readonly description: "Resolve human or code references..."; '.repeat(5) +
+      "}, ... 8 more]";
+
+    registerMockProvider(tmpDir, {
+      hover: async () => ({ contents: largeHover }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/context.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "context-hover-truncation",
+      {
+        task: "check hover display",
+        targetId,
+        include: ["defs"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    const text = result.content[0].text;
+    expect(text).toContain("## Definitions");
+    expect(text).toContain("Hover:");
+    expect(text).toContain("truncated, use `code_inspect` for full type");
+    // Should NOT contain the full hover content
+    expect(text).not.toContain(largeHover);
+  });
+
+  it("shows full hover content when under 600 chars", async () => {
+    writeSource("src/context.ts", "export function contextTarget() { return 1; }\n");
+
+    const shortHover = "function contextTarget(): number";
+
+    registerMockProvider(tmpDir, {
+      hover: async () => ({ contents: shortHover }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/context.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "context-hover-full",
+      {
+        task: "check hover display",
+        targetId,
+        include: ["defs"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    const text = result.content[0].text;
+    expect(text).toContain("## Definitions");
+    expect(text).toContain(shortHover);
+    expect(text).not.toContain("truncated");
+  });
 });
 
 describe("code_context no-target fallback", () => {

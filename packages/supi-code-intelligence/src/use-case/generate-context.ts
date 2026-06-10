@@ -623,18 +623,37 @@ function buildDefinitionLines(
     lines.push(`- Node: \`${treeContext.nodeInfo.type}\``);
   }
   if (treeContext?.hover?.contents) {
-    const trimmed = treeContext.hover.contents.trim();
-    const hoverLines = trimmed.split("\n");
-    const maxHoverLines = 5;
-    if (hoverLines.length <= maxHoverLines) {
-      lines.push(`- Hover: ${trimmed}`);
-    } else {
-      const truncated = hoverLines.slice(0, maxHoverLines).join("\n");
-      lines.push(`- Hover: ${truncated}`);
-      lines.push(`  _... ${hoverLines.length - maxHoverLines} more line(s) omitted_`);
-    }
+    lines.push(...formatHoverLine(treeContext.hover.contents));
   }
   return lines;
+}
+
+/**
+ * Format hover content for the definitions section.
+ * Truncates at 600 characters to keep context bundles compact.
+ */
+function formatHoverLine(contents: string): string[] {
+  const trimmed = contents.trim();
+  const maxHoverChars = 600;
+  if (trimmed.length <= maxHoverChars) {
+    return [`- Hover: ${trimmed}`];
+  }
+
+  const hoverLines = trimmed.split("\n");
+  if (hoverLines.length === 1) {
+    return [
+      `- Hover: ${trimmed.slice(0, maxHoverChars)}...`,
+      `  _(truncated, use \`code_inspect\` for full type)_`,
+    ];
+  }
+
+  // Multi-line — cut at line boundary before the character limit
+  let acc = "";
+  for (const line of hoverLines) {
+    if (acc.length + line.length + 1 > maxHoverChars && acc.length > 0) break;
+    acc += (acc ? "\n" : "") + line;
+  }
+  return [`- Hover: ${acc}`, `  _(truncated, use \`code_inspect\` for full type)_`];
 }
 
 function buildImportLines(
