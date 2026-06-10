@@ -49,6 +49,13 @@ export async function executeContext(
 ): Promise<ContextUseCaseResult> {
   // Section mode: honor include without task
   if (input.include && input.include.length > 0 && !input.task) {
+    if (!input.target) {
+      // No target available — fall back to orientation mode
+      // which handles scopes (directory/file) well.
+      const result = await executeOrientationContext(input, deps);
+      result.content = `_Note: requested sections require a precise target. Returning orientation overview for the scope._\n\n${result.content}`;
+      return result;
+    }
     return executeSectionMode(input, deps);
   }
 
