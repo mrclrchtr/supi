@@ -128,6 +128,7 @@ Extensions register settings via `registerSettings()` from `@mrclrchtr/supi-core
 - `pnpm exec jiti /tmp/script.mjs` — ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli).
 - RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward.
+- `tsc -b` (build mode) and `--noEmit` are incompatible — use `pnpm typecheck:ai` instead of raw `tsc` commands.
 
 > For per-package gotchas (session entry parsing, message rendering, config patterns, WASM quirks), see individual `packages/*/CLAUDE.md` files — injected automatically by supi-claude-md when working in that directory.
 ## Publish pipeline
