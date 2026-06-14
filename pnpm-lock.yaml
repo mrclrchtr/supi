@@ -520,7 +520,7 @@ importers:
         version: link:../supi-core
       '@upstash/context7-sdk':
         specifier: ^0.3.0
-        version: 0.3.0
+        version: 0.3.1
       jsdom:
         specifier: ^29.0.0
         version: 29.1.1
@@ -1016,8 +1016,8 @@ packages:
     resolution: {integrity: sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ==}
     engines: {node: '>=14.0.0'}
 
-  '@napi-rs/wasm-runtime@1.1.4':
-    resolution: {integrity: sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow==}
+  '@napi-rs/wasm-runtime@1.1.5':
+    resolution: {integrity: sha512-AWPoBRJ9tsnVhor4sjO7rkni+7p+2IAEFj6cx06UgP10jkQHqay/36uRV/bFkgrh18D9vb4cr8Q0Pthskgzy+Q==}
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
@@ -1316,8 +1316,8 @@ packages:
   '@types/turndown@5.0.6':
     resolution: {integrity: sha512-ru00MoyeeouE5BX4gRL+6m/BsDfbRayOskWqUvh7CLGW+UXxHQItqALa38kKnOiZPqJrtzJUgAC2+F0rL1S4Pg==}
 
-  '@upstash/context7-sdk@0.3.0':
-    resolution: {integrity: sha512-kW5UV49mG9hh30sWP7nLq0mF7YHbTtfWrnm1VsT0UFW8mR6ovlYp7anobUh5qOaewSzraq9o2QyY77KVpI1twg==}
+  '@upstash/context7-sdk@0.3.1':
+    resolution: {integrity: sha512-K1NZ8MuaMkCJ9y1/q6P8WDehpfsp5pNapVbh65oNq+QcZcwIFZcmpe9WhnzV9eoEdlbtF/y7zmQJhXDuDdGhbA==}
 
   '@vitest/expect@4.1.8':
     resolution: {integrity: sha512-h3nDO677RDLEGlBxyQ5CW8RlMThSKSRLUePLOx09gNIWRL40edgA1GCZSZgf1W55MFAG6/Sw14KeaAnqv0NKdQ==}
@@ -3184,7 +3184,7 @@ snapshots:
 
   '@mozilla/readability@0.6.0': {}
 
-  '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
+  '@napi-rs/wasm-runtime@1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
@@ -3346,7 +3346,7 @@ snapshots:
     dependencies:
       '@emnapi/core': 1.10.0
       '@emnapi/runtime': 1.10.0
-      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
+      '@napi-rs/wasm-runtime': 1.1.5(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)
     optional: true
 
   '@rolldown/binding-win32-arm64-msvc@1.0.3':
@@ -3460,7 +3460,7 @@ snapshots:
 
   '@types/turndown@5.0.6': {}
 
-  '@upstash/context7-sdk@0.3.0': {}
+  '@upstash/context7-sdk@0.3.1': {}
 
   '@vitest/expect@4.1.8':
     dependencies:
