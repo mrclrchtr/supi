@@ -147,6 +147,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
       "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test function names.",
       "After code_graph, follow up with code_context on individual results for type or definition context.",
+      "code_graph uses `scope` (not `path`) for workspace-relative directory/package filtering.",
     ],
     parameters: CodeGraphParameters,
     run: (params, ctx) => executeGraphTool(params as Parameters<typeof executeGraphTool>[0], ctx),

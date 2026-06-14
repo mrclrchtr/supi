@@ -261,6 +261,72 @@ describe("execute-graph (code_graph tool)", () => {
       expect(result.content).toContain("Unavailable");
       expect(result.content).toContain("exports");
     });
+
+    it("resolves symbol to file for file-level relations", async () => {
+      writeSource("test.ts", "export function foo() { return 1; }\nexport const bar = 2;\n");
+      registerMockProvider(tmpDir, {
+        workspaceSymbols: async () => [
+          {
+            name: "foo",
+            kind: "function",
+            file: `${tmpDir}/test.ts`,
+            line: 1,
+            character: 17,
+          },
+        ],
+        exports: async (_file) => ({
+          kind: "success",
+          data: [
+            {
+              name: "foo",
+              kind: "function",
+              startLine: 1,
+              startCharacter: 1,
+              endLine: 1,
+              endCharacter: 32,
+            },
+            {
+              name: "bar",
+              kind: "const",
+              startLine: 2,
+              startCharacter: 1,
+              endLine: 2,
+              endCharacter: 18,
+            },
+          ],
+        }),
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          symbol: "foo",
+          relations: ["exports"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("Graph of");
+      expect(result.content).toContain("Exports");
+      expect(result.content).toContain("`foo`");
+      expect(result.content).toContain("`bar`");
+      // Display name should be file path, not "symbol at ..."
+      expect(result.content).not.toContain("symbol at");
+    });
+
+    it("rejects scope-only queries for file-level relations", async () => {
+      const result = await executeAction(
+        {
+          action: "graph",
+          path: "src/",
+          relations: ["exports"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("Error");
+      expect(result.content).toContain("require a `file` or `symbol`");
+    });
   });
 
   describe("tests relation", () => {

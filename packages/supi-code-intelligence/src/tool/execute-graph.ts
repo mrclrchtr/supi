@@ -45,7 +45,7 @@ export interface CodeGraphToolParams {
   line?: number;
   character?: number;
   symbol?: string;
-  path?: string;
+  scope?: string;
   relations?: GraphRelation[];
   maxResults?: number;
 }
@@ -68,15 +68,17 @@ export async function executeGraphTool(
   }
 
   // ── 2. Validate params ──────────────────────────────────────────────
-  const error = validateFocusedToolParams(params, ctx.cwd);
+  // Map public `scope` to internal `path` for shared validation
+  const internalParams = { ...params, path: params.scope };
+  const error = validateFocusedToolParams(internalParams, ctx.cwd);
   if (error) {
     return errorResult(error);
   }
 
   // Must have targetId, anchored coords, or symbol (file-level relations only need file)
-  if (!params.file && !params.symbol) {
+  if (!params.file && !params.symbol && !params.scope) {
     return errorResult(
-      "**Error:** `code_graph` requires a target. Provide `targetId` (from `code_resolve`), `file` + `line` + `character`, or a `symbol`. For `imports`/`exports` relations only, a bare `file` is sufficient.",
+      "**Error:** `code_graph` requires a target. Provide `targetId` (from `code_resolve`), `file` + `line` + `character`, or `symbol`. Optionally pass `scope` to narrow results.",
     );
   }
 
@@ -116,14 +118,43 @@ export async function executeGraphTool(
   let displayName: string;
 
   if (allFileLevel) {
-    // File-level relations only need the file path — no position or symbol resolution.
-    // biome-ignore lint/style/noNonNullAssertion: guarded by allFileLevel and prior !params.file check
-    resolvedFile = params.file!;
+    // File-level relations only need the file path — resolve symbol/scope to file if needed.
+    if (params.file) {
+      resolvedFile = params.file;
+    } else if (params.symbol) {
+      // Resolve symbol to file via the targeting pipeline
+      const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
+      const target = await resolveTarget(
+        { ...params, path: params.scope },
+        ctx.cwd,
+        provider ?? undefined,
+      );
+      if (typeof target === "string") {
+        return errorResult(target);
+      }
+      if ("targets" in target) {
+        return errorResult(
+          "**Error:** `code_graph` requires a precise target for file-level relations. Use `file` or `targetId` from `code_resolve`.",
+        );
+      }
+      resolvedFile = target.file;
+    } else if (params.scope) {
+      // Scope alone isn't a file — error
+      return errorResult(
+        "**Error:** `code_graph` file-level relations require a `file` or `symbol`, not just `scope`.",
+      );
+    } else {
+      return errorResult("**Error:** `code_graph` requires a target for file-level relations.");
+    }
     resolvedPosition = { line: 1, character: 1 };
-    displayName = expandedTargetName ?? `symbol at ${toDisplayPath(ctx.cwd, resolvedFile)}:1`;
+    displayName = expandedTargetName ?? toDisplayPath(ctx.cwd, resolvedFile);
   } else {
     const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
-    const target = await resolveTarget(params, ctx.cwd, provider ?? undefined);
+    const target = await resolveTarget(
+      { ...params, path: params.scope },
+      ctx.cwd,
+      provider ?? undefined,
+    );
     if (typeof target === "string") {
       return { content: target, details: undefined };
     }
@@ -132,7 +163,7 @@ export async function executeGraphTool(
     if ("targets" in target) {
       return {
         content:
-          "**Error:** `code_graph` requires a precise target. Use anchored coordinates (`file`, `line`, `character`) or pass a `targetId` from `code_resolve`.",
+          "**Error:** `code_graph` requires a precise target. Use anchored coordinates (`file`, `line`, `character`), `symbol`, or pass a `targetId` from `code_resolve`.",
         details: {
           type: "search" as const,
           data: {
@@ -195,7 +226,7 @@ export async function executeGraphTool(
       type: "search" as const,
       data: {
         confidence,
-        scope: params.path ?? null,
+        scope: params.scope ?? null,
         candidateCount: sections.reduce((sum, s) => {
           if (s.kind === "ok") return sum + s.count;
           return sum;

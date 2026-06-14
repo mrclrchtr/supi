@@ -149,7 +149,7 @@ export const CodeFindParameters = Type.Object(
  * until a true incoming-call hierarchy exists.
  *
  * Runtime rule for future executors:
- * - require `targetId`, `file` + `line` + `character`, `symbol`, or `path`
+ * - require `targetId`, `file` + `line` + `character`, `symbol`, or `scope`
  */
 export const CodeGraphParameters = Type.Object(
   {
@@ -158,7 +158,7 @@ export const CodeGraphParameters = Type.Object(
     line: Type.Optional(LineParam),
     character: Type.Optional(CharacterParam),
     symbol: Type.Optional(SymbolParam),
-    path: Type.Optional(ScopeParam),
+    scope: Type.Optional(ScopeParam),
     relations: Type.Optional(
       Type.Array(
         StringEnum(["references", "callees", "imports", "exports", "implements", "tests"], {

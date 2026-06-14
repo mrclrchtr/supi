@@ -82,7 +82,7 @@ export async function executeAction(
           line: rest.line,
           character: rest.character,
           symbol: rest.symbol,
-          path: rest.path,
+          scope: rest.path,
           relations: rest.relations as GraphRelation[] | undefined,
           maxResults: rest.maxResults,
         },
