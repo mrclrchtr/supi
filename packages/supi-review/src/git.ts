@@ -1,4 +1,4 @@
-// biome-ignore lint/nursery/noExcessiveLinesPerFile: many tightly-coupled git helpers; splitting would create cross-ref overhead
+// biome-ignore lint/style/noExcessiveLinesPerFile: many tightly-coupled git helpers; splitting would create cross-ref overhead
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { basename, join } from "node:path";

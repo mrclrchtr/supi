@@ -1,4 +1,4 @@
-// biome-ignore lint/nursery/noExcessiveLinesPerFile: analysis file is inherently large
+// biome-ignore lint/style/noExcessiveLinesPerFile: analysis file is inherently large
 import { dirname, resolve } from "node:path";
 import {
   type BuildSystemPromptOptions,

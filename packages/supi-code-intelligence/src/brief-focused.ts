@@ -1,5 +1,5 @@
 // Focused brief generation — directory and file briefs.
-// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: focused brief formatting and recursive directory summarization are kept together to share local helpers
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: focused brief formatting and recursive directory summarization are kept together to share local helpers
 
 import * as fs from "node:fs";
 import * as path from "node:path";

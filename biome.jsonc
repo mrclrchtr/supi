@@ -24,7 +24,7 @@
       "types": "all"
     },
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "complexity": {
         "noExcessiveCognitiveComplexity": {
           "level": "error",
@@ -39,6 +39,7 @@
           }
         },
         "noForEach": "error",
+        "useArrayFind": "error",
         "useMaxParams": "error"
       },
       "correctness": {
@@ -53,28 +54,27 @@
         "noSecrets": "error"
       },
       "style": {
-        "useImportType": "error"
-      },
-      "suspicious": {
-        "noConsole": "error",
-        "noDebugger": "error",
-        "noExplicitAny": "error"
-      },
-      "nursery": {
         "noExcessiveLinesPerFile": {
           "level": "error",
           "options": {
             "maxLines": 400
           }
         },
+        "useErrorCause": "error",
+        "useImportType": "error"
+      },
+      "suspicious": {
+        "noConsole": "error",
+        "noDebugger": "error",
+        "noExplicitAny": "error",
+        "noNestedPromises": "error",
+        "useArraySortCompare": "error"
+      },
+      "nursery": {
         "noFloatingPromises": "error",
         "noMisusedPromises": "error",
-        "noNestedPromises": "error",
         "useArraySome": "error",
-        "useArraySortCompare": "error",
-        "useErrorCause": "error",
         "useExhaustiveSwitchCases": "error",
-        "useFind": "error",
         "useNullishCoalescing": "error"
       }
     }
@@ -103,7 +103,7 @@
           "complexity": {
             "noExcessiveLinesPerFunction": "off"
           },
-          "nursery": {
+          "style": {
             "noExcessiveLinesPerFile": "off"
           }
         }
@@ -123,7 +123,7 @@
       "includes": ["packages/supi-code-intelligence/src/use-case/generate-relations.ts"],
       "linter": {
         "rules": {
-          "nursery": {
+          "style": {
             "noExcessiveLinesPerFile": "off"
           }
         }

@@ -1,4 +1,4 @@
-/* biome-ignore lint/nursery/noExcessiveLinesPerFile: report stylesheet is shipped as one runtime asset. */
+/* biome-ignore lint/style/noExcessiveLinesPerFile: report stylesheet is shipped as one runtime asset. */
 * {
   box-sizing: border-box;
   margin: 0;
