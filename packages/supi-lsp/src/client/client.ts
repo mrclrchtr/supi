@@ -1,7 +1,7 @@
 // LSP Client — wraps a server process + JsonRpcClient.
 // Handles initialize handshake, document sync, shutdown, and crash recovery.
 
-// biome-ignore lint/nursery/noExcessiveLinesPerFile: LspClient remains a cohesive stateful wrapper; refresh logic is already split out.
+// biome-ignore lint/style/noExcessiveLinesPerFile: LspClient remains a cohesive stateful wrapper; refresh logic is already split out.
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import * as path from "node:path";

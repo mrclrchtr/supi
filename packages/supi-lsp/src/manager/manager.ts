@@ -1,5 +1,5 @@
 // LSP Manager — server pool with lazy spawning and diagnostic collection.
-// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: LspManager stays cohesive; recovery and sync helpers are split into manager-*.ts modules.
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: LspManager stays cohesive; recovery and sync helpers are split into manager-*.ts modules.
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as projectRoots from "@mrclrchtr/supi-core/project";
