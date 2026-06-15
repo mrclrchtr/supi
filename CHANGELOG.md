@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.1](https://github.com/mrclrchtr/supi/compare/v1.12.0...v1.12.1) (2026-06-15)
+
+
+### Bug Fixes
+
+* **supi-web:** make CONTEXT7_API_KEY optional, drop context7-sdk ([8ef9ad8](https://github.com/mrclrchtr/supi/commit/8ef9ad821e45b34034057b323ecbe3084f0ca2ac))
+* update biome config for v2.5.0 breaking changes ([1fb1ce8](https://github.com/mrclrchtr/supi/commit/1fb1ce8f4093db173f5b856acfb7bb2b4196c385))
+
 ## [1.12.0](https://github.com/mrclrchtr/supi/compare/v1.11.3...v1.12.0) (2026-06-07)
 
 
