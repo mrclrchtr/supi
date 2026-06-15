@@ -4,7 +4,7 @@ import * as path from "node:path";
 
 import { collectOutgoingCalls } from "../analysis/calls/service.ts";
 import { collectReferences } from "../analysis/references/service.ts";
-import { extractTestFunctions, findTestCompanionFiles } from "../analysis/relations/tests.ts";
+import { discoverTestFilesForSource } from "../analysis/relations/tests.ts";
 import {
   type RenderedContextSection,
   renderContextResult,
@@ -325,13 +325,6 @@ async function buildTestsSection(
     };
   }
 
-  if (!deps.provider?.outline) {
-    return {
-      lines: ["Tests unavailable — no active provider."],
-      hasStructuralEvidence: false,
-    };
-  }
-
   const targetAbs = path.resolve(deps.cwd, target.file);
   if (!existsSync(targetAbs)) {
     return {
@@ -340,44 +333,31 @@ async function buildTestsSection(
     };
   }
 
-  if (!deps.provider?.references) {
-    return {
-      lines: ["Tests unavailable — no semantic provider for test discovery."],
-      hasStructuralEvidence: false,
-    };
-  }
+  const discovered = await discoverTestFilesForSource(targetAbs, {
+    references: deps.provider?.references,
+    outline: deps.provider?.outline,
+    cwd: deps.cwd,
+    cap: limit,
+  });
 
-  const found = await findTestCompanionFiles(targetAbs, deps.provider);
-
-  if (found.length === 0) {
+  if (discovered.length === 0) {
     return {
       lines: ["No test companion files found for this target."],
       hasStructuralEvidence: false,
     };
   }
 
-  // Use outline to extract test function names
   const lines: string[] = [];
-  let hasStructuralEvidence = false;
-  const filesToScan = found.slice(0, Math.min(found.length, 3));
+  const filesToScan = discovered.slice(0, 3);
   for (const testFile of filesToScan) {
-    const relTestFile = toDisplayPath(deps.cwd, testFile);
+    const relTestFile = toDisplayPath(deps.cwd, testFile.absPath);
     lines.push(`- \`${relTestFile}\``);
-    if (deps.provider?.outline) {
-      const result = await extractTestFunctions(
-        testFile,
-        deps.cwd,
-        { outline: deps.provider.outline },
-        limit,
-      );
-      for (const name of result.names) {
-        lines.push(`  - \`${name}\``);
-      }
-      hasStructuralEvidence = hasStructuralEvidence || result.hasStructuralEvidence;
+    for (const name of testFile.testNames.slice(0, limit)) {
+      lines.push(`  - \`${name}\``);
     }
   }
 
-  return { lines, hasStructuralEvidence };
+  return { lines, hasStructuralEvidence: discovered.length > 0 };
 }
 
 /**

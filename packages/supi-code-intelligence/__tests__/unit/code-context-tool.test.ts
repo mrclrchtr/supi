@@ -266,8 +266,8 @@ describe("code_context tool", () => {
     // No JSDoc on the target symbol, so docs section reports the honest "not found" note
     expect(result.content[0].text).toContain("No JSDoc");
     expect(result.content[0].text).toContain("## Tests");
-    // No provider registered, so tests section reports "no active provider" honestly
-    expect(result.content[0].text).toContain("no active provider");
+    // No provider registered and no deterministic test files exist
+    expect(result.content[0].text).toContain("No test companion files found");
   });
 });
 
@@ -411,6 +411,101 @@ describe("code_context real-data sections", () => {
     expect(result.content[0].text).toContain("## Tests");
     expect(result.content[0].text).toContain("context.test.ts");
     expect(result.content[0].text).toContain("returns expected value");
+  });
+
+  it("discovers package-layout test file without semantic references (regression for audit failure)", async () => {
+    // Package layout: source at src/tool/execute-graph.ts
+    // Test at __tests__/unit/tool/execute-graph.test.ts
+    // No semantic reference from test to source is established.
+    writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
+    writeSource(
+      "__tests__/unit/tool/execute-graph.test.ts",
+      "import { executeGraph } from '../../../src/tool/execute-graph';\n" +
+        // biome-ignore lint/security/noSecrets: test double content
+        "describe('executeGraph', () => {\n" +
+        "  it('returns 1', () => {\n" +
+        "    expect(executeGraph()).toBe(1);\n" +
+        "  });\n" +
+        "});\n",
+    );
+
+    const outlineSpy = vi.fn(async (_relFile: string) => ({
+      kind: "success" as const,
+      data: [
+        {
+          name: "executeGraph",
+          kind: "function",
+          startLine: 1,
+          startCharacter: 1,
+          endLine: 1,
+          endCharacter: 50,
+        },
+      ],
+    }));
+
+    // Register mock provider with references returning empty
+    registerMockProvider(tmpDir, {
+      references: async () => [],
+      outline: outlineSpy,
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/tool/execute-graph.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "context-package-layout-tests",
+      {
+        task: "find related tests",
+        targetId,
+        include: ["tests"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).not.toContain("No test companion files found");
+    expect(result.content[0].text).toContain("__tests__/unit/tool/execute-graph.test.ts");
+    expect(result.content[0].text).toContain("executeGraph");
+  });
+
+  it("reports structural confidence when tests are discovered without outline data", async () => {
+    writeSource("src/source.ts", "export function source() { return 1; }\n");
+    writeSource("src/source.test.ts", "import { source } from './source';\nvoid source;\n");
+
+    registerMockProvider(tmpDir, {
+      references: async () => [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/source.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "context-tests-structural-confidence",
+      {
+        task: "find related tests",
+        targetId,
+        include: ["tests"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: string; data?: { confidence?: string } };
+    };
+
+    expect(result.content[0].text).toContain("source.test.ts");
+    expect(result.details?.type).toBe("context");
+    if (result.details?.type === "context") {
+      expect(result.details.data?.confidence).toBe("structural");
+    }
   });
 
   it("returns JSDoc comment for target symbol when docs section is requested", async () => {

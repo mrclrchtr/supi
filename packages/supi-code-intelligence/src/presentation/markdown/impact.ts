@@ -63,6 +63,14 @@ export function renderChangedFilesImpact(params: {
     lines.push("");
   }
 
+  if (params.analysis.likelyTestCommands.length > 0) {
+    lines.push("## Likely Test Commands");
+    for (const cmd of params.analysis.likelyTestCommands.slice(0, 3)) {
+      lines.push(`- \`${cmd}\``);
+    }
+    lines.push("");
+  }
+
   appendPrioritySignalsSection(lines, params.prioritySignals);
 
   return lines.join("\n");

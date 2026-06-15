@@ -248,7 +248,7 @@ describe("file-level semantic targets", () => {
 
     expect(result.details?.type).toBe("impact");
     if (result.details?.type === "impact") {
-      expect(result.details.data.omittedCount).toBe(2);
+      expect(result.details.data.omittedCount).toBe(3);
     }
   });
 });

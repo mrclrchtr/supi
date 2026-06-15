@@ -3,10 +3,11 @@
 // Shared engine for both `code_impact` (preferred) and `code_affected`
 // (compatibility alias).
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
+import { discoverTestFilesForSource, isTestFilePath } from "../analysis/relations/tests.ts";
 import { resolveTarget } from "../analysis/targeting/resolve-target.ts";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../model.ts";
 import {
@@ -58,6 +59,7 @@ interface ImpactAnalysis {
   downstreamCount: number;
   checkNext: string[];
   likelyTests: string[];
+  likelyTestCommands: string[];
   riskLevel: "low" | "medium" | "high";
   externalRefs: number;
 }
@@ -65,6 +67,40 @@ interface ImpactAnalysis {
 interface ChangedFileEntry {
   absPath: string;
   relPath: string;
+}
+
+/** Exported for backward-compatible unit-test access. Prefer `discoverTestFilesForSource` from tests.ts. */
+export function findLikelyTests(
+  affectedFiles: Set<string>,
+  _cwd: string,
+): Array<{ path: string; provenance: string }> {
+  const seen = new Set<string>();
+  const results: Array<{ path: string; provenance: string }> = [];
+
+  // Pass 1: boundary-aware path heuristic on affected file paths
+  for (const file of affectedFiles) {
+    if (isTestFilePath(file)) {
+      seen.add(file);
+      results.push({ path: file, provenance: "name heuristic" });
+    }
+  }
+
+  // Pass 2: companion-file discovery for affected files without test-like names
+  const remaining = [...affectedFiles].filter((f) => !seen.has(f));
+  for (const sourceFile of remaining) {
+    const ext = path.extname(sourceFile);
+    const stem = sourceFile.slice(0, ext.length > 0 ? -ext.length : undefined);
+    for (const suffix of [".test", ".spec"]) {
+      const candidate = `${stem}${suffix}${ext}`;
+      if (!seen.has(candidate) && existsSync(candidate)) {
+        seen.add(candidate);
+        results.push({ path: candidate, provenance: "companion file" });
+      }
+    }
+  }
+
+  results.sort((a, b) => a.path.localeCompare(b.path));
+  return results.slice(0, 3);
 }
 
 /** Execute the shared impact use-case for the preferred or compatibility surface. */
@@ -76,7 +112,7 @@ export async function executeImpact(
   const resultType = surfaceResultType(surface);
 
   if (input.changedFiles && input.changedFiles.length > 0) {
-    return executeChangedFilesImpact(input, deps.cwd, surface, deps.lspService);
+    return executeChangedFilesImpact(input, deps.cwd, deps.provider, surface, deps.lspService);
   }
 
   if (input.change && !input.file && !input.symbol) {
@@ -138,11 +174,13 @@ async function executeSingleImpact(
 ): Promise<CodeIntelResult> {
   const refs = await collectReferences(target, cwd, semantic);
   const model = await buildArchitectureModel(cwd);
-  const analysis = analyzeReferenceImpact(
+  const analysis = await analyzeReferenceImpact(
     refs,
     model,
     cwd,
     shouldIncludeTests(surface, input.includeTests),
+    semantic.references,
+    [target.file], // seed the target file itself as affected
   );
 
   const prioritySignals = summarizePrioritySignalsForFiles(
@@ -211,11 +249,13 @@ async function executeFileLevelImpact(
   );
 
   const model = await buildArchitectureModel(cwd);
-  const analysis = analyzeReferenceImpact(
+  const analysis = await analyzeReferenceImpact(
     aggregated,
     model,
     cwd,
     shouldIncludeTests(surface, input.includeTests),
+    semantic.references,
+    targetGroup.targets.map((t) => t.file), // seed all target files
   );
 
   const prioritySignals = summarizePrioritySignalsForFiles(
@@ -264,9 +304,11 @@ async function executeFileLevelImpact(
   };
 }
 
+// biome-ignore lint/complexity/useMaxParams: shared changed-files orchestration keeps provider and LSP inputs explicit
 async function executeChangedFilesImpact(
   input: ImpactInput,
   cwd: string,
+  provider: CodeProvider | null,
   surface: ImpactSurface,
   lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
@@ -283,11 +325,12 @@ async function executeChangedFilesImpact(
   }
 
   const model = await buildArchitectureModel(cwd);
-  const analysis = analyzeChangedFiles(
+  const analysis = await analyzeChangedFiles(
     changedFiles,
     model,
     cwd,
     shouldIncludeTests(surface, input.includeTests),
+    provider?.references,
   );
   const prioritySignals = summarizePrioritySignalsForFiles(
     cwd,
@@ -327,18 +370,32 @@ async function executeChangedFilesImpact(
   };
 }
 
-function analyzeReferenceImpact(
+// biome-ignore lint/complexity/useMaxParams: seed-files parameter is explicit for testability
+async function analyzeReferenceImpact(
   result: ReferenceCollection,
   model: Awaited<ReturnType<typeof buildArchitectureModel>>,
   cwd: string,
   includeTests: boolean,
-): ImpactAnalysis {
+  references: CodeProvider["references"] | undefined,
+  seedFiles?: string[],
+): Promise<ImpactAnalysis> {
   const affectedFiles = new Set(result.refs.map((r) => path.resolve(cwd, r.file)));
+
+  // Seed the target file(s) so zero-reference targets still have affected evidence
+  if (seedFiles) {
+    for (const f of seedFiles) {
+      affectedFiles.add(path.resolve(cwd, f));
+    }
+  }
+
   const { affectedModules, checkNext, downstreamCount } = analyzeModelImpact(
     affectedFiles,
     model,
     cwd,
   );
+
+  const likelyTests = includeTests ? await collectLikelyTests(affectedFiles, cwd, references) : [];
+  const likelyTestCommands = buildLikelyTestCommands(cwd, likelyTests);
 
   return {
     confidence: result.confidence,
@@ -346,7 +403,8 @@ function analyzeReferenceImpact(
     affectedModules,
     downstreamCount,
     checkNext,
-    likelyTests: includeTests ? findLikelyTests(affectedFiles, cwd).map((t) => t.path) : [],
+    likelyTests,
+    likelyTestCommands,
     riskLevel: assessRisk(
       result.refs.length + result.externalCount,
       affectedModules.size,
@@ -356,12 +414,14 @@ function analyzeReferenceImpact(
   };
 }
 
-function analyzeChangedFiles(
+// biome-ignore lint/complexity/useMaxParams: shared changed-files analysis keeps reference discovery explicit
+async function analyzeChangedFiles(
   changedFiles: ChangedFileEntry[],
   model: Awaited<ReturnType<typeof buildArchitectureModel>>,
   cwd: string,
   includeTests: boolean,
-): ImpactAnalysis {
+  references: CodeProvider["references"] | undefined,
+): Promise<ImpactAnalysis> {
   const affectedFiles = new Set(changedFiles.map((entry) => entry.absPath));
   const { affectedModules, checkNext, downstreamCount } = analyzeModelImpact(
     affectedFiles,
@@ -369,13 +429,17 @@ function analyzeChangedFiles(
     cwd,
   );
 
+  const likelyTests = includeTests ? await collectLikelyTests(affectedFiles, cwd, references) : [];
+  const likelyTestCommands = buildLikelyTestCommands(cwd, likelyTests);
+
   return {
     confidence: "structural",
     affectedFiles,
     affectedModules,
     downstreamCount,
     checkNext,
-    likelyTests: includeTests ? findTestCompanions(changedFiles, cwd) : [],
+    likelyTests,
+    likelyTestCommands,
     riskLevel: assessRisk(changedFiles.length, affectedModules.size, downstreamCount),
     externalRefs: 0,
   };
@@ -434,85 +498,134 @@ function normalizeChangedFiles(files: string[], cwd: string): ChangedFileEntry[]
   return result;
 }
 
-/** Boundary-aware regex for test-file detection.
- *  Matches: .test.<ext>, .spec.<ext>, /__tests__/ in path
- *  Does NOT match: contest.ts, testing.ts, latest.ts, tool-specs.ts
- */
-const TEST_FILE_RE = /\.test\.|\.spec\.|\/__tests__\//;
-
-/** One detected test file with provenance. */
-export interface LikelyTest {
-  path: string;
-  provenance: "name heuristic" | "companion file";
-}
-
-/** Maximum number of test files to return. */
-const LIKELY_TESTS_CAP = 3;
-
-/**
- * Identify likely test files among affected files.
- *
- * Uses a boundary-aware regex to avoid false positives on words like
- * "contest" or "tool-specs". Falls back to companion-file discovery
- * (same basename with .test.<ext> or .spec.<ext> suffix) for affected
- * files that don't match the regex.
- */
-export function findLikelyTests(affectedFiles: Set<string>, cwd: string): LikelyTest[] {
+async function collectLikelyTests(
+  affectedFiles: Set<string>,
+  cwd: string,
+  references: CodeProvider["references"] | undefined,
+): Promise<string[]> {
   const seen = new Set<string>();
-  const results: LikelyTest[] = [];
+  const likelyTests: string[] = [];
 
-  // Pass 1: boundary-aware regex on affected file paths
-  for (const file of affectedFiles) {
-    if (TEST_FILE_RE.test(file)) {
-      seen.add(file);
-      results.push({ path: file, provenance: "name heuristic" });
+  for (const affFile of affectedFiles) {
+    if (isTestFilePath(affFile)) {
+      addLikelyTestPath(cwd, affFile, seen, likelyTests);
+      continue;
     }
-  }
 
-  // Pass 2: companion-file discovery for affected files without test-like names
-  const remaining = [...affectedFiles].filter((f) => !seen.has(f));
-  if (remaining.length > 0) {
-    const companions = findTestCompanions(
-      remaining.map((absPath) => ({ absPath, relPath: path.relative(cwd, absPath) })),
+    const discovered = await discoverTestFilesForSource(affFile, {
       cwd,
-    );
-    // Re-resolve companion relative paths back to absolute paths for consistent output
-    for (const relCompanion of companions) {
-      const absCompanion = path.resolve(cwd, relCompanion);
-      if (!seen.has(absCompanion)) {
-        seen.add(absCompanion);
-        results.push({ path: absCompanion, provenance: "companion file" });
-      }
+      cap: 3,
+      references,
+    });
+    for (const testFile of discovered) {
+      addLikelyTestPath(cwd, testFile.absPath, seen, likelyTests);
     }
   }
 
-  // Sort by path for deterministic output, then cap
-  results.sort((a, b) => a.path.localeCompare(b.path));
-  return results.slice(0, LIKELY_TESTS_CAP);
+  likelyTests.sort((a, b) => a.localeCompare(b));
+  return likelyTests.slice(0, 3);
 }
 
-function findTestCompanions(changedFiles: ChangedFileEntry[], cwd: string): string[] {
-  const tests: string[] = [];
-  const seen = new Set<string>();
+function addLikelyTestPath(
+  cwd: string,
+  absPath: string,
+  seen: Set<string>,
+  likelyTests: string[],
+): void {
+  const relPath = path.relative(cwd, absPath) || absPath;
+  if (seen.has(relPath)) return;
+  seen.add(relPath);
+  likelyTests.push(relPath);
+}
 
-  for (const entry of changedFiles) {
-    const ext = path.extname(entry.absPath);
-    const stem = entry.absPath.slice(0, ext.length > 0 ? -ext.length : undefined);
-    const candidates = [
-      `${stem}.test${ext}`,
-      `${stem}.spec${ext}`,
-      path.join(path.dirname(entry.absPath), "__tests__", `${path.basename(stem)}.test${ext}`),
-      path.join(path.dirname(entry.absPath), "__tests__", `${path.basename(stem)}.spec${ext}`),
-    ];
-
-    for (const candidate of candidates) {
-      if (!existsSync(candidate) || seen.has(candidate)) continue;
-      seen.add(candidate);
-      tests.push(path.relative(cwd, candidate));
-    }
+function buildLikelyTestCommands(cwd: string, likelyTests: string[]): string[] {
+  if (likelyTests.length === 0 || !detectVitestWorkspace(cwd)) {
+    return [];
   }
 
-  return tests.slice(0, 3);
+  return likelyTests
+    .filter((testPath) => VITEST_RUNNABLE_EXTENSIONS.has(path.extname(testPath)))
+    .slice(0, 3)
+    .map((relTest) => `pnpm vitest run ${relTest} --reporter=verbose`);
+}
+
+const VITEST_RUNNABLE_EXTENSIONS = new Set([
+  ".js",
+  ".jsx",
+  ".ts",
+  ".tsx",
+  ".mjs",
+  ".cjs",
+  ".mts",
+  ".cts",
+]);
+
+const VITEST_CONFIG_FILES = [
+  "vitest.config.ts",
+  "vitest.config.mts",
+  "vitest.config.cts",
+  "vitest.config.js",
+  "vitest.config.mjs",
+  "vitest.config.cjs",
+  "vitest.workspace.ts",
+  "vitest.workspace.mts",
+  "vitest.workspace.cts",
+  "vitest.workspace.js",
+  "vitest.workspace.mjs",
+  "vitest.workspace.cjs",
+];
+
+function detectVitestWorkspace(cwd: string): boolean {
+  let current = path.resolve(cwd);
+
+  while (true) {
+    if (packageJsonUsesVitest(current) || hasVitestConfig(current)) {
+      return true;
+    }
+    if (existsSync(path.join(current, ".git"))) {
+      return false;
+    }
+
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return false;
+    }
+    current = parent;
+  }
+}
+
+function packageJsonUsesVitest(dir: string): boolean {
+  const packageJsonPath = path.join(dir, "package.json");
+  if (!existsSync(packageJsonPath)) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
+      scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+      optionalDependencies?: Record<string, string>;
+    };
+
+    if (Object.values(parsed.scripts ?? {}).some((script) => script.includes("vitest"))) {
+      return true;
+    }
+
+    return [
+      parsed.dependencies,
+      parsed.devDependencies,
+      parsed.peerDependencies,
+      parsed.optionalDependencies,
+    ].some((deps) => Boolean(deps?.vitest));
+  } catch {
+    return false;
+  }
+}
+
+function hasVitestConfig(dir: string): boolean {
+  return VITEST_CONFIG_FILES.some((file) => existsSync(path.join(dir, file)));
 }
 
 function assessRisk(
@@ -573,6 +686,7 @@ function buildDetailsData(
     riskLevel: analysis.riskLevel,
     checkNext: analysis.checkNext,
     likelyTests: analysis.likelyTests,
+    likelyTestCommands: analysis.likelyTestCommands,
     omittedCount,
     nextQueries,
     prioritySignals,
@@ -603,6 +717,7 @@ function unavailableImpactResult(
     riskLevel: "low",
     checkNext: [],
     likelyTests: [],
+    likelyTestCommands: [],
     omittedCount: 0,
     nextQueries,
   };

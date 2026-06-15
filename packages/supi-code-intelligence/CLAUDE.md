@@ -140,7 +140,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_imp
 - **maxResults** caps per-relation output
 - Each relation dispatched to appropriate substrate (semantic for references/implements, structural for callees)
 - Best-effort per relation: unavailable substrates skip with a note rather than failing the entire call
-- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files via import-graph analysis using the semantic provider's `references` method
+- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using the shared helper in `src/analysis/relations/tests.ts`. Discovery combines semantic import/reference evidence with deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`, same-directory companions). `code_graph`, `code_context`, and `code_impact` all use the same discovery path — any divergence is a bug.
 - File-level expansion not supported — requires precise target (anchored coords or targetId)
 
 ### `code_impact`
@@ -220,6 +220,14 @@ The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`)
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
 - `code_context`, `code_impact`, and `code_refactor` accept optional `targetId` that takes precedence over raw coordinates.
 - `code_context` accepts optional `targetId` for orientation-only follow-up.
+
+### Shared test discovery
+- `src/analysis/relations/tests.ts` is the single source of truth for test-file discovery. `code_graph`, `code_context`, and `code_impact` all route through `discoverTestFilesForSource()`. Any divergent test lookup logic in a tool file is a bug.
+- Discovery combines semantic import/reference evidence with deterministic path conventions: same-directory companions, same-directory `__tests__/` companions, and package-level mirrors (`__tests__/unit/…`, `__tests__/integration/…`).
+
+### Impact seeding
+- Target-based `code_impact` seeds the target file itself as affected evidence. A symbol with zero semantic references still reports its own file as affected and can discover likely tests through the shared test-discovery helper.
+- `code_impact` with `includeTests: true` emits `likelyTestCommands` only when the workspace clearly uses Vitest (for example via package metadata, scripts, or a Vitest config file).
 
 ### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.

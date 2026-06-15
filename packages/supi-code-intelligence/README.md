@@ -120,13 +120,16 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **targetId** (preferred from `code_resolve`) or file+line+character or symbol
 - **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
-- `imports` and `exports` use file-level tree-sitter analysis; `tests` returns "not yet implemented" gracefully
+- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
 
 ### `code_impact`
 Preferred workflow-oriented impact analysis.
 
 - supports the existing target-based path (`targetId`, anchored coords, symbol)
 - adds diff-aware entry points for `changedFiles` and explicit `includeTests`
+- `includeTests` uses the same shared test discovery as `code_graph` and `code_context` (import/reference evidence plus package-layout conventions)
+- **target-based analysis seeds the target file itself** — zero-reference targets still report affected evidence and likely tests
+- when the workspace clearly uses Vitest, likely test files also come with concrete `pnpm vitest run … --reporter=verbose` commands
 - `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing
 - uses real workspace/git evidence only; no heuristic grep fallback
 

@@ -102,6 +102,7 @@ function unavailableImpactToolResult(
         riskLevel: "low" as const,
         checkNext: [],
         likelyTests: [],
+        likelyTestCommands: [],
         omittedCount: 0,
         nextQueries,
       },

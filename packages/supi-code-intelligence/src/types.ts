@@ -49,6 +49,8 @@ export interface AffectedDetails {
   riskLevel: "low" | "medium" | "high";
   checkNext: string[];
   likelyTests: string[];
+  /** Concrete test commands to run relevant verification. */
+  likelyTestCommands: string[];
   omittedCount: number;
   nextQueries: string[];
   prioritySignals?: PrioritySignalsSummary | null;

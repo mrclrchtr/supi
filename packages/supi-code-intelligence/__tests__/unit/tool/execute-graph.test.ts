@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -379,6 +379,49 @@ describe("execute-graph (code_graph tool)", () => {
 
       expect(result.content).toContain("tests");
       expect(result.content).toContain("__tests__/test.test.ts");
+    });
+
+    it("finds package-layout test without semantic references (regression for audit failure)", async () => {
+      // Package layout: source at src/tool/execute-graph.ts
+      // Test at __tests__/unit/tool/execute-graph.test.ts
+      // No semantic reference from test to source is established.
+      const srcDir = path.join(tmpDir, "src", "tool");
+      mkdirSync(srcDir, { recursive: true });
+      writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
+      const testDir = path.join(tmpDir, "__tests__", "unit", "tool");
+      mkdirSync(testDir, { recursive: true });
+      writeSource(
+        "__tests__/unit/tool/execute-graph.test.ts",
+        "import { executeGraph } from '../../../src/tool/execute-graph';\n",
+      );
+      // Write package.json to mimic a package root (beforeEach doesn't write one for this file)
+      writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
+
+      // Register mock provider with references returning empty
+      registerMockProvider(tmpDir, {
+        references: async () => [],
+      });
+
+      const result = (await executeAction(
+        {
+          action: "graph",
+          file: "src/tool/execute-graph.ts",
+          line: 1,
+          character: 1,
+          relations: ["tests"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      )) as {
+        content: string;
+        details?: { type: string; data?: { confidence?: string } };
+      };
+
+      expect(result.content).not.toContain("no companion test files found");
+      expect(result.content).toContain("__tests__/unit/tool/execute-graph.test.ts");
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type === "search") {
+        expect(result.details.data?.confidence).toBe("structural");
+      }
     });
 
     it("finds test via import analysis when naming conventions differ", async () => {

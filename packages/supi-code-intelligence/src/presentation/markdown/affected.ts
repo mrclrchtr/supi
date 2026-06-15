@@ -15,6 +15,7 @@ export interface ImpactAnalysis {
   downstreamCount: number;
   checkNext: string[];
   likelyTests: string[];
+  likelyTestCommands: string[];
   riskLevel: "low" | "medium" | "high";
   externalRefs: number;
 }
@@ -63,6 +64,7 @@ export function renderAffectedSingle(params: RenderSingleParams): string {
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
+  addLikelyTestCommandsSection(lines, analysis.likelyTestCommands);
 
   return lines.join("\n");
 }
@@ -109,6 +111,7 @@ export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests);
+  addLikelyTestCommandsSection(lines, analysis.likelyTestCommands);
 
   return lines.join("\n");
 }
@@ -149,6 +152,16 @@ function addTestsSection(lines: string[], tests: string[]): void {
   lines.push("## Likely Tests");
   for (const t of tests.slice(0, 3)) {
     lines.push(`- \`${t}\``);
+  }
+  lines.push("");
+}
+
+/** Render the Likely Test Commands section when commands are available. */
+function addLikelyTestCommandsSection(lines: string[], commands: string[]): void {
+  if (commands.length === 0) return;
+  lines.push("## Likely Test Commands");
+  for (const cmd of commands.slice(0, 3)) {
+    lines.push(`- \`${cmd}\``);
   }
   lines.push("");
 }

@@ -1,0 +1,43 @@
+schema_version = 1
+status = "in_progress"
+updated_at = "2026-06-14T16:18:43.984232Z"
+revision = 30
+
+[document_fingerprints]
+content = "sha256:8f9f0a5fd8ec28a03b39d4efda54f49445c643cea3eb2c776b988e3c31fa7546"
+task-01 = "sha256:9f24ae03d9d75c101c2147405677894b89c4c41a2d905bababa15e96f66a1c12"
+task-02 = "sha256:87e5eaf54da66ac7d7515dce02c579dbcf392d9d84e19618a9c377780f22bf9c"
+task-03 = "sha256:ca20b1dbf2ee26ef40b83d9e853d338bc22fd673efc13600cd7525f22896d401"
+task-04 = "sha256:92bfaceea7c763ec285aa656e8280ec264055e53397e1e4d5ceddaab443bcf45"
+task-05 = "sha256:4ac4ab81a7bf7f2f507c81b7255fc412d8c6bb4463d974e5b4617e6ce07841b9"
+task-06 = "sha256:e153347fbde8625e0346e2810741498cda5aae3745ede4634eb817927d7033ed"
+
+[[tasks]]
+number = 1
+title = "RED: codify shared package-layout test discovery for graph/context"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: implement shared test discovery and wire graph/context to it"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "RED: codify impact accuracy, likely tests, and test-command output"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "GREEN: fix impact seeds, likely tests, and likely test commands"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update code-intelligence docs for shared test discovery and impact commands"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Final verification: package tests, typecheck, lint, and full repo verify"
+status = "done"

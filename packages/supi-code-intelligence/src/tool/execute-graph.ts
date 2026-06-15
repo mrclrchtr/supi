@@ -16,7 +16,7 @@ import {
   type ImplementationsResult,
 } from "../analysis/implementations/service.ts";
 import { collectReferences, type ReferencesResult } from "../analysis/references/service.ts";
-import { extractTestFunctions, findTestCompanionFiles } from "../analysis/relations/tests.ts";
+import { discoverTestFilesForSource } from "../analysis/relations/tests.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import { renderCallsResult } from "../presentation/markdown/calls.ts";
 import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
@@ -209,7 +209,12 @@ export async function executeGraphTool(
 
   // Derive confidence from the highest-capability successful section
   const hasStructural = sections.some(
-    (s) => s.kind === "ok" && (s.rel === "callees" || s.rel === "imports" || s.rel === "exports"),
+    (s) =>
+      s.kind === "ok" &&
+      (s.rel === "callees" ||
+        s.rel === "imports" ||
+        s.rel === "exports" ||
+        (s.rel === "tests" && s.count > 0)),
   );
   const hasSemantic = sections.some(
     (s) => s.kind === "ok" && (s.rel === "references" || s.rel === "implements"),
@@ -379,15 +384,15 @@ async function collectRelation(
       }
 
       case "tests": {
-        if (!provider?.references) {
-          return {
-            kind: "unavailable",
-            rel,
-            message: "No semantic provider for test discovery",
-          };
-        }
-        const testFiles = await findTestCompanionFiles(file, provider, position);
-        if (testFiles.length === 0) {
+        const discovered = await discoverTestFilesForSource(file, {
+          references: provider?.references,
+          outline: provider?.outline,
+          cwd,
+          cap: maxResults,
+          position,
+        });
+
+        if (discovered.length === 0) {
           return {
             kind: "ok",
             rel,
@@ -397,28 +402,22 @@ async function collectRelation(
         }
 
         const testLines: string[] = [];
-        const filesToScan = testFiles.slice(0, Math.min(testFiles.length, 3));
+        const filesToScan = discovered.slice(0, 3);
         for (const testFile of filesToScan) {
-          const relTestFile = testFile.startsWith(cwd) ? testFile.slice(cwd.length + 1) : testFile;
+          const relTestFile = testFile.absPath.startsWith(cwd)
+            ? testFile.absPath.slice(cwd.length + 1)
+            : testFile.absPath;
           testLines.push(`- \`${relTestFile}\``);
-          if (provider?.outline) {
-            const result = await extractTestFunctions(
-              testFile,
-              cwd,
-              { outline: provider.outline },
-              maxResults,
-            );
-            for (const name of result.names) {
-              testLines.push(`  - \`${name}\``);
-            }
+          for (const name of testFile.testNames.slice(0, maxResults)) {
+            testLines.push(`  - \`${name}\``);
           }
         }
 
-        const content = `**Tests** (${testFiles.length} companion file${testFiles.length !== 1 ? "s" : ""})\n\n${testLines.join("\n")}\n`;
+        const content = `**Tests** (${discovered.length} companion file${discovered.length !== 1 ? "s" : ""})\n\n${testLines.join("\n")}\n`;
         return {
           kind: "ok",
           rel,
-          count: testFiles.length,
+          count: discovered.length,
           content,
         };
       }

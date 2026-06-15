@@ -194,6 +194,405 @@ describe("code_impact tool", () => {
     }
   });
 
+  it("reports likely tests for target-based impact with zero semantic references (regression for audit failure)", async () => {
+    // Package layout: source in src/tool/execute-graph.ts
+    // Test in __tests__/unit/tool/execute-graph.test.ts
+    // No semantic reference from test to source.
+    mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "src/tool/execute-graph.ts"),
+      "export function executeGraph() { return 1; }\n",
+    );
+    mkdirSync(path.join(tmpDir, "__tests__", "unit", "tool"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "__tests__/unit/tool/execute-graph.test.ts"),
+      "import { executeGraph } from '../../src/tool/execute-graph';\n",
+    );
+
+    registerMockProvider(tmpDir, {
+      exports: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "executeGraph",
+            kind: "function",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 29,
+          },
+        ],
+      }),
+      references: async () => [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const resolveTool = getTool(pi, "code_resolve");
+    const resolveResult = (await resolveTool.execute(
+      "impact-resolve",
+      { file: "src/tool/execute-graph.ts", line: 1, character: 17 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: { data?: { targets?: Array<{ targetId: string }> } };
+    };
+    const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
+    expect(targetId).toBeDefined();
+
+    const impactTool = getTool(pi, "code_impact");
+    const result = (await impactTool.execute(
+      "impact-package-layout",
+      { targetId, includeTests: true },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: string; data?: { likelyTests?: string[]; downstreamCount?: number } };
+    };
+
+    expect(result.content[0].text).toContain("__tests__/unit/tool/execute-graph.test.ts");
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.likelyTests?.length ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it("ignores __tests__/helpers support files for target-based likely tests", async () => {
+    writeFileSync(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify(
+        {
+          name: "impact-ws",
+          scripts: { test: "vitest run" },
+        },
+        null,
+        2,
+      ),
+    );
+    mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "src/tool/execute-graph.ts"),
+      "export function executeGraph() { return 1; }\n",
+    );
+    mkdirSync(path.join(tmpDir, "__tests__", "unit", "tool"), { recursive: true });
+    mkdirSync(path.join(tmpDir, "__tests__", "helpers"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "__tests__/unit/tool/execute-graph.test.ts"),
+      "import { executeGraph } from '../../../src/tool/execute-graph';\nvoid executeGraph;\n",
+    );
+    writeFileSync(
+      path.join(tmpDir, "__tests__/helpers/execute-action.ts"),
+      "import { executeGraph } from '../../src/tool/execute-graph';\nvoid executeGraph;\n",
+    );
+
+    registerMockProvider(tmpDir, {
+      exports: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "executeGraph",
+            kind: "function",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 29,
+          },
+        ],
+      }),
+      references: async (file) =>
+        file.endsWith("execute-graph.ts")
+          ? [
+              {
+                uri: `file://${path.join(tmpDir, "__tests__/unit/tool/execute-graph.test.ts")}`,
+                range: {
+                  start: { line: 0, character: 9 },
+                  end: { line: 0, character: 21 },
+                },
+              },
+              {
+                uri: `file://${path.join(tmpDir, "__tests__/helpers/execute-action.ts")}`,
+                range: {
+                  start: { line: 0, character: 9 },
+                  end: { line: 0, character: 21 },
+                },
+              },
+            ]
+          : [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const resolveTool = getTool(pi, "code_resolve");
+    const resolveResult = (await resolveTool.execute(
+      "impact-resolve-helpers",
+      { file: "src/tool/execute-graph.ts", line: 1, character: 17 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: { data?: { targets?: Array<{ targetId: string }> } };
+    };
+    const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
+    expect(targetId).toBeDefined();
+
+    const impactTool = getTool(pi, "code_impact");
+    const result = (await impactTool.execute(
+      "impact-ignore-test-helpers",
+      { targetId, includeTests: true },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: string;
+        data?: { likelyTests?: string[]; likelyTestCommands?: string[] };
+      };
+    };
+
+    expect(result.content[0].text).toContain("__tests__/unit/tool/execute-graph.test.ts");
+    expect(result.content[0].text).not.toContain(
+      "pnpm vitest run __tests__/helpers/execute-action.ts --reporter=verbose",
+    );
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.likelyTests).toContain(
+        "__tests__/unit/tool/execute-graph.test.ts",
+      );
+      expect(result.details.data?.likelyTests).not.toContain("__tests__/helpers/execute-action.ts");
+      expect(result.details.data?.likelyTestCommands).toContain(
+        "pnpm vitest run __tests__/unit/tool/execute-graph.test.ts --reporter=verbose",
+      );
+      expect(result.details.data?.likelyTestCommands).not.toContain(
+        "pnpm vitest run __tests__/helpers/execute-action.ts --reporter=verbose",
+      );
+    }
+  });
+
+  it("reports likely tests for changed-files impact with package-layout mirrors", async () => {
+    // Package layout: source src/tool/execute-graph.ts, test __tests__/unit/tool/execute-graph.test.ts
+    mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "src/tool/execute-graph.ts"),
+      "export function executeGraph() { return 1; }\n",
+    );
+    mkdirSync(path.join(tmpDir, "__tests__", "unit", "tool"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "__tests__/unit/tool/execute-graph.test.ts"),
+      "import { executeGraph } from '../../src/tool/execute-graph';\n",
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const impactTool = getTool(pi, "code_impact");
+
+    const result = (await impactTool.execute(
+      "impact-changed-pkg",
+      {
+        changedFiles: ["src/tool/execute-graph.ts"],
+        includeTests: true,
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: string; data?: { likelyTests?: string[] } };
+    };
+
+    expect(result.content[0].text).toContain("__tests__/unit/tool/execute-graph.test.ts");
+    expect(result.content[0].text).not.toContain(tmpDir);
+    expect(result.content[0].text).not.toContain("Likely Test Commands");
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.likelyTests).toContain(
+        "__tests__/unit/tool/execute-graph.test.ts",
+      );
+    }
+  });
+
+  it("uses semantic test references for changed-files impact", async () => {
+    mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "src/tool/execute-find.ts"),
+      "export function executeFind() { return 1; }\n",
+    );
+    mkdirSync(path.join(tmpDir, "__tests__"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "__tests__/code-find-tool.test.ts"),
+      "import { executeFind } from '../src/tool/execute-find';\nvoid executeFind;\n",
+    );
+
+    registerMockProvider(tmpDir, {
+      references: async (file) =>
+        file.endsWith("execute-find.ts")
+          ? [
+              {
+                uri: `file://${path.join(tmpDir, "__tests__/code-find-tool.test.ts")}`,
+                range: {
+                  start: { line: 0, character: 9 },
+                  end: { line: 0, character: 20 },
+                },
+              },
+            ]
+          : [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const impactTool = getTool(pi, "code_impact");
+
+    const result = (await impactTool.execute(
+      "impact-changed-semantic-tests",
+      {
+        changedFiles: ["src/tool/execute-find.ts"],
+        includeTests: true,
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: string; data?: { likelyTests?: string[] } };
+    };
+
+    expect(result.content[0].text).toContain("__tests__/code-find-tool.test.ts");
+    expect(result.content[0].text).not.toContain("Likely Test Commands");
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.likelyTests).toContain("__tests__/code-find-tool.test.ts");
+    }
+  });
+
+  it("emits Vitest commands only when the workspace clearly uses Vitest", async () => {
+    writeFileSync(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify(
+        {
+          name: "impact-ws",
+          scripts: { test: "vitest run" },
+        },
+        null,
+        2,
+      ),
+    );
+    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src/module.ts"), "export const value = 42;\n");
+    writeFileSync(path.join(tmpDir, "src/module.test.ts"), "test('value', () => {});\n");
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const impactTool = getTool(pi, "code_impact");
+
+    const result = (await impactTool.execute(
+      "impact-vitest-commands",
+      {
+        changedFiles: ["src/module.ts"],
+        includeTests: true,
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: string; data?: { likelyTestCommands?: string[] } };
+    };
+
+    expect(result.content[0].text).toContain("Likely Test Commands");
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.likelyTestCommands).toContain(
+        "pnpm vitest run src/module.test.ts --reporter=verbose",
+      );
+    }
+  });
+
+  it("skips Vitest commands for non-JavaScript test files", async () => {
+    writeFileSync(
+      path.join(tmpDir, "package.json"),
+      JSON.stringify(
+        {
+          name: "impact-ws",
+          scripts: { test: "vitest run" },
+        },
+        null,
+        2,
+      ),
+    );
+    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    mkdirSync(path.join(tmpDir, "tests"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src/widget.ts"), "export const widget = 1;\n");
+    writeFileSync(
+      path.join(tmpDir, "tests/widget.spec.py"),
+      "def test_widget():\n    assert True\n",
+    );
+
+    registerMockProvider(tmpDir, {
+      references: async (file) =>
+        file.endsWith("widget.ts")
+          ? [
+              {
+                uri: `file://${path.join(tmpDir, "tests/widget.spec.py")}`,
+                range: {
+                  start: { line: 0, character: 0 },
+                  end: { line: 0, character: 6 },
+                },
+              },
+            ]
+          : [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const impactTool = getTool(pi, "code_impact");
+
+    const result = (await impactTool.execute(
+      "impact-non-js-test-command",
+      {
+        changedFiles: ["src/widget.ts"],
+        includeTests: true,
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: string; data?: { likelyTests?: string[]; likelyTestCommands?: string[] } };
+    };
+
+    expect(result.content[0].text).toContain("tests/widget.spec.py");
+    expect(result.content[0].text).not.toContain("Likely Test Commands");
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.likelyTests).toContain("tests/widget.spec.py");
+      expect(result.details.data?.likelyTestCommands).toEqual([]);
+    }
+  });
+
+  it("does not fabricate test commands when no tests exist", async () => {
+    // Source with no companion or mirror test files
+    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src/standalone.ts"), "export const value = 42;\n");
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const impactTool = getTool(pi, "code_impact");
+
+    const result = (await impactTool.execute(
+      "impact-no-tests",
+      {
+        changedFiles: ["src/standalone.ts"],
+        includeTests: true,
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    // Should have no Likely Tests section
+    expect(result.content[0].text).not.toContain("Likely Tests");
+  });
+
   it("does not register code_affected on the public tool surface", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
@@ -247,6 +646,14 @@ describe("findLikelyTests boundary awareness", () => {
     const affected = pathSet("src/__tests__/myModule.ts");
     const tests = findLikelyTests(affected, tmpDir);
     expect(tests.map((t) => t.path)).toContain(path.resolve(tmpDir, "src/__tests__/myModule.ts"));
+  });
+
+  it("does not match __tests__/helpers support files as tests", () => {
+    const affected = pathSet("src/__tests__/helpers/test-harness.ts");
+    const tests = findLikelyTests(affected, tmpDir);
+    expect(tests.map((t) => t.path)).not.toContain(
+      path.resolve(tmpDir, "src/__tests__/helpers/test-harness.ts"),
+    );
   });
 
   it("includes companion test files as fallback for non-test-named affected files", () => {
