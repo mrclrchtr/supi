@@ -1,17 +1,17 @@
 /**
  * Tool executor for code_find.
  *
- * Unified ranked code search with mode dispatch:
+ * Unified ranked code search with strict mode dispatch:
  * - text (default): literal ripgrep
  * - regex: ripgrep regex
- * - ast: tree-sitter structured search
- * - semantic: LSP workspace symbols with text fallback
+ * - ast: tree-sitter structured search (definition | import | export only)
+ * - semantic: LSP workspace symbols
  */
 
 import { existsSync } from "node:fs";
+import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
-import { collectCallSitesInFile } from "../analysis/relations/call-sites.ts";
-import { normalizePath, runRipgrep } from "../search-helpers.ts";
+import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
 
@@ -24,8 +24,11 @@ export interface CodeFindToolParams {
   maxResults?: number;
 }
 
-/** All valid structured pattern kind values (subset not yet implemented in AST mode). */
-const STRUCTURED_KINDS = new Set(["definition", "export", "import", "call", "type", "test"]);
+const SUPPORTED_AST_KINDS = new Set<NonNullable<CodeFindToolParams["kind"]>>([
+  "definition",
+  "import",
+  "export",
+]);
 
 export async function executeFindTool(
   params: CodeFindToolParams,
@@ -33,7 +36,6 @@ export async function executeFindTool(
 ): Promise<CodeIntelResult> {
   const cwd = ctx.cwd;
 
-  // ── Validation ──────────────────────────────────────────────────
   if (!params.query || params.query.trim().length === 0) {
     return {
       content: "**Error:** `code_find` requires a non-empty `query` parameter.",
@@ -50,30 +52,26 @@ export async function executeFindTool(
   }
 
   const mode = params.mode ?? "text";
-  const query = params.query;
+  validateModeKindCombination(params, mode);
 
-  // ── Mode dispatch ───────────────────────────────────────────────
   switch (mode) {
     case "text":
-      return executeTextMode(query, params, scopePath, cwd);
+      return executeTextMode(params.query, params, cwd);
     case "regex":
-      return executeRegexMode(query, params, scopePath, cwd);
+      return executeRegexMode(params.query, params, cwd);
     case "ast":
-      return executeAstMode(query, params, scopePath, cwd);
+      return executeAstMode(params.query, params, cwd);
     case "semantic":
-      return executeSemanticMode(query, params, scopePath, cwd);
+      return executeSemanticMode(params.query, params, cwd);
   }
 }
-
-// ── Mode implementations ──────────────────────────────────────────────
 
 async function executeTextMode(
   query: string,
   params: CodeFindToolParams,
-  _scopePath: string | null,
   cwd: string,
 ): Promise<CodeIntelResult> {
-  const result = await executePattern(
+  return executePattern(
     {
       pattern: query,
       path: params.scope,
@@ -84,17 +82,14 @@ async function executeTextMode(
     },
     { cwd, provider: getEffectiveProvider(cwd) },
   );
-
-  return maybeAppendKindNote(result, params);
 }
 
 async function executeRegexMode(
   query: string,
   params: CodeFindToolParams,
-  _scopePath: string | null,
   cwd: string,
 ): Promise<CodeIntelResult> {
-  const result = await executePattern(
+  return executePattern(
     {
       pattern: query,
       path: params.scope,
@@ -105,44 +100,20 @@ async function executeRegexMode(
     },
     { cwd, provider: getEffectiveProvider(cwd) },
   );
-
-  return maybeAppendKindNote(result, params);
 }
 
 async function executeAstMode(
   query: string,
   params: CodeFindToolParams,
-  _scopePath: string | null,
   cwd: string,
 ): Promise<CodeIntelResult> {
-  // Check for unsupported kind values
-  if (params.kind && !STRUCTURED_KINDS.has(params.kind)) {
-    return {
-      content: `**Error:** Unknown \`kind: "${params.kind}"\`. Valid kinds for \`mode: "ast"\`: \`definition\`, \`export\`, \`import\`, \`call\`. \`type\` and \`test\` are not yet available.`,
-      details: undefined,
-    };
-  }
-
-  // type/test are not yet implemented for AST mode
-  if (params.kind === "type" || params.kind === "test") {
-    return {
-      content: `**Not yet implemented:** AST \`kind: "${params.kind}"\` is not yet available. Supported AST kinds: \`definition\`, \`export\`, \`import\`, \`call\`. Use \`mode: "text"\` or \`mode: "semantic"\` as alternatives.`,
-      details: undefined,
-    };
-  }
-
-  // call uses ripgrep + heuristic filtering — no tree-sitter needed
-  if (params.kind === "call") {
-    return executeCallSiteSearch(query, params, cwd);
-  }
-
-  const kind = params.kind ?? "definition";
+  ensureStructuralAvailable(cwd);
 
   return executePattern(
     {
       pattern: query,
       path: params.scope,
-      kind,
+      kind: params.kind,
       maxResults: params.maxResults ?? 8,
       contextLines: params.contextLines ?? 1,
     },
@@ -153,38 +124,61 @@ async function executeAstMode(
 async function executeSemanticMode(
   query: string,
   params: CodeFindToolParams,
-  scopePath: string | null,
   cwd: string,
 ): Promise<CodeIntelResult> {
-  // Reject unsupported kind values before attempting LSP lookup
-  if (params.kind && !STRUCTURED_KINDS.has(params.kind)) {
-    return {
-      content: `**Error:** Semantic \`kind: "${params.kind}"\` is not yet implemented. Supported kinds for \`mode: "semantic"\`: \`definition\`, \`export\`, \`import\`.`,
-      details: undefined,
-    };
-  }
+  ensureSemanticAvailable(cwd);
 
   const providerState = getCodeProvider(cwd);
-
-  if (providerState.kind === "ready") {
-    const symbols = await providerState.provider.workspaceSymbols(query);
-
-    if (symbols && symbols.length > 0) {
-      return renderSemanticResults(query, symbols, params, cwd);
-    }
+  if (providerState.kind !== "ready") {
+    throw new Error(
+      "code_find semantic search is unavailable because no semantic/LSP provider is active for this workspace.",
+    );
   }
 
-  // Fall back to text search when no LSP or no symbols found
-  const fallbackResult = await executeTextMode(query, params, scopePath, cwd);
-  const note =
-    "\n\n_Semantic search unavailable or returned no results — fell back to text search._";
-  return {
-    content: fallbackResult.content + note,
-    details: fallbackResult.details,
-  };
+  const symbols = await providerState.provider.workspaceSymbols(query);
+  if (symbols === null) {
+    throw new Error(
+      "code_find semantic search is unavailable because the active semantic provider cannot serve workspace symbol queries.",
+    );
+  }
+
+  if (symbols.length === 0) {
+    return renderSemanticEmptyResult(query, params);
+  }
+
+  return renderSemanticResults(query, symbols, params, cwd);
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+function validateModeKindCombination(
+  params: CodeFindToolParams,
+  mode: NonNullable<CodeFindToolParams["mode"]>,
+): void {
+  if (!params.mode && params.kind) {
+    throw new Error(
+      'code_find does not accept `kind` when `mode` is omitted. Use `mode: "ast"` with `kind: "definition"`, `"import"`, or `"export"`.',
+    );
+  }
+
+  if ((mode === "text" || mode === "regex" || mode === "semantic") && params.kind) {
+    throw new Error(
+      `code_find does not accept \`kind\` with \`mode: "${mode}"\`. Use \`mode: "ast"\` with \`kind: "definition"\`, \`"import"\`, or \`"export"\` for structured filtering.`,
+    );
+  }
+
+  if (mode !== "ast") return;
+
+  if (!params.kind) {
+    throw new Error(
+      'code_find with `mode: "ast"` requires `kind`. Supported AST kinds in this phase: `definition`, `import`, `export`.',
+    );
+  }
+
+  if (!SUPPORTED_AST_KINDS.has(params.kind)) {
+    throw new Error(
+      `code_find with \`mode: "ast"\` supports only \`definition\`, \`import\`, and \`export\` in this phase. Received \`${params.kind}\`.`,
+    );
+  }
+}
 
 function resolveScope(scope: string | undefined, cwd: string): string | null {
   if (!scope) return null;
@@ -198,102 +192,50 @@ function getEffectiveProvider(cwd: string) {
   return state.kind === "ready" ? state.provider : null;
 }
 
-/**
- * Call-site search using ripgrep pre-filter + shared regex-based matching.
- *
- * Uses ripgrep to find candidate files containing the query, then runs
- * the shared `collectCallSitesInFile` on each candidate to verify actual
- * call sites. This avoids the arbitrary file-cap problems of a filesystem
- * walk (the old `collectSourceFiles` approach) and is consistent with how
- * `getStructuredPatternMatches` pre-filters for tree-sitter search.
- */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: call-site search naturally spans ripgrep pre-filter, file iteration, and result rendering
-async function executeCallSiteSearch(
+function ensureSemanticAvailable(cwd: string): void {
+  const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
+  const available =
+    workspace.semantic.state.kind === "ready" && workspace.semantic.provider !== null;
+  if (!available) {
+    throw new Error(
+      "code_find semantic search is unavailable because no semantic/LSP provider is active for this workspace.",
+    );
+  }
+}
+
+function ensureStructuralAvailable(cwd: string): void {
+  const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
+  const available =
+    workspace.structural.state.kind === "ready" && workspace.structural.provider !== null;
+  if (!available) {
+    throw new Error(
+      "code_find AST search is unavailable because no structural/tree-sitter provider is active for this workspace.",
+    );
+  }
+}
+
+function renderSemanticEmptyResult(
   query: string,
-  params: CodeFindToolParams,
-  cwd: string,
-): Promise<CodeIntelResult> {
-  const path = await import("node:path");
-
-  const scopePath = resolveScope(params.scope, cwd) ?? cwd;
-  const maxResults = params.maxResults ?? 8;
-
-  // Pre-filter via ripgrep — find files containing the query
-  const rgMatches = runRipgrep(query, scopePath, cwd, {
-    literal: true,
-    filterLowSignal: true,
-    maxMatches: 500,
-  });
-
-  // Deduplicate files and sort for stable processing order
-  const candidateFiles = [...new Set(rgMatches.map((m) => m.file))].sort((a, b) =>
-    a.localeCompare(b),
-  );
-
-  const matches: Array<{ file: string; name: string; line: number }> = [];
-
-  for (const relFile of candidateFiles) {
-    if (matches.length >= maxResults) break;
-    const absFile = path.resolve(cwd, relFile);
-    const callSites = collectCallSitesInFile(absFile, (word) => word === query);
-    for (const cs of callSites) {
-      if (matches.length >= maxResults) break;
-      matches.push({ file: relFile, name: cs.name, line: cs.line });
-    }
-  }
-
-  if (matches.length === 0) {
-    return {
-      content: `**Call-site search** — \`${query}\`\n\nNo call sites found in \`${params.scope ?? "."}\`.`,
-      details: {
-        type: "search",
-        data: {
-          confidence: "structural",
-          scope: params.scope ?? null,
-          candidateCount: 0,
-          omittedCount: 0,
-          nextQueries: [
-            'Use `mode: "text"` for all occurrences, including declarations and imports.',
-          ],
-        } satisfies SearchDetails,
-      },
-    };
-  }
-
-  const lines = [
-    `**Call-site search** — \`${query}\` (${matches.length} call site${matches.length !== 1 ? "s" : ""} found)`,
-  ];
-  for (const m of matches) {
-    lines.push(`- \`${m.file}\`:${m.line} — \`${m.name}()\``);
-  }
-
+  params: Pick<CodeFindToolParams, "scope">,
+): CodeIntelResult {
   return {
-    content: lines.join("\n"),
+    content: `**Semantic search** — \`${query}\`\n\nNo semantic results found in \`${params.scope ?? "."}\`.`,
     details: {
       type: "search",
       data: {
-        confidence: "structural",
+        confidence: "semantic",
         scope: params.scope ?? null,
-        candidateCount: matches.length,
+        candidateCount: 0,
         omittedCount: 0,
-        nextQueries: ["Use `code_context` with the file for deeper context."],
+        nextQueries: [
+          'Use `mode: "text"` for literal text search',
+          'Use `mode: "ast"` with `kind` for structural filtering',
+        ],
       } satisfies SearchDetails,
     },
   };
 }
 
-/** Advisory note for text/regex mode when kind is set — no filtering is applied. */
-function maybeAppendKindNote(result: CodeIntelResult, params: CodeFindToolParams): CodeIntelResult {
-  if (!params.kind) return result;
-
-  const note = `\n\n_Note: \`kind\` is ignored in text/regex mode. Use \`mode: "ast"\` or \`mode: "semantic"\` for kind-filtered results._`;
-  return {
-    content: result.content + note,
-    details: result.details,
-  };
-}
-
-/** Render semantic (LSP workspace symbol) results. */
 function renderSemanticResults(
   query: string,
   symbols: Array<{
@@ -326,11 +268,6 @@ function renderSemanticResults(
     lines.push(`  _+${omitted} more omitted — narrow \`query\` or increase \`maxResults\`_`);
   }
 
-  const nextQueries = [
-    'Use `mode: "text"` for literal text search',
-    'Use `mode: "ast"` with `kind` for structural filtering',
-  ];
-
   return {
     content: lines.join("\n"),
     details: {
@@ -340,7 +277,10 @@ function renderSemanticResults(
         scope: params.scope ?? null,
         candidateCount: symbols.length,
         omittedCount: omitted,
-        nextQueries,
+        nextQueries: [
+          'Use `mode: "text"` for literal text search',
+          'Use `mode: "ast"` with `kind` for structural filtering',
+        ],
       } satisfies SearchDetails,
     },
   };

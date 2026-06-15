@@ -152,10 +152,15 @@ Preferred workflow-oriented blast-radius tool.
 - does not fall back to heuristic search
 
 ### `code_find`
-Unified ranked code search with mode dispatch — the sole search tool.
+Unified ranked code search with strict mode dispatch — the sole search tool.
 - `query` (required) — search pattern or symbol query
-- `mode?` — `text` (ripgrep literal, default), `regex` (ripgrep regex), `ast` (tree-sitter structured), `semantic` (LSP workspace symbols with text fallback)
-- `kind?` — result filtering/ranking: `definition`, `import`, `export`, `call`, `type`, `test`. Advisory-only in text/regex modes (no filtering applied). In AST mode: `definition`/`export`/`import` use tree-sitter; `call` uses ripgrep-based call-site matching; `type`/`test` return "not yet implemented". In semantic mode: supported kinds (`definition`, `export`, `import`) are applied directly.
+- `mode?` — `text` (ripgrep literal, default), `regex` (ripgrep regex), `ast` (tree-sitter structured), `semantic` (LSP workspace symbols)
+- omitted `mode` or `mode: "text"` allow literal text search only and do not accept `kind`
+- `mode: "regex"` allows regex search only and does not accept `kind`
+- `mode: "semantic"` allows semantic workspace-symbol search only, does not accept `kind`, and does not fall back to text search
+- `mode: "ast"` requires explicit `kind`
+- supported AST kinds in this phase: `definition`, `import`, `export`
+- unsupported combinations fail explicitly; `call`, `type`, and `test` are not supported AST kinds in this phase
 - `scope?` — workspace-relative path, package, or directory to limit search
 - `contextLines?` — context lines around matches (default 1)
 - `maxResults?` — result cap (default 8)

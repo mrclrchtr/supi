@@ -126,12 +126,14 @@ export const CodeFindParameters = Type.Object(
     scope: Type.Optional(ScopeParam),
     mode: Type.Optional(
       StringEnum(["text", "regex", "ast", "semantic"], {
-        description: "Search mode. Defaults to literal text search when omitted.",
+        description:
+          'Search mode. Omit for literal text search. mode: "ast" requires `kind`; mode: "text", mode: "regex", and mode: "semantic" do not accept `kind`.',
       }),
     ),
     kind: Type.Optional(
-      StringEnum(["definition", "import", "export", "call", "type", "test"], {
-        description: "Preferred result kind for ranked search results.",
+      StringEnum(["definition", "import", "export"], {
+        description:
+          'Only valid with `mode: "ast"`. Supported AST kinds in this phase: `definition`, `import`, `export`.',
       }),
     ),
     contextLines: Type.Optional(

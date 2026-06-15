@@ -169,12 +169,14 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_find",
     label: "Code Find",
     description:
-      "Unified ranked code search with mode dispatch: text (literal ripgrep), regex (ripgrep regex), ast (tree-sitter structured: definition, export, import, call), semantic (LSP workspace symbols). Defaults to text mode. In text/regex modes, kind is advisory-only (no filtering).",
+      'Unified ranked code search with strict mode dispatch: default/`mode: "text"` is literal ripgrep, `mode: "regex"` is ripgrep regex, `mode: "semantic"` is LSP workspace-symbol search, and `mode: "ast"` is tree-sitter structured search. `mode: "ast"` requires `kind` and currently supports only `definition`, `import`, and `export`. `mode: "text"`, `mode: "regex"`, and `mode: "semantic"` do not accept `kind`. `code_find` with `mode: "semantic"` does not silently fall back to text search, and unsupported mode/kind combinations fail.',
     promptSnippet: "code_find — unified ranked code search",
     basePromptGuidelines: [
-      "Use code_find for text, regex, AST-level, or semantic workspace symbol search.",
-      "code_find defaults to text mode (literal ripgrep). Use code_find with mode: 'regex' for regex, mode: 'ast' with kind for structured search, mode: 'semantic' for LSP workspace symbols.",
-      "In code_find AST mode, supported kinds are: 'definition', 'export', 'import', and 'call' (call-site matching via ripgrep + heuristic filtering). In code_find text/regex mode, `kind` is ignored — use `mode: \"ast\"` or `mode: \"semantic\"` for filtered results.",
+      "Use code_find for literal text search, regex search, semantic workspace-symbol search, or AST structured search.",
+      'Use code_find with `mode: "text"` or omitted `mode` for literal ripgrep search, and use code_find with `mode: "regex"` for regex search.',
+      'code_find with `mode: "ast"` requires `kind` and supports only `definition`, `import`, and `export` in this phase.',
+      'code_find with `mode: "text"`, `mode: "regex"`, or `mode: "semantic"` does not accept `kind`.',
+      'code_find with `mode: "semantic"` does not fall back to text search and fails when semantic capability is unavailable.',
       "code_find is the sole code search tool — use code_find for all text, regex, AST, and semantic searches.",
     ],
     parameters: CodeFindParameters,

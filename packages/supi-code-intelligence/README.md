@@ -134,11 +134,14 @@ Preferred workflow-oriented impact analysis.
 - uses real workspace/git evidence only; no heuristic grep fallback
 
 ### `code_find`
-Unified ranked search tool for:
-- literal text search (default mode)
-- regex search (`mode: "regex"`)
-- AST structured search (`mode: "ast"` with `kind`)
-- LSP semantic workspace symbol search (`mode: "semantic"`)
+Unified ranked search tool with a strict evidence contract.
+
+- omitted `mode` or `mode: "text"` → literal text search; `kind` is not accepted
+- `mode: "regex"` → ripgrep regex search; `kind` is not accepted
+- `mode: "semantic"` → LSP workspace symbol search; `kind` is not accepted and semantic mode does not fall back to text search
+- `mode: "ast"` → tree-sitter structured search; requires explicit `kind`
+- supported AST kinds in this phase: `definition`, `import`, `export`
+- unsupported mode/kind combinations fail explicitly instead of being broadened into best-effort search
 
 Supports `query` (required), `scope`, `mode`, `kind`, `contextLines`, and `maxResults`.
 

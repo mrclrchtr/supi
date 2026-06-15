@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: split in later phase when file grows further
 /**
  * code_resolve business logic.
  *
@@ -5,8 +6,6 @@
  * into the existing targeting pipeline, registers resolved targets in the
  * target store, and returns a typed intermediate result that the tool
  * executor renders into markdown + details.
- *
- * biome-ignore lint/nursery/noExcessiveLinesPerFile: split in later phase when file grows further
  */
 import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";

@@ -1,4 +1,4 @@
-// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: relation dispatch for 7 relation kinds stays together
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: relation dispatch for 7 relation kinds stays together
 // biome-ignore-all lint/complexity/noExcessiveLinesPerFunction: relation dispatch naturally spans cases — pre-existing, split in later phase
 /**
  * Tool executor for code_graph.

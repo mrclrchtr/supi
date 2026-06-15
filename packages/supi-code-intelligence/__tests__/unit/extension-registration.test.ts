@@ -82,17 +82,22 @@ describe("focused code intelligence tool registration", () => {
     expect(kindParam?.enum).not.toContain("setting");
   });
 
-  it("registers code_find with correct parameter shape", () => {
+  it("registers code_find with the strict runtime contract and aligned metadata", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const tool = getTool(pi, "code_find");
+    const tool = getTool(pi, "code_find") as {
+      name: string;
+      execute?: unknown;
+      description?: string;
+      promptGuidelines?: string[];
+      parameters?: { properties?: Record<string, { description?: string; enum?: string[] }> };
+    };
     expect(tool).toBeDefined();
     expect(tool.name).toBe("code_find");
     expect(typeof tool.execute).toBe("function");
 
-    const props = (tool as { parameters?: { properties?: Record<string, unknown> } }).parameters
-      ?.properties;
+    const props = tool.parameters?.properties;
     expect(props).toBeDefined();
     expect(props).toHaveProperty("query");
     expect(props).toHaveProperty("scope");
@@ -101,10 +106,39 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("contextLines");
     expect(props).toHaveProperty("maxResults");
 
-    // mode enum check
-    const modeParam = props?.mode as { enum?: string[] } | undefined;
+    const modeParam = props?.mode;
     expect(modeParam?.enum).toBeDefined();
     expect(modeParam?.enum).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
+
+    const kindParam = props?.kind;
+    expect(tool.description).toContain('mode: "ast"');
+    expect(tool.description).toContain("requires `kind`");
+    expect(tool.description).toContain("definition");
+    expect(tool.description).toContain("import");
+    expect(tool.description).toContain("export");
+    expect(tool.description).toContain("does not silently fall back");
+    expect(tool.description).not.toContain("advisory-only");
+
+    const guidanceText = tool.promptGuidelines?.join("\n") ?? "";
+    expect(guidanceText).toContain('code_find with `mode: "ast"` requires `kind`');
+    expect(guidanceText).toContain('code_find with `mode: "semantic"` does not fall back');
+    expect(guidanceText).toContain(
+      'code_find with `mode: "text"`, `mode: "regex"`, or `mode: "semantic"` does not accept `kind`',
+    );
+    expect(guidanceText).not.toContain("kind is ignored");
+    expect(guidanceText).not.toContain("call-site matching via ripgrep");
+
+    expect(modeParam?.description).toContain('mode: "ast" requires `kind`');
+    expect(kindParam?.description).toContain('Only valid with `mode: "ast"`');
+    expect(kindParam?.description).toContain("definition");
+    expect(kindParam?.description).toContain("import");
+    expect(kindParam?.description).toContain("export");
+
+    expect(kindParam?.enum).toBeDefined();
+    expect(kindParam?.enum).toEqual(["definition", "import", "export"]);
+    expect(kindParam?.enum).not.toContain("call");
+    expect(kindParam?.enum).not.toContain("type");
+    expect(kindParam?.enum).not.toContain("test");
   });
 
   it("registers code_inspect as the factual point-inspection tool", () => {

@@ -1,4 +1,4 @@
-// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: shared impact orchestration stays together while the preferred and compatibility surfaces reuse one engine.
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: shared impact orchestration stays together while the preferred and compatibility surfaces reuse one engine.
 // Impact orchestration use-case — workflow-oriented blast-radius analysis.
 // Shared engine for both `code_impact` (preferred) and `code_affected`
 // (compatibility alias).

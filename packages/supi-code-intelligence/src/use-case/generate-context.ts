@@ -1,4 +1,4 @@
-// biome-ignore-all lint/nursery/noExcessiveLinesPerFile: context orchestration is kept together to share local section helpers
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: context orchestration is kept together to share local section helpers
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 

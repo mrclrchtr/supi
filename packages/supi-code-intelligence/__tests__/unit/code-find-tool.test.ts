@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: strict code_find contract scenarios are kept together for this focused tool test
 /**
  * Tests for the code_find tool.
  */
@@ -10,6 +11,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
+interface TextToolResult {
+  content: Array<{ type: string; text: string }>;
+}
+
 let tmpDir: string;
 
 beforeEach(() => {
@@ -21,11 +26,15 @@ afterEach(() => {
   clearMockRuntime();
 });
 
+function getCodeFindTool() {
+  const pi = createPiMock();
+  codeIntelligenceExtension(pi as never);
+  return getTool(pi, "code_find");
+}
+
 describe("code_find tool", () => {
   it("is registered as an active public tool", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_find");
+    const tool = getCodeFindTool();
 
     expect(tool).toBeDefined();
     expect(tool.name).toBe("code_find");
@@ -34,9 +43,7 @@ describe("code_find tool", () => {
   });
 
   it("has query as a required parameter", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_find") as {
+    const tool = getCodeFindTool() as {
       parameters?: { required?: string[]; properties?: Record<string, unknown> };
     };
 
@@ -50,10 +57,8 @@ describe("code_find tool", () => {
     expect(props).toHaveProperty("maxResults");
   });
 
-  it("rejects empty query with an error", async () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_find");
+  it("rejects empty query with an error result", async () => {
+    const tool = getCodeFindTool();
 
     const result = (await tool.execute(
       "test-empty-query",
@@ -61,18 +66,14 @@ describe("code_find tool", () => {
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
+    )) as TextToolResult;
 
     expect(result.content[0].text).toContain("Error");
     expect(result.content[0].text).toContain("query");
   });
 
-  it("returns error for scope not found", async () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_find");
+  it("returns an error result when scope is missing", async () => {
+    const tool = getCodeFindTool();
 
     const result = (await tool.execute(
       "test-scope-missing",
@@ -80,23 +81,114 @@ describe("code_find tool", () => {
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
+    )) as TextToolResult;
 
     expect(result.content[0].text).toContain("Error");
     expect(result.content[0].text).toContain("Scope");
   });
 
-  describe("mode: text (default)", () => {
-    it("returns literal matches for a query", async () => {
+  describe("strict mode-kind contract", () => {
+    it("fails when kind is provided without mode", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
+      const tool = getCodeFindTool();
+
+      await expect(
+        tool.execute(
+          "test-kind-without-mode",
+          { query: "foo", kind: "definition" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow(/code_find/i);
+    });
+
+    it("fails when kind is provided in text mode", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
+      const tool = getCodeFindTool();
+
+      await expect(
+        tool.execute(
+          "test-kind-in-text-mode",
+          { query: "foo", mode: "text", kind: "definition" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow(/code_find/i);
+    });
+
+    it("fails when kind is provided in regex mode", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const fooBar = 1;\n");
+      const tool = getCodeFindTool();
+
+      await expect(
+        tool.execute(
+          "test-kind-in-regex-mode",
+          { query: "foo[A-Z]", mode: "regex", kind: "definition" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow(/code_find/i);
+    });
+
+    it("fails when kind is provided in semantic mode", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
+      const tool = getCodeFindTool();
+
+      await expect(
+        tool.execute(
+          "test-kind-in-semantic-mode",
+          { query: "foo", mode: "semantic", kind: "definition" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow(/code_find/i);
+    });
+
+    it("fails when ast mode omits kind", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), 'export const foo = "hello";\n');
+      const tool = getCodeFindTool();
+
+      await expect(
+        tool.execute(
+          "test-ast-without-kind",
+          { query: "foo", mode: "ast" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow(/code_find/i);
+    });
+
+    it.each([
+      "call",
+      "type",
+      "test",
+    ] as const)("fails when ast mode uses unsupported kind %s", async (kind) => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
+      const tool = getCodeFindTool();
+
+      await expect(
+        tool.execute(
+          `test-ast-unsupported-${kind}`,
+          { query: "foo", mode: "ast", kind },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow(/code_find/i);
+    });
+  });
+
+  describe("mode: text and regex", () => {
+    it("returns literal matches for a default text query", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\nconst bar = 2;");
       writeFileSync(path.join(tmpDir, "b.ts"), "const foo = 3;");
       writeFileSync(path.join(tmpDir, "c.ts"), "const baz = 4;");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
+      const tool = getCodeFindTool();
 
       const result = (await tool.execute(
         "test-text-mode",
@@ -104,52 +196,19 @@ describe("code_find tool", () => {
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
+      )) as TextToolResult;
 
       const text = result.content[0].text;
       expect(text).toContain("foo");
       expect(text).toContain("a.ts");
       expect(text).toContain("b.ts");
-      // c.ts does not contain foo
       expect(text).not.toContain("c.ts");
     });
 
-    it("appends advisory note when kind is set in text mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
-
-      const result = (await tool.execute(
-        "test-text-kind",
-        { query: "foo", kind: "definition" },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
-
-      const text = result.content[0].text;
-      // Should still return matches
-      expect(text).toContain("foo");
-      expect(text).toContain("a.ts");
-      // Should include ignored note
-      expect(text).toContain("ignored");
-    });
-  });
-
-  describe("mode: regex", () => {
-    it("returns regex matches", async () => {
+    it("returns regex matches in regex mode", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const fooBar = 1;\nconst fooBaz = 2;");
       writeFileSync(path.join(tmpDir, "b.ts"), "const barOnly = 3;");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
+      const tool = getCodeFindTool();
 
       const result = (await tool.execute(
         "test-regex-mode",
@@ -157,186 +216,164 @@ describe("code_find tool", () => {
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
+      )) as TextToolResult;
 
       const text = result.content[0].text;
       expect(text).toContain("fooBar");
       expect(text).toContain("fooBaz");
       expect(text).not.toContain("barOnly");
     });
-
-    it("does not match when query has no regex chars in text mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const fooBar = 1;");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
-
-      // In default text mode, "foo[A-Z]" is a literal search
-      const result = (await tool.execute(
-        "test-text-literal-regex",
-        { query: "foo[A-Z]" },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
-
-      const text = result.content[0].text;
-      // Literal search for "foo[A-Z]" should not match "fooBar"
-      expect(text).toContain("No matches found");
-      expect(text).toContain("regex");
-    });
   });
 
   describe("mode: ast", () => {
-    it("returns unavailable when no structural provider", async () => {
+    it("fails when no structural provider is available", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), 'export const foo = "hello";');
+      const tool = getCodeFindTool();
 
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
+      await expect(
+        tool.execute(
+          "test-ast-no-provider",
+          { query: "foo", mode: "ast", kind: "definition" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow(/tree-sitter|structural|code_find/i);
+    });
+
+    it("finds definitions when structural support is available", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), 'export const foo = "hello";\n');
+      registerMockProvider(tmpDir, {
+        outline: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: "foo",
+              kind: "variable",
+              startLine: 1,
+              startCharacter: 14,
+              endLine: 1,
+              endCharacter: 17,
+              children: [],
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
 
       const result = (await tool.execute(
-        "test-ast-no-provider",
+        "test-ast-definition",
         { query: "foo", mode: "ast", kind: "definition" },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
+      )) as TextToolResult;
 
-      const text = result.content[0].text;
-      expect(text).toContain("Error");
+      expect(result.content[0].text).toContain("foo");
+      expect(result.content[0].text).toContain("a.ts");
     });
 
-    it("finds call sites for kind call in ast mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\nconst x = foo();\n");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
+    it("finds exports when structural support is available", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), 'export const foo = "hello";\n');
+      registerMockProvider(tmpDir, {
+        exports: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: "foo",
+              kind: "variable",
+              startLine: 1,
+              startCharacter: 14,
+              endLine: 1,
+              endCharacter: 17,
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
 
       const result = (await tool.execute(
-        "test-ast-kind-call",
-        { query: "foo", mode: "ast", kind: "call" },
+        "test-ast-export",
+        { query: "foo", mode: "ast", kind: "export" },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
+      )) as TextToolResult;
 
-      const text = result.content[0].text;
-      // Should find the call site: `foo()` on line 2
-      expect(text).not.toContain("Not yet implemented");
-      expect(text).toContain("foo");
+      expect(result.content[0].text).toContain("foo");
+      expect(result.content[0].text).toContain("a.ts");
     });
 
-    it("does not match declarations as call sites", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
+    it("finds imports when structural support is available", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), 'import { foo } from "./foo.ts";\n');
+      registerMockProvider(tmpDir, {
+        imports: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              moduleSpecifier: "./foo.ts",
+              startLine: 1,
+              startCharacter: 1,
+              endLine: 1,
+              endCharacter: 29,
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
 
       const result = (await tool.execute(
-        "test-ast-call-no-sites",
-        { query: "foo", mode: "ast", kind: "call" },
+        "test-ast-import",
+        { query: "./foo.ts", mode: "ast", kind: "import" },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
+      )) as TextToolResult;
 
-      const text = result.content[0].text;
-      // No call sites — should report no matches
-      expect(text).toContain("No"); // "No matches" or similar
-    });
-
-    it("returns not-yet-implemented for kind type in ast mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "type Foo = string;\n");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
-
-      const result = (await tool.execute(
-        "test-ast-kind-type",
-        { query: "Foo", mode: "ast", kind: "type" },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
-
-      const text = result.content[0].text;
-      expect(text).toContain("Not yet implemented");
-      expect(text).toContain("type");
-    });
-
-    it("returns not-yet-implemented for kind test in ast mode", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "function testFoo() {}\n");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
-
-      const result = (await tool.execute(
-        "test-ast-kind-test",
-        { query: "test", mode: "ast", kind: "test" },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
-
-      const text = result.content[0].text;
-      expect(text).toContain("Not yet implemented");
-      expect(text).toContain("test");
+      expect(result.content[0].text).toContain("./foo.ts");
+      expect(result.content[0].text).toContain("a.ts");
     });
   });
 
   describe("mode: semantic", () => {
-    it("falls back to text search when no LSP provider", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;");
+    it("fails when no semantic provider is available", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
+      const tool = getCodeFindTool();
 
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
+      await expect(
+        tool.execute(
+          "test-semantic-no-provider",
+          { query: "foo", mode: "semantic" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow(/semantic|lsp|code_find/i);
+    });
+
+    it("returns a semantic no-results result without text fallback", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const ghost = 1;\n");
+      registerMockProvider(tmpDir, {
+        workspaceSymbols: async () => [],
+      });
+      const tool = getCodeFindTool();
 
       const result = (await tool.execute(
-        "test-semantic-fallback",
-        { query: "foo", mode: "semantic" },
+        "test-semantic-no-results",
+        { query: "ghost", mode: "semantic" },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
+      )) as TextToolResult;
 
       const text = result.content[0].text;
-      // Should fall back to text search
-      expect(text).toContain("foo");
-      expect(text).toContain("a.ts");
-      // Should include fallback note
-      expect(text).toContain("fell back to text search");
+      expect(text).toContain("No semantic results found");
+      expect(text).not.toContain("fell back to text search");
+      expect(text).not.toContain("a.ts");
     });
 
-    it("returns workspace symbols when LSP provider is available", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "export function myFunc() {}");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-
-      // Register a mock semantic provider with workspaceSymbols
+    it("returns workspace symbols when a semantic provider is available", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "export function myFunc() {}\n");
       registerMockProvider(tmpDir, {
         workspaceSymbols: async () => [
           {
@@ -348,8 +385,7 @@ describe("code_find tool", () => {
           },
         ],
       });
-
-      const tool = getTool(pi, "code_find");
+      const tool = getCodeFindTool();
 
       const result = (await tool.execute(
         "test-semantic-symbols",
@@ -357,35 +393,11 @@ describe("code_find tool", () => {
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
+      )) as TextToolResult;
 
       const text = result.content[0].text;
-      // Should show the symbol result
       expect(text).toContain("myFunc");
-    });
-
-    it("does not error for kind call in semantic mode (falls back to text)", async () => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
-
-      const result = (await tool.execute(
-        "test-semantic-kind-call",
-        { query: "foo", mode: "semantic", kind: "call" },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
-
-      const text = result.content[0].text;
-      expect(text).not.toContain("not yet implemented");
-      expect(text).toContain("fell back to text search");
+      expect(text).toContain("a.ts");
     });
   });
 
@@ -396,10 +408,7 @@ describe("code_find tool", () => {
       mkdirSync(subDir, { recursive: true });
       writeFileSync(path.join(tmpDir, "root.ts"), "const foo = 1;");
       writeFileSync(path.join(subDir, "nested.ts"), "const bar = 2;");
-
-      const pi = createPiMock();
-      codeIntelligenceExtension(pi as never);
-      const tool = getTool(pi, "code_find");
+      const tool = getCodeFindTool();
 
       const result = (await tool.execute(
         "test-scope-filter",
@@ -407,9 +416,7 @@ describe("code_find tool", () => {
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as {
-        content: Array<{ type: string; text: string }>;
-      };
+      )) as TextToolResult;
 
       const text = result.content[0].text;
       expect(text).toContain("bar");
