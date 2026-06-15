@@ -97,6 +97,6 @@ Skip step 1 if you already know the exact Context7 `library_id`.
 
 ## Context7 API key
 
-`web_docs_search` and `web_docs_fetch` use [Context7](https://context7.com/) through `@upstash/context7-sdk`.
+`web_docs_search` and `web_docs_fetch` call the [Context7 REST API](https://context7.com/) directly.
 
-If `CONTEXT7_API_KEY` is set in your environment, the SDK uses it automatically for higher rate limits. Without a key, the tools still work with lower defaults.
+Set `CONTEXT7_API_KEY` in your environment to authenticate with the Context7 API. Without a key, the tools will return an authentication error when called. Get a free API key at https://context7.com/dashboard.

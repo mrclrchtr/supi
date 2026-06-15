@@ -1,0 +1,50 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-15T22:35:48.919413Z"
+revision = 37
+
+[document_fingerprints]
+archive = "sha256:5954a63e67882bc249a70b1bb140ff5dc1b09e4c59a975594ab5d7972116e602"
+content = "sha256:45e6d27eb9cacd5a4cfcdceb9b2570dda7a2731d07f3bbcb865643d03a1932ca"
+task-01 = "sha256:066be3d76216407d7b02cfe18d86b8ac85666640e1af0729e1132660c527ffd1"
+task-02 = "sha256:97903233ebf63331fad16c6dc25c0c3f6957a226df7552ed90e89c0b808e1201"
+task-03 = "sha256:c4cdf1d5fd2a31307ea3b1699af6eb5db80b2aa1c5560611f64537ea5feb83d2"
+task-04 = "sha256:b103287ac69bbd9b6d13af4ca4b3cbf6fb3975f1c7d61e13f6f49040e3f5c4d8"
+task-05 = "sha256:78b2727fc32280c5a4610d8fef0436208ccb8320b0a9f237e46b8bf3e35aeb2d"
+task-06 = "sha256:685da1a6ea3fc5c5107059411a2bd0f529ca44020304377563cdd93418783ed5"
+task-07 = "sha256:9b44a4eb884ab5004effb27cb9681c8b561a4f74cb954d39a595ce898a9cd535"
+
+[[tasks]]
+number = 1
+title = "Rewrite context7-client.ts — drop SDK, use direct REST API"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Update docs.ts — adapt to new client API surface"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Remove @upstash/context7-sdk dependency and run pnpm install"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Correct API key guidance in README.md and CLAUDE.md"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Rewrite context7-client unit tests — mock fetch instead of SDK"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Update docs unit tests — adapt mocks to new client module"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Final verification — full test suite + smoke test without API key"
+status = "done"

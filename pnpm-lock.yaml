@@ -518,9 +518,6 @@ importers:
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
-      '@upstash/context7-sdk':
-        specifier: ^0.3.0
-        version: 0.3.1
       jsdom:
         specifier: ^29.0.0
         version: 29.1.1
@@ -1309,9 +1306,6 @@ packages:
 
   '@types/turndown@5.0.6':
     resolution: {integrity: sha512-ru00MoyeeouE5BX4gRL+6m/BsDfbRayOskWqUvh7CLGW+UXxHQItqALa38kKnOiZPqJrtzJUgAC2+F0rL1S4Pg==}
-
-  '@upstash/context7-sdk@0.3.1':
-    resolution: {integrity: sha512-K1NZ8MuaMkCJ9y1/q6P8WDehpfsp5pNapVbh65oNq+QcZcwIFZcmpe9WhnzV9eoEdlbtF/y7zmQJhXDuDdGhbA==}
 
   '@vitest/expect@4.1.8':
     resolution: {integrity: sha512-h3nDO677RDLEGlBxyQ5CW8RlMThSKSRLUePLOx09gNIWRL40edgA1GCZSZgf1W55MFAG6/Sw14KeaAnqv0NKdQ==}
@@ -3450,8 +3444,6 @@ snapshots:
   '@types/tough-cookie@4.0.5': {}
 
   '@types/turndown@5.0.6': {}
-
-  '@upstash/context7-sdk@0.3.1': {}
 
   '@vitest/expect@4.1.8':
     dependencies:

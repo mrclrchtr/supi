@@ -25,7 +25,7 @@ src/
 ├── fetch.ts           # HTTP logic: HEAD negotiation, range sniff, sibling probe, full GET
 ├── convert.ts         # HTML → Markdown: JSDOM + Readability + Turndown + link absolutization
 ├── temp-file.ts       # Temporary file helper for large content
-├── context7-client.ts # Thin wrapper around @upstash/context7-sdk (lazy init, error mapping)
+├── context7-client.ts # REST API client for Context7 (direct fetch, auth header handling)
 ├── docs.ts            # Extension factory — registers web_docs_search + web_docs_fetch tools
 ├── tool/
 │   ├── web-fetch-md-guidance.ts   # prompt surfaces for web_fetch_md
@@ -43,13 +43,13 @@ src/
 
 ## Context7 pipeline (web_docs_search + web_docs_fetch)
 
-1. **web_docs_search** — calls `GET /api/v2/libs/search` via the SDK with `libraryName` + `query`
+1. **web_docs_search** — calls `GET /api/v2/libs/search` directly with `libraryName` + `query`
    - Returns formatted Markdown table: Name, ID, Description, Trust Score, Benchmark Score, Snippets, Versions
 2. **agent picks a library ID** from the results
-3. **web_docs_fetch** — calls `GET /api/v2/context` via the SDK with `libraryId` + `query`
-   - Default `type: "txt"` returns pre-formatted Markdown ready for LLM consumption
-   - `raw: true` returns `type: "json"` for programmatic use
-4. API key read from `CONTEXT7_API_KEY` env var automatically by the SDK; works unauthenticated with lower rate limits
+3. **web_docs_fetch** — calls `GET /api/v2/context` directly with `libraryId` + `query`
+   - Default mode returns pre-formatted text from Context7's API response
+   - `raw: true` returns parsed JSON snippet objects for programmatic use
+4. API key read from `CONTEXT7_API_KEY` env var automatically; without a key, requests return an authentication error
 
 ## Tool contracts
 
@@ -77,9 +77,7 @@ src/
 - `turndown-plugin-gfm` has no `@types` package — import uses `@ts-expect-error`
 - `fetchWithNegotiation` is split into 4 internal helpers to stay under Biome cognitive complexity limits
 - `readPartialText` handles both ReadableStream and plain text Response bodies for the range sniff
-- `@upstash/context7-sdk` is WIP (v0.3.0) — API may change; the thin wrapper `context7-client.ts` limits blast radius
-- SDK calls in `context7-client.ts` are cast through `unknown` because the SDK's TypeScript types may not fully align with the actual API shape
-- `Context7Error` is re-exported from `context7-client.ts` for test mocking purposes
+- `Context7Error` is exported from `context7-client.ts` for error handling in `docs.ts`
 - The `noSecrets` Biome rule false-positives on test `describe()` names — suppress inline when needed
 
 ## Test layout
