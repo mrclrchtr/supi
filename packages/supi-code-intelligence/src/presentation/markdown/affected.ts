@@ -38,7 +38,7 @@ interface RenderSingleParams {
 // ── Single target renderer ───────────────────────────────────────────
 
 export function renderAffectedSingle(params: RenderSingleParams): string {
-  const { symbolName, refs, analysis, maxResults, prioritySignals, cwd } = params;
+  const { symbolName, refs, analysis, maxResults, prioritySignals } = params;
   const totalRefs = refs.refs.length + analysis.externalRefs;
   const lines: string[] = [];
 
@@ -62,7 +62,7 @@ export function renderAffectedSingle(params: RenderSingleParams): string {
   lines.push("");
 
   addRiskSection(lines, analysis, totalRefs);
-  formatReferenceList(lines, refs.refs, maxResults, cwd);
+  formatReferenceList(lines, refs.refs, maxResults);
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests, analysis.tests);
@@ -109,7 +109,7 @@ export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
   lines.push("");
 
   addRiskSection(lines, analysis, totalRefs);
-  formatReferenceList(lines, aggregated.refs, maxResults, "");
+  formatReferenceList(lines, aggregated.refs, maxResults);
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests, analysis.tests);

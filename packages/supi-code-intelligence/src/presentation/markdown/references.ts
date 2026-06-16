@@ -28,6 +28,6 @@ export function renderReferencesResult(
     file: toDisplayPath(cwd, r.file),
     line: r.line,
   }));
-  formatReferenceList(lines, refLines, maxResults, cwd);
+  formatReferenceList(lines, refLines, maxResults);
   return lines.join("\n");
 }

@@ -76,14 +76,37 @@ export async function aggregatePerTarget<T extends ReferenceCollection>(
 }
 
 /**
+ * Compact sorted line numbers into a concise label string.
+ * Consecutive runs produce ranges: [9,10] → "L9-L10".
+ * Non-consecutive lines stay single: [9,348] → "L9, L348".
+ */
+export function compactLineRanges(lines: number[]): string {
+  const sorted = [...lines].sort((a, b) => a - b);
+  const parts: string[] = [];
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) {
+      j++;
+    }
+    if (j > i) {
+      parts.push(`L${sorted[i]}-L${sorted[j]}`);
+    } else {
+      parts.push(`L${sorted[i]}`);
+    }
+    i = j + 1;
+  }
+  return parts.join(", ");
+}
+
+/**
  * Append a formatted reference list to a lines array.
- * Groups refs by file, caps per-file lines at 5, and caps total files at maxResults.
+ * Groups refs by file, compacts line numbers into concise labels, and caps total files at maxResults.
  */
 export function formatReferenceList(
   lines: string[],
   refs: FileLineRef[],
   maxResults: number,
-  _cwd: string,
 ): void {
   if (refs.length === 0) return;
 
@@ -98,12 +121,8 @@ export function formatReferenceList(
   for (const [file, locations] of byFile) {
     if (shown >= maxResults) break;
     lines.push(`### ${file}`);
-    for (const loc of locations.slice(0, 5)) {
-      lines.push(`- L${loc}`);
-    }
-    if (locations.length > 5) {
-      lines.push(`- _+${locations.length - 5} more in this file_`);
-    }
+    const label = compactLineRanges(locations);
+    lines.push(`- ${label}`);
     lines.push("");
     shown++;
   }

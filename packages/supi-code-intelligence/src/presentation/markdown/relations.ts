@@ -1,7 +1,6 @@
 // Relations markdown renderer — consumes use-case data and produces markdown content.
 
 import type { TestSurfaceDetails } from "../../analysis/relations/tests.ts";
-import { isInProjectPath, uriToFile } from "../../search-helpers.ts";
 import type { ReferenceCollection } from "../../use-case/support/semantic-references.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
 
@@ -10,7 +9,7 @@ import { formatReferenceList } from "../../use-case/support/semantic-references.
 export function renderCallersResult(
   symbolName: string,
   result: ReferenceCollection,
-  cwd: string,
+  _cwd: string,
   maxResults: number,
 ): string {
   const lines: string[] = [];
@@ -26,63 +25,7 @@ export function renderCallersResult(
   }
   lines.push("");
 
-  formatReferenceList(lines, result.refs, maxResults, cwd);
-  return lines.join("\n");
-}
-
-// ── Implementations ──────────────────────────────────────────────────
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: implementation rendering with project/external splitting and formatting is clearer as one function
-export function renderImplementationsResult(
-  locations: Array<{
-    uri?: string;
-    targetUri?: string;
-    range?: { start: { line: number } };
-    targetRange?: { start: { line: number } };
-    targetSelectionRange?: { start: { line: number } };
-  }>,
-  cwd: string,
-  maxResults: number,
-): string {
-  const projectLocs = locations.filter((loc) => {
-    const uri = loc.uri ?? loc.targetUri ?? "";
-    const filePath = uriToFile(uri);
-    return filePath && isInProjectPath(filePath, cwd);
-  });
-  const externalLocs = locations.filter((loc) => {
-    const uri = loc.uri ?? loc.targetUri ?? "";
-    const filePath = uriToFile(uri);
-    return !filePath || !isInProjectPath(filePath, cwd);
-  });
-
-  const lines: string[] = [];
-  lines.push("# Implementations (semantic)");
-  lines.push("");
-  if (projectLocs.length > 0) {
-    lines.push(
-      `**${projectLocs.length} implementation${projectLocs.length !== 1 ? "s" : ""}** in the project`,
-    );
-    lines.push("");
-    for (const loc of projectLocs.slice(0, maxResults)) {
-      const uri = loc.uri ?? loc.targetUri ?? "";
-      const filePath = uriToFile(uri);
-      const range = loc.targetSelectionRange ?? loc.targetRange ?? loc.range;
-      if (filePath && range) {
-        lines.push(`- \`${filePath}:${(range as { start: { line: number } }).start.line + 1}\``);
-      } else if (filePath) {
-        lines.push(`- \`${filePath}\``);
-      }
-    }
-    lines.push("");
-  }
-
-  if (externalLocs.length > 0) {
-    lines.push(
-      `_+${externalLocs.length} external location${externalLocs.length !== 1 ? "s" : ""} (outside this project)_`,
-    );
-    lines.push("");
-  }
-
+  formatReferenceList(lines, result.refs, maxResults);
   return lines.join("\n");
 }
 

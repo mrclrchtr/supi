@@ -281,7 +281,7 @@ describe("aggregatePerTarget", () => {
 // ── formatReferenceList ────────────────────────────────────────────────────
 
 describe("formatReferenceList", () => {
-  it("groups refs by file and appends per-file sections", async () => {
+  it("groups refs by file with compressed line refs", async () => {
     const { formatReferenceList } = await import(
       "../../src/use-case/support/semantic-references.ts"
     );
@@ -295,30 +295,33 @@ describe("formatReferenceList", () => {
         { file: "src/b.ts", line: 3 },
       ],
       5,
-      tmpDir,
     );
 
     const aIdx = lines.findIndex((l) => l.includes("### src/a.ts"));
     const bIdx = lines.findIndex((l) => l.includes("### src/b.ts"));
     expect(aIdx).toBeGreaterThanOrEqual(0);
     expect(bIdx).toBeGreaterThan(aIdx);
-    expect(lines).toContain("- L5");
-    expect(lines).toContain("- L10");
+    // Line refs are now on one line per file
+    expect(lines).toContain("- L5, L10");
     expect(lines).toContain("- L3");
   });
 
-  it("caps per-file lines at 5 with omitted notice", async () => {
+  it("renders consecutive lines as ranges", async () => {
     const { formatReferenceList } = await import(
       "../../src/use-case/support/semantic-references.ts"
     );
     const lines: string[] = [];
-    const refs = Array.from({ length: 8 }, (_, i) => ({ file: "src/a.ts", line: i + 1 }));
+    const refs = [
+      { file: "src/a.ts", line: 1 },
+      { file: "src/a.ts", line: 2 },
+      { file: "src/a.ts", line: 3 },
+      { file: "src/a.ts", line: 5 },
+      { file: "src/a.ts", line: 6 },
+    ];
 
-    formatReferenceList(lines, refs, 5, tmpDir);
+    formatReferenceList(lines, refs, 5);
 
-    expect(lines).toContain("- L1");
-    expect(lines).toContain("- L5");
-    expect(lines.some((l) => l.includes("more in this file"))).toBe(true);
+    expect(lines).toContain("- L1-L3, L5-L6");
   });
 
   it("caps total files at maxResults with omitted notice", async () => {
@@ -333,7 +336,7 @@ describe("formatReferenceList", () => {
       { file: "src/d.ts", line: 1 },
     ];
 
-    formatReferenceList(lines, refs, 2, tmpDir);
+    formatReferenceList(lines, refs, 2);
 
     expect(lines.some((l) => l.includes("### src/a.ts"))).toBe(true);
     expect(lines.some((l) => l.includes("### src/d.ts"))).toBe(false);
@@ -346,7 +349,7 @@ describe("formatReferenceList", () => {
     );
     const lines: string[] = [];
 
-    formatReferenceList(lines, [], 5, tmpDir);
+    formatReferenceList(lines, [], 5);
 
     expect(lines).toHaveLength(0);
   });

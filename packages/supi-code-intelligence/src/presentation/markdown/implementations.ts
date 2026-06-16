@@ -4,6 +4,21 @@
 
 import type { ImplementationEntry } from "../../analysis/implementations/service.ts";
 import { toDisplayPath } from "../../search-helpers.ts";
+import { compactLineRanges } from "../../use-case/support/semantic-references.ts";
+
+/**
+ * Group implementation entries by display file path, collecting line numbers.
+ */
+function groupByFile(impls: ImplementationEntry[], cwd: string): Map<string, number[]> {
+  const byFile = new Map<string, number[]>();
+  for (const impl of impls) {
+    const displayPath = toDisplayPath(cwd, impl.file);
+    const group = byFile.get(displayPath) ?? [];
+    group.push(impl.line);
+    byFile.set(displayPath, group);
+  }
+  return byFile;
+}
 
 // biome-ignore lint/complexity/useMaxParams: render function with independent display parameters
 export function renderImplementationsResult(
@@ -23,11 +38,22 @@ export function renderImplementationsResult(
   if (impls.length > 0) {
     lines.push(`**${impls.length} implementation${impls.length !== 1 ? "s" : ""}** in the project`);
     lines.push("");
-    const shown = impls.slice(0, maxResults);
-    for (const impl of shown) {
-      lines.push(`- \`${toDisplayPath(cwd, impl.file)}:${impl.line}\``);
+
+    const byFile = groupByFile(impls, cwd);
+    let shown = 0;
+    for (const [file, locations] of byFile) {
+      if (shown >= maxResults) break;
+      lines.push(`### ${file}`);
+      lines.push(`- ${compactLineRanges(locations)}`);
+      lines.push("");
+      shown++;
     }
-    lines.push("");
+
+    if (byFile.size > maxResults) {
+      lines.push(
+        `_+${byFile.size - maxResults} more files omitted. Narrow with \`path\` or increase \`maxResults\`._`,
+      );
+    }
   }
 
   if (externalCount > 0) {
