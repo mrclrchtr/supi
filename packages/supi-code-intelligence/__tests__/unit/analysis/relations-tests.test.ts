@@ -73,6 +73,54 @@ describe("shared test discovery contract", () => {
     expect(files.some((f) => f.absPath.includes("src/source.test.ts"))).toBe(true);
   });
 
+  it("keeps discovery provenance separate from extracted labels", async () => {
+    writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource(
+      "__tests__/code-find-tool.test.ts",
+      "import { executeFind } from '../src/tool/execute-find';\nvoid executeFind;\n",
+    );
+
+    const { files, provenance } = await discoverTestFilesForSource(
+      path.join(tmpDir, "src/tool/execute-find.ts"),
+      {
+        references: async () => [
+          {
+            uri: `file://${tmpDir}/__tests__/code-find-tool.test.ts`,
+            range: {
+              start: { line: 0, character: 9 },
+              end: { line: 0, character: 20 },
+            },
+          },
+        ],
+        outline: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: "tmpDir",
+              kind: "const",
+              startLine: 1,
+              endLine: 1,
+              startCharacter: 0,
+              endCharacter: 0,
+            },
+            {
+              name: "writeSource",
+              kind: "function",
+              startLine: 2,
+              endLine: 2,
+              startCharacter: 0,
+              endCharacter: 0,
+            },
+          ],
+        }),
+        cwd: tmpDir,
+      },
+    );
+
+    expect(provenance).toBe("semantic+conventions");
+    expect(files[0]?.testNames).toEqual([]);
+  });
+
   it("does not classify false positives as tests", async () => {
     writeSource("src/contest.ts", "export const x = 1;\n");
     writeSource("src/testing.ts", "export const y = 2;\n");
@@ -165,6 +213,34 @@ describe("shared test discovery contract", () => {
           },
         ],
       }),
+      references: async () => [
+        {
+          uri: `file://${tmpDir}/src/source.test.ts`,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
+        },
+      ],
+      cap: 8,
+    });
+
+    expect(files[0]?.testNames).toEqual(["describe('source')", "it('returns expected')"]);
+  });
+
+  it("falls back to obvious test-call labels when outline is unavailable", async () => {
+    writeSource("src/source.ts", "export function source() { return 1; }\n");
+    writeSource(
+      "src/source.test.ts",
+      [
+        "import { source } from './source';",
+        "describe('source', () => {",
+        "  it('returns expected', () => {",
+        "    expect(source()).toBe(1);",
+        "  });",
+        "});",
+      ].join("\n"),
+    );
+
+    const { files } = await discoverTestFilesForSource(path.join(tmpDir, "src/source.ts"), {
+      cwd: tmpDir,
       references: async () => [
         {
           uri: `file://${tmpDir}/src/source.test.ts`,

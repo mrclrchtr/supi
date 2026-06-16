@@ -5,7 +5,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
-import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { CodePosition, ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
 import { discoverTestFilesForSource, isTestFilePath } from "../analysis/relations/tests.ts";
 import { resolveTarget } from "../analysis/targeting/resolve-target.ts";
@@ -70,6 +70,8 @@ interface ChangedFileEntry {
   absPath: string;
   relPath: string;
 }
+
+type TestAnchorMap = Map<string, CodePosition[]>;
 
 /** Exported for backward-compatible unit-test access. Prefer `discoverTestFilesForSource` from tests.ts. */
 export function findLikelyTests(
@@ -183,6 +185,7 @@ async function executeSingleImpact(
     shouldIncludeTests(surface, input.includeTests),
     semantic.references,
     [target.file], // seed the target file itself as affected
+    buildTestAnchorMap([{ file: target.file, position: target.position }]),
   );
 
   const prioritySignals = summarizePrioritySignalsForFiles(
@@ -258,6 +261,7 @@ async function executeFileLevelImpact(
     shouldIncludeTests(surface, input.includeTests),
     semantic.references,
     targetGroup.targets.map((t) => t.file), // seed all target files
+    buildTestAnchorMap(targetGroup.targets.map((t) => ({ file: t.file, position: t.position }))),
   );
 
   const prioritySignals = summarizePrioritySignalsForFiles(
@@ -381,6 +385,7 @@ async function analyzeReferenceImpact(
   includeTests: boolean,
   references: CodeProvider["references"] | undefined,
   seedFiles?: string[],
+  testAnchors?: TestAnchorMap,
 ): Promise<ImpactAnalysis> {
   const affectedFiles = new Set(result.refs.map((r) => path.resolve(cwd, r.file)));
 
@@ -397,7 +402,9 @@ async function analyzeReferenceImpact(
     cwd,
   );
 
-  const likelyTests = includeTests ? await collectLikelyTests(affectedFiles, cwd, references) : [];
+  const likelyTests = includeTests
+    ? await collectLikelyTests(affectedFiles, cwd, references, testAnchors)
+    : [];
   const likelyTestCommands = buildLikelyTestCommands(cwd, likelyTests);
 
   return {
@@ -501,10 +508,38 @@ function normalizeChangedFiles(files: string[], cwd: string): ChangedFileEntry[]
   return result;
 }
 
+function buildTestAnchorMap(
+  entries: Array<{ file: string; position: CodePosition }>,
+): TestAnchorMap {
+  const map: TestAnchorMap = new Map();
+  for (const entry of entries) {
+    const key = path.resolve(entry.file);
+    const positions = map.get(key) ?? [];
+    positions.push(entry.position);
+    map.set(key, positions);
+  }
+  return map;
+}
+
+function dedupeDiscoveredTestFiles(files: Array<{ absPath: string }>): Array<{ absPath: string }> {
+  const seen = new Set<string>();
+  const result: Array<{ absPath: string }> = [];
+
+  for (const file of files) {
+    if (seen.has(file.absPath)) continue;
+    seen.add(file.absPath);
+    result.push(file);
+  }
+
+  result.sort((left, right) => left.absPath.localeCompare(right.absPath));
+  return result;
+}
+
 async function collectLikelyTests(
   affectedFiles: Set<string>,
   cwd: string,
   references: CodeProvider["references"] | undefined,
+  testAnchors?: TestAnchorMap,
 ): Promise<string[]> {
   const seen = new Set<string>();
   const likelyTests: string[] = [];
@@ -515,11 +550,28 @@ async function collectLikelyTests(
       continue;
     }
 
-    const { files: discovered } = await discoverTestFilesForSource(affFile, {
-      cwd,
-      cap: 3,
-      references,
-    });
+    const positions = testAnchors?.get(path.resolve(affFile)) ?? [];
+    const discoveries =
+      positions.length > 0
+        ? await Promise.all(
+            positions.map((position) =>
+              discoverTestFilesForSource(affFile, {
+                cwd,
+                cap: 3,
+                references,
+                position,
+              }),
+            ),
+          )
+        : [
+            await discoverTestFilesForSource(affFile, {
+              cwd,
+              cap: 3,
+              references,
+            }),
+          ];
+
+    const discovered = dedupeDiscoveredTestFiles(discoveries.flatMap((entry) => entry.files));
     for (const testFile of discovered) {
       addLikelyTestPath(cwd, testFile.absPath, seen, likelyTests);
     }

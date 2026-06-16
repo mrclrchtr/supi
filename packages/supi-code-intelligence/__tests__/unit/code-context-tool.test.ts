@@ -484,6 +484,110 @@ describe("code_context real-data sections", () => {
     expect(result.content[0].text).toContain("it");
   });
 
+  it("matches code_graph on non-mirror semantic companion tests for the same target", async () => {
+    writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource(
+      "__tests__/code-find-tool.test.ts",
+      "import { executeFind } from '../src/tool/execute-find';\nvoid executeFind;\n",
+    );
+
+    registerMockProvider(tmpDir, {
+      references: async (file, position) =>
+        file.endsWith("execute-find.ts") && position.character > 0
+          ? [
+              {
+                uri: `file://${path.join(tmpDir, "__tests__/code-find-tool.test.ts")}`,
+                range: {
+                  start: { line: 0, character: 9 },
+                  end: { line: 0, character: 20 },
+                },
+              },
+            ]
+          : [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/tool/execute-find.ts", 1, 17);
+    const graphTool = getTool(pi, "code_graph");
+    const contextTool = getTool(pi, "code_context");
+
+    const graphResult = (await graphTool.execute(
+      "context-tests-graph-parity",
+      {
+        targetId,
+        relations: ["tests"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    const contextResult = (await contextTool.execute(
+      "context-tests-context-parity",
+      {
+        task: "find related tests",
+        targetId,
+        include: ["tests"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(graphResult.content[0].text).toContain("__tests__/code-find-tool.test.ts");
+    expect(contextResult.content[0].text).toContain("__tests__/code-find-tool.test.ts");
+  });
+
+  it("extracts obvious test-call labels when outline data is unavailable", async () => {
+    writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
+    writeSource(
+      "__tests__/unit/tool/execute-graph.test.ts",
+      [
+        // biome-ignore lint/security/noSecrets: test fixture labels are intentional
+        "import { executeGraph } from '../../../src/tool/execute-graph';",
+        // biome-ignore lint/security/noSecrets: test fixture labels are intentional
+        "describe('executeGraph', () => {",
+        "  it('returns 1', () => {",
+        "    expect(executeGraph()).toBe(1);",
+        "  });",
+        "});",
+      ].join("\n"),
+    );
+
+    registerMockProvider(tmpDir, {
+      references: async () => [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/tool/execute-graph.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "context-package-layout-fallback-test-labels",
+      {
+        task: "find related tests",
+        targetId,
+        include: ["tests"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    // biome-ignore lint/security/noSecrets: assertion on intentional test label fixture
+    expect(result.content[0].text).toContain("describe('executeGraph')");
+    expect(result.content[0].text).toContain("it('returns 1')");
+    expect(result.content[0].text).not.toContain("_(no recognized test blocks)_");
+  });
+
   it("renders no recognized test blocks instead of helper fallback names", async () => {
     writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
     writeSource(
@@ -547,6 +651,8 @@ describe("code_context real-data sections", () => {
 
     expect(result.content[0].text).toContain("__tests__/unit/tool/execute-graph.test.ts");
     expect(result.content[0].text).toContain("_(no recognized test blocks)_");
+    expect(result.content[0].text).toContain("conventions-only");
+    expect(result.content[0].text).not.toContain("no LSP/TS");
     expect(result.content[0].text).not.toContain("tmpDir");
     expect(result.content[0].text).not.toContain("writeSource");
     expect(result.content[0].text).not.toContain("`result`");

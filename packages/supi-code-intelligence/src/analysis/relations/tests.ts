@@ -1,16 +1,19 @@
 /**
  * Shared test-file discovery helpers.
  *
- * Used by both `code_context` and `code_graph` to find companion test files
- * and extract test function names via tree-sitter outline.
+ * Used by `code_graph`, `code_context`, and `code_impact` to find companion
+ * test files and extract recognizable test labels.
  *
  * The discovery uses two strategies:
  * 1. **Semantic reference/import evidence** — files that import the source and match test patterns.
  * 2. **Deterministic path conventions** — package-layout mirrors, same-directory companions.
- * Both strategies are combined, deduplicated, sorted, and capped.
+ *
+ * Discovery provenance describes only how test files were found. Test-label
+ * extraction is tracked separately so callers do not overload provenance with
+ * outline/provider availability claims.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
@@ -24,7 +27,7 @@ import type {
 export interface DiscoverTestFilesOptions {
   /** Semantic provider references method. When absent, no reference-based discovery. */
   references?: SemanticProvider["references"];
-  /** Structural provider outline method. When present, test function names are extracted. */
+  /** Structural provider outline method. When present, test labels are extracted. */
   outline?: StructuralProvider["outline"];
   /** Current working directory used for package-root detection and relative display. */
   cwd?: string;
@@ -34,30 +37,50 @@ export interface DiscoverTestFilesOptions {
   position?: CodePosition;
 }
 
+/** Label extraction status for one discovered companion test file. */
+export type TestLabelExtractionStatus = "recognized" | "none-recognized" | "unavailable";
+
 export interface DiscoveredTestFile {
   /** Absolute path to the discovered test file. */
   absPath: string;
   /** How this file was discovered. */
   provenance: "semantic reference" | "companion file" | "package layout";
-  /** Test function names extracted from outline (only when provider.outline is supplied). */
+  /** Recognized test labels extracted from outline when available. */
   testNames: string[];
+  /** Extraction status separate from file-discovery provenance. */
+  labelStatus: TestLabelExtractionStatus;
 }
 
 /** Evidence source for test discovery. */
 export type TestDiscoveryProvenance = "semantic+conventions" | "conventions-only";
 
+export type TestDiscoveryKind = "found" | "empty" | "unavailable";
+
+export type TestDiscoveryReason = "no-semantic-or-structural-provider" | "no-companion-test-files";
+
 /** Result of a test discovery call, with files and overall provenance. */
 export interface DiscoverTestFilesResult {
+  /** Normalized outcome for callers: found, empty, or unavailable. */
+  kind: TestDiscoveryKind;
+  /** Optional normalized reason for empty or unavailable outcomes. */
+  reason?: TestDiscoveryReason;
   /** Discovered test files, deduplicated, sorted, and capped. */
   files: DiscoveredTestFile[];
   /**
-   * Evidence provenance for the discovery.
-   * - `"semantic+conventions"`: semantic reference evidence contributed.
-   * - `"conventions-only"`: no semantic provider available or returned zero results.
+   * Discovery provenance.
+   * - `semantic+conventions`: semantic reference evidence contributed.
+   * - `conventions-only`: only deterministic path/layout conventions contributed.
    */
   provenance: TestDiscoveryProvenance;
-  /** Whether a semantic references provider was available (non-null). Distinguishes "provider absent" from "provider present but found nothing". */
+  /** Whether a semantic references provider was available (non-null). */
   semanticsAvailable: boolean;
+  /** Whether a structural outline provider was available (non-null). */
+  structuralAvailable: boolean;
+}
+
+interface ExtractedTestLabels {
+  names: string[];
+  status: TestLabelExtractionStatus;
 }
 
 /**
@@ -71,15 +94,14 @@ export async function discoverTestFilesForSource(
   sourceAbs: string,
   options: DiscoverTestFilesOptions,
 ): Promise<DiscoverTestFilesResult> {
-  // Resolve to absolute so convention-path comparisons match LSP absolute paths.
   sourceAbs = path.resolve(sourceAbs);
 
   const cap = options.cap ?? 8;
   const seen = new Set<string>();
   const results: DiscoveredTestFile[] = [];
   const semanticsAvailable = options.references != null;
+  const structuralAvailable = options.outline != null;
 
-  // ── Strategy 1: Semantic references ───────────────────────────────
   let semanticContributed = false;
   if (options.references) {
     const refs = await options.references(sourceAbs, options.position ?? { line: 0, character: 0 });
@@ -97,41 +119,75 @@ export async function discoverTestFilesForSource(
       }
 
       for (const absPath of refFiles) {
+        if (seen.has(absPath)) continue;
         seen.add(absPath);
-        const testNames = options.outline
-          ? await extractTestFunctionNames(
-              absPath,
-              options.outline,
-              options.cwd ?? path.dirname(sourceAbs),
-            )
-          : [];
-        results.push({ absPath, provenance: "semantic reference", testNames });
+        const extracted = await extractTestLabels(
+          absPath,
+          options.outline,
+          options.cwd ?? path.dirname(sourceAbs),
+        );
+        results.push({
+          absPath,
+          provenance: "semantic reference",
+          testNames: extracted.names,
+          labelStatus: extracted.status,
+        });
       }
     }
   }
 
-  // ── Strategy 2: Deterministic path conventions ────────────────────
   const conventionFiles = findConventionTestFiles(sourceAbs, options.cwd);
   for (const absPath of conventionFiles) {
     if (seen.has(absPath)) continue;
     seen.add(absPath);
-    const testNames = options.outline
-      ? await extractTestFunctionNames(
-          absPath,
-          options.outline,
-          options.cwd ?? path.dirname(sourceAbs),
-        )
-      : [];
-    results.push({ absPath, provenance: "companion file", testNames });
+    const extracted = await extractTestLabels(
+      absPath,
+      options.outline,
+      options.cwd ?? path.dirname(sourceAbs),
+    );
+    results.push({
+      absPath,
+      provenance: "companion file",
+      testNames: extracted.names,
+      labelStatus: extracted.status,
+    });
   }
 
-  // Deduplicate by absolute path (already done above), sort, cap
   results.sort((a, b) => a.absPath.localeCompare(b.absPath));
   const files = results.slice(0, cap);
   const provenance: TestDiscoveryProvenance = semanticContributed
     ? "semantic+conventions"
     : "conventions-only";
-  return { files, provenance, semanticsAvailable };
+
+  if (files.length === 0) {
+    if (!semanticsAvailable && !structuralAvailable) {
+      return {
+        kind: "unavailable",
+        reason: "no-semantic-or-structural-provider",
+        files,
+        provenance,
+        semanticsAvailable,
+        structuralAvailable,
+      };
+    }
+
+    return {
+      kind: "empty",
+      reason: "no-companion-test-files",
+      files,
+      provenance,
+      semanticsAvailable,
+      structuralAvailable,
+    };
+  }
+
+  return {
+    kind: "found",
+    files,
+    provenance,
+    semanticsAvailable,
+    structuralAvailable,
+  };
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────
@@ -145,8 +201,8 @@ export async function discoverTestFilesForSource(
  * 3. Package-level mirrors: `<pkg>/__tests__/unit/<src-relative>`, `<pkg>/__tests__/integration/<src-relative>`
  *    using both `.test.ext` and `.spec.ext` variants.
  *
- * Does NOT match files whose bare stem contains "test" or "spec" without boundary boundaries
- * (e.g. contest.ts, testing.ts, tool-specs.ts are excluded).
+ * Does NOT match files whose bare stem contains `test` or `spec` without boundary boundaries
+ * (e.g. `contest.ts`, `testing.ts`, `tool-specs.ts` are excluded).
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: deterministic path enumeration across many candidate patterns is simpler as one function
 function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
@@ -156,14 +212,12 @@ function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
   const dir = path.dirname(sourceAbs);
   const ext = path.extname(sourceAbs);
   const basename = path.basename(sourceAbs, ext);
-  const _stem = path.basename(sourceAbs);
 
-  // Guard: skip false-positive source stems that look like tests but aren't
+  // Guard: skip false-positive source stems that look like tests but aren't.
   if (/^contest$/i.test(basename) || /^testing$/i.test(basename) || /tool-specs$/i.test(basename)) {
     // Source itself is not a test; still permit companion discovery.
   }
 
-  // 1. Same-directory companions: foo.test.ext, foo.spec.ext
   for (const suffix of [".test", ".spec"]) {
     const candidate = path.join(dir, `${basename}${suffix}${ext}`);
     if (!seen.has(candidate) && existsSync(candidate)) {
@@ -172,7 +226,6 @@ function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
     }
   }
 
-  // 2. Same-directory __tests__/: foo/__tests__/basename.test.ext, foo/__tests__/basename.spec.ext
   for (const suffix of [".test", ".spec"]) {
     const candidate = path.join(dir, "__tests__", `${basename}${suffix}${ext}`);
     if (!seen.has(candidate) && existsSync(candidate)) {
@@ -181,16 +234,12 @@ function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
     }
   }
 
-  // 3. Package-level mirrors — requires cwd for package-root detection
   if (cwd) {
     const pkgRoot = findNearestPackageRoot(dir, cwd);
     if (pkgRoot) {
       const relFromPkg = path.relative(pkgRoot, sourceAbs);
-      // Try package-level __tests__/unit/ and __tests__/integration/ mirrors
       for (const testPrefix of ["__tests__/unit", "__tests__/integration"]) {
-        // Replace src/ or lib/ prefix with test prefix
         let mirroredRel = relFromPkg;
-        // Strip common source prefixes
         for (const srcPrefix of ["src/", "lib/", "source/"]) {
           if (mirroredRel.startsWith(srcPrefix)) {
             mirroredRel = mirroredRel.slice(srcPrefix.length);
@@ -219,51 +268,101 @@ function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
  * filesystem root or `cwd` if cwd itself has a package.json.
  */
 function findNearestPackageRoot(startDir: string, cwd: string): string | null {
-  // First check if cwd is already a package root
   if (existsSync(path.join(cwd, "package.json"))) {
-    // Walk up from startDir toward cwd to find the nearest package root
     let current = startDir;
     while (current.startsWith(cwd)) {
       if (existsSync(path.join(current, "package.json"))) {
         return current;
       }
       const parent = path.dirname(current);
-      if (parent === current) break; // filesystem root
+      if (parent === current) break;
       current = parent;
     }
   }
 
-  // Fallback: walk up from startDir toward fs root
   let current = startDir;
   while (true) {
     if (existsSync(path.join(current, "package.json"))) {
       return current;
     }
     const parent = path.dirname(current);
-    if (parent === current) break; // reached filesystem root
+    if (parent === current) break;
     current = parent;
   }
 
   return null;
 }
 
-async function extractTestFunctionNames(
+async function extractTestLabels(
   testFile: string,
-  outline: StructuralProvider["outline"],
+  outline: StructuralProvider["outline"] | undefined,
   cwd: string,
-): Promise<string[]> {
+): Promise<ExtractedTestLabels> {
+  if (!outline) {
+    return extractFallbackTestLabels(testFile);
+  }
+
   try {
     const relPath = path.relative(cwd, testFile);
     const outlineResult = await outline(relPath);
     if (outlineResult.kind === "success") {
       const entries = outlineResult.data.map((item) => item.name);
-      const testLike = entries.filter((n) => isTestLikeName(n));
-      return testLike.slice(0, 8);
+      const testLike = entries.filter((name) => isTestLikeName(name)).slice(0, 8);
+      if (testLike.length > 0) {
+        return {
+          names: testLike,
+          status: "recognized",
+        };
+      }
+
+      return extractFallbackTestLabels(testFile, "none-recognized");
     }
   } catch {
-    // Continue without test function details
+    // Continue with the conservative fallback parser.
   }
-  return [];
+
+  return extractFallbackTestLabels(testFile);
+}
+
+function extractFallbackTestLabels(
+  testFile: string,
+  emptyStatus: TestLabelExtractionStatus = "unavailable",
+): ExtractedTestLabels {
+  try {
+    const source = readFileSync(testFile, "utf-8");
+    const matches = collectObviousTestCallLabels(source);
+    if (matches.length > 0) {
+      return {
+        names: matches,
+        status: "recognized",
+      };
+    }
+  } catch {
+    // Fall through to the explicit empty/unavailable result.
+  }
+
+  return { names: [], status: emptyStatus };
+}
+
+function collectObviousTestCallLabels(source: string): string[] {
+  const labels: string[] = [];
+  const seen = new Set<string>();
+  const regex =
+    /(^|[^\w$.])((?:describe|it|test|spec)(?:\.(?:only|skip|todo|concurrent|each))?)\(\s*(['"`])((?:\\.|(?!\3)[^\\])*)\3/gs;
+
+  for (const match of source.matchAll(regex)) {
+    const callee = match[2];
+    const quote = match[3];
+    const label = match[4];
+    if (!callee || !quote || !label) continue;
+    const rendered = `${callee}(${quote}${label}${quote})`;
+    if (seen.has(rendered)) continue;
+    seen.add(rendered);
+    labels.push(rendered);
+    if (labels.length >= 8) break;
+  }
+
+  return labels;
 }
 
 // ── Existing language-agnostic detection helpers ─────────────────────

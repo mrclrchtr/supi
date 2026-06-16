@@ -120,10 +120,9 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **targetId** (preferred from `code_resolve`) or file+line+character or symbol
 - **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
-- **Each relation annotates its evidence source** in the output. Results carry provenance — `semantic+conventions` when LSP/TS contributed, `conventions-only` when they didn't.
+- **Each relation annotates its evidence source** in the output. For the `tests` relation, provenance describes **file discovery only** — `semantic+conventions` means semantic references contributed, `conventions-only` means only deterministic path/layout conventions contributed.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
-- The `tests` relation displays provenance: `conventions-only — no LSP/TS` appears in its heading when only path-based discovery ran
-- when a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` instead of helper or variable names
+- Test-label extraction is tracked separately from discovery provenance. When a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` intentionally instead of helper or variable names.
 
 ### `code_impact`
 Preferred workflow-oriented impact analysis.
@@ -223,7 +222,7 @@ Results report evidence provenance such as:
 
 `heuristic` results may appear from `code_find` in text/regex modes. The other tools prefer explicit unavailable states over silent search fallbacks.
 
-**Evidence-strictness principle:** Every tool result that depends on LSP or TreeSitter explicitly declares its evidence source. Test discovery annotates provenance: `semantic+conventions` means semantic references contributed, `conventions-only` means only path-based conventions ran. No silent degradation when providers are absent.
+**Evidence-strictness principle:** Every tool result that depends on LSP or TreeSitter explicitly declares its evidence source. For test discovery, provenance describes how companion test files were found: `semantic+conventions` means semantic references contributed, `conventions-only` means only path-based conventions ran. Test-label extraction is a separate concern; `_(no recognized test blocks)_` is an intentional honest placeholder, not silent degradation.
 
 ## Architecture
 

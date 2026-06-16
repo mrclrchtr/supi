@@ -424,6 +424,48 @@ describe("execute-graph (code_graph tool)", () => {
       }
     });
 
+    it("extracts obvious test-call labels when outline data is unavailable", async () => {
+      const srcDir = path.join(tmpDir, "src", "tool");
+      mkdirSync(srcDir, { recursive: true });
+      writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
+      const testDir = path.join(tmpDir, "__tests__", "unit", "tool");
+      mkdirSync(testDir, { recursive: true });
+      writeSource(
+        "__tests__/unit/tool/execute-graph.test.ts",
+        [
+          // biome-ignore lint/security/noSecrets: test fixture labels are intentional
+          "import { executeGraph } from '../../../src/tool/execute-graph';",
+          // biome-ignore lint/security/noSecrets: test fixture labels are intentional
+          "describe('executeGraph', () => {",
+          "  it('returns 1', () => {",
+          "    expect(executeGraph()).toBe(1);",
+          "  });",
+          "});",
+        ].join("\n"),
+      );
+      writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
+
+      registerMockProvider(tmpDir, {
+        references: async () => [],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "src/tool/execute-graph.ts",
+          line: 1,
+          character: 1,
+          relations: ["tests"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      // biome-ignore lint/security/noSecrets: assertion on intentional test label fixture
+      expect(result.content).toContain("describe('executeGraph')");
+      expect(result.content).toContain("it('returns 1')");
+      expect(result.content).not.toContain("_(no recognized test blocks)_");
+    });
+
     it("renders no recognized test blocks instead of helper fallback names", async () => {
       const srcDir = path.join(tmpDir, "src", "tool");
       mkdirSync(srcDir, { recursive: true });
@@ -484,6 +526,8 @@ describe("execute-graph (code_graph tool)", () => {
 
       expect(result.content).toContain("__tests__/unit/tool/execute-graph.test.ts");
       expect(result.content).toContain("_(no recognized test blocks)_");
+      expect(result.content).toContain("conventions-only");
+      expect(result.content).not.toContain("no LSP/TS");
       expect(result.content).not.toContain("tmpDir");
       expect(result.content).not.toContain("writeSource");
       expect(result.content).not.toContain("`result`");

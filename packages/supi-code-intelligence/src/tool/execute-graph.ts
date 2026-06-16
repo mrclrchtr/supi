@@ -384,11 +384,7 @@ async function collectRelation(
       }
 
       case "tests": {
-        const {
-          files: discovered,
-          provenance,
-          semanticsAvailable,
-        } = await discoverTestFilesForSource(file, {
+        const discovery = await discoverTestFilesForSource(file, {
           references: provider?.references,
           outline: provider?.outline,
           cwd,
@@ -396,14 +392,15 @@ async function collectRelation(
           position,
         });
 
-        if (discovered.length === 0) {
-          if (!semanticsAvailable) {
-            return {
-              kind: "unavailable",
-              rel,
-              message: "No test provider available — semantic and structural providers are absent",
-            };
-          }
+        if (discovery.kind === "unavailable") {
+          return {
+            kind: "unavailable",
+            rel,
+            message: "No test provider available — semantic and structural providers are absent",
+          };
+        }
+
+        if (discovery.kind === "empty") {
           return {
             kind: "ok",
             rel,
@@ -413,7 +410,7 @@ async function collectRelation(
         }
 
         const testLines: string[] = [];
-        const filesToScan = discovered.slice(0, 3);
+        const filesToScan = discovery.files.slice(0, 3);
         for (const testFile of filesToScan) {
           const relTestFile = testFile.absPath.startsWith(cwd)
             ? testFile.absPath.slice(cwd.length + 1)
@@ -423,12 +420,12 @@ async function collectRelation(
         }
 
         const provenanceNote =
-          provenance === "conventions-only" ? `, conventions-only — no LSP/TS` : "";
-        const content = `**Tests** (${discovered.length} companion file${discovered.length !== 1 ? "s" : ""}${provenanceNote})\n\n${testLines.join("\n")}\n`;
+          discovery.provenance === "conventions-only" ? `, conventions-only` : "";
+        const content = `**Tests** (${discovery.files.length} companion file${discovery.files.length !== 1 ? "s" : ""}${provenanceNote})\n\n${testLines.join("\n")}\n`;
         return {
           kind: "ok",
           rel,
-          count: discovered.length,
+          count: discovery.files.length,
           content,
         };
       }

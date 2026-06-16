@@ -139,13 +139,13 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_graph",
     label: "Code Graph",
     description:
-      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays provenance (semantic+conventions or conventions-only). Use code_resolve first to get a targetId, then pass it to code_graph.',
+      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays discovery provenance (semantic+conventions or conventions-only) separately from any extracted test labels. Use code_resolve first to get a targetId, then pass it to code_graph.',
     promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
       "Use code_graph to find references, outgoing calls, and implementations for a target.",
       'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for outgoing calls or `relations: ["implements"]` for implementations.',
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
-      "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test function names. The tests relation displays provenance (`semantic+conventions` or `conventions-only`) in its output.",
+      "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test labels. The tests relation displays discovery provenance (`semantic+conventions` or `conventions-only`) separately from placeholder output such as `_(no recognized test blocks)_`.",
       "After code_graph, follow up with code_context on individual results for type or definition context.",
       "code_graph uses `scope` (not `path`) for workspace-relative directory/package filtering.",
     ],

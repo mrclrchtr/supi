@@ -1,0 +1,32 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-16T17:40:47.44302Z"
+revision = 25
+
+[document_fingerprints]
+archive = "sha256:78f5595819e6cceed901ee71ea67a5a7a0651dc3165a4376934ca61d1defc860"
+content = "sha256:65f9748f05e7319d9fc2dde974e5b5fa1970b5bb4c615fc03e8209a3717caed4"
+task-01 = "sha256:a9adfd062b10584540a7ff7adbb7199e913de82dbc063ad32811d3f636efa170"
+task-02 = "sha256:fe0bd8f09284e45b91563554567f4284a9e1c1f83d54da7f036ef4890053934f"
+task-03 = "sha256:1014f58772484fbe01873a32d4582076be6bdab38486262a1847f1d69e7deb4c"
+task-04 = "sha256:749a19bf328a1b9a14dbbe1be68fc0cfed8a960097193c083c860e642a481d15"
+
+[[tasks]]
+number = 1
+title = "Add failing regressions for shared test-analysis parity and provenance"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Implement a shared test-analysis contract for code_graph, code_context, and code_impact"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Broaden best-effort test-label extraction and document the evidence contract"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Run full verification and live smoke-check the unified tests surface"
+status = "done"

@@ -333,24 +333,22 @@ async function buildTestsSection(
     };
   }
 
-  const {
-    files: discovered,
-    provenance,
-    semanticsAvailable,
-  } = await discoverTestFilesForSource(targetAbs, {
+  const discovery = await discoverTestFilesForSource(targetAbs, {
     references: deps.provider?.references,
     outline: deps.provider?.outline,
     cwd: deps.cwd,
     cap: limit,
+    position: { line: target.line - 1, character: target.character - 1 },
   });
 
-  if (discovered.length === 0) {
-    if (!semanticsAvailable) {
-      return {
-        lines: ["Tests unavailable — no semantic or structural provider available."],
-        hasStructuralEvidence: false,
-      };
-    }
+  if (discovery.kind === "unavailable") {
+    return {
+      lines: ["Tests unavailable — no semantic or structural provider available."],
+      hasStructuralEvidence: false,
+    };
+  }
+
+  if (discovery.kind === "empty") {
     return {
       lines: ["No test companion files found for this target."],
       hasStructuralEvidence: false,
@@ -358,17 +356,17 @@ async function buildTestsSection(
   }
 
   const lines: string[] = [];
-  if (provenance === "conventions-only") {
-    lines.push("Tests (conventions-only — no LSP/TS):");
+  if (discovery.provenance === "conventions-only") {
+    lines.push("Tests (conventions-only):");
   }
-  const filesToScan = discovered.slice(0, 3);
+  const filesToScan = discovery.files.slice(0, 3);
   for (const testFile of filesToScan) {
     const relTestFile = toDisplayPath(deps.cwd, testFile.absPath);
     lines.push(`- \`${relTestFile}\``);
     lines.push(...renderTestNames(testFile.testNames, limit));
   }
 
-  return { lines, hasStructuralEvidence: discovered.length > 0 };
+  return { lines, hasStructuralEvidence: discovery.files.length > 0 };
 }
 
 /** Render recognized test block names, or a placeholder when none were found. */

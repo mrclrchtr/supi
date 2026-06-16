@@ -404,6 +404,8 @@ describe("code_impact tool", () => {
     };
 
     expect(result.content[0].text).toContain("__tests__/unit/tool/execute-graph.test.ts");
+    expect(result.content[0].text).toContain("Likely Tests (conventions-only)");
+    expect(result.content[0].text).not.toContain("semantic+conventions");
     expect(result.content[0].text).not.toContain(tmpDir);
     expect(result.content[0].text).not.toContain("Likely Test Commands");
     if (result.details?.type === "impact") {
