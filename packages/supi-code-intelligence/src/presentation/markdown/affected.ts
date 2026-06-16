@@ -1,5 +1,6 @@
 // Affected markdown renderer — consumes analysis data and produces markdown content.
 
+import type { TestSurfaceDetails } from "../../analysis/relations/tests.ts";
 import type { PrioritySignalsSummary } from "../../prioritization-signals.ts";
 import { appendPrioritySignalsSection } from "../../prioritization-signals.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../../target-resolution.ts";
@@ -18,8 +19,7 @@ export interface ImpactAnalysis {
   likelyTestCommands: string[];
   riskLevel: "low" | "medium" | "high";
   externalRefs: number;
-  /** Evidence provenance for test discovery, set when includeTests was requested. */
-  testProvenance?: "semantic+conventions" | "conventions-only";
+  tests?: TestSurfaceDetails;
 }
 
 export const AFFECTED_COMPATIBILITY_NOTE =
@@ -65,7 +65,7 @@ export function renderAffectedSingle(params: RenderSingleParams): string {
   formatReferenceList(lines, refs.refs, maxResults, cwd);
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
-  addTestsSection(lines, analysis.likelyTests);
+  addTestsSection(lines, analysis.likelyTests, analysis.tests);
   addLikelyTestCommandsSection(lines, analysis.likelyTestCommands);
 
   return lines.join("\n");
@@ -112,7 +112,7 @@ export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
   formatReferenceList(lines, aggregated.refs, maxResults, "");
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
-  addTestsSection(lines, analysis.likelyTests);
+  addTestsSection(lines, analysis.likelyTests, analysis.tests);
   addLikelyTestCommandsSection(lines, analysis.likelyTestCommands);
 
   return lines.join("\n");
@@ -149,9 +149,12 @@ function addCheckNextSection(lines: string[], checkNext: string[]): void {
   lines.push("");
 }
 
-function addTestsSection(lines: string[], tests: string[]): void {
+function addTestsSection(lines: string[], tests: string[], details?: TestSurfaceDetails): void {
   if (tests.length === 0) return;
-  lines.push("## Likely Tests");
+  const heading = details?.provenance
+    ? `## Likely Tests (${details.provenance})`
+    : "## Likely Tests";
+  lines.push(heading);
   for (const t of tests.slice(0, 3)) {
     lines.push(`- \`${t}\``);
   }

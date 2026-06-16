@@ -18,7 +18,10 @@ export type {
 // ── Code-intelligence-specific types ─────────────────────────────────
 
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
 import type { PrioritySignalsSummary } from "./prioritization-signals.ts";
+
+export type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
 
 /** Structured details metadata returned alongside markdown brief content. */
 export interface BriefDetails {
@@ -39,6 +42,7 @@ export interface SearchDetails {
   candidateCount: number;
   omittedCount: number;
   nextQueries: string[];
+  tests?: TestSurfaceDetails;
 }
 
 /** Structured details metadata for affected analysis results. */
@@ -54,6 +58,7 @@ export interface AffectedDetails {
   omittedCount: number;
   nextQueries: string[];
   prioritySignals?: PrioritySignalsSummary | null;
+  tests?: TestSurfaceDetails;
 }
 
 /**
@@ -116,6 +121,7 @@ export interface ContextDetails {
   renderedSections: string[];
   omittedCount: number;
   nextQueries: string[];
+  tests?: TestSurfaceDetails;
 }
 
 /** Structured details metadata for code_inspect results. */

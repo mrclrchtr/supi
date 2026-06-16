@@ -4,12 +4,16 @@ import * as path from "node:path";
 
 import { collectOutgoingCalls } from "../analysis/calls/service.ts";
 import { collectReferences } from "../analysis/references/service.ts";
-import { discoverTestFilesForSource } from "../analysis/relations/tests.ts";
+import {
+  buildTestSurfaceDetails,
+  discoverTestFilesForSource,
+  renderRankedTestLabelsForMarkdown,
+  type TestSurfaceDetails,
+} from "../analysis/relations/tests.ts";
 import {
   type RenderedContextSection,
   renderContextResult,
 } from "../presentation/markdown/context.ts";
-import { toDisplayPath } from "../search-helpers.ts";
 import type { ConfidenceMode, ContextDetails } from "../types.ts";
 import { gatherTreeSitterContext } from "./gather-context.ts";
 import { executeBrief } from "./generate-brief.ts";
@@ -119,6 +123,7 @@ async function executeSectionMode(
   let omittedCount = 0;
   let hasStructural = false;
   let hasSemantic = false;
+  let tests: TestSurfaceDetails | undefined;
 
   for (const section of requestedSections) {
     const built = await buildRequestedSection({
@@ -132,6 +137,7 @@ async function executeSectionMode(
     omittedCount += built.omittedCount;
     hasStructural = hasStructural || built.hasStructuralEvidence;
     hasSemantic = hasSemantic || built.hasSemanticEvidence;
+    tests ??= built.tests;
   }
 
   const confidence: ConfidenceMode = hasSemantic
@@ -148,6 +154,7 @@ async function executeSectionMode(
     renderedSections: sections.map((s) => s.key),
     omittedCount,
     nextQueries: [],
+    tests,
   };
 
   return {
@@ -175,6 +182,7 @@ async function executeTaskContext(
   let omittedCount = 0;
   let hasStructural = false;
   let hasSemantic = false;
+  let tests: TestSurfaceDetails | undefined;
 
   const treeContext = await maybeGatherTreeContext(input.target, deps, requestedSections);
 
@@ -190,6 +198,7 @@ async function executeTaskContext(
     omittedCount += built.omittedCount;
     hasStructural = hasStructural || built.hasStructuralEvidence;
     hasSemantic = hasSemantic || built.hasSemanticEvidence;
+    tests ??= built.tests;
   }
 
   const confidence: ConfidenceMode = hasSemantic
@@ -206,6 +215,7 @@ async function executeTaskContext(
     renderedSections: sections.map((section) => section.key),
     omittedCount,
     nextQueries,
+    tests,
   };
 
   return {
@@ -229,6 +239,7 @@ async function buildRequestedSection(options: {
   omittedCount: number;
   hasStructuralEvidence: boolean;
   hasSemanticEvidence: boolean;
+  tests?: TestSurfaceDetails;
 }> {
   const { section, input, deps, limit, treeContext } = options;
 
@@ -294,6 +305,7 @@ async function buildRequestedSection(options: {
         omittedCount: 0,
         hasStructuralEvidence: result.hasStructuralEvidence,
         hasSemanticEvidence: false,
+        tests: result.tests,
       };
     }
     case "diagnostics": {
@@ -317,7 +329,7 @@ async function buildTestsSection(
   target: ContextTarget | null | undefined,
   deps: ContextDeps,
   limit: number,
-): Promise<{ lines: string[]; hasStructuralEvidence: boolean }> {
+): Promise<{ lines: string[]; hasStructuralEvidence: boolean; tests?: TestSurfaceDetails }> {
   if (!target) {
     return {
       lines: ["Tests unavailable without a precise target."],
@@ -341,10 +353,21 @@ async function buildTestsSection(
     position: { line: target.line - 1, character: target.character - 1 },
   });
 
+  const tests = buildTestSurfaceDetails(
+    {
+      status: discovery.kind,
+      provenance: discovery.provenance,
+      files: discovery.files,
+    },
+    deps.cwd,
+    limit,
+  );
+
   if (discovery.kind === "unavailable") {
     return {
       lines: ["Tests unavailable — no semantic or structural provider available."],
       hasStructuralEvidence: false,
+      tests,
     };
   }
 
@@ -352,27 +375,19 @@ async function buildTestsSection(
     return {
       lines: ["No test companion files found for this target."],
       hasStructuralEvidence: false,
+      tests,
     };
   }
 
   const lines: string[] = [];
-  if (discovery.provenance === "conventions-only") {
-    lines.push("Tests (conventions-only):");
-  }
-  const filesToScan = discovery.files.slice(0, 3);
+  lines.push(`Tests (${discovery.provenance}):`);
+  const filesToScan = tests.files.slice(0, 3);
   for (const testFile of filesToScan) {
-    const relTestFile = toDisplayPath(deps.cwd, testFile.absPath);
-    lines.push(`- \`${relTestFile}\``);
-    lines.push(...renderTestNames(testFile.testNames, limit));
+    lines.push(`- \`${testFile.file}\``);
+    lines.push(...renderRankedTestLabelsForMarkdown(testFile.labels, limit));
   }
 
-  return { lines, hasStructuralEvidence: discovery.files.length > 0 };
-}
-
-/** Render recognized test block names, or a placeholder when none were found. */
-function renderTestNames(names: string[], limit: number): string[] {
-  if (names.length === 0) return ["  _(no recognized test blocks)_"];
-  return names.slice(0, limit).map((n) => `  - \`${n}\``);
+  return { lines, hasStructuralEvidence: discovery.files.length > 0, tests };
 }
 
 /**

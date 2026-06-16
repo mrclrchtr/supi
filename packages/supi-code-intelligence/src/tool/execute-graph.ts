@@ -16,7 +16,11 @@ import {
   type ImplementationsResult,
 } from "../analysis/implementations/service.ts";
 import { collectReferences, type ReferencesResult } from "../analysis/references/service.ts";
-import { discoverTestFilesForSource } from "../analysis/relations/tests.ts";
+import {
+  buildTestSurfaceDetails,
+  discoverTestFilesForSource,
+  renderRankedTestLabelsForMarkdown,
+} from "../analysis/relations/tests.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import { renderCallsResult } from "../presentation/markdown/calls.ts";
 import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
@@ -225,6 +229,8 @@ export async function executeGraphTool(
       ? "structural"
       : "unavailable";
 
+  const tests = sections.find((section) => section.rel === "tests")?.tests;
+
   return {
     content,
     details: {
@@ -241,6 +247,7 @@ export async function executeGraphTool(
           "`code_context` on individual results for deeper context",
           "`code_impact` for impact analysis",
         ],
+        tests,
       },
     },
   };
@@ -391,12 +398,22 @@ async function collectRelation(
           cap: maxResults,
           position,
         });
+        const tests = buildTestSurfaceDetails(
+          {
+            status: discovery.kind,
+            provenance: discovery.provenance,
+            files: discovery.files,
+          },
+          cwd,
+          maxResults,
+        );
 
         if (discovery.kind === "unavailable") {
           return {
             kind: "unavailable",
             rel,
             message: "No test provider available — semantic and structural providers are absent",
+            tests,
           };
         }
 
@@ -406,27 +423,25 @@ async function collectRelation(
             rel,
             count: 0,
             content: `**Tests** — no companion test files found.\n`,
+            tests,
           };
         }
 
         const testLines: string[] = [];
-        const filesToScan = discovery.files.slice(0, 3);
+        const filesToScan = tests.files.slice(0, 3);
         for (const testFile of filesToScan) {
-          const relTestFile = testFile.absPath.startsWith(cwd)
-            ? testFile.absPath.slice(cwd.length + 1)
-            : testFile.absPath;
-          testLines.push(`- \`${relTestFile}\``);
-          testLines.push(...renderGraphTestNames(testFile.testNames, maxResults));
+          testLines.push(`- \`${testFile.file}\``);
+          testLines.push(...renderRankedTestLabelsForMarkdown(testFile.labels, maxResults));
         }
 
-        const provenanceNote =
-          discovery.provenance === "conventions-only" ? `, conventions-only` : "";
+        const provenanceNote = `, ${discovery.provenance}`;
         const content = `**Tests** (${discovery.files.length} companion file${discovery.files.length !== 1 ? "s" : ""}${provenanceNote})\n\n${testLines.join("\n")}\n`;
         return {
           kind: "ok",
           rel,
           count: discovery.files.length,
           content,
+          tests,
         };
       }
 
@@ -443,12 +458,6 @@ async function collectRelation(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
-
-/** Render recognized test block names, or a placeholder when none were found. */
-function renderGraphTestNames(names: string[], limit: number): string[] {
-  if (names.length === 0) return ["  _(no recognized test blocks)_"];
-  return names.slice(0, limit).map((n) => `  - \`${n}\``);
-}
 
 function errorResult(content: string): CodeIntelResult {
   return {

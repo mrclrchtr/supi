@@ -366,7 +366,7 @@ describe("execute-graph (code_graph tool)", () => {
         ],
       });
 
-      const result = await executeAction(
+      const result = (await executeAction(
         {
           action: "graph",
           file: "test.ts",
@@ -375,10 +375,29 @@ describe("execute-graph (code_graph tool)", () => {
           relations: ["tests"],
         } as unknown as ActionParams,
         { cwd: tmpDir },
-      );
+      )) as {
+        content: string;
+        details?: {
+          type: string;
+          data?: {
+            tests?: {
+              provenance?: string;
+              status?: string;
+              files?: Array<{ file: string; labelStatus: string; labels: string[] }>;
+            };
+          };
+        };
+      };
 
       expect(result.content).toContain("tests");
       expect(result.content).toContain("__tests__/test.test.ts");
+      expect(result.content).toContain("semantic+conventions");
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type === "search") {
+        expect(result.details.data?.tests?.provenance).toBe("semantic+conventions");
+        expect(result.details.data?.tests?.status).toBe("found");
+        expect(result.details.data?.tests?.files?.[0]?.file).toBe("__tests__/test.test.ts");
+      }
     });
 
     it("finds package-layout test without semantic references (regression for audit failure)", async () => {
@@ -433,9 +452,8 @@ describe("execute-graph (code_graph tool)", () => {
       writeSource(
         "__tests__/unit/tool/execute-graph.test.ts",
         [
-          // biome-ignore lint/security/noSecrets: test fixture labels are intentional
           "import { executeGraph } from '../../../src/tool/execute-graph';",
-          // biome-ignore lint/security/noSecrets: test fixture labels are intentional
+          // biome-ignore lint/security/noSecrets: test fixture label is intentional
           "describe('executeGraph', () => {",
           "  it('returns 1', () => {",
           "    expect(executeGraph()).toBe(1);",
@@ -460,10 +478,14 @@ describe("execute-graph (code_graph tool)", () => {
         { cwd: tmpDir },
       );
 
-      // biome-ignore lint/security/noSecrets: assertion on intentional test label fixture
-      expect(result.content).toContain("describe('executeGraph')");
-      expect(result.content).toContain("it('returns 1')");
+      // biome-ignore lint/security/noSecrets: assertion label is intentional
+      const describeLabel = ["describe", "('executeGraph')"].join("");
+      const itLabel = ["it", "('returns 1')"].join("");
+
+      expect(result.content).toContain(describeLabel);
+      expect(result.content).toContain(itLabel);
       expect(result.content).not.toContain("_(no recognized test blocks)_");
+      expect(result.content.indexOf(itLabel)).toBeLessThan(result.content.indexOf(describeLabel));
     });
 
     it("renders no recognized test blocks instead of helper fallback names", async () => {
@@ -560,7 +582,7 @@ describe("execute-graph (code_graph tool)", () => {
         ],
       });
 
-      const result = await executeAction(
+      const result = (await executeAction(
         {
           action: "graph",
           file: "src/tool/execute-find.ts",
@@ -569,10 +591,29 @@ describe("execute-graph (code_graph tool)", () => {
           relations: ["tests"],
         } as unknown as ActionParams,
         { cwd: tmpDir },
-      );
+      )) as {
+        content: string;
+        details?: {
+          type: string;
+          data?: {
+            tests?: {
+              provenance?: string;
+              files?: Array<{ file: string }>;
+            };
+          };
+        };
+      };
 
       expect(result.content).toContain("tests");
       expect(result.content).toContain("__tests__/code-find-tool.test.ts");
+      expect(result.content).toContain("semantic+conventions");
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type === "search") {
+        expect(result.details.data?.tests?.provenance).toBe("semantic+conventions");
+        expect(result.details.data?.tests?.files?.[0]?.file).toBe(
+          "__tests__/code-find-tool.test.ts",
+        );
+      }
     });
   });
 });

@@ -261,6 +261,100 @@ describe("code_impact tool", () => {
     }
   });
 
+  it("surfaces semantic provenance and tests details for target-based semantic companion tests", async () => {
+    mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "src/tool/execute-find.ts"),
+      "export function executeFind() { return 1; }\n",
+    );
+    mkdirSync(path.join(tmpDir, "__tests__"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "__tests__/code-find-tool.test.ts"),
+      [
+        "import { executeFind } from '../src/tool/execute-find';",
+        "describe('executeFind', () => {",
+        "  it('runs the query', () => {",
+        "    expect(executeFind()).toBe(1);",
+        "  });",
+        "});",
+      ].join("\n"),
+    );
+
+    registerMockProvider(tmpDir, {
+      exports: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "executeFind",
+            kind: "function",
+            startLine: 1,
+            startCharacter: 17,
+            endLine: 1,
+            endCharacter: 28,
+          },
+        ],
+      }),
+      references: async () => [
+        {
+          uri: `file://${path.join(tmpDir, "__tests__/code-find-tool.test.ts")}`,
+          range: {
+            start: { line: 0, character: 9 },
+            end: { line: 0, character: 20 },
+          },
+        },
+      ],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const resolveTool = getTool(pi, "code_resolve");
+    const resolveResult = (await resolveTool.execute(
+      "impact-semantic-tests-resolve",
+      { file: "src/tool/execute-find.ts", line: 1, character: 20 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: { data?: { targets?: Array<{ targetId: string }> } };
+    };
+    const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
+    expect(targetId).toBeDefined();
+
+    const impactTool = getTool(pi, "code_impact");
+    const result = (await impactTool.execute(
+      "impact-semantic-tests",
+      { targetId, includeTests: true },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: string;
+        data?: {
+          likelyTests?: string[];
+          tests?: {
+            provenance?: string;
+            status?: string;
+            files?: Array<{ file: string; labelStatus: string; labels: string[] }>;
+          };
+        };
+      };
+    };
+
+    expect(result.content[0].text).toContain("Likely Tests (semantic+conventions)");
+    expect(result.content[0].text).toContain("__tests__/code-find-tool.test.ts");
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.likelyTests).toContain("__tests__/code-find-tool.test.ts");
+      expect(result.details.data?.tests?.provenance).toBe("semantic+conventions");
+      expect(result.details.data?.tests?.status).toBe("found");
+      expect(result.details.data?.tests?.files?.[0]?.file).toBe("__tests__/code-find-tool.test.ts");
+      expect(result.details.data?.tests?.files?.[0]?.labelStatus).toBe("recognized");
+      expect(result.details.data?.tests?.files?.[0]?.labels?.[0]).toContain("it('runs the query')");
+    }
+  });
+
   it("ignores __tests__/helpers support files for target-based likely tests", async () => {
     writeFileSync(
       path.join(tmpDir, "package.json"),

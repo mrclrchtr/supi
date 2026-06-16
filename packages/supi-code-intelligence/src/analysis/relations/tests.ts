@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: shared test discovery and presentation helpers stay together to preserve one contract
 /**
  * Shared test-file discovery helpers.
  *
@@ -51,6 +52,26 @@ export interface DiscoveredTestFile {
   labelStatus: TestLabelExtractionStatus;
 }
 
+/** Compact per-file metadata shared in tool details. */
+export interface TestSurfaceFile {
+  /** Workspace-relative test file path when cwd is known, else absolute path. */
+  file: string;
+  /** Ranked extracted labels shown to users/consumers. */
+  labels: string[];
+  /** Whether labels were recognized, absent, or unavailable. */
+  labelStatus: TestLabelExtractionStatus;
+}
+
+/** Small shared tests metadata shape for tool details. */
+export interface TestSurfaceDetails {
+  /** Whether companion tests were found, empty, or unavailable. */
+  status: TestDiscoveryKind;
+  /** Discovery provenance only; omitted when unavailable. */
+  provenance?: TestDiscoveryProvenance;
+  /** Per-file extracted labels and status. */
+  files: TestSurfaceFile[];
+}
+
 /** Evidence source for test discovery. */
 export type TestDiscoveryProvenance = "semantic+conventions" | "conventions-only";
 
@@ -81,6 +102,47 @@ export interface DiscoverTestFilesResult {
 interface ExtractedTestLabels {
   names: string[];
   status: TestLabelExtractionStatus;
+}
+
+/** Read label data for one known test file without assigning discovery provenance. */
+export async function describeTestFile(
+  testFile: string,
+  options: { outline?: StructuralProvider["outline"]; cwd: string },
+): Promise<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">> {
+  const extracted = await extractTestLabels(testFile, options.outline, options.cwd);
+  return {
+    absPath: testFile,
+    testNames: extracted.names,
+    labelStatus: extracted.status,
+  };
+}
+
+/** Build a small shared tests metadata shape for structured tool details. */
+export function buildTestSurfaceDetails(
+  input: {
+    status: TestDiscoveryKind;
+    provenance?: TestDiscoveryProvenance;
+    files: Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">>;
+  },
+  cwd: string,
+  labelLimit = 8,
+): TestSurfaceDetails {
+  return {
+    status: input.status,
+    provenance: input.status === "unavailable" ? undefined : input.provenance,
+    files: input.files.map((file) => ({
+      file: path.relative(cwd, file.absPath) || file.absPath,
+      labels: rankTestLabels(file.testNames, labelLimit),
+      labelStatus: file.labelStatus,
+    })),
+  };
+}
+
+/** Render ranked labels for markdown output, or an honest placeholder when none were recognized. */
+export function renderRankedTestLabelsForMarkdown(names: string[], limit: number): string[] {
+  const ranked = rankTestLabels(names, limit);
+  if (ranked.length === 0) return ["  _(no recognized test blocks)_"];
+  return ranked.map((name) => `  - \`${name}\``);
 }
 
 /**
@@ -121,16 +183,13 @@ export async function discoverTestFilesForSource(
       for (const absPath of refFiles) {
         if (seen.has(absPath)) continue;
         seen.add(absPath);
-        const extracted = await extractTestLabels(
-          absPath,
-          options.outline,
-          options.cwd ?? path.dirname(sourceAbs),
-        );
+        const described = await describeTestFile(absPath, {
+          outline: options.outline,
+          cwd: options.cwd ?? path.dirname(sourceAbs),
+        });
         results.push({
-          absPath,
+          ...described,
           provenance: "semantic reference",
-          testNames: extracted.names,
-          labelStatus: extracted.status,
         });
       }
     }
@@ -140,16 +199,13 @@ export async function discoverTestFilesForSource(
   for (const absPath of conventionFiles) {
     if (seen.has(absPath)) continue;
     seen.add(absPath);
-    const extracted = await extractTestLabels(
-      absPath,
-      options.outline,
-      options.cwd ?? path.dirname(sourceAbs),
-    );
+    const described = await describeTestFile(absPath, {
+      outline: options.outline,
+      cwd: options.cwd ?? path.dirname(sourceAbs),
+    });
     results.push({
-      absPath,
+      ...described,
       provenance: "companion file",
-      testNames: extracted.names,
-      labelStatus: extracted.status,
     });
   }
 
@@ -281,7 +337,7 @@ function findNearestPackageRoot(startDir: string, cwd: string): string | null {
   }
 
   let current = startDir;
-  while (true) {
+  for (;;) {
     if (existsSync(path.join(current, "package.json"))) {
       return current;
     }
@@ -363,6 +419,36 @@ function collectObviousTestCallLabels(source: string): string[] {
   }
 
   return labels;
+}
+
+function rankTestLabels(names: string[], limit: number): string[] {
+  const unique = [...new Set(names)];
+  if (unique.length === 0) return [];
+
+  const runnable = unique.filter((name) => isRunnableTestLabel(name));
+  const describe = unique.filter((name) => isDescribeTestLabel(name));
+  const other = unique.filter((name) => !isRunnableTestLabel(name) && !isDescribeTestLabel(name));
+
+  if (runnable.length === 0) {
+    return [...describe, ...other].slice(0, limit);
+  }
+
+  const describeCap = Math.min(2, describe.length);
+  const runnableCap = Math.min(runnable.length, Math.max(1, limit - describeCap));
+  const remainingAfterRunnable = Math.max(0, limit - runnableCap);
+  const describeShown = describe.slice(0, Math.min(describeCap, remainingAfterRunnable));
+  const remainingAfterDescribe = Math.max(0, limit - runnableCap - describeShown.length);
+  const otherShown = other.slice(0, remainingAfterDescribe);
+
+  return [...runnable.slice(0, runnableCap), ...describeShown, ...otherShown];
+}
+
+function isRunnableTestLabel(name: string): boolean {
+  return /^(it|test|spec)\b/i.test(name);
+}
+
+function isDescribeTestLabel(name: string): boolean {
+  return /^describe\b/i.test(name);
 }
 
 // ── Existing language-agnostic detection helpers ─────────────────────

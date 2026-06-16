@@ -7,7 +7,14 @@ import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import type { CodePosition, ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
-import { discoverTestFilesForSource, isTestFilePath } from "../analysis/relations/tests.ts";
+import {
+  buildTestSurfaceDetails,
+  type DiscoveredTestFile,
+  describeTestFile,
+  discoverTestFilesForSource,
+  isTestFilePath,
+  type TestSurfaceDetails,
+} from "../analysis/relations/tests.ts";
 import { resolveTarget } from "../analysis/targeting/resolve-target.ts";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../model.ts";
 import {
@@ -62,8 +69,7 @@ interface ImpactAnalysis {
   likelyTestCommands: string[];
   riskLevel: "low" | "medium" | "high";
   externalRefs: number;
-  /** Evidence provenance for test discovery, set when includeTests was requested. */
-  testProvenance?: "semantic+conventions" | "conventions-only";
+  tests?: TestSurfaceDetails;
 }
 
 interface ChangedFileEntry {
@@ -72,6 +78,12 @@ interface ChangedFileEntry {
 }
 
 type TestAnchorMap = Map<string, CodePosition[]>;
+
+interface LikelyTestsResult {
+  paths: string[];
+  files: Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">>;
+  provenance?: "semantic+conventions" | "conventions-only";
+}
 
 /** Exported for backward-compatible unit-test access. Prefer `discoverTestFilesForSource` from tests.ts. */
 export function findLikelyTests(
@@ -186,6 +198,7 @@ async function executeSingleImpact(
     semantic.references,
     [target.file], // seed the target file itself as affected
     buildTestAnchorMap([{ file: target.file, position: target.position }]),
+    semantic.outline,
   );
 
   const prioritySignals = summarizePrioritySignalsForFiles(
@@ -262,6 +275,7 @@ async function executeFileLevelImpact(
     semantic.references,
     targetGroup.targets.map((t) => t.file), // seed all target files
     buildTestAnchorMap(targetGroup.targets.map((t) => ({ file: t.file, position: t.position }))),
+    semantic.outline,
   );
 
   const prioritySignals = summarizePrioritySignalsForFiles(
@@ -314,7 +328,7 @@ async function executeFileLevelImpact(
 async function executeChangedFilesImpact(
   input: ImpactInput,
   cwd: string,
-  provider: CodeProvider | null,
+  _provider: CodeProvider | null,
   surface: ImpactSurface,
   lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
@@ -386,6 +400,7 @@ async function analyzeReferenceImpact(
   references: CodeProvider["references"] | undefined,
   seedFiles?: string[],
   testAnchors?: TestAnchorMap,
+  outline?: CodeProvider["outline"],
 ): Promise<ImpactAnalysis> {
   const affectedFiles = new Set(result.refs.map((r) => path.resolve(cwd, r.file)));
 
@@ -402,10 +417,22 @@ async function analyzeReferenceImpact(
     cwd,
   );
 
-  const likelyTests = includeTests
-    ? await collectLikelyTests(affectedFiles, cwd, references, testAnchors)
-    : [];
+  const likelyTestsResult = includeTests
+    ? await collectLikelyTests(affectedFiles, cwd, references, testAnchors, undefined, outline)
+    : null;
+  const likelyTests = likelyTestsResult?.paths ?? [];
   const likelyTestCommands = buildLikelyTestCommands(cwd, likelyTests);
+  const tests =
+    likelyTestsResult === null
+      ? undefined
+      : buildTestSurfaceDetails(
+          {
+            status: likelyTestsResult.files.length > 0 ? "found" : "empty",
+            provenance: likelyTestsResult.provenance,
+            files: likelyTestsResult.files,
+          },
+          cwd,
+        );
 
   return {
     confidence: result.confidence,
@@ -415,6 +442,7 @@ async function analyzeReferenceImpact(
     checkNext,
     likelyTests,
     likelyTestCommands,
+    tests,
     riskLevel: assessRisk(
       result.refs.length + result.externalCount,
       affectedModules.size,
@@ -424,7 +452,6 @@ async function analyzeReferenceImpact(
   };
 }
 
-// biome-ignore lint/complexity/useMaxParams: shared changed-files analysis keeps file/module impact explicit
 async function analyzeChangedFiles(
   changedFiles: ChangedFileEntry[],
   model: Awaited<ReturnType<typeof buildArchitectureModel>>,
@@ -438,8 +465,22 @@ async function analyzeChangedFiles(
     cwd,
   );
 
-  const likelyTests = includeTests ? await collectLikelyTests(affectedFiles, cwd, undefined) : [];
+  const likelyTestsResult = includeTests
+    ? await collectLikelyTests(affectedFiles, cwd, undefined, undefined, "conventions-only")
+    : null;
+  const likelyTests = likelyTestsResult?.paths ?? [];
   const likelyTestCommands = buildLikelyTestCommands(cwd, likelyTests);
+  const tests =
+    likelyTestsResult === null
+      ? undefined
+      : buildTestSurfaceDetails(
+          {
+            status: likelyTestsResult.files.length > 0 ? "found" : "empty",
+            provenance: likelyTestsResult.provenance,
+            files: likelyTestsResult.files,
+          },
+          cwd,
+        );
 
   return {
     confidence: "structural",
@@ -449,7 +490,7 @@ async function analyzeChangedFiles(
     checkNext,
     likelyTests,
     likelyTestCommands,
-    testProvenance: includeTests ? ("conventions-only" as const) : undefined,
+    tests,
     riskLevel: assessRisk(changedFiles.length, affectedModules.size, downstreamCount),
     externalRefs: 0,
   };
@@ -521,32 +562,50 @@ function buildTestAnchorMap(
   return map;
 }
 
-function dedupeDiscoveredTestFiles(files: Array<{ absPath: string }>): Array<{ absPath: string }> {
-  const seen = new Set<string>();
-  const result: Array<{ absPath: string }> = [];
+function dedupeDiscoveredTestFiles(
+  files: Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">>,
+): Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">> {
+  const byPath = new Map<
+    string,
+    Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">
+  >();
 
   for (const file of files) {
-    if (seen.has(file.absPath)) continue;
-    seen.add(file.absPath);
-    result.push(file);
+    const existing = byPath.get(file.absPath);
+    if (!existing) {
+      byPath.set(file.absPath, file);
+      continue;
+    }
+
+    if (existing.labelStatus !== "recognized" && file.labelStatus === "recognized") {
+      byPath.set(file.absPath, file);
+    }
   }
 
-  result.sort((left, right) => left.absPath.localeCompare(right.absPath));
-  return result;
+  return [...byPath.values()].sort((left, right) => left.absPath.localeCompare(right.absPath));
 }
 
+// biome-ignore lint/complexity/useMaxParams: shared likely-test collection keeps evidence inputs explicit
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: discovery aggregation across direct tests, semantic references, and conventions is clearest in one helper
 async function collectLikelyTests(
   affectedFiles: Set<string>,
   cwd: string,
   references: CodeProvider["references"] | undefined,
   testAnchors?: TestAnchorMap,
-): Promise<string[]> {
+  fallbackProvenance?: "semantic+conventions" | "conventions-only",
+  outline?: CodeProvider["outline"],
+): Promise<LikelyTestsResult> {
   const seen = new Set<string>();
   const likelyTests: string[] = [];
+  const discoveredFiles: Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">> =
+    [];
+  let provenance = fallbackProvenance;
 
   for (const affFile of affectedFiles) {
     if (isTestFilePath(affFile)) {
       addLikelyTestPath(cwd, affFile, seen, likelyTests);
+      const described = await describeTestFile(affFile, { outline, cwd });
+      discoveredFiles.push(described);
       continue;
     }
 
@@ -559,6 +618,7 @@ async function collectLikelyTests(
                 cwd,
                 cap: 3,
                 references,
+                outline,
                 position,
               }),
             ),
@@ -568,17 +628,29 @@ async function collectLikelyTests(
               cwd,
               cap: 3,
               references,
+              outline,
             }),
           ];
+
+    for (const discovery of discoveries) {
+      if (discovery.kind !== "found") continue;
+      if (discovery.provenance === "semantic+conventions") {
+        provenance = "semantic+conventions";
+      } else if (!provenance) {
+        provenance = discovery.provenance;
+      }
+    }
 
     const discovered = dedupeDiscoveredTestFiles(discoveries.flatMap((entry) => entry.files));
     for (const testFile of discovered) {
       addLikelyTestPath(cwd, testFile.absPath, seen, likelyTests);
+      discoveredFiles.push(testFile);
     }
   }
 
+  const files = dedupeDiscoveredTestFiles(discoveredFiles).slice(0, 3);
   likelyTests.sort((a, b) => a.localeCompare(b));
-  return likelyTests.slice(0, 3);
+  return { paths: likelyTests.slice(0, 3), files, provenance };
 }
 
 function addLikelyTestPath(
@@ -633,7 +705,7 @@ const VITEST_CONFIG_FILES = [
 function detectVitestWorkspace(cwd: string): boolean {
   let current = path.resolve(cwd);
 
-  while (true) {
+  for (;;) {
     if (packageJsonUsesVitest(current) || hasVitestConfig(current)) {
       return true;
     }
@@ -717,7 +789,7 @@ function buildChangedFilesNextQueries(
   const next: string[] = [];
   if (firstFile) {
     next.push(
-      `\`code_context\` with \`file: "${firstFile}"\` for focused context on the changed file`,
+      `\`code_context\` with \`scope: "${firstFile}"\` for focused context on the changed file`,
     );
   }
   if (analysis.checkNext.length > 0) {
@@ -745,6 +817,7 @@ function buildDetailsData(
     omittedCount,
     nextQueries,
     prioritySignals,
+    tests: analysis.tests,
   };
 }
 

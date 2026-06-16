@@ -1,5 +1,6 @@
 // Relations markdown renderer — consumes use-case data and produces markdown content.
 
+import type { TestSurfaceDetails } from "../../analysis/relations/tests.ts";
 import { isInProjectPath, uriToFile } from "../../search-helpers.ts";
 import type { ReferenceCollection } from "../../use-case/support/semantic-references.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
@@ -185,9 +186,20 @@ export type GraphRelationKind =
 
 /** A section in the combined graph output. */
 export type GraphSection =
-  | { kind: "ok"; rel: GraphRelationKind; count: number; content: string }
-  | { kind: "unavailable"; rel: GraphRelationKind; message: string }
-  | { kind: "not-implemented"; rel: GraphRelationKind; message: string };
+  | {
+      kind: "ok";
+      rel: GraphRelationKind;
+      count: number;
+      content: string;
+      tests?: TestSurfaceDetails;
+    }
+  | { kind: "unavailable"; rel: GraphRelationKind; message: string; tests?: TestSurfaceDetails }
+  | {
+      kind: "not-implemented";
+      rel: GraphRelationKind;
+      message: string;
+      tests?: TestSurfaceDetails;
+    };
 
 /**
  * Render a combined graph result from multiple relation sections.

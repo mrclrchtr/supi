@@ -121,6 +121,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
 - **Each relation annotates its evidence source** in the output. For the `tests` relation, provenance describes **file discovery only** — `semantic+conventions` means semantic references contributed, `conventions-only` means only deterministic path/layout conventions contributed.
+- Test-producing surfaces also include a small structured tests metadata shape in tool details: discovery status/provenance plus per-file label status and extracted labels.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
 - Test-label extraction is tracked separately from discovery provenance. When a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` intentionally instead of helper or variable names.
 
@@ -132,7 +133,7 @@ Preferred workflow-oriented impact analysis.
 - `includeTests` uses the same shared test discovery as `code_graph` and `code_context` (import/reference evidence plus package-layout conventions)
 - **Target-based analysis** uses semantic references and fails explicitly when no LSP provider is available
 - **changedFiles analysis** uses structural evidence only (file-level module analysis, path-based test discovery) and always annotates its evidence: `**Evidence: structural** — impact limited to file-level module analysis and path-based test discovery. Use \`code_resolve\` for semantic impact.`
-- **test list annotations** — `changedFiles` impact labels convention-discovered tests as `Likely Tests (conventions-only)`
+- **test list annotations** — when likely tests are shown, impact headings annotate discovery provenance explicitly (`Likely Tests (semantic+conventions)` or `Likely Tests (conventions-only)`)
 - **target-based analysis seeds the target file itself** — zero-reference targets still report affected evidence and likely tests
 - when the workspace clearly uses Vitest, likely test files also come with concrete `pnpm vitest run … --reporter=verbose` commands
 - `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing

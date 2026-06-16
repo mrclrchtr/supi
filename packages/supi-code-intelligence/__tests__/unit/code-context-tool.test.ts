@@ -523,6 +523,10 @@ describe("code_context real-data sections", () => {
       makeCtx({ cwd: tmpDir }),
     )) as {
       content: Array<{ type: string; text: string }>;
+      details?: {
+        type: string;
+        data?: { tests?: { provenance?: string; files?: Array<{ file: string }> } };
+      };
     };
 
     const contextResult = (await contextTool.execute(
@@ -537,10 +541,29 @@ describe("code_context real-data sections", () => {
       makeCtx({ cwd: tmpDir }),
     )) as {
       content: Array<{ type: string; text: string }>;
+      details?: {
+        type: string;
+        data?: {
+          tests?: { provenance?: string; status?: string; files?: Array<{ file: string }> };
+        };
+      };
     };
 
     expect(graphResult.content[0].text).toContain("__tests__/code-find-tool.test.ts");
     expect(contextResult.content[0].text).toContain("__tests__/code-find-tool.test.ts");
+    expect(contextResult.content[0].text).toContain("semantic+conventions");
+    expect(graphResult.details?.type).toBe("search");
+    expect(contextResult.details?.type).toBe("context");
+    if (graphResult.details?.type === "search") {
+      expect(graphResult.details.data?.tests?.provenance).toBe("semantic+conventions");
+    }
+    if (contextResult.details?.type === "context") {
+      expect(contextResult.details.data?.tests?.provenance).toBe("semantic+conventions");
+      expect(contextResult.details.data?.tests?.status).toBe("found");
+      expect(contextResult.details.data?.tests?.files?.[0]?.file).toBe(
+        "__tests__/code-find-tool.test.ts",
+      );
+    }
   });
 
   it("extracts obvious test-call labels when outline data is unavailable", async () => {
@@ -548,9 +571,8 @@ describe("code_context real-data sections", () => {
     writeSource(
       "__tests__/unit/tool/execute-graph.test.ts",
       [
-        // biome-ignore lint/security/noSecrets: test fixture labels are intentional
         "import { executeGraph } from '../../../src/tool/execute-graph';",
-        // biome-ignore lint/security/noSecrets: test fixture labels are intentional
+        // biome-ignore lint/security/noSecrets: test fixture label is intentional
         "describe('executeGraph', () => {",
         "  it('returns 1', () => {",
         "    expect(executeGraph()).toBe(1);",
@@ -582,10 +604,16 @@ describe("code_context real-data sections", () => {
       content: Array<{ type: string; text: string }>;
     };
 
-    // biome-ignore lint/security/noSecrets: assertion on intentional test label fixture
-    expect(result.content[0].text).toContain("describe('executeGraph')");
-    expect(result.content[0].text).toContain("it('returns 1')");
+    // biome-ignore lint/security/noSecrets: assertion label is intentional
+    const describeLabel = ["describe", "('executeGraph')"].join("");
+    const itLabel = ["it", "('returns 1')"].join("");
+
+    expect(result.content[0].text).toContain(describeLabel);
+    expect(result.content[0].text).toContain(itLabel);
     expect(result.content[0].text).not.toContain("_(no recognized test blocks)_");
+    expect(result.content[0].text.indexOf(itLabel)).toBeLessThan(
+      result.content[0].text.indexOf(describeLabel),
+    );
   });
 
   it("renders no recognized test blocks instead of helper fallback names", async () => {

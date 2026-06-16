@@ -52,4 +52,5 @@ export type {
   DisambiguationCandidate,
   InspectDetails,
   SearchDetails,
+  TestSurfaceDetails,
 } from "./types.ts";

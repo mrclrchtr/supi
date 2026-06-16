@@ -57,10 +57,9 @@ export function renderChangedFilesImpact(params: {
   }
 
   if (params.analysis.likelyTests.length > 0) {
-    const testHeading =
-      params.analysis.testProvenance === "conventions-only"
-        ? "Likely Tests (conventions-only)"
-        : "Likely Tests";
+    const testHeading = params.analysis.tests?.provenance
+      ? `Likely Tests (${params.analysis.tests.provenance})`
+      : "Likely Tests";
     lines.push(`## ${testHeading}`);
     for (const file of params.analysis.likelyTests) {
       lines.push(`- \`${file}\``);

@@ -230,7 +230,8 @@ The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`)
 - Test discovery results carry `provenance`: `"semantic+conventions"` if semantic references contributed files, `"conventions-only"` otherwise.
 - This provenance describes **file discovery only**. It must not imply whether test labels were extracted.
 - `code_graph`, `code_context`, and `code_impact` all display provenance annotations in their output.
-- In `code_impact` changed-files analysis, convention-discovered tests are labeled `Likely Tests (conventions-only)` because that path is structural-only even when semantic providers exist.
+- Structured tool details for those surfaces also carry a compact tests metadata shape: discovery status/provenance plus per-file label status and extracted labels.
+- In `code_impact`, likely-test headings annotate discovery provenance symmetrically: `Likely Tests (semantic+conventions)` when semantic discovery contributed, `Likely Tests (conventions-only)` when only conventions contributed.
 - A `conventions-only` result with zero test files is treated as `unavailable` by `code_graph` only when neither semantic references nor structural outline support is available; otherwise it is an honest empty result.
 - User-facing test-label output includes only recognized `` describe ``/`` it ``/`` test ``/`` spec `` blocks from provider-backed or conservative fallback extraction. Helper names like `tmpDir`, `result`, `writeSource` are not rendered.
 - A discovered test file with zero recognized test blocks displays `_(no recognized test blocks)_`. This placeholder is intentional honesty, not missing rendering.
