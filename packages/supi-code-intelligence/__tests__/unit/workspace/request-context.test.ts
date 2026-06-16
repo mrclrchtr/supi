@@ -34,6 +34,22 @@ describe("request-context", () => {
     }
   });
 
+  it("returns ready when semantic capability is pending but a provider is registered", () => {
+    const noopSemantic: SemanticProvider = {
+      references: async () => [],
+      implementation: async () => null,
+      documentSymbols: async () => null,
+      workspaceSymbols: async () => null,
+    };
+    getDefaultWorkspaceRuntime().registerSemanticPending("/project", noopSemantic);
+
+    const state = getCodeProvider("/project");
+    expect(state.kind).toBe("ready");
+    if (state.kind === "ready") {
+      expect(typeof state.provider.references).toBe("function");
+    }
+  });
+
   it("returns ready when structural capability is registered", () => {
     registerMockProvider("/project", {
       outline: async () => ({ kind: "success" as const, data: [] }),

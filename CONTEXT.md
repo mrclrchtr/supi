@@ -63,3 +63,15 @@ _Avoid_: tag, status label
 **Package Card**:
 A root README catalog entry that promotes one SuPi package with its README link, install command, compact badges, and a short value statement. Package cards should not duplicate each package README.
 _Avoid_: package table row
+
+**Code intelligence**:
+The set of agent-facing capabilities that help understand, navigate, search, and refactor code.
+_Avoid_: code intel, IDE features
+
+**Semantic analysis**:
+Code understanding based on symbol identity and relationships, such as definitions, references, implementations, and renames.
+_Avoid_: structural analysis, syntax-only analysis
+
+**Structural analysis**:
+Code understanding based on source shape and syntax, such as imports, exports, outlines, and call-like structure, without requiring symbol identity.
+_Avoid_: semantic analysis, symbol-aware analysis

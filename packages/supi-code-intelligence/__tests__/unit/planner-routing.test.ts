@@ -24,6 +24,11 @@ describe("Planner routing", () => {
     runtime.registerSemantic("/project", createMockSemanticProvider());
   }
 
+  function registerPendingSemantic() {
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemanticPending("/project", createMockSemanticProvider());
+  }
+
   function registerStructural() {
     const runtime = getDefaultWorkspaceRuntime();
     runtime.registerStructural("/project", createMockStructuralProvider());
@@ -130,6 +135,14 @@ describe("Planner routing", () => {
       registerSemantic();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
       const route = routeFor("/project", asPlannedToolName("code_impact"));
+      expect(route.preferred).toBe("semantic");
+    });
+
+    it("treats pending semantic capability as available for semantic routing", async () => {
+      registerPendingSemantic();
+      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
+      const route = routeFor("/project", asPlannedToolName("code_impact"));
+      expect(route.semanticAvailable).toBe(true);
       expect(route.preferred).toBe("semantic");
     });
 

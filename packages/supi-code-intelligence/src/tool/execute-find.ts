@@ -14,6 +14,7 @@ import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
+import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 
 export interface CodeFindToolParams {
   query: string;
@@ -128,6 +129,20 @@ async function executeSemanticMode(
 ): Promise<CodeIntelResult> {
   ensureSemanticAvailable(cwd);
 
+  const readiness = await ensureSemanticReadiness(cwd, { kind: "workspace" });
+  if (readiness.kind === "timeout") {
+    return {
+      content: renderSemanticReadinessTimeout("code_find", 15_000),
+      details: undefined,
+    };
+  }
+  if (readiness.kind === "unavailable") {
+    return {
+      content: `**Error:** ${readiness.reason}`,
+      details: undefined,
+    };
+  }
+
   const providerState = getCodeProvider(cwd);
   if (providerState.kind !== "ready") {
     throw new Error(
@@ -195,7 +210,8 @@ function getEffectiveProvider(cwd: string) {
 function ensureSemanticAvailable(cwd: string): void {
   const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
   const available =
-    workspace.semantic.state.kind === "ready" && workspace.semantic.provider !== null;
+    (workspace.semantic.state.kind === "ready" || workspace.semantic.state.kind === "pending") &&
+    workspace.semantic.provider !== null;
   if (!available) {
     throw new Error(
       "code_find semantic search is unavailable because no semantic/LSP provider is active for this workspace.",

@@ -11,12 +11,28 @@ import { createLspSemanticProvider } from "../provider/lsp-semantic-provider.ts"
 import type { SessionLspService } from "./service-registry.ts";
 
 /**
- * Register LSP capabilities for a workspace cwd.
+ * Register LSP capabilities for a workspace cwd in pending state.
  *
- * Wraps SessionLspService into a SemanticProvider via the existing
- * semantic adapter and publishes it into the shared workspace runtime
- * so that code-intelligence and other consumers can discover semantic
- * analysis availability.
+ * Use this once the session service exists but before the language server has
+ * finished its initial readiness pipeline. Calls can then be deferred instead
+ * of silently observing "no provider" during startup.
+ */
+export function registerPendingLspCapabilities(
+  runtime: WorkspaceRuntime,
+  cwd: string,
+  service: SessionLspService,
+): void {
+  const provider = createLspSemanticProvider(service);
+  runtime.registerSemanticPending(cwd, provider);
+}
+
+/**
+ * Register LSP capabilities for a workspace cwd as ready.
+ *
+ * Wraps SessionLspService into a SemanticProvider via the existing semantic
+ * adapter and publishes it into the shared workspace runtime so that
+ * code-intelligence and other consumers can discover semantic analysis
+ * availability.
  */
 export function registerLspCapabilities(
   runtime: WorkspaceRuntime,
@@ -25,6 +41,11 @@ export function registerLspCapabilities(
 ): void {
   const provider = createLspSemanticProvider(service);
   runtime.registerSemantic(cwd, provider);
+}
+
+/** Promote an already-registered pending semantic provider to ready. */
+export function markLspCapabilitiesReady(runtime: WorkspaceRuntime, cwd: string): void {
+  runtime.markSemanticReady(cwd);
 }
 
 /**

@@ -8,6 +8,7 @@
 import { executeResolveService, validateResolveParams } from "../analysis/resolve/service.ts";
 import { renderResolveResult } from "../presentation/markdown/resolve.ts";
 import type { CodeIntelResult, ResolveDetails } from "../types.ts";
+import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 
 export interface CodeResolveToolParams {
   query?: string;
@@ -27,6 +28,21 @@ export async function executeResolveTool(
   const validationError = validateResolveParams(params);
   if (validationError) {
     return { content: validationError, details: undefined };
+  }
+
+  const needsSemanticWarmup =
+    Boolean(params.query) && params.kind !== "file" && params.kind !== "File";
+  if (needsSemanticWarmup) {
+    const readiness = await ensureSemanticReadiness(ctx.cwd, { kind: "workspace" });
+    if (readiness.kind === "timeout") {
+      return {
+        content: renderSemanticReadinessTimeout("code_resolve", 15_000),
+        details: undefined,
+      };
+    }
+    if (readiness.kind === "unavailable") {
+      return { content: `**Error:** ${readiness.reason}`, details: undefined };
+    }
   }
 
   const result = await executeResolveService(params, ctx.cwd);

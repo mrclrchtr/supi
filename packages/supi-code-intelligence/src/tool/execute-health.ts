@@ -6,6 +6,7 @@
 
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type { SessionLspService, SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
@@ -50,13 +51,19 @@ export async function executeHealthTool(
   }
 
   const providerState = getCodeProvider(cwd);
+  const semanticState = getDefaultWorkspaceRuntime().getWorkspace(cwd).semantic.state;
   const lspState: SessionLspServiceState =
     providerState.kind === "ready"
       ? providerState.lspService
       : { kind: "unavailable", reason: "No provider" };
   const service = lspState.kind === "ready" ? lspState.service : null;
 
-  const { recovered, lspStatus } = await maybeRecover(service, params.refresh, lspState);
+  const { recovered, lspStatus } = await maybeRecover(
+    service,
+    params.refresh,
+    lspState,
+    semanticState.kind,
+  );
 
   const diagnostics = await collectDiagnostics(service, included, scopeFilter, cwd);
   const servers = collectServers(service, included);
@@ -165,9 +172,10 @@ async function maybeRecover(
   service: SessionLspService | null,
   refresh: boolean | undefined,
   lspState: SessionLspServiceState,
+  semanticStateKind?: "pending" | "ready" | "inactive" | "disabled" | "unavailable",
 ): Promise<{ recovered: boolean; lspStatus: string }> {
   let recovered = false;
-  let lspStatus = describeLspState(lspState);
+  let lspStatus = semanticStateKind === "pending" ? "warming…" : describeLspState(lspState);
 
   if (refresh && service) {
     try {

@@ -109,6 +109,8 @@ describe("SessionLspService semantic operations", () => {
       getKnownProjectServers: vi.fn().mockReturnValue([]),
       getDiagnosticSummary: vi.fn().mockReturnValue([]),
       syncFileAndGetDiagnostics: vi.fn().mockResolvedValue([]),
+      waitUntilFileReady: vi.fn().mockResolvedValue(mockClient ?? null),
+      waitUntilWorkspaceReady: vi.fn().mockResolvedValue(undefined),
       recoverWorkspaceDiagnostics: vi.fn().mockResolvedValue({
         refreshedClients: 0,
         restartedClients: 0,
@@ -256,6 +258,37 @@ describe("SessionLspService semantic operations", () => {
 
     service.getOutstandingDiagnosticSummary(1);
     expect(manager.getOutstandingDiagnosticSummary).toHaveBeenCalledWith(1);
+  });
+
+  it("waits for file readiness through the manager", async () => {
+    const manager = makeManager();
+    const service = new SessionLspService(manager);
+
+    const result = await service.waitUntilReadyForFile("src/index.ts", { timeoutMs: 100 });
+
+    expect(result.kind).toBe("ready");
+    expect(manager.canServeFile).toHaveBeenCalledWith("/project/src/index.ts");
+    expect(manager.waitUntilFileReady).toHaveBeenCalledWith("/project/src/index.ts");
+  });
+
+  it("returns unavailable readiness when the target file has no serving LSP", async () => {
+    const manager = makeManager();
+    manager.canServeFile = vi.fn().mockReturnValue(false);
+    const service = new SessionLspService(manager);
+
+    const result = await service.waitUntilReadyForFile("src/index.ts", { timeoutMs: 100 });
+
+    expect(result).toEqual({ kind: "unavailable", reason: "No LSP client can serve this file" });
+  });
+
+  it("waits for workspace readiness through the manager", async () => {
+    const manager = makeManager();
+    const service = new SessionLspService(manager);
+
+    const result = await service.waitUntilReadyForWorkspace({ timeoutMs: 100 });
+
+    expect(result.kind).toBe("ready");
+    expect(manager.waitUntilWorkspaceReady).toHaveBeenCalledTimes(1);
   });
 });
 

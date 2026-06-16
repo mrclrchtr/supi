@@ -83,7 +83,27 @@ export class WorkspaceRuntime {
   }
 
   /**
-   * Register a semantic provider for a workspace.
+   * Register a semantic provider for a workspace in pending state.
+   *
+   * Use this when the provider object exists and can accept calls, but the
+   * underlying semantic substrate is still warming (for example, an LSP server
+   * that has started but has not finished initial indexing yet).
+   */
+  registerSemanticPending(cwd: string, provider: SemanticProvider): void {
+    const refactorAvailable = hasRefactorCapability(provider);
+    const existing = this.#workspaces.get(cwd);
+    if (existing) {
+      existing.semantic = { state: { kind: "pending" }, provider, refactorAvailable };
+    } else {
+      this.#workspaces.set(cwd, {
+        semantic: { state: { kind: "pending" }, provider, refactorAvailable },
+        structural: createDefaultCapabilities().structural,
+      });
+    }
+  }
+
+  /**
+   * Register a semantic provider for a workspace as ready.
    * Replaces any existing semantic provider for the same cwd
    * without affecting the structural provider.
    */
@@ -98,6 +118,16 @@ export class WorkspaceRuntime {
         structural: createDefaultCapabilities().structural,
       });
     }
+  }
+
+  /**
+   * Promote an already-registered semantic provider from pending to ready.
+   * If no semantic provider is registered for the workspace, this is a no-op.
+   */
+  markSemanticReady(cwd: string): void {
+    const ws = this.#workspaces.get(cwd);
+    if (!ws || ws.semantic.provider === null) return;
+    ws.semantic.state = { kind: "ready" };
   }
 
   /**

@@ -104,6 +104,15 @@ describe("WorkspaceRuntime", () => {
       expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("ready");
     });
 
+    it("supports pending semantic registration before promotion to ready", () => {
+      runtime = new WorkspaceRuntime();
+      runtime.registerSemanticPending("/project", createMockSemanticProvider());
+      expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("pending");
+
+      runtime.markSemanticReady("/project");
+      expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("ready");
+    });
+
     it("transitions back to unavailable after clearing", () => {
       runtime = new WorkspaceRuntime();
       runtime.registerSemantic("/project", createMockSemanticProvider());

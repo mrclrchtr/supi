@@ -24,7 +24,8 @@ function readAvailability(cwd: string): RouteAvailability {
   const workspace = runtime.getWorkspace(cwd);
   return {
     semanticAvailable:
-      workspace.semantic.state.kind === "ready" && workspace.semantic.provider !== null,
+      (workspace.semantic.state.kind === "ready" || workspace.semantic.state.kind === "pending") &&
+      workspace.semantic.provider !== null,
     structuralAvailable:
       workspace.structural.state.kind === "ready" && workspace.structural.provider !== null,
     refactorAvailable: workspace.semantic.refactorAvailable,

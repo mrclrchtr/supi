@@ -4,11 +4,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type {
-  OutstandingDiagnosticSummaryEntry,
-  ProjectServerInfo,
-  SessionLspService,
-} from "@mrclrchtr/supi-lsp/api";
+import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { type CiStatusData, createCiStatusDialog } from "./code-intelligence-status-overlay.ts";
 
@@ -96,29 +92,12 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
   const providerState = getCodeProvider(cwd);
   const lspState = providerState.kind === "ready" ? providerState.lspService : null;
 
-  let servers: ProjectServerInfo[] = [];
-  let diagnostics: OutstandingDiagnosticSummaryEntry[] = [];
-  let semanticKind = "unavailable";
-  let semanticReason: string | undefined;
-  let semanticProviderAvailable = false;
-
-  if (lspState && lspState.kind === "ready") {
-    const service: SessionLspService = lspState.service;
-    servers = service.getProjectServers();
-    diagnostics = service.getOutstandingDiagnosticSummary(1);
-    semanticKind = "ready";
-    semanticProviderAvailable = true;
-  } else if (lspState && lspState.kind === "pending") {
-    semanticKind = "pending";
-  } else if (lspState && lspState.kind === "inactive") {
-    semanticKind = "inactive";
-  } else if (lspState && lspState.kind === "disabled") {
-    semanticKind = "disabled";
-    semanticReason = "LSP is disabled in settings";
-  } else {
-    semanticKind = "unavailable";
-    semanticReason = lspState && "reason" in lspState ? lspState.reason : "No LSP service";
-  }
+  const servers = lspState && lspState.kind === "ready" ? lspState.service.getProjectServers() : [];
+  const diagnostics =
+    lspState && lspState.kind === "ready"
+      ? lspState.service.getOutstandingDiagnosticSummary(1)
+      : [];
+  const semanticState = deriveSemanticCapabilityState(workspace, lspState);
 
   // Sort: errors desc, warnings desc, info desc, hints desc
   diagnostics.sort((a, b) => {
@@ -138,11 +117,7 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
     servers,
     diagnostics,
     capabilities: {
-      semantic: {
-        kind: semanticKind,
-        reason: semanticReason,
-        providerAvailable: semanticProviderAvailable,
-      },
+      semantic: semanticState,
       structural: {
         kind: structKind,
         reason: structReason,
@@ -151,6 +126,44 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
       refactorAvailable: workspace.semantic.refactorAvailable,
     },
     activeTools,
+  };
+}
+
+function deriveSemanticCapabilityState(
+  workspace: {
+    semantic: {
+      state: { kind: string };
+      provider: unknown | null;
+    };
+  },
+  lspState: SessionLspServiceState | null,
+): CiStatusData["capabilities"]["semantic"] {
+  if (lspState?.kind === "ready") {
+    return {
+      kind: workspace.semantic.state.kind === "pending" ? "pending" : "ready",
+      providerAvailable: workspace.semantic.provider !== null,
+    };
+  }
+  if (workspace.semantic.state.kind === "pending" || lspState?.kind === "pending") {
+    return {
+      kind: "pending",
+      providerAvailable: workspace.semantic.provider !== null,
+    };
+  }
+  if (lspState?.kind === "inactive") {
+    return { kind: "inactive", providerAvailable: workspace.semantic.provider !== null };
+  }
+  if (lspState?.kind === "disabled") {
+    return {
+      kind: "disabled",
+      reason: "LSP is disabled in settings",
+      providerAvailable: workspace.semantic.provider !== null,
+    };
+  }
+  return {
+    kind: workspace.semantic.state.kind,
+    reason: lspState && "reason" in lspState ? lspState.reason : "No LSP service",
+    providerAvailable: workspace.semantic.provider !== null,
   };
 }
 

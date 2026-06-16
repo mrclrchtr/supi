@@ -14,7 +14,11 @@ import { clearTsconfigCache } from "../config/tsconfig-scope.ts";
 import type { DetectedProjectServer, LspConfig, ProjectServerInfo } from "../config/types.ts";
 import { scanWorkspaceSentinels } from "../diagnostics/workspace-sentinels.ts";
 import { LspManager } from "../manager/manager.ts";
-import { registerLspCapabilities, unregisterLspCapabilities } from "./runtime-registration.ts";
+import {
+  markLspCapabilitiesReady,
+  registerPendingLspCapabilities,
+  unregisterLspCapabilities,
+} from "./runtime-registration.ts";
 import { scanMissingServers, scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
 import {
   clearSessionLspService,
@@ -88,6 +92,7 @@ export class LspRuntimeController {
   readonly #cwd: string;
   #state: LspControllerState;
   #runtime: WorkspaceRuntime | null;
+  #readinessGeneration = 0;
 
   constructor(cwd: string, runtime?: WorkspaceRuntime) {
     this.#cwd = cwd;
@@ -176,6 +181,7 @@ export class LspRuntimeController {
    * Shut down any existing LSP session before starting a new one.
    */
   private async cleanupExistingSession(): Promise<void> {
+    this.#readinessGeneration++;
     if (this.#state.kind !== "ready") return;
     await this.#state.manager.shutdownAll();
     if (this.#runtime) unregisterLspCapabilities(this.#runtime, this.#cwd);
@@ -227,7 +233,7 @@ export class LspRuntimeController {
     this.#state = { kind: "pending" };
 
     const manager = new LspManager(config, this.#cwd);
-    manager.setExcludePatterns(settings.exclude ?? []);
+    manager.setExcludePatterns(settings.exclude);
     setSessionLspServiceState(this.#cwd, { kind: "pending" });
 
     const detectedServers = scanProjectCapabilities(config, this.#cwd);
@@ -240,7 +246,7 @@ export class LspRuntimeController {
     setSessionLspServiceState(this.#cwd, { kind: "ready", service });
 
     if (this.#runtime) {
-      registerLspCapabilities(this.#runtime, this.#cwd, service);
+      registerPendingLspCapabilities(this.#runtime, this.#cwd, service);
     }
 
     const projectServers = manager.getKnownProjectServers(detectedServers);
@@ -254,7 +260,51 @@ export class LspRuntimeController {
       settings,
     };
 
+    const readinessGeneration = ++this.#readinessGeneration;
+    void this.promoteSemanticReadiness(manager, detectedServers, readinessGeneration);
+
     return { kind: "ready", manager, service };
+  }
+
+  private async promoteSemanticReadiness(
+    manager: LspManager,
+    detectedServers: DetectedProjectServer[],
+    readinessGeneration: number,
+  ): Promise<void> {
+    try {
+      await manager.waitUntilWorkspaceReady();
+    } catch {
+      this.retractPendingCapabilities();
+      return;
+    }
+
+    if (
+      readinessGeneration !== this.#readinessGeneration ||
+      this.#state.kind !== "ready" ||
+      this.#state.manager !== manager
+    ) {
+      return;
+    }
+
+    this.#state.projectServers = manager.getKnownProjectServers(detectedServers);
+    if (this.#runtime) {
+      markLspCapabilitiesReady(this.#runtime, this.#cwd);
+    }
+  }
+
+  /**
+   * Retract the pending semantic registration when warm-up fails.
+   * Leaves the workspace in unavailable state so callers see a definitive
+   * failure rather than an orphaned pending capability.
+   */
+  private retractPendingCapabilities(): void {
+    if (this.#runtime) {
+      unregisterLspCapabilities(this.#runtime, this.#cwd);
+    }
+    setSessionLspServiceState(this.#cwd, {
+      kind: "unavailable",
+      reason: "LSP warm-up failed. Check code_health for server status.",
+    });
   }
 
   /**
@@ -264,6 +314,7 @@ export class LspRuntimeController {
    * all LSP clients.
    */
   async shutdown(): Promise<void> {
+    this.#readinessGeneration++;
     clearTsconfigCache();
 
     if (this.#runtime) {

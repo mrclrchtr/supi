@@ -34,6 +34,7 @@ import {
 } from "../presentation/markdown/relations.ts";
 import { toDisplayPath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
@@ -88,6 +89,24 @@ export async function executeGraphTool(
 
   // ── 3. Normalize relations ──────────────────────────────────────────
   const relations = params.relations ?? DEFAULT_RELATIONS;
+  const needsSemanticRelations = relations.some(
+    (relation) => relation === "references" || relation === "implements",
+  );
+
+  if (needsSemanticRelations) {
+    const readiness = await ensureSemanticReadiness(
+      ctx.cwd,
+      params.file ? { kind: "file", file: params.file } : { kind: "workspace" },
+    );
+    if (readiness.kind === "timeout") {
+      return errorResult(renderSemanticReadinessTimeout("code_graph", 15_000));
+    }
+    if (readiness.kind === "unavailable") {
+      return errorResult(
+        "**Error:** No analysis provider is available for this workspace. Check `code_health` for LSP and tree-sitter status.",
+      );
+    }
+  }
 
   // File-level relations (imports/exports) don't need a position — bare `file` is sufficient.
   const FILE_LEVEL_RELATIONS: GraphRelation[] = ["imports", "exports"];

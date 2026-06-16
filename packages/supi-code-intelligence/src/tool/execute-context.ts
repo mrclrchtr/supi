@@ -2,6 +2,7 @@ import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { buildArchitectureModel } from "../model.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeContext } from "../use-case/generate-context.ts";
+import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 
 export interface CodeContextToolParams {
@@ -40,6 +41,9 @@ export async function executeContextTool(
     params.targetName = expansion.targetName;
     params.targetKind = expansion.targetKind;
   }
+
+  const readinessResult = await gateSemanticReadiness(params, ctx.cwd);
+  if (readinessResult) return readinessResult;
 
   const providerState = getCodeProvider(ctx.cwd);
   const provider = providerState.kind === "ready" ? providerState.provider : null;
@@ -91,4 +95,30 @@ export async function executeContextTool(
     content: result.content,
     details: { type: "context", data: result.details },
   };
+}
+
+async function gateSemanticReadiness(
+  params: CodeContextToolParams,
+  cwd: string,
+): Promise<CodeIntelResult | null> {
+  // Orientation-only and structural-only calls skip the LSP readiness gate.
+  const semanticSections = new Set(["references", "implements", "diagnostics", "defs"]);
+  const hasSemanticTarget = params.file != null && params.line != null && params.character != null;
+  const hasSemanticInclude =
+    params.include?.some((section) => semanticSections.has(section)) ?? false;
+  if (!hasSemanticTarget && !hasSemanticInclude) return null;
+
+  const readiness = await ensureSemanticReadiness(
+    cwd,
+    params.file ? { kind: "file", file: params.file } : { kind: "workspace" },
+  );
+  if (readiness.kind === "timeout") {
+    return {
+      content: renderSemanticReadinessTimeout("code_context", 15_000),
+      details: undefined,
+    };
+  }
+  // Let unavailable pass through — downstream section renderers handle
+  // unavailable LSP with honest notes rather than blocking the whole call.
+  return null;
 }

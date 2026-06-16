@@ -19,10 +19,10 @@ import {
   storePlan,
 } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
-import { routeFor } from "../analysis/routing/planner.ts";
 import { renderRefactorPlanResult } from "../presentation/markdown/refactor.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 
 export interface CodeRefactorPlanToolParams {
@@ -51,63 +51,15 @@ export async function executeRefactorPlanTool(
   }
   const operation = normalizedOperation.operation;
 
-  // Expand targetId if provided (takes precedence over raw coords)
-  const expansion = expandTargetId(params, ctx.cwd);
-  if (expansion.kind === "error") {
-    return { content: expansion.message, details: undefined };
-  }
-  if (expansion.kind === "ok") {
-    params.file = expansion.file;
-    params.line = expansion.line;
-    params.character = expansion.character;
-  }
+  const target = resolveRefactorTarget(params, ctx.cwd, operation);
+  if ("content" in target) return target;
 
-  // Validate file + coordinates after targetId expansion
-  if (!params.file) {
-    return {
-      content:
-        "**Error:** Refactor preview requires a `file`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
-      details: undefined,
-    };
-  }
-  if (params.line == null || params.character == null) {
-    return {
-      content:
-        "**Error:** Refactor preview requires `line` and `character`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
-      details: undefined,
-    };
-  }
+  const readinessResult = await waitForRefactorReadiness(ctx.cwd, target.file, invokedAs);
+  if (readinessResult) return readinessResult;
 
-  if (operation === "rename_file" || operation === "move_file") {
-    // TODO(TNDM-D9FEHR): Replace this explicit unavailable result once shared
-    // file/resource edits and rollback semantics exist end-to-end.
-    return {
-      content: `**Refactor unavailable:** Refactor operation "${operation}" is not supported yet. File/resource operations are deferred.`,
-      details: undefined,
-    };
-  }
-
-  if (operation === "rename_symbol" && !params.newName) {
-    return {
-      content: "**Error:** Refactor preview requires `newName` for `rename_symbol`.",
-      details: undefined,
-    };
-  }
-
-  const route = routeFor(ctx.cwd, invokedAs);
-  if (route.preferred === "unavailable") {
-    return {
-      content:
-        "**Error:** No refactor-capable semantic provider is available. Ensure an LSP server is configured and running.",
-      details: undefined,
-    };
-  }
-
-  const runtime = getDefaultWorkspaceRuntime();
-  const ws = runtime.getWorkspace(ctx.cwd);
-  const provider = ws.semantic.provider;
-  const resolvedFile = normalizePath(params.file, ctx.cwd);
-  const position = toLspPosition(params.line, params.character);
+  const provider = getDefaultWorkspaceRuntime().getWorkspace(ctx.cwd).semantic.provider;
+  const resolvedFile = normalizePath(target.file, ctx.cwd);
+  const position = toLspPosition(target.line, target.character);
 
   const refactorResult = await planRefactorWithProvider(provider, {
     operation,
@@ -125,16 +77,7 @@ export async function executeRefactorPlanTool(
   }
 
   if (refactorResult.kind === "ambiguous") {
-    const candidates = refactorResult.candidates
-      .map(
-        (candidate, index) =>
-          `${index + 1}. ${candidate.description} (${candidate.file}:${candidate.line})`,
-      )
-      .join("\n");
-    return {
-      content: `**Refactor ambiguous:** Multiple matching targets found. Please disambiguate:\n${candidates}`,
-      details: undefined,
-    };
+    return renderAmbiguousRefactorResult(refactorResult);
   }
 
   const validation = validateEdit(refactorResult.edits);
@@ -149,8 +92,8 @@ export async function executeRefactorPlanTool(
   const planId = generatePlanId(
     operation,
     resolvedFile,
-    params.line,
-    params.character,
+    target.line,
+    target.character,
     params.newName ?? params.destination ?? "",
   );
 
@@ -160,8 +103,8 @@ export async function executeRefactorPlanTool(
     newName: params.newName,
     destination: params.destination,
     targetFile: resolvedFile,
-    targetLine: params.line,
-    targetCharacter: params.character,
+    targetLine: target.line,
+    targetCharacter: target.character,
     edits: refactorResult.edits,
     fileFingerprints,
     createdAt: Date.now(),
@@ -198,6 +141,91 @@ function normalizeRequestedOperation(
   return {
     kind: "error",
     message: `**Error:** Unsupported refactor operation: "${operation}". The public \`code_refactor\` tool currently supports: "rename", "rename_symbol".`,
+  };
+}
+
+function resolveRefactorTarget(
+  params: CodeRefactorPlanToolParams,
+  cwd: string,
+  operation: CanonicalRefactorOperation,
+): CodeIntelResult | { file: string; line: number; character: number } {
+  const expansion = expandTargetId(params, cwd);
+  if (expansion.kind === "error") {
+    return { content: expansion.message, details: undefined };
+  }
+  if (expansion.kind === "ok") {
+    params.file = expansion.file;
+    params.line = expansion.line;
+    params.character = expansion.character;
+  }
+
+  if (!params.file) {
+    return {
+      content:
+        "**Error:** Refactor preview requires a `file`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
+      details: undefined,
+    };
+  }
+  if (params.line == null || params.character == null) {
+    return {
+      content:
+        "**Error:** Refactor preview requires `line` and `character`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
+      details: undefined,
+    };
+  }
+
+  if (operation === "rename_file" || operation === "move_file") {
+    return {
+      content: `**Refactor unavailable:** Refactor operation "${operation}" is not supported yet. File/resource operations are deferred.`,
+      details: undefined,
+    };
+  }
+
+  if (operation === "rename_symbol" && !params.newName) {
+    return {
+      content: "**Error:** Refactor preview requires `newName` for `rename_symbol`.",
+      details: undefined,
+    };
+  }
+
+  return {
+    file: params.file,
+    line: params.line,
+    character: params.character,
+  };
+}
+
+async function waitForRefactorReadiness(
+  cwd: string,
+  file: string,
+  invokedAs: "code_refactor" | "code_refactor_plan",
+): Promise<CodeIntelResult | null> {
+  const readiness = await ensureSemanticReadiness(cwd, { kind: "file", file });
+  if (readiness.kind === "ready") return null;
+  if (readiness.kind === "timeout") {
+    return {
+      content: renderSemanticReadinessTimeout(invokedAs, 15_000),
+      details: undefined,
+    };
+  }
+  return {
+    content: `**Error:** ${readiness.reason}`,
+    details: undefined,
+  };
+}
+
+function renderAmbiguousRefactorResult(
+  refactorResult: Extract<RefactorResult, { kind: "ambiguous" }>,
+): CodeIntelResult {
+  const candidates = refactorResult.candidates
+    .map(
+      (candidate, index) =>
+        `${index + 1}. ${candidate.description} (${candidate.file}:${candidate.line})`,
+    )
+    .join("\n");
+  return {
+    content: `**Refactor ambiguous:** Multiple matching targets found. Please disambiguate:\n${candidates}`,
+    details: undefined,
   };
 }
 

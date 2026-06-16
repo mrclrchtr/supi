@@ -55,6 +55,10 @@ import type {
   ServerStatus,
 } from "./manager-types.ts";
 import { recoverWorkspaceDiagnostics as recoverWorkspaceDiagnosticsImpl } from "./manager-workspace-recovery.ts";
+import {
+  findWorkspaceSymbolWarmTargets,
+  getWorkspaceSymbolWarmPosition,
+} from "./manager-workspace-symbol.ts";
 
 type UnavailableReason = "missing-command" | "start-failed" | "runtime-error";
 
@@ -74,6 +78,10 @@ export class LspManager {
   private excludePatterns: string[] = [];
   /** Project roots already warmed for workspace-symbol queries. */
   private warmedWorkspaceSymbolProjects = new Set<string>();
+  /** Project roots whose semantic state was warmed with a readiness probe. */
+  private warmedSemanticProjects = new Set<string>();
+  /** In-flight warm-up probes keyed by project key so concurrent callers share one probe. */
+  private pendingWarmProbes = new Map<string, Promise<void>>();
   constructor(
     private readonly config: LspConfig,
     private readonly cwd: string,
@@ -174,6 +182,8 @@ export class LspManager {
       this.clients.delete(key);
       this.unavailable.set(key, "runtime-error");
       this.clearWarmedWorkspaceSymbolProjects(existing.name, existing.root);
+      this.clearWarmedSemanticProjects(existing.name, existing.root);
+      this.clearPendingWarmProbes(existing.name, existing.root);
       return null;
     }
 
@@ -213,6 +223,8 @@ export class LspManager {
     // Spawn new client
     const client = new LspClient(serverName, serverConfig, root);
     this.clearWarmedWorkspaceSymbolProjects(serverName, root);
+    this.clearWarmedSemanticProjects(serverName, root);
+    this.clearPendingWarmProbes(serverName, root);
     this.clients.set(key, client);
     rememberKnownRoot(this.knownRoots, serverName, root);
     try {
@@ -276,6 +288,8 @@ export class LspManager {
     this.clients.delete(key);
     this.unavailable.delete(key);
     this.clearWarmedWorkspaceSymbolProjects(client.name, client.root);
+    this.clearWarmedSemanticProjects(client.name, client.root);
+    this.clearPendingWarmProbes(client.name, client.root);
 
     const replacement = new LspClient(client.name, serverConfig, client.root);
     this.clients.set(key, replacement);
@@ -335,6 +349,36 @@ export class LspManager {
           a.name.localeCompare(b.name) ||
           a.status.localeCompare(b.status),
       );
+  }
+
+  /** Wait until the client that owns a file is query-ready, then run a light warm-up probe. */
+  async waitUntilFileReady(filePath: string): Promise<LspClient | null> {
+    const resolvedPath = resolveSessionPath(this.cwd, filePath);
+    const client = await this.getClientForFile(resolvedPath);
+    if (!client) return null;
+    await client.getReady();
+    await this.warmSemanticProject(client, resolvedPath, true);
+    return client;
+  }
+
+  /** Wait until all started clients are query-ready, then warm one project file per client/root. */
+  async waitUntilWorkspaceReady(): Promise<void> {
+    const activeClients = Array.from(this.clients.values()).filter(
+      (client) => client.status === "running",
+    );
+    await Promise.all(activeClients.map((client) => client.getReady()));
+
+    for (const client of activeClients) {
+      const serverConfig = this.config.servers[client.name];
+      if (!serverConfig) continue;
+      const target = findWorkspaceSymbolWarmTargets(
+        client.root,
+        serverConfig.rootMarkers,
+        serverConfig.fileTypes,
+      )[0];
+      if (!target) continue;
+      await this.warmSemanticProject(client, target.file);
+    }
   }
   async syncFileAndGetDiagnostics(
     filePath: string,
@@ -422,6 +466,8 @@ export class LspManager {
     this.unavailable.clear();
     this.knownRoots.clear();
     this.warmedWorkspaceSymbolProjects.clear();
+    this.warmedSemanticProjects.clear();
+    this.pendingWarmProbes.clear();
   }
   /** Get status of all servers. */
   getStatus(): ManagerStatus {
@@ -661,6 +707,60 @@ export class LspManager {
     return { warmedAny, results: null };
   }
 
+  private async warmSemanticProject(
+    client: LspClient,
+    filePath: string,
+    preferExactFile: boolean = false,
+  ): Promise<void> {
+    const serverConfig = this.config.servers[client.name];
+    if (!serverConfig) return;
+
+    const resolvedFile = resolveSessionPath(this.cwd, filePath);
+    const projectRoot = preferExactFile
+      ? resolveRootForFile(resolvedFile, client.name, serverConfig.rootMarkers, {
+          knownRoots: this.knownRoots,
+          cwd: this.cwd,
+        })
+      : client.root;
+    const projectKey = this.workspaceSymbolProjectKey(client.name, projectRoot);
+    if (this.warmedSemanticProjects.has(projectKey)) return;
+
+    const pending = this.pendingWarmProbes.get(projectKey);
+    if (pending) {
+      await pending;
+      return;
+    }
+
+    const probe = this.performWarmProbe(client, resolvedFile, projectKey);
+    this.pendingWarmProbes.set(projectKey, probe);
+    try {
+      await probe;
+    } finally {
+      this.pendingWarmProbes.delete(projectKey);
+    }
+  }
+
+  private async performWarmProbe(
+    _client: LspClient,
+    resolvedFile: string,
+    projectKey: string,
+  ): Promise<void> {
+    const openedClient = await this.ensureFileOpen(resolvedFile);
+    if (!openedClient) return;
+
+    this.warmedSemanticProjects.add(projectKey);
+
+    try {
+      const symbols = await openedClient.documentSymbols(resolvedFile);
+      const hoverPosition = getWorkspaceSymbolWarmPosition(symbols);
+      if (hoverPosition) {
+        await openedClient.hover(resolvedFile, hoverPosition);
+      }
+    } catch {
+      // Best-effort warm-up only.
+    }
+  }
+
   private hasOpenFileInProject(client: LspClient, projectRoot: string): boolean {
     return client.openFiles.some((openFile) => projectRoots.isWithinOrEqual(projectRoot, openFile));
   }
@@ -674,6 +774,24 @@ export class LspManager {
     for (const key of Array.from(this.warmedWorkspaceSymbolProjects)) {
       if (key === prefix || key.startsWith(`${prefix}${path.sep}`)) {
         this.warmedWorkspaceSymbolProjects.delete(key);
+      }
+    }
+  }
+
+  private clearWarmedSemanticProjects(serverName: string, root: string): void {
+    const prefix = `${serverName}:${path.resolve(root)}`;
+    for (const key of Array.from(this.warmedSemanticProjects)) {
+      if (key === prefix || key.startsWith(`${prefix}${path.sep}`)) {
+        this.warmedSemanticProjects.delete(key);
+      }
+    }
+  }
+
+  private clearPendingWarmProbes(serverName: string, root: string): void {
+    const prefix = `${serverName}:${path.resolve(root)}`;
+    for (const key of Array.from(this.pendingWarmProbes.keys())) {
+      if (key === prefix || key.startsWith(`${prefix}${path.sep}`)) {
+        this.pendingWarmProbes.delete(key);
       }
     }
   }

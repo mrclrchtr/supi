@@ -30,6 +30,7 @@ export { LspRuntimeController } from "./session/runtime-controller.ts";
 export type {
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
+  SemanticReadinessResult,
   SessionLspServiceState,
   WorkspaceDiagnosticSummaryEntry,
 } from "./session/service-registry.ts";

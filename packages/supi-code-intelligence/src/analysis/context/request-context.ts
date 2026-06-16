@@ -59,7 +59,9 @@ export function getCodeProviderState(cwd: string): CodeProviderState {
   const runtime = getDefaultWorkspaceRuntime();
   const ws = runtime.getWorkspace(cwd);
 
-  const hasSemantic = ws.semantic.state.kind === "ready" && ws.semantic.provider !== null;
+  const hasSemantic =
+    (ws.semantic.state.kind === "ready" || ws.semantic.state.kind === "pending") &&
+    ws.semantic.provider !== null;
   const hasStructural = ws.structural.state.kind === "ready" && ws.structural.provider !== null;
 
   if (!hasSemantic && !hasStructural) {

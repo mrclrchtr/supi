@@ -2,6 +2,7 @@ import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeImpact } from "../use-case/generate-impact.ts";
+import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
@@ -46,7 +47,7 @@ export async function executeImpactLikeTool(
     return { content: error, details: undefined };
   }
 
-  const hasDiffInputs = (params.changedFiles?.length ?? 0) > 0 || Boolean(params.change);
+  const hasDiffInputs = (params.changedFiles?.length || 0) > 0 || Boolean(params.change);
   if (!params.file && !params.symbol && !hasDiffInputs) {
     return unavailableImpactToolResult(
       detailType,
@@ -66,6 +67,14 @@ export async function executeImpactLikeTool(
     return executeImpact(params, { cwd: ctx.cwd, provider, lspService }, surface);
   }
 
+  const readinessResult = await waitForImpactSemanticReadiness(
+    ctx.cwd,
+    params.file,
+    detailType,
+    preferredTool,
+  );
+  if (readinessResult) return readinessResult;
+
   const route = routeFor(ctx.cwd, preferredTool);
   if (route.preferred === "unavailable") {
     return unavailableImpactToolResult(
@@ -84,6 +93,31 @@ export async function executeImpactTool(
   ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
   return executeImpactLikeTool(params, ctx, "impact");
+}
+
+async function waitForImpactSemanticReadiness(
+  cwd: string,
+  file: string | undefined,
+  detailType: "impact" | "affected",
+  preferredTool: "code_impact" | "code_affected",
+): Promise<CodeIntelResult | null> {
+  const readiness = await ensureSemanticReadiness(
+    cwd,
+    file ? { kind: "file", file } : { kind: "workspace" },
+  );
+  if (readiness.kind === "ready") return null;
+  if (readiness.kind === "timeout") {
+    return unavailableImpactToolResult(
+      detailType,
+      renderSemanticReadinessTimeout(preferredTool, 15_000),
+      ["Check `code_health` for LSP status"],
+    );
+  }
+  return unavailableImpactToolResult(
+    detailType,
+    "**Error:** No semantic analysis provider is available for this workspace. Check `code_health` for LSP status or enable an LSP server.",
+    ["Check `code_health` for LSP status or enable an LSP server."],
+  );
 }
 
 function unavailableImpactToolResult(
