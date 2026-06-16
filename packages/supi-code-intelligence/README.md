@@ -123,6 +123,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **Each relation annotates its evidence source** in the output. Results carry provenance — `semantic+conventions` when LSP/TS contributed, `conventions-only` when they didn't.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
 - The `tests` relation displays provenance: `conventions-only — no LSP/TS` appears in its heading when only path-based discovery ran
+- when a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` instead of helper or variable names
 
 ### `code_impact`
 Preferred workflow-oriented impact analysis.
@@ -132,7 +133,7 @@ Preferred workflow-oriented impact analysis.
 - `includeTests` uses the same shared test discovery as `code_graph` and `code_context` (import/reference evidence plus package-layout conventions)
 - **Target-based analysis** uses semantic references and fails explicitly when no LSP provider is available
 - **changedFiles analysis** uses structural evidence only (file-level module analysis, path-based test discovery) and always annotates its evidence: `**Evidence: structural** — impact limited to file-level module analysis and path-based test discovery. Use \`code_resolve\` for semantic impact.`
-- **test list annotations** — when test discovery runs without LSP/TS, the test list heading reads `Likely Tests (conventions-only — no LSP/TS)`
+- **test list annotations** — `changedFiles` impact labels convention-discovered tests as `Likely Tests (conventions-only)`
 - **target-based analysis seeds the target file itself** — zero-reference targets still report affected evidence and likely tests
 - when the workspace clearly uses Vitest, likely test files also come with concrete `pnpm vitest run … --reporter=verbose` commands
 - `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing
@@ -190,22 +191,25 @@ The legacy compatibility executors (`code_affected`, `code_refactor_plan`, `code
 ## Shared input conventions
 
 Depending on the tool, inputs may include:
-- `path`
+- `scope`
 - `file`
 - `line`
 - `character`
+- `query`
 - `symbol`
 - `kind`
-- `exportedOnly`
+- `targetId`
+- `changedFiles`
+- `includeTests`
 - `maxResults`
 - `contextLines`
 
 Notes:
 - line and character positions are **1-based**
-- `line` and `character` require `file`, not `path`
+- `line` and `character` require `file`, not `scope`
 - `code_inspect` is the public point-inspection tool for `file` + `line` + `character`
 - `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, and `code_refactor`
-- a leading `@` is stripped from `path` and `file`
+- a leading `@` is stripped from `scope` and `file`
 - non-search tools do **not** silently fall back to heuristic grep behavior
 
 ## Result style

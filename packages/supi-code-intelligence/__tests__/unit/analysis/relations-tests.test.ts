@@ -174,11 +174,53 @@ describe("shared test discovery contract", () => {
       cap: 8,
     });
 
-    // Only describe/it names survive filtering, not tmpDir/writeSource/result
-    for (const file of files) {
-      expect(file.testNames).not.toContain("tmpDir");
-      expect(file.testNames).not.toContain("writeSource");
-      expect(file.testNames).not.toContain("result");
-    }
+    expect(files[0]?.testNames).toEqual(["describe('source')", "it('returns expected')"]);
+  });
+
+  it("returns no test names when outline has only helper symbols", async () => {
+    writeSource("src/source.ts", "export function source() { return 1; }\n");
+    writeSource("src/source.test.ts", "import { source } from './source';\nvoid source;\n");
+
+    const { files } = await discoverTestFilesForSource(path.join(tmpDir, "src/source.ts"), {
+      cwd: tmpDir,
+      outline: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "tmpDir",
+            kind: "const",
+            startLine: 1,
+            endLine: 1,
+            startCharacter: 0,
+            endCharacter: 0,
+          },
+          {
+            name: "writeSource",
+            kind: "function",
+            startLine: 2,
+            endLine: 2,
+            startCharacter: 0,
+            endCharacter: 0,
+          },
+          {
+            name: "result",
+            kind: "const",
+            startLine: 3,
+            endLine: 3,
+            startCharacter: 0,
+            endCharacter: 0,
+          },
+        ],
+      }),
+      references: async () => [
+        {
+          uri: `file://${tmpDir}/src/source.test.ts`,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
+        },
+      ],
+      cap: 8,
+    });
+
+    expect(files[0]?.testNames).toEqual([]);
   });
 });

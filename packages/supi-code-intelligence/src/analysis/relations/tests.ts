@@ -257,14 +257,8 @@ async function extractTestFunctionNames(
     const outlineResult = await outline(relPath);
     if (outlineResult.kind === "success") {
       const entries = outlineResult.data.map((item) => item.name);
-      // Prefer test-like names (describe, it, test, spec).
       const testLike = entries.filter((n) => isTestLikeName(n));
-      if (testLike.length > 0) return testLike.slice(0, 8);
-      // Fall back to all entries for test files when tree-sitter can't
-      // extract describe/it/test call expressions (common with Vitest/Jest).
-      // Non-test-like names are annotated by callers.
-      if (isTestFilePath(relPath)) return entries.slice(0, 8);
-      return [];
+      return testLike.slice(0, 8);
     }
   } catch {
     // Continue without test function details

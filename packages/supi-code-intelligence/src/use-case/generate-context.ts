@@ -4,7 +4,7 @@ import * as path from "node:path";
 
 import { collectOutgoingCalls } from "../analysis/calls/service.ts";
 import { collectReferences } from "../analysis/references/service.ts";
-import { discoverTestFilesForSource, isTestLikeName } from "../analysis/relations/tests.ts";
+import { discoverTestFilesForSource } from "../analysis/relations/tests.ts";
 import {
   type RenderedContextSection,
   renderContextResult,
@@ -371,12 +371,10 @@ async function buildTestsSection(
   return { lines, hasStructuralEvidence: discovered.length > 0 };
 }
 
-/** Render test names with annotation when they come from structural outline fallback. */
+/** Render recognized test block names, or a placeholder when none were found. */
 function renderTestNames(names: string[], limit: number): string[] {
   if (names.length === 0) return ["  _(no recognized test blocks)_"];
-  const isFallback = !names.some((n) => isTestLikeName(n));
-  const suffix = isFallback ? " _(structural outline)_" : "";
-  return names.slice(0, limit).map((n) => `  - \`${n}\`${suffix}`);
+  return names.slice(0, limit).map((n) => `  - \`${n}\``);
 }
 
 /**

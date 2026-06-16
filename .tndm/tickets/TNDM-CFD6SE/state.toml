@@ -1,0 +1,32 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-16T18:40:25.56593Z"
+revision = 25
+
+[document_fingerprints]
+archive = "sha256:f1db6a0875a27b53c97bbdecb86f850ffe15a395ce6ee8f012aa125018ac3c9b"
+content = "sha256:37326840425d68f05b3e3f8aa4532a03c2a360eff6613cdf24048e91397a4313"
+task-01 = "sha256:4d24762b2c28bbcdf5ea32b1f318954d44fc7785fafad0b8539e25c129f4e0ba"
+task-02 = "sha256:2a5cb5c9e15cacbaef60b535a085661022da1f5f2ed79fb74ae81db343e03ff9"
+task-03 = "sha256:fc665df443f842339d7094d14d03b3e4da5c1feda701d545fd7305118574f74d"
+task-04 = "sha256:75a08ad00d46d10af705495be763d3b17d4696f15598b305960c28d14da5e396"
+
+[[tasks]]
+number = 1
+title = "Lock noisy test-name regressions and clean graph/context test listings"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Make changedFiles impact truly structural-only"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Align inspect guidance and public docs with the tightened trust contract"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Run focused regressions, full verification, and repo smoke checks"
+status = "done"

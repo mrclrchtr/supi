@@ -59,7 +59,7 @@ export function renderChangedFilesImpact(params: {
   if (params.analysis.likelyTests.length > 0) {
     const testHeading =
       params.analysis.testProvenance === "conventions-only"
-        ? "Likely Tests (conventions-only — no LSP/TS)"
+        ? "Likely Tests (conventions-only)"
         : "Likely Tests";
     lines.push(`## ${testHeading}`);
     for (const file of params.analysis.likelyTests) {

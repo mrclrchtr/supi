@@ -155,6 +155,7 @@ describe("code_impact tool", () => {
     expect(result.content[0].text).toContain("Impact");
     expect(result.content[0].text).toContain("src.ts");
     expect(result.content[0].text).toContain("Likely Tests");
+    expect(result.content[0].text).toContain("**Evidence: structural**");
     expect(result.details?.type).toBe("impact");
     if (result.details?.type === "impact") {
       expect(result.details.data?.nextQueries).toEqual(
@@ -412,7 +413,7 @@ describe("code_impact tool", () => {
     }
   });
 
-  it("uses semantic test references for changed-files impact", async () => {
+  it("ignores semantic-only test references for changed-files impact", async () => {
     mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
     writeFileSync(
       path.join(tmpDir, "src/tool/execute-find.ts"),
@@ -457,10 +458,12 @@ describe("code_impact tool", () => {
       details?: { type: string; data?: { likelyTests?: string[] } };
     };
 
-    expect(result.content[0].text).toContain("__tests__/code-find-tool.test.ts");
+    expect(result.content[0].text).not.toContain("__tests__/code-find-tool.test.ts");
+    expect(result.content[0].text).not.toContain("Likely Tests");
+    expect(result.content[0].text).toContain("**Evidence: structural**");
     expect(result.content[0].text).not.toContain("Likely Test Commands");
     if (result.details?.type === "impact") {
-      expect(result.details.data?.likelyTests).toContain("__tests__/code-find-tool.test.ts");
+      expect(result.details.data?.likelyTests ?? []).toEqual([]);
     }
   });
 
@@ -506,7 +509,7 @@ describe("code_impact tool", () => {
     }
   });
 
-  it("skips Vitest commands for non-JavaScript test files", async () => {
+  it("ignores semantic-only non-JavaScript test files in structural changed-files mode", async () => {
     writeFileSync(
       path.join(tmpDir, "package.json"),
       JSON.stringify(
@@ -559,10 +562,12 @@ describe("code_impact tool", () => {
       details?: { type: string; data?: { likelyTests?: string[]; likelyTestCommands?: string[] } };
     };
 
-    expect(result.content[0].text).toContain("tests/widget.spec.py");
+    expect(result.content[0].text).not.toContain("tests/widget.spec.py");
+    expect(result.content[0].text).not.toContain("Likely Tests");
+    expect(result.content[0].text).toContain("**Evidence: structural**");
     expect(result.content[0].text).not.toContain("Likely Test Commands");
     if (result.details?.type === "impact") {
-      expect(result.details.data?.likelyTests).toContain("tests/widget.spec.py");
+      expect(result.details.data?.likelyTests ?? []).toEqual([]);
       expect(result.details.data?.likelyTestCommands).toEqual([]);
     }
   });

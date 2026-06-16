@@ -218,7 +218,7 @@ The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`)
 
 ### Param validation
 - `code_inspect` requires `file` + `line` + `character`.
-- `line`/`character` require `file`, **not** `path`.
+- `line`/`character` require `file`, **not** `scope`.
 - `code_refactor` requires `operation` plus either `targetId` or `file` + `line` + `character`.
 - `newName` is required for `rename_symbol` (and for the legacy `rename` alias on `code_refactor`).
 - `code_apply` requires `planId`.
@@ -229,9 +229,10 @@ The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`)
 ### Evidence provenance in test discovery
 - Test discovery results carry `provenance`: `"semantic+conventions"` if semantic references contributed files, `"conventions-only"` otherwise.
 - `code_graph`, `code_context`, and `code_impact` all display provenance annotations in their output.
-- When test discovery runs `conventions-only` (no LSP/TS contributed), the heading reads `(conventions-only — no LSP/TS)`.
+- In `code_graph` and `code_context`, when test discovery runs `conventions-only` (no LSP/TS contributed), the heading reads `(conventions-only — no LSP/TS)`.
+- In `code_impact` changed-files analysis, convention-discovered tests are labeled `Likely Tests (conventions-only)` because that path is structural-only even when semantic providers exist.
 - A `conventions-only` result with zero test files is treated as `unavailable` by `code_graph` (not an empty success).
-- Test name extraction filters to `` describe ``/`` it ``/`` test ``/`` spec ``-like names only. Helper names like `tmpDir`, `result`, `writeSource` are excluded.
+- User-facing test-name output includes only recognized `` describe ``/`` it ``/`` test ``/`` spec `` blocks. Helper names like `tmpDir`, `result`, `writeSource` are not rendered.
 - A discovered test file with zero recognized test blocks displays `_(no recognized test blocks)_`.
 
 ### Evidence in changedFiles impact

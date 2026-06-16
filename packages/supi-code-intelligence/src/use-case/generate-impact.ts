@@ -332,7 +332,6 @@ async function executeChangedFilesImpact(
     model,
     cwd,
     shouldIncludeTests(surface, input.includeTests),
-    provider?.references,
   );
   const prioritySignals = summarizePrioritySignalsForFiles(
     cwd,
@@ -418,13 +417,12 @@ async function analyzeReferenceImpact(
   };
 }
 
-// biome-ignore lint/complexity/useMaxParams: shared changed-files analysis keeps reference discovery explicit
+// biome-ignore lint/complexity/useMaxParams: shared changed-files analysis keeps file/module impact explicit
 async function analyzeChangedFiles(
   changedFiles: ChangedFileEntry[],
   model: Awaited<ReturnType<typeof buildArchitectureModel>>,
   cwd: string,
   includeTests: boolean,
-  references: CodeProvider["references"] | undefined,
 ): Promise<ImpactAnalysis> {
   const affectedFiles = new Set(changedFiles.map((entry) => entry.absPath));
   const { affectedModules, checkNext, downstreamCount } = analyzeModelImpact(
@@ -433,7 +431,7 @@ async function analyzeChangedFiles(
     cwd,
   );
 
-  const likelyTests = includeTests ? await collectLikelyTests(affectedFiles, cwd, references) : [];
+  const likelyTests = includeTests ? await collectLikelyTests(affectedFiles, cwd, undefined) : [];
   const likelyTestCommands = buildLikelyTestCommands(cwd, likelyTests);
 
   return {
@@ -444,11 +442,7 @@ async function analyzeChangedFiles(
     checkNext,
     likelyTests,
     likelyTestCommands,
-    testProvenance: includeTests
-      ? references
-        ? ("semantic+conventions" as const)
-        : ("conventions-only" as const)
-      : undefined,
+    testProvenance: includeTests ? ("conventions-only" as const) : undefined,
     riskLevel: assessRisk(changedFiles.length, affectedModules.size, downstreamCount),
     externalRefs: 0,
   };

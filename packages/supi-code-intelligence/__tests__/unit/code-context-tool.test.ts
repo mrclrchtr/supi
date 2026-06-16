@@ -484,6 +484,74 @@ describe("code_context real-data sections", () => {
     expect(result.content[0].text).toContain("it");
   });
 
+  it("renders no recognized test blocks instead of helper fallback names", async () => {
+    writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
+    writeSource(
+      "__tests__/unit/tool/execute-graph.test.ts",
+      "import { executeGraph } from '../../../src/tool/execute-graph';\n",
+    );
+
+    const outlineSpy = vi.fn(async () => ({
+      kind: "success" as const,
+      data: [
+        {
+          name: "tmpDir",
+          kind: "const",
+          startLine: 1,
+          startCharacter: 1,
+          endLine: 1,
+          endCharacter: 10,
+        },
+        {
+          name: "writeSource",
+          kind: "function",
+          startLine: 2,
+          startCharacter: 1,
+          endLine: 2,
+          endCharacter: 12,
+        },
+        {
+          name: "result",
+          kind: "const",
+          startLine: 3,
+          startCharacter: 1,
+          endLine: 3,
+          endCharacter: 7,
+        },
+      ],
+    }));
+
+    registerMockProvider(tmpDir, {
+      references: async () => [],
+      outline: outlineSpy,
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/tool/execute-graph.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "context-package-layout-noisy-tests",
+      {
+        task: "find related tests",
+        targetId,
+        include: ["tests"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).toContain("__tests__/unit/tool/execute-graph.test.ts");
+    expect(result.content[0].text).toContain("_(no recognized test blocks)_");
+    expect(result.content[0].text).not.toContain("tmpDir");
+    expect(result.content[0].text).not.toContain("writeSource");
+    expect(result.content[0].text).not.toContain("`result`");
+  });
+
   it("reports structural confidence when tests are discovered without outline data", async () => {
     writeSource("src/source.ts", "export function source() { return 1; }\n");
     writeSource("src/source.test.ts", "import { source } from './source';\nvoid source;\n");

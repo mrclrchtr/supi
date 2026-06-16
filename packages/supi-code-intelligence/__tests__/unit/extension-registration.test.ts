@@ -205,6 +205,12 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("changedFiles");
     expect(props).toHaveProperty("includeTests");
     expect(props).toHaveProperty("maxResults");
+
+    const includeTestsParam = props?.includeTests as { description?: string } | undefined;
+    expect(includeTestsParam?.description).toContain(
+      "changedFiles analysis uses conventions-only structural discovery",
+    );
+    expect(includeTestsParam?.description).not.toContain("no LSP/TS");
   });
 
   it("registers all workflow tool names on the public surface", () => {

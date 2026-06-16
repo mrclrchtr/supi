@@ -16,7 +16,7 @@ import {
   type ImplementationsResult,
 } from "../analysis/implementations/service.ts";
 import { collectReferences, type ReferencesResult } from "../analysis/references/service.ts";
-import { discoverTestFilesForSource, isTestLikeName } from "../analysis/relations/tests.ts";
+import { discoverTestFilesForSource } from "../analysis/relations/tests.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import { renderCallsResult } from "../presentation/markdown/calls.ts";
 import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
@@ -447,12 +447,10 @@ async function collectRelation(
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-/** Render test names with annotation when they come from structural outline fallback. */
+/** Render recognized test block names, or a placeholder when none were found. */
 function renderGraphTestNames(names: string[], limit: number): string[] {
   if (names.length === 0) return ["  _(no recognized test blocks)_"];
-  const isFallback = !names.some((n) => isTestLikeName(n));
-  const suffix = isFallback ? " _(structural outline)_" : "";
-  return names.slice(0, limit).map((n) => `  - \`${n}\`${suffix}`);
+  return names.slice(0, limit).map((n) => `  - \`${n}\``);
 }
 
 function errorResult(content: string): CodeIntelResult {

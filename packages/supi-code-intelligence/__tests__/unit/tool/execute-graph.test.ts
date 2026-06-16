@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ActionParams } from "../../helpers/execute-action.ts";
 import { executeAction } from "../../helpers/execute-action.ts";
 import { registerMockProvider } from "../../helpers/register-mock-runtime.ts";
@@ -422,6 +422,71 @@ describe("execute-graph (code_graph tool)", () => {
       if (result.details?.type === "search") {
         expect(result.details.data?.confidence).toBe("structural");
       }
+    });
+
+    it("renders no recognized test blocks instead of helper fallback names", async () => {
+      const srcDir = path.join(tmpDir, "src", "tool");
+      mkdirSync(srcDir, { recursive: true });
+      writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
+      const testDir = path.join(tmpDir, "__tests__", "unit", "tool");
+      mkdirSync(testDir, { recursive: true });
+      writeSource(
+        "__tests__/unit/tool/execute-graph.test.ts",
+        "import { executeGraph } from '../../../src/tool/execute-graph';\n",
+      );
+      writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
+
+      const outlineSpy = vi.fn(async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "tmpDir",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 1,
+            endLine: 1,
+            endCharacter: 10,
+          },
+          {
+            name: "writeSource",
+            kind: "function",
+            startLine: 2,
+            startCharacter: 1,
+            endLine: 2,
+            endCharacter: 12,
+          },
+          {
+            name: "result",
+            kind: "const",
+            startLine: 3,
+            startCharacter: 1,
+            endLine: 3,
+            endCharacter: 7,
+          },
+        ],
+      }));
+
+      registerMockProvider(tmpDir, {
+        references: async () => [],
+        outline: outlineSpy,
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "src/tool/execute-graph.ts",
+          line: 1,
+          character: 1,
+          relations: ["tests"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("__tests__/unit/tool/execute-graph.test.ts");
+      expect(result.content).toContain("_(no recognized test blocks)_");
+      expect(result.content).not.toContain("tmpDir");
+      expect(result.content).not.toContain("writeSource");
+      expect(result.content).not.toContain("`result`");
     });
 
     it("finds test via import analysis when naming conventions differ", async () => {

@@ -201,7 +201,7 @@ export const CodeImpactParameters = Type.Object(
     includeTests: Type.Optional(
       Type.Boolean({
         description:
-          "Whether likely tests should be included in the impact set. Test discovery provenance is annotated in output — conventions-only when LSP/TS is absent.",
+          "Whether likely tests should be included in the impact set. changedFiles analysis uses conventions-only structural discovery; target-based analysis may combine semantic references with deterministic conventions.",
       }),
     ),
     maxResults: Type.Optional(MaxResultsParam),

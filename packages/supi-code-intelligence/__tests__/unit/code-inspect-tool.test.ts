@@ -214,7 +214,7 @@ describe("code_inspect tool", () => {
       makeCtx({ cwd: tmpDir }),
     )) as {
       content: Array<{ type: string; text: string }>;
-      details?: { type: string; data?: { confidence?: string } };
+      details?: { type: string; data?: { confidence?: string; nextQueries?: string[] } };
     };
 
     expect(result.content[0].text).toContain("Inspect");
@@ -227,6 +227,18 @@ describe("code_inspect tool", () => {
     expect(result.content[0].text).toContain("Remove unused import");
     expect(result.content[0].text).toContain("Cannot assign to 'foo'");
     expect(result.details?.type).toBe("inspect");
+    if (result.details?.type === "inspect") {
+      expect(result.details.data?.nextQueries).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('`code_context` with `scope: "src/index.ts"`'),
+        ]),
+      );
+      expect(result.details.data?.nextQueries).not.toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('`code_context` with `file: "src/index.ts"`'),
+        ]),
+      );
+    }
   });
 
   it("reports explicit unavailable sections instead of heuristic guesses", async () => {
