@@ -165,6 +165,16 @@ Root cause for the staging pipeline: direct `pnpm pack` on workspace packages pr
   gh release create "vX.Y.Z" --title "vX.Y.Z" --notes "..." --latest
   ```
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in `.tndm/tickets/` and are managed via the `tndm` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` at repo root + `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Testing patterns
 
 - `vi.hoisted()` callbacks execute before imports — must be inline arrow functions, cannot reference imported values; supports both single-value (`vi.hoisted(() => vi.fn())`) and object (`vi.hoisted(() => ({ fn: vi.fn() }))`) patterns
