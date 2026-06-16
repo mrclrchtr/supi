@@ -120,7 +120,9 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **targetId** (preferred from `code_resolve`) or file+line+character or symbol
 - **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
+- **Each relation annotates its evidence source** in the output. Results carry provenance — `semantic+conventions` when LSP/TS contributed, `conventions-only` when they didn't.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
+- The `tests` relation displays provenance: `conventions-only — no LSP/TS` appears in its heading when only path-based discovery ran
 
 ### `code_impact`
 Preferred workflow-oriented impact analysis.
@@ -128,6 +130,9 @@ Preferred workflow-oriented impact analysis.
 - supports the existing target-based path (`targetId`, anchored coords, symbol)
 - adds diff-aware entry points for `changedFiles` and explicit `includeTests`
 - `includeTests` uses the same shared test discovery as `code_graph` and `code_context` (import/reference evidence plus package-layout conventions)
+- **Target-based analysis** uses semantic references and fails explicitly when no LSP provider is available
+- **changedFiles analysis** uses structural evidence only (file-level module analysis, path-based test discovery) and always annotates its evidence: `**Evidence: structural** — impact limited to file-level module analysis and path-based test discovery. Use \`code_resolve\` for semantic impact.`
+- **test list annotations** — when test discovery runs without LSP/TS, the test list heading reads `Likely Tests (conventions-only — no LSP/TS)`
 - **target-based analysis seeds the target file itself** — zero-reference targets still report affected evidence and likely tests
 - when the workspace clearly uses Vitest, likely test files also come with concrete `pnpm vitest run … --reporter=verbose` commands
 - `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing
@@ -205,14 +210,16 @@ Notes:
 
 ## Result style
 
-Results report confidence such as:
+Results report evidence provenance such as:
 
-- `semantic`
-- `structural`
-- `heuristic`
-- `unavailable`
+- `semantic` — backed by LSP/semantic provider
+- `structural` — backed by tree-sitter/structural provider
+- `heuristic` — pattern-based, may include false positives
+- `unavailable` — the required provider or substrate was absent
 
 `heuristic` results may appear from `code_find` in text/regex modes. The other tools prefer explicit unavailable states over silent search fallbacks.
+
+**Evidence-strictness principle:** Every tool result that depends on LSP or TreeSitter explicitly declares its evidence source. Test discovery annotates provenance: `semantic+conventions` means semantic references contributed, `conventions-only` means only path-based conventions ran. No silent degradation when providers are absent.
 
 ## Architecture
 

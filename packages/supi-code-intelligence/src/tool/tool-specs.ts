@@ -139,13 +139,13 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_graph",
     label: "Code Graph",
     description:
-      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Use code_resolve first to get a targetId, then pass it to code_graph.',
+      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays provenance (semantic+conventions or conventions-only). Use code_resolve first to get a targetId, then pass it to code_graph.',
     promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
       "Use code_graph to find references, outgoing calls, and implementations for a target.",
       'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for outgoing calls or `relations: ["implements"]` for implementations.',
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
-      "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test function names.",
+      "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test function names. The tests relation displays provenance (`semantic+conventions` or `conventions-only`) in its output.",
       "After code_graph, follow up with code_context on individual results for type or definition context.",
       "code_graph uses `scope` (not `path`) for workspace-relative directory/package filtering.",
     ],
@@ -156,7 +156,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_impact",
     label: "Code Impact",
     description:
-      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for impact assessment and does not fall back to heuristic text search. Supports target-based analysis and changedFiles-based analysis.",
+      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for impact assessment and does not fall back to heuristic text search. Supports target-based analysis and changedFiles-based analysis. changedFiles-based analysis uses structural evidence only. Use a resolved target for semantic reference-based impact.",
     promptSnippet: "code_impact — blast radius and impact",
     basePromptGuidelines: [
       "Use code_impact before edits to estimate blast radius and follow-up checks.",

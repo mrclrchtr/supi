@@ -62,6 +62,8 @@ interface ImpactAnalysis {
   likelyTestCommands: string[];
   riskLevel: "low" | "medium" | "high";
   externalRefs: number;
+  /** Evidence provenance for test discovery, set when includeTests was requested. */
+  testProvenance?: "semantic+conventions" | "conventions-only";
 }
 
 interface ChangedFileEntry {
@@ -338,8 +340,10 @@ async function executeChangedFilesImpact(
     lspService,
   );
   const nextQueries = buildChangedFilesNextQueries(changedFiles, analysis);
+  const evidenceNote =
+    "\n**Evidence: structural** — impact limited to file-level module analysis and path-based test discovery. Use `code_resolve` for semantic impact.\n";
   const content =
-    surface === "impact"
+    (surface === "impact"
       ? renderChangedFilesImpact({
           changedFiles: changedFiles.map((entry) => entry.relPath),
           analysis,
@@ -351,7 +355,7 @@ async function executeChangedFilesImpact(
           prioritySignals,
           heading: "Affected",
           compatibilityNote: AFFECTED_COMPATIBILITY_NOTE,
-        });
+        })) + evidenceNote;
 
   const detailsData = buildDetailsData(
     analysis,
@@ -440,6 +444,11 @@ async function analyzeChangedFiles(
     checkNext,
     likelyTests,
     likelyTestCommands,
+    testProvenance: includeTests
+      ? references
+        ? ("semantic+conventions" as const)
+        : ("conventions-only" as const)
+      : undefined,
     riskLevel: assessRisk(changedFiles.length, affectedModules.size, downstreamCount),
     externalRefs: 0,
   };
@@ -512,7 +521,7 @@ async function collectLikelyTests(
       continue;
     }
 
-    const discovered = await discoverTestFilesForSource(affFile, {
+    const { files: discovered } = await discoverTestFilesForSource(affFile, {
       cwd,
       cap: 3,
       references,

@@ -226,6 +226,17 @@ The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`)
 - `code_context`, `code_impact`, and `code_refactor` accept optional `targetId` that takes precedence over raw coordinates.
 - `code_context` accepts optional `targetId` for orientation-only follow-up.
 
+### Evidence provenance in test discovery
+- Test discovery results carry `provenance`: `"semantic+conventions"` if semantic references contributed files, `"conventions-only"` otherwise.
+- `code_graph`, `code_context`, and `code_impact` all display provenance annotations in their output.
+- When test discovery runs `conventions-only` (no LSP/TS contributed), the heading reads `(conventions-only — no LSP/TS)`.
+- A `conventions-only` result with zero test files is treated as `unavailable` by `code_graph` (not an empty success).
+- Test name extraction filters to `` describe ``/`` it ``/`` test ``/`` spec ``-like names only. Helper names like `tmpDir`, `result`, `writeSource` are excluded.
+- A discovered test file with zero recognized test blocks displays `_(no recognized test blocks)_`.
+
+### Evidence in changedFiles impact
+- `code_impact` with `changedFiles` always appends `**Evidence: structural**` to its output. changedFiles analysis is structurally limited to file-level module analysis and path-based test discovery.
+
 ### Shared test discovery
 - `src/analysis/relations/tests.ts` is the single source of truth for test-file discovery. `code_graph`, `code_context`, and `code_impact` all route through `discoverTestFilesForSource()`. Any divergent test lookup logic in a tool file is a bug.
 - Discovery combines semantic import/reference evidence with deterministic path conventions: same-directory companions, same-directory `__tests__/` companions, and package-level mirrors (`__tests__/unit/…`, `__tests__/integration/…`).

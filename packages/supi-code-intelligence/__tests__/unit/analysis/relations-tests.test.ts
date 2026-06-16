@@ -2,11 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  discoverTestFilesForSource,
-  // biome-ignore lint/suspicious/noDeprecatedImports: used for legacy-contract assertions
-  findTestCompanionFiles,
-} from "../../../src/analysis/relations/tests.ts";
+import { discoverTestFilesForSource } from "../../../src/analysis/relations/tests.ts";
 
 let tmpDir: string;
 
@@ -37,9 +33,9 @@ describe("shared test discovery contract", () => {
     // Write a package.json to signal a package root
     writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
 
-    // Semantic references return empty — no import-chain evidence
-    // Use the new shared helper that includes deterministic fallbacks
-    const result = await discoverTestFilesForSource(
+    // Semantic references return empty — no import-chain evidence.
+    // With the enhanced helper, this should still find the package-layout test file.
+    const { files, provenance } = await discoverTestFilesForSource(
       path.join(tmpDir, "src/tool/execute-graph.ts"),
       {
         references: async () => [],
@@ -48,18 +44,19 @@ describe("shared test discovery contract", () => {
       },
     );
 
-    // With the enhanced helper, this should find the package-layout test file
-    expect(result.length).toBeGreaterThan(0);
-    expect(
-      result.some((f) => f.absPath.includes("__tests__/unit/tool/execute-graph.test.ts")),
-    ).toBe(true);
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.some((f) => f.absPath.includes("__tests__/unit/tool/execute-graph.test.ts"))).toBe(
+      true,
+    );
+    // References returned empty -> provenance is conventions-only
+    expect(provenance).toBe("conventions-only");
   });
 
   it("still finds test files via semantic references when they exist", async () => {
     writeSource("src/source.ts", "export function source() { return 1; }\n");
     writeSource("src/source.test.ts", "import { source } from './source';\n");
 
-    const result = await findTestCompanionFiles(path.join(tmpDir, "src/source.ts"), {
+    const { files } = await discoverTestFilesForSource(path.join(tmpDir, "src/source.ts"), {
       references: async () => [
         {
           uri: `file://${tmpDir}/src/source.test.ts`,
@@ -69,11 +66,11 @@ describe("shared test discovery contract", () => {
           },
         },
       ],
+      cwd: tmpDir,
     });
 
-    // This should pass even before the shared helper is enhanced
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.some((f) => f.includes("src/source.test.ts"))).toBe(true);
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.some((f) => f.absPath.includes("src/source.test.ts"))).toBe(true);
   });
 
   it("does not classify false positives as tests", async () => {
@@ -82,45 +79,106 @@ describe("shared test discovery contract", () => {
     writeSource("src/tool/tool-specs.ts", "export const spec = true;\n");
 
     // With empty references, the function should not fabricate test files
-    const forContest = await findTestCompanionFiles(path.join(tmpDir, "src/contest.ts"), {
+    const forContest = await discoverTestFilesForSource(path.join(tmpDir, "src/contest.ts"), {
       references: async () => [],
+      cwd: tmpDir,
     });
-    expect(forContest.every((f) => !f.endsWith("src/contest.ts"))).toBe(true);
+    expect(forContest.files.every((f) => !f.absPath.endsWith("src/contest.ts"))).toBe(true);
 
-    const forTesting = await findTestCompanionFiles(path.join(tmpDir, "src/testing.ts"), {
+    const forTesting = await discoverTestFilesForSource(path.join(tmpDir, "src/testing.ts"), {
       references: async () => [],
+      cwd: tmpDir,
     });
-    expect(forTesting.every((f) => !f.endsWith("src/testing.ts"))).toBe(true);
+    expect(forTesting.files.every((f) => !f.absPath.endsWith("src/testing.ts"))).toBe(true);
 
-    const forSpec = await findTestCompanionFiles(path.join(tmpDir, "src/tool/tool-specs.ts"), {
+    const forSpec = await discoverTestFilesForSource(path.join(tmpDir, "src/tool/tool-specs.ts"), {
       references: async () => [],
+      cwd: tmpDir,
     });
-    expect(forSpec.every((f) => !f.endsWith("tool-specs.ts"))).toBe(true);
+    expect(forSpec.files.every((f) => !f.absPath.endsWith("tool-specs.ts"))).toBe(true);
   });
 
-  it("exposes test function names from outline when provider is available", async () => {
-    // Note: this test uses findTestCompanionFiles which doesn't take an outline param currently.
-    // It tests the outline-extraction contract that the updated helper must support.
+  it("reports conventions-only provenance when no semantic provider contributes", async () => {
     writeSource("src/source.ts", "export function source() { return 1; }\n");
-    writeSource(
-      "src/source.test.ts",
-      "test('returns expected value', () => { expect(source()).toBe(1); });\n",
+    writeSource("src/source.test.ts", "import { source } from './source';\n");
+
+    // No references provider — only conventions run
+    const { files, provenance } = await discoverTestFilesForSource(
+      path.join(tmpDir, "src/source.ts"),
+      {
+        cwd: tmpDir,
+      },
     );
 
-    const result = await findTestCompanionFiles(path.join(tmpDir, "src/source.ts"), {
+    // Conventions should find the same-directory companion
+    expect(files.length).toBeGreaterThan(0);
+    expect(provenance).toBe("conventions-only");
+  });
+
+  it("filters test names to describe/it/test/spec-like blocks only", async () => {
+    writeSource("src/source.ts", "export function source() { return 1; }\n");
+
+    const { files } = await discoverTestFilesForSource(path.join(tmpDir, "src/source.ts"), {
+      cwd: tmpDir,
+      outline: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "tmpDir",
+            kind: "const",
+            startLine: 1,
+            endLine: 1,
+            startCharacter: 0,
+            endCharacter: 0,
+          },
+          {
+            name: "describe('source')",
+            kind: "function",
+            startLine: 2,
+            endLine: 2,
+            startCharacter: 0,
+            endCharacter: 0,
+          },
+          {
+            name: "it('returns expected')",
+            kind: "function",
+            startLine: 3,
+            endLine: 3,
+            startCharacter: 0,
+            endCharacter: 0,
+          },
+          {
+            name: "writeSource",
+            kind: "function",
+            startLine: 4,
+            endLine: 4,
+            startCharacter: 0,
+            endCharacter: 0,
+          },
+          {
+            name: "result",
+            kind: "const",
+            startLine: 5,
+            endLine: 5,
+            startCharacter: 0,
+            endCharacter: 0,
+          },
+        ],
+      }),
       references: async () => [
         {
           uri: `file://${tmpDir}/src/source.test.ts`,
-          range: {
-            start: { line: 0, character: 0 },
-            end: { line: 0, character: 6 },
-          },
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
         },
       ],
+      cap: 8,
     });
 
-    // Reference-based discovery must still work
-    expect(result.length).toBeGreaterThan(0);
-    expect(result.some((f) => f.includes("src/source.test.ts"))).toBe(true);
+    // Only describe/it names survive filtering, not tmpDir/writeSource/result
+    for (const file of files) {
+      expect(file.testNames).not.toContain("tmpDir");
+      expect(file.testNames).not.toContain("writeSource");
+      expect(file.testNames).not.toContain("result");
+    }
   });
 });

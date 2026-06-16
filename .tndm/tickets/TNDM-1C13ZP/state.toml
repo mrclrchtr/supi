@@ -1,0 +1,50 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-15T23:52:28.904548Z"
+revision = 37
+
+[document_fingerprints]
+archive = "sha256:4a58eda0072e36106cc66112773b01925b2988b8fba56d4a2a5f1d9fb3828395"
+content = "sha256:86b60ad5da92fc1d7fc1998d755349d27421c36ecf69c540098143b0c76882ed"
+task-01 = "sha256:b794090848685ccb42d2e7bb9960bf3a68550b103f41be78785ff550f8fa0883"
+task-02 = "sha256:1f00208ebe4d10fbc7dccb683e3dd56c379b7efd5bf90775a26057bb6d9054e5"
+task-03 = "sha256:505afcde4636df5700f127aa25654fe40d2364f7c4ff3221158cda2498a32e9c"
+task-04 = "sha256:02b4821c691c85b5f465da89cdbb95fedcdcba8762f2aa761fb2cfc1dd09959c"
+task-05 = "sha256:ac26fbd7a08bbfc1fb909bb50b5b2e4f80f167c832413b750513898ac26fdaf8"
+task-06 = "sha256:559f6a2b39ff72b1b32708af3fb6663a31d28a36d7c3f64472b5a5738433b085"
+task-07 = "sha256:d7a96deea6947c5f7c09a15acbc59e649c593cc52bc72a280c9995ac63372599"
+
+[[tasks]]
+number = 1
+title = "Shared test discovery: types, return change, name filtering, deletions"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "code_graph: evidence annotation for tests relation"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "code_impact: evidence annotation for changedFiles and test provenance"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "code_context: evidence annotation for tests section"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Tests: update existing tests and add evidence annotation test cases"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Docs and metadata: sync tool-specs, schemas, README, CLAUDE.md"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Final verification: full test suite, repo check, manual smoke test"
+status = "done"

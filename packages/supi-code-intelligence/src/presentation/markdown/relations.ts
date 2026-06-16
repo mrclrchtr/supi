@@ -239,6 +239,9 @@ export function renderGraphResult(
     if (section.kind === "ok") {
       lines.push(section.content);
       lines.push("");
+    } else if (section.kind === "unavailable") {
+      lines.push(`**${section.rel}**: ${section.message}`);
+      lines.push("");
     }
   }
 

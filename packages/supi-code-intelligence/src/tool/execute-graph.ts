@@ -16,7 +16,7 @@ import {
   type ImplementationsResult,
 } from "../analysis/implementations/service.ts";
 import { collectReferences, type ReferencesResult } from "../analysis/references/service.ts";
-import { discoverTestFilesForSource } from "../analysis/relations/tests.ts";
+import { discoverTestFilesForSource, isTestLikeName } from "../analysis/relations/tests.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import { renderCallsResult } from "../presentation/markdown/calls.ts";
 import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
@@ -384,7 +384,11 @@ async function collectRelation(
       }
 
       case "tests": {
-        const discovered = await discoverTestFilesForSource(file, {
+        const {
+          files: discovered,
+          provenance,
+          semanticsAvailable,
+        } = await discoverTestFilesForSource(file, {
           references: provider?.references,
           outline: provider?.outline,
           cwd,
@@ -393,6 +397,13 @@ async function collectRelation(
         });
 
         if (discovered.length === 0) {
+          if (!semanticsAvailable) {
+            return {
+              kind: "unavailable",
+              rel,
+              message: "No test provider available — semantic and structural providers are absent",
+            };
+          }
           return {
             kind: "ok",
             rel,
@@ -408,12 +419,12 @@ async function collectRelation(
             ? testFile.absPath.slice(cwd.length + 1)
             : testFile.absPath;
           testLines.push(`- \`${relTestFile}\``);
-          for (const name of testFile.testNames.slice(0, maxResults)) {
-            testLines.push(`  - \`${name}\``);
-          }
+          testLines.push(...renderGraphTestNames(testFile.testNames, maxResults));
         }
 
-        const content = `**Tests** (${discovered.length} companion file${discovered.length !== 1 ? "s" : ""})\n\n${testLines.join("\n")}\n`;
+        const provenanceNote =
+          provenance === "conventions-only" ? `, conventions-only — no LSP/TS` : "";
+        const content = `**Tests** (${discovered.length} companion file${discovered.length !== 1 ? "s" : ""}${provenanceNote})\n\n${testLines.join("\n")}\n`;
         return {
           kind: "ok",
           rel,
@@ -435,6 +446,14 @@ async function collectRelation(
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
+
+/** Render test names with annotation when they come from structural outline fallback. */
+function renderGraphTestNames(names: string[], limit: number): string[] {
+  if (names.length === 0) return ["  _(no recognized test blocks)_"];
+  const isFallback = !names.some((n) => isTestLikeName(n));
+  const suffix = isFallback ? " _(structural outline)_" : "";
+  return names.slice(0, limit).map((n) => `  - \`${n}\`${suffix}`);
+}
 
 function errorResult(content: string): CodeIntelResult {
   return {

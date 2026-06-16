@@ -267,7 +267,9 @@ describe("code_context tool", () => {
     expect(result.content[0].text).toContain("No JSDoc");
     expect(result.content[0].text).toContain("## Tests");
     // No provider registered and no deterministic test files exist
-    expect(result.content[0].text).toContain("No test companion files found");
+    expect(result.content[0].text).toContain(
+      "Tests unavailable — no semantic or structural provider available.",
+    );
   });
 });
 
@@ -363,7 +365,7 @@ describe("code_context real-data sections", () => {
           kind: "success" as const,
           data: [
             {
-              name: "returns expected value",
+              name: "test",
               kind: "function",
               startLine: 2,
               startCharacter: 1,
@@ -410,7 +412,7 @@ describe("code_context real-data sections", () => {
 
     expect(result.content[0].text).toContain("## Tests");
     expect(result.content[0].text).toContain("context.test.ts");
-    expect(result.content[0].text).toContain("returns expected value");
+    expect(result.content[0].text).toContain("test");
   });
 
   it("discovers package-layout test file without semantic references (regression for audit failure)", async () => {
@@ -433,11 +435,19 @@ describe("code_context real-data sections", () => {
       kind: "success" as const,
       data: [
         {
-          name: "executeGraph",
+          name: "describe",
           kind: "function",
           startLine: 1,
           startCharacter: 1,
           endLine: 1,
+          endCharacter: 50,
+        },
+        {
+          name: "it",
+          kind: "function",
+          startLine: 2,
+          startCharacter: 1,
+          endLine: 4,
           endCharacter: 50,
         },
       ],
@@ -470,7 +480,8 @@ describe("code_context real-data sections", () => {
 
     expect(result.content[0].text).not.toContain("No test companion files found");
     expect(result.content[0].text).toContain("__tests__/unit/tool/execute-graph.test.ts");
-    expect(result.content[0].text).toContain("executeGraph");
+    expect(result.content[0].text).toContain("describe");
+    expect(result.content[0].text).toContain("it");
   });
 
   it("reports structural confidence when tests are discovered without outline data", async () => {

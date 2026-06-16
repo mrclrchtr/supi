@@ -43,6 +43,23 @@ export interface DiscoveredTestFile {
   testNames: string[];
 }
 
+/** Evidence source for test discovery. */
+export type TestDiscoveryProvenance = "semantic+conventions" | "conventions-only";
+
+/** Result of a test discovery call, with files and overall provenance. */
+export interface DiscoverTestFilesResult {
+  /** Discovered test files, deduplicated, sorted, and capped. */
+  files: DiscoveredTestFile[];
+  /**
+   * Evidence provenance for the discovery.
+   * - `"semantic+conventions"`: semantic reference evidence contributed.
+   * - `"conventions-only"`: no semantic provider available or returned zero results.
+   */
+  provenance: TestDiscoveryProvenance;
+  /** Whether a semantic references provider was available (non-null). Distinguishes "provider absent" from "provider present but found nothing". */
+  semanticsAvailable: boolean;
+}
+
 /**
  * Discover companion test files for a source file using both semantic evidence
  * and deterministic path conventions.
@@ -53,25 +70,43 @@ export interface DiscoveredTestFile {
 export async function discoverTestFilesForSource(
   sourceAbs: string,
   options: DiscoverTestFilesOptions,
-): Promise<DiscoveredTestFile[]> {
+): Promise<DiscoverTestFilesResult> {
+  // Resolve to absolute so convention-path comparisons match LSP absolute paths.
+  sourceAbs = path.resolve(sourceAbs);
+
   const cap = options.cap ?? 8;
   const seen = new Set<string>();
   const results: DiscoveredTestFile[] = [];
+  const semanticsAvailable = options.references != null;
 
   // ── Strategy 1: Semantic references ───────────────────────────────
+  let semanticContributed = false;
   if (options.references) {
-    const refFiles = await findReferenceTestFiles(sourceAbs, options.references, options.position);
-    for (const absPath of refFiles) {
-      if (seen.has(absPath)) continue;
-      seen.add(absPath);
-      const testNames = options.outline
-        ? await extractTestFunctionNames(
-            absPath,
-            options.outline,
-            options.cwd ?? path.dirname(sourceAbs),
-          )
-        : [];
-      results.push({ absPath, provenance: "semantic reference", testNames });
+    const refs = await options.references(sourceAbs, options.position ?? { line: 0, character: 0 });
+    if (refs && refs.length > 0) {
+      const refFiles = [
+        ...new Set(
+          refs
+            .filter((ref) => isTestFilePath(ref.uri))
+            .map((ref) => (ref.uri.startsWith("file://") ? fileURLToPath(ref.uri) : ref.uri)),
+        ),
+      ];
+
+      if (refFiles.length > 0) {
+        semanticContributed = true;
+      }
+
+      for (const absPath of refFiles) {
+        seen.add(absPath);
+        const testNames = options.outline
+          ? await extractTestFunctionNames(
+              absPath,
+              options.outline,
+              options.cwd ?? path.dirname(sourceAbs),
+            )
+          : [];
+        results.push({ absPath, provenance: "semantic reference", testNames });
+      }
     }
   }
 
@@ -92,43 +127,14 @@ export async function discoverTestFilesForSource(
 
   // Deduplicate by absolute path (already done above), sort, cap
   results.sort((a, b) => a.absPath.localeCompare(b.absPath));
-  return results.slice(0, cap);
-}
-
-/**
- * Find companion test files for a given source file (absolute path)
- * using import-graph analysis (semantic references only).
- *
- * @deprecated Use `discoverTestFilesForSource` which also applies deterministic fallbacks.
- */
-export async function findTestCompanionFiles(
-  targetAbs: string,
-  { references }: { references: SemanticProvider["references"] },
-  position: CodePosition = { line: 0, character: 0 },
-): Promise<string[]> {
-  const refs = await references(targetAbs, position);
-  if (!refs) return [];
-
-  const seen = new Set<string>();
-  return refs
-    .filter((ref) => isTestFile(ref.uri))
-    .map((ref) => (ref.uri.startsWith("file://") ? fileURLToPath(ref.uri) : ref.uri))
-    .filter((abs) => {
-      if (seen.has(abs)) return false;
-      seen.add(abs);
-      return true;
-    });
+  const files = results.slice(0, cap);
+  const provenance: TestDiscoveryProvenance = semanticContributed
+    ? "semantic+conventions"
+    : "conventions-only";
+  return { files, provenance, semanticsAvailable };
 }
 
 // ── Internal helpers ─────────────────────────────────────────────────
-
-async function findReferenceTestFiles(
-  targetAbs: string,
-  references: SemanticProvider["references"],
-  position: CodePosition = { line: 0, character: 0 },
-): Promise<string[]> {
-  return findTestCompanionFiles(targetAbs, { references }, position);
-}
 
 /**
  * Apply deterministic path conventions to discover test files for a source.
@@ -250,11 +256,15 @@ async function extractTestFunctionNames(
     const relPath = path.relative(cwd, testFile);
     const outlineResult = await outline(relPath);
     if (outlineResult.kind === "success") {
-      const isTestF = isTestFilePath(relPath);
-      return outlineResult.data
-        .filter((item) => isTestF || isTestLikeName(item.name))
-        .slice(0, 8)
-        .map((item) => item.name);
+      const entries = outlineResult.data.map((item) => item.name);
+      // Prefer test-like names (describe, it, test, spec).
+      const testLike = entries.filter((n) => isTestLikeName(n));
+      if (testLike.length > 0) return testLike.slice(0, 8);
+      // Fall back to all entries for test files when tree-sitter can't
+      // extract describe/it/test call expressions (common with Vitest/Jest).
+      // Non-test-like names are annotated by callers.
+      if (isTestFilePath(relPath)) return entries.slice(0, 8);
+      return [];
     }
   } catch {
     // Continue without test function details
@@ -264,15 +274,6 @@ async function extractTestFunctionNames(
 
 // ── Existing language-agnostic detection helpers ─────────────────────
 
-/** Language-agnostic patterns for identifying test files. */
-const TEST_FILE_PATTERNS = [
-  /\.test\.[^.]+$/, // foo.test.ts
-  /\.spec\.[^.]+$/, // foo.spec.py
-  /^test_.+\.[^.]+$/, // test_foo.py
-  /_test\.[^.]+$/, // foo_test.go
-  /_spec\.[^.]+$/, // foo_spec.rb
-];
-
 /** Test-support directories that should not be treated as runnable tests. */
 const TEST_SUPPORT_SEGMENTS = ["/__tests__/helpers/", "/__tests__/fixtures/"];
 
@@ -280,19 +281,6 @@ const TEST_SUPPORT_SEGMENTS = ["/__tests__/helpers/", "/__tests__/fixtures/"];
 export function isTestSupportPath(filePath: string): boolean {
   const normalized = filePath.replaceAll("\\", "/");
   return TEST_SUPPORT_SEGMENTS.some((segment) => normalized.includes(segment));
-}
-
-/**
- * Check if a file path matches known test file naming patterns.
- * Language-agnostic — works for any extension.
- */
-export function isTestFile(filePath: string): boolean {
-  if (isTestSupportPath(filePath)) {
-    return false;
-  }
-
-  const filename = path.basename(filePath);
-  return TEST_FILE_PATTERNS.some((p) => p.test(filename));
 }
 
 /** Check if an outline name looks like a test declaration. */
@@ -308,38 +296,4 @@ export function isTestFilePath(relPath: string): boolean {
 
   const normalized = relPath.replaceAll("\\", "/");
   return /\.test\.|\.spec\.|\/__tests__\//.test(normalized);
-}
-
-/**
- * Extract test function names from a test file using the structural provider's outline.
- */
-export async function extractTestFunctions(
-  testFile: string,
-  cwd: string,
-  provider: { outline: StructuralProvider["outline"] },
-  limit: number,
-): Promise<{ names: string[]; hasStructuralEvidence: boolean }> {
-  const names: string[] = [];
-  let hasStructuralEvidence = false;
-
-  try {
-    const relPath = path.relative(cwd, testFile);
-    const outlineResult = await provider.outline(relPath);
-    if (outlineResult.kind === "success") {
-      const isTestF = isTestFilePath(relPath);
-      const testFns = outlineResult.data
-        .filter((item) => isTestF || isTestLikeName(item.name))
-        .slice(0, limit);
-      for (const fn of testFns) {
-        names.push(fn.name);
-      }
-      if (testFns.length > 0) {
-        hasStructuralEvidence = true;
-      }
-    }
-  } catch {
-    // Continue without test function details
-  }
-
-  return { names, hasStructuralEvidence };
 }

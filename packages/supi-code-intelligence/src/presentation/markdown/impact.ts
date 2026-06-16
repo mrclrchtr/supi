@@ -19,6 +19,7 @@ export function renderImpactFileLevel(
   return rewriteAffectedHeading(renderAffectedFileLevel(params));
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: shared changed-files renderer combines risk, files, tests, and priority signals in one function; refactoring deferred to a later dedup pass
 export function renderChangedFilesImpact(params: {
   changedFiles: string[];
   analysis: ImpactAnalysis;
@@ -56,7 +57,11 @@ export function renderChangedFilesImpact(params: {
   }
 
   if (params.analysis.likelyTests.length > 0) {
-    lines.push("## Likely Tests");
+    const testHeading =
+      params.analysis.testProvenance === "conventions-only"
+        ? "Likely Tests (conventions-only — no LSP/TS)"
+        : "Likely Tests";
+    lines.push(`## ${testHeading}`);
     for (const file of params.analysis.likelyTests) {
       lines.push(`- \`${file}\``);
     }

@@ -18,6 +18,8 @@ export interface ImpactAnalysis {
   likelyTestCommands: string[];
   riskLevel: "low" | "medium" | "high";
   externalRefs: number;
+  /** Evidence provenance for test discovery, set when includeTests was requested. */
+  testProvenance?: "semantic+conventions" | "conventions-only";
 }
 
 export const AFFECTED_COMPATIBILITY_NOTE =

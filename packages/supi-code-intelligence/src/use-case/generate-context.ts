@@ -4,7 +4,7 @@ import * as path from "node:path";
 
 import { collectOutgoingCalls } from "../analysis/calls/service.ts";
 import { collectReferences } from "../analysis/references/service.ts";
-import { discoverTestFilesForSource } from "../analysis/relations/tests.ts";
+import { discoverTestFilesForSource, isTestLikeName } from "../analysis/relations/tests.ts";
 import {
   type RenderedContextSection,
   renderContextResult,
@@ -333,7 +333,11 @@ async function buildTestsSection(
     };
   }
 
-  const discovered = await discoverTestFilesForSource(targetAbs, {
+  const {
+    files: discovered,
+    provenance,
+    semanticsAvailable,
+  } = await discoverTestFilesForSource(targetAbs, {
     references: deps.provider?.references,
     outline: deps.provider?.outline,
     cwd: deps.cwd,
@@ -341,6 +345,12 @@ async function buildTestsSection(
   });
 
   if (discovered.length === 0) {
+    if (!semanticsAvailable) {
+      return {
+        lines: ["Tests unavailable — no semantic or structural provider available."],
+        hasStructuralEvidence: false,
+      };
+    }
     return {
       lines: ["No test companion files found for this target."],
       hasStructuralEvidence: false,
@@ -348,16 +358,25 @@ async function buildTestsSection(
   }
 
   const lines: string[] = [];
+  if (provenance === "conventions-only") {
+    lines.push("Tests (conventions-only — no LSP/TS):");
+  }
   const filesToScan = discovered.slice(0, 3);
   for (const testFile of filesToScan) {
     const relTestFile = toDisplayPath(deps.cwd, testFile.absPath);
     lines.push(`- \`${relTestFile}\``);
-    for (const name of testFile.testNames.slice(0, limit)) {
-      lines.push(`  - \`${name}\``);
-    }
+    lines.push(...renderTestNames(testFile.testNames, limit));
   }
 
   return { lines, hasStructuralEvidence: discovered.length > 0 };
+}
+
+/** Render test names with annotation when they come from structural outline fallback. */
+function renderTestNames(names: string[], limit: number): string[] {
+  if (names.length === 0) return ["  _(no recognized test blocks)_"];
+  const isFallback = !names.some((n) => isTestLikeName(n));
+  const suffix = isFallback ? " _(structural outline)_" : "";
+  return names.slice(0, limit).map((n) => `  - \`${n}\`${suffix}`);
 }
 
 /**
