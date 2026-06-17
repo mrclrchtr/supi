@@ -11,7 +11,7 @@ src/
 ├── monitor/          Real-time, event-driven monitoring
 │   ├── monitor.ts    Extension factory — event wiring, commands, tool registration
 │   ├── state.ts      Per-turn TurnRecord store + regression detection + cause tracking
-│   └── status.ts     Compact footer status line ("cache: 80% ↑")
+│   └── status.ts     Compact turn cache-hit stats-line contribution ("TCH80%↑")
 ├── forensics/        Cross-session, query-driven investigation
 │   ├── forensics.ts  Engine: SessionManager.listAll → parse → extract → query
 │   ├── extract.ts    Branch walking: cache turn extraction + timestamp-aligned tool windows

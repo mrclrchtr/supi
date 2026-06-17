@@ -129,35 +129,74 @@ export function gatherUsage(entries: ReadonlyArray<UsageEntry>): UsageTotals {
 
 // ---- stats builder ----
 
+/** Push token-metric parts (↑ ↓ R W) onto the array. */
+function pushTokenParts(parts: string[], usage: UsageTotals): void {
+  if (usage.totalInput) parts.push(`↑${formatTokens(usage.totalInput)}`);
+  if (usage.totalOutput) parts.push(`↓${formatTokens(usage.totalOutput)}`);
+  if (usage.totalCacheRead) parts.push(`R${formatTokens(usage.totalCacheRead)}`);
+  if (usage.totalCacheWrite) parts.push(`W${formatTokens(usage.totalCacheWrite)}`);
+}
+
+/**
+ * Push CH (cumulative session cache hit rate) onto the array.
+ * Denominator includes cacheRead + cacheWrite + input (matches PI's built-in footer).
+ * Contrast with TCH which is per-turn and excludes cacheWrite.
+ */
+function pushCHPart(parts: string[], usage: UsageTotals): void {
+  const { totalCacheRead, totalCacheWrite, totalInput } = usage;
+  const denom = totalCacheRead + totalCacheWrite + totalInput;
+  if ((totalCacheRead > 0 || totalCacheWrite > 0) && denom > 0) {
+    parts.push(`CH${((totalCacheRead / denom) * 100).toFixed(1)}%`);
+  }
+}
+
+/** Build the core stats parts array (↑↓RW CH extra cost context). */
+function buildStatsParts(
+  usage: UsageTotals,
+  params: {
+    contextWindow: number;
+    percent: number | null;
+    useSubscription: boolean;
+    extraParts?: string[];
+  },
+): string[] {
+  const { totalCost } = usage;
+  const { contextWindow, percent, useSubscription, extraParts } = params;
+  const contextPercent = percent != null ? percent.toFixed(1) : "?";
+
+  const parts: string[] = [];
+  pushTokenParts(parts, usage);
+  pushCHPart(parts, usage);
+
+  for (const part of extraParts ?? []) {
+    if (part) parts.push(part);
+  }
+
+  if (totalCost || useSubscription) {
+    parts.push(`$${totalCost.toFixed(3)}${useSubscription ? " (sub)" : ""}`);
+  }
+
+  parts.push(
+    contextPercent === "?"
+      ? `?/${formatTokens(contextWindow)}`
+      : `${contextPercent}%/${formatTokens(contextWindow)}`,
+  );
+
+  return parts;
+}
+
 /** Build the left-side stats string. */
 export function buildStatsLeft(params: {
   contextWindow: number;
   percent: number | null;
   usage: UsageTotals;
   useSubscription: boolean;
+  /** Extra parts inserted after CH, before cost and context. */
+  extraParts?: string[];
 }): { text: string; contextPercentValue: number } {
-  const { contextWindow, percent, usage, useSubscription } = params;
-  const { totalInput, totalOutput, totalCacheRead, totalCacheWrite, totalCost } = usage;
-
-  const contextPercentValue = percent ?? 0;
-  const contextPercent = percent != null ? percent.toFixed(1) : "?";
-
-  const parts: string[] = [];
-  if (totalInput) parts.push(`↑${formatTokens(totalInput)}`);
-  if (totalOutput) parts.push(`↓${formatTokens(totalOutput)}`);
-  if (totalCacheRead) parts.push(`R${formatTokens(totalCacheRead)}`);
-  if (totalCacheWrite) parts.push(`W${formatTokens(totalCacheWrite)}`);
-
-  if (totalCost || useSubscription) {
-    parts.push(`$${totalCost.toFixed(3)}${useSubscription ? " (sub)" : ""}`);
-  }
-
-  const ctxDisplay =
-    contextPercent === "?"
-      ? `?/${formatTokens(contextWindow)}`
-      : `${contextPercent}%/${formatTokens(contextWindow)}`;
-  parts.push(ctxDisplay);
-
+  const { usage } = params;
+  const contextPercentValue = params.percent ?? 0;
+  const parts = buildStatsParts(usage, params);
   return { text: parts.join(" "), contextPercentValue };
 }
 

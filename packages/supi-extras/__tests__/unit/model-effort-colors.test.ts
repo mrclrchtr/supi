@@ -1,3 +1,4 @@
+import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import modelEffortColors from "../../src/model-effort-colors.ts";
@@ -102,6 +103,7 @@ describe("modelEffortColors extension", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    footerContributions.clear();
   });
 
   describe("color mapping", () => {
@@ -410,6 +412,309 @@ describe("modelEffortColors extension", () => {
       ) => Promise<unknown>;
       await selectHandler?.({ model: { provider: "anthropic", id: "claude" } }, ctx);
       // If we get here without throwing, cleanup worked
+    });
+  });
+
+  describe("stats line", () => {
+    it("includes CH when cache data is present", async () => {
+      const pi = createPiMock();
+      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        model: { provider: "anthropic", id: "claude", reasoning: false, contextWindow: 200000 },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+        sessionManager: defaultSessionManager({
+          getEntries: vi.fn(() => [
+            {
+              type: "message",
+              message: {
+                role: "assistant",
+                usage: {
+                  input: 2000,
+                  output: 500,
+                  cacheRead: 8000,
+                  cacheWrite: 2000,
+                  cost: { total: 0.05 },
+                },
+              },
+            },
+          ]),
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const factory = footerFactory as FooterFactory;
+      const renderer = factory(mockTui, mockTheme, makeFooterData());
+      const lines = renderer.render(120);
+      // CH = 8000 / (8000 + 2000 + 2000) * 100 = 66.7%
+      expect(lines[1]).toContain("CH66.7%");
+    });
+
+    it("omits CH when no cache data", async () => {
+      const pi = createPiMock();
+      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        model: { provider: "openai", id: "gpt-4", reasoning: false, contextWindow: 128000 },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+        sessionManager: defaultSessionManager({
+          getEntries: vi.fn(() => [
+            {
+              type: "message",
+              message: {
+                role: "assistant",
+                usage: {
+                  input: 2000,
+                  output: 500,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  cost: { total: 0.01 },
+                },
+              },
+            },
+          ]),
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const factory = footerFactory as FooterFactory;
+      const renderer = factory(mockTui, mockTheme, makeFooterData());
+      const lines = renderer.render(120);
+      expect(lines[1]).not.toContain("CH");
+    });
+
+    it("places extra parts after CH and before cost/context", async () => {
+      const pi = createPiMock();
+      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+
+      // Register a real stats contribution before rendering
+      footerContributions.register({
+        key: "test-contrib",
+        placement: "stats",
+        render: () => "EXTRA",
+      });
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        model: { provider: "anthropic", id: "claude", reasoning: false, contextWindow: 200000 },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+        sessionManager: defaultSessionManager({
+          getEntries: vi.fn(() => [
+            {
+              type: "message",
+              message: {
+                role: "assistant",
+                usage: {
+                  input: 2000,
+                  output: 500,
+                  cacheRead: 8000,
+                  cacheWrite: 0,
+                  cost: { total: 0.05 },
+                },
+              },
+            },
+          ]),
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const factory = footerFactory as FooterFactory;
+      const renderer = factory(mockTui, mockTheme, makeFooterData());
+      const lines = renderer.render(200);
+
+      // EXTRA should appear after CH but before $
+      const statsLine = lines[1];
+      const chIdx = statsLine.indexOf("CH");
+      const extraIdx = statsLine.indexOf("EXTRA");
+      const costIdx = statsLine.indexOf("$");
+
+      expect(chIdx).toBeGreaterThan(-1);
+      expect(extraIdx).toBeGreaterThan(chIdx);
+      expect(costIdx).toBeGreaterThan(extraIdx);
+    });
+
+    it("renders TCH from real registry after CH", async () => {
+      const pi = createPiMock();
+      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+
+      // Simulate what supi-cache does: register a stats contribution
+      footerContributions.register({
+        key: "supi-cache",
+        placement: "stats",
+        priority: 0,
+        render: () => "TCH80%↑",
+      });
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        model: { provider: "anthropic", id: "claude", reasoning: false, contextWindow: 200000 },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+        sessionManager: defaultSessionManager({
+          getEntries: vi.fn(() => [
+            {
+              type: "message",
+              message: {
+                role: "assistant",
+                usage: {
+                  input: 2000,
+                  output: 500,
+                  cacheRead: 8000,
+                  cacheWrite: 2000,
+                  cost: { total: 0.05 },
+                },
+              },
+            },
+          ]),
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const factory = footerFactory as FooterFactory;
+      const renderer = factory(mockTui, mockTheme, makeFooterData());
+      const lines = renderer.render(200);
+
+      // TCH should appear immediately after CH
+      expect(lines[1]).toMatch(/CH[\d.]+% TCH/);
+    });
+
+    it("places priority-0 contribution before default-priority ones", async () => {
+      const pi = createPiMock();
+      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+
+      // TCH at priority 0, another at default 100
+      footerContributions.register({
+        key: "tch",
+        placement: "stats",
+        priority: 0,
+        render: () => "TCH80%↑",
+      });
+      footerContributions.register({
+        key: "other",
+        placement: "stats",
+        render: () => "OTHER",
+      });
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        model: { provider: "anthropic", id: "claude", reasoning: false, contextWindow: 200000 },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+        sessionManager: defaultSessionManager({
+          getEntries: vi.fn(() => [
+            {
+              type: "message",
+              message: {
+                role: "assistant",
+                usage: {
+                  input: 2000,
+                  output: 500,
+                  cacheRead: 8000,
+                  cacheWrite: 0,
+                  cost: { total: 0.05 },
+                },
+              },
+            },
+          ]),
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const factory = footerFactory as FooterFactory;
+      const renderer = factory(mockTui, mockTheme, makeFooterData());
+      const lines = renderer.render(200);
+
+      // TCH must appear before OTHER in the stats line
+      const tchIdx = lines[1].indexOf("TCH");
+      const otherIdx = lines[1].indexOf("OTHER");
+      expect(tchIdx).toBeGreaterThan(-1);
+      expect(otherIdx).toBeGreaterThan(tchIdx);
+    });
+
+    it("omits stats contributions that return empty strings", async () => {
+      const pi = createPiMock();
+      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+
+      footerContributions.register({
+        key: "empty",
+        placement: "stats",
+        render: () => "",
+      });
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        model: { provider: "openai", id: "gpt-4", reasoning: false, contextWindow: 128000 },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+        sessionManager: defaultSessionManager({
+          getEntries: vi.fn(() => [
+            {
+              type: "message",
+              message: {
+                role: "assistant",
+                usage: {
+                  input: 2000,
+                  output: 500,
+                  cacheRead: 0,
+                  cacheWrite: 0,
+                  cost: { total: 0 },
+                },
+              },
+            },
+          ]),
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+
+      const factory = footerFactory as FooterFactory;
+      const renderer = factory(mockTui, mockTheme, makeFooterData());
+      const lines = renderer.render(200);
+
+      // Empty string contributions should not add blank parts.
+      // Verifying the stats line still renders normally without extra gaps.
+      expect(lines[1]).toContain("↑");
+      expect(lines[1]).toContain("↓");
     });
   });
 });

@@ -4,6 +4,13 @@ const mockFns = vi.hoisted(() => ({
   loadCacheMonitorConfig: vi.fn(),
 }));
 
+const mockFooterContributions = vi.hoisted(() => ({
+  register: vi.fn(),
+  unregister: vi.fn(),
+  getByPlacement: vi.fn().mockReturnValue([]),
+  clear: vi.fn(),
+}));
+
 vi.mock("../../../src/config.ts", () => ({
   CACHE_MONITOR_DEFAULTS: {
     enabled: true,
@@ -20,6 +27,10 @@ vi.mock("../../../src/settings-registration.ts", () => ({
 
 vi.mock("../../../src/forensics/forensics.ts", () => ({
   runForensics: vi.fn(),
+}));
+
+vi.mock("@mrclrchtr/supi-core/footer-registry", () => ({
+  footerContributions: mockFooterContributions,
 }));
 
 import { createPiMock, getHandlerOrThrow, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -45,6 +56,7 @@ function assistantMessage(cacheRead: number, cacheWrite: number, input: number) 
 
 function resetMocks() {
   vi.clearAllMocks();
+  mockFooterContributions.getByPlacement.mockReturnValue([]);
   mockFns.loadCacheMonitorConfig.mockReturnValue({
     enabled: true,
     notifications: true,
@@ -91,7 +103,16 @@ describe("message_end handler", () => {
     expect(pi.entries).toHaveLength(1);
     expect(pi.entries[0].type).toBe("supi-cache-turn");
     expect((pi.entries[0].data as Record<string, unknown>).hitRate).toBe(80);
-    expect(ctx.ui.setStatus).toHaveBeenCalledWith("supi-cache", "cache: 80%");
+    expect(mockFooterContributions.register).toHaveBeenCalledWith({
+      key: "supi-cache",
+      placement: "stats",
+      priority: 0,
+      render: expect.any(Function),
+    });
+    const registerCall = mockFooterContributions.register.mock.calls[0]?.[0] as {
+      render: () => string;
+    };
+    expect(registerCall.render()).toBe("TCH80%");
   });
 
   it("skips non-assistant messages", async () => {
@@ -103,7 +124,7 @@ describe("message_end handler", () => {
     await handler({ type: "message_end", message: { role: "user" } }, ctx);
 
     expect(pi.entries).toHaveLength(0);
-    expect(ctx.ui.setStatus).not.toHaveBeenCalled();
+    expect(mockFooterContributions.register).not.toHaveBeenCalled();
   });
 
   it("skips assistant messages without usage", async () => {
@@ -170,7 +191,7 @@ describe("message_end handler", () => {
     await pi.handlers.get("message_end")?.[0]?.(assistantMessage(8000, 0, 2000), ctx);
 
     expect(pi.entries).toHaveLength(0);
-    expect(ctx.ui.setStatus).not.toHaveBeenCalled();
+    expect(mockFooterContributions.register).not.toHaveBeenCalled();
   });
 });
 
@@ -208,7 +229,16 @@ describe("session lifecycle", () => {
       ctx,
     );
 
-    expect(ctx.ui.setStatus).toHaveBeenCalledWith("supi-cache", "cache: 80%");
+    expect(mockFooterContributions.register).toHaveBeenCalledWith({
+      key: "supi-cache",
+      placement: "stats",
+      priority: 0,
+      render: expect.any(Function),
+    });
+    const registerCall = mockFooterContributions.register.mock.calls[0]?.[0] as {
+      render: () => string;
+    };
+    expect(registerCall.render()).toBe("TCH80%");
   });
 
   it("clears status on session_start when disabled", async () => {
@@ -228,7 +258,7 @@ describe("session lifecycle", () => {
       ctx,
     );
 
-    expect(ctx.ui.setStatus).toHaveBeenCalledWith("supi-cache", undefined);
+    expect(mockFooterContributions.unregister).toHaveBeenCalledWith("supi-cache");
   });
 
   it("clears state on session_shutdown", async () => {
@@ -244,7 +274,7 @@ describe("session lifecycle", () => {
       ctx,
     );
 
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-cache", undefined);
+    expect(mockFooterContributions.unregister).toHaveBeenCalledWith("supi-cache");
   });
 });
 
@@ -574,8 +604,8 @@ describe("no-data turns (zero cache counters)", () => {
 
     // Should NOT notify regression — turn 2 is no-data, not a real 0%
     expect(ctx.ui.notify).not.toHaveBeenCalled();
-    // Status should show — not 0%
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-cache", "cache: \u2014");
+    // No-data turn unregisters the contribution
+    expect(mockFooterContributions.unregister).toHaveBeenCalledWith("supi-cache");
   });
 
   it("does not compare across a no-data gap", async () => {
@@ -592,7 +622,16 @@ describe("no-data turns (zero cache counters)", () => {
     expect(ctx.ui.notify).not.toHaveBeenCalled();
     expect(pi.entries).toHaveLength(3);
     expect((pi.entries[2].data as Record<string, unknown>).note).toBeUndefined();
-    expect(ctx.ui.setStatus).toHaveBeenLastCalledWith("supi-cache", "cache: 10%");
+    expect(mockFooterContributions.register).toHaveBeenCalledWith({
+      key: "supi-cache",
+      placement: "stats",
+      priority: 0,
+      render: expect.any(Function),
+    });
+    const lastRegister = mockFooterContributions.register.mock.calls.at(-1)?.[0] as {
+      render: () => string;
+    };
+    expect(lastRegister.render()).toBe("TCH10%");
   });
 
   it("carries model-change attribution across a no-data gap", async () => {

@@ -28,6 +28,7 @@ const CORE_EXPORTS = {
   "./config": "./src/config.ts",
   "./context": "./src/context.ts",
   "./debug": "./src/debug-registry.ts",
+  "./footer-registry": "./src/footer-registry.ts",
   "./llm": "./src/llm.ts",
   "./package.json": "./package.json",
   "./path": "./src/path.ts",

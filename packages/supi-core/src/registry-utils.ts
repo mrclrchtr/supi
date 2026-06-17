@@ -27,7 +27,7 @@ function getGlobalRegistryMap<T>(name: string): Map<string, T> {
  *
  * @typeParam T - The value type stored in the registry.
  * @param name - Unique registry name (used to construct the `Symbol.for` key).
- * @returns An object with `register`, `getAll`, and `clear` functions.
+ * @returns An object with `register`, `unregister`, `getAll`, and `clear` functions.
  */
 export function createRegistry<T>(name: string) {
   const getMap = (): Map<string, T> => getGlobalRegistryMap<T>(name);
@@ -38,6 +38,13 @@ export function createRegistry<T>(name: string) {
      */
     register: (id: string, value: T): void => {
       getMap().set(id, value);
+    },
+
+    /**
+     * Remove a registration by id. No-op if not registered.
+     */
+    unregister: (id: string): void => {
+      getMap().delete(id);
     },
 
     /**

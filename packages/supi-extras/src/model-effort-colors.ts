@@ -8,6 +8,7 @@
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
 import {
   buildPwdLine,
   buildStatsLeft,
@@ -91,11 +92,17 @@ export default function modelEffortColors(pi: ExtensionAPI) {
               : false;
 
             // Stats
+            const statContribs = footerContributions
+              .getByPlacement("stats")
+              .map((c) => c.render())
+              .filter(Boolean);
+
             const rawStats = buildStatsLeft({
               contextWindow,
               percent: contextUsage?.percent ?? null,
               usage,
               useSubscription,
+              extraParts: statContribs,
             });
 
             let statsLeft = rawStats.text;
@@ -167,12 +174,21 @@ function buildStatusLine(
   theme: FooterTheme,
 ): void {
   const statuses = footerData.getExtensionStatuses();
-  if (statuses.size === 0) return;
+  const legacyEntries =
+    statuses.size > 0
+      ? (Array.from(statuses.entries()) as Array<[string, string]>)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([, text]) => sanitizeStatusText(text))
+      : [];
 
-  const entries = Array.from(statuses.entries()) as Array<[string, string]>;
-  const statusLine = entries
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([, text]) => sanitizeStatusText(text))
-    .join(" ");
+  const contribEntries = footerContributions
+    .getByPlacement("status")
+    .map((c) => c.render())
+    .filter(Boolean);
+
+  const allEntries = [...legacyEntries, ...contribEntries];
+  if (allEntries.length === 0) return;
+
+  const statusLine = allEntries.join(" ");
   lines.push(truncateToWidth(statusLine, width, theme.fg("dim", "...")));
 }

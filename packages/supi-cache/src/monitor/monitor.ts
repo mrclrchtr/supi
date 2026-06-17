@@ -6,6 +6,7 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
+import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
 import { Type } from "typebox";
 import { loadCacheMonitorConfig } from "../config.ts";
 import { computePromptFingerprint, diffFingerprints, zeroFingerprint } from "../fingerprint.ts";
@@ -44,6 +45,22 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
     return loadCacheMonitorConfig(ctx.cwd).regressionThreshold;
   }
 
+  // ── Helpers ──────────────────────────────────────────────
+
+  function updateFooterStatus(): void {
+    const statusText = formatCacheStatus(state);
+    if (statusText) {
+      footerContributions.register({
+        key: STATUS_KEY,
+        placement: "stats",
+        priority: 0,
+        render: () => statusText,
+      });
+    } else {
+      footerContributions.unregister(STATUS_KEY);
+    }
+  }
+
   // ── message_end: record turn + update status + check regression
 
   pi.on("message_end", async (event, ctx) => {
@@ -59,9 +76,8 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
     // Persist turn record
     pi.appendEntry(ENTRY_TYPE, record);
 
-    // Update footer status
-    const statusText = formatCacheStatus(state);
-    ctx.ui.setStatus(STATUS_KEY, statusText);
+    // Update footer contribution
+    updateFooterStatus();
 
     // Check regression
     const regression = state.detectRegression(getThreshold(ctx));
@@ -106,22 +122,21 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
     state.reset();
 
     if (!isEnabled(ctx)) {
-      ctx.ui.setStatus(STATUS_KEY, undefined);
+      footerContributions.unregister(STATUS_KEY);
       return;
     }
 
     const branch = ctx.sessionManager.getBranch();
     state.restoreFromEntries(branch);
 
-    const statusText = formatCacheStatus(state);
-    ctx.ui.setStatus(STATUS_KEY, statusText);
+    updateFooterStatus();
   });
 
   // ── session_shutdown: clear state ─────────────────────────
 
-  pi.on("session_shutdown", async (_event, ctx) => {
+  pi.on("session_shutdown", async (_event, _ctx) => {
     state.reset();
-    ctx.ui.setStatus(STATUS_KEY, undefined);
+    footerContributions.unregister(STATUS_KEY);
   });
 
   // ── /supi-cache-history command ──────────────────────────

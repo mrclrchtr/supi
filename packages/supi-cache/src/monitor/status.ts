@@ -3,11 +3,11 @@
 import type { CacheMonitorState } from "./state.ts";
 
 /**
- * Format the compact footer status string.
+ * Format the compact footer status string for the stats line.
  *
- * - `cache: 87% ↑` — hit rate with trend arrow
- * - `cache: 0%` — first turn (no trend)
- * - `cache: —` — no cache data available
+ * - `TCH87%↑` — hit rate with trend arrow
+ * - `TCH100%` — first turn (no trend)
+ * - `undefined` — no cache data available (contribution suppressed)
  */
 export function formatCacheStatus(state: CacheMonitorState): string | undefined {
   const latest = state.getLatestTurn();
@@ -15,7 +15,7 @@ export function formatCacheStatus(state: CacheMonitorState): string | undefined 
 
   // No cache data: unsupported provider or zero denominator
   if (!state.cacheSupported || latest.hitRate === undefined) {
-    return "cache: —";
+    return undefined;
   }
 
   const previous = state.getPreviousTurn();
@@ -23,11 +23,11 @@ export function formatCacheStatus(state: CacheMonitorState): string | undefined 
 
   if (previous?.hitRate !== undefined) {
     if (latest.hitRate > previous.hitRate) {
-      trend = " ↑";
+      trend = "↑";
     } else if (latest.hitRate < previous.hitRate) {
-      trend = " ↓";
+      trend = "↓";
     }
   }
 
-  return `cache: ${latest.hitRate}%${trend}`;
+  return `TCH${latest.hitRate}%${trend}`;
 }
