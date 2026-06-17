@@ -201,6 +201,83 @@ describe("loadConfig", () => {
     fs.rmSync(tmpDir, { recursive: true });
   });
 
+  it("top-level lsp.enabled: false does NOT affect per-language server config loading", () => {
+    const tmpDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: { enabled: false },
+      }),
+    );
+
+    const config = loadConfig(tmpDir);
+    // lsp.enabled is a session-level toggle, not a server-level filter.
+    // Server configs should still load regardless.
+    expect(config.servers.typescript).toBeDefined();
+    expect(config.servers.python).toBeDefined();
+
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("per-language enabled: false still removes that server from merged config", () => {
+    const tmpDir = makeTmpDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: { enabled: false },
+          },
+        },
+      }),
+    );
+
+    const config = loadConfig(tmpDir);
+    expect(config.servers.typescript).toBeUndefined();
+    expect(config.servers.python).toBeDefined();
+
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
+  it("project re-enable overrides global per-language disable", () => {
+    const tmpDir = makeTmpDir();
+
+    withHomeDir(tmpDir, () => {
+      fs.mkdirSync(path.join(tmpDir, ".pi", "agent", "supi"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".pi", "agent", "supi", "config.json"),
+        JSON.stringify({
+          lsp: {
+            servers: {
+              typescript: { enabled: false },
+            },
+          },
+        }),
+      );
+
+      // Project explicitly re-enables
+      fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, ".pi", "supi", "config.json"),
+        JSON.stringify({
+          lsp: {
+            servers: {
+              typescript: { enabled: true, command: "vtsls" },
+            },
+          },
+        }),
+      );
+
+      const config = loadConfig(tmpDir);
+      expect(config.servers.typescript).toBeDefined();
+      expect(config.servers.typescript?.command).toBe("vtsls");
+    });
+
+    fs.rmSync(tmpDir, { recursive: true });
+  });
+
   it("ignores legacy .pi-lsp.json", () => {
     const tmpDir = makeTmpDir();
     fs.writeFileSync(

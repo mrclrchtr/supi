@@ -3,6 +3,7 @@
 
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createCodeIntelligenceApp } from "./app/create-code-intelligence-app.ts";
+import { evaluateCoverageWarnings, gatherCoverageEvalInput } from "./lsp/coverage-warnings.ts";
 import { registerDiagnosticInjectionHandlers } from "./lsp/diagnostic-injection.ts";
 import { createLspAdapterState } from "./lsp/runtime-state.ts";
 import { registerLspSessionLifecycle } from "./lsp/session-lifecycle.ts";
@@ -42,6 +43,37 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
   // ── UI registration ───────────────────────────────────────────────
   registerLspMessageRenderer(pi);
   registerCiStatusCommand(pi);
+
+  // ── Coverage warning emission ─────────────────────────────────────
+  pi.on(
+    "before_agent_start",
+    async (_event, ctx): Promise<BeforeAgentStartEventResult | undefined> => {
+      const session = app.getSession(ctx.cwd);
+      if (!session) return;
+
+      const report = evaluateCoverageWarnings(
+        gatherCoverageEvalInput(ctx.cwd, lspState.controller),
+      );
+      const pending = session.coverageWarningState.getPendingWarnings(report);
+      if (pending.length === 0) return;
+
+      const lines = [
+        '<extension-context source="supi-code-intelligence">',
+        "Code intelligence coverage is degraded:",
+      ];
+      for (const w of pending) {
+        const lang = w.language ? `[${w.language}] ` : "";
+        lines.push(`- ${lang}${w.message}`);
+      }
+      lines.push("</extension-context>");
+
+      return {
+        systemPrompt:
+          (await ctx.getSystemPrompt()) +
+          `\n\nThe code intelligence stack has degraded coverage. This means some code-understanding tools (code_* tools) may return limited or structural-only information. The agent should still attempt using them, but be aware that semantic coverage for some languages may be unavailable.`,
+      };
+    },
+  );
 
   // ── Overview injection — uses the app-managed session state ────────
   pi.on(

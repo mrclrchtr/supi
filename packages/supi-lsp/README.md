@@ -43,21 +43,24 @@ Language servers start automatically when a PI session opens. By default, every 
 
 **To reduce startup overhead:**
 
-- **Limit to the servers you actually use** via the `active` allowlist:
+- **Disable specific language servers** that you don't need. Only servers whose source files are detected in the project will be started. To explicitly exclude a language:
 
   ```json
-  { "lsp": { "active": ["typescript"] } }
+  {
+    "lsp": {
+      "servers": {
+        "python": { "enabled": false },
+        "rust": { "enabled": false }
+      }
+    }
+  }
   ```
 
-  Add this to `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global). Only the listed servers will start.
+  Add this to `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global). Only the listed language servers are disabled; all others remain active.
 
-- **Disable LSP entirely** if you don't need semantic code intelligence:
+  > **Note:** The global `lsp.enabled` switch and `lsp.active` allowlist were removed in v0.7.0. LSP is always-on by default. Per-language `lsp.servers.<language>.enabled: false` is the only supported way to opt out. If your config still has `lsp.enabled` or `lsp.active` keys, they are ignored and a deprecation warning will appear at session start.
 
-  ```json
-  { "lsp": { "enabled": false } }
-  ```
-
-  Server discovery walks the project tree at depth 3 (skipping `node_modules`, `.git`, `.pnpm`). Without an `active` allowlist, every detected language server starts in parallel via `Promise.all`.
+  Server discovery walks the project tree at depth 3 (skipping `node_modules`, `.git`, `.pnpm`). Every detected language server starts in parallel via `Promise.all`.
 
 ## Architecture
 

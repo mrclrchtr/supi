@@ -35,17 +35,68 @@ export function loadLspSettings(cwd: string, homeDir?: string): LspSettings {
 }
 
 /**
- * Return a user-facing message that indicates which config scope disabled LSP.
+ * Return a user-facing message explaining why LSP may appear disabled.
+ *
+ * **Since the always-on policy:** `lsp.enabled: false` is deprecated and
+ * ignored. This function is kept for backward compatibility with the
+ * settings UI and reports that LSP is always attempted.
  */
 export function getLspDisabledMessage(cwd: string, homeDir?: string): string {
   const global = loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope: "global", homeDir });
   const project = loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope: "project", homeDir });
 
   if (project.enabled === false) {
-    return "LSP is disabled in project settings (.pi/supi/config.json)";
+    return "LSP is always attempted; `lsp.enabled: false` in project settings (.pi/supi/config.json) is deprecated and ignored";
   }
   if (global.enabled === false) {
-    return "LSP is disabled in global settings (~/.pi/agent/supi/config.json)";
+    return "LSP is always attempted; `lsp.enabled: false` in global settings (~/.pi/agent/supi/config.json) is deprecated and ignored";
   }
-  return "LSP is disabled in settings";
+  return "LSP is always attempted";
 }
+
+// ── Deprecated-key detection (always-on policy) ────────────────
+
+/**
+ * Result of checking for deprecated LSP configuration keys.
+ */
+export interface DeprecatedLspKeys {
+  /** `lsp.enabled` presence in project config. */
+  projectEnabled: boolean;
+  /** `lsp.enabled` presence in global config. */
+  globalEnabled: boolean;
+  /** `lsp.active` presence in project config. */
+  projectActive: boolean;
+  /** `lsp.active` presence in global config. */
+  globalActive: boolean;
+}
+
+/**
+ * Check whether deprecated `lsp.enabled` or `lsp.active` keys exist
+ * in project or global config. These keys are ignored by the always-on
+ * LSP policy but may be present in user config.
+ */
+export function getDeprecatedLspKeys(cwd: string, homeDir?: string): DeprecatedLspKeys {
+  const global = loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope: "global", homeDir });
+  const project = loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope: "project", homeDir });
+
+  return {
+    projectEnabled: hasExplicitEnabledKey(project),
+    globalEnabled: hasExplicitEnabledKey(global),
+    projectActive: hasExplicitActiveKey(project),
+    globalActive: hasExplicitActiveKey(global),
+  };
+}
+
+/** Whether the loaded settings had an explicit `enabled` key (different from default). */
+function hasExplicitEnabledKey(settings: Partial<{ enabled: boolean }>): boolean {
+  return settings.enabled === false;
+}
+
+/** Whether the loaded settings had an explicit `active` key. */
+function hasExplicitActiveKey(settings: Partial<{ active: string[] }>): boolean {
+  return Array.isArray(settings.active) && settings.active.length > 0;
+}
+
+// Alias for backwards compatibility with the RED test name
+/** @deprecated Use {@link getDeprecatedLspKeys} instead. */
+export const hasDeprecatedLspKeys: typeof getDeprecatedLspKeys = getDeprecatedLspKeys;

@@ -7,6 +7,7 @@
 
 import type { GitContext } from "../../git-context.ts";
 import { formatGitContext } from "../../git-context.ts";
+import type { CoverageWarningReport } from "../../lsp/coverage-warnings.ts";
 
 export type HealthSection = "diagnostics" | "servers" | "dirty" | "coverage" | "unused";
 
@@ -66,6 +67,8 @@ export interface HealthData {
   codeActions: CodeActionSuggestion[] | null;
   coverage: HealthCoverageData | null;
   unused: HealthUnusedData | null;
+  /** Coverage warnings for degraded semantic/structural substrate. Undefined when fully healthy. */
+  degradedCoverage?: CoverageWarningReport;
 }
 
 export function renderHealthResult(data: HealthData, cwd: string): string {
@@ -82,6 +85,7 @@ export function renderHealthResult(data: HealthData, cwd: string): string {
   if (data.includedSections.includes("unused")) {
     renderUnusedSection(lines, data, cwd);
   }
+  renderDegradedCoverageSection(lines, data);
   if (data.includedSections.includes("servers")) {
     renderServersSection(lines, data);
   }
@@ -90,6 +94,22 @@ export function renderHealthResult(data: HealthData, cwd: string): string {
   }
 
   return lines.join("\n");
+}
+
+function renderDegradedCoverageSection(lines: string[], data: HealthData): void {
+  if (!data.degradedCoverage?.hasWarnings) return;
+
+  lines.push("### Degraded Coverage");
+  lines.push("");
+
+  for (const warning of data.degradedCoverage.warnings) {
+    const lang = warning.language ? `[${warning.language}] ` : "";
+    lines.push(`- ⚠ ${lang}${warning.message}`);
+    if (warning.detail) {
+      lines.push(`  — ${warning.detail}`);
+    }
+  }
+  lines.push("");
 }
 
 function renderStatusLine(lines: string[], data: HealthData): void {

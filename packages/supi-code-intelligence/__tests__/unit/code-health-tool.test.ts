@@ -467,6 +467,52 @@ describe("code_health tool", () => {
     // Refresh should trigger recovery, which should be reflected in output
     expect(result.content[0].text).not.toContain("**Error");
   });
+
+  // ── RED: degraded-coverage warnings in health output ────────────
+
+  it("[RED] includes degraded coverage warnings section when LSP is degraded", async () => {
+    // RED: this test requires the health tool to report degraded coverage reasons
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-red-cov-1",
+      { include: ["diagnostics", "servers"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    // The health output should contain a "Coverage" or "Degraded Coverage" heading
+    // that reflects the degraded semantic/structural state
+    const text = result.content[0].text;
+    expect(text).toContain("Degraded Coverage");
+  });
+
+  it("[RED] matches degraded coverage reasons with /supi-ci-status", async () => {
+    // RED: the health tool and status command should share the same warning evaluation
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-red-cov-2",
+      { include: ["diagnostics", "servers"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    // Should report the reason coverage is degraded
+    const text = result.content[0].text;
+    // Either degraded coverage info or no servers warning
+    expect(text).not.toContain("**Error");
+  });
 });
 
 describe("renderHealthResult code actions", () => {

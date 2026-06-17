@@ -198,6 +198,17 @@ Preferred workflow apply surface. Thin Phase 5 wrapper over the stored-plan appl
 
 The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`) remain as internal substrates for `code_refactor` and `code_apply` respectively, but are no longer registered on the public tool surface.
 
+## Always-on LSP policy
+
+- The global `lsp.enabled` and `lsp.active` keys are **deprecated and ignored** since v0.7.0.
+- LSP now always attempts to start detected servers — there is no global disable.
+- Per-language disable via `lsp.servers.<language>.enabled: false` is the only supported opt-out.
+- Deprecated keys are detected via `getDeprecatedLspKeys()` from `@mrclrchtr/supi-lsp/api`.
+- Coverage warnings for degraded state (deprecated keys, missing servers, explicit disables, Tree-sitter failures) are computed by `src/lsp/coverage-warnings.ts` and surfaced in:
+  - the /supi-ci-status overlay (as a "Degraded Coverage" section)
+  - code_health (as a "Degraded Coverage" section)
+  - a one-time chat-visible message after a short grace period (5s)
+
 ## Key gotchas
 
 ### Planner routing

@@ -48,7 +48,14 @@ Pull diagnostic sync should use pull when `diagnosticProvider` is available and 
 
 Keep summary and relevance formatting out of `manager.ts`; use focused helpers such as `summary.ts` or `manager-*.ts` modules. `ctx.cwd` is threaded through `LspManager` and formatting utilities, so do not use `process.cwd()` for path resolution.
 
-`loadConfig()` reads server definitions from supi config (`~/.pi/agent/supi/config.json` and `.pi/supi/config.json`) under `lsp.servers`. `.pi-lsp.json` is no longer read. Keys are language names such as `typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, and `kotlin`, not server binary names. Each language entry merges independently against built-in defaults, and omitted fields fall back to the code default for that language. The active-server allowlist is stored under `lsp.active` and applied in `session_start` after config load.
+`loadConfig()` reads server definitions from supi config (`~/.pi/agent/supi/config.json` and `.pi/supi/config.json`) under `lsp.servers`. `.pi-lsp.json` is no longer read. Keys are language names such as `typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, and `kotlin`, not server binary names. Each language entry merges independently against built-in defaults, and omitted fields fall back to the code default for that language.
+
+### Always-on LSP policy
+
+- The global `lsp.enabled` switch is **deprecated and ignored** — LSP always attempts to start detected servers.
+- The `lsp.active` allowlist is **deprecated and ignored** — all detected servers are started.
+- Per-language disable through `lsp.servers.<language>.enabled: false` is the only supported opt-out.
+- Deprecated keys (`lsp.enabled`, `lsp.active`) are detected at session start via `getDeprecatedLspKeys()` from `@mrclrchtr/supi-lsp/api`. Downstream packages (e.g., `supi-code-intelligence`) use this to emit one-time deprecation warnings.
 
 User exclusion patterns live under `lsp.exclude` as gitignore-style glob strings. They are loaded in `session_start`, stored on `LspManager` through `setExcludePatterns()`, and applied only by diagnostic and coverage collection methods; explicit semantic requests issued through the public `code_*` tools are not filtered. `isGlobMatch()` in `pattern-matcher.ts` supports leading `/` for anchored matches, trailing `/` for directory-only matches, `**` for recursive wildcards, and `*` for single-segment wildcards.
 

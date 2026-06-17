@@ -8,7 +8,7 @@
 // It does NOT import pi event types or ExtensionAPI.
 
 import type { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { loadConfig, resolveLanguageAlias } from "../config/config.ts";
+import { loadConfig } from "../config/config.ts";
 import { type LspSettings, loadLspSettings } from "../config/lsp-settings.ts";
 import { clearTsconfigCache } from "../config/tsconfig-scope.ts";
 import type { DetectedProjectServer, LspConfig, ProjectServerInfo } from "../config/types.ts";
@@ -154,6 +154,10 @@ export class LspRuntimeController {
    * Loads settings, creates the manager, starts detected servers,
    * publishes the session service, and registers capabilities.
    *
+   * Always attempts detected servers unless they were explicitly disabled
+   * per language via `lsp.servers.<language>.enabled: false`.
+   * The global `lsp.enabled` and `lsp.active` keys are deprecated and ignored.
+   *
    * Returns the start result and updates the controller's state.
    */
   async start(): Promise<LspStartResult> {
@@ -163,12 +167,12 @@ export class LspRuntimeController {
     await this.cleanupExistingSession();
 
     const lspSettings = loadLspSettings(this.#cwd);
+    // Note: lspSettings.enabled is ignored — the global switch is deprecated.
+    // Per-language `lsp.servers.<language>.enabled: false` is the supported
+    // way to opt out and is already handled by loadConfig.
+    // lspSettings.active is also ignored — the allowlist is deprecated.
 
-    if (!lspSettings.enabled) {
-      return this.setDisabled();
-    }
-
-    const config = this.applyServerAllowlist(loadConfig(this.#cwd), lspSettings);
+    const config = loadConfig(this.#cwd);
 
     try {
       return await this.initializeLspSession(config, lspSettings);
@@ -188,37 +192,12 @@ export class LspRuntimeController {
     clearSessionLspService(this.#cwd);
   }
 
-  /** Set controller state to disabled and publish disabled service state. */
-  private setDisabled(): LspStartResult {
-    const message = "LSP is disabled in settings";
-    this.#state = { kind: "disabled", message };
-    clearSessionLspService(this.#cwd);
-    setSessionLspServiceState(this.#cwd, { kind: "disabled" });
-    return { kind: "disabled", message };
-  }
-
   /** Set controller state to unavailable with the given error. */
   private setUnavailable(error: unknown): LspStartResult {
     const reason = error instanceof Error ? error.message : String(error);
     this.#state = { kind: "unavailable", reason };
     setSessionLspServiceState(this.#cwd, { kind: "unavailable", reason });
     return { kind: "unavailable", reason };
-  }
-
-  /**
-   * Apply the server allowlist filter from config settings.
-   * Removes servers not in the active allowlist.
-   */
-  private applyServerAllowlist(config: LspConfig, settings: LspSettings): LspConfig {
-    if (settings.active.length === 0) return config;
-
-    const allowList = new Set(settings.active.map(resolveLanguageAlias));
-    for (const name of Object.keys(config.servers)) {
-      if (!allowList.has(name)) {
-        delete config.servers[name];
-      }
-    }
-    return config;
   }
 
   /**

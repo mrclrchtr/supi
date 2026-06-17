@@ -11,6 +11,7 @@
  * This session coordinates local state *around* it.
  */
 
+import { CoverageWarningState } from "../lsp/coverage-warnings.ts";
 import type { LspAdapterState } from "../lsp/runtime-state.ts";
 import type { TsAdapterState } from "../tree-sitter/session-lifecycle.ts";
 
@@ -50,6 +51,12 @@ export interface WorkspaceSession {
    * to coordinate cleanup and access.
    */
   adapterState: AdapterStateSlots;
+
+  /**
+   * Coverage warning state for deduplication and grace-period timing.
+   * Evaluated after session startup to avoid transient pending noise.
+   */
+  coverageWarningState: CoverageWarningState;
 }
 
 /**
@@ -64,5 +71,6 @@ export function createWorkspaceSession(cwd: string): WorkspaceSession {
       semantic: undefined,
       structural: undefined,
     },
+    coverageWarningState: new CoverageWarningState(),
   };
 }

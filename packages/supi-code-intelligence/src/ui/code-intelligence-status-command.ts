@@ -6,6 +6,7 @@ import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
+import { evaluateCoverageWarnings, gatherCoverageEvalInput } from "../lsp/coverage-warnings.ts";
 import { type CiStatusData, createCiStatusDialog } from "./code-intelligence-status-overlay.ts";
 
 const STATUS_KEY = "code-intelligence";
@@ -113,6 +114,9 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
 
   const activeTools = pi.getActiveTools().filter((t) => t.startsWith("code_"));
 
+  // Evaluate degraded coverage from available data
+  const degradedCoverage = evaluateCoverageWarnings(gatherCoverageEvalInput(cwd, null));
+
   return {
     servers,
     diagnostics,
@@ -126,6 +130,7 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
       refactorAvailable: workspace.semantic.refactorAvailable,
     },
     activeTools,
+    degradedCoverage: degradedCoverage.hasWarnings ? degradedCoverage : undefined,
   };
 }
 

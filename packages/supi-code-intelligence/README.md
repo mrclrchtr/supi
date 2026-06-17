@@ -48,21 +48,34 @@ LSP language servers start automatically on session open. By default, every serv
 
 **If you experience high CPU on startup:**
 
-1. **Limit to the servers you actually use** via the `active` allowlist:
+**Disable specific language servers** you don't need by adding per-language opt-outs to your config:
 
-   ```json
-   { "lsp": { "active": ["typescript"] } }
-   ```
+```json
+{
+  "lsp": {
+    "servers": {
+      "python": { "enabled": false },
+      "rust": { "enabled": false }
+    }
+  }
+}
+```
 
-   Add this to `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global). Only the listed servers will start.
+Add this to `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global). Only the listed language servers are excluded; all others start normally.
 
-2. **Disable LSP entirely** if you don't use the `code_*` tools:
+> **Note:** The global `lsp.enabled` switch and `lsp.active` allowlist are deprecated and ignored since v0.7.0. LSP now always attempts to start detected servers. If your config still has `lsp.enabled` or `lsp.active` keys, a one-time deprecation warning will appear at session start, but the keys have no runtime effect.
 
-   ```json
-   { "lsp": { "enabled": false } }
-   ```
+### Degraded coverage warnings
 
-   Tree-sitter structural analysis (`code_find` ast mode, `code_graph` imports/exports) still works without LSP.
+When the code-intelligence stack cannot provide full coverage for a workspace, you will see:
+
+- **Deprecated key warnings** — if `lsp.enabled` or `lsp.active` are present in your config (ignored keys)
+- **Language-scoped semantic warnings** — when a detected language's LSP server binary is missing from PATH, or has been explicitly disabled via `lsp.servers.<language>.enabled: false`
+- **Structural warnings** — when Tree-sitter initialization fails (structural coverage unavailable)
+
+These warnings appear once near session start and are also visible in:
+- `/supi-ci-status` — the interactive overlay
+- `code_health` — the health check tool
 
 ## V2 workflow roadmap
 

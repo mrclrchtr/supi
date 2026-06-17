@@ -16,6 +16,7 @@ import type {
   OutstandingDiagnosticSummaryEntry,
   ProjectServerInfo,
 } from "@mrclrchtr/supi-lsp/api";
+import type { CoverageWarningReport } from "../lsp/coverage-warnings.ts";
 import { diagnosticMessageString } from "../lsp/diagnostic-utils.ts";
 
 /**
@@ -39,6 +40,8 @@ export interface CiStatusData {
     refactorAvailable: boolean;
   };
   activeTools: string[];
+  /** Coverage warnings for degraded semantic/structural substrate. Undefined when fully healthy. */
+  degradedCoverage?: CoverageWarningReport;
 }
 
 /** Fetcher for full diagnostic details when a file row is expanded. */
@@ -105,6 +108,7 @@ export class CiStatusDialog {
     this.addProblemsSection(container, width);
     container.addChild(new Spacer(1));
     this.addCapabilitiesSection(container);
+    this.addDegradedCoverageSection(container);
     this.addToolsSection(container, width);
     container.addChild(new Text(this.renderKeyHints(), 1, 0));
     container.addChild(new DynamicBorder((s: string) => this.theme.fg("accent", s)));
@@ -445,6 +449,23 @@ export class CiStatusDialog {
     container.addChild(
       new Text(`  ${t.fg("text", label)} ${t.fg(capColor, capLabel)}${reason}`, 0, 0),
     );
+  }
+
+  private addDegradedCoverageSection(container: Container): void {
+    const warnings = this.data.degradedCoverage;
+    if (!warnings?.hasWarnings) return;
+
+    const t = this.theme;
+    container.addChild(new Spacer(1));
+    container.addChild(new Text(t.fg("error", t.bold(" Degraded Coverage")), 1, 0));
+
+    for (const w of warnings.warnings) {
+      const lang = w.language ? `${t.fg("accent", w.language)} ` : "";
+      container.addChild(
+        new Text(`  ${t.fg("warning", "⚠")} ${lang}${t.fg("dim", w.message)}`, 0, 0),
+      );
+    }
+    container.addChild(new Spacer(1));
   }
 
   private addToolsSection(container: Container, width: number): void {

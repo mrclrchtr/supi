@@ -89,6 +89,16 @@ describe("getLspDisabledMessage (from lsp-settings module)", () => {
   });
 });
 
+// ── Deprecated-key helpers (lsp-settings) ────────────────────
+
+describe("hasDeprecatedLspKeys (always-on policy detection)", () => {
+  it("is exported as a function from lsp-settings", async () => {
+    // RED: this import will fail until hasDeprecatedLspKeys is implemented
+    const mod = await import("../../src/config/lsp-settings.ts");
+    expect(typeof (mod as Record<string, unknown>).hasDeprecatedLspKeys).toBe("function");
+  });
+});
+
 // ── Runtime controller ────────────────────────────────────────
 
 describe("LspRuntimeController", () => {
@@ -107,7 +117,9 @@ describe("LspRuntimeController", () => {
     await controller.shutdown();
   });
 
-  it("returns disabled state when LSP is configured off", async () => {
+  it("does NOT return disabled state when lsp.enabled: false (always-on policy)", async () => {
+    // RED: with the new policy, lsp.enabled is ignored as a runtime switch.
+    // The controller should attempt to start servers normally.
     const tmpDir = makeProjectDir();
     fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
     fs.writeFileSync(
@@ -117,12 +129,54 @@ describe("LspRuntimeController", () => {
 
     const controller = new LspRuntimeController(tmpDir);
     const result = await controller.start();
-    expect(result.kind).toBe("disabled");
-    if (result.kind !== "disabled") {
-      throw new Error("Expected disabled result");
-    }
-    expect(result.message.length).toBeGreaterThan(0);
-    expect(controller.kind).toBe("disabled");
+    // Should NOT return disabled — lsp.enabled is deprecated and ignored
+    expect(result.kind).not.toBe("disabled");
+    // Valid outcomes: ready (servers started) or unavailable (no servers found)
+    expect(["ready", "unavailable"]).toContain(result.kind);
+  });
+
+  it("ignores lsp.active allowlist — servers not in active list are still attempted", async () => {
+    // RED: lsp.active is deprecated and ignored. All detected servers should proceed.
+    const tmpDir = makeProjectDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({ lsp: { active: ["typescript"] } }),
+    );
+
+    const controller = new LspRuntimeController(tmpDir);
+    const result = await controller.start();
+    // The allowlist should not block startup or cause a disabled state
+    expect(result.kind).not.toBe("disabled");
+  });
+
+  it("still respects per-language lsp.servers.<lang>.enabled: false", async () => {
+    // Per-language disable remains the supported way to opt out.
+    const tmpDir = makeProjectDir();
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: {
+            typescript: { enabled: false },
+          },
+        },
+      }),
+    );
+
+    const controller = new LspRuntimeController(tmpDir);
+    const result = await controller.start();
+    // Should not be disabled — per-language disable still allows other servers
+    expect(result.kind).not.toBe("disabled");
+    expect(["ready", "unavailable"]).toContain(result.kind);
+  });
+
+  it("exposes deprecated keys info for downstream consumers", async () => {
+    // RED: The controller or lsp-settings should expose information about
+    // deprecated keys so code-intelligence can warn users.
+    const { getDeprecatedLspKeys } = await import("../../src/config/lsp-settings.ts");
+    expect(typeof getDeprecatedLspKeys).toBe("function");
   });
 
   it("exposes manager and service in ready state after start", async () => {

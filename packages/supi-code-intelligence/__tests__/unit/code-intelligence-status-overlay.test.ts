@@ -287,4 +287,108 @@ describe("CiStatusDialog", () => {
       expect(after).not.toEqual(before);
     });
   });
+
+  // ── RED: degraded coverage in overlay ──────────────────────────
+
+  describe("degraded coverage", () => {
+    it("[RED] shows degraded coverage warnings section when semantic coverage is degraded", () => {
+      // RED: the overlay should display a dedicated "Degraded Coverage" section
+      // when semantic or structural coverage has warnings
+      const dialog = createCiStatusDialog(
+        makeData({
+          servers: [],
+          diagnostics: [],
+          capabilities: {
+            semantic: { kind: "unavailable", reason: "no LSP session", providerAvailable: false },
+            structural: { kind: "ready", providerAvailable: true },
+            refactorAvailable: false,
+          },
+          // RED: degradedCoverage is a new field that doesn't exist yet
+          degradedCoverage: {
+            hasWarnings: true,
+            warnings: [
+              {
+                type: "missing-server",
+                language: "python",
+                message: "pyright-langserver not found on PATH",
+              },
+            ],
+          },
+        }),
+        makeDeps(),
+      );
+      const lines = dialog.render(80).join("\n");
+      expect(lines).toContain("Degraded Coverage");
+      expect(lines).toContain("python");
+    });
+
+    it("[RED] hides degraded coverage section when no warnings exist", () => {
+      // RED: the section should be absent when coverage is fully healthy
+      const dialog = createCiStatusDialog(
+        makeData({
+          servers: mockServers,
+          diagnostics: [],
+          capabilities: {
+            semantic: { kind: "ready", providerAvailable: true },
+            structural: { kind: "ready", providerAvailable: true },
+            refactorAvailable: true,
+          },
+          degradedCoverage: { hasWarnings: false, warnings: [] },
+        }),
+        makeDeps(),
+      );
+      const lines = dialog.render(80).join("\n");
+      expect(lines).not.toContain("Degraded Coverage");
+    });
+
+    it("[RED] shows deprecation warning for ignored lsp.enabled key", () => {
+      const dialog = createCiStatusDialog(
+        makeData({
+          servers: mockServers,
+          diagnostics: [],
+          capabilities: {
+            semantic: { kind: "ready", providerAvailable: true },
+            structural: { kind: "ready", providerAvailable: true },
+            refactorAvailable: true,
+          },
+          degradedCoverage: {
+            hasWarnings: true,
+            warnings: [
+              { type: "deprecated-key", message: "lsp.enabled is deprecated and ignored" },
+            ],
+          },
+        }),
+        makeDeps(),
+      );
+      const lines = dialog.render(80).join("\n");
+      expect(lines).toContain("deprecated");
+      expect(lines).toContain("lsp.enabled");
+    });
+
+    it("[RED] shows structural failure warning when tree-sitter is unavailable", () => {
+      const dialog = createCiStatusDialog(
+        makeData({
+          servers: mockServers,
+          diagnostics: [],
+          capabilities: {
+            semantic: { kind: "ready", providerAvailable: true },
+            structural: {
+              kind: "unavailable",
+              reason: "tree-sitter not initialized",
+              providerAvailable: false,
+            },
+            refactorAvailable: true,
+          },
+          degradedCoverage: {
+            hasWarnings: true,
+            warnings: [{ type: "structural-unavailable", message: "Tree-sitter is unavailable" }],
+          },
+        }),
+        makeDeps(),
+      );
+      const lines = dialog.render(80).join("\n");
+      expect(lines).toContain("Degraded Coverage");
+      expect(lines).toContain("Tree-sitter");
+    });
+  });
 });

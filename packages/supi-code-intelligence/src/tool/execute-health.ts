@@ -11,6 +11,7 @@ import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type { SessionLspService, SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { gatherGitContext } from "../git-context.ts";
+import { evaluateCoverageWarnings, gatherCoverageEvalInput } from "../lsp/coverage-warnings.ts";
 import {
   type CodeActionSuggestion,
   type HealthCoverageData,
@@ -84,6 +85,9 @@ export async function executeHealthTool(
       ? await collectCodeActions(service, scopeFilter, cwd)
       : null;
 
+  // Evaluate degraded coverage
+  const degradedCoverage = evaluateCoverageWarnings(gatherCoverageEvalInput(cwd, null));
+
   const data: HealthData = {
     includedSections: included,
     lspAvailable: service !== null,
@@ -97,6 +101,7 @@ export async function executeHealthTool(
     codeActions,
     coverage,
     unused,
+    degradedCoverage: degradedCoverage.hasWarnings ? degradedCoverage : undefined,
   };
 
   const content = renderHealthResult(data, cwd);
