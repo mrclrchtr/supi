@@ -201,6 +201,8 @@ function buildRunnerCtx(runner: ReviewerRunnerState): RunnerContext {
   ctx.timeoutSteered = runner.timeoutSteered;
   ctx.graceTurnsRemaining = runner.graceTurnsRemaining;
   ctx.debug = runner.debug;
+  ctx.toolCounts = {};
+  ctx.inspectedFiles = new Set();
   return ctx;
 }
 
@@ -214,6 +216,7 @@ function syncCtxFromLifecycle(
   ctx.resolve = lcCtx.resolve;
   ctx.cleanup = lcCtx.cleanup;
   ctx.state = lcCtx.state;
+  ctx.startTime = lcCtx.startTime;
   ctx.submitSteered = runner.submitSteered;
   ctx.timeoutSteered = runner.timeoutSteered;
   ctx.graceTurnsRemaining = runner.graceTurnsRemaining;

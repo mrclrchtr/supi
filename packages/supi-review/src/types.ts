@@ -128,11 +128,12 @@ export interface ReviewPacket {
 export interface ReviewFailureDebugInfo {
   turns: number;
   toolUses: number;
-  activities?: string[];
   tokens?: {
     input: number;
     output: number;
     total: number;
+    cacheRead?: number;
+    cacheWrite?: number;
   };
   recentEvents?: string[];
   lastAssistantText?: string;
@@ -200,10 +201,24 @@ export interface ReviewProgress {
   turns: number;
   /** Number of tool executions started. */
   toolUses: number;
-  /** Human-readable active tool descriptions. */
-  activities: string[];
   /** Token usage stats, if available. */
-  tokens?: { input: number; output: number; total: number };
+  tokens?: {
+    input: number;
+    output: number;
+    total: number;
+    cacheRead?: number;
+    cacheWrite?: number;
+  };
+  /** Per-tool execution counts keyed by short display label (e.g. "diffs", "reads", "greps"). */
+  toolCounts?: Record<string, number>;
+  /** Number of distinct files inspected so far (via read_snapshot_diff / read_snapshot_file). */
+  filesInspected?: number;
+  /** Total files in the review snapshot. */
+  filesTotal?: number;
+  /** Current tool + context for the progress narrative line. */
+  currentFocus?: { label: string; detail: string };
+  /** Elapsed time in milliseconds since the operation started. */
+  elapsedMs?: number;
 }
 
 export type BriefSynthesisRunResult =

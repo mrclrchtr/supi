@@ -42,8 +42,18 @@ export function extractAssistantText(content: unknown): string | undefined {
 
 /** Build a truncated string representation of session stats for progress. */
 export function buildProgressTokens(
-  getSessionStats: () => { tokens?: { input?: number; output?: number; total?: number } },
-): { input: number; output: number; total: number } | undefined {
+  getSessionStats: () => {
+    tokens?: {
+      input?: number;
+      output?: number;
+      total?: number;
+      cacheRead?: number;
+      cacheWrite?: number;
+    };
+  },
+):
+  | { input: number; output: number; total: number; cacheRead?: number; cacheWrite?: number }
+  | undefined {
   try {
     const stats = getSessionStats();
     return stats?.tokens
@@ -51,6 +61,8 @@ export function buildProgressTokens(
           input: stats.tokens.input ?? 0,
           output: stats.tokens.output ?? 0,
           total: stats.tokens.total ?? 0,
+          cacheRead: stats.tokens.cacheRead,
+          cacheWrite: stats.tokens.cacheWrite,
         }
       : undefined;
   } catch {

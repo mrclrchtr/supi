@@ -84,7 +84,8 @@ function emitBriefProgress(
   invocation: BriefSynthesisInvocation,
 ): void {
   ctx.progress.tokens = buildProgressTokens(() => ctx.session.getSessionStats());
-  invocation.onProgress?.({ ...ctx.progress, activities: [...ctx.progress.activities] });
+  ctx.progress.elapsedMs = Date.now() - ctx.startTime;
+  invocation.onProgress?.(ctx.progress);
 }
 
 function handleAgentEnd(options: {
@@ -145,13 +146,14 @@ export async function runBriefSynthesis(
           break;
         case "tool_execution_start":
           ctx.progress.toolUses++;
-          ctx.progress.activities = [
-            event.toolName === "submit_review_brief" ? "submitting brief" : event.toolName,
-          ];
+          ctx.progress.currentFocus = {
+            label: event.toolName === "submit_review_brief" ? "Submitting brief" : event.toolName,
+            detail: "",
+          };
           emitBriefProgress(ctx, invocation);
           break;
         case "tool_execution_end":
-          ctx.progress.activities = [];
+          ctx.progress.currentFocus = undefined;
           emitBriefProgress(ctx, invocation);
           break;
         case "agent_end": {

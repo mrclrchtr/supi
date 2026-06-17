@@ -107,7 +107,6 @@ export function buildFailureDebug(input: BuildFailureDebugInput): ReviewFailureD
   return {
     turns: input.progress.turns,
     toolUses: input.progress.toolUses,
-    activities: input.progress.activities.length > 0 ? [...input.progress.activities] : undefined,
     tokens: input.progress.tokens,
     recentEvents: input.recentEvents.length > 0 ? [...input.recentEvents] : undefined,
     lastAssistantText: lastAssistant?.text,

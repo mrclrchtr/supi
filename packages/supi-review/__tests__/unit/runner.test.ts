@@ -301,7 +301,6 @@ describe("runReviewer", () => {
         lastAssistantStopReason: "stop",
         lastAssistantErrorMessage: undefined,
         lastAssistantToolCalls: undefined,
-        activities: undefined,
       });
     }
   });

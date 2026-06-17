@@ -27,6 +27,8 @@ export interface LifecycleCtx<TResult> {
    * Useful for custom timers or resources set up by `onTimeout`.
    */
   addTeardown: (fn: () => void) => void;
+  /** Timestamp (ms) when the lifecycle started, for elapsed-time display. */
+  startTime: number;
 }
 
 /** Configuration for `runWithLifecycle`. */
@@ -90,7 +92,6 @@ export function runWithLifecycle<TResult>(
   const progress: ReviewProgress = {
     turns: 0,
     toolUses: 0,
-    activities: [],
     tokens: undefined,
   };
   const state: { settled: boolean; aborting: boolean } = {
@@ -122,6 +123,8 @@ export function runWithLifecycle<TResult>(
     return result;
   };
 
+  const startTime = Date.now();
+
   return new Promise<TResult>((resolve) => {
     const ctx: LifecycleCtx<TResult> = {
       resolve,
@@ -130,6 +133,7 @@ export function runWithLifecycle<TResult>(
       state,
       session,
       addTeardown,
+      startTime,
     };
 
     session.subscribe((event: AgentSessionEvent) => {

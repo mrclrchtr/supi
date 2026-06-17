@@ -87,9 +87,6 @@ function appendDebugContent(parts: string[], debug: ReviewFailureDebugInfo | und
   const lines = [
     `- Turns: ${debug.turns}`,
     `- Tool uses: ${debug.toolUses}`,
-    debug.activities && debug.activities.length > 0
-      ? `- Active: ${debug.activities.join(", ")}`
-      : undefined,
     debug.tokens
       ? `- Tokens: ${debug.tokens.input} in / ${debug.tokens.output} out / ${debug.tokens.total} total`
       : undefined,
