@@ -62,6 +62,7 @@ export default function (pi: ExtensionAPI) {
     // Stack skill autocomplete on top of the built-in provider.
     // addAutocompleteProvider takes a wrapper callback: (current) => provider.
     ctx.ui.addAutocompleteProvider((current) => ({
+      triggerCharacters: ["$"],
       async getSuggestions(lines, cursorLine, cursorCol, options) {
         const textBeforeCursor = (lines[cursorLine] || "").slice(0, cursorCol);
         const dollarPrefix = extractDollarPrefix(textBeforeCursor);
