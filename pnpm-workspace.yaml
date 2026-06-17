@@ -22,3 +22,9 @@ allowBuilds:
   tree-sitter-ruby: true
   tree-sitter-rust: true
   tree-sitter-typescript: true
+
+minimumReleaseAgeExclude:
+  - '@earendil-works/pi-agent-core'
+  - '@earendil-works/pi-ai'
+  - '@earendil-works/pi-coding-agent'
+  - '@earendil-works/pi-tui'
