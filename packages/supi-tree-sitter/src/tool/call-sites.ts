@@ -6,22 +6,20 @@ import type { CallSiteMatch, GrammarId, TreeSitterResult } from "../types.ts";
 
 // ── Per-grammar call-site queries ─────────────────────────────────────
 
+// JS/TS/TSX queries that capture the full callee expression, not just the leaf name.
+// `(_)` matches any expression node, giving us the full callee including member chains
+// and nested call expressions (e.g. `factory()()` captures `factory()` for the outer call).
+const JS_TS_CALL_SITE_QUERY = [
+  // Regular calls: capture the whole callee expression
+  "(call_expression function: (_) @call)",
+  // New expressions: capture the constructor expression
+  "(new_expression constructor: (_) @call)",
+].join("\n");
+
 const CALL_SITE_QUERIES: Partial<Record<GrammarId, string>> = {
-  javascript: [
-    "(call_expression function: (identifier) @call)",
-    "(call_expression function: (member_expression property: (property_identifier) @call))",
-    "(new_expression constructor: (identifier) @call)",
-  ].join("\n"),
-  typescript: [
-    "(call_expression function: (identifier) @call)",
-    "(call_expression function: (member_expression property: (property_identifier) @call))",
-    "(new_expression constructor: (identifier) @call)",
-  ].join("\n"),
-  tsx: [
-    "(call_expression function: (identifier) @call)",
-    "(call_expression function: (member_expression property: (property_identifier) @call))",
-    "(new_expression constructor: (identifier) @call)",
-  ].join("\n"),
+  javascript: JS_TS_CALL_SITE_QUERY,
+  typescript: JS_TS_CALL_SITE_QUERY,
+  tsx: JS_TS_CALL_SITE_QUERY,
   python:
     "(call function: (identifier) @call) (call function: (attribute attribute: (identifier) @call))",
   rust: "(call_expression function: (identifier) @call) (call_expression function: (field_expression field: (field_identifier) @call)) (macro_invocation macro: (identifier) @call)",
@@ -37,7 +35,7 @@ const CALL_SITE_QUERIES: Partial<Record<GrammarId, string>> = {
 };
 
 /**
- * Extract all call-site identifiers from a file.
+ * Extract all call-site callee expressions from a file.
  *
  * Returns a deduplicated list of { name, startLine } for every call-site
  * captured by the grammar-specific query.
@@ -72,7 +70,8 @@ export async function extractCallSites(
   const matches: CallSiteMatch[] = [];
 
   for (const capture of captures) {
-    const name = capture.text.trim();
+    // Normalize: trim whitespace and collapse internal whitespace to single space
+    const name = capture.text.trim().replace(/\s+/g, " ");
     if (name.length === 0) continue;
 
     // Deduplicate by name + line

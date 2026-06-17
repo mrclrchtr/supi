@@ -159,7 +159,7 @@ Unified ranked search tool with a strict evidence contract.
 - `mode: "regex"` → ripgrep regex search; `kind` is not accepted
 - `mode: "semantic"` → LSP workspace symbol search; `kind` is not accepted and semantic mode does not fall back to text search
 - `mode: "ast"` → tree-sitter structured search; requires explicit `kind`
-- supported AST kinds in this phase: `definition`, `import`, `export`
+- supported AST kinds in this phase: `definition`, `import`, `export`, `call`
 - unsupported mode/kind combinations fail explicitly instead of being broadened into best-effort search
 
 Supports `query` (required), `scope`, `mode`, `kind`, `contextLines`, and `maxResults`.

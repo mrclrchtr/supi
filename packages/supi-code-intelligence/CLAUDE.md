@@ -159,8 +159,8 @@ Unified ranked code search with strict mode dispatch — the sole search tool.
 - `mode: "regex"` allows regex search only and does not accept `kind`
 - `mode: "semantic"` allows semantic workspace-symbol search only, does not accept `kind`, and does not fall back to text search
 - `mode: "ast"` requires explicit `kind`
-- supported AST kinds in this phase: `definition`, `import`, `export`
-- unsupported combinations fail explicitly; `call`, `type`, and `test` are not supported AST kinds in this phase
+- supported AST kinds in this phase: `definition`, `import`, `export`, `call`
+- unsupported combinations fail explicitly; `type` and `test` are not supported AST kinds in this phase
 - `scope?` — workspace-relative path, package, or directory to limit search
 - `contextLines?` — context lines around matches (default 1)
 - `maxResults?` — result cap (default 8)

@@ -4,7 +4,7 @@
  * Unified ranked code search with strict mode dispatch:
  * - text (default): literal ripgrep
  * - regex: ripgrep regex
- * - ast: tree-sitter structured search (definition | import | export only)
+ * - ast: tree-sitter structured search (definition | import | export | call)
  * - semantic: LSP workspace symbols
  */
 
@@ -171,13 +171,13 @@ function validateModeKindCombination(
 ): void {
   if (!params.mode && params.kind) {
     throw new Error(
-      'code_find does not accept `kind` when `mode` is omitted. Use `mode: "ast"` with `kind: "definition"`, `"import"`, or `"export"`.',
+      'code_find does not accept `kind` when `mode` is omitted. Use `mode: "ast"` with `kind: "definition"`, `"import"`, `"export"`, or `"call"`.',
     );
   }
 
   if ((mode === "text" || mode === "regex" || mode === "semantic") && params.kind) {
     throw new Error(
-      `code_find does not accept \`kind\` with \`mode: "${mode}"\`. Use \`mode: "ast"\` with \`kind: "definition"\`, \`"import"\`, or \`"export"\` for structured filtering.`,
+      `code_find does not accept \`kind\` with \`mode: "${mode}"\`. Use \`mode: "ast"\` with \`kind: "definition"\`, \`"import"\`, \`"export"\`, or \`"call"\` for structured filtering.`,
     );
   }
 
@@ -185,13 +185,13 @@ function validateModeKindCombination(
 
   if (!params.kind) {
     throw new Error(
-      'code_find with `mode: "ast"` requires `kind`. Supported AST kinds in this phase: `definition`, `import`, `export`.',
+      'code_find with `mode: "ast"` requires `kind`. Supported AST kinds in this phase: `definition`, `import`, `export`, `call`.',
     );
   }
 
   if (!SUPPORTED_AST_KINDS.has(params.kind)) {
     throw new Error(
-      `code_find with \`mode: "ast"\` supports only \`definition\`, \`import\`, and \`export\` in this phase. Received \`${params.kind}\`.`,
+      `code_find with \`mode: "ast"\` supports only \`definition\`, \`import\`, \`export\`, and \`call\` in this phase. Received \`${params.kind}\`.`,
     );
   }
 }

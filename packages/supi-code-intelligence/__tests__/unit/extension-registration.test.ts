@@ -116,6 +116,7 @@ describe("focused code intelligence tool registration", () => {
     expect(tool.description).toContain("definition");
     expect(tool.description).toContain("import");
     expect(tool.description).toContain("export");
+    expect(tool.description).toContain("call");
     expect(tool.description).toContain("does not silently fall back");
     expect(tool.description).not.toContain("advisory-only");
 
@@ -133,6 +134,7 @@ describe("focused code intelligence tool registration", () => {
     expect(kindParam?.description).toContain("definition");
     expect(kindParam?.description).toContain("import");
     expect(kindParam?.description).toContain("export");
+    expect(kindParam?.description).toContain("call");
 
     expect(kindParam?.enum).toBeDefined();
     expect(kindParam?.enum).toEqual(["definition", "import", "export", "call"]);

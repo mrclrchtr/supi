@@ -3,10 +3,13 @@
  * Tests for the code_find tool.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createTreeSitterSession } from "@mrclrchtr/supi-tree-sitter/api";
+import { createTreeSitterProvider } from "@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
@@ -160,11 +163,10 @@ describe("code_find tool", () => {
           undefined,
           makeCtx({ cwd: tmpDir }),
         ),
-      ).rejects.toThrow(/code_find/i);
+      ).rejects.toThrow(/supported AST kinds|definition.*import.*export.*call/i);
     });
 
     it.each([
-      "call",
       "type",
       "test",
     ] as const)("fails when ast mode uses unsupported kind %s", async (kind) => {
@@ -332,6 +334,69 @@ describe("code_find tool", () => {
 
       expect(result.content[0].text).toContain("./foo.ts");
       expect(result.content[0].text).toContain("a.ts");
+    });
+
+    it("finds call sites when structural support is available (mocked)", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const x = obj.method();\n");
+      registerMockProvider(tmpDir, {
+        callSites: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: "obj.method",
+              startLine: 1,
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-ast-call-mocked",
+        { query: "obj.method", mode: "ast", kind: "call" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain("obj.method");
+      expect(result.content[0].text).toContain("a.ts");
+    });
+
+    it("finds full-expression call sites with a real tree-sitter provider", async () => {
+      const srcDir = path.join(tmpDir, "src");
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(
+        path.join(srcDir, "target.ts"),
+        [
+          "interface Query { trim(): string }",
+          "interface Params { query: Query }",
+          "function process(params: Params) {",
+          "  const result = params.query.trim();",
+          "  return result;",
+          "}",
+          "",
+        ].join("\n"),
+      );
+
+      const session = createTreeSitterSession(tmpDir);
+      getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
+      const tool = getCodeFindTool();
+
+      try {
+        const result = (await tool.execute(
+          "test-ast-call-integration",
+          { query: "params.query.trim", mode: "ast", kind: "call", scope: "src" },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        )) as TextToolResult;
+
+        expect(result.content[0].text).toContain("params.query.trim");
+        expect(result.content[0].text).toContain("src/target.ts");
+      } finally {
+        session.dispose();
+      }
     });
   });
 
