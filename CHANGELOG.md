@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/mrclrchtr/supi/compare/v1.12.1...v1.13.0) (2026-06-17)
+
+
+### Features
+
+* **supi-core:** add footer contribution registry with TCH display ([336e9a9](https://github.com/mrclrchtr/supi/commit/336e9a998190d61751dbb5ad466fadc379194717))
+
 ## [1.12.1](https://github.com/mrclrchtr/supi/compare/v1.12.0...v1.12.1) (2026-06-15)
 
 
