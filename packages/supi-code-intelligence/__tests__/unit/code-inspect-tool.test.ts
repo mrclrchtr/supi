@@ -135,6 +135,7 @@ function registerInspectProviders() {
         },
       ],
     }),
+    callSites: async (_f) => ({ kind: "success" as const, data: [] }),
   });
 }
 

@@ -83,5 +83,6 @@ function makeService(): TreeSitterService {
     exports: vi.fn(),
     nodeAt: vi.fn(),
     calleesAt: vi.fn(),
+    callSites: vi.fn(),
   };
 }

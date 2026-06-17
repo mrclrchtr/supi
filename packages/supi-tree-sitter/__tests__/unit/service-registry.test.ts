@@ -40,6 +40,7 @@ describe("TreeSitter service registry", () => {
           callees: [],
         },
       }),
+      callSites: async () => ({ kind: "success" as const, data: [] }),
     };
 
     setSessionTreeSitterService("/project", mockService);
@@ -82,6 +83,7 @@ describe("TreeSitter service registry", () => {
           callees: [],
         },
       }),
+      callSites: async () => ({ kind: "success" as const, data: [] }),
     });
 
     const mockA = mockTemplate();

@@ -8,6 +8,7 @@
 export {
   detectGrammar,
   getSupportedExtension,
+  getSupportedExtensions,
   isJsTsGrammar,
   isSupportedFile,
 } from "./language.ts";
@@ -21,6 +22,7 @@ export { getSessionTreeSitterService } from "./session/service-registry.ts";
 export { createTreeSitterSession } from "./session/session.ts";
 
 // Structural extraction services (consumed by supi-code-intelligence tool execution)
+export { extractCallSites } from "./tool/call-sites.ts";
 export { lookupCalleesAt } from "./tool/callees.ts";
 export { extractExports } from "./tool/exports.ts";
 export { extractImports } from "./tool/imports.ts";
@@ -30,6 +32,7 @@ export { collectOutline } from "./tool/outline.ts";
 // Shared types
 export type {
   CalleesAtResult,
+  CallSiteMatch,
   ExportRecord,
   GrammarId,
   ImportRecord,

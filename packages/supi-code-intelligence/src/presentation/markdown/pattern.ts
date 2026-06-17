@@ -20,19 +20,39 @@ export function renderStructuredEmptyState(
   result?: StructuredPatternResult,
 ): string {
   const lines = [`No ${kind} matches found for \`${pattern}\` in \`${relScope}\`.`];
-  if (result && result.omittedCount > 0 && result.partialReason) {
+  const partial = renderPartialWarning(result);
+  if (partial) {
     lines.push("");
-    if (result.partialReason === "timeout") {
-      lines.push(
-        `_Partial structured results — scan timed out with +${result.omittedCount} file${result.omittedCount !== 1 ? "s" : ""} omitted. Narrow \`path\` or \`pattern\` for complete coverage._`,
-      );
-    } else {
-      lines.push(
-        `_Partial structured results — +${result.omittedCount} file${result.omittedCount !== 1 ? "s" : ""} omitted after reaching the structured scan cap. Narrow \`path\` or \`pattern\` for complete coverage._`,
-      );
-    }
+    lines.push(partial);
+  }
+  const failureLines = renderFailureSummary(result?.failures);
+  if (failureLines.length > 0) {
+    lines.push("");
+    lines.push(...failureLines);
   }
   return lines.join("\n");
+}
+
+function renderFailureSummary(failures?: Array<{ file: string; reason: string }>): string[] {
+  if (!failures || failures.length === 0) return [];
+  const lines: string[] = [
+    `**${failures.length} file${failures.length !== 1 ? "s" : ""} could not be analyzed:**`,
+  ];
+  for (const f of failures.slice(0, 5)) {
+    lines.push(`- \`${f.file}\` — ${f.reason}`);
+  }
+  if (failures.length > 5) {
+    lines.push(`- _+${failures.length - 5} more_`);
+  }
+  return lines;
+}
+
+function renderPartialWarning(result?: StructuredPatternResult): string | null {
+  if (!result || result.omittedCount <= 0 || !result.partialReason) return null;
+  if (result.partialReason === "timeout") {
+    return `_Partial structured results — scan timed out with +${result.omittedCount} file${result.omittedCount !== 1 ? "s" : ""} omitted. Narrow \`path\` or \`pattern\` for complete coverage._`;
+  }
+  return `_Partial structured results — +${result.omittedCount} file${result.omittedCount !== 1 ? "s" : ""} omitted after reaching the structured scan cap. Narrow \`path\` or \`pattern\` for complete coverage._`;
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pattern search rendering groups matches by file and adds summaries — each branch stays linear
@@ -67,9 +87,13 @@ export function renderStructuredMatches(
   lines.push(
     `**${result.matches.length} match${result.matches.length !== 1 ? "es" : ""}** across **${grouped.size} file${grouped.size !== 1 ? "s" : ""}** in \`${relScope}\``,
   );
-  const partialWarning = formatPartialStructuredWarning(result);
+  const partialWarning = renderPartialWarning(result);
   if (partialWarning) {
     lines.push(partialWarning);
+  }
+  if (result.failures.length > 0) {
+    lines.push("");
+    lines.push(...renderFailureSummary(result.failures));
   }
   lines.push("");
 
@@ -89,16 +113,6 @@ export function renderStructuredMatches(
   }
 
   return lines.join("\n");
-}
-
-function formatPartialStructuredWarning(result: StructuredPatternResult): string | null {
-  if (!result.partialReason || result.omittedCount <= 0) return null;
-
-  if (result.partialReason === "timeout") {
-    return `_Partial structured results — scan timed out with +${result.omittedCount} file${result.omittedCount !== 1 ? "s" : ""} omitted. Narrow \`path\` or \`pattern\` for complete coverage._`;
-  }
-
-  return `_Partial structured results — +${result.omittedCount} file${result.omittedCount !== 1 ? "s" : ""} omitted after reaching the structured scan cap. Narrow \`path\` or \`pattern\` for complete coverage._`;
 }
 
 function addDuplicateSummary(lines: string[], matches: StructuredMatch[]): void {

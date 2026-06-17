@@ -29,6 +29,7 @@ const SUPPORTED_AST_KINDS = new Set<NonNullable<CodeFindToolParams["kind"]>>([
   "definition",
   "import",
   "export",
+  "call",
 ]);
 
 export async function executeFindTool(

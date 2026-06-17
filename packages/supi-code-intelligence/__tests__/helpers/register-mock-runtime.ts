@@ -36,6 +36,7 @@ export function registerMockProvider(cwd: string, overrides: Partial<CodeProvide
     outline: overrides.outline ?? noopStructural,
     imports: overrides.imports ?? noopStructural,
     nodeAt: overrides.nodeAt ?? noopStructural,
+    callSites: overrides.callSites ?? noopStructural,
   });
 }
 

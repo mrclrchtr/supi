@@ -56,6 +56,11 @@ export function isSupportedFile(filePath: string): boolean {
   return detectGrammar(filePath) !== undefined;
 }
 
+/** Return all supported file extensions (with leading dot). */
+export function getSupportedExtensions(): string[] {
+  return [...SUPPORTED_EXTENSIONS];
+}
+
 /** Get the file extension if it's supported, otherwise undefined. */
 export function getSupportedExtension(filePath: string): SupportedExtension | undefined {
   const ext = path.extname(filePath).toLowerCase();

@@ -209,5 +209,10 @@ function createMockTsService(): StructuralProvider {
       file: "x",
       message: "mock",
     }),
+    callSites: vi.fn().mockResolvedValue({
+      kind: "unsupported-language" as const,
+      file: "x",
+      message: "mock",
+    }),
   };
 }

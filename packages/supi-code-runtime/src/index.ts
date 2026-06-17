@@ -7,6 +7,7 @@
 
 export type {
   CalleesData,
+  CallSite,
   CapabilityState,
   CodeLocation,
   CodePosition,

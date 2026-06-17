@@ -66,6 +66,12 @@ export interface QueryCapture {
   text: string;
 }
 
+/** A single call-site match from tree-sitter analysis. */
+export interface CallSiteMatch {
+  name: string;
+  startLine: number;
+}
+
 /** Shared Tree-sitter service surface, independent of lifecycle ownership. */
 export interface TreeSitterService {
   /** Validate that a supported file can be read and parsed; does not expose the raw tree. */
@@ -86,6 +92,8 @@ export interface TreeSitterService {
     line: number,
     character: number,
   ): Promise<TreeSitterResult<CalleesAtResult>>;
+  /** Extract all call-site identifiers in a file. */
+  callSites(file: string): Promise<TreeSitterResult<CallSiteMatch[]>>;
 }
 
 /** Owned Tree-sitter session that must release its runtime resources. */

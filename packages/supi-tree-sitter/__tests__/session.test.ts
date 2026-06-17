@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
     extractOutline: vi.fn(),
     lookupNodeAt: vi.fn(),
     lookupCalleesAt: vi.fn(),
+    extractCallSites: vi.fn(),
   };
 });
 
@@ -40,6 +41,7 @@ vi.mock("../src/tool/structure.ts", () => ({
   extractOutline: mocks.extractOutline,
   lookupNodeAt: mocks.lookupNodeAt,
   lookupCalleesAt: mocks.lookupCalleesAt,
+  extractCallSites: mocks.extractCallSites,
 }));
 
 async function importSessionFactory() {
@@ -61,6 +63,8 @@ describe("createTreeSitterSession", () => {
     mocks.extractImports.mockReset();
     mocks.extractOutline.mockReset();
     mocks.lookupNodeAt.mockReset();
+    mocks.lookupCalleesAt.mockReset();
+    mocks.extractCallSites.mockReset();
   });
 
   it("delegates canParse and deletes the parse tree", async () => {

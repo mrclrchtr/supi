@@ -188,3 +188,9 @@ export interface CalleesData {
   enclosingScope: { name: string; startLine: number; endLine: number };
   callees: Array<{ name: string; startLine: number }>;
 }
+
+/** A single call-site match with name and start line. */
+export interface CallSite {
+  name: string;
+  startLine: number;
+}

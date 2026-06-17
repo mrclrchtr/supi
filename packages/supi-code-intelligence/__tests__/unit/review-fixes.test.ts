@@ -181,6 +181,7 @@ describe("focused-tool follow-up regressions", () => {
           },
         ],
       }),
+      callSites: async (_f) => ({ kind: "success" as const, data: [] }),
     });
 
     const result = await executeContextTool(

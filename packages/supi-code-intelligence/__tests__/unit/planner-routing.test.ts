@@ -242,5 +242,10 @@ function createMockStructuralProvider(): StructuralProvider {
       file: "x",
       message: "mock",
     }),
+    callSites: async (_f) => ({
+      kind: "unsupported-language" as const,
+      file: "x",
+      message: "mock",
+    }),
   };
 }

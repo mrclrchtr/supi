@@ -16,6 +16,7 @@ export type {
 // Shared canonical types
 export type {
   CalleesData,
+  CallSite,
   CodeLocation,
   CodePosition,
   CodeResult,

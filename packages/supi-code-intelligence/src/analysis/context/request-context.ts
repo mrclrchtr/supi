@@ -170,5 +170,13 @@ function createCompositeProvider(
         }
       );
     },
+    async callSites(file: string) {
+      return (
+        structural?.callSites(file) ?? {
+          kind: "unavailable" as const,
+          message: "Structural analysis not available.",
+        }
+      );
+    },
   };
 }

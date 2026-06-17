@@ -22,6 +22,7 @@ describe("Provider type compatibility", () => {
       outline: async () => ({ kind: "unavailable" as const, message: "" }),
       imports: async () => ({ kind: "unavailable" as const, message: "" }),
       nodeAt: async () => ({ kind: "unavailable" as const, message: "" }),
+      callSites: async () => ({ kind: "unavailable" as const, message: "" }),
     };
     const substrate: import("@mrclrchtr/supi-code-runtime/api").StructuralProvider = provider;
     expect(typeof substrate.calleesAt).toBe("function");

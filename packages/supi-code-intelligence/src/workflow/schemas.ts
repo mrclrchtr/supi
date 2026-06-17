@@ -131,9 +131,9 @@ export const CodeFindParameters = Type.Object(
       }),
     ),
     kind: Type.Optional(
-      StringEnum(["definition", "import", "export"], {
+      StringEnum(["definition", "import", "export", "call"], {
         description:
-          'Only valid with `mode: "ast"`. Supported AST kinds in this phase: `definition`, `import`, `export`.',
+          'Only valid with `mode: "ast"`. Supported AST kinds in this phase: `definition`, `import`, `export`, `call`.',
       }),
     ),
     contextLines: Type.Optional(

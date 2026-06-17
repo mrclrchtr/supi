@@ -6,6 +6,7 @@
 
 import type {
   CalleesData,
+  CallSite,
   CodeLocation,
   CodePosition,
   CodeResult,
@@ -120,6 +121,8 @@ export interface StructuralProvider {
   outline(file: string): Promise<CodeResult<OutlineData[]>>;
   imports(file: string): Promise<CodeResult<ImportData[]>>;
   nodeAt(file: string, line: number, character: number): Promise<CodeResult<NodeAtData>>;
+  /** Find all call-site identifiers in a file. Returns name + start line for each match. */
+  callSites(file: string): Promise<CodeResult<CallSite[]>>;
 }
 
 /** Convenience alias for `CodeResult` used in structural contexts. */

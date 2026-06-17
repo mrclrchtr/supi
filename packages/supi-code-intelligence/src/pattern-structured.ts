@@ -1,11 +1,11 @@
+import { execFileSync } from "node:child_process";
 import * as path from "node:path";
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
-import { collectCallSitesInFile } from "./analysis/relations/call-sites.ts";
+import { getSupportedExtensions } from "@mrclrchtr/supi-tree-sitter/api";
 import type { CodeQueryParams as ActionParams } from "./query-params.ts";
-import { runRipgrep } from "./search-helpers.ts";
 
-/** Ripgrep text-match file cap — backstop for degenerate queries that match thousands of files. */
-const RG_PREFILTER_FILE_CAP = 5000;
+/** Soft file cap — warn when a workspace has more source files than this. */
+const FILE_SOFT_CAP = 5000;
 const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;
 
 export type StructuredPatternKind = "definition" | "export" | "import" | "call" | "type" | "test";
@@ -21,6 +21,13 @@ export interface StructuredPatternResult {
   matches: StructuredMatch[];
   omittedCount: number;
   partialReason: "file-cap" | "timeout" | null;
+  /** Per-file parse/analysis failures surfaced to the agent. */
+  failures: StructuredFailure[];
+}
+
+export interface StructuredFailure {
+  file: string;
+  reason: string;
 }
 
 export function isStructuredPatternKind(kind: string | undefined): kind is StructuredPatternKind {
@@ -35,6 +42,7 @@ export function isStructuredPatternKind(kind: string | undefined): kind is Struc
 }
 
 // biome-ignore lint/complexity/useMaxParams: substrate injection keeps related inputs explicit for readability
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: enumeration-interrupted, cap, timeout, and error branches are each necessary
 export async function getStructuredPatternMatches(
   params: ActionParams & { pattern: string; kind: StructuredPatternKind },
   scopePath: string,
@@ -44,31 +52,32 @@ export async function getStructuredPatternMatches(
 ): Promise<StructuredPatternResult | string | null> {
   const deadline = Date.now() + STRUCTURED_PATTERN_TIMEOUT_MS;
 
-  // Ripgrep pre-filter: find candidate files by text match, then tree-sitter only those.
-  // This avoids a filesystem walk + cap that silently truncates on repos with >200 source files.
-  const literal = !(params.regex ?? false);
-  const rgMatches = runRipgrep(params.pattern, scopePath, cwd, {
-    literal,
-    filterLowSignal: true,
-  });
+  // Enumerate all supported source files via ripgrep (language-agnostic).
+  const enumeration = enumerateSourceFiles(scopePath, cwd);
+  if (enumeration === null) {
+    return `Ripgrep (rg) is not available. Install it for structured pattern search.`;
+  }
 
-  // Deduplicate files and sort for stable processing order.
-  const candidateFiles = [...new Set(rgMatches.map((m) => m.file))].sort((a, b) =>
-    a.localeCompare(b),
-  );
+  const allFiles = enumeration.files;
+  let omittedCount = 0;
 
-  if (candidateFiles.length === 0) {
+  if (enumeration.interrupted) {
+    // rg was killed before completing the file listing — treat as partial
+    omittedCount = Math.max(1, omittedCount);
+  }
+
+  if (allFiles.length === 0) {
     return {
       matches: [],
-      omittedCount: 0,
-      partialReason: null,
+      omittedCount,
+      partialReason: enumeration.interrupted ? "timeout" : null,
+      failures: [],
     };
   }
 
-  let omittedCount = 0;
-  const capped = candidateFiles.slice(0, RG_PREFILTER_FILE_CAP);
-  if (candidateFiles.length > RG_PREFILTER_FILE_CAP) {
-    omittedCount = candidateFiles.length - RG_PREFILTER_FILE_CAP;
+  const capped = allFiles.slice(0, FILE_SOFT_CAP);
+  if (allFiles.length > FILE_SOFT_CAP) {
+    omittedCount = allFiles.length - FILE_SOFT_CAP;
   }
 
   const matcher = createStructuredMatcher(params.pattern, params.regex ?? false);
@@ -78,6 +87,7 @@ export async function getStructuredPatternMatches(
 
   try {
     const matches: StructuredMatch[] = [];
+    const failures: StructuredFailure[] = [];
     let timedOut = false;
 
     for (const [index, file] of capped.entries()) {
@@ -88,11 +98,12 @@ export async function getStructuredPatternMatches(
       }
       const absFile = path.resolve(cwd, file);
       const relFile = path.relative(cwd, absFile);
-      await collectMatchesForFile(matches, structural, absFile, relFile, params.kind, matcher);
+      await collectMatchesForFile(matches, failures, structural, relFile, params.kind, matcher);
     }
 
     return {
       matches,
+      failures,
       omittedCount: timedOut ? Math.max(1, omittedCount) : omittedCount,
       partialReason: timedOut ? "timeout" : omittedCount > 0 ? "file-cap" : null,
     };
@@ -101,19 +112,78 @@ export async function getStructuredPatternMatches(
   }
 }
 
+// ── File enumeration ─────────────────────────────────────────────────
+
+interface FileEnumeration {
+  files: string[];
+  /** True when rg was terminated before completing the listing. */
+  interrupted: boolean;
+}
+
+/**
+ * Enumerate all tree-sitter-supported source files in scopePath using rg --files.
+ * Returns null if ripgrep is not available.
+ */
+function enumerateSourceFiles(scopePath: string, cwd: string): FileEnumeration | null {
+  const extensions = getSupportedExtensions();
+  // Strip leading dots — ripgrep -g expects ".ext" without the dot prefix
+  const globPattern = `*.{${Array.from(extensions)
+    .map((ext) => ext.replace(/^\./, ""))
+    .join(",")}}`;
+
+  try {
+    const output = execFileSync("rg", ["--files", "-g", globPattern, scopePath], {
+      encoding: "utf-8",
+      cwd,
+      timeout: 5000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return {
+      files: output
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .sort((a, b) => a.localeCompare(b)),
+      interrupted: false,
+    };
+  } catch (err: unknown) {
+    if (isCodeError(err, "ENOENT")) {
+      return null;
+    }
+    // Non-zero exit (e.g. no matches) is fine — return what we got
+    if (isExecError(err)) {
+      const stdout = typeof err.stdout === "string" ? err.stdout : "";
+      const wasKilled = (err as { killed?: boolean }).killed === true;
+      return {
+        files: stdout
+          .split("\n")
+          .map((line) => line.trim())
+          .filter((line) => line.length > 0)
+          .sort((a, b) => a.localeCompare(b)),
+        interrupted: wasKilled,
+      };
+    }
+    return { files: [], interrupted: false };
+  }
+}
+
 // biome-ignore lint/complexity/useMaxParams: helper takes explicit collection inputs to avoid intermediate objects in the hot path
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: kind-specific tree-sitter matching is clearest as one helper
 async function collectMatchesForFile(
   matches: StructuredMatch[],
+  failures: StructuredFailure[],
   structural: StructuralSubstrate,
-  absFile: string,
   relFile: string,
   kind: StructuredPatternKind,
   matcher: (value: string) => boolean,
 ): Promise<void> {
+  const recordFailure = (reason: string) => {
+    failures.push({ file: relFile, reason });
+  };
+
   if (kind === "definition") {
     const outline = await structural.outline(relFile);
-    if (outline.kind !== "success") return;
+    if (!handleStructuralResult(outline, relFile, recordFailure)) return;
     for (const item of outline.data) {
       if (!matcher(item.name)) continue;
       matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
@@ -123,7 +193,7 @@ async function collectMatchesForFile(
 
   if (kind === "export") {
     const exportsResult = await structural.exports(relFile);
-    if (exportsResult.kind !== "success") return;
+    if (!handleStructuralResult(exportsResult, relFile, recordFailure)) return;
     for (const item of exportsResult.data) {
       if (!matcher(item.name)) continue;
       matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
@@ -133,7 +203,7 @@ async function collectMatchesForFile(
 
   if (kind === "import") {
     const importsResult = await structural.imports(relFile);
-    if (importsResult.kind !== "success") return;
+    if (!handleStructuralResult(importsResult, relFile, recordFailure)) return;
     for (const item of importsResult.data) {
       if (!matcher(item.moduleSpecifier)) continue;
       matches.push({
@@ -146,12 +216,12 @@ async function collectMatchesForFile(
     return;
   }
 
-  // ── call — ripgrep-based call-site matching ────────────────────────
-
   if (kind === "call") {
-    const callSites = collectCallSitesInFile(absFile, matcher);
-    for (const cs of callSites) {
-      matches.push({ file: relFile, name: cs.name, kind: "call", line: cs.line });
+    const callResult = await structural.callSites(relFile);
+    if (!handleStructuralResult(callResult, relFile, recordFailure)) return;
+    for (const cs of callResult.data) {
+      if (!matcher(cs.name)) continue;
+      matches.push({ file: relFile, name: cs.name, kind: "call", line: cs.startLine });
     }
     return;
   }
@@ -160,11 +230,10 @@ async function collectMatchesForFile(
 
   if (kind === "type" || kind === "test") {
     const outline = await structural.outline(relFile);
-    if (outline.kind !== "success") return;
+    if (!handleStructuralResult(outline, relFile, recordFailure)) return;
     for (const item of outline.data) {
       if (kind === "type" && !isTypeLikeKind(item.kind)) continue;
       if (kind === "test") {
-        // Match by name: test functions, describe/it blocks, or files with test/spec in name
         const isTestName =
           /^(test|it|describe|spec)\b/.test(item.name) ||
           /\b(test|spec|Test|Spec)\b/.test(item.name);
@@ -174,6 +243,22 @@ async function collectMatchesForFile(
       matches.push({ file: relFile, name: item.name, kind: item.kind, line: item.startLine });
     }
   }
+}
+
+// ── Result handling ──────────────────────────────────────────────────
+
+/**
+ * Handle a structural CodeResult: surface non-success results as failures,
+ * return whether the caller should continue processing data.
+ */
+function handleStructuralResult<T>(
+  result: { kind: string; message?: string; file?: string },
+  _relFile: string,
+  recordFailure: (reason: string) => void,
+): result is { kind: "success"; data: T } {
+  if (result.kind === "success") return true;
+  recordFailure(result.message ?? result.kind);
+  return false;
 }
 
 /** Outline kind values that represent type declarations (as normalized by the outline extractor). */
@@ -204,4 +289,23 @@ function createStructuredMatcher(
     const haystack = ignoreCase ? value.toLowerCase() : value;
     return haystack.includes(needle);
   };
+}
+
+// ── Error helpers ────────────────────────────────────────────────────
+
+function isExecError(err: unknown): err is {
+  status: number;
+  stdout?: unknown;
+  stderr?: unknown;
+} {
+  return typeof err === "object" && err !== null && "status" in err;
+}
+
+function isCodeError(err: unknown, code: string): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as { code: unknown }).code === code
+  );
 }
