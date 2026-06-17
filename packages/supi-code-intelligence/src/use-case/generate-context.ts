@@ -15,6 +15,7 @@ import {
   renderContextResult,
 } from "../presentation/markdown/context.ts";
 import type { ConfidenceMode, ContextDetails } from "../types.ts";
+import { formatReferenceList } from "../use-case/support/semantic-references.ts";
 import { gatherTreeSitterContext } from "./gather-context.ts";
 import { executeBrief } from "./generate-brief.ts";
 import type {
@@ -731,11 +732,18 @@ async function buildReferenceSection(
     };
   }
 
+  const lines: string[] = [];
+  formatReferenceList(
+    lines,
+    refs.references.map((ref) => ({
+      file: path.relative(deps.cwd, ref.file),
+      line: ref.line,
+    })),
+    limit,
+  );
+
   return {
-    lines: refs.references.map((ref) => {
-      const relFile = path.relative(deps.cwd, ref.file);
-      return `- \`${relFile}:${ref.line}\``;
-    }),
+    lines,
     omittedCount: 0,
     hasSemanticEvidence: refs.confidence === "semantic",
   };
