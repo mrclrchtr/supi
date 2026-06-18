@@ -68,7 +68,7 @@
     "@commitlint/cli": "21.0.2",
     "@commitlint/config-conventional": "21.0.2",
     "@earendil-works/pi-ai": "0.75.4",
-    "@earendil-works/pi-coding-agent": "0.75.4",
+    "@earendil-works/pi-coding-agent": "0.79.0",
     "@earendil-works/pi-tui": "0.75.4",
     "@pnpm/exportable-manifest": "1000.4.2",
     "@types/node": "25.9.3",
