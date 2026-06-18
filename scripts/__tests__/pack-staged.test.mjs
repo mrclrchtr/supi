@@ -32,6 +32,7 @@ const CORE_EXPORTS = {
   "./llm": "./src/llm.ts",
   "./package.json": "./package.json",
   "./path": "./src/path.ts",
+  "./report": "./src/report.ts",
   "./progress-widget": "./src/progress-widget.ts",
   "./project": "./src/project.ts",
   "./session": "./src/session.ts",
