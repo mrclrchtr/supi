@@ -1,8 +1,6 @@
 <div align="center">
   <a href="https://github.com/mrclrchtr/supi/tree/main/packages/supi-ask-user">
-    <picture>
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/logo.png" alt="SuPi" width="50%">
-    </picture>
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/logo.png" alt="SuPi" width="50%">
   </a>
 </div>
 
@@ -22,9 +20,36 @@ For local development:
 pi install ./packages/supi-ask-user
 ```
 
-![ask_user form](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user.png)
+## Preview
 
-![ask_user choice with preview](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user-2.png)
+<table>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-choice-preview.png" width="100%" alt="Choice question with side preview" />
+      <br/>Choice question with side preview
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-question-comment.png" width="100%" alt="Question comment editor" />
+      <br/>Question comment editor
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-multi-choice-preview.png" width="100%" alt="Multi-select with preview" />
+      <br/>Multi-select with preview
+    </td>
+    <td align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-text-input.png" width="100%" alt="Text input with recommendation" />
+      <br/>Text input with recommendation
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-review-form-comment.png" width="70%" alt="Review screen with form comment" />
+      <br/>Review screen with form comment
+    </td>
+  </tr>
+</table>
 
 ## What you get
 
@@ -75,9 +100,18 @@ Each question has a `type`, `id`, `header`, and `prompt`. Two question types are
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `options` | array (2–12) | Allowed answers with `value`, `label`, and optional `description`/`preview` |
+| `options` | array (2–12) | Allowed answers; each option has the fields below |
 | `multi` | boolean (default: `false`) | Allow selecting multiple options |
 | `recommendation` | string \| string[] | Recommended option value(s). Single-select: a string (default: first option). Multi-select: an array (default: none). |
+
+Each `options` entry:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `value` | string | Returned identifier for the response |
+| `label` | string | Displayed option label |
+| `description` | string (optional) | Short sub-label shown under the option |
+| `preview` | string (optional) | Longer explanatory text rendered in the side preview panel |
 
 Model yes/no questions as a `choice` with `{ value: "yes", label: "Yes" }` and `{ value: "no", label: "No" }`.
 
@@ -205,7 +239,7 @@ Question, option, and form-level comment editors are opened with `c`, `n`, or `A
 ```json
 {
   "title": "Formatter decision",
-  "intro": "I need one explicit choice before I update the repo config.",
+  "intro": "I need a couple of explicit choices before I update the repo config.",
   "questions": [
     {
       "type": "choice",
@@ -213,10 +247,33 @@ Question, option, and form-level comment editors are opened with `c`, `n`, or `A
       "header": "Formatter",
       "prompt": "Which formatter should I configure?",
       "options": [
-        { "value": "biome", "label": "Biome" },
-        { "value": "prettier", "label": "Prettier" }
+        {
+          "value": "biome",
+          "label": "Biome",
+          "description": "Lint + format in one tool",
+          "preview": "Rust-based linter/formatter. Replaces ESLint + Prettier. Only JS/TS/JSON/CSS. Fastest option."
+        },
+        {
+          "value": "prettier",
+          "label": "Prettier",
+          "description": "Standalone formatter",
+          "preview": "Mature formatter with a large ecosystem of plugins and configuration presets."
+        }
       ],
       "recommendation": "biome"
+    },
+    {
+      "type": "choice",
+      "id": "features",
+      "header": "Features",
+      "prompt": "Which extra tooling should I set up?",
+      "options": [
+        { "value": "vitest", "label": "Vitest" },
+        { "value": "knip", "label": "Knip" },
+        { "value": "lefthook", "label": "Lefthook" }
+      ],
+      "multi": true,
+      "recommendation": ["vitest"]
     },
     {
       "type": "text",
