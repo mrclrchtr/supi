@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.14.0](https://github.com/mrclrchtr/supi/compare/v1.13.0...v1.14.0) (2026-06-18)
+
+
+### Features
+
+* **supi-ask-user:** redesign form UX and result contract ([418552f](https://github.com/mrclrchtr/supi/commit/418552fdf04487adcc07989a55b66d7feb69a8ed))
+* **supi-core:** redesign progress widget as two-line layout ([ee30cde](https://github.com/mrclrchtr/supi/commit/ee30cde868fdc1be3d392be27ab302ab18d56515))
+* **supi-extras:** trigger skill autocomplete on $ ([f146556](https://github.com/mrclrchtr/supi/commit/f146556ced0df692c9e03ae016e93890791f11df))
+
+
+### Bug Fixes
+
+* **supi-core:** add missing ./report export to pack-staged test ([84f3d74](https://github.com/mrclrchtr/supi/commit/84f3d74362f60b8286e7aaac7dffe0ba565785a7))
+
 ## [1.13.0](https://github.com/mrclrchtr/supi/compare/v1.12.1...v1.13.0) (2026-06-17)
 
 
