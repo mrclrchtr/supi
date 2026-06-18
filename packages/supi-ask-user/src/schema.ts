@@ -7,7 +7,7 @@ const OptionSchema = Type.Object({
   label: Type.String({ description: "Displayed label" }),
   description: Type.Optional(
     Type.String({
-      description: "Optional note",
+      description: "Optional description",
     }),
   ),
   preview: Type.Optional(
@@ -17,6 +17,9 @@ const OptionSchema = Type.Object({
   ),
 });
 
+const ChoiceOptionCount = { minItems: 2, maxItems: 12 } as const;
+const QuestionCount = { minItems: 1, maxItems: 10 } as const;
+
 const ChoiceQuestionSchema = Type.Object({
   type: Type.Literal("choice"),
   id: Type.String({ description: "Question id" }),
@@ -24,32 +27,17 @@ const ChoiceQuestionSchema = Type.Object({
   prompt: Type.String({ description: "Question text" }),
   options: Type.Array(OptionSchema, {
     description: "Allowed options (2-12)",
+    ...ChoiceOptionCount,
   }),
-  required: Type.Optional(
-    Type.Boolean({
-      default: true,
-      description: "Required for full submit",
-    }),
-  ),
   multi: Type.Optional(
     Type.Boolean({
       default: false,
       description: "Allow multiple selections",
     }),
   ),
-  allowOther: Type.Optional(
-    Type.Boolean({
-      description: "Allow a custom option; single-select only",
-    }),
-  ),
   recommendation: Type.Optional(
     Type.Union([Type.String(), Type.Array(Type.String())], {
       description: "Recommended value(s)",
-    }),
-  ),
-  initial: Type.Optional(
-    Type.Union([Type.String(), Type.Array(Type.String())], {
-      description: "Initial value(s)",
     }),
   ),
 });
@@ -59,13 +47,7 @@ const TextQuestionSchema = Type.Object({
   id: Type.String({ description: "Question id" }),
   header: Type.String({ description: "Short label" }),
   prompt: Type.String({ description: "Question text" }),
-  required: Type.Optional(
-    Type.Boolean({
-      default: true,
-      description: "Required for full submit",
-    }),
-  ),
-  initial: Type.Optional(Type.String({ description: "Initial text" })),
+  recommendation: Type.Optional(Type.String({ description: "Suggested prefilled text" })),
   placeholder: Type.Optional(Type.String({ description: "Editor placeholder" })),
 });
 
@@ -79,13 +61,9 @@ export const AskUserParamsSchema = Type.Object({
     }),
   ),
   questions: Type.Array(QuestionSchema, {
-    description: "1-4 focused questions for one decision",
+    description: "1-10 focused questions for one decision",
+    ...QuestionCount,
   }),
-  allowPartialSubmit: Type.Optional(
-    Type.Boolean({
-      description: "Allow partial submission",
-    }),
-  ),
 });
 
 export type AskUserParams = Static<typeof AskUserParamsSchema>;

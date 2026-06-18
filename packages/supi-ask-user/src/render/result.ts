@@ -1,10 +1,11 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import type {
-  Answer,
   AskUserDetails,
   AskUserErrorDetails,
   AskUserOutcome,
+  AskUserResponse,
   AskUserToolDetails,
+  ChoiceQuestionResponse,
   NormalizedQuestion,
   NormalizedQuestionnaire,
 } from "../types.ts";
@@ -19,10 +20,9 @@ export function buildResult(
     ...(questionnaire.title ? { title: questionnaire.title } : {}),
     ...(questionnaire.intro ? { intro: questionnaire.intro } : {}),
     questions: questionnaire.questions,
-    status: outcome.status,
-    answersById: outcome.answersById,
-    missingQuestionIds: outcome.missingQuestionIds,
-    ...(outcome.discussMessage ? { discussMessage: outcome.discussMessage } : {}),
+    outcome: outcome.outcome,
+    comment: outcome.comment,
+    responses: outcome.responses,
   };
 
   return {
@@ -39,64 +39,87 @@ export function buildErrorResult(message: string): AskUserToolResult {
   };
 }
 
-export function formatAnswerSummary(_question: NormalizedQuestion, answer: Answer): string {
-  switch (answer.kind) {
-    case "choice":
-      return answer.selections.map(formatChoiceSelectionSummary).join("; ");
-    case "custom":
-      return `Other — ${answer.value}`;
-    case "text":
-      return answer.value;
-  }
-}
-
-function formatChoiceSelectionSummary(selection: { label: string; note?: string }): string {
-  return selection.note ? `${selection.label} (note: ${selection.note})` : selection.label;
-}
-
 function summarizeOutcome(questions: NormalizedQuestion[], outcome: AskUserOutcome): string {
-  if (outcome.status === "cancelled") return "User cancelled the form.";
-  if (outcome.status === "aborted") return "The form was aborted before completion.";
+  const responseLines = outcome.responses.flatMap((response) =>
+    formatResponseSummaryLines(questions, response),
+  );
 
-  const lines = formatAnsweredLines(questions, outcome.answersById);
-  const missing = formatMissingHeaders(questions, outcome.missingQuestionIds);
+  const headerLines =
+    outcome.outcome === "submitted"
+      ? []
+      : [
+          "User needs discussion before a complete decision.",
+          ...formatUnansweredSummary(questions, outcome.responses),
+        ];
 
-  if (outcome.status === "submitted") {
-    return lines.length > 0 ? lines.join("\n") : "User submitted the form.";
-  }
+  const commentLines = outcome.comment ? [`Form comment: ${outcome.comment}`] : [];
+  const lines = [...headerLines, ...commentLines, ...responseLines];
 
-  if (outcome.status === "partial") {
-    return [
-      "User submitted a partial form.",
-      ...lines,
-      ...(missing ? [`Missing required answers: ${missing}`] : []),
-    ].join("\n");
-  }
-
-  return [
-    "User wants to discuss before deciding.",
-    ...(outcome.discussMessage ? [`Discussion request: ${outcome.discussMessage}`] : []),
-    ...lines,
-    ...(missing ? [`Still missing: ${missing}`] : []),
-  ].join("\n");
+  if (lines.length > 0) return lines.join("\n");
+  return outcome.outcome === "submitted"
+    ? "User submitted the form."
+    : "User needs discussion before a complete decision.";
 }
 
-function formatAnsweredLines(
+function formatUnansweredSummary(
   questions: NormalizedQuestion[],
-  answersById: Record<string, Answer>,
+  responses: AskUserResponse[],
 ): string[] {
-  return questions.flatMap((question) => {
-    const answer = answersById[question.id];
-    return answer ? [`${question.header}: ${formatAnswerSummary(question, answer)}`] : [];
+  const unanswered = responses
+    .filter((response) => !response.answer.answered)
+    .map((response) => questionHeader(questions, response.questionId));
+
+  return unanswered.length > 0 ? [`Unanswered: ${unanswered.join(", ")}`] : [];
+}
+
+function formatResponseSummaryLines(
+  questions: NormalizedQuestion[],
+  response: AskUserResponse,
+): string[] {
+  const header = questionHeader(questions, response.questionId);
+  const answerLine = formatAnswerSummaryLine(header, response);
+  const lines = answerLine ? [answerLine] : [];
+
+  if (response.questionComment) {
+    lines.push(`${header} question comment: ${response.questionComment}`);
+  }
+
+  if (response.answer.kind === "choice") {
+    lines.push(...formatUnselectedOptionCommentLines(header, response as ChoiceQuestionResponse));
+  }
+
+  return lines;
+}
+
+function formatAnswerSummaryLine(header: string, response: AskUserResponse): string | undefined {
+  if (!response.answer.answered) return undefined;
+
+  if (response.answer.kind === "choice") {
+    const selected = response.answer.options
+      .filter((option) => option.selected)
+      .map((option) =>
+        option.comment ? `${option.label} (comment: ${option.comment})` : option.label,
+      );
+    return selected.length > 0 ? `${header}: ${selected.join("; ")}` : undefined;
+  }
+
+  if (response.answer.kind === "text" && response.answer.value) {
+    return `${header}: ${response.answer.value}`;
+  }
+
+  return undefined;
+}
+
+function formatUnselectedOptionCommentLines(
+  header: string,
+  response: ChoiceQuestionResponse,
+): string[] {
+  return response.answer.options.flatMap((option) => {
+    if (option.selected || !option.comment) return [];
+    return [`${header} option comment (${option.label}): ${option.comment}`];
   });
 }
 
-export function formatMissingHeaders(
-  questions: NormalizedQuestion[],
-  missingQuestionIds: string[],
-): string | undefined {
-  const headers = questions
-    .filter((question) => missingQuestionIds.includes(question.id))
-    .map((question) => question.header);
-  return headers.length > 0 ? headers.join(", ") : undefined;
+function questionHeader(questions: NormalizedQuestion[], questionId: string): string {
+  return questions.find((question) => question.id === questionId)?.header ?? questionId;
 }

@@ -2,8 +2,6 @@
 // The external tool-call schema lives in schema.ts; everything past validation
 // works with the normalized shapes defined here.
 
-export type AskUserStatus = "submitted" | "partial" | "discuss" | "cancelled" | "aborted";
-
 export interface NormalizedOption {
   value: string;
   label: string;
@@ -15,21 +13,18 @@ interface BaseQuestion {
   id: string;
   header: string;
   prompt: string;
-  required: boolean;
 }
 
 export interface NormalizedChoiceQuestion extends BaseQuestion {
   type: "choice";
   options: NormalizedOption[];
   multi: boolean;
-  allowOther: boolean;
   recommendedIndexes: number[];
-  initialIndexes: number[];
 }
 
 export interface NormalizedTextQuestion extends BaseQuestion {
   type: "text";
-  initial?: string;
+  recommendation?: string;
   placeholder?: string;
 }
 
@@ -39,43 +34,43 @@ export interface NormalizedQuestionnaire {
   title?: string;
   intro?: string;
   questions: NormalizedQuestion[];
-  allowPartialSubmit: boolean;
 }
 
-/**
- * One selected choice option returned from `ask_user`.
- *
- * `note` is optional user-entered context attached to this specific option.
- * It is only used on `choice` answers and is absent for `text` / `custom` answers.
- */
-export interface AnswerSelection {
-  value: string;
-  label: string;
-  note?: string;
+// ── User-facing outcome types ──────────────────────────────────────
+
+export type AskUserOutcomeKind = "submitted" | "needs_discussion";
+
+export interface ChoiceQuestionResponse {
+  questionId: string;
+  questionComment?: string;
+  answer: {
+    kind: "choice";
+    answered: boolean;
+    options: Array<{
+      value: string;
+      label: string;
+      selected: boolean;
+      comment?: string;
+    }>;
+  };
 }
 
-export interface ChoiceAnswer {
-  kind: "choice";
-  selections: AnswerSelection[];
+export interface TextQuestionResponse {
+  questionId: string;
+  questionComment?: string;
+  answer: {
+    kind: "text";
+    answered: boolean;
+    value?: string;
+  };
 }
 
-export interface CustomAnswer {
-  kind: "custom";
-  value: string;
-}
-
-export interface TextAnswer {
-  kind: "text";
-  value: string;
-}
-
-export type Answer = ChoiceAnswer | CustomAnswer | TextAnswer;
+export type AskUserResponse = ChoiceQuestionResponse | TextQuestionResponse;
 
 export interface AskUserOutcome {
-  status: AskUserStatus;
-  answersById: Record<string, Answer>;
-  missingQuestionIds: string[];
-  discussMessage?: string;
+  outcome: AskUserOutcomeKind;
+  comment?: string;
+  responses: AskUserResponse[];
 }
 
 export interface AskUserDetails extends AskUserOutcome {
@@ -91,6 +86,20 @@ export interface AskUserErrorDetails {
 
 export type AskUserToolDetails = AskUserDetails | AskUserErrorDetails;
 
+// ── Internal interaction result: UI cancel/abort are NOT persisted ──
+
+export type AskUserInteractionResult = AskUserInteractionCancel | AskUserInteractionAbort;
+
+export interface AskUserInteractionCancel {
+  kind: "cancel";
+}
+
+export interface AskUserInteractionAbort {
+  kind: "abort";
+}
+
+// ── Limits ─────────────────────────────────────────────────────────
+
 export const ASK_USER_LIMITS = {
   minQuestions: 1,
   maxQuestions: 10,
@@ -102,6 +111,8 @@ export const ASK_USER_LIMITS = {
   maxIntroLength: 4000,
   maxPlaceholderLength: 200,
 } as const;
+
+// ── Guards ─────────────────────────────────────────────────────────
 
 export function isChoiceQuestion(
   question: NormalizedQuestion,

@@ -7,13 +7,18 @@ import { buildTreeSummaryLabel } from "./render/tree-summary.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import { ActiveQuestionnaireLock } from "./session/lock.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
-import type { AskUserToolDetails, NormalizedQuestionnaire } from "./types.ts";
+import type {
+  AskUserInteractionResult,
+  AskUserOutcome,
+  AskUserToolDetails,
+  NormalizedQuestionnaire,
+} from "./types.ts";
 import { runQuestionnaire } from "./ui/choose-renderer.ts";
 
 const TOOL_NAME = "ask_user";
 const TOOL_LABEL = "Ask User";
 
-export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "abort"> & {
+export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "mode" | "abort"> & {
   ui: {
     custom?: unknown;
     notify?(message: string, type?: "info" | "warning" | "error"): void;
@@ -61,9 +66,9 @@ export async function executeAskUser(
     throw error;
   }
 
-  if (!ctx.hasUI) {
+  if (!ctx.hasUI || ctx.mode !== "tui") {
     return buildErrorResult(
-      "Error: ask_user requires an interactive UI session. No user-facing UI is available in the current mode.",
+      "Error: ask_user requires an interactive TUI session. No user-facing form UI is available in the current mode.",
     );
   }
   if (!lock.acquire()) {
@@ -91,12 +96,14 @@ export async function executeAskUser(
 
     if (outcome === "unsupported") {
       return buildErrorResult(
-        "Error: ask_user requires a TUI with custom overlay support. Do not use ask_user in non-interactive or degraded UI sessions.",
+        "Error: ask_user requires a TUI with custom form support. Do not use ask_user in non-interactive or degraded UI sessions.",
       );
     }
 
-    if (outcome.status === "cancelled" || outcome.status === "aborted") {
+    // Internal cancel/abort: treat as control flow, abort the turn
+    if (isInternalInteractionResult(outcome)) {
       ctx.abort();
+      return buildErrorResult("The user interaction was cancelled.");
     }
 
     pi.appendEntry(buildTreeSummaryLabel(questionnaire));
@@ -107,6 +114,16 @@ export async function executeAskUser(
     restoreTerminalTitle(ctx, pi);
     lock.release();
   }
+}
+
+function isInternalInteractionResult(
+  outcome: AskUserOutcome | AskUserInteractionResult | "unsupported",
+): outcome is AskUserInteractionResult {
+  return (
+    typeof outcome === "object" &&
+    "kind" in outcome &&
+    (outcome.kind === "cancel" || outcome.kind === "abort")
+  );
 }
 
 function signalAttention(ctx: AskUserExecutionContext): void {
@@ -122,7 +139,6 @@ function asFunction<T extends (...args: never[]) => unknown>(value: unknown): T 
 }
 
 export { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
-export { buildErrorResult, buildResult } from "./render/result.ts";
 export { AskUserController } from "./session/controller.ts";
 export { ActiveQuestionnaireLock } from "./session/lock.ts";
 export {

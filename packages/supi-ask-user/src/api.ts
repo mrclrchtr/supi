@@ -4,17 +4,19 @@ export { AskUserParamsSchema } from "./schema.ts";
 export { AskUserController } from "./session/controller.ts";
 export { ActiveQuestionnaireLock } from "./session/lock.ts";
 export type {
-  Answer,
   AskUserDetails,
   AskUserErrorDetails,
+  AskUserInteractionAbort,
+  AskUserInteractionCancel,
+  AskUserInteractionResult,
   AskUserOutcome,
-  AskUserStatus,
+  AskUserOutcomeKind,
+  AskUserResponse,
   AskUserToolDetails,
-  ChoiceAnswer,
-  CustomAnswer,
+  ChoiceQuestionResponse,
   NormalizedChoiceQuestion,
   NormalizedQuestion,
   NormalizedQuestionnaire,
   NormalizedTextQuestion,
-  TextAnswer,
+  TextQuestionResponse,
 } from "./types.ts";

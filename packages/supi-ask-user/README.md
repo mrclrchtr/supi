@@ -22,7 +22,7 @@ For local development:
 pi install ./packages/supi-ask-user
 ```
 
-![ask_user overlay](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user.png)
+![ask_user form](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user.png)
 
 ![ask_user choice with preview](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-ask-user-2.png)
 
@@ -32,7 +32,7 @@ After install, pi gets one new tool:
 
 - **`ask_user`** — open a blocking decision form during a run
 
-The tool presents a structured questionnaire in the TUI overlay and blocks the agent turn until the user responds. It is designed for focused decisions, **not** long surveys or open-ended discovery.
+The tool presents a structured questionnaire in the TUI form and blocks the agent turn until the user responds. It is designed for focused decisions, **not** long surveys or open-ended discovery.
 
 Typical use cases:
 
@@ -64,7 +64,8 @@ const controller = new AskUserController(questionnaire);
 | `title` | string (optional) | Short overall title for the form |
 | `intro` | string (optional) | Why the agent is asking |
 | `questions` | array (1–10) | Choice or text questions |
-| `allowPartialSubmit` | boolean (optional) | Let the user submit partial progress |
+
+All questions are always required for a full submission. Unanswered questions produce a `needs_discussion` outcome instead of a silent partial submit. The deprecated fields `allowPartialSubmit`, `required`, `initial`, and `allowOther` are rejected with a validation error.
 
 ## Questions
 
@@ -75,11 +76,8 @@ Each question has a `type`, `id`, `header`, and `prompt`. Two question types are
 | Field | Type | Description |
 |-------|------|-------------|
 | `options` | array (2–12) | Allowed answers with `value`, `label`, and optional `description`/`preview` |
-| `required` | boolean (default: `true`) | Whether this question must be answered |
 | `multi` | boolean (default: `false`) | Allow selecting multiple options |
-| `allowOther` | boolean | Allow a freeform answer instead of listed options. Single-select only. |
-| `recommendation` | string \| string[] | Recommended option value(s) |
-| `initial` | string \| string[] | Initially selected option value(s) |
+| `recommendation` | string \| string[] | Recommended option value(s). Single-select: a string (default: first option). Multi-select: an array (default: none). |
 
 Model yes/no questions as a `choice` with `{ value: "yes", label: "Yes" }` and `{ value: "no", label: "No" }`.
 
@@ -87,33 +85,59 @@ Model yes/no questions as a `choice` with `{ value: "yes", label: "Yes" }` and `
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `required` | boolean (default: `true`) | Whether this question must be answered |
-| `initial` | string | Initial value shown in the editor |
-| `placeholder` | string | Placeholder shown before the user types |
+| `recommendation` | string (optional) | Suggested text prefilled in the editor |
+| `placeholder` | string (optional) | Placeholder shown before the user types |
 
 ## Result
 
-A completed form returns a result with `details.status` set to one of:
+A completed form returns a result with `details.outcome` set to one of:
 
-| Status | Meaning |
-|--------|---------|
-| `submitted` | Full submit, all required questions answered |
-| `partial` | Partial submit with some required questions unanswered |
-| `discuss` | User wants to continue the conversation instead of deciding |
-| `cancelled` | User explicitly cancelled (aborts the current agent turn) |
-| `aborted` | The interaction was aborted externally (aborts the current agent turn) |
+| Outcome | Meaning |
+|---------|---------|
+| `submitted` | Full submit, every question was answered |
+| `needs_discussion` | One or more questions were left unanswered |
 
-`details.answersById` maps question IDs to their answers. Each answer has a `kind` and type-specific data:
+`details.responses` is an ordered array matching the original question order. Each response has:
+- `questionId` — matching the original question ID
+- `questionComment` (optional) — user comment on this specific question
+- `answer` — structured response with `kind`, `answered`, and type-specific data
 
-- `{ kind: "choice", selections: [{ value, label, note? }] }` — single or multi-select choice, with optional per-option user notes
-- `{ kind: "custom", value: "..." }` — freeform `allowOther` answer
-- `{ kind: "text", value: "..." }` — freeform text answer
+**Choice responses** include only touched options (selected options and/or options with comments):
+```ts
+{
+  answer: {
+    kind: "choice",
+    answered: boolean,
+    options: Array<{
+      value: string;
+      label: string;
+      selected: boolean;
+      comment?: string;
+    }>;
+  }
+}
+```
 
-`details.missingQuestionIds` lists any required questions that were left unanswered on a partial submit.
+**Text responses**:
+```ts
+{
+  answer: {
+    kind: "text",
+    answered: boolean,
+    value?: string;
+  }
+}
+```
+
+`details.comment` is the form-level user comment when one was entered.
+
+The tool result `details` also includes `title`, `intro`, and the normalized `questions` array (same order as the original request, with internal fields such as `multi` and `recommendedIndexes`). Consumers should rely on `responses` for the user's answers; `questions` is kept for rendering and is not part of the model-facing answer contract.
+
+Internal cancel and abort results are not persisted as user responses — they cause the agent turn to be aborted and return an error-style result to the model.
 
 ## Behavior
 
-- Requires pi in interactive (TUI) mode with custom overlay support — no degraded fallback
+- Requires pi in interactive (TUI) mode with custom form support — no degraded fallback
 - Only one `ask_user` form may be active at a time; calling `ask_user` while another form is in flight returns an error
 - Cancellation or abort stops the current agent turn
 - Completed forms are summarized in the session tree
@@ -127,7 +151,9 @@ The tool registers the following prompt guidance that the model sees:
 - Use ask_user only for blocking user input, not open-ended interviews or repo facts.
 - Use ask_user with 1-10 related questions; prefer one when possible.
 - Use ask_user `choice` for fixed options and ask_user `text` for freeform input; yes/no should be a `choice`.
-- Keep one ask_user form active at a time; use `allowOther` only for single-select choice and `allowPartialSubmit` only when actionable.
+- Keep one ask_user form active at a time.
+- Use `recommendation` to suggest default choices or prefilled text.
+- Comments are user UI affordances — do not reference removed fields like `required`, `initial`, `allowOther`, or `allowPartialSubmit`.
 
 ## UI controls
 
@@ -135,33 +161,44 @@ The tool registers the following prompt guidance that the model sees:
 
 - `↑↓` — move between options
 - `Space` — select the focused option (single-select) or toggle (multi-select)
-- `Enter` — submit the current answer
-- `n` — edit a note for the focused choice option
-- `←` — go back to the previous question
-- `Esc` — cancel the whole form (or close the note editor if one is open)
+- `Enter` — on single-select, selects the focused option and advances; on multi-select, accepts current selections and advances (no toggling)
+- `Tab` / `→` — go to the next question; from the last question, go to review
+- `Shift+Tab` / `←` — go to the previous question
+- `n` — edit a comment for the focused choice option (whether selected or not)
+- `c` — edit a comment for the current question
+- `u` — mark the current question unanswered and show an unanswered status line (preserves comments)
+- `Esc` — cancel the whole form
+
+The recommended/preselected option is labeled `[recommended]`.
 
 On wide terminals, option previews render side-by-side with the option list. On narrow terminals, previews stack below.
 
-Notes are available only for real `choice` options. They do not apply to `text` questions, `Other…` freeform answers, or other exceptional action rows. Saving a non-empty note selects the option if needed; clearing a note leaves the current selection alone; deselecting a multi-select option removes its note with the selection.
-
-Only exceptional action rows are visible:
-
-- `Other…` — when `allowOther` is enabled
-- `Discuss instead…` — always available
-- `Submit partial answers` — when `allowPartialSubmit` is enabled
-- `Skip question` — for optional questions
-
-Back and cancel are keyboard-only (`←`, `Esc`) — no visible rows.
-
 ### Text questions
 
-- The editor is visible immediately (no separate entry row)
-- `Enter` — submit the current text
-- `↓` — move from the editor into visible exceptional action rows
-- `↑` — from the first action row, return focus to the editor
+- The editor is visible immediately with any recommendation prefilled
+- `Enter` — submit the current text and advance
+- `Tab` — go to the next question
+- `Alt+C` — edit a comment for the current question
+- `Alt+U` — mark the current question unanswered
+- Plain printable characters, including `c` and `u`, are inserted into the editor
 - `Esc` — cancel the whole form
 
-Exceptional action rows (`Discuss instead…`, `Submit partial answers`) may appear below the editor when those paths are enabled.
+### Review screen
+
+- `↑↓` — move between questions and the Submit row
+- `Enter` — on a question, open that question for editing; on the Submit row, submit the form
+- `←` / `Shift+Tab` — return to the last question
+- `c` — edit the form-level comment
+- `Esc` — cancel the whole form
+
+The review screen shows every question with an answered/unanswered marker and any option comments before submission. The final question always moves to review rather than submitting immediately, and the Submit row is focused by default so the form can be submitted with a single `Enter`. When a question is opened from review, saving/advancing that question returns to review instead of walking through later questions.
+
+### Comment editors
+
+Question, option, and form-level comment editors are opened with `c`, `n`, or `Alt+C` depending on the current screen.
+
+- `Enter` — save the comment and return to the form or review screen
+- `Esc` — discard unsaved comment edits and return to the form or review screen without cancelling the whole interaction
 
 ## Example
 
@@ -179,19 +216,16 @@ Exceptional action rows (`Discuss instead…`, `Submit partial answers`) may app
         { "value": "biome", "label": "Biome" },
         { "value": "prettier", "label": "Prettier" }
       ],
-      "recommendation": "biome",
-      "initial": "biome"
+      "recommendation": "biome"
     },
     {
       "type": "text",
       "id": "reason",
       "header": "Reason",
       "prompt": "Anything I should optimize for?",
-      "required": false,
       "placeholder": "optional"
     }
-  ],
-  "allowPartialSubmit": true
+  ]
 }
 ```
 
@@ -202,17 +236,18 @@ Exceptional action rows (`Discuss instead…`, `Submit partial answers`) may app
 - `src/index.ts` — package barrel
 - `src/ask-user.ts` — tool registration and execution boundary
 - `src/schema.ts` — tool-call parameter schema (TypeBox)
-- `src/types.ts` — internal normalized types and answer shapes
+- `src/types.ts` — internal normalized types and response shapes
 - `src/normalize.ts` — validation and lowering into internal types
 - `src/tool/guidance.ts` — prompt guidance and tool description
-- `src/session/controller.ts` — headless decision-form state machine
+- `src/session/controller.ts` — headless decision-form state machine with comment/responses
 - `src/session/lock.ts` — session-scoped concurrency lock
-- `src/ui/choose-renderer.ts` — custom-overlay capability gate
-- `src/ui/overlay.ts` — overlay runner that creates the custom interaction session
-- `src/ui/overlay-component.ts` — rich custom interaction state and input orchestration
-- `src/ui/overlay-view.ts` — choice/action row modeling and split-layout helpers
-- `src/ui/overlay-render.ts` — rich overlay rendering built on `Markdown`, `Editor`, and `SelectList`
-- `src/ui/overlay-actions.ts` — exceptional-action list wiring for text questions
+- `src/ui/choose-renderer.ts` — custom-form capability gate
+- `src/ui/form.ts` — form runner that creates the custom interaction session
+- `src/ui/form-component.ts` — keyboard orchestration for question screens, comment editors, and review
+- `src/ui/form-view.ts` — choice row helpers
+- `src/ui/form-render.ts` — main form rendering for choices, text, comments, and layout frame
+- `src/ui/form-review-render.ts` — review-screen summary cards
+- `src/ui/form-render-primitives.ts` — shared rendering primitives for boxes, wrapping, prompts, and padding
 - `src/ui/types.ts` — shared UI runner types
 - `src/render/result.ts` — tool result shaping
 - `src/render/transcript.ts` — transcript rendering

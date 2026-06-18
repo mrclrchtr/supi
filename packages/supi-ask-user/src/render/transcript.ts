@@ -1,9 +1,14 @@
 import { type AgentToolResult, keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import type { AskUserParams } from "../schema.ts";
-import type { AskUserDetails, AskUserStatus, AskUserToolDetails } from "../types.ts";
+import type {
+  AskUserDetails,
+  AskUserOutcomeKind,
+  AskUserResponse,
+  AskUserToolDetails,
+  NormalizedQuestion,
+} from "../types.ts";
 import { isErrorDetails } from "../types.ts";
-import { formatAnswerSummary, formatMissingHeaders } from "./result.ts";
 
 const COLLAPSED_ANSWER_LIMIT = 2;
 const DEFAULT_REVIEW_KEY = "Ctrl+O";
@@ -37,9 +42,6 @@ export function renderAskUserResult(
 }
 
 function buildCollapsedResultLines(details: AskUserDetails, theme: Theme): string[] {
-  if (details.status === "cancelled") return [theme.fg("warning", "Cancelled")];
-  if (details.status === "aborted") return [theme.fg("error", "Aborted")];
-
   const answerLines = buildAnswerLines(details, theme);
   const shownAnswerLines = answerLines.slice(0, COLLAPSED_ANSWER_LIMIT);
   const hiddenAnswerCount = Math.max(answerLines.length - shownAnswerLines.length, 0);
@@ -49,34 +51,36 @@ function buildCollapsedResultLines(details: AskUserDetails, theme: Theme): strin
 }
 
 function buildExpandedResultLines(details: AskUserDetails, theme: Theme): string[] {
-  if (details.status === "cancelled") return [theme.fg("warning", "Cancelled")];
-  if (details.status === "aborted") return [theme.fg("error", "Aborted")];
-
   const lines = [formatStatusLine(details, theme)];
   const title = details.title?.trim();
   const intro = details.intro?.trim();
-  const discussMessage = details.discussMessage?.trim();
-  const missing = formatMissingSummary(details);
+  const comment = details.comment?.trim();
+  const unansweredCount = details.responses.filter((r) => !r.answer.answered).length;
 
   if (title) lines.push(theme.fg("accent", title));
   if (intro) lines.push(theme.fg("text", intro));
-  if (details.status === "discuss" && discussMessage) {
-    lines.push(theme.fg("text", `Message: ${discussMessage}`));
-  }
-  if (missing) {
-    lines.push(theme.fg("dim", missing));
-  }
+  if (comment) lines.push(theme.fg("text", `Comment: ${comment}`));
 
   for (const question of details.questions) {
     lines.push("");
     lines.push(theme.fg("accent", question.header));
     lines.push(theme.fg("dim", question.prompt));
 
-    const answer = details.answersById[question.id];
+    const resp = details.responses.find((r) => r.questionId === question.id);
+    if (resp) {
+      lines.push(...formatResponseLines(resp, question, theme));
+      if (resp.questionComment) {
+        lines.push(theme.fg("dim", `  Question comment: ${resp.questionComment}`));
+      }
+    } else {
+      lines.push(theme.fg("dim", "Not answered"));
+    }
+  }
+
+  if (unansweredCount > 0 && details.outcome === "needs_discussion") {
+    lines.push("");
     lines.push(
-      answer
-        ? theme.fg("text", `Answer: ${formatAnswerSummary(question, answer)}`)
-        : theme.fg("dim", "Not answered"),
+      theme.fg("dim", `${unansweredCount} question${unansweredCount > 1 ? "s" : ""} unanswered`),
     );
   }
 
@@ -84,14 +88,62 @@ function buildExpandedResultLines(details: AskUserDetails, theme: Theme): string
 }
 
 function buildAnswerLines(details: AskUserDetails, theme: Theme): string[] {
-  return details.questions.flatMap((question) => {
-    const answer = details.answersById[question.id];
-    return answer
+  return details.responses.flatMap((resp) => {
+    if (!resp.answer.answered) return [];
+    const question = details.questions.find((q) => q.id === resp.questionId);
+    if (!question) return [];
+
+    const summary = formatAnswerLine(resp);
+    return summary
       ? [
-          `${theme.fg("success", "✓ ")}${theme.fg("accent", question.header)}: ${theme.fg("text", formatAnswerSummary(question, answer))}`,
+          `${theme.fg("success", "\u2713 ")}${theme.fg("accent", question.header)}: ${theme.fg("text", summary)}`,
         ]
       : [];
   });
+}
+
+function formatAnswerLine(resp: AskUserResponse): string | undefined {
+  if (!resp.answer.answered) return undefined;
+
+  if (resp.answer.kind === "choice") {
+    const selected = resp.answer.options.filter((o) => o.selected);
+    if (selected.length === 0) return undefined;
+    return selected
+      .map((o) => (o.comment ? `${o.label} (comment: ${o.comment})` : o.label))
+      .join("; ");
+  }
+
+  if (resp.answer.kind === "text" && resp.answer.value) {
+    return resp.answer.value;
+  }
+
+  return undefined;
+}
+
+function formatResponseLines(
+  resp: AskUserResponse,
+  question: NormalizedQuestion,
+  theme: Theme,
+): string[] {
+  if (resp.answer.kind === "choice") {
+    const multi = question.type === "choice" && question.multi;
+    const optionLines = resp.answer.options.map((opt) => {
+      const selected = opt.selected
+        ? theme.fg("success", multi ? "[x]" : "(*)")
+        : theme.fg("dim", multi ? "[ ]" : "( )");
+      const comment = opt.comment ? theme.fg("dim", ` (comment: ${opt.comment})`) : "";
+      return `${selected} ${opt.label}${comment}`;
+    });
+
+    if (resp.answer.answered) return optionLines;
+    return [theme.fg("dim", "Not answered"), ...optionLines];
+  }
+
+  if (resp.answer.kind === "text" && resp.answer.answered && resp.answer.value) {
+    return [theme.fg("text", resp.answer.value)];
+  }
+
+  return [theme.fg("dim", "Not answered")];
 }
 
 function buildCollapsedMetaLine(
@@ -100,12 +152,10 @@ function buildCollapsedMetaLine(
   theme: Theme,
 ): string {
   const parts: string[] = [];
+  const unansweredCount = details.responses.filter((r) => !r.answer.answered).length;
 
-  if (details.missingQuestionIds.length > 0) {
-    parts.push(`${details.missingQuestionIds.length} required missing`);
-  }
-  if (details.status === "discuss" && details.discussMessage?.trim()) {
-    parts.push("discussion message included");
+  if (unansweredCount > 0) {
+    parts.push(`${unansweredCount} unanswered`);
   }
   if (hiddenAnswerCount > 0) {
     parts.push(`${hiddenAnswerCount} more answer${hiddenAnswerCount === 1 ? "" : "s"}`);
@@ -119,50 +169,28 @@ function buildCollapsedMetaLine(
 }
 
 function formatStatusLine(details: AskUserDetails, theme: Theme): string {
-  const answeredCount = countAnsweredQuestions(details);
-  const totalCount = details.questions.length;
+  const answeredCount = details.responses.filter((r) => r.answer.answered).length;
+  const totalCount = details.responses.length;
   return theme.fg(
-    statusColor(details.status),
-    `${statusLabel(details.status)} · ${answeredCount}/${totalCount} answered`,
+    statusColor(details.outcome),
+    `${statusLabel(details.outcome)} \u00B7 ${answeredCount}/${totalCount} answered`,
   );
 }
 
-function countAnsweredQuestions(details: AskUserDetails): number {
-  return details.questions.filter((question) => question.id in details.answersById).length;
-}
-
-function formatMissingSummary(details: AskUserDetails): string | undefined {
-  const missing = formatMissingHeaders(details.questions, details.missingQuestionIds);
-  if (!missing) return undefined;
-  return details.status === "partial"
-    ? `Missing required: ${missing}`
-    : `Still missing: ${missing}`;
-}
-
-function statusColor(status: AskUserStatus): "success" | "warning" | "error" {
-  switch (status) {
+function statusColor(outcome: AskUserOutcomeKind): "success" | "warning" | "error" {
+  switch (outcome) {
     case "submitted":
       return "success";
-    case "partial":
-    case "discuss":
-    case "cancelled":
+    case "needs_discussion":
       return "warning";
-    case "aborted":
-      return "error";
   }
 }
 
-function statusLabel(status: AskUserStatus): string {
-  switch (status) {
+function statusLabel(outcome: AskUserOutcomeKind): string {
+  switch (outcome) {
     case "submitted":
       return "Submitted";
-    case "partial":
-      return "Partial";
-    case "discuss":
-      return "Discuss";
-    case "cancelled":
-      return "Cancelled";
-    case "aborted":
-      return "Aborted";
+    case "needs_discussion":
+      return "Needs discussion";
   }
 }

@@ -15,6 +15,10 @@ import {
   type NormalizedTextQuestion,
 } from "./types.ts";
 
+const DEPRECATED_TOP_LEVEL_KEYS = ["allowPartialSubmit"] as const;
+const DEPRECATED_CHOICE_KEYS = ["required", "initial", "allowOther"] as const;
+const DEPRECATED_TEXT_KEYS = ["required", "initial"] as const;
+
 export class AskUserValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -23,6 +27,15 @@ export class AskUserValidationError extends Error {
 }
 
 export function normalizeQuestionnaire(params: AskUserParams): NormalizedQuestionnaire {
+  // Reject deprecated top-level fields
+  for (const key of DEPRECATED_TOP_LEVEL_KEYS) {
+    if (key in params) {
+      throw new AskUserValidationError(
+        `The "${key}" field is no longer supported. All questions are always required for a full submission. Use "needs_discussion" outcome for unanswered questions.`,
+      );
+    }
+  }
+
   validateQuestionCount(params.questions.length);
   const title = trimOptional(params.title);
   const intro = trimOptional(params.intro);
@@ -49,7 +62,6 @@ export function normalizeQuestionnaire(params: AskUserParams): NormalizedQuestio
     ...(title ? { title } : {}),
     ...(intro ? { intro } : {}),
     questions,
-    allowPartialSubmit: params.allowPartialSubmit ?? false,
   };
 }
 
@@ -91,45 +103,47 @@ function validateCommonFields(question: ExternalQuestion): void {
 }
 
 function normalizeChoice(question: ExternalChoiceQuestion): NormalizedChoiceQuestion {
-  const options = normalizeOptions(question.id.trim(), question.options);
-  const multi = question.multi ?? false;
-  const allowOther = question.allowOther ?? false;
-  if (multi && allowOther) {
-    throw new AskUserValidationError(
-      `choice question "${question.id}" cannot use allowOther together with multi-select.`,
-    );
+  // Reject deprecated fields on choice questions
+  for (const key of DEPRECATED_CHOICE_KEYS) {
+    if (key in question) {
+      throw new AskUserValidationError(
+        `The "${key}" field on choice questions is no longer supported. Use "recommendation" for suggested options.`,
+      );
+    }
   }
 
-  validateSelectionShape(question.id, question.recommendation, multi, "recommendation");
-  validateSelectionShape(question.id, question.initial, multi, "initial");
+  const options = normalizeOptions(question.id.trim(), question.options);
+  const multi = question.multi ?? false;
+
+  validateRecommendationShape(question.id, question.recommendation, multi);
 
   return {
     id: question.id.trim(),
     header: question.header.trim(),
     prompt: question.prompt.trim(),
-    required: question.required ?? true,
     type: "choice",
     options,
     multi,
-    allowOther,
     recommendedIndexes: resolveIndexes({
       questionId: question.id,
       options,
       value: question.recommendation,
       multi,
-      kind: "recommendation",
-    }),
-    initialIndexes: resolveIndexes({
-      questionId: question.id,
-      options,
-      value: question.initial,
-      multi,
-      kind: "initial",
+      defaultToFirst: !multi,
     }),
   };
 }
 
 function normalizeText(question: ExternalTextQuestion): NormalizedTextQuestion {
+  // Reject deprecated fields on text questions
+  for (const key of DEPRECATED_TEXT_KEYS) {
+    if (key in question) {
+      throw new AskUserValidationError(
+        `The "${key}" field on text questions is no longer supported. Use "recommendation" for suggested text.`,
+      );
+    }
+  }
+
   const placeholder = trimOptional(question.placeholder);
   if (placeholder && placeholder.length > ASK_USER_LIMITS.maxPlaceholderLength) {
     throw new AskUserValidationError(
@@ -137,13 +151,14 @@ function normalizeText(question: ExternalTextQuestion): NormalizedTextQuestion {
     );
   }
 
+  const recommendation = trimOptional(question.recommendation);
+
   return {
     id: question.id.trim(),
     header: question.header.trim(),
     prompt: question.prompt.trim(),
-    required: question.required ?? true,
     type: "text",
-    ...(question.initial !== undefined ? { initial: question.initial } : {}),
+    ...(recommendation ? { recommendation } : {}),
     ...(placeholder ? { placeholder } : {}),
   };
 }
@@ -185,21 +200,20 @@ function normalizeOptions(
   });
 }
 
-function validateSelectionShape(
+function validateRecommendationShape(
   questionId: string,
   value: string | string[] | undefined,
   multi: boolean,
-  kind: "recommendation" | "initial",
 ): void {
   if (value === undefined) return;
   if (multi && !Array.isArray(value)) {
     throw new AskUserValidationError(
-      `multi-select question "${questionId}" ${kind} must be an array, not a string.`,
+      `multi-select question "${questionId}" recommendation must be an array, not a string.`,
     );
   }
   if (!multi && Array.isArray(value)) {
     throw new AskUserValidationError(
-      `single-select question "${questionId}" ${kind} must be a string, not an array.`,
+      `single-select question "${questionId}" recommendation must be a string, not an array.`,
     );
   }
 }
@@ -209,24 +223,27 @@ function resolveIndexes(args: {
   options: NormalizedOption[];
   value: string | string[] | undefined;
   multi: boolean;
-  kind: "recommendation" | "initial";
+  defaultToFirst: boolean;
 }): number[] {
-  const { questionId, options, value, multi, kind } = args;
-  if (value === undefined) return [];
+  const { questionId, options, value, multi, defaultToFirst } = args;
+  if (value === undefined) {
+    return defaultToFirst ? [0] : [];
+  }
+
   const values = multi ? (value as string[]) : [value as string];
   const seen = new Set<string>();
   return values.map((entry: string) => {
     const trimmed = entry.trim();
     if (seen.has(trimmed)) {
       throw new AskUserValidationError(
-        `choice question "${questionId}" has duplicate ${kind} value "${trimmed}".`,
+        `choice question "${questionId}" has duplicate recommendation value "${trimmed}".`,
       );
     }
     seen.add(trimmed);
     const index = options.findIndex((option) => option.value === trimmed);
     if (index < 0) {
       throw new AskUserValidationError(
-        `choice question "${questionId}" ${kind} value "${trimmed}" does not match any option value.`,
+        `choice question "${questionId}" recommendation value "${trimmed}" does not match any option value.`,
       );
     }
     return index;

@@ -1,7 +1,11 @@
 import type { KeybindingsManager, Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { AskUserController } from "../session/controller.ts";
-import type { AskUserOutcome, NormalizedQuestionnaire } from "../types.ts";
+import type {
+  AskUserInteractionResult,
+  AskUserOutcome,
+  NormalizedQuestionnaire,
+} from "../types.ts";
 
 export interface AskUserUiContext {
   notify?(message: string, type?: "info" | "warning" | "error"): void;
@@ -27,11 +31,11 @@ export interface RenderContext {
   options: RunQuestionnaireOptions;
 }
 
-export interface OverlayArgs {
+export interface FormArgs {
   tui: TUI;
   theme: Theme;
   controller: AskUserController;
-  done: (result: AskUserOutcome) => void;
+  done: (result: AskUserOutcome | AskUserInteractionResult) => void;
   signal?: AbortSignal;
   keybindings: KeybindingsManager;
   onToggleToolsExpanded?: () => void;

@@ -1,21 +1,24 @@
 import { AskUserController } from "../session/controller.ts";
-import type { AskUserOutcome, NormalizedQuestionnaire } from "../types.ts";
-import { AskUserOverlay } from "./overlay-component.ts";
+import type {
+  AskUserInteractionResult,
+  AskUserOutcome,
+  NormalizedQuestionnaire,
+} from "../types.ts";
+import { AskUserForm } from "./form-component.ts";
 import type { RunQuestionnaireOptions } from "./types.ts";
 
-export async function runOverlayQuestionnaire(
+export async function runFormQuestionnaire(
   questionnaire: NormalizedQuestionnaire,
   opts: RunQuestionnaireOptions,
-): Promise<AskUserOutcome> {
+): Promise<AskUserOutcome | AskUserInteractionResult | undefined> {
   const controller = new AskUserController(questionnaire);
   if (opts.signal?.aborted) {
-    controller.abort();
-    return controller.outcome();
+    return controller.abort();
   }
 
-  return opts.ui.custom?.<AskUserOutcome>(
+  return opts.ui.custom?.<AskUserOutcome | AskUserInteractionResult>(
     (tui, theme, kb, done) =>
-      new AskUserOverlay({
+      new AskUserForm({
         tui,
         theme,
         controller,
@@ -24,5 +27,5 @@ export async function runOverlayQuestionnaire(
         keybindings: kb,
         onToggleToolsExpanded: opts.onToggleToolsExpanded,
       }),
-  ) as Promise<AskUserOutcome>;
+  );
 }

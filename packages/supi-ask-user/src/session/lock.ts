@@ -1,7 +1,7 @@
 // Session-scoped single-active interaction guard for ask_user.
 
 export class ActiveQuestionnaireLock {
-  private active = false;
+  private active: boolean = false;
 
   acquire(): boolean {
     if (this.active) return false;

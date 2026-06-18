@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-17T17:11:22.121535Z"
+revision = 33
+
+[document_fingerprints]
+archive = "sha256:abd0864f2440d5cf17586037c38fe41e4bf00844f480eeab05a584885b0ad5af"
+content = "sha256:30041d17c61af48cb7a532f73b2590650e138c9f61e4dc934844dd63ae3d0b16"
+task-01 = "sha256:4029a7c3607702da69caa66a01a6cd8a2b20b819e9deb250c1a5c0bedb2ab999"
+task-02 = "sha256:5e7704606974a274b410e12ab8e44463f1002c2c134f790c8d1863d19537a289"
+task-03 = "sha256:dcec010ac3b97234652c54770995f1e4b17baff8f2379d19960c6e8b09cd4210"
+task-04 = "sha256:0e18e9fdf0e9dd54f86732808c7483dbaee2285bc49bd5372fbe6ee882412639"
+task-05 = "sha256:a225923d7a4e7c5807e7cc6ffc35fe2df59263e2dcf99d9f10cdc9a62622a4dd"
+task-06 = "sha256:2be1a079d93aec4749a671622c73309d49c1824cb7e54fd093fe74ab04d483ae"
+
+[[tasks]]
+number = 1
+title = "Redesign external schema and normalization contract"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Rebuild controller around comments, unanswered state, and ordered responses"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update tool execution and transcript/result rendering for the new outcome shape"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Rebuild form keyboard flow with review screen and comment editors"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update documentation, guidance, and maintainer contract notes"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Run package and workspace verification"
+status = "done"

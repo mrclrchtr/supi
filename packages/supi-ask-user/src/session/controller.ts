@@ -1,281 +1,314 @@
 import type {
-  Answer,
-  AnswerSelection,
+  AskUserInteractionResult,
   AskUserOutcome,
-  AskUserStatus,
+  ChoiceQuestionResponse,
   NormalizedChoiceQuestion,
   NormalizedQuestion,
   NormalizedQuestionnaire,
+  NormalizedTextQuestion,
+  TextQuestionResponse,
 } from "../types.ts";
 
+type OptionState = {
+  value: string;
+  label: string;
+  selected: boolean;
+  comment?: string;
+};
+
+type ChoiceState = {
+  kind: "choice";
+  options: OptionState[];
+  questionComment?: string;
+  markedUnanswered?: boolean;
+};
+
+type TextState = {
+  kind: "text";
+  value: string;
+  questionComment?: string;
+  markedUnanswered?: boolean;
+};
+
+type QuestionState = ChoiceState | TextState;
+
 export class AskUserController {
-  private readonly answers = new Map<string, Answer>();
+  private readonly states: QuestionState[];
   private index = 0;
-  private status: AskUserStatus | null = null;
-  private discussMessage: string | undefined;
+  private terminal: boolean = false;
+  private terminalResult: AskUserInteractionResult | undefined;
+  private formComment: string | undefined;
 
   constructor(public readonly questionnaire: NormalizedQuestionnaire) {
     if (questionnaire.questions.length === 0) {
       throw new Error("AskUserController requires at least one question.");
     }
+    this.states = questionnaire.questions.map((q) => this.initialState(q));
   }
 
-  get questions(): NormalizedQuestion[] {
-    return this.questionnaire.questions;
-  }
+  // ── Navigation ──────────────────────────────────────────────────
 
   get currentIndex(): number {
     return this.index;
   }
 
   get currentQuestion(): NormalizedQuestion {
-    const question = this.questionnaire.questions[this.index];
-    if (!question) {
-      throw new Error(`No question at index ${this.index}.`);
-    }
-    return question;
+    return this.questionnaire.questions[this.index];
   }
 
   get isTerminal(): boolean {
-    return this.status !== null;
-  }
-
-  get answerCount(): number {
-    return this.answers.size;
-  }
-
-  hasAnswer(questionId: string): boolean {
-    return this.answers.has(questionId);
-  }
-
-  getAnswer(questionId: string): Answer | undefined {
-    return this.answers.get(questionId);
-  }
-
-  getSelectedIndexes(question: NormalizedChoiceQuestion): number[] {
-    const answer = this.answers.get(question.id);
-    if (answer?.kind !== "choice") return [...question.initialIndexes];
-    return answer.selections
-      .map((selection) => question.options.findIndex((option) => option.value === selection.value))
-      .filter((index) => index >= 0);
-  }
-
-  getChoiceOptionNote(questionId: string, optionValue: string): string | undefined {
-    const answer = this.answers.get(questionId);
-    if (answer?.kind !== "choice") return undefined;
-    return answer.selections.find((selection) => selection.value === optionValue)?.note;
-  }
-
-  selectChoiceOption(question: NormalizedChoiceQuestion, optionIndex: number): void {
-    if (this.isTerminal) return;
-    const option = question.options[optionIndex];
-    if (!option) return;
-    const existingNote = this.getChoiceOptionNote(question.id, option.value);
-    this.commitChoiceSelections(question, [
-      buildSelection(option.value, option.label, existingNote),
-    ]);
-  }
-
-  toggleChoiceOption(question: NormalizedChoiceQuestion, optionIndex: number): void {
-    if (this.isTerminal) return;
-    const option = question.options[optionIndex];
-    if (!option) return;
-    if (!question.multi) {
-      this.selectChoiceOption(question, optionIndex);
-      return;
-    }
-
-    const selections = this.getStoredChoiceSelections(question.id);
-    const filtered = selections.filter((selection) => selection.value !== option.value);
-    if (filtered.length !== selections.length) {
-      this.commitChoiceSelections(question, filtered);
-      return;
-    }
-
-    this.commitChoiceSelections(question, [
-      ...selections,
-      buildSelection(option.value, option.label),
-    ]);
-  }
-
-  setChoiceOptionNote(
-    question: NormalizedChoiceQuestion,
-    optionIndex: number,
-    note: string | undefined,
-  ): void {
-    if (this.isTerminal) return;
-    const option = question.options[optionIndex];
-    if (!option) return;
-
-    const trimmedNote = trimOptional(note);
-    const selections = this.getStoredChoiceSelections(question.id);
-    const existing = selections.find((selection) => selection.value === option.value);
-
-    if (existing) {
-      this.commitChoiceSelections(
-        question,
-        selections.map((selection) => {
-          if (selection.value !== option.value) return selection;
-          return buildSelection(selection.value, selection.label, trimmedNote);
-        }),
-      );
-      return;
-    }
-
-    if (!trimmedNote) return;
-
-    const nextSelection = buildSelection(option.value, option.label, trimmedNote);
-    this.commitChoiceSelections(
-      question,
-      question.multi ? [...selections, nextSelection] : [nextSelection],
-    );
-  }
-
-  setAnswer(questionId: string, answer: Answer): void {
-    if (this.isTerminal) return;
-    this.answers.set(questionId, normalizeAnswer(answer));
-  }
-
-  clearAnswer(questionId: string): void {
-    if (this.isTerminal) return;
-    this.answers.delete(questionId);
+    return this.terminal;
   }
 
   goNext(): boolean {
-    if (this.isTerminal) return false;
+    if (this.terminal) return false;
     if (this.index >= this.questionnaire.questions.length - 1) return false;
     this.index += 1;
     return true;
   }
 
   goBack(): boolean {
-    if (this.isTerminal) return false;
+    if (this.terminal) return false;
     if (this.index === 0) return false;
     this.index -= 1;
     return true;
   }
 
-  canSubmit(): boolean {
-    return this.missingQuestionIds().length === 0;
-  }
-
-  canPartialSubmit(): boolean {
-    return (
-      this.questionnaire.allowPartialSubmit &&
-      this.answerCount > 0 &&
-      this.missingQuestionIds().length > 0
-    );
-  }
-
-  finishSubmitted(): boolean {
-    if (!this.canSubmit() || this.isTerminal) return false;
-    this.status = "submitted";
+  goTo(index: number): boolean {
+    if (this.terminal) return false;
+    if (index < 0 || index >= this.questionnaire.questions.length) return false;
+    this.index = index;
     return true;
   }
 
-  finishPartial(): boolean {
-    if (!this.canPartialSubmit() || this.isTerminal) return false;
-    this.status = "partial";
-    return true;
+  // ── Direct state queries ────────────────────────────────────────
+
+  isOptionSelected(questionId: string, optionValue: string): boolean {
+    const state = this.stateFor(questionId);
+    if (state.kind !== "choice") return false;
+    return state.options.find((option) => option.value === optionValue)?.selected ?? false;
   }
 
-  finishDiscuss(message?: string): boolean {
-    if (this.isTerminal) return false;
-    this.status = "discuss";
-    this.discussMessage = trimOptional(message);
-    return true;
+  isQuestionMarkedUnanswered(questionId: string): boolean {
+    return this.stateFor(questionId).markedUnanswered ?? false;
   }
 
-  cancel(): void {
-    if (this.isTerminal) return;
-    this.status = "cancelled";
+  // ── Comments ────────────────────────────────────────────────────
+
+  get comment(): string | undefined {
+    return this.formComment;
   }
 
-  abort(): void {
-    if (this.isTerminal) return;
-    this.status = "aborted";
+  setComment(text: string): void {
+    const trimmed = text.trim();
+    this.formComment = trimmed || undefined;
   }
+
+  setQuestionComment(questionId: string, text: string): void {
+    const state = this.stateFor(questionId);
+    const trimmed = text.trim();
+    state.questionComment = trimmed || undefined;
+  }
+
+  getQuestionComment(questionId: string): string | undefined {
+    return this.stateFor(questionId).questionComment;
+  }
+
+  getOptionComment(questionId: string, optionValue: string): string | undefined {
+    const state = this.stateFor(questionId);
+    if (state.kind !== "choice") return undefined;
+    return state.options.find((o) => o.value === optionValue)?.comment;
+  }
+
+  setChoiceOptionComment(
+    question: NormalizedChoiceQuestion,
+    optionIndex: number,
+    comment: string | undefined,
+  ): void {
+    if (this.terminal) return;
+    const state = this.stateFor(question.id);
+    if (state.kind !== "choice") return;
+    const option = state.options[optionIndex];
+    if (!option) return;
+
+    const trimmed = comment?.trim();
+    option.comment = trimmed || undefined;
+  }
+
+  // ── Single-select operations ────────────────────────────────────
+
+  selectChoiceOption(question: NormalizedChoiceQuestion, optionIndex: number): void {
+    if (this.terminal) return;
+    const state = this.stateFor(question.id);
+    if (state.kind !== "choice") return;
+
+    for (const opt of state.options) {
+      opt.selected = opt === state.options[optionIndex];
+    }
+    state.markedUnanswered = false;
+  }
+
+  // ── Multi-select operations ─────────────────────────────────────
+
+  toggleChoiceOption(question: NormalizedChoiceQuestion, optionIndex: number): void {
+    if (this.terminal) return;
+    if (!question.multi) {
+      this.selectChoiceOption(question, optionIndex);
+      return;
+    }
+    const state = this.stateFor(question.id);
+    if (state.kind !== "choice") return;
+    const option = state.options[optionIndex];
+    if (!option) return;
+
+    option.selected = !option.selected;
+    state.markedUnanswered = false;
+    // Preserve comment, only remove it explicitly via setChoiceOptionComment with blank
+  }
+
+  // ── Text operations ─────────────────────────────────────────────
+
+  setTextAnswer(questionId: string, value: string): void {
+    if (this.terminal) return;
+    const state = this.stateFor(questionId);
+    if (state.kind !== "text") return;
+    state.value = value.trim();
+    if (state.value.length > 0) state.markedUnanswered = false;
+  }
+
+  getTextAnswer(questionId: string): string {
+    const state = this.stateFor(questionId);
+    return state.kind === "text" ? state.value : "";
+  }
+
+  // ── Unanswered marking ──────────────────────────────────────────
+
+  markCurrentQuestionUnanswered(): void {
+    if (this.terminal) return;
+    const state = this.states[this.index];
+    if (state.kind === "choice") {
+      for (const opt of state.options) {
+        opt.selected = false;
+      }
+    } else {
+      state.value = "";
+    }
+    state.markedUnanswered = true;
+    // Comments are preserved
+  }
+
+  // ── Cancel / Abort (internal interaction results) ───────────────
+
+  cancel(): AskUserInteractionResult {
+    if (this.terminal) return { kind: "cancel" };
+    this.terminal = true;
+    this.terminalResult = { kind: "cancel" };
+    return { kind: "cancel" };
+  }
+
+  abort(): AskUserInteractionResult {
+    if (this.terminal) return { kind: "abort" };
+    this.terminal = true;
+    this.terminalResult = { kind: "abort" };
+    return { kind: "abort" };
+  }
+
+  /** Returns the terminal interaction result if the controller was cancelled/aborted, undefined otherwise. */
+  getInteractionResult(): AskUserInteractionResult | undefined {
+    return this.terminalResult;
+  }
+
+  // ── Outcome ─────────────────────────────────────────────────────
 
   outcome(): AskUserOutcome {
+    const responses = this.questionnaire.questions.map((q) => this.buildResponse(q));
+
+    const allAnswered = responses.every((r) => r.answer.answered);
+
     return {
-      status: this.status ?? "cancelled",
-      answersById: Object.fromEntries(this.answers),
-      missingQuestionIds: this.missingQuestionIds(),
-      ...(this.discussMessage ? { discussMessage: this.discussMessage } : {}),
+      outcome: allAnswered ? "submitted" : "needs_discussion",
+      ...(this.formComment ? { comment: this.formComment } : {}),
+      responses,
     };
   }
 
-  missingQuestionIds(): string[] {
-    return this.questionnaire.questions
-      .filter((question) => question.required && !this.answers.has(question.id))
-      .map((question) => question.id);
-  }
+  // ── Private helpers ─────────────────────────────────────────────
 
-  private getStoredChoiceSelections(questionId: string): AnswerSelection[] {
-    const answer = this.answers.get(questionId);
-    if (answer?.kind !== "choice") return [];
-    return answer.selections.map((selection) => ({ ...selection }));
-  }
-
-  private commitChoiceSelections(
-    question: NormalizedChoiceQuestion,
-    selections: AnswerSelection[],
-  ): void {
-    const ordered = orderSelections(question, normalizeChoiceSelections(selections));
-    const nextSelections = question.multi ? ordered : ordered.slice(0, 1);
-    if (nextSelections.length === 0) {
-      this.answers.delete(question.id);
-      return;
+  private stateFor(questionId: string): QuestionState {
+    const idx = this.questionnaire.questions.findIndex((q) => q.id === questionId);
+    if (idx < 0) {
+      throw new Error(`Unknown question id "${questionId}" in AskUserController.`);
     }
-
-    this.answers.set(question.id, {
-      kind: "choice",
-      selections: nextSelections,
-    });
+    return this.states[idx];
   }
-}
 
-function normalizeAnswer(answer: Answer): Answer {
-  switch (answer.kind) {
-    case "choice":
+  private initialState(question: NormalizedQuestion): QuestionState {
+    if (question.type === "choice") {
       return {
         kind: "choice",
-        selections: normalizeChoiceSelections(answer.selections),
+        options: question.options.map((opt, i) => ({
+          value: opt.value,
+          label: opt.label,
+          selected: question.recommendedIndexes.includes(i),
+        })),
       };
-    case "custom":
-      return { kind: "custom", value: answer.value.trim() };
-    case "text":
-      return { kind: "text", value: answer.value.trim() };
+    }
+
+    return {
+      kind: "text",
+      value: question.recommendation ?? "",
+    };
   }
-}
 
-function normalizeChoiceSelections(selections: AnswerSelection[]): AnswerSelection[] {
-  return selections.map((selection) =>
-    buildSelection(selection.value, selection.label, selection.note),
-  );
-}
+  private buildResponse(
+    question: NormalizedQuestion,
+  ): ChoiceQuestionResponse | TextQuestionResponse {
+    const state = this.stateFor(question.id);
 
-function orderSelections(
-  question: NormalizedChoiceQuestion,
-  selections: AnswerSelection[],
-): AnswerSelection[] {
-  const byValue = new Map(selections.map((selection) => [selection.value, selection]));
-  return question.options.flatMap((option) => {
-    const selection = byValue.get(option.value);
-    return selection ? [selection] : [];
-  });
-}
+    if (question.type === "choice") {
+      return this.buildChoiceResponse(question, state as ChoiceState);
+    }
 
-function buildSelection(value: string, label: string, note?: string): AnswerSelection {
-  const trimmedNote = trimOptional(note);
-  return {
-    value: value.trim(),
-    label: label.trim(),
-    ...(trimmedNote ? { note: trimmedNote } : {}),
-  };
-}
+    return this.buildTextResponse(question, state as TextState);
+  }
 
-function trimOptional(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : undefined;
+  private buildChoiceResponse(
+    question: NormalizedChoiceQuestion,
+    state: ChoiceState,
+  ): ChoiceQuestionResponse {
+    // Only include touched options: selected and/or commented
+    const touchedOptions = state.options.filter((o) => o.selected || o.comment);
+
+    return {
+      questionId: question.id,
+      ...(state.questionComment ? { questionComment: state.questionComment } : {}),
+      answer: {
+        kind: "choice",
+        answered: touchedOptions.some((o) => o.selected),
+        options: touchedOptions.map((o) => ({
+          value: o.value,
+          label: o.label,
+          selected: o.selected,
+          ...(o.comment ? { comment: o.comment } : {}),
+        })),
+      },
+    };
+  }
+
+  private buildTextResponse(
+    question: NormalizedTextQuestion,
+    state: TextState,
+  ): TextQuestionResponse {
+    const answered = state.value.length > 0;
+
+    return {
+      questionId: question.id,
+      ...(state.questionComment ? { questionComment: state.questionComment } : {}),
+      answer: {
+        kind: "text",
+        answered,
+        ...(answered ? { value: state.value } : {}),
+      },
+    };
+  }
 }
