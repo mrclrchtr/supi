@@ -150,15 +150,25 @@ function addCheckNextSection(lines: string[], checkNext: string[]): void {
 }
 
 function addTestsSection(lines: string[], tests: string[], details?: TestSurfaceDetails): void {
-  if (tests.length === 0) return;
-  const heading = details?.provenance
-    ? `## Likely Tests (${details.provenance})`
-    : "## Likely Tests";
-  lines.push(heading);
-  for (const t of tests.slice(0, 3)) {
-    lines.push(`- \`${t}\``);
+  if (tests.length > 0) {
+    const heading = details?.provenance
+      ? `## Likely Tests (${details.provenance})`
+      : "## Likely Tests";
+    lines.push(heading);
+    for (const t of tests.slice(0, 3)) {
+      lines.push(`- \`${t}\``);
+    }
+    lines.push("");
+    return;
   }
-  lines.push("");
+
+  // When test discovery was explicitly requested but found nothing,
+  // render an honest note instead of silently omitting test information.
+  if (details) {
+    lines.push("## Likely Tests");
+    lines.push("No likely tests found by bounded companion/package discovery.");
+    lines.push("");
+  }
 }
 
 /** Render the Likely Test Commands section when commands are available. */

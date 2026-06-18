@@ -252,11 +252,12 @@ The legacy compatibility executors (`code_refactor_plan`, `code_refactor_apply`)
 
 ### Shared test discovery
 - `src/analysis/relations/tests.ts` is the single source of truth for test-file discovery. `code_graph`, `code_context`, and `code_impact` all route through `discoverTestFilesForSource()`. Any divergent test lookup logic in a tool file is a bug.
-- Discovery combines semantic import/reference evidence with deterministic path conventions: same-directory companions, same-directory `__tests__/` companions, and package-level mirrors (`__tests__/unit/…`, `__tests__/integration/…`).
+- Discovery combines semantic import/reference evidence with deterministic path conventions: same-directory companions, same-directory `__tests__/` companions, package-level mirrors (`__tests__/unit/…`, `__tests__/integration/…`), and bounded tool/package-aware candidates. For source files at `src/tool/execute-<name>.ts`, exact candidates such as `code-<name>-tool`, `<name>-tool`, and `execute-<name>` are checked in both `__tests__/unit/` and `__tests__/integration/` with `.test` and `.spec` suffixes. No broad search, fuzzy matching, or AI guessing is performed.
 
 ### Impact seeding
 - Target-based `code_impact` seeds the target file itself as affected evidence. A symbol with zero semantic references still reports its own file as affected and can discover likely tests through the shared test-discovery helper.
 - `code_impact` with `includeTests: true` emits `likelyTestCommands` only when the workspace clearly uses Vitest (for example via package metadata, scripts, or a Vitest config file).
+- When `includeTests: true` is set and bounded companion/package discovery completes without finding any test files, `code_impact` renders an explicit `No likely tests found by bounded companion/package discovery.` note instead of silently omitting test information. This note is gated on the presence of tests metadata (present only when discovery was attempted).
 
 ### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.

@@ -299,4 +299,75 @@ describe("shared test discovery contract", () => {
 
     expect(files[0]?.testNames).toEqual([]);
   });
+
+  it("discovers bounded tool test file via conventions-only", async () => {
+    // Source at src/tool/execute-find.ts, test at __tests__/unit/code-find-tool.test.ts
+    writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource(
+      "__tests__/unit/code-find-tool.test.ts",
+      "import { executeFind } from '../../src/tool/execute-find';\n",
+    );
+    writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
+
+    const { files, kind, provenance } = await discoverTestFilesForSource(
+      path.join(tmpDir, "src/tool/execute-find.ts"),
+      {
+        references: async () => [],
+        cwd: tmpDir,
+        cap: 8,
+      },
+    );
+
+    // After bounded tool-aware discovery is implemented, this should find
+    // __tests__/unit/code-find-tool.test.ts via bounded candidates.
+    expect(kind).toBe("found");
+    expect(files.some((f) => f.absPath.includes("__tests__/unit/code-find-tool.test.ts"))).toBe(
+      true,
+    );
+    expect(provenance).toBe("conventions-only");
+  });
+
+  it("discovers root-level execute-name tool test via bounded conventions", async () => {
+    writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource(
+      "__tests__/unit/execute-find.test.ts",
+      "import { executeFind } from '../../src/tool/execute-find';\n",
+    );
+    writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
+
+    const { files, provenance } = await discoverTestFilesForSource(
+      path.join(tmpDir, "src/tool/execute-find.ts"),
+      {
+        references: async () => [],
+        cwd: tmpDir,
+        cap: 8,
+      },
+    );
+
+    expect(files.some((file) => file.absPath.endsWith("__tests__/unit/execute-find.test.ts"))).toBe(
+      true,
+    );
+    expect(provenance).toBe("conventions-only");
+  });
+
+  it("does not apply bounded tool aliases outside src/tool", async () => {
+    writeSource("lib/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource(
+      "__tests__/unit/code-find-tool.test.ts",
+      "import { executeFind } from '../../lib/tool/execute-find';\n",
+    );
+    writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
+
+    const { files, kind } = await discoverTestFilesForSource(
+      path.join(tmpDir, "lib/tool/execute-find.ts"),
+      {
+        references: async () => [],
+        cwd: tmpDir,
+        cap: 8,
+      },
+    );
+
+    expect(kind).toBe("empty");
+    expect(files.some((file) => file.absPath.includes("code-find-tool.test.ts"))).toBe(false);
+  });
 });

@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-18T17:42:14.224213Z"
+revision = 33
+
+[document_fingerprints]
+archive = "sha256:490808ac192b7f8a8c7be1826331c0dead335f0f424405e73a5dfe7fd2fd2634"
+content = "sha256:3f23f5e9ccac18cf4748032e333f8c4959d56d32a26ada44f4cfd1e789d37178"
+task-01 = "sha256:c0a1f85676fe3dfbc757a817ed0297dd2ba5744822a9051f81558da69480138d"
+task-02 = "sha256:ef4825567fec8b56cd4c48570e16b48e401a253c86c9a6aad60cae27bd869aff"
+task-03 = "sha256:a0be88f6db8bdb781db009598f4607d10f8922e334177e4a5b315dea2da0b558"
+task-04 = "sha256:5774615510f97ecaee3e8b359b7f7c49135369ad5d1fdec2f9f60f4e8ba4f3a1"
+task-05 = "sha256:7ad6ffc5a1fd3912e6778d0c7322c5fc868d4ec9255e27c8a7f5edca57cc6464"
+task-06 = "sha256:3834884088448d147377da3442eb411372fc66164e85a5d651f14c818c3bacf7"
+
+[[tasks]]
+number = 1
+title = "RED: codify bounded tool/package-aware test discovery"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: implement bounded package/tool-aware discovery"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "RED/GREEN: deduplicate same-line reference display"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "RED/GREEN: make empty impact test discovery explicit"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update docs for bounded discovery and explicit empty-test evidence"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Final verification and smoke test"
+status = "done"

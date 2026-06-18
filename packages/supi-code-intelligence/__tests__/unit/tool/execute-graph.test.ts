@@ -555,6 +555,38 @@ describe("execute-graph (code_graph tool)", () => {
       expect(result.content).not.toContain("`result`");
     });
 
+    it("discovers named-different tool test via conventions-only", async () => {
+      // Source src/tool/execute-find.ts, test __tests__/unit/code-find-tool.test.ts
+      mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
+      writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+      mkdirSync(path.join(tmpDir, "__tests__", "unit"), { recursive: true });
+      writeSource(
+        "__tests__/unit/code-find-tool.test.ts",
+        "import { executeFind } from '../../src/tool/execute-find';\n",
+      );
+      writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
+
+      registerMockProvider(tmpDir, {
+        references: async () => [],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "src/tool/execute-find.ts",
+          line: 1,
+          character: 1,
+          relations: ["tests"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      // After bounded discovery, this should not say "no companion test files found"
+      // and should list __tests__/unit/code-find-tool.test.ts.
+      expect(result.content).not.toContain("no companion test files found");
+      expect(result.content).toContain("__tests__/unit/code-find-tool.test.ts");
+    });
+
     it("finds test via import analysis when naming conventions differ", async () => {
       // source file
       const { mkdirSync } = await import("node:fs");
@@ -614,6 +646,93 @@ describe("execute-graph (code_graph tool)", () => {
           "__tests__/code-find-tool.test.ts",
         );
       }
+    });
+  });
+
+  describe("reference line deduplication", () => {
+    it("deduplicates same-line references in grouped output", async () => {
+      // Two semantic references on the same line should render as one line number.
+      writeSource("test.ts", "export function foo() { return 1; }\n");
+
+      registerMockProvider(tmpDir, {
+        references: async () => [
+          {
+            uri: `file://${tmpDir}/test.ts`,
+            range: {
+              start: { line: 0, character: 17 },
+              end: { line: 0, character: 20 },
+            },
+          },
+          {
+            uri: `file://${tmpDir}/test.ts`,
+            range: {
+              start: { line: 0, character: 21 },
+              end: { line: 0, character: 24 },
+            },
+          },
+        ],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 18,
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      // Same line should appear once, not "L1, L1"
+      expect(result.content).not.toContain("L1, L1");
+      expect(result.content).toContain("L1");
+      const l1Matches = result.content.match(/\bL1\b/g);
+      expect(l1Matches?.length).toBe(1);
+    });
+
+    it("still compacts consecutive lines alongside deduplication", async () => {
+      // Three references: two on line 9, one on line 10 → "L9-L10"
+      writeSource("test.ts", "export function bar() { return 2; }\n");
+
+      registerMockProvider(tmpDir, {
+        references: async () => [
+          {
+            uri: `file://${tmpDir}/test.ts`,
+            range: {
+              start: { line: 8, character: 3 },
+              end: { line: 8, character: 6 },
+            },
+          },
+          {
+            uri: `file://${tmpDir}/test.ts`,
+            range: {
+              start: { line: 8, character: 17 },
+              end: { line: 8, character: 20 },
+            },
+          },
+          {
+            uri: `file://${tmpDir}/test.ts`,
+            range: {
+              start: { line: 9, character: 5 },
+              end: { line: 9, character: 8 },
+            },
+          },
+        ],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 18,
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      // Should be "L9-L10", not "L9, L9, L10"
+      expect(result.content).not.toContain("L9, L9");
+      expect(result.content).toContain("L9-L10");
     });
   });
 });

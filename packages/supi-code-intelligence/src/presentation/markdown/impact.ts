@@ -65,6 +65,11 @@ export function renderChangedFilesImpact(params: {
       lines.push(`- \`${file}\``);
     }
     lines.push("");
+  } else if (params.analysis.tests) {
+    // Test discovery was explicitly requested but found nothing.
+    lines.push("## Likely Tests");
+    lines.push("No likely tests found by bounded companion/package discovery.");
+    lines.push("");
   }
 
   if (params.analysis.likelyTestCommands.length > 0) {

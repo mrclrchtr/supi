@@ -260,7 +260,9 @@ export async function discoverTestFilesForSource(
  * Does NOT match files whose bare stem contains `test` or `spec` without boundary boundaries
  * (e.g. `contest.ts`, `testing.ts`, `tool-specs.ts` are excluded).
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: deterministic path enumeration across many candidate patterns is simpler as one function
+const TEST_LAYOUT_PREFIXES = ["__tests__/unit", "__tests__/integration"] as const;
+const TEST_FILE_SUFFIXES = [".test", ".spec"] as const;
+
 function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
   const results: string[] = [];
   const seen = new Set<string>();
@@ -274,48 +276,89 @@ function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
     // Source itself is not a test; still permit companion discovery.
   }
 
-  for (const suffix of [".test", ".spec"]) {
-    const candidate = path.join(dir, `${basename}${suffix}${ext}`);
-    if (!seen.has(candidate) && existsSync(candidate)) {
-      seen.add(candidate);
-      results.push(candidate);
-    }
+  for (const suffix of TEST_FILE_SUFFIXES) {
+    addExistingTestCandidate(results, seen, path.join(dir, `${basename}${suffix}${ext}`));
   }
 
-  for (const suffix of [".test", ".spec"]) {
-    const candidate = path.join(dir, "__tests__", `${basename}${suffix}${ext}`);
-    if (!seen.has(candidate) && existsSync(candidate)) {
-      seen.add(candidate);
-      results.push(candidate);
-    }
+  for (const suffix of TEST_FILE_SUFFIXES) {
+    addExistingTestCandidate(
+      results,
+      seen,
+      path.join(dir, "__tests__", `${basename}${suffix}${ext}`),
+    );
   }
 
   if (cwd) {
     const pkgRoot = findNearestPackageRoot(dir, cwd);
     if (pkgRoot) {
-      const relFromPkg = path.relative(pkgRoot, sourceAbs);
-      for (const testPrefix of ["__tests__/unit", "__tests__/integration"]) {
-        let mirroredRel = relFromPkg;
-        for (const srcPrefix of ["src/", "lib/", "source/"]) {
-          if (mirroredRel.startsWith(srcPrefix)) {
-            mirroredRel = mirroredRel.slice(srcPrefix.length);
-            break;
-          }
-        }
-        for (const suffix of [".test", ".spec"]) {
-          const mirroredName = `${path.basename(mirroredRel, ext)}${suffix}${ext}`;
-          const mirroredDir = path.dirname(mirroredRel);
-          const candidate = path.join(pkgRoot, testPrefix, mirroredDir, mirroredName);
-          if (!seen.has(candidate) && existsSync(candidate)) {
-            seen.add(candidate);
-            results.push(candidate);
-          }
-        }
-      }
+      addPackageMirrorCandidates(results, seen, { pkgRoot, sourceAbs, ext });
+      addBoundedToolCandidates(results, seen, { pkgRoot, dir, basename, ext });
     }
   }
 
   return results;
+}
+
+function addExistingTestCandidate(results: string[], seen: Set<string>, candidate: string): void {
+  if (seen.has(candidate) || !existsSync(candidate)) return;
+  seen.add(candidate);
+  results.push(candidate);
+}
+
+function addPackageMirrorCandidates(
+  results: string[],
+  seen: Set<string>,
+  options: { pkgRoot: string; sourceAbs: string; ext: string },
+): void {
+  const { pkgRoot, sourceAbs, ext } = options;
+  const relFromPkg = path.relative(pkgRoot, sourceAbs);
+
+  for (const testPrefix of TEST_LAYOUT_PREFIXES) {
+    let mirroredRel = relFromPkg;
+    for (const srcPrefix of ["src/", "lib/", "source/"]) {
+      if (mirroredRel.startsWith(srcPrefix)) {
+        mirroredRel = mirroredRel.slice(srcPrefix.length);
+        break;
+      }
+    }
+
+    for (const suffix of TEST_FILE_SUFFIXES) {
+      const mirroredName = `${path.basename(mirroredRel, ext)}${suffix}${ext}`;
+      const mirroredDir = path.dirname(mirroredRel);
+      addExistingTestCandidate(
+        results,
+        seen,
+        path.join(pkgRoot, testPrefix, mirroredDir, mirroredName),
+      );
+    }
+  }
+}
+
+function addBoundedToolCandidates(
+  results: string[],
+  seen: Set<string>,
+  options: { pkgRoot: string; dir: string; basename: string; ext: string },
+): void {
+  const { pkgRoot, dir, basename, ext } = options;
+  const toolSrcMatch = basename.match(/^execute-(.+)$/);
+  const relDirFromPkg = path.relative(pkgRoot, dir).replaceAll("\\", "/");
+  if (!toolSrcMatch || relDirFromPkg !== "src/tool") return;
+
+  const toolName = toolSrcMatch[1];
+  if (toolName.length === 0) return;
+
+  const boundedStems = [`code-${toolName}-tool`, `${toolName}-tool`, `execute-${toolName}`];
+  for (const testPrefix of TEST_LAYOUT_PREFIXES) {
+    for (const stem of boundedStems) {
+      for (const suffix of TEST_FILE_SUFFIXES) {
+        addExistingTestCandidate(
+          results,
+          seen,
+          path.join(pkgRoot, testPrefix, `${stem}${suffix}${ext}`),
+        );
+      }
+    }
+  }
 }
 
 /**

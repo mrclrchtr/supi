@@ -355,6 +355,126 @@ describe("code_impact tool", () => {
     }
   });
 
+  it("discovers bounded tool test via conventions-only impact", async () => {
+    // Source src/tool/execute-find.ts, test __tests__/unit/code-find-tool.test.ts
+    mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "src/tool/execute-find.ts"),
+      "export function executeFind() { return 1; }\n",
+    );
+    mkdirSync(path.join(tmpDir, "__tests__", "unit"), { recursive: true });
+    writeFileSync(
+      path.join(tmpDir, "__tests__/unit/code-find-tool.test.ts"),
+      "import { executeFind } from '../../src/tool/execute-find';\n",
+    );
+
+    registerMockProvider(tmpDir, {
+      exports: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "executeFind",
+            kind: "function",
+            startLine: 1,
+            startCharacter: 17,
+            endLine: 1,
+            endCharacter: 28,
+          },
+        ],
+      }),
+      references: async () => [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const resolveTool = getTool(pi, "code_resolve");
+    const resolveResult = (await resolveTool.execute(
+      "impact-resolve",
+      { file: "src/tool/execute-find.ts", line: 1, character: 17 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: { data?: { targets?: Array<{ targetId: string }> } };
+    };
+    const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
+    expect(targetId).toBeDefined();
+
+    const impactTool = getTool(pi, "code_impact");
+    const result = (await impactTool.execute(
+      "impact-bounded-tool-test",
+      { targetId, includeTests: true },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    // After bounded discovery, this should find __tests__/unit/code-find-tool.test.ts.
+    expect(result.content[0].text).toContain("__tests__/unit/code-find-tool.test.ts");
+  });
+
+  it("renders explicit empty-test note when includeTests is true but no tests found", async () => {
+    // Source file with no companion, package-layout, or bounded test files
+    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src/standalone.ts"), "export const value = 42;\n");
+
+    registerMockProvider(tmpDir, {
+      exports: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "value",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 19,
+          },
+        ],
+      }),
+      references: async () => [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const resolveTool = getTool(pi, "code_resolve");
+    const resolveResult = (await resolveTool.execute(
+      "impact-resolve-empty",
+      { file: "src/standalone.ts", line: 1, character: 17 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: { data?: { targets?: Array<{ targetId: string }> } };
+    };
+    const targetId = resolveResult.details?.data?.targets?.[0]?.targetId;
+    expect(targetId).toBeDefined();
+
+    const impactTool = getTool(pi, "code_impact");
+    const result = (await impactTool.execute(
+      "impact-empty-tests",
+      { targetId, includeTests: true },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: string; data?: { tests?: { status?: string; files?: unknown[] } } };
+    };
+
+    // Should render explicit note instead of silently omitting test info.
+    expect(result.content[0].text).toContain(
+      "No likely tests found by bounded companion/package discovery.",
+    );
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.tests?.status).toBe("empty");
+      expect(result.details.data?.tests?.files).toEqual([]);
+    }
+  });
+
   it("ignores __tests__/helpers support files for target-based likely tests", async () => {
     writeFileSync(
       path.join(tmpDir, "package.json"),
@@ -555,7 +675,9 @@ describe("code_impact tool", () => {
     };
 
     expect(result.content[0].text).not.toContain("__tests__/code-find-tool.test.ts");
-    expect(result.content[0].text).not.toContain("Likely Tests");
+    expect(result.content[0].text).toContain(
+      "No likely tests found by bounded companion/package discovery.",
+    );
     expect(result.content[0].text).toContain("**Evidence: structural**");
     expect(result.content[0].text).not.toContain("Likely Test Commands");
     if (result.details?.type === "impact") {
@@ -659,7 +781,9 @@ describe("code_impact tool", () => {
     };
 
     expect(result.content[0].text).not.toContain("tests/widget.spec.py");
-    expect(result.content[0].text).not.toContain("Likely Tests");
+    expect(result.content[0].text).toContain(
+      "No likely tests found by bounded companion/package discovery.",
+    );
     expect(result.content[0].text).toContain("**Evidence: structural**");
     expect(result.content[0].text).not.toContain("Likely Test Commands");
     if (result.details?.type === "impact") {
@@ -690,8 +814,10 @@ describe("code_impact tool", () => {
       content: Array<{ type: string; text: string }>;
     };
 
-    // Should have no Likely Tests section
-    expect(result.content[0].text).not.toContain("Likely Tests");
+    // Should have explicit empty-test note
+    expect(result.content[0].text).toContain(
+      "No likely tests found by bounded companion/package discovery.",
+    );
   });
 
   it("does not register code_affected on the public tool surface", () => {

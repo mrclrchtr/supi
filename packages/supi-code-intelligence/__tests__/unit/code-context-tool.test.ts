@@ -566,6 +566,43 @@ describe("code_context real-data sections", () => {
     }
   });
 
+  it("discovers bounded tool test via conventions-only in code_context", async () => {
+    // Source src/tool/execute-find.ts, test __tests__/unit/code-find-tool.test.ts
+    writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource(
+      "__tests__/unit/code-find-tool.test.ts",
+      "import { executeFind } from '../../src/tool/execute-find';\n",
+    );
+
+    registerMockProvider(tmpDir, {
+      references: async () => [],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/tool/execute-find.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "context-bounded-tool-test",
+      {
+        task: "find related tests",
+        targetId,
+        include: ["tests"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    // After bounded discovery, this should find __tests__/unit/code-find-tool.test.ts
+    // via conventions-only, not say "No test companion files found".
+    expect(result.content[0].text).not.toContain("No test companion files found");
+    expect(result.content[0].text).toContain("__tests__/unit/code-find-tool.test.ts");
+  });
+
   it("extracts obvious test-call labels when outline data is unavailable", async () => {
     writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
     writeSource(

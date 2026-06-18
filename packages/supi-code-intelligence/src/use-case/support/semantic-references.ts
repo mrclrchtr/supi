@@ -81,7 +81,8 @@ export async function aggregatePerTarget<T extends ReferenceCollection>(
  * Non-consecutive lines stay single: [9,348] → "L9, L348".
  */
 export function compactLineRanges(lines: number[]): string {
-  const sorted = [...lines].sort((a, b) => a - b);
+  const unique = [...new Set(lines)];
+  const sorted = unique.sort((a, b) => a - b);
   const parts: string[] = [];
   let i = 0;
   while (i < sorted.length) {
