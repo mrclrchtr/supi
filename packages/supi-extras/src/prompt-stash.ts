@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { DynamicBorder } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, DynamicBorder } from "@earendil-works/pi-coding-agent";
 import { Container, type SelectItem, SelectList, Spacer, Text } from "@earendil-works/pi-tui";
 import { readJsonFile } from "@mrclrchtr/supi-core/config";
 import { copyToClipboard } from "./clipboard.ts";
@@ -25,7 +25,7 @@ interface Stash {
 }
 
 /** Storage directory relative to the user's home directory. */
-const STORAGE_RELATIVE_DIR = ".pi/agent/supi";
+const STORAGE_RELATIVE_DIR = `${CONFIG_DIR_NAME}/agent/supi`;
 const STASH_FILE = "prompt-stash.json";
 
 /** Resolve the absolute path to the stash persistence file. */

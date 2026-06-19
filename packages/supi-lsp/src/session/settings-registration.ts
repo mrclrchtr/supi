@@ -1,6 +1,6 @@
 // LSP settings registration for the supi settings registry.
 
-import { getSettingsListTheme } from "@earendil-works/pi-coding-agent";
+import { CONFIG_DIR_NAME, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import type { SettingItem } from "@earendil-works/pi-tui";
 import { Container, Key, matchesKey, SettingsList, Text } from "@earendil-works/pi-tui";
 import {
@@ -40,10 +40,10 @@ export function getLspDisabledMessage(cwd: string, homeDir?: string): string {
   const project = loadSupiConfigForScope("lsp", cwd, LSP_DEFAULTS, { scope: "project", homeDir });
 
   if (project.enabled === false) {
-    return "LSP is disabled in project settings (.pi/supi/config.json)";
+    return `LSP is disabled in project settings (${CONFIG_DIR_NAME}/supi/config.json)`;
   }
   if (global.enabled === false) {
-    return "LSP is disabled in global settings (~/.pi/agent/supi/config.json)";
+    return `LSP is disabled in global settings (~/${CONFIG_DIR_NAME}/agent/supi/config.json)`;
   }
   return "LSP is disabled in settings";
 }
@@ -251,7 +251,11 @@ function createExcludeSubmenu(
   const header = new Text("Exclude Patterns — toggle off to remove", 0, 0);
   container.addChild(header);
 
-  const footer = new Text("Add new patterns in .pi/supi/config.json under lsp.exclude", 0, 0);
+  const footer = new Text(
+    `Add new patterns in ${CONFIG_DIR_NAME}/supi/config.json under lsp.exclude`,
+    0,
+    0,
+  );
   container.addChild(footer);
 
   const settingsList = new SettingsList(

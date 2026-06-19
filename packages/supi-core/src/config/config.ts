@@ -7,9 +7,10 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { CONFIG_DIR_NAME } from "@earendil-works/pi-coding-agent";
 
-const GLOBAL_CONFIG_DIR = ".pi/agent/supi";
-const PROJECT_CONFIG_DIR = ".pi/supi";
+const GLOBAL_CONFIG_DIR = `${CONFIG_DIR_NAME}/agent/supi`;
+const PROJECT_CONFIG_DIR = `${CONFIG_DIR_NAME}/supi`;
 const CONFIG_FILE = "config.json";
 
 function getGlobalConfigPath(homeDir?: string): string {
