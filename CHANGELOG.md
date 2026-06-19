@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.1](https://github.com/mrclrchtr/supi/compare/v1.14.0...v1.14.1) (2026-06-19)
+
+
+### Bug Fixes
+
+* **scripts:** add -L to find in pack-staged for broken symlinks ([7400098](https://github.com/mrclrchtr/supi/commit/7400098c7f79f605430ac2c582c427ade3825698))
+
 ## [1.14.0](https://github.com/mrclrchtr/supi/compare/v1.13.0...v1.14.0) (2026-06-18)
 
 
