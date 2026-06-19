@@ -92,7 +92,7 @@ function removeKnownBrokenSymlinks(packageDir) {
   try {
     execFileSync(
       "find",
-      [packageDir, "-type", "l", "!", "-exec", "test", "-e", "{}", ";", "-delete"],
+      ["-L", packageDir, "-type", "l", "!", "-exec", "test", "-e", "{}", ";", "-delete"],
       { stdio: "ignore" },
     );
   } catch {
