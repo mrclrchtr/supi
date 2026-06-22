@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.14.2](https://github.com/mrclrchtr/supi/compare/v1.14.1...v1.14.2) (2026-06-22)
+
+
+### Bug Fixes
+
+* **build:** skip unused tree-sitter native build on Node 24 ([c46ad6c](https://github.com/mrclrchtr/supi/commit/c46ad6c0f3ee34c1ca4a161f4a3c2a514b679511))
+* **deps:** deduplicate pi packages in lockfile ([a43b829](https://github.com/mrclrchtr/supi/commit/a43b82904a96e0b6e54aded349ec669b1de6ba61))
+* **deps:** update dependency @davisvaughan/tree-sitter-r to v1.3.0 ([63070db](https://github.com/mrclrchtr/supi/commit/63070db017275bde5de37a0197a5878b312262fc))
+
 ## [1.14.1](https://github.com/mrclrchtr/supi/compare/v1.14.0...v1.14.1) (2026-06-19)
 
 
