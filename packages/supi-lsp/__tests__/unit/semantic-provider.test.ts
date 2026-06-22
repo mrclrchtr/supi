@@ -169,7 +169,7 @@ describe("LspSemanticProvider", () => {
       expect(result?.[0].name).toBe("myFunc");
       expect(result?.[0].kind).toBe("Function");
       expect(result?.[0].file).toBe("/src/index.ts");
-      expect(result?.[0].line).toBe(6);
+      expect(result?.[0].declarationAnchor.line).toBe(6);
       expect(result?.[0].container).toBe("moduleA");
     });
   });

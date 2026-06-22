@@ -256,20 +256,27 @@ function flattenDocumentSymbols(
   const result: CodeSymbol[] = [];
 
   for (const sym of symbols) {
-    // DocumentSymbol has selectionRange; SymbolInformation has location
+    // DocumentSymbol.range = full defining node (declaration anchor);
+    // .selectionRange = identifier token (name anchor). SymbolInformation has
+    // only location.range (declaration) and no selectionRange.
     const ds = sym as DocumentSymbol;
     const si = sym as SymbolInformation;
-    const start = ds.selectionRange?.start ?? si.location?.range?.start;
-    if (!start) continue;
+    const declStart = ds.range?.start ?? si.location?.range?.start;
+    if (!declStart) continue;
+    const nameStart = ds.selectionRange?.start;
 
-    result.push({
+    const symbol: CodeSymbol = {
       name: sym.name,
       kind: symbolKindName(sym.kind),
       file: filePath,
-      line: start.line + 1,
-      character: start.character + 1,
+      declarationAnchor: { line: declStart.line + 1, character: declStart.character + 1 },
       container,
-    });
+    };
+    if (nameStart) {
+      symbol.nameAnchor = { line: nameStart.line + 1, character: nameStart.character + 1 };
+    }
+
+    result.push(symbol);
 
     if (Array.isArray(ds.children) && ds.children.length > 0) {
       result.push(...flattenDocumentSymbols(ds.children, filePath, sym.name));
@@ -286,8 +293,12 @@ function toCodeSymbol(sym: SymbolInformation): CodeSymbol {
     name: sym.name,
     kind: symbolKindName(sym.kind),
     file: uri.startsWith("file://") ? decodeURIComponent(uri.slice(7)) : uri,
-    line: start ? start.line + 1 : 0,
-    character: start ? start.character + 1 : 0,
+    // SymbolInformation has no selectionRange — nameAnchor is derived later
+    // by the orchestration layer's refine, or left absent.
+    declarationAnchor: {
+      line: start ? start.line + 1 : 0,
+      character: start ? start.character + 1 : 0,
+    },
     container: sym.containerName ?? null,
   };
 }

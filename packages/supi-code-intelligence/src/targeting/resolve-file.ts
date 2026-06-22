@@ -125,15 +125,18 @@ async function resolveViaSemantic(
 
     const topLevel = symbols
       .filter((s) => !s.container)
-      .map((s) => ({
-        file: resolvedFile,
-        position: { line: s.line - 1, character: s.character - 1 },
-        displayLine: s.line,
-        displayCharacter: s.character,
-        name: s.name,
-        kind: s.kind,
-        confidence: "semantic" as const,
-      }));
+      .map((s) => {
+        const a = s.nameAnchor ?? s.declarationAnchor;
+        return {
+          file: resolvedFile,
+          position: { line: a.line - 1, character: a.character - 1 },
+          displayLine: a.line,
+          displayCharacter: a.character,
+          name: s.name,
+          kind: s.kind,
+          confidence: "semantic" as const,
+        };
+      });
 
     if (topLevel.length === 0) return structuralTargets;
 

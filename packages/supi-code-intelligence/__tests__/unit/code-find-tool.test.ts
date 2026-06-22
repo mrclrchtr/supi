@@ -532,8 +532,7 @@ describe("code_find tool", () => {
             name: "myFunc",
             kind: "function",
             file: path.join(tmpDir, "a.ts"),
-            line: 1,
-            character: 17,
+            declarationAnchor: { line: 1, character: 17 },
           },
         ],
       });
@@ -563,15 +562,13 @@ describe("code_find tool", () => {
             name: "scopedFunc",
             kind: "function",
             file: path.join(tmpDir, "src/a.ts"),
-            line: 1,
-            character: 17,
+            declarationAnchor: { line: 1, character: 17 },
           },
           {
             name: "scopedFunc",
             kind: "function",
             file: path.join(tmpDir, "other/a.ts"),
-            line: 1,
-            character: 17,
+            declarationAnchor: { line: 1, character: 17 },
           },
         ],
       });

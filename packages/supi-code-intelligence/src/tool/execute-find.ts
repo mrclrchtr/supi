@@ -8,7 +8,7 @@
  * - semantic: LSP workspace symbols
  */
 
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { type CodeSymbol, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { resolveScope } from "../search-helpers.ts";
@@ -275,14 +275,7 @@ function renderSemanticEmptyResult(
 
 function renderSemanticResults(
   query: string,
-  symbols: Array<{
-    name: string;
-    kind: string;
-    file: string;
-    line: number;
-    character: number;
-    container?: string | null;
-  }>,
+  symbols: CodeSymbol[],
   params: CodeFindToolParams,
   cwd: string,
 ): CodeIntelResult {
@@ -298,7 +291,8 @@ function renderSemanticResults(
     const kindLabel = sym.kind ? ` [${sym.kind}]` : "";
     const container = sym.container ? ` (in ${sym.container})` : "";
     const fileRel = sym.file.startsWith(cwd) ? sym.file.slice(cwd.length + 1) : sym.file;
-    lines.push(`- \`${sym.name}\`${kindLabel}${container} — \`${fileRel}:${sym.line}\``);
+    const anchor = sym.nameAnchor ?? sym.declarationAnchor;
+    lines.push(`- \`${sym.name}\`${kindLabel}${container} — \`${fileRel}:${anchor.line}\``);
   }
 
   if (omitted > 0) {

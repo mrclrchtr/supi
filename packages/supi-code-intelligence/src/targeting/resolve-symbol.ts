@@ -31,6 +31,19 @@ function isExactDocumentSymbolMatch(candidate: CodeSymbol, workspaceSymbol: Code
 }
 
 /**
+ * The preferred anchor for resolution/downstream: the name (identifier) anchor
+ * when the provider derived it, else the declaration anchor. Strict consumers
+ * (tree-sitter `calleesAt`, LSP `rename`) prefer the name anchor; tolerant
+ * consumers (`references`, `implementation`, `definition`) accept either.
+ * Per ADR 0003. When `nameAnchor` is absent, strict consumers that consume
+ * this anchor should hard-fail observably (slice D) rather than silently use
+ * the declaration — handled at the consumer boundary, not here.
+ */
+function anchorOf(s: CodeSymbol): CodeSymbol["declarationAnchor"] {
+  return s.nameAnchor ?? s.declarationAnchor;
+}
+
+/**
  * Prefer a document-symbol anchor when it provides one unambiguous exact match
  * for the already-selected workspace symbol.
  */
@@ -52,7 +65,8 @@ async function refineResolvedSymbolAnchor(
     }
 
     const refined = exactMatches[0];
-    if (refined.line <= 0 && refined.character <= 0) {
+    const a = anchorOf(refined);
+    if (a.line <= 0 && a.character <= 0) {
       return workspaceSymbol;
     }
 
@@ -115,17 +129,20 @@ export async function resolveSymbolTarget(
 
   // Range-less candidates (line=0,char=0) come from URI-only workspace symbols.
   // Keep them for disambiguation but don't promote to single-match resolution.
-  const ranged = candidates.filter((s) => s.line > 0 || s.character > 0);
+  const ranged = candidates.filter(
+    (s) => s.declarationAnchor.line > 0 || s.declarationAnchor.character > 0,
+  );
 
   if (ranged.length === 1) {
     const c = await refineResolvedSymbolAnchor(ranged[0], semantic);
+    const a = anchorOf(c);
     return {
       kind: "resolved",
       target: {
         file: c.file,
-        position: { line: c.line - 1, character: c.character - 1 },
-        displayLine: c.line,
-        displayCharacter: c.character,
+        position: { line: a.line - 1, character: a.character - 1 },
+        displayLine: a.line,
+        displayCharacter: a.character,
         name: c.name,
         kind: c.kind,
         confidence: "semantic",
@@ -146,21 +163,22 @@ export async function resolveSymbolTarget(
   // (tree-sitter calleesAt, LSP rename) receive the identifier anchor rather
   // than the declaration anchor (the `export` keyword) that workspace-symbol
   // hits carry. Mirrors the single-match refine path above.
-  // TODO(ADR 0003): fold into the CodeSymbol nameAnchor/declarationAnchor
-  // split; batch the per-file documentSymbols dedupe as a follow-up refactor.
+  // Per ADR 0003, `anchorOf` prefers the refined doc symbol's `nameAnchor`.
+  // TODO: batch the per-file documentSymbols dedupe across candidates.
   const cap = options?.maxResults ?? MAX_CANDIDATES;
   const refined = await Promise.all(
     candidates.slice(0, cap).map((c) => refineResolvedSymbolAnchor(c, semantic)),
   );
   const candidatesOut = refined.map((c, idx) => {
     const relFile = path.relative(cwd, c.file);
+    const a = anchorOf(c);
     return {
       name: c.name,
       kind: c.kind,
       container: c.container ?? null,
       file: relFile,
-      line: c.line,
-      character: c.character,
+      line: a.line,
+      character: a.character,
       reason: relFile,
       rank: idx + 1,
     };

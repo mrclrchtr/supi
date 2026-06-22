@@ -129,16 +129,14 @@ describe("resolveSymbolTarget", () => {
           name: "Widget",
           kind: "Class",
           file: "/project/src/a.ts",
-          line: 2,
-          character: 3,
+          declarationAnchor: { line: 2, character: 3 },
           container: null,
         },
         {
           name: "Widget",
           kind: "Class",
           file: "/project/src/b.ts",
-          line: 5,
-          character: 2,
+          declarationAnchor: { line: 5, character: 2 },
           container: null,
         },
       ]),
@@ -159,8 +157,7 @@ describe("resolveSymbolTarget", () => {
           name: "Thing",
           kind: "Interface",
           file: "/project/src/types.ts",
-          line: 0,
-          character: 0,
+          declarationAnchor: { line: 0, character: 0 },
           container: null,
         },
       ]),
@@ -177,8 +174,7 @@ describe("resolveSymbolTarget", () => {
           name: "Thing",
           kind: "Function",
           file: "/project/src/types.ts",
-          line: 2,
-          character: 3,
+          declarationAnchor: { line: 2, character: 3 },
           container: null,
         },
       ]),
@@ -187,16 +183,14 @@ describe("resolveSymbolTarget", () => {
           name: "Thing",
           kind: "Function",
           file: "/project/src/types.ts",
-          line: 10,
-          character: 5,
+          declarationAnchor: { line: 10, character: 5 },
           container: null,
         },
         {
           name: "Thing",
           kind: "Function",
           file: "/project/src/types.ts",
-          line: 20,
-          character: 7,
+          declarationAnchor: { line: 20, character: 7 },
           container: null,
         },
       ]),
@@ -216,8 +210,7 @@ describe("resolveSymbolTarget", () => {
           name: "Thing",
           kind: "Function",
           file: "/project/src/types.ts",
-          line: 2,
-          character: 3,
+          declarationAnchor: { line: 2, character: 3 },
           container: null,
         },
       ]),
@@ -226,8 +219,7 @@ describe("resolveSymbolTarget", () => {
           name: "Thing",
           kind: "Function",
           file: "/project/src/types.ts",
-          line: 0,
-          character: 0,
+          declarationAnchor: { line: 0, character: 0 },
           container: null,
         },
       ]),
@@ -247,8 +239,7 @@ describe("resolveSymbolTarget", () => {
           name: "Thing",
           kind: "Function",
           file: "/project/src/types.ts",
-          line: 2,
-          character: 3,
+          declarationAnchor: { line: 2, character: 3 },
           container: null,
         },
       ]),
@@ -269,8 +260,7 @@ describe("resolveSymbolTarget", () => {
           name: "Thing",
           kind: "Function",
           file: "/project/src/types.ts",
-          line: 2,
-          character: 3,
+          declarationAnchor: { line: 2, character: 3 },
           container: null,
         },
       ]),
@@ -286,9 +276,10 @@ describe("resolveSymbolTarget", () => {
 
   // Tracer bullet for ADR 0003 — see docs/adr/0003-code-symbol-name-declaration-anchors.md
   it("refines ambiguous-symbol disambiguation candidates to the identifier (name) anchor, not the declaration (export) anchor", async () => {
-    // Workspace symbols mimic LSP SymbolInformation: location.range.start points
-    // at the declaration (the `export` keyword) — column 1.
-    // Document symbols mimic DocumentSymbol.selectionRange: the identifier offset.
+    // Workspace symbols mimic toCodeSymbol (LSP SymbolInformation): only a
+    // declaration anchor (the `export` keyword), no name anchor.
+    // Document symbols mimic flattenDocumentSymbols (DocumentSymbol): a
+    // declaration anchor plus a name anchor from selectionRange (identifier).
     const aDeclaration = { line: 10, character: 1 };
     const bDeclaration = { line: 20, character: 1 };
     const aNameAnchor = { line: 10, character: 23 };
@@ -296,10 +287,28 @@ describe("resolveSymbolTarget", () => {
 
     const documentSymbols = vi.fn(async (file: string) => {
       if (file.endsWith("a.ts")) {
-        return [{ name: "dup", kind: "Function", file, ...aNameAnchor, container: null }];
+        return [
+          {
+            name: "dup",
+            kind: "Function",
+            file,
+            declarationAnchor: aDeclaration,
+            nameAnchor: aNameAnchor,
+            container: null,
+          },
+        ];
       }
       if (file.endsWith("b.ts")) {
-        return [{ name: "dup", kind: "Function", file, ...bNameAnchor, container: null }];
+        return [
+          {
+            name: "dup",
+            kind: "Function",
+            file,
+            declarationAnchor: bDeclaration,
+            nameAnchor: bNameAnchor,
+            container: null,
+          },
+        ];
       }
       return [];
     });
@@ -310,14 +319,14 @@ describe("resolveSymbolTarget", () => {
           name: "dup",
           kind: "Function",
           file: "/project/src/a.ts",
-          ...aDeclaration,
+          declarationAnchor: aDeclaration,
           container: null,
         },
         {
           name: "dup",
           kind: "Function",
           file: "/project/src/b.ts",
-          ...bDeclaration,
+          declarationAnchor: bDeclaration,
           container: null,
         },
       ]),
@@ -327,10 +336,10 @@ describe("resolveSymbolTarget", () => {
     expect(result.kind).toBe("disambiguation");
     if (result.kind !== "disambiguation") return;
     expect(result.candidates).toHaveLength(2);
-    // Invariant: each candidate's anchor is the identifier (name anchor, col 23),
-    // NOT the declaration (export keyword, col 1). Red today because the
-    // disambiguation path never refines candidates, so they inherit the
-    // declaration anchor (character: 1) straight from the workspace symbol.
+    // Invariant: each disambiguation candidate carries the refined name
+    // (identifier) anchor (col 23), NOT the declaration anchor (col 1) the
+    // workspace hit carries. The disambiguation path refines each candidate
+    // via documentSymbols and anchorOf prefers nameAnchor.
     expect(result.candidates[0]?.character).toBe(aNameAnchor.character);
     expect(result.candidates[1]?.character).toBe(bNameAnchor.character);
   });

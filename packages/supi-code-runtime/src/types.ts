@@ -28,13 +28,29 @@ export interface CodeLocation {
 
 // ── Symbol types ───────────────────────────────────────────────────────
 
-/** A discovered symbol / declaration. */
+/** A 1-based source position used as a symbol anchor. */
+export interface SymbolAnchor {
+  line: number;
+  character: number;
+}
+
+/**
+ * A discovered symbol / declaration.
+ *
+ * Per ADR 0003, anchors are split so position-strict substrates
+ * (tree-sitter `calleesAt`, LSP `rename`) cannot silently consume a
+ * declaration anchor (the `export` keyword) as if it were the identifier.
+ * - `declarationAnchor` is always present (the defining node start).
+ * - `nameAnchor` is best-effort (the identifier token), present when the
+ *   provider can derive it (LSP `selectionRange`, or a tree-sitter snap).
+ *   Strict consumers must prefer it and hard-fail when it is absent.
+ */
 export interface CodeSymbol {
   name: string;
   kind: string;
   file: string;
-  line: number;
-  character: number;
+  declarationAnchor: SymbolAnchor;
+  nameAnchor?: SymbolAnchor;
   container?: string | null;
 }
 
