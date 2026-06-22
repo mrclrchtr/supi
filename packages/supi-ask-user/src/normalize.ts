@@ -242,8 +242,9 @@ function resolveIndexes(args: {
     seen.add(trimmed);
     const index = options.findIndex((option) => option.value === trimmed);
     if (index < 0) {
+      const allowed = options.map((option) => `"${option.value}"`).join(", ");
       throw new AskUserValidationError(
-        `choice question "${questionId}" recommendation value "${trimmed}" does not match any option value.`,
+        `choice question "${questionId}" recommendation value "${trimmed}" does not match any option value. Allowed values: [${allowed}].`,
       );
     }
     return index;

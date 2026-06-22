@@ -180,14 +180,7 @@ Internal cancel and abort results are not persisted as user responses — they c
 
 ## Tool guidance
 
-The tool registers the following prompt guidance that the model sees:
-
-- Use ask_user only for blocking user input, not open-ended interviews or repo facts.
-- Use ask_user with 1-10 related questions; prefer one when possible.
-- Use ask_user `choice` for fixed options and ask_user `text` for freeform input; yes/no should be a `choice`.
-- Keep one ask_user form active at a time.
-- Use `recommendation` to suggest default choices or prefilled text.
-- Comments are user UI affordances — do not reference removed fields like `required`, `initial`, `allowOther`, or `allowPartialSubmit`.
+The model-facing guidance for this tool — `description`, `promptSnippet`, and `promptGuidelines` — lives in [`src/tool/guidance.ts`](./src/tool/guidance.ts). Read it there directly; that file is the single source of truth, so this README cannot drift from what the model actually sees.
 
 ## UI controls
 

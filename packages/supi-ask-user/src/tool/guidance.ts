@@ -6,11 +6,8 @@ export const toolDescription =
 export const promptSnippet = "ask_user — request a focused blocking user decision";
 
 export const promptGuidelines = [
-  "Use ask_user only for blocking user input, not open-ended interviews or repo facts.",
-  "Use ask_user with 1-10 related questions; prefer one when possible.",
-  "Use ask_user `choice` for fixed options and ask_user `text` for freeform input; yes/no should be a `choice`.",
-  "Keep one ask_user form active at a time.",
-  "Use `recommendation` to suggest default choices or prefilled text.",
-  "All questions are expected for a full submission — unanswered questions produce `needs_discussion` instead.",
-  "Comments on questions and options are user UI affordances — do not reference removed fields like `required`, `initial`, `allowOther`, or `allowPartialSubmit`.",
+  "Use ask_user with 1-10 related questions.",
+  "Use ask_user `choice` for fixed options and `text` for freeform input; use `choice` for yes/no (binary).",
+  "In ask_user, `recommendation` is type-specific: `choice` → exactly one `options[].value` (single-select: a string, defaulting to the first option; multi-select: an array); `text` → freeform prefilled text, omitted when blank.",
+  "ask_user requires all questions answered to submit; unanswered questions produce `needs_discussion`.",
 ];

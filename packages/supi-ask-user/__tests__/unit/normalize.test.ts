@@ -256,6 +256,26 @@ describe("normalizeQuestionnaire", () => {
         }),
       ).toThrowError(AskUserValidationError);
     });
+
+    it("mismatch error names the bad value and lists the allowed option values", () => {
+      expect(() =>
+        normalizeQuestionnaire({
+          questions: [
+            {
+              type: "choice",
+              id: "fmt",
+              header: "Formatter",
+              prompt: "Pick one",
+              recommendation: "rome",
+              options: [
+                { value: "biome", label: "Biome" },
+                { value: "prettier", label: "Prettier" },
+              ],
+            },
+          ],
+        }),
+      ).toThrowError(/recommendation value "rome".*Allowed values: \["biome", "prettier"\]/);
+    });
   });
 
   describe("text question recommendation", () => {
