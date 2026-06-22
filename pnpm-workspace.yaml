@@ -7,7 +7,11 @@ peerDependencyRules:
     - tree-sitter
 
 allowBuilds:
-  tree-sitter: true
+  # tree-sitter@0.25.0 pins -std=c++17 in binding.gyp, but Node 24's V8
+  # headers require C++20, so the native build fails. The package ships no
+  # prebuilds, but we never import the native binding — supi-tree-sitter uses
+  # web-tree-sitter (WASM) at runtime. Skip the build.
+  tree-sitter: false
   tree-sitter-kotlin: false
   '@davisvaughan/tree-sitter-r': false
   '@derekstride/tree-sitter-sql': false
