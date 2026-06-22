@@ -141,9 +141,18 @@ export async function resolveSymbolTarget(
     };
   }
 
-  // Multiple candidates — return disambiguation
+  // Multiple candidates — refine each to a name (identifier) anchor before
+  // returning disambiguation, so position-strict downstream substrates
+  // (tree-sitter calleesAt, LSP rename) receive the identifier anchor rather
+  // than the declaration anchor (the `export` keyword) that workspace-symbol
+  // hits carry. Mirrors the single-match refine path above.
+  // TODO(ADR 0003): fold into the CodeSymbol nameAnchor/declarationAnchor
+  // split; batch the per-file documentSymbols dedupe as a follow-up refactor.
   const cap = options?.maxResults ?? MAX_CANDIDATES;
-  const candidatesOut = candidates.slice(0, cap).map((c, idx) => {
+  const refined = await Promise.all(
+    candidates.slice(0, cap).map((c) => refineResolvedSymbolAnchor(c, semantic)),
+  );
+  const candidatesOut = refined.map((c, idx) => {
     const relFile = path.relative(cwd, c.file);
     return {
       name: c.name,

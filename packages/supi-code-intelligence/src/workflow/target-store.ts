@@ -93,9 +93,11 @@ export function computeFileFingerprint(
 /**
  * Build a deterministic target handle from target identity fields.
  *
- * The hash includes cwd, absolute file path, position, name, kind,
- * and file fingerprint so the same target with the same file content
- * always produces the same ID, and content changes produce new IDs.
+ * Per ADR 0003, position is intentionally excluded from symbol identity:
+ * nameAnchor is best-effort, so the same symbol can resolve to a name
+ * anchor or fall back to the declaration anchor across calls; including
+ * position would break the "re-resolve reuses the same IDs" invariant.
+ * Identity is cwd, absolute file path, name, kind, and file fingerprint.
  */
 function computeTargetId(opts: {
   cwd: string;
@@ -109,8 +111,6 @@ function computeTargetId(opts: {
   hash.update(normalizeCwd(opts.cwd));
   hash.update("\0");
   hash.update(resolve(opts.cwd, opts.file));
-  hash.update("\0");
-  hash.update(`${opts.position.line}:${opts.position.character}`);
   hash.update("\0");
   hash.update(opts.name ?? "");
   hash.update("\0");

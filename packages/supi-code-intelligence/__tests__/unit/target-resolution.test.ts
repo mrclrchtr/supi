@@ -283,4 +283,55 @@ describe("resolveSymbolTarget", () => {
       expect(result.target.displayCharacter).toBe(3);
     }
   });
+
+  // Tracer bullet for ADR 0003 — see docs/adr/0003-code-symbol-name-declaration-anchors.md
+  it("refines ambiguous-symbol disambiguation candidates to the identifier (name) anchor, not the declaration (export) anchor", async () => {
+    // Workspace symbols mimic LSP SymbolInformation: location.range.start points
+    // at the declaration (the `export` keyword) — column 1.
+    // Document symbols mimic DocumentSymbol.selectionRange: the identifier offset.
+    const aDeclaration = { line: 10, character: 1 };
+    const bDeclaration = { line: 20, character: 1 };
+    const aNameAnchor = { line: 10, character: 23 };
+    const bNameAnchor = { line: 20, character: 23 };
+
+    const documentSymbols = vi.fn(async (file: string) => {
+      if (file.endsWith("a.ts")) {
+        return [{ name: "dup", kind: "Function", file, ...aNameAnchor, container: null }];
+      }
+      if (file.endsWith("b.ts")) {
+        return [{ name: "dup", kind: "Function", file, ...bNameAnchor, container: null }];
+      }
+      return [];
+    });
+
+    const result = await resolveSymbolTarget("dup", "/project", {
+      workspaceSymbols: vi.fn().mockResolvedValue([
+        {
+          name: "dup",
+          kind: "Function",
+          file: "/project/src/a.ts",
+          ...aDeclaration,
+          container: null,
+        },
+        {
+          name: "dup",
+          kind: "Function",
+          file: "/project/src/b.ts",
+          ...bDeclaration,
+          container: null,
+        },
+      ]),
+      documentSymbols,
+    } as unknown as SemanticSubstrate);
+
+    expect(result.kind).toBe("disambiguation");
+    if (result.kind !== "disambiguation") return;
+    expect(result.candidates).toHaveLength(2);
+    // Invariant: each candidate's anchor is the identifier (name anchor, col 23),
+    // NOT the declaration (export keyword, col 1). Red today because the
+    // disambiguation path never refines candidates, so they inherit the
+    // declaration anchor (character: 1) straight from the workspace symbol.
+    expect(result.candidates[0]?.character).toBe(aNameAnchor.character);
+    expect(result.candidates[1]?.character).toBe(bNameAnchor.character);
+  });
 });

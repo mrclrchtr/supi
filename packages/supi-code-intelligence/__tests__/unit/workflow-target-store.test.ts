@@ -254,4 +254,46 @@ describe("workflow target store", () => {
       expect(lookup.reason).toContain("File not found");
     }
   });
+
+  // ADR 0003 — targetId identity must not depend on the anchor position.
+  it("reuses the same targetId when the same symbol is re-resolved at a different anchor position (position is not part of identity)", () => {
+    // nameAnchor is best-effort: the same symbol can resolve to the identifier
+    // (name anchor) on one call and fall back to the declaration anchor
+    // (the `export` keyword) on another. If position were part of the identity
+    // hash, re-resolution would yield a different targetId — violating the
+    // documented "re-resolving the same target reuses the same IDs" invariant
+    // and destabilizing plan/apply handles across re-resolve.
+    const srcDir = path.join(tmpDir, "src");
+    mkdirSync(srcDir, { recursive: true });
+    const filePath = path.join(srcDir, "index.ts");
+    writeFileSync(filePath, "export const foo = 1;\n");
+
+    const base = {
+      file: filePath,
+      name: "foo",
+      kind: "const",
+      confidence: "semantic" as const,
+      provenance: "symbol",
+    };
+
+    // Resolve #1: refine succeeded -> name anchor on the identifier (col 15).
+    const r1 = registerWorkflowTarget(tmpDir, {
+      ...base,
+      position: { line: 0, character: 14 },
+      displayLine: 1,
+      displayCharacter: 15,
+    });
+    // Resolve #2: refine fell through -> declaration anchor on `export` (col 1).
+    const r2 = registerWorkflowTarget(tmpDir, {
+      ...base,
+      position: { line: 0, character: 0 },
+      displayLine: 1,
+      displayCharacter: 1,
+    });
+
+    expect(r1.targetId.length).toBeGreaterThan(0);
+    // The invariant: symbol identity is stable across anchor variance.
+    // (spanId MAY differ — a span is a range — but targetId must not.)
+    expect(r2.targetId).toBe(r1.targetId);
+  });
 });
