@@ -450,8 +450,8 @@ importers:
         version: 0.26.9
     devDependencies:
       '@davisvaughan/tree-sitter-r':
-        specifier: 1.2.0
-        version: 1.2.0(tree-sitter@0.25.0)
+        specifier: 1.3.0
+        version: 1.3.0(tree-sitter@0.25.0)
       '@derekstride/tree-sitter-sql':
         specifier: 0.3.11
         version: 0.3.11(tree-sitter@0.25.0)
@@ -864,8 +864,8 @@ packages:
     resolution: {integrity: sha512-QxULHAm7cNu72w97JUNCBFODFaXpbDg+dP8b/oWFAZ2MTRppA3U00Y2L1HqaS4J6yBqxwa/Y3nMBaxVKbB/NsA==}
     engines: {node: '>=20.19.0'}
 
-  '@davisvaughan/tree-sitter-r@1.2.0':
-    resolution: {integrity: sha512-KnvUaJJS6h1oCcRaq8fFb/xYyvqodMcE5M48vYmIWW7uOJCFkNwaHdGXuLzTipOWfXGzrKuq4EFRifHphLu9GQ==}
+  '@davisvaughan/tree-sitter-r@1.3.0':
+    resolution: {integrity: sha512-IwQyWDNgWtTguaEaxKLOD4wuAfbbfpRdVIpMrEvErTQl6VaPGWwCDEJ3O3RpjwDG6pCDmiOQj88xnwb5j/M9fA==}
     peerDependencies:
       tree-sitter: ^0.21.1
     peerDependenciesMeta:
@@ -3002,7 +3002,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@davisvaughan/tree-sitter-r@1.2.0(tree-sitter@0.25.0)':
+  '@davisvaughan/tree-sitter-r@1.3.0(tree-sitter@0.25.0)':
     dependencies:
       node-addon-api: 8.8.0
       node-gyp-build: 4.8.4
