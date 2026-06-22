@@ -40,7 +40,7 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.79.8",
     "@mrclrchtr/supi-test-utils": "workspace:*",
-    "@types/node": "25.9.3",
+    "@types/node": "25.9.4",
     "vitest": "4.1.9"
   },
   "pi": {
