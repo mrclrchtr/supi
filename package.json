@@ -72,7 +72,7 @@
     "@earendil-works/pi-tui": "^0.79.8",
     "@mrclrchtr/supi-test-utils": "workspace:*",
     "@pnpm/exportable-manifest": "1000.4.2",
-    "@types/node": "25.9.3",
+    "@types/node": "25.9.4",
     "clipboardy": "5.3.1",
     "tree-sitter-javascript": "0.25.0",
     "tree-sitter-typescript": "0.23.2",
