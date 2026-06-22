@@ -40,6 +40,7 @@ declare -a BUMPED_FILES=()
 declare -a UPDATE_PACKAGES=()
 declare BUMP_CHANGES="[]"
 
+declare PM=""
 declare INSTALL_CMD=""
 declare INSTALL_OUTPUT=""
 declare -i INSTALL_EXIT=0
@@ -84,32 +85,73 @@ detect_package_manager() {
 find_workspace_packages() {
   local root="$1"
   local -n _out="$2"
-  local -a found=("$root/package.json")
 
-  # pnpm workspace
-  if [[ -f "$root/pnpm-workspace.yaml" ]]; then
-    while IFS= read -r -d '' f; do
-      found+=("$f")
-    done < <(find "$root" -name 'package.json' -not -path '*/node_modules/*' -print0 2>/dev/null || true)
-  fi
+  # Collect workspace package.json files by honoring the globs in pnpm-workspace.yaml
+  # and/or the package.json `workspaces` field, rather than grabbing every package.json
+  # under the root (which pulls in examples, docs, snapshots, etc.).
+  mapfile -t _out < <(FIND_WS_ROOT="$root" node <<'NODE'
+    const fs = require("fs");
+    const path = require("path");
+    const root = process.env.FIND_WS_ROOT;
+    const results = [path.join(root, "package.json")];
 
-  # npm/yarn workspaces
-  local has_ws
-  has_ws=$(node -e "
+    const patterns = [];
+    const pnpmConfig = path.join(root, "pnpm-workspace.yaml");
+    if (fs.existsSync(pnpmConfig)) {
+      let inPackages = false;
+      for (const line of fs.readFileSync(pnpmConfig, "utf8").split("\n")) {
+        const m = line.match(/^\s*-\s+["']?(.+?)["']?\s*$/);
+        if (m && inPackages) patterns.push(m[1]);
+        else if (/^\s*packages\s*:/.test(line)) inPackages = true;
+        else if (/^\S/.test(line)) inPackages = false;
+      }
+    }
     try {
-      const ws = require('$root/package.json').workspaces || [];
-      console.log(ws.length > 0 ? 'yes' : 'no');
-    } catch { console.log('no'); }
-  " 2>/dev/null || echo "no")
+      const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+      const ws = Array.isArray(pkg.workspaces) ? pkg.workspaces : (pkg.workspaces && pkg.workspaces.packages) || [];
+      patterns.push(...ws);
+    } catch {}
 
-  if [[ "$has_ws" == "yes" ]]; then
-    while IFS= read -r -d '' f; do
-      found+=("$f")
-    done < <(find "$root" -name 'package.json' -not -path '*/node_modules/*' -print0 2>/dev/null || true)
-  fi
+    // Minimal glob -> regex (supports * and ** relative to the workspace root).
+    function globToRegex(g) {
+      let r = "";
+      for (let i = 0; i < g.length; i++) {
+        const c = g[i];
+        if (c === "*") {
+          if (g[i + 1] === "*") { r += ".*"; i++; if (g[i + 1] === "/") i++; }
+          else r += "[^/]*";
+        } else if (c === "?") r += "[^/]";
+        else if (".+^${}()|[]\\".includes(c)) r += "\\" + c;
+        else r += c;
+      }
+      return new RegExp("^" + r + "$");
+    }
+    const include = [], exclude = [];
+    for (const p of patterns) {
+      if (p.startsWith("!")) exclude.push(globToRegex(p.slice(1)));
+      else include.push(globToRegex(p));
+    }
 
-  # De-duplicate and sort
-  mapfile -t _out < <(printf '%s\n' "${found[@]}" | sort -u)
+    function walk(dir, rel = "") {
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of entries) {
+        if (e.name === "node_modules" || e.name.startsWith(".")) continue;
+        const childRel = rel ? rel + "/" + e.name : e.name;
+        if (e.isDirectory()) {
+          walk(path.join(dir, e.name), childRel);
+          if (include.some((rx) => rx.test(childRel)) && !exclude.some((rx) => rx.test(childRel))) {
+            const p = path.join(dir, e.name, "package.json");
+            if (fs.existsSync(p)) results.push(p);
+          }
+        }
+      }
+    }
+    walk(root);
+
+    console.log([...new Set(results)].sort().join("\n"));
+NODE
+  )
 }
 
 # --- arg parsing ---
@@ -176,9 +218,13 @@ function textLockVersion(name, fileName) {
   const text = fs.readFileSync(lockPath, "utf8");
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const versions = [];
+  // pnpm-lock v9 (and yarn/bun text lockfiles) quote scoped package names, e.g.
+  //   '@earendil-works/pi-coding-agent@0.79.9':          (packages: section)
+  //   '@earendil-works/pi-coding-agent': ... version: 0.79.9   (importers section)
+  // Allow optional single or double quotes around the name on either side.
   for (const re of [
-    new RegExp(`["]?${escaped}@(\\d+\\.\\d+\\.\\d+)["]?:`, "g"),
-    new RegExp(`${escaped}:\\n(?:\\s+[^\\n]+\\n)*?\\s+version:\\s+(\\d+\\.\\d+\\.\\d+)`, "g"),
+    new RegExp(`['"]?${escaped}@(\\d+\\.\\d+\\.\\d+)['"]?:`, "g"),
+    new RegExp(`['"]?${escaped}['"]?:\\n(?:\\s+[^\\n]+\\n)*?\\s+version:\\s+(\\d+\\.\\d+\\.\\d+)`, "g"),
   ]) {
     for (const match of text.matchAll(re)) versions.push(match[1]);
   }
@@ -272,10 +318,10 @@ fetch_releases() {
 compute_delta() {
   local releases_json="$1"
 
-  node -e "
-    const releases = $releases_json;
-    const current = '$CURRENT_VERSION';
-    const semver = (t) => t.replace(/^v/, '').split('.').map(Number);
+  PI_UPGRADE_RELEASES="$releases_json" PI_UPGRADE_CURRENT="$CURRENT_VERSION" node <<'NODE'
+    const releases = JSON.parse(process.env.PI_UPGRADE_RELEASES);
+    const current = process.env.PI_UPGRADE_CURRENT;
+    const semver = (t) => t.replace(/^v/, "").split(".").map(Number);
     const cmp = (a, b) => {
       for (let i = 0; i < 3; i++) {
         if (a[i] > b[i]) return 1;
@@ -285,31 +331,32 @@ compute_delta() {
     };
     const cur = semver(current);
     const newer = releases
-      .filter(r => cmp(semver(r.tagName), cur) > 0)
+      .filter((r) => cmp(semver(r.tagName), cur) > 0)
       .sort((a, b) => cmp(semver(a.tagName), semver(b.tagName)));
     console.log(JSON.stringify(newer));
-  "
+NODE
 }
 
 fetch_release_notes() {
   local newer_releases="$1"
 
-  node -e "
-    const tags = $newer_releases.map(r => r.tagName);
+  PI_UPGRADE_NEWER="$newer_releases" PI_UPGRADE_REPO="$REPO" node <<'NODE'
+    const tags = JSON.parse(process.env.PI_UPGRADE_NEWER).map((r) => r.tagName);
+    const REPO = process.env.PI_UPGRADE_REPO;
     const results = [];
     for (const tag of tags) {
       try {
-        const out = require('child_process').execSync(
-          'gh release view ' + tag + ' --repo $REPO --json tagName,name,body,publishedAt',
-          { encoding: 'utf8', timeout: 15000 }
+        const out = require("child_process").execSync(
+          "gh release view " + JSON.stringify(tag) + " --repo " + JSON.stringify(REPO) + " --json tagName,name,body,publishedAt",
+          { encoding: "utf8", timeout: 15000 }
         );
         results.push(JSON.parse(out));
       } catch (e) {
-        results.push({ tagName: tag, name: tag, body: '(failed to fetch notes)', publishedAt: null, error: true });
+        results.push({ tagName: tag, name: tag, body: "(failed to fetch notes)", publishedAt: null, error: true });
       }
     }
     console.log(JSON.stringify(results));
-  "
+NODE
 }
 
 # --- workspace discovery ---
@@ -317,32 +364,33 @@ fetch_release_notes() {
 discover_workspace() {
   PKG_DIR="$(cd "$(dirname "$PKG_JSON")" && pwd)"
   PKG_JSON="$PKG_DIR/$(basename "$PKG_JSON")"
-  WORKSPACE_ROOT="$PKG_DIR"
 
-  local dir="$PKG_DIR"
-  while true; do
-    if [[ -f "$dir/pnpm-workspace.yaml" ]]; then
-      WORKSPACE_ROOT="$dir"
-      break
-    fi
-
-    local has_ws
-    has_ws=$(node -e "
+  # Walk up from the package dir to the first ancestor with a pnpm-workspace.yaml or
+  # package.json workspaces field. Done in one node process to avoid per-ancestor spawns.
+  # Defaults to the package dir itself when no workspace marker is found.
+  WORKSPACE_ROOT=$(PKG_DIR="$PKG_DIR" node <<'NODE'
+    const fs = require("fs");
+    const path = require("path");
+    let dir = process.env.PKG_DIR;
+    let root = dir;
+    const hasWorkspaces = (pkg) => {
+      const ws = pkg && pkg.workspaces;
+      if (Array.isArray(ws)) return ws.length > 0;
+      if (ws && Array.isArray(ws.packages)) return ws.packages.length > 0;
+      return false;
+    };
+    while (true) {
+      if (fs.existsSync(path.join(dir, "pnpm-workspace.yaml"))) { root = dir; break; }
       try {
-        const ws = require('$dir/package.json').workspaces || [];
-        console.log(ws.length > 0 ? 'yes' : 'no');
-      } catch { console.log('no'); }
-    " 2>/dev/null || echo "no")
-    if [[ "$has_ws" == "yes" ]]; then
-      WORKSPACE_ROOT="$dir"
-      break
-    fi
-
-    local parent
-    parent="$(dirname "$dir")"
-    [[ "$parent" == "$dir" ]] && break
-    dir="$parent"
-  done
+        if (hasWorkspaces(JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")))) { root = dir; break; }
+      } catch {}
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    process.stdout.write(root);
+NODE
+  )
 
   find_workspace_packages "$WORKSPACE_ROOT" ALL_PKG_FILES
 }
@@ -447,69 +495,93 @@ apply_bumps() {
   ((${#BUMPED_FILES[@]} == 0)) && return 0
 
   for f in "${BUMPED_FILES[@]}"; do
-    PI_UPGRADE_PACKAGE_MAP_JSON="$PI_PACKAGE_MAP_JSON" PI_UPGRADE_MANAGED_PACKAGES_JSON="$PI_MANAGED_PACKAGES_JSON" PI_UPGRADE_PROVIDED_PACKAGES_JSON="$PI_PROVIDED_PACKAGES_JSON" node -e "
-      const fs = require('fs');
-      const file = '${f//\'/\\\'}';
-      const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+    PI_UPGRADE_FILE="$f" \
+    PI_UPGRADE_LATEST_NO_V="$LATEST_NO_V" \
+    PI_UPGRADE_PACKAGE_MAP_JSON="$PI_PACKAGE_MAP_JSON" \
+    PI_UPGRADE_MANAGED_PACKAGES_JSON="$PI_MANAGED_PACKAGES_JSON" \
+    PI_UPGRADE_PROVIDED_PACKAGES_JSON="$PI_PROVIDED_PACKAGES_JSON" \
+    node <<'NODE' 2>/dev/null || true
+      const fs = require("fs");
+      const file = process.env.PI_UPGRADE_FILE;
+      const latest = process.env.PI_UPGRADE_LATEST_NO_V;
       const packageMap = new Map(Object.entries(JSON.parse(process.env.PI_UPGRADE_PACKAGE_MAP_JSON)));
       const managedPackages = new Set(JSON.parse(process.env.PI_UPGRADE_MANAGED_PACKAGES_JSON));
       const providedPackages = new Set(JSON.parse(process.env.PI_UPGRADE_PROVIDED_PACKAGES_JSON));
       const canonicalName = (name) => packageMap.get(name) || name;
       const bumpValue = (value) => {
         const match = String(value).match(/^([~^>=]*)([0-9]+\.[0-9]+\.[0-9]+)/);
-        return match ? (match[1] || '') + '$LATEST_NO_V' : undefined;
+        return match ? (match[1] || "") + latest : undefined;
       };
 
-      for (const field of ['dependencies', 'peerDependencies', 'devDependencies']) {
+      const raw = fs.readFileSync(file, "utf8");
+      const pkg = JSON.parse(raw);
+      for (const field of ["dependencies", "peerDependencies", "devDependencies"]) {
         const deps = pkg[field];
         if (!deps) continue;
         for (const key of Object.keys({ ...deps })) {
-          const isPeerProvided = field === 'peerDependencies' && providedPackages.has(key);
+          const isPeerProvided = field === "peerDependencies" && providedPackages.has(key);
           if (!managedPackages.has(key) && !isPeerProvided) continue;
           const targetKey = canonicalName(key);
-          const newValue = isPeerProvided ? '*' : bumpValue(deps[key]);
+          const newValue = isPeerProvided ? "*" : bumpValue(deps[key]);
           if (!newValue) continue;
           if (targetKey !== key) delete deps[key];
           deps[targetKey] = newValue;
         }
       }
 
-      fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
-    " 2>/dev/null || true
+      // Preserve the original indentation and trailing newline so unrelated files keep their style.
+      const indentMatch = raw.match(/^\{\n([ \t]+)"/);
+      const indent = indentMatch ? indentMatch[1] : "  ";
+      const trailing = raw.endsWith("\n") ? "\n" : "";
+      fs.writeFileSync(file, JSON.stringify(pkg, null, indent) + trailing);
+NODE
   done
 }
 
 plan_install() {
-  local pm
-  pm=$(detect_package_manager "$WORKSPACE_ROOT")
+  PM=$(detect_package_manager "$WORKSPACE_ROOT")
 
-  case "$pm" in
+  case "$PM" in
     pnpm) INSTALL_CMD="pnpm install" ;;
     yarn) INSTALL_CMD="yarn install" ;;
     npm) INSTALL_CMD="npm install" ;;
     bun) INSTALL_CMD="bun install" ;;
-    *) INSTALL_CMD="npm install" ;;
+    *) INSTALL_CMD="npm install"; PM="npm" ;;
   esac
 
-  printf '%s' "$pm"
+  printf '%s' "$PM"
+}
+
+build_resync_cmd() {
+  local pm="$1"
+  local pkgs="${UPDATE_PACKAGES[*]}"
+  case "$pm" in
+    # pnpm pins already-satisfied "*" peer deps in the lockfile; a scoped recursive
+    # update of just the pi packages re-resolves them against the newly pinned version
+    # without touching unrelated deps. npm/yarn/bun re-resolve "*" peers on a plain
+    # install, so no extra step is needed there.
+    pnpm) [[ -n "$pkgs" ]] && printf 'pnpm -r update %s' "$pkgs" ;;
+    *) : ;;
+  esac
 }
 
 run_install() {
-  local pm
-  pm=$(plan_install)
+  # Call directly (not via $(...)) so the PM/INSTALL_CMD assignments in plan_install
+  # propagate to this shell — command substitution would run it in a subshell and the
+  # installCommand field in the JSON would come out empty.
+  plan_install >/dev/null
 
-  INSTALL_OUTPUT=$(
-    (
-      cd "$WORKSPACE_ROOT" || exit
-      case "$pm" in
-        pnpm) pnpm install ;;
-        yarn) yarn install ;;
-        npm) npm install ;;
-        bun) bun install ;;
-        *) npm install ;;
-      esac
-    ) 2>&1
-  ) || INSTALL_EXIT=$?
+  INSTALL_OUTPUT=$( ( cd "$WORKSPACE_ROOT" && $INSTALL_CMD ) 2>&1 ) || INSTALL_EXIT=$?
+
+  if (( INSTALL_EXIT == 0 )) && (( ${#UPDATE_PACKAGES[@]} > 0 )); then
+    local resync
+    resync=$(build_resync_cmd "$PM")
+    if [[ -n "$resync" ]]; then
+      local resync_out
+      resync_out=$( ( cd "$WORKSPACE_ROOT" && $resync ) 2>&1 ) || true
+      INSTALL_OUTPUT+=$'\n\n--- post-install lockfile sync ---\n'"$resync_out"
+    fi
+  fi
 }
 
 # --- output ---
@@ -519,34 +591,46 @@ emit_json() {
   local tmp_json
   tmp_json=$(mktemp)
 
-  local bumped_list
-  bumped_list=$(node -e "const c = $BUMP_CHANGES; console.log(JSON.stringify(c.map(x => x.file)));" )
+  local install_output_json update_packages_json
+  install_output_json=$(printf '%s' "$INSTALL_OUTPUT" | jq -Rs .)
+  update_packages_json=$(printf '%s\n' "${UPDATE_PACKAGES[@]}" | jq -R . | jq -s .)
 
-  node -e "
-    const fs = require('fs');
-    const bumpChanges = $BUMP_CHANGES;
-    const installOutput = $(printf '%s' "$INSTALL_OUTPUT" | jq -Rs .);
-    const updatePackages = $(printf '%s\n' "${UPDATE_PACKAGES[@]}" | jq -R . | jq -s .);
-
+  PI_UPGRADE_NOTES="$notes" \
+  PI_UPGRADE_BUMP_CHANGES="$BUMP_CHANGES" \
+  PI_UPGRADE_INSTALL_OUTPUT="$install_output_json" \
+  PI_UPGRADE_UPDATE_PACKAGES="$update_packages_json" \
+  PI_UPGRADE_CURRENT="$CURRENT_VERSION" \
+  PI_UPGRADE_CURRENT_SOURCE="$CURRENT_SOURCE" \
+  PI_UPGRADE_DEP_NAME="$DEP_NAME" \
+  PI_UPGRADE_DEP_FIELD="$DEP_FIELD" \
+  PI_UPGRADE_DEP_RANGE="$DEP_RANGE" \
+  PI_UPGRADE_LATEST="$LATEST" \
+  PI_UPGRADE_APPLY="$APPLY" \
+  PI_UPGRADE_INSTALL_CMD="$INSTALL_CMD" \
+  PI_UPGRADE_INSTALL_EXIT="$INSTALL_EXIT" \
+  PI_UPGRADE_TMP="$tmp_json" \
+  node <<'NODE'
+    const fs = require("fs");
+    const bump = JSON.parse(process.env.PI_UPGRADE_BUMP_CHANGES || "[]");
     const data = {
-      current: '$CURRENT_VERSION',
-      currentSource: '$CURRENT_SOURCE',
-      depName: '$DEP_NAME',
-      depField: '$DEP_FIELD',
-      depRange: '$DEP_RANGE',
-      latest: '$LATEST',
+      current: process.env.PI_UPGRADE_CURRENT,
+      currentSource: process.env.PI_UPGRADE_CURRENT_SOURCE,
+      depName: process.env.PI_UPGRADE_DEP_NAME,
+      depField: process.env.PI_UPGRADE_DEP_FIELD,
+      depRange: process.env.PI_UPGRADE_DEP_RANGE,
+      latest: process.env.PI_UPGRADE_LATEST,
       upToDate: false,
-      newerReleases: $notes,
-      applied: $APPLY,
-      bumpedFiles: $bumped_list,
-      bumpChanges: bumpChanges,
-      updatePackages,
-      installCommand: '$INSTALL_CMD',
-      installExitCode: $INSTALL_EXIT,
-      installOutput: installOutput
+      newerReleases: JSON.parse(process.env.PI_UPGRADE_NOTES || "[]"),
+      applied: process.env.PI_UPGRADE_APPLY === "true",
+      bumpedFiles: bump.map((x) => x.file),
+      bumpChanges: bump,
+      updatePackages: JSON.parse(process.env.PI_UPGRADE_UPDATE_PACKAGES || "[]"),
+      installCommand: process.env.PI_UPGRADE_INSTALL_CMD,
+      installExitCode: Number(process.env.PI_UPGRADE_INSTALL_EXIT),
+      installOutput: JSON.parse(process.env.PI_UPGRADE_INSTALL_OUTPUT)
     };
-    fs.writeFileSync('$tmp_json', JSON.stringify(data, null, 2));
-  "
+    fs.writeFileSync(process.env.PI_UPGRADE_TMP, JSON.stringify(data, null, 2) + "\n");
+NODE
 
   cat "$tmp_json"
   rm -f "$tmp_json"
@@ -582,7 +666,7 @@ main() {
   fi
 
   # Determine latest
-  LATEST=$(node -e "const r = $newer_releases; console.log(r[r.length - 1].tagName);" )
+  LATEST=$(PI_UPGRADE_NEWER="$newer_releases" node -e "const r = JSON.parse(process.env.PI_UPGRADE_NEWER); console.log(r[r.length - 1].tagName);")
   LATEST_NO_V="${LATEST#v}"
 
   # Fetch notes
