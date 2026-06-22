@@ -41,7 +41,7 @@ export type GraphNodeId = WorkflowHandle<"GraphNodeId">;
  * Handle for a stored edit/refactor plan.
  *
  * Plans must eventually be guarded by workspace fingerprints and stale-plan checks
- * before `code_apply` can mutate files safely.
+ * before `code_refactor_apply` can mutate files safely.
  */
 export type PlanId = WorkflowHandle<"PlanId">;
 

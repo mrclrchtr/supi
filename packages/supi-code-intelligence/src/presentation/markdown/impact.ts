@@ -56,6 +56,17 @@ export function renderChangedFilesImpact(params: {
     lines.push("");
   }
 
+  if (params.analysis.semanticRefFiles && params.analysis.semanticRefFiles.length > 0) {
+    lines.push("## Semantic Reference Files");
+    for (const file of params.analysis.semanticRefFiles.slice(0, 5)) {
+      lines.push(`- \`${file}\``);
+    }
+    if (params.analysis.semanticRefFiles.length > 5) {
+      lines.push(`- _+${params.analysis.semanticRefFiles.length - 5} more_`);
+    }
+    lines.push("");
+  }
+
   if (params.analysis.likelyTests.length > 0) {
     const testHeading = params.analysis.tests?.provenance
       ? `Likely Tests (${params.analysis.tests.provenance})`

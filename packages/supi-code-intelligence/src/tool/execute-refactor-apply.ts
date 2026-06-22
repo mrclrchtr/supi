@@ -1,6 +1,5 @@
 /**
- * Tool executor for the stored-plan application path shared by
- * code_apply (preferred) and code_refactor_apply (compatibility alias).
+ * Tool executor for the stored-plan application path.
  * Revalidates the plan and applies the workspace edit through safety gates.
  */
 
@@ -9,6 +8,7 @@ import { getPlan, isPlanFresh, removePlan } from "../analysis/refactor/plan-stor
 import { validateEdit } from "../analysis/refactor/safety.ts";
 import { renderRefactorApplyResult } from "../presentation/markdown/refactor.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { unavailableSearchDetails } from "./details-helpers.ts";
 
 export interface CodeRefactorApplyToolParams {
   planId: string;
@@ -21,7 +21,7 @@ export async function executeRefactorApplyTool(
   if (!params.planId) {
     return {
       content: "**Error:** `planId` is required.",
-      details: undefined,
+      details: unavailableSearchDetails(null, ["Provide a valid `planId` from code_refactor_plan"]),
     };
   }
 
@@ -29,8 +29,8 @@ export async function executeRefactorApplyTool(
   const plan = getPlan(params.planId);
   if (!plan) {
     return {
-      content: `**Error:** Plan "${params.planId}" not found. The plan may have expired or was generated in a different session. Use code_refactor to generate a new plan.`,
-      details: undefined,
+      content: `**Error:** Plan "${params.planId}" not found. The plan may have expired or was generated in a different session. Use code_refactor_plan to generate a new plan.`,
+      details: unavailableSearchDetails(null, ["Run code_refactor_plan to generate a new plan"]),
     };
   }
 
@@ -39,7 +39,7 @@ export async function executeRefactorApplyTool(
   if (!freshness.fresh) {
     return {
       content: `**Stale plan:** ${freshness.reason}`,
-      details: undefined,
+      details: unavailableSearchDetails(null, ["Regenerate the plan with code_refactor_plan"]),
     };
   }
 
@@ -47,8 +47,8 @@ export async function executeRefactorApplyTool(
   const validation = validateEdit(plan.edits);
   if (!validation.safe) {
     return {
-      content: `**Safety check failed:** ${validation.reason}. Regenerate the plan with code_refactor.`,
-      details: undefined,
+      content: `**Safety check failed:** ${validation.reason}. Regenerate the plan with code_refactor_plan.`,
+      details: unavailableSearchDetails(null, ["Regenerate the plan with code_refactor_plan"]),
     };
   }
 

@@ -75,3 +75,15 @@ _Avoid_: structural analysis, syntax-only analysis
 **Structural analysis**:
 Code understanding based on source shape and syntax, such as imports, exports, outlines, and call-like structure, without requiring symbol identity.
 _Avoid_: semantic analysis, symbol-aware analysis
+
+**Refactor plan**:
+A stored, fingerprinted description of a proposed code refactor — its target, operation (e.g. rename or extract), and the exact text edits — produced for inspection and applied later, never silently. Non-mutating by construction.
+_Avoid_: "refactor action", "code action result" (those are advisory, not stored plans)
+
+**Plan-then-apply (planner/applier split)**:
+The invariant that composing a refactor and mutating files are done by separate concerns: the proposer only composes a plan (returning a plan handle), and mutation is an explicit, revalidating second step against that handle. Producers of plans never mutate; mutators never compose.
+_Avoid_: "auto-apply", "preview-and-apply in one call" (these collapse the split into one mutating step)
+
+**Scope**:
+The public parameter that narrows a code-intelligence query to one workspace-relative path — a directory or a single file. It is a filter, not a search pattern; an unresolved path is a hard error rather than a silent widening to the whole workspace, and package-name-to-directory resolution is intentionally absent.
+_Avoid_: `path`, `searchPath`, `dir` as public parameter names

@@ -124,34 +124,34 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     ],
   },
   {
-    name: "code_refactor",
+    name: "code_refactor_plan",
     purpose:
-      "Create precise refactor plans for named operations such as rename, move, import updates, and dead-code removal.",
-    schemaKey: "code_refactor",
+      "Create precise refactor plans for named operations such as rename and extract refactors.",
+    schemaKey: "code_refactor_plan",
     schemaDocs:
-      "Uses a scoped operation enum with target/file coordinates and operation-specific options. This is the only intentional operation-style schema in the V2 skeleton.",
-    absorbsTools: ["code_refactor_plan"],
+      "Uses a scoped operation enum with target/file coordinates, optional selected range, and operation-specific options. This is the only intentional operation-style schema in the V2 skeleton.",
+    absorbsTools: [],
     absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search"],
     phase: "phase-5",
     nonGoals: [
       "Does not introduce a broad action mega-tool.",
-      "code_refactor is preview-only; use code_apply to execute stored plans.",
+      "code_refactor_plan is a pure planner; use code_refactor_apply to execute stored plans.",
     ],
   },
   {
-    name: "code_apply",
-    purpose: "Apply a previously stored plan through explicit, fingerprint-checked mutation modes.",
-    schemaKey: "code_apply",
+    name: "code_refactor_apply",
+    purpose: "Apply a previously stored plan through explicit, fingerprint-checked mutation.",
+    schemaKey: "code_refactor_apply",
     schemaDocs:
-      "Requires a planId and optional apply mode. Later phases must enforce stale-plan rejection, validation, and rollback semantics.",
-    absorbsTools: ["code_refactor_apply"],
+      "Requires a planId. Enforces stale-plan rejection, validation, and fingerprint checks before mutation.",
+    absorbsTools: [],
     absorbsBehaviors: [],
     substrates: ["semantic", "search", "git"],
     phase: "phase-5",
     nonGoals: [
-      'Only `mode: "apply"` is implemented; format/verify modes return explicit unavailable outcomes.',
       "Does not bypass plan validation or fingerprint checks.",
+      "Format/verify modes are not implemented; they return explicit unavailable outcomes when added later.",
     ],
   },
   {

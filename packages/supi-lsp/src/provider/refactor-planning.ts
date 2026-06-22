@@ -1,4 +1,4 @@
-import type { CodePosition, RefactorResult } from "@mrclrchtr/supi-code-runtime/api";
+import type { CodePosition, RefactorResult, SourceRange } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeAction, TextDocumentEdit, TextEdit, WorkspaceEdit } from "../config/types.ts";
 import type { SessionLspService } from "../session/service-registry.ts";
 
@@ -40,11 +40,12 @@ export async function runFilteredCodeActionRefactor(options: {
   lsp: SessionLspService;
   file: string;
   position: CodePosition;
-  operation: "update_imports" | "delete_dead_code";
+  operation: "update_imports" | "delete_dead_code" | "extract_function" | "extract_variable";
+  range?: SourceRange;
   matches: (action: CodeAction) => boolean;
 }): Promise<RefactorResult> {
   const { lsp, file, position, operation, matches } = options;
-  const actions = await lsp.codeActions(file, position);
+  const actions = await lsp.codeActions(file, options.range ?? position);
   if (!actions || actions.length === 0) {
     return {
       kind: "unavailable",
@@ -81,6 +82,28 @@ export function isUpdateImportsCodeAction(action: CodeAction): boolean {
     kind === "source.organizeImports" ||
     kind.startsWith("source.organizeImports.") ||
     kindlessTitleMatch
+  );
+}
+
+export function isExtractFunctionCodeAction(action: CodeAction): boolean {
+  const kind = action.kind ?? "";
+  const title = action.title.trim().toLowerCase();
+  return (
+    kind === "refactor.extract.function" ||
+    kind.startsWith("refactor.extract.function.") ||
+    (title.includes("extract") && /\b(function|method)\b/.test(title))
+  );
+}
+
+export function isExtractVariableCodeAction(action: CodeAction): boolean {
+  const kind = action.kind ?? "";
+  const title = action.title.trim().toLowerCase();
+  return (
+    kind === "refactor.extract.constant" ||
+    kind.startsWith("refactor.extract.constant.") ||
+    kind === "refactor.extract.variable" ||
+    kind.startsWith("refactor.extract.variable.") ||
+    (title.includes("extract") && /\b(constant|const|variable)\b/.test(title))
   );
 }
 

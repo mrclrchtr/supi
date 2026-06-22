@@ -92,11 +92,11 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_resolve",
     label: "Code Resolve",
     description:
-      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_impact, and code_refactor. Supports anchored (file + line + character), file-only, and query/symbol inputs. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
+      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_impact, and code_refactor_plan. Supports anchored (file + line + character), file-only, and query/symbol inputs. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
     promptSnippet: "code_resolve — resolve references into precise targets and target handles",
     basePromptGuidelines: [
       "Use code_resolve when a symbol, file, or code reference is ambiguous and needs precise resolution.",
-      "Prefer code_resolve as the entry point before code_context, code_graph, code_impact, or code_refactor — its targetId replaces fragile file/line/character coordinates.",
+      "Prefer code_resolve as the entry point before code_context, code_graph, code_impact, or code_refactor_plan — its targetId replaces fragile file/line/character coordinates.",
       "When code_resolve returns ambiguous results with ranked candidates, pick one and use file + line + character for follow-up resolution.",
     ],
     parameters: CodeResolveParameters,
@@ -145,6 +145,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       "Use code_graph to find references, outgoing calls, and implementations for a target.",
       'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for outgoing calls or `relations: ["implements"]` for implementations.',
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
+      'Use `relations: ["all"]` to expand to every relation family in one call.',
       "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test labels. The tests relation displays discovery provenance (`semantic+conventions` or `conventions-only`) separately from placeholder output such as `_(no recognized test blocks)_`.",
       "After code_graph, follow up with code_context on individual results for type or definition context.",
       "code_graph uses `scope` (not `path`) for workspace-relative directory/package filtering.",
@@ -156,7 +157,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_impact",
     label: "Code Impact",
     description:
-      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for impact assessment and does not fall back to heuristic text search. Supports target-based analysis and changedFiles-based analysis. changedFiles-based analysis uses structural evidence only. Use a resolved target for semantic reference-based impact.",
+      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for target-based impact and merges semantic references into changedFiles analysis when available. Does not fall back to heuristic text search. Use a resolved target for precise semantic reference-based impact.",
     promptSnippet: "code_impact — blast radius and impact",
     basePromptGuidelines: [
       "Use code_impact before edits to estimate blast radius and follow-up checks.",
@@ -169,12 +170,12 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_find",
     label: "Code Find",
     description:
-      'Unified ranked code search with strict mode dispatch: default/`mode: "text"` is literal ripgrep, `mode: "regex"` is ripgrep regex, `mode: "semantic"` is LSP workspace-symbol search, and `mode: "ast"` is tree-sitter structured search. `mode: "ast"` requires `kind` and currently supports `definition`, `import`, `export`, and `call`. `mode: "text"`, `mode: "regex"`, and `mode: "semantic"` do not accept `kind`. `code_find` with `mode: "semantic"` does not silently fall back to text search, and unsupported mode/kind combinations fail.',
+      'Unified ranked code search with strict mode dispatch: default/`mode: "text"` is literal ripgrep, `mode: "regex"` is ripgrep regex, `mode: "semantic"` is LSP workspace-symbol search, and `mode: "ast"` is tree-sitter structured search. `mode: "ast"` requires `kind` and currently supports `definition`, `import`, `export`, `call`, `type`, and `interface`. `mode: "text"`, `mode: "regex"`, and `mode: "semantic"` do not accept `kind`. `code_find` with `mode: "semantic"` does not silently fall back to text search, and unsupported mode/kind combinations fail.',
     promptSnippet: "code_find — unified ranked code search",
     basePromptGuidelines: [
       "Use code_find for literal text search, regex search, semantic workspace-symbol search, or AST structured search.",
       'Use code_find with `mode: "text"` or omitted `mode` for literal ripgrep search, and use code_find with `mode: "regex"` for regex search.',
-      'code_find with `mode: "ast"` requires `kind` and supports `definition`, `import`, `export`, and `call` in this phase.',
+      'code_find with `mode: "ast"` requires `kind` and supports `definition`, `import`, `export`, `call`, `type`, and `interface`.',
       'code_find with `mode: "text"`, `mode: "regex"`, or `mode: "semantic"` does not accept `kind`.',
       'code_find with `mode: "semantic"` does not fall back to text search and fails when semantic capability is unavailable.',
       "code_find is the sole code search tool — use code_find for all text, regex, AST, and semantic searches.",
@@ -183,28 +184,29 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
   },
   {
-    name: "code_refactor",
-    label: "Code Refactor",
+    name: "code_refactor_plan",
+    label: "Code Refactor Plan",
     description:
-      'Preferred workflow refactor surface. Previews a semantic rename plan without mutating files and returns a plan ID for later use with code_apply. Supports only rename_symbol in this phase. Legacy `operation: "rename"` is accepted as a compatibility alias.',
-    promptSnippet: "code_refactor — preview a precise workflow refactor",
+      'Pure planner: previews a precise semantic refactor plan without mutating files and returns a planId for later use with code_refactor_apply. Supports rename_symbol plus extract_function/extract_variable when the active LSP can return precise edits. Legacy `operation: "rename"` is accepted as a compatibility alias. This tool never mutates files.',
+    promptSnippet: "code_refactor_plan — preview a precise workflow refactor plan",
     basePromptGuidelines: [
-      'Use `operation: "rename_symbol"` with code_refactor for symbol renames. Legacy `operation: "rename"` is accepted as a compatibility alias.',
-      "code_refactor is preview-only — it returns a plan ID. Use `code_apply` with that planId to execute.",
+      'Use `operation: "rename_symbol"` with code_refactor_plan for symbol renames. Legacy `operation: "rename"` is accepted as a compatibility alias.',
+      'Use `operation: "extract_function"` or `"extract_variable"` with a 1-based `range` and `newName` when the LSP advertises precise extract code actions.',
+      "code_refactor_plan is a pure planner — it returns a planId. Use code_refactor_apply with that planId to execute.",
     ],
     parameters: CodeRefactorParameters,
     run: (params, ctx) =>
       executeRefactorTool(params as Parameters<typeof executeRefactorTool>[0], ctx),
   },
   {
-    name: "code_apply",
-    label: "Code Apply",
+    name: "code_refactor_apply",
+    label: "Code Refactor Apply",
     description:
-      'Preferred workflow plan-application surface. Applies a previously stored plan by plan ID with fingerprint checks and safety validation. In this phase, `mode: "apply"` is supported; format/verify modes return explicit unavailable results.',
-    promptSnippet: "code_apply — apply a stored workflow plan",
+      "Sole mutator in the refactor workflow: applies a previously stored plan by planId with revalidation and fingerprint checks.",
+    promptSnippet: "code_refactor_apply — apply a stored refactor plan",
     basePromptGuidelines: [
-      "Use code_apply to execute a plan generated by code_refactor.",
-      'In code_apply, use `mode: "apply"` or omit `mode` — it is the only supported mode.',
+      "Use code_refactor_apply to execute a plan generated by code_refactor_plan.",
+      "code_refactor_apply validates the plan, checks file fingerprints, and mutates files only when the plan is still fresh.",
     ],
     parameters: CodeApplyParameters,
     run: (params, ctx) => executeApplyTool(params as Parameters<typeof executeApplyTool>[0], ctx),

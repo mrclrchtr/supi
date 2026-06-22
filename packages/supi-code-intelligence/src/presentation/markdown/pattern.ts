@@ -80,7 +80,9 @@ export function renderStructuredMatches(
             ? "Calls"
             : kind === "type"
               ? "Types"
-              : "Tests";
+              : kind === "interface"
+                ? "Interfaces"
+                : "Tests";
   const lines: string[] = [];
   lines.push(`# Pattern ${kindLabel}: \`${pattern}\``);
   lines.push("");

@@ -19,6 +19,7 @@ export interface ImpactAnalysis {
   likelyTestCommands: string[];
   riskLevel: "low" | "medium" | "high";
   externalRefs: number;
+  semanticRefFiles?: string[];
   tests?: TestSurfaceDetails;
 }
 

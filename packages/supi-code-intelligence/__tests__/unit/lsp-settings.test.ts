@@ -41,7 +41,9 @@ afterEach(() => {
 });
 
 describe("LSP settings UI", () => {
-  it("replaces Enable LSP and Active Servers with Disabled Servers", async () => {
+  it("replaces Enable LSP and Active Servers with Disabled Servers", {
+    timeout: 30_000,
+  }, async () => {
     const { registerLspSettings } = await import("../../src/lsp/settings.ts");
     registerLspSettings();
 
@@ -54,9 +56,11 @@ describe("LSP settings UI", () => {
       ) => Array<{ id: string; submenu?: unknown }>;
     };
     const buildItems = callArgs?.buildItems;
-    expect(buildItems).toBeDefined();
+    if (!buildItems) {
+      throw new Error("buildItems is required");
+    }
 
-    const items = buildItems!(
+    const items = buildItems(
       { enabled: true, severity: 1, active: [], exclude: [] },
       "project",
       "/tmp",

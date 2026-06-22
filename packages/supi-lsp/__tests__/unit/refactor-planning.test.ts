@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   collectCodeActionResults,
   isDeleteDeadCodeCodeAction,
+  isExtractFunctionCodeAction,
+  isExtractVariableCodeAction,
   isUpdateImportsCodeAction,
 } from "../../src/provider/refactor-planning.ts";
 
@@ -17,6 +19,13 @@ function makeUpdateImportsAction(
   kind?: string,
 ): Parameters<typeof isUpdateImportsCodeAction>[0] {
   return { title, kind } as Parameters<typeof isUpdateImportsCodeAction>[0];
+}
+
+function makeExtractAction(
+  title: string,
+  kind?: string,
+): Parameters<typeof isExtractFunctionCodeAction>[0] {
+  return { title, kind } as Parameters<typeof isExtractFunctionCodeAction>[0];
 }
 
 describe("isUpdateImportsCodeAction", () => {
@@ -58,6 +67,24 @@ describe("collectCodeActionResults", () => {
       kind: "unavailable",
       reason: 'Code action "Rewrite" could not produce precise edits',
     });
+  });
+});
+
+describe("extract code action matching", () => {
+  it("matches extract function actions by kind or title", () => {
+    expect(isExtractFunctionCodeAction(makeExtractAction("Extract to function"))).toBe(true);
+    expect(
+      isExtractFunctionCodeAction(makeExtractAction("Extract helper", "refactor.extract.function")),
+    ).toBe(true);
+    expect(isExtractFunctionCodeAction(makeExtractAction("Extract constant"))).toBe(false);
+  });
+
+  it("matches extract variable actions by kind or title", () => {
+    expect(isExtractVariableCodeAction(makeExtractAction("Extract constant"))).toBe(true);
+    expect(
+      isExtractVariableCodeAction(makeExtractAction("Extract value", "refactor.extract.variable")),
+    ).toBe(true);
+    expect(isExtractVariableCodeAction(makeExtractAction("Extract method"))).toBe(false);
   });
 });
 

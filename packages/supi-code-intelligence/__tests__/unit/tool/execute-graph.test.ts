@@ -262,6 +262,45 @@ describe("execute-graph (code_graph tool)", () => {
       expect(result.content).toContain("exports");
     });
 
+    it("normalizes leading @ in symbol scope", async () => {
+      mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+      writeSource("src/test.ts", "export function foo() { return 1; }\n");
+      writeSource("other.ts", "export function foo() { return 2; }\n");
+      registerMockProvider(tmpDir, {
+        workspaceSymbols: async () => [
+          {
+            name: "foo",
+            kind: "function",
+            file: `${tmpDir}/src/test.ts`,
+            line: 1,
+            character: 17,
+          },
+          {
+            name: "foo",
+            kind: "function",
+            file: `${tmpDir}/other.ts`,
+            line: 1,
+            character: 17,
+          },
+        ],
+        references: async () => [],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          symbol: "foo",
+          path: "@src",
+          relations: ["references"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("src/test.ts");
+      expect(result.content).not.toContain("other.ts");
+      expect(result.content).not.toContain("Symbol not found");
+    });
+
     it("resolves symbol to file for file-level relations", async () => {
       writeSource("test.ts", "export function foo() { return 1; }\nexport const bar = 2;\n");
       registerMockProvider(tmpDir, {
@@ -315,6 +354,7 @@ describe("execute-graph (code_graph tool)", () => {
     });
 
     it("rejects scope-only queries for file-level relations", async () => {
+      mkdirSync(path.join(tmpDir, "src"));
       const result = await executeAction(
         {
           action: "graph",
@@ -733,6 +773,99 @@ describe("execute-graph (code_graph tool)", () => {
       // Should be "L9-L10", not "L9, L9, L10"
       expect(result.content).not.toContain("L9, L9");
       expect(result.content).toContain("L9-L10");
+    });
+  });
+
+  describe("relation shortcuts and readiness", () => {
+    it("expands relations: [all] to the six concrete relation families", async () => {
+      writeSource("test.ts", "export function foo() { return 1; }\n");
+      registerMockProvider(tmpDir, {
+        references: async () => [
+          {
+            uri: `file://${tmpDir}/test.ts`,
+            range: {
+              start: { line: 0, character: 17 },
+              end: { line: 0, character: 20 },
+            },
+          },
+        ],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 18,
+          relations: ["all"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("references");
+      expect(result.content).toContain("callees");
+      expect(result.content).toContain("imports");
+      expect(result.content).toContain("exports");
+      expect(result.content).toContain("implements");
+      expect(result.content).toContain("Tests");
+    });
+
+    it("treats any relation list containing all as the full six-relation shortcut", async () => {
+      writeSource("test.ts", "export function foo() { return 1; }\n");
+      registerMockProvider(tmpDir, {
+        references: async () => [
+          {
+            uri: `file://${tmpDir}/test.ts`,
+            range: {
+              start: { line: 0, character: 17 },
+              end: { line: 0, character: 20 },
+            },
+          },
+        ],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 18,
+          relations: ["all", "tests"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).not.toContain("Unknown relation: all");
+      expect(result.content).toContain("references");
+      expect(result.content).toContain("Tests");
+    });
+
+    it("degrades semantic relations on readiness timeout while keeping structural relations", async () => {
+      writeSource("test.ts", "export function foo() { return 1; }\n");
+      registerMockProvider(tmpDir, {
+        references: async () => null,
+      });
+
+      vi.useFakeTimers();
+      const promise = executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 18,
+          relations: ["references", "callees", "imports", "exports", "tests"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+      vi.advanceTimersByTime(20_000);
+      const result = await promise;
+      vi.useRealTimers();
+
+      expect(result.content).toContain("references");
+      expect(result.content).toContain("Unavailable");
+      expect(result.content).toContain("callees");
+      expect(result.content).toContain("imports");
+      expect(result.content).toContain("exports");
     });
   });
 });

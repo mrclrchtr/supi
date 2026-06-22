@@ -124,10 +124,9 @@ describe("Planner routing", () => {
       expect(route.preferred).toBe("structural");
     });
 
-    it("routes code_refactor and code_refactor_plan to semantic-preferred when refactor-capable semantic is available", async () => {
+    it("routes code_refactor_plan to semantic-preferred when refactor-capable semantic is available", async () => {
       registerSemanticWithRename();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      expect(routeFor("/project", asToolName("code_refactor")).preferred).toBe("semantic");
       expect(routeFor("/project", asToolName("code_refactor_plan")).preferred).toBe("semantic");
     });
 
@@ -185,9 +184,8 @@ describe("Planner routing", () => {
       expect(route.preferred).toBe("unavailable");
     });
 
-    it("routes code_apply and code_refactor_apply as semantic-preferred regardless of capability state", async () => {
+    it("routes code_refactor_apply as semantic-preferred regardless of capability state", async () => {
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      expect(routeFor("/project", asToolName("code_apply")).preferred).toBe("semantic");
       expect(routeFor("/project", asToolName("code_refactor_apply")).preferred).toBe("semantic");
     });
 

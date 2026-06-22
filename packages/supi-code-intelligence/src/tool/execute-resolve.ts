@@ -7,7 +7,9 @@
 
 import { executeResolveService, validateResolveParams } from "../analysis/resolve/service.ts";
 import { renderResolveResult } from "../presentation/markdown/resolve.ts";
+import { resolveScope } from "../search-helpers.ts";
 import type { CodeIntelResult, ResolveDetails } from "../types.ts";
+import { unavailableResolveDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 
 export interface CodeResolveToolParams {
@@ -27,8 +29,26 @@ export async function executeResolveTool(
   // Validation (defensive — TypeBox schema should catch most cases)
   const validationError = validateResolveParams(params);
   if (validationError) {
-    return { content: validationError, details: undefined };
+    return {
+      content: validationError,
+      details: unavailableResolveDetails([
+        "Fix the input parameters and retry",
+        "Use anchored `file` + `line` + `character` or a `query` for resolution",
+      ]),
+    };
   }
+
+  const scopeResolution = resolveScope(params.scope, ctx.cwd);
+  if (scopeResolution.kind === "error") {
+    return {
+      content: `**Error:** ${scopeResolution.reason}`,
+      details: unavailableResolveDetails([
+        "Verify the `scope` path exists and is within the workspace",
+        "Use an existing workspace-relative file or directory path",
+      ]),
+    };
+  }
+  const resolvedScope = params.scope ? scopeResolution.path : undefined;
 
   const needsSemanticWarmup =
     Boolean(params.query) && params.kind !== "file" && params.kind !== "File";
@@ -37,15 +57,18 @@ export async function executeResolveTool(
     if (readiness.kind === "timeout") {
       return {
         content: renderSemanticReadinessTimeout("code_resolve", 15_000),
-        details: undefined,
+        details: unavailableResolveDetails(["Retry shortly or check `code_health`"]),
       };
     }
     if (readiness.kind === "unavailable") {
-      return { content: `**Error:** ${readiness.reason}`, details: undefined };
+      return {
+        content: `**Error:** ${readiness.reason}`,
+        details: unavailableResolveDetails(["Check `code_health` for provider status"]),
+      };
     }
   }
 
-  const result = await executeResolveService(params, ctx.cwd);
+  const result = await executeResolveService({ ...params, scope: resolvedScope }, ctx.cwd);
 
   const content = renderResolveResult(result, ctx.cwd);
 
@@ -93,6 +116,12 @@ export async function executeResolveTool(
     return { content, details: { type: "resolve", data: details } };
   }
 
-  // Error — no details
-  return { content, details: undefined };
+  // Error — still return structured details
+  return {
+    content,
+    details: unavailableResolveDetails([
+      "Refine the `query` or `scope`",
+      "Use anchored `file` + `line` + `character` for a precise target",
+    ]),
+  };
 }

@@ -21,8 +21,9 @@ import {
   renderHealthResult,
 } from "../presentation/markdown/health.ts";
 import { type LoadedSignals, loadPrioritizationSignals } from "../prioritization-signals.ts";
-import { normalizePath } from "../search-helpers.ts";
+import { resolveScope } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { unavailableHealthDetails } from "./details-helpers.ts";
 
 export interface CodeHealthToolParams {
   scope?: string;
@@ -43,13 +44,14 @@ export async function executeHealthTool(
   ) as HealthSection[];
   const level = params.level ?? "summary";
 
-  const scopeFilter = resolveScope(params.scope, cwd);
-  if (scopeFilter === null && params.scope) {
+  const scopeResolution = resolveScope(params.scope, cwd);
+  if (scopeResolution.kind === "error") {
     return {
-      content: `**Error:** Scope path not found: \`${params.scope}\``,
-      details: undefined,
+      content: `**Error:** ${scopeResolution.reason}`,
+      details: unavailableHealthDetails("scope not found"),
     };
   }
+  const scopeFilter = scopeResolution.path === cwd ? null : scopeResolution.path;
 
   const providerState = getCodeProvider(cwd);
   const semanticState = getDefaultWorkspaceRuntime().getWorkspace(cwd).semantic.state;
@@ -164,13 +166,6 @@ function collectUnusedSection(
 
 function isWithinOptionalScope(scopeFilter: string | null, file: string): boolean {
   return !scopeFilter || isWithinOrEqual(scopeFilter, file);
-}
-
-function resolveScope(scope: string | undefined, cwd: string): string | null {
-  if (!scope) return null;
-  const resolved = normalizePath(scope, cwd);
-  if (!existsSync(resolved)) return null;
-  return resolved;
 }
 
 async function maybeRecover(

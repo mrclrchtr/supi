@@ -34,6 +34,7 @@ describe("executeAction validation", () => {
   });
 
   it("rejects line/character with path instead of file", async () => {
+    mkdirSync(path.join(tmpDir, "src"));
     const result = await executeAction(
       { action: "graph", path: "src/", line: 1, character: 1 },
       { cwd: tmpDir },

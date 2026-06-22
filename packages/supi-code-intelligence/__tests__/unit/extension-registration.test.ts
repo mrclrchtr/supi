@@ -1,8 +1,12 @@
-import { createPiMock, getTool, getTools } from "@mrclrchtr/supi-test-utils";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
 import { WORKFLOW_CODE_TOOL_NAMES } from "../../src/workflow/index.ts";
+import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 describe("focused code intelligence tool registration", () => {
   it("registers the focused tool set from shared specs", () => {
@@ -32,6 +36,7 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toBeDefined();
     expect(props).toHaveProperty("targetId");
     expect(props).toHaveProperty("relations");
+    expect(JSON.stringify(props?.relations)).toContain("all");
     expect(props).toHaveProperty("file");
     expect(props).toHaveProperty("maxResults");
     // Phase 6: unimplemented no-op params removed from schema
@@ -135,10 +140,18 @@ describe("focused code intelligence tool registration", () => {
     expect(kindParam?.description).toContain("import");
     expect(kindParam?.description).toContain("export");
     expect(kindParam?.description).toContain("call");
+    expect(kindParam?.description).toContain("type");
+    expect(kindParam?.description).toContain("interface");
 
     expect(kindParam?.enum).toBeDefined();
-    expect(kindParam?.enum).toEqual(["definition", "import", "export", "call"]);
-    expect(kindParam?.enum).not.toContain("type");
+    expect(kindParam?.enum).toEqual([
+      "definition",
+      "import",
+      "export",
+      "call",
+      "type",
+      "interface",
+    ]);
     expect(kindParam?.enum).not.toContain("test");
   });
 
@@ -209,7 +222,7 @@ describe("focused code intelligence tool registration", () => {
 
     const includeTestsParam = props?.includeTests as { description?: string } | undefined;
     expect(includeTestsParam?.description).toContain(
-      "changedFiles analysis uses conventions-only structural discovery",
+      "changedFiles analysis uses semantic references",
     );
     expect(includeTestsParam?.description).not.toContain("no LSP/TS");
   });
@@ -231,8 +244,6 @@ describe("focused code intelligence tool registration", () => {
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
     expect(names).not.toContain("code_affected");
-    expect(names).not.toContain("code_refactor_plan");
-    expect(names).not.toContain("code_refactor_apply");
 
     const substratePrefixes = ["lsp_", "tree_sitter_"];
     const substrateTools = names.filter((n) =>
@@ -275,7 +286,7 @@ describe("focused code intelligence tool registration", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const workflowRefactorTool = getTool(pi, "code_refactor") as {
+    const workflowRefactorTool = getTool(pi, "code_refactor_plan") as {
       parameters?: { properties?: Record<string, unknown> };
     };
     expect(workflowRefactorTool).toBeDefined();
@@ -284,20 +295,80 @@ describe("focused code intelligence tool registration", () => {
     expect(workflowRefactorTool.parameters?.properties).toHaveProperty("file");
     expect(workflowRefactorTool.parameters?.properties).toHaveProperty("line");
     expect(workflowRefactorTool.parameters?.properties).toHaveProperty("character");
+    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("range");
     expect(workflowRefactorTool.parameters?.properties).toHaveProperty("newName");
-    expect(workflowRefactorTool.parameters?.properties).toHaveProperty("preview");
+    expect(workflowRefactorTool.parameters?.properties).not.toHaveProperty("preview");
 
     const workflowOperationParam = workflowRefactorTool.parameters?.properties?.operation as
       | { enum?: string[] }
       | undefined;
-    expect(workflowOperationParam?.enum).toEqual(["rename", "rename_symbol"]);
+    expect(workflowOperationParam?.enum).toEqual([
+      "rename",
+      "rename_symbol",
+      "extract_function",
+      "extract_variable",
+    ]);
 
-    const workflowApplyTool = getTool(pi, "code_apply") as {
+    const workflowApplyTool = getTool(pi, "code_refactor_apply") as {
       parameters?: { properties?: Record<string, unknown> };
     };
     expect(workflowApplyTool).toBeDefined();
     expect(workflowApplyTool.parameters?.properties).toHaveProperty("planId");
-    expect(workflowApplyTool.parameters?.properties).toHaveProperty("mode");
+    expect(workflowApplyTool.parameters?.properties).not.toHaveProperty("mode");
+  });
+
+  it("registered-tool smoke test covers graph all, resolve missing scope, and renamed refactor tools", async () => {
+    const tmpDir = mkdtempSync(path.join(os.tmpdir(), "ci-registration-"));
+    writeFileSync(path.join(tmpDir, "test.ts"), "export function foo() { return 1; }\n");
+    registerMockProvider(tmpDir, {
+      references: async () => [
+        {
+          uri: `file://${path.join(tmpDir, "test.ts")}`,
+          range: {
+            start: { line: 0, character: 16 },
+            end: { line: 0, character: 19 },
+          },
+        },
+      ],
+    });
+
+    try {
+      const pi = createPiMock();
+      codeIntelligenceExtension(pi as never);
+
+      const graphTool = getTool(pi, "code_graph") as {
+        parameters?: { properties?: Record<string, unknown> };
+        execute: (...args: unknown[]) => Promise<{ content: Array<{ text: string }> }>;
+      };
+      const resolveTool = getTool(pi, "code_resolve") as {
+        execute: (...args: unknown[]) => Promise<{ content: Array<{ text: string }> }>;
+      };
+
+      expect(getTool(pi, "code_refactor_plan")).toBeDefined();
+      expect(getTool(pi, "code_refactor_apply")).toBeDefined();
+      expect(JSON.stringify(graphTool.parameters?.properties?.relations)).toContain("all");
+
+      const graphResult = await graphTool.execute(
+        "smoke-graph-all",
+        { file: "test.ts", line: 1, character: 17, relations: ["all"] },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      );
+      expect(graphResult.content[0].text).not.toContain("Unknown relation: all");
+
+      const resolveResult = await resolveTool.execute(
+        "smoke-missing-scope",
+        { query: "foo", scope: "missing-dir" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      );
+      expect(resolveResult.content[0].text).toContain("Scope path not found");
+    } finally {
+      clearMockRuntime();
+      rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });
 

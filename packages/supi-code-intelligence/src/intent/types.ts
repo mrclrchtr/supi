@@ -15,10 +15,8 @@ export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_find",
   "code_graph",
   "code_health",
-  "code_refactor",
-  "code_apply",
-  "code_refactor_apply",
   "code_refactor_plan",
+  "code_refactor_apply",
   "code_resolve",
 ] as const;
 export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[number];
@@ -31,8 +29,8 @@ export const PUBLIC_CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_find",
   "code_graph",
   "code_health",
-  "code_refactor",
-  "code_apply",
+  "code_refactor_plan",
+  "code_refactor_apply",
   "code_resolve",
 ] as const;
 export type PublicCodeIntelligenceToolName = (typeof PUBLIC_CODE_INTELLIGENCE_TOOL_NAMES)[number];

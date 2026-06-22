@@ -216,7 +216,7 @@ Before running Terminal-Bench tasks, verify the local package can load in a Linu
 scripts/check-supi-container-load
 ```
 
-The script mounts this checkout at `/mnt/supi-worktree`, mounts a writable `PI_CODING_AGENT_DIR` at `/tmp/pi-config`, installs pi in a short-lived `node:22-bookworm` container, enables `SUPI_LOG_STATUS=1`, and runs `/supi-debug` as a sentinel. A passing preflight prints a `customType: "supi-debug-report"` JSON event plus a `SUPI_STATUS {...}` line showing expected SuPi tools registered/active (`ask_user`, the split LSP tools, the focused `tree_sitter_*` expert tools, the focused code-intelligence tools including `code_refactor`, and `supi_debug`). The status is recorded with pi's native non-LLM `appendEntry("supi-status", ...)` surface when sessions are enabled, and also written to stderr so Harbor's `2>&1 | tee pi.txt` captures it during `--no-session` runs. Do not use `pi.sendMessage()` for this marker; custom messages are converted into LLM-visible user messages even when `display: false`. This does not run Terminal-Bench and should not need an API key; if SuPi does not load, the slash command is not registered and pi falls through to a model call, which fails in the clean container.
+The script mounts this checkout at `/mnt/supi-worktree`, mounts a writable `PI_CODING_AGENT_DIR` at `/tmp/pi-config`, installs pi in a short-lived `node:22-bookworm` container, enables `SUPI_LOG_STATUS=1`, and runs `/supi-debug` as a sentinel. A passing preflight prints a `customType: "supi-debug-report"` JSON event plus a `SUPI_STATUS {...}` line showing expected SuPi tools registered/active (`ask_user`, the split LSP tools, the focused `tree_sitter_*` expert tools, the focused code-intelligence tools including `code_refactor_plan` and `code_refactor_apply`, and `supi_debug`). The status is recorded with pi's native non-LLM `appendEntry("supi-status", ...)` surface when sessions are enabled, and also written to stderr so Harbor's `2>&1 | tee pi.txt` captures it during `--no-session` runs. Do not use `pi.sendMessage()` for this marker; custom messages are converted into LLM-visible user messages even when `display: false`. This does not run Terminal-Bench and should not need an API key; if SuPi does not load, the slash command is not registered and pi falls through to a model call, which fails in the clean container.
 
 Important local-container details:
 
@@ -233,7 +233,7 @@ For actual A/B run artifacts, enable the status marker on SuPi runs only:
 Then verify SuPi loading before interpreting results:
 
 - Inspect the SuPi variant's `agent/pi.txt` and parse the `SUPI_STATUS {...}` line.
-- Confirm the marker reports expected tools registered and active: `ask_user`, the split LSP tools, the focused `tree_sitter_*` expert tools, the focused code-intelligence tools (including `code_refactor`), and `supi_debug`.
+- Confirm the marker reports expected tools registered and active: `ask_user`, the split LSP tools, the focused `tree_sitter_*` expert tools, the focused code-intelligence tools (including `code_refactor_plan` and `code_refactor_apply`), and `supi_debug`.
 - Confirm the marker reports expected commands such as `/supi-debug` and `/supi-settings`.
 - Confirm the plain pi run does not contain `SUPI_STATUS` or SuPi-only resources.
 - If SuPi loading cannot be proven from logs, treat the run as invalid for A/B comparison.

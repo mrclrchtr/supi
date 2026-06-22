@@ -2,6 +2,7 @@ import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeImpact } from "../use-case/generate-impact.ts";
+import { unavailableImpactDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
@@ -32,9 +33,12 @@ export async function executeImpactLikeTool(
 
   const expansion = expandTargetId(params, ctx.cwd);
   if (expansion.kind === "error") {
-    return unavailableImpactToolResult(detailType, expansion.message, [
-      "Use `code_resolve` to resolve a target first",
-    ]);
+    return {
+      content: expansion.message,
+      details: unavailableImpactDetails(detailType, [
+        "Use `code_resolve` to resolve a target first",
+      ]),
+    };
   }
   if (expansion.kind === "ok") {
     params.file = expansion.file;
@@ -44,7 +48,10 @@ export async function executeImpactLikeTool(
 
   const error = validateFocusedToolParams(params, ctx.cwd);
   if (error) {
-    return { content: error, details: undefined };
+    return {
+      content: error,
+      details: unavailableImpactDetails(detailType, ["Fix the input parameters and retry"]),
+    };
   }
 
   const hasDiffInputs = (params.changedFiles?.length || 0) > 0 || Boolean(params.change);

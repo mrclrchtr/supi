@@ -11,8 +11,8 @@ export const WORKFLOW_CODE_TOOL_NAMES = [
   "code_find",
   "code_graph",
   "code_impact",
-  "code_refactor",
-  "code_apply",
+  "code_refactor_plan",
+  "code_refactor_apply",
   "code_health",
 ] as const;
 

@@ -1,6 +1,7 @@
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeInspect } from "../use-case/generate-inspect.ts";
+import { unavailableInspectDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
@@ -17,13 +18,20 @@ export async function executeInspectTool(
 ): Promise<CodeIntelResult> {
   const validationError = validateFocusedToolParams(params, ctx.cwd);
   if (validationError) {
-    return { content: validationError, details: undefined };
+    return {
+      content: validationError,
+      details: unavailableInspectDetails("validation error", [
+        "Provide `file`, `line`, and `character` for point inspection",
+      ]),
+    };
   }
 
   if (!params.file || params.line == null || params.character == null) {
     return {
       content: "**Error:** `code_inspect` requires `file`, `line`, and `character`.",
-      details: undefined,
+      details: unavailableInspectDetails("missing coordinates", [
+        "Provide `file`, `line`, and `character` for point inspection",
+      ]),
     };
   }
 
@@ -34,7 +42,7 @@ export async function executeInspectTool(
   if (readiness.kind === "timeout") {
     return {
       content: renderSemanticReadinessTimeout("code_inspect", 15_000),
-      details: undefined,
+      details: unavailableInspectDetails(params.file, ["Retry shortly or check `code_health`"]),
     };
   }
   // Let unavailable pass through — the use-case layer handles missing

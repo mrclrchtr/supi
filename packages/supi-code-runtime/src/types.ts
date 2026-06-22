@@ -133,6 +133,8 @@ export interface WorkspaceEdit {
 export type RefactorOperation =
   | "rename"
   | "rename_symbol"
+  | "extract_function"
+  | "extract_variable"
   | "rename_file"
   | "move_file"
   | "update_imports"
@@ -156,6 +158,7 @@ export interface RefactorRequest {
   operation: RefactorOperation;
   file: string;
   position: CodePosition;
+  range?: SourceRange;
   newName?: string;
   destination?: string;
 }

@@ -316,7 +316,7 @@ async function resolveQueryTarget(opts: {
 
   // Map public kind to internal options for resolveSymbol.
   // "symbol" means "any kind" (no filter). "export" maps to exportedOnly.
-  const scopePath = scope ? resolve(cwd, scope) : undefined;
+  const scopePath = scope ? normalizePath(scope, cwd) : undefined;
   const symbolKind = kind !== undefined && kind !== "symbol" ? kind : undefined;
   const exportedOnly = kind === "export" ? true : undefined;
 

@@ -36,6 +36,10 @@ export interface ActionParams {
   summary?: boolean;
   relations?: string[];
   operation?: string;
+  range?: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  };
   newName?: string;
   planId?: string;
   mode?: "apply";
@@ -100,6 +104,7 @@ export async function executeAction(
             | "export"
             | "call"
             | "type"
+            | "interface"
             | "test"
             | undefined,
           maxResults: rest.maxResults,

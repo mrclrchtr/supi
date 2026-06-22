@@ -30,12 +30,12 @@ After install, pi gets:
 
 - `code_context` — task-focused context bundles for a change, question, or resolved target; also serves orientation overviews for projects, packages, directories, files, or symbols (`code_brief` has been merged into it)
 - `code_inspect` — factual point inspection for one precise file position
-- `code_graph` — unified relation graph (references, callees, implementations) from a resolved target
+- `code_graph` — unified relation graph (references, callees, imports, exports, implementations, tests) from a resolved target
 - `code_impact` — preferred workflow-oriented blast radius, downstream impact, and diff-aware changed-file analysis
 - `code_find` — unified ranked search (text, regex, AST, semantic)
 - `code_health` — diagnostics, server status, dirty workspace, coverage, and unused-code health signals
-- `code_refactor` — preferred workflow refactor surface; preview an operation-aware semantic refactor plan without mutating files
-- `code_apply` — preferred workflow apply surface; apply a previously stored, validated plan by `planId`
+- `code_refactor_plan` — pure planner; preview an operation-aware semantic refactor plan without mutating files
+- `code_refactor_apply` — sole mutator; apply a previously stored, validated plan by `planId`
 - `code_resolve` — resolve human/code references into precise targets with stable target handles for follow-up calls
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
@@ -90,8 +90,8 @@ The current public surface now includes:
 - `code_health` — **active** (Phase 1.5)
 - `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
 - `code_impact` — **active** (Phase 4, preferred workflow impact tool)
-- `code_refactor` — **active** (Phase 5, preferred workflow refactor surface)
-- `code_apply` — **active** (Phase 5, preferred workflow apply surface)
+- `code_refactor_plan` — **active** (Phase 5, pure refactor planner)
+- `code_refactor_apply` — **active** (Phase 5, refactor plan applier)
 
 The design source of truth lives in `src/workflow/` with types, schemas, and metadata.
 
@@ -107,6 +107,29 @@ This package is for questions like:
 - `@mrclrchtr/supi-lsp` provides the semantic library substrate used by the public `code_*` tools
 - `@mrclrchtr/supi-tree-sitter` provides the structural library substrate used by the public `code_*` tools
 - `@mrclrchtr/supi-code-intelligence` owns the public `code_*` tool surface and the orchestration layer above those substrates
+
+## Workflow cookbook
+
+### Trace a symbol and prepare a change
+
+1. `code_resolve(query="executeHealthTool")` → capture `targetId`
+2. `code_graph(targetId, relations=["references", "callees", "tests"])` → inspect usage
+3. `code_impact(targetId, change="add coverage unused section")` → estimate blast radius
+4. `code_context(targetId, include=["defs", "tests"])` → gather edit context
+5. Edit files, then `code_health(scope="packages/...", refresh=true)` → verify diagnostics
+
+### Understand a package before editing
+
+1. `code_context(scope="packages/supi-code-intelligence")` → package orientation
+2. `code_context(scope="packages/supi-code-intelligence/src/tool")` → directory drill-down
+3. `code_context(scope="packages/.../execute-graph.ts")` → file overview
+
+### Safe refactoring
+
+1. `code_resolve(query="oldFunctionName")` → capture `targetId`
+2. `code_graph(targetId, relations=["references"])` → confirm scope
+3. `code_refactor_plan(targetId, operation="rename_symbol", newName="newFunctionName")` → preview plan
+4. `code_refactor_apply(planId)` → apply after reviewing the plan
 
 ## Tool overview
 
@@ -131,7 +154,7 @@ Factual point-inspection tool for one precise file position.
 Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code_implementations`. Resolves one target and dispatches to the appropriate substrate per requested relation.
 
 - **targetId** (preferred from `code_resolve`) or file+line+character or symbol
-- **relations**: `["references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`
+- **relations**: `["all", "references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`; use `["all"]` for the full graph in one call
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
 - **Each relation annotates its evidence source** in the output. For the `tests` relation, provenance describes **file discovery only** — `semantic+conventions` means semantic references contributed, `conventions-only` means only deterministic path/layout conventions contributed.
 - Test-producing surfaces also include a small structured tests metadata shape in tool details: discovery status/provenance plus per-file label status and extracted labels.
@@ -146,7 +169,7 @@ Preferred workflow-oriented impact analysis.
 - adds diff-aware entry points for `changedFiles` and explicit `includeTests`
 - `includeTests` uses the same shared test discovery as `code_graph` and `code_context` (import/reference evidence plus package-layout conventions)
 - **Target-based analysis** uses semantic references and fails explicitly when no LSP provider is available
-- **changedFiles analysis** uses structural evidence only (file-level module analysis, path-based test discovery) and always annotates its evidence: `**Evidence: structural** — impact limited to file-level module analysis and path-based test discovery. Use \`code_resolve\` for semantic impact.`
+- **changedFiles analysis** uses structural evidence by default and, when LSP/export data is available, merges semantic references for symbols defined in changed files. Evidence is annotated as either `**Evidence: structural**` or `**Evidence: semantic+structural**`.
 - **test list annotations** — when likely tests are shown, impact headings annotate discovery provenance explicitly (`Likely Tests (semantic+conventions)` or `Likely Tests (conventions-only)`)
 - **explicit empty-test note** — when `includeTests: true` is set and bounded companion/package discovery completes without finding any test files, an explicit `No likely tests found by bounded companion/package discovery.` note appears instead of silently omitting test information. This note is not shown when `includeTests` is omitted or unavailable.
 - **target-based analysis seeds the target file itself** — zero-reference targets still report affected evidence and likely tests
@@ -161,7 +184,7 @@ Unified ranked search tool with a strict evidence contract.
 - `mode: "regex"` → ripgrep regex search; `kind` is not accepted
 - `mode: "semantic"` → LSP workspace symbol search; `kind` is not accepted and semantic mode does not fall back to text search
 - `mode: "ast"` → tree-sitter structured search; requires explicit `kind`
-- supported AST kinds in this phase: `definition`, `import`, `export`, `call`
+- supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`
 - unsupported mode/kind combinations fail explicitly instead of being broadened into best-effort search
 
 Supports `query` (required), `scope`, `mode`, `kind`, `contextLines`, and `maxResults`.
@@ -175,33 +198,35 @@ Health/status summary for the current workspace or a scoped path.
 - `unused` reads `knip.json` when present and reports unused files/exports
 - when a requested coverage/unused report is missing, the result says so explicitly instead of silently falling back to diagnostics
 
-### `code_refactor`
-Preferred workflow refactor surface.
+### `code_refactor_plan`
+Pure refactor planner.
 
 - previews a precise semantic refactor plan without mutating files
-- returns a `planId` for follow-up `code_apply`
-- uses the workflow schema (`operation`, target/file coords, operation-specific fields)
+- returns a `planId` for follow-up `code_refactor_apply`
+- uses the workflow schema (`operation`, target/file coords, optional selected `range`, and operation-specific fields)
 - legacy `operation: "rename"` is accepted as a compatibility alias for `rename_symbol`
-- `preview: false` is not yet supported; `code_refactor` remains preview-only in this phase
-- in this phase it intentionally wraps the proven `code_refactor_plan` machinery
+- extract operations require a 1-based `range`, `newName`, and an LSP code action that returns precise text edits
 
-Supported operation in this phase:
+Supported operations:
 - `rename_symbol`
+- `extract_function`
+- `extract_variable`
 
 Notes:
 - only precise semantic text edits become plans
 - `targetId` from `code_resolve` can replace raw file + line + character targeting
+- this tool never mutates files
 
-### `code_apply`
-Preferred workflow apply surface.
+### `code_refactor_apply`
+Sole mutator in the refactor workflow.
 
 - applies a previously stored plan by `planId`
-- supports `mode: "apply"` in this phase
 - rejects stale plans using file fingerprints and re-validates ranges/overlap before mutation
+- this is the only tool in the refactor workflow that writes files
 
 ## Internal compatibility paths
 
-The legacy compatibility executors (`code_affected`, `code_refactor_plan`, `code_refactor_apply`) remain in the source tree for migration/tests, but are no longer registered on the public tool surface.
+The legacy compatibility executor (`code_affected`) remains in the source tree for migration/tests, but is no longer registered on the public tool surface.
 
 ## Shared input conventions
 
@@ -223,9 +248,16 @@ Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `scope`
 - `code_inspect` is the public point-inspection tool for `file` + `line` + `character`
-- `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, and `code_refactor`
-- a leading `@` is stripped from `scope` and `file`
+- `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, and `code_refactor_plan`
+- `scope` and `file` use pi-style paths: a leading `@` is stripped, relative paths resolve from the current cwd, and existing file scopes match only that file while directory scopes match descendants
 - non-search tools do **not** silently fall back to heuristic grep behavior
+
+### Target handle lifecycle
+
+- `targetId` handles are session-scoped; they are valid only within the current agent session.
+- A handle becomes stale when its backing file is modified and the stored fingerprint no longer matches. Stale handles return an explicit error — re-run `code_resolve` to obtain a fresh handle.
+- Handles have no cross-session persistence; a new session resolves targets fresh.
+- `planId` handles follow the same session-scoped, fingerprint-checked lifecycle. See `docs/adr/0002-refactor-planner-applier-split.md` for the planner/applier invariant.
 
 ## Result style
 

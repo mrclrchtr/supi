@@ -32,7 +32,7 @@ import {
   renderGraphResult,
   renderImportsResult,
 } from "../presentation/markdown/relations.ts";
-import { toDisplayPath } from "../search-helpers.ts";
+import { resolveScope, toDisplayPath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
@@ -72,9 +72,15 @@ export async function executeGraphTool(
     params.character = expansion.character;
   }
 
-  // ── 2. Validate params ──────────────────────────────────────────────
+  // ── 2. Resolve scope and validate params ─────────────────────────────
+  const scopeResolution = resolveScope(params.scope, ctx.cwd);
+  if (scopeResolution.kind === "error") {
+    return errorResult(`**Error:** ${scopeResolution.reason}`);
+  }
+  const resolvedScope = params.scope ? scopeResolution.path : undefined;
+
   // Map public `scope` to internal `path` for shared validation
-  const internalParams = { ...params, path: params.scope };
+  const internalParams = { ...params, path: resolvedScope };
   const error = validateFocusedToolParams(internalParams, ctx.cwd);
   if (error) {
     return errorResult(error);
@@ -88,30 +94,32 @@ export async function executeGraphTool(
   }
 
   // ── 3. Normalize relations ──────────────────────────────────────────
-  const relations = params.relations ?? DEFAULT_RELATIONS;
-  const needsSemanticRelations = relations.some(
-    (relation) => relation === "references" || relation === "implements",
+  const requestedRelations = params.relations ?? DEFAULT_RELATIONS;
+  const relations = expandAllRelations(requestedRelations);
+  const semanticRelations: GraphRelation[] = ["references", "implements"];
+  const requestedSemanticRelations = relations.filter((r: GraphRelation) =>
+    semanticRelations.includes(r),
   );
+  const needsSemanticRelations = requestedSemanticRelations.length > 0;
 
+  let semanticReadinessError: string | null = null;
   if (needsSemanticRelations) {
     const readiness = await ensureSemanticReadiness(
       ctx.cwd,
       params.file ? { kind: "file", file: params.file } : { kind: "workspace" },
     );
     if (readiness.kind === "timeout") {
-      return errorResult(renderSemanticReadinessTimeout("code_graph", 15_000));
-    }
-    if (readiness.kind === "unavailable") {
-      return errorResult(
-        "**Error:** No analysis provider is available for this workspace. Check `code_health` for LSP and tree-sitter status.",
-      );
+      semanticReadinessError = renderSemanticReadinessTimeout("code_graph", 15_000);
+    } else if (readiness.kind === "unavailable") {
+      semanticReadinessError =
+        "No analysis provider is available for this workspace. Check `code_health` for LSP and tree-sitter status.";
     }
   }
 
   // File-level relations (imports/exports) don't need a position — bare `file` is sufficient.
   const FILE_LEVEL_RELATIONS: GraphRelation[] = ["imports", "exports"];
   const allFileLevel =
-    relations.length > 0 && relations.every((r) => FILE_LEVEL_RELATIONS.includes(r));
+    relations.length > 0 && relations.every((r: GraphRelation) => FILE_LEVEL_RELATIONS.includes(r));
 
   // ── 4. Check provider availability ──────────────────────────────────
   const route = routeFor(ctx.cwd, "code_graph");
@@ -148,7 +156,7 @@ export async function executeGraphTool(
       // Resolve symbol to file via the targeting pipeline
       const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
       const target = await resolveTarget(
-        { ...params, path: params.scope },
+        { ...params, path: resolvedScope },
         ctx.cwd,
         provider ?? undefined,
       );
@@ -174,12 +182,12 @@ export async function executeGraphTool(
   } else {
     const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
     const target = await resolveTarget(
-      { ...params, path: params.scope },
+      { ...params, path: resolvedScope },
       ctx.cwd,
       provider ?? undefined,
     );
     if (typeof target === "string") {
-      return { content: target, details: undefined };
+      return errorResult(target);
     }
 
     // File-level disambiguation — not supported for graph
@@ -223,6 +231,7 @@ export async function executeGraphTool(
       ctx.cwd,
       provider,
       maxResults,
+      semanticReadinessError,
     );
     sections.push(section);
   }
@@ -284,7 +293,12 @@ async function collectRelation(
   cwd: string,
   provider: CodeProvider | null,
   maxResults: number,
+  semanticReadinessError: string | null,
 ): Promise<GraphSection> {
+  if (semanticReadinessError && (rel === "references" || rel === "implements")) {
+    return { kind: "unavailable", rel, message: semanticReadinessError };
+  }
+
   try {
     switch (rel) {
       case "references": {
@@ -492,4 +506,11 @@ function errorResult(content: string): CodeIntelResult {
       },
     },
   };
+}
+
+function expandAllRelations(relations: GraphRelation[]): GraphRelation[] {
+  if (!relations.includes("all")) {
+    return relations;
+  }
+  return ["references", "callees", "imports", "exports", "implements", "tests"];
 }

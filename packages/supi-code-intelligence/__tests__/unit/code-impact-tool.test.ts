@@ -164,6 +164,64 @@ describe("code_impact tool", () => {
     }
   });
 
+  it("merges semantic references into changedFiles impact when available", async () => {
+    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src.ts"), "export const changed = true;\n");
+    writeFileSync(
+      path.join(tmpDir, "src/consumer.ts"),
+      "import { changed } from '../src';\nvoid changed;\n",
+    );
+
+    registerMockProvider(tmpDir, {
+      exports: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "changed",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 21,
+          },
+        ],
+      }),
+      references: async () => [
+        {
+          uri: `file://${path.join(tmpDir, "src/consumer.ts")}`,
+          range: {
+            start: { line: 0, character: 9 },
+            end: { line: 0, character: 16 },
+          },
+        },
+      ],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const impactTool = getTool(pi, "code_impact");
+
+    const result = (await impactTool.execute(
+      "impact-changed-files-semantic",
+      {
+        changedFiles: ["src.ts"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: string; data?: { confidence?: string; checkNext?: string[] } };
+    };
+
+    expect(result.content[0].text).toContain("**Evidence: semantic+structural**");
+    expect(result.content[0].text).toContain("consumer.ts");
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
+      expect(result.details.data?.confidence).toBe("semantic");
+    }
+  });
+
   it("returns an explicit insufficient-evidence result for change-only requests instead of heuristic guessing", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);

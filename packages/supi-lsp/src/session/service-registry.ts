@@ -12,12 +12,17 @@ import type {
   LocationLink,
   Position,
   ProjectServerInfo,
+  Range,
   SymbolInformation,
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
+
+function isRange(value: Position | Range): value is Range {
+  return "start" in value && "end" in value;
+}
 
 /** Workspace diagnostic summary grouped by file. */
 export interface WorkspaceDiagnosticSummaryEntry {
@@ -127,16 +132,21 @@ export class SessionLspService {
     return client.rename(resolvedPath, position, newName);
   }
 
-  async codeActions(filePath: string, position: Position): Promise<CodeAction[] | null> {
+  async codeActions(
+    filePath: string,
+    positionOrRange: Position | Range,
+  ): Promise<CodeAction[] | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return null;
 
-    const range = { start: position, end: position };
+    const range = isRange(positionOrRange)
+      ? positionOrRange
+      : { start: positionOrRange, end: positionOrRange };
     const diagnostics = client
       .getDiagnostics(resolvedPath)
-      .filter((diagnostic) => diagnostic.range.start.line <= position.line)
-      .filter((diagnostic) => diagnostic.range.end.line >= position.line);
+      .filter((diagnostic) => diagnostic.range.end.line >= range.start.line)
+      .filter((diagnostic) => diagnostic.range.start.line <= range.end.line);
 
     return client.codeActions(resolvedPath, range, { diagnostics });
   }

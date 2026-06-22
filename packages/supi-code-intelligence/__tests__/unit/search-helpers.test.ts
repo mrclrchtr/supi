@@ -1,8 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   escapeRegex,
   isLowSignalPath,
   normalizePath,
+  resolveScope,
   uriToFile,
 } from "../../src/search-helpers.ts";
 
@@ -64,5 +68,60 @@ describe("uriToFile", () => {
 
   it("passes through non-file URIs", () => {
     expect(uriToFile("https://example.com")).toBe("https://example.com");
+  });
+});
+
+describe("resolveScope", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(path.join(os.tmpdir(), "resolve-scope-"));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it("returns cwd when scope is omitted", () => {
+    const result = resolveScope(undefined, tmpDir);
+    expect(result).toEqual({ kind: "ok", path: tmpDir });
+  });
+
+  it("resolves a relative directory scope", () => {
+    const subDir = path.join(tmpDir, "src");
+    mkdirSync(subDir);
+    const result = resolveScope("src", tmpDir);
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.path).toBe(subDir);
+    }
+  });
+
+  it("resolves a file scope", () => {
+    const file = path.join(tmpDir, "index.ts");
+    writeFileSync(file, "export const x = 1;", "utf-8");
+    const result = resolveScope("index.ts", tmpDir);
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.path).toBe(file);
+    }
+  });
+
+  it("strips a leading @", () => {
+    const subDir = path.join(tmpDir, "src");
+    mkdirSync(subDir);
+    const result = resolveScope("@src", tmpDir);
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.path).toBe(subDir);
+    }
+  });
+
+  it("returns an error for a missing scope", () => {
+    const result = resolveScope("does-not-exist", tmpDir);
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.reason).toContain("does-not-exist");
+    }
   });
 });

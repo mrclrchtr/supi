@@ -1,7 +1,9 @@
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { buildArchitectureModel } from "../model.ts";
+import { resolveScope } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
 import { executeContext } from "../use-case/generate-context.ts";
+import { unavailableContextDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 
@@ -32,7 +34,10 @@ export async function executeContextTool(
 ): Promise<CodeIntelResult> {
   const expansion = expandTargetId(params, ctx.cwd);
   if (expansion.kind === "error") {
-    return { content: expansion.message, details: undefined };
+    return {
+      content: expansion.message,
+      details: unavailableContextDetails(["Verify the `targetId` is valid and from this session"]),
+    };
   }
   if (expansion.kind === "ok") {
     params.file = expansion.file;
@@ -41,6 +46,17 @@ export async function executeContextTool(
     params.targetName = expansion.targetName;
     params.targetKind = expansion.targetKind;
   }
+
+  const scopeResolution = resolveScope(params.scope, ctx.cwd);
+  if (scopeResolution.kind === "error") {
+    return {
+      content: `**Error:** ${scopeResolution.reason}`,
+      details: unavailableContextDetails([
+        "Verify the `scope` path exists and is within the workspace",
+      ]),
+    };
+  }
+  const resolvedScope = params.scope ? scopeResolution.path : undefined;
 
   const readinessResult = await gateSemanticReadiness(params, ctx.cwd);
   if (readinessResult) return readinessResult;
@@ -77,7 +93,7 @@ export async function executeContextTool(
               kind: params.targetKind ?? null,
             }
           : null,
-      scope: params.scope,
+      scope: resolvedScope,
       budget: params.budget,
       include: params.include,
       maxResults: params.maxResults,
@@ -115,7 +131,7 @@ async function gateSemanticReadiness(
   if (readiness.kind === "timeout") {
     return {
       content: renderSemanticReadinessTimeout("code_context", 15_000),
-      details: undefined,
+      details: unavailableContextDetails(["Retry shortly or check `code_health`"]),
     };
   }
   // Let unavailable pass through — downstream section renderers handle

@@ -12,6 +12,7 @@ import {
   type SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type {
+  CodeAction,
   DocumentSymbol,
   Hover,
   Location,
@@ -23,6 +24,8 @@ import type { SessionLspService } from "../session/service-registry.ts";
 import {
   collectCodeActionResults,
   isDeleteDeadCodeCodeAction,
+  isExtractFunctionCodeAction,
+  isExtractVariableCodeAction,
   isUpdateImportsCodeAction,
   runFilteredCodeActionRefactor,
   runRenameRefactor,
@@ -105,6 +108,10 @@ export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvi
             };
           }
           return runRenameRefactor(lsp, request.file, request.position, request.newName);
+        case "extract_function":
+          return runExtractRefactor(lsp, request, "extract_function", isExtractFunctionCodeAction);
+        case "extract_variable":
+          return runExtractRefactor(lsp, request, "extract_variable", isExtractVariableCodeAction);
         case "update_imports":
           return runFilteredCodeActionRefactor({
             lsp,
@@ -158,6 +165,29 @@ export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvi
         .map((a) => ({ title: a.title, kind: a.kind ?? undefined }));
     },
   };
+}
+
+function runExtractRefactor(
+  lsp: SessionLspService,
+  request: RefactorRequest,
+  operation: "extract_function" | "extract_variable",
+  matches: (action: CodeAction) => boolean,
+): Promise<RefactorResult> | RefactorResult {
+  if (!request.range) {
+    return {
+      kind: "unavailable",
+      reason: `Refactor operation "${operation}" requires \`range\`.`,
+    };
+  }
+
+  return runFilteredCodeActionRefactor({
+    lsp,
+    file: request.file,
+    position: request.position,
+    range: request.range,
+    operation,
+    matches,
+  });
 }
 
 // ── Type conversion helpers ───────────────────────────────────────────

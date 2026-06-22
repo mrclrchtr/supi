@@ -101,28 +101,32 @@ function removeKnownBrokenSymlinks(packageDir) {
 }
 
 /**
- * Remove @mrclrchtr devDependency symlinks that would create cycles.
+ * Remove @mrclrchtr symlinks that would create cp -RL cycles.
  *
- * pnpm hoists transitive devDeps into a package's node_modules/@mrclrchtr/.
- * When the package has @mrclrchtr/supi-X as a regular dep + bundledDep,
- * and supi-X has this package as a devDep, cp -RL follows the symlink
- * chain into supi-X, which has a symlink back to this package — a cycle.
+ * pnpm hoists transitive workspace packages into a package's
+ * node_modules/@mrclrchtr/. When A bundles B and B's node_modules
+ * contains a hoisted symlink back to A, cp -RL follows the symlink
+ * chain into B then back to A — a cycle.
  *
- * The same cycle can appear at any nesting depth (e.g. A → B → A, where
- * B is a regular dep of A and A is a devDep of B). This function recurses
- * into every @mrclrchtr dependency to remove devDep symlinks at every
- * level, breaking all transitive dev-dependency cycles.
+ * This happens in two flavors:
+ * 1. devDependency symlinks: supi-X appears as a devDep of supi-Y,
+ *    and supi-Y bundles supi-X. cp -RL copies supi-Y which contains
+ *    supi-X as a devDep symlink, which leads back.
+ * 2. hoisting artifacts: pnpm places supi-X in supi-Y's node_modules
+ *    even though supi-Y never declared it as a dependency. These
+ *    stray symlinks also create cycles when the hoisted package
+ *    bundles the current package.
  *
- * DevDependencies are never included in the published tarball, so it is
- * safe to remove them from the source tree before staging.
+ * The function recurses into remaining @mrclrchtr dependencies to
+ * clean nested symlinks at every level, breaking all transitive
+ * cycles. Both devDependencies and hoisted non-dependency symlinks
+ * are safe to remove: devDeps are never shipped, and hoisted
+ * non-dependency packages are pnpm artifacts that would not appear
+ * in the published tarball.
  */
-function removeCyclicDevDepSymlinks(packageDir) {
+function removeCyclicSymlinks(packageDir) {
   const visited = new Set();
 
-  /**
-   * Remove devDependency symlinks pointing to @mrclrchtr packages
-   * from the given package directory, excluding bundled dependencies.
-   */
   function removeMrclrchtrSymlink(dir, depName) {
     const symlinkPath = join(dir, "node_modules", ...depName.split("/"));
     let stat;
@@ -136,12 +140,34 @@ function removeCyclicDevDepSymlinks(packageDir) {
     }
   }
 
-  function removeMrclrchtrDevDepSymlinks(dir, pkg) {
-    const devDeps = Object.keys(pkg.devDependencies || {});
-    const bundled = new Set(pkg.bundledDependencies || []);
+  /**
+   * Remove @mrclrchtr symlinks from node_modules that should not
+   * be copied into the staged tree:
+   * - devDependencies (never shipped)
+   * - packages not declared in dependencies or devDependencies
+   *   (pnpm hoisting artifacts that create cp -RL cycles)
+   */
+  function removeNonProductionMrclrchtrSymlinks(dir, pkg) {
+    const declared = new Set([
+      ...Object.keys(pkg.dependencies || {}),
+      ...Object.keys(pkg.devDependencies || {}),
+    ]);
+    const mrclrchtrDir = join(dir, "node_modules", "@mrclrchtr");
+    let entries;
+    try {
+      entries = readdirSync(mrclrchtrDir, { withFileTypes: true });
+    } catch {
+      return; // Directory doesn't exist — nothing to clean
+    }
 
-    for (const depName of devDeps) {
-      if (depName.startsWith("@mrclrchtr/") && !bundled.has(depName)) {
+    for (const entry of entries) {
+      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
+      const depName = `@mrclrchtr/${entry.name}`;
+      if (!declared.has(depName)) {
+        // Not a declared dependency — hoisted artifact. Remove it.
+        removeMrclrchtrSymlink(dir, depName);
+      } else if (Object.keys(pkg.devDependencies || {}).includes(depName)) {
+        // Declared devDependency — safe to remove; not shipped.
         removeMrclrchtrSymlink(dir, depName);
       }
     }
@@ -149,7 +175,7 @@ function removeCyclicDevDepSymlinks(packageDir) {
 
   /**
    * Recurse into remaining @mrclrchtr dependencies to clean their
-   * nested devDep symlinks as well.
+   * nested symlinks as well.
    */
   function recurseIntoMrclrchtrDeps(dir) {
     const mrclrchtrDir = join(dir, "node_modules", "@mrclrchtr");
@@ -187,7 +213,7 @@ function removeCyclicDevDepSymlinks(packageDir) {
       return;
     }
 
-    removeMrclrchtrDevDepSymlinks(dir, pkg);
+    removeNonProductionMrclrchtrSymlinks(dir, pkg);
     recurseIntoMrclrchtrDeps(dir);
   }
 
@@ -196,7 +222,7 @@ function removeCyclicDevDepSymlinks(packageDir) {
 
 function copyPackageTree(sourceDir, destDir) {
   removeKnownBrokenSymlinks(sourceDir);
-  removeCyclicDevDepSymlinks(sourceDir);
+  removeCyclicSymlinks(sourceDir);
   execFileSync("cp", ["-RL", `${sourceDir}/.`, destDir]);
 }
 

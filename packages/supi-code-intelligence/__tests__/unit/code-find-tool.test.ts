@@ -166,10 +166,7 @@ describe("code_find tool", () => {
       ).rejects.toThrow(/supported AST kinds|definition.*import.*export.*call/i);
     });
 
-    it.each([
-      "type",
-      "test",
-    ] as const)("fails when ast mode uses unsupported kind %s", async (kind) => {
+    it.each(["test"] as const)("fails when ast mode uses unsupported kind %s", async (kind) => {
       writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
       const tool = getCodeFindTool();
 
@@ -336,6 +333,96 @@ describe("code_find tool", () => {
       expect(result.content[0].text).toContain("a.ts");
     });
 
+    it("finds type-like declarations when structural support is available", async () => {
+      writeFileSync(
+        path.join(tmpDir, "a.ts"),
+        "interface Foo { value: string }\ntype FooId = string;\n",
+      );
+      registerMockProvider(tmpDir, {
+        outline: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: "Foo",
+              kind: "interface",
+              startLine: 1,
+              startCharacter: 11,
+              endLine: 1,
+              endCharacter: 14,
+              children: [],
+            },
+            {
+              name: "FooId",
+              kind: "type",
+              startLine: 2,
+              startCharacter: 6,
+              endLine: 2,
+              endCharacter: 11,
+              children: [],
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-ast-type",
+        { query: "Foo", mode: "ast", kind: "type" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain("Foo");
+      expect(result.content[0].text).toContain("FooId");
+      expect(result.content[0].text).toContain("Types");
+    });
+
+    it("finds interface declarations when structural support is available", async () => {
+      writeFileSync(
+        path.join(tmpDir, "a.ts"),
+        "interface Foo { value: string }\ntype FooId = string;\n",
+      );
+      registerMockProvider(tmpDir, {
+        outline: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: "Foo",
+              kind: "interface",
+              startLine: 1,
+              startCharacter: 11,
+              endLine: 1,
+              endCharacter: 14,
+              children: [],
+            },
+            {
+              name: "FooId",
+              kind: "type",
+              startLine: 2,
+              startCharacter: 6,
+              endLine: 2,
+              endCharacter: 11,
+              children: [],
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-ast-interface",
+        { query: "Foo", mode: "ast", kind: "interface" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain("Foo");
+      expect(result.content[0].text).not.toContain("FooId");
+      expect(result.content[0].text).toContain("Interfaces");
+    });
+
     it("finds call sites when structural support is available (mocked)", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const x = obj.method();\n");
       registerMockProvider(tmpDir, {
@@ -463,6 +550,44 @@ describe("code_find tool", () => {
       const text = result.content[0].text;
       expect(text).toContain("myFunc");
       expect(text).toContain("a.ts");
+    });
+
+    it("respects scope in semantic mode and normalizes leading @", async () => {
+      mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+      mkdirSync(path.join(tmpDir, "other"), { recursive: true });
+      writeFileSync(path.join(tmpDir, "src/a.ts"), "export function scopedFunc() {}\n");
+      writeFileSync(path.join(tmpDir, "other/a.ts"), "export function scopedFunc() {}\n");
+      registerMockProvider(tmpDir, {
+        workspaceSymbols: async () => [
+          {
+            name: "scopedFunc",
+            kind: "function",
+            file: path.join(tmpDir, "src/a.ts"),
+            line: 1,
+            character: 17,
+          },
+          {
+            name: "scopedFunc",
+            kind: "function",
+            file: path.join(tmpDir, "other/a.ts"),
+            line: 1,
+            character: 17,
+          },
+        ],
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-semantic-scope-filter",
+        { query: "scopedFunc", mode: "semantic", scope: "@src" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      const text = result.content[0].text;
+      expect(text).toContain("src/a.ts");
+      expect(text).not.toContain("other/a.ts");
     });
   });
 

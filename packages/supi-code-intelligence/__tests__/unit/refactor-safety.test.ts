@@ -19,7 +19,7 @@ type OperationAwareSemanticProvider = SemanticProvider & {
   refactor?: (request: RefactorRequest) => Promise<RefactorResult>;
 };
 
-describe("code_refactor safety", () => {
+describe("code_refactor_plan safety", () => {
   afterEach(() => {
     getDefaultWorkspaceRuntime().clearAll();
   });

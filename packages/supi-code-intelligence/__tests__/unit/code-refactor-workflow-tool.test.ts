@@ -43,6 +43,10 @@ type RefactorRequest = {
   operation: string;
   file: string;
   position: { line: number; character: number };
+  range?: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  };
   newName?: string;
 };
 
@@ -65,8 +69,8 @@ function createSemanticProvider(
   } as SemanticProvider;
 }
 
-describe("code_refactor / code_apply workflow wrappers", () => {
-  it("registers and executes code_refactor as the preferred workflow wrapper", async () => {
+describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
+  it("registers and executes code_refactor_plan as the pure planner", async () => {
     const { projectDir, file } = createProjectFile();
     getDefaultWorkspaceRuntime().registerSemantic(
       projectDir,
@@ -88,7 +92,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_refactor");
+    const tool = getTool(pi, "code_refactor_plan");
 
     const result = (await tool.execute(
       "workflow-refactor-1",
@@ -106,36 +110,60 @@ describe("code_refactor / code_apply workflow wrappers", () => {
 
     expect(result.content[0].text).toContain("Plan ID");
     expect(result.content[0].text).toContain("rename_symbol");
-    expect(result.content[0].text).toContain("code_apply");
+    expect(result.content[0].text).toContain("code_refactor_apply");
     expect(result.content[0].text).not.toContain(projectDir);
   });
 
-  it("rejects preview: false explicitly because code_refactor is preview-only", async () => {
-    const { projectDir } = createProjectFile();
+  it("creates extract function plans when the semantic provider returns precise edits", async () => {
+    const { projectDir, file } = createProjectFile("const value = 1 + 2;\n");
+    getDefaultWorkspaceRuntime().registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        refactor: async (request) => {
+          expect(request.operation).toBe("extract_function");
+          expect(request.newName).toBe("computeValue");
+          expect(request.range).toEqual({
+            start: { line: 0, character: 14 },
+            end: { line: 0, character: 19 },
+          });
+          return {
+            kind: "precise",
+            edits: {
+              edits: [
+                {
+                  file,
+                  range: { start: { line: 0, character: 14 }, end: { line: 0, character: 19 } },
+                  newText: "computeValue()",
+                },
+              ],
+            },
+          };
+        },
+      }),
+    );
+
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_refactor");
+    const tool = getTool(pi, "code_refactor_plan");
 
     const result = (await tool.execute(
-      "workflow-refactor-preview-false",
+      "workflow-refactor-extract-function",
       {
-        operation: "rename_symbol",
+        operation: "extract_function",
         file: "src/index.ts",
-        line: 1,
-        character: 1,
-        newName: "newName",
-        preview: false,
+        range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
+        newName: "computeValue",
       },
       undefined,
       undefined,
       makeCtx({ cwd: projectDir }),
     )) as { content: Array<{ type: string; text: string }> };
 
-    expect(result.content[0].text).toContain("Preview mode unavailable");
-    expect(result.content[0].text).toContain("preview: false");
+    expect(result.content[0].text).toContain("Plan ID");
+    expect(result.content[0].text).toContain("extract_function");
   });
 
-  it("accepts the legacy rename alias on code_refactor and canonicalizes it", async () => {
+  it("accepts the legacy rename alias on code_refactor_plan and canonicalizes it", async () => {
     const { projectDir, file } = createProjectFile();
     getDefaultWorkspaceRuntime().registerSemantic(
       projectDir,
@@ -157,7 +185,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_refactor");
+    const tool = getTool(pi, "code_refactor_plan");
 
     const result = (await tool.execute(
       "workflow-refactor-rename-alias",
@@ -178,7 +206,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
     expect(result.content[0].text).not.toContain("Unsupported refactor operation");
   });
 
-  it("applies a workflow plan via code_apply", async () => {
+  it("applies a workflow plan via code_refactor_apply", async () => {
     const { projectDir, file } = createProjectFile();
     getDefaultWorkspaceRuntime().registerSemantic(
       projectDir,
@@ -201,7 +229,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const refactorTool = getTool(pi, "code_refactor");
+    const refactorTool = getTool(pi, "code_refactor_plan");
     const planResult = (await refactorTool.execute(
       "workflow-refactor-2",
       {
@@ -216,7 +244,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
       makeCtx({ cwd: projectDir }),
     )) as { content: Array<{ type: string; text: string }> };
 
-    const applyTool = getTool(pi, "code_apply");
+    const applyTool = getTool(pi, "code_refactor_apply");
     const applyResult = (await applyTool.execute(
       "workflow-apply-1",
       { planId: extractPlanId(planResult.content[0].text) },
@@ -229,7 +257,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
     expect(readFileSync(file, "utf-8")).toBe("newName();\n");
   });
 
-  it("applies a plan generated by code_refactor_plan via code_apply", async () => {
+  it("applies a plan generated by code_refactor_plan via code_refactor_apply", async () => {
     const { projectDir, file } = createProjectFile();
     getDefaultWorkspaceRuntime().registerSemantic(
       projectDir,
@@ -263,7 +291,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
       { cwd: projectDir },
     );
 
-    const applyTool = getTool(pi, "code_apply");
+    const applyTool = getTool(pi, "code_refactor_apply");
     const applyResult = (await applyTool.execute(
       "workflow-cross-compat-2",
       { planId: extractPlanId(planResult.content) },
@@ -276,7 +304,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
     expect(readFileSync(file, "utf-8")).toBe("newName();\n");
   });
 
-  it("applies a plan generated by code_refactor via code_refactor_apply", async () => {
+  it("applies a plan generated by code_refactor_plan via executeRefactorApplyTool", async () => {
     const { projectDir, file } = createProjectFile();
     getDefaultWorkspaceRuntime().registerSemantic(
       projectDir,
@@ -299,7 +327,7 @@ describe("code_refactor / code_apply workflow wrappers", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const refactorTool = getTool(pi, "code_refactor");
+    const refactorTool = getTool(pi, "code_refactor_plan");
     const planResult = (await refactorTool.execute(
       "workflow-cross-compat-3",
       {
@@ -321,23 +349,5 @@ describe("code_refactor / code_apply workflow wrappers", () => {
 
     expect(applyResult.content).toContain("applied");
     expect(readFileSync(file, "utf-8")).toBe("newName();\n");
-  });
-
-  it("reports unsupported code_apply modes explicitly", async () => {
-    const { projectDir } = createProjectFile();
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_apply");
-
-    const result = (await tool.execute(
-      "workflow-apply-2",
-      { planId: "plan-test", mode: "apply-and-format" },
-      undefined,
-      undefined,
-      makeCtx({ cwd: projectDir }),
-    )) as { content: Array<{ type: string; text: string }> };
-
-    expect(result.content[0].text).toContain("Apply mode unavailable");
-    expect(result.content[0].text).toContain("apply-and-format");
   });
 });

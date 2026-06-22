@@ -12,6 +12,7 @@ import type {
   SemanticProvider as SemanticSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
+import { normalizePath } from "../search-helpers.ts";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
 const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided
@@ -92,8 +93,10 @@ export async function resolveSymbolTarget(
     return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
   }
 
-  // Filter by path scope
-  const scopePath = options?.path ? path.resolve(cwd, options.path) : null;
+  // Filter by path scope. Tool paths may include pi's leading `@` prefix;
+  // normalize through the shared path helper so every caller gets the same
+  // scope semantics.
+  const scopePath = options?.path ? normalizePath(options.path, cwd) : null;
   let candidates = results.filter((s) => {
     if (scopePath && !isWithinOrEqual(scopePath, s.file)) return false;
     return true;
@@ -140,20 +143,23 @@ export async function resolveSymbolTarget(
 
   // Multiple candidates — return disambiguation
   const cap = options?.maxResults ?? MAX_CANDIDATES;
-  const candidatesOut = candidates.slice(0, cap).map((c, idx) => ({
-    name: c.name,
-    kind: c.kind,
-    container: c.container ?? null,
-    file: path.relative(cwd, c.file),
-    line: c.line,
-    character: c.character,
-    reason: path.relative(cwd, c.file),
-    rank: idx + 1,
-  })) satisfies DisambiguationCandidateData[];
+  const candidatesOut = candidates.slice(0, cap).map((c, idx) => {
+    const relFile = path.relative(cwd, c.file);
+    return {
+      name: c.name,
+      kind: c.kind,
+      container: c.container ?? null,
+      file: relFile,
+      line: c.line,
+      character: c.character,
+      reason: relFile,
+      rank: idx + 1,
+    };
+  }) satisfies DisambiguationCandidateData[];
 
   return {
     kind: "disambiguation",
     candidates: candidatesOut,
-    omittedCount: Math.max(0, candidates.length - MAX_CANDIDATES),
+    omittedCount: Math.max(0, candidates.length - cap),
   };
 }

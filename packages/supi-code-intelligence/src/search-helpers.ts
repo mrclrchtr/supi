@@ -1,6 +1,7 @@
 // Shared search helpers for code-intelligence search and routing helpers.
 
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { resolveToolPath, uriToFile as uriToFileShared } from "@mrclrchtr/supi-core/path";
 
@@ -40,6 +41,24 @@ export function isInProjectPath(filePath: string, cwd: string): boolean {
     normalized.includes("/.pnpm/") ||
     normalized.startsWith(".pnpm/")
   );
+}
+
+/** Result of resolving a user-provided `scope` value to an absolute path. */
+export type ScopeResolution = { kind: "ok"; path: string } | { kind: "error"; reason: string };
+
+/**
+ * Resolve a `scope` value to an absolute path using pi scope semantics:
+ * - strip leading `@`
+ * - resolve relative paths from `cwd`
+ * - require the resolved path to exist
+ */
+export function resolveScope(scope: string | undefined, cwd: string): ScopeResolution {
+  if (!scope) return { kind: "ok", path: cwd };
+  const resolved = normalizePath(scope, cwd);
+  if (!existsSync(resolved)) {
+    return { kind: "error", reason: `Scope path not found: \`${scope}\`` };
+  }
+  return { kind: "ok", path: resolved };
 }
 
 /** Escape regex special characters. */

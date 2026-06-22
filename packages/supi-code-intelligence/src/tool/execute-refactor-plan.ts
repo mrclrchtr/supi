@@ -1,7 +1,6 @@
 /**
- * Tool executor for the preview-only refactor planning path shared by
- * code_refactor (preferred) and code_refactor_plan (compatibility alias).
- * Does not mutate files and returns a plan ID for later use with code_apply.
+ * Tool executor for the preview-only refactor planning path.
+ * Does not mutate files and returns a plan ID for later use with code_refactor_apply.
  */
 
 import {
@@ -10,6 +9,7 @@ import {
   type RefactorOperation,
   type RefactorResult,
   type SemanticProvider,
+  type SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import {
@@ -22,6 +22,7 @@ import { validateEdit } from "../analysis/refactor/safety.ts";
 import { renderRefactorPlanResult } from "../presentation/markdown/refactor.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
+import { unavailableSearchDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 
@@ -31,8 +32,11 @@ export interface CodeRefactorPlanToolParams {
   file?: string;
   line?: number;
   character?: number;
+  range?: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  };
   newName?: string;
-  destination?: string;
 }
 
 type CanonicalRefactorOperation = Exclude<RefactorOperation, "rename">;
@@ -40,13 +44,15 @@ type CanonicalRefactorOperation = Exclude<RefactorOperation, "rename">;
 export async function executeRefactorPlanTool(
   params: CodeRefactorPlanToolParams,
   ctx: { cwd: string },
-  invokedAs: "code_refactor" | "code_refactor_plan" = "code_refactor_plan",
+  invokedAs: "code_refactor_plan" = "code_refactor_plan",
 ): Promise<CodeIntelResult> {
   const normalizedOperation = normalizeRequestedOperation(params.operation);
   if (normalizedOperation.kind === "error") {
     return {
       content: normalizedOperation.message,
-      details: undefined,
+      details: unavailableSearchDetails(null, [
+        'Use one of: "rename", "rename_symbol", "extract_function", "extract_variable"',
+      ]),
     };
   }
   const operation = normalizedOperation.operation;
@@ -65,14 +71,14 @@ export async function executeRefactorPlanTool(
     operation,
     file: resolvedFile,
     position,
+    range: params.range ? toLspRange(params.range) : undefined,
     newName: params.newName,
-    destination: params.destination,
   });
 
   if (refactorResult.kind === "unavailable") {
     return {
       content: `**Refactor unavailable:** ${refactorResult.reason}`,
-      details: undefined,
+      details: unavailableSearchDetails(null, ["Check `code_health` for provider status"]),
     };
   }
 
@@ -84,7 +90,7 @@ export async function executeRefactorPlanTool(
   if (!validation.safe) {
     return {
       content: `**Refactor safety check failed:** ${validation.reason}`,
-      details: undefined,
+      details: unavailableSearchDetails(null, ["Adjust the target or range and retry"]),
     };
   }
 
@@ -94,14 +100,13 @@ export async function executeRefactorPlanTool(
     resolvedFile,
     target.line,
     target.character,
-    params.newName ?? params.destination ?? "",
+    params.newName ?? "",
   );
 
   const plan: RefactorPlan = {
     id: planId,
     operation,
     newName: params.newName,
-    destination: params.destination,
     targetFile: resolvedFile,
     targetLine: target.line,
     targetCharacter: target.character,
@@ -122,7 +127,7 @@ export async function executeRefactorPlanTool(
         scope: null,
         candidateCount: refactorResult.edits.edits.length,
         omittedCount: 0,
-        nextQueries: [`Use code_apply with planId: "${planId}" to apply this refactor`],
+        nextQueries: [`Use code_refactor_apply with planId: "${planId}" to apply this refactor`],
       },
     },
   };
@@ -131,7 +136,12 @@ export async function executeRefactorPlanTool(
 function normalizeRequestedOperation(
   operation: string,
 ): { kind: "ok"; operation: CanonicalRefactorOperation } | { kind: "error"; message: string } {
-  if (operation === "rename" || operation === "rename_symbol") {
+  if (
+    operation === "rename" ||
+    operation === "rename_symbol" ||
+    operation === "extract_function" ||
+    operation === "extract_variable"
+  ) {
     return {
       kind: "ok",
       operation: normalizeRefactorOperation(operation as RefactorOperation),
@@ -140,10 +150,13 @@ function normalizeRequestedOperation(
 
   return {
     kind: "error",
-    message: `**Error:** Unsupported refactor operation: "${operation}". The public \`code_refactor\` tool currently supports: "rename", "rename_symbol".`,
+    message:
+      `**Error:** Unsupported refactor operation: "${operation}". The public \`code_refactor_plan\` tool currently supports: ` +
+      '"rename", "rename_symbol", "extract_function", "extract_variable".',
   };
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: target expansion and operation-specific validation are kept together for clear user-facing errors.
 function resolveRefactorTarget(
   params: CodeRefactorPlanToolParams,
   cwd: string,
@@ -151,7 +164,12 @@ function resolveRefactorTarget(
 ): CodeIntelResult | { file: string; line: number; character: number } {
   const expansion = expandTargetId(params, cwd);
   if (expansion.kind === "error") {
-    return { content: expansion.message, details: undefined };
+    return {
+      content: expansion.message,
+      details: unavailableSearchDetails(null, [
+        "Verify the `targetId` is valid and from this session",
+      ]),
+    };
   }
   if (expansion.kind === "ok") {
     params.file = expansion.file;
@@ -163,28 +181,47 @@ function resolveRefactorTarget(
     return {
       content:
         "**Error:** Refactor preview requires a `file`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
-      details: undefined,
+      details: unavailableSearchDetails(null, [
+        "Provide `targetId` from `code_resolve` or `file` + `line` + `character`",
+      ]),
     };
   }
+
+  if (isExtractOperation(operation) && params.range) {
+    const rangeError = validatePublicRange(params.range);
+    if (rangeError) {
+      return {
+        content: rangeError,
+        details: unavailableSearchDetails(null, ["Ensure `range.end` is after `range.start`"]),
+      };
+    }
+    if (params.line == null || params.character == null) {
+      params.line = params.range.start.line;
+      params.character = params.range.start.character;
+    }
+  }
+
   if (params.line == null || params.character == null) {
     return {
       content:
         "**Error:** Refactor preview requires `line` and `character`. Provide `targetId` (from `code_resolve`) or `file` + `line` + `character`.",
-      details: undefined,
+      details: unavailableSearchDetails(null, [
+        "Provide `targetId` from `code_resolve` or `file` + `line` + `character`",
+      ]),
     };
   }
 
-  if (operation === "rename_file" || operation === "move_file") {
+  if ((operation === "rename_symbol" || isExtractOperation(operation)) && !params.newName) {
     return {
-      content: `**Refactor unavailable:** Refactor operation "${operation}" is not supported yet. File/resource operations are deferred.`,
-      details: undefined,
+      content: `**Error:** Refactor preview requires \`newName\` for \`${operation}\`.`,
+      details: unavailableSearchDetails(null, [`Provide \`newName\` for \`${operation}\``]),
     };
   }
 
-  if (operation === "rename_symbol" && !params.newName) {
+  if (isExtractOperation(operation) && !params.range) {
     return {
-      content: "**Error:** Refactor preview requires `newName` for `rename_symbol`.",
-      details: undefined,
+      content: `**Error:** Refactor preview requires \`range\` for \`${operation}\`.`,
+      details: unavailableSearchDetails(null, [`Provide a 1-based \`range\` for \`${operation}\``]),
     };
   }
 
@@ -198,19 +235,19 @@ function resolveRefactorTarget(
 async function waitForRefactorReadiness(
   cwd: string,
   file: string,
-  invokedAs: "code_refactor" | "code_refactor_plan",
+  invokedAs: "code_refactor_plan",
 ): Promise<CodeIntelResult | null> {
   const readiness = await ensureSemanticReadiness(cwd, { kind: "file", file });
   if (readiness.kind === "ready") return null;
   if (readiness.kind === "timeout") {
     return {
       content: renderSemanticReadinessTimeout(invokedAs, 15_000),
-      details: undefined,
+      details: unavailableSearchDetails(null, ["Retry shortly or check `code_health`"]),
     };
   }
   return {
     content: `**Error:** ${readiness.reason}`,
-    details: undefined,
+    details: unavailableSearchDetails(null, ["Check `code_health` for provider status"]),
   };
 }
 
@@ -225,7 +262,9 @@ function renderAmbiguousRefactorResult(
     .join("\n");
   return {
     content: `**Refactor ambiguous:** Multiple matching targets found. Please disambiguate:\n${candidates}`,
-    details: undefined,
+    details: unavailableSearchDetails(null, [
+      "Use `targetId` from `code_resolve` or provide precise anchored coordinates",
+    ]),
   };
 }
 
@@ -235,8 +274,8 @@ async function planRefactorWithProvider(
     operation: CanonicalRefactorOperation;
     file: string;
     position: { line: number; character: number };
+    range?: SourceRange;
     newName?: string;
-    destination?: string;
   },
 ): Promise<RefactorResult> {
   if (!provider) {
@@ -257,6 +296,29 @@ async function planRefactorWithProvider(
   return {
     kind: "unavailable",
     reason: `The active semantic provider does not support refactor planning for operation "${request.operation}".`,
+  };
+}
+
+function isExtractOperation(operation: CanonicalRefactorOperation): boolean {
+  return operation === "extract_function" || operation === "extract_variable";
+}
+
+function validatePublicRange(
+  range: NonNullable<CodeRefactorPlanToolParams["range"]>,
+): string | null {
+  if (
+    range.end.line < range.start.line ||
+    (range.end.line === range.start.line && range.end.character <= range.start.character)
+  ) {
+    return "**Error:** Refactor preview requires `range.end` to be after `range.start`.";
+  }
+  return null;
+}
+
+function toLspRange(range: NonNullable<CodeRefactorPlanToolParams["range"]>): SourceRange {
+  return {
+    start: toLspPosition(range.start.line, range.start.character),
+    end: toLspPosition(range.end.line, range.end.character),
   };
 }
 

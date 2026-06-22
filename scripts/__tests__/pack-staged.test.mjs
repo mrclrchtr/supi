@@ -35,7 +35,6 @@ const CORE_EXPORTS = {
   "./report": "./src/report.ts",
   "./progress-widget": "./src/progress-widget.ts",
   "./project": "./src/project.ts",
-  "./report": "./src/report.ts",
   "./session": "./src/session.ts",
   "./settings": "./src/settings.ts",
   "./settings-ui": "./src/settings-ui.ts",

@@ -75,7 +75,7 @@ export function renderRefactorPlanResult(plan: RefactorPlan, cwd: string): strin
   }
   lines.push("");
   lines.push("**This is a preview. No files were changed.**");
-  lines.push(`Use code_apply with planId: "${plan.id}" to apply this refactor.`);
+  lines.push(`Use code_refactor_apply with planId: "${plan.id}" to apply this refactor.`);
   return lines.join("\n");
 }
 

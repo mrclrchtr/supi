@@ -8,29 +8,38 @@
  * - semantic: LSP workspace symbols
  */
 
-import { existsSync } from "node:fs";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
-import { normalizePath } from "../search-helpers.ts";
+import { resolveScope } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
+import { unavailableSearchDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 
 export interface CodeFindToolParams {
   query: string;
   scope?: string;
   mode?: "text" | "regex" | "ast" | "semantic";
-  kind?: "definition" | "import" | "export" | "call" | "type" | "test";
+  kind?: "definition" | "import" | "export" | "call" | "type" | "interface" | "test";
   contextLines?: number;
   maxResults?: number;
 }
 
-const SUPPORTED_AST_KINDS = new Set<NonNullable<CodeFindToolParams["kind"]>>([
+const SUPPORTED_AST_KIND_LABELS = [
   "definition",
   "import",
   "export",
   "call",
-]);
+  "type",
+  "interface",
+] as const;
+
+const SUPPORTED_AST_KINDS = new Set<NonNullable<CodeFindToolParams["kind"]>>(
+  SUPPORTED_AST_KIND_LABELS,
+);
+
+const SUPPORTED_AST_KIND_TEXT = SUPPORTED_AST_KIND_LABELS.map((kind) => `\`${kind}\``).join(", ");
 
 export async function executeFindTool(
   params: CodeFindToolParams,
@@ -41,42 +50,48 @@ export async function executeFindTool(
   if (!params.query || params.query.trim().length === 0) {
     return {
       content: "**Error:** `code_find` requires a non-empty `query` parameter.",
-      details: undefined,
+      details: unavailableSearchDetails(params.scope ?? null, [
+        "Provide a non-empty `query` parameter",
+      ]),
     };
   }
 
-  const scopePath = resolveScope(params.scope, cwd);
-  if (scopePath === null && params.scope) {
+  const scopeResolution = resolveScope(params.scope, cwd);
+  if (scopeResolution.kind === "error") {
     return {
-      content: `**Error:** Scope path not found: \`${params.scope}\``,
-      details: undefined,
+      content: `**Error:** ${scopeResolution.reason}`,
+      details: unavailableSearchDetails(params.scope ?? null, [
+        "Verify the `scope` path exists and is within the workspace",
+      ]),
     };
   }
+  const scopePath = scopeResolution.path;
 
   const mode = params.mode ?? "text";
   validateModeKindCombination(params, mode);
 
   switch (mode) {
     case "text":
-      return executeTextMode(params.query, params, cwd);
+      return executeTextMode(params.query, params, scopePath, cwd);
     case "regex":
-      return executeRegexMode(params.query, params, cwd);
+      return executeRegexMode(params.query, params, scopePath, cwd);
     case "ast":
-      return executeAstMode(params.query, params, cwd);
+      return executeAstMode(params.query, params, scopePath, cwd);
     case "semantic":
-      return executeSemanticMode(params.query, params, cwd);
+      return executeSemanticMode(params.query, params, scopePath, cwd);
   }
 }
 
 async function executeTextMode(
   query: string,
   params: CodeFindToolParams,
+  scopePath: string,
   cwd: string,
 ): Promise<CodeIntelResult> {
   return executePattern(
     {
       pattern: query,
-      path: params.scope,
+      path: scopePath,
       regex: false,
       kind: undefined,
       maxResults: params.maxResults ?? 8,
@@ -89,12 +104,13 @@ async function executeTextMode(
 async function executeRegexMode(
   query: string,
   params: CodeFindToolParams,
+  scopePath: string,
   cwd: string,
 ): Promise<CodeIntelResult> {
   return executePattern(
     {
       pattern: query,
-      path: params.scope,
+      path: scopePath,
       regex: true,
       kind: undefined,
       maxResults: params.maxResults ?? 8,
@@ -107,6 +123,7 @@ async function executeRegexMode(
 async function executeAstMode(
   query: string,
   params: CodeFindToolParams,
+  scopePath: string,
   cwd: string,
 ): Promise<CodeIntelResult> {
   ensureStructuralAvailable(cwd);
@@ -114,7 +131,7 @@ async function executeAstMode(
   return executePattern(
     {
       pattern: query,
-      path: params.scope,
+      path: scopePath,
       kind: params.kind,
       maxResults: params.maxResults ?? 8,
       contextLines: params.contextLines ?? 1,
@@ -126,6 +143,7 @@ async function executeAstMode(
 async function executeSemanticMode(
   query: string,
   params: CodeFindToolParams,
+  scopePath: string,
   cwd: string,
 ): Promise<CodeIntelResult> {
   ensureSemanticAvailable(cwd);
@@ -134,13 +152,17 @@ async function executeSemanticMode(
   if (readiness.kind === "timeout") {
     return {
       content: renderSemanticReadinessTimeout("code_find", 15_000),
-      details: undefined,
+      details: unavailableSearchDetails(params.scope ?? null, [
+        "Retry shortly or check `code_health`",
+      ]),
     };
   }
   if (readiness.kind === "unavailable") {
     return {
       content: `**Error:** ${readiness.reason}`,
-      details: undefined,
+      details: unavailableSearchDetails(params.scope ?? null, [
+        "Check `code_health` for provider status",
+      ]),
     };
   }
 
@@ -158,11 +180,12 @@ async function executeSemanticMode(
     );
   }
 
-  if (symbols.length === 0) {
+  const scopedSymbols = filterSymbolsByScope(symbols, scopePath);
+  if (scopedSymbols.length === 0) {
     return renderSemanticEmptyResult(query, params);
   }
 
-  return renderSemanticResults(query, symbols, params, cwd);
+  return renderSemanticResults(query, scopedSymbols, params, cwd);
 }
 
 function validateModeKindCombination(
@@ -171,13 +194,13 @@ function validateModeKindCombination(
 ): void {
   if (!params.mode && params.kind) {
     throw new Error(
-      'code_find does not accept `kind` when `mode` is omitted. Use `mode: "ast"` with `kind: "definition"`, `"import"`, `"export"`, or `"call"`.',
+      `code_find does not accept \`kind\` when \`mode\` is omitted. Did you mean \`mode: "ast"\` with one of: ${SUPPORTED_AST_KIND_TEXT}?`,
     );
   }
 
   if ((mode === "text" || mode === "regex" || mode === "semantic") && params.kind) {
     throw new Error(
-      `code_find does not accept \`kind\` with \`mode: "${mode}"\`. Use \`mode: "ast"\` with \`kind: "definition"\`, \`"import"\`, \`"export"\`, or \`"call"\` for structured filtering.`,
+      `code_find does not accept \`kind\` with \`mode: "${mode}"\`. Use \`mode: "ast"\` with one of: ${SUPPORTED_AST_KIND_TEXT}.`,
     );
   }
 
@@ -185,22 +208,19 @@ function validateModeKindCombination(
 
   if (!params.kind) {
     throw new Error(
-      'code_find with `mode: "ast"` requires `kind`. Supported AST kinds in this phase: `definition`, `import`, `export`, `call`.',
+      `code_find with \`mode: "ast"\` requires \`kind\`. Supported AST kinds: ${SUPPORTED_AST_KIND_TEXT}.`,
     );
   }
 
   if (!SUPPORTED_AST_KINDS.has(params.kind)) {
     throw new Error(
-      `code_find with \`mode: "ast"\` supports only \`definition\`, \`import\`, \`export\`, and \`call\` in this phase. Received \`${params.kind}\`.`,
+      `code_find unsupported AST kind \`${params.kind}\`. Supported: ${SUPPORTED_AST_KIND_TEXT}.`,
     );
   }
 }
 
-function resolveScope(scope: string | undefined, cwd: string): string | null {
-  if (!scope) return null;
-  const resolved = normalizePath(scope, cwd);
-  if (!existsSync(resolved)) return null;
-  return resolved;
+function filterSymbolsByScope<T extends { file: string }>(symbols: T[], scopePath: string): T[] {
+  return symbols.filter((symbol) => isWithinOrEqual(scopePath, symbol.file));
 }
 
 function getEffectiveProvider(cwd: string) {

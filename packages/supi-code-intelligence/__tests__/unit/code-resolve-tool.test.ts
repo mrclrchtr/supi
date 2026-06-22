@@ -7,7 +7,7 @@
  * - No real resolution yields target IDs
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -304,6 +304,143 @@ describe("code_resolve tool", () => {
     // Will fail: stub doesn't resolve anything
     expect(result.content[0].text).toContain("Widget");
     expect(result.content[0].text).toContain("Target ID");
+  });
+
+  it("normalizes leading @ in query scope", async () => {
+    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+    mkdirSync(path.join(tmpDir, "other"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src/widget.ts"), "export class Widget {}\n");
+    writeFileSync(path.join(tmpDir, "other/widget.ts"), "export class Widget {}\n");
+
+    registerMockProvider(tmpDir, {
+      workspaceSymbols: async (_query) => [
+        {
+          name: "Widget",
+          kind: "Class" as const,
+          file: path.join(tmpDir, "src/widget.ts"),
+          line: 5,
+          character: 1,
+          container: null,
+        },
+        {
+          name: "Widget",
+          kind: "Class" as const,
+          file: path.join(tmpDir, "other/widget.ts"),
+          line: 5,
+          character: 1,
+          container: null,
+        },
+      ],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_resolve");
+
+    const result = (await tool.execute(
+      "test-scope-at-prefix",
+      { query: "Widget", scope: "@src" },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("src/widget.ts");
+    expect(result.content[0].text).not.toContain("other/widget.ts");
+    expect(result.content[0].text).toContain("Target ID");
+  });
+
+  it("rejects a missing query scope with a hard scope-path error", async () => {
+    registerMockProvider(tmpDir, {
+      workspaceSymbols: async (_query) => [
+        {
+          name: "Widget",
+          kind: "Class" as const,
+          file: path.join(tmpDir, "src/widget.ts"),
+          line: 5,
+          character: 1,
+          container: null,
+        },
+      ],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_resolve");
+
+    const result = (await tool.execute(
+      "test-missing-scope",
+      { query: "Widget", scope: "missing-dir" },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("Scope path not found");
+    expect(result.content[0].text).not.toContain("Symbol not found");
+  });
+
+  it("keeps scope as a hard filter instead of surfacing a redundant scope-match ranking label", async () => {
+    mkdirSync(path.join(tmpDir, "src/a"), { recursive: true });
+    mkdirSync(path.join(tmpDir, "src/b"), { recursive: true });
+    mkdirSync(path.join(tmpDir, "other"), { recursive: true });
+    writeFileSync(path.join(tmpDir, "src/a/widget.ts"), "export class Widget {}\n");
+    writeFileSync(path.join(tmpDir, "src/b/widget.ts"), "export interface Widget {}\n");
+    writeFileSync(path.join(tmpDir, "other/widget.ts"), "export class Widget {}\n");
+
+    registerMockProvider(tmpDir, {
+      workspaceSymbols: async (_query) => [
+        {
+          name: "Widget",
+          kind: "Class" as const,
+          file: path.join(tmpDir, "src/a/widget.ts"),
+          line: 5,
+          character: 1,
+          container: null,
+        },
+        {
+          name: "Widget",
+          kind: "Interface" as const,
+          file: path.join(tmpDir, "src/b/widget.ts"),
+          line: 1,
+          character: 1,
+          container: null,
+        },
+        {
+          name: "Widget",
+          kind: "Class" as const,
+          file: path.join(tmpDir, "other/widget.ts"),
+          line: 2,
+          character: 1,
+          container: null,
+        },
+      ],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_resolve");
+
+    const result = (await tool.execute(
+      "test-scope-hard-filter",
+      { query: "Widget", scope: "src" },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: string;
+        data: { candidates?: Array<{ file: string; reason: string }> };
+      };
+    };
+
+    expect(result.content[0].text).toContain("src/a/widget.ts");
+    expect(result.content[0].text).toContain("src/b/widget.ts");
+    expect(result.content[0].text).not.toContain("other/widget.ts");
+    for (const candidate of result.details?.data.candidates ?? []) {
+      expect(candidate.reason).not.toContain("scope match");
+    }
   });
 
   it("returns disambiguation candidates with target IDs for ambiguous queries", async () => {

@@ -1,9 +1,9 @@
 /**
- * Tool executor for code_refactor.
+ * Tool executor for code_refactor_plan.
  *
  * Thin Phase 5 workflow wrapper over the existing preview-only
- * code_refactor_plan executor. In this phase, code_refactor always
- * returns a plan preview and never mutates files directly.
+ * refactor plan executor. code_refactor_plan is a pure planner: it
+ * always returns a plan preview and never mutates files directly.
  */
 
 import type { CodeIntelResult } from "../types.ts";
@@ -15,33 +15,17 @@ export interface CodeRefactorToolParams {
   file?: string;
   line?: number;
   character?: number;
+  range?: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  };
   newName?: string;
-  destination?: string;
-  preview?: boolean;
 }
 
 export async function executeRefactorTool(
   params: CodeRefactorToolParams,
   ctx: { cwd: string },
 ): Promise<CodeIntelResult> {
-  if (params.preview === false) {
-    return {
-      content:
-        "**Preview mode unavailable:** `code_refactor` is preview-only in this phase. " +
-        "Requested `preview: false` is not supported yet.",
-      details: {
-        type: "search" as const,
-        data: {
-          confidence: "unavailable" as const,
-          scope: null,
-          candidateCount: 0,
-          omittedCount: 0,
-          nextQueries: ["Retry with `preview: true` or omit `preview`"],
-        },
-      },
-    };
-  }
-
   return executeRefactorPlanTool(
     {
       targetId: params.targetId,
@@ -49,10 +33,10 @@ export async function executeRefactorTool(
       file: params.file,
       line: params.line,
       character: params.character,
+      range: params.range,
       newName: params.newName,
-      destination: params.destination,
     },
     ctx,
-    "code_refactor",
+    "code_refactor_plan",
   );
 }

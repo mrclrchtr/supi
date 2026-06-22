@@ -76,7 +76,7 @@ export function isPlanFresh(
     if (current !== fp.fingerprint) {
       return {
         fresh: false,
-        reason: `File ${fp.file} has changed since the plan was generated. Regenerate with code_refactor.`,
+        reason: `File ${fp.file} has changed since the plan was generated. Regenerate with code_refactor_plan.`,
       };
     }
   }

@@ -8,7 +8,14 @@ import type { CodeQueryParams as ActionParams } from "./query-params.ts";
 const FILE_SOFT_CAP = 5000;
 const STRUCTURED_PATTERN_TIMEOUT_MS = 10_000;
 
-export type StructuredPatternKind = "definition" | "export" | "import" | "call" | "type" | "test";
+export type StructuredPatternKind =
+  | "definition"
+  | "export"
+  | "import"
+  | "call"
+  | "type"
+  | "interface"
+  | "test";
 
 export interface StructuredMatch {
   file: string;
@@ -37,6 +44,7 @@ export function isStructuredPatternKind(kind: string | undefined): kind is Struc
     kind === "import" ||
     kind === "call" ||
     kind === "type" ||
+    kind === "interface" ||
     kind === "test"
   );
 }
@@ -226,13 +234,14 @@ async function collectMatchesForFile(
     return;
   }
 
-  // ── type / test — use outline with kind-specific filters ────────────
+  // ── type / interface / test — use outline with kind-specific filters ─
 
-  if (kind === "type" || kind === "test") {
+  if (kind === "type" || kind === "interface" || kind === "test") {
     const outline = await structural.outline(relFile);
     if (!handleStructuralResult(outline, relFile, recordFailure)) return;
     for (const item of outline.data) {
       if (kind === "type" && !isTypeLikeKind(item.kind)) continue;
+      if (kind === "interface" && !isInterfaceKind(item.kind)) continue;
       if (kind === "test") {
         const isTestName =
           /^(test|it|describe|spec)\b/.test(item.name) ||
@@ -265,7 +274,11 @@ function handleStructuralResult<T>(
 const TYPE_LIKE_KINDS = new Set(["class", "interface", "type", "enum"]);
 
 function isTypeLikeKind(kind: string): boolean {
-  return TYPE_LIKE_KINDS.has(kind);
+  return TYPE_LIKE_KINDS.has(kind.toLowerCase());
+}
+
+function isInterfaceKind(kind: string): boolean {
+  return kind.toLowerCase() === "interface";
 }
 
 function createStructuredMatcher(

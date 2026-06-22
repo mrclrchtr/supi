@@ -120,6 +120,7 @@ export function renderExportsResult(
 
 /** Relation families accepted by code_graph. */
 export type GraphRelationKind =
+  | "all"
   | "references"
   | "callees"
   | "imports"

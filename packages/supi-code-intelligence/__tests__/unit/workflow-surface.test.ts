@@ -71,8 +71,8 @@ const EXPECTED_WORKFLOW_TOOL_NAMES = [
   "code_find",
   "code_graph",
   "code_impact",
-  "code_refactor",
-  "code_apply",
+  "code_refactor_plan",
+  "code_refactor_apply",
   "code_health",
 ] as const;
 
@@ -110,11 +110,11 @@ describe("workflow surface skeleton", () => {
     }
   });
 
-  it("avoids a broad action parameter and reserves operation for code_refactor only", () => {
+  it("avoids a broad action parameter and reserves operation for code_refactor_plan only", () => {
     for (const [name, schema] of Object.entries(WORKFLOW_CODE_TOOL_SCHEMAS)) {
       const properties = (schema as { properties?: Record<string, unknown> }).properties ?? {};
       expect(properties).not.toHaveProperty("action");
-      if (name === "code_refactor") {
+      if (name === "code_refactor_plan") {
         expect(properties).toHaveProperty("operation");
       } else {
         expect(properties).not.toHaveProperty("operation");
@@ -131,6 +131,7 @@ describe("workflow surface skeleton", () => {
 
     expect(values).toEqual(
       expect.arrayContaining([
+        "all",
         "references",
         "callees",
         "imports",

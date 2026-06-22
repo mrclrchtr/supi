@@ -181,12 +181,7 @@ async function executeStructuredSearch(
   }
 
   return {
-    content: renderStructuredMatches(
-      input.pattern,
-      kind as "definition" | "export" | "import",
-      relScope,
-      structured,
-    ),
+    content: renderStructuredMatches(input.pattern, kind, relScope, structured),
     details: {
       type: "search",
       data: {

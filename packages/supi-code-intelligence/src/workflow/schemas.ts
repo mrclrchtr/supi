@@ -23,6 +23,13 @@ const TargetIdParam = Type.String({
   description:
     "Resolved target handle from `code_resolve`. Takes precedence over file/line/character/symbol.",
 });
+const RangeParam = Type.Object(
+  {
+    start: Type.Object({ line: LineParam, character: CharacterParam }),
+    end: Type.Object({ line: LineParam, character: CharacterParam }),
+  },
+  { description: "1-based selected source range for extract refactors." },
+);
 
 /**
  * Planned `code_resolve` parameters.
@@ -131,9 +138,9 @@ export const CodeFindParameters = Type.Object(
       }),
     ),
     kind: Type.Optional(
-      StringEnum(["definition", "import", "export", "call"], {
+      StringEnum(["definition", "import", "export", "call", "type", "interface"], {
         description:
-          'Only valid with `mode: "ast"`. Supported AST kinds in this phase: `definition`, `import`, `export`, `call`.',
+          'Only valid with `mode: "ast"`. Supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`.',
       }),
     ),
     contextLines: Type.Optional(
@@ -163,8 +170,9 @@ export const CodeGraphParameters = Type.Object(
     scope: Type.Optional(ScopeParam),
     relations: Type.Optional(
       Type.Array(
-        StringEnum(["references", "callees", "imports", "exports", "implements", "tests"], {
-          description: "Relation families to include in the graph.",
+        StringEnum(["all", "references", "callees", "imports", "exports", "implements", "tests"], {
+          description:
+            'Relation families to include in the graph. Use `"all"` to expand to every relation family.',
         }),
         {
           description: 'Requested relation families. Defaults to ["references"] when omitted.',
@@ -201,7 +209,7 @@ export const CodeImpactParameters = Type.Object(
     includeTests: Type.Optional(
       Type.Boolean({
         description:
-          "Whether likely tests should be included in the impact set. changedFiles analysis uses conventions-only structural discovery; target-based analysis may combine semantic references with deterministic conventions.",
+          "Whether likely tests should be included in the impact set. changedFiles analysis uses semantic references when available plus deterministic conventions; target-based analysis may combine semantic references with deterministic conventions.",
       }),
     ),
     maxResults: Type.Optional(MaxResultsParam),
@@ -210,20 +218,21 @@ export const CodeImpactParameters = Type.Object(
 );
 
 /**
- * Planned `code_refactor` parameters.
+ * Planned `code_refactor_plan` parameters.
  *
  * `operation` is the only intentional operation-style enum in the V2 skeleton.
  * Phase 0 does not introduce a generic action mega-tool.
  *
  * Runtime rules for future executors:
  * - require `targetId` or anchored `file` + `line` + `character`
- * - `rename` (legacy alias) and `rename_symbol` require `newName`
+ * - `rename` (legacy alias), `rename_symbol`, and extract operations require `newName`
+ * - extract operations require `range`
  */
 export const CodeRefactorParameters = Type.Object(
   {
-    operation: StringEnum(["rename", "rename_symbol"], {
+    operation: StringEnum(["rename", "rename_symbol", "extract_function", "extract_variable"], {
       description:
-        "Precise refactor operation to preview or plan. `rename` is accepted as a compatibility alias for `rename_symbol`.",
+        "Precise refactor operation to plan. `rename` is accepted as a compatibility alias for `rename_symbol`.",
     }),
     targetId: Type.Optional(
       Type.String({ description: "Resolved target handle from `code_resolve`." }),
@@ -231,25 +240,20 @@ export const CodeRefactorParameters = Type.Object(
     file: Type.Optional(FileParam),
     line: Type.Optional(LineParam),
     character: Type.Optional(CharacterParam),
-    newName: Type.Optional(Type.String({ description: "New symbol name for rename operations." })),
-    preview: Type.Optional(
-      Type.Boolean({ description: "Whether to return a preview-only plan when supported." }),
+    range: Type.Optional(RangeParam),
+    newName: Type.Optional(
+      Type.String({ description: "New symbol name for rename/extract operations." }),
     ),
   },
   { additionalProperties: false },
 );
 
-/** Planned `code_apply` parameters. `planId` is required. */
+/** Planned `code_refactor_apply` parameters. `planId` is required. */
 export const CodeApplyParameters = Type.Object(
   {
     planId: Type.String({
       description: "Stored plan identifier returned by a previous refactor/plan step.",
     }),
-    mode: Type.Optional(
-      StringEnum(["apply"], {
-        description: "Application mode for a stored plan. Only `apply` is supported in this phase.",
-      }),
-    ),
   },
   { additionalProperties: false },
 );
@@ -296,7 +300,7 @@ export const WORKFLOW_CODE_TOOL_SCHEMAS = {
   code_find: CodeFindParameters,
   code_graph: CodeGraphParameters,
   code_impact: CodeImpactParameters,
-  code_refactor: CodeRefactorParameters,
-  code_apply: CodeApplyParameters,
+  code_refactor_plan: CodeRefactorParameters,
+  code_refactor_apply: CodeApplyParameters,
   code_health: CodeHealthParameters,
 } as const satisfies Record<WorkflowCodeToolSchemaKey, TSchema>;
