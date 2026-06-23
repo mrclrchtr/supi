@@ -2,6 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  clearWorkflowTargets,
+  registerWorkflowTarget,
+} from "../../../src/workflow/target-store.ts";
 import type { ActionParams } from "../../helpers/execute-action.ts";
 import { executeAction } from "../../helpers/execute-action.ts";
 import { registerMockProvider } from "../../helpers/register-mock-runtime.ts";
@@ -14,6 +18,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearWorkflowTargets(tmpDir);
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -149,6 +154,44 @@ describe("execute-graph (code_graph tool)", () => {
       expect(result.content).toContain("`bar` (L1)");
       expect(result.content).not.toContain("L0");
       expect(result.content).toContain("callees");
+    });
+
+    it("refuses declaration-anchor targetIds for callees instead of silently calling tree-sitter", async () => {
+      writeSource("test.ts", "export function foo() { bar(); }\n");
+      const calleesAt = vi.fn(async () => ({
+        kind: "success" as const,
+        data: {
+          enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
+          callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+        },
+      }));
+      registerMockProvider(tmpDir, { calleesAt });
+      const { targetId } = registerWorkflowTarget(tmpDir, {
+        file: "test.ts",
+        position: { line: 0, character: 0 },
+        displayLine: 1,
+        displayCharacter: 1,
+        name: "foo",
+        kind: "Function",
+        confidence: "semantic",
+        provenance: "test",
+        anchorKind: "declaration",
+        container: null,
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          targetId,
+          relations: ["callees"],
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(calleesAt).not.toHaveBeenCalled();
+      expect(result.content).toContain("Unavailable");
+      expect(result.content).toContain("declaration anchor");
+      expect(result.content).toContain("name anchor");
     });
 
     it("discloses truncated structural relation evidence", async () => {

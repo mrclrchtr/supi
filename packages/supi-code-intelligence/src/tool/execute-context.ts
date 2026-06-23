@@ -22,6 +22,7 @@ export interface CodeContextToolParams {
   character?: number;
   targetName?: string | null;
   targetKind?: string | null;
+  targetAnchorKind?: "name" | "declaration";
 }
 
 /** Track which cwds have already shown git context in this session. */
@@ -45,6 +46,7 @@ export async function executeContextTool(
     params.character = expansion.character;
     params.targetName = expansion.targetName;
     params.targetKind = expansion.targetKind;
+    params.targetAnchorKind = expansion.entry.anchorKind;
   }
 
   const scopeResolution = resolveScope(params.scope, ctx.cwd);
@@ -83,16 +85,7 @@ export async function executeContextTool(
   const result = await executeContext(
     {
       task: params.task,
-      target:
-        params.file && params.line != null && params.character != null
-          ? {
-              file: params.file,
-              line: params.line,
-              character: params.character,
-              name: params.targetName ?? null,
-              kind: params.targetKind ?? null,
-            }
-          : null,
+      target: buildContextTarget(params),
       scope: resolvedScope,
       budget: params.budget,
       include: params.include,
@@ -110,6 +103,18 @@ export async function executeContextTool(
   return {
     content: result.content,
     details: { type: "context", data: result.details },
+  };
+}
+
+function buildContextTarget(params: CodeContextToolParams) {
+  if (!params.file || params.line == null || params.character == null) return null;
+  return {
+    file: params.file,
+    line: params.line,
+    character: params.character,
+    name: params.targetName ?? null,
+    kind: params.targetKind ?? null,
+    anchorKind: params.targetAnchorKind ?? "name",
   };
 }
 

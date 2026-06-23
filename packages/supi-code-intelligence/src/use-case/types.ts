@@ -4,6 +4,7 @@ import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
 import type { ArchitectureModel } from "../model.ts";
 import type { BriefDetails, ContextDetails, InspectDetails } from "../types.ts";
+import type { AnchorKind } from "../workflow/target-store.ts";
 
 // ── Overview use-case ────────────────────────────────────────────────
 
@@ -84,6 +85,8 @@ export interface ContextTarget {
   character: number;
   name: string | null;
   kind: string | null;
+  /** Which anchor this target carries; strict consumers refuse declaration anchors. */
+  anchorKind: AnchorKind;
 }
 
 export interface ContextInput {

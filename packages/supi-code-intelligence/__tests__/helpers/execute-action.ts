@@ -22,6 +22,7 @@ export type TestAction =
 export interface ActionParams {
   action?: string;
   path?: string;
+  targetId?: string;
   file?: string;
   line?: number;
   character?: number;
@@ -82,6 +83,7 @@ export async function executeAction(
     case "graph":
       return executeGraphTool(
         {
+          targetId: rest.targetId,
           file: rest.file,
           line: rest.line,
           character: rest.character,

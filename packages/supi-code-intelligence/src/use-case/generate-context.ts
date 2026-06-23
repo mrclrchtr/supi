@@ -776,6 +776,16 @@ async function buildCalleesSection(
     };
   }
 
+  if (target.anchorKind === "declaration") {
+    return {
+      lines: [
+        "Callees unavailable: the resolved target is a declaration anchor, not a name anchor. Re-resolve the target, or pass file + line + character anchored on the identifier.",
+      ],
+      omittedCount: 0,
+      hasStructuralEvidence: false,
+    };
+  }
+
   if (!deps.provider?.calleesAt) {
     return {
       lines: ["Callees unavailable for the current workspace."],

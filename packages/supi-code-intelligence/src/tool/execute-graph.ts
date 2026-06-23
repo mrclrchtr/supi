@@ -34,6 +34,7 @@ import {
 } from "../presentation/markdown/relations.ts";
 import { resolveScope, toDisplayPath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
+import type { AnchorKind } from "../workflow/target-store.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
@@ -63,6 +64,7 @@ export async function executeGraphTool(
   // ── 1. Expand targetId ──────────────────────────────────────────────
   const expansion = expandTargetId(params, ctx.cwd);
   const expandedTargetName = expansion.kind === "ok" ? expansion.targetName : null;
+  const expandedAnchorKind = expansion.kind === "ok" ? expansion.entry.anchorKind : null;
   if (expansion.kind === "error") {
     return errorResult(expansion.message);
   }
@@ -147,6 +149,7 @@ export async function executeGraphTool(
   let resolvedFile: string;
   let resolvedPosition: { line: number; character: number };
   let displayName: string;
+  let resolvedAnchorKind: AnchorKind = "name";
 
   if (allFileLevel) {
     // File-level relations only need the file path — resolve symbol/scope to file if needed.
@@ -210,6 +213,7 @@ export async function executeGraphTool(
 
     resolvedFile = target.file;
     resolvedPosition = target.position;
+    resolvedAnchorKind = expandedAnchorKind ?? target.anchorKind;
     displayName =
       target.name ??
       expandedTargetName ??
@@ -232,6 +236,7 @@ export async function executeGraphTool(
       provider,
       maxResults,
       semanticReadinessError,
+      resolvedAnchorKind,
     );
     sections.push(section);
   }
@@ -302,6 +307,7 @@ async function collectRelation(
   provider: CodeProvider | null,
   maxResults: number,
   semanticReadinessError: string | null,
+  anchorKind: AnchorKind,
 ): Promise<GraphSection> {
   if (semanticReadinessError && (rel === "references" || rel === "implements")) {
     return { kind: "unavailable", rel, message: semanticReadinessError };
@@ -338,6 +344,14 @@ async function collectRelation(
       }
 
       case "callees": {
+        if (anchorKind === "declaration") {
+          return {
+            kind: "unavailable",
+            rel,
+            message:
+              "Cannot collect callees from a declaration anchor. Re-resolve the target to a name anchor, or pass file + line + character anchored on the identifier.",
+          };
+        }
         if (!provider?.calleesAt) {
           return { kind: "unavailable", rel, message: "No structural provider for callees" };
         }

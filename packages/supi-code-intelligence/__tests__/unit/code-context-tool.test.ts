@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
+import { clearWorkflowTargets, registerWorkflowTarget } from "../../src/workflow/target-store.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 const mockLspFns = vi.hoisted(() => ({
@@ -30,6 +31,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  clearWorkflowTargets(tmpDir);
   clearMockRuntime();
   rmSync(tmpDir, { recursive: true, force: true });
   vi.clearAllMocks();
@@ -180,6 +182,50 @@ describe("code_context tool", () => {
     expect(result.content[0].text).toContain("## References");
     expect(result.content[0].text).toContain("## Callees");
     expect(calleesAtSpy).toHaveBeenCalledWith(expect.any(String), 1, 17);
+  });
+
+  it("refuses declaration-anchor targetIds for task callees without calling tree-sitter", async () => {
+    writeSource("src/context.ts", "export function contextTarget() { helper(); }\n");
+    const calleesAtSpy = vi.fn(async () => ({
+      kind: "success" as const,
+      data: {
+        enclosingScope: { name: "contextTarget", startLine: 1, endLine: 1 },
+        callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+      },
+    }));
+    registerMockProvider(tmpDir, { calleesAt: calleesAtSpy });
+    const { targetId } = registerWorkflowTarget(tmpDir, {
+      file: "src/context.ts",
+      position: { line: 0, character: 0 },
+      displayLine: 1,
+      displayCharacter: 1,
+      name: "contextTarget",
+      kind: "Function",
+      confidence: "semantic",
+      provenance: "test",
+      anchorKind: "declaration",
+      container: null,
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "context-declaration-anchor",
+      {
+        task: "inspect callees safely",
+        targetId,
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(calleesAtSpy).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain("declaration anchor");
+    expect(result.content[0].text).toContain("name anchor");
   });
 
   it("discloses truncated task references in markdown and details", async () => {
