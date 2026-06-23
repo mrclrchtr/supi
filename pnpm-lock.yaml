@@ -405,12 +405,21 @@ importers:
 
   packages/supi-tree-sitter:
     dependencies:
+      '@earendil-works/pi-ai':
+        specifier: '*'
+        version: 0.79.10(ws@8.21.0)(zod@4.4.3)
+      '@earendil-works/pi-coding-agent':
+        specifier: '*'
+        version: 0.79.10(ws@8.21.0)(zod@4.4.3)
       '@mrclrchtr/supi-code-runtime':
         specifier: workspace:*
         version: link:../supi-code-runtime
       '@mrclrchtr/supi-core':
         specifier: workspace:*
         version: link:../supi-core
+      typebox:
+        specifier: '*'
+        version: 1.3.0
       web-tree-sitter:
         specifier: ^0.26.8
         version: 0.26.9
