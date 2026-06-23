@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-debug"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-debug#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,12 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "debug",
+    "diagnostics",
+    "events",
+    "observability"
   ],
   "files": [
     "src/**/*.ts",
@@ -49,7 +59,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-debug/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-debug.png"
   },
   "main": "src/api.ts",
   "exports": {

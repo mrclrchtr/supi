@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-review"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-review#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,12 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "code-review",
+    "review",
+    "llm-review",
+    "tui"
   ],
   "files": [
     "src/**/*.ts",
@@ -52,7 +62,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-review/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-review-3.png"
   },
   "exports": {
     "./extension": "./src/extension.ts",

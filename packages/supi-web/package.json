@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-web"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-web#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,13 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "web-fetch",
+    "markdown",
+    "context7",
+    "documentation",
+    "readability"
   ],
   "files": [
     "src/**/*.ts",
@@ -51,7 +62,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-web/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-web.png"
   },
   "main": "src/api.ts",
   "exports": {

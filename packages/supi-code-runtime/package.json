@@ -5,14 +5,23 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-code-runtime"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-code-runtime#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
   },
   "keywords": [
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "supi",
+    "code-intelligence",
+    "workspace-context",
+    "provider-api"
   ],
   "files": [
     "src/**/*.ts",
@@ -21,10 +30,9 @@
   "dependencies": {
     "@mrclrchtr/supi-core": "workspace:*"
   },
-  "devDependencies": {
-    "@types/node": "25.9.4",
-    "vitest": "4.1.9"
-  },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
   },
@@ -33,9 +41,10 @@
       "optional": true
     }
   },
-  "bundledDependencies": [
-    "@mrclrchtr/supi-core"
-  ],
+  "devDependencies": {
+    "@types/node": "25.9.4",
+    "vitest": "4.1.9"
+  },
   "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",

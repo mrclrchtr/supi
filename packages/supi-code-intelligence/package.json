@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-code-intelligence"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-code-intelligence#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,15 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "code-intelligence",
+    "architecture",
+    "call-graph",
+    "impact-analysis",
+    "refactoring",
+    "lsp",
+    "tree-sitter"
   ],
   "files": [
     "src/**/*.ts"
@@ -57,7 +70,7 @@
       "node_modules/@mrclrchtr/supi-lsp/src/extension.ts",
       "node_modules/@mrclrchtr/supi-tree-sitter/src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-code-intelligence/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.png"
   },
   "main": "src/api.ts",
   "exports": {

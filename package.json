@@ -9,30 +9,22 @@
     "type": "git",
     "url": "git+https://github.com/mrclrchtr/supi.git"
   },
+  "homepage": "https://github.com/mrclrchtr/supi#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
+  },
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "supi",
+    "extension-stack",
+    "code-intelligence",
+    "lsp",
+    "tree-sitter",
+    "tui"
   ],
-  "pi": {
-    "extensions": [
-      "./packages/supi-ask-user/src/extension.ts",
-      "./packages/supi-bash-timeout/src/extension.ts",
-      "./packages/supi-claude-md/src/extension.ts",
-      "./packages/supi-context/src/extension.ts",
-      "./packages/supi-settings/src/extension.ts",
-      "./packages/supi-review/src/extension.ts",
-      "./packages/supi-lsp/src/extension.ts",
-      "./packages/supi-tree-sitter/src/extension.ts",
-      "./packages/supi-cache/src/extension.ts",
-      "./packages/supi-code-intelligence/src/extension.ts",
-      "./packages/supi-debug/src/extension.ts",
-      "./packages/supi-web/src/extension.ts",
-      "./packages/supi-rtk/src/extension.ts",
-      "./packages/supi-extras/src/extension.ts",
-      "./packages/supi-insights/src/extension.ts"
-    ]
-  },
   "scripts": {
     "biome": "biome check",
     "biome:fix": "biome check --write --error-on-warnings",
@@ -79,5 +71,25 @@
     "typescript": "6.0.3",
     "vitest": "4.1.9",
     "web-tree-sitter": "0.26.9"
+  },
+  "pi": {
+    "extensions": [
+      "./packages/supi-ask-user/src/extension.ts",
+      "./packages/supi-bash-timeout/src/extension.ts",
+      "./packages/supi-claude-md/src/extension.ts",
+      "./packages/supi-context/src/extension.ts",
+      "./packages/supi-settings/src/extension.ts",
+      "./packages/supi-review/src/extension.ts",
+      "./packages/supi-lsp/src/extension.ts",
+      "./packages/supi-tree-sitter/src/extension.ts",
+      "./packages/supi-cache/src/extension.ts",
+      "./packages/supi-code-intelligence/src/extension.ts",
+      "./packages/supi-debug/src/extension.ts",
+      "./packages/supi-web/src/extension.ts",
+      "./packages/supi-rtk/src/extension.ts",
+      "./packages/supi-extras/src/extension.ts",
+      "./packages/supi-insights/src/extension.ts"
+    ],
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/assets/supi-logo.png"
   }
 }

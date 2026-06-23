@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-claude-md"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-claude-md#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,13 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "claude-md",
+    "agents-md",
+    "context-files",
+    "context-injection",
+    "skills"
   ],
   "files": [
     "src/**/*.ts",

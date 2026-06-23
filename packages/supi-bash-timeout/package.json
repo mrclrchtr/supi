@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-bash-timeout"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-bash-timeout#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,12 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "bash",
+    "timeout",
+    "tool-call",
+    "guardrails"
   ],
   "files": [
     "src/**/*.ts",

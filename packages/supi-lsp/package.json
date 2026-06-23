@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-lsp"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-lsp#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,14 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "lsp",
+    "language-server",
+    "go-to-definition",
+    "references",
+    "rename",
+    "diagnostics"
   ],
   "files": [
     "src/**/*.ts",
@@ -67,7 +79,7 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-lsp/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-lsp-status.png"
   },
   "main": "src/api.ts",
   "exports": {

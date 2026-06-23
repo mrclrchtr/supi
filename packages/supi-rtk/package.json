@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-rtk"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-rtk#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,13 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "rtk",
+    "bash",
+    "token-savings",
+    "command-rewriting",
+    "compression"
   ],
   "files": [
     "src/**/*.ts",

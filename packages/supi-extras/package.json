@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-extras"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-extras#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,13 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "aliases",
+    "prompt-stash",
+    "tab-spinner",
+    "shortcuts",
+    "tui"
   ],
   "files": [
     "src/**/*.ts",
@@ -26,11 +37,6 @@
   "bundledDependencies": [
     "@mrclrchtr/supi-core"
   ],
-  "devDependencies": {
-    "vitest": "4.1.9",
-    "@mrclrchtr/supi-test-utils": "workspace:*"
-  },
-  "main": "src/api.ts",
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*"
@@ -43,12 +49,17 @@
       "optional": true
     }
   },
+  "devDependencies": {
+    "vitest": "4.1.9",
+    "@mrclrchtr/supi-test-utils": "workspace:*"
+  },
   "pi": {
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-extras/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-extras-stash.png"
   },
+  "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",

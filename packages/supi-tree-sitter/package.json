@@ -5,7 +5,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/mrclrchtr/supi.git"
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-tree-sitter"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-tree-sitter#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
   },
   "publishConfig": {
     "access": "public"
@@ -13,7 +18,13 @@
   "keywords": [
     "pi-package",
     "pi",
-    "pi-coding-agent"
+    "pi-coding-agent",
+    "pi-extension",
+    "tree-sitter",
+    "ast",
+    "syntax-tree",
+    "code-navigation",
+    "structural-search"
   ],
   "files": [
     "src/**/*.ts",
@@ -35,6 +46,10 @@
     "@mrclrchtr/supi-core": "workspace:*",
     "web-tree-sitter": "^0.26.8"
   },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-code-runtime",
+    "@mrclrchtr/supi-core"
+  ],
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
@@ -77,12 +92,8 @@
     "extensions": [
       "./src/extension.ts"
     ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-tree-sitter/assets/logo.png"
+    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-tree-sitter.png"
   },
-  "bundledDependencies": [
-    "@mrclrchtr/supi-code-runtime",
-    "@mrclrchtr/supi-core"
-  ],
   "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",
