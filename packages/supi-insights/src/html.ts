@@ -2,6 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { AggregatedData, InsightResults } from "./types.ts";
 import {
   emptyHtml,
@@ -15,8 +16,10 @@ import {
   SATISFACTION_ORDER,
 } from "./utils.ts";
 
-const REPORT_CSS = readFileSync(join(__dirname, "report.css"), "utf-8");
-const REPORT_JS_TEMPLATE = readFileSync(join(__dirname, "report.js"), "utf-8");
+const INSIGHTS_DIR = join(fileURLToPath(import.meta.url), "..");
+
+const REPORT_CSS = readFileSync(join(INSIGHTS_DIR, "report.css"), "utf-8");
+const REPORT_JS_TEMPLATE = readFileSync(join(INSIGHTS_DIR, "report.js"), "utf-8");
 
 function generateReportJs(hourCountsJson: string): string {
   return REPORT_JS_TEMPLATE.replace("__HOUR_COUNTS_JSON__", hourCountsJson);

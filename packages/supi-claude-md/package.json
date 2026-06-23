@@ -26,6 +26,7 @@
     "context-injection",
     "skills"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "skills",

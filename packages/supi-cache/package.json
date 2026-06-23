@@ -25,6 +25,7 @@
     "cache-forensics",
     "analytics"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "README.md"

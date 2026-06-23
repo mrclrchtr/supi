@@ -23,6 +23,7 @@
     "settings",
     "configuration"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "!__tests__"

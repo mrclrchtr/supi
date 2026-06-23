@@ -23,6 +23,7 @@
     "workspace-context",
     "provider-api"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "!__tests__"

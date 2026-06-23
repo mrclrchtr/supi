@@ -28,6 +28,7 @@
     "lsp",
     "tree-sitter"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts"
   ],

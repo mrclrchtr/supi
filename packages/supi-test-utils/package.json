@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Shared test utilities for SuPi extensions.",
   "license": "MIT",
+  "type": "module",
   "main": "src/api.ts",
   "exports": {
     ".": "./src/api.ts",

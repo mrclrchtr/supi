@@ -26,6 +26,7 @@
     "interactive",
     "tui"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "!__tests__"

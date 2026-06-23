@@ -25,6 +25,7 @@
     "code-navigation",
     "structural-search"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "src/**/*.json",

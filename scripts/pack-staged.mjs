@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { sanitizeNpmEnv } from "./npm-env.mjs";
 import { rewriteStagedManifests } from "./staged-manifests.mjs";
 
 function parseArgs(argv) {
@@ -344,13 +345,18 @@ export async function packStaged(packageDir, options = {}) {
 
     if (dryRun) {
       console.log(`Staged pack dry-run: ${pkg.name} (${packageDir})`);
-      execFileSync("npm", ["pack", "--dry-run"], { cwd: stageDir, stdio: "inherit" });
+      execFileSync("npm", ["pack", "--dry-run"], {
+        cwd: stageDir,
+        env: sanitizeNpmEnv(),
+        stdio: "inherit",
+      });
       return null;
     }
 
     const output = execFileSync("npm", ["pack", "--json", "--pack-destination", outDir], {
       cwd: stageDir,
       encoding: "utf8",
+      env: sanitizeNpmEnv(),
     });
     const result = JSON.parse(output);
     if (!Array.isArray(result) || result.length === 0 || !result[0]?.filename) {

@@ -26,6 +26,7 @@
     "rename",
     "diagnostics"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "src/**/*.json",
