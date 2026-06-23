@@ -87,16 +87,18 @@ function assertPackageDir(packageDir) {
 /**
  * Remove broken symlinks that would cause cp -RL to fail.
  * pnpm's hoisted linker creates dangling .bin entries (e.g.,
- * node_modules/.bin/vitest). Use find -L to follow workspace
- * symlinks and remove any broken symlinks before the copy.
+ * node_modules/.bin/vitest). find -L reports only links it cannot follow;
+ * remove them explicitly because BSD find forbids -delete with -L.
  */
 function removeKnownBrokenSymlinks(packageDir) {
   try {
-    execFileSync(
-      "find",
-      ["-L", packageDir, "-type", "l", "!", "-exec", "test", "-e", "{}", ";", "-delete"],
-      { stdio: "ignore" },
-    );
+    const output = execFileSync("find", ["-L", packageDir, "-type", "l", "-print0"], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+
+    for (const entryPath of output.toString("utf8").split("\0")) {
+      if (entryPath) rmSync(entryPath, { force: true });
+    }
   } catch {
     // find exits non-zero when any directory is inaccessible (harmless)
   }
