@@ -123,6 +123,7 @@ describe("focused code intelligence tool registration", () => {
     expect(tool.description).toContain("export");
     expect(tool.description).toContain("call");
     expect(tool.description).toContain("does not silently fall back");
+    expect(tool.description).toContain("not by symbol identity");
     expect(tool.description).not.toContain("advisory-only");
 
     const guidanceText = tool.promptGuidelines?.join("\n") ?? "";
@@ -131,6 +132,7 @@ describe("focused code intelligence tool registration", () => {
     expect(guidanceText).toContain(
       'code_find with `mode: "text"`, `mode: "regex"`, or `mode: "semantic"` does not accept `kind`',
     );
+    expect(guidanceText).toContain("symbol-identity-aware callers");
     expect(guidanceText).not.toContain("kind is ignored");
     expect(guidanceText).not.toContain("call-site matching via ripgrep");
 
@@ -142,6 +144,7 @@ describe("focused code intelligence tool registration", () => {
     expect(kindParam?.description).toContain("call");
     expect(kindParam?.description).toContain("type");
     expect(kindParam?.description).toContain("interface");
+    expect(kindParam?.description).toContain("not by symbol identity");
 
     expect(kindParam?.enum).toBeDefined();
     expect(kindParam?.enum).toEqual([

@@ -486,8 +486,11 @@ describe("code_find tool", () => {
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("obj.method");
-      expect(result.content[0].text).toContain("a.ts");
+      const text = result.content[0].text;
+      expect(text).toContain("obj.method");
+      expect(text).toContain("a.ts");
+      expect(text).toContain("AST call results are name-based");
+      expect(text).toContain("not symbol-identity-aware");
     });
 
     it("discloses truncated AST matches in markdown and details", async () => {
@@ -582,8 +585,10 @@ describe("code_find tool", () => {
           makeCtx({ cwd: tmpDir }),
         )) as TextToolResult;
 
-        expect(result.content[0].text).toContain("params.query.trim");
-        expect(result.content[0].text).toContain("src/target.ts");
+        const text = result.content[0].text;
+        expect(text).toContain("params.query.trim");
+        expect(text).toContain("src/target.ts");
+        expect(text).toContain("AST call results are name-based");
       } finally {
         session.dispose();
       }

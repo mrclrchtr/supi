@@ -102,8 +102,9 @@ export function renderStructuredMatches(
     `**${result.matches.length} match${result.matches.length !== 1 ? "es" : ""}** across **${grouped.size} file${grouped.size !== 1 ? "s" : ""}** in \`${relScope}\``,
   );
   if (kind === "call") {
+    lines.push("");
     lines.push(
-      '_AST call search matches call-site identifiers by name, not by symbol identity. It returns call sites for every symbol with this name, including shadowed definitions. Use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers._',
+      '_Note: AST call results are name-based, not symbol-identity-aware. Use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers._',
     );
   }
   const partialWarning = renderPartialWarning(result);

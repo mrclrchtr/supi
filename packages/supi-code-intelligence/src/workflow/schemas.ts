@@ -140,7 +140,7 @@ export const CodeFindParameters = Type.Object(
     kind: Type.Optional(
       StringEnum(["definition", "import", "export", "call", "type", "interface"], {
         description:
-          'Only valid with `mode: "ast"`. Supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`.',
+          'Only valid with `mode: "ast"`. Supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`. AST `call` matches call-site identifiers by name, not by symbol identity.',
       }),
     ),
     contextLines: Type.Optional(

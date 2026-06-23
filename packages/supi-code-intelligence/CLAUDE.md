@@ -160,6 +160,7 @@ Unified ranked code search with strict mode dispatch — the sole search tool.
 - `mode: "semantic"` allows semantic workspace-symbol search only, does not accept `kind`, and does not fall back to text search
 - `mode: "ast"` requires explicit `kind`
 - supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`
+- AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers
 - unsupported combinations fail explicitly; `test` is not a public AST kind in this phase
 - `scope?` — workspace-relative path, package, or directory to limit search
 - `contextLines?` — context lines around matches (default 1)
