@@ -1,0 +1,37 @@
+schema_version = 1
+status = "todo"
+updated_at = "2026-06-23T23:42:49.559124Z"
+revision = 9
+
+[document_fingerprints]
+content = "sha256:e730aebb819f2cffe1d39bcc0654d0c5225e70ca9d1382ce4546e0b31c08ae5c"
+task-01 = "sha256:61b4de8a97c9b97a8f47979f8e54e1fc7910cacc76595023e04c60bcad87b839"
+task-02 = "sha256:05450e9af3136e274e3037454ee21a54c6cd2fe937e935cf4937e4fc1429d7e5"
+task-03 = "sha256:a02cae9a9a91cc97d18b0fa01aa4d5e3e9bb03a443ad8eb6927ced9b6689ccbb"
+task-04 = "sha256:caffcabb92129a3f07e99a372cbed8d7afb9318063298b7fd23c3269a6b67eed"
+task-05 = "sha256:48606496e86c4f78be8d5ec7c45d9a29a006f02c9c9b6b440cf1876d411dc210"
+
+[[tasks]]
+number = 1
+title = "Define anchored target resolution result metadata and target details"
+status = "todo"
+
+[[tasks]]
+number = 2
+title = "Upgrade anchored code_resolve to resolve real symbol targets"
+status = "todo"
+
+[[tasks]]
+number = 3
+title = "Add coordinate target mode to code_context"
+status = "todo"
+
+[[tasks]]
+number = 4
+title = "Document coordinate target semantics and scope precedence"
+status = "todo"
+
+[[tasks]]
+number = 5
+title = "Verify with targeted and full checks"
+status = "todo"
