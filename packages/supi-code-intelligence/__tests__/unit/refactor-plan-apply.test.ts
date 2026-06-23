@@ -7,6 +7,8 @@ import {
   type SemanticProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, describe, expect, it } from "vitest";
+import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
+import { executeResolveTool } from "../../src/tool/execute-resolve.ts";
 import { type ActionParams, executeAction } from "../helpers/execute-action.ts";
 
 let tmpDir: string | null = null;
@@ -265,5 +267,75 @@ describe("code_refactor_apply", () => {
 
     expect(result.content).toContain("applied");
     expect(result.content).toContain("1");
+  });
+});
+
+describe("code_refactor_plan anchor enforcement (ADR 0003)", () => {
+  // A rename is position-strict: fed a declaration anchor (the `export`
+  // keyword) LSP/textDocument/rename silently yields empty or wrong edits.
+  // When a targetId resolves to a declaration anchor (nameAnchor could not
+  // be derived), code_refactor_plan must refuse rename with an observable
+  // error instead of producing a (silently wrong) plan.
+  it("refuses rename_symbol when the resolved target fell back to a declaration anchor", async () => {
+    tmpDir = mkdtempSync(path.join(os.tmpdir(), "refactor-anchor-"));
+    const projectDir = tmpDir;
+    const file = path.join(projectDir, "src", "index.ts");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "export function oldName() {}\n", "utf-8");
+
+    // Workspace symbol carries only a declaration anchor (mirrors toCodeSymbol
+    // for a SymbolInformation hit). documentSymbols returns null so refine
+    // cannot derive a nameAnchor -> the registered anchorKind is "declaration".
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemantic(projectDir, {
+      references: async () => null,
+      implementation: async () => null,
+      documentSymbols: async () => null,
+      workspaceSymbols: async () => [
+        {
+          name: "oldName",
+          kind: "Function",
+          file,
+          declarationAnchor: { line: 1, character: 1 },
+          container: null,
+        },
+      ],
+      // A rename that WOULD produce a plan if the check did not fire, making
+      // the Red observable: without enforcement, refactor_plan proceeds and the
+      // test sees "Plan ID" instead of the refusal.
+      rename: async () => ({
+        kind: "precise",
+        edits: {
+          edits: [
+            {
+              file,
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+              newText: "newName",
+            },
+          ],
+        },
+      }),
+    } as SemanticProvider);
+
+    // Step 1: resolve -> get a targetId whose anchor is the declaration.
+    const resolveResult = await executeResolveTool(
+      { query: "oldName", kind: "function" },
+      { cwd: projectDir },
+    );
+    const targetId =
+      resolveResult.details?.type === "resolve"
+        ? resolveResult.details.data.targets[0]?.targetId
+        : undefined;
+    expect(targetId).toBeDefined();
+    if (!targetId) return;
+
+    // Step 2: refactor_plan with that targetId must refuse, not plan.
+    const result = await executeRefactorPlanTool(
+      { operation: "rename_symbol", targetId, newName: "newName" },
+      { cwd: projectDir },
+    );
+
+    expect(result.content).toContain("name anchor");
+    expect(result.content).not.toContain("Plan ID");
   });
 });

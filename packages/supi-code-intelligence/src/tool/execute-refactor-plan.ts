@@ -175,6 +175,22 @@ function resolveRefactorTarget(
     params.file = expansion.file;
     params.line = expansion.line;
     params.character = expansion.character;
+
+    // Per ADR 0003: rename_symbol is position-strict — LSP rename requires
+    // the identifier (name anchor), and a declaration anchor (the `export`
+    // keyword) silently yields empty or wrong edits. Refuse before planning.
+    if (operation === "rename_symbol" && expansion.entry.anchorKind === "declaration") {
+      return {
+        content:
+          `**Cannot plan rename:** The resolved target fell back to a declaration anchor (the \`export\` keyword or similar), not an identifier (name anchor). LSP \`rename\` requires the identifier. ` +
+          `Re-resolve via \`code_resolve\` after the language server has indexed the file, ` +
+          `or pass \`file\` + \`line\` + \`character\` anchored directly on the identifier.`,
+        details: unavailableSearchDetails(null, [
+          "Re-resolve via `code_resolve` when the LSP has indexed the file",
+          "Or use `file` + `line` + `character` anchored on the identifier directly",
+        ]),
+      };
+    }
   }
 
   if (!params.file) {

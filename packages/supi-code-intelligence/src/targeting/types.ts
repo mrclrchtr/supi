@@ -10,6 +10,7 @@ import type {
   SemanticProvider as SemanticSubstrate,
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
+import type { AnchorKind } from "../workflow/target-store.ts";
 
 // ── Normalized query ──────────────────────────────────────────────────
 
@@ -71,6 +72,8 @@ export interface ResolvedTargetData {
   name: string | null;
   kind: string | null;
   confidence: "semantic" | "structural" | "heuristic" | "unavailable";
+  /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
+  anchorKind: AnchorKind;
 }
 
 /**
@@ -95,6 +98,8 @@ export interface DisambiguationCandidateData {
   character: number;
   reason: string;
   rank: number;
+  /** Which anchor this candidate carries (ADR 0003). */
+  anchorKind: AnchorKind;
 }
 
 /**

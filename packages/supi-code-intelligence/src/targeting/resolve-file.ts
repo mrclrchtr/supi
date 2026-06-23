@@ -16,6 +16,7 @@ import type {
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { normalizePath } from "../search-helpers.ts";
 import { highestConfidence } from "../semantic-action-helpers.ts";
+import type { AnchorKind } from "../workflow/target-store.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 
 const BINARY_EXTENSIONS = new Set([
@@ -135,6 +136,7 @@ async function resolveViaSemantic(
           name: s.name,
           kind: s.kind,
           confidence: "semantic" as const,
+          anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
         };
       });
 
@@ -182,6 +184,9 @@ async function resolveViaStructral(
         name: record.name,
         kind: record.kind,
         confidence: "structural" as const,
+        // Structural exports use the node start (startLine/startCharacter) =
+        // declaration anchor; no name anchor is derivable from exports alone.
+        anchorKind: "declaration",
       })),
     );
   } catch {

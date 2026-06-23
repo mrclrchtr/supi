@@ -39,6 +39,7 @@ describe("workflow target store", () => {
       kind: "const",
       confidence: "semantic",
       provenance: "anchored",
+      anchorKind: "name",
     });
 
     // These will fail with the Phase 1 stub (returns empty strings)
@@ -58,6 +59,7 @@ describe("workflow target store", () => {
       kind: "const",
       confidence: "semantic" as const,
       provenance: "anchored",
+      anchorKind: "name" as const,
     };
 
     const r1 = registerWorkflowTarget(tmpDir, input);
@@ -84,6 +86,7 @@ describe("workflow target store", () => {
       kind: "const",
       confidence: "semantic",
       provenance: "anchored",
+      anchorKind: "name",
     });
 
     const lookup = getWorkflowTarget(tmpDir, result.targetId);
@@ -126,6 +129,7 @@ describe("workflow target store", () => {
       kind: "const",
       confidence: "semantic",
       provenance: "anchored",
+      anchorKind: "name",
     });
 
     // Will fail at length check with stub
@@ -143,6 +147,7 @@ describe("workflow target store", () => {
       kind: "const",
       confidence: "semantic",
       provenance: "anchored",
+      anchorKind: "name",
     });
 
     // File fingerprint changed, so IDs should differ
@@ -173,6 +178,7 @@ describe("workflow target store", () => {
         kind: null,
         confidence: "heuristic",
         provenance: "file",
+        anchorKind: "name",
       });
       const r2 = registerWorkflowTarget(otherDir, {
         file: path.join(otherDir, "b.ts"),
@@ -183,6 +189,7 @@ describe("workflow target store", () => {
         kind: null,
         confidence: "heuristic",
         provenance: "file",
+        anchorKind: "name",
       });
 
       // First assertion to fail with stub
@@ -218,6 +225,7 @@ describe("workflow target store", () => {
       kind: "const",
       confidence: "semantic",
       provenance: "anchored",
+      anchorKind: "name",
     });
 
     // Verify registered successfully
@@ -245,6 +253,7 @@ describe("workflow target store", () => {
       kind: null,
       confidence: "heuristic",
       provenance: "file",
+      anchorKind: "name",
     });
 
     // Lookup should detect the file is still missing → unavailable
@@ -274,6 +283,7 @@ describe("workflow target store", () => {
       kind: "const",
       confidence: "semantic" as const,
       provenance: "symbol",
+      anchorKind: "name" as const,
     };
 
     // Resolve #1: refine succeeded -> name anchor on the identifier (col 15).

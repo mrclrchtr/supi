@@ -75,6 +75,10 @@ export function resolveAnchoredTarget(
       name: null,
       kind: null,
       confidence: "semantic",
+      // Anchored coords are user-provided; trust the position as a name
+      // anchor. (Determining whether an arbitrary coord lands on an
+      // identifier is slice E — tree-sitter nodeAt — not done here.)
+      anchorKind: "name",
     },
   };
 }

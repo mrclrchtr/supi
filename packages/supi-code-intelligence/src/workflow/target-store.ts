@@ -16,6 +16,15 @@ import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 
 // ── Public types ──────────────────────────────────────────────────────
 
+/**
+ * Which anchor a resolved target carries, per ADR 0003.
+ * - `name` — the identifier token (preferred by position-strict substrates).
+ * - `declaration` — the defining node start (export/modifiers); a fallback
+ *   when the name anchor could not be derived. Position-strict consumers
+ *   (rename, callees) must refuse rather than silently use it.
+ */
+export type AnchorKind = "name" | "declaration";
+
 /** A stored resolved target entry with handles and metadata. */
 export interface TargetStoreEntry {
   targetId: string;
@@ -28,6 +37,7 @@ export interface TargetStoreEntry {
   kind: string | null;
   confidence: ConfidenceMode;
   provenance: string;
+  anchorKind: AnchorKind;
   fileFingerprint: string;
 }
 
@@ -41,6 +51,8 @@ export interface TargetRegistrationInput {
   kind: string | null;
   confidence: ConfidenceMode;
   provenance: string;
+  /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
+  anchorKind: AnchorKind;
 }
 
 /** Output from registering a target: stable session-scoped handles. */
@@ -191,6 +203,7 @@ export function registerWorkflowTarget(
     kind: input.kind,
     confidence: input.confidence,
     provenance: input.provenance,
+    anchorKind: input.anchorKind,
     fileFingerprint: fingerprint,
   };
 

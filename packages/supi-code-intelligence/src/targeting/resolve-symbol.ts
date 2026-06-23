@@ -13,6 +13,7 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { normalizePath } from "../search-helpers.ts";
+import type { AnchorKind } from "../workflow/target-store.ts";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
 
 const MAX_CANDIDATES = 8; // default fallback when maxResults is not provided
@@ -146,6 +147,7 @@ export async function resolveSymbolTarget(
         name: c.name,
         kind: c.kind,
         confidence: "semantic",
+        anchorKind: (c.nameAnchor ? "name" : "declaration") as AnchorKind,
       },
     };
   }
@@ -181,6 +183,7 @@ export async function resolveSymbolTarget(
       character: a.character,
       reason: relFile,
       rank: idx + 1,
+      anchorKind: (c.nameAnchor ? "name" : "declaration") as AnchorKind,
     };
   }) satisfies DisambiguationCandidateData[];
 

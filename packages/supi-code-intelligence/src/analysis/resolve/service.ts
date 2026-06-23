@@ -16,6 +16,7 @@ import { resolveFileTargetGroup as resolveFile } from "../../targeting/resolve-f
 import { resolveSymbolTarget as resolveSymbol } from "../../targeting/resolve-symbol.ts";
 import type { TargetOutcome } from "../../targeting/types.ts";
 import {
+  type AnchorKind,
   registerWorkflowTarget,
   type TargetRegistrationInput,
 } from "../../workflow/target-store.ts";
@@ -127,6 +128,7 @@ function registerFromTarget(
     name: string | null;
     kind: string | null;
     confidence: string;
+    anchorKind: AnchorKind;
   },
   cwd: string,
   provenance: string,
@@ -140,6 +142,7 @@ function registerFromTarget(
     kind: target.kind,
     confidence: target.confidence as ConfidenceMode,
     provenance,
+    anchorKind: target.anchorKind,
   };
   const { targetId, spanId } = registerWorkflowTarget(cwd, input);
   return {
@@ -165,6 +168,7 @@ function registerCandidate(
     character: number;
     reason: string;
     rank: number;
+    anchorKind: AnchorKind;
   },
   cwd: string,
 ): DisambiguationCandidateEntry {
@@ -177,6 +181,7 @@ function registerCandidate(
     kind: c.kind,
     confidence: "semantic" as ConfidenceMode,
     provenance: "disambiguation",
+    anchorKind: c.anchorKind,
   };
   const { targetId } = registerWorkflowTarget(cwd, input);
   return {
