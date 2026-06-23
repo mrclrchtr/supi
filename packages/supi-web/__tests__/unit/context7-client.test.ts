@@ -102,6 +102,16 @@ describe("context7-client", () => {
       expect(results).toEqual([]);
     });
 
+    it("passes AbortSignal to fetch", async () => {
+      const controller = new AbortController();
+      mockFetch.mockResolvedValue(mockResponse(200, { results: [] }));
+
+      await searchLibrary("query", "lib", { signal: controller.signal });
+
+      const [, init] = mockFetch.mock.calls[0];
+      expect(init?.signal).toBe(controller.signal);
+    });
+
     it("propagates Context7Error on 404", async () => {
       mockFetch.mockResolvedValue(mockResponse(404, { message: "Library not found" }));
 
@@ -153,6 +163,16 @@ describe("context7-client", () => {
       const result = await getContext("How to use useState", "/facebook/react", true);
 
       expect(result).toEqual(snippets);
+    });
+
+    it("passes AbortSignal to fetch", async () => {
+      const controller = new AbortController();
+      mockFetch.mockResolvedValue(mockResponse(200, "docs", "text/plain"));
+
+      await getContext("query", "/lib", false, { signal: controller.signal });
+
+      const [, init] = mockFetch.mock.calls[0];
+      expect(init?.signal).toBe(controller.signal);
     });
 
     it("propagates Context7Error on non-ok response", async () => {

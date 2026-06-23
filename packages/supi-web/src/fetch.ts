@@ -25,6 +25,7 @@ export interface FetchResult {
 /** Fetch options. */
 export interface FetchOptions {
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 /** Validate that a string is a real http(s) URL. */
@@ -43,29 +44,35 @@ export async function fetchWithNegotiation(
   options: FetchOptions = {},
 ): Promise<FetchResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const { signal } = options;
 
   // 1. Try HEAD negotiation for Markdown
-  const headResult = await tryHeadNegotiation(url, timeoutMs);
+  const headResult = await tryHeadNegotiation(url, timeoutMs, signal);
   if (headResult) return headResult;
 
   // 2. Range GET to sniff content type
-  const sniffResult = await trySniffNegotiation(url, timeoutMs);
+  const sniffResult = await trySniffNegotiation(url, timeoutMs, signal);
   if (sniffResult) return sniffResult;
 
   // 3. Try sibling .md URLs
-  const siblingResult = await trySiblingNegotiation(url, timeoutMs);
+  const siblingResult = await trySiblingNegotiation(url, timeoutMs, signal);
   if (siblingResult) return siblingResult;
 
   // 4. Full GET as HTML → convert to Markdown
-  return fetchAsHtml(url, timeoutMs);
+  return fetchAsHtml(url, timeoutMs, signal);
 }
 
-async function tryHeadNegotiation(url: string, timeoutMs: number): Promise<FetchResult | null> {
+async function tryHeadNegotiation(
+  url: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<FetchResult | null> {
   try {
     const headRes = await timedFetch(
       url,
       { method: "HEAD", redirect: "follow", headers: { "User-Agent": USER_AGENT } },
       timeoutMs,
+      signal,
     );
     if (!headRes.ok) return null;
     const ct = headRes.headers.get("content-type") || "";
@@ -75,9 +82,12 @@ async function tryHeadNegotiation(url: string, timeoutMs: number): Promise<Fetch
       url,
       { method: "GET", redirect: "follow", headers: { "User-Agent": USER_AGENT } },
       timeoutMs,
+      signal,
     );
     if (!getRes.ok)
-      throw new FetchError(`Fetch failed: ${getRes.status} ${getRes.statusText}`, getRes.status);
+      throw new FetchError(`Fetch failed: ${getRes.status} ${getRes.statusText}`, {
+        status: getRes.status,
+      });
     return {
       url: getRes.url || url,
       text: await getRes.text(),
@@ -85,12 +95,17 @@ async function tryHeadNegotiation(url: string, timeoutMs: number): Promise<Fetch
       isMarkdown: true,
       isPlainText: false,
     };
-  } catch {
+  } catch (err) {
+    if (signal?.aborted) throw err;
     return null;
   }
 }
 
-async function trySniffNegotiation(url: string, timeoutMs: number): Promise<FetchResult | null> {
+async function trySniffNegotiation(
+  url: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<FetchResult | null> {
   try {
     const sniffRes = await timedFetch(
       url,
@@ -100,109 +115,152 @@ async function trySniffNegotiation(url: string, timeoutMs: number): Promise<Fetc
         headers: { "User-Agent": USER_AGENT, Range: `bytes=0-${SNIFF_BYTES - 1}` },
       },
       timeoutMs,
+      signal,
     );
     const sniffText = await readPartialText(sniffRes, SNIFF_BYTES);
     const ct = sniffRes.headers.get("content-type") || "";
     const finalUrl = sniffRes.url || url;
 
     if (!sniffRes.ok || isHtml(sniffText)) return null;
-
-    if (
-      isMarkdownContentType(ct) ||
-      looksLikeMarkdownUrl(finalUrl) ||
-      looksLikeMarkdown(sniffText)
-    ) {
-      const fullRes = await timedFetch(
+    if (isMarkdownCandidate(ct, finalUrl, sniffText)) {
+      return fetchFullTextResult({
         url,
-        { method: "GET", redirect: "follow", headers: { "User-Agent": USER_AGENT } },
         timeoutMs,
-      );
-      if (!fullRes.ok)
-        throw new FetchError(
-          `Fetch failed: ${fullRes.status} ${fullRes.statusText}`,
-          fullRes.status,
-        );
-      return {
-        url: fullRes.url || url,
-        text: await fullRes.text(),
+        signal,
         contentType: ct,
-        isMarkdown: true,
-        isPlainText: false,
-      };
+        kind: MARKDOWN_RESPONSE_KIND,
+        headers: { "User-Agent": USER_AGENT },
+      });
     }
-
-    if (
-      isPlainTextContentType(ct) &&
-      !looksLikeMarkdownUrl(finalUrl) &&
-      !looksLikeMarkdown(sniffText)
-    ) {
-      const fullRes = await timedFetch(
+    if (isPlainTextCandidate(ct, finalUrl, sniffText)) {
+      return fetchFullTextResult({
         url,
-        { method: "GET", redirect: "follow", headers: { "User-Agent": USER_AGENT } },
         timeoutMs,
-      );
-      if (!fullRes.ok)
-        throw new FetchError(
-          `Fetch failed: ${fullRes.status} ${fullRes.statusText}`,
-          fullRes.status,
-        );
-      return {
-        url: fullRes.url || url,
-        text: await fullRes.text(),
+        signal,
         contentType: ct,
-        isMarkdown: false,
-        isPlainText: true,
-      };
+        kind: PLAIN_TEXT_RESPONSE_KIND,
+        headers: { "User-Agent": USER_AGENT },
+      });
     }
-
     return null;
-  } catch {
+  } catch (err) {
+    if (signal?.aborted) throw err;
     return null;
   }
 }
 
-async function trySiblingNegotiation(url: string, timeoutMs: number): Promise<FetchResult | null> {
+async function trySiblingNegotiation(
+  url: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<FetchResult | null> {
   for (const sibling of generateSiblingUrls(url)) {
     try {
-      const sibRes = await timedFetch(
-        sibling,
-        {
-          method: "GET",
-          redirect: "follow",
-          headers: { "User-Agent": USER_AGENT, Accept: ACCEPT_SIBLING },
-        },
-        timeoutMs,
-      );
-      const sibText = await readPartialText(sibRes, SNIFF_BYTES);
-      const sibCt = sibRes.headers.get("content-type") || "";
-      if (!sibRes.ok || isHtml(sibText) || isHtmlContentType(sibCt)) continue;
-      if (!looksLikeMarkdown(sibText) && !isMarkdownContentType(sibCt)) continue;
-
-      const fullRes = await timedFetch(
-        sibling,
-        {
-          method: "GET",
-          redirect: "follow",
-          headers: { "User-Agent": USER_AGENT, Accept: ACCEPT_SIBLING },
-        },
-        timeoutMs,
-      );
-      if (!fullRes.ok) continue;
-      return {
-        url: fullRes.url || sibling,
-        text: await fullRes.text(),
-        contentType: sibCt,
-        isMarkdown: true,
-        isPlainText: false,
-      };
-    } catch {
+      const result = await fetchMarkdownSibling(sibling, timeoutMs, signal);
+      if (result) return result;
+    } catch (err) {
+      if (signal?.aborted) throw err;
       // Try next sibling
     }
   }
   return null;
 }
 
-async function fetchAsHtml(url: string, timeoutMs: number): Promise<FetchResult> {
+async function fetchMarkdownSibling(
+  sibling: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<FetchResult | null> {
+  const headers = { "User-Agent": USER_AGENT, Accept: ACCEPT_SIBLING };
+  const sibRes = await timedFetch(
+    sibling,
+    { method: "GET", redirect: "follow", headers },
+    timeoutMs,
+    signal,
+  );
+  const sibText = await readPartialText(sibRes, SNIFF_BYTES);
+  const sibCt = sibRes.headers.get("content-type") || "";
+
+  if (!sibRes.ok || isHtml(sibText) || isHtmlContentType(sibCt)) return null;
+  if (!looksLikeMarkdown(sibText) && !isMarkdownContentType(sibCt)) return null;
+
+  const fullRes = await timedFetch(
+    sibling,
+    { method: "GET", redirect: "follow", headers },
+    timeoutMs,
+    signal,
+  );
+  if (!fullRes.ok) return null;
+  return buildFetchResult(fullRes, sibling, sibCt, MARKDOWN_RESPONSE_KIND);
+}
+
+interface ResponseKind {
+  isMarkdown: boolean;
+  isPlainText: boolean;
+}
+
+interface FetchFullTextOptions {
+  url: string;
+  timeoutMs: number;
+  signal: AbortSignal | undefined;
+  contentType: string;
+  kind: ResponseKind;
+  headers: Record<string, string>;
+}
+
+const MARKDOWN_RESPONSE_KIND = { isMarkdown: true, isPlainText: false } as const;
+const PLAIN_TEXT_RESPONSE_KIND = { isMarkdown: false, isPlainText: true } as const;
+
+async function fetchFullTextResult(options: FetchFullTextOptions): Promise<FetchResult> {
+  const fullRes = await timedFetch(
+    options.url,
+    { method: "GET", redirect: "follow", headers: options.headers },
+    options.timeoutMs,
+    options.signal,
+  );
+  if (!fullRes.ok)
+    throw new FetchError(`Fetch failed: ${fullRes.status} ${fullRes.statusText}`, {
+      status: fullRes.status,
+    });
+  return buildFetchResult(fullRes, options.url, options.contentType, options.kind);
+}
+
+async function buildFetchResult(
+  response: Response,
+  fallbackUrl: string,
+  contentType: string,
+  kind: ResponseKind,
+): Promise<FetchResult> {
+  return {
+    url: response.url || fallbackUrl,
+    text: await response.text(),
+    contentType,
+    isMarkdown: kind.isMarkdown,
+    isPlainText: kind.isPlainText,
+  };
+}
+
+function isMarkdownCandidate(contentType: string, finalUrl: string, sniffText: string): boolean {
+  return (
+    isMarkdownContentType(contentType) ||
+    looksLikeMarkdownUrl(finalUrl) ||
+    looksLikeMarkdown(sniffText)
+  );
+}
+
+function isPlainTextCandidate(contentType: string, finalUrl: string, sniffText: string): boolean {
+  return (
+    isPlainTextContentType(contentType) &&
+    !looksLikeMarkdownUrl(finalUrl) &&
+    !looksLikeMarkdown(sniffText)
+  );
+}
+
+async function fetchAsHtml(
+  url: string,
+  timeoutMs: number,
+  signal: AbortSignal | undefined,
+): Promise<FetchResult> {
   const res = await timedFetch(
     url,
     {
@@ -211,8 +269,10 @@ async function fetchAsHtml(url: string, timeoutMs: number): Promise<FetchResult>
       headers: { "User-Agent": USER_AGENT, Accept: "text/html,*/*;q=0.1" },
     },
     timeoutMs,
+    signal,
   );
-  if (!res.ok) throw new FetchError(`Fetch failed: ${res.status} ${res.statusText}`, res.status);
+  if (!res.ok)
+    throw new FetchError(`Fetch failed: ${res.status} ${res.statusText}`, { status: res.status });
   return {
     url: res.url || url,
     text: await res.text(),
@@ -223,23 +283,45 @@ async function fetchAsHtml(url: string, timeoutMs: number): Promise<FetchResult>
 }
 
 /** Error thrown on fetch failures. */
+export interface FetchErrorOptions extends ErrorOptions {
+  status?: number;
+}
+
 export class FetchError extends Error {
-  constructor(
-    message: string,
-    readonly status?: number,
-  ) {
-    super(message);
+  readonly status?: number;
+
+  constructor(message: string, options: FetchErrorOptions = {}) {
+    super(message, options);
     this.name = "FetchError";
+    this.status = options.status;
   }
 }
 
-async function timedFetch(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+async function timedFetch(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<Response> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const abortFromParent = () => controller.abort();
+  if (signal?.aborted) abortFromParent();
+  else signal?.addEventListener("abort", abortFromParent, { once: true });
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (timedOut) throw new FetchError(`Fetch timed out after ${timeoutMs}ms`, { cause: err });
+    throw err;
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener("abort", abortFromParent);
   }
 }
 

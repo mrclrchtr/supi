@@ -110,6 +110,23 @@ describe("fetchWithNegotiation", () => {
 
     vi.unstubAllGlobals();
   });
+
+  it("honors an already-aborted signal without trying fallbacks", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const abortError = new DOMException("Aborted", "AbortError");
+    const fetchMock = vi.fn(async () => {
+      throw abortError;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      fetchWithNegotiation("https://example.com/readme", { signal: controller.signal }),
+    ).rejects.toThrow("Aborted");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.unstubAllGlobals();
+  });
 });
 
 describe("isPlainTextContentType", () => {

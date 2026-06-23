@@ -23,7 +23,6 @@ import docsExtension from "../../src/docs.ts";
 /** Result shape returned by both web_docs tools. */
 type ToolResult = {
   content: { type: "text"; text: string }[];
-  isError?: boolean;
   details?: Record<string, unknown>;
 };
 
@@ -46,28 +45,18 @@ describe("docsExtension", () => {
   describe("web_docs_search", () => {
     it("rejects missing library_name", async () => {
       const tool = getTool(pi, "web_docs_search");
-      const result = (await tool.execute(
-        "tc-1",
-        { query: "how to do X" },
-        undefined,
-        undefined,
-        makeCtx(),
-      )) as ToolResult;
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("library_name");
+
+      await expect(
+        tool.execute("tc-1", { query: "how to do X" }, undefined, undefined, makeCtx()),
+      ).rejects.toThrow("library_name");
     });
 
     it("rejects missing query", async () => {
       const tool = getTool(pi, "web_docs_search");
-      const result = (await tool.execute(
-        "tc-1",
-        { library_name: "react" },
-        undefined,
-        undefined,
-        makeCtx(),
-      )) as ToolResult;
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("query");
+
+      await expect(
+        tool.execute("tc-1", { library_name: "react" }, undefined, undefined, makeCtx()),
+      ).rejects.toThrow("query");
     });
 
     it("returns formatted markdown table of search results", async () => {
@@ -92,8 +81,7 @@ describe("docsExtension", () => {
         makeCtx(),
       )) as ToolResult;
 
-      expect(result.isError).toBeUndefined();
-      expect(mockSearchLibrary).toHaveBeenCalledWith("how to use hooks", "react");
+      expect(mockSearchLibrary).toHaveBeenCalledWith("how to use hooks", "react", undefined);
       expect(result.content[0].text).toContain("React");
       expect(result.content[0].text).toContain("/facebook/react");
       expect(result.content[0].text).toContain("95.5");
@@ -112,7 +100,6 @@ describe("docsExtension", () => {
         makeCtx(),
       )) as ToolResult;
 
-      expect(result.isError).toBeUndefined();
       expect(result.content[0].text).toContain("No libraries found");
     });
   });
@@ -120,28 +107,18 @@ describe("docsExtension", () => {
   describe("web_docs_fetch", () => {
     it("rejects missing library_id", async () => {
       const tool = getTool(pi, "web_docs_fetch");
-      const result = (await tool.execute(
-        "tc-1",
-        { query: "how to do X" },
-        undefined,
-        undefined,
-        makeCtx(),
-      )) as ToolResult;
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("library_id");
+
+      await expect(
+        tool.execute("tc-1", { query: "how to do X" }, undefined, undefined, makeCtx()),
+      ).rejects.toThrow("library_id");
     });
 
     it("rejects missing query", async () => {
       const tool = getTool(pi, "web_docs_fetch");
-      const result = (await tool.execute(
-        "tc-1",
-        { library_id: "/facebook/react" },
-        undefined,
-        undefined,
-        makeCtx(),
-      )) as ToolResult;
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("query");
+
+      await expect(
+        tool.execute("tc-1", { library_id: "/facebook/react" }, undefined, undefined, makeCtx()),
+      ).rejects.toThrow("query");
     });
 
     it("returns markdown content in text mode by default", async () => {
@@ -156,8 +133,12 @@ describe("docsExtension", () => {
         makeCtx(),
       )) as ToolResult;
 
-      expect(result.isError).toBeUndefined();
-      expect(mockGetContext).toHaveBeenCalledWith("how to use hooks", "/facebook/react", false);
+      expect(mockGetContext).toHaveBeenCalledWith(
+        "how to use hooks",
+        "/facebook/react",
+        false,
+        undefined,
+      );
       expect(result.content[0].text).toBe("### React Hooks\n\nContent here");
     });
 
@@ -180,25 +161,42 @@ describe("docsExtension", () => {
         makeCtx(),
       )) as ToolResult;
 
-      expect(result.isError).toBeUndefined();
-      expect(mockGetContext).toHaveBeenCalledWith("useState", "/facebook/react", true);
+      expect(mockGetContext).toHaveBeenCalledWith("useState", "/facebook/react", true, undefined);
       expect(result.content[0].text).toContain("useState");
+    });
+
+    it("truncates large docs output and saves the full response", async () => {
+      mockGetContext.mockResolvedValue(
+        Array.from({ length: 2001 }, (_, index) => `docs line ${index}`).join("\n"),
+      );
+
+      const tool = getTool(pi, "web_docs_fetch");
+      const result = (await tool.execute(
+        "tc-1",
+        { library_id: "/facebook/react", query: "hooks" },
+        undefined,
+        undefined,
+        makeCtx(),
+      )) as ToolResult;
+
+      expect(result.content[0].text).toContain("Output truncated");
+      expect(result.details?.truncation).toMatchObject({ truncated: true });
+      expect(result.details?.fullOutputPath).toMatch(/web-docs-fetch-/);
     });
 
     it("propagates Context7Error", async () => {
       mockGetContext.mockRejectedValue(new MockContext7Error("Library not found"));
 
       const tool = getTool(pi, "web_docs_fetch");
-      const result = (await tool.execute(
-        "tc-1",
-        { library_id: "/invalid/lib", query: "test" },
-        undefined,
-        undefined,
-        makeCtx(),
-      )) as ToolResult;
-
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain("Library not found");
+      await expect(
+        tool.execute(
+          "tc-1",
+          { library_id: "/invalid/lib", query: "test" },
+          undefined,
+          undefined,
+          makeCtx(),
+        ),
+      ).rejects.toThrow("Library not found");
     });
   });
 });

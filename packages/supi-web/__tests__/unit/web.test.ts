@@ -25,36 +25,20 @@ describe("webExtension", () => {
     const pi = createPiMock();
     webExtension(pi as never);
     const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
-    const result = (await tool.execute(
-      "tc-1",
-      { url: "not-a-url" },
-      undefined,
-      undefined,
-      makeCtx(),
-    )) as {
-      content: { text: string }[];
-      isError?: boolean;
-    };
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("URL must be http(s)");
+
+    await expect(
+      tool.execute("tc-1", { url: "not-a-url" }, undefined, undefined, makeCtx()),
+    ).rejects.toThrow("URL must be http(s)");
   });
 
   it("rejects non-http schemes", async () => {
     const pi = createPiMock();
     webExtension(pi as never);
     const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
-    const result = (await tool.execute(
-      "tc-1",
-      { url: "ftp://example.com" },
-      undefined,
-      undefined,
-      makeCtx(),
-    )) as {
-      content: { text: string }[];
-      isError?: boolean;
-    };
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("URL must be http(s)");
+
+    await expect(
+      tool.execute("tc-1", { url: "ftp://example.com" }, undefined, undefined, makeCtx()),
+    ).rejects.toThrow("URL must be http(s)");
   });
 
   it("fetches and returns markdown inline for small content", async () => {
@@ -89,6 +73,43 @@ describe("webExtension", () => {
     expect(result.content[0].text).toBe("# Small\n\nContent");
     expect(result.details?.chars).toBe(16);
     expect(result.details?.lines).toBe(3);
+
+    vi.unstubAllGlobals();
+  });
+
+  it("truncates model-visible inline output and saves full content", async () => {
+    const pi = createPiMock();
+    webExtension(pi as never);
+    const largeMarkdown = Array.from({ length: 2001 }, (_, index) => `line ${index}`).join("\n");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+        if (init?.method === "HEAD") {
+          return new Response("", {
+            status: 200,
+            headers: { "content-type": "text/markdown" },
+          });
+        }
+        return new Response(largeMarkdown, { status: 200 });
+      }),
+    );
+
+    const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
+    const result = (await tool.execute(
+      "tc-1",
+      { url: "https://example.com/huge", output_mode: "inline" },
+      undefined,
+      undefined,
+      makeCtx(),
+    )) as {
+      content: { text: string }[];
+      details?: { fullOutputPath?: string; truncation?: { truncated: boolean } };
+    };
+
+    expect(result.content[0].text).toContain("Output truncated");
+    expect(result.details?.truncation?.truncated).toBe(true);
+    expect(result.details?.fullOutputPath).toMatch(/web-fetch-md-/);
 
     vi.unstubAllGlobals();
   });

@@ -50,7 +50,7 @@ Fetches a public URL and returns clean Markdown.
 ### Output modes
 
 - **`auto`** — returns Markdown inline if ≤15,000 characters; otherwise writes to a temporary file and returns the path
-- **`inline`** — always returns Markdown inline
+- **`inline`** — returns Markdown inline, truncated to PI's model-visible output limit when necessary
 - **`file`** — always writes to a temporary file and returns the path
 
 ### Behavior
@@ -58,6 +58,7 @@ Fetches a public URL and returns clean Markdown.
 - Only accepts real `http://` or `https://` URLs
 - Access-controlled pages (login, paywall) should be skipped — ask the user for an allowed source instead
 - Plain-text responses are wrapped in fenced code blocks
+- Model-visible inline output is truncated to 2,000 lines or 50KB; full truncated output is saved to a temp file
 - Links and images are absolutized by default; set `abs_links: false` to keep them relative
 
 ## `web_docs_search`
@@ -85,7 +86,7 @@ Retrieves documentation context for a known Context7 library.
 | `query` | string | ✓ | — | Specific question about the library |
 | `raw` | boolean | — | `false` | When `true`, returns JSON-serialized snippet objects instead of Markdown |
 
-Default mode returns pre-formatted Markdown. Set `raw: true` when you need structured JSON for programmatic use.
+Default mode returns pre-formatted Markdown. Set `raw: true` when you need structured JSON for programmatic use. Large model-visible responses are truncated to 2,000 lines or 50KB with the full response saved to a temp file.
 
 ## Typical workflow
 

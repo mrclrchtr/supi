@@ -512,6 +512,9 @@ importers:
 
   packages/supi-web:
     dependencies:
+      '@earendil-works/pi-ai':
+        specifier: '*'
+        version: 0.79.10(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.79.10(ws@8.21.0)(zod@4.4.3)

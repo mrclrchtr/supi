@@ -31,6 +31,11 @@ export interface DocSnippet {
   source: string;
 }
 
+/** Request options shared by Context7 REST calls. */
+export interface Context7RequestOptions {
+  signal?: AbortSignal;
+}
+
 function authHeaders(): Record<string, string> {
   const apiKey = process.env.CONTEXT7_API_KEY;
   return apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
@@ -86,12 +91,16 @@ function mapSearchResult(r: ApiSearchResult): SearchResult {
   };
 }
 
-export async function searchLibrary(query: string, libraryName: string): Promise<SearchResult[]> {
+export async function searchLibrary(
+  query: string,
+  libraryName: string,
+  options: Context7RequestOptions = {},
+): Promise<SearchResult[]> {
   const url = new URL(`${BASE_URL}/v2/libs/search`);
   url.searchParams.set("query", query);
   url.searchParams.set("libraryName", libraryName);
 
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await fetch(url, { headers: authHeaders(), signal: options.signal });
 
   if (!response.ok) {
     throw new Context7Error(await parseErrorResponse(response));
@@ -105,12 +114,13 @@ export async function getContext(
   query: string,
   libraryId: string,
   raw?: boolean,
+  options: Context7RequestOptions = {},
 ): Promise<string | DocSnippet[]> {
   const url = new URL(`${BASE_URL}/v2/context`);
   url.searchParams.set("query", query);
   url.searchParams.set("libraryId", libraryId);
 
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await fetch(url, { headers: authHeaders(), signal: options.signal });
 
   if (!response.ok) {
     throw new Context7Error(await parseErrorResponse(response));

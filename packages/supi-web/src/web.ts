@@ -2,43 +2,47 @@
  * SuPi Web extension entry point — registers the `web_fetch_md` tool with pi.
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import type {
+  AgentToolResult,
+  AgentToolUpdateCallback,
+  ExtensionAPI,
+  ExtensionContext,
+  TruncationResult,
+} from "@earendil-works/pi-coding-agent";
 import { htmlToMarkdown, wrapAsCodeBlock } from "./convert.ts";
-import { FetchError, fetchWithNegotiation, isValidHttpUrl } from "./fetch.ts";
+import { fetchWithNegotiation, isValidHttpUrl } from "./fetch.ts";
 import { writeTempFile } from "./temp-file.ts";
+import { getWebToolPromptSurface } from "./tool/guidance.ts";
+import { limitModelVisibleOutput } from "./tool/output.ts";
 import {
-  buildPromptGuidelines,
-  promptSnippet,
-  toolDescription,
-} from "./tool/web-fetch-md-guidance.ts";
+  getWebToolSpec,
+  WEB_FETCH_INLINE_MAX_CHARS,
+  WEB_FETCH_MD_TOOL_NAME,
+  type WebFetchMdInput,
+  type WebFetchOutputMode,
+} from "./tool/tool-specs.ts";
 
-const TOOL_NAME = "web_fetch_md";
-const TOOL_LABEL = "Web Fetch";
-const INLINE_MAX_CHARS = 15_000;
-
-const OutputModeEnum = Type.Union(
-  [Type.Literal("auto"), Type.Literal("inline"), Type.Literal("file")],
-  { default: "auto", description: "Output mode: auto, inline, or file" },
-);
+interface WebFetchDetails extends Record<string, unknown> {
+  chars: number;
+  lines: number;
+  url: string;
+  outputMode: WebFetchOutputMode;
+  filePath?: string;
+  truncation?: TruncationResult;
+  fullOutputPath?: string;
+}
 
 export default function webExtension(pi: ExtensionAPI): void {
+  const spec = getWebToolSpec(WEB_FETCH_MD_TOOL_NAME);
+  const surface = getWebToolPromptSurface(WEB_FETCH_MD_TOOL_NAME);
+
   pi.registerTool({
-    name: TOOL_NAME,
-    label: TOOL_LABEL,
-    description: toolDescription,
-    promptSnippet,
-    promptGuidelines: buildPromptGuidelines(),
-    parameters: Type.Object({
-      url: Type.String({ description: "http(s) URL to fetch" }),
-      output_mode: Type.Optional(OutputModeEnum),
-      abs_links: Type.Optional(
-        Type.Boolean({ description: "Absolutize relative links/images", default: true }),
-      ),
-      timeout_ms: Type.Optional(
-        Type.Number({ description: "Fetch timeout in milliseconds", default: 30_000 }),
-      ),
-    }),
+    name: spec.name,
+    label: spec.label,
+    description: surface.description,
+    promptSnippet: surface.promptSnippet,
+    promptGuidelines: surface.promptGuidelines,
+    parameters: spec.parameters,
     execute: runWebFetch,
   });
 }
@@ -46,61 +50,62 @@ export default function webExtension(pi: ExtensionAPI): void {
 // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
 async function runWebFetch(
   _toolCallId: string,
-  params: Record<string, unknown>,
-  _signal: AbortSignal | undefined,
-  _onUpdate: unknown,
-  _ctx: unknown,
-): Promise<{
-  content: { type: "text"; text: string }[];
-  details: Record<string, unknown>;
-  isError?: boolean;
-}> {
-  const url = String(params.url || "").trim();
+  params: unknown,
+  signal: AbortSignal | undefined,
+  onUpdate: AgentToolUpdateCallback<Record<string, unknown>> | undefined,
+  _ctx: ExtensionContext,
+): Promise<AgentToolResult<WebFetchDetails>> {
+  const input = (params ?? {}) as WebFetchMdInput;
+  const url = String(input.url || "").trim();
   if (!isValidHttpUrl(url)) {
-    return {
-      content: [{ type: "text", text: `Error: URL must be http(s): ${url}` }],
-      isError: true,
-      details: { invalidUrl: url },
-    } as const;
+    throw new Error(`URL must be http(s): ${url}`);
   }
 
-  const outputMode = (params.output_mode as "auto" | "inline" | "file" | undefined) ?? "auto";
-  const absLinks = (params.abs_links as boolean | undefined) ?? true;
-  const timeoutMs = typeof params.timeout_ms === "number" ? params.timeout_ms : 30_000;
+  const outputMode = input.output_mode ?? "auto";
+  const absLinks = input.abs_links ?? true;
+  const timeoutMs = typeof input.timeout_ms === "number" ? input.timeout_ms : 30_000;
 
-  try {
-    const result = await fetchWithNegotiation(url, { timeoutMs });
-    const markdown = await resolveMarkdown(result, absLinks);
-    const lines = markdown.split("\n").length;
-    const chars = markdown.length;
+  onUpdate?.({
+    content: [{ type: "text", text: `Fetching ${url}...` }],
+    details: { url, outputMode },
+  });
 
-    const useFile = outputMode === "file" || (outputMode === "auto" && chars > INLINE_MAX_CHARS);
+  const result = await fetchWithNegotiation(url, { timeoutMs, signal });
+  const markdown = await resolveMarkdown(result, absLinks);
+  const lines = markdown.split("\n").length;
+  const chars = markdown.length;
+  const details: WebFetchDetails = { chars, lines, url: result.url, outputMode };
 
-    if (useFile) {
-      const filePath = await writeTempFile(markdown, "web-fetch-md", ".md");
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Content written to ${filePath} (${chars.toLocaleString()} chars, ${lines.toLocaleString()} lines). Use the read tool to access it.`,
-          },
-        ],
-        details: { filePath, chars, lines, url: result.url },
-      };
-    }
-
+  if (shouldReturnFile(outputMode, chars)) {
+    const filePath = await writeTempFile(markdown, "web-fetch-md", ".md");
     return {
-      content: [{ type: "text", text: markdown }],
-      details: { chars, lines, url: result.url },
-    };
-  } catch (err) {
-    const message = err instanceof FetchError ? err.message : `Unexpected error: ${String(err)}`;
-    return {
-      content: [{ type: "text", text: `Error: ${message}` }],
-      isError: true,
-      details: { url, error: String(err) },
+      content: [
+        {
+          type: "text",
+          text: `Content written to ${filePath} (${chars.toLocaleString()} chars, ${lines.toLocaleString()} lines). Use the read tool to access it.`,
+        },
+      ],
+      details: { ...details, filePath },
     };
   }
+
+  const output = await limitModelVisibleOutput(markdown, {
+    tempPrefix: "web-fetch-md",
+    suffix: ".md",
+  });
+
+  return {
+    content: [{ type: "text", text: output.text }],
+    details: {
+      ...details,
+      truncation: output.truncation,
+      fullOutputPath: output.fullOutputPath,
+    },
+  };
+}
+
+function shouldReturnFile(outputMode: WebFetchOutputMode, chars: number): boolean {
+  return outputMode === "file" || (outputMode === "auto" && chars > WEB_FETCH_INLINE_MAX_CHARS);
 }
 
 async function resolveMarkdown(

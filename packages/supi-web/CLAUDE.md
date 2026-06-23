@@ -28,9 +28,9 @@ src/
 ├── context7-client.ts # REST API client for Context7 (direct fetch, auth header handling)
 ├── docs.ts            # Extension factory — registers web_docs_search + web_docs_fetch tools
 ├── tool/
-│   ├── web-fetch-md-guidance.ts   # prompt surfaces for web_fetch_md
-│   ├── web-docs-search-guidance.ts # prompt surfaces for web_docs_search
-│   └── web-docs-fetch-guidance.ts  # prompt surfaces for web_docs_fetch
+│   ├── tool-specs.ts # single source of truth for tool metadata, schemas, and input types
+│   ├── guidance.ts   # prompt surfaces derived from specs (+ runtime gh guidance)
+│   └── output.ts     # model-visible truncation helpers
 └── index.ts           # Programmatic API exports reused by src/api.ts
 ```
 
@@ -56,6 +56,7 @@ src/
 ### web_fetch_md
 - Only accepts `http://` and `https://` URLs; everything else is rejected with an error
 - `output_mode: auto` (default) returns inline for content ≤15,000 chars; larger content is written to `/tmp/web-fetch-md-*/<hash>.md`
+- Any model-visible inline output is truncated to PI's default 2,000-line / 50KB limit; truncated full output is saved to a temp file
 - `abs_links: true` (default) resolves all relative `href` and `src` to absolute URLs
 - Plain text responses are wrapped in fenced code blocks with a language hint from the URL extension
 
@@ -63,21 +64,22 @@ src/
 - `library_name` (required) — library name to search for (e.g. `react`, `next.js`)
 - `query` (required) — what the agent is trying to do (used for Context7's relevance ranking)
 - Returns a Markdown table of matching libraries; empty results return a clear "not found" message
-- Errors (Context7 API failure, network) are surfaced with `isError: true`
+- Errors (Context7 API failure, network) are signaled by throwing from `execute()` so PI marks the tool result as failed
 
 ### web_docs_fetch
 - `library_id` (required) — Context7 library ID (e.g. `/facebook/react`, `/vercel/next.js/v15.1.8`)
 - `query` (required) — specific question about the library
 - `raw` (optional, default `false`) — when `true`, returns JSON-serialized snippet objects
 - Default text mode returns pre-formatted Markdown from Context7's `type: "txt"` response
-- Errors (library not found, rate limit, Context7Error) are surfaced with `isError: true`
+- Errors (library not found, rate limit, Context7Error) are signaled by throwing from `execute()` so PI marks the tool result as failed
 
 ## Key gotchas
 
 - `turndown-plugin-gfm` has no `@types` package — import uses `@ts-expect-error`
 - `fetchWithNegotiation` is split into 4 internal helpers to stay under Biome cognitive complexity limits
+- `fetchWithNegotiation` and Context7 client calls accept `AbortSignal` and pass it through to abort-aware `fetch()` calls
 - `readPartialText` handles both ReadableStream and plain text Response bodies for the range sniff
-- `Context7Error` is exported from `context7-client.ts` for error handling in `docs.ts`
+- Tool metadata lives in `src/tool/tool-specs.ts`; registration and docs derive names, labels, schemas, snippets, and guidelines from it
 - The `noSecrets` Biome rule false-positives on test `describe()` names — suppress inline when needed
 
 ## Test layout
