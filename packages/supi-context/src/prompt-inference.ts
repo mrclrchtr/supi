@@ -1,6 +1,6 @@
 import type {
   BuildSystemPromptOptions,
-  ExtensionCommandContext,
+  ExtensionContext,
   Skill,
 } from "@earendil-works/pi-coding-agent";
 
@@ -123,7 +123,7 @@ export function extractGuidelinesSection(systemPrompt: string): string | null {
 }
 
 export function deriveOptionsFromSystemPrompt(
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
   cachedOptions: BuildSystemPromptOptions | undefined,
 ): BuildSystemPromptOptions | undefined {
   const systemPrompt = ctx.getSystemPrompt();

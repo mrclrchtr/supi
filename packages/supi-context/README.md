@@ -26,12 +26,15 @@ pi install ./packages/supi-context
 
 ## What you get
 
-After install, pi gets one user command:
+After install, pi gets one user command and an optional agent-callable tool:
 
 - `/supi-context` — render a detailed context-usage report for the current session
 - `/supi-context full` — render the same report with the full guideline and tool-definition lists instead of previews
+- `supi_context` — agent-callable tool (disabled by default; see Configuration)
 
 The command sends a custom `supi-context` message, and this package registers a dedicated renderer so the report shows up as a structured TUI view instead of plain text.
+
+The `supi_context` tool returns the same analysis as JSON, so the agent can inspect context usage programmatically — useful for checking remaining capacity before large operations or after heavy tool results.
 
 ## What the report shows
 
@@ -66,9 +69,21 @@ It includes:
 
 ## Configuration
 
-No settings are required.
+No settings are required for the `/supi-context` command.
 
-This package does not add a model-callable tool; it adds a user command only.
+To enable the `supi_context` agent tool, set `agentToolEnabled` to `true` in your supi config:
+
+```json
+{
+  "supi-context": {
+    "agentToolEnabled": true
+  }
+}
+```
+
+Or toggle it via `/supi-settings` → **Context** → **Agent Tool**, then `/reload`.
+
+The tool is disabled by default and requires a `/reload` or restart after toggling.
 
 ## Notes
 
@@ -79,7 +94,9 @@ This package does not add a model-callable tool; it adds a user command only.
 
 ## Source
 
-- `src/context.ts` — command registration, cached prompt-option handling, and renderer wiring
+- `src/context.ts` — command registration, agent tool registration, cached prompt-option handling, and renderer wiring
+- `src/config.ts` — config loading with `agentToolEnabled` toggle
+- `src/settings-registration.ts` — `/supi-settings` registration for the agent tool toggle
 - `src/analysis.ts` — token accounting, attribution, and report data assembly
 - `src/format.ts` — report orchestration for the TUI view
 - `src/format-helpers.ts` — shared numeric and category helpers for report rendering
@@ -87,6 +104,7 @@ This package does not add a model-callable tool; it adds a user command only.
 - `src/format-sections.ts` — instruction file, context file, skill, guideline, tool, compaction, and provider sections
 - `src/prompt-inference.ts` — fallback recovery of context files, skills, and guideline sections from the live system prompt
 - `src/renderer.ts` — custom renderer for `supi-context` messages
+- `src/tool/guidance.ts` — tool description, prompt snippet, and guidelines for the agent tool
 - `src/utils.ts` — token and plural-format helpers
 
 Tests live under `__tests__/unit/`.

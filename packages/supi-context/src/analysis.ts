@@ -4,7 +4,7 @@ import {
   type BuildSystemPromptOptions,
   buildSessionContext,
   type ExtensionAPI,
-  type ExtensionCommandContext,
+  type ExtensionContext,
   type estimateTokens,
   formatSkillsForPrompt,
   getLatestCompactionEntry,
@@ -508,9 +508,7 @@ function computeToolDefinitions(pi: ExtensionAPI): {
   };
 }
 
-function detectCompaction(
-  branch: ReturnType<ExtensionCommandContext["sessionManager"]["getBranch"]>,
-): {
+function detectCompaction(branch: ReturnType<ExtensionContext["sessionManager"]["getBranch"]>): {
   summarizedTurns: number;
 } | null {
   const compactionEntry = getLatestCompactionEntry(branch);
@@ -559,7 +557,7 @@ export function extractInjectedContextFiles(messages: AgentMessage[]): InjectedF
 }
 
 export function analyzeContext(
-  ctx: ExtensionCommandContext,
+  ctx: ExtensionContext,
   pi: ExtensionAPI,
   cachedOptions: BuildSystemPromptOptions | undefined,
   full = false,

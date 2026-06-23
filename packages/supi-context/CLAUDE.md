@@ -1,6 +1,6 @@
 # supi-context
 
-Detailed context usage report for pi via `/supi-context`.
+Detailed context usage report for pi via `/supi-context` and the `supi_context` agent tool.
 
 ## Scope
 
@@ -11,7 +11,9 @@ Detailed context usage report for pi via `/supi-context`.
 
 ```
 src/
-├── context.ts          # Extension entry — registers /supi-context command
+├── context.ts          # Extension entry — registers /supi-context command + supi_context tool
+├── config.ts           # Config loading (agentToolEnabled toggle)
+├── settings-registration.ts  # /supi-settings registration for the agent tool toggle
 ├── analysis.ts         # Context token breakdown (system, messages, tools, extensions)
 ├── format.ts           # Report orchestration
 ├── format-helpers.ts   # Shared local numeric/category helpers for report rendering
@@ -19,6 +21,8 @@ src/
 ├── format-sections.ts  # File, skill, guideline, tool, compaction, and provider sections
 ├── prompt-inference.ts # Model-specific context window detection
 ├── renderer.ts         # Custom message renderer for TUI display
+├── tool/
+│   └── guidance.ts     # Tool description, prompt snippet, and guidelines
 └── utils.ts            # Token formatting helpers
 __tests__/
 ├── tsconfig.json
@@ -31,6 +35,8 @@ __tests__/
 
 On `/supi-context`, analyzes the current system prompt and calculates token usage breakdowns. Results are sent as a `supi-context` custom message with a TUI-visible summary in `content` and detailed analysis in `details`.
 
+The `supi_context` agent tool returns the same `ContextAnalysis` data as JSON so the agent can inspect context usage programmatically. It is gated on the `agentToolEnabled` config flag (default `false`).
+
 Rendering uses the shared `@mrclrchtr/supi-core/report` helpers for common themed report primitives so other SuPi packages can reuse the same header, row, overflow-hint, and wrapped-text behavior.
 
 ## Gotchas
@@ -38,3 +44,4 @@ Rendering uses the shared `@mrclrchtr/supi-core/report` helpers for common theme
 - `supi-context` caches `event.systemPromptOptions` from `before_agent_start`; when those options are missing or incomplete, `prompt-inference.ts` backfills `contextFiles` and `skills` from the current system prompt.
 - System-prompt breakdown separates native instruction files (`AGENTS.md`, `CLAUDE.md`, etc.) from other `contextFiles`, so changes to pi's context-file loading directly affect the report.
 - Custom message renderers must explicitly display `warning` for all result states, not just `failed`/`timeout`.
+- The `supi_context` tool reads config at extension load time (`process.cwd()`). Toggling `agentToolEnabled` in `/supi-settings` requires `/reload` or a restart to take effect.

@@ -37,7 +37,7 @@ Install individual packages from the table below. For the full stack, install fr
 | `pi install npm:@mrclrchtr/supi-code-intelligence` | Architecture briefs, caller/callee analysis, impact assessment |
 | `pi install npm:@mrclrchtr/supi-ask-user` | Structured decision forms for agent-user handoff |
 | `pi install npm:@mrclrchtr/supi-claude-md` | Subdirectory context injection + CLAUDE.md maintenance skills |
-| `pi install npm:@mrclrchtr/supi-context` | Context window transparency — see what's eating tokens |
+| `pi install npm:@mrclrchtr/supi-context` | Context window transparency — `/supi-context` command + `supi_context` agent tool (opt-in) |
 | `pi install npm:@mrclrchtr/supi-debug` | Diagnostics guardrails + debug event inspection |
 | `pi install npm:@mrclrchtr/supi-extras` | Command aliases, skill shorthand, tab spinner, prompt stash |
 | `pi install npm:@mrclrchtr/supi-bash-timeout` | Default timeouts on bash tool calls |

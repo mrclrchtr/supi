@@ -1,10 +1,17 @@
 import type { BuildSystemPromptOptions, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { analyzeContext } from "./analysis.ts";
+import { loadContextConfig } from "./config.ts";
 import { registerContextRenderer } from "./renderer.ts";
+import { registerContextSettings } from "./settings-registration.ts";
+import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
 import { formatTokens } from "./utils.ts";
 
 export default function contextExtension(pi: ExtensionAPI) {
   let cachedOptions: BuildSystemPromptOptions | undefined;
+
+  // Register settings synchronously during factory
+  registerContextSettings();
 
   pi.on("before_agent_start", async (event) => {
     cachedOptions = event.systemPromptOptions;
@@ -31,4 +38,25 @@ export default function contextExtension(pi: ExtensionAPI) {
   });
 
   registerContextRenderer(pi);
+
+  // ── supi_context agent tool (gated on config) ────────────
+
+  if (loadContextConfig(process.cwd()).agentToolEnabled) {
+    pi.registerTool({
+      name: "supi_context",
+      label: "Context Usage",
+      description: toolDescription,
+      promptSnippet,
+      parameters: Type.Object({}),
+      promptGuidelines,
+      // biome-ignore lint/complexity/useMaxParams: pi tool execute signature
+      async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
+        const analysis = analyzeContext(ctx, pi, cachedOptions, true);
+        return {
+          content: [{ type: "text", text: JSON.stringify(analysis, null, 2) }],
+          details: undefined,
+        };
+      },
+    });
+  }
 }

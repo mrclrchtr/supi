@@ -554,13 +554,18 @@ plan_install() {
 
 build_resync_cmd() {
   local pm="$1"
-  local pkgs="${UPDATE_PACKAGES[*]}"
   case "$pm" in
-    # pnpm pins already-satisfied "*" peer deps in the lockfile; a scoped recursive
-    # update of just the pi packages re-resolves them against the newly pinned version
-    # without touching unrelated deps. npm/yarn/bun re-resolve "*" peers on a plain
-    # install, so no extra step is needed there.
-    pnpm) [[ -n "$pkgs" ]] && printf 'pnpm -r update %s' "$pkgs" ;;
+    # pnpm pins already-satisfied "*" peer resolutions in pnpm-lock.yaml (v9 quotes
+    # scoped names and records a pinned version per importer). After bumping a
+    # pi devDependency to ^NEW, `pnpm install` re-resolves THAT entry but leaves the
+    # `*` peer pins (and their nested node_modules copies in sub-packages) at the OLD
+    # version — a real "version split". `pnpm update` won't help either: per the docs it
+    # only touches dependencies/devDependencies/optionalDependencies, never peerDependencies.
+    # `pnpm dedupe` is the pnpm-native way to re-resolve the whole lockfile so the `*`
+    # peers follow the newly pinned version and the stale nested copies are hoisted away.
+    # npm/yarn/bun resolve `*` peers from the consuming anchor on a plain install, so no
+    # extra step is needed for them.
+    pnpm) printf 'pnpm dedupe' ;;
     *) : ;;
   esac
 }

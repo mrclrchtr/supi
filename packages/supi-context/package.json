@@ -30,7 +30,8 @@
     "README.md"
   ],
   "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*"
+    "@mrclrchtr/supi-core": "workspace:*",
+    "typebox": "*"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-core"
