@@ -608,6 +608,13 @@ describe("code_context details metadata", () => {
           requestedSections: string[];
           omittedCount: number;
           nextQueries: string[];
+          evidenceLists?: Array<{
+            key: string;
+            totalCount: number | null;
+            shownCount: number;
+            omittedCount: number | null;
+            partialReason: string | null;
+          }>;
         };
       };
     };
@@ -622,6 +629,13 @@ describe("code_context details metadata", () => {
         expect.arrayContaining(["defs", "references", "callees"]),
       );
       expect(result.details.data.nextQueries.length).toBeGreaterThan(0);
+      expect(result.details.data.evidenceLists).toContainEqual({
+        key: "callees.calls",
+        totalCount: 1,
+        shownCount: 1,
+        omittedCount: 0,
+        partialReason: null,
+      });
     }
   });
 });

@@ -172,7 +172,7 @@ export const CodeGraphParameters = Type.Object(
       Type.Array(
         StringEnum(["all", "references", "callees", "imports", "exports", "implements", "tests"], {
           description:
-            'Relation families to include in the graph. Use `"all"` to expand to every relation family.',
+            'Relation families to include in the graph. Use `"all"` to expand to every relation family. `callees` is direct structural outgoing-call evidence: source-shape calls in the enclosing scope, not symbol-identity resolution.',
         }),
         {
           description: 'Requested relation families. Defaults to ["references"] when omitted.',

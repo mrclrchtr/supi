@@ -80,7 +80,10 @@ describe("code_graph callees relation", () => {
       { cwd: tmpDir },
     );
     expect(result.content).toContain("Graph of");
-    expect(result.content).toContain("outgoing call");
+    expect(result.content).toContain("Direct structural calls from `foo`");
+    expect(result.content).toContain("direct structural calls");
+    expect(result.content).toContain("Structural only");
+    expect(result.content).toContain("nested function/method/callback scopes");
   });
 
   it("labels callee results as outgoing calls not callers or callees", async () => {
@@ -104,6 +107,7 @@ describe("code_graph callees relation", () => {
       } as unknown as ActionParams,
       { cwd: tmpDir },
     );
-    expect(result.content).toContain("outgoing call");
+    expect(result.content).toContain("direct structural call");
+    expect(result.content).not.toContain("Callers");
   });
 });

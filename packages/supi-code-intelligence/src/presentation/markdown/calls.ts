@@ -3,6 +3,7 @@
  */
 
 import type { CallEntry } from "../../analysis/calls/service.ts";
+import type { CalleeScope } from "../../analysis/relations/types.ts";
 import {
   createEvidenceList,
   type EvidenceListMetadata,
@@ -10,16 +11,20 @@ import {
 } from "../../evidence-list.ts";
 
 export function renderCallsResult(
-  enclosingScopeName: string,
+  enclosingScope: CalleeScope,
   calls: CallEntry[],
   relPath: string,
   maxResults: number,
 ): { content: string; evidenceList: EvidenceListMetadata | null } {
   const lines: string[] = [];
-  lines.push(`# Outgoing calls from \`${enclosingScopeName}\``);
+  lines.push(`# Direct structural calls from \`${enclosingScope.name}\``);
   lines.push("");
   lines.push(
-    `**${calls.length} outgoing call${calls.length > 1 ? "s" : ""}** from \`${enclosingScopeName}\` in \`${relPath}\``,
+    `**${calls.length} direct structural call${calls.length !== 1 ? "s" : ""}** from enclosing scope \`${enclosingScope.name}\` (${formatScopeRange(enclosingScope)}) in \`${relPath}\``,
+  );
+  lines.push("");
+  lines.push(
+    "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._",
   );
   lines.push("");
 
@@ -36,4 +41,9 @@ export function renderCallsResult(
     lines.push(disclosure);
   }
   return { content: lines.join("\n"), evidenceList: evidence.metadata };
+}
+
+function formatScopeRange(scope: CalleeScope): string {
+  if (scope.startLine === scope.endLine) return `L${scope.startLine}`;
+  return `L${scope.startLine}–L${scope.endLine}`;
 }

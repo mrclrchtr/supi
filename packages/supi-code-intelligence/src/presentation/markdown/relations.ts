@@ -37,27 +37,45 @@ export function renderCallersResult(
 // ── Callees ──────────────────────────────────────────────────────────
 
 export function renderCalleesResult(
-  data: { enclosingScope: { name: string }; callees: Array<{ name: string; startLine: number }> },
+  data: {
+    enclosingScope: { name: string; startLine?: number; endLine?: number };
+    callees: Array<{ name: string; startLine: number }>;
+  },
   relPath: string,
   maxResults: number,
 ): string {
   const lines: string[] = [];
-  lines.push(`# Callees of \`${data.enclosingScope.name}\` (structural)`);
+  lines.push(`# Direct structural calls from \`${data.enclosingScope.name}\``);
   lines.push("");
   lines.push(
-    `**${data.callees.length} outgoing call${data.callees.length > 1 ? "s" : ""}** from \`${data.enclosingScope.name}\` in \`${relPath}\``,
+    `**${data.callees.length} direct structural call${data.callees.length !== 1 ? "s" : ""}** from enclosing scope \`${data.enclosingScope.name}\`${formatOptionalScopeRange(data.enclosingScope)} in \`${relPath}\``,
+  );
+  lines.push("");
+  lines.push(
+    "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._",
   );
   lines.push("");
 
-  const shown = data.callees.slice(0, maxResults);
-  for (const c of shown) {
+  const evidence = createEvidenceList({
+    key: "callees.calls",
+    items: data.callees,
+    maxResults,
+  });
+  for (const c of evidence.items) {
     lines.push(`- \`${c.name}\` (L${c.startLine})`);
   }
-  if (data.callees.length > maxResults) {
-    lines.push(`- _+${data.callees.length - maxResults} more_`);
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
   }
   lines.push("");
   return lines.join("\n");
+}
+
+function formatOptionalScopeRange(scope: { startLine?: number; endLine?: number }): string {
+  if (!scope.startLine) return "";
+  if (!scope.endLine || scope.startLine === scope.endLine) return ` (L${scope.startLine})`;
+  return ` (L${scope.startLine}–L${scope.endLine})`;
 }
 
 // ── Imports ─────────────────────────────────────────────────────────

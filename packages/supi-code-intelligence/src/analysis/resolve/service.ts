@@ -236,7 +236,7 @@ function resolveAnchoredInput(
       omittedCount: 0,
       nextQueries: [
         "`code_graph` for usages of this target",
-        '`code_graph` with `relations: ["callees"]` for outgoing calls from this target',
+        '`code_graph` with `relations: ["callees"]` for direct structural outgoing calls from this target',
         "`code_impact` for blast radius",
       ],
     };
@@ -346,7 +346,7 @@ async function resolveQueryTarget(opts: {
       omittedCount: 0,
       nextQueries: [
         "`code_graph` for usages of this target",
-        '`code_graph` with `relations: ["callees"]` for outgoing calls from this target',
+        '`code_graph` with `relations: ["callees"]` for direct structural outgoing calls from this target',
         "`code_impact` for blast radius",
       ],
     };

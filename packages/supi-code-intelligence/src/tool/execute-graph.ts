@@ -366,7 +366,7 @@ async function collectRelation(
           return { kind: "unavailable", rel, message: "No callees available" };
         }
         const rendered = renderCallsResult(
-          result.enclosingScopeName,
+          result.enclosingScope,
           result.calls,
           toDisplayPath(cwd, file),
           maxResults,

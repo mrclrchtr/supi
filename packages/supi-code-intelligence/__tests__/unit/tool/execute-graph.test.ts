@@ -150,7 +150,10 @@ describe("execute-graph (code_graph tool)", () => {
 
       expect(result.content).toContain("Graph of");
       expect(result.content).toContain("_File: `test.ts`_");
-      expect(result.content).toContain("outgoing call");
+      expect(result.content).toContain("direct structural call");
+      expect(result.content).toContain("Direct structural calls from `foo`");
+      expect(result.content).toContain("Structural only");
+      expect(result.content).toContain("nested function/method/callback scopes");
       expect(result.content).toContain("`bar` (L1)");
       expect(result.content).not.toContain("L0");
       expect(result.content).toContain("callees");

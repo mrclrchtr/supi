@@ -103,13 +103,14 @@ function extractScopeName(_type: string, text: string): string {
 // ── Main entrypoint ──────────────────────────────────────────────────
 
 /**
- * Extract structural callee calls for a file at the given position.
+ * Extract direct structural callee calls for a file at the given position.
  *
  * 1. Parses the file with the Tree-sitter runtime.
- * 2. Finds the enclosing function/method scope at the position.
+ * 2. Finds the enclosing function/method/callback scope at the position.
  * 3. Runs a grammar-specific callee query.
- * 4. Filters to captures within the enclosing scope.
- * 5. Deduplicates by name.
+ * 4. Filters to captures within that enclosing scope.
+ * 5. Excludes nested function/method/callback scopes that do not contain the anchor.
+ * 6. Deduplicates by name.
  */
 /** Validate that coordinates are usable and grammar is supported. */
 function validateCalleeInput(
@@ -239,9 +240,9 @@ export async function lookupCalleesAt(
 }
 
 /**
- * Recursively collect line ranges of inner function/method scopes that do not
- * contain the anchor row. Captures from these ranges are excluded so that
- * nested function calls are not attributed to the parent scope.
+ * Recursively collect line ranges of inner function/method/callback scopes that
+ * do not contain the anchor row. Captures from these ranges are excluded so
+ * nested calls are not attributed to the parent scope.
  */
 function collectInnerScopes(
   node: {
@@ -282,7 +283,7 @@ function collectInnerScopes(
 
 /**
  * Filter query captures to only those within the enclosing scope,
- * excluding any that fall within inner nested function scopes.
+ * excluding any that fall within inner nested function/callback scopes.
  */
 function filterCalleeCaptures(
   captures: Array<{ range: SourceRange; text: string }>,

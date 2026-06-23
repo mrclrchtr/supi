@@ -157,6 +157,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **relations**: `["all", "references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`; use `["all"]` for the full graph in one call
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
 - **Each relation annotates its evidence source** in the output. For the `tests` relation, provenance describes **file discovery only** — `semantic+conventions` means semantic references contributed, `conventions-only` means only deterministic path/layout conventions contributed.
+- `callees` reports **direct structural outgoing calls** from the enclosing executable scope at the target anchor. It matches call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes.
 - Test-producing surfaces also include a small structured tests metadata shape in tool details: discovery status/provenance plus per-file label status and extracted labels.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
 - Test-label extraction is tracked separately from discovery provenance. When a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` intentionally instead of helper or variable names.

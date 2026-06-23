@@ -181,6 +181,12 @@ describe("code_context tool", () => {
     expect(result.content[0].text).toContain("## Definitions");
     expect(result.content[0].text).toContain("## References");
     expect(result.content[0].text).toContain("## Callees");
+    expect(result.content[0].text).toContain(
+      "Direct structural callees from enclosing scope `contextTarget`",
+    );
+    expect(result.content[0].text).toContain("Structural only");
+    expect(result.content[0].text).toContain("nested function/method/callback scopes");
+    expect(result.content[0].text).toContain("`helper` (L1)");
     expect(calleesAtSpy).toHaveBeenCalledWith(expect.any(String), 1, 17);
   });
 

@@ -101,7 +101,8 @@ describe("relations render", () => {
       8,
     );
 
-    expect(content).toContain("widget");
+    expect(content).toContain("Direct structural calls from `widget`");
+    expect(content).toContain("Structural only");
     expect(content).toContain("helper");
     expect(content).toContain("L5");
   });

@@ -17,7 +17,15 @@ export interface CallerReference {
   name: string | null;
 }
 
-/** One callee entry from a structural callee lookup. */
+/** Enclosing scope used for direct structural callee lookup. */
+export interface CalleeScope {
+  name: string;
+  file: string;
+  startLine: number;
+  endLine: number;
+}
+
+/** One direct structural callee entry from an enclosing-scope lookup. */
 export interface CalleeEntry {
   name: string;
   file: string;
@@ -63,6 +71,11 @@ export interface RelationsServiceDeps {
     ) => Promise<{
       kind: string;
       data?: {
+        enclosingScope?: {
+          name?: string;
+          startLine?: number;
+          endLine?: number;
+        };
         callees: Array<{
           name: string;
           file?: string;

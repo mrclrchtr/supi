@@ -1,13 +1,13 @@
 /**
- * Calls service — structural outgoing call lookup.
+ * Calls service — direct structural outgoing-call lookup.
  *
- * V1 supports outgoing calls only. Does not claim or implement
- * true incoming call hierarchy.
+ * V1 reports direct structural callees only. It does not claim or implement
+ * true incoming call hierarchy or symbol-identity resolution.
  */
 
 import type { ConfidenceMode } from "../../types.ts";
 import { collectCallees } from "../relations/callees.ts";
-import type { RelationsServiceDeps } from "../relations/types.ts";
+import type { CalleeScope, RelationsServiceDeps } from "../relations/types.ts";
 
 export interface CallEntry {
   name: string;
@@ -18,13 +18,13 @@ export interface CallEntry {
 export interface CallsResult {
   kind: "calls";
   targetName: string;
-  enclosingScopeName: string;
+  enclosingScope: CalleeScope;
   calls: CallEntry[];
   confidence: ConfidenceMode;
 }
 
 /**
- * Collect structural outgoing calls at a target file/position.
+ * Collect direct structural outgoing calls at a target file/position.
  */
 // biome-ignore lint/complexity/useMaxParams: service wrapper matching underlying provider contract
 export async function collectOutgoingCalls(
@@ -47,8 +47,12 @@ export async function collectOutgoingCalls(
   return {
     kind: "calls",
     targetName: calleeResult.targetName,
-    enclosingScopeName:
-      calleeResult.kind === "callees" ? (targetName ?? "symbol") : (targetName ?? "symbol"),
+    enclosingScope: calleeResult.enclosingScope ?? {
+      name: targetName ?? "symbol",
+      file: targetFile,
+      startLine: targetLine,
+      endLine: targetLine,
+    },
     calls: calleeResult.callees.map((c) => ({
       name: c.name,
       file: c.file,

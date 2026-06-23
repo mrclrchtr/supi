@@ -38,7 +38,7 @@ export interface SymbolAnchor {
  * A discovered symbol / declaration.
  *
  * Per ADR 0003, anchors are split so position-strict substrates
- * (tree-sitter `calleesAt`, LSP `rename`) cannot silently consume a
+ * (structural callee lookup, LSP `rename`) cannot silently consume a
  * declaration anchor (the `export` keyword) as if it were the identifier.
  * - `declarationAnchor` is always present (the defining node start).
  * - `nameAnchor` is best-effort (the identifier token), present when the
@@ -203,6 +203,12 @@ export type RefactorResult =
 
 // ── Structural data shapes (value types, range-flattened) ──────────────
 
+/**
+ * Direct structural outgoing calls from the enclosing executable scope at a
+ * position. Callee names are source-shape facts, not resolved symbol
+ * identities, and nested function/callback scopes are excluded from the outer
+ * scope.
+ */
 export interface CalleesData {
   enclosingScope: { name: string; startLine: number; endLine: number };
   callees: Array<{ name: string; startLine: number }>;

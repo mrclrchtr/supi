@@ -140,6 +140,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_imp
 - **maxResults** caps per-relation output
 - Each relation dispatched to appropriate substrate (semantic for references/implements, structural for callees)
 - Best-effort per relation: unavailable substrates skip with a note rather than failing the entire call
+- `callees` reports direct structural outgoing calls from the enclosing executable scope at the target anchor. It matches call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using the shared helper in `src/analysis/relations/tests.ts`. Discovery combines semantic import/reference evidence with deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`, same-directory companions). `code_graph`, `code_context`, and `code_impact` all use the same discovery path — any divergence is a bug.
 - File-level expansion not supported — requires precise target (anchored coords or targetId)
 

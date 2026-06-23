@@ -108,6 +108,10 @@ _Avoid_: structural analysis, syntax-only analysis
 Code understanding based on source shape and syntax, such as imports, exports, outlines, and call-like structure, without requiring symbol identity.
 _Avoid_: semantic analysis, symbol-aware analysis
 
+**Structural callee**:
+A syntax-derived outgoing-call evidence atom from the enclosing executable scope at a target anchor. Structural callees name the call expression as written; they are not symbol-identity evidence. Calls inside nested functions, methods, or callbacks are not attributed to the outer scope.
+_Avoid_: semantic callee, caller, reference, treating nested callback calls as direct parent calls
+
 **Refactor plan**:
 A stored, fingerprinted description of a proposed code refactor — its target, operation (e.g. rename or extract), and the exact text edits — produced for inspection and applied later, never silently. Non-mutating by construction.
 _Avoid_: "refactor action", "code action result" (those are advisory, not stored plans)

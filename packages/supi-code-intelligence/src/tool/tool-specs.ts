@@ -143,9 +143,10 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
       "Use code_graph to find references, outgoing calls, and implementations for a target.",
-      'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for outgoing calls or `relations: ["implements"]` for implementations.',
+      'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for direct structural outgoing calls or `relations: ["implements"]` for implementations.',
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
       'Use `relations: ["all"]` to expand to every relation family in one call.',
+      "In code_graph, `callees` is structural/direct-scope evidence: it reports call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes. Use `references` on a resolved target for identity-aware incoming callers.",
       "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test labels. The tests relation displays discovery provenance (`semantic+conventions` or `conventions-only`) separately from placeholder output such as `_(no recognized test blocks)_`.",
       "After code_graph, follow up with code_context on individual results for type or definition context.",
       "code_graph uses `scope` (not `path`) for workspace-relative directory/package filtering.",

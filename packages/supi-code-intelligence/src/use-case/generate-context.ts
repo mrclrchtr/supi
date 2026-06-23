@@ -10,7 +10,12 @@ import {
   renderRankedTestLabelsForMarkdown,
   type TestSurfaceDetails,
 } from "../analysis/relations/tests.ts";
-import type { EvidenceListMetadata } from "../evidence-list.ts";
+import type { CalleeScope } from "../analysis/relations/types.ts";
+import {
+  createEvidenceList,
+  type EvidenceListMetadata,
+  renderEvidenceListDisclosure,
+} from "../evidence-list.ts";
 import {
   type RenderedContextSection,
   renderContextResult,
@@ -295,6 +300,7 @@ async function buildRequestedSection(options: {
       return {
         section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
         omittedCount: result.omittedCount,
+        evidenceLists: result.evidenceList ? [result.evidenceList] : [],
         hasStructuralEvidence: result.hasStructuralEvidence,
         hasSemanticEvidence: false,
       };
@@ -767,7 +773,12 @@ async function buildCalleesSection(
   target: ContextTarget | null | undefined,
   deps: ContextDeps,
   limit: number,
-): Promise<{ lines: string[]; omittedCount: number; hasStructuralEvidence: boolean }> {
+): Promise<{
+  lines: string[];
+  omittedCount: number;
+  evidenceList?: EvidenceListMetadata;
+  hasStructuralEvidence: boolean;
+}> {
   if (!target) {
     return {
       lines: ["Callees unavailable without a precise target."],
@@ -805,17 +816,41 @@ async function buildCalleesSection(
 
   if (calls.calls.length === 0) {
     return {
-      lines: ["No callees found."],
+      lines: [
+        `No direct structural callees found in enclosing scope \`${calls.enclosingScope.name}\` (${formatCalleeScopeRange(calls.enclosingScope)}).`,
+        "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._",
+      ],
       omittedCount: 0,
       hasStructuralEvidence: calls.confidence === "structural",
     };
   }
 
+  const evidence = createEvidenceList({
+    key: "callees.calls",
+    items: calls.calls,
+    maxResults: limit,
+  });
+  const lines = [
+    `Direct structural callees from enclosing scope \`${calls.enclosingScope.name}\` (${formatCalleeScopeRange(calls.enclosingScope)}).`,
+    "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._",
+    ...evidence.items.map((entry) => `- \`${entry.name}\` (L${entry.line})`),
+  ];
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
+  }
+
   return {
-    lines: calls.calls.map((entry) => `- \`${entry.name}\``),
-    omittedCount: 0,
+    lines,
+    omittedCount: evidence.metadata.omittedCount ?? 0,
+    evidenceList: evidence.metadata,
     hasStructuralEvidence: calls.confidence === "structural",
   };
+}
+
+function formatCalleeScopeRange(scope: Pick<CalleeScope, "startLine" | "endLine">): string {
+  if (scope.startLine === scope.endLine) return `L${scope.startLine}`;
+  return `L${scope.startLine}–L${scope.endLine}`;
 }
 
 function formatFocusTarget(target: ContextTarget, cwd: string): string {
