@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.14.3](https://github.com/mrclrchtr/supi/compare/v1.14.2...v1.14.3) (2026-06-23)
+
+
+### Bug Fixes
+
+* **deps:** update vscode-languageserver-node ([e9c5ff2](https://github.com/mrclrchtr/supi/commit/e9c5ff2688bb966677bdab2f434ecf805c176319))
+* **supi-ask-user:** align tool behavior with pi guidance ([669e7de](https://github.com/mrclrchtr/supi/commit/669e7de291f60a92dfbe6a5f4f077dee9d11a93e))
+* **supi-ask-user:** clarify recommendation semantics in guidance and error messages ([60d5a96](https://github.com/mrclrchtr/supi/commit/60d5a96e57b8267dafb1800c23ea1c25911e1ef6))
+
 ## [1.14.2](https://github.com/mrclrchtr/supi/compare/v1.14.1...v1.14.2) (2026-06-22)
 
 
