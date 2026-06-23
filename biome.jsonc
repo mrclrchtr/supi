@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!.agents/skills"]
+    "includes": ["**", "!.agents/skills", "!.pi/skills", "!.claude/skills"]
   },
   "formatter": {
     "enabled": true,
