@@ -68,13 +68,12 @@ export async function collectCallers(
     }
   }
 
-  const limit = maxResults ?? 5;
-  const limited = inProject.slice(0, limit);
+  void maxResults;
 
   return {
     kind: "callers",
     targetName: targetName ?? "symbol",
-    references: limited,
+    references: inProject,
     externalCount,
     evidence: "semantic-references",
     confidence: "semantic",

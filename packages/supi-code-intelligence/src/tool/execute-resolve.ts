@@ -76,8 +76,17 @@ export async function executeResolveTool(
   if (result.kind === "resolved") {
     const details: ResolveDetails = {
       confidence: result.confidence,
-      targetCount: result.targets.length,
+      targetCount: result.targets.length + result.omittedCount,
       omittedCount: result.omittedCount,
+      evidenceLists: [
+        {
+          key: "resolve.targets",
+          totalCount: result.targets.length + result.omittedCount,
+          shownCount: result.targets.length,
+          omittedCount: result.omittedCount,
+          partialReason: null,
+        },
+      ],
       targets: result.targets.map((t) => ({
         targetId: t.targetId,
         spanId: t.spanId,
@@ -97,8 +106,17 @@ export async function executeResolveTool(
   if (result.kind === "disambiguation") {
     const details: ResolveDetails = {
       confidence: "semantic",
-      targetCount: 0,
+      targetCount: result.candidates.length + result.omittedCount,
       omittedCount: result.omittedCount,
+      evidenceLists: [
+        {
+          key: "resolve.candidates",
+          totalCount: result.candidates.length + result.omittedCount,
+          shownCount: result.candidates.length,
+          omittedCount: result.omittedCount,
+          partialReason: null,
+        },
+      ],
       targets: [],
       candidates: result.candidates.map((c) => ({
         targetId: c.targetId,

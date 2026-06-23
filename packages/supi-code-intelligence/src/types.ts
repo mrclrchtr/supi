@@ -19,6 +19,7 @@ export type {
 
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
+import type { EvidenceListMetadata } from "./evidence-list.ts";
 import type { PrioritySignalsSummary } from "./prioritization-signals.ts";
 
 export type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
@@ -31,6 +32,7 @@ export interface BriefDetails {
   publicSurfaces: string[];
   dependencySummary: { moduleCount: number; edgeCount: number } | null;
   omittedCount: number;
+  evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
   prioritySignals?: PrioritySignalsSummary | null;
 }
@@ -41,6 +43,7 @@ export interface SearchDetails {
   scope: string | null;
   candidateCount: number;
   omittedCount: number;
+  evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
   tests?: TestSurfaceDetails;
 }
@@ -56,6 +59,7 @@ export interface AffectedDetails {
   /** Concrete test commands to run relevant verification. */
   likelyTestCommands: string[];
   omittedCount: number;
+  evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
   prioritySignals?: PrioritySignalsSummary | null;
   tests?: TestSurfaceDetails;
@@ -87,6 +91,7 @@ export interface ResolveDetails {
   confidence: ConfidenceMode;
   targetCount: number;
   omittedCount: number;
+  evidenceLists?: EvidenceListMetadata[];
   targets: Array<{
     targetId: string;
     spanId: string;
@@ -120,6 +125,7 @@ export interface ContextDetails {
   requestedSections: string[];
   renderedSections: string[];
   omittedCount: number;
+  evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
   tests?: TestSurfaceDetails;
 }
@@ -129,6 +135,7 @@ export interface InspectDetails {
   confidence: ConfidenceMode;
   focusTarget: string;
   unavailableSections: string[];
+  evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
 }
 
@@ -139,6 +146,7 @@ export interface HealthDetails {
   recovered: boolean;
   diagnosticFileCount: number;
   serverCount: number;
+  evidenceLists?: EvidenceListMetadata[];
 }
 
 /** Tool result shape returned by executeAction. */

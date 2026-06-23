@@ -1,3 +1,4 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: health orchestration keeps public sections together
 /**
  * Tool executor for code_health.
  *
@@ -10,6 +11,7 @@ import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type { SessionLspService, SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
+import { createEvidenceList, type EvidenceListMetadata } from "../evidence-list.ts";
 import { gatherGitContext } from "../git-context.ts";
 import { evaluateCoverageWarnings, gatherCoverageEvalInput } from "../lsp/coverage-warnings.ts";
 import {
@@ -106,6 +108,8 @@ export async function executeHealthTool(
     degradedCoverage: degradedCoverage.hasWarnings ? degradedCoverage : undefined,
   };
 
+  const evidenceLists = buildHealthEvidenceLists(gitContext);
+
   const content = renderHealthResult(data, cwd);
   return {
     content,
@@ -117,9 +121,23 @@ export async function executeHealthTool(
         recovered: data.recovered,
         diagnosticFileCount: data.diagnostics.length,
         serverCount: data.servers.length,
+        evidenceLists,
       },
     },
   };
+}
+
+function buildHealthEvidenceLists(
+  gitContext: ReturnType<typeof gatherGitContext>,
+): EvidenceListMetadata[] {
+  if (!gitContext) return [];
+  return [
+    createEvidenceList({
+      key: "health.dirtyFiles",
+      items: gitContext.dirtyFiles,
+      maxResults: 5,
+    }).metadata,
+  ];
 }
 
 function needsPrioritizationSignals(included: HealthSection[]): boolean {

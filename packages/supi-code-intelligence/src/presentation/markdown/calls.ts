@@ -3,13 +3,18 @@
  */
 
 import type { CallEntry } from "../../analysis/calls/service.ts";
+import {
+  createEvidenceList,
+  type EvidenceListMetadata,
+  renderEvidenceListDisclosure,
+} from "../../evidence-list.ts";
 
 export function renderCallsResult(
   enclosingScopeName: string,
   calls: CallEntry[],
   relPath: string,
   maxResults: number,
-): string {
+): { content: string; evidenceList: EvidenceListMetadata | null } {
   const lines: string[] = [];
   lines.push(`# Outgoing calls from \`${enclosingScopeName}\``);
   lines.push("");
@@ -18,12 +23,17 @@ export function renderCallsResult(
   );
   lines.push("");
 
-  const shown = calls.slice(0, maxResults);
-  for (const c of shown) {
+  const evidence = createEvidenceList({
+    key: "callees.calls",
+    items: calls,
+    maxResults,
+  });
+  for (const c of evidence.items) {
     lines.push(`- \`${c.name}\` (L${c.line})`);
   }
-  if (calls.length > maxResults) {
-    lines.push(`- _+${calls.length - maxResults} more_`);
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
   }
-  return lines.join("\n");
+  return { content: lines.join("\n"), evidenceList: evidence.metadata };
 }

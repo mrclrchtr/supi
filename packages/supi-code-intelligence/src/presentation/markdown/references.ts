@@ -3,6 +3,7 @@
  */
 
 import type { ReferenceEntry } from "../../analysis/references/service.ts";
+import type { EvidenceListMetadata } from "../../evidence-list.ts";
 import { toDisplayPath } from "../../search-helpers.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
 
@@ -14,7 +15,7 @@ export function renderReferencesResult(
   confidence: string,
   cwd: string,
   maxResults: number,
-): string {
+): { content: string; evidenceList: EvidenceListMetadata | null } {
   const lines: string[] = [];
   lines.push(`# References of \`${symbolName}\``);
   lines.push("");
@@ -28,6 +29,6 @@ export function renderReferencesResult(
     file: toDisplayPath(cwd, r.file),
     line: r.line,
   }));
-  formatReferenceList(lines, refLines, maxResults);
-  return lines.join("\n");
+  const evidenceList = formatReferenceList(lines, refLines, maxResults);
+  return { content: lines.join("\n"), evidenceList };
 }

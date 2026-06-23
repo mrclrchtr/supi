@@ -19,6 +19,7 @@ import {
   storePlan,
 } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
+import { createEvidenceList } from "../evidence-list.ts";
 import { renderRefactorPlanResult } from "../presentation/markdown/refactor.ts";
 import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult } from "../types.ts";
@@ -116,6 +117,11 @@ export async function executeRefactorPlanTool(
   };
   storePlan(plan);
 
+  const editEvidence = createEvidenceList({
+    key: "refactor.edits",
+    items: refactorResult.edits.edits,
+    maxResults: 5,
+  }).metadata;
   const content = renderRefactorPlanResult(plan, ctx.cwd);
 
   return {
@@ -126,7 +132,8 @@ export async function executeRefactorPlanTool(
         confidence: "semantic" as const,
         scope: null,
         candidateCount: refactorResult.edits.edits.length,
-        omittedCount: 0,
+        omittedCount: editEvidence.omittedCount ?? 0,
+        evidenceLists: [editEvidence],
         nextQueries: [`Use code_refactor_apply with planId: "${planId}" to apply this refactor`],
       },
     },

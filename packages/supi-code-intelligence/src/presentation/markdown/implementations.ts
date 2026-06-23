@@ -3,6 +3,11 @@
  */
 
 import type { ImplementationEntry } from "../../analysis/implementations/service.ts";
+import {
+  createEvidenceList,
+  type EvidenceListMetadata,
+  renderEvidenceListDisclosure,
+} from "../../evidence-list.ts";
 import { toDisplayPath } from "../../search-helpers.ts";
 import { compactLineRanges } from "../../use-case/support/semantic-references.ts";
 
@@ -27,7 +32,7 @@ export function renderImplementationsResult(
   cwd: string,
   maxResults: number,
   targetName?: string,
-): string {
+): { content: string; evidenceList: EvidenceListMetadata | null } {
   const lines: string[] = [];
   lines.push(
     targetName
@@ -39,20 +44,21 @@ export function renderImplementationsResult(
     lines.push(`**${impls.length} implementation${impls.length !== 1 ? "s" : ""}** in the project`);
     lines.push("");
 
-    const byFile = groupByFile(impls, cwd);
-    let shown = 0;
+    const evidence = createEvidenceList({
+      key: "implements.locations",
+      items: impls,
+      maxResults,
+    });
+    const byFile = groupByFile(evidence.items, cwd);
     for (const [file, locations] of byFile) {
-      if (shown >= maxResults) break;
       lines.push(`### ${file}`);
       lines.push(`- ${compactLineRanges(locations)}`);
       lines.push("");
-      shown++;
     }
 
-    if (byFile.size > maxResults) {
-      lines.push(
-        `_+${byFile.size - maxResults} more files omitted. Narrow with \`path\` or increase \`maxResults\`._`,
-      );
+    const disclosure = renderEvidenceListDisclosure(evidence);
+    if (disclosure) {
+      lines.push(disclosure);
     }
   }
 
@@ -63,5 +69,11 @@ export function renderImplementationsResult(
     lines.push("");
   }
 
-  return lines.join("\n");
+  return {
+    content: lines.join("\n"),
+    evidenceList:
+      impls.length > 0
+        ? createEvidenceList({ key: "implements.locations", items: impls, maxResults }).metadata
+        : null,
+  };
 }

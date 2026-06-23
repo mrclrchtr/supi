@@ -163,6 +163,72 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     expect(result.content[0].text).toContain("extract_function");
   });
 
+  it("discloses truncated refactor edit previews in markdown and details", async () => {
+    const { projectDir, file } = createProjectFile();
+    getDefaultWorkspaceRuntime().registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: Array.from({ length: 6 }, (_, index) => ({
+              file,
+              range: {
+                start: { line: index, character: 0 },
+                end: { line: index, character: 7 },
+              },
+              newText: `newName${index}`,
+            })),
+          },
+        }),
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_refactor_plan");
+
+    const result = (await tool.execute(
+      "workflow-refactor-truncated-preview",
+      {
+        operation: "rename_symbol",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: projectDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "search";
+        data: {
+          omittedCount: number;
+          evidenceLists?: Array<{
+            key: string;
+            totalCount: number | null;
+            shownCount: number;
+            omittedCount: number | null;
+          }>;
+        };
+      };
+    };
+
+    expect(result.content[0].text).toContain("newName0");
+    expect(result.content[0].text).not.toContain("newName5");
+    expect(result.content[0].text).toContain("_(showing 5 of 6; 1 omitted)_");
+    expect(result.details?.data.omittedCount).toBe(1);
+    expect(result.details?.data.evidenceLists).toContainEqual({
+      key: "refactor.edits",
+      totalCount: 6,
+      shownCount: 5,
+      omittedCount: 1,
+      partialReason: null,
+    });
+  });
+
   it("accepts the legacy rename alias on code_refactor_plan and canonicalizes it", async () => {
     const { projectDir, file } = createProjectFile();
     getDefaultWorkspaceRuntime().registerSemantic(

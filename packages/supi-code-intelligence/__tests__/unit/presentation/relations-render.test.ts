@@ -127,7 +127,7 @@ describe("relations render", () => {
   });
 
   it("renders imports result with module specifiers and line numbers", () => {
-    const content = renderImportsResult(
+    const result = renderImportsResult(
       "widget",
       [
         { moduleSpecifier: "./helper", startLine: 1 },
@@ -136,6 +136,7 @@ describe("relations render", () => {
       "src/widget.ts",
       8,
     );
+    const { content } = result;
 
     expect(content).toContain("# Imports");
     expect(content).toContain("structural");
@@ -152,16 +153,23 @@ describe("relations render", () => {
       startLine: i + 1,
     }));
 
-    const content = renderImportsResult("widget", imports, "src/widget.ts", 3);
+    const result = renderImportsResult("widget", imports, "src/widget.ts", 3);
+    const { content } = result;
 
     expect(content).toContain("10 imports");
     expect(content).toContain("./module-0");
     expect(content).toContain("./module-2");
-    expect(content).toContain("+7 more");
+    expect(content).toContain("showing 3 of 10; 7 omitted");
+    expect(result.evidenceList).toMatchObject({
+      key: "imports.modules",
+      totalCount: 10,
+      shownCount: 3,
+      omittedCount: 7,
+    });
   });
 
   it("renders exports result with names, kinds, and line numbers", () => {
-    const content = renderExportsResult(
+    const result = renderExportsResult(
       "widget",
       [
         { name: "foo", kind: "function", startLine: 1 },
@@ -170,6 +178,7 @@ describe("relations render", () => {
       "src/widget.ts",
       8,
     );
+    const { content } = result;
 
     expect(content).toContain("# Exports");
     expect(content).toContain("structural");
@@ -189,11 +198,18 @@ describe("relations render", () => {
       startLine: i + 1,
     }));
 
-    const content = renderExportsResult("widget", exports, "src/widget.ts", 3);
+    const result = renderExportsResult("widget", exports, "src/widget.ts", 3);
+    const { content } = result;
 
     expect(content).toContain("8 exports");
     expect(content).toContain("sym0");
     expect(content).toContain("sym2");
-    expect(content).toContain("+5 more");
+    expect(content).toContain("showing 3 of 8; 5 omitted");
+    expect(result.evidenceList).toMatchObject({
+      key: "exports.symbols",
+      totalCount: 8,
+      shownCount: 3,
+      omittedCount: 5,
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createEvidenceList, renderEvidenceListDisclosure } from "./evidence-list.ts";
 
 function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next = { ...env };
@@ -32,10 +33,7 @@ export function gatherGitContext(cwd: string): GitContext | null {
 
     const status = execGit(cwd, ["status", "--porcelain"]).trim();
 
-    const dirtyFiles = status
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => line.slice(3).trim());
+    const dirtyFiles = status.split("\n").filter(Boolean).map(parsePorcelainPath);
 
     let lastCommitMessage: string | null = null;
     try {
@@ -59,11 +57,17 @@ export function formatGitContext(ctx: GitContext): string {
     lines.push(
       `Uncommitted: ${ctx.dirtyFiles.length} file${ctx.dirtyFiles.length !== 1 ? "s" : ""}`,
     );
-    for (const f of ctx.dirtyFiles.slice(0, 5)) {
+    const evidence = createEvidenceList({
+      key: "health.dirtyFiles",
+      items: ctx.dirtyFiles,
+      maxResults: 5,
+    });
+    for (const f of evidence.items) {
       lines.push(`- \`${f}\``);
     }
-    if (ctx.dirtyFiles.length > 5) {
-      lines.push(`- _+${ctx.dirtyFiles.length - 5} more_`);
+    const disclosure = renderEvidenceListDisclosure(evidence);
+    if (disclosure) {
+      lines.push(disclosure);
     }
   } else {
     lines.push("Working tree clean.");
@@ -73,4 +77,13 @@ export function formatGitContext(ctx: GitContext): string {
   }
   lines.push("");
   return lines.join("\n");
+}
+
+function parsePorcelainPath(line: string): string {
+  const rawPath = line[2] === " " ? line.slice(3) : line.slice(2);
+  const renameSeparator = " -> ";
+  const renamedPath = rawPath.includes(renameSeparator)
+    ? (rawPath.split(renameSeparator).at(-1) ?? rawPath)
+    : rawPath;
+  return renamedPath.trim();
 }

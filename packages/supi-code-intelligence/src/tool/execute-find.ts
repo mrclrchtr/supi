@@ -11,6 +11,7 @@
 import { type CodeSymbol, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
+import { createEvidenceList, renderEvidenceListDisclosure } from "../evidence-list.ts";
 import { resolveScope } from "../search-helpers.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
@@ -280,14 +281,17 @@ function renderSemanticResults(
   cwd: string,
 ): CodeIntelResult {
   const max = params.maxResults ?? 8;
-  const shown = symbols.slice(0, max);
-  const omitted = symbols.length - shown.length;
+  const evidence = createEvidenceList({
+    key: "find.semanticSymbols",
+    items: symbols,
+    maxResults: max,
+  });
 
   const lines = [
     `**Semantic search** — \`${query}\` (${symbols.length} symbol${symbols.length !== 1 ? "s" : ""} found)`,
   ];
 
-  for (const sym of shown) {
+  for (const sym of evidence.items) {
     const kindLabel = sym.kind ? ` [${sym.kind}]` : "";
     const container = sym.container ? ` (in ${sym.container})` : "";
     const fileRel = sym.file.startsWith(cwd) ? sym.file.slice(cwd.length + 1) : sym.file;
@@ -295,8 +299,9 @@ function renderSemanticResults(
     lines.push(`- \`${sym.name}\`${kindLabel}${container} — \`${fileRel}:${anchor.line}\``);
   }
 
-  if (omitted > 0) {
-    lines.push(`  _+${omitted} more omitted — narrow \`query\` or increase \`maxResults\`_`);
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
   }
 
   return {
@@ -307,7 +312,8 @@ function renderSemanticResults(
         confidence: "semantic",
         scope: params.scope ?? null,
         candidateCount: symbols.length,
-        omittedCount: omitted,
+        omittedCount: evidence.metadata.omittedCount ?? 0,
+        evidenceLists: [evidence.metadata],
         nextQueries: [
           'Use `mode: "text"` for literal text search',
           'Use `mode: "ast"` with `kind` for structural filtering',

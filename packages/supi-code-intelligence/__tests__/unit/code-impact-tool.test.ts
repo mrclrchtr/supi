@@ -123,6 +123,75 @@ describe("code_impact tool", () => {
     }
   });
 
+  it("discloses truncated target reference evidence in markdown and details", async () => {
+    writeFileSync(path.join(tmpDir, "index.ts"), "export const foo = 1;\n");
+    writeFileSync(path.join(tmpDir, "consumer-a.ts"), "foo;\n");
+    writeFileSync(path.join(tmpDir, "consumer-b.ts"), "foo;\n");
+    registerMockProvider(tmpDir, {
+      exports: async () => ({
+        kind: "success" as const,
+        data: [
+          {
+            name: "foo",
+            kind: "const",
+            startLine: 1,
+            startCharacter: 14,
+            endLine: 1,
+            endCharacter: 17,
+          },
+        ],
+      }),
+      references: async () => [
+        {
+          uri: `file://${path.join(tmpDir, "consumer-a.ts")}`,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+        },
+        {
+          uri: `file://${path.join(tmpDir, "consumer-b.ts")}`,
+          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
+        },
+      ],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi);
+    const impactTool = getTool(pi, "code_impact");
+
+    const result = (await impactTool.execute(
+      "impact-reference-truncation",
+      { targetId, maxResults: 1 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "impact";
+        data?: {
+          omittedCount?: number;
+          evidenceLists?: Array<{
+            key: string;
+            totalCount: number | null;
+            shownCount: number;
+            omittedCount: number | null;
+          }>;
+        };
+      };
+    };
+
+    expect(result.content[0].text).toContain("consumer-a.ts");
+    expect(result.content[0].text).not.toContain("consumer-b.ts");
+    expect(result.content[0].text).toContain("_(showing 1 of 2; 1 omitted)_");
+    expect(result.details?.data?.evidenceLists).toContainEqual({
+      key: "references.locations",
+      totalCount: 2,
+      shownCount: 1,
+      omittedCount: 1,
+      partialReason: null,
+    });
+  });
+
   it("accepts changedFiles with includeTests without requiring an anchored target", async () => {
     writeFileSync(path.join(tmpDir, "src.ts"), "export const changed = true;\n");
     writeFileSync(

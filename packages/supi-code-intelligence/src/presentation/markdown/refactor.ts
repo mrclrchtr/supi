@@ -4,6 +4,7 @@
 
 import type { ApplyResult } from "../../analysis/refactor/apply-workspace-edit.ts";
 import type { RefactorPlan } from "../../analysis/refactor/plan-store.ts";
+import { createEvidenceList, renderEvidenceListDisclosure } from "../../evidence-list.ts";
 import { toDisplayPath } from "../../search-helpers.ts";
 
 export interface RefactorRenderInput {
@@ -61,7 +62,12 @@ export function renderRefactorPlanResult(plan: RefactorPlan, cwd: string): strin
   lines.push("");
   lines.push("## Preview");
   lines.push("");
-  for (const edit of plan.edits.edits.slice(0, 5)) {
+  const editEvidence = createEvidenceList({
+    key: "refactor.edits",
+    items: plan.edits.edits,
+    maxResults: 5,
+  });
+  for (const edit of editEvidence.items) {
     const range = edit.range;
     lines.push(
       `- \`${toDisplayPath(cwd, edit.file)}\` L${range.start.line + 1}:${range.start.character} → L${range.end.line + 1}:${range.end.character}`,
@@ -70,8 +76,9 @@ export function renderRefactorPlanResult(plan: RefactorPlan, cwd: string): strin
     lines.push(`  ${edit.newText.slice(0, 80).split("\n").join("\n  ")}`);
     lines.push("  ```");
   }
-  if (plan.edits.edits.length > 5) {
-    lines.push(`_+${plan.edits.edits.length - 5} more edits_`);
+  const disclosure = renderEvidenceListDisclosure(editEvidence);
+  if (disclosure) {
+    lines.push(disclosure);
   }
   lines.push("");
   lines.push("**This is a preview. No files were changed.**");

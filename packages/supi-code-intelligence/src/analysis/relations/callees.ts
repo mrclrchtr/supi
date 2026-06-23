@@ -42,7 +42,8 @@ export async function collectCallees(
     };
   }
 
-  const callees: CalleeEntry[] = result.data.callees.slice(0, maxResults ?? 8).map((c) => ({
+  void maxResults;
+  const callees: CalleeEntry[] = result.data.callees.map((c) => ({
     name: c.name,
     file: c.file ?? c.location ?? targetFile,
     line: c.startLine ?? targetLine,

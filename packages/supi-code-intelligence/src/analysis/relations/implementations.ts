@@ -64,13 +64,12 @@ export async function collectImplementations(
     }
   }
 
-  const limit = maxResults ?? 8;
-  const limited = project.slice(0, limit);
+  void maxResults;
 
   return {
     kind: "implementations",
     targetName: targetName ?? "symbol",
-    implementations: limited,
+    implementations: project,
     externalCount,
     confidence: "semantic",
   };

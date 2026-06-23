@@ -1,4 +1,8 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  type EvidenceListMetadata,
+  renderEvidenceListMetadataDisclosure,
+} from "../../evidence-list.ts";
 
 export interface InspectRenderInput {
   relPath: string;
@@ -31,6 +35,7 @@ export interface InspectRenderInput {
   definitions: Array<{ file: string; line: number; character: number }>;
   diagnostics: Array<{ line: number; severity: number | string; message: string }>;
   codeActions: Array<{ title: string; kind?: string }>;
+  codeActionEvidence?: EvidenceListMetadata;
   unavailableSections: string[];
 }
 
@@ -100,6 +105,12 @@ export function renderInspectResult(input: InspectRenderInput): string {
     for (const action of input.codeActions) {
       const kind = action.kind ? ` (${action.kind})` : "";
       lines.push(`- "${action.title}"${kind}`);
+    }
+    if (input.codeActionEvidence) {
+      const disclosure = renderEvidenceListMetadataDisclosure(input.codeActionEvidence);
+      if (disclosure) {
+        lines.push(disclosure);
+      }
     }
     lines.push("");
   }

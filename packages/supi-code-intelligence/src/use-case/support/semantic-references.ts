@@ -6,6 +6,11 @@ import type {
   ConfidenceMode,
   SemanticProvider as SemanticSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  createEvidenceList,
+  type EvidenceListMetadata,
+  renderEvidenceListDisclosure,
+} from "../../evidence-list.ts";
 import { filterOutDeclaration, isInProjectPath, uriToFile } from "../../search-helpers.ts";
 import { dedupeFileLineRefs, highestConfidence } from "../../semantic-action-helpers.ts";
 import type { ResolvedTarget } from "../../target-resolution.ts";
@@ -102,35 +107,40 @@ export function compactLineRanges(lines: number[]): string {
 
 /**
  * Append a formatted reference list to a lines array.
- * Groups refs by file, compacts line numbers into concise labels, and caps total files at maxResults.
+ * Groups shown refs by file, compacts line numbers into concise labels, and
+ * caps reference-location atoms at maxResults.
  */
 export function formatReferenceList(
   lines: string[],
   refs: FileLineRef[],
   maxResults: number,
-): void {
-  if (refs.length === 0) return;
+): EvidenceListMetadata | null {
+  if (refs.length === 0) return null;
+
+  const evidence = createEvidenceList({
+    key: "references.locations",
+    items: refs,
+    maxResults,
+  });
 
   const byFile = new Map<string, number[]>();
-  for (const ref of refs) {
+  for (const ref of evidence.items) {
     const group = byFile.get(ref.file) ?? [];
     group.push(ref.line);
     byFile.set(ref.file, group);
   }
 
-  let shown = 0;
   for (const [file, locations] of byFile) {
-    if (shown >= maxResults) break;
     lines.push(`### ${file}`);
     const label = compactLineRanges(locations);
     lines.push(`- ${label}`);
     lines.push("");
-    shown++;
   }
 
-  if (byFile.size > maxResults) {
-    lines.push(
-      `_+${byFile.size - maxResults} more files omitted. Narrow with \`path\` or increase \`maxResults\`._`,
-    );
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
   }
+
+  return evidence.metadata;
 }

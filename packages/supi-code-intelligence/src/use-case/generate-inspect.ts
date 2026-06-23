@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import { createEvidenceList } from "../evidence-list.ts";
 import { renderInspectResult } from "../presentation/markdown/inspect.ts";
 import { normalizePath } from "../search-helpers.ts";
 import { gatherNearbyDiagnostics, gatherTreeSitterContext } from "./gather-context.ts";
@@ -81,6 +82,13 @@ export async function executeInspect(
     hasDiagnostics: diagnostics.length > 0,
   });
 
+  const maxResults = input.maxResults ?? 5;
+  const codeActions = createEvidenceList({
+    key: "inspect.codeActions",
+    items: context.codeActions ?? [],
+    maxResults,
+  });
+
   const nextQueries = buildNextQueries(relPath, input.line, input.character, confidence);
   const content = renderInspectResult({
     relPath,
@@ -99,7 +107,8 @@ export async function executeInspect(
     hover: context.hover?.contents ?? null,
     definitions,
     diagnostics,
-    codeActions: context.codeActions ?? [],
+    codeActions: codeActions.items,
+    codeActionEvidence: codeActions.metadata,
     unavailableSections: dedupe(unavailableSections),
   });
 
@@ -109,6 +118,7 @@ export async function executeInspect(
       confidence,
       focusTarget: `${relPath}:${input.line}:${input.character}`,
       unavailableSections: dedupe(unavailableSections),
+      evidenceLists: [codeActions.metadata],
       nextQueries,
     },
   };

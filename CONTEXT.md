@@ -68,6 +68,38 @@ _Avoid_: package table row
 The set of agent-facing capabilities that help understand, navigate, search, and refactor code.
 _Avoid_: code intel, IDE features
 
+**Honest correctness**:
+The code-intelligence result standard that a tool must either report evidence-backed facts or explicitly say why it cannot. Silent guessing, silent truncation, silent scope widening, and silent fallback to a weaker substrate are incorrect even when they look helpful.
+_Avoid_: best-effort correctness, "probably right", hiding degraded evidence
+
+**Truncation disclosure**:
+The honest-correctness invariant that a partial result must say it is partial. When a tool omits matching evidence because of a result cap, the user and agent must be able to distinguish "there are no more results" from "more results exist but were not shown".
+_Avoid_: silent truncation, hidden caps, treating capped output as complete evidence
+
+**Tool evidence**:
+The facts in a public code-intelligence result that a user or agent may rely on to make a coding decision, such as matched targets, references, diagnostics, test files, test labels, imports, exports, callees, implementations, affected files, source-file listings, dependency facts, planned refactor edits, or exposed code-action facts. Decorative summaries, next-step hints, and UI-only chrome are not tool evidence.
+_Avoid_: treating every rendered list as evidence, hiding evidence limits in presentation details
+
+**Evidence list**:
+A bounded collection of tool evidence with explicit completeness metadata: which evidence atoms are shown and whether the list is complete. Normal public-tool paths compute exact totals and omitted counts. Unknown totals are reserved for exceptional interruption or provider-limited results, such as timeout, safety-limit, interrupted enumeration, or an upstream provider that cannot expose a true total, and must carry an explicit partial reason instead of pretending exact completeness. Markdown and structured details should describe the same evidence list rather than computing truncation separately.
+_Avoid_: raw capped arrays, renderer-only omission math, details-only omission math, inventing exact totals, using unknown totals as a routine performance shortcut
+
+**Actionable list**:
+A bounded list of generated executable or check actions a user or agent may run, such as verification commands. Actionable lists are not tool evidence, but they follow the same truncation-disclosure rule because omitting actions silently can mislead follow-up work. Prose navigation hints such as `nextQueries` are guidance chrome, not actionable lists.
+_Avoid_: silently capped command lists, treating generated actions as evidence facts, treating all hints as actions
+
+**Evidence atom**:
+One fact that can independently support a coding decision. Evidence-list totals and omitted counts are expressed in evidence atoms, not rendered rows or grouping containers. For example, reference locations count as references even when displayed under grouped file headings, and individual diagnostic messages count as diagnostics even when grouped by file.
+_Avoid_: counting visual rows as facts, treating file groups as references
+
+**Result cap**:
+A display limit for public tool evidence, not a normal-path collection limit. A capped result may show fewer evidence atoms than exist, but it must still disclose the exact total and omitted count unless exceptional interruption prevents exact counting.
+_Avoid_: treating `maxResults` as permission to stop counting evidence, silent early-stop search
+
+**Evidence ordering**:
+The rule for choosing which evidence atoms are shown when a result cap applies. Domain-specific ranking is preserved when it is meaningful, such as semantic/search relevance; otherwise evidence atoms are ordered deterministically by stable facts such as file, line, or name.
+_Avoid_: accidental provider order, random truncation, sorting away meaningful relevance
+
 **Semantic analysis**:
 Code understanding based on symbol identity and relationships, such as definitions, references, implementations, and renames.
 _Avoid_: structural analysis, syntax-only analysis

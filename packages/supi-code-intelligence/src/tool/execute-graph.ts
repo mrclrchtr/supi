@@ -258,6 +258,13 @@ export async function executeGraphTool(
       : "unavailable";
 
   const tests = sections.find((section) => section.rel === "tests")?.tests;
+  const evidenceLists = sections.flatMap((section) =>
+    section.kind === "ok" ? (section.evidenceLists ?? []) : [],
+  );
+  const omittedCount = evidenceLists.reduce(
+    (sum, evidenceList) => sum + (evidenceList.omittedCount ?? 0),
+    0,
+  );
 
   return {
     content,
@@ -270,7 +277,8 @@ export async function executeGraphTool(
           if (s.kind === "ok") return sum + s.count;
           return sum;
         }, 0),
-        omittedCount: 0,
+        omittedCount,
+        evidenceLists,
         nextQueries: [
           "`code_context` on individual results for deeper context",
           "`code_impact` for impact analysis",
@@ -305,17 +313,14 @@ async function collectRelation(
         if (!provider?.references) {
           return { kind: "unavailable", rel, message: "No semantic provider for references" };
         }
-        const result: ReferencesResult = await collectReferences(
-          file,
-          position,
-          displayName,
-          { cwd, provider: { references: provider.references } },
-          maxResults,
-        );
+        const result: ReferencesResult = await collectReferences(file, position, displayName, {
+          cwd,
+          provider: { references: provider.references },
+        });
         if (result.confidence === "unavailable") {
           return { kind: "unavailable", rel, message: "No references available" };
         }
-        const content = renderReferencesResult(
+        const rendered = renderReferencesResult(
           displayName,
           result.references,
           result.externalCount,
@@ -323,7 +328,13 @@ async function collectRelation(
           cwd,
           maxResults,
         );
-        return { kind: "ok", rel, count: result.references.length, content };
+        return {
+          kind: "ok",
+          rel,
+          count: result.references.length,
+          content: rendered.content,
+          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
+        };
       }
 
       case "callees": {
@@ -336,18 +347,23 @@ async function collectRelation(
           position.character + 1,
           displayName,
           { cwd, provider: { calleesAt: provider.calleesAt } },
-          maxResults,
         );
         if (result.confidence === "unavailable") {
           return { kind: "unavailable", rel, message: "No callees available" };
         }
-        const calleeContent = renderCallsResult(
+        const rendered = renderCallsResult(
           result.enclosingScopeName,
           result.calls,
           toDisplayPath(cwd, file),
           maxResults,
         );
-        return { kind: "ok", rel, count: result.calls.length, content: calleeContent };
+        return {
+          kind: "ok",
+          rel,
+          count: result.calls.length,
+          content: rendered.content,
+          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
+        };
       }
 
       case "implements": {
@@ -370,14 +386,20 @@ async function collectRelation(
         const filtered = result.implementations.filter(
           (impl) => !(impl.file === file && impl.line === targetLine),
         );
-        const content = renderImplementationsResult(
+        const rendered = renderImplementationsResult(
           filtered,
           result.externalCount,
           cwd,
           maxResults,
           displayName,
         );
-        return { kind: "ok", rel, count: filtered.length, content };
+        return {
+          kind: "ok",
+          rel,
+          count: filtered.length,
+          content: rendered.content,
+          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
+        };
       }
 
       case "imports": {
@@ -392,13 +414,19 @@ async function collectRelation(
           moduleSpecifier: entry.moduleSpecifier,
           startLine: entry.startLine,
         }));
-        const importContent = renderImportsResult(
+        const rendered = renderImportsResult(
           displayName,
           flatImports,
           toDisplayPath(cwd, file),
           maxResults,
         );
-        return { kind: "ok", rel, count: flatImports.length, content: importContent };
+        return {
+          kind: "ok",
+          rel,
+          count: flatImports.length,
+          content: rendered.content,
+          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
+        };
       }
 
       case "exports": {
@@ -414,13 +442,19 @@ async function collectRelation(
           kind: entry.kind,
           startLine: entry.startLine,
         }));
-        const exportContent = renderExportsResult(
+        const rendered = renderExportsResult(
           displayName,
           flatExports,
           toDisplayPath(cwd, file),
           maxResults,
         );
-        return { kind: "ok", rel, count: flatExports.length, content: exportContent };
+        return {
+          kind: "ok",
+          rel,
+          count: flatExports.length,
+          content: rendered.content,
+          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
+        };
       }
 
       case "tests": {

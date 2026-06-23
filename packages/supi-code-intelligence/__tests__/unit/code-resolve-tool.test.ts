@@ -643,14 +643,37 @@ describe("code_resolve tool", () => {
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
-    )) as { content: Array<{ type: string; text: string }> };
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "resolve";
+        data: {
+          omittedCount: number;
+          evidenceLists?: Array<{
+            key: string;
+            totalCount: number | null;
+            shownCount: number;
+            omittedCount: number | null;
+          }>;
+        };
+      };
+    };
 
     // Should be disambiguation (3 ambiguous matches, narrowed to 1)
     expect(result.content[0].text).toContain("Multiple matches");
+    expect(result.content[0].text).toContain("_(showing 1 of 3; 2 omitted)_");
     // Count the candidate entries: should have exactly 1, not all 3
     const lines = result.content[0].text.split("\n");
     const targetIdLines = lines.filter((l) => l.includes("Target ID:"));
     expect(targetIdLines.length).toBe(1);
+    expect(result.details?.data.omittedCount).toBe(2);
+    expect(result.details?.data.evidenceLists).toContainEqual({
+      key: "resolve.candidates",
+      totalCount: 3,
+      shownCount: 1,
+      omittedCount: 2,
+      partialReason: null,
+    });
   });
 
   it("respects maxResults for disambiguation (maxResults=3 returns up to 3)", async () => {

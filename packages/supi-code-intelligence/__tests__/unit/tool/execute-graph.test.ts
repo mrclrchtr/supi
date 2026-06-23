@@ -68,6 +68,55 @@ describe("execute-graph (code_graph tool)", () => {
       expect(result.content).toContain("Graph of");
       expect(result.content).toContain("reference");
     });
+
+    it("discloses truncated references in markdown and details", async () => {
+      writeSource("test.ts", "export function foo() { return 1; }\n");
+      writeSource("consumer-a.ts", "foo();\n");
+      writeSource("consumer-b.ts", "foo();\n");
+      registerMockProvider(tmpDir, {
+        references: async () => [
+          {
+            uri: `file://${tmpDir}/consumer-a.ts`,
+            range: {
+              start: { line: 0, character: 0 },
+              end: { line: 0, character: 3 },
+            },
+          },
+          {
+            uri: `file://${tmpDir}/consumer-b.ts`,
+            range: {
+              start: { line: 0, character: 0 },
+              end: { line: 0, character: 3 },
+            },
+          },
+        ],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 18,
+          maxResults: 1,
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("consumer-a.ts");
+      expect(result.content).not.toContain("consumer-b.ts");
+      expect(result.content).toContain("_(showing 1 of 2; 1 omitted)_");
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type !== "search") return;
+      expect(result.details.data.omittedCount).toBe(1);
+      expect(result.details.data.evidenceLists).toContainEqual({
+        key: "references.locations",
+        totalCount: 2,
+        shownCount: 1,
+        omittedCount: 1,
+        partialReason: null,
+      });
+    });
   });
 
   describe("callees relation", () => {
@@ -100,6 +149,149 @@ describe("execute-graph (code_graph tool)", () => {
       expect(result.content).toContain("`bar` (L1)");
       expect(result.content).not.toContain("L0");
       expect(result.content).toContain("callees");
+    });
+
+    it("discloses truncated structural relation evidence", async () => {
+      writeSource(
+        "test.ts",
+        "import { a } from './a';\nimport { b } from './b';\nexport const x = foo();\nexport const y = bar();\n",
+      );
+      registerMockProvider(tmpDir, {
+        calleesAt: async (_file, _line, _char) => ({
+          kind: "success",
+          data: {
+            enclosingScope: { name: "test", startLine: 1, endLine: 4 },
+            callees: [
+              { name: "foo", startLine: 3, endLine: 3 },
+              { name: "bar", startLine: 4, endLine: 4 },
+            ],
+          },
+        }),
+        imports: async () => ({
+          kind: "success",
+          data: [
+            {
+              moduleSpecifier: "./a",
+              startLine: 1,
+              startCharacter: 1,
+              endLine: 1,
+              endCharacter: 24,
+            },
+            {
+              moduleSpecifier: "./b",
+              startLine: 2,
+              startCharacter: 1,
+              endLine: 2,
+              endCharacter: 24,
+            },
+          ],
+        }),
+        exports: async () => ({
+          kind: "success",
+          data: [
+            {
+              name: "x",
+              kind: "const",
+              startLine: 3,
+              startCharacter: 1,
+              endLine: 3,
+              endCharacter: 22,
+            },
+            {
+              name: "y",
+              kind: "const",
+              startLine: 4,
+              startCharacter: 1,
+              endLine: 4,
+              endCharacter: 22,
+            },
+          ],
+        }),
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 3,
+          character: 16,
+          relations: ["callees", "imports", "exports"],
+          maxResults: 1,
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("_(showing 1 of 2; 1 omitted)_");
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type !== "search") return;
+      expect(result.details.data.omittedCount).toBe(3);
+      expect(result.details.data.evidenceLists).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            key: "callees.calls",
+            totalCount: 2,
+            shownCount: 1,
+            omittedCount: 1,
+          }),
+          expect.objectContaining({
+            key: "imports.modules",
+            totalCount: 2,
+            shownCount: 1,
+            omittedCount: 1,
+          }),
+          expect.objectContaining({
+            key: "exports.symbols",
+            totalCount: 2,
+            shownCount: 1,
+            omittedCount: 1,
+          }),
+        ]),
+      );
+    });
+  });
+
+  describe("implementations relation", () => {
+    it("discloses truncated implementation locations in markdown and details", async () => {
+      writeSource("test.ts", "interface Service { run(): void }\n");
+      writeSource("impl-a.ts", "class A implements Service { run() {} }\n");
+      writeSource("impl-b.ts", "class B implements Service { run() {} }\n");
+      registerMockProvider(tmpDir, {
+        implementation: async () => [
+          {
+            uri: `file://${tmpDir}/impl-a.ts`,
+            range: { start: { line: 0, character: 6 }, end: { line: 0, character: 7 } },
+          },
+          {
+            uri: `file://${tmpDir}/impl-b.ts`,
+            range: { start: { line: 0, character: 6 }, end: { line: 0, character: 7 } },
+          },
+        ],
+      });
+
+      const result = await executeAction(
+        {
+          action: "graph",
+          file: "test.ts",
+          line: 1,
+          character: 11,
+          relations: ["implements"],
+          maxResults: 1,
+        } as unknown as ActionParams,
+        { cwd: tmpDir },
+      );
+
+      expect(result.content).toContain("impl-a.ts");
+      expect(result.content).not.toContain("impl-b.ts");
+      expect(result.content).toContain("_(showing 1 of 2; 1 omitted)_");
+      expect(result.details?.type).toBe("search");
+      if (result.details?.type !== "search") return;
+      expect(result.details.data.evidenceLists).toContainEqual({
+        key: "implements.locations",
+        totalCount: 2,
+        shownCount: 1,
+        omittedCount: 1,
+        partialReason: null,
+      });
     });
   });
 

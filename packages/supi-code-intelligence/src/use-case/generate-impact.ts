@@ -16,6 +16,7 @@ import {
   type TestSurfaceDetails,
 } from "../analysis/relations/tests.ts";
 import { resolveTarget } from "../analysis/targeting/resolve-target.ts";
+import { createEvidenceList, type EvidenceListMetadata } from "../evidence-list.ts";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../model.ts";
 import {
   AFFECTED_COMPATIBILITY_NOTE,
@@ -238,12 +239,18 @@ async function executeSingleImpact(
           cwd,
         });
 
+  const referenceEvidence = createEvidenceList({
+    key: "references.locations",
+    items: refs.refs,
+    maxResults,
+  }).metadata;
   const detailsData = buildDetailsData(
     analysis,
     refs.refs.length,
     computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, input),
     buildTargetNextQueries(target, symbolName, cwd),
     prioritySignals,
+    [referenceEvidence],
   );
 
   return {
@@ -907,6 +914,7 @@ function buildDetailsData(
   omittedCount: number,
   nextQueries: string[],
   prioritySignals: AffectedDetails["prioritySignals"],
+  evidenceLists: EvidenceListMetadata[] = [],
 ): AffectedDetails | ImpactDetails {
   return {
     confidence: analysis.confidence,
@@ -917,6 +925,7 @@ function buildDetailsData(
     likelyTests: analysis.likelyTests,
     likelyTestCommands: analysis.likelyTestCommands,
     omittedCount,
+    evidenceLists,
     nextQueries,
     prioritySignals,
     tests: analysis.tests,

@@ -74,7 +74,6 @@ export async function executePattern(
         summary: input.summary,
       })
     : runRipgrep(input.pattern, scopePath, deps.cwd, {
-        maxMatches: input.summary ? undefined : maxResults * 3,
         contextLines,
         literal: true,
         filterLowSignal: true,
@@ -100,20 +99,24 @@ export async function executePattern(
     file: toDisplayPath(deps.cwd, m.file),
   }));
 
-  const content = input.summary
-    ? renderPatternSummary(input.pattern, relScope, displayMatches, maxResults)
+  const rendered = input.summary
+    ? {
+        content: renderPatternSummary(input.pattern, relScope, displayMatches, maxResults),
+        evidenceList: undefined,
+      }
     : renderPatternResults(input.pattern, relScope, displayMatches, maxResults);
 
   const details: SearchDetails = {
     confidence: "heuristic",
     scope: input.path ?? null,
     candidateCount: matches.length,
-    omittedCount: 0,
+    omittedCount: rendered.evidenceList?.omittedCount ?? 0,
+    evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
     nextQueries: input.regex
       ? ["Set `regex: false` for literal matching"]
       : ["Set `regex: true` for regex matching"],
   };
-  return { content, details: { type: "search" as const, data: details } };
+  return { content: rendered.content, details: { type: "search" as const, data: details } };
 }
 
 // ── Structured search ────────────────────────────────────────────────
@@ -125,7 +128,7 @@ async function executeStructuredSearch(
   scopePath: string,
   cwd: string,
   relScope: string,
-  _maxResults: number,
+  maxResults: number,
   provider: CodeProvider | null,
 ): Promise<CodeIntelResult> {
   if (!provider) {
@@ -180,15 +183,18 @@ async function executeStructuredSearch(
     };
   }
 
+  const rendered = renderStructuredMatches(input.pattern, kind, relScope, structured, maxResults);
+
   return {
-    content: renderStructuredMatches(input.pattern, kind, relScope, structured),
+    content: rendered.content,
     details: {
       type: "search",
       data: {
         confidence: "structural",
         scope: input.path ?? null,
         candidateCount: structured.matches.length,
-        omittedCount: structured.omittedCount,
+        omittedCount: structured.omittedCount + (rendered.evidenceList.omittedCount ?? 0),
+        evidenceLists: [rendered.evidenceList],
         nextQueries: [
           "Omit `kind` for plain text matches",
           "Use `summary: true` for broader textual distribution",
@@ -236,7 +242,6 @@ function getRegexMatches(options: {
   summary?: boolean;
 }): RgMatch[] | string {
   const result = runRipgrepDetailed(options.pattern, options.scopePath, options.cwd, {
-    maxMatches: options.summary ? undefined : options.maxResults * 3,
     contextLines: options.contextLines,
     filterLowSignal: true,
   });

@@ -204,6 +204,46 @@ describe("code_find tool", () => {
       expect(text).not.toContain("c.ts");
     });
 
+    it("discloses truncated text matches in markdown and details", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
+      writeFileSync(path.join(tmpDir, "b.ts"), "const foo = 2;\n");
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-text-truncation",
+        { query: "foo", maxResults: 1 },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult & {
+        details?: {
+          type: "search";
+          data: {
+            omittedCount: number;
+            evidenceLists?: Array<{
+              key: string;
+              totalCount: number | null;
+              shownCount: number;
+              omittedCount: number | null;
+            }>;
+          };
+        };
+      };
+
+      const text = result.content[0].text;
+      expect(text).toContain("a.ts");
+      expect(text).not.toContain("b.ts");
+      expect(text).toContain("_(showing 1 of 2; 1 omitted)_");
+      expect(result.details?.data.omittedCount).toBe(1);
+      expect(result.details?.data.evidenceLists).toContainEqual({
+        key: "find.textMatches",
+        totalCount: 2,
+        shownCount: 1,
+        omittedCount: 1,
+        partialReason: null,
+      });
+    });
+
     it("returns regex matches in regex mode", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const fooBar = 1;\nconst fooBaz = 2;");
       writeFileSync(path.join(tmpDir, "b.ts"), "const barOnly = 3;");
@@ -450,6 +490,69 @@ describe("code_find tool", () => {
       expect(result.content[0].text).toContain("a.ts");
     });
 
+    it("discloses truncated AST matches in markdown and details", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "export const alpha = 1;\nexport const beta = 2;\n");
+      registerMockProvider(tmpDir, {
+        outline: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: "alpha",
+              kind: "variable",
+              startLine: 1,
+              startCharacter: 14,
+              endLine: 1,
+              endCharacter: 19,
+              children: [],
+            },
+            {
+              name: "beta",
+              kind: "variable",
+              startLine: 2,
+              startCharacter: 14,
+              endLine: 2,
+              endCharacter: 18,
+              children: [],
+            },
+          ],
+        }),
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-ast-truncation",
+        { query: "a", mode: "ast", kind: "definition", maxResults: 1 },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult & {
+        details?: {
+          type: "search";
+          data: {
+            omittedCount: number;
+            evidenceLists?: Array<{
+              key: string;
+              totalCount: number | null;
+              shownCount: number;
+              omittedCount: number | null;
+            }>;
+          };
+        };
+      };
+
+      const text = result.content[0].text;
+      expect(text).toContain("alpha");
+      expect(text).not.toContain("beta");
+      expect(text).toContain("_(showing 1 of 2; 1 omitted)_");
+      expect(result.details?.data.evidenceLists).toContainEqual({
+        key: "find.astMatches",
+        totalCount: 2,
+        shownCount: 1,
+        omittedCount: 1,
+        partialReason: null,
+      });
+    });
+
     it("finds full-expression call sites with a real tree-sitter provider", async () => {
       const srcDir = path.join(tmpDir, "src");
       mkdirSync(srcDir, { recursive: true });
@@ -549,6 +652,62 @@ describe("code_find tool", () => {
       const text = result.content[0].text;
       expect(text).toContain("myFunc");
       expect(text).toContain("a.ts");
+    });
+
+    it("discloses truncated semantic symbols in markdown and details", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "export function one() {}\n");
+      writeFileSync(path.join(tmpDir, "b.ts"), "export function two() {}\n");
+      registerMockProvider(tmpDir, {
+        workspaceSymbols: async () => [
+          {
+            name: "one",
+            kind: "function",
+            file: path.join(tmpDir, "a.ts"),
+            declarationAnchor: { line: 1, character: 17 },
+          },
+          {
+            name: "two",
+            kind: "function",
+            file: path.join(tmpDir, "b.ts"),
+            declarationAnchor: { line: 1, character: 17 },
+          },
+        ],
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-semantic-truncation",
+        { query: "o", mode: "semantic", maxResults: 1 },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult & {
+        details?: {
+          type: "search";
+          data: {
+            omittedCount: number;
+            evidenceLists?: Array<{
+              key: string;
+              totalCount: number | null;
+              shownCount: number;
+              omittedCount: number | null;
+            }>;
+          };
+        };
+      };
+
+      const text = result.content[0].text;
+      expect(text).toContain("one");
+      expect(text).not.toContain("two");
+      expect(text).toContain("_(showing 1 of 2; 1 omitted)_");
+      expect(result.details?.data.omittedCount).toBe(1);
+      expect(result.details?.data.evidenceLists).toContainEqual({
+        key: "find.semanticSymbols",
+        totalCount: 2,
+        shownCount: 1,
+        omittedCount: 1,
+        partialReason: null,
+      });
     });
 
     it("respects scope in semantic mode and normalizes leading @", async () => {

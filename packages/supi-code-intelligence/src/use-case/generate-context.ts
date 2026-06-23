@@ -10,6 +10,7 @@ import {
   renderRankedTestLabelsForMarkdown,
   type TestSurfaceDetails,
 } from "../analysis/relations/tests.ts";
+import type { EvidenceListMetadata } from "../evidence-list.ts";
 import {
   type RenderedContextSection,
   renderContextResult,
@@ -125,6 +126,7 @@ async function executeSectionMode(
   let hasStructural = false;
   let hasSemantic = false;
   let tests: TestSurfaceDetails | undefined;
+  const evidenceLists: EvidenceListMetadata[] = [];
 
   for (const section of requestedSections) {
     const built = await buildRequestedSection({
@@ -136,6 +138,7 @@ async function executeSectionMode(
     });
     sections.push(built.section);
     omittedCount += built.omittedCount;
+    evidenceLists.push(...(built.evidenceLists ?? []));
     hasStructural = hasStructural || built.hasStructuralEvidence;
     hasSemantic = hasSemantic || built.hasSemanticEvidence;
     tests ??= built.tests;
@@ -154,6 +157,7 @@ async function executeSectionMode(
     requestedSections,
     renderedSections: sections.map((s) => s.key),
     omittedCount,
+    evidenceLists,
     nextQueries: [],
     tests,
   };
@@ -184,6 +188,7 @@ async function executeTaskContext(
   let hasStructural = false;
   let hasSemantic = false;
   let tests: TestSurfaceDetails | undefined;
+  const evidenceLists: EvidenceListMetadata[] = [];
 
   const treeContext = await maybeGatherTreeContext(input.target, deps, requestedSections);
 
@@ -197,6 +202,7 @@ async function executeTaskContext(
     });
     sections.push(built.section);
     omittedCount += built.omittedCount;
+    evidenceLists.push(...(built.evidenceLists ?? []));
     hasStructural = hasStructural || built.hasStructuralEvidence;
     hasSemantic = hasSemantic || built.hasSemanticEvidence;
     tests ??= built.tests;
@@ -215,6 +221,7 @@ async function executeTaskContext(
     requestedSections,
     renderedSections: sections.map((section) => section.key),
     omittedCount,
+    evidenceLists,
     nextQueries,
     tests,
   };
@@ -238,6 +245,7 @@ async function buildRequestedSection(options: {
 }): Promise<{
   section: RenderedContextSection;
   omittedCount: number;
+  evidenceLists?: EvidenceListMetadata[];
   hasStructuralEvidence: boolean;
   hasSemanticEvidence: boolean;
   tests?: TestSurfaceDetails;
@@ -277,6 +285,7 @@ async function buildRequestedSection(options: {
       return {
         section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
         omittedCount: result.omittedCount,
+        evidenceLists: result.evidenceList ? [result.evidenceList] : [],
         hasStructuralEvidence: false,
         hasSemanticEvidence: result.hasSemanticEvidence,
       };
@@ -699,7 +708,12 @@ async function buildReferenceSection(
   target: ContextTarget | null | undefined,
   deps: ContextDeps,
   limit: number,
-): Promise<{ lines: string[]; omittedCount: number; hasSemanticEvidence: boolean }> {
+): Promise<{
+  lines: string[];
+  omittedCount: number;
+  evidenceList?: EvidenceListMetadata;
+  hasSemanticEvidence: boolean;
+}> {
   if (!target) {
     return {
       lines: ["References unavailable without a precise target."],
@@ -721,7 +735,6 @@ async function buildReferenceSection(
     { line: target.line - 1, character: target.character - 1 },
     target.name,
     { cwd: deps.cwd, provider: { references: deps.provider.references } },
-    limit,
   );
 
   if (refs.references.length === 0) {
@@ -733,7 +746,7 @@ async function buildReferenceSection(
   }
 
   const lines: string[] = [];
-  formatReferenceList(
+  const evidenceList = formatReferenceList(
     lines,
     refs.references.map((ref) => ({
       file: path.relative(deps.cwd, ref.file),
@@ -744,7 +757,8 @@ async function buildReferenceSection(
 
   return {
     lines,
-    omittedCount: 0,
+    omittedCount: evidenceList?.omittedCount ?? 0,
+    evidenceList: evidenceList ?? undefined,
     hasSemanticEvidence: refs.confidence === "semantic",
   };
 }

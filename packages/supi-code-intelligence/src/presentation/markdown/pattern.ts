@@ -1,6 +1,11 @@
 // Pattern search markdown renderer — all formatting for literal, regex, and structured search results.
 
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  createEvidenceList,
+  type EvidenceListMetadata,
+  renderEvidenceListDisclosure,
+} from "../../evidence-list.ts";
 import type {
   StructuredMatch,
   StructuredPatternKind,
@@ -56,14 +61,21 @@ function renderPartialWarning(result?: StructuredPatternResult): string | null {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pattern search rendering groups matches by file and adds summaries — each branch stays linear
+// biome-ignore lint/complexity/useMaxParams: structured renderer mirrors the existing public helper shape plus display cap
 export function renderStructuredMatches(
   pattern: string,
   kind: StructuredPatternKind,
   relScope: string,
   result: StructuredPatternResult,
-): string {
+  maxResults: number,
+): { content: string; evidenceList: EvidenceListMetadata } {
+  const evidence = createEvidenceList({
+    key: "find.astMatches",
+    items: result.matches,
+    maxResults,
+  });
   const grouped = new Map<string, StructuredMatch[]>();
-  for (const match of result.matches) {
+  for (const match of evidence.items) {
     const group = grouped.get(match.file) ?? [];
     group.push(match);
     grouped.set(match.file, group);
@@ -105,16 +117,18 @@ export function renderStructuredMatches(
 
   for (const [file, fileMatches] of grouped) {
     lines.push(`### ${file}`);
-    for (const match of fileMatches.slice(0, 8)) {
+    for (const match of fileMatches) {
       lines.push(`- \`${match.name}\` (${match.kind}) L${match.line}`);
-    }
-    if (fileMatches.length > 8) {
-      lines.push(`- _+${fileMatches.length - 8} more in this file_`);
     }
     lines.push("");
   }
 
-  return lines.join("\n");
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
+  }
+
+  return { content: lines.join("\n"), evidenceList: evidence.metadata };
 }
 
 function addDuplicateSummary(lines: string[], matches: StructuredMatch[]): void {
@@ -168,37 +182,35 @@ export function renderPatternResults(
   relScope: string,
   matches: RgMatch[],
   maxResults: number,
-): string {
+): { content: string; evidenceList: EvidenceListMetadata } {
   const lines: string[] = [];
   lines.push(`# Pattern: \`${pattern}\``);
   lines.push("");
   lines.push(`**${matches.length} match${matches.length > 1 ? "es" : ""}** in \`${relScope}\``);
   lines.push("");
 
-  const byFile = groupByFile(matches);
-  let shown = 0;
+  const evidence = createEvidenceList({
+    key: "find.textMatches",
+    items: matches,
+    maxResults,
+  });
+  const byFile = groupByFile(evidence.items);
   for (const [file, fileMatches] of byFile) {
-    if (shown >= maxResults) break;
     lines.push(`### ${file}`);
     const renderedLines = new Set<number>();
     const matchLines = new Set(fileMatches.map((match) => match.line));
-    for (const m of fileMatches.slice(0, 5)) {
+    for (const m of fileMatches) {
       renderMatchWithContext(lines, m, renderedLines, matchLines, pattern);
     }
-    if (fileMatches.length > 5) {
-      lines.push(`- _+${fileMatches.length - 5} more in this file_`);
-    }
     lines.push("");
-    shown++;
   }
 
-  if (byFile.size > maxResults) {
-    lines.push(
-      `_+${byFile.size - maxResults} more files omitted. Narrow \`path\` or increase \`maxResults\`._`,
-    );
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
   }
   lines.push("");
-  return lines.join("\n");
+  return { content: lines.join("\n"), evidenceList: evidence.metadata };
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: context-line rendering with before/after/skip logic is clearer as one function

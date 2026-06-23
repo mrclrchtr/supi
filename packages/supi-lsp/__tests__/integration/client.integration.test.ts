@@ -8,6 +8,8 @@ import * as path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic, ServerConfig } from "../../src/config/types.ts";
+import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
+import type { SessionLspService } from "../../src/session/service-registry.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
 
 const TS_SERVER_CONFIG: ServerConfig = {
@@ -197,6 +199,30 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     const symbols = await unsupportedClient.workspaceSymbol("add");
     expect(symbols).toBeNull();
   });
+
+  // ADR 0003 — the real LSP must produce CodeSymbols with nameAnchor
+  // (identifier offset) distinct from declarationAnchor (export keyword).
+  // Mocked-provider unit tests asserted shapes they fed in; this test
+  // validates the actual flattenDocumentSymbols → selectionRange path.
+  it("semantic provider populates nameAnchor from DocumentSymbol.selectionRange (ADR 0003)", async () => {
+    // Re-open after the "closes a document" test above.
+    client.didOpen(goodFile, fs.readFileSync(goodFile, "utf-8"));
+
+    const semantic = createLspSemanticProvider(client as unknown as SessionLspService);
+    const symbols = await semantic.documentSymbols(goodFile);
+    expect(symbols).not.toBeNull();
+    expect(symbols?.length).toBeGreaterThan(0);
+
+    const addFn = symbols?.find((s) => s.name === "add");
+    expect(addFn).toBeDefined();
+    // Declaration anchor: the `export` keyword (col 1).
+    expect(addFn?.declarationAnchor.character).toBe(1);
+    // Name anchor: the identifier `add` (~col 17), NOT the export keyword.
+    expect(addFn?.nameAnchor).toBeDefined();
+    if (addFn?.nameAnchor) {
+      expect(addFn.nameAnchor.character).toBeGreaterThan(1);
+    }
+  }, 10_000);
 
   it("shuts down cleanly", async () => {
     await client.shutdown();

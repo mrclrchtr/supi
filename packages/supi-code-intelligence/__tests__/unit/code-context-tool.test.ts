@@ -182,7 +182,7 @@ describe("code_context tool", () => {
     expect(calleesAtSpy).toHaveBeenCalledWith(expect.any(String), 1, 17);
   });
 
-  it("filters to requested sections and caps repeated entries deterministically", async () => {
+  it("discloses truncated task references in markdown and details", async () => {
     writeSource("src/context.ts", "export function contextTarget() { return 1; }\n");
     writeSource("src/consumer-a.ts", "contextTarget();\n");
     writeSource("src/consumer-b.ts", "contextTarget();\n");
@@ -232,12 +232,33 @@ describe("code_context tool", () => {
       makeCtx({ cwd: tmpDir }),
     )) as {
       content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "context";
+        data: {
+          omittedCount: number;
+          evidenceLists?: Array<{
+            key: string;
+            totalCount: number | null;
+            shownCount: number;
+            omittedCount: number | null;
+          }>;
+        };
+      };
     };
 
     expect(result.content[0].text).toContain("## References");
     expect(result.content[0].text).not.toContain("## Callees");
     expect(result.content[0].text).toContain("consumer-a.ts");
     expect(result.content[0].text).not.toContain("consumer-b.ts");
+    expect(result.content[0].text).toContain("_(showing 1 of 2; 1 omitted)_");
+    expect(result.details?.data.omittedCount).toBe(1);
+    expect(result.details?.data.evidenceLists).toContainEqual({
+      key: "references.locations",
+      totalCount: 2,
+      shownCount: 1,
+      omittedCount: 1,
+      partialReason: null,
+    });
   });
 
   it("calls out requested but unavailable docs and tests sections honestly", async () => {

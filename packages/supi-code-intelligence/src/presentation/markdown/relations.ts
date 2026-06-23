@@ -1,6 +1,11 @@
 // Relations markdown renderer — consumes use-case data and produces markdown content.
 
 import type { TestSurfaceDetails } from "../../analysis/relations/tests.ts";
+import {
+  createEvidenceList,
+  type EvidenceListMetadata,
+  renderEvidenceListDisclosure,
+} from "../../evidence-list.ts";
 import type { ReferenceCollection } from "../../use-case/support/semantic-references.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
 
@@ -68,21 +73,26 @@ export function renderImportsResult(
   imports: Array<{ moduleSpecifier: string; startLine: number }>,
   relPath: string,
   maxResults: number,
-): string {
+): { content: string; evidenceList: EvidenceListMetadata | null } {
   const lines: string[] = [];
   lines.push(`# Imports of \`${displayName}\` (structural)`);
   lines.push("");
   lines.push(`**${imports.length} import${imports.length !== 1 ? "s" : ""}** in \`${relPath}\``);
   lines.push("");
 
-  const shown = imports.slice(0, maxResults);
-  for (const entry of shown) {
+  const evidence = createEvidenceList({
+    key: "imports.modules",
+    items: imports,
+    maxResults,
+  });
+  for (const entry of evidence.items) {
     lines.push(`- \`${entry.moduleSpecifier}\` (L${entry.startLine})`);
   }
-  if (imports.length > maxResults) {
-    lines.push(`- _+${imports.length - maxResults} more_`);
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
   }
-  return lines.join("\n");
+  return { content: lines.join("\n"), evidenceList: evidence.metadata };
 }
 
 // ── Exports ─────────────────────────────────────────────────────────
@@ -98,22 +108,27 @@ export function renderExportsResult(
   exports: Array<{ name: string; kind: string; startLine: number }>,
   relPath: string,
   maxResults: number,
-): string {
+): { content: string; evidenceList: EvidenceListMetadata | null } {
   const lines: string[] = [];
   lines.push(`# Exports of \`${displayName}\` (structural)`);
   lines.push("");
   lines.push(`**${exports.length} export${exports.length !== 1 ? "s" : ""}** in \`${relPath}\``);
   lines.push("");
 
-  const shown = exports.slice(0, maxResults);
-  for (const entry of shown) {
+  const evidence = createEvidenceList({
+    key: "exports.symbols",
+    items: exports,
+    maxResults,
+  });
+  for (const entry of evidence.items) {
     const kindLabel = entry.kind ? ` (${entry.kind})` : "";
     lines.push(`- \`${entry.name}\`${kindLabel} (L${entry.startLine})`);
   }
-  if (exports.length > maxResults) {
-    lines.push(`- _+${exports.length - maxResults} more_`);
+  const disclosure = renderEvidenceListDisclosure(evidence);
+  if (disclosure) {
+    lines.push(disclosure);
   }
-  return lines.join("\n");
+  return { content: lines.join("\n"), evidenceList: evidence.metadata };
 }
 
 // ── Combined graph ───────────────────────────────────────────────────
@@ -135,6 +150,7 @@ export type GraphSection =
       rel: GraphRelationKind;
       count: number;
       content: string;
+      evidenceLists?: EvidenceListMetadata[];
       tests?: TestSurfaceDetails;
     }
   | { kind: "unavailable"; rel: GraphRelationKind; message: string; tests?: TestSurfaceDetails }

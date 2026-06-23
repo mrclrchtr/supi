@@ -324,7 +324,7 @@ describe("formatReferenceList", () => {
     expect(lines).toContain("- L1-L3, L5-L6");
   });
 
-  it("caps total files at maxResults with omitted notice", async () => {
+  it("caps reference-location atoms at maxResults with truncation disclosure", async () => {
     const { formatReferenceList } = await import(
       "../../src/use-case/support/semantic-references.ts"
     );
@@ -340,7 +340,7 @@ describe("formatReferenceList", () => {
 
     expect(lines.some((l) => l.includes("### src/a.ts"))).toBe(true);
     expect(lines.some((l) => l.includes("### src/d.ts"))).toBe(false);
-    expect(lines.some((l) => l.includes("more files omitted"))).toBe(true);
+    expect(lines.some((l) => l.includes("showing 2 of 4; 2 omitted"))).toBe(true);
   });
 
   it("is a no-op with empty refs", async () => {

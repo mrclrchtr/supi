@@ -242,6 +242,58 @@ describe("code_inspect tool", () => {
     }
   });
 
+  it("discloses truncated code action facts in markdown and details", async () => {
+    registerInspectProviders();
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemantic(tmpDir, {
+      references: async () => [],
+      implementation: async () => [],
+      documentSymbols: async () => [],
+      workspaceSymbols: async () => [],
+      codeActionTitles: async () => [
+        { title: "Action one", kind: "quickfix" },
+        { title: "Action two", kind: "quickfix" },
+      ],
+    });
+    mockReadyLsp();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    const tool = getTool(pi, "code_inspect");
+    const result = (await tool.execute(
+      "inspect-code-actions-truncated",
+      { file: "src/index.ts", line: 2, character: 10, maxResults: 1 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "inspect";
+        data?: {
+          evidenceLists?: Array<{
+            key: string;
+            totalCount: number | null;
+            shownCount: number;
+            omittedCount: number | null;
+          }>;
+        };
+      };
+    };
+
+    expect(result.content[0].text).toContain("Action one");
+    expect(result.content[0].text).not.toContain("Action two");
+    expect(result.content[0].text).toContain("_(showing 1 of 2; 1 omitted)_");
+    expect(result.details?.data?.evidenceLists).toContainEqual({
+      key: "inspect.codeActions",
+      totalCount: 2,
+      shownCount: 1,
+      omittedCount: 1,
+      partialReason: null,
+    });
+  });
+
   it("reports explicit unavailable sections instead of heuristic guesses", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
