@@ -40,6 +40,7 @@ describe("workflow target store", () => {
       confidence: "semantic",
       provenance: "anchored",
       anchorKind: "name",
+      container: null,
     });
 
     // These will fail with the Phase 1 stub (returns empty strings)
@@ -60,6 +61,7 @@ describe("workflow target store", () => {
       confidence: "semantic" as const,
       provenance: "anchored",
       anchorKind: "name" as const,
+      container: null,
     };
 
     const r1 = registerWorkflowTarget(tmpDir, input);
@@ -87,6 +89,7 @@ describe("workflow target store", () => {
       confidence: "semantic",
       provenance: "anchored",
       anchorKind: "name",
+      container: null,
     });
 
     const lookup = getWorkflowTarget(tmpDir, result.targetId);
@@ -130,6 +133,7 @@ describe("workflow target store", () => {
       confidence: "semantic",
       provenance: "anchored",
       anchorKind: "name",
+      container: null,
     });
 
     // Will fail at length check with stub
@@ -148,6 +152,7 @@ describe("workflow target store", () => {
       confidence: "semantic",
       provenance: "anchored",
       anchorKind: "name",
+      container: null,
     });
 
     // File fingerprint changed, so IDs should differ
@@ -179,6 +184,7 @@ describe("workflow target store", () => {
         confidence: "heuristic",
         provenance: "file",
         anchorKind: "name",
+        container: null,
       });
       const r2 = registerWorkflowTarget(otherDir, {
         file: path.join(otherDir, "b.ts"),
@@ -190,6 +196,7 @@ describe("workflow target store", () => {
         confidence: "heuristic",
         provenance: "file",
         anchorKind: "name",
+        container: null,
       });
 
       // First assertion to fail with stub
@@ -226,6 +233,7 @@ describe("workflow target store", () => {
       confidence: "semantic",
       provenance: "anchored",
       anchorKind: "name",
+      container: null,
     });
 
     // Verify registered successfully
@@ -254,6 +262,7 @@ describe("workflow target store", () => {
       confidence: "heuristic",
       provenance: "file",
       anchorKind: "name",
+      container: null,
     });
 
     // Lookup should detect the file is still missing → unavailable
@@ -284,6 +293,7 @@ describe("workflow target store", () => {
       confidence: "semantic" as const,
       provenance: "symbol",
       anchorKind: "name" as const,
+      container: null,
     };
 
     // Resolve #1: refine succeeded -> name anchor on the identifier (col 15).
@@ -305,5 +315,38 @@ describe("workflow target store", () => {
     // The invariant: symbol identity is stable across anchor variance.
     // (spanId MAY differ — a span is a range — but targetId must not.)
     expect(r2.targetId).toBe(r1.targetId);
+  });
+
+  // ADR 0003, slice B2 — container distinguishes same-name same-file symbols.
+  it("produces different targetIds for identical name+kind+file but different containers", () => {
+    const srcDir = path.join(tmpDir, "src");
+    mkdirSync(srcDir, { recursive: true });
+    const filePath = path.join(srcDir, "index.ts");
+    writeFileSync(filePath, "export class A { foo() {} } export class B { foo() {} }\n");
+
+    const base = {
+      file: filePath,
+      name: "foo",
+      kind: "Method",
+      confidence: "semantic" as const,
+      provenance: "symbol",
+      anchorKind: "name" as const,
+      position: { line: 0, character: 10 },
+    };
+
+    const rA = registerWorkflowTarget(tmpDir, {
+      ...base,
+      container: "A",
+      displayLine: 1,
+      displayCharacter: 20,
+    });
+    const rB = registerWorkflowTarget(tmpDir, {
+      ...base,
+      container: "B",
+      displayLine: 1,
+      displayCharacter: 40,
+    });
+
+    expect(rA.targetId).not.toBe(rB.targetId);
   });
 });

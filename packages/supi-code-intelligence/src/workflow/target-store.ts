@@ -53,6 +53,8 @@ export interface TargetRegistrationInput {
   provenance: string;
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
+  /** Container scope, or null for top-level (ADR 0003 — disambiguates same-file collisions in the identity hash). */
+  container: string | null;
 }
 
 /** Output from registering a target: stable session-scoped handles. */
@@ -109,7 +111,7 @@ export function computeFileFingerprint(
  * nameAnchor is best-effort, so the same symbol can resolve to a name
  * anchor or fall back to the declaration anchor across calls; including
  * position would break the "re-resolve reuses the same IDs" invariant.
- * Identity is cwd, absolute file path, name, kind, and file fingerprint.
+ * Identity is cwd, file path, name, kind, container, and fingerprint.
  */
 function computeTargetId(opts: {
   cwd: string;
@@ -117,6 +119,7 @@ function computeTargetId(opts: {
   position: { line: number; character: number };
   name: string | null;
   kind: string | null;
+  container: string | null;
   fingerprint: string;
 }): string {
   const hash = createHash("sha256");
@@ -127,6 +130,8 @@ function computeTargetId(opts: {
   hash.update(opts.name ?? "");
   hash.update("\0");
   hash.update(opts.kind ?? "");
+  hash.update("\0");
+  hash.update(opts.container ?? "");
   hash.update("\0");
   hash.update(opts.fingerprint);
   return `tg-${hash.digest("hex").slice(0, 28)}`;
@@ -181,6 +186,7 @@ export function registerWorkflowTarget(
     position: input.position,
     name: input.name,
     kind: input.kind,
+    container: input.container,
     fingerprint,
   });
   const spanId = computeSpanId(key, input.file, input.position, fingerprint);

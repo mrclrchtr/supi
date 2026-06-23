@@ -74,6 +74,8 @@ export interface ResolvedTargetData {
   confidence: "semantic" | "structural" | "heuristic" | "unavailable";
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
+  /** Symbolic container (class/namespace/module name), or null for top-level. */
+  container: string | null;
 }
 
 /**

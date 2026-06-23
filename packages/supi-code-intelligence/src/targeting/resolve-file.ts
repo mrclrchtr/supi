@@ -137,6 +137,7 @@ async function resolveViaSemantic(
           kind: s.kind,
           confidence: "semantic" as const,
           anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
+          container: s.container ?? null,
         };
       });
 
@@ -187,6 +188,7 @@ async function resolveViaStructral(
         // Structural exports use the node start (startLine/startCharacter) =
         // declaration anchor; no name anchor is derivable from exports alone.
         anchorKind: "declaration",
+        container: null,
       })),
     );
   } catch {

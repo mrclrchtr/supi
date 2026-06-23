@@ -129,6 +129,7 @@ function registerFromTarget(
     kind: string | null;
     confidence: string;
     anchorKind: AnchorKind;
+    container: string | null;
   },
   cwd: string,
   provenance: string,
@@ -143,6 +144,7 @@ function registerFromTarget(
     confidence: target.confidence as ConfidenceMode,
     provenance,
     anchorKind: target.anchorKind,
+    container: target.container,
   };
   const { targetId, spanId } = registerWorkflowTarget(cwd, input);
   return {
@@ -182,6 +184,7 @@ function registerCandidate(
     confidence: "semantic" as ConfidenceMode,
     provenance: "disambiguation",
     anchorKind: c.anchorKind,
+    container: c.container,
   };
   const { targetId } = registerWorkflowTarget(cwd, input);
   return {

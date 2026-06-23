@@ -79,6 +79,7 @@ export function resolveAnchoredTarget(
       // anchor. (Determining whether an arbitrary coord lands on an
       // identifier is slice E — tree-sitter nodeAt — not done here.)
       anchorKind: "name",
+      container: null,
     },
   };
 }

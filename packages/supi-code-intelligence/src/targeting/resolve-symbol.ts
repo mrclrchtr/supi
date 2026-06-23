@@ -148,6 +148,7 @@ export async function resolveSymbolTarget(
         kind: c.kind,
         confidence: "semantic",
         anchorKind: (c.nameAnchor ? "name" : "declaration") as AnchorKind,
+        container: c.container ?? null,
       },
     };
   }
