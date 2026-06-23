@@ -40,12 +40,14 @@ function parseArgs(argv) {
     if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`);
     }
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: args.packageDir is set by a previous loop iteration via mutation; biome's flow analysis does not track reassignments on plain objects
     if (args.packageDir) {
       throw new Error("Only one package directory may be provided");
     }
     args.packageDir = resolve(arg);
   }
 
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: args.packageDir may remain undefined when only flags (--dry-run, --out-dir) are passed and no positional arg is present
   if (!args.packageDir) {
     throw new Error(
       "Usage: node scripts/pack-staged.mjs <package-dir> [--dry-run] [--out-dir <dir>]",
@@ -140,6 +142,16 @@ function removeCyclicSymlinks(packageDir) {
     }
   }
 
+  function _removeIfUndeclaredOrDev(entry, dir, declared, devDeps) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) return;
+    const depName = `@mrclrchtr/${entry.name}`;
+    if (!declared.has(depName)) {
+      removeMrclrchtrSymlink(dir, depName);
+    } else if (devDeps.has(depName)) {
+      removeMrclrchtrSymlink(dir, depName);
+    }
+  }
+
   /**
    * Remove @mrclrchtr symlinks from node_modules that should not
    * be copied into the staged tree:
@@ -152,6 +164,7 @@ function removeCyclicSymlinks(packageDir) {
       ...Object.keys(pkg.dependencies || {}),
       ...Object.keys(pkg.devDependencies || {}),
     ]);
+    const devDeps = new Set(Object.keys(pkg.devDependencies || {}));
     const mrclrchtrDir = join(dir, "node_modules", "@mrclrchtr");
     let entries;
     try {
@@ -161,15 +174,7 @@ function removeCyclicSymlinks(packageDir) {
     }
 
     for (const entry of entries) {
-      if (!entry.isDirectory() && !entry.isSymbolicLink()) continue;
-      const depName = `@mrclrchtr/${entry.name}`;
-      if (!declared.has(depName)) {
-        // Not a declared dependency — hoisted artifact. Remove it.
-        removeMrclrchtrSymlink(dir, depName);
-      } else if (Object.keys(pkg.devDependencies || {}).includes(depName)) {
-        // Declared devDependency — safe to remove; not shipped.
-        removeMrclrchtrSymlink(dir, depName);
-      }
+      _removeIfUndeclaredOrDev(entry, dir, declared, devDeps);
     }
   }
 

@@ -52,6 +52,7 @@ describe("prioritization signals", () => {
     );
 
     expect(summary).not.toBeNull();
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: vitest's .not.toBeNull() does not type-narrow
     expect(summary?.lowCoverageCount).toBe(1);
     expect(summary?.unusedCount).toBe(2);
     expect(summary?.warnings.join("\n")).toContain("Low coverage");
@@ -86,6 +87,7 @@ describe("prioritization signals", () => {
     );
 
     expect(summary).not.toBeNull();
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: vitest's .not.toBeNull() does not type-narrow; `?.` is the correct defensive choice
     expect(summary?.diagnosticsCount).toBe(2);
     expect(summary?.warnings.join("\n")).toContain("Diagnostics:");
     expect(summary?.warnings.join("\n")).toContain("1 errors");

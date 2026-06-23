@@ -22,12 +22,14 @@ function parseArgs(argv) {
     if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`);
     }
+    // biome-ignore lint/suspicious/noUnnecessaryConditions: see pack-staged.mjs — same parseArgs pattern, same biome flow-analysis gap
     if (args.packageDir) {
       throw new Error("Only one package directory may be provided");
     }
     args.packageDir = resolve(arg);
   }
 
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: see pack-staged.mjs
   if (!args.packageDir) {
     throw new Error("Usage: node scripts/publish.mjs <package-dir> [--publish]");
   }
@@ -72,6 +74,7 @@ async function main() {
   verifyTarball(tarballPath);
   console.log("Verified: OK");
 
+  // biome-ignore lint/suspicious/noUnnecessaryConditions: args.publish is set to true when --publish flag is passed; same flow-analysis gap
   if (args.publish) {
     execFileSync("npm", ["publish", tarballPath], { stdio: "inherit" });
     console.log("Published.");

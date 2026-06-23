@@ -66,14 +66,14 @@ describe("workspace-manager", () => {
     const session = app.createSession("/project-a");
     const mockAdapter = { controller: null, inlineSeverity: 1 };
     session.adapterState.semantic = mockAdapter as never;
-    expect(app.getSession("/project-a")?.adapterState.semantic).toBe(mockAdapter);
+    expect(app.getSession("/project-a")!.adapterState.semantic).toBe(mockAdapter);
   });
 
   it("allows setting structural adapter state on a session", () => {
     const session = app.createSession("/project-a");
     const mockAdapter = { controller: null };
     session.adapterState.structural = mockAdapter as never;
-    expect(app.getSession("/project-a")?.adapterState.structural).toBe(mockAdapter);
+    expect(app.getSession("/project-a")!.adapterState.structural).toBe(mockAdapter);
   });
 
   it("tracks overview-injection state and model-cache state on a session", () => {
