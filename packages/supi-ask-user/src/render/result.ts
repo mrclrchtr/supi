@@ -1,4 +1,10 @@
-import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import {
+  type AgentToolResult,
+  DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_LINES,
+  formatSize,
+  truncateHead,
+} from "@earendil-works/pi-coding-agent";
 import type {
   AskUserDetails,
   AskUserErrorDetails,
@@ -26,7 +32,12 @@ export function buildResult(
   };
 
   return {
-    content: [{ type: "text", text: summarizeOutcome(questionnaire.questions, outcome) }],
+    content: [
+      {
+        type: "text",
+        text: truncateModelVisibleSummary(summarizeOutcome(questionnaire.questions, outcome)),
+      },
+    ],
     details,
   };
 }
@@ -37,6 +48,21 @@ export function buildErrorResult(message: string): AskUserToolResult {
     content: [{ type: "text", text: message }],
     details,
   };
+}
+
+function truncateModelVisibleSummary(summary: string): string {
+  const truncation = truncateHead(summary, {
+    maxLines: DEFAULT_MAX_LINES,
+    maxBytes: DEFAULT_MAX_BYTES,
+  });
+
+  if (!truncation.truncated) return summary;
+
+  const notice = truncation.firstLineExceedsLimit
+    ? `[Output truncated: first response line exceeds ${formatSize(truncation.maxBytes)}; ask a focused follow-up for omitted text.]`
+    : `[Output truncated: showing ${truncation.outputLines}/${truncation.totalLines} lines (${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}); ask a focused follow-up for omitted text.]`;
+
+  return truncation.content ? `${truncation.content}\n\n${notice}` : notice;
 }
 
 function summarizeOutcome(questions: NormalizedQuestion[], outcome: AskUserOutcome): string {

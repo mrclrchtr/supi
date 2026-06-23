@@ -1,12 +1,18 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/terminal";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
-import { type AskUserToolResult, buildErrorResult, buildResult } from "./render/result.ts";
+import { type AskUserToolResult, buildResult } from "./render/result.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render/transcript.ts";
 import { buildTreeSummaryLabel } from "./render/tree-summary.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import { ActiveQuestionnaireLock } from "./session/lock.ts";
-import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
+import {
+  ASK_USER_TOOL_LABEL,
+  ASK_USER_TOOL_NAME,
+  promptGuidelines,
+  promptSnippet,
+  toolDescription,
+} from "./tool/guidance.ts";
 import type {
   AskUserInteractionResult,
   AskUserOutcome,
@@ -14,9 +20,6 @@ import type {
   NormalizedQuestionnaire,
 } from "./types.ts";
 import { runQuestionnaire } from "./ui/choose-renderer.ts";
-
-const TOOL_NAME = "ask_user";
-const TOOL_LABEL = "Ask User";
 
 export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "mode" | "abort"> & {
   ui: {
@@ -33,18 +36,20 @@ export default function askUserExtension(pi: ExtensionAPI): void {
   const lock = new ActiveQuestionnaireLock();
 
   pi.registerTool<typeof AskUserParamsSchema, AskUserToolDetails>({
-    name: TOOL_NAME,
-    label: TOOL_LABEL,
+    name: ASK_USER_TOOL_NAME,
+    label: ASK_USER_TOOL_LABEL,
     description: toolDescription,
     promptSnippet,
     promptGuidelines,
     parameters: AskUserParamsSchema,
+    executionMode: "sequential",
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       return executeAskUser(params, signal, ctx, lock, pi);
     },
     renderCall: (args, theme) => renderAskUserCall(args, theme),
-    renderResult: (result, options, theme) => renderAskUserResult(result, theme, options),
+    renderResult: (result, options, theme, context) =>
+      renderAskUserResult(result, theme, options, context),
   });
 }
 
@@ -61,19 +66,19 @@ export async function executeAskUser(
     questionnaire = normalizeQuestionnaire(params);
   } catch (error) {
     if (error instanceof AskUserValidationError) {
-      return buildErrorResult(`Error: ${error.message}`);
+      throw new Error(error.message, { cause: error });
     }
     throw error;
   }
 
   if (!ctx.hasUI || ctx.mode !== "tui") {
-    return buildErrorResult(
-      "Error: ask_user requires an interactive TUI session. No user-facing form UI is available in the current mode.",
+    throw new Error(
+      "ask_user requires an interactive TUI session. No user-facing form UI is available in the current mode.",
     );
   }
   if (!lock.acquire()) {
-    return buildErrorResult(
-      "Error: another ask_user form is already in flight. Wait for it to complete before calling ask_user again.",
+    throw new Error(
+      "another ask_user form is already in flight. Wait for it to complete before calling ask_user again.",
     );
   }
 
@@ -95,15 +100,15 @@ export async function executeAskUser(
     });
 
     if (outcome === "unsupported") {
-      return buildErrorResult(
-        "Error: ask_user requires a TUI with custom form support. Do not use ask_user in non-interactive or degraded UI sessions.",
+      throw new Error(
+        "ask_user requires a TUI with custom form support. Do not use ask_user in non-interactive or degraded UI sessions.",
       );
     }
 
-    // Internal cancel/abort: treat as control flow, abort the turn
+    // Internal cancel/abort: treat as control flow, abort the turn, and mark the tool failed.
     if (isInternalInteractionResult(outcome)) {
       ctx.abort();
-      return buildErrorResult("The user interaction was cancelled.");
+      throw new Error("The user interaction was cancelled.");
     }
 
     pi.appendEntry(buildTreeSummaryLabel(questionnaire));

@@ -64,59 +64,50 @@ function makeFormCtx(result: unknown): FormCtx {
 }
 
 describe("ask_user tool", () => {
-  it("registers the ask_user tool", () => {
+  it("registers the ask_user tool with blocking guidance metadata", () => {
     const pi = createPiMock() as unknown as PiApi;
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
+
     expect(tool.label).toBe("Ask User");
+    expect((tool as { executionMode?: string }).executionMode).toBe("sequential");
+    expect(tool.description).toContain("interactive TUI decision form");
+    expect(tool.description).toContain("truncated");
+    expect(tool.promptSnippet).toContain("ask_user");
+    expect(tool.promptGuidelines?.every((guideline) => guideline.includes("ask_user"))).toBe(true);
   });
 
-  it("returns an error result for invalid forms", async () => {
+  it("throws for invalid forms", async () => {
     const pi = createPiMock() as unknown as PiApi;
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
 
-    const result = (await tool.execute(
-      "tc-1",
-      { questions: [] },
-      undefined,
-      undefined,
-      makeUnsupportedCtx(),
-    )) as { content: { type: string; text: string }[]; details: { kind?: string } };
-
-    expect(result.content[0]?.text).toContain("supports 1-10 questions only");
-    expect(result.details.kind).toBe("error");
+    await expect(
+      tool.execute("tc-1", { questions: [] }, undefined, undefined, makeUnsupportedCtx()),
+    ).rejects.toThrow("supports 1-10 questions only");
   });
 
-  it("returns an error when custom form support is unavailable", async () => {
+  it("throws when custom form support is unavailable", async () => {
     const pi = createPiMock({ sessionName: "My Session" }) as unknown as PiApi;
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
     const ctx = makeUnsupportedCtx();
 
-    const result = (await tool.execute("tc-2", request, undefined, undefined, ctx)) as {
-      content: { type: string; text: string }[];
-      details: { kind?: string };
-    };
-
-    expect(result.details.kind).toBe("error");
-    expect(result.content[0]?.text).toContain("requires a TUI with custom form support");
+    await expect(tool.execute("tc-2", request, undefined, undefined, ctx)).rejects.toThrow(
+      "requires a TUI with custom form support",
+    );
   });
 
-  it("returns an error in RPC mode even though ctx.hasUI is true", async () => {
+  it("throws in RPC mode even though ctx.hasUI is true", async () => {
     const pi = createPiMock({ sessionName: "My Session" }) as unknown as PiApi;
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx(undefined);
     const rpcCtx = { ...ctx, hasUI: true, mode: "rpc" };
 
-    const result = (await tool.execute("tc-2b", request, undefined, undefined, rpcCtx)) as {
-      content: { type: string; text: string }[];
-      details: { kind?: string };
-    };
-
-    expect(result.details.kind).toBe("error");
-    expect(result.content[0]?.text).toContain("requires an interactive TUI session");
+    await expect(tool.execute("tc-2b", request, undefined, undefined, rpcCtx)).rejects.toThrow(
+      "requires an interactive TUI session",
+    );
   });
 
   it("records successful form submissions with outcome and responses", async () => {
@@ -170,13 +161,11 @@ describe("ask_user tool", () => {
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx({ kind: "cancel" } as AskUserInteractionResult);
 
-    const result = (await tool.execute("tc-4", request, undefined, undefined, ctx)) as {
-      details: { kind?: string };
-    };
+    await expect(tool.execute("tc-4", request, undefined, undefined, ctx)).rejects.toThrow(
+      "interaction was cancelled",
+    );
 
     expect(ctx.abort).toHaveBeenCalledTimes(1);
-    // The result should be an error-style result since execution was aborted
-    expect(result.details.kind).toBe("error");
   });
 
   it("aborts the turn when the form returns an internal abort result", async () => {
@@ -185,12 +174,11 @@ describe("ask_user tool", () => {
     const tool = getTool(pi, "ask_user");
     const ctx = makeFormCtx({ kind: "abort" } as AskUserInteractionResult);
 
-    const result = (await tool.execute("tc-4b", request, undefined, undefined, ctx)) as {
-      details: { kind?: string };
-    };
+    await expect(tool.execute("tc-4b", request, undefined, undefined, ctx)).rejects.toThrow(
+      "interaction was cancelled",
+    );
 
     expect(ctx.abort).toHaveBeenCalledTimes(1);
-    expect(result.details.kind).toBe("error");
   });
 
   it("rejects a second concurrent ask_user call", async () => {
@@ -209,13 +197,9 @@ describe("ask_user tool", () => {
     const secondCtx = makeUnsupportedCtx();
 
     const pending = tool.execute("tc-5", request, undefined, undefined, firstCtx);
-    const second = (await tool.execute("tc-6", request, undefined, undefined, secondCtx)) as {
-      details: { kind?: string };
-      content: { type: string; text: string }[];
-    };
-
-    expect(second.details.kind).toBe("error");
-    expect(second.content[0]?.text).toContain("already in flight");
+    await expect(tool.execute("tc-6", request, undefined, undefined, secondCtx)).rejects.toThrow(
+      "already in flight",
+    );
 
     resolveFirst?.({
       outcome: "submitted",

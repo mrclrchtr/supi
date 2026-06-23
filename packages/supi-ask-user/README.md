@@ -30,6 +30,12 @@ All questions are expected to be answered before the form can be submitted. If y
 
 You can also add comments to individual questions, options, or the whole form if you want to explain your thinking.
 
+## Agent-facing behavior
+
+`ask_user` is an interactive TUI-only handoff. The agent should use one form for one focused decision, combine related questions instead of opening multiple forms, and wait for the result before doing work that depends on your answer. Only one form can be active at a time.
+
+The model-visible result summary is bounded to Pi's default tool-output limits: 2,000 lines or 50KB, whichever is hit first. If a very large response is truncated, the agent is told to ask a focused follow-up for any omitted text it still needs.
+
 ## Preview
 
 <table>

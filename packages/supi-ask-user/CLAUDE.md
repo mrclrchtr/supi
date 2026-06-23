@@ -43,7 +43,8 @@ import { normalizeQuestionnaire, AskUserController } from "@mrclrchtr/supi-ask-u
 
 - Requires pi interactive (TUI) mode — no degraded fallback.
 - Only one `ask_user` form may be active at a time; a session-scoped lock enforces this.
-- Cancellation/abort stops the current agent turn (returns `AskUserInteractionResult`, then `ctx.abort()`).
+- Tool execution is registered as sequential so sibling tool calls do not run concurrently with a live form.
+- Cancellation/abort stops the current agent turn (UI returns `AskUserInteractionResult`, then `ctx.abort()`, then tool execution throws to mark the result failed).
 - Final question always moves to **review**, never submits directly. Submit row is focused by default so a single `Enter` submits.
 - When a question is opened from review, saving/advancing returns to review instead of walking through later questions.
 - `Enter` on single-select selects the focused option **and advances**; on multi-select it accepts current selections and advances (no toggling).
@@ -52,3 +53,4 @@ import { normalizeQuestionnaire, AskUserController } from "@mrclrchtr/supi-ask-u
 - In comment editors, `Esc` discards unsaved edits and returns to form/review **without cancelling the interaction**.
 - `recommendation` on single-select defaults to first option; on multi-select defaults to none.
 - Completed forms are summarized in the session tree. In chat history, results can be expanded read-only with `Ctrl+O` — this does not reopen the live form.
+- Model-visible result summaries are truncated to Pi's default 2,000-line / 50KB tool-output limits with a clear truncation notice.

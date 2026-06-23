@@ -204,6 +204,33 @@ describe("ask_user transcript rendering", () => {
     expect(component.render(80).join("\n")).toContain("Error: invalid");
   });
 
+  it("renders thrown execution errors from model-visible content", () => {
+    const component = renderAskUserResult(
+      {
+        content: [{ type: "text", text: "ask_user failed badly" }],
+        details: {} as AskUserToolDetails,
+      },
+      theme,
+      {},
+      { isError: true },
+    );
+
+    expect(component.render(80).join("\n")).toContain("ask_user failed badly");
+  });
+
+  it("renders partial result content without requiring final details", () => {
+    const component = renderAskUserResult(
+      {
+        content: [{ type: "text", text: "Waiting for user response..." }],
+        details: {} as AskUserToolDetails,
+      },
+      theme,
+      { isPartial: true },
+    );
+
+    expect(component.render(80).join("\n")).toContain("Waiting for user response...");
+  });
+
   it("renders needs_discussion expanded with unanswered state", () => {
     const output = renderResultLines(
       {

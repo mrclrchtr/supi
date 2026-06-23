@@ -124,6 +124,8 @@ export function isTextQuestion(question: NormalizedQuestion): question is Normal
   return question.type === "text";
 }
 
-export function isErrorDetails(details: AskUserToolDetails): details is AskUserErrorDetails {
-  return "kind" in details && details.kind === "error";
+export function isErrorDetails(details: unknown): details is AskUserErrorDetails {
+  return (
+    typeof details === "object" && details !== null && "kind" in details && details.kind === "error"
+  );
 }

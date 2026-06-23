@@ -1,6 +1,7 @@
 import { type AgentToolResult, keyText, type Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import type { AskUserParams } from "../schema.ts";
+import { ASK_USER_TOOL_NAME } from "../tool/guidance.ts";
 import type {
   AskUserDetails,
   AskUserOutcomeKind,
@@ -15,6 +16,11 @@ const DEFAULT_REVIEW_KEY = "Ctrl+O";
 
 type AskUserRenderOptions = {
   expanded?: boolean;
+  isPartial?: boolean;
+};
+
+type AskUserRenderContext = {
+  isError?: boolean;
 };
 
 export function renderAskUserCall(args: AskUserParams, theme: Theme): Text {
@@ -22,7 +28,7 @@ export function renderAskUserCall(args: AskUserParams, theme: Theme): Text {
   const headers = args.questions.map((question) => question.header.trim()).filter(Boolean);
   const label = title || `${headers.length} question${headers.length === 1 ? "" : "s"}`;
   const suffix = title && headers.length > 0 ? ` (${headers.join(", ")})` : headers.join(", ");
-  const text = `${theme.fg("toolTitle", theme.bold("ask_user "))}${theme.fg("muted", label)}${suffix ? theme.fg("dim", ` ${suffix}`) : ""}`;
+  const text = `${theme.fg("toolTitle", theme.bold(`${ASK_USER_TOOL_NAME} `))}${theme.fg("muted", label)}${suffix ? theme.fg("dim", ` ${suffix}`) : ""}`;
   return new Text(text, 0, 0);
 }
 
@@ -30,15 +36,51 @@ export function renderAskUserResult(
   result: Pick<AgentToolResult<AskUserToolDetails>, "content" | "details">,
   theme: Theme,
   options: AskUserRenderOptions = {},
+  context: AskUserRenderContext = {},
 ): Text {
-  if (isErrorDetails(result.details)) {
-    return new Text(theme.fg("error", result.details.message), 0, 0);
+  if (context.isError || isErrorDetails(result.details)) {
+    return new Text(theme.fg("error", formatErrorResult(result)), 0, 0);
+  }
+
+  if (options.isPartial) {
+    return new Text(
+      theme.fg("dim", firstTextContent(result) ?? "Waiting for user response..."),
+      0,
+      0,
+    );
+  }
+
+  if (!isAskUserDetails(result.details)) {
+    return new Text(theme.fg("error", formatErrorResult(result)), 0, 0);
   }
 
   const lines = options.expanded
     ? buildExpandedResultLines(result.details, theme)
     : buildCollapsedResultLines(result.details, theme);
   return new Text(lines.join("\n"), 0, 0);
+}
+
+function isAskUserDetails(details: unknown): details is AskUserDetails {
+  if (typeof details !== "object" || details === null) return false;
+  const candidate = details as Partial<AskUserDetails>;
+  return (
+    (candidate.outcome === "submitted" || candidate.outcome === "needs_discussion") &&
+    Array.isArray(candidate.questions) &&
+    Array.isArray(candidate.responses)
+  );
+}
+
+function formatErrorResult(
+  result: Pick<AgentToolResult<AskUserToolDetails>, "content" | "details">,
+): string {
+  if (isErrorDetails(result.details)) return result.details.message;
+  return firstTextContent(result) ?? "ask_user failed.";
+}
+
+function firstTextContent(
+  result: Pick<AgentToolResult<AskUserToolDetails>, "content" | "details">,
+): string | undefined {
+  return result.content.find((block) => block.type === "text")?.text;
 }
 
 function buildCollapsedResultLines(details: AskUserDetails, theme: Theme): string[] {

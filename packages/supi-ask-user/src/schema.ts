@@ -1,32 +1,39 @@
 // External, model-facing parameter schema for the redesigned ask_user tool.
 
 import { type Static, Type } from "typebox";
+import { ASK_USER_LIMITS } from "./types.ts";
 
 const OptionSchema = Type.Object({
-  value: Type.String({ description: "Returned id" }),
+  value: Type.String({ description: "Unique returned id" }),
   label: Type.String({ description: "Displayed label" }),
   description: Type.Optional(
     Type.String({
-      description: "Optional description",
+      description: "Optional helper text",
     }),
   ),
   preview: Type.Optional(
     Type.String({
-      description: "Optional preview",
+      description: "Optional focused-option preview",
     }),
   ),
 });
 
-const ChoiceOptionCount = { minItems: 2, maxItems: 12 } as const;
-const QuestionCount = { minItems: 1, maxItems: 10 } as const;
+const ChoiceOptionCount = {
+  minItems: ASK_USER_LIMITS.minChoiceOptions,
+  maxItems: ASK_USER_LIMITS.maxChoiceOptions,
+} as const;
+const QuestionCount = {
+  minItems: ASK_USER_LIMITS.minQuestions,
+  maxItems: ASK_USER_LIMITS.maxQuestions,
+} as const;
 
 const ChoiceQuestionSchema = Type.Object({
   type: Type.Literal("choice"),
-  id: Type.String({ description: "Question id" }),
+  id: Type.String({ description: "Unique question id" }),
   header: Type.String({ description: "Short label" }),
   prompt: Type.String({ description: "Question text" }),
   options: Type.Array(OptionSchema, {
-    description: "Allowed options (2-12)",
+    description: "Allowed options with unique values",
     ...ChoiceOptionCount,
   }),
   multi: Type.Optional(
@@ -37,17 +44,17 @@ const ChoiceQuestionSchema = Type.Object({
   ),
   recommendation: Type.Optional(
     Type.Union([Type.String(), Type.Array(Type.String())], {
-      description: "Recommended value(s)",
+      description: "Recommended value(s): single string, multi array",
     }),
   ),
 });
 
 const TextQuestionSchema = Type.Object({
   type: Type.Literal("text"),
-  id: Type.String({ description: "Question id" }),
+  id: Type.String({ description: "Unique question id" }),
   header: Type.String({ description: "Short label" }),
   prompt: Type.String({ description: "Question text" }),
-  recommendation: Type.Optional(Type.String({ description: "Suggested prefilled text" })),
+  recommendation: Type.Optional(Type.String({ description: "Suggested text" })),
   placeholder: Type.Optional(Type.String({ description: "Editor placeholder" })),
 });
 
@@ -57,11 +64,11 @@ export const AskUserParamsSchema = Type.Object({
   title: Type.Optional(Type.String({ description: "Optional title" })),
   intro: Type.Optional(
     Type.String({
-      description: "Optional intro for the decision",
+      description: "Optional context",
     }),
   ),
   questions: Type.Array(QuestionSchema, {
-    description: "1-10 focused questions for one decision",
+    description: "1-10 related questions for one decision",
     ...QuestionCount,
   }),
 });
