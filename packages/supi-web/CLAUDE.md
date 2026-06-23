@@ -44,7 +44,7 @@ src/
 ## Context7 pipeline (web_docs_search + web_docs_fetch)
 
 1. **web_docs_search** — calls `GET /api/v2/libs/search` directly with `libraryName` + `query`
-   - Returns formatted Markdown table: Name, ID, Description, Trust Score, Benchmark Score, Snippets, Versions
+   - Returns compact Markdown table: ID, Name, Trust Score, Benchmark Score, Snippets, shortened Versions, Description
 2. **agent picks a library ID** from the results
 3. **web_docs_fetch** — calls `GET /api/v2/context` directly with `libraryId` + `query`
    - Default mode returns pre-formatted text from Context7's API response

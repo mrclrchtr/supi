@@ -8,7 +8,7 @@ import {
 import { writeTempFile } from "../temp-file.ts";
 
 /** Human-readable truncation contract shared by all model-visible web outputs. */
-export const MODEL_OUTPUT_LIMIT_DESCRIPTION = `Model-visible output is truncated to ${DEFAULT_MAX_LINES.toLocaleString()} lines or ${formatSize(DEFAULT_MAX_BYTES)} (whichever is hit first); when truncated, full output is saved to a temp file.`;
+export const MODEL_OUTPUT_LIMIT_DESCRIPTION = `Inline truncates at ${DEFAULT_MAX_LINES.toLocaleString()} lines/${formatSize(DEFAULT_MAX_BYTES)}; full saved to temp.`;
 
 /** Result of preparing content for a tool response visible to the model. */
 export interface ModelVisibleOutput {
@@ -35,14 +35,11 @@ export async function limitModelVisibleOutput(
   }
 
   const fullOutputPath = await writeTempFile(content, options.tempPrefix, options.suffix);
-  const omittedLines = truncation.totalLines - truncation.outputLines;
-  const omittedBytes = truncation.totalBytes - truncation.outputBytes;
   const prefix = truncation.content.length > 0 ? `${truncation.content}\n\n` : "";
   const notice = [
-    `[Output truncated: showing ${truncation.outputLines.toLocaleString()} of ${truncation.totalLines.toLocaleString()} lines`,
-    `(${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}).`,
-    `${omittedLines.toLocaleString()} lines (${formatSize(omittedBytes)}) omitted.`,
-    `Full output saved to: ${fullOutputPath}]`,
+    `[Output truncated: ${truncation.outputLines.toLocaleString()}/${truncation.totalLines.toLocaleString()} lines,`,
+    `${formatSize(truncation.outputBytes)}/${formatSize(truncation.totalBytes)}.`,
+    `Full: ${fullOutputPath}]`,
   ].join(" ");
 
   return {

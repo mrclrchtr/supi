@@ -72,7 +72,7 @@ Searches Context7 for library IDs before fetching documentation.
 | `library_name` | string | ✓ | Library name to search for (e.g. `"react"`, `"next.js"`) |
 | `query` | string | ✓ | What you're trying to do — used for relevance ranking |
 
-Results return as a Markdown table with library ID, name, description, trust score, benchmark score, snippet count, and available versions.
+Results return as a compact Markdown table with library ID, name, description, trust score, benchmark score, snippet count, and shortened version lists (top 10 matches shown).
 
 ## `web_docs_fetch`
 

@@ -14,9 +14,7 @@ export function getWebToolPromptSurface(name: WebToolName): WebToolPromptSurface
   const promptGuidelines = [...spec.promptGuidelines];
 
   if (name === WEB_FETCH_MD_TOOL_NAME && isGhAvailable()) {
-    promptGuidelines.push(
-      "Use bash with the `gh` CLI instead of web_fetch_md for GitHub URLs when `gh` is available.",
-    );
+    promptGuidelines.push("Use `gh` CLI instead of web_fetch_md for GitHub URLs.");
   }
 
   return {

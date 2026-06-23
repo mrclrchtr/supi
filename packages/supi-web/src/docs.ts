@@ -36,6 +36,12 @@ interface FetchDetails extends Record<string, unknown> {
   fullOutputPath?: string;
 }
 
+type SearchLibraryResult = Awaited<ReturnType<typeof searchLibrary>>[number];
+
+const MAX_SEARCH_RESULTS = 10;
+const MAX_DESCRIPTION_CHARS = 120;
+const MAX_VERSION_COUNT = 5;
+
 export default function docsExtension(pi: ExtensionAPI): void {
   const searchSpec = getWebToolSpec(WEB_DOCS_SEARCH_TOOL_NAME);
   const searchSurface = getWebToolPromptSurface(WEB_DOCS_SEARCH_TOOL_NAME);
@@ -158,20 +164,52 @@ function formatSearchResults(
   libraryName: string,
   results: Awaited<ReturnType<typeof searchLibrary>>,
 ): string {
-  const rows = results.map(
-    (lib) =>
-      `| **${escapeMd(lib.name)}** | \`${escapeMd(lib.id)}\` | ${escapeMd(lib.description ?? "")} | ${lib.trustScore ?? ""} | ${lib.benchmarkScore ?? ""} | ${lib.totalSnippets ?? ""} | ${lib.versions ? lib.versions.join(", ") : ""} |`,
-  );
+  const visibleResults = results.slice(0, MAX_SEARCH_RESULTS);
+  const hiddenCount = results.length - visibleResults.length;
+  const rows = visibleResults.map(formatSearchRow);
+  const noun = results.length === 1 ? "library" : "libraries";
+  const hiddenNote =
+    hiddenCount > 0
+      ? [`_${hiddenCount} more omitted; refine \`library_name\` or \`query\` if needed._`, ""]
+      : [];
 
   return [
-    `Found **${results.length}** library/libraries matching "${libraryName}":`,
+    `Found ${results.length} Context7 ${noun} for "${libraryName}"${hiddenCount > 0 ? `; showing top ${visibleResults.length}` : ""}:`,
     "",
-    "| Name | ID | Description | Trust | Benchmark | Snippets | Versions |",
+    "| ID | Name | Trust | Bench | Snips | Versions | Description |",
     "|---|---|---|---|---|---|---|",
     ...rows,
     "",
-    "> Use `web_docs_fetch` with the library ID to retrieve documentation.",
+    ...hiddenNote,
+    "> Use `web_docs_fetch` with the chosen ID.",
   ].join("\n");
+}
+
+function formatSearchRow(lib: SearchLibraryResult): string {
+  const cells = [
+    `\`${escapeMd(lib.id)}\``,
+    escapeMd(lib.name),
+    String(lib.trustScore ?? ""),
+    String(lib.benchmarkScore ?? ""),
+    String(lib.totalSnippets ?? ""),
+    escapeMd(formatVersions(lib.versions)),
+    escapeMd(truncateCell(lib.description ?? "", MAX_DESCRIPTION_CHARS)),
+  ];
+
+  return `| ${cells.join(" | ")} |`;
+}
+
+function formatVersions(versions?: string[]): string {
+  if (!versions?.length) return "";
+  const visibleVersions = versions.slice(0, MAX_VERSION_COUNT);
+  const hiddenCount = versions.length - visibleVersions.length;
+  return `${visibleVersions.join(", ")}${hiddenCount > 0 ? `, +${hiddenCount}` : ""}`;
+}
+
+function truncateCell(text: string, maxChars: number): string {
+  const compact = text.replace(/\s+/g, " ").trim();
+  if (compact.length <= maxChars) return compact;
+  return `${compact.slice(0, maxChars - 1).trimEnd()}…`;
 }
 
 function escapeMd(text: string): string {

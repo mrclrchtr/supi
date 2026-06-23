@@ -88,6 +88,35 @@ describe("docsExtension", () => {
       expect(result.details?.count).toBe(1);
     });
 
+    it("keeps large search result metadata compact", async () => {
+      mockSearchLibrary.mockResolvedValue(
+        Array.from({ length: 12 }, (_, index) => ({
+          id: `/example/lib-${index}`,
+          name: `Library ${index}`,
+          description: `Long description for library ${index}. `.repeat(10),
+          totalSnippets: 100 + index,
+          trustScore: 8,
+          benchmarkScore: 90 + index,
+          versions: ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"],
+        })),
+      );
+
+      const tool = getTool(pi, "web_docs_search");
+      const result = (await tool.execute(
+        "tc-1",
+        { library_name: "lib", query: "docs" },
+        undefined,
+        undefined,
+        makeCtx(),
+      )) as ToolResult;
+
+      const text = result.content[0].text;
+      expect(text).toContain("showing top 10");
+      expect(text).toContain("v1, v2, v3, v4, v5, +3");
+      expect(text).toContain("…");
+      expect(text).not.toContain("/example/lib-10");
+    });
+
     it("returns helpful message when no results found", async () => {
       mockSearchLibrary.mockResolvedValue([]);
 
