@@ -40,14 +40,12 @@ function parseArgs(argv) {
     if (arg.startsWith("-")) {
       throw new Error(`Unknown option: ${arg}`);
     }
-    // biome-ignore lint/suspicious/noUnnecessaryConditions: args.packageDir is set by a previous loop iteration via mutation; biome's flow analysis does not track reassignments on plain objects
     if (args.packageDir) {
       throw new Error("Only one package directory may be provided");
     }
     args.packageDir = resolve(arg);
   }
 
-  // biome-ignore lint/suspicious/noUnnecessaryConditions: args.packageDir may remain undefined when only flags (--dry-run, --out-dir) are passed and no positional arg is present
   if (!args.packageDir) {
     throw new Error(
       "Usage: node scripts/pack-staged.mjs <package-dir> [--dry-run] [--out-dir <dir>]",

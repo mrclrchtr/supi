@@ -60,7 +60,6 @@ const multiChoiceQuestion = multiQuestionnaire.questions[0] as NormalizedChoiceQ
 function responseById(outcome: { responses: AskUserResponse[] }, id: string): AskUserResponse {
   const r = outcome.responses.find((r) => r.questionId === id);
   expect(r).toBeDefined();
-  // biome-ignore lint/style/noNonNullAssertion: guaranteed by expect above
   return r!;
 }
 
@@ -74,7 +73,6 @@ describe("AskUserController", () => {
       const resp = responseById(outcome, "formatter");
       expect(resp.answer.answered).toBe(true);
       if (resp.answer.kind === "choice") {
-        // biome-ignore lint/style/noNonNullAssertion: biome is guaranteed to be in the options list
         const biome = resp.answer.options.find((o) => o.value === "biome")!;
         expect(biome.selected).toBe(true);
       }
