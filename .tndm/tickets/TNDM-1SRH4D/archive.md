@@ -20,4 +20,3 @@ Diff/doc review:
   - `packages/supi-tree-sitter/README.md`
   - `packages/supi-code-intelligence/README.md`
 - Conclusion: no living doc updates were required because those READMEs describe package surfaces/actions at a stable level and do not document the removed prompt-guidance wording or pseudocode blocks.
-

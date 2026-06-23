@@ -5,7 +5,7 @@ revision = 24
 
 [document_fingerprints]
 archive = "sha256:78a1ba44068fdaf8ad0e1c1bbdfb52c06dcf228b245f88fb5867542b362de03b"
-content = "sha256:bf63e0c4f03ec23d7b9343f0e0b93858187fe75e98d80bfa3df7e4656b695fbe"
+content = "sha256:8ac01fd1dd8d0d75de6f730cc4a323d7e60f3b323ebb0e68b11a566f9ef0d4b0"
 task-01 = "sha256:02c2be2e13a48357452125abf1e671728d9c75bc7ba5ba897a85d7cb331df49f"
 task-02 = "sha256:03b7df423ae115365aa7514e4ba5190e0160cd4d068d69e0da6d87c3840abdb9"
 task-03 = "sha256:52c51ce49f3440f99382219c129a502bbf82a27f4de6acf25c35e28a50b8037c"
@@ -15,34 +15,18 @@ task-04 = "sha256:3debb2fa14ed0bc49c9674c1394d1e487dd9d57002c9c6928d257395db4dde
 number = 1
 title = "Refactor supi-tree-sitter so split tree_sitter_* tools derive from one shared metadata source"
 status = "done"
-files = ["packages/supi-tree-sitter/src/tool/tool-specs.ts", "packages/supi-tree-sitter/src/tool/action-specs.ts", "packages/supi-tree-sitter/src/tool/guidance.ts", "packages/supi-tree-sitter/src/tool/register-tools.ts", "packages/supi-tree-sitter/src/tree-sitter.ts", "packages/supi-tree-sitter/README.md", "packages/supi-tree-sitter/__tests__/guidance.test.ts", "packages/supi-tree-sitter/__tests__/tool-focus.test.ts", "packages/supi-tree-sitter/__tests__/tool.test.ts"]
-verification = "pnpm vitest run packages/supi-tree-sitter/ && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json && pnpm exec biome check packages/supi-tree-sitter"
-notes = "TDD: start by making the focused tree-sitter guidance/registration tests fail against the current drift, then implement the minimum refactor to make the split public tool surface spec-driven again."
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Align supi-lsp docs and regression coverage with the split lsp_* expert tool surface"
 status = "done"
-files = ["packages/supi-lsp/src/tool/tool-specs.ts", "packages/supi-lsp/src/tool/guidance.ts", "packages/supi-lsp/src/tool/register-tools.ts", "packages/supi-lsp/src/handlers/session-lifecycle.ts", "packages/supi-lsp/README.md", "packages/supi-lsp/__tests__/unit/tool-specs.test.ts", "packages/supi-lsp/__tests__/unit/guidance.test.ts", "packages/supi-lsp/__tests__/unit/focused-tools.test.ts"]
-verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/tool-specs.test.ts packages/supi-lsp/__tests__/unit/guidance.test.ts packages/supi-lsp/__tests__/unit/focused-tools.test.ts && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json && pnpm exec biome check packages/supi-lsp"
-notes = "TDD: tighten the focused LSP tool tests first so public tool-name drift and guidance drift are caught before updating docs or registration wiring."
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Add explicit cross-family orchestration guidance to supi-code-intelligence without adding a new runtime layer"
 status = "done"
-files = ["packages/supi-code-intelligence/src/tool/tool-specs.ts", "packages/supi-code-intelligence/src/tool/guidance.ts", "packages/supi-code-intelligence/src/tool/register-tools.ts", "packages/supi-code-intelligence/src/code-intelligence.ts", "packages/supi-code-intelligence/README.md", "packages/supi-code-intelligence/__tests__/unit/guidance.test.ts", "packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts", "packages/supi-code-intelligence/__tests__/unit/tool-adapters.test.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/guidance.test.ts packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts packages/supi-code-intelligence/__tests__/unit/tool-adapters.test.ts && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json && pnpm exec biome check packages/supi-code-intelligence"
-notes = "TDD: write or tighten guidance/registration tests first so the package proves it can steer between code_*, lsp_*, and tree_sitter_* tools without re-owning substrate metadata."
-detail_path = "tasks/task-03.md"
 
 [[tasks]]
 number = 4
 title = "Sync maintainer-facing architecture docs and run the cross-package regression sweep"
 status = "done"
-files = ["docs/tool-architecture.md", "packages/supi-lsp/CLAUDE.md", "packages/supi-tree-sitter/CLAUDE.md", "packages/supi-code-intelligence/CLAUDE.md"]
-verification = "pnpm vitest run packages/supi-tree-sitter/ packages/supi-lsp/__tests__/unit/tool-specs.test.ts packages/supi-lsp/__tests__/unit/guidance.test.ts packages/supi-lsp/__tests__/unit/focused-tools.test.ts packages/supi-code-intelligence/__tests__/unit/guidance.test.ts packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts packages/supi-code-intelligence/__tests__/unit/tool-adapters.test.ts && pnpm exec biome check docs/tool-architecture.md packages/supi-lsp/CLAUDE.md packages/supi-tree-sitter/CLAUDE.md packages/supi-code-intelligence/CLAUDE.md && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json"
-notes = "Test-exempt rationale: this task is maintainer-doc synchronization plus final regression verification, not new runtime logic. Manual verification should include reading the updated docs to confirm they state the agreed ownership/orchestration rule with no stale tool names."
-detail_path = "tasks/task-04.md"

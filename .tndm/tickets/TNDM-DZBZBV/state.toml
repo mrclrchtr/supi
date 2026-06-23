@@ -5,11 +5,9 @@ revision = 8
 
 [document_fingerprints]
 archive = "sha256:ccdfaa040fa837437b089b53b98baafda4bee7d461c1acaa26c469ffef1c69d4"
-content = "sha256:be2f3fc571ee7f6145b4f83ed0e7478160fea929404633e82cfb5b8698c719b3"
+content = "sha256:377f32aaa79f8b5387527882d574216af8e2393a4f5200d8d3e897568dddeba6"
 
 [[tasks]]
 number = 1
 title = "Fix `renderNoteStatus` to wrap note text using `wrapTextWithAnsi`"
 status = "done"
-file = "packages/supi-ask-user/src/render/ui-rich-render.ts"
-verification = "pnpm vitest run packages/supi-ask-user/ && pnpm exec tsc --noEmit -p packages/supi-ask-user/tsconfig.json"

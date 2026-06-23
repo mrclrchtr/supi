@@ -5,41 +5,29 @@ revision = 16
 
 [document_fingerprints]
 archive = "sha256:fa42baf5238e34ecf568f3095c9ef700f93c1c5cf415f00a4319072de130437d"
-content = "sha256:ac1e9d2a728879c4a2a81d6e6612d736770ec6a609195ef50e9684b905d7a60b"
+content = "sha256:200fe16203a9466939da9c20d650b3ddb7e138484301abfa91017dd3899f5313"
 
 [[tasks]]
 number = 1
 title = "Move the `lsp` tool to a top-level `{ action, args }` schema while preserving a provider-compatible top-level object."
 status = "done"
-file = "packages/supi-lsp/__tests__/tool-actions.validation.test.ts"
-verification = "pnpm exec vitest run packages/supi-lsp/__tests__/e2e-smoke.test.ts packages/supi-lsp/__tests__/tool-actions.validation.test.ts"
 
 [[tasks]]
 number = 2
 title = "Update the remaining `executeAction`/`safeExecuteAction` callers and LSP tool help text to the breaking `{ action, args }` API."
 status = "done"
-file = "packages/supi-lsp/__tests__/tool-actions-workspace.integration.test.ts"
-verification = "pnpm exec vitest run packages/supi-lsp/__tests__/tool-actions.test.ts packages/supi-lsp/__tests__/tool-actions.recover.test.ts packages/supi-lsp/__tests__/tool-actions.integration.test.ts packages/supi-lsp/__tests__/tool-actions-workspace.integration.test.ts"
 
 [[tasks]]
 number = 3
 title = "Run targeted package verification for the breaking API change."
 status = "done"
-file = "packages/supi-lsp/__tests__/tool-actions-workspace.integration.test.ts"
-verification = "pnpm exec vitest run packages/supi-lsp/__tests__/e2e-smoke.test.ts packages/supi-lsp/__tests__/tool-actions.validation.test.ts packages/supi-lsp/__tests__/tool-actions.test.ts packages/supi-lsp/__tests__/tool-actions.recover.test.ts packages/supi-lsp/__tests__/tool-actions.integration.test.ts packages/supi-lsp/__tests__/tool-actions-workspace.integration.test.ts && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json"
 
 [[tasks]]
 number = 4
 title = "Address review follow-ups for lsp import, pi.image asset, and explicit tree_sitter guideline naming"
 status = "done"
-file = "packages/supi-lsp/src/lsp.ts; packages/supi/package.json; packages/supi-tree-sitter/src/tree-sitter.ts"
-verification = "pnpm exec biome check packages/supi-lsp/src/lsp.ts packages/supi-tree-sitter/src/tree-sitter.ts && cd packages/supi && npm pack --dry-run --json && pnpm exec vitest run packages/supi-lsp/__tests__/e2e-smoke.test.ts packages/supi-lsp/__tests__/tool-actions.validation.test.ts packages/supi-lsp/__tests__/tool-actions.test.ts packages/supi-lsp/__tests__/tool-actions.recover.test.ts packages/supi-lsp/__tests__/tool-actions.integration.test.ts packages/supi-lsp/__tests__/tool-actions-workspace.integration.test.ts && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json"
-notes = "Follow up on code review findings after the breaking { action, args } API change."
 
 [[tasks]]
 number = 5
 title = "Adjust LSP guidance to prefer workspace_symbol + hover over symbol_hover for generic type lookups"
 status = "done"
-file = "packages/supi-lsp/src/guidance.ts; packages/supi-lsp/__tests__/e2e-smoke.test.ts"
-verification = "pnpm exec vitest run packages/supi-lsp/__tests__/e2e-smoke.test.ts && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json"
-notes = "Avoid recommending ambiguous symbol_hover for generic type names like Config, Options, or Props."

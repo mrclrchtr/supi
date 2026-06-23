@@ -26,4 +26,3 @@ Run the full verification suite to confirm the entire change works end-to-end.
 - No lint errors
 - No stale references to old tool names or executor files in source
 - code_graph is the only public relation tool
-

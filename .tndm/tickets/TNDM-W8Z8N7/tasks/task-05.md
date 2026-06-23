@@ -39,4 +39,3 @@ Since `getReady()` is public (Task 4), this works. If `getReady()` rejects, the 
 - Run: `pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts` — existing pull diagnostics tests pass.
 - All existing unit tests still pass: `pnpm exec vitest run packages/supi-lsp/__tests__/unit/`
 - `pnpm exec tsc -b packages/supi-lsp/tsconfig.json` — compiles clean.
-

@@ -32,4 +32,3 @@ The composite `CodeProvider` implements both `SemanticProvider` and `StructuralP
 - New test passes
 - Existing `code_resolve` file-only test still passes
 - Full package tests pass
-

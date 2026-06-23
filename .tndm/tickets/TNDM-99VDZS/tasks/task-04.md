@@ -30,4 +30,3 @@ Call `provider.hover()` in the anchored brief code path and pass the result to t
 ## Verification
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` passes
 - Existing tests still pass: `pnpm vitest run packages/supi-code-intelligence/`
-

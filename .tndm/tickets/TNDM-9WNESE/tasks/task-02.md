@@ -17,4 +17,3 @@ Replace the local Tree-sitter session-registry storage boilerplate with the new 
 2. Run `pnpm vitest run packages/supi-tree-sitter/__tests__/service-registry.test.ts -v` and confirm it fails before the migration.
 3. Implement the registry migration and package manifest update.
 4. Re-run the verification command until tests and typechecks pass.
-

@@ -45,4 +45,3 @@ Update all tests to reflect the new `code_graph` tool and remove references to t
 ## Verification
 - `pnpm vitest run packages/supi-code-intelligence/` — all tests pass
 - `pnpm exec biome check packages/supi-code-intelligence/__tests__/` — no lint errors
-

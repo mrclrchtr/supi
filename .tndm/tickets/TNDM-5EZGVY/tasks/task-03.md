@@ -26,4 +26,3 @@ export function loadSectionConfig<T extends Record<string, unknown>>(
 ## Verification
 - `pnpm vitest run packages/supi-core/__tests__/unit/config/config.test.ts` passes
 - `pnpm exec tsc -b packages/supi-core/tsconfig.json` passes
-

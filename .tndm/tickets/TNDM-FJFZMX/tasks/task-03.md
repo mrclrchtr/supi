@@ -24,4 +24,3 @@ it("does not register any lsp_* or tree_sitter_* substrate tools", () => {
 
 - `pnpm vitest run packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts` — new test passes
 - Intentionally register an `lsp_` tool and confirm the test would catch it — not required for commit, just sanity
-

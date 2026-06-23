@@ -17,4 +17,3 @@ Add `code_graph` routing case to the planner's `routeFor()` function. The graph 
 ## Verification
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` compiles cleanly
 - `pnpm vitest run packages/supi-code-intelligence/__tests__/unit/planner-routing.test.ts` — will fail until tests are updated in task 8
-

@@ -22,4 +22,3 @@ For each mock shape that constructs a `ProjectServerInfo`-like object, add `read
 - Run: `pnpm exec vitest run packages/supi-code-intelligence/__tests__/` — all tests pass.
 - Run: `pnpm exec vitest run packages/supi-lsp/__tests__/` — all tests pass.
 - Run: `pnpm exec tsc -b` — full workspace typecheck passes.
-

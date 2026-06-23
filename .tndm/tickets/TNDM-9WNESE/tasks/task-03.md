@@ -21,4 +21,3 @@ Swap the LSP session-registry storage layer over to the new shared core helper w
 2. Run `pnpm vitest run packages/supi-lsp/__tests__/unit/service-registry.test.ts -v` and confirm it fails before the migration.
 3. Implement the storage migration without changing package-local wait logic.
 4. Re-run the verification command until tests and typechecks pass.
-

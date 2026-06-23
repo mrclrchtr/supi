@@ -41,4 +41,3 @@ pnpm exec biome check packages/supi-rtk/src/
 
 ## Failure handling
 If any step fails, fix the issue before marking this task complete. This is the integration gate.
-

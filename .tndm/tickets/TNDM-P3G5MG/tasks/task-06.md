@@ -35,4 +35,3 @@
    - Verify `code_pattern` still works
 
 **Verification:** All commands pass with zero errors.
-

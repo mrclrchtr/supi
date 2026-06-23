@@ -42,4 +42,3 @@ rg -n 'semantic rename|only "rename" is supported|apply this rename|lsp_rename|l
 Expected result: stale rename-only phrasing and stale public-substrate-tool wording are removed or limited to intentional historical/maintainer notes.
 
 Manual check: confirm the four documentation files describe the same first-wave operation set and the same deferral of file/resource operations.
-

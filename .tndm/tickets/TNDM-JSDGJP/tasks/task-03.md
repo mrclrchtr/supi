@@ -52,4 +52,3 @@ rg "V2 workflow|src/workflow|code_resolve|code_health" packages/supi-code-intell
 ```
 
 Expected result: both files contain the roadmap/skeleton guidance and mention `src/workflow/`.
-

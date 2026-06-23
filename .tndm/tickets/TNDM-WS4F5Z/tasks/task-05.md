@@ -61,4 +61,3 @@ Expected result: no matches.
    - `rename_file` / `move_file` fail explicitly and honestly
 
 This task is the integration gate for the whole change.
-

@@ -78,4 +78,3 @@ Re-apply only the low-level fixes that still make sense in the restored package-
 - All listed tests pass.
 - `packages/supi-lsp` is again a standalone install surface for `lsp_*`.
 - The package owns its own extension wiring instead of depending on `packages/supi-code-intelligence` to host it.
-

@@ -41,4 +41,3 @@ pnpm exec tsc -b \
 ```
 
 Expected result: the refactor tests pass and the package typechecks with the generalized first-wave operation set.
-

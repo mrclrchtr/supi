@@ -48,4 +48,3 @@ No new lint violations.
 - Full test suite (unit + integration + downstream) passes.
 - No `waitFor` retry pattern for `workspaceSymbol` remains.
 - No `retryWorkspaceSymbolAfterWarmup` references remain in codebase.
-

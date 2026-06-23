@@ -46,4 +46,3 @@ pnpm install
 - `pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json` passes (no missing module errors)
 - `pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json` passes
 - Grep confirms no source files in either package import from `@mrclrchtr/supi-code-intelligence`
-

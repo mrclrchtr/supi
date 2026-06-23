@@ -26,4 +26,3 @@ Add and update tests for the hover absorption. Ensure full test coverage.
 - `pnpm vitest run packages/supi-lsp/` — all pass
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` passes
 - `pnpm exec tsc -b packages/supi-code-intelligence/__tests__/tsconfig.json` passes
-

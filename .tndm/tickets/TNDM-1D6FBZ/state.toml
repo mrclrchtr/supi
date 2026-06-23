@@ -5,7 +5,7 @@ revision = 29
 
 [document_fingerprints]
 archive = "sha256:6a12bb60765235a85b454e470f136da784c9bae1fcd6bc1eadf259544e06b469"
-content = "sha256:2ca9f8c6136c64ed52b17a855598eb229eb2384ff4017695fb3ab27798550a44"
+content = "sha256:e02a6f6d2e1a716b324f389b4a6ca0e697c956e3f933f3a081ac8777640a31f7"
 task-01 = "sha256:33dc0e803ed83063b0b2a0c51a36314f080cf9bdf585f140ef039fb004a1e6bf"
 task-02 = "sha256:403cac591e96d776ef104421e7935680a9dea752b8b1459c5533e7fe28ed12a7"
 task-03 = "sha256:e669efa850c8d99829294d2132fb4dab66b2edbca72da7a31906be7c713d3591"
@@ -16,43 +16,23 @@ task-05 = "sha256:7fecb87686987e8e65b76c99baa695394e5b445ac7ddd39da13a2ae329f587
 number = 1
 title = "Introduce multi-tool specs and focused registration scaffolding"
 status = "done"
-files = ["packages/supi-code-intelligence/src/tool/tool-specs.ts", "packages/supi-code-intelligence/src/tool/guidance.ts", "packages/supi-code-intelligence/src/tool/register-tools.ts", "packages/supi-code-intelligence/src/code-intelligence.ts", "packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts", "packages/supi-code-intelligence/__tests__/unit/guidance.test.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts packages/supi-code-intelligence/__tests__/unit/guidance.test.ts -v && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json"
-notes = "TDD: yes. Update tests first so they describe the five-tool metadata/registration model before changing implementation."
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Implement code_brief and code_map with distinct interpretive vs factual behavior"
 status = "done"
-files = ["packages/supi-code-intelligence/src/actions/brief-action.ts", "packages/supi-code-intelligence/src/actions/map-action.ts", "packages/supi-code-intelligence/src/actions/index-action.ts", "packages/supi-code-intelligence/src/tool/execute-brief.ts", "packages/supi-code-intelligence/src/tool/execute-map.ts", "packages/supi-code-intelligence/src/types.ts", "packages/supi-code-intelligence/__tests__/unit/map-action.test.ts", "packages/supi-code-intelligence/__tests__/unit/details-metadata.test.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/map-action.test.ts packages/supi-code-intelligence/__tests__/unit/details-metadata.test.ts -v && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json"
-notes = "TDD: yes. Add focused map tests before moving the old index behavior into the new public `code_map` contract."
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Rework relations and target resolution to be substrate-only with no heuristic fallback"
 status = "done"
-files = ["packages/supi-code-intelligence/src/tool/execute-relations.ts", "packages/supi-code-intelligence/src/resolve-target.ts", "packages/supi-code-intelligence/src/target-resolution.ts", "packages/supi-code-intelligence/src/actions/callers-action.ts", "packages/supi-code-intelligence/src/actions/callees-action.ts", "packages/supi-code-intelligence/src/actions/implementations-action.ts", "packages/supi-code-intelligence/src/types.ts", "packages/supi-code-intelligence/__tests__/integration/fallback-chain.test.ts", "packages/supi-code-intelligence/__tests__/unit/semantic-file-target.test.ts", "packages/supi-code-intelligence/__tests__/unit/target-resolution.test.ts", "packages/supi-code-intelligence/__tests__/unit/details-metadata.test.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/integration/fallback-chain.test.ts packages/supi-code-intelligence/__tests__/unit/semantic-file-target.test.ts packages/supi-code-intelligence/__tests__/unit/target-resolution.test.ts packages/supi-code-intelligence/__tests__/unit/details-metadata.test.ts -v && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json"
-notes = "TDD: yes. Existing fallback-chain coverage must flip from 'heuristic fallback works' to 'unavailable/disambiguation is returned' before implementation."
-detail_path = "tasks/task-03.md"
 
 [[tasks]]
 number = 4
 title = "Make code_affected substrate-only and keep code_pattern as the sole heuristic tool"
 status = "done"
-files = ["packages/supi-code-intelligence/src/tool/execute-affected.ts", "packages/supi-code-intelligence/src/tool/execute-pattern.ts", "packages/supi-code-intelligence/src/actions/affected-action.ts", "packages/supi-code-intelligence/src/actions/pattern-action.ts", "packages/supi-code-intelligence/src/types.ts", "packages/supi-code-intelligence/__tests__/integration/fallback-chain.test.ts", "packages/supi-code-intelligence/__tests__/unit/tool-actions.test.ts", "packages/supi-code-intelligence/__tests__/unit/details-metadata.test.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/integration/fallback-chain.test.ts packages/supi-code-intelligence/__tests__/unit/tool-actions.test.ts packages/supi-code-intelligence/__tests__/unit/details-metadata.test.ts -v && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json"
-notes = "TDD: yes. Update affected/pattern expectations before code so the package-wide heuristic boundary is tested explicitly."
-detail_path = "tasks/task-04.md"
 
 [[tasks]]
 number = 5
 title = "Cut over to the clean-break tool surface, delete obsolete multiplexer files, and update docs"
 status = "done"
-files = ["packages/supi-code-intelligence/src/code-intelligence.ts", "packages/supi-code-intelligence/src/tool/tool-specs.ts", "packages/supi-code-intelligence/src/tool/register-tools.ts", "packages/supi-code-intelligence/src/tool/action-specs.ts", "packages/supi-code-intelligence/src/tool-actions.ts", "packages/supi-code-intelligence/src/actions/index-action.ts", "packages/supi-code-intelligence/src/api.ts", "packages/supi-code-intelligence/src/index.ts", "packages/supi-code-intelligence/README.md", "packages/supi-code-intelligence/CLAUDE.md", "docs/tool-architecture.md", "packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts", "packages/supi-code-intelligence/__tests__/unit/guidance.test.ts", "packages/supi-code-intelligence/package.json"]
-verification = "pnpm exec biome check packages/supi-code-intelligence --max-diagnostics=20 && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json && pnpm vitest run packages/supi-code-intelligence/ -v"
-notes = "TDD: yes for the public cutover (registration/guidance/tests first), then update docs in the same task after the package is green."
-detail_path = "tasks/task-05.md"

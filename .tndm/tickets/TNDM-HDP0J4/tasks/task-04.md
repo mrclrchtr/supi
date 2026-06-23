@@ -26,4 +26,3 @@ The existing `CodeGraphParameters` in `workflow/schemas.ts` only has targetId/re
 ## Verification
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json`
 - Guidance auto-generates from specs — run `pnpm vitest run packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts` after test updates
-

@@ -31,4 +31,3 @@ This is a schema constraint change. No new logic tests needed — existing tests
 - Existing tests pass
 - TypeBox rejects invalid kinds at the schema layer (runtime tests if a test harness exists)
 - Typecheck passes
-

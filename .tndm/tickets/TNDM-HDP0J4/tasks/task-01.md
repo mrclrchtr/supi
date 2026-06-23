@@ -18,4 +18,3 @@ Add `"code_graph"` to `CodeIntelligenceToolName` in `intent/types.ts` and remove
 ## Verification
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` shows type errors only where the old names were used (planner, tool-specs, tests) — these will be fixed in subsequent tasks
 - No test-only verification needed for this task alone
-

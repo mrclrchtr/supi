@@ -19,4 +19,3 @@ The conversion helper should be a local function — no need to export it.
 ## Verification
 - `pnpm exec tsc -b packages/supi-lsp/tsconfig.json` passes
 - `pnpm vitest run packages/supi-lsp/` passes (existing tests + optional new unit test for hover conversion)
-

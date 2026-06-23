@@ -33,4 +33,3 @@ export interface ProjectServerInfo extends DetectedProjectServer {
 
 ## Test-exempt
 Type-only change. Manual verification via typecheck pass. Test updates for mock shapes that reference `ProjectServerInfo` will be caught by typecheck and handled in the integration task.
-

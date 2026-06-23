@@ -70,4 +70,3 @@ When all items have `configType`, use the auto-generated handler. When any item 
 ## Verification
 - `pnpm vitest run packages/supi-core/__tests__/unit/config/config-settings.test.ts` passes
 - `pnpm exec tsc -b packages/supi-core/tsconfig.json` passes
-

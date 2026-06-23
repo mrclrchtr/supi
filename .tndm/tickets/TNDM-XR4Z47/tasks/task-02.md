@@ -34,4 +34,3 @@ Implementation: add a small mapper function before the `resolveSymbol()` call th
 
 - New tests pass
 - Existing `code_resolve` query tests pass
-

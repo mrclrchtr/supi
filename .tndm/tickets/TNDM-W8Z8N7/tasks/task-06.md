@@ -33,4 +33,3 @@ Add to `packages/supi-lsp/__tests__/unit/manager-project-info.test.ts` (or creat
 ## Verification
 - Run unit tests: `pnpm exec vitest run packages/supi-lsp/__tests__/unit/manager-project-info.test.ts`
 - `pnpm exec tsc -b packages/supi-lsp/tsconfig.json packages/supi-lsp/__tests__/tsconfig.json` — compiles clean.
-

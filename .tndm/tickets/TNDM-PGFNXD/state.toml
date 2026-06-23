@@ -5,7 +5,7 @@ revision = 23
 
 [document_fingerprints]
 archive = "sha256:0bd5a46fd5f34ed02231d5f536d1ff6b65aa764d1c06bf6f38954b8db93d8818"
-content = "sha256:d8d901ad6ef806ba5d473f613d86cd0621387ce415ab1a6ec937246213b9aaf1"
+content = "sha256:6f11379642219c479cb3524c0770b58648607296d010b2c9e72a2645f68b02b9"
 
 [[tasks]]
 number = 1

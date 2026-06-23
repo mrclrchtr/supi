@@ -33,4 +33,3 @@ RTK_DISABLED=1 pnpm vitest run packages/supi-code-intelligence/__tests__/unit/ex
 ```
 
 Expected result: tests prove that Phase 0 introduces no active V2 tools and does not remove current tools.
-

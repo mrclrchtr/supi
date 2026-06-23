@@ -40,4 +40,3 @@ expect(results?.length).toBeGreaterThan(0);
 - Run: `pnpm exec vitest run packages/supi-lsp/__tests__/integration/client.integration.test.ts`
 - All integration tests pass, including the new readiness and pull-diagnostics assertions.
 - Confirm no `waitFor` retry pattern remains in the integration test for workspace symbols or diagnostics.
-

@@ -19,4 +19,3 @@ Keep the header text ("A code review just completed...") shared across all branc
 - Info-only → light message
 - Patch-is-correct with findings → contradiction note
 - No findings → no follow-up (already tested by `maybeQueueReviewFollowUp`)
-

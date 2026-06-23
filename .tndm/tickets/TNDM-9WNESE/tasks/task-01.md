@@ -18,4 +18,3 @@ Create a minimal reusable helper in `packages/supi-core/` for session-scoped sta
 2. Run `pnpm vitest run packages/supi-core/__tests__/unit/registry-utils.test.ts -v` and confirm it fails for the missing helper or missing normalization behavior.
 3. Implement the helper and exports.
 4. Re-run the verification command until the test and typechecks pass.
-

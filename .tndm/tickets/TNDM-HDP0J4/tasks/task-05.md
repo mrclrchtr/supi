@@ -14,4 +14,3 @@ Before deleting, confirm no other code imports from these files (task 4 should h
 ## Verification
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` — no import errors from deleted files
 - `rg "execute-references|execute-calls|execute-implementations" packages/supi-code-intelligence/src/` — no remaining references in source (test references are OK, handled in task 7)
-

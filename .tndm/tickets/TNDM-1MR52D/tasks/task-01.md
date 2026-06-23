@@ -56,4 +56,3 @@ const mockDiagnostics: OutstandingDiagnosticSummaryEntry[] = [
 - Run: `pnpm vitest run packages/supi-code-intelligence/__tests__/unit/code-intelligence-status-overlay.test.ts`
 - All tests should FAIL (RED phase) because the component doesn't exist yet
 - Ensure failures are for "module not found" or import errors, not assertion mismatches
-

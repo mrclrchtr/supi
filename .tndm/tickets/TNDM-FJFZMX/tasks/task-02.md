@@ -14,4 +14,3 @@ Update two files in `packages/supi-code-intelligence/src/workflow/`:
 
 - `pnpm exec biome check packages/supi-code-intelligence/src/workflow/surface.ts packages/supi-code-intelligence/src/workflow/names.ts` — passes
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` — no errors
-

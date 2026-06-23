@@ -28,4 +28,3 @@ Test-exempt — pure wiring with no logic. Verified by Tasks 7 and 8 which impor
 ## Verification
 - `pnpm exec tsc -b packages/supi-core/tsconfig.json` passes
 - `node -e "require('./packages/supi-core/package.json').exports['./llm']"` confirms the export exists
-

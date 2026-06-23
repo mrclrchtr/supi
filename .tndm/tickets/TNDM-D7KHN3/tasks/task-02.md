@@ -52,4 +52,3 @@ interface BriefEnrichment {
 ## Verification
 - `pnpm exec vitest run packages/supi-code-intelligence/__tests__/unit/brief.test.ts` — Task 1 tests pass
 - `pnpm exec tsc -p packages/supi-code-intelligence/tsconfig.json` — no type errors
-

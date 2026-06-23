@@ -18,4 +18,3 @@ Remove the following files that have zero external callers after TNDM-A9AQF4:
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json packages/supi-code-intelligence/__tests__/tsconfig.json` — no type errors
 - `pnpm vitest run packages/supi-code-intelligence/` — all tests pass
 - Confirm no imports of `executeLspTool`, `executeTsTool`, `LSP_TOOL_DEFINITION_SPECS`, `TREE_SITTER_TOOL_SPECS`, `registerLspTools`, `registerTsTools`, `defaultLspToolPromptSurfaces`, `defaultTsToolPromptSurfaces` remain in live code
-

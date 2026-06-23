@@ -35,4 +35,3 @@ Full end-to-end verification: typecheck, lint, test suite, and manual smoke test
 - All tests pass (0 failures)
 - Manual smoke test confirms hover info appears in anchored brief
 - Git diff is clean (only expected changes)
-

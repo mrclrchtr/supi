@@ -16,4 +16,3 @@ async hover(filePath: string, position: { line: number; character: number }) {
 
 ## Verification
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` passes
-

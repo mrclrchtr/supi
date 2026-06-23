@@ -23,4 +23,3 @@ window: {
 
 ## Test-exempt
 Config-only change with no logic. Manual verification via typecheck + integration test pass is sufficient.
-

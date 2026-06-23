@@ -58,4 +58,3 @@ export function createCiStatusDialog(
 ## Verification
 - Run: `pnpm vitest run packages/supi-code-intelligence/__tests__/unit/code-intelligence-status-overlay.test.ts`
 - All 12 tests from Task 1 should now PASS
-

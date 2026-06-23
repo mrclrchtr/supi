@@ -34,4 +34,3 @@ Full-package verification:
 - `RTK_DISABLED=1 pnpm -v exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json`
 
 Expected result: all tests pass, Biome is clean, both TypeScript checks pass, and the package no longer contains behavior-owning files under `src/actions/`.
-

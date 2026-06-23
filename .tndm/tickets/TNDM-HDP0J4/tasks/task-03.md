@@ -37,4 +37,3 @@ Follow the boilerplate pattern from `execute-references.ts`:
 ## Verification
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` compiles cleanly
 - Code review: compare against `execute-references.ts` pattern for correctness
-

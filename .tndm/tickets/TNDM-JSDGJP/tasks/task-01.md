@@ -42,4 +42,3 @@ RTK_DISABLED=1 pnpm vitest run packages/supi-code-intelligence/__tests__/unit/wo
 ```
 
 Expected result before implementation: test fails because `src/workflow/index.ts` or its exports do not exist yet. The failure should be a missing-module/export failure, not an unrelated runtime failure.
-

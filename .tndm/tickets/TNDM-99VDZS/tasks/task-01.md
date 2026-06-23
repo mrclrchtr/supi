@@ -22,4 +22,3 @@ This uses existing types (`CodePosition`, `SourceRange`) already in `src/types.t
 
 - `pnpm exec tsc -b packages/supi-code-runtime/tsconfig.json` passes
 - No downstream type errors in supi-lsp or supi-code-intelligence (yet — will break until task 2 is done, which is expected)
-

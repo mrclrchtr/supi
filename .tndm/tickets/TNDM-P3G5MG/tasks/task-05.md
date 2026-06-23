@@ -21,4 +21,3 @@
 **Verification:**
 - Read the rendered CLAUDE.md — `code_find` section is present and accurate
 - `pnpm exec biome check packages/supi-code-intelligence/CLAUDE.md` passes (markdown lint)
-

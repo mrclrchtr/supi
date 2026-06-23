@@ -50,4 +50,3 @@ In `performStart()` and `restartClient()`, alongside `clearWarmedWorkspaceSymbol
 
 ## Test-exempt
 Behavioral change (removing dead code). Existing integration tests cover workspaceSymbol behavior. Manual verification via `rg` + typecheck + existing test pass is sufficient.
-

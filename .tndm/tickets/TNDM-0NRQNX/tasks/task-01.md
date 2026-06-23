@@ -21,4 +21,3 @@ For each, determine:
 ## Verification
 
 - Output a markdown table or structured list of file → symbol → action (delete re-definition, update import, keep as-is)
-

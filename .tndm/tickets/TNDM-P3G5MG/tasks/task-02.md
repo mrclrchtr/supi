@@ -36,4 +36,3 @@
 **Verification:**
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` passes
 - `pnpm vitest run packages/supi-code-intelligence/__tests__/unit/code-find-tool.test.ts` — all tests pass (test file created in next task)
-

@@ -41,4 +41,3 @@ All existing supi-code-intelligence tests still PASS. No new failures.
 
 ## Verification
 All automated tests pass, no type errors, no lint errors, manual smoke test confirms overlay renders and interacts correctly.
-

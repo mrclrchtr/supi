@@ -5,7 +5,7 @@ revision = 35
 
 [document_fingerprints]
 archive = "sha256:abf6a3ff06eaa0658064cb0c51ba1ac6eb42f0ae8f78b7515e3f97b9541cd128"
-content = "sha256:14e84def559a85cde1813f107533d6a65c008bdef7a1eb9393347e87d15d74e4"
+content = "sha256:7de64190b16330e0ded63a4a373eac05d68dcd79baae5debd1aa43d1637baba8"
 task-01 = "sha256:c3df76d266c5e21aeaa4e2ebe4cc89c783f1674af79a4f5df1872d5cc95a5d9b"
 task-02 = "sha256:23cf8cb1973c200d5844b105327dfba44f3a7935a54a1d81bb0c84bfa7d5420e"
 task-03 = "sha256:b388b2488fd00d5b2010627e48c75ab8bffebab216e4920826fd112817df15cd"

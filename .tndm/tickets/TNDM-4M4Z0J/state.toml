@@ -5,7 +5,7 @@ revision = 27
 
 [document_fingerprints]
 archive = "sha256:37d08d9b572811d17bfbbe1db1775ff201a996b57bc671ceccd853bc427702bd"
-content = "sha256:43ead3de9e1af121f512fed008af704796c8fb6f545f5e9845ce92fbe4ffb5a4"
+content = "sha256:298a4a70c31112ed32ae17bc3d7f7e6740c3ae65775fd8af493b97bae92bc69e"
 task-01 = "sha256:181e67b4c80211e28ec67ee943aa0648312e51287c967dbf86898a8e43017cc2"
 task-02 = "sha256:4c72dc62c7c6c5232a3aa7f41940a0264ed7e1eca6d3c5a914738f2166c77026"
 task-03 = "sha256:e5bf328d690df7c3cce5eb20358e76282a1ef824e3aa42b54fd501c696fb937c"
@@ -15,42 +15,23 @@ task-04 = "sha256:fadee9e1fcc77adfd698c0ef11fa104301eef3afdb28f92e7108409b95566d
 number = 1
 title = "Compact LSP prompt guidance and metadata with deduped server coverage"
 status = "done"
-files = ["packages/supi-lsp/src/tool/guidance.ts", "packages/supi-lsp/src/tool/tool-specs.ts", "packages/supi-lsp/__tests__/unit/guidance.test.ts", "packages/supi-lsp/__tests__/unit/tool-specs.test.ts", "packages/supi-lsp/__tests__/unit/focused-tools.test.ts"]
-verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/guidance.test.ts packages/supi-lsp/__tests__/unit/tool-specs.test.ts packages/supi-lsp/__tests__/unit/focused-tools.test.ts -v"
-notes = "TDD task. Tighten the LSP guidance/spec tests first so they describe the new compact contract: each tool keeps its own routing hint, dynamic coverage still appears somewhere useful, and repeated per-tool coverage duplication is removed before trimming the implementation text."
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Compact code-intelligence and tree-sitter guidance without losing routing clarity"
 status = "done"
-files = ["packages/supi-code-intelligence/src/tool/guidance.ts", "packages/supi-code-intelligence/src/tool/tool-specs.ts", "packages/supi-tree-sitter/src/tool/tool-specs.ts", "packages/supi-code-intelligence/__tests__/unit/guidance.test.ts", "packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts", "packages/supi-tree-sitter/__tests__/guidance.test.ts", "packages/supi-tree-sitter/__tests__/tool-focus.test.ts", "packages/supi-tree-sitter/__tests__/tool.test.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/guidance.test.ts packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts packages/supi-tree-sitter/__tests__/guidance.test.ts packages/supi-tree-sitter/__tests__/tool-focus.test.ts packages/supi-tree-sitter/__tests__/tool.test.ts -v"
-notes = "TDD task. Update the guidance/registration tests first so they capture the leaner cross-family and structural-tool contracts before trimming the text."
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Shrink ask_user schema text and top-level tool guidance"
 status = "done"
-files = ["packages/supi-ask-user/src/schema.ts", "packages/supi-ask-user/src/tool/guidance.ts", "packages/supi-ask-user/__tests__/unit/guidance.test.ts"]
-verification = "pnpm vitest run packages/supi-ask-user/__tests__/unit/guidance.test.ts -v"
-notes = "TDD task. Extend the guidance test first if needed, then shorten the model-facing descriptions aggressively while keeping the blocking decision-form contract clear."
-detail_path = "tasks/task-03.md"
 
 [[tasks]]
 number = 4
 title = "Trim web and smaller support-tool guidance surfaces"
 status = "done"
-files = ["packages/supi-web/src/tool/web-fetch-md-guidance.ts", "packages/supi-web/src/tool/web-docs-search-guidance.ts", "packages/supi-web/src/tool/web-docs-fetch-guidance.ts", "packages/supi-cache/src/tool/guidance.ts", "packages/supi-debug/src/tool/guidance.ts", "packages/supi-rtk/src/tool/guidance.ts", "packages/supi-web/__tests__/unit/guidance.test.ts", "packages/supi-cache/__tests__/unit/guidance.test.ts", "packages/supi-debug/__tests__/unit/guidance.test.ts", "packages/supi-rtk/__tests__/unit/guidance.test.ts"]
-verification = "pnpm vitest run packages/supi-web/__tests__/unit/guidance.test.ts packages/supi-cache/__tests__/unit/guidance.test.ts packages/supi-debug/__tests__/unit/guidance.test.ts packages/supi-rtk/__tests__/unit/guidance.test.ts -v"
-notes = "TDD task. Update the small guidance tests first, then trim wording while keeping the important guardrails intact."
-detail_path = "tasks/task-04.md"
 
 [[tasks]]
 number = 5
 title = "Run cross-package verification and confirm the token totals drop"
 status = "done"
-files = ["packages/supi-lsp/", "packages/supi-code-intelligence/", "packages/supi-tree-sitter/", "packages/supi-ask-user/", "packages/supi-web/", "packages/supi-cache/", "packages/supi-debug/", "packages/supi-rtk/", "packages/supi-context/"]
-verification = "pnpm exec biome check packages/supi-lsp packages/supi-code-intelligence packages/supi-tree-sitter packages/supi-ask-user packages/supi-web packages/supi-cache packages/supi-debug packages/supi-rtk packages/supi-context --max-diagnostics=20 && pnpm typecheck && pnpm typecheck:tests && pnpm vitest run packages/supi-lsp/__tests__/unit/guidance.test.ts packages/supi-lsp/__tests__/unit/tool-specs.test.ts packages/supi-lsp/__tests__/unit/focused-tools.test.ts packages/supi-code-intelligence/__tests__/unit/guidance.test.ts packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts packages/supi-tree-sitter/__tests__/guidance.test.ts packages/supi-tree-sitter/__tests__/tool-focus.test.ts packages/supi-tree-sitter/__tests__/tool.test.ts packages/supi-ask-user/__tests__/unit/guidance.test.ts packages/supi-web/__tests__/unit/guidance.test.ts packages/supi-cache/__tests__/unit/guidance.test.ts packages/supi-debug/__tests__/unit/guidance.test.ts packages/supi-rtk/__tests__/unit/guidance.test.ts packages/supi-context/__tests__/unit/analysis.test.ts packages/supi-context/__tests__/unit/format.test.ts -v"
-notes = "Test-exempt for the token-measurement part because this task is verification/reporting only, not new logic. After the automated checks pass, reload pi and run `/supi-context full`; confirm the `Guidelines` and `Tool Definitions` token totals are both lower than the pre-change baseline shown in the original report."

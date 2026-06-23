@@ -34,4 +34,3 @@ Confirm all six fixes are correct and don't break existing behavior.
 ## Files touched by verification
 
 None — verify-only task.
-

@@ -35,4 +35,3 @@ Note: `SourceRange` is used by `types.ts`'s own `AffectedDetails`? Check — if 
 - `pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json` passes
 - `pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json` passes
 - No residual `from "../types.ts"` imports of the deleted symbols remain in src/
-

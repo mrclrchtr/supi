@@ -13,4 +13,3 @@ Ensure directory briefs also use `maxResults` for file listing caps and show any
 
 ## Verification
 - `pnpm exec vitest run packages/supi-code-intelligence/__tests__/unit/directory-brief-recursive.test.ts` — passes with new assertions
-

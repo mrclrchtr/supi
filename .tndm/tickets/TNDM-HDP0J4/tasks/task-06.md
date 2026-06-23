@@ -26,4 +26,3 @@ interface GraphSection {
 ## Verification
 - Used by execute-graph.ts (task 3) — visual verification through actual tool usage
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json`
-

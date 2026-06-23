@@ -36,4 +36,3 @@ Prepare a concise summary for the user covering:
 - recommended next phase ticket, likely `code_resolve` handles
 
 Stop after the handoff. The user should review and commit Phase 0 before a future phase starts.
-

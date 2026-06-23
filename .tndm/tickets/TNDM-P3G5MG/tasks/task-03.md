@@ -25,4 +25,3 @@
 **Verification:**
 - `pnpm vitest run packages/supi-code-intelligence/__tests__/unit/code-find-tool.test.ts` — all tests pass
 - Red-green-refactor: write failing tests first, then implement in task 2
-

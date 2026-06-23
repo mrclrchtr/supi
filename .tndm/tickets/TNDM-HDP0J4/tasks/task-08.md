@@ -27,4 +27,3 @@ Update CLAUDE.md to document `code_graph` and remove documentation for the old t
 ## Verification
 - Read through CLAUDE.md to confirm no stale references to code_references, code_calls, code_implementations as public tools
 - Any internal references to the old service modules (analysis/references/service.ts etc.) should remain
-

@@ -15,4 +15,3 @@
 - TypeScript typecheck: ✅ (no errors)
 - All 1586 tests pass across 152 test files: ✅
 - Biome checks on all 16 edited package.json files: ✅ (no fixes needed)
-

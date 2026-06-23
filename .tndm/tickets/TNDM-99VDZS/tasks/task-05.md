@@ -35,4 +35,3 @@ This surfaces type signatures, documentation, and other hover info in the brief 
 ## Verification
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` passes
 - Existing tests pass: `pnpm vitest run packages/supi-code-intelligence/`
-

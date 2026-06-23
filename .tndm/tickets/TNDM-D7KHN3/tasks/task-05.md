@@ -28,4 +28,3 @@ pnpm exec biome check packages/supi-code-intelligence/
 - Typecheck clean
 - No new biome issues
 - Smoke test shows enrichment sections
-

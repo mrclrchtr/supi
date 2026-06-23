@@ -92,4 +92,3 @@ When `_status` becomes `"error"`: same readiness cleanup as shutdown, using `rej
 - All 11 tests pass.
 - All existing tests still pass: `pnpm exec vitest run packages/supi-lsp/__tests__/unit/`
 - `pnpm exec tsc -b packages/supi-lsp/tsconfig.json packages/supi-lsp/__tests__/tsconfig.json` — compiles clean.
-

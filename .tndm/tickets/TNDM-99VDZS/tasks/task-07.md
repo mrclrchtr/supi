@@ -17,4 +17,3 @@ In `packages/supi-code-intelligence/CLAUDE.md`, under "Known absorption gaps":
 
 ## Verification
 - CLAUDE.md no longer lists lsp_hover as an absorption gap
-

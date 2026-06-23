@@ -38,4 +38,3 @@ RTK_DISABLED=1 pnpm vitest run \
 ```
 
 Expected result: failures mention the new operation-aware behavior that has not been implemented yet.
-

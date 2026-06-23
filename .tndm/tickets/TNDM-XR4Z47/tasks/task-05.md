@@ -27,4 +27,3 @@ Also consider: should `registerWorkflowTarget()` reject unreadable files outrigh
 
 - New tests pass
 - Existing target-store tests still pass (stale detection, cwd isolation, etc.)
-

@@ -22,5 +22,3 @@ Write `scripts/pack-all.mjs` that spawns `node scripts/publish.mjs <pkg>` for al
 node scripts/pack-all.mjs
 # Expect: 16 packages discovered, parallel execution, ✓ per package, exit 0
 ```
-
-

@@ -14,4 +14,3 @@ Update CLAUDE.md and README.md to reflect enriched brief output and maxResults b
 ## Verification
 - Manual review: both files describe enriched output accurately
 - No stale references to old behavior
-

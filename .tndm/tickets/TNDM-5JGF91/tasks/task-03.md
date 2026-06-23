@@ -24,4 +24,3 @@ to:
 grep -A2 "pack:check" CLAUDE.md
 # Should show the new description
 ```
-

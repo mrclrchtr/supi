@@ -41,4 +41,3 @@ pnpm exec tsc -b \
 ```
 
 Expected result: targeted refactor-provider tests pass and both packages typecheck cleanly.
-

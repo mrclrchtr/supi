@@ -53,4 +53,3 @@ Write the unit test file for the `LspClient` readiness state machine. These test
 - Run: `pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-readiness.test.ts`
 - Confirm ALL 11 tests FAIL (they reference methods/fields that don't exist yet).
 - `pnpm exec tsc -b packages/supi-lsp/__tests__/tsconfig.json` — test file compiles (types may error on missing fields, that's expected as RED).
-

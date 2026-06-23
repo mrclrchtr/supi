@@ -119,4 +119,3 @@ Update `code-intelligence-status-command.test.ts`:
 - All tests PASS
 - Run: `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json packages/supi-code-intelligence/__tests__/tsconfig.json`
 - No type errors
-

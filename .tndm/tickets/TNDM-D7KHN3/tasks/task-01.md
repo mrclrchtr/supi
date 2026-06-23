@@ -16,4 +16,3 @@ Update existing brief tests in `__tests__/unit/brief.test.ts` (and any related t
 
 ## Verification
 - `pnpm exec vitest run packages/supi-code-intelligence/__tests__/unit/brief.test.ts` — fails with assertion errors (enrichment not yet implemented)
-

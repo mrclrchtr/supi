@@ -33,4 +33,3 @@ Add a subsection under "V2 workflow — Phase 1.5" called "Known absorption gaps
 
 - Manual read-through confirms architecture diagram paths match reality
 - Absorption gap section is accurate and located under Phase 1.5
-

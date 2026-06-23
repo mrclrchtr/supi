@@ -42,4 +42,3 @@ Create the generation script that produces per-package PNG logos.
 - Confirm all 17 PNG files exist under `packages/*/assets/logo.png`
 - Confirm files are non-zero size
 - Spot-check 3 PNGs visually with `open packages/supi-lsp/assets/logo.png` (or similar)
-

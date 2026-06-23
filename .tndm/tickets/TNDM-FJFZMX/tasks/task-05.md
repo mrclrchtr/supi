@@ -13,4 +13,3 @@ Run the full verification suite to confirm the cleanup didn't break anything:
 ## Lint note
 
 After deleting the source files, Biome may flag unused suppression comments (e.g. `// biome-ignore` in remaining files that previously suppressed errors related to imports from the deleted files). If so, remove those unused suppression comments.
-

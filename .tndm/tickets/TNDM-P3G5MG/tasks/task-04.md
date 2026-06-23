@@ -20,4 +20,3 @@
 **Verification:**
 - `pnpm vitest run packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts` — all tests pass
 - No lsp_* or tree_sitter_* tools leak into the registered set
-

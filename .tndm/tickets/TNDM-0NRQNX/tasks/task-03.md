@@ -43,4 +43,3 @@ rm packages/supi-code-intelligence/src/substrates/types.ts
 - No remaining imports from `substrates/types.ts` anywhere
 - `pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json` passes
 - `pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json` passes
-

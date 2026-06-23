@@ -17,4 +17,3 @@
 - `pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json` passes
 - Extension registration test in `__tests__/unit/extension-registration.test.ts` still passes (adds `code_find` assertion in a later task)
 - Tool spec array length increases by 1
-

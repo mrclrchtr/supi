@@ -33,4 +33,3 @@ pnpm verify
 ## Verification
 
 - Visual inspection of command outputs — all should be green exit codes
-
