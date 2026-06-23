@@ -35,7 +35,6 @@ const SUBTITLES = {
   "supi-insights": "Insights",
   "supi-lsp": "LSP",
   "supi-review": "Review",
-  "supi-rtk": "RTK",
   "supi-settings": "Settings",
   "supi-test-utils": "Test Utils",
   "supi-tree-sitter": "Tree-sitter",

@@ -127,7 +127,6 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-insights` | flat source is fine; move tests to package-level `__tests__/unit/` |
 | `supi-lsp` | hybrid large-package layout with `config/`, `client/`, `manager/`, `diagnostics/`, `tool/`, `ui/`, `session/` |
 | `supi-review` | likely hybrid with `ui/` and `tool/` if reorganized |
-| `supi-rtk` | stay flat unless it grows |
 | `supi-test-utils` | stay flat utility package |
 | `supi-tree-sitter` | hybrid: root surfaces + `tool/` + `session/` |
 | `supi-web` | mostly flat; use `tool/` for per-tool guidance files when multiple tools are present |
@@ -167,8 +166,6 @@ Stay flat unless they grow:
 - `supi`
 - `supi-bash-timeout`
 - `supi-context`
-- `supi-debug`
-- `supi-rtk`
 - `supi-test-utils`
 
 Lightweight packages that may stay mostly flat while still using a focused `tool/` folder for guidance or tool-specific wiring:

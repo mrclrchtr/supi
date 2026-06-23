@@ -18,7 +18,6 @@
         "packages/supi-insights/package.json",
         "packages/supi-lsp/package.json",
         "packages/supi-review/package.json",
-        "packages/supi-rtk/package.json",
         "packages/supi-settings/package.json",
         "packages/supi-tree-sitter/package.json",
         "packages/supi-web/package.json"

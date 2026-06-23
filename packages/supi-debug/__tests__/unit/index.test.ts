@@ -110,7 +110,7 @@ describe("supi-debug extension setup", () => {
     mockFns.getDebugSummary.mockReturnValue({
       total: 3,
       byLevel: { warning: 2, debug: 1 },
-      bySource: { rtk: 3 },
+      bySource: { lsp: 3 },
     });
 
     const provider = mockFns.registerContextProvider.mock.calls[0][0];
@@ -119,7 +119,7 @@ describe("supi-debug extension setup", () => {
       total: 3,
       "level:warning": 2,
       "level:debug": 1,
-      "source:rtk": 3,
+      "source:lsp": 3,
     });
   });
 });
@@ -231,7 +231,7 @@ describe("supi-debug command and tool", () => {
         {
           id: 1,
           timestamp: 1_700_000_000_000,
-          source: "rtk",
+          source: "lsp",
           level: "warning",
           category: "fallback",
           message: "timeout",
@@ -244,14 +244,14 @@ describe("supi-debug command and tool", () => {
     const cmd = pi.commands.get("supi-debug") as {
       handler: (args: string, ctx: { cwd: string }) => Promise<void>;
     };
-    await cmd?.handler("source=rtk level=warning limit=5", { cwd: "/repo" });
+    await cmd?.handler("source=lsp level=warning limit=5", { cwd: "/repo" });
 
     expect(mockFns.getDebugEvents).toHaveBeenCalledWith({
-      source: "rtk",
+      source: "lsp",
       level: "warning",
       limit: 5,
     });
-    expect(pi.messages[0]?.content).toContain("rtk");
+    expect(pi.messages[0]?.content).toContain("lsp");
     expect(pi.messages[0]?.content).toContain("git status");
   });
 
@@ -265,7 +265,7 @@ describe("supi-debug command and tool", () => {
         {
           id: 1,
           timestamp: 1_700_000_000_000,
-          source: "rtk",
+          source: "lsp",
           level: "warning",
           category: "fallback",
           message: "timeout",
@@ -278,7 +278,7 @@ describe("supi-debug command and tool", () => {
       handler: (args: string, ctx: { cwd: string }) => Promise<void>;
     };
 
-    await expect(cmd?.handler("source=rtk", { cwd: "/repo" })).resolves.toBeUndefined();
+    await expect(cmd?.handler("source=lsp", { cwd: "/repo" })).resolves.toBeUndefined();
     expect(pi.messages[0]?.content).toContain('"[Circular]"');
     expect(pi.messages[0]?.content).toContain("1n");
   });
@@ -304,7 +304,7 @@ describe("supi-debug command and tool", () => {
         {
           id: 1,
           timestamp: 1_700_000_000_000,
-          source: "rtk",
+          source: "lsp",
           level: "warning",
           category: "fallback",
           message: "timeout",
@@ -315,7 +315,7 @@ describe("supi-debug command and tool", () => {
 
     const result = (await tool?.execute(
       "id",
-      { source: "rtk", includeRaw: true },
+      { source: "lsp", includeRaw: true },
       undefined,
       undefined,
       { cwd: "/repo" },
@@ -325,7 +325,7 @@ describe("supi-debug command and tool", () => {
     };
 
     expect(mockFns.getDebugEvents).toHaveBeenCalledWith({
-      source: "rtk",
+      source: "lsp",
       level: undefined,
       category: undefined,
       limit: undefined,
@@ -362,7 +362,7 @@ describe("supi-debug command and tool", () => {
         {
           id: 1,
           timestamp: 1_700_000_000_000,
-          source: "rtk",
+          source: "lsp",
           level: "warning",
           category: "fallback",
           message: "timeout",

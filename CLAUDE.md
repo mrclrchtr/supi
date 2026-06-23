@@ -28,7 +28,7 @@ SuPi is pre-release and not API-stable. Intentional breaking changes to package 
 - Keep small packages flat; add `config/`, `tool/`, `ui/`, `session/`, or other domain folders only when the package size and responsibilities clearly justify them.
 - Current anchor examples: `supi-lsp` uses the hybrid large-package model; `supi-insights` uses the standard package-level test layout.
 - This convention is the default for new packages and for existing packages when they receive structural work.
-- Packages that should stay flat unless they grow: `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-rtk`, `supi-test-utils`.
+- Packages that should stay flat unless they grow: `supi-bash-timeout`, `supi-context`, `supi-debug`, `supi-test-utils`.
 - `supi-web` should stay mostly flat, but may use `src/tool/` for per-tool guidance files and other narrowly scoped tool-specific wiring.
 
 ## Commands
@@ -127,7 +127,6 @@ Extensions register settings via `registerSettings()` from `@mrclrchtr/supi-core
 - `hk` drives local hooks: `pre-commit` autofixes, `pre-push` runs `pnpm verify`.
 - `pnpm exec jiti /tmp/script.mjs` — ad-hoc workspace TS runtime probes; Node `--experimental-strip-types` breaks on TS parameter properties here.
 - pnpm `ignoredBuiltDependencies` silently skips install scripts; `onlyBuiltDependencies` explicitly allows them — confusing the two causes missing native binaries (e.g. tree-sitter-cli).
-- RTK fallback warnings (`rtk/fallback: non-zero-exit`) are rewrite-attempt noise, not actual failures — the bash command usually succeeds afterward.
 - `tsc -b` (build mode) and `--noEmit` are incompatible — use `pnpm typecheck:ai` instead of raw `tsc` commands.
 - Per PI docs, signal real tool failures by throwing from `execute()` — returning error text is still a successful tool call. Only throw for actual invalid usage or capability-unavailable conditions, not for valid searches that find zero results.
 

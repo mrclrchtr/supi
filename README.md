@@ -50,7 +50,6 @@ Install individual packages from the table below. For the full stack, install fr
 | `pi install npm:@mrclrchtr/supi-cache` | Prompt cache health monitoring and cross-session forensics |
 | `pi install npm:@mrclrchtr/supi-insights` | Usage reports and session analytics |
 | `pi install npm:@mrclrchtr/supi-review` | Structured code reviews via `/supi-review` |
-| `pi install npm:@mrclrchtr/supi-rtk` | Transparent bash command rewriting for token savings |
 
 Each package has its own README with full details, configuration, and API docs.
 

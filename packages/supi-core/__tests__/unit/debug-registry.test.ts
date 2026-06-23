@@ -21,7 +21,7 @@ describe("debug registry", () => {
     configureDebugRegistry({ enabled: false });
 
     const event = recordDebugEvent({
-      source: "rtk",
+      source: "lsp",
       level: "warning",
       category: "fallback",
       message: "fallback",
@@ -35,7 +35,7 @@ describe("debug registry", () => {
     configureDebugRegistry({ enabled: true });
 
     recordDebugEvent({
-      source: "rtk",
+      source: "lsp",
       level: "warning",
       category: "fallback",
       message: "rewrite failed",
@@ -47,7 +47,7 @@ describe("debug registry", () => {
       {
         id: 1,
         timestamp: 1_700_000_000_000,
-        source: "rtk",
+        source: "lsp",
         level: "warning",
         category: "fallback",
         message: "rewrite failed",
@@ -70,12 +70,12 @@ describe("debug registry", () => {
   it("filters by source, level, and category with newest-first limits", () => {
     configureDebugRegistry({ enabled: true, maxEvents: 10 });
 
-    recordDebugEvent({ source: "rtk", level: "warning", category: "fallback", message: "one" });
+    recordDebugEvent({ source: "lsp", level: "warning", category: "fallback", message: "one" });
     recordDebugEvent({ source: "lsp", level: "error", category: "diagnostic", message: "two" });
-    recordDebugEvent({ source: "rtk", level: "warning", category: "fallback", message: "three" });
+    recordDebugEvent({ source: "lsp", level: "warning", category: "fallback", message: "three" });
 
     const result = getDebugEvents({
-      source: "rtk",
+      source: "lsp",
       level: "warning",
       category: "fallback",
       limit: 1,
@@ -90,7 +90,7 @@ describe("debug registry", () => {
     const queryKey = ["api", "Key"].join("");
     const rawCommand = `${secretKey}=abc echo ok https://example.test?${queryKey}=xyz`;
     recordDebugEvent({
-      source: "rtk",
+      source: "lsp",
       level: "warning",
       category: "fallback",
       message: "secret command",
@@ -137,14 +137,14 @@ describe("debug registry", () => {
   it("summarizes events by level and source", () => {
     configureDebugRegistry({ enabled: true });
 
-    recordDebugEvent({ source: "rtk", level: "warning", category: "fallback", message: "one" });
-    recordDebugEvent({ source: "rtk", level: "debug", category: "rewrite", message: "two" });
+    recordDebugEvent({ source: "lsp", level: "warning", category: "fallback", message: "one" });
+    recordDebugEvent({ source: "lsp", level: "debug", category: "rewrite", message: "two" });
     recordDebugEvent({ source: "lsp", level: "warning", category: "diagnostic", message: "three" });
 
     expect(getDebugSummary()).toEqual({
       total: 3,
       byLevel: { warning: 2, debug: 1 },
-      bySource: { rtk: 2, lsp: 1 },
+      bySource: { lsp: 3 },
     });
   });
 
@@ -165,7 +165,7 @@ describe("debug registry", () => {
 
   it("clears events and resets configuration", () => {
     configureDebugRegistry({ enabled: true, maxEvents: 5 });
-    recordDebugEvent({ source: "rtk", level: "warning", category: "fallback", message: "one" });
+    recordDebugEvent({ source: "lsp", level: "warning", category: "fallback", message: "one" });
 
     clearDebugEvents();
     expect(getDebugEvents().events).toEqual([]);

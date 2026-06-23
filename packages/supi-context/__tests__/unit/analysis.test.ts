@@ -212,8 +212,8 @@ describe("analyzeContext", () => {
     mockFns.buildSessionContext.mockReturnValue({ messages: [] });
     mockFns.getRegisteredContextProviders.mockReturnValue([
       {
-        id: "rtk",
-        label: "RTK",
+        id: "lsp",
+        label: "LSP",
         getData: () => ({ rewrites: 5, fallbacks: 1 }),
       },
     ]);
@@ -226,8 +226,8 @@ describe("analyzeContext", () => {
 
     expect(result.providerSections).toHaveLength(1);
     expect(result.providerSections[0]).toMatchObject({
-      id: "rtk",
-      label: "RTK",
+      id: "lsp",
+      label: "LSP",
       data: { rewrites: 5, fallbacks: 1 },
     });
   });
@@ -236,8 +236,8 @@ describe("analyzeContext", () => {
     mockFns.buildSessionContext.mockReturnValue({ messages: [] });
     mockFns.getRegisteredContextProviders.mockReturnValue([
       {
-        id: "rtk",
-        label: "RTK",
+        id: "lsp",
+        label: "LSP",
         getData: () => null,
       },
     ]);

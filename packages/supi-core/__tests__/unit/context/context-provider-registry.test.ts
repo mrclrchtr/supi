@@ -17,22 +17,22 @@ describe("context-provider-registry", () => {
 
   it("registers and retrieves a provider", () => {
     const provider: ContextProvider = {
-      id: "rtk",
-      label: "RTK",
+      id: "lsp",
+      label: "LSP",
       getData: () => ({ rewrites: 5 }),
     };
     registerContextProvider(provider);
 
     const result = getRegisteredContextProviders();
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ id: "rtk", label: "RTK" });
+    expect(result[0]).toMatchObject({ id: "lsp", label: "LSP" });
     expect(result[0].getData()).toEqual({ rewrites: 5 });
   });
 
   it("registers multiple providers in order", () => {
     const p1: ContextProvider = {
-      id: "rtk",
-      label: "RTK",
+      id: "lsp",
+      label: "LSP",
       getData: () => ({ rewrites: 1 }),
     };
     const p2: ContextProvider = {
@@ -45,18 +45,18 @@ describe("context-provider-registry", () => {
 
     const result = getRegisteredContextProviders();
     expect(result).toHaveLength(2);
-    expect(result.map((p) => p.id)).toEqual(["rtk", "cache"]);
+    expect(result.map((p) => p.id)).toEqual(["lsp", "cache"]);
   });
 
   it("replaces previous registration with duplicate id", () => {
     const original: ContextProvider = {
-      id: "rtk",
-      label: "RTK",
+      id: "lsp",
+      label: "LSP",
       getData: () => ({ rewrites: 1 }),
     };
     const replacement: ContextProvider = {
-      id: "rtk",
-      label: "RTK v2",
+      id: "lsp",
+      label: "LSP v2",
       getData: () => ({ rewrites: 2 }),
     };
     registerContextProvider(original);
@@ -64,14 +64,14 @@ describe("context-provider-registry", () => {
 
     const result = getRegisteredContextProviders();
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ id: "rtk", label: "RTK v2" });
+    expect(result[0]).toMatchObject({ id: "lsp", label: "LSP v2" });
     expect(result[0].getData()).toEqual({ rewrites: 2 });
   });
 
   it("clearRegisteredContextProviders empties the registry", () => {
     registerContextProvider({
-      id: "rtk",
-      label: "RTK",
+      id: "lsp",
+      label: "LSP",
       getData: () => ({ rewrites: 1 }),
     });
     expect(getRegisteredContextProviders()).toHaveLength(1);
@@ -82,8 +82,8 @@ describe("context-provider-registry", () => {
 
   it("allows provider to return null", () => {
     const provider: ContextProvider = {
-      id: "rtk",
-      label: "RTK",
+      id: "lsp",
+      label: "LSP",
       getData: () => null,
     };
     registerContextProvider(provider);

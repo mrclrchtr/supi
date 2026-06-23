@@ -6,7 +6,7 @@
 import { createRegistry } from "../registry-utils.ts";
 
 export interface ContextProvider {
-  /** Unique identifier — e.g. "rtk" */
+  /** Unique identifier — e.g. "lsp" */
   id: string;
   /** Human-readable label shown in the report */
   label: string;

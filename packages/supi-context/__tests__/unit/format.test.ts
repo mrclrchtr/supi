@@ -341,16 +341,16 @@ describe("formatContextReport", () => {
     const analysis = makeAnalysis();
     const lines = formatContextReport(analysis, mockTheme);
 
-    expect(lines.some((l) => l.includes("RTK"))).toBe(false);
+    expect(lines.some((l) => l.includes("LSP"))).toBe(false);
   });
 
   it("renders provider sections when present", () => {
     const analysis = makeAnalysis({
-      providerSections: [{ id: "rtk", label: "RTK", data: { rewrites: 5, fallbacks: 1 } }],
+      providerSections: [{ id: "lsp", label: "LSP", data: { rewrites: 5, fallbacks: 1 } }],
     });
     const lines = formatContextReport(analysis, mockTheme);
 
-    expect(lines.some((l) => l.includes("RTK"))).toBe(true);
+    expect(lines.some((l) => l.includes("LSP"))).toBe(true);
     expect(lines.some((l) => l.includes("[text]rewrites[/text]"))).toBe(true);
     expect(lines.some((l) => l.includes("[text]fallbacks[/text]"))).toBe(true);
   });
@@ -358,13 +358,13 @@ describe("formatContextReport", () => {
   it("renders multiple provider sections", () => {
     const analysis = makeAnalysis({
       providerSections: [
-        { id: "rtk", label: "RTK", data: { rewrites: 5 } },
+        { id: "lsp", label: "LSP", data: { rewrites: 5 } },
         { id: "cache", label: "Cache", data: { hits: 10 } },
       ],
     });
     const lines = formatContextReport(analysis, mockTheme);
 
-    expect(lines.some((l) => l.includes("RTK"))).toBe(true);
+    expect(lines.some((l) => l.includes("LSP"))).toBe(true);
     expect(lines.some((l) => l.includes("Cache"))).toBe(true);
   });
 });

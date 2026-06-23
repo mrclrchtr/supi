@@ -323,7 +323,7 @@ export default function debugExtension(pi: ExtensionAPI) {
     promptSnippet,
     promptGuidelines,
     parameters: Type.Object({
-      source: Type.Optional(Type.String({ description: "Filter by extension source, e.g. rtk" })),
+      source: Type.Optional(Type.String({ description: "Filter by extension source, e.g. lsp" })),
       level: Type.Optional(
         Type.Union([
           Type.Literal("debug"),

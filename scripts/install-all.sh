@@ -24,7 +24,6 @@ PACKAGES=(
   supi-cache
   supi-insights
   supi-review
-  supi-rtk
 )
 
 if ! command -v pi &>/dev/null; then

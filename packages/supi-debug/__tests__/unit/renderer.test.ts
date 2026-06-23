@@ -70,7 +70,7 @@ describe("debug message renderer", () => {
           {
             id: 1,
             timestamp: 1_700_000_000_000,
-            source: "rtk",
+            source: "lsp",
             level: "warning",
             category: "fallback",
             message: "timeout",
@@ -78,7 +78,7 @@ describe("debug message renderer", () => {
           {
             id: 2,
             timestamp: 1_700_000_001_000,
-            source: "rtk",
+            source: "lsp",
             level: "debug",
             category: "rewrite",
             message: "ok",
@@ -89,7 +89,7 @@ describe("debug message renderer", () => {
       createMockTheme(),
     );
 
-    expect((result as { text: string }).text).toBe("2 events — rtk/fallback +1 more");
+    expect((result as { text: string }).text).toBe("2 events — lsp/fallback +1 more");
   });
 
   it("renders full events when expanded", () => {
@@ -101,7 +101,7 @@ describe("debug message renderer", () => {
           {
             id: 1,
             timestamp: 1_700_000_000_000,
-            source: "rtk",
+            source: "lsp",
             level: "warning",
             category: "fallback",
             message: "timeout",
@@ -116,7 +116,7 @@ describe("debug message renderer", () => {
     );
 
     const text = (result as { text: string }).text;
-    expect(text).toContain("rtk/fallback");
+    expect(text).toContain("lsp/fallback");
     expect(text).toContain("timeout");
     expect(text).toContain("/repo");
     expect(text).toContain('"command": "git status"');
@@ -132,10 +132,10 @@ describe("debug message renderer", () => {
           {
             id: 1,
             timestamp: 1_700_000_000_000,
-            source: "rtk",
+            source: "lsp",
             level: "debug",
             category: "rewrite",
-            message: "RTK rewrote command",
+            message: "LSP rewrote command",
             data: {
               command: "line1\nline2\nline3",
               other: "single",

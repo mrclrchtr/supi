@@ -48,7 +48,7 @@ It also registers a **Debug** provider section for `/supi-context`.
 - **Collapsed** (default) — a one-line summary:
 
   ```
-  3 events — rtk/rewrite +2 more
+  3 events — lsp/rewrite +2 more
   ```
 
 - **Expanded** — full details with timestamp, level, source/category, message, cwd,

@@ -45,7 +45,6 @@ Depending on which SuPi packages are installed, the overlay may include settings
 - `supi-bash-timeout` — default bash timeout injection
 - `supi-cache` — prompt-cache monitoring and history collection
 - `supi-debug` — debug event capture and retention
-- `supi-rtk` — command rewriting controls
 - `supi-insights` — report-generation options
 
 ## Package surfaces
