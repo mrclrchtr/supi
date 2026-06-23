@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.15.0](https://github.com/mrclrchtr/supi/compare/v1.14.3...v1.15.0) (2026-06-23)
+
+
+### Features
+
+* **supi-web:** collapse tool output by default, expand for full text ([531205a](https://github.com/mrclrchtr/supi/commit/531205ad7466152530081d787769b62db33dd882))
+
+
+### Bug Fixes
+
+* **supi-web:** align tool behavior with pi guidance ([6dcf683](https://github.com/mrclrchtr/supi/commit/6dcf683a7e0701b553ea8662b93a7709236a5ff8))
+
+
+### Performance Improvements
+
+* **supi-web:** compress tool guidance, truncation, and search output ([7918134](https://github.com/mrclrchtr/supi/commit/79181341064d9806762ca71d6a72555b0c0ec62b))
+
 ## [1.14.3](https://github.com/mrclrchtr/supi/compare/v1.14.2...v1.14.3) (2026-06-23)
 
 
