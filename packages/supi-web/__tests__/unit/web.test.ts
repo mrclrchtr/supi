@@ -1,6 +1,15 @@
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it, vi } from "vitest";
 
+interface ThemeMock {
+  fg: (_color: string, text: string) => string;
+}
+
+interface RenderableTool {
+  execute: (...args: unknown[]) => Promise<unknown>;
+  renderResult: (...args: unknown[]) => { render: (width: number) => string[] };
+}
+
 const { spawnSync } = vi.hoisted(() => ({
   spawnSync: vi.fn(() => ({ status: 0 })),
 }));
@@ -10,6 +19,19 @@ vi.mock("node:child_process", () => ({
 }));
 
 import webExtension from "../../src/web.ts";
+
+function createTheme(): ThemeMock {
+  return {
+    fg: (_color, text) => text,
+  };
+}
+
+function renderToolResult(tool: RenderableTool, result: unknown, expanded: boolean): string {
+  return tool
+    .renderResult(result, { expanded, isPartial: false }, createTheme(), {} as never)
+    .render(120)
+    .join("\n");
+}
 
 describe("webExtension", () => {
   it("registers the web_fetch_md tool", () => {
@@ -24,7 +46,7 @@ describe("webExtension", () => {
   it("rejects invalid URLs", async () => {
     const pi = createPiMock();
     webExtension(pi as never);
-    const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
+    const tool = pi.tools[0] as RenderableTool;
 
     await expect(
       tool.execute("tc-1", { url: "not-a-url" }, undefined, undefined, makeCtx()),
@@ -34,7 +56,7 @@ describe("webExtension", () => {
   it("rejects non-http schemes", async () => {
     const pi = createPiMock();
     webExtension(pi as never);
-    const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
+    const tool = pi.tools[0] as RenderableTool;
 
     await expect(
       tool.execute("tc-1", { url: "ftp://example.com" }, undefined, undefined, makeCtx()),
@@ -58,7 +80,7 @@ describe("webExtension", () => {
       }),
     );
 
-    const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
+    const tool = pi.tools[0] as RenderableTool;
     const result = (await tool.execute(
       "tc-1",
       { url: "https://example.com/doc" },
@@ -73,6 +95,14 @@ describe("webExtension", () => {
     expect(result.content[0].text).toBe("# Small\n\nContent");
     expect(result.details?.chars).toBe(16);
     expect(result.details?.lines).toBe(3);
+
+    const collapsed = renderToolResult(tool, result, false);
+    const expanded = renderToolResult(tool, result, true);
+    expect(collapsed).toContain("Fetched Markdown");
+    expect(collapsed).toContain("expand for output");
+    expect(collapsed).not.toContain("# Small");
+    expect(expanded).toContain("# Small");
+    expect(expanded).toContain("Content");
 
     vi.unstubAllGlobals();
   });
@@ -95,7 +125,7 @@ describe("webExtension", () => {
       }),
     );
 
-    const tool = pi.tools[0] as { execute: (...args: unknown[]) => Promise<unknown> };
+    const tool = pi.tools[0] as RenderableTool;
     const result = (await tool.execute(
       "tc-1",
       { url: "https://example.com/huge", output_mode: "inline" },

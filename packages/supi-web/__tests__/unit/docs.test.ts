@@ -1,6 +1,15 @@
 import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+interface ThemeMock {
+  fg: (_color: string, text: string) => string;
+}
+
+interface RenderableTool {
+  execute: (...args: unknown[]) => Promise<unknown>;
+  renderResult: (...args: unknown[]) => { render: (width: number) => string[] };
+}
+
 const { mockSearchLibrary, mockGetContext, MockContext7Error } = vi.hoisted(() => ({
   mockSearchLibrary: vi.fn(),
   mockGetContext: vi.fn(),
@@ -25,6 +34,19 @@ type ToolResult = {
   content: { type: "text"; text: string }[];
   details?: Record<string, unknown>;
 };
+
+function createTheme(): ThemeMock {
+  return {
+    fg: (_color, text) => text,
+  };
+}
+
+function renderToolResult(tool: RenderableTool, result: unknown, expanded: boolean): string {
+  return tool
+    .renderResult(result, { expanded, isPartial: false }, createTheme(), {} as never)
+    .render(120)
+    .join("\n");
+}
 
 describe("docsExtension", () => {
   let pi: ReturnType<typeof createPiMock>;
@@ -72,7 +94,7 @@ describe("docsExtension", () => {
         },
       ]);
 
-      const tool = getTool(pi, "web_docs_search");
+      const tool = getTool(pi, "web_docs_search") as unknown as RenderableTool;
       const result = (await tool.execute(
         "tc-1",
         { library_name: "react", query: "how to use hooks" },
@@ -86,6 +108,14 @@ describe("docsExtension", () => {
       expect(result.content[0].text).toContain("/facebook/react");
       expect(result.content[0].text).toContain("95.5");
       expect(result.details?.count).toBe(1);
+
+      const collapsed = renderToolResult(tool, result, false);
+      const expanded = renderToolResult(tool, result, true);
+      expect(collapsed).toContain("Found 1 library");
+      expect(collapsed).toContain("expand for output");
+      expect(collapsed).not.toContain("| ID |");
+      expect(expanded).toContain("| ID |");
+      expect(expanded).toContain("/facebook/react");
     });
 
     it("keeps large search result metadata compact", async () => {
@@ -153,7 +183,7 @@ describe("docsExtension", () => {
     it("returns markdown content in text mode by default", async () => {
       mockGetContext.mockResolvedValue("### React Hooks\n\nContent here");
 
-      const tool = getTool(pi, "web_docs_fetch");
+      const tool = getTool(pi, "web_docs_fetch") as unknown as RenderableTool;
       const result = (await tool.execute(
         "tc-1",
         { library_id: "/facebook/react", query: "how to use hooks" },
@@ -169,6 +199,14 @@ describe("docsExtension", () => {
         undefined,
       );
       expect(result.content[0].text).toBe("### React Hooks\n\nContent here");
+
+      const collapsed = renderToolResult(tool, result, false);
+      const expanded = renderToolResult(tool, result, true);
+      expect(collapsed).toContain("Fetched Markdown");
+      expect(collapsed).toContain("/facebook/react");
+      expect(collapsed).not.toContain("### React Hooks");
+      expect(expanded).toContain("### React Hooks");
+      expect(expanded).toContain("Content here");
     });
 
     it("returns raw json when raw=true", async () => {

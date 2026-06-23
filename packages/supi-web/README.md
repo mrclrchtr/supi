@@ -26,7 +26,10 @@ pi install ./packages/supi-web
 
 ## What you get
 
-After install, pi gets three tools:
+After install, pi gets three tools.
+
+In PI's TUI, these tools now render a collapsed summary by default; expand the tool row to reveal the full inline output.
+
 
 | Tool | Purpose |
 |------|---------|

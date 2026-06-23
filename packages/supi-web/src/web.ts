@@ -14,6 +14,7 @@ import { fetchWithNegotiation, isValidHttpUrl } from "./fetch.ts";
 import { writeTempFile } from "./temp-file.ts";
 import { getWebToolPromptSurface } from "./tool/guidance.ts";
 import { limitModelVisibleOutput } from "./tool/output.ts";
+import { renderCollapsibleTextResult, renderToolCall } from "./tool/render.ts";
 import {
   getWebToolSpec,
   WEB_FETCH_INLINE_MAX_CHARS,
@@ -44,6 +45,38 @@ export default function webExtension(pi: ExtensionAPI): void {
     promptGuidelines: surface.promptGuidelines,
     parameters: spec.parameters,
     execute: runWebFetch,
+    renderCall(args, theme) {
+      const input = (args ?? {}) as WebFetchMdInput;
+      const url = typeof input.url === "string" ? input.url : "";
+      const outputMode = typeof input.output_mode === "string" ? input.output_mode : undefined;
+      return renderToolCall(spec.name, url, theme, outputMode);
+    },
+    renderResult(result, { expanded, isPartial }, theme) {
+      if (isPartial) {
+        return renderCollapsibleTextResult({
+          summary: theme.fg("warning", "Fetching web content..."),
+          expanded,
+          theme,
+        });
+      }
+
+      const details = result.details as WebFetchDetails | undefined;
+      const summary = buildWebFetchSummary(details, theme);
+      const content = result.content.find((item) => item.type === "text");
+      const body = details?.filePath
+        ? undefined
+        : content?.type === "text"
+          ? content.text
+          : undefined;
+
+      return renderCollapsibleTextResult({
+        summary,
+        body,
+        expanded,
+        theme,
+        fullOutputPath: details?.fullOutputPath,
+      });
+    },
   });
 }
 
@@ -115,4 +148,38 @@ async function resolveMarkdown(
   if (result.isMarkdown) return result.text;
   if (result.isPlainText) return wrapAsCodeBlock(result.text, result.url);
   return htmlToMarkdown(result.text, result.url, { absLinks });
+}
+
+function buildWebFetchSummary(
+  details: WebFetchDetails | undefined,
+  theme: { fg: (color: "success" | "warning" | "dim", text: string) => string },
+): string {
+  if (!details) {
+    return theme.fg("success", "Fetched web content");
+  }
+
+  if (details.filePath) {
+    return [
+      theme.fg("success", "Saved Markdown to "),
+      theme.fg("dim", details.filePath),
+      theme.fg(
+        "dim",
+        ` (${details.chars.toLocaleString()} chars, ${details.lines.toLocaleString()} lines)`,
+      ),
+    ].join("");
+  }
+
+  let summary = [
+    theme.fg("success", "Fetched Markdown"),
+    theme.fg(
+      "dim",
+      ` (${details.chars.toLocaleString()} chars, ${details.lines.toLocaleString()} lines)`,
+    ),
+  ].join("");
+
+  if (details.truncation?.truncated) {
+    summary += theme.fg("warning", " [truncated]");
+  }
+
+  return summary;
 }
