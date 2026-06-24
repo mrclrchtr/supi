@@ -195,10 +195,16 @@ async function executeStructuredSearch(
         candidateCount: structured.matches.length,
         omittedCount: structured.omittedCount + (rendered.evidenceList.omittedCount ?? 0),
         evidenceLists: [rendered.evidenceList],
-        nextQueries: [
-          "Omit `kind` for plain text matches",
-          "Use `summary: true` for broader textual distribution",
-        ],
+        nextQueries:
+          kind === "call"
+            ? [
+                "Omit `kind` for plain text matches",
+                'Use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers',
+              ]
+            : [
+                "Omit `kind` for plain text matches",
+                "Widen `scope` or raise `maxResults` for broader coverage",
+              ],
       },
     },
   };

@@ -58,6 +58,8 @@ export interface HealthData {
   lspAvailable: boolean;
   lspStatus: string;
   recovered: boolean;
+  /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */
+  structuralStatus?: string;
   diagnostics: HealthDiagnosticEntry[];
   servers: HealthServerInfo[];
   gitContext: GitContext | null;
@@ -114,6 +116,9 @@ function renderDegradedCoverageSection(lines: string[], data: HealthData): void 
 
 function renderStatusLine(lines: string[], data: HealthData): void {
   lines.push(`**LSP**: ${data.lspStatus}`);
+  if (data.structuralStatus) {
+    lines.push(`**Structural**: ${data.structuralStatus}`);
+  }
   if (data.recovered) {
     lines.push("**Recovery**: diagnostics refreshed");
   }

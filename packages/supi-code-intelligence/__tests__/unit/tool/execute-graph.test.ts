@@ -125,7 +125,7 @@ describe("execute-graph (code_graph tool)", () => {
   });
 
   describe("callees relation", () => {
-    it("reports outgoing calls", async () => {
+    it("reports direct structural calls", async () => {
       writeSource("test.ts", "function foo() { bar(); }\n");
       registerMockProvider(tmpDir, {
         calleesAt: async (_file, _line, _char) => ({

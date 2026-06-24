@@ -604,6 +604,24 @@ describe("renderHealthResult code actions", () => {
     expect(result).toContain("suggestions only");
   });
 
+  it("renders structural readiness in the status line when structuralStatus is set", () => {
+    const data = makeBaseData({ lspStatus: "ready", structuralStatus: "ready" });
+
+    const result = renderHealthResult(data, "/tmp");
+
+    expect(result).toContain("**LSP**: ready");
+    expect(result).toContain("**Structural**: ready");
+  });
+
+  it("omits the structural status line when structuralStatus is unset", () => {
+    const data = makeBaseData({ lspStatus: "ready" });
+
+    const result = renderHealthResult(data, "/tmp");
+
+    expect(result).toContain("**LSP**: ready");
+    expect(result).not.toContain("**Structural**");
+  });
+
   it("does not render code actions section when codeActions is null", () => {
     const data = makeBaseData({
       diagnostics: [{ file: "/tmp/src/file.ts", errors: 2, warnings: 0 }],

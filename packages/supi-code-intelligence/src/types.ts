@@ -223,6 +223,8 @@ export interface HealthDetails {
   lspAvailable: boolean;
   lspStatus: string;
   recovered: boolean;
+  /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */
+  structuralStatus?: string;
   diagnosticFileCount: number;
   serverCount: number;
   evidenceLists?: EvidenceListMetadata[];

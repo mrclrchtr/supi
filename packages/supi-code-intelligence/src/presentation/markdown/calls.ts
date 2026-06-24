@@ -1,5 +1,5 @@
 /**
- * Calls markdown renderer — renders outgoing structural calls.
+ * Calls markdown renderer — renders direct structural calls.
  */
 
 import type { CallEntry } from "../../analysis/calls/service.ts";

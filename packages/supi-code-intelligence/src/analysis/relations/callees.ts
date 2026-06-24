@@ -1,5 +1,5 @@
 /**
- * Structural callee lookup — finds direct outgoing calls in the enclosing scope at a target position.
+ * Structural callee lookup — finds direct calls in the enclosing scope at a target position.
  */
 
 import type { CalleeEntry, CalleeScope, RelationsServiceDeps } from "./types.ts";

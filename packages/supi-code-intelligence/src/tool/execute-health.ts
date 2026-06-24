@@ -7,7 +7,7 @@
 
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { type CapabilityState, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type { SessionLspService, SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
@@ -56,7 +56,9 @@ export async function executeHealthTool(
   const scopeFilter = scopeResolution.path === cwd ? null : scopeResolution.path;
 
   const providerState = getCodeProvider(cwd);
-  const semanticState = getDefaultWorkspaceRuntime().getWorkspace(cwd).semantic.state;
+  const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
+  const semanticState = workspace.semantic.state;
+  const structuralState = workspace.structural.state;
   const lspState: SessionLspServiceState =
     providerState.kind === "ready"
       ? providerState.lspService
@@ -69,6 +71,7 @@ export async function executeHealthTool(
     lspState,
     semanticState.kind,
   );
+  const structuralStatus = describeStructuralState(structuralState);
 
   const diagnostics = await collectDiagnostics(service, included, scopeFilter, cwd);
   const servers = collectServers(service, included);
@@ -97,6 +100,7 @@ export async function executeHealthTool(
     lspAvailable: service !== null,
     lspStatus,
     recovered,
+    structuralStatus,
     diagnostics,
     servers,
     gitContext,
@@ -119,6 +123,7 @@ export async function executeHealthTool(
         lspAvailable: data.lspAvailable,
         lspStatus: data.lspStatus,
         recovered: data.recovered,
+        structuralStatus: data.structuralStatus,
         diagnosticFileCount: data.diagnostics.length,
         serverCount: data.servers.length,
         evidenceLists,
@@ -392,6 +397,23 @@ function describeLspState(state: SessionLspServiceState): string {
       return "starting…";
     case "inactive":
       return "inactive on current session branch";
+    case "disabled":
+      return "disabled by configuration";
+    case "unavailable":
+      return `unavailable — ${state.reason}`;
+    default:
+      return "unknown state";
+  }
+}
+
+function describeStructuralState(state: CapabilityState): string {
+  switch (state.kind) {
+    case "ready":
+      return "ready";
+    case "pending":
+      return "starting…";
+    case "inactive":
+      return "inactive";
     case "disabled":
       return "disabled by configuration";
     case "unavailable":

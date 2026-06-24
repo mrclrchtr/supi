@@ -147,8 +147,8 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays discovery provenance (semantic+conventions or conventions-only) separately from any extracted test labels. Use code_resolve first to get a targetId, then pass it to code_graph.',
     promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
-      "Use code_graph to find references, outgoing calls, and implementations for a target.",
-      'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for direct structural outgoing calls or `relations: ["implements"]` for implementations.',
+      "Use code_graph to find references, direct structural calls, and implementations for a target.",
+      'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for direct structural calls or `relations: ["implements"]` for implementations.',
       'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
       'Use `relations: ["all"]` to expand to every relation family in one call.',
       "In code_graph, `callees` is structural/direct-scope evidence: it reports call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes. Use `references` on a resolved target for identity-aware incoming callers.",

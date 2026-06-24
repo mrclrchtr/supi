@@ -55,7 +55,7 @@ describe("code_graph callees relation", () => {
     expect(result.content).toContain("not found");
   });
 
-  it("reports outgoing calls with structural confidence", async () => {
+  it("reports callees as direct structural calls with structural confidence", async () => {
     writeSource("test.ts", "function foo() { bar(); baz(); }\n");
     registerMockProvider(tmpDir, {
       calleesAt: async (_file, _line, _char) => ({
@@ -86,7 +86,7 @@ describe("code_graph callees relation", () => {
     expect(result.content).toContain("nested function/method/callback scopes");
   });
 
-  it("labels callee results as outgoing calls not callers or callees", async () => {
+  it("labels callee results as direct structural calls, not callers", async () => {
     writeSource("test.ts", "function foo() { bar(); }\n");
     registerMockProvider(tmpDir, {
       calleesAt: async (_file, _line, _char) => ({

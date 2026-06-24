@@ -429,7 +429,7 @@ describe("structured details via tool adapters and action routers", () => {
         }
       });
 
-      it("returns details for a function with zero outgoing calls", async () => {
+      it("returns details for a function with zero direct structural calls", async () => {
         writeFileSync(path.join(tmpDir, "empty.ts"), "function noCalls() { return 1; }\n");
         registerMockProvider(tmpDir, {
           calleesAt: async (_file, _line, _char) => ({

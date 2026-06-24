@@ -493,6 +493,36 @@ describe("code_find tool", () => {
       expect(text).toContain("not symbol-identity-aware");
     });
 
+    it("routes AST call nextQueries to code_graph and emits no stale summary hint", async () => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "const x = obj.method();\n");
+      registerMockProvider(tmpDir, {
+        callSites: async () => ({
+          kind: "success" as const,
+          data: [{ name: "obj.method", startLine: 1 }],
+        }),
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-ast-call-nextqueries",
+        { query: "obj.method", mode: "ast", kind: "call" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult & {
+        details?: { type: "search"; data: { nextQueries: string[] } };
+      };
+
+      const nextQueries = result.details?.data.nextQueries ?? [];
+      expect(nextQueries).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("code_graph"),
+          expect.stringContaining('"references"'),
+        ]),
+      );
+      expect(nextQueries.some((q) => q.includes("summary"))).toBe(false);
+    });
+
     it("discloses truncated AST matches in markdown and details", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "export const alpha = 1;\nexport const beta = 2;\n");
       registerMockProvider(tmpDir, {
