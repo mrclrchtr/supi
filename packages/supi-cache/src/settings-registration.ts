@@ -9,9 +9,9 @@ const IDLE_THRESHOLD_VALUES = ["1", "2", "3", "5", "10", "15", "20", "30", "45",
 /** Register supi-cache settings with the supi settings registry. */
 export function registerCacheMonitorSettings(homeDir?: string): void {
   registerConfigSettings({
-    id: "supi-cache",
+    id: "cache",
     label: "Cache",
-    section: "supi-cache",
+    section: "cache",
     defaults: CACHE_MONITOR_DEFAULTS,
     buildItems: (settings) => [
       {

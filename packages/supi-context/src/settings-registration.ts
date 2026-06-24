@@ -6,9 +6,9 @@ import { CONTEXT_DEFAULTS } from "./config.ts";
 /** Register supi-context settings with the supi settings registry. */
 export function registerContextSettings(homeDir?: string): void {
   registerConfigSettings({
-    id: "supi-context",
+    id: "context",
     label: "Context",
-    section: "supi-context",
+    section: "context",
     defaults: CONTEXT_DEFAULTS,
     buildItems: (settings) => [
       {

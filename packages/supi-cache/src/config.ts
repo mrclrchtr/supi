@@ -1,6 +1,6 @@
 // Configuration for supi-cache.
 //
-// Config shape (in supi shared config, "supi-cache" section):
+// Config shape (in supi shared config, "cache" section):
 // {
 //   "enabled": true,              // enable/disable cache monitoring
 //   "notifications": true,        // show regression warning notifications
@@ -30,7 +30,7 @@ export const CACHE_MONITOR_DEFAULTS: CacheMonitorConfig = {
 
 export function loadCacheMonitorConfig(cwd: string, homeDir?: string): CacheMonitorConfig {
   // Read the new section first, then fall back to the old section for upgrades.
-  const merged = loadSupiConfig("supi-cache", cwd, CACHE_MONITOR_DEFAULTS, { homeDir });
+  const merged = loadSupiConfig("cache", cwd, CACHE_MONITOR_DEFAULTS, { homeDir });
   const legacy = loadSupiConfig("cache-monitor", cwd, CACHE_MONITOR_DEFAULTS, { homeDir });
   // Prefer new-section values when present; keep defaults as the base.
   return { ...CACHE_MONITOR_DEFAULTS, ...legacy, ...merged };

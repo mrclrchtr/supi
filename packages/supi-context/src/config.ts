@@ -1,6 +1,6 @@
 // Configuration for supi-context.
 //
-// Config shape (in supi shared config, "supi-context" section):
+// Config shape (in supi shared config, "context" section):
 // {
 //   "agentToolEnabled": false   // enable the supi_context agent-callable tool
 // }
@@ -18,5 +18,5 @@ export const CONTEXT_DEFAULTS: ContextConfig = {
 
 /** Load merged supi-context config for the given working directory. */
 export function loadContextConfig(cwd: string, homeDir?: string): ContextConfig {
-  return loadSupiConfig("supi-context", cwd, CONTEXT_DEFAULTS, { homeDir });
+  return loadSupiConfig("context", cwd, CONTEXT_DEFAULTS, { homeDir });
 }

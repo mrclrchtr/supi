@@ -42,7 +42,7 @@ describe("registerCacheMonitorSettings", () => {
     const sections = getRegisteredSettings();
     expect(sections).toHaveLength(1);
     expect(sections[0]).toMatchObject({
-      id: "supi-cache",
+      id: "cache",
       label: "Cache",
     });
   });
@@ -71,7 +71,7 @@ describe("registerCacheMonitorSettings", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".pi/agent/supi/config.json"),
       JSON.stringify({
-        "supi-cache": { enabled: false, regressionThreshold: 15 },
+        cache: { enabled: false, regressionThreshold: 15 },
       }),
     );
 
@@ -79,7 +79,7 @@ describe("registerCacheMonitorSettings", () => {
     fs.writeFileSync(
       path.join(tmpDir, ".pi/supi/config.json"),
       JSON.stringify({
-        "supi-cache": { notifications: false, regressionThreshold: 40 },
+        cache: { notifications: false, regressionThreshold: 40 },
       }),
     );
 
@@ -106,7 +106,7 @@ describe("registerCacheMonitorSettings", () => {
 
     const configPath = path.join(tmpDir, ".pi/supi/config.json");
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    expect(raw["supi-cache"].enabled).toBe(false);
+    expect(raw.cache.enabled).toBe(false);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -120,7 +120,7 @@ describe("registerCacheMonitorSettings", () => {
 
     const configPath = path.join(tmpDir, ".pi/agent/supi/config.json");
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    expect(raw["supi-cache"].regressionThreshold).toBe(15);
+    expect(raw.cache.regressionThreshold).toBe(15);
 
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });

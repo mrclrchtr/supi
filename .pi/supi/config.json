@@ -6,5 +6,8 @@
   "debug": {
     "enabled": true,
     "notifyLevel": "warning"
+  },
+  "context": {
+    "agentToolEnabled": true
   }
 }
