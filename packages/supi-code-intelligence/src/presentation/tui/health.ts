@@ -2,18 +2,20 @@
  * TUI renderer for code_health — renderCall + renderResult.
  */
 
-import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeHealthToolParams } from "../../tool/execute-health.ts";
+import {
+  type EvidenceEntry,
+  type ResultOptios,
+  renderEvidenceLines,
+  renderMarkdownDetail,
+  renderPartial,
+  type ToolResult,
+} from "./common.ts";
 
-interface ToolResult {
-  content: Array<{ type: string; text?: string }>;
-  details?: { type: string; data: Record<string, unknown> };
-  isError?: boolean;
-}
-
-/** ── renderCall ────────────────────────────────────────────────────── */
+/** ── renderCall ────────────────────────────────────────────────── */
 
 export function renderHealthCall(args: unknown, theme: Theme, _context: unknown): Text {
   const params = (args ?? {}) as CodeHealthToolParams;
@@ -29,22 +31,21 @@ export function renderHealthCall(args: unknown, theme: Theme, _context: unknown)
   return new Text(content, 0, 0);
 }
 
-/** ── renderResult ──────────────────────────────────────────────────── */
+/** ── renderResult ──────────────────────────────────────────────── */
 
 export function renderHealthResult(
   result: ToolResult,
-  options: { expanded: boolean; isPartial: boolean },
+  options: ResultOptios,
   theme: Theme,
   _context: unknown,
 ): Container | Text {
   if (options.isPartial) {
-    return new Text(theme.fg("warning", "Gathering workspace health…"), 0, 0);
+    return renderPartial("Gathering workspace health…", theme);
   }
 
   const container = new Container();
   const data =
     result.details?.type === "health" ? (result.details.data as Record<string, unknown>) : null;
-  const markdownText = result.content.find((c) => c.type === "text")?.text ?? "";
 
   if (result.isError) {
     container.addChild(new Text(theme.fg("error", "code_health failed"), 0, 0));
@@ -61,23 +62,18 @@ export function renderHealthResult(
   container.addChild(new Spacer(1));
   container.addChild(buildDiagnosticSummary(data, theme));
 
-  if (data?.evidenceLists) {
+  const lists = data?.evidenceLists as EvidenceEntry[] | undefined;
+  if (lists && lists.length > 0) {
     container.addChild(new Spacer(1));
-    container.addChild(
-      buildEvidenceSection(data.evidenceLists as Array<Record<string, unknown>>, theme),
-    );
+    renderEvidenceLines(container, lists, theme);
   }
 
-  if (markdownText) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("dim", "▸ raw markdown"), 0, 0));
-    container.addChild(new Markdown(markdownText, 0, 0, getMarkdownTheme()));
-  }
+  renderMarkdownDetail(container, result, theme);
 
   return container;
 }
 
-/** ── Helpers ───────────────────────────────────────────────────────── */
+/** ── Helpers ───────────────────────────────────────────────────── */
 
 function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme): Text {
   if (!data) {
@@ -88,14 +84,16 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   const serverCount = (data.serverCount as number) ?? 0;
   const lspStatus = (data.lspStatus as string) ?? "unknown";
 
-  const parts: string[] = [];
-  parts.push(theme.fg("success", `${diagCount} files with issues`));
-  parts.push(theme.fg("muted", `${serverCount} servers`));
-
   const statusColor = lspStatus === "ready" ? "success" : "warning";
-  parts.push(theme.fg(statusColor, lspStatus));
+  const dot = theme.fg("dim", "·");
 
-  return new Text(parts.join("  "), 0, 0);
+  const segments = [
+    `${theme.fg("dim", "diag")} ${theme.fg("success", theme.bold(`${diagCount}`))}${theme.fg("muted", " with issues")}`,
+    `${theme.fg("dim", "servers")} ${theme.fg("muted", `${serverCount}`)}`,
+    `${theme.fg("dim", "lsp")} ${theme.fg(statusColor, lspStatus)}`,
+  ];
+
+  return new Text(segments.join(` ${dot} `), 0, 0);
 }
 
 function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Text {
@@ -135,26 +133,5 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
     label: "files with issues",
   });
 
-  return new Text(theme.fg("warning", badge), 0, 0);
-}
-
-function buildEvidenceSection(
-  evidenceLists: Array<Record<string, unknown>>,
-  theme: Theme,
-): Container {
-  const container = new Container();
-
-  for (const ev of evidenceLists) {
-    const label = String(ev.key ?? "files");
-    const badge = formatEvidenceBadge({
-      shownCount: Number(ev.shownCount ?? 0),
-      totalCount: ev.totalCount != null ? Number(ev.totalCount) : null,
-      omittedCount: ev.omittedCount != null ? Number(ev.omittedCount) : null,
-      partialReason: typeof ev.partialReason === "string" ? ev.partialReason : null,
-      label,
-    });
-    container.addChild(new Text(theme.fg("muted", badge), 0, 0));
-  }
-
-  return container;
+  return new Text(theme.fg("warning", theme.bold(badge)), 0, 0);
 }

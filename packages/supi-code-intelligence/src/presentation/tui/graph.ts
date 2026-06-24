@@ -5,19 +5,20 @@
  * available as a collapsible detail view.
  */
 
-import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeGraphToolParams, GraphRelation } from "../../tool/execute-graph.ts";
+import {
+  type EvidenceEntry,
+  type ResultOptios,
+  renderEvidenceLines,
+  renderMarkdownDetail,
+  renderPartial,
+  type ToolResult,
+} from "./common.ts";
 
-/** pi ToolDefinition renderResult */
-interface ToolResult {
-  content: Array<{ type: string; text?: string }>;
-  details?: { type: string; data: Record<string, unknown> };
-  isError?: boolean;
-}
-
-/** ── renderCall ────────────────────────────────────────────────────── */
+/** ── renderCall ────────────────────────────────────────────────── */
 
 export function renderGraphCall(args: unknown, theme: Theme, _context: unknown): Text {
   const params = (args ?? {}) as CodeGraphToolParams;
@@ -38,22 +39,21 @@ export function renderGraphCall(args: unknown, theme: Theme, _context: unknown):
   return new Text(content, 0, 0);
 }
 
-/** ── renderResult ──────────────────────────────────────────────────── */
+/** ── renderResult ──────────────────────────────────────────────── */
 
 export function renderGraphResult(
   result: ToolResult,
-  options: { expanded: boolean; isPartial: boolean },
+  options: ResultOptios,
   theme: Theme,
   _context: unknown,
 ): Container | Text {
   if (options.isPartial) {
-    return new Text(theme.fg("warning", "Collecting relations…"), 0, 0);
+    return renderPartial("Collecting relations…", theme);
   }
 
   const container = new Container();
   const details =
     result.details?.type === "search" ? (result.details.data as Record<string, unknown>) : null;
-  const markdownText = result.content.find((c) => c.type === "text")?.text ?? "";
 
   if (result.isError) {
     container.addChild(new Text(theme.fg("error", "code_graph failed"), 0, 0));
@@ -68,10 +68,10 @@ export function renderGraphResult(
   // Expanded view
   container.addChild(buildSummaryHeader(details, theme));
 
-  const evidenceLists = details?.evidenceLists as Array<Record<string, unknown>> | undefined;
+  const evidenceLists = details?.evidenceLists as EvidenceEntry[] | undefined;
   if (evidenceLists && evidenceLists.length > 0) {
     container.addChild(new Spacer(1));
-    container.addChild(buildEvidenceSection(evidenceLists, theme));
+    renderEvidenceLines(container, evidenceLists, theme);
   }
 
   if (details?.tests) {
@@ -79,16 +79,12 @@ export function renderGraphResult(
     container.addChild(buildTestsSection(details.tests as Record<string, unknown>, theme));
   }
 
-  if (markdownText) {
-    container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("dim", "▸ raw markdown"), 0, 0));
-    container.addChild(new Markdown(markdownText, 0, 0, getMarkdownTheme()));
-  }
+  renderMarkdownDetail(container, result, theme);
 
   return container;
 }
 
-/** ── Helpers ───────────────────────────────────────────────────────── */
+/** ── Helpers ───────────────────────────────────────────────────── */
 
 function formatRelations(relations: GraphRelation[]): string {
   if (relations.length === 0) return "";
@@ -115,6 +111,8 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   const candidateCount = (data.candidateCount as number) ?? 0;
   const omittedCount = (data.omittedCount as number) ?? 0;
 
+  const confidence = (data.confidence as string) ?? "";
+
   const badge = formatEvidenceBadge({
     shownCount: candidateCount,
     totalCount: candidateCount + omittedCount,
@@ -123,7 +121,13 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
     label: "results",
   });
 
-  return new Text(theme.fg("success", badge), 0, 0);
+  const dot = theme.fg("dim", "·");
+  const segments = [theme.fg("success", theme.bold(badge))];
+  if (confidence) {
+    segments.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
+  }
+
+  return new Text(segments.join(` ${dot} `), 0, 0);
 }
 
 function buildSummaryHeader(data: Record<string, unknown> | null, theme: Theme): Text {
@@ -143,30 +147,14 @@ function buildSummaryHeader(data: Record<string, unknown> | null, theme: Theme):
   });
 
   const confidence = (data.confidence as string) ?? "";
-  const suffix = confidence ? theme.fg("dim", ` — ${confidence}`) : "";
 
-  return new Text(`${theme.fg("accent", badge)}${suffix}`, 0, 0);
-}
-
-function buildEvidenceSection(
-  evidenceLists: Array<Record<string, unknown>>,
-  theme: Theme,
-): Container {
-  const container = new Container();
-
-  for (const ev of evidenceLists) {
-    const label = evidenceKeyToLabel(String(ev.key ?? ""));
-    const badge = formatEvidenceBadge({
-      shownCount: Number(ev.shownCount ?? 0),
-      totalCount: ev.totalCount != null ? Number(ev.totalCount) : null,
-      omittedCount: ev.omittedCount != null ? Number(ev.omittedCount) : null,
-      partialReason: typeof ev.partialReason === "string" ? ev.partialReason : null,
-      label,
-    });
-    container.addChild(new Text(theme.fg("muted", badge), 0, 0));
+  const dot = theme.fg("dim", "·");
+  const segments = [theme.fg("accent", theme.bold(badge))];
+  if (confidence) {
+    segments.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
   }
 
-  return container;
+  return new Text(segments.join(` ${dot} `), 0, 0);
 }
 
 function buildTestsSection(tests: Record<string, unknown>, theme: Theme): Text {
@@ -179,23 +167,4 @@ function buildTestsSection(tests: Record<string, unknown>, theme: Theme): Text {
     0,
     0,
   );
-}
-
-function evidenceKeyToLabel(key: string): string {
-  const labels: Record<string, string> = {
-    "callees.calls": "calls",
-    "exports.symbols": "exports",
-    "find.astMatches": "AST matches",
-    "find.semanticSymbols": "symbols",
-    "find.textMatches": "matches",
-    "health.dirtyFiles": "dirty files",
-    "implements.locations": "implementations",
-    "imports.modules": "imports",
-    "inspect.codeActions": "code actions",
-    "references.locations": "references",
-    "refactor.edits": "edits",
-    "resolve.candidates": "candidates",
-    "resolve.targets": "targets",
-  };
-  return labels[key] ?? key;
 }

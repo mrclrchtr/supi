@@ -1,22 +1,20 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import { renderContextCall, renderContextResult } from "../presentation/tui/context.ts";
+import { renderFindCall, renderFindResult } from "../presentation/tui/find.ts";
 import { renderGraphCall, renderGraphResult } from "../presentation/tui/graph.ts";
 import { renderHealthCall, renderHealthResult } from "../presentation/tui/health.ts";
+import { renderImpactCall, renderImpactResult } from "../presentation/tui/impact.ts";
+import { renderInspectCall, renderInspectResult } from "../presentation/tui/inspect.ts";
 import {
-  renderFindCall,
-  renderFindResult,
-  renderImpactCall,
-  renderImpactResult,
-  renderInspectCall,
-  renderInspectResult,
   renderRefactorApplyCall,
   renderRefactorApplyResult,
+} from "../presentation/tui/refactor-apply.ts";
+import {
   renderRefactorPlanCall,
   renderRefactorPlanResult,
-  renderResolveCall,
-  renderResolveResult,
-} from "../presentation/tui/tools.ts";
+} from "../presentation/tui/refactor-plan.ts";
+import { renderResolveCall, renderResolveResult } from "../presentation/tui/resolve.ts";
 import {
   CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES,
   type CodeIntelligenceToolPromptSurfaceMap,

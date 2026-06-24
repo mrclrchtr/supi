@@ -6,14 +6,9 @@ import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeContextToolParams } from "../../tool/execute-context.ts";
+import { type ResultOptios, renderPartial, type ToolResult } from "./common.ts";
 
-interface ToolResult {
-  content: Array<{ type: string; text?: string }>;
-  details?: { type: string; data: Record<string, unknown> };
-  isError?: boolean;
-}
-
-/** ── renderCall ────────────────────────────────────────────────────── */
+/** ── renderCall ────────────────────────────────────────────────── */
 
 export function renderContextCall(args: unknown, theme: Theme, _context: unknown): Text {
   const params = (args ?? {}) as CodeContextToolParams;
@@ -26,7 +21,7 @@ export function renderContextCall(args: unknown, theme: Theme, _context: unknown
     const file = params.file.split("/").pop() ?? params.file;
     content += ` ${theme.fg("accent", file)}`;
     if (params.line) {
-      content += theme.fg("muted", `:${params.line}`);
+      content += theme.fg("warning", `:${params.line}`);
     }
   } else if (params.task) {
     content += ` ${theme.fg("accent", params.task.slice(0, 40))}`;
@@ -44,16 +39,16 @@ export function renderContextCall(args: unknown, theme: Theme, _context: unknown
   return new Text(content, 0, 0);
 }
 
-/** ── renderResult ──────────────────────────────────────────────────── */
+/** ── renderResult ──────────────────────────────────────────────── */
 
 export function renderContextResult(
   result: ToolResult,
-  options: { expanded: boolean; isPartial: boolean },
+  options: ResultOptios,
   theme: Theme,
   _context: unknown,
 ): Container | Text {
   if (options.isPartial) {
-    return new Text(theme.fg("warning", "Gathering context…"), 0, 0);
+    return renderPartial("Gathering context…", theme);
   }
 
   const container = new Container();
@@ -115,7 +110,7 @@ export function renderContextResult(
   return container;
 }
 
-/** ── Helpers ───────────────────────────────────────────────────────── */
+/** ── Helpers ───────────────────────────────────────────────────── */
 
 function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme): Text {
   if (!data) {
@@ -124,20 +119,21 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
 
   const sections = (data?.renderedSections as string[] | undefined) ?? [];
   const confidence = (data.confidence as string) ?? "";
-  const parts: string[] = [];
-
-  parts.push(theme.fg("success", `${sections.length} sections`));
+  const dot = theme.fg("dim", "·");
+  const segments: string[] = [
+    `${theme.fg("dim", "sections")} ${theme.fg("success", theme.bold(`${sections.length}`))}`,
+  ];
 
   if (confidence) {
-    parts.push(theme.fg("dim", `— ${confidence}`));
+    segments.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
   }
 
   const target = data.target as Record<string, unknown> | undefined;
   if (target?.name) {
-    parts.push(theme.fg("muted", String(target.name)));
+    segments.push(theme.fg("muted", String(target.name)));
   }
 
-  return new Text(parts.join(" "), 0, 0);
+  return new Text(segments.join(` ${dot} `), 0, 0);
 }
 
 function buildHeader(data: Record<string, unknown> | null, theme: Theme): Text {
@@ -146,9 +142,13 @@ function buildHeader(data: Record<string, unknown> | null, theme: Theme): Text {
   const sections = (data?.renderedSections as string[] | undefined) ?? [];
   const confidence = (data.confidence as string) ?? "";
 
-  return new Text(
-    `${theme.fg("accent", `${sections.length} sections`)}${confidence ? theme.fg("dim", ` — ${confidence}`) : ""}`,
-    0,
-    0,
-  );
+  const dot = theme.fg("dim", "·");
+  const parts = [
+    `${theme.fg("dim", "sections")} ${theme.fg("accent", theme.bold(`${sections.length}`))}`,
+  ];
+  if (confidence) {
+    parts.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
+  }
+
+  return new Text(parts.join(` ${dot} `), 0, 0);
 }
