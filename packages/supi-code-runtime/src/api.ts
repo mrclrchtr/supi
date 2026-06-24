@@ -13,6 +13,8 @@ export type {
   StructuralProvider,
   StructuralResult,
 } from "./capability/types.ts";
+// Evidence display
+export { type EvidenceBadgeInput, formatEvidenceBadge } from "./evidence-badge.ts";
 // Shared canonical types
 export type {
   CalleesData,

@@ -131,3 +131,15 @@ _Avoid_: "the symbol's start", "selectionRange part", conflating with declaratio
 **Declaration anchor**:
 The source position of the defining node's start, including `export`/modifier keywords — what LSP `SymbolInformation.location.range.start` gives. Always available; safe for position-tolerant queries (`references`), wrong for position-strict substrates (`callees`, `rename`). Distinct from `Name anchor`.
 _Avoid_: "the symbol's start", "location start", conflating with name anchor
+
+**Dual-surface rendering**:
+The rule that a tool's TUI rendering builds its chrome (headers, badges, counts) and body (main content) from the structured `details` object, never by parsing the markdown `content` string. The markdown string serves only as the LLM-facing output and as an optional collapsible detail view in the TUI. Chrome and body are independent consumers of the same underlying tool evidence.
+_Avoid_: parsing markdown in TUI renderers, using the Markdown component as the primary TUI body, duplicating evidence between content and details
+
+**TUI chrome**:
+The non-body decorative and status elements of a dual-surface tool result: the compact call line in `renderCall`, and in `renderResult` the header badges, count summaries, evidence disclosures, and section toggles. Chrome is built from `details` data, never from markdown parsing.
+_Avoid_: building chrome from markdown, embedding chrome in the markdown content string
+
+**TUI body**:
+The main content of a dual-surface tool result in `renderResult`: per-section structured widgets built from `details` data. The markdown `content` string is available as an optional collapsible detail view within the body, not as the primary body itself.
+_Avoid_: using the Markdown component as the primary body, treating the markdown string as the user-facing result

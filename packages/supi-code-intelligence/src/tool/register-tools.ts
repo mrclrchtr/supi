@@ -1,4 +1,22 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
+import { renderContextCall, renderContextResult } from "../presentation/tui/context.ts";
+import { renderGraphCall, renderGraphResult } from "../presentation/tui/graph.ts";
+import { renderHealthCall, renderHealthResult } from "../presentation/tui/health.ts";
+import {
+  renderFindCall,
+  renderFindResult,
+  renderImpactCall,
+  renderImpactResult,
+  renderInspectCall,
+  renderInspectResult,
+  renderRefactorApplyCall,
+  renderRefactorApplyResult,
+  renderRefactorPlanCall,
+  renderRefactorPlanResult,
+  renderResolveCall,
+  renderResolveResult,
+} from "../presentation/tui/tools.ts";
 import {
   CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES,
   type CodeIntelligenceToolPromptSurfaceMap,
@@ -8,6 +26,54 @@ import {
   type CodeIntelligenceToolDefinitionSpec,
 } from "./tool-specs.ts";
 import { truncateToolContent } from "./truncate-output.ts";
+
+interface ToolRenderer {
+  // biome-ignore lint/suspicious/noExplicitAny: pi render call/result signatures vary per tool; spread into pi.registerTool where concrete typing handles variance
+  renderCall?: (...args: any[]) => Component;
+  // biome-ignore lint/suspicious/noExplicitAny: same variance reason as renderCall
+  renderResult?: (...args: any[]) => Component;
+  renderShell?: "self";
+}
+
+function getToolRenderer(name: string): ToolRenderer {
+  switch (name) {
+    case "code_graph":
+      return {
+        renderCall: renderGraphCall,
+        renderResult: renderGraphResult,
+      };
+    case "code_health":
+      return {
+        renderCall: renderHealthCall,
+        renderResult: renderHealthResult,
+      };
+    case "code_context":
+      return {
+        renderCall: renderContextCall,
+        renderResult: renderContextResult,
+      };
+    case "code_resolve":
+      return { renderCall: renderResolveCall, renderResult: renderResolveResult };
+    case "code_inspect":
+      return { renderCall: renderInspectCall, renderResult: renderInspectResult };
+    case "code_find":
+      return { renderCall: renderFindCall, renderResult: renderFindResult };
+    case "code_impact":
+      return { renderCall: renderImpactCall, renderResult: renderImpactResult };
+    case "code_refactor_plan":
+      return {
+        renderCall: renderRefactorPlanCall,
+        renderResult: renderRefactorPlanResult,
+      };
+    case "code_refactor_apply":
+      return {
+        renderCall: renderRefactorApplyCall,
+        renderResult: renderRefactorApplyResult,
+      };
+    default:
+      return {};
+  }
+}
 
 /** Register the focused code-intelligence tool surface from shared specs. */
 export function registerCodeIntelligenceTools(
@@ -40,6 +106,7 @@ export function registerCodeIntelligenceTools(
           details,
         };
       },
+      ...getToolRenderer(spec.name),
     });
   }
 }

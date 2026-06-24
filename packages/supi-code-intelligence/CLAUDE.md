@@ -214,6 +214,14 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
   - code_health (as a "Degraded Coverage" section)
   - a one-time chat-visible message after a short grace period (5s)
 
+## TUI rendering
+
+- `src/presentation/tui/` contains per-tool `renderCall` and `renderResult` for all 9 tools, wired in `register-tools.ts` via `getToolRenderer()`.
+- **Dual-surface**: TUI body + chrome built from `details`; markdown `content` shown as `▸ raw markdown` collapsible detail. Never parse markdown in TUI renderers — body and chrome are independent consumers of the same evidence.
+- `formatEvidenceBadge({ shownCount, totalCount, omittedCount, partialReason, label })` from `@mrclrchtr/supi-code-runtime/api` formats evidence completeness badges used in all tool result renderers.
+- `evidenceKeyToLabel()` in `graph.ts` maps structured evidence keys (`references.locations`, `resolve.targets`, etc.) to human-readable labels. Add new keys there when they appear in tool details.
+- **`renderShell: "self"` strips pi's Box background entirely.** Use default shell unless the tool needs full framing control. Return `Container`/`Text` from renderResult and pi wraps them in a Box with proper `toolSuccessBg`/`toolErrorBg`.
+
 ## Key gotchas
 
 ### Planner routing
