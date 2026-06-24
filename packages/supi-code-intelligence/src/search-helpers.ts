@@ -1,6 +1,7 @@
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: ripgrep abort/process handling, JSON parsing, and path/scope helpers are cohesive search infrastructure
 // Shared search helpers for code-intelligence search and routing helpers.
 
-import { execFileSync } from "node:child_process";
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { resolveToolPath, uriToFile as uriToFileShared } from "@mrclrchtr/supi-core/path";
@@ -104,56 +105,102 @@ export interface RipgrepRunResult {
   error?: string;
 }
 
+/** Options for {@link runRipgrep} / {@link runRipgrepDetailed}. */
+export interface RipgrepOptions {
+  maxMatches?: number;
+  contextLines?: number;
+  literal?: boolean;
+  filterLowSignal?: boolean;
+  /**
+   * Abort signal from the agent runtime. When aborted, the ripgrep child is
+   * killed and the call rejects with {@link RipgrepAbortedError} so the
+   * executor (and pi) can treat the tool call as cancelled rather than
+   * silently completing with partial matches.
+   */
+  signal?: AbortSignal;
+}
+
+/** Hard upper bound on a single ripgrep invocation, matching the prior `execFileSync` timeout. */
+const RIPGREP_TIMEOUT_MS = 10_000;
+
+/**
+ * Thrown by {@link runRipgrepDetailed} when the supplied `AbortSignal` fires.
+ * Propagates out of executors so pi cancels the tool call instead of returning
+ * partial results.
+ */
+export class RipgrepAbortedError extends Error {
+  constructor(signal?: AbortSignal) {
+    const reason = signal?.reason;
+    super(reason instanceof Error ? reason.message : "ripgrep search was aborted");
+    this.name = "RipgrepAbortedError";
+  }
+}
+
 /**
  * Run ripgrep with JSON output and parse matches, filtering low-signal paths.
  *
- * This helper preserves the historical behavior used by internal
- * actions: any ripgrep execution failure is treated like an empty match set.
- * Call `runRipgrepDetailed()` when a caller needs to surface regex parse errors
- * or other non-no-match failures to the agent.
+ * Async and abort-aware: when `opts.signal` aborts, the ripgrep child is killed
+ * and the returned promise rejects with {@link RipgrepAbortedError}. Any
+ * non-abort ripgrep execution failure is still treated like an empty match set
+ * (or surfaces an error via {@link runRipgrepDetailed}).
  */
-export function runRipgrep(
+export async function runRipgrep(
   pattern: string,
   scopePath: string,
   cwd: string,
-  opts?: {
-    maxMatches?: number;
-    contextLines?: number;
-    literal?: boolean;
-    filterLowSignal?: boolean;
-  },
-): RgMatch[] {
-  return runRipgrepDetailed(pattern, scopePath, cwd, opts).matches;
+  opts?: RipgrepOptions,
+): Promise<RgMatch[]> {
+  return (await runRipgrepDetailed(pattern, scopePath, cwd, opts)).matches;
 }
 
 /**
  * Run ripgrep and preserve non-no-match execution errors for callers that need
  * to distinguish invalid regex syntax from a genuine empty search result.
+ * Abort-aware: rejects with {@link RipgrepAbortedError} when `opts.signal` fires.
  */
-export function runRipgrepDetailed(
+export async function runRipgrepDetailed(
   pattern: string,
   scopePath: string,
   cwd: string,
-  opts?: {
-    maxMatches?: number;
-    contextLines?: number;
-    literal?: boolean;
-    filterLowSignal?: boolean;
-  },
-): RipgrepRunResult {
+  opts?: RipgrepOptions,
+): Promise<RipgrepRunResult> {
   const filter = opts?.filterLowSignal ?? true;
-
+  let proc: RgProcessResult;
   try {
-    const result = execFileSync("rg", buildRipgrepArgs(pattern, scopePath, opts), {
-      encoding: "utf-8",
+    proc = await runRgProcess(
+      buildRipgrepArgs(pattern, scopePath, opts),
       cwd,
-      timeout: 10000,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-
-    return { matches: parseRgJson(result, filter) };
+      RIPGREP_TIMEOUT_MS,
+      opts?.signal,
+    );
   } catch (err: unknown) {
-    return handleRipgrepError(err, filter);
+    // Abort propagates so pi cancels the tool call. Any other unexpected spawn
+    // failure is treated like an empty match set, preserving prior behavior.
+    if (err instanceof RipgrepAbortedError) throw err;
+    return { matches: [] };
+  }
+
+  switch (proc.kind) {
+    case "missing":
+      return {
+        matches: [],
+        error:
+          "ripgrep (rg) is not available. Install it (e.g., `apt install ripgrep` or `brew install ripgrep`).",
+      };
+    case "ok":
+    case "nomatch":
+      return { matches: parseRgJson(proc.stdout, filter) };
+    case "timeout":
+      // Timeout: yield any partial stdout matches with no error surfaced — an
+      // improvement over the prior execFileSync path, which discarded partial
+      // output on timeout (the timeout error lacked a `status`, so the old
+      // handleRipgrepError returned an empty match set).
+      return { matches: proc.stdout ? parseRgJson(proc.stdout, filter) : [] };
+    case "error":
+      return {
+        matches: proc.stdout ? parseRgJson(proc.stdout, filter) : [],
+        ...(proc.stderr.trim() ? { error: proc.stderr.trim() } : {}),
+      };
   }
 }
 
@@ -173,36 +220,117 @@ function buildRipgrepArgs(
   return args;
 }
 
-function handleRipgrepError(err: unknown, filterLowSignal: boolean): RipgrepRunResult {
-  // ENOENT means rg is not installed — surface a clear error instead of silent empty results
-  if (isCodeError(err, "ENOENT")) {
-    return {
-      matches: [],
-      error:
-        "ripgrep (rg) is not available. Install it (e.g., `apt install ripgrep` or `brew install ripgrep`).",
+/** Discriminated result of a single ripgrep process run (see {@link runRgProcess}). */
+type RgProcessResult =
+  | { kind: "ok"; stdout: string; stderr: string; status: number }
+  | { kind: "nomatch"; stdout: string; stderr: string; status: 1 }
+  | { kind: "error"; stdout: string; stderr: string; status: number }
+  | { kind: "timeout"; stdout: string; stderr: string }
+  | { kind: "missing" };
+
+/**
+ * Spawn ripgrep, collect stdout/stderr, and resolve a discriminated result.
+ * Rejects with {@link RipgrepAbortedError} when `signal` aborts (the child is
+ * killed with SIGKILL). Maps exit codes: 0 → ok, 1 → nomatch, 2+ → error;
+ * ENOENT → missing (rg not installed); timeout → timeout.
+ */
+function runRgProcess(
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<RgProcessResult> {
+  return new Promise<RgProcessResult>((resolve, reject) => {
+    let child: ChildProcess;
+    try {
+      child = spawn("rg", args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+    } catch (err: unknown) {
+      if (isCodeError(err, "ENOENT")) {
+        resolve({ kind: "missing" });
+        return;
+      }
+      reject(err);
+      return;
+    }
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let abortListener: (() => void) | null = null;
+
+    const cleanup = (): void => {
+      if (timer) clearTimeout(timer);
+      if (abortListener && signal) signal.removeEventListener("abort", abortListener);
     };
-  }
+    const settle = (r: RgProcessResult): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(r);
+    };
+    const failAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // Child may already have exited; ignore.
+      }
+      reject(new RipgrepAbortedError(signal));
+    };
 
-  if (!isExecError(err)) {
-    return { matches: [] };
-  }
+    // Fast path: signal already aborted before any work is scheduled.
+    if (signal?.aborted) {
+      failAbort();
+      return;
+    }
 
-  const stdout = typeof err.stdout === "string" ? err.stdout : "";
-  const stderr = typeof err.stderr === "string" ? err.stderr.trim() : "";
-  const matches = stdout ? parseRgJson(stdout, filterLowSignal) : [];
+    child.stdout?.setEncoding("utf-8");
+    child.stderr?.setEncoding("utf-8");
+    child.stdout?.on("data", (d: string) => {
+      stdout += d;
+    });
+    child.stderr?.on("data", (d: string) => {
+      stderr += d;
+    });
 
-  if (err.status === 1) {
-    return { matches };
-  }
+    timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        // Ignore; the close handler will still fire.
+      }
+    }, timeoutMs);
 
-  return {
-    matches,
-    ...(stderr ? { error: stderr } : {}),
-  };
-}
+    if (signal) {
+      abortListener = () => failAbort();
+      signal.addEventListener("abort", abortListener);
+    }
 
-function isExecError(err: unknown): err is { status: number; stdout?: unknown; stderr?: unknown } {
-  return typeof err === "object" && err !== null && "status" in err;
+    child.on("error", (err: NodeJS.ErrnoException) => {
+      if (settled) return;
+      if (isCodeError(err, "ENOENT")) {
+        settle({ kind: "missing" });
+        return;
+      }
+      settle({ kind: "error", stdout, stderr, status: -1 });
+    });
+
+    child.on("close", (status: number | null) => {
+      if (settled) return;
+      if (timedOut) {
+        settle({ kind: "timeout", stdout, stderr });
+        return;
+      }
+      if (status === 0) settle({ kind: "ok", stdout, stderr, status });
+      else if (status === 1) settle({ kind: "nomatch", stdout, stderr, status });
+      else settle({ kind: "error", stdout, stderr, status: status ?? -1 });
+    });
+  });
 }
 
 function isCodeError(err: unknown, code: string): boolean {

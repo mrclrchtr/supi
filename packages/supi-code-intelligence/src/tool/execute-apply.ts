@@ -5,7 +5,7 @@
  * Applies a previously stored plan by planId after revalidation and fingerprint checks.
  */
 
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
 
 export interface CodeApplyToolParams {
@@ -14,7 +14,7 @@ export interface CodeApplyToolParams {
 
 export async function executeApplyTool(
   params: CodeApplyToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   return executeRefactorApplyTool({ planId: params.planId }, ctx);
 }

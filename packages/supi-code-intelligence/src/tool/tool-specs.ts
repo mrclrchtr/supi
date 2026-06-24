@@ -1,7 +1,7 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
 import type { PublicCodeIntelligenceToolName } from "../intent/types.ts";
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import {
   CodeApplyParameters,
   CodeContextParameters,
@@ -82,7 +82,19 @@ export interface CodeIntelligenceToolDefinitionSpec {
   promptSnippet: string;
   basePromptGuidelines: string[];
   parameters: TSchema;
-  run: (params: unknown, ctx: { cwd: string }) => Promise<CodeIntelResult> | CodeIntelResult;
+  /** Per-spec line-limit override for the adapter's head truncation. Defaults to pi's `DEFAULT_MAX_LINES`. */
+  maxLines?: number;
+  /** Per-spec byte-limit override for the adapter's head truncation. Defaults to pi's `DEFAULT_MAX_BYTES`. */
+  maxBytes?: number;
+  /**
+   * Reserved: when true, oversized output spills to a temp file whose path is
+   * appended to the truncation notice (full output preserved for `read`).
+   * Mechanic not yet wired; output is currently head-truncated with a notice
+   * regardless. Intended for heavy-output tools (code_find, code_graph:all,
+   * code_impact) once the spill path lands.
+   */
+  spillToTempFile?: boolean;
+  run: (params: unknown, ctx: CodeIntelToolExecCtx) => Promise<CodeIntelResult> | CodeIntelResult;
 }
 
 // Stubs removed — real executors from execute-refactor-plan.ts and execute-refactor-apply.ts are used below
@@ -92,12 +104,11 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_resolve",
     label: "Code Resolve",
     description:
-      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_impact, and code_refactor_plan. Supports anchored (file + line + character), file-only, and query/symbol inputs. Anchored coordinates resolve a real symbol target from provider-backed evidence: an exact identifier coordinate resolves to a named target; a declaration-header coordinate (e.g. an `export` keyword) snaps to the symbol name anchor only when unambiguous. Whitespace/comment/non-symbol coordinates fail honestly and recommend code_inspect. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
+      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_impact, and code_refactor_plan. Supports anchored (file + line + character), file-only, and query/symbol inputs. Anchored coordinates resolve a real symbol target from provider-backed evidence: an exact identifier coordinate resolves to a named target; a declaration-header coordinate (e.g. an `export` keyword) snaps to the symbol name anchor only when unambiguous. Whitespace/comment/non-symbol coordinates fail honestly and recommend code_inspect. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item. Output is truncated to 2000 lines / 50KB.",
     promptSnippet: "code_resolve — resolve references into precise targets and target handles",
     basePromptGuidelines: [
       "Use code_resolve when a symbol, file, or code reference is ambiguous and needs precise resolution.",
       "Prefer code_resolve as the entry point before code_context, code_graph, code_impact, or code_refactor_plan — its targetId replaces fragile file/line/character coordinates.",
-      "code_resolve anchored coordinates (file + line + character) resolve a real symbol target: exact identifier hits resolve directly; declaration-header coordinates snap to the name anchor when unambiguous; non-symbol coordinates recommend code_inspect.",
       "When code_resolve returns ambiguous results with ranked candidates, pick one and use file + line + character for follow-up resolution.",
     ],
     parameters: CodeResolveParameters,
@@ -108,14 +119,12 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_inspect",
     label: "Code Inspect",
     description:
-      "Inspect one precise point in a file and return factual syntax, symbol, hover, definition, diagnostics, and code-action information. Use when you need to understand exactly what is at a position without choosing between provider-specific substrate tools.",
+      "Inspect one precise point in a file and return factual syntax, symbol, hover, definition, diagnostics, and code-action information. Use when you need to understand exactly what is at a position without choosing between provider-specific substrate tools. When some providers are unavailable, returns best-effort sections with explicit unavailable notes instead of heuristic guesses. Code action titles are advisory only — there is no tool to execute them yet. Output is truncated to 2000 lines / 50KB.",
     promptSnippet: "code_inspect — factual point inspection",
     basePromptGuidelines: [
       "Use code_inspect for factual point inspection at one precise file position.",
-      "Provide `file`, `line`, and `character` — code_inspect is intentionally point-based in this phase.",
-      "Use code_inspect when you want syntax node, enclosing symbol, hover/type info, definitions, nearby diagnostics, and available code-action titles gathered together.",
-      "When some providers are unavailable, code_inspect returns best-effort sections and explicit unavailable notes instead of heuristic guesses.",
-      "Code action titles from code_inspect are advisory only — there is no tool to execute them yet.",
+      "Provide `file`, `line`, and `character` — code_inspect is intentionally point-based.",
+      "Prefer code_inspect over code_context for point-level facts when no symbol target can be resolved.",
     ],
     parameters: CodeInspectParameters,
     run: (params, ctx) =>
@@ -125,16 +134,12 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_context",
     label: "Code Context",
     description:
-      "Task-focused context bundle for a change, question, or resolved target. Use when you want prioritized definitions, relationships, diagnostics, docs, and tests gathered into one coding-oriented context result. Accepts either `targetId` (from `code_resolve`) or `file` + `line` + `character` for precise target context; `targetId` takes precedence over coordinates. Coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. When called without a `task`, returns a neutral orientation brief — use it as the primary entry point for project, package, directory, file, or symbol overviews. Not a point-inspection tool — use `code_inspect` for point-level facts when no symbol target can be resolved.",
+      "Task-focused context bundle for a change, question, or resolved target. Use when you want prioritized definitions, relationships, diagnostics, docs, and tests gathered into one coding-oriented context result. Accepts either `targetId` (from `code_resolve`) or `file` + `line` + `character` for precise target context; `targetId` takes precedence over coordinates. Coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. When called without a `task`, returns a neutral orientation brief — use it as the primary entry point for project, package, directory, file, or symbol overviews. Not a point-inspection tool — use `code_inspect` for point-level facts when no symbol target can be resolved. `scope` is a selection/orientation boundary, not a downstream evidence filter: when a precise target is supplied with `scope`, the target wins and `scope` is ignored with a visible note. Output is truncated to 2000 lines / 50KB.",
     promptSnippet: "code_context — task-focused coding context bundle",
     basePromptGuidelines: [
       "Use code_context for both task-focused coding context and neutral orientation overviews.",
       "Omit `task` in code_context to get a neutral project/package/file orientation brief.",
       "Use `include` in code_context to request only the sections you need.",
-      "In code_context, pass either `targetId` or `file` + `line` + `character` for precise target context. `targetId` takes precedence over coordinates; a stale/invalid `targetId` errors and does not fall back to coordinates.",
-      "code_context coordinate mode (`file` + `line` + `character`) resolves a real symbol target and returns a reusable `targetId` — no separate `code_resolve` turn required. It requires all three coordinate fields when any is present.",
-      "code_context is not a point-inspection tool. When a coordinate does not resolve to a symbol, it recommends `code_inspect`; use `code_inspect` directly for point-level facts.",
-      "In code_context, `scope` is a selection/orientation boundary, not a downstream evidence filter. When a precise target is supplied with `scope`, the target wins and `scope` is ignored with a visible note.",
     ],
     parameters: CodeContextParameters,
     run: (params, ctx) =>
@@ -144,17 +149,12 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_graph",
     label: "Code Graph",
     description:
-      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays discovery provenance (semantic+conventions or conventions-only) separately from any extracted test labels. Use code_resolve first to get a targetId, then pass it to code_graph.',
+      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays discovery provenance (semantic+conventions or conventions-only) separately from any extracted test labels. `callees` is structural/direct-scope evidence: it reports call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes — use `references` on a resolved target for identity-aware incoming callers. `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files and labels. `scope` (not `path`) narrows by workspace-relative directory/package. Use code_resolve first to get a targetId, then pass it to code_graph. Output is truncated to 2000 lines / 50KB.',
     promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
       "Use code_graph to find references, direct structural calls, and implementations for a target.",
-      'In code_graph, default `relations` is ["references"] — use `relations: ["callees"]` for direct structural calls or `relations: ["implements"]` for implementations.',
-      'Use `relations: ["references", "callees"]` in code_graph to query multiple relation families in one call.',
-      'Use `relations: ["all"]` to expand to every relation family in one call.',
-      "In code_graph, `callees` is structural/direct-scope evidence: it reports call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes. Use `references` on a resolved target for identity-aware incoming callers.",
-      "In code_graph, `imports` and `exports` relations use file-level tree-sitter analysis; `tests` discovers companion test files and test labels. The tests relation displays discovery provenance (`semantic+conventions` or `conventions-only`) separately from placeholder output such as `_(no recognized test blocks)_`.",
+      'Default `relations` is ["references"]; use `relations: ["callees"]` or `["implements"]` for those, or `relations: ["all"]` to expand to every relation family in one call.',
       "After code_graph, follow up with code_context on individual results for type or definition context.",
-      "code_graph uses `scope` (not `path`) for workspace-relative directory/package filtering.",
     ],
     parameters: CodeGraphParameters,
     run: (params, ctx) => executeGraphTool(params as Parameters<typeof executeGraphTool>[0], ctx),
@@ -163,7 +163,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_impact",
     label: "Code Impact",
     description:
-      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for target-based impact and merges semantic references into changedFiles analysis when available. Does not fall back to heuristic text search. Use a resolved target for precise semantic reference-based impact.",
+      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for target-based impact and merges semantic references into changedFiles analysis when available. Does not fall back to heuristic text search. Use a resolved target for precise semantic reference-based impact. Output is truncated to 2000 lines / 50KB.",
     promptSnippet: "code_impact — blast radius and impact",
     basePromptGuidelines: [
       "Use code_impact before edits to estimate blast radius and follow-up checks.",
@@ -176,16 +176,14 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_find",
     label: "Code Find",
     description:
-      'Unified ranked code search with strict mode dispatch: default/`mode: "text"` is literal ripgrep, `mode: "regex"` is ripgrep regex, `mode: "semantic"` is LSP workspace-symbol search, and `mode: "ast"` is tree-sitter structured search. `mode: "ast"` requires `kind` and currently supports `definition`, `import`, `export`, `call`, `type`, and `interface`. `mode: "text"`, `mode: "regex"`, and `mode: "semantic"` do not accept `kind`. `code_find` with `mode: "semantic"` does not silently fall back to text search, and unsupported mode/kind combinations fail. AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` references for identity-aware callers of a resolved target.',
+      'Unified ranked code search with strict mode dispatch: default/`mode: "text"` is literal ripgrep, `mode: "regex"` is ripgrep regex, `mode: "semantic"` is LSP workspace-symbol search, and `mode: "ast"` is tree-sitter structured search. `mode: "ast"` requires `kind` and currently supports `definition`, `import`, `export`, `call`, `type`, and `interface`. `mode: "text"`, `mode: "regex"`, and `mode: "semantic"` do not accept `kind`. `code_find` with `mode: "semantic"` does not silently fall back to text search, and unsupported mode/kind combinations fail. AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` references for identity-aware callers of a resolved target. Output is truncated to 2000 lines / 50KB.',
     promptSnippet: "code_find — unified ranked code search",
     basePromptGuidelines: [
-      "Use code_find for literal text search, regex search, semantic workspace-symbol search, or AST structured search.",
-      'Use code_find with `mode: "text"` or omitted `mode` for literal ripgrep search, and use code_find with `mode: "regex"` for regex search.',
+      "Use code_find as the sole code search tool for literal text, regex, semantic workspace-symbol, or AST structured search.",
       'code_find with `mode: "ast"` requires `kind` and supports `definition`, `import`, `export`, `call`, `type`, and `interface`.',
       'code_find with `mode: "text"`, `mode: "regex"`, or `mode: "semantic"` does not accept `kind`.',
       'code_find with `mode: "semantic"` does not fall back to text search and fails when semantic capability is unavailable.',
       'AST `call` mode matches call-site identifiers by name only; use `code_graph` with `relations: ["references"]` on a resolved target for symbol-identity-aware callers.',
-      "code_find is the sole code search tool — use code_find for all text, regex, AST, and semantic searches.",
     ],
     parameters: CodeFindParameters,
     run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
@@ -194,7 +192,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_refactor_plan",
     label: "Code Refactor Plan",
     description:
-      'Pure planner: previews a precise semantic refactor plan without mutating files and returns a planId for later use with code_refactor_apply. Supports rename_symbol plus extract_function/extract_variable when the active LSP can return precise edits. Legacy `operation: "rename"` is accepted as a compatibility alias. This tool never mutates files.',
+      'Pure planner: previews a precise semantic refactor plan without mutating files and returns a planId for later use with code_refactor_apply. Supports rename_symbol plus extract_function/extract_variable when the active LSP can return precise edits. Legacy `operation: "rename"` is accepted as a compatibility alias. This tool never mutates files. Output is truncated to 2000 lines / 50KB.',
     promptSnippet: "code_refactor_plan — preview a precise workflow refactor plan",
     basePromptGuidelines: [
       'Use `operation: "rename_symbol"` with code_refactor_plan for symbol renames. Legacy `operation: "rename"` is accepted as a compatibility alias.',
@@ -209,11 +207,11 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_refactor_apply",
     label: "Code Refactor Apply",
     description:
-      "Sole mutator in the refactor workflow: applies a previously stored plan by planId with revalidation and fingerprint checks.",
+      "Sole mutator in the refactor workflow: applies a previously stored plan by planId. Revalidates the plan and checks file fingerprints, mutating files only when the plan is still fresh. Output is truncated to 2000 lines / 50KB.",
     promptSnippet: "code_refactor_apply — apply a stored refactor plan",
     basePromptGuidelines: [
       "Use code_refactor_apply to execute a plan generated by code_refactor_plan.",
-      "code_refactor_apply validates the plan, checks file fingerprints, and mutates files only when the plan is still fresh.",
+      "Use code_refactor_plan first to obtain a planId, then code_refactor_apply to execute it.",
     ],
     parameters: CodeApplyParameters,
     run: (params, ctx) => executeApplyTool(params as Parameters<typeof executeApplyTool>[0], ctx),
@@ -222,7 +220,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_health",
     label: "Code Health",
     description:
-      "Summarize diagnostics, language server status, dirty workspace signals, coverage, and unused-code findings. Pass refresh: true to recover stale diagnostics before checking. Use scope to narrow to a specific file or package. Use include to request specific sections: diagnostics, servers, dirty, coverage, unused. Defaults to summary level (counts); use level: detailed for per-file listings.",
+      "Summarize diagnostics, language server status, dirty workspace signals, coverage, and unused-code findings. Pass refresh: true to recover stale diagnostics before checking. Use scope to narrow to a specific file or package. Use include to request specific sections: diagnostics, servers, dirty, coverage, unused. Defaults to summary level (counts); use level: detailed for per-file listings. Output is truncated to 2000 lines / 50KB.",
     promptSnippet:
       "code_health — diagnostics, server status, coverage, unused-code, and workspace health",
     basePromptGuidelines: [

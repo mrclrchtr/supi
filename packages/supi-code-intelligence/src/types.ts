@@ -17,6 +17,7 @@ export type {
 
 // ── Code-intelligence-specific types ─────────────────────────────────
 
+import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
 import type { EvidenceListMetadata } from "./evidence-list.ts";
@@ -228,6 +229,25 @@ export interface HealthDetails {
   diagnosticFileCount: number;
   serverCount: number;
   evidenceLists?: EvidenceListMetadata[];
+}
+
+/**
+ * Execution context passed to every code-intelligence tool executor.
+ *
+ * The adapter in `register-tools.ts` builds this from the pi
+ * `ToolDefinition.execute` arguments and forwards it to `spec.run`.
+ * `signal` and `onUpdate` are optional. An executor that does not yet use
+ * them can still type its ctx as `{ cwd: string }` (a structural supertype —
+ * it destructures only `cwd` and ignores the rest) and keep compiling; all
+ * current executors use this full type, and long-running ones forward `signal`
+ * to subprocesses / emit coarse `onUpdate` beats.
+ */
+export interface CodeIntelToolExecCtx {
+  cwd: string;
+  /** Abort signal from the agent runtime; forward to long-running subprocesses. */
+  signal?: AbortSignal;
+  /** Progress callback; long-running executors emit coarse beats, not chatty ones. */
+  onUpdate?: AgentToolUpdateCallback;
 }
 
 /** Tool result shape returned by executeAction. */

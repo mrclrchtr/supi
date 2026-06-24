@@ -7,6 +7,7 @@ import { buildArchitectureModel } from "../model.ts";
 import { resolveScope } from "../search-helpers.ts";
 import type {
   CodeIntelResult,
+  CodeIntelToolExecCtx,
   ConfidenceMode,
   ContextDetails,
   ResolvedTargetMetadata,
@@ -61,7 +62,7 @@ interface PreciseTarget {
 /** Execute the public code_context tool through the planner-backed use-case layers. */
 export async function executeContextTool(
   params: CodeContextToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const hasCoords =
     params.file !== undefined || params.line !== undefined || params.character !== undefined;
@@ -81,7 +82,7 @@ export async function executeContextTool(
 /** Resolve a precise target (targetId wins over coordinates), ignoring `scope`. */
 async function resolvePreciseTarget(
   params: CodeContextToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
   hasCoords: boolean,
 ): Promise<CodeIntelResult> {
   // targetId wins over coordinates. A stale/invalid targetId errors and does
@@ -105,7 +106,7 @@ async function resolvePreciseTarget(
 /** Orientation / scope-only mode: validate `scope` (the selection input) and run. */
 async function runOrientationMode(
   params: CodeContextToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   // `scope` is the actual selection input in orientation mode, so an invalid
   // path is a hard error here (unlike precise-target mode, where it is
@@ -130,7 +131,7 @@ async function runOrientationMode(
 /** Resolve a targetId-supplied precise target, or null to fall through. */
 async function resolveTargetIdTarget(
   params: CodeContextToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
   hasCoords: boolean,
 ): Promise<CodeIntelResult | null> {
   const expansion = expandTargetId(params, ctx.cwd);
@@ -171,7 +172,7 @@ async function resolveTargetIdTarget(
 /** Resolve a coordinate-supplied precise target, or null to fall through. */
 async function resolveCoordinateTarget(
   params: CodeContextToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult | null> {
   const coordError = validateCoordinateParams(params);
   if (coordError) {
@@ -228,7 +229,7 @@ async function resolveCoordinateTarget(
 /** Run context sections for a precise target, merging target metadata + notes. */
 async function runWithContextTarget(
   params: CodeContextToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
   precise: PreciseTarget,
 ): Promise<CodeIntelResult> {
   // `scope` is validated once at the top of `executeContextTool` and ignored
@@ -269,7 +270,7 @@ async function runWithContextTarget(
 /** Orientation / scope-only mode (no precise target). */
 async function runOrientation(
   params: CodeContextToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
   resolvedScope: string | undefined,
 ): Promise<CodeIntelResult> {
   // `scope` is validated and resolved once at the top of `executeContextTool`;
@@ -311,7 +312,7 @@ type ContextDeps = Omit<UseCaseContextDeps, "cwd"> | CodeIntelResult;
 
 async function prepareContextDeps(
   params: CodeContextToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<ContextDeps> {
   const readinessResult = await gateSemanticReadiness(params, ctx.cwd);
   if (readinessResult) return readinessResult;

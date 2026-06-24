@@ -222,7 +222,15 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - `code_refactor_plan` checks `refactorAvailable` from the semantic capability slot.
 - The semantic provider prefers its generic `refactor(request)` entrypoint; rename-only fallback exists only for compatibility with older provider shapes.
 - `code_refactor_apply` does not require a live semantic provider — plan validity is enforced through fingerprint comparison in the executor.
-- When no capability is available, the planner returns `preferred: "unavailable"` and the execute function returns an explicit error message.
+- When no capability is available, the planner returns `preferred: "unavailable"`. The executors follow a 3-way throw policy:
+  - **Throw** from `execute()` for whole-tool capability-unavailable — `route.preferred === "unavailable"` (no provider at all), or a provider that lacks the requested capability (e.g. refactor on a rename-only provider). pi marks the call `isError: true`. `code_find` already did this; `code_graph`, `code_resolve`, and `code_refactor_plan` were aligned to it.
+  - **Return error text** for self-correctable invalid usage — missing target/params, bad `scope`, stale/invalid `targetId`, invalid `mode`/`kind`, malformed `range`. These stay `CodeIntelResult` with `details` so the model can correct and retry.
+  - **Return best-effort notes** for per-relation/per-target partial unavailability — a `code_graph` relation whose substrate is down while another substrate serves the call, a `code_context` section whose provider is unavailable, `code_resolve` ambiguous candidates. These do not throw.
+  - Warmup timeouts stay error-text results (transient readiness, not capability-unavailable).
+
+### Tool adapter contract
+- The adapter in `register-tools.ts` head-truncates every executor's `content` string at pi defaults (2000 lines / 50 KB) via `truncateHead`, appending a `[truncated: kept N of M lines (X of Y)]` notice. `details` are never truncated. Per‑spec `maxLines`/`maxBytes` overrides are available on `CodeIntelligenceToolDefinitionSpec`; a reserved `spillToTempFile` knob for heavy‑output tools is not yet wired.
+- The adapter forwards `signal` (AbortSignal) and `onUpdate` (AgentToolUpdateCallback) from pi's `execute()` through `spec.run` into every executor's `CodeIntelToolExecCtx`. Long‑running executors (`code_find` ripgrep, `code_graph:all`, `code_impact` sweeps, `code_health:refresh`, `code_refactor_plan` LSP requests) forward `signal` to abort‑aware sub‑processes and emit coarse `onUpdate` progress beats via `emitToolProgress`.
 
 ### Public-surface split
 - `code_context` is now active as the solo task-focused and orientation surface; `code_brief` has been removed from the public surface.
@@ -286,9 +294,10 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 
 ### Refactor safety
 - `validateEdit()` rejects empty edits and invalid ranges before filesystem apply.
-- `code_refactor_plan` validates the edit before generating a plan; it returns `unavailable` or `ambiguous` if the provider cannot produce precise edits.
+- `code_refactor_plan` validates the edit before generating a plan; it **throws** for `unavailable` (provider cannot produce precise edits) and returns an `ambiguous` result (text + candidates) when multiple targets match.
 - `code_refactor_apply` remains text-edit-only in this phase — do not extend it to file/resource operations until shared runtime support exists.
 - `code_refactor_apply` rejects stale plans by comparing stored SHA-256 file fingerprints to current contents, and re-validates ranges before applying.
+- `code_refactor_apply` acquires pi's per‑file `withFileMutationQueue` for every involved file in sorted path order before reading original contents, building transformed contents, and committing (ADR 0006). Cross‑file rollback is preserved; no `executionMode` change.
 - No heuristic text fallback.
 
 ## Dependencies

@@ -33,7 +33,7 @@ describe("applyWorkspaceEdit", () => {
 
     write("a.ts", "hello old goodbye");
 
-    const result = applyWorkspaceEdit({
+    const result = await applyWorkspaceEdit({
       edits: [
         {
           file: absPath("a.ts"),
@@ -59,7 +59,7 @@ describe("applyWorkspaceEdit", () => {
     write("a.ts", "apple");
     write("b.ts", "banana");
 
-    const result = applyWorkspaceEdit({
+    const result = await applyWorkspaceEdit({
       edits: [
         {
           file: absPath("a.ts"),
@@ -93,7 +93,7 @@ describe("applyWorkspaceEdit", () => {
     chmodSync(lockedFile, 0o444);
 
     try {
-      const result = applyWorkspaceEdit({
+      const result = await applyWorkspaceEdit({
         edits: [
           {
             file: absPath("a.ts"),
@@ -124,7 +124,7 @@ describe("applyWorkspaceEdit", () => {
 
     write("a.ts", "foo bar baz");
 
-    const result = applyWorkspaceEdit({
+    const result = await applyWorkspaceEdit({
       edits: [
         {
           file: absPath("a.ts"),
@@ -150,7 +150,7 @@ describe("applyWorkspaceEdit", () => {
 
     write("a.ts", "line1\nline2\nline3");
 
-    const result = applyWorkspaceEdit({
+    const result = await applyWorkspaceEdit({
       edits: [
         {
           file: absPath("a.ts"),
@@ -171,7 +171,7 @@ describe("applyWorkspaceEdit", () => {
 
     write("a.ts", "short");
 
-    const result = applyWorkspaceEdit({
+    const result = await applyWorkspaceEdit({
       edits: [
         {
           file: absPath("a.ts"),
@@ -196,7 +196,7 @@ describe("applyWorkspaceEdit", () => {
 
     write("a.ts", "abc\n");
 
-    const result = applyWorkspaceEdit({
+    const result = await applyWorkspaceEdit({
       edits: [
         {
           file: absPath("a.ts"),
@@ -215,7 +215,7 @@ describe("applyWorkspaceEdit", () => {
       "../../src/analysis/refactor/apply-workspace-edit.ts"
     );
 
-    const result = applyWorkspaceEdit({
+    const result = await applyWorkspaceEdit({
       edits: [
         {
           file: absPath("nonexistent.ts"),
@@ -237,7 +237,7 @@ describe("applyWorkspaceEdit", () => {
     mkdirSync(path.dirname(nestedFile), { recursive: true });
     writeFileSync(nestedFile, "old content", "utf-8");
 
-    const result = applyWorkspaceEdit({
+    const result = await applyWorkspaceEdit({
       edits: [
         {
           file: nestedFile,

@@ -33,8 +33,9 @@ import {
   renderImportsResult,
 } from "../presentation/markdown/relations.ts";
 import { resolveScope, toDisplayPath } from "../search-helpers.ts";
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import type { AnchorKind } from "../workflow/target-store.ts";
+import { emitToolProgress } from "./progress.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
@@ -59,8 +60,9 @@ export interface CodeGraphToolParams {
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestration with multi-stage resolution, relation dispatch, and confidence derivation
 export async function executeGraphTool(
   params: CodeGraphToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
+  emitToolProgress(ctx.onUpdate, "code_graph: resolving target...");
   // ── 1. Expand targetId ──────────────────────────────────────────────
   const expansion = expandTargetId(params, ctx.cwd);
   const expandedTargetName = expansion.kind === "ok" ? expansion.targetName : null;
@@ -126,20 +128,13 @@ export async function executeGraphTool(
   // ── 4. Check provider availability ──────────────────────────────────
   const route = routeFor(ctx.cwd, "code_graph");
   if (route.preferred === "unavailable") {
-    return {
-      content:
-        "**Error:** No analysis provider is available for this workspace. Check `code_health` for LSP and tree-sitter status.",
-      details: {
-        type: "search" as const,
-        data: {
-          confidence: "unavailable" as const,
-          scope: null,
-          candidateCount: 0,
-          omittedCount: 0,
-          nextQueries: ["Check `code_health` for provider status"],
-        },
-      },
-    };
+    // Whole-tool capability-unavailable (no provider at all) → throw so pi
+    // marks the tool call as an error rather than a successful empty result.
+    // Per-relation unavailability (e.g. semantic down, structural up) is still
+    // surfaced as best-effort notes per relation below.
+    throw new Error(
+      "No analysis provider is available for this workspace. Check `code_health` for LSP and tree-sitter status.",
+    );
   }
 
   const providerState = getCodeProvider(ctx.cwd);
@@ -226,7 +221,12 @@ export async function executeGraphTool(
   const sections: GraphSection[] = [];
   const maxResults = params.maxResults ?? 8;
 
+  emitToolProgress(ctx.onUpdate, `code_graph: collecting ${relations.length} relation(s)...`);
+
   for (const rel of relations) {
+    if (relations.length > 1) {
+      emitToolProgress(ctx.onUpdate, `code_graph: ${rel}...`);
+    }
     const section = await collectRelation(
       rel,
       resolvedFile,

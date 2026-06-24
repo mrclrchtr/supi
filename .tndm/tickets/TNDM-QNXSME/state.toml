@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-24T21:14:51.26144Z"
+revision = 33
+
+[document_fingerprints]
+archive = "sha256:251bfee1c484e21129dc874c4878b761c5367207c58f70a045c1dfa8228bfd3b"
+content = "sha256:512ad19591a69202b57600d6e17d29ea6cc83ce6b4fcfefc26b7c8d07bcbe02d"
+task-01 = "sha256:f144ddd4c164da04f2af82007706f6a2a5e39e82dcf321a7e00c7c95a4b4f104"
+task-02 = "sha256:96d2196347aae486c633dc7d0622057996a103b1bbdb8fe5860a337adabcfbb9"
+task-03 = "sha256:b084908f834274b49c397b852464e38a233bc850c3941536877c0089ed4a52d1"
+task-04 = "sha256:a090e8323c167fc05e507499d7b9db7c8dfa59f6b0928de3b930832c644d371c"
+task-05 = "sha256:9e1bd84950b2433b8bf7dc97f6923598dfee44bb6a412c71436f42a5c0272ff6"
+task-06 = "sha256:388b159c16e202cfd4d94c1523b92d8a382996d0141728bf7c3780488d675e5b"
+
+[[tasks]]
+number = 1
+title = "Executor contract + adapter spine (A-contract + B)"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Abort-aware ripgrep (A-deep)"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "onUpdate progress emission (A-progress)"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "refactor-apply file-mutation queue (C)"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Prompt-surface dedupe + truncation clauses (D)"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Throw policy + CLAUDE.md gotcha rewrite (H)"
+status = "done"

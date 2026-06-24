@@ -25,17 +25,11 @@ function createSourceFile(name: string, content: string): string {
 }
 
 describe("references action without heuristic fallback", () => {
-  it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    // No provider registered — getCodeProvider returns unavailable
-    const result = await executeAction({ action: "graph", symbol: "myFunc" }, { cwd: tmpDir });
-
-    expect(result.content).toContain("No analysis provider is available");
-    expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("unavailable");
-      expect(result.details.data.candidateCount).toBe(0);
-    }
+  it("throws when symbol discovery lacks any provider (no heuristic fallback)", async () => {
+    // No provider registered — whole-tool capability-unavailable → execute() throws.
+    await expect(
+      executeAction({ action: "graph", symbol: "myFunc" }, { cwd: tmpDir }),
+    ).rejects.toThrow("No analysis provider is available");
   });
 
   it("returns semantic confidence when LSP returns reference results", async () => {
@@ -100,18 +94,13 @@ describe("references action without heuristic fallback", () => {
 });
 
 describe("implementations action without heuristic fallback", () => {
-  it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    const result = await executeAction(
-      { action: "graph", relations: ["implements"], symbol: "Drawable" },
-      { cwd: tmpDir },
-    );
-
-    expect(result.content).toContain("No analysis provider is available");
-    expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("unavailable");
-    }
+  it("throws when symbol discovery lacks any provider (no heuristic fallback)", async () => {
+    await expect(
+      executeAction(
+        { action: "graph", relations: ["implements"], symbol: "Drawable" },
+        { cwd: tmpDir },
+      ),
+    ).rejects.toThrow("No analysis provider is available");
   });
 
   it("returns semantic confidence when LSP returns implementation locations", async () => {

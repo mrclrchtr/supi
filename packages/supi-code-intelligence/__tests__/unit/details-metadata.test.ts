@@ -225,27 +225,20 @@ describe("structured details via tool adapters and action routers", () => {
       }
     });
 
-    it("references symbol lookup without LSP stays unavailable rather than heuristic", async () => {
-      const result = await executeAction({ action: "graph", symbol: "Widget" }, { cwd: tmpDir });
-      expect(result.details).toBeDefined();
-      expect(result.details?.type).toBe("search");
-      if (result.details?.type === "search") {
-        expect(result.details.data.confidence).toBe("unavailable");
-      }
-      expect(result.content).not.toContain("heuristic");
+    it("references symbol lookup without LSP throws (no heuristic fallback)", async () => {
+      // No provider registered — whole-tool capability-unavailable → execute() throws.
+      await expect(
+        executeAction({ action: "graph", symbol: "Widget" }, { cwd: tmpDir }),
+      ).rejects.toThrow("No analysis provider is available");
     });
 
-    it("implementations symbol lookup without LSP stays unavailable rather than heuristic", async () => {
-      const result = await executeAction(
-        { action: "graph", relations: ["implements"], symbol: "Widget" },
-        { cwd: tmpDir },
-      );
-      expect(result.details).toBeDefined();
-      expect(result.details?.type).toBe("search");
-      if (result.details?.type === "search") {
-        expect(result.details.data.confidence).toBe("unavailable");
-      }
-      expect(result.content).not.toContain("heuristic");
+    it("implementations symbol lookup without LSP throws (no heuristic fallback)", async () => {
+      await expect(
+        executeAction(
+          { action: "graph", relations: ["implements"], symbol: "Widget" },
+          { cwd: tmpDir },
+        ),
+      ).rejects.toThrow("No analysis provider is available");
     });
   });
 
@@ -416,17 +409,15 @@ describe("structured details via tool adapters and action routers", () => {
         expect(result.details?.type).toBe("search");
       });
 
-      it("returns details for tree-sitter unsuccessful on unsupported file type", async () => {
+      it("throws for callees on an unsupported file type when no provider is registered", async () => {
         writeFileSync(path.join(tmpDir, "notes.txt"), "some content\n");
-        const result = await executeAction(
-          { action: "graph", relations: ["callees"], file: "notes.txt", line: 1, character: 1 },
-          { cwd: tmpDir },
-        );
-        expect(result.details).toBeDefined();
-        expect(result.details?.type).toBe("search");
-        if (result.details?.type === "search") {
-          expect(result.details.data.confidence).toBe("unavailable");
-        }
+        // No provider registered — whole-tool capability-unavailable → execute() throws.
+        await expect(
+          executeAction(
+            { action: "graph", relations: ["callees"], file: "notes.txt", line: 1, character: 1 },
+            { cwd: tmpDir },
+          ),
+        ).rejects.toThrow("No analysis provider is available");
       });
 
       it("returns details for a function with zero direct structural calls", async () => {

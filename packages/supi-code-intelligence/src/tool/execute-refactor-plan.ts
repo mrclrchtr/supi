@@ -77,10 +77,9 @@ export async function executeRefactorPlanTool(
   });
 
   if (refactorResult.kind === "unavailable") {
-    return {
-      content: `**Refactor unavailable:** ${refactorResult.reason}`,
-      details: unavailableSearchDetails(null, ["Check `code_health` for provider status"]),
-    };
+    // Whole-tool capability-unavailable (no provider, or provider lacks refactor
+    // support for this operation) → throw so pi marks the call as an error.
+    throw new Error(`Refactor unavailable: ${refactorResult.reason}`);
   }
 
   if (refactorResult.kind === "ambiguous") {
@@ -268,10 +267,9 @@ async function waitForRefactorReadiness(
       details: unavailableSearchDetails(null, ["Retry shortly or check `code_health`"]),
     };
   }
-  return {
-    content: `**Error:** ${readiness.reason}`,
-    details: unavailableSearchDetails(null, ["Check `code_health` for provider status"]),
-  };
+  // Whole-tool capability-unavailable (no semantic provider) → throw. A
+  // warmup timeout above stays an error-text result.
+  throw new Error(readiness.reason);
 }
 
 function renderAmbiguousRefactorResult(

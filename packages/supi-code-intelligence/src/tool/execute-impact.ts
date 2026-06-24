@@ -1,8 +1,9 @@
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { executeImpact } from "../use-case/generate-impact.ts";
 import { unavailableImpactDetails } from "./details-helpers.ts";
+import { emitToolProgress } from "./progress.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
@@ -25,11 +26,12 @@ export type ImpactToolSurface = "impact" | "affected";
 /** Execute the shared public impact tool flow for the preferred or compatibility surface. */
 export async function executeImpactLikeTool(
   params: CodeImpactToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
   surface: ImpactToolSurface = "impact",
 ): Promise<CodeIntelResult> {
   const detailType = surface === "impact" ? "impact" : "affected";
   const preferredTool = surface === "impact" ? "code_impact" : "code_affected";
+  emitToolProgress(ctx.onUpdate, `${preferredTool}: analyzing blast radius...`);
 
   const expansion = expandTargetId(params, ctx.cwd);
   if (expansion.kind === "error") {
@@ -71,6 +73,7 @@ export async function executeImpactLikeTool(
       : { kind: "unavailable" as const, reason: "No provider" };
 
   if (hasDiffInputs) {
+    emitToolProgress(ctx.onUpdate, `${preferredTool}: sweeping changed files...`);
     return executeImpact(params, { cwd: ctx.cwd, provider, lspService }, surface);
   }
 
@@ -91,13 +94,14 @@ export async function executeImpactLikeTool(
     );
   }
 
+  emitToolProgress(ctx.onUpdate, `${preferredTool}: sweeping references...`);
   return executeImpact(params, { cwd: ctx.cwd, provider, lspService }, surface);
 }
 
 /** Execute the preferred public code_impact tool. */
 export async function executeImpactTool(
   params: CodeImpactToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   return executeImpactLikeTool(params, ctx, "impact");
 }

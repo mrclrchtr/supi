@@ -977,14 +977,12 @@ describe("code_resolve targetId follow-up", () => {
     expect(targetId).toBeDefined();
     if (!targetId) return;
 
-    const refPlanResult = await executeRefactorPlanTool(
-      { targetId, operation: "rename", newName: "bar" },
-      { cwd: tmpDir },
-    );
-
-    // Expected: only no LSP provider available, not a targetId error
-    expect(refPlanResult.content).toContain("provider");
-    expect(refPlanResult.content).not.toContain("not found");
+    // Expected: the follow-up reaches the provider-capability check (the
+    // provider lacks refactor support) and throws — not a targetId error,
+    // which would return text instead of rejecting.
+    await expect(
+      executeRefactorPlanTool({ targetId, operation: "rename", newName: "bar" }, { cwd: tmpDir }),
+    ).rejects.toThrow(/provider/i);
   });
 });
 

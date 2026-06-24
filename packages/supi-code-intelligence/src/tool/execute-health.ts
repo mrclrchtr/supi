@@ -7,6 +7,7 @@
 
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
+import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import { type CapabilityState, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type { SessionLspService, SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
@@ -24,8 +25,9 @@ import {
 } from "../presentation/markdown/health.ts";
 import { type LoadedSignals, loadPrioritizationSignals } from "../prioritization-signals.ts";
 import { resolveScope } from "../search-helpers.ts";
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { unavailableHealthDetails } from "./details-helpers.ts";
+import { emitToolProgress } from "./progress.ts";
 
 export interface CodeHealthToolParams {
   scope?: string;
@@ -38,9 +40,10 @@ const DEFAULT_INCLUDE: HealthSection[] = ["diagnostics", "servers"];
 
 export async function executeHealthTool(
   params: CodeHealthToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const cwd = ctx.cwd;
+  emitToolProgress(ctx.onUpdate, "code_health: gathering workspace health...");
   const included = (
     params.include && params.include.length > 0 ? params.include : DEFAULT_INCLUDE
   ) as HealthSection[];
@@ -65,12 +68,13 @@ export async function executeHealthTool(
       : { kind: "unavailable", reason: "No provider" };
   const service = lspState.kind === "ready" ? lspState.service : null;
 
-  const { recovered, lspStatus } = await maybeRecover(
+  const { recovered, lspStatus } = await maybeRecover({
     service,
-    params.refresh,
+    refresh: params.refresh,
     lspState,
-    semanticState.kind,
-  );
+    semanticStateKind: semanticState.kind,
+    onUpdate: ctx.onUpdate,
+  });
   const structuralStatus = describeStructuralState(structuralState);
 
   const diagnostics = await collectDiagnostics(service, included, scopeFilter, cwd);
@@ -191,16 +195,23 @@ function isWithinOptionalScope(scopeFilter: string | null, file: string): boolea
   return !scopeFilter || isWithinOrEqual(scopeFilter, file);
 }
 
+interface RecoverOptions {
+  service: SessionLspService | null;
+  refresh: boolean | undefined;
+  lspState: SessionLspServiceState;
+  semanticStateKind?: "pending" | "ready" | "inactive" | "disabled" | "unavailable";
+  onUpdate?: AgentToolUpdateCallback;
+}
+
 async function maybeRecover(
-  service: SessionLspService | null,
-  refresh: boolean | undefined,
-  lspState: SessionLspServiceState,
-  semanticStateKind?: "pending" | "ready" | "inactive" | "disabled" | "unavailable",
+  opts: RecoverOptions,
 ): Promise<{ recovered: boolean; lspStatus: string }> {
+  const { service, refresh, lspState, semanticStateKind, onUpdate } = opts;
   let recovered = false;
   let lspStatus = semanticStateKind === "pending" ? "warming…" : describeLspState(lspState);
 
   if (refresh && service) {
+    emitToolProgress(onUpdate, "code_health: refreshing diagnostics (may restart LSP)...");
     try {
       await service.recoverDiagnostics({ restartIfStillStale: true });
       recovered = true;

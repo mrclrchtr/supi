@@ -8,7 +8,7 @@
 import { executeResolveService, validateResolveParams } from "../analysis/resolve/service.ts";
 import { renderResolveResult } from "../presentation/markdown/resolve.ts";
 import { resolveScope } from "../search-helpers.ts";
-import type { CodeIntelResult, ResolveDetails } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx, ResolveDetails } from "../types.ts";
 import { unavailableResolveDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 
@@ -24,7 +24,7 @@ export interface CodeResolveToolParams {
 
 export async function executeResolveTool(
   params: CodeResolveToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   // Validation (defensive — TypeBox schema should catch most cases)
   const validationError = validateResolveParams(params);
@@ -61,10 +61,9 @@ export async function executeResolveTool(
       };
     }
     if (readiness.kind === "unavailable") {
-      return {
-        content: `**Error:** ${readiness.reason}`,
-        details: unavailableResolveDetails(["Check `code_health` for provider status"]),
-      };
+      // Whole-tool capability-unavailable (no semantic provider for a query
+      // resolve) → throw. A warmup timeout above stays an error-text result.
+      throw new Error(readiness.reason);
     }
   }
 

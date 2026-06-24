@@ -1,5 +1,5 @@
 import { getCodeProvider } from "../analysis/context/request-context.ts";
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { executeInspect } from "../use-case/generate-inspect.ts";
 import { unavailableInspectDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
@@ -14,7 +14,7 @@ export interface CodeInspectToolParams {
 
 export async function executeInspectTool(
   params: Partial<CodeInspectToolParams>,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const validationError = validateFocusedToolParams(params, ctx.cwd);
   if (validationError) {

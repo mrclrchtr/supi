@@ -26,17 +26,17 @@ function writeJson(dir: string, file: string, data: unknown) {
 }
 
 describe("shell injection prevention", () => {
-  it("handles paths with shell metacharacters safely", () => {
+  it("handles paths with shell metacharacters safely", async () => {
     const dangerousDir = path.join(tmpDir, "safe-dir");
     mkdirSync(dangerousDir, { recursive: true });
     writeFileSync(path.join(dangerousDir, "test.ts"), "export const x = 1;");
-    const matches = runRipgrep("export", dangerousDir, tmpDir);
+    const matches = await runRipgrep("export", dangerousDir, tmpDir);
     expect(matches.length).toBeGreaterThanOrEqual(0);
   });
 
-  it("handles patterns with special characters safely", () => {
+  it("handles patterns with special characters safely", async () => {
     writeFileSync(path.join(tmpDir, "test.ts"), "const x = foo();");
-    const matches = runRipgrep("foo()", tmpDir, tmpDir);
+    const matches = await runRipgrep("foo()", tmpDir, tmpDir);
     expect(matches.length).toBeGreaterThanOrEqual(0);
   });
 });

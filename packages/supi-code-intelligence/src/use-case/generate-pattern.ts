@@ -33,6 +33,8 @@ export interface PatternInput {
 export interface PatternDeps {
   cwd: string;
   provider: CodeProvider | null;
+  /** Abort signal forwarded to ripgrep for text/regex modes. */
+  signal?: AbortSignal;
 }
 
 /** Execute the pattern search use-case. */
@@ -65,18 +67,20 @@ export async function executePattern(
   }
 
   const matches = input.regex
-    ? getRegexMatches({
+    ? await getRegexMatches({
         pattern: input.pattern,
         scopePath,
         cwd: deps.cwd,
         maxResults,
         contextLines,
         summary: input.summary,
+        signal: deps.signal,
       })
-    : runRipgrep(input.pattern, scopePath, deps.cwd, {
+    : await runRipgrep(input.pattern, scopePath, deps.cwd, {
         contextLines,
         literal: true,
         filterLowSignal: true,
+        signal: deps.signal,
       });
 
   if (typeof matches === "string") {
@@ -239,17 +243,19 @@ function formatEmptyResult(input: PatternInput, relScope: string): CodeIntelResu
   };
 }
 
-function getRegexMatches(options: {
+async function getRegexMatches(options: {
   pattern: string;
   scopePath: string;
   cwd: string;
   maxResults: number;
   contextLines: number;
   summary?: boolean;
-}): RgMatch[] | string {
-  const result = runRipgrepDetailed(options.pattern, options.scopePath, options.cwd, {
+  signal?: AbortSignal;
+}): Promise<RgMatch[] | string> {
+  const result = await runRipgrepDetailed(options.pattern, options.scopePath, options.cwd, {
     contextLines: options.contextLines,
     filterLowSignal: true,
+    signal: options.signal,
   });
 
   if (result.error) {

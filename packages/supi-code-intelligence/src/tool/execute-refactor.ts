@@ -6,8 +6,9 @@
  * always returns a plan preview and never mutates files directly.
  */
 
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
+import { emitToolProgress } from "./progress.ts";
 
 export interface CodeRefactorToolParams {
   operation: string;
@@ -24,8 +25,12 @@ export interface CodeRefactorToolParams {
 
 export async function executeRefactorTool(
   params: CodeRefactorToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
+  emitToolProgress(
+    ctx.onUpdate,
+    `code_refactor_plan: requesting ${params.operation} plan from LSP...`,
+  );
   return executeRefactorPlanTool(
     {
       targetId: params.targetId,

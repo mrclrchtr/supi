@@ -7,7 +7,7 @@ import { applyWorkspaceEdit } from "../analysis/refactor/apply-workspace-edit.ts
 import { getPlan, isPlanFresh, removePlan } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
 import { renderRefactorApplyResult } from "../presentation/markdown/refactor.ts";
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { unavailableSearchDetails } from "./details-helpers.ts";
 
 export interface CodeRefactorApplyToolParams {
@@ -16,7 +16,7 @@ export interface CodeRefactorApplyToolParams {
 
 export async function executeRefactorApplyTool(
   params: CodeRefactorApplyToolParams,
-  _ctx: { cwd: string },
+  _ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   if (!params.planId) {
     return {
@@ -53,7 +53,7 @@ export async function executeRefactorApplyTool(
   }
 
   // Apply
-  const applyResult = applyWorkspaceEdit(plan.edits);
+  const applyResult = await applyWorkspaceEdit(plan.edits);
   removePlan(plan.id);
 
   const content = renderRefactorApplyResult(applyResult, plan);

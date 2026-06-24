@@ -12,6 +12,7 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
+import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import type { FileEdit, WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
 import { validateEditAgainstFiles } from "./safety.ts";
 
@@ -25,23 +26,45 @@ export type ApplyResult =
  * Precomputes every file's new content in memory first, then commits
  * all writes. If a commit fails after some files were already written,
  * the function rolls those files back to their original contents.
+ *
+ * The whole precompute-then-commit (including range/safety re-checks) runs
+ * inside pi's per-file mutation queue, acquired for every involved file in
+ * sorted path order before reading. This serializes against sibling
+ * `edit`/`write` tools on the same file and prevents lock-ordering deadlock
+ * across concurrent applies, while preserving all-or-nothing across files
+ * (ADR 0006).
  */
-export function applyWorkspaceEdit(edit: WorkspaceEdit): ApplyResult {
-  const validation = validateEditAgainstFiles(edit);
-  if (!validation.safe) {
-    return { kind: "error", reason: validation.reason };
-  }
-
+export async function applyWorkspaceEdit(edit: WorkspaceEdit): Promise<ApplyResult> {
   const grouped = groupEditsByFile(edit.edits);
-  const originalContents = readOriginalContents(grouped);
-  if (originalContents.kind === "error") return originalContents;
+  const files = [...grouped.keys()].sort();
+  return withAllMutationQueues(files, async () => {
+    const validation = validateEditAgainstFiles(edit);
+    if (!validation.safe) {
+      return { kind: "error", reason: validation.reason };
+    }
 
-  const transformedContents = buildTransformedContents(grouped, originalContents.contents);
-  return commitTransformedContents(
-    transformedContents,
-    originalContents.contents,
-    edit.edits.length,
-  );
+    const originalContents = readOriginalContents(grouped);
+    if (originalContents.kind === "error") return originalContents;
+
+    const transformedContents = buildTransformedContents(grouped, originalContents.contents);
+    return commitTransformedContents(
+      transformedContents,
+      originalContents.contents,
+      edit.edits.length,
+    );
+  });
+}
+
+/**
+ * Acquire pi's per-file mutation queue for every involved file in sorted path
+ * order before running `fn`, holding all locks for the duration. Sorted order
+ * prevents lock-ordering deadlock across concurrent applies; per-file queues
+ * serialize against sibling `edit`/`write` tools on the same file (ADR 0006).
+ */
+async function withAllMutationQueues<T>(files: string[], fn: () => Promise<T>): Promise<T> {
+  if (files.length === 0) return fn();
+  const [head, ...rest] = files;
+  return withFileMutationQueue(head, () => withAllMutationQueues(rest, fn));
 }
 
 function groupEditsByFile(edits: FileEdit[]): Map<string, FileEdit[]> {

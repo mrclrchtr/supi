@@ -13,9 +13,10 @@ import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { createEvidenceList, renderEvidenceListDisclosure } from "../evidence-list.ts";
 import { resolveScope } from "../search-helpers.ts";
-import type { CodeIntelResult, SearchDetails } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx, SearchDetails } from "../types.ts";
 import { executePattern } from "../use-case/generate-pattern.ts";
 import { unavailableSearchDetails } from "./details-helpers.ts";
+import { emitToolProgress } from "./progress.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 
 export interface CodeFindToolParams {
@@ -44,7 +45,7 @@ const SUPPORTED_AST_KIND_TEXT = SUPPORTED_AST_KIND_LABELS.map((kind) => `\`${kin
 
 export async function executeFindTool(
   params: CodeFindToolParams,
-  ctx: { cwd: string },
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const cwd = ctx.cwd;
 
@@ -56,6 +57,8 @@ export async function executeFindTool(
       ]),
     };
   }
+
+  emitToolProgress(ctx.onUpdate, `code_find: searching for "${params.query}"...`);
 
   const scopeResolution = resolveScope(params.scope, cwd);
   if (scopeResolution.kind === "error") {
@@ -71,15 +74,17 @@ export async function executeFindTool(
   const mode = params.mode ?? "text";
   validateModeKindCombination(params, mode);
 
+  emitToolProgress(ctx.onUpdate, `code_find: ${mode} mode...`);
+
   switch (mode) {
     case "text":
-      return executeTextMode(params.query, params, scopePath, cwd);
+      return executeTextMode(params.query, params, scopePath, ctx);
     case "regex":
-      return executeRegexMode(params.query, params, scopePath, cwd);
+      return executeRegexMode(params.query, params, scopePath, ctx);
     case "ast":
-      return executeAstMode(params.query, params, scopePath, cwd);
+      return executeAstMode(params.query, params, scopePath, ctx);
     case "semantic":
-      return executeSemanticMode(params.query, params, scopePath, cwd);
+      return executeSemanticMode(params.query, params, scopePath, ctx);
   }
 }
 
@@ -87,7 +92,7 @@ async function executeTextMode(
   query: string,
   params: CodeFindToolParams,
   scopePath: string,
-  cwd: string,
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   return executePattern(
     {
@@ -98,7 +103,7 @@ async function executeTextMode(
       maxResults: params.maxResults ?? 8,
       contextLines: params.contextLines ?? 1,
     },
-    { cwd, provider: getEffectiveProvider(cwd) },
+    { cwd: ctx.cwd, provider: getEffectiveProvider(ctx.cwd), signal: ctx.signal },
   );
 }
 
@@ -106,7 +111,7 @@ async function executeRegexMode(
   query: string,
   params: CodeFindToolParams,
   scopePath: string,
-  cwd: string,
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   return executePattern(
     {
@@ -117,7 +122,7 @@ async function executeRegexMode(
       maxResults: params.maxResults ?? 8,
       contextLines: params.contextLines ?? 1,
     },
-    { cwd, provider: getEffectiveProvider(cwd) },
+    { cwd: ctx.cwd, provider: getEffectiveProvider(ctx.cwd), signal: ctx.signal },
   );
 }
 
@@ -125,9 +130,9 @@ async function executeAstMode(
   query: string,
   params: CodeFindToolParams,
   scopePath: string,
-  cwd: string,
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
-  ensureStructuralAvailable(cwd);
+  ensureStructuralAvailable(ctx.cwd);
 
   return executePattern(
     {
@@ -137,7 +142,7 @@ async function executeAstMode(
       maxResults: params.maxResults ?? 8,
       contextLines: params.contextLines ?? 1,
     },
-    { cwd, provider: getEffectiveProvider(cwd) },
+    { cwd: ctx.cwd, provider: getEffectiveProvider(ctx.cwd), signal: ctx.signal },
   );
 }
 
@@ -145,8 +150,9 @@ async function executeSemanticMode(
   query: string,
   params: CodeFindToolParams,
   scopePath: string,
-  cwd: string,
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
+  const cwd = ctx.cwd;
   ensureSemanticAvailable(cwd);
 
   const readiness = await ensureSemanticReadiness(cwd, { kind: "workspace" });
