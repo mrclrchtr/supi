@@ -73,7 +73,7 @@ Use `defineTool()` for standalone constants, arrays, or SDK `customTools` where 
 `execute(toolCallId, params, signal, onUpdate, ctx)` returns an `AgentToolResult`:
 
 - `content`: text/image blocks sent back to the model.
-- `details`: structured data for UI, logs, and state reconstruction; use `details: undefined` if there is no state.
+- `details`: structured data for UI, logs, and state reconstruction; use `details: {}` if there is no state.
 - `terminate?: true`: hint to skip the automatic follow-up LLM call **only when every finalized result in the current tool batch also terminates**.
 
 Rules:
