@@ -11,8 +11,6 @@ import type {
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { type Position, toLspPosition } from "@mrclrchtr/supi-lsp/api";
-import { normalizePath } from "./search-helpers.ts";
-import { resolveAnchoredTarget as resolveAnchored } from "./targeting/resolve-anchored.ts";
 import { resolveFileTargetGroup as resolveFile } from "./targeting/resolve-file.ts";
 import { resolveSymbolTarget as resolveSymbol } from "./targeting/resolve-symbol.ts";
 import type { DisambiguationCandidate } from "./types.ts";
@@ -51,31 +49,6 @@ export { normalizePath } from "./search-helpers.ts";
  */
 export function toZeroBased(line: number, character: number): Position {
   return toLspPosition(line, character);
-}
-
-// ── Anchored resolver ─────────────────────────────────────────────────
-
-/**
- * Resolve a target from anchored coordinates (file + line + character).
- * Delegates to the new targeting pipeline after normalizing the file path.
- */
-export function resolveAnchoredTarget(
-  file: string,
-  line: number,
-  character: number,
-  cwd: string,
-): TargetResolutionResult {
-  const resolvedFile = normalizePath(file, cwd);
-  const outcome = resolveAnchored(resolvedFile, line, character);
-
-  if (outcome.kind === "resolved") {
-    return {
-      kind: "resolved",
-      target: outcome.target as ResolvedTarget,
-    };
-  }
-
-  return outcome as TargetResolutionResult;
 }
 
 // ── File-level target group ───────────────────────────────────────────

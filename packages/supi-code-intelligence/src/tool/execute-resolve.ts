@@ -95,8 +95,10 @@ export async function executeResolveTool(
         displayCharacter: t.displayCharacter,
         name: t.name,
         kind: t.kind,
+        anchorKind: t.anchorKind,
         confidence: t.confidence,
         provenance: t.provenance,
+        resolution: t.resolution,
       })),
       nextQueries: result.nextQueries,
     };
@@ -128,6 +130,7 @@ export async function executeResolveTool(
         character: c.character,
         reason: c.reason,
         rank: c.rank,
+        anchorKind: c.anchorKind,
       })),
       nextQueries: result.nextQueries,
     };

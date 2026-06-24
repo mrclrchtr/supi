@@ -7,10 +7,11 @@
 
 import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { normalizePath } from "../../search-helpers.ts";
-import { resolveAnchoredTarget as resolveAnchored } from "../../targeting/resolve-anchored.ts";
+import { resolveAnchoredSymbolTarget } from "../../targeting/resolve-anchored.ts";
 import { resolveFileTargetGroup as resolveFile } from "../../targeting/resolve-file.ts";
 import { resolveSymbolTarget as resolveSymbol } from "../../targeting/resolve-symbol.ts";
 import type {
+  NormalizedQuery,
   ResolvedTargetData,
   ResolvedTargetGroupData,
   TargetOutcome,
@@ -32,13 +33,8 @@ export async function resolveTarget(
   const query = normalizeQuery(params);
 
   switch (query.kind) {
-    case "anchored": {
-      const resolvedFile = normalizePath(query.file, cwd);
-      const result = resolveAnchored(resolvedFile, query.line, query.character);
-      if (result.kind === "error") return result.message;
-      if (result.kind === "resolved") return result.target;
-      return "**Error:** Unexpected resolution outcome.";
-    }
+    case "anchored":
+      return resolveAnchoredCase(query, cwd, semantic);
 
     case "file": {
       const result = await resolveFile(query.file, cwd);
@@ -69,6 +65,33 @@ export async function resolveTarget(
   }
 }
 
+/**
+ * Anchored case: route file + line + character through the same provider-backed
+ * symbol resolver as `code_resolve`/`code_context` (resolveAnchoredSymbolTarget),
+ * so `code_graph`/`code_impact` resolve real symbol targets (exact identifier
+ * hit or declaration-header snap) instead of anonymous point targets.
+ * Per ADR 0003 — no silent `name:null` point targets.
+ */
+async function resolveAnchoredCase(
+  query: Extract<NormalizedQuery, { kind: "anchored" }>,
+  cwd: string,
+  semantic: SemanticProvider | undefined,
+): Promise<ResolvedTargetData | string> {
+  const resolvedFile = normalizePath(query.file, cwd);
+  const result = await resolveAnchoredSymbolTarget(
+    resolvedFile,
+    query.line,
+    query.character,
+    semantic ?? null,
+  );
+  if (result.kind === "error") return result.message;
+  if (result.kind === "resolved") return result.target;
+  if (result.kind === "disambiguation") {
+    return formatAnchoredDisambiguation(query.file, query.line, query.character, result);
+  }
+  return "**Error:** Unexpected resolution outcome.";
+}
+
 function formatDisambiguation(
   symbol: string,
   result: Extract<TargetOutcome, { kind: "disambiguation" }>,
@@ -95,6 +118,33 @@ function formatDisambiguation(
     const first = result.candidates[0];
     lines.push(
       `Example: rerun with \`file: "${first.file}"\`, \`line: ${first.line}\`, and \`character: ${first.character}\`.`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/** Format anchored-coordinate disambiguation (multiple symbols match one coordinate). */
+function formatAnchoredDisambiguation(
+  file: string,
+  line: number,
+  character: number,
+  result: Extract<TargetOutcome, { kind: "disambiguation" }>,
+): string {
+  const lines: string[] = [];
+  lines.push(`# Disambiguation needed at \`${file}:${line}:${character}\``);
+  lines.push("");
+  const omitNote = result.omittedCount > 0 ? ` (+${result.omittedCount} more)` : "";
+  lines.push(
+    `Found ${result.candidates.length} symbol candidates at this coordinate${omitNote}. Use \`code_resolve\` to pick one:`,
+  );
+  lines.push("");
+
+  for (const c of result.candidates) {
+    const kind = c.kind ? ` (${c.kind})` : "";
+    const container = c.container ? ` in ${c.container}` : "";
+    lines.push(
+      `${c.rank}. **${c.name}**${kind}${container} — \`${c.file}\`:${c.line}:${c.character}`,
     );
   }
 

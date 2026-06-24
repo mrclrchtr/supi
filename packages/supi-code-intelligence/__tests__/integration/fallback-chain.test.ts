@@ -45,7 +45,9 @@ describe("references action without heuristic fallback", () => {
     const refResult = [
       {
         uri: `file://${sourcePath}`,
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
+        // Declaration-site ref at the `target` identifier (0-based char 16);
+        // collectReferences filters the ref at the resolved target position.
+        range: { start: { line: 0, character: 16 }, end: { line: 0, character: 22 } },
       },
       {
         uri: `file://${path.join(tmpDir, "src", "caller.ts")}`,

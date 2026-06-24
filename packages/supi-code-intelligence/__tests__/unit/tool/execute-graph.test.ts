@@ -255,12 +255,15 @@ describe("execute-graph (code_graph tool)", () => {
         }),
       });
 
+      // Coordinate on the `export const x` declaration header (line 3).
+      // Resolves to `x` via declaration-header snap; the structural relation
+      // mocks below ignore position, so truncation disclosure is what's tested.
       const result = await executeAction(
         {
           action: "graph",
           file: "test.ts",
           line: 3,
-          character: 16,
+          character: 1,
           relations: ["callees", "imports", "exports"],
           maxResults: 1,
         } as unknown as ActionParams,

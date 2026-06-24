@@ -41,7 +41,6 @@ export {
 export type { ResolvedTarget, TargetResolutionResult } from "./target-resolution.ts";
 export {
   normalizePath,
-  resolveAnchoredTarget,
   resolveSymbolTarget,
   toZeroBased,
 } from "./target-resolution.ts";

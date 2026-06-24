@@ -110,10 +110,14 @@ src/
 ### `code_context`
 Task-focused context bundle. It is the solo surface for both orientation and task-focused coding context — `code_brief` has been merged into it.
 
-- accepts `task`, `targetId`, `scope`, `budget`, `include`, and `maxResults`
+- accepts `task`, `targetId`, `file` + `line` + `character` (coordinate target mode), `scope`, `budget`, `include`, and `maxResults`
+- for precise target context, pass either `targetId` (from `code_resolve`) **or** `file` + `line` + `character`. `targetId` takes precedence over coordinates; when both are supplied, coordinates are ignored with a visible note. A stale/invalid `targetId` errors and does **not** fall back to coordinates.
+- coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` (exact identifier hit, declaration-header snap when unambiguous, or explicit disambiguation) and exposes a reusable `targetId` in `details.data.target`. Coordinate mode requires all three fields when any is present.
+- ambiguous coordinate resolution returns candidate `targetId`s and runs no task sections; unresolved coordinates error and recommend `code_inspect` (it is **not** a point-inspection tool).
 - when `task` is omitted, returns a neutral orientation brief (project, package, directory, file, or symbol overview)
 - when `task` is present, renders only the requested sections and reports unavailable sections honestly
 - `targetId` from `code_resolve` is the preferred precise anchor for task-focused follow-up
+- `scope` is a selection/orientation boundary, not a downstream evidence filter: when a precise target is supplied with `scope`, the target wins and `scope` is ignored with a visible note. Future evidence filtering should use a separate parameter, not `scope`.
 - first-wave docs/tests/diagnostics sections are best-effort and must stay explicit when empty or unavailable
 
 **Orientation briefs** — When called without `task`:
@@ -236,8 +240,10 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - `range` is required for `extract_function` and `extract_variable`; public range coordinates are 1-based and converted to LSP ranges internally.
 - `code_refactor_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
+- `code_context` accepts `targetId` or `file` + `line` + `character` for precise target context. `targetId` takes precedence over coordinates; a stale/invalid `targetId` errors and does not fall back to coordinates. Coordinate mode requires all three fields when any is present; partial coordinates are a validation error.
 - `code_context`, `code_impact`, and `code_refactor_plan` accept optional `targetId` that takes precedence over raw coordinates.
 - `code_context` accepts optional `targetId` for orientation-only follow-up.
+- `scope` is a selection/orientation boundary, not a downstream evidence filter. In `code_context`, `scope` is ignored (with a visible note) when a precise target is supplied. Future evidence filtering should use a separate parameter such as `within`/`evidenceScope`, not `scope`.
 
 ### Evidence provenance in test discovery
 - Test discovery results carry `provenance`: `"semantic+conventions"` if semantic references contributed files, `"conventions-only"` otherwise.
@@ -266,8 +272,11 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - File-level target expansion is allowed only when the required substrate can support it.
 - The planner delegates to the existing targeting pipeline (`resolve-target.ts` and `src/targeting/*`).
 - `code_resolve` registers targets in a session-scoped in-memory store (`src/workflow/target-store.ts`).
-- Target IDs (`tg-*`) and span IDs (`sp-*`) are deterministic and stable while the backing file fingerprint is unchanged.
-- Unknown or stale target IDs return explicit unavailable messages rather than silent fallthrough.
+- Anchored `code_resolve({ file, line, character })` resolves a **real symbol target** from provider-backed evidence via `resolveAnchoredSymbolTarget` (`src/targeting/resolve-anchored.ts`): exact identifier hit → named `name` anchor; declaration-header coordinate → snaps to the name anchor only when one provider-backed symbol is unambiguous (with a visible note + structured resolution metadata); whitespace/comment/non-symbol coordinates error and recommend `code_inspect`. It does **not** register anonymous point targets.
+- `code_context` coordinate mode (`file` + `line` + `character`) reuses the same anchored resolution + store path as `code_resolve` (via `executeResolveService`), so a one-call context bundle exposes a reusable `targetId`.
+- `code_graph` and `code_impact` coordinate mode (`file` + `line` + `character`) routes through `resolveTarget` (`src/analysis/targeting/resolve-target.ts`), whose anchored case calls the same `resolveAnchoredSymbolTarget` — all four target-oriented tools share one provider-backed symbol resolver and never produce anonymous `name:null` point targets (ADR 0003). The legacy sync `resolveAnchoredTarget` point-target resolver has been removed.
+- Target IDs (`tg-*`) and span IDs (`sp-*`) are deterministic and stable while the backing file fingerprint is unchanged. Per ADR 0003, position is excluded from the `targetId` identity hash (name/kind/container/fingerprint), so re-resolving the same symbol reuses the same ID regardless of anchor refine success.
+- Unknown or stale target IDs return explicit unavailable messages rather than silent fallthrough. `code_context` and `code_graph` do **not** fall back to coordinates when a `targetId` is stale/invalid.
 - No cross-session persistence — target handles live only as long as the current process.
 
 ### First-turn overview

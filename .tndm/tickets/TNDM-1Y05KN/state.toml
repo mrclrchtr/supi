@@ -1,9 +1,10 @@
 schema_version = 1
-status = "todo"
-updated_at = "2026-06-23T23:42:49.559124Z"
-revision = 9
+status = "done"
+updated_at = "2026-06-24T16:51:51.28876Z"
+revision = 18
 
 [document_fingerprints]
+archive = "sha256:db50345a804355f3c7b9cd46e09814db106626ee4fd15e7b142d746e17acb671"
 content = "sha256:e730aebb819f2cffe1d39bcc0654d0c5225e70ca9d1382ce4546e0b31c08ae5c"
 task-01 = "sha256:61b4de8a97c9b97a8f47979f8e54e1fc7910cacc76595023e04c60bcad87b839"
 task-02 = "sha256:05450e9af3136e274e3037454ee21a54c6cd2fe937e935cf4937e4fc1429d7e5"
@@ -14,24 +15,24 @@ task-05 = "sha256:48606496e86c4f78be8d5ec7c45d9a29a006f02c9c9b6b440cf1876d411dc2
 [[tasks]]
 number = 1
 title = "Define anchored target resolution result metadata and target details"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 2
 title = "Upgrade anchored code_resolve to resolve real symbol targets"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 3
 title = "Add coordinate target mode to code_context"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 4
 title = "Document coordinate target semantics and scope precedence"
-status = "todo"
+status = "done"
 
 [[tasks]]
 number = 5
 title = "Verify with targeted and full checks"
-status = "todo"
+status = "done"

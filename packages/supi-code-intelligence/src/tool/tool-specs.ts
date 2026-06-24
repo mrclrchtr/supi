@@ -92,11 +92,12 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_resolve",
     label: "Code Resolve",
     description:
-      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_impact, and code_refactor_plan. Supports anchored (file + line + character), file-only, and query/symbol inputs. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
+      "Resolve human or code references into precise file/range/symbol targets and stable target handles. Use when a symbol, file, or code reference is ambiguous and needs precise resolution. Returns targetId and spanId handles that can be passed to code_graph, code_impact, and code_refactor_plan. Supports anchored (file + line + character), file-only, and query/symbol inputs. Anchored coordinates resolve a real symbol target from provider-backed evidence: an exact identifier coordinate resolves to a named target; a declaration-header coordinate (e.g. an `export` keyword) snaps to the symbol name anchor only when unambiguous. Whitespace/comment/non-symbol coordinates fail honestly and recommend code_inspect. Does not fall back to text search for symbol resolution; ambiguous results return ranked candidates with target IDs for every shown item.",
     promptSnippet: "code_resolve — resolve references into precise targets and target handles",
     basePromptGuidelines: [
       "Use code_resolve when a symbol, file, or code reference is ambiguous and needs precise resolution.",
       "Prefer code_resolve as the entry point before code_context, code_graph, code_impact, or code_refactor_plan — its targetId replaces fragile file/line/character coordinates.",
+      "code_resolve anchored coordinates (file + line + character) resolve a real symbol target: exact identifier hits resolve directly; declaration-header coordinates snap to the name anchor when unambiguous; non-symbol coordinates recommend code_inspect.",
       "When code_resolve returns ambiguous results with ranked candidates, pick one and use file + line + character for follow-up resolution.",
     ],
     parameters: CodeResolveParameters,
@@ -124,12 +125,16 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_context",
     label: "Code Context",
     description:
-      "Task-focused context bundle for a change, question, or resolved target. Use when you want prioritized definitions, relationships, diagnostics, docs, and tests gathered into one coding-oriented context result. When called without a `task`, returns a neutral orientation brief — use it as the primary entry point for project, package, directory, file, or symbol overviews.",
+      "Task-focused context bundle for a change, question, or resolved target. Use when you want prioritized definitions, relationships, diagnostics, docs, and tests gathered into one coding-oriented context result. Accepts either `targetId` (from `code_resolve`) or `file` + `line` + `character` for precise target context; `targetId` takes precedence over coordinates. Coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. When called without a `task`, returns a neutral orientation brief — use it as the primary entry point for project, package, directory, file, or symbol overviews. Not a point-inspection tool — use `code_inspect` for point-level facts when no symbol target can be resolved.",
     promptSnippet: "code_context — task-focused coding context bundle",
     basePromptGuidelines: [
       "Use code_context for both task-focused coding context and neutral orientation overviews.",
       "Omit `task` in code_context to get a neutral project/package/file orientation brief.",
       "Use `include` in code_context to request only the sections you need.",
+      "In code_context, pass either `targetId` or `file` + `line` + `character` for precise target context. `targetId` takes precedence over coordinates; a stale/invalid `targetId` errors and does not fall back to coordinates.",
+      "code_context coordinate mode (`file` + `line` + `character`) resolves a real symbol target and returns a reusable `targetId` — no separate `code_resolve` turn required. It requires all three coordinate fields when any is present.",
+      "code_context is not a point-inspection tool. When a coordinate does not resolve to a symbol, it recommends `code_inspect`; use `code_inspect` directly for point-level facts.",
+      "In code_context, `scope` is a selection/orientation boundary, not a downstream evidence filter. When a precise target is supplied with `scope`, the target wins and `scope` is ignored with a visible note.",
     ],
     parameters: CodeContextParameters,
     run: (params, ctx) =>

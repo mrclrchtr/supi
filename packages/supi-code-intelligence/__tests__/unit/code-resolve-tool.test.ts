@@ -987,3 +987,292 @@ describe("code_resolve targetId follow-up", () => {
     expect(refPlanResult.content).not.toContain("not found");
   });
 });
+
+describe("code_resolve anchored symbol resolution", () => {
+  function writeWidget(dir: string): string {
+    const file = path.join(dir, "src/widget.ts");
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, "export function widget() { helper(); }\nfunction helper() {}\n");
+    return file;
+  }
+
+  function widgetSymbols(file: string) {
+    return [
+      {
+        name: "widget",
+        kind: "Function",
+        file,
+        declarationAnchor: { line: 1, character: 1 },
+        nameAnchor: { line: 1, character: 17 },
+        container: null,
+      },
+      {
+        name: "helper",
+        kind: "Function",
+        file,
+        declarationAnchor: { line: 2, character: 1 },
+        nameAnchor: { line: 2, character: 10 },
+        container: null,
+      },
+    ];
+  }
+
+  it("resolves an exact identifier coordinate to a named name-anchor target with resolution metadata", async () => {
+    const file = writeWidget(tmpDir);
+    registerMockProvider(tmpDir, { documentSymbols: async () => widgetSymbols(file) });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_resolve");
+
+    const result = (await tool.execute(
+      "anchored-exact",
+      { file: "src/widget.ts", line: 1, character: 17 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "resolve";
+        data: {
+          targets: Array<{
+            targetId: string;
+            name: string | null;
+            anchorKind: string;
+            resolution?: {
+              snapped: boolean;
+              source: string;
+              requested: unknown;
+              resolved: unknown;
+            };
+          }>;
+        };
+      };
+    };
+
+    expect(result.content[0].text).toContain("**widget**");
+    expect(result.content[0].text).toContain("Target ID:");
+    expect(result.content[0].text).not.toContain("snapped");
+    const target = result.details?.data.targets[0];
+    expect(target?.name).toBe("widget");
+    expect(target?.anchorKind).toBe("name");
+    expect(target?.resolution?.snapped).toBe(false);
+    expect(target?.resolution?.source).toBe("semantic");
+  });
+
+  it("snaps a declaration-header coordinate to the name anchor and surfaces a snap note", async () => {
+    const file = writeWidget(tmpDir);
+    registerMockProvider(tmpDir, { documentSymbols: async () => widgetSymbols(file) });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_resolve");
+
+    const result = (await tool.execute(
+      "anchored-snap",
+      { file: "src/widget.ts", line: 1, character: 1 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "resolve";
+        data: {
+          targets: Array<{
+            name: string | null;
+            displayCharacter: number;
+            resolution?: {
+              snapped: boolean;
+              requested: { line: number; character: number };
+              resolved: { line: number; character: number };
+            };
+          }>;
+        };
+      };
+    };
+
+    expect(result.content[0].text).toContain("**widget**");
+    expect(result.content[0].text).toContain("snapped");
+    expect(result.content[0].text).toContain("1:1");
+    expect(result.content[0].text).toContain("1:17");
+    const target = result.details?.data.targets[0];
+    expect(target?.name).toBe("widget");
+    expect(target?.displayCharacter).toBe(17);
+    expect(target?.resolution?.snapped).toBe(true);
+    expect(target?.resolution?.requested).toEqual({ line: 1, character: 1 });
+    expect(target?.resolution?.resolved).toEqual({ line: 1, character: 17 });
+  });
+
+  it("returns an error recommending code_inspect for a non-symbol coordinate and registers no target", async () => {
+    const file = writeWidget(tmpDir);
+    registerMockProvider(tmpDir, { documentSymbols: async () => widgetSymbols(file) });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_resolve");
+
+    const result = (await tool.execute(
+      "anchored-unresolved",
+      { file: "src/widget.ts", line: 3, character: 1 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: "resolve"; data: { targets: Array<{ targetId: string }> } };
+    };
+
+    expect(result.content[0].text).toContain("code_inspect");
+    expect(result.content[0].text).not.toContain("Target ID:");
+    expect(result.details?.data.targets).toEqual([]);
+  });
+
+  it("returns disambiguation candidates with targetIds for an ambiguous anchored coordinate", async () => {
+    const file = writeWidget(tmpDir);
+    // Two symbols share the same identifier coordinate (different containers).
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => [
+        {
+          name: "widget",
+          kind: "Function",
+          file,
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 17 },
+          container: null,
+        },
+        {
+          name: "widget",
+          kind: "Function",
+          file,
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 17 },
+          container: "Other",
+        },
+      ],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_resolve");
+
+    const result = (await tool.execute(
+      "anchored-ambiguous",
+      { file: "src/widget.ts", line: 1, character: 17 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "resolve";
+        data: { candidates: Array<{ targetId: string; name: string; anchorKind: string }> };
+      };
+    };
+
+    expect(result.content[0].text).not.toContain("Resolved **widget**");
+    expect(result.content[0].text).toContain("Multiple matches");
+    const candidates = result.details?.data.candidates ?? [];
+    expect(candidates.length).toBe(2);
+    for (const c of candidates) {
+      expect(c.targetId).toMatch(/^tg-/);
+      expect(c.anchorKind).toBe("name");
+    }
+  });
+
+  it("does not collide targetIds for unrelated coordinates in the same file", async () => {
+    const file = writeWidget(tmpDir);
+    registerMockProvider(tmpDir, { documentSymbols: async () => widgetSymbols(file) });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_resolve");
+
+    const widgetRes = (await tool.execute(
+      "no-collision-widget",
+      { file: "src/widget.ts", line: 1, character: 17 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { details?: { data: { targets: Array<{ targetId: string; name: string | null }> } } };
+    const helperRes = (await tool.execute(
+      "no-collision-helper",
+      { file: "src/widget.ts", line: 2, character: 10 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { details?: { data: { targets: Array<{ targetId: string; name: string | null }> } } };
+
+    const widgetId = widgetRes.details?.data.targets[0]?.targetId;
+    const helperId = helperRes.details?.data.targets[0]?.targetId;
+    expect(widgetId).toBeDefined();
+    expect(helperId).toBeDefined();
+    expect(widgetId).not.toBe(helperId);
+    expect(widgetRes.details?.data.targets[0]?.name).toBe("widget");
+    expect(helperRes.details?.data.targets[0]?.name).toBe("helper");
+
+    // A non-symbol coordinate registers no target at all (no anonymous collision).
+    const whitespaceRes = (await tool.execute(
+      "no-collision-whitespace",
+      { file: "src/widget.ts", line: 3, character: 1 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { details?: { data: { targets: Array<{ targetId: string }> } } };
+    expect(whitespaceRes.details?.data.targets).toEqual([]);
+  });
+
+  it("follows up with code_graph callees using a snapped name-anchor targetId", async () => {
+    const file = writeWidget(tmpDir);
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => widgetSymbols(file),
+      calleesAt: async (_f, line, character) => {
+        if (line === 1 && character === 17) {
+          return {
+            kind: "success" as const,
+            data: {
+              enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
+              callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+            },
+          };
+        }
+        return { kind: "unsupported-language" as const, file: _f, message: "no callees" };
+      },
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const resolveTool = getTool(pi, "code_resolve");
+
+    // Resolve from the `export` keyword — snaps to the widget name anchor.
+    const resolveResult = (await resolveTool.execute(
+      "snap-followup",
+      { file: "src/widget.ts", line: 1, character: 1 },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: {
+        data: { targets: Array<{ targetId: string; resolution?: { snapped: boolean } }> };
+      };
+    };
+
+    const target = resolveResult.details?.data.targets[0];
+    expect(target?.targetId).toBeDefined();
+    expect(target?.resolution?.snapped).toBe(true);
+    if (!target?.targetId) return;
+
+    const graphTool = getTool(pi, "code_graph");
+    const graphResult = (await graphTool.execute(
+      "snap-followup-callees",
+      { targetId: target.targetId, relations: ["callees"] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(graphResult.content[0].text).toContain("helper");
+    expect(graphResult.content[0].text).not.toContain("Unavailable");
+  });
+});

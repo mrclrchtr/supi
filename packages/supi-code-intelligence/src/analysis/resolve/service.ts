@@ -11,7 +11,7 @@ import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import { normalizePath } from "../../search-helpers.ts";
-import { resolveAnchoredTarget as resolveAnchored } from "../../targeting/resolve-anchored.ts";
+import { resolveAnchoredSymbolTarget } from "../../targeting/resolve-anchored.ts";
 import { resolveFileTargetGroup as resolveFile } from "../../targeting/resolve-file.ts";
 import { resolveSymbolTarget as resolveSymbol } from "../../targeting/resolve-symbol.ts";
 import type { TargetOutcome } from "../../targeting/types.ts";
@@ -41,8 +41,11 @@ export interface ResolvedTargetEntry {
   displayCharacter: number;
   name: string | null;
   kind: string | null;
+  anchorKind: AnchorKind;
   confidence: ConfidenceMode;
   provenance: string;
+  /** Resolution provenance — present when resolved from anchored coordinates. */
+  resolution?: import("../../types.ts").AnchoredResolutionMetadata;
 }
 /** One disambiguation candidate with a target handle. */
 export interface DisambiguationCandidateEntry {
@@ -55,6 +58,7 @@ export interface DisambiguationCandidateEntry {
   character: number;
   reason: string;
   rank: number;
+  anchorKind: AnchorKind;
 }
 export type ResolveServiceResult =
   | {
@@ -130,6 +134,7 @@ function registerFromTarget(
     confidence: string;
     anchorKind: AnchorKind;
     container: string | null;
+    resolution?: import("../../types.ts").AnchoredResolutionMetadata;
   },
   cwd: string,
   provenance: string,
@@ -155,8 +160,10 @@ function registerFromTarget(
     displayCharacter: target.displayCharacter,
     name: target.name,
     kind: target.kind,
+    anchorKind: target.anchorKind,
     confidence: target.confidence as ConfidenceMode,
     provenance,
+    resolution: target.resolution,
   };
 }
 /** Register a disambiguation candidate in the target store. */
@@ -197,15 +204,17 @@ function registerCandidate(
     character: c.character,
     reason: c.reason,
     rank: c.rank,
+    anchorKind: c.anchorKind,
   };
 }
 // ── Resolver sub-routines ────────────────────────────────────────────
-/** Resolve anchored (file + line + character) input. */
-function resolveAnchoredInput(
+/** Resolve anchored (file + line + character) input via provider-backed symbol resolution. */
+async function resolveAnchoredInput(
   params: ResolveServiceParams,
   cwd: string,
   _maxResults: number,
-): ResolveServiceResult {
+  provider: CodeProvider | null,
+): Promise<ResolveServiceResult> {
   // Guard: caller ensures file/line/character are present for anchored
   const file = params.file;
   const line = params.line;
@@ -223,7 +232,7 @@ function resolveAnchoredInput(
   if (!existsSync(resolvedFile)) {
     return { kind: "error", message: `**Error:** File not found: \`${file}\`` };
   }
-  const outcome = resolveAnchored(resolvedFile, line, character);
+  const outcome = await resolveAnchoredSymbolTarget(resolvedFile, line, character, provider);
   if (outcome.kind === "error") {
     return { kind: "error", message: outcome.message };
   }
@@ -241,7 +250,20 @@ function resolveAnchoredInput(
       ],
     };
   }
-  return { kind: "error", message: "**Error:** Unexpected resolution outcome." };
+  // Disambiguation — register each candidate and surface targetIds.
+  const disambig = outcome as Extract<TargetOutcome, { kind: "disambiguation" }>;
+  const candidates = disambig.candidates.map((c) =>
+    registerCandidate({ ...c, file: relative(cwd, c.file) }, cwd),
+  );
+  return {
+    kind: "disambiguation",
+    candidates,
+    omittedCount: disambig.omittedCount,
+    nextQueries: [
+      "Use `file` + `line` + `character` for one of the candidates above (pass the identifier coordinate)",
+      "Or refine with `query` + `scope` or `kind` filters",
+    ],
+  };
 }
 /** Resolve file-only (no coordinates) input. */
 async function resolveFileOnlyInput(
@@ -384,7 +406,7 @@ export async function executeResolveService(
   const maxResults = params.maxResults ?? 10;
   // Anchored resolution
   if (params.file && params.line != null && params.character != null) {
-    return resolveAnchoredInput(params, cwd, maxResults);
+    return resolveAnchoredInput(params, cwd, maxResults, provider);
   }
   // File-only resolution
   if (params.file && !params.query) {

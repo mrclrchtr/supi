@@ -769,6 +769,7 @@ describe("code_impact tool", () => {
     );
 
     registerMockProvider(tmpDir, {
+      documentSymbols: async () => null,
       references: async (file) =>
         file.endsWith("execute-find.ts")
           ? [
@@ -875,6 +876,7 @@ describe("code_impact tool", () => {
     );
 
     registerMockProvider(tmpDir, {
+      documentSymbols: async () => null,
       references: async (file) =>
         file.endsWith("widget.ts")
           ? [

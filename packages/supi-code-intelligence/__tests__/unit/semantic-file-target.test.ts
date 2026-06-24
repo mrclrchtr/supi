@@ -35,7 +35,6 @@ describe("file-level semantic targets", () => {
     );
 
     registerMockProvider(tmpDir, {
-      documentSymbols: async () => null,
       exports: async (_file) => ({
         kind: "success",
         data: [

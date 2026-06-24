@@ -76,6 +76,12 @@ export interface ResolvedTargetData {
   anchorKind: AnchorKind;
   /** Symbolic container (class/namespace/module name), or null for top-level. */
   container: string | null;
+  /**
+   * Resolution provenance — present when the target was resolved from
+   * anchored coordinates. Carries requested/resolved coordinates, whether the
+   * anchor was snapped, and the provider-backed evidence source.
+   */
+  resolution?: import("../types.ts").AnchoredResolutionMetadata;
 }
 
 /**

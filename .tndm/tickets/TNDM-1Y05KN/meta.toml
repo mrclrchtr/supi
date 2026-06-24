@@ -5,7 +5,11 @@ type = "feature"
 priority = "p2"
 effort = "l"
 depends_on = []
-tags = ["flow:planned"]
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
 
 [[documents]]
 name = "content"

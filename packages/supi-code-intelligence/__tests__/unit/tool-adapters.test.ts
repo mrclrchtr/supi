@@ -83,7 +83,7 @@ describe("executeAction validation", () => {
       ],
     });
     const result = await executeAction(
-      { action: "graph", file: "test.ts", line: 1, character: 18 },
+      { action: "graph", file: "test.ts", line: 1, character: 14 },
       { cwd: tmpDir },
     );
     expect(result.content).toContain("Graph of");

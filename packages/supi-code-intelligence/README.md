@@ -118,6 +118,13 @@ This package is for questions like:
 4. `code_context(targetId, include=["defs", "tests"])` → gather edit context
 5. Edit files, then `code_health(scope="packages/...", refresh=true)` → verify diagnostics
 
+### Context from a known source location (one call)
+
+When you already know the file and identifier coordinate, skip the separate `code_resolve` turn and pass coordinates directly to `code_context`:
+
+1. `code_context(task="understand executeHealthTool", file="packages/.../execute-health.ts", line=42, character=17, include=["defs", "callees", "references"])` → resolves the target, renders the sections, and returns a reusable `targetId`
+2. `code_graph(targetId, relations=["references"])` → follow up using the `targetId` from step 1
+
 ### Understand a package before editing
 
 1. `code_context(scope="packages/supi-code-intelligence")` → package orientation
@@ -136,10 +143,14 @@ This package is for questions like:
 ### `code_context`
 Task-focused context bundle for a change, question, or resolved target.
 
-- accepts `task`, `targetId`, `scope`, `budget`, `include`, and `maxResults`
+- accepts `task`, `targetId`, `file` + `line` + `character` (coordinate target mode), `scope`, `budget`, `include`, and `maxResults`
+- for precise target context, pass either `targetId` (from `code_resolve`) **or** `file` + `line` + `character`. `targetId` takes precedence over coordinates; when both are supplied, coordinates are ignored with a visible note. A stale/invalid `targetId` errors and does **not** fall back to coordinates.
+- coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` (exact identifier hit, declaration-header snap when unambiguous, or explicit disambiguation) and exposes a reusable `targetId` in the markdown and `details.data.target`.
+- when coordinate resolution is ambiguous, `code_context` returns candidate `targetId`s and runs no task sections; when no symbol target can be resolved, it errors and recommends `code_inspect` for point-level facts (it is **not** a point-inspection tool).
 - when `task` is omitted, falls back to orientation-style output instead of erroring
 - when `task` is present, renders requested sections such as `defs`, `references`, `callees`, `docs`, `tests`, and `diagnostics`
 - requested but unavailable sections are called out explicitly instead of being silently omitted
+- `scope` is a selection/orientation boundary, not a downstream evidence filter: when a precise target (`targetId` or coordinates) is supplied with `scope`, the target wins and `scope` is ignored with a visible note. Future evidence filtering should use a separate parameter, not `scope`.
 - in this first implementation wave, `code_context` is the solo surface: `code_brief` has been removed from the public surface
 
 ### `code_inspect`
@@ -250,9 +261,20 @@ Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `scope`
 - `code_inspect` is the public point-inspection tool for `file` + `line` + `character`
-- `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, and `code_refactor_plan`
+- `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, and `code_refactor_plan`. In `code_context`, `targetId` takes precedence over `file`/`line`/`character`; a stale/invalid `targetId` errors and does not fall back to coordinates.
+- `code_context` accepts `file` + `line` + `character` directly as a coordinate target mode: it resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. Coordinate mode requires all three fields when any is present; partial coordinates are a validation error.
+- `scope` is a selection/orientation boundary, not a downstream evidence filter. For `code_context`, `scope` is ignored (with a visible note) when a precise target (`targetId` or coordinates) is supplied. Future evidence filtering should use a separate parameter such as `within`/`evidenceScope`, not `scope`.
 - `scope` and `file` use pi-style paths: a leading `@` is stripped, relative paths resolve from the current cwd, and existing file scopes match only that file while directory scopes match descendants
 - non-search tools do **not** silently fall back to heuristic grep behavior
+
+### `code_resolve` anchored coordinate resolution
+
+`code_resolve({ file, line, character })` resolves a **real symbol target** from provider-backed evidence, not an anonymous point target:
+
+- an exact coordinate on a symbol identifier resolves to a named `name` anchor with a stable `targetId`.
+- a coordinate on a declaration header/modifier (such as an `export` keyword) snaps to the symbol's name anchor **only when** provider-backed evidence identifies exactly one enclosing symbol. Snapped results carry a visible note and structured resolution metadata (requested vs. resolved coordinate and evidence source).
+- ambiguous coordinates return ranked candidates with `targetId`s and do not pick one silently.
+- whitespace, comment, or other non-symbol coordinates return an explicit error and recommend `code_inspect` for point-level facts — `code_resolve` does not register anonymous point targets.
 
 ### Target handle lifecycle
 

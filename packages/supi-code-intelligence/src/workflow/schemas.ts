@@ -86,6 +86,11 @@ export const CodeInspectParameters = Type.Object(
  * Runtime rule for future executors:
  * - allow plain orientation when `task` is omitted
  * - prefer `targetId` over raw coordinates once Phase 1 handle resolution exists
+ * - `targetId` takes precedence over `file` + `line` + `character`; when both
+ *   are supplied, coordinates are ignored with a visible note
+ * - coordinate mode (`file` + `line` + `character`) resolves a real symbol
+ *   target through the same path as `code_resolve` and exposes a reusable
+ *   `targetId`; it requires all three coordinate fields when any is present
  */
 export const CodeContextParameters = Type.Object(
   {
@@ -93,9 +98,36 @@ export const CodeContextParameters = Type.Object(
       Type.String({ description: "Task-oriented request describing the change or question." }),
     ),
     targetId: Type.Optional(
-      Type.String({ description: "Resolved target handle from `code_resolve`." }),
+      Type.String({
+        description:
+          "Resolved target handle from `code_resolve`. Takes precedence over `file`/`line`/`character`. If invalid or stale, the call errors and does not fall back to coordinates.",
+      }),
     ),
-    scope: Type.Optional(ScopeParam),
+    file: Type.Optional(
+      Type.String({
+        description:
+          "Target file path for coordinate target mode. Requires `line` and `character`. Resolves a real symbol target through the same path as `code_resolve`.",
+      }),
+    ),
+    line: Type.Optional(
+      Type.Number({
+        description: "1-based line for coordinate target mode. Requires `file` and `character`.",
+        minimum: 1,
+      }),
+    ),
+    character: Type.Optional(
+      Type.Number({
+        description:
+          "1-based UTF-16 column for coordinate target mode. Requires `file` and `line`.",
+        minimum: 1,
+      }),
+    ),
+    scope: Type.Optional(
+      Type.String({
+        description:
+          "Workspace-relative path, package, or directory scope for orientation/selection. Ignored (with a visible note) when a precise target (`targetId` or coordinates) is supplied; it is a selection boundary, not a downstream evidence filter.",
+      }),
+    ),
     budget: Type.Optional(
       StringEnum(["small", "medium", "large"], {
         description:

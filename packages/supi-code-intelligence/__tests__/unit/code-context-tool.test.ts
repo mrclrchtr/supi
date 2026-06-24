@@ -318,7 +318,21 @@ describe("code_context tool", () => {
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const targetId = await resolveTargetId(pi, "src/context.ts", 1, 17);
+    // Pre-register the target directly so this test stays focused on the
+    // docs/tests section honesty (no provider registered → tests section is
+    // honestly "unavailable"; no JSDoc → docs section is "not found").
+    const { targetId } = registerWorkflowTarget(tmpDir, {
+      file: "src/context.ts",
+      position: { line: 0, character: 16 },
+      displayLine: 1,
+      displayCharacter: 17,
+      name: "contextTarget",
+      kind: "Function",
+      confidence: "semantic",
+      provenance: "test",
+      anchorKind: "name",
+      container: null,
+    });
     const tool = getTool(pi, "code_context");
 
     const result = (await tool.execute(
@@ -394,7 +408,7 @@ describe("code_context real-data sections", () => {
     writeSource("src/context.ts", "export function contextTarget() { return 1; }\n");
 
     // Default mockLspFns setup returns unavailable
-
+    registerMockProvider(tmpDir);
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     const targetId = await resolveTargetId(pi, "src/context.ts", 1, 17);
@@ -846,6 +860,7 @@ describe("code_context real-data sections", () => {
       ].join("\n"),
     );
 
+    registerMockProvider(tmpDir);
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     // Target the 'add' function symbol (line 8, character 17 = the function name)
@@ -874,6 +889,7 @@ describe("code_context real-data sections", () => {
   it("returns unavailable note for docs when no JSDoc comment exists", async () => {
     writeSource("src/context.ts", "export function add(a: number, b: number) { return a + b; }\n");
 
+    registerMockProvider(tmpDir);
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     const targetId = await resolveTargetId(pi, "src/context.ts", 1, 17);
@@ -906,6 +922,7 @@ describe("code_context real-data sections", () => {
       ].join("\n"),
     );
 
+    registerMockProvider(tmpDir);
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     const targetId = await resolveTargetId(pi, "src/context.ts", 2, 17);
@@ -1142,5 +1159,548 @@ describe("code_context git context once-per-session", () => {
     )) as { content: Array<{ type: string; text: string }> };
 
     expect(result.content[0].text).toContain("## Git Context");
+  });
+});
+
+describe("code_context coordinate target mode", () => {
+  function writeWidgetSource(): void {
+    writeSource(
+      "src/widget.ts",
+      ["export function widget() { helper(); }", "function helper() {}"].join("\n"),
+    );
+  }
+
+  function widgetSymbols() {
+    return [
+      {
+        name: "widget",
+        kind: "Function",
+        file: path.join(tmpDir, "src/widget.ts"),
+        declarationAnchor: { line: 1, character: 1 },
+        nameAnchor: { line: 1, character: 17 },
+        container: null,
+      },
+      {
+        name: "helper",
+        kind: "Function",
+        file: path.join(tmpDir, "src/widget.ts"),
+        declarationAnchor: { line: 2, character: 1 },
+        nameAnchor: { line: 2, character: 10 },
+        container: null,
+      },
+    ];
+  }
+
+  it("resolves a valid symbol coordinate and renders callees in one call", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => widgetSymbols(),
+      calleesAt: async (_file, line, character) => {
+        if (line === 1 && character === 17) {
+          return {
+            kind: "success" as const,
+            data: {
+              enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
+              callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+            },
+          };
+        }
+        return { kind: "unsupported-language" as const, file: _file, message: "no callees" };
+      },
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-callees",
+      {
+        task: "understand widget callees",
+        file: "src/widget.ts",
+        line: 1,
+        character: 17,
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "context";
+        data: {
+          target?: {
+            targetId: string;
+            name: string | null;
+            anchorKind: string;
+          };
+        };
+      };
+    };
+
+    expect(result.content[0].text).not.toContain("**Error");
+    expect(result.content[0].text).toContain("## Callees");
+    expect(result.content[0].text).toContain("`helper` (L1)");
+    // Resolved target info + reusable targetId in markdown
+    expect(result.content[0].text).toContain("widget");
+    expect(result.content[0].text).toContain("tg-");
+    // Resolved-target summary must be well-formed markdown: balanced code
+    // spans and no leading `_` italic artifact. Regression guard for the
+    // unbalanced-backtick bug (odd backtick count left an unclosed code span).
+    const resolvedLine = result.content[0].text
+      .split("\n")
+      .find((l) => l.startsWith("Resolved target"));
+    expect(resolvedLine).toBeDefined();
+    const backtickCount = (resolvedLine?.match(/`/g) ?? []).length;
+    expect(backtickCount % 2).toBe(0);
+    // Structured target metadata
+    expect(result.details?.data.target?.targetId).toMatch(/^tg-/);
+    expect(result.details?.data.target?.name).toBe("widget");
+    expect(result.details?.data.target?.anchorKind).toBe("name");
+  });
+
+  it("uses targetId and notes that coordinates were ignored when both are supplied", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => widgetSymbols(),
+      calleesAt: async () => ({
+        kind: "success" as const,
+        data: {
+          enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
+          callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        },
+      }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/widget.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-targetid-precedence",
+      {
+        task: "use targetId not coordinates",
+        targetId,
+        // Coordinates point at helper, but targetId (widget) must win
+        file: "src/widget.ts",
+        line: 2,
+        character: 10,
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: "context"; data: { target?: { name: string | null } } };
+    };
+
+    expect(result.content[0].text).not.toContain("**Error");
+    expect(result.content[0].text).toContain("ignored");
+    // targetId (widget) wins — callees are widget's (helper), not helper's
+    expect(result.content[0].text).toContain("`helper` (L1)");
+    expect(result.details?.data.target?.name).toBe("widget");
+  });
+
+  it("does not fall back to coordinates when targetId is stale/invalid", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, { documentSymbols: async () => widgetSymbols() });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-stale-targetid",
+      {
+        task: "should error not fall back",
+        targetId: "tg-nonexistent",
+        file: "src/widget.ts",
+        line: 1,
+        character: 17,
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("**Error");
+    // Must NOT have resolved the coordinates (no callees rendered)
+    expect(result.content[0].text).not.toContain("## Callees");
+    expect(result.content[0].text).not.toContain("`helper`");
+  });
+
+  it("returns a validation error for partial coordinates", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, { documentSymbols: async () => widgetSymbols() });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-partial",
+      {
+        task: "partial coords",
+        file: "src/widget.ts",
+        line: 1,
+        // character omitted
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).toContain("**Error");
+    expect(result.content[0].text).toMatch(/character|line|together|all three/i);
+  });
+
+  it("ignores scope with a visible note when a precise target is supplied", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => widgetSymbols(),
+      calleesAt: async () => ({
+        kind: "success" as const,
+        data: {
+          enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
+          callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        },
+      }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-scope-ignored",
+      {
+        task: "target plus scope",
+        file: "src/widget.ts",
+        line: 1,
+        character: 17,
+        scope: "src",
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).not.toContain("**Error");
+    expect(result.content[0].text).toContain("ignored");
+    expect(result.content[0].text).toContain("scope");
+    // Target still resolved and used
+    expect(result.content[0].text).toContain("`helper` (L1)");
+  });
+
+  it("ignores an INVALID scope with a visible note when a precise coordinate target is supplied", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => widgetSymbols(),
+      calleesAt: async () => ({
+        kind: "success" as const,
+        data: {
+          enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
+          callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        },
+      }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-invalid-scope-ignored",
+      {
+        task: "target plus invalid scope",
+        file: "src/widget.ts",
+        line: 1,
+        character: 17,
+        scope: "does-not-exist",
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    // A precise target wins; an invalid scope is ignored (with a note), not a
+    // hard error — scope is a selection boundary, not an evidence filter.
+    expect(result.content[0].text).not.toContain("**Error");
+    expect(result.content[0].text).toContain("ignored");
+    expect(result.content[0].text).toContain("`helper` (L1)");
+  });
+
+  it("ignores an INVALID scope with a visible note when a targetId target is supplied", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => widgetSymbols(),
+      calleesAt: async () => ({
+        kind: "success" as const,
+        data: {
+          enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
+          callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        },
+      }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/widget.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "targetid-invalid-scope-ignored",
+      {
+        task: "targetId plus invalid scope",
+        targetId,
+        scope: "does-not-exist",
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    expect(result.content[0].text).not.toContain("**Error");
+    expect(result.content[0].text).toContain("ignored");
+    expect(result.content[0].text).toContain("`helper` (L1)");
+  });
+
+  it("hard-errors on an invalid scope in orientation mode (no precise target)", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, { documentSymbols: async () => widgetSymbols() });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "orient-invalid-scope",
+      { scope: "does-not-exist" },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ type: string; text: string }> };
+
+    // Scope is the actual selection input in orientation mode, so an invalid
+    // path is a hard error here (unlike precise-target mode, where it is ignored).
+    expect(result.content[0].text).toContain("Scope path not found");
+  });
+
+  it("returns candidate targetIds with no task sections for ambiguous coordinates", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => [
+        {
+          name: "widget",
+          kind: "Function",
+          file: path.join(tmpDir, "src/widget.ts"),
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 17 },
+          container: null,
+        },
+        {
+          name: "widget",
+          kind: "Function",
+          file: path.join(tmpDir, "src/widget.ts"),
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 17 },
+          container: "Other",
+        },
+      ],
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-ambiguous",
+      {
+        task: "ambiguous target",
+        file: "src/widget.ts",
+        line: 1,
+        character: 17,
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "context";
+        data: {
+          candidates?: Array<{ targetId: string; name: string }>;
+          renderedSections?: string[];
+        };
+      };
+    };
+
+    expect(result.content[0].text).toContain("Multiple matches");
+    expect(result.content[0].text).toContain("tg-");
+    // No task sections rendered
+    expect(result.content[0].text).not.toContain("## Callees");
+    expect(result.details?.data.renderedSections).toEqual([]);
+  });
+
+  it("recommends code_inspect for an unresolved coordinate and runs no sections", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, { documentSymbols: async () => widgetSymbols() });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-unresolved",
+      {
+        task: "whitespace target",
+        file: "src/widget.ts",
+        line: 3,
+        character: 1,
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: "context"; data: { renderedSections?: string[] } };
+    };
+
+    expect(result.content[0].text).toContain("code_inspect");
+    expect(result.content[0].text).not.toContain("## Callees");
+    expect(result.details?.data.renderedSections).toEqual([]);
+  });
+
+  it("populates details.data.target for targetId mode too", async () => {
+    writeWidgetSource();
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => widgetSymbols(),
+      calleesAt: async () => ({
+        kind: "success" as const,
+        data: {
+          enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
+          callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        },
+      }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/widget.ts", 1, 17);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-targetid-target-meta",
+      {
+        task: "targetId mode target meta",
+        targetId,
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      details?: {
+        type: "context";
+        data: { target?: { targetId: string; name: string | null; anchorKind: string } };
+      };
+    };
+
+    expect(result.details?.data.target?.targetId).toBe(targetId);
+    expect(result.details?.data.target?.name).toBe("widget");
+    expect(result.details?.data.target?.anchorKind).toBe("name");
+  });
+
+  it("reports structural confidence for a coordinate resolved via the structural fallback", async () => {
+    writeWidgetSource();
+    // Semantic layer returns no matching symbol so anchored resolution falls
+    // through to the tree-sitter structural layer, which resolves the `widget`
+    // identifier (a function_declaration name) with confidence "structural".
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => [],
+      nodeAt: async (_file, line, character) => {
+        if (line === 1 && character === 17) {
+          return {
+            kind: "success" as const,
+            data: {
+              type: "identifier",
+              startLine: 1,
+              startCharacter: 17,
+              endLine: 1,
+              endCharacter: 23,
+              text: "widget",
+              ancestry: [
+                {
+                  type: "function_declaration",
+                  startLine: 1,
+                  startCharacter: 1,
+                  endLine: 1,
+                  endCharacter: 24,
+                },
+              ],
+            },
+          };
+        }
+        return { kind: "unsupported-language" as const, file: _file, message: "no node" };
+      },
+      calleesAt: async () => ({
+        kind: "success" as const,
+        data: {
+          enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
+          callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        },
+      }),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_context");
+
+    const result = (await tool.execute(
+      "coord-structural-fallback",
+      {
+        task: "understand widget callees",
+        file: "src/widget.ts",
+        line: 1,
+        character: 17,
+        include: ["callees"],
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "context";
+        data: {
+          target?: {
+            targetId: string;
+            name: string | null;
+            confidence: string;
+            resolution?: { source: string };
+          };
+        };
+      };
+    };
+
+    // Structural fallback resolved the target end-to-end.
+    expect(result.content[0].text).not.toContain("**Error");
+    expect(result.content[0].text).toContain("## Callees");
+    expect(result.details?.data.target?.name).toBe("widget");
+    // Core regression guard: structured target confidence must reflect the
+    // structural fallback, not the previously hardcoded "semantic".
+    expect(result.details?.data.target?.confidence).toBe("structural");
+    // Provenance source is preserved alongside the corrected confidence.
+    expect(result.details?.data.target?.resolution?.source).toBe("structural-identifier");
   });
 });

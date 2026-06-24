@@ -121,8 +121,8 @@ The invariant that composing a refactor and mutating files are done by separate 
 _Avoid_: "auto-apply", "preview-and-apply in one call" (these collapse the split into one mutating step)
 
 **Scope**:
-The public parameter that narrows a code-intelligence query to one workspace-relative path — a directory or a single file. It is a filter, not a search pattern; an unresolved path is a hard error rather than a silent widening to the whole workspace, and package-name-to-directory resolution is intentionally absent.
-_Avoid_: `path`, `searchPath`, `dir` as public parameter names
+The public parameter that narrows a code-intelligence query to one workspace-relative path — a directory or a single file. It is a selection/orientation boundary and a filter, not a search pattern and not a downstream evidence filter: an unresolved path is a hard error rather than a silent widening to the whole workspace, package-name-to-directory resolution is intentionally absent, and when a precise target (`targetId` or anchored coordinates) is supplied alongside `scope`, the precise target wins and `scope` is ignored with a visible note. Future evidence filtering should use a separate parameter, not `scope`.
+_Avoid_: `path`, `searchPath`, `dir` as public parameter names, treating `scope` as a downstream evidence filter for precise targets
 
 **Name anchor**:
 The source position of a symbol's identifier token — the offset position-strict substrates (tree-sitter `calleesAt`, hover-at, rename) must resolve against. Best-effort on `CodeSymbol`: present when the provider can derive it (LSP `DocumentSymbol.selectionRange`, or a tree-sitter identifier-snap fallback), absent when neither is available. Distinct from `Declaration anchor`.

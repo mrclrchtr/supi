@@ -113,7 +113,16 @@ describe("focused-tool follow-up regressions", () => {
     runtime.registerSemantic(tmpDir, {
       references: async () => [],
       implementation: async () => [],
-      documentSymbols: async () => [],
+      documentSymbols: async () => [
+        {
+          name: "Widget",
+          kind: "Function",
+          file: widgetPath,
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 17 },
+          container: null,
+        },
+      ],
       workspaceSymbols: async () => [
         {
           name: "Widget",
@@ -310,5 +319,38 @@ describe("path scoping uses proper containment", () => {
 
     expect(result.content).toContain("supiOnly");
     expect(result.content).not.toContain("coreOnly");
+  });
+});
+
+describe("unified scope validation across target modes", () => {
+  it("ignores an invalid scope for a precise coordinate target and proceeds to resolution", async () => {
+    writeJson(tmpDir, "package.json", { name: "test" });
+    const srcDir = path.join(tmpDir, "src");
+    mkdirSync(srcDir, { recursive: true });
+    writeFileSync(path.join(srcDir, "widget.ts"), "export function Widget() {\n  return 1;\n}\n");
+
+    // No provider is registered. Per the reconciled contract, a precise target
+    // wins over `scope`: an invalid scope is ignored (with a note) rather than
+    // short-circuiting, so the call proceeds to coordinate resolution, which
+    // then fails honestly because no provider can resolve a symbol here.
+    const result = await executeContextTool(
+      { file: "src/widget.ts", line: 1, character: 17, scope: "does-not-exist" },
+      { cwd: tmpDir },
+    );
+
+    // Scope is ignored for precise targets — it must NOT be the reported error.
+    expect(result.content).not.toContain("does-not-exist");
+    expect(result.content).not.toContain("Scope path not found");
+    // The result reflects coordinate resolution, not scope validation.
+    expect(result.details?.type).toBe("context");
+  });
+
+  it("surfaces a scope-path error in orientation mode", async () => {
+    writeJson(tmpDir, "package.json", { name: "test" });
+
+    const result = await executeContextTool({ scope: "nope/" }, { cwd: tmpDir });
+
+    expect(result.content).toContain("**Error:**");
+    expect(result.content).toContain("nope");
   });
 });

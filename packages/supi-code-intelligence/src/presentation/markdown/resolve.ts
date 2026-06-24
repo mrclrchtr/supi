@@ -12,6 +12,49 @@ import type {
 } from "../../analysis/resolve/service.ts";
 import { renderEvidenceListMetadataDisclosure } from "../../evidence-list.ts";
 
+/**
+ * Render a provenance note for an anchored resolution, but only when the
+ * resolution was non-obvious — i.e. the coordinate was snapped to a different
+ * anchor, or the evidence was structural rather than semantic. Exact
+ * name-anchor hits resolved from semantic evidence stay quiet.
+ */
+function renderAnchoredResolutionNote(t: ResolvedTargetEntry): string | null {
+  const r = t.resolution;
+  if (!r) return null;
+  const degraded = r.source !== "semantic";
+  if (!r.snapped && !degraded) return null;
+
+  const req = `${r.requested.line}:${r.requested.character}`;
+  const res = `${r.resolved.line}:${r.resolved.character}`;
+  if (r.snapped) {
+    return `_Note: snapped from requested coordinate ${req} to name anchor ${res} (evidence: ${r.source})._`;
+  }
+  return `_Note: resolved from ${r.source} evidence; confirm with \`code_inspect\` if you need point-level facts._`;
+}
+
+/** Render the single-target resolved block (with optional provenance note). */
+function renderSingleTarget(t: ResolvedTargetEntry, confidence: string): string[] {
+  const kind = t.kind ? ` \`${t.kind}\`` : "";
+  const name = t.name ? ` **${t.name}**${kind}` : "";
+  const lines: string[] = [
+    `Resolved${name}:`,
+    "",
+    `- File: \`${t.file}\``,
+    `- Line: ${t.displayLine}, Column: ${t.displayCharacter}`,
+    `- Target ID: \`${t.targetId}\``,
+    `- Span ID: \`${t.spanId}\``,
+    `- Confidence: \`${confidence}\``,
+    `- Provenance: \`${t.provenance}\``,
+  ];
+  const note = renderAnchoredResolutionNote(t);
+  if (note) {
+    lines.push("");
+    lines.push(note);
+  }
+  lines.push("");
+  return lines;
+}
+
 /** Render a full resolve service result into markdown. */
 export function renderResolveResult(result: ResolveServiceResult, _cwd: string): string {
   switch (result.kind) {
@@ -36,19 +79,7 @@ function renderResolved(
   const lines: string[] = [];
 
   if (targets.length === 1) {
-    const t = targets[0];
-    const kind = t.kind ? ` \`${t.kind}\`` : "";
-    const name = t.name ? ` **${t.name}**${kind}` : "";
-
-    lines.push(`Resolved${name}:`);
-    lines.push("");
-    lines.push(`- File: \`${t.file}\``);
-    lines.push(`- Line: ${t.displayLine}, Column: ${t.displayCharacter}`);
-    lines.push(`- Target ID: \`${t.targetId}\``);
-    lines.push(`- Span ID: \`${t.spanId}\``);
-    lines.push(`- Confidence: \`${confidence}\``);
-    lines.push(`- Provenance: \`${t.provenance}\``);
-    lines.push("");
+    lines.push(...renderSingleTarget(targets[0], confidence));
   } else {
     lines.push(`Resolved ${targets.length} target(s):`);
     lines.push("");
