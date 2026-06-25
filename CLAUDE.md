@@ -171,10 +171,6 @@ Root cause for the staging pipeline: direct `pnpm pack` on workspace packages pr
 
 ## Agent skills
 
-### Issue tracker
-
-Issues live in `.tndm/tickets/` and are managed via the `tndm` CLI. See `docs/agents/issue-tracker.md`.
-
 ### Domain docs
 
 Single-context — one `CONTEXT.md` at repo root + `docs/adr/`. See `docs/agents/domain.md`.
