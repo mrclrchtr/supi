@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.16.0](https://github.com/mrclrchtr/supi/compare/v1.15.0...v1.16.0) (2026-06-25)
+
+
+### Features
+
+* **supi-context:** add supi_context agent tool gated on config ([86037b1](https://github.com/mrclrchtr/supi/commit/86037b15634723766d937a9bc2e2e841c95f1e75))
+
+
+### Bug Fixes
+
+* **config:** remove redundant supi- prefix from section keys ([4902301](https://github.com/mrclrchtr/supi/commit/49023015dc674eb25c2c2fb32d2decc337f782ad))
+
 ## [1.15.0](https://github.com/mrclrchtr/supi/compare/v1.14.3...v1.15.0) (2026-06-23)
 
 
