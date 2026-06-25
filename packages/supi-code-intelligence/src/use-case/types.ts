@@ -77,7 +77,8 @@ export type ContextSection =
   | "docs"
   | "diagnostics"
   | "exports"
-  | "imports";
+  | "imports"
+  | "impact";
 
 export interface ContextTarget {
   file: string;
@@ -98,6 +99,8 @@ export interface ContextInput {
   maxResults?: number;
   /** Show git context in orientation output. Defaults to true. */
   showGitContext?: boolean;
+  /** When present, the executor may append impact assessment. */
+  change?: string;
 }
 
 export interface ContextDeps {

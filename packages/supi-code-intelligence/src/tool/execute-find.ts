@@ -85,21 +85,44 @@ export async function executeFindTool(
   }
   const scopePath = scopeResolution.path;
 
-  const mode = params.mode ?? "text";
+  const autoDetected = params.kind && !params.mode;
+  const mode = autoDetected ? "ast" : (params.mode ?? "text");
+  let inferredNote: string | null = null;
+
+  if (autoDetected) {
+    inferredNote = `_Note: \`mode: "ast"\` was auto-detected because \`kind\` was provided._`;
+  }
+
   validateModeKindCombination(params, mode);
 
   emitToolProgress(ctx.onUpdate, `code_find: ${mode} mode...`);
 
+  let result: CodeIntelResult;
   switch (mode) {
     case "text":
-      return executeTextMode(params.query, params, scopePath, ctx);
+      result = await executeTextMode(params.query, params, scopePath, ctx);
+      break;
     case "regex":
-      return executeRegexMode(params.query, params, scopePath, ctx);
+      result = await executeRegexMode(params.query, params, scopePath, ctx);
+      break;
     case "ast":
-      return executeAstMode(params.query, params, scopePath, ctx);
+      result = await executeAstMode(params.query, params, scopePath, ctx);
+      break;
     case "semantic":
-      return executeSemanticMode(params.query, params, scopePath, ctx);
+      result = await executeSemanticMode(params.query, params, scopePath, ctx);
+      break;
+    default:
+      return {
+        content: `**Error:** Unsupported mode: ${mode}`,
+        details: unavailableSearchDetails(params.scope ?? null, [
+          "Use text, regex, ast, or semantic",
+        ]),
+      };
   }
+  if (inferredNote && result) {
+    result.content = `${inferredNote}\n\n${result.content}`;
+  }
+  return result;
 }
 
 async function executeTextMode(
@@ -213,12 +236,6 @@ function validateModeKindCombination(
   params: CodeFindToolParams,
   mode: NonNullable<CodeFindToolParams["mode"]>,
 ): void {
-  if (!params.mode && params.kind) {
-    throw new Error(
-      `code_find does not accept \`kind\` when \`mode\` is omitted. Did you mean \`mode: "ast"\` with one of: ${SUPPORTED_AST_KIND_TEXT}?`,
-    );
-  }
-
   if ((mode === "text" || mode === "regex" || mode === "semantic") && params.kind) {
     throw new Error(
       `code_find does not accept \`kind\` with \`mode: "${mode}"\`. Use \`mode: "ast"\` with one of: ${SUPPORTED_AST_KIND_TEXT}.`,

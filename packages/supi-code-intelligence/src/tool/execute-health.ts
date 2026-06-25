@@ -40,6 +40,10 @@ export interface CodeHealthToolParams {
 
 const DEFAULT_INCLUDE: HealthSection[] = ["diagnostics", "servers"];
 
+/** Last diagnostic refresh time by workspace path (for staleness banner). */
+const lastRefreshByWorkspace = new Map<string, number>();
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: pre-existing complexity with minor staleness tracking additions
 export async function executeHealthTool(
   params: CodeHealthToolParams,
   ctx: CodeIntelToolExecCtx,
@@ -69,6 +73,15 @@ export async function executeHealthTool(
       ? providerState.lspService
       : { kind: "unavailable", reason: "No provider" };
   const service = lspState.kind === "ready" ? lspState.service : null;
+
+  // Track diagnostic freshness for staleness banner.
+  const now = Date.now();
+  if (params.refresh) {
+    lastRefreshByWorkspace.set(cwd, now);
+  }
+  const lastRefresh = lastRefreshByWorkspace.get(cwd);
+  const diagnosticAgeSeconds =
+    lastRefresh != null ? Math.round((now - lastRefresh) / 1000) : undefined;
 
   const { recovered, lspStatus } = await maybeRecover({
     service,
@@ -116,6 +129,7 @@ export async function executeHealthTool(
     coverage,
     unused,
     degradedCoverage: degradedCoverage.hasWarnings ? degradedCoverage : undefined,
+    diagnosticAgeSeconds,
   };
 
   const evidenceLists = buildHealthEvidenceLists(gitContext);

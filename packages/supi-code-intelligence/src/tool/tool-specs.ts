@@ -155,6 +155,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       'Default `relations` is ["references"]; use `relations: ["callees"]` or `["implements"]` for those, or `relations: ["all"]` to expand to every relation family in one call.',
       "After code_graph, follow up with code_context on individual results for type or definition context.",
       'Pass `calleeDepth: "deep"` to include callees from nested function/method/callback scopes (default `"direct"` excludes them).',
+      'Suggested relations by target kind: For functions/methods: `["references", "callees", "tests"]` — For interfaces/types/classes/enums: `["references", "implements"]` — For files/modules: `["imports", "exports"]` — For tests: `["tests"]`.',
     ],
     parameters: CodeGraphParameters,
     spillToTempFile: true,

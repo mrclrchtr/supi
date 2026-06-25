@@ -40,6 +40,21 @@ After install, pi gets:
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
 
+## Coming from standard tools?
+
+| Standard approach | `code_*` equivalent |
+|---|---|
+| `rg "symbol" --type ts` | `code_graph(targetId, relations=["references"])` |
+| `read` + manual symbol tracing | `code_inspect(file, line, character)` |
+| `tsc --noEmit` + `git status` | `code_health(refresh=true)` |
+| `rg` + counting + intuition | `code_impact(targetId, change="...")` or `code_context(include: ["impact"])` |
+| `rg` for defs/imports/exports | `code_find(mode="ast", kind="definition")` |
+| Multi-file find-and-replace | `code_refactor_plan` → `code_refactor_apply` |
+| `ls` + `read` to explore a package | `code_context(scope="packages/...")` |
+| `rg "symbolName"` (ambiguous) | `code_resolve(query="symbolName")` |
+
+> 💡 **Key insight:** `code_resolve` → `targetId` → `code_graph`/`code_context`/`code_impact` is the core chained workflow. Learn it once.
+
 ## Quick start — three most common workflows
 
 ### Find references and trace usage
@@ -64,9 +79,11 @@ code_refactor_plan(targetId, operation="rename_symbol", newName="newName") → p
 code_refactor_apply(planId)                                     → apply
 ```
 
-## `targetId` lifecycle
+## ⚠️ `targetId` lifecycle — essential for chained workflows
 
-`targetId` handles are the backbone of the chained workflow. Understanding their lifecycle is essential:
+> 💡 **Every chained workflow — references, impact, refactoring — flows through `targetId`. Spend 30 seconds here.**
+
+`targetId` handles are the backbone of the chained workflow:
 
 - **Session-scoped** — handles live only within the current agent session. A new session resolves targets fresh.
 - **Fingerprint-gated** — when the backing file is modified, the stored fingerprint no longer matches and the handle becomes stale. Re-run `code_resolve` to obtain a fresh handle.
@@ -195,14 +212,15 @@ When you already know the file and identifier coordinate, skip the separate `cod
 ### `code_context`
 Task-focused context bundle for a change, question, or resolved target.
 
-- accepts `task`, `targetId`, `file` + `line` + `character` (coordinate target mode), `scope`, `budget`, `include`, and `maxResults`
+- accepts `task`, `targetId`, `file` + `line` + `character` (coordinate target mode), `scope`, `budget`, `include`, `change`, and `maxResults`
 - for precise target context, pass either `targetId` (from `code_resolve`) **or** `file` + `line` + `character`. `targetId` takes precedence over coordinates; when both are supplied, coordinates are ignored with a visible note. A stale/invalid `targetId` errors and does **not** fall back to coordinates.
 - coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` (exact identifier hit, declaration-header snap when unambiguous, or explicit disambiguation) and exposes a reusable `targetId` in the markdown and `details.data.target`.
 - when coordinate resolution is ambiguous, `code_context` returns candidate `targetId`s and runs no task sections; when no symbol target can be resolved, it errors and recommends `code_inspect` for point-level facts (it is **not** a point-inspection tool).
 - when `task` is omitted, falls back to orientation-style output instead of erroring
-- when `task` is present, renders requested sections such as `defs`, `references`, `callees`, `docs`, `tests`, and `diagnostics`
+- when `task` is present, renders requested sections such as `defs`, `references`, `callees`, `docs`, `tests`, `diagnostics`, and `impact`
 - requested but unavailable sections are called out explicitly instead of being silently omitted
 - `scope` is a selection/orientation boundary, not a downstream evidence filter: when a precise target (`targetId` or coordinates) is supplied with `scope`, the target wins and `scope` is ignored with a visible note. Future evidence filtering should use a separate parameter, not `scope`.
+- when `change` is present, a condensed Impact Assessment section is appended (risk level, ref count, downstream, test commands)
 - in this first implementation wave, `code_context` is the solo surface: `code_brief` has been removed from the public surface
 
 ### `code_inspect`

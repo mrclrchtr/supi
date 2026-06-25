@@ -71,12 +71,15 @@ export interface HealthData {
   unused: HealthUnusedData | null;
   /** Coverage warnings for degraded semantic/structural substrate. Undefined when fully healthy. */
   degradedCoverage?: CoverageWarningReport;
+  /** Seconds since diagnostics were last refreshed, or undefined if never refreshed. */
+  diagnosticAgeSeconds?: number;
 }
 
 export function renderHealthResult(data: HealthData, cwd: string): string {
   const lines: string[] = ["## Code Health", ""];
 
   renderStatusLine(lines, data);
+  renderStalenessBanner(lines, data);
 
   if (data.includedSections.includes("diagnostics")) {
     renderDiagnosticsSection(lines, data, cwd);
@@ -96,6 +99,21 @@ export function renderHealthResult(data: HealthData, cwd: string): string {
   }
 
   return lines.join("\n");
+}
+
+function renderStalenessBanner(lines: string[], data: HealthData): void {
+  if (data.diagnosticAgeSeconds == null) {
+    lines.push("⚠ Diagnostics have not been refreshed this session. Use `refresh: true` to check.");
+    lines.push("");
+    return;
+  }
+  if (data.diagnosticAgeSeconds < 60) return;
+  const age =
+    data.diagnosticAgeSeconds < 120
+      ? `${Math.round(data.diagnosticAgeSeconds)}s ago`
+      : `${Math.round(data.diagnosticAgeSeconds / 60)}m ago`;
+  lines.push(`⚠ Diagnostics are ${age}. Use \`refresh: true\` to re-check.`);
+  lines.push("");
 }
 
 function renderDegradedCoverageSection(lines: string[], data: HealthData): void {

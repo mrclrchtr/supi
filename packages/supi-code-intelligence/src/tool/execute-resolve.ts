@@ -69,7 +69,17 @@ export async function executeResolveTool(
 
   const result = await executeResolveService({ ...params, scope: resolvedScope }, ctx.cwd);
 
-  const content = renderResolveResult(result, ctx.cwd);
+  let content = renderResolveResult(result, ctx.cwd);
+
+  // For single-target resolutions, append actionable "Chain next" guidance.
+  if (result.kind === "resolved" && result.targets.length === 1) {
+    const target = result.targets[0];
+    const rels = suggestedRelations(target.kind);
+    if (rels) {
+      const chainLine = `Chain next: \`code_graph(targetId: "${target.targetId}", relations: ${JSON.stringify(rels)})\``;
+      content = `${content}\n${chainLine}\n`;
+    }
+  }
 
   // Build structured details
   if (result.kind === "resolved") {
@@ -144,4 +154,29 @@ export async function executeResolveTool(
       "Use anchored `file` + `line` + `character` for a precise target",
     ]),
   };
+}
+
+/**
+ * Suggested `code_graph` relations for a resolved symbol kind.
+ * Uses only currently-supported relation names.
+ */
+function suggestedRelations(kind: string | undefined | null): string[] | undefined {
+  switch (kind?.toLowerCase()) {
+    case "function":
+    case "method":
+    case "constructor":
+      return ["references", "callees", "tests"];
+    case "class":
+    case "interface":
+    case "type":
+    case "enum":
+      return ["references", "implements"];
+    case "file":
+    case "module":
+      return ["imports", "exports"];
+    case "test":
+      return ["tests"];
+    default:
+      return undefined;
+  }
 }

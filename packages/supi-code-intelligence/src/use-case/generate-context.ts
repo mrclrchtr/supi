@@ -24,6 +24,7 @@ import type { ConfidenceMode, ContextDetails } from "../types.ts";
 import { formatReferenceList } from "../use-case/support/semantic-references.ts";
 import { gatherTreeSitterContext } from "./gather-context.ts";
 import { executeBrief } from "./generate-brief.ts";
+import { executeImpact } from "./generate-impact.ts";
 import type {
   BriefInput,
   ContextDeps,
@@ -44,6 +45,7 @@ const SECTION_TITLES: Record<ContextSection, string> = {
   diagnostics: "Diagnostics",
   exports: "Exports",
   imports: "Imports",
+  impact: "Impact Assessment",
 };
 
 /**
@@ -259,12 +261,13 @@ async function buildRequestedSection(options: {
 
   switch (section) {
     case "defs": {
-      const lines = buildDefinitionLines(input.target, deps.cwd, treeContext);
+      const lines = await buildEnrichedDefsSection(input.target, deps, treeContext, limit);
+      const hasSemantic = deps.lspService.kind === "ready";
       return {
         section: { key: section, title: SECTION_TITLES[section], lines },
         omittedCount: 0,
         hasStructuralEvidence: hasRenderableItems(lines),
-        hasSemanticEvidence: false,
+        hasSemanticEvidence: hasSemantic,
       };
     }
     case "imports": {
@@ -333,10 +336,100 @@ async function buildRequestedSection(options: {
         hasSemanticEvidence: result.hasSemanticEvidence,
       };
     }
+    case "impact": {
+      const result = await buildImpactSection(input.target, deps, input.maxResults);
+      return {
+        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
+        omittedCount: result.omittedCount,
+        hasStructuralEvidence: false,
+        hasSemanticEvidence: true,
+      };
+    }
   }
 }
 
 // ── Real section builders for previously-stubbed sections ───────────
+
+/**
+ * Build enriched defs section: tree-sitter definitions + LSP definition
+ * targets + code actions (when LSP is ready).
+ */
+async function buildEnrichedDefsSection(
+  target: ContextTarget | null | undefined,
+  deps: ContextDeps,
+  treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
+  limit: number,
+): Promise<string[]> {
+  const lines = buildDefinitionLines(target, deps.cwd, treeContext);
+
+  if (!target || deps.lspService.kind !== "ready") return lines;
+
+  // LSP definition targets — narrow the existing defs with precise go-to-definition.
+  const lspDefs = await appendDefinitionTargets(target, deps);
+  if (lspDefs.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push(...lspDefs.slice(0, limit));
+  }
+
+  // Code actions — suggest available refactors/quick-fixes at the target.
+  const actions = await appendCodeActions(target, deps, limit);
+  if (actions.length > 0) {
+    if (lines.length > 0) lines.push("");
+    lines.push(...actions.slice(0, limit));
+  }
+
+  return lines;
+}
+
+/** Append LSP go-to-definition targets. */
+async function appendDefinitionTargets(
+  target: ContextTarget,
+  deps: ContextDeps,
+): Promise<string[]> {
+  if (!deps.provider?.definition) return [];
+  try {
+    const defs = await deps.provider.definition(target.file, {
+      line: target.line - 1,
+      character: target.character - 1,
+    });
+    if (!defs || !Array.isArray(defs) || defs.length === 0) return [];
+    const lines: string[] = ["**Definition:**"];
+    for (const def of defs.slice(0, 3)) {
+      const filePath = def.uri.startsWith("file://")
+        ? decodeURIComponent(def.uri.slice(7))
+        : def.uri;
+      const relPath = path.relative(deps.cwd, filePath);
+      lines.push(`- \`${relPath}:${def.range.start.line + 1}:${def.range.start.character + 1}\``);
+    }
+    return lines;
+  } catch {
+    return [];
+  }
+}
+
+/** Append LSP code actions at the target location. */
+async function appendCodeActions(
+  target: ContextTarget,
+  deps: ContextDeps,
+  limit: number,
+): Promise<string[]> {
+  if (deps.lspService.kind !== "ready" || !deps.lspService.service) return [];
+  try {
+    const actions = await deps.lspService.service.codeActions(target.file, {
+      line: target.line - 1,
+      character: target.character - 1,
+    });
+    if (!actions || actions.length === 0) return [];
+    const lines: string[] = ["**Code Actions:**"];
+    for (const action of actions.slice(0, limit)) {
+      const kindLabel = action.kind ? ` (${action.kind})` : "";
+      lines.push(`- ${action.title}${kindLabel}`);
+    }
+    return lines;
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Build the `tests` section: find companion test files and their test functions.
@@ -872,4 +965,53 @@ function buildNextQueries(target: ContextTarget | null | undefined, cwd: string)
 
 function hasRenderableItems(lines: string[]): boolean {
   return lines.some((line) => line.trim().startsWith("- "));
+}
+
+/** Build a condensed inspect section from point-level inspection data. */
+/** Build a condensed impact section for a context target. */
+async function buildImpactSection(
+  target: ContextTarget | null | undefined,
+  deps: ContextDeps,
+  maxResults?: number,
+): Promise<{ lines: string[]; omittedCount: number }> {
+  if (!target) {
+    return { lines: ["_No target available for impact analysis._"], omittedCount: 0 };
+  }
+  try {
+    const result = await executeImpact(
+      {
+        file: target.file,
+        line: target.line,
+        character: target.character,
+        symbol: target.name ?? undefined,
+        includeTests: true,
+        maxResults: maxResults ?? 8,
+      },
+      { cwd: deps.cwd, provider: deps.provider, lspService: deps.lspService },
+      "impact",
+    );
+    if (result.details?.type !== "impact") {
+      return { lines: ["_Impact analysis unavailable — no provider._"], omittedCount: 0 };
+    }
+    const data = result.details.data as {
+      directCount?: number;
+      downstreamCount?: number;
+      riskLevel?: string;
+      likelyTestCommands?: string[];
+    };
+    const lines: string[] = [];
+    lines.push(
+      `**Risk: ${data.riskLevel?.toUpperCase() ?? "UNKNOWN"}** | ${data.directCount ?? 0} refs | ${data.downstreamCount ?? 0} downstream`,
+    );
+    if (data.likelyTestCommands && data.likelyTestCommands.length > 0) {
+      lines.push("");
+      lines.push("**Test Commands:**");
+      for (const cmd of data.likelyTestCommands.slice(0, 3)) {
+        lines.push(`- \`${cmd}\``);
+      }
+    }
+    return { lines, omittedCount: 0 };
+  } catch {
+    return { lines: ["_Impact analysis failed._"], omittedCount: 0 };
+  }
 }

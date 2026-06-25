@@ -137,7 +137,17 @@ export const CodeContextParameters = Type.Object(
     include: Type.Optional(
       Type.Array(
         StringEnum(
-          ["defs", "references", "callees", "tests", "docs", "diagnostics", "exports", "imports"],
+          [
+            "defs",
+            "references",
+            "callees",
+            "tests",
+            "docs",
+            "diagnostics",
+            "exports",
+            "imports",
+            "impact",
+          ],
           {
             description: "Context sections to include in the bundle.",
           },
@@ -149,6 +159,12 @@ export const CodeContextParameters = Type.Object(
       ),
     ),
     maxResults: Type.Optional(MaxResultsParam),
+    change: Type.Optional(
+      Type.String({
+        description:
+          "When present, runs impact analysis and appends a condensed Impact Assessment section to the context result.",
+      }),
+    ),
   },
   { additionalProperties: false },
 );

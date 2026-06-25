@@ -13,6 +13,7 @@ import type {
   ResolvedTargetMetadata,
 } from "../types.ts";
 import { executeContext } from "../use-case/generate-context.ts";
+import { executeImpact } from "../use-case/generate-impact.ts";
 import type { ContextDeps as UseCaseContextDeps } from "../use-case/types.ts";
 import { unavailableContextDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
@@ -37,6 +38,8 @@ export interface CodeContextToolParams {
   targetName?: string | null;
   targetKind?: string | null;
   targetAnchorKind?: "name" | "declaration";
+  /** When present, runs impact analysis and appends a condensed Impact Assessment section. */
+  change?: string;
 }
 
 /** Track which cwds have already shown git context in this session. */
@@ -267,8 +270,17 @@ async function runWithContextTarget(
   );
 
   const targetMeta = buildTargetMetadata(precise, ctx.cwd);
+  let content = prependNotes(result.content, precise.notes, targetMeta);
+
+  // When `change` is present, run impact analysis and append a condensed section.
+  if (params.change) {
+    const impactContent = await buildCondensedImpact(params, ctx, deps);
+    if (impactContent) {
+      content = `${content}\n${impactContent}`;
+    }
+  }
+
   const details: ContextDetails = { ...result.details, target: targetMeta };
-  const content = prependNotes(result.content, precise.notes, targetMeta);
   return { content, details: { type: "context", data: details } };
 }
 
@@ -451,6 +463,55 @@ function resolveAbsFile(cwd: string, relFile: string): string {
   // otherwise resolves it from `cwd` — matching the prior hand-rolled behavior
   // while being Windows-safe and consistent with the rest of the codebase.
   return resolve(cwd, relFile);
+}
+
+/** Run impact analysis and return a condensed Impact Assessment section, or null on failure. */
+async function buildCondensedImpact(
+  params: CodeContextToolParams,
+  ctx: CodeIntelToolExecCtx,
+  deps: Awaited<ReturnType<typeof prepareContextDeps>>,
+): Promise<string | null> {
+  if ("content" in deps) return null;
+  try {
+    const impactResult = await executeImpact(
+      {
+        file: params.file,
+        line: params.line,
+        character: params.character,
+        symbol: params.targetName ?? undefined,
+        change: params.change,
+        includeTests: true,
+        maxResults: params.maxResults ?? 8,
+      },
+      {
+        cwd: ctx.cwd,
+        provider: deps.provider,
+        lspService: deps.lspService,
+      },
+      "impact",
+    );
+    if (impactResult.details?.type !== "impact") return null;
+    const data = impactResult.details.data as {
+      directCount?: number;
+      downstreamCount?: number;
+      riskLevel?: string;
+      likelyTestCommands?: string[];
+    };
+    const lines: string[] = ["## Impact Assessment", ""];
+    lines.push(
+      `**Risk: ${data.riskLevel?.toUpperCase() ?? "UNKNOWN"}** | ${data.directCount ?? 0} refs | ${data.downstreamCount ?? 0} downstream`,
+    );
+    if (data.likelyTestCommands && data.likelyTestCommands.length > 0) {
+      lines.push("");
+      lines.push("**Likely Test Commands:**");
+      for (const cmd of data.likelyTestCommands.slice(0, 3)) {
+        lines.push(`- \`${cmd}\``);
+      }
+    }
+    return lines.join("\n");
+  } catch {
+    return null;
+  }
 }
 
 async function gateSemanticReadiness(
