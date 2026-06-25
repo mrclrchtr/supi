@@ -40,6 +40,58 @@ After install, pi gets:
 - a lightweight hidden architecture overview injected near the start of a session when a project model can be built
 - bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
 
+## Quick start — three most common workflows
+
+### Find references and trace usage
+```
+code_resolve(query="myFunction")              → capture targetId
+code_graph(targetId, relations=["references"]) → inspect usage
+code_context(targetId, task="understand usage") → gather edit context
+```
+
+### Understand a package before editing
+```
+code_context(scope="packages/my-package")           → package orientation
+code_context(scope="packages/my-package/src/tool")   → directory drill-down
+code_health(scope="packages/my-package", refresh=true) → check diagnostics
+```
+
+### Safe rename refactoring
+```
+code_resolve(query="oldName")                                  → capture targetId
+code_impact(targetId, change="rename to newName")              → estimate blast radius
+code_refactor_plan(targetId, operation="rename_symbol", newName="newName") → preview
+code_refactor_apply(planId)                                     → apply
+```
+
+## `targetId` lifecycle
+
+`targetId` handles are the backbone of the chained workflow. Understanding their lifecycle is essential:
+
+- **Session-scoped** — handles live only within the current agent session. A new session resolves targets fresh.
+- **Fingerprint-gated** — when the backing file is modified, the stored fingerprint no longer matches and the handle becomes stale. Re-run `code_resolve` to obtain a fresh handle.
+- **Content-hash based** — `targetId`s are derived from the symbol's name, kind, container, and file fingerprint (position is excluded). Re-resolving the same symbol across reloads produces the same ID.
+- **No cross-session persistence** — `planId` handles follow the same lifecycle.
+
+```text
+┌─────────────┐     ┌──────────────┐     ┌─────────────┐
+│ code_resolve │ ──→ │  targetId    │ ──→ │ code_graph  │
+│              │     │  (stable)    │     │ code_context│
+└─────────────┘     └──────────────┘     │ code_impact │
+       ↑                  │              └─────────────┘
+       │  re-resolve       │  stale after
+       └───────────────────┘  file edit
+```
+
+## When each tool won't help you
+
+- **`code_graph` callees** — won't find calls inside nested functions, callbacks, or method bodies. Use `code_graph` with `relations: ["references"]` for identity-aware incoming callers instead.
+- **`code_find` semantic mode** — fails when no LSP provider is active. Does not fall back to text search — use `mode: "text"` explicitly.
+- **`code_refactor_plan`** — requires LSP precise edit support. When the LSP can't produce semantic edits for the target, the tool throws — there is no text fallback.
+- **`code_health` coverage/unused** — depends on `coverage/coverage-summary.json` and `knip.json` at the project root. Use `coveragePath` and `unusedPath` params for non-standard locations.
+- **`code_impact`** — `change`-only requests (no target, no changedFiles) return insufficient-evidence instead of guessing.
+- **`code_find` AST test mode** — `mode: "ast"` with `kind: "test"` matches outline entries with test-like names. Does not find test blocks within untest-like wrapper functions.
+
 Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface. Historical compatibility executors remain in the source tree for migration/tests, but are no longer registered as public tools.
 
 ## Startup performance
@@ -168,7 +220,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **relations**: `["all", "references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`; use `["all"]` for the full graph in one call
 - Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
 - **Each relation annotates its evidence source** in the output. For the `tests` relation, provenance describes **file discovery only** — `semantic+conventions` means semantic references contributed, `conventions-only` means only deterministic path/layout conventions contributed.
-- `callees` reports **direct structural outgoing calls** from the enclosing executable scope at the target anchor. It matches call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes.
+- `callees` reports **structural outgoing calls** from the enclosing executable scope at the target anchor. It matches call expressions by source shape, not symbol identity. By default (`calleeDepth: "direct"`), calls inside nested function/method/callback scopes are excluded. Pass `calleeDepth: "deep"` to include all callees within the enclosing scope, including those inside nested scopes.
 - Test-producing surfaces also include a small structured tests metadata shape in tool details: discovery status/provenance plus per-file label status and extracted labels.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
 - Test-label extraction is tracked separately from discovery provenance. When a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` intentionally instead of helper or variable names.

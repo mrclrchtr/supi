@@ -10,6 +10,7 @@ import {
   loadLspSettings,
   scanWorkspaceSentinels,
 } from "@mrclrchtr/supi-lsp/api";
+import { unregisterLspFooterContribution } from "./lsp-status-bar.ts";
 import type { LspAdapterState } from "./runtime-state.ts";
 
 export function registerLspSessionLifecycle(pi: ExtensionAPI, state: LspAdapterState): void {
@@ -43,13 +44,14 @@ export function registerLspSessionLifecycle(pi: ExtensionAPI, state: LspAdapterS
     }
   });
 
-  pi.on("session_shutdown", async () => {
+  pi.on("session_shutdown", async (_event, _ctx: ExtensionContext) => {
     if (state.controller) {
       await state.controller.shutdown();
       state.controller = null;
     }
     resetDiagnosticContext(state);
     state.lspActive = false;
+    unregisterLspFooterContribution();
   });
 }
 

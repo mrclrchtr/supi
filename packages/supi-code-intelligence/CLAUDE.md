@@ -237,7 +237,7 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
   - Warmup timeouts stay error-text results (transient readiness, not capability-unavailable).
 
 ### Tool adapter contract
-- The adapter in `register-tools.ts` head-truncates every executor's `content` string at pi defaults (2000 lines / 50 KB) via `truncateHead`, appending a `[truncated: kept N of M lines (X of Y)]` notice. `details` are never truncated. Per‑spec `maxLines`/`maxBytes` overrides are available on `CodeIntelligenceToolDefinitionSpec`; a reserved `spillToTempFile` knob for heavy‑output tools is not yet wired.
+- The adapter in `register-tools.ts` head-truncates every executor's `content` string at pi defaults (2000 lines / 50 KB) via `truncateHead`, appending a `[truncated: kept N of M lines (X of Y)]` notice. `details` are never truncated. Per‑spec `maxLines`/`maxBytes` overrides are available on `CodeIntelligenceToolDefinitionSpec`. When `spillToTempFile: true` and truncation occurs, the full content is written to a temp file and the path is appended to the truncation notice.
 - The adapter forwards `signal` (AbortSignal) and `onUpdate` (AgentToolUpdateCallback) from pi's `execute()` through `spec.run` into every executor's `CodeIntelToolExecCtx`. Long‑running executors (`code_find` ripgrep, `code_graph:all`, `code_impact` sweeps, `code_health:refresh`, `code_refactor_plan` LSP requests) forward `signal` to abort‑aware sub‑processes and emit coarse `onUpdate` progress beats via `emitToolProgress`.
 
 ### Public-surface split
@@ -260,6 +260,9 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - `code_context`, `code_impact`, and `code_refactor_plan` accept optional `targetId` that takes precedence over raw coordinates.
 - `code_context` accepts optional `targetId` for orientation-only follow-up.
 - `scope` is a selection/orientation boundary, not a downstream evidence filter. In `code_context`, `scope` is ignored (with a visible note) when a precise target is supplied. Future evidence filtering should use a separate parameter such as `within`/`evidenceScope`, not `scope`.
+
+### Composite provider contract
+- `createCompositeProvider` in `src/analysis/context/request-context.ts` wraps `StructuralProvider` and `SemanticProvider` into a single `CodeProvider`. **When you add a new parameter to any provider method, update the composite wrapper to accept and pass it through.** Missing parameters are silently dropped — the wrapper uses `?` optional params, so TypeScript won't catch the mismatch at runtime (the extra argument is simply ignored).
 
 ### Evidence provenance in test discovery
 - Test discovery results carry `provenance`: `"semantic+conventions"` if semantic references contributed files, `"conventions-only"` otherwise.

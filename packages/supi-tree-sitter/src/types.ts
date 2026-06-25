@@ -56,6 +56,7 @@ export interface CalleesAtResult {
     name: string;
     range: SourceRange;
   }>;
+  depth: "direct" | "deep";
 }
 
 /** Query capture result. */
@@ -91,6 +92,7 @@ export interface TreeSitterService {
     file: string,
     line: number,
     character: number,
+    depth?: "direct" | "deep",
   ): Promise<TreeSitterResult<CalleesAtResult>>;
   /** Extract all call-site identifiers in a file. */
   callSites(file: string): Promise<TreeSitterResult<CallSiteMatch[]>>;

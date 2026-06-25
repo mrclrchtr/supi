@@ -133,6 +133,7 @@ describe("execute-graph (code_graph tool)", () => {
           data: {
             enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
             callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+            depth: "direct" as const,
           },
         }),
       });
@@ -166,6 +167,7 @@ describe("execute-graph (code_graph tool)", () => {
         data: {
           enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
           callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }));
       registerMockProvider(tmpDir, { calleesAt });
@@ -207,6 +209,7 @@ describe("execute-graph (code_graph tool)", () => {
           kind: "success",
           data: {
             enclosingScope: { name: "test", startLine: 1, endLine: 4 },
+            depth: "direct" as const,
             callees: [
               { name: "foo", startLine: 3, endLine: 3 },
               { name: "bar", startLine: 4, endLine: 4 },
@@ -362,6 +365,7 @@ describe("execute-graph (code_graph tool)", () => {
           data: {
             enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
             callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+            depth: "direct" as const,
           },
         }),
       });

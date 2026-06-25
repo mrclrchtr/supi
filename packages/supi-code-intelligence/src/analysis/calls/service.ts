@@ -21,10 +21,11 @@ export interface CallsResult {
   enclosingScope: CalleeScope;
   calls: CallEntry[];
   confidence: ConfidenceMode;
+  depth: "direct" | "deep";
 }
 
 /**
- * Collect direct structural calls at a target file/position.
+ * Collect structural calls at a target file/position.
  */
 // biome-ignore lint/complexity/useMaxParams: service wrapper matching underlying provider contract
 export async function collectOutgoingCalls(
@@ -34,6 +35,7 @@ export async function collectOutgoingCalls(
   targetName: string | null,
   deps: RelationsServiceDeps,
   maxResults?: number,
+  depth: "direct" | "deep" = "direct",
 ): Promise<CallsResult> {
   const calleeResult = await collectCallees(
     targetFile,
@@ -42,6 +44,7 @@ export async function collectOutgoingCalls(
     targetName,
     deps,
     maxResults,
+    depth,
   );
 
   return {
@@ -59,5 +62,6 @@ export async function collectOutgoingCalls(
       line: c.line,
     })),
     confidence: calleeResult.confidence,
+    depth: calleeResult.depth,
   };
 }

@@ -203,15 +203,22 @@ export type RefactorResult =
 
 // ── Structural data shapes (value types, range-flattened) ──────────────
 
+/** Callee collection depth. */
+export type CalleeDepth = "direct" | "deep";
+
 /**
- * Direct structural outgoing calls from the enclosing executable scope at a
+ * Structural outgoing calls from the enclosing executable scope at a
  * position. Callee names are source-shape facts, not resolved symbol
- * identities, and nested function/callback scopes are excluded from the outer
- * scope.
+ * identities.
+ *
+ * In `direct` depth, nested function/callback scopes are excluded from the
+ * outer scope. In `deep` depth, all callees within the enclosing scope are
+ * included, including those inside nested scopes.
  */
 export interface CalleesData {
   enclosingScope: { name: string; startLine: number; endLine: number };
   callees: Array<{ name: string; startLine: number }>;
+  depth: CalleeDepth;
 }
 
 /** A single call-site match with name and start line. */

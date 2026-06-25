@@ -5,6 +5,7 @@ import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/
 import { createCodeIntelligenceApp } from "./app/create-code-intelligence-app.ts";
 import { evaluateCoverageWarnings, gatherCoverageEvalInput } from "./lsp/coverage-warnings.ts";
 import { registerDiagnosticInjectionHandlers } from "./lsp/diagnostic-injection.ts";
+import { registerLspFooterContribution } from "./lsp/lsp-status-bar.ts";
 import { createLspAdapterState } from "./lsp/runtime-state.ts";
 import { registerLspSessionLifecycle } from "./lsp/session-lifecycle.ts";
 import { registerLspSettings } from "./lsp/settings.ts";
@@ -43,6 +44,7 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
   // ── UI registration ───────────────────────────────────────────────
   registerLspMessageRenderer(pi);
   registerCiStatusCommand(pi);
+  registerLspFooterContribution(lspState);
 
   // ── Coverage warning emission ─────────────────────────────────────
   pi.on(

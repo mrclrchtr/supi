@@ -10,22 +10,28 @@ import {
   renderEvidenceListDisclosure,
 } from "../../evidence-list.ts";
 
-export function renderCallsResult(
+export // biome-ignore lint/complexity/useMaxParams: renderer needs target data + depth
+function renderCallsResult(
   enclosingScope: CalleeScope,
   calls: CallEntry[],
   relPath: string,
   maxResults: number,
+  depth: "direct" | "deep" = "direct",
 ): { content: string; evidenceList: EvidenceListMetadata | null } {
   const lines: string[] = [];
-  lines.push(`# Direct structural calls from \`${enclosingScope.name}\``);
+  const depthLabel = depth === "deep" ? "Deep structural calls" : "Direct structural calls";
+  const depthNote =
+    depth === "deep"
+      ? "_Deep: includes calls from nested function/method/callback scopes within the enclosing scope._"
+      : "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._";
+
+  lines.push(`# ${depthLabel} from \`${enclosingScope.name}\``);
   lines.push("");
   lines.push(
-    `**${calls.length} direct structural call${calls.length !== 1 ? "s" : ""}** from enclosing scope \`${enclosingScope.name}\` (${formatScopeRange(enclosingScope)}) in \`${relPath}\``,
+    `**${calls.length} ${depth === "deep" ? "" : "direct "}structural call${calls.length !== 1 ? "s" : ""}** from enclosing scope \`${enclosingScope.name}\` (${formatScopeRange(enclosingScope)}) in \`${relPath}\``,
   );
   lines.push("");
-  lines.push(
-    "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._",
-  );
+  lines.push(depthNote);
   lines.push("");
 
   const evidence = createEvidenceList({

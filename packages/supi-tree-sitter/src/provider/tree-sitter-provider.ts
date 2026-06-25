@@ -29,8 +29,8 @@ import type {
  */
 export function createTreeSitterProvider(service: TreeSitterService): StructuralProvider {
   return {
-    async calleesAt(file, line, character) {
-      const result = await service.calleesAt(file, line, character);
+    async calleesAt(file, line, character, depth?) {
+      const result = await service.calleesAt(file, line, character, depth);
       return mapTreeSitterResult(result, mapCalleesAtResult);
     },
 
@@ -147,6 +147,7 @@ function mapCalleesAtResult(result: CalleesAtResult): CalleesData {
       name: c.name,
       startLine: c.range.startLine,
     })),
+    depth: result.depth,
   };
 }
 

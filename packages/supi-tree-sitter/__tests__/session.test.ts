@@ -134,8 +134,17 @@ describe("createTreeSitterSession", () => {
     mocks.lookupCalleesAt.mockResolvedValue({
       kind: "success",
       data: {
-        enclosingScope: { name: "foo", startLine: 1, endLine: 5 },
-        callees: [{ name: "bar", line: 3 }],
+        enclosingScope: {
+          name: "foo",
+          range: { startLine: 1, startCharacter: 1, endLine: 5, endCharacter: 1 },
+        },
+        callees: [
+          {
+            name: "bar",
+            range: { startLine: 3, startCharacter: 1, endLine: 3, endCharacter: 4 },
+          },
+        ],
+        depth: "direct" as const,
       },
     });
 
@@ -147,6 +156,7 @@ describe("createTreeSitterSession", () => {
       "sample.ts",
       1,
       2,
+      undefined,
     );
   });
 

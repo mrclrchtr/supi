@@ -49,6 +49,7 @@ function mockService(overrides?: Partial<TreeSitterService>): TreeSitterService 
             range: { startLine: 1, startCharacter: 0, endLine: 10, endCharacter: 0 },
           },
           callees: [],
+          depth: "direct" as const,
         } satisfies CalleesAtResult,
       })),
     callSites:
@@ -250,6 +251,7 @@ describe("TreeSitterProvider", () => {
                 range: { startLine: 5, startCharacter: 0, endLine: 5, endCharacter: 10 },
               },
             ],
+            depth: "direct" as const,
           } satisfies CalleesAtResult,
         }),
       });

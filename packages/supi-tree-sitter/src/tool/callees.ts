@@ -14,6 +14,7 @@ export interface CalleesAtResult {
     name: string;
     range: SourceRange;
   }>;
+  depth: "direct" | "deep";
 }
 
 // ── Per-grammar callee queries ────────────────────────────────────────
@@ -166,11 +167,13 @@ function findEnclosingScope(
   return null;
 }
 
+// biome-ignore lint/complexity/useMaxParams: provider function needs runtime + coordinates + depth
 export async function lookupCalleesAt(
   runtime: TreeSitterRuntime,
   filePath: string,
   line: number,
   character: number,
+  depth: "direct" | "deep" = "direct",
 ): Promise<TreeSitterResult<CalleesAtResult>> {
   // Validate coordinates and grammar
   const validation = validateCalleeInput(filePath, line, character);
@@ -219,7 +222,13 @@ export async function lookupCalleesAt(
       };
     }
 
-    const callees = filterCalleeCaptures(queryResult.data, enclosingNode, scopes, tsPoint.row);
+    const callees = filterCalleeCaptures(
+      queryResult.data,
+      enclosingNode,
+      scopes,
+      tsPoint.row,
+      depth,
+    );
 
     const enclosingRange = nodeToSourceRange(enclosingNode);
     const scopeName = extractScopeName(enclosingNode.type, enclosingNode.text);
@@ -232,6 +241,7 @@ export async function lookupCalleesAt(
           range: enclosingRange,
         },
         callees,
+        depth,
       },
     };
   } finally {
@@ -282,18 +292,24 @@ function collectInnerScopes(
 }
 
 /**
- * Filter query captures to only those within the enclosing scope,
- * excluding any that fall within inner nested function/callback scopes.
+ * Filter query captures to only those within the enclosing scope.
+ * In `direct` depth, excludes captures that fall within inner nested
+ * function/callback scopes. In `deep` depth, all captures within the
+ * enclosing scope are included regardless of nesting.
  */
+// biome-ignore lint/complexity/useMaxParams: filtering needs captures + node context + depth
 function filterCalleeCaptures(
   captures: Array<{ range: SourceRange; text: string }>,
   // biome-ignore lint/suspicious/noExplicitAny: tree-sitter SyntaxNode is complex
   enclosingNode: any,
   scopeTypes: ReadonlySet<string>,
   anchorRow: number,
+  depth: "direct" | "deep" = "direct",
 ): Array<{ name: string; range: SourceRange }> {
   const excludeRanges: Array<{ startRow: number; endRow: number }> = [];
-  collectInnerScopes(enclosingNode, scopeTypes, anchorRow, excludeRanges);
+  if (depth === "direct") {
+    collectInnerScopes(enclosingNode, scopeTypes, anchorRow, excludeRanges);
+  }
 
   const seen = new Set<string>();
   const callees: Array<{ name: string; range: SourceRange }> = [];
@@ -307,11 +323,13 @@ function filterCalleeCaptures(
       continue;
     }
 
-    // Exclude captures that fall within inner nested function scopes
-    const isInInner = excludeRanges.some(
-      (exc) => capture.range.startLine >= exc.startRow && capture.range.endLine <= exc.endRow,
-    );
-    if (isInInner) continue;
+    // In direct depth, exclude captures that fall within inner nested function scopes
+    if (depth === "direct") {
+      const isInInner = excludeRanges.some(
+        (exc) => capture.range.startLine >= exc.startRow && capture.range.endLine <= exc.endRow,
+      );
+      if (isInInner) continue;
+    }
 
     const name = capture.text.replace(/\s+/g, "").slice(0, 60);
     if (name.length === 0 || seen.has(name)) continue;

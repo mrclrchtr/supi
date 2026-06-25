@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
 import { renderContextCall, renderContextResult } from "../presentation/tui/context.ts";
@@ -95,10 +98,20 @@ export function registerCodeIntelligenceTools(
           signal,
           onUpdate,
         });
-        const { text } = truncateToolContent(content, {
+        const { text, truncated } = truncateToolContent(content, {
           maxLines: spec.maxLines,
           maxBytes: spec.maxBytes,
         });
+        if (truncated && spec.spillToTempFile && content.length > 0) {
+          const dir = mkdtempSync(join(tmpdir(), "supi-ci-"));
+          const spillPath = join(dir, `${spec.name}-output.md`);
+          writeFileSync(spillPath, content, "utf-8");
+          const notice = `\n_Full output saved to: \`${spillPath}\`_`;
+          return {
+            content: [{ type: "text" as const, text: text + notice }],
+            details,
+          };
+        }
         return {
           content: [{ type: "text" as const, text }],
           details,

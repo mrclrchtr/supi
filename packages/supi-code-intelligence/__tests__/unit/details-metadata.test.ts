@@ -428,6 +428,7 @@ describe("structured details via tool adapters and action routers", () => {
             data: {
               enclosingScope: { name: "noCalls", startLine: 1, endLine: 3 },
               callees: [],
+              depth: "direct" as const,
             },
           }),
         });
@@ -569,6 +570,7 @@ describe("code_context details metadata", () => {
         data: {
           enclosingScope: { name: "targetFn", startLine: 1, endLine: 1 },
           callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });

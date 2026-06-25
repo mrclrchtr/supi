@@ -845,6 +845,7 @@ describe("code_resolve targetId follow-up", () => {
             data: {
               enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
               callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+              depth: "direct" as const,
             },
           };
         }
@@ -1232,6 +1233,7 @@ describe("code_resolve anchored symbol resolution", () => {
             data: {
               enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
               callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+              depth: "direct" as const,
             },
           };
         }

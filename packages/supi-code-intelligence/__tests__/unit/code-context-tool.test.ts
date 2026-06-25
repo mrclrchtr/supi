@@ -132,6 +132,7 @@ describe("code_context tool", () => {
       data: {
         enclosingScope: { name: "contextTarget", startLine: 1, endLine: 1 },
         callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        depth: "direct" as const,
       },
     }));
 
@@ -187,7 +188,7 @@ describe("code_context tool", () => {
     expect(result.content[0].text).toContain("Structural only");
     expect(result.content[0].text).toContain("nested function/method/callback scopes");
     expect(result.content[0].text).toContain("`helper` (L1)");
-    expect(calleesAtSpy).toHaveBeenCalledWith(expect.any(String), 1, 17);
+    expect(calleesAtSpy).toHaveBeenCalledWith(expect.any(String), 1, 17, "direct");
   });
 
   it("refuses declaration-anchor targetIds for task callees without calling tree-sitter", async () => {
@@ -197,6 +198,7 @@ describe("code_context tool", () => {
       data: {
         enclosingScope: { name: "contextTarget", startLine: 1, endLine: 1 },
         callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+        depth: "direct" as const,
       },
     }));
     registerMockProvider(tmpDir, { calleesAt: calleesAtSpy });
@@ -261,6 +263,7 @@ describe("code_context tool", () => {
         data: {
           enclosingScope: { name: "contextTarget", startLine: 1, endLine: 1 },
           callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });
@@ -1202,6 +1205,7 @@ describe("code_context coordinate target mode", () => {
             data: {
               enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
               callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+              depth: "direct" as const,
             },
           };
         }
@@ -1269,6 +1273,7 @@ describe("code_context coordinate target mode", () => {
         data: {
           enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
           callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });
@@ -1368,6 +1373,7 @@ describe("code_context coordinate target mode", () => {
         data: {
           enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
           callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });
@@ -1407,6 +1413,7 @@ describe("code_context coordinate target mode", () => {
         data: {
           enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
           callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });
@@ -1446,6 +1453,7 @@ describe("code_context coordinate target mode", () => {
         data: {
           enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
           callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });
@@ -1590,6 +1598,7 @@ describe("code_context coordinate target mode", () => {
         data: {
           enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
           callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });
@@ -1658,6 +1667,7 @@ describe("code_context coordinate target mode", () => {
         data: {
           enclosingScope: { name: "widget", startLine: 1, endLine: 1 },
           callees: [{ name: "helper", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });

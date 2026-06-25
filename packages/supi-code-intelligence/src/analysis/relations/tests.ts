@@ -253,14 +253,24 @@ export async function discoverTestFilesForSource(
  *
  * Checks:
  * 1. Same-directory: `./basename.test.ext`, `./basename.spec.ext`
- * 2. Same-directory `__tests__/`: `./__tests__/basename.test.ext`, `./__tests__/basename.spec.ext`
- * 3. Package-level mirrors: `<pkg>/__tests__/unit/<src-relative>`, `<pkg>/__tests__/integration/<src-relative>`
+ * 2. Same-directory test dirs: `./__tests__/`, `./tests/`, `./spec/`, `./__spec__/`
+ *    each with `basename.test.ext` and `basename.spec.ext`
+ * 3. Package-level mirrors: `<pkg>/<test-layout>/<unit|integration>/<src-relative>`
  *    using both `.test.ext` and `.spec.ext` variants.
  *
  * Does NOT match files whose bare stem contains `test` or `spec` without boundary boundaries
  * (e.g. `contest.ts`, `testing.ts`, `tool-specs.ts` are excluded).
  */
-const TEST_LAYOUT_PREFIXES = ["__tests__/unit", "__tests__/integration"] as const;
+const TEST_LAYOUT_PREFIXES = [
+  "__tests__/unit",
+  "__tests__/integration",
+  "tests/unit",
+  "tests/integration",
+  "spec/unit",
+  "spec/integration",
+  "__spec__/unit",
+  "__spec__/integration",
+] as const;
 const TEST_FILE_SUFFIXES = [".test", ".spec"] as const;
 
 function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
@@ -281,11 +291,11 @@ function findConventionTestFiles(sourceAbs: string, cwd?: string): string[] {
   }
 
   for (const suffix of TEST_FILE_SUFFIXES) {
-    addExistingTestCandidate(
-      results,
-      seen,
-      path.join(dir, "__tests__", `${basename}${suffix}${ext}`),
-    );
+    const companion = `${basename}${suffix}${ext}`;
+    addExistingTestCandidate(results, seen, path.join(dir, "__tests__", companion));
+    addExistingTestCandidate(results, seen, path.join(dir, "tests", companion));
+    addExistingTestCandidate(results, seen, path.join(dir, "spec", companion));
+    addExistingTestCandidate(results, seen, path.join(dir, "__spec__", companion));
   }
 
   if (cwd) {

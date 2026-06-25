@@ -11,6 +11,7 @@
  */
 
 import {
+  type CalleeDepth,
   getDefaultWorkspaceRuntime,
   type SemanticProvider,
   type StructuralProvider,
@@ -130,9 +131,9 @@ function createCompositeProvider(
         }
       );
     },
-    async calleesAt(file: string, line: number, character: number) {
+    async calleesAt(file: string, line: number, character: number, depth?: CalleeDepth) {
       return (
-        structural?.calleesAt(file, line, character) ?? {
+        structural?.calleesAt(file, line, character, depth) ?? {
           kind: "unavailable" as const,
           message: "Structural analysis not available.",
         }

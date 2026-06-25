@@ -17,6 +17,7 @@ export type {
 export { type EvidenceBadgeInput, formatEvidenceBadge } from "./evidence-badge.ts";
 // Shared canonical types
 export type {
+  CalleeDepth,
   CalleesData,
   CallSite,
   CodeLocation,

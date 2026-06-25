@@ -8,7 +8,7 @@
 import { createRegistry } from "./registry-utils.ts";
 
 /** Where the contribution should appear in the footer. */
-export type FooterPlacement = "stats" | "status";
+export type FooterPlacement = "stats" | "stats-end" | "status";
 
 /** A single footer contribution registered by an extension. */
 export interface FooterContribution {

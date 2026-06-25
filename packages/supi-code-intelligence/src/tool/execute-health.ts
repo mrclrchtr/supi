@@ -34,6 +34,8 @@ export interface CodeHealthToolParams {
   refresh?: boolean;
   include?: string[];
   level?: "summary" | "detailed";
+  coveragePath?: string;
+  unusedPath?: string;
 }
 
 const DEFAULT_INCLUDE: HealthSection[] = ["diagnostics", "servers"];
@@ -84,10 +86,10 @@ export async function executeHealthTool(
     ? loadPrioritizationSignals(cwd, lspState)
     : null;
   const coverage = included.includes("coverage")
-    ? collectCoverageSection(prioritizationSignals, cwd, scopeFilter)
+    ? collectCoverageSection(prioritizationSignals, cwd, scopeFilter, params.coveragePath)
     : null;
   const unused = included.includes("unused")
-    ? collectUnusedSection(prioritizationSignals, cwd, scopeFilter)
+    ? collectUnusedSection(prioritizationSignals, cwd, scopeFilter, params.unusedPath)
     : null;
 
   // Code actions only in detailed mode to avoid unnecessary LSP calls
@@ -157,8 +159,9 @@ function collectCoverageSection(
   loaded: LoadedSignals | null,
   cwd: string,
   scopeFilter: string | null,
+  coveragePath?: string,
 ): HealthCoverageData {
-  const reportPath = resolve(cwd, "coverage", "coverage-summary.json");
+  const reportPath = resolve(cwd, coveragePath ?? "coverage/coverage-summary.json");
   if (!existsSync(reportPath) || !loaded) {
     return { available: false, entries: [] };
   }
@@ -175,8 +178,9 @@ function collectUnusedSection(
   loaded: LoadedSignals | null,
   cwd: string,
   scopeFilter: string | null,
+  unusedPath?: string,
 ): HealthUnusedData {
-  const reportPath = resolve(cwd, "knip.json");
+  const reportPath = resolve(cwd, unusedPath ?? "knip.json");
   if (!existsSync(reportPath) || !loaded) {
     return { available: false, files: [], exports: [] };
   }

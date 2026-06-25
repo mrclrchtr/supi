@@ -54,6 +54,7 @@ export interface CodeGraphToolParams {
   symbol?: string;
   scope?: string;
   relations?: GraphRelation[];
+  calleeDepth?: "direct" | "deep";
   maxResults?: number;
 }
 
@@ -237,6 +238,7 @@ export async function executeGraphTool(
       maxResults,
       semanticReadinessError,
       resolvedAnchorKind,
+      params.calleeDepth ?? "direct",
     );
     sections.push(section);
   }
@@ -308,6 +310,7 @@ async function collectRelation(
   maxResults: number,
   semanticReadinessError: string | null,
   anchorKind: AnchorKind,
+  calleeDepth: "direct" | "deep" = "direct",
 ): Promise<GraphSection> {
   if (semanticReadinessError && (rel === "references" || rel === "implements")) {
     return { kind: "unavailable", rel, message: semanticReadinessError };
@@ -361,6 +364,8 @@ async function collectRelation(
           position.character + 1,
           displayName,
           { cwd, provider: { calleesAt: provider.calleesAt } },
+          undefined,
+          calleeDepth,
         );
         if (result.confidence === "unavailable") {
           return { kind: "unavailable", rel, message: "No callees available" };
@@ -370,6 +375,7 @@ async function collectRelation(
           result.calls,
           toDisplayPath(cwd, file),
           maxResults,
+          result.depth,
         );
         return {
           kind: "ok",

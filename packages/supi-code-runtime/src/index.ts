@@ -6,6 +6,7 @@
  */
 
 export type {
+  CalleeDepth,
   CalleesData,
   CallSite,
   CapabilityState,

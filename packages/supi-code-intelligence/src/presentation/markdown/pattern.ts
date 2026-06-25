@@ -94,7 +94,13 @@ export function renderStructuredMatches(
               ? "Types"
               : kind === "interface"
                 ? "Interfaces"
-                : "Tests";
+                : kind === "class"
+                  ? "Classes"
+                  : kind === "method"
+                    ? "Methods"
+                    : kind === "enum"
+                      ? "Enums"
+                      : "Tests";
   const lines: string[] = [];
   lines.push(`# Pattern ${kindLabel}: \`${pattern}\``);
   lines.push("");

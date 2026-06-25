@@ -23,7 +23,17 @@ export interface CodeFindToolParams {
   query: string;
   scope?: string;
   mode?: "text" | "regex" | "ast" | "semantic";
-  kind?: "definition" | "import" | "export" | "call" | "type" | "interface" | "test";
+  kind?:
+    | "definition"
+    | "import"
+    | "export"
+    | "call"
+    | "type"
+    | "interface"
+    | "class"
+    | "method"
+    | "enum"
+    | "test";
   contextLines?: number;
   maxResults?: number;
 }
@@ -35,6 +45,10 @@ const SUPPORTED_AST_KIND_LABELS = [
   "call",
   "type",
   "interface",
+  "class",
+  "method",
+  "enum",
+  "test",
 ] as const;
 
 const SUPPORTED_AST_KINDS = new Set<NonNullable<CodeFindToolParams["kind"]>>(

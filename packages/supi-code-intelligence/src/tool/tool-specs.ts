@@ -55,6 +55,7 @@ const CodeResolveParameters = Type.Object(
           "function",
           "class",
           "interface",
+          "type",
           "file",
           "export",
           "variable",
@@ -87,11 +88,9 @@ export interface CodeIntelligenceToolDefinitionSpec {
   /** Per-spec byte-limit override for the adapter's head truncation. Defaults to pi's `DEFAULT_MAX_BYTES`. */
   maxBytes?: number;
   /**
-   * Reserved: when true, oversized output spills to a temp file whose path is
+   * When true, oversized truncated output spills to a temp file whose path is
    * appended to the truncation notice (full output preserved for `read`).
-   * Mechanic not yet wired; output is currently head-truncated with a notice
-   * regardless. Intended for heavy-output tools (code_find, code_graph:all,
-   * code_impact) once the spill path lands.
+   * Enabled for heavy-output tools (code_find, code_graph, code_impact).
    */
   spillToTempFile?: boolean;
   run: (params: unknown, ctx: CodeIntelToolExecCtx) => Promise<CodeIntelResult> | CodeIntelResult;
@@ -149,14 +148,16 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_graph",
     label: "Code Graph",
     description:
-      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays discovery provenance (semantic+conventions or conventions-only) separately from any extracted test labels. `callees` is structural/direct-scope evidence: it reports call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes — use `references` on a resolved target for identity-aware incoming callers. `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files and labels. `scope` (not `path`) narrows by workspace-relative directory/package. Use code_resolve first to get a targetId, then pass it to code_graph. Output is truncated to 2000 lines / 50KB.',
+      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays discovery provenance (semantic+conventions or conventions-only) separately from any extracted test labels. `callees` is structural/direct-scope evidence: it reports call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes — use `references` on a resolved target for identity-aware incoming callers. Pass `calleeDepth: "deep"` to include callees from nested scopes. `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files and labels. `scope` (not `path`) narrows by workspace-relative directory/package. Use code_resolve first to get a targetId, then pass it to code_graph. Output is truncated to 2000 lines / 50KB.',
     promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
       "Use code_graph to find references, direct structural calls, and implementations for a target.",
       'Default `relations` is ["references"]; use `relations: ["callees"]` or `["implements"]` for those, or `relations: ["all"]` to expand to every relation family in one call.',
       "After code_graph, follow up with code_context on individual results for type or definition context.",
+      'Pass `calleeDepth: "deep"` to include callees from nested function/method/callback scopes (default `"direct"` excludes them).',
     ],
     parameters: CodeGraphParameters,
+    spillToTempFile: true,
     run: (params, ctx) => executeGraphTool(params as Parameters<typeof executeGraphTool>[0], ctx),
   },
   {
@@ -170,22 +171,24 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       "Use code_graph instead of code_impact when you only need a plain reference list without impact analysis.",
     ],
     parameters: CodeImpactParameters,
+    spillToTempFile: true,
     run: (params, ctx) => executeImpactTool(params as Parameters<typeof executeImpactTool>[0], ctx),
   },
   {
     name: "code_find",
     label: "Code Find",
     description:
-      'Unified ranked code search with strict mode dispatch: default/`mode: "text"` is literal ripgrep, `mode: "regex"` is ripgrep regex, `mode: "semantic"` is LSP workspace-symbol search, and `mode: "ast"` is tree-sitter structured search. `mode: "ast"` requires `kind` and currently supports `definition`, `import`, `export`, `call`, `type`, and `interface`. `mode: "text"`, `mode: "regex"`, and `mode: "semantic"` do not accept `kind`. `code_find` with `mode: "semantic"` does not silently fall back to text search, and unsupported mode/kind combinations fail. AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` references for identity-aware callers of a resolved target. Output is truncated to 2000 lines / 50KB.',
+      'Unified ranked code search with strict mode dispatch: default/`mode: "text"` is literal ripgrep, `mode: "regex"` is ripgrep regex, `mode: "semantic"` is LSP workspace-symbol search, and `mode: "ast"` is tree-sitter structured search. `mode: "ast"` requires `kind` and currently supports `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, `enum`, and `test`. `mode: "text"`, `mode: "regex"`, and `mode: "semantic"` do not accept `kind`. `code_find` with `mode: "semantic"` does not silently fall back to text search, and unsupported mode/kind combinations fail. AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` references for identity-aware callers of a resolved target. Output is truncated to 2000 lines / 50KB.',
     promptSnippet: "code_find — unified ranked code search",
     basePromptGuidelines: [
       "Use code_find as the sole code search tool for literal text, regex, semantic workspace-symbol, or AST structured search.",
-      'code_find with `mode: "ast"` requires `kind` and supports `definition`, `import`, `export`, `call`, `type`, and `interface`.',
+      'code_find with `mode: "ast"` requires `kind` and supports `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, `enum`, and `test`.',
       'code_find with `mode: "text"`, `mode: "regex"`, or `mode: "semantic"` does not accept `kind`.',
       'code_find with `mode: "semantic"` does not fall back to text search and fails when semantic capability is unavailable.',
       'AST `call` mode matches call-site identifiers by name only; use `code_graph` with `relations: ["references"]` on a resolved target for symbol-identity-aware callers.',
     ],
     parameters: CodeFindParameters,
+    spillToTempFile: true,
     run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
   },
   {

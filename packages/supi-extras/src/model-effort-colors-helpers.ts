@@ -158,10 +158,11 @@ function buildStatsParts(
     percent: number | null;
     useSubscription: boolean;
     extraParts?: string[];
+    suffixParts?: string[];
   },
 ): string[] {
   const { totalCost } = usage;
-  const { contextWindow, percent, useSubscription, extraParts } = params;
+  const { contextWindow, percent, useSubscription, extraParts, suffixParts } = params;
   const contextPercent = percent != null ? percent.toFixed(1) : "?";
 
   const parts: string[] = [];
@@ -182,6 +183,10 @@ function buildStatsParts(
       : `${contextPercent}%/${formatTokens(contextWindow)}`,
   );
 
+  for (const part of suffixParts ?? []) {
+    if (part) parts.push(part);
+  }
+
   return parts;
 }
 
@@ -193,6 +198,8 @@ export function buildStatsLeft(params: {
   useSubscription: boolean;
   /** Extra parts inserted after CH, before cost and context. */
   extraParts?: string[];
+  /** Extra parts appended after cost and context. */
+  suffixParts?: string[];
 }): { text: string; contextPercentValue: number } {
   const { usage } = params;
   const contextPercentValue = params.percent ?? 0;

@@ -66,6 +66,7 @@ describe("code_graph callees relation", () => {
             { name: "bar", startLine: 1, endLine: 1 },
             { name: "baz", startLine: 1, endLine: 1 },
           ],
+          depth: "direct" as const,
         },
       }),
     });
@@ -94,6 +95,7 @@ describe("code_graph callees relation", () => {
         data: {
           enclosingScope: { name: "foo", startLine: 1, endLine: 1 },
           callees: [{ name: "bar", startLine: 1, endLine: 1 }],
+          depth: "direct" as const,
         },
       }),
     });

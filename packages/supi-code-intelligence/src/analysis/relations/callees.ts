@@ -10,6 +10,7 @@ export interface CalleesResult {
   enclosingScope: CalleeScope | null;
   callees: CalleeEntry[];
   confidence: "structural" | "unavailable";
+  depth: "direct" | "deep";
 }
 
 /**
@@ -24,12 +25,13 @@ export async function collectCallees(
   targetName: string | null,
   deps: RelationsServiceDeps,
   maxResults?: number,
+  depth: "direct" | "deep" = "direct",
 ): Promise<CalleesResult> {
   if (!deps.provider?.calleesAt) {
     return unavailableCallees(targetName);
   }
 
-  const result = await deps.provider.calleesAt(targetFile, targetLine, targetCharacter);
+  const result = await deps.provider.calleesAt(targetFile, targetLine, targetCharacter, depth);
   if (result.kind !== "success" || !result.data) {
     return unavailableCallees(targetName);
   }
@@ -54,6 +56,7 @@ export async function collectCallees(
     enclosingScope,
     callees,
     confidence: "structural",
+    depth: result.data.depth ?? depth,
   };
 }
 
@@ -64,6 +67,7 @@ function unavailableCallees(targetName: string | null): CalleesResult {
     enclosingScope: null,
     callees: [],
     confidence: "unavailable",
+    depth: "direct",
   };
 }
 

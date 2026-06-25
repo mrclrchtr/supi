@@ -68,6 +68,7 @@ export interface RelationsServiceDeps {
       file: string,
       line: number,
       character: number,
+      depth?: "direct" | "deep",
     ) => Promise<{
       kind: string;
       data?: {
@@ -83,6 +84,7 @@ export interface RelationsServiceDeps {
           startLine?: number;
           startCharacter?: number;
         }>;
+        depth?: "direct" | "deep";
       };
       message?: string;
     }>;

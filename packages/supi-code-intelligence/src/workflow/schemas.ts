@@ -170,10 +170,24 @@ export const CodeFindParameters = Type.Object(
       }),
     ),
     kind: Type.Optional(
-      StringEnum(["definition", "import", "export", "call", "type", "interface"], {
-        description:
-          'Only valid with `mode: "ast"`. Supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`. AST `call` matches call-site identifiers by name, not by symbol identity.',
-      }),
+      StringEnum(
+        [
+          "definition",
+          "import",
+          "export",
+          "call",
+          "type",
+          "interface",
+          "class",
+          "method",
+          "enum",
+          "test",
+        ],
+        {
+          description:
+            'Only valid with `mode: "ast"`. Supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, `enum`, `test`. AST `call` matches call-site identifiers by name, not by symbol identity.',
+        },
+      ),
     ),
     contextLines: Type.Optional(
       Type.Number({ description: "Context lines to include around matches.", minimum: 0 }),
@@ -213,6 +227,12 @@ export const CodeGraphParameters = Type.Object(
       ),
     ),
     maxResults: Type.Optional(MaxResultsParam),
+    calleeDepth: Type.Optional(
+      StringEnum(["direct", "deep"], {
+        description:
+          'Depth for callee collection. `"direct"` (default): only direct calls from the enclosing scope, excluding nested function/callback scopes. `"deep"`: include all callees within the enclosing scope, including those inside nested scopes.',
+      }),
+    ),
   },
   { additionalProperties: false },
 );
@@ -316,6 +336,17 @@ export const CodeHealthParameters = Type.Object(
     level: Type.Optional(
       StringEnum(["summary", "detailed"], {
         description: "Detail level for the health report.",
+      }),
+    ),
+    coveragePath: Type.Optional(
+      Type.String({
+        description:
+          "Workspace-relative path to a coverage summary JSON file. Defaults to `coverage/coverage-summary.json`.",
+      }),
+    ),
+    unusedPath: Type.Optional(
+      Type.String({
+        description: "Workspace-relative path to a knip JSON report. Defaults to `knip.json`.",
       }),
     ),
   },

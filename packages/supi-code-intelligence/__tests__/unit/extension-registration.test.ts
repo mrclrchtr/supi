@@ -154,8 +154,11 @@ describe("focused code intelligence tool registration", () => {
       "call",
       "type",
       "interface",
+      "class",
+      "method",
+      "enum",
+      "test",
     ]);
-    expect(kindParam?.enum).not.toContain("test");
   });
 
   it("registers code_inspect as the factual point-inspection tool", () => {

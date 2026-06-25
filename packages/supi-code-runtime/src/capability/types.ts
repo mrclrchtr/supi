@@ -5,6 +5,7 @@
  */
 
 import type {
+  CalleeDepth,
   CalleesData,
   CallSite,
   CodeLocation,
@@ -116,7 +117,12 @@ export interface SemanticProvider {
  * and runtime error states.
  */
 export interface StructuralProvider {
-  calleesAt(file: string, line: number, character: number): Promise<CodeResult<CalleesData>>;
+  calleesAt(
+    file: string,
+    line: number,
+    character: number,
+    depth?: CalleeDepth,
+  ): Promise<CodeResult<CalleesData>>;
   exports(file: string): Promise<CodeResult<ExportData[]>>;
   outline(file: string): Promise<CodeResult<OutlineData[]>>;
   imports(file: string): Promise<CodeResult<ImportData[]>>;

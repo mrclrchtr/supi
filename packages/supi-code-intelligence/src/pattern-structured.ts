@@ -15,6 +15,9 @@ export type StructuredPatternKind =
   | "call"
   | "type"
   | "interface"
+  | "class"
+  | "method"
+  | "enum"
   | "test";
 
 export interface StructuredMatch {
@@ -45,6 +48,9 @@ export function isStructuredPatternKind(kind: string | undefined): kind is Struc
     kind === "call" ||
     kind === "type" ||
     kind === "interface" ||
+    kind === "class" ||
+    kind === "method" ||
+    kind === "enum" ||
     kind === "test"
   );
 }
@@ -234,14 +240,24 @@ async function collectMatchesForFile(
     return;
   }
 
-  // ── type / interface / test — use outline with kind-specific filters ─
+  // ── type / interface / class / method / enum / test — use outline with kind-specific filters ─
 
-  if (kind === "type" || kind === "interface" || kind === "test") {
+  if (
+    kind === "type" ||
+    kind === "interface" ||
+    kind === "class" ||
+    kind === "method" ||
+    kind === "enum" ||
+    kind === "test"
+  ) {
     const outline = await structural.outline(relFile);
     if (!handleStructuralResult(outline, relFile, recordFailure)) return;
     for (const item of outline.data) {
       if (kind === "type" && !isTypeLikeKind(item.kind)) continue;
       if (kind === "interface" && !isInterfaceKind(item.kind)) continue;
+      if (kind === "class" && item.kind.toLowerCase() !== "class") continue;
+      if (kind === "method" && item.kind.toLowerCase() !== "method") continue;
+      if (kind === "enum" && item.kind.toLowerCase() !== "enum") continue;
       if (kind === "test") {
         const isTestName =
           /^(test|it|describe|spec)\b/.test(item.name) ||

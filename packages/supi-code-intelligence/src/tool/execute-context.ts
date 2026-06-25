@@ -247,6 +247,11 @@ async function runWithContextTarget(
   const deps = await prepareContextDeps(params, ctx);
   if ("content" in deps) return deps;
 
+  // When `task` is present and `include` is omitted, default to the most
+  // useful sections for a coding task.
+  const include =
+    params.include ?? (params.task ? ["defs", "references", "tests", "diagnostics"] : undefined);
+
   // Task mode with a target — git context is for orientation only.
   const result = await executeContext(
     {
@@ -254,7 +259,7 @@ async function runWithContextTarget(
       target: buildContextTarget(params),
       scope: undefined, // precise target — scope is ignored
       budget: params.budget,
-      include: params.include,
+      include,
       maxResults: params.maxResults,
       showGitContext: false,
     },
@@ -288,13 +293,18 @@ async function runOrientation(
   const showGitContext = !shownGitContextCwds.has(ctx.cwd);
   shownGitContextCwds.add(ctx.cwd);
 
+  // When `task` is present and `include` is omitted, default to the most
+  // useful sections for a coding task.
+  const include =
+    params.include ?? (params.task ? ["defs", "references", "tests", "diagnostics"] : undefined);
+
   const result = await executeContext(
     {
       task: params.task,
       target: buildContextTarget(params),
       scope: resolvedScope,
       budget: params.budget,
-      include: params.include,
+      include,
       maxResults: params.maxResults,
       showGitContext,
     },
