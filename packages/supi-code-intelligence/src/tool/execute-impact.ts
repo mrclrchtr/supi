@@ -17,7 +17,7 @@ export interface CodeImpactToolParams {
   exportedOnly?: boolean;
   maxResults?: number;
   change?: string;
-  changedFiles?: string[];
+  changeSetFiles?: string[];
   includeTests?: boolean;
 }
 
@@ -56,8 +56,8 @@ export async function executeImpactLikeTool(
     };
   }
 
-  const hasDiffInputs = (params.changedFiles?.length || 0) > 0 || Boolean(params.change);
-  if (!params.file && !params.symbol && !hasDiffInputs) {
+  const hasChangeSetInputs = (params.changeSetFiles?.length || 0) > 0 || Boolean(params.change);
+  if (!params.file && !params.symbol && !hasChangeSetInputs) {
     return unavailableImpactToolResult(
       detailType,
       "**Error:** Impact analysis currently requires either anchored coordinates (`file`, `line`, `character`) or a `symbol` for discovery.",
@@ -72,8 +72,8 @@ export async function executeImpactLikeTool(
       ? providerState.lspService
       : { kind: "unavailable" as const, reason: "No provider" };
 
-  if (hasDiffInputs) {
-    emitToolProgress(ctx.onUpdate, `${preferredTool}: sweeping changed files...`);
+  if (hasChangeSetInputs) {
+    emitToolProgress(ctx.onUpdate, `${preferredTool}: analyzing impact input...`);
     return executeImpact(params, { cwd: ctx.cwd, provider, lspService }, surface);
   }
 

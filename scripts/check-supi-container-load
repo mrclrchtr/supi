@@ -63,8 +63,8 @@ const status = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const requiredTools = [
   "ask_user",
   "code_resolve",
-  "code_context",
-  "code_brief",
+  "code_inspect",
+  "code_orientation",
   "code_graph",
   "code_impact",
   "code_affected",

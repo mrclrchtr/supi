@@ -1,4 +1,5 @@
 import type { ContextSection } from "../../use-case/types.ts";
+import { type ReadNextItem, renderReadNextSection } from "./read-next.ts";
 
 export interface RenderedContextSection {
   key: ContextSection;
@@ -7,21 +8,18 @@ export interface RenderedContextSection {
 }
 
 export interface RenderContextParams {
-  task: string;
   focusTarget: string | null;
   sections: RenderedContextSection[];
-  nextQueries?: string[];
+  readNext?: ReadNextItem[];
 }
 
-/** Render a task-focused code_context bundle into markdown. */
+/** Render a symbol-centered code_orientation result into markdown. */
 export function renderContextResult(params: RenderContextParams): string {
-  const lines: string[] = ["# Code Context", "", "## Task Context", ""];
+  const lines: string[] = ["# Code Orientation", ""];
 
-  lines.push(`- Task: ${params.task}`);
   if (params.focusTarget) {
-    lines.push(`- Focus: \`${params.focusTarget}\``);
+    lines.push("## Focus", `- \`${params.focusTarget}\``, "");
   }
-  lines.push("");
 
   for (const section of params.sections) {
     lines.push(`## ${section.title}`);
@@ -30,6 +28,8 @@ export function renderContextResult(params: RenderContextParams): string {
     }
     lines.push("");
   }
+
+  lines.push(...renderReadNextSection(params.readNext ?? []));
 
   return lines.join("\n");
 }

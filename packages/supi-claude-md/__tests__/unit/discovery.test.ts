@@ -170,14 +170,14 @@ describe("extractPathFromToolEvent", () => {
     expect(extractPathFromToolEvent("tree_sitter_outline", { file: "ast.ts" })).toBe("ast.ts");
   });
 
-  it("extracts file from an active code tool", () => {
-    expect(extractPathFromToolEvent("code_brief", { file: "brief.ts" })).toBe("brief.ts");
+  it("extracts focus from an active code tool", () => {
+    expect(extractPathFromToolEvent("code_orientation", { focus: "brief.ts" })).toBe("brief.ts");
   });
 
-  it("extracts path from a code tool that accepts path inputs", () => {
-    expect(
-      extractPathFromToolEvent("code_brief", { path: "packages/supi-code-intelligence" }),
-    ).toBe("packages/supi-code-intelligence");
+  it("extracts path from a legacy code tool path input", () => {
+    expect(extractPathFromToolEvent("code_find", { path: "packages/supi-code-intelligence" })).toBe(
+      "packages/supi-code-intelligence",
+    );
   });
 
   it("returns null for bash tool", () => {

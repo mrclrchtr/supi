@@ -113,7 +113,7 @@ async function executeSymbolBrief(
   if (!provider) {
     return {
       content:
-        "**Error:** Symbol discovery requires an active code provider. Use `code_context` with `file` for file orientation, or use `code_inspect` with `file` + coordinates for point facts.",
+        "**Error:** Symbol discovery requires an active code provider. Use `code_orientation` with `focus` for file orientation, or use `code_inspect` with `file` + coordinates for point facts.",
       details: {
         confidence: "unavailable",
         focusTarget: symbol,
@@ -122,7 +122,7 @@ async function executeSymbolBrief(
         dependencySummary: null,
         omittedCount: 0,
         nextQueries: [
-          "Use `code_context` with `file` for file orientation, or `code_inspect` with file + coordinates for point facts",
+          "Use `code_orientation` with `focus` for file orientation, or `code_inspect` with file + coordinates for point facts",
         ],
       },
     };
@@ -142,7 +142,7 @@ async function executeSymbolBrief(
         dependencySummary: null,
         omittedCount: 0,
         nextQueries: [
-          "Use `code_context` with `file` for file orientation, or `code_inspect` with file + coordinates for point facts",
+          "Use `code_orientation` with `focus` for file orientation, or `code_inspect` with file + coordinates for point facts",
         ],
       },
     };
@@ -160,7 +160,7 @@ async function executeSymbolBrief(
         dependencySummary: null,
         omittedCount: resolved.omittedCount,
         nextQueries: [
-          "Use `code_context` with `file` for file orientation, or `code_inspect` with file + coordinates for point facts",
+          "Use `code_orientation` with `focus` for file orientation, or `code_inspect` with file + coordinates for point facts",
         ],
       },
     };

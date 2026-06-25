@@ -1,5 +1,5 @@
 import { executeApplyTool } from "../../src/tool/execute-apply.ts";
-import { executeContextTool } from "../../src/tool/execute-context.ts";
+import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executeFindTool } from "../../src/tool/execute-find.ts";
 import type { GraphRelation } from "../../src/tool/execute-graph.ts";
 import { executeGraphTool } from "../../src/tool/execute-graph.ts";
@@ -77,7 +77,16 @@ export async function executeAction(
 
   switch (action) {
     case "context":
-      return executeContextTool(rest, ctx);
+      return executeOrientationTool(
+        {
+          focus: rest.path ?? rest.file,
+          targetId: rest.targetId,
+          line: rest.line,
+          character: rest.character,
+          maxResults: rest.maxResults,
+        },
+        ctx,
+      );
     case "impact":
       return executeImpactTool(rest, ctx);
     case "graph":

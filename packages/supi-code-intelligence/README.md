@@ -28,10 +28,10 @@ pi install ./packages/supi-code-intelligence
 
 After install, pi gets:
 
-- `code_context` — task-focused context bundles for a change, question, or resolved target; also serves orientation overviews for projects, packages, directories, files, or symbols (`code_brief` has been merged into it)
+- `code_orientation` — first-pass orientation for projects, discovered modules, directories, files, or precise symbols (`code_brief` and the old `code_context` surface have been replaced)
 - `code_inspect` — factual point inspection for one precise file position
 - `code_graph` — unified relation graph (references, callees, imports, exports, implementations, tests) from a resolved target
-- `code_impact` — preferred workflow-oriented blast radius, downstream impact, and diff-aware changed-file analysis
+- `code_impact` — preferred workflow-oriented blast radius, downstream impact, and user-supplied change-set analysis
 - `code_find` — unified ranked search (text, regex, AST, semantic)
 - `code_health` — diagnostics, server status, dirty workspace, coverage, and unused-code health signals
 - `code_refactor_plan` — pure planner; preview an operation-aware semantic refactor plan without mutating files
@@ -44,16 +44,73 @@ After install, pi gets:
 
 | Standard approach | `code_*` equivalent |
 |---|---|
-| `rg "symbol" --type ts` | `code_graph(targetId, relations=["references"])` |
-| `read` + manual symbol tracing | `code_inspect(file, line, character)` |
-| `tsc --noEmit` + `git status` | `code_health(refresh=true)` |
-| `rg` + counting + intuition | `code_impact(targetId, change="...")` or `code_context(include: ["impact"])` |
+| `rg "symbol" --type ts` | `code_resolve(query="symbol")` → `code_graph(targetId, relations=["references"])` |
+| `read` + manual symbol tracing | `code_inspect(file, line, character)` for point facts, then `read` the suggested source range |
+| manual dependency/reference tracing | `code_graph(targetId, relations=["references", "callees", "tests"])` |
+| `git status` + diagnostics commands | `code_health(refresh=true, include=["diagnostics", "servers", "dirty"])` |
+| `rg` + counting + intuition | `code_impact(targetId, change="...")` or `code_impact(changeSetFiles=[...])` |
 | `rg` for defs/imports/exports | `code_find(mode="ast", kind="definition")` |
-| Multi-file find-and-replace | `code_refactor_plan` → `code_refactor_apply` |
-| `ls` + `read` to explore a package | `code_context(scope="packages/...")` |
+| Multi-file find-and-replace | `code_refactor_plan` → review → `code_refactor_apply` |
+| `ls` + `read` to explore a package | `code_orientation(focus="packages/...")`, then inspect identified entrypoints |
 | `rg "symbolName"` (ambiguous) | `code_resolve(query="symbolName")` |
 
-> 💡 **Key insight:** `code_resolve` → `targetId` → `code_graph`/`code_context`/`code_impact` is the core chained workflow. Learn it once.
+> 💡 **Key insight:** `code_resolve` → `targetId` → `code_graph`/`code_orientation`/`code_impact` is the core chained workflow. `code_*` tools summarize and prioritize; use `read` on the suggested ranges before editing.
+
+## Standard-tools cookbook
+
+### Find references to a symbol
+
+Standard:
+```bash
+rg -n "myFunction" packages/my-package
+```
+Then manually separate declarations, docs, imports, and actual symbol uses.
+
+Code intelligence:
+```text
+code_resolve(query="myFunction", scope="packages/my-package") → targetId
+code_graph(targetId, relations=["references", "tests"])
+```
+Use the `Read Next` section to inspect the resolved target or top reference sites.
+
+### Understand a package or module
+
+Standard:
+```bash
+find packages/my-package -maxdepth 3 -type f
+cat packages/my-package/package.json
+```
+Then read likely entrypoints by hand.
+
+Code intelligence:
+```text
+code_orientation(focus="packages/my-package")
+code_orientation(focus="packages/my-package/src/tool")
+code_orientation(focus="packages/my-package/src/tool/execute-health.ts")
+```
+Orientation briefs are summaries, not source replacement; read the files before editing.
+
+### Estimate impact before a change
+
+Standard: run `rg`, inspect consumers, infer test files, and decide risk manually.
+
+Code intelligence:
+```text
+code_resolve(query="myFunction") → targetId
+code_impact(targetId, change="change output formatting", includeTests=true)
+```
+For already-known files, use `code_impact(changeSetFiles=["packages/.../file.ts"], includeTests=true)`.
+
+### Check health quickly
+
+Standard: combine editor diagnostics, `git status`, coverage files, and project commands.
+
+Code intelligence:
+```text
+code_health(refresh=true, include=["diagnostics", "servers", "dirty"])
+code_health(include=["coverage", "unused"])
+```
+`code_health` is a quick status surface; it does not replace the project's required verification commands after edits.
 
 ## Quick start — three most common workflows
 
@@ -61,13 +118,13 @@ After install, pi gets:
 ```
 code_resolve(query="myFunction")              → capture targetId
 code_graph(targetId, relations=["references"]) → inspect usage
-code_context(targetId, task="understand usage") → gather edit context
+code_orientation(targetId)                       → orient around the symbol
 ```
 
 ### Understand a package before editing
 ```
-code_context(scope="packages/my-package")           → package orientation
-code_context(scope="packages/my-package/src/tool")   → directory drill-down
+code_orientation(focus="packages/my-package")           → package orientation
+code_orientation(focus="packages/my-package/src/tool")   → directory drill-down
 code_health(scope="packages/my-package", refresh=true) → check diagnostics
 ```
 
@@ -93,7 +150,7 @@ code_refactor_apply(planId)                                     → apply
 ```text
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
 │ code_resolve │ ──→ │  targetId    │ ──→ │ code_graph  │
-│              │     │  (stable)    │     │ code_context│
+│              │     │  (stable)    │     │ code_orientation│
 └─────────────┘     └──────────────┘     │ code_impact │
        ↑                  │              └─────────────┘
        │  re-resolve       │  stale after
@@ -102,11 +159,14 @@ code_refactor_apply(planId)                                     → apply
 
 ## When each tool won't help you
 
-- **`code_graph` callees** — won't find calls inside nested functions, callbacks, or method bodies. Use `code_graph` with `relations: ["references"]` for identity-aware incoming callers instead.
-- **`code_find` semantic mode** — fails when no LSP provider is active. Does not fall back to text search — use `mode: "text"` explicitly.
+- **No silent fallback:** non-search tools do not silently turn semantic requests into grep. If the required provider is unavailable, results say so or the tool errors.
+- **LSP warmup/provider gaps:** `code_resolve` symbol queries, semantic `code_find`, references, implementations, impact, and refactor planning need an active semantic/LSP provider. Retry after warmup or check `code_health`.
+- **Tree-sitter/structural gaps:** AST `code_find`, callees, imports, exports, outlines, and structural test-label extraction need the structural provider.
+- **`code_graph` callees** — won't find calls inside nested functions, callbacks, or method bodies unless `calleeDepth: "deep"` is requested. Callees are structural source-shape evidence, not symbol identity.
+- **`code_find` semantic mode** — fails when no LSP provider is active. It does not fall back to text search — use `mode: "text"` explicitly.
 - **`code_refactor_plan`** — requires LSP precise edit support. When the LSP can't produce semantic edits for the target, the tool throws — there is no text fallback.
 - **`code_health` coverage/unused** — depends on `coverage/coverage-summary.json` and `knip.json` at the project root. Use `coveragePath` and `unusedPath` params for non-standard locations.
-- **`code_impact`** — `change`-only requests (no target, no changedFiles) return insufficient-evidence instead of guessing.
+- **`code_impact`** — `change`-only requests (no target, no changeSetFiles) return insufficient-evidence instead of guessing.
 - **`code_find` AST test mode** — `mode: "ast"` with `kind: "test"` matches outline entries with test-like names. Does not find test blocks within untest-like wrapper functions.
 
 Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface. Historical compatibility executors remain in the source tree for migration/tests, but are no longer registered as public tools.
@@ -154,7 +214,7 @@ The current public surface now includes:
 
 - `code_resolve` — **active** (Phase 1)
 - `code_inspect` — **active** (explicit point inspection tool)
-- `code_context` — **active** (solo surface for both orientation and task-focused context; `code_brief` merged)
+- `code_orientation` — **active** (orientation surface; replaces `code_brief` and old `code_context`)
 - `code_find` — **active** (Phase 2a, supersedes code_pattern)
 - `code_health` — **active** (Phase 1.5)
 - `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
@@ -184,21 +244,21 @@ This package is for questions like:
 1. `code_resolve(query="executeHealthTool")` → capture `targetId`
 2. `code_graph(targetId, relations=["references", "callees", "tests"])` → inspect usage
 3. `code_impact(targetId, change="add coverage unused section")` → estimate blast radius
-4. `code_context(targetId, include=["defs", "tests"])` → gather edit context
+4. `code_orientation(targetId)` → orient around definitions, docs, and local diagnostics
 5. Edit files, then `code_health(scope="packages/...", refresh=true)` → verify diagnostics
 
 ### Context from a known source location (one call)
 
-When you already know the file and identifier coordinate, skip the separate `code_resolve` turn and pass coordinates directly to `code_context`:
+When you already know the file and identifier coordinate, skip the separate `code_resolve` turn and pass coordinates directly to `code_orientation`:
 
-1. `code_context(task="understand executeHealthTool", file="packages/.../execute-health.ts", line=42, character=17, include=["defs", "callees", "references"])` → resolves the target, renders the sections, and returns a reusable `targetId`
+1. `code_orientation(focus="packages/.../execute-health.ts", line=42, character=17)` → resolves the target, renders the sections, and returns a reusable `targetId`
 2. `code_graph(targetId, relations=["references"])` → follow up using the `targetId` from step 1
 
 ### Understand a package before editing
 
-1. `code_context(scope="packages/supi-code-intelligence")` → package orientation
-2. `code_context(scope="packages/supi-code-intelligence/src/tool")` → directory drill-down
-3. `code_context(scope="packages/.../execute-graph.ts")` → file overview
+1. `code_orientation(focus="packages/supi-code-intelligence")` → package orientation
+2. `code_orientation(focus="packages/supi-code-intelligence/src/tool")` → directory drill-down
+3. `code_orientation(focus="packages/.../execute-graph.ts")` → file overview
 
 ### Safe refactoring
 
@@ -209,19 +269,18 @@ When you already know the file and identifier coordinate, skip the separate `cod
 
 ## Tool overview
 
-### `code_context`
-Task-focused context bundle for a change, question, or resolved target.
+### `code_orientation`
+Primary orientation surface for understanding where you are before choosing surgical tools.
 
-- accepts `task`, `targetId`, `file` + `line` + `character` (coordinate target mode), `scope`, `budget`, `include`, `change`, and `maxResults`
-- for precise target context, pass either `targetId` (from `code_resolve`) **or** `file` + `line` + `character`. `targetId` takes precedence over coordinates; when both are supplied, coordinates are ignored with a visible note. A stale/invalid `targetId` errors and does **not** fall back to coordinates.
-- coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` (exact identifier hit, declaration-header snap when unambiguous, or explicit disambiguation) and exposes a reusable `targetId` in the markdown and `details.data.target`.
-- when coordinate resolution is ambiguous, `code_context` returns candidate `targetId`s and runs no task sections; when no symbol target can be resolved, it errors and recommends `code_inspect` for point-level facts (it is **not** a point-inspection tool).
-- when `task` is omitted, falls back to orientation-style output instead of erroring
-- when `task` is present, renders requested sections such as `defs`, `references`, `callees`, `docs`, `tests`, `diagnostics`, and `impact`
-- requested but unavailable sections are called out explicitly instead of being silently omitted
-- `scope` is a selection/orientation boundary, not a downstream evidence filter: when a precise target (`targetId` or coordinates) is supplied with `scope`, the target wins and `scope` is ignored with a visible note. Future evidence filtering should use a separate parameter, not `scope`.
-- when `change` is present, a condensed Impact Assessment section is appended (risk level, ref count, downstream, test commands)
-- in this first implementation wave, `code_context` is the solo surface: `code_brief` has been removed from the public surface
+- accepts `focus`, `targetId`, `line`, `character`, and `maxResults`
+- omit `focus` for project orientation
+- `focus` is path-first and language-agnostic; if no path exists, discovered module-name lookup is attempted
+- `focus` + `line` + `character` resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`
+- `targetId` takes precedence over `focus`/coordinates; stale target IDs error and do not fall back
+- symbol orientation renders definitions, JSDoc/TSDoc docs, local diagnostics near the target, and Read Next guidance
+- use `code_graph` for references/callees/imports/exports/tests, `code_impact` for blast radius, and `code_health` for full health/status
+- `maxResults` defaults to 10 and caps each rendered list independently
+- `code_orientation` replaces `code_brief` and the old `code_context` public surface; there is no compatibility alias
 
 ### `code_inspect`
 Factual point-inspection tool for one precise file position.
@@ -240,6 +299,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - **Each relation annotates its evidence source** in the output. For the `tests` relation, provenance describes **file discovery only** — `semantic+conventions` means semantic references contributed, `conventions-only` means only deterministic path/layout conventions contributed.
 - `callees` reports **structural outgoing calls** from the enclosing executable scope at the target anchor. It matches call expressions by source shape, not symbol identity. By default (`calleeDepth: "direct"`), calls inside nested function/method/callback scopes are excluded. Pass `calleeDepth: "deep"` to include all callees within the enclosing scope, including those inside nested scopes.
 - Test-producing surfaces also include a small structured tests metadata shape in tool details: discovery status/provenance plus per-file label status and extracted labels.
+- Targeted graph results include a `Read Next` guidance section for the resolved target, enclosing scope, or top relation sites when those source ranges are known.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
 - Test-label extraction is tracked separately from discovery provenance. When a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` intentionally instead of helper or variable names.
 - Bounded package/tool-aware candidates are generated for source files at `src/tool/execute-<name>.ts`. Exact candidates such as `code-<name>-tool.test.ts`, `<name>-tool.test.ts`, and `execute-<name>.test.ts` are checked in both `__tests__/unit/` and `__tests__/integration/`. No broad search, fuzzy matching, or AI guessing is performed.
@@ -248,16 +308,17 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 Preferred workflow-oriented impact analysis.
 
 - supports the existing target-based path (`targetId`, anchored coords, symbol)
-- adds diff-aware entry points for `changedFiles` and explicit `includeTests`
-- `includeTests` uses the same shared test discovery as `code_graph` and `code_context` (import/reference evidence plus package-layout conventions)
+- adds change-set entry points for `changeSetFiles` and explicit `includeTests`
+- `includeTests` uses the same shared test discovery as `code_graph` (import/reference evidence plus package-layout conventions)
 - **Target-based analysis** uses semantic references and fails explicitly when no LSP provider is available
-- **changedFiles analysis** uses structural evidence by default and, when LSP/export data is available, merges semantic references for symbols defined in changed files. Evidence is annotated as either `**Evidence: structural**` or `**Evidence: semantic+structural**`.
+- **changeSetFiles analysis** uses structural evidence by default and, when LSP/export data is available, merges semantic references for symbols defined in change-set files. `changeSetFiles` is user-supplied; it is not inferred from git and carries no line-level diff evidence. Evidence is annotated as either `**Evidence: structural**` or `**Evidence: semantic+structural**`.
 - **test list annotations** — when likely tests are shown, impact headings annotate discovery provenance explicitly (`Likely Tests (semantic+conventions)` or `Likely Tests (conventions-only)`)
 - **explicit empty-test note** — when `includeTests: true` is set and bounded companion/package discovery completes without finding any test files, an explicit `No likely tests found by bounded companion/package discovery.` note appears instead of silently omitting test information. This note is not shown when `includeTests` is omitted or unavailable.
 - **target-based analysis seeds the target file itself** — zero-reference targets still report affected evidence and likely tests
+- target and change-set impact results include a `Read Next` guidance section for source ranges worth inspecting before editing
 - when the workspace clearly uses Vitest, likely test files also come with concrete `pnpm vitest run … --reporter=verbose` commands
 - `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing
-- uses real workspace/git evidence only; no heuristic grep fallback
+- uses real workspace/provider evidence only; no heuristic grep fallback
 
 ### `code_find`
 Unified ranked search tool with a strict evidence contract.
@@ -266,7 +327,7 @@ Unified ranked search tool with a strict evidence contract.
 - `mode: "regex"` → ripgrep regex search; `kind` is not accepted
 - `mode: "semantic"` → LSP workspace symbol search; `kind` is not accepted and semantic mode does not fall back to text search
 - `mode: "ast"` → tree-sitter structured search; requires explicit `kind`
-- supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`
+- supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, `enum`, `test`
 - AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers
 - unsupported mode/kind combinations fail explicitly instead of being broadened into best-effort search
 
@@ -322,7 +383,7 @@ Depending on the tool, inputs may include:
 - `symbol`
 - `kind`
 - `targetId`
-- `changedFiles`
+- `changeSetFiles`
 - `includeTests`
 - `maxResults`
 - `contextLines`
@@ -331,10 +392,10 @@ Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `scope`
 - `code_inspect` is the public point-inspection tool for `file` + `line` + `character`
-- `targetId` (from `code_resolve`) can replace raw coordinates in `code_context`, `code_graph`, `code_impact`, and `code_refactor_plan`. In `code_context`, `targetId` takes precedence over `file`/`line`/`character`; a stale/invalid `targetId` errors and does not fall back to coordinates.
-- `code_context` accepts `file` + `line` + `character` directly as a coordinate target mode: it resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. Coordinate mode requires all three fields when any is present; partial coordinates are a validation error.
-- `scope` is a selection/orientation boundary, not a downstream evidence filter. For `code_context`, `scope` is ignored (with a visible note) when a precise target (`targetId` or coordinates) is supplied. Future evidence filtering should use a separate parameter such as `within`/`evidenceScope`, not `scope`.
-- `scope` and `file` use pi-style paths: a leading `@` is stripped, relative paths resolve from the current cwd, and existing file scopes match only that file while directory scopes match descendants
+- `targetId` (from `code_resolve`) can replace raw coordinates in `code_orientation`, `code_graph`, `code_impact`, and `code_refactor_plan`. In `code_orientation`, `targetId` takes precedence over `focus`/`line`/`character`; a stale/invalid `targetId` errors and does not fall back to coordinates.
+- `code_orientation` accepts `focus` + `line` + `character` directly as a coordinate target mode: it resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. Coordinate mode requires all three fields when any is present; `focus` must be a file path and partial coordinates are a validation error.
+- `focus` is the selection input for `code_orientation`; other tools keep `scope` for narrowing/filtering.
+- `focus`, `scope`, and `file` use pi-style paths where applicable: a leading `@` is stripped and relative paths resolve from the current cwd
 - non-search tools do **not** silently fall back to heuristic grep behavior
 
 ### `code_resolve` anchored coordinate resolution

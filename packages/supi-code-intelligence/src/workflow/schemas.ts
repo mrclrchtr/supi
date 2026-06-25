@@ -81,90 +81,41 @@ export const CodeInspectParameters = Type.Object(
 );
 
 /**
- * Planned `code_context` parameters.
+ * `code_orientation` parameters.
  *
- * Runtime rule for future executors:
- * - allow plain orientation when `task` is omitted
- * - prefer `targetId` over raw coordinates once Phase 1 handle resolution exists
- * - `targetId` takes precedence over `file` + `line` + `character`; when both
- *   are supplied, coordinates are ignored with a visible note
- * - coordinate mode (`file` + `line` + `character`) resolves a real symbol
- *   target through the same path as `code_resolve` and exposes a reusable
- *   `targetId`; it requires all three coordinate fields when any is present
+ * Runtime rules:
+ * - no focus means workspace-level orientation
+ * - `focus` is a workspace-relative path or discovered module name
+ * - `focus` + `line` + `character` resolves a real symbol target through the same path as `code_resolve`
+ * - `targetId` takes precedence over focus/coordinates; stale target IDs do not fall back
  */
-export const CodeContextParameters = Type.Object(
+export const CodeOrientationParameters = Type.Object(
   {
-    task: Type.Optional(
-      Type.String({ description: "Task-oriented request describing the change or question." }),
+    focus: Type.Optional(
+      Type.String({
+        description:
+          "Workspace-relative path or discovered module name to orient around. Omit for project orientation.",
+      }),
     ),
     targetId: Type.Optional(
       Type.String({
         description:
-          "Resolved target handle from `code_resolve`. Takes precedence over `file`/`line`/`character`. If invalid or stale, the call errors and does not fall back to coordinates.",
-      }),
-    ),
-    file: Type.Optional(
-      Type.String({
-        description:
-          "Target file path for coordinate target mode. Requires `line` and `character`. Resolves a real symbol target through the same path as `code_resolve`.",
+          "Resolved target handle from `code_resolve`. Takes precedence over `focus`/`line`/`character`. If invalid or stale, the call errors and does not fall back to coordinates.",
       }),
     ),
     line: Type.Optional(
       Type.Number({
-        description: "1-based line for coordinate target mode. Requires `file` and `character`.",
+        description: "1-based line for symbol orientation. Requires `focus` and `character`.",
         minimum: 1,
       }),
     ),
     character: Type.Optional(
       Type.Number({
-        description:
-          "1-based UTF-16 column for coordinate target mode. Requires `file` and `line`.",
+        description: "1-based UTF-16 column for symbol orientation. Requires `focus` and `line`.",
         minimum: 1,
       }),
     ),
-    scope: Type.Optional(
-      Type.String({
-        description:
-          "Workspace-relative path, package, or directory scope for orientation/selection. Ignored (with a visible note) when a precise target (`targetId` or coordinates) is supplied; it is a selection boundary, not a downstream evidence filter.",
-      }),
-    ),
-    budget: Type.Optional(
-      StringEnum(["small", "medium", "large"], {
-        description:
-          "Context budget: small=3, medium=8, large=15 results per section. Smaller values prefer fewer, higher-signal items.",
-      }),
-    ),
-    include: Type.Optional(
-      Type.Array(
-        StringEnum(
-          [
-            "defs",
-            "references",
-            "callees",
-            "tests",
-            "docs",
-            "diagnostics",
-            "exports",
-            "imports",
-            "impact",
-          ],
-          {
-            description: "Context sections to include in the bundle.",
-          },
-        ),
-        {
-          description: "Explicit context sections to include.",
-          uniqueItems: true,
-        },
-      ),
-    ),
     maxResults: Type.Optional(MaxResultsParam),
-    change: Type.Optional(
-      Type.String({
-        description:
-          "When present, runs impact analysis and appends a condensed Impact Assessment section to the context result.",
-      }),
-    ),
   },
   { additionalProperties: false },
 );
@@ -257,7 +208,7 @@ export const CodeGraphParameters = Type.Object(
  * Planned `code_impact` parameters.
  *
  * Runtime rule for future executors:
- * - require at least one of `targetId`, `change`, or `changedFiles`
+ * - require at least one of `targetId`, `change`, or `changeSetFiles`
  */
 export const CodeImpactParameters = Type.Object(
   {
@@ -267,9 +218,10 @@ export const CodeImpactParameters = Type.Object(
     change: Type.Optional(
       Type.String({ description: "Proposed change description for blast-radius analysis." }),
     ),
-    changedFiles: Type.Optional(
-      Type.Array(Type.String({ description: "Changed file path." }), {
-        description: "Dirty or proposed changed files to analyze.",
+    changeSetFiles: Type.Optional(
+      Type.Array(Type.String({ description: "Workspace-relative file in the change set." }), {
+        description:
+          "User-supplied files to analyze as the change set. This is not inferred from git and carries no line-level diff evidence.",
         minItems: 1,
         uniqueItems: true,
       }),
@@ -277,7 +229,7 @@ export const CodeImpactParameters = Type.Object(
     includeTests: Type.Optional(
       Type.Boolean({
         description:
-          "Whether likely tests should be included in the impact set. changedFiles analysis uses semantic references when available plus deterministic conventions; target-based analysis may combine semantic references with deterministic conventions.",
+          "Whether likely tests should be included in the impact set. changeSetFiles analysis uses semantic references when available plus deterministic conventions; target-based analysis may combine semantic references with deterministic conventions.",
       }),
     ),
     maxResults: Type.Optional(MaxResultsParam),
@@ -375,7 +327,7 @@ export type WorkflowCodeToolSchemaKey = WorkflowCodeToolName;
 export const WORKFLOW_CODE_TOOL_SCHEMAS = {
   code_resolve: CodeResolveParameters,
   code_inspect: CodeInspectParameters,
-  code_context: CodeContextParameters,
+  code_orientation: CodeOrientationParameters,
   code_find: CodeFindParameters,
   code_graph: CodeGraphParameters,
   code_impact: CodeImpactParameters,

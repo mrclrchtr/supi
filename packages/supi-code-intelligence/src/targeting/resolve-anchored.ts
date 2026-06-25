@@ -290,7 +290,7 @@ async function resolveFromStructural(
 /**
  * Resolve a real symbol target from anchored coordinates using provider
  * evidence. Replaces the anonymous point-target behavior for `code_resolve`
- * and `code_context`.
+ * and `code_orientation`.
  *
  * Layered resolution (per the coordinated-targets plan):
  * 1. Prefer LSP document-symbol evidence: exact identifier hit, declaration

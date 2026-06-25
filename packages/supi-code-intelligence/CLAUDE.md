@@ -3,7 +3,7 @@
 Architecture briefs with structural enrichment, factual point inspection, reference/usages tracing, outgoing call analysis, implementation lookup, impact assessment, explicit search, and two-step semantic refactoring for pi.
 
 Surfaces:
-- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused public code-only tool surface (`code_context`, `code_inspect`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
+- `@mrclrchtr/supi-code-intelligence/extension` → `src/extension.ts` registers the focused public code-only tool surface (`code_orientation`, `code_inspect`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_resolve`, `code_refactor_plan`, `code_refactor_apply`)
 - Historical substrate-named tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
@@ -70,7 +70,7 @@ src/
 │   ├── register-tools.ts       # Focused Pi tool registration (iterates over specs)
 │   ├── validation.ts           # Shared parameter validation
 │   ├── target-id-params.ts     # targetId expansion/lookup helpers (Phase 1)
-│   ├── execute-context.ts      # code_context tool executor
+│   ├── execute-context.ts      # code_orientation tool executor
 │   ├── execute-inspect.ts      # code_inspect point-inspection executor
 │   ├── execute-graph.ts        # code_graph tool executor (unified relations)
 │   ├── execute-impact.ts       # code_impact tool executor (preferred impact surface)
@@ -90,7 +90,7 @@ src/
 │   └── index.ts               # Internal barrel for workflow skeleton consumers/tests
 ├── presentation/markdown/
 │   ├── overview.ts             # Hidden overview markdown renderer
-│   ├── context.ts              # code_context markdown renderer
+│   ├── context.ts              # code_orientation markdown renderer
 │   ├── brief.ts                # Brief markdown renderer
 │   ├── inspect.ts              # code_inspect markdown renderer
 │   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
@@ -107,26 +107,18 @@ src/
 
 ## Public tool contracts
 
-### `code_context`
-Task-focused context bundle. It is the solo surface for both orientation and task-focused coding context — `code_brief` has been merged into it.
+### `code_orientation`
+Primary orientation surface. Use it for first-pass project/module/directory/file orientation and for narrow symbol orientation after coordinates or `code_resolve`.
 
-- accepts `task`, `targetId`, `file` + `line` + `character` (coordinate target mode), `scope`, `budget`, `include`, and `maxResults`
-- for precise target context, pass either `targetId` (from `code_resolve`) **or** `file` + `line` + `character`. `targetId` takes precedence over coordinates; when both are supplied, coordinates are ignored with a visible note. A stale/invalid `targetId` errors and does **not** fall back to coordinates.
-- coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` (exact identifier hit, declaration-header snap when unambiguous, or explicit disambiguation) and exposes a reusable `targetId` in `details.data.target`. Coordinate mode requires all three fields when any is present.
-- ambiguous coordinate resolution returns candidate `targetId`s and runs no task sections; unresolved coordinates error and recommend `code_inspect` (it is **not** a point-inspection tool).
-- when `task` is omitted, returns a neutral orientation brief (project, package, directory, file, or symbol overview)
-- when `task` is present, renders only the requested sections and reports unavailable sections honestly
-- `targetId` from `code_resolve` is the preferred precise anchor for task-focused follow-up
-- `scope` is a selection/orientation boundary, not a downstream evidence filter: when a precise target is supplied with `scope`, the target wins and `scope` is ignored with a visible note. Future evidence filtering should use a separate parameter, not `scope`.
-- first-wave docs/tests/diagnostics sections are best-effort and must stay explicit when empty or unavailable
-
-**Orientation briefs** — When called without `task`:
-- **Enriched file briefs** — outline (top-level declarations), imports, exports, diagnostics
-- **Enriched module briefs** — aggregate diagnostics across source files when LSP is active
-- **Directory brief enrichment** — extension breakdown, landmark files
-- **Symbol briefs** — orientation-focused, not inspect-style
-
-**`maxResults`** — Controls section caps: outline items (default 15), imports (default 10), exports (default 10), diagnostic messages (default 5), source file listings (default 10). When omitted, defaults apply.
+- accepts `focus`, `targetId`, `line`, `character`, and `maxResults`
+- omit `focus` for workspace/project orientation
+- `focus` is path-first and language-agnostic; if no path exists, discovered module-name lookup is attempted and ambiguity/errors are reported honestly
+- `focus` + `line` + `character` resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId` in `details.data.target`
+- `targetId` takes precedence over `focus`/coordinates with a visible ignored-focus note; stale/invalid `targetId` errors and does not fall back
+- symbol orientation renders definitions, JSDoc/TSDoc docs, local diagnostics near the target, and Read Next guidance
+- relation/test evidence belongs to `code_graph`; impact evidence belongs to `code_impact`; full health/status belongs to `code_health`
+- `maxResults` defaults to 10 and caps each rendered list independently
+- `code_orientation` replaces `code_brief` and the old `code_context`; no compatibility alias is kept
 
 ### `code_inspect`
 Factual point-inspection tool for one precise file position.
@@ -145,15 +137,17 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_imp
 - Each relation dispatched to appropriate substrate (semantic for references/implements, structural for callees)
 - Best-effort per relation: unavailable substrates skip with a note rather than failing the entire call
 - `callees` reports direct structural outgoing calls from the enclosing executable scope at the target anchor. It matches call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes.
-- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using the shared helper in `src/analysis/relations/tests.ts`. Discovery combines semantic import/reference evidence with deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`, same-directory companions). `code_graph`, `code_context`, and `code_impact` all use the same discovery path — any divergence is a bug.
+- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using the shared helper in `src/analysis/relations/tests.ts`. Discovery combines semantic import/reference evidence with deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`, same-directory companions). `code_graph` and `code_impact` use the same discovery path — any divergence is a bug.
+- Targeted graph output includes `Read Next` guidance for the resolved target, enclosing scope, or top relation sites when those source ranges are known
 - File-level expansion not supported — requires precise target (anchored coords or targetId)
 
 ### `code_impact`
 Preferred workflow-oriented blast-radius tool.
 
-- supports target-based impact analysis plus diff-aware `changedFiles` input
+- supports target-based impact analysis plus user-supplied `changeSetFiles` input; `changeSetFiles` is not inferred from git and carries no line-level diff evidence
 - explicit `includeTests` for companion test file discovery
 - `change`-only requests return an explicit insufficient-evidence result instead of heuristic guessing
+- target and change-set output includes `Read Next` guidance for source ranges worth inspecting before editing
 - does not fall back to heuristic search
 
 ### `code_find`
@@ -164,9 +158,9 @@ Unified ranked code search with strict mode dispatch — the sole search tool.
 - `mode: "regex"` allows regex search only and does not accept `kind`
 - `mode: "semantic"` allows semantic workspace-symbol search only, does not accept `kind`, and does not fall back to text search
 - `mode: "ast"` requires explicit `kind`
-- supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`
+- supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, `enum`, `test`
 - AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers
-- unsupported combinations fail explicitly; `test` is not a public AST kind in this phase
+- unsupported combinations fail explicitly instead of widening into best-effort search
 - `scope?` — workspace-relative path, package, or directory to limit search
 - `contextLines?` — context lines around matches (default 1)
 - `maxResults?` — result cap (default 8)
@@ -226,14 +220,14 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 
 ### Planner routing
 - The `planner.ts` central router reads capability state from the shared broker and returns `PlannerRoute` for each tool intent.
-- `code_context` uses the same semantic/structural preference model as `code_brief`, but falls back to orientation-style output when `task` is omitted.
+- `code_orientation` uses the same semantic/structural preference model as `code_brief`, but its public contract is orientation-only: no `task`, `include`, `budget`, or `change`.
 - `code_refactor_plan` checks `refactorAvailable` from the semantic capability slot.
 - The semantic provider prefers its generic `refactor(request)` entrypoint; rename-only fallback exists only for compatibility with older provider shapes.
 - `code_refactor_apply` does not require a live semantic provider — plan validity is enforced through fingerprint comparison in the executor.
 - When no capability is available, the planner returns `preferred: "unavailable"`. The executors follow a 3-way throw policy:
   - **Throw** from `execute()` for whole-tool capability-unavailable — `route.preferred === "unavailable"` (no provider at all), or a provider that lacks the requested capability (e.g. refactor on a rename-only provider). pi marks the call `isError: true`. `code_find` already did this; `code_graph`, `code_resolve`, and `code_refactor_plan` were aligned to it.
   - **Return error text** for self-correctable invalid usage — missing target/params, bad `scope`, stale/invalid `targetId`, invalid `mode`/`kind`, malformed `range`. These stay `CodeIntelResult` with `details` so the model can correct and retry.
-  - **Return best-effort notes** for per-relation/per-target partial unavailability — a `code_graph` relation whose substrate is down while another substrate serves the call, a `code_context` section whose provider is unavailable, `code_resolve` ambiguous candidates. These do not throw.
+  - **Return best-effort notes** for per-relation/per-target partial unavailability — a `code_graph` relation whose substrate is down while another substrate serves the call, a `code_orientation` symbol section whose provider is unavailable, `code_resolve` ambiguous candidates. These do not throw.
   - Warmup timeouts stay error-text results (transient readiness, not capability-unavailable).
 
 ### Tool adapter contract
@@ -241,7 +235,7 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - The adapter forwards `signal` (AbortSignal) and `onUpdate` (AgentToolUpdateCallback) from pi's `execute()` through `spec.run` into every executor's `CodeIntelToolExecCtx`. Long‑running executors (`code_find` ripgrep, `code_graph:all`, `code_impact` sweeps, `code_health:refresh`, `code_refactor_plan` LSP requests) forward `signal` to abort‑aware sub‑processes and emit coarse `onUpdate` progress beats via `emitToolProgress`.
 
 ### Public-surface split
-- `code_context` is now active as the solo task-focused and orientation surface; `code_brief` has been removed from the public surface.
+- `code_orientation` is now active as the orientation surface; `code_brief` and the old `code_context` public surface have been removed.
 - `code_inspect` is the explicit public point-inspection tool.
 - `code_impact` is now active as the preferred workflow impact surface.
 - `code_find` is the sole search tool, supporting text, regex, AST, and semantic modes.
@@ -250,16 +244,15 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 
 ### Param validation
 - `code_inspect` requires `file` + `line` + `character`.
-- `line`/`character` require `file`, **not** `scope`.
+- For `code_orientation`, `line`/`character` require `focus`. For other coordinate tools, `line`/`character` require `file`, **not** `scope`.
 - `code_refactor_plan` requires `operation` plus either `targetId` or `file` + `line` + `character`.
 - `newName` is required for `rename_symbol`, `extract_function`, and `extract_variable` (and for the legacy `rename` alias on `code_refactor_plan`).
 - `range` is required for `extract_function` and `extract_variable`; public range coordinates are 1-based and converted to LSP ranges internally.
 - `code_refactor_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
-- `code_context` accepts `targetId` or `file` + `line` + `character` for precise target context. `targetId` takes precedence over coordinates; a stale/invalid `targetId` errors and does not fall back to coordinates. Coordinate mode requires all three fields when any is present; partial coordinates are a validation error.
-- `code_context`, `code_impact`, and `code_refactor_plan` accept optional `targetId` that takes precedence over raw coordinates.
-- `code_context` accepts optional `targetId` for orientation-only follow-up.
-- `scope` is a selection/orientation boundary, not a downstream evidence filter. In `code_context`, `scope` is ignored (with a visible note) when a precise target is supplied. Future evidence filtering should use a separate parameter such as `within`/`evidenceScope`, not `scope`.
+- `code_orientation` accepts `targetId` or `focus` + `line` + `character` for precise symbol orientation. `targetId` takes precedence over focus/coordinates with a visible note; a stale/invalid `targetId` errors and does not fall back. Coordinate mode requires all three fields when any is present and `focus` must be a file path.
+- `code_orientation`, `code_impact`, and `code_refactor_plan` accept optional `targetId` that takes precedence over raw coordinates.
+- `focus` is the orientation selection input for `code_orientation`; other tools keep `scope` for narrowing/filtering.
 
 ### Composite provider contract
 - `createCompositeProvider` in `src/analysis/context/request-context.ts` wraps `StructuralProvider` and `SemanticProvider` into a single `CodeProvider`. **When you add a new parameter to any provider method, update the composite wrapper to accept and pass it through.** Missing parameters are silently dropped — the wrapper uses `?` optional params, so TypeScript won't catch the mismatch at runtime (the extra argument is simply ignored).
@@ -267,18 +260,18 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 ### Evidence provenance in test discovery
 - Test discovery results carry `provenance`: `"semantic+conventions"` if semantic references contributed files, `"conventions-only"` otherwise.
 - This provenance describes **file discovery only**. It must not imply whether test labels were extracted.
-- `code_graph`, `code_context`, and `code_impact` all display provenance annotations in their output.
+- `code_graph` and `code_impact` display provenance annotations in their output.
 - Structured tool details for those surfaces also carry a compact tests metadata shape: discovery status/provenance plus per-file label status and extracted labels.
 - In `code_impact`, likely-test headings annotate discovery provenance symmetrically: `Likely Tests (semantic+conventions)` when semantic discovery contributed, `Likely Tests (conventions-only)` when only conventions contributed.
 - A `conventions-only` result with zero test files is treated as `unavailable` by `code_graph` only when neither semantic references nor structural outline support is available; otherwise it is an honest empty result.
 - User-facing test-label output includes only recognized `` describe ``/`` it ``/`` test ``/`` spec `` blocks from provider-backed or conservative fallback extraction. Helper names like `tmpDir`, `result`, `writeSource` are not rendered.
 - A discovered test file with zero recognized test blocks displays `_(no recognized test blocks)_`. This placeholder is intentional honesty, not missing rendering.
 
-### Evidence in changedFiles impact
-- `code_impact` with `changedFiles` appends an evidence note. It reports `semantic+structural` when semantic references for changed-file symbols contributed, otherwise `structural` for file-level module analysis and path-based test discovery.
+### Evidence in changeSetFiles impact
+- `code_impact` with `changeSetFiles` appends an evidence note. It reports `semantic+structural` when semantic references for symbols defined in change-set files contributed, otherwise `structural` for file-level module analysis and path-based test discovery.
 
 ### Shared test discovery
-- `src/analysis/relations/tests.ts` is the single source of truth for test-file discovery. `code_graph`, `code_context`, and `code_impact` all route through `discoverTestFilesForSource()`. Any divergent test lookup logic in a tool file is a bug.
+- `src/analysis/relations/tests.ts` is the single source of truth for test-file discovery. `code_graph` and `code_impact` route through `discoverTestFilesForSource()`. Any divergent test lookup logic in a tool file is a bug.
 - Discovery combines semantic import/reference evidence with deterministic path conventions: same-directory companions, same-directory `__tests__/` companions, package-level mirrors (`__tests__/unit/…`, `__tests__/integration/…`), and bounded tool/package-aware candidates. For source files at `src/tool/execute-<name>.ts`, exact candidates such as `code-<name>-tool`, `<name>-tool`, and `execute-<name>` are checked in both `__tests__/unit/` and `__tests__/integration/` with `.test` and `.spec` suffixes. No broad search, fuzzy matching, or AI guessing is performed.
 
 ### Impact seeding
@@ -292,10 +285,10 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - The planner delegates to the existing targeting pipeline (`resolve-target.ts` and `src/targeting/*`).
 - `code_resolve` registers targets in a session-scoped in-memory store (`src/workflow/target-store.ts`).
 - Anchored `code_resolve({ file, line, character })` resolves a **real symbol target** from provider-backed evidence via `resolveAnchoredSymbolTarget` (`src/targeting/resolve-anchored.ts`): exact identifier hit → named `name` anchor; declaration-header coordinate → snaps to the name anchor only when one provider-backed symbol is unambiguous (with a visible note + structured resolution metadata); whitespace/comment/non-symbol coordinates error and recommend `code_inspect`. It does **not** register anonymous point targets.
-- `code_context` coordinate mode (`file` + `line` + `character`) reuses the same anchored resolution + store path as `code_resolve` (via `executeResolveService`), so a one-call context bundle exposes a reusable `targetId`.
+- `code_orientation` coordinate mode (`focus` + `line` + `character`) reuses the same anchored resolution + store path as `code_resolve` (via `executeResolveService`), so a one-call orientation result exposes a reusable `targetId`.
 - `code_graph` and `code_impact` coordinate mode (`file` + `line` + `character`) routes through `resolveTarget` (`src/analysis/targeting/resolve-target.ts`), whose anchored case calls the same `resolveAnchoredSymbolTarget` — all four target-oriented tools share one provider-backed symbol resolver and never produce anonymous `name:null` point targets (ADR 0003). The legacy sync `resolveAnchoredTarget` point-target resolver has been removed.
 - Target IDs (`tg-*`) and span IDs (`sp-*`) are deterministic and stable while the backing file fingerprint is unchanged. Per ADR 0003, position is excluded from the `targetId` identity hash (name/kind/container/fingerprint), so re-resolving the same symbol reuses the same ID regardless of anchor refine success.
-- Unknown or stale target IDs return explicit unavailable messages rather than silent fallthrough. `code_context` and `code_graph` do **not** fall back to coordinates when a `targetId` is stale/invalid.
+- Unknown or stale target IDs return explicit unavailable messages rather than silent fallthrough. `code_orientation` and `code_graph` do **not** fall back to coordinates when a `targetId` is stale/invalid.
 - No cross-session persistence — target handles live only as long as the current process.
 
 ### First-turn overview

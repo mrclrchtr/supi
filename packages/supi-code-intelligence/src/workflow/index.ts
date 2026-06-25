@@ -13,12 +13,12 @@ export type {
 export type { WorkflowCodeToolSchemaKey } from "./schemas.ts";
 export {
   CodeApplyParameters,
-  CodeContextParameters,
   CodeFindParameters,
   CodeGraphParameters,
   CodeHealthParameters,
   CodeImpactParameters,
   CodeInspectParameters,
+  CodeOrientationParameters,
   CodeRefactorParameters,
   CodeResolveParameters,
   WORKFLOW_CODE_TOOL_SCHEMAS,

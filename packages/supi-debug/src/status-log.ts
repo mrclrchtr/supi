@@ -5,8 +5,10 @@ const STATUS_LOG_ENV = "SUPI_LOG_STATUS";
 const EXPECTED_SUPI_TOOLS = [
   "ask_user",
   "code_resolve",
-  "code_brief",
+  "code_inspect",
+  "code_orientation",
   "code_graph",
+  "code_impact",
   "code_affected",
   "code_find",
   "code_health",

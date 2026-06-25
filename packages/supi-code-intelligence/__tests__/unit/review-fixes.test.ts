@@ -5,7 +5,7 @@ import { buildArchitectureModel, getDependents } from "@mrclrchtr/supi-code-inte
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runRipgrep } from "../../src/search-helpers.ts";
-import { executeContextTool } from "../../src/tool/execute-context.ts";
+import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
@@ -102,7 +102,7 @@ describe("transitive downstream impact", () => {
 });
 
 describe("focused-tool follow-up regressions", () => {
-  it("uses symbol input for orientation without leaking inspect-style sections", async () => {
+  it("uses focus coordinates for symbol orientation without leaking inspect-style sections", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
     const srcDir = path.join(tmpDir, "src");
     mkdirSync(srcDir, { recursive: true });
@@ -191,16 +191,15 @@ describe("focused-tool follow-up regressions", () => {
       callSites: async (_f) => ({ kind: "success" as const, data: [] }),
     });
 
-    const result = await executeContextTool(
-      { file: "src/widget.ts", line: 1, character: 17 },
+    const result = await executeOrientationTool(
+      { focus: "src/widget.ts", line: 1, character: 17 },
       { cwd: tmpDir },
     );
 
     expect(result.content).toContain("src/widget.ts");
-    expect(result.content).toContain("## File Outline");
+    expect(result.content).toContain("## Definitions");
     expect(result.content).not.toContain("Project Brief");
     expect(result.content).not.toContain("## Hover");
-    expect(result.content).not.toContain("## Definition");
     expect(result.content).not.toContain("## Code Actions");
     expect(result.details?.type).toBe("context");
     if (result.details?.type === "context") {
@@ -322,33 +321,24 @@ describe("path scoping uses proper containment", () => {
   });
 });
 
-describe("unified scope validation across target modes", () => {
-  it("ignores an invalid scope for a precise coordinate target and proceeds to resolution", async () => {
+describe("unified focus validation across target modes", () => {
+  it("requires focus for a precise coordinate target", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
     const srcDir = path.join(tmpDir, "src");
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(path.join(srcDir, "widget.ts"), "export function Widget() {\n  return 1;\n}\n");
 
-    // No provider is registered. Per the reconciled contract, a precise target
-    // wins over `scope`: an invalid scope is ignored (with a note) rather than
-    // short-circuiting, so the call proceeds to coordinate resolution, which
-    // then fails honestly because no provider can resolve a symbol here.
-    const result = await executeContextTool(
-      { file: "src/widget.ts", line: 1, character: 17, scope: "does-not-exist" },
-      { cwd: tmpDir },
-    );
+    const result = await executeOrientationTool({ line: 1, character: 17 }, { cwd: tmpDir });
 
-    // Scope is ignored for precise targets — it must NOT be the reported error.
-    expect(result.content).not.toContain("does-not-exist");
-    expect(result.content).not.toContain("Scope path not found");
-    // The result reflects coordinate resolution, not scope validation.
+    expect(result.content).toContain("**Error:**");
+    expect(result.content).toContain("focus");
     expect(result.details?.type).toBe("context");
   });
 
-  it("surfaces a scope-path error in orientation mode", async () => {
+  it("surfaces a focus-path error in orientation mode", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
 
-    const result = await executeContextTool({ scope: "nope/" }, { cwd: tmpDir });
+    const result = await executeOrientationTool({ focus: "nope/" }, { cwd: tmpDir });
 
     expect(result.content).toContain("**Error:**");
     expect(result.content).toContain("nope");

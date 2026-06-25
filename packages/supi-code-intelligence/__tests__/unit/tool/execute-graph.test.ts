@@ -965,10 +965,13 @@ describe("execute-graph (code_graph tool)", () => {
         { cwd: tmpDir },
       );
 
-      // Same line should appear once, not "L1, L1"
-      expect(result.content).not.toContain("L1, L1");
-      expect(result.content).toContain("L1");
-      const l1Matches = result.content.match(/\bL1\b/g);
+      const referencesContent = result.content.split("## Read Next")[0];
+
+      // Same line should appear once in reference evidence, not "L1, L1".
+      // Read-next guidance may repeat source ranges because it is navigation chrome.
+      expect(referencesContent).not.toContain("L1, L1");
+      expect(referencesContent).toContain("L1");
+      const l1Matches = referencesContent.match(/\bL1\b/g);
       expect(l1Matches?.length).toBe(1);
     });
 

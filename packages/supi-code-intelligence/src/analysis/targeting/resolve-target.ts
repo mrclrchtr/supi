@@ -67,7 +67,7 @@ export async function resolveTarget(
 
 /**
  * Anchored case: route file + line + character through the same provider-backed
- * symbol resolver as `code_resolve`/`code_context` (resolveAnchoredSymbolTarget),
+ * symbol resolver as `code_resolve`/`code_orientation` (resolveAnchoredSymbolTarget),
  * so `code_graph`/`code_impact` resolve real symbol targets (exact identifier
  * hit or declaration-header snap) instead of anonymous point targets.
  * Per ADR 0003 — no silent `name:null` point targets.

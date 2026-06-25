@@ -4,16 +4,16 @@ import type { PublicCodeIntelligenceToolName } from "../intent/types.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import {
   CodeApplyParameters,
-  CodeContextParameters,
   CodeFindParameters,
   CodeGraphParameters,
   CodeHealthParameters,
   CodeImpactParameters,
   CodeInspectParameters,
+  CodeOrientationParameters,
   CodeRefactorParameters,
 } from "../workflow/schemas.ts";
 import { executeApplyTool } from "./execute-apply.ts";
-import { executeContextTool } from "./execute-context.ts";
+import { executeOrientationTool } from "./execute-context.ts";
 import { executeFindTool } from "./execute-find.ts";
 import { executeGraphTool } from "./execute-graph.ts";
 import { executeHealthTool } from "./execute-health.ts";
@@ -107,7 +107,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     promptSnippet: "code_resolve — resolve references into precise targets and target handles",
     basePromptGuidelines: [
       "Use code_resolve when a symbol, file, or code reference is ambiguous and needs precise resolution.",
-      "Prefer code_resolve as the entry point before code_context, code_graph, code_impact, or code_refactor_plan — its targetId replaces fragile file/line/character coordinates.",
+      "Prefer code_resolve as the entry point before code_orientation, code_graph, code_impact, or code_refactor_plan — its targetId replaces fragile file/line/character coordinates.",
       "When code_resolve returns ambiguous results with ranked candidates, pick one and use file + line + character for follow-up resolution.",
     ],
     parameters: CodeResolveParameters,
@@ -123,37 +123,37 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     basePromptGuidelines: [
       "Use code_inspect for factual point inspection at one precise file position.",
       "Provide `file`, `line`, and `character` — code_inspect is intentionally point-based.",
-      "Prefer code_inspect over code_context for point-level facts when no symbol target can be resolved.",
+      "Prefer code_inspect over code_orientation for point-level facts when no symbol target can be resolved.",
     ],
     parameters: CodeInspectParameters,
     run: (params, ctx) =>
       executeInspectTool(params as Parameters<typeof executeInspectTool>[0], ctx),
   },
   {
-    name: "code_context",
-    label: "Code Context",
+    name: "code_orientation",
+    label: "Code Orientation",
     description:
-      "Task-focused context bundle for a change, question, or resolved target. Use when you want prioritized definitions, relationships, diagnostics, docs, and tests gathered into one coding-oriented context result. Accepts either `targetId` (from `code_resolve`) or `file` + `line` + `character` for precise target context; `targetId` takes precedence over coordinates. Coordinate mode resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. When called without a `task`, returns a neutral orientation brief — use it as the primary entry point for project, package, directory, file, or symbol overviews. Not a point-inspection tool — use `code_inspect` for point-level facts when no symbol target can be resolved. `scope` is a selection/orientation boundary, not a downstream evidence filter: when a precise target is supplied with `scope`, the target wins and `scope` is ignored with a visible note. Output is truncated to 2000 lines / 50KB.",
-    promptSnippet: "code_context — task-focused coding context bundle",
+      "Primary code-orientation tool for understanding a project, discovered module, directory, file, or symbol before choosing surgical follow-up tools. Use `focus` for a workspace-relative path or discovered module name; omit `focus` for project orientation. Use `focus` + `line` + `character` for symbol orientation, or pass `targetId` from `code_resolve`; `targetId` takes precedence over focus/coordinates and stale target IDs do not fall back. Symbol orientation returns definitions, JSDoc/TSDoc docs, local diagnostics near the target, and Read Next guidance; relation evidence belongs in code_graph, impact evidence in code_impact, and health/status in code_health. Not a point-inspection tool — use code_inspect for exact position facts. `maxResults` caps each rendered list and defaults to 10. Output is truncated to 2000 lines / 50KB.",
+    promptSnippet: "code_orientation — project/module/file/symbol orientation",
     basePromptGuidelines: [
-      "Use code_context for both task-focused coding context and neutral orientation overviews.",
-      "Omit `task` in code_context to get a neutral project/package/file orientation brief.",
-      "Use `include` in code_context to request only the sections you need.",
+      "Use `code_orientation({ focus })` for first-pass project/package/directory/file orientation before `bash`/`read`.",
+      "Use code_resolve first for bare symbol names, then pass the resulting targetId to code_orientation.",
+      "Use code_graph/code_impact/code_health for relations, impact, or full health instead of asking code_orientation for those sections.",
     ],
-    parameters: CodeContextParameters,
+    parameters: CodeOrientationParameters,
     run: (params, ctx) =>
-      executeContextTool(params as Parameters<typeof executeContextTool>[0], ctx),
+      executeOrientationTool(params as Parameters<typeof executeOrientationTool>[0], ctx),
   },
   {
     name: "code_graph",
     label: "Code Graph",
     description:
-      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays discovery provenance (semantic+conventions or conventions-only) separately from any extracted test labels. `callees` is structural/direct-scope evidence: it reports call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes — use `references` on a resolved target for identity-aware incoming callers. Pass `calleeDepth: "deep"` to include callees from nested scopes. `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files and labels. `scope` (not `path`) narrows by workspace-relative directory/package. Use code_resolve first to get a targetId, then pass it to code_graph. Output is truncated to 2000 lines / 50KB.',
+      'Unified relation-graph tool — replaces code_references, code_calls, and code_implementations. Resolves a target once and dispatches to the appropriate analysis service per requested relation. Defaults to ["references"] when `relations` is omitted. Each relation is best-effort: unavailable substrates skip with a note rather than failing the whole call. Each relation annotates its evidence source. The tests relation displays discovery provenance (semantic+conventions or conventions-only) separately from any extracted test labels. `callees` is structural/direct-scope evidence: it reports call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes — use `references` on a resolved target for identity-aware incoming callers. Pass `calleeDepth: "deep"` to include callees from nested scopes. `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion test files and labels. Targeted graph results include Read Next guidance for source ranges worth inspecting via `read`. `scope` (not `path`) narrows by workspace-relative directory/package. Use code_resolve first to get a targetId, then pass it to code_graph. Output is truncated to 2000 lines / 50KB.',
     promptSnippet: "code_graph — semantic and structural relation graph",
     basePromptGuidelines: [
       "Use code_graph to find references, direct structural calls, and implementations for a target.",
       'Default `relations` is ["references"]; use `relations: ["callees"]` or `["implements"]` for those, or `relations: ["all"]` to expand to every relation family in one call.',
-      "After code_graph, follow up with code_context on individual results for type or definition context.",
+      "After code_graph, follow up with code_orientation on individual results for type or definition context.",
       'Pass `calleeDepth: "deep"` to include callees from nested function/method/callback scopes (default `"direct"` excludes them).',
       'Suggested relations by target kind: For functions/methods: `["references", "callees", "tests"]` — For interfaces/types/classes/enums: `["references", "implements"]` — For files/modules: `["imports", "exports"]` — For tests: `["tests"]`.',
     ],
@@ -165,7 +165,7 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_impact",
     label: "Code Impact",
     description:
-      "Estimate blast radius and downstream impact for a target before making edits. This is the preferred workflow-oriented impact tool. Uses semantic evidence for target-based impact and merges semantic references into changedFiles analysis when available. Does not fall back to heuristic text search. Use a resolved target for precise semantic reference-based impact. Output is truncated to 2000 lines / 50KB.",
+      "Estimate blast radius and downstream impact for a target or user-supplied change set before making edits. `changeSetFiles` are explicit workspace-relative files to analyze as in scope for a proposed/current change; they are not inferred from git and carry no line-level diff evidence. Uses semantic evidence for target-based impact and merges semantic references for symbols defined in change-set files when available. Includes Read Next guidance for source ranges worth inspecting via `read` before editing. Does not fall back to heuristic text search. Use a resolved target for precise semantic reference-based impact. Output is truncated to 2000 lines / 50KB.",
     promptSnippet: "code_impact — blast radius and impact",
     basePromptGuidelines: [
       "Use code_impact before edits to estimate blast radius and follow-up checks.",

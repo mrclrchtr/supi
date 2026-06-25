@@ -6,7 +6,7 @@ import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
-import { executeContextTool } from "../../src/tool/execute-context.ts";
+import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
 import { executeAction } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
@@ -178,7 +178,7 @@ describe("focused brief details metadata", () => {
 describe("structured details via tool adapters and action routers", () => {
   it("returns project-level orientation details when called without a target", async () => {
     setupWorkspace();
-    const result = await executeContextTool({}, { cwd: tmpDir });
+    const result = await executeOrientationTool({}, { cwd: tmpDir });
     expect(result.content).toContain("Project Brief");
     expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("context");
@@ -244,7 +244,7 @@ describe("structured details via tool adapters and action routers", () => {
 
   describe("brief action — no-result detail states", () => {
     it("returns details for no project model", async () => {
-      const result = await executeContextTool({}, { cwd: tmpDir });
+      const result = await executeOrientationTool({}, { cwd: tmpDir });
       expect(result.details).toBeDefined();
       expect(result.details?.type).toBe("context");
       if (result.details?.type === "context") {
@@ -332,7 +332,7 @@ describe("structured details via tool adapters and action routers", () => {
       }
     });
 
-    it("code_impact changedFiles input returns impact details with diff-aware next queries", async () => {
+    it("code_impact changeSetFiles input returns impact details with change-set next queries", async () => {
       setupWorkspace();
       writeFileSync(path.join(tmpDir, "packages/core/index.ts"), "export const changed = 1;\n");
       writeFileSync(
@@ -345,9 +345,9 @@ describe("structured details via tool adapters and action routers", () => {
       const tool = getTool(pi, "code_impact");
 
       const result = (await tool.execute(
-        "details-impact-changed-files",
+        "details-impact-change-set",
         {
-          changedFiles: ["packages/core/index.ts"],
+          changeSetFiles: ["packages/core/index.ts"],
           includeTests: true,
         },
         undefined,
@@ -370,7 +370,7 @@ describe("structured details via tool adapters and action routers", () => {
         expect(result.details.data.confidence).not.toBe("unavailable");
         expect(result.details.data.likelyTests.length).toBeGreaterThan(0);
         expect(result.details.data.nextQueries).toEqual(
-          expect.arrayContaining([expect.stringContaining("code_context")]),
+          expect.arrayContaining([expect.stringContaining("code_orientation")]),
         );
       }
     });
@@ -447,7 +447,7 @@ describe("structured details via tool adapters and action routers", () => {
   });
 });
 
-describe("code_context details metadata", () => {
+describe("code_orientation details metadata", () => {
   async function resolveTargetId(pi: ReturnType<typeof createPiMock>): Promise<string> {
     const resolveTool = getTool(pi, "code_resolve");
     const resolveResult = (await resolveTool.execute(
@@ -472,7 +472,7 @@ describe("code_context details metadata", () => {
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_context");
+    const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(
       "details-context-project",
@@ -505,19 +505,16 @@ describe("code_context details metadata", () => {
     }
   });
 
-  it("falls back to orientation for defs-only task context without a precise target", async () => {
+  it("returns orientation details for a focused module", async () => {
     setupWorkspace();
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_context");
+    const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(
-      "details-context-no-target-defs",
-      {
-        task: "understand the surrounding definitions",
-        include: ["defs"],
-      },
+      "details-context-focused-module",
+      { focus: "packages/core" },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -526,27 +523,22 @@ describe("code_context details metadata", () => {
         type: string;
         data: {
           confidence: string;
-          task: string | null;
           focusTarget: string | null;
           renderedSections: string[];
           requestedSections: string[];
-          omittedCount: number;
-          nextQueries: string[];
         };
       };
     };
 
-    expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("context");
     if (result.details?.type === "context") {
-      // Model is now always built, so confidence is structural even for task fallback
       expect(result.details.data.confidence).toBe("structural");
-      // Orientation mode has different section semantics
       expect(result.details.data.renderedSections).toContain("orientation");
+      expect(result.details.data.requestedSections).toEqual([]);
     }
   });
 
-  it("returns dedicated context details for a targeted task bundle", async () => {
+  it("returns dedicated context details for targeted symbol orientation", async () => {
     setupWorkspace();
     writeFileSync(
       path.join(tmpDir, "packages/core/index.ts"),
@@ -555,39 +547,16 @@ describe("code_context details metadata", () => {
         .concat("\n"),
     );
 
-    registerMockProvider(tmpDir, {
-      references: async () => [
-        {
-          uri: `file://${path.join(tmpDir, "packages/app/main.ts")}`,
-          range: {
-            start: { line: 0, character: 0 },
-            end: { line: 0, character: 8 },
-          },
-        },
-      ],
-      calleesAt: async () => ({
-        kind: "success",
-        data: {
-          enclosingScope: { name: "targetFn", startLine: 1, endLine: 1 },
-          callees: [{ name: "helper", startLine: 1, endLine: 1 }],
-          depth: "direct" as const,
-        },
-      }),
-    });
+    registerMockProvider(tmpDir);
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
     const targetId = await resolveTargetId(pi);
-    const tool = getTool(pi, "code_context");
+    const tool = getTool(pi, "code_orientation");
 
     const result = (await tool.execute(
       "details-context-targeted",
-      {
-        task: "rename targetFn safely",
-        targetId,
-        include: ["defs", "references", "callees"],
-        maxResults: 2,
-      },
+      { targetId, maxResults: 2 },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -601,13 +570,6 @@ describe("code_context details metadata", () => {
           requestedSections: string[];
           omittedCount: number;
           nextQueries: string[];
-          evidenceLists?: Array<{
-            key: string;
-            totalCount: number | null;
-            shownCount: number;
-            omittedCount: number | null;
-            partialReason: string | null;
-          }>;
         };
       };
     };
@@ -615,20 +577,13 @@ describe("code_context details metadata", () => {
     expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("context");
     if (result.details?.type === "context") {
-      expect(result.details.data.task).toBe("rename targetFn safely");
+      expect(result.details.data.task).toBeNull();
       expect(result.details.data.focusTarget).not.toBeNull();
-      expect(result.details.data.requestedSections).toEqual(["defs", "references", "callees"]);
+      expect(result.details.data.requestedSections).toEqual(["defs", "docs", "diagnostics"]);
       expect(result.details.data.renderedSections).toEqual(
-        expect.arrayContaining(["defs", "references", "callees"]),
+        expect.arrayContaining(["defs", "docs", "diagnostics"]),
       );
       expect(result.details.data.nextQueries.length).toBeGreaterThan(0);
-      expect(result.details.data.evidenceLists).toContainEqual({
-        key: "callees.calls",
-        totalCount: 1,
-        shownCount: 1,
-        omittedCount: 0,
-        partialReason: null,
-      });
     }
   });
 });

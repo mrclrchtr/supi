@@ -155,12 +155,12 @@ describe("CiStatusDialog", () => {
 
     it("shows tools section with active code_* tools", () => {
       const dialog = createCiStatusDialog(
-        makeData({ activeTools: ["code_context", "code_graph", "code_find"] }),
+        makeData({ activeTools: ["code_orientation", "code_graph", "code_find"] }),
         makeDeps(),
       );
       const lines = dialog.render(80);
       const all = lines.join("\n");
-      expect(all).toContain("code_context");
+      expect(all).toContain("code_orientation");
       expect(all).toContain("code_graph");
       expect(all).toContain("code_find");
     });
@@ -177,7 +177,7 @@ describe("CiStatusDialog", () => {
         makeData({
           servers: mockServers,
           diagnostics: mockDiagnostics,
-          activeTools: ["code_context", "code_graph", "code_find", "code_health"],
+          activeTools: ["code_orientation", "code_graph", "code_find", "code_health"],
         }),
         makeDeps(),
       );

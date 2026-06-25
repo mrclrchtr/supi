@@ -91,7 +91,7 @@
 
 ### 7. Auto-Delivered Overlap (10 points)
 
-Score this criterion after a **context baseline review**: compare the CLAUDE.md against what a SuPi-enabled PI session likely already has from `code_brief` and other known injected context.
+Score this criterion after a **context baseline review**: compare the CLAUDE.md against what a SuPi-enabled PI session likely already has from the code-intelligence overview/`code_orientation` and other known injected context.
 
 **10 points**: Almost no overlap. Any overlap is tiny and clearly justified by human-only reasoning.
 
@@ -103,15 +103,15 @@ Score this criterion after a **context baseline review**: compare the CLAUDE.md 
 
 **What is NOT overlap:** Gotchas specific to a package's behavior; cross-package patterns that aren't discoverable from manifests; non-obvious commands and workflows (gotcha flags, hook behaviors, ordering requirements — not routine npm install/test/build); human-curated "Start Here" guidance with reasoning; concise structure notes that explain boundaries, ownership, initialization order, or important exceptions; and sections classified as **unique** during the baseline review.
 
-**What IS overlap:** Monorepo package tables where every row is `{name, description, path}`; root-level "Modules" or "Packages" sections with >5 entries; the **fully redundant** portion of a section during baseline review; root `## Project structure` / `## Architecture` trees that mostly restate folders, packages, or module layout already visible from `code_brief`; high-level architecture overviews that don't add relationships, gotchas, conventions, or exceptions beyond what's in `package.json`; and dependency graphs that could be generated from `pnpm-workspace.yaml`.
+**What IS overlap:** Monorepo package tables where every row is `{name, description, path}`; root-level "Modules" or "Packages" sections with >5 entries; the **fully redundant** portion of a section during baseline review; root `## Project structure` / `## Architecture` trees that mostly restate folders, packages, or module layout already visible from the code-intelligence overview or `code_orientation`; high-level architecture overviews that don't add relationships, gotchas, conventions, or exceptions beyond what's in `package.json`; and dependency graphs that could be generated from `pnpm-workspace.yaml`.
 
 ## Assessment Process
 
 1. Read the CLAUDE.md file completely.
-2. If SuPi is active, perform a **context baseline review** first: compare against `code_brief` and other known injected context, then classify sections as **fully redundant**, **partially redundant**, or **unique**.
+2. If SuPi is active, perform a **context baseline review** first: compare against the code-intelligence overview/`code_orientation` and other known injected context, then classify sections as **fully redundant**, **partially redundant**, or **unique**.
 3. Cross-reference with the actual codebase: run documented commands (mentally or actually), check that referenced files exist, and verify architecture descriptions.
 4. Score each criterion, calculate the total, assign the grade, list the specific issues, and propose concrete improvements.
 
 ## Red Flags
 
-Watch for commands that would fail (wrong paths, missing deps), references to deleted files or folders, outdated tech versions, template copy without customization, generic advice, stale `TODO` items, duplicate info across multiple CLAUDE.md files, sections that duplicate `code_brief` output, and structure sections where the redundant tree/inventory portion should be separated from the unique guidance portion.
+Watch for commands that would fail (wrong paths, missing deps), references to deleted files or folders, outdated tech versions, template copy without customization, generic advice, stale `TODO` items, duplicate info across multiple CLAUDE.md files, sections that duplicate the code-intelligence overview or `code_orientation` output, and structure sections where the redundant tree/inventory portion should be separated from the unique guidance portion.

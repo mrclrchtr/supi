@@ -63,7 +63,7 @@ export function routeFor(cwd: string, tool: CodeIntelligenceToolName): PlannerRo
     return withPreferred(availability, "unavailable");
   }
 
-  if (tool === "code_context" || tool === "code_inspect") {
+  if (tool === "code_orientation" || tool === "code_inspect") {
     return withPreferred(availability, briefPreferred(availability));
   }
 

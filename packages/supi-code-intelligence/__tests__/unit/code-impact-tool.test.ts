@@ -63,7 +63,7 @@ describe("code_impact tool", () => {
     expect(props).toBeDefined();
     expect(props).toHaveProperty("targetId");
     expect(props).toHaveProperty("change");
-    expect(props).toHaveProperty("changedFiles");
+    expect(props).toHaveProperty("changeSetFiles");
     expect(props).toHaveProperty("includeTests");
     expect(props).toHaveProperty("maxResults");
   });
@@ -111,6 +111,9 @@ describe("code_impact tool", () => {
 
     expect(result.content[0].text).not.toContain("**Error");
     expect(result.content[0].text).toContain("Impact");
+    expect(result.content[0].text).toContain("## Read Next");
+    expect(result.content[0].text).toContain("inspect the target before editing");
+    expect(result.content[0].text).toContain("`read` offset 1, limit");
     expect(result.details?.type).toBe("impact");
     if (result.details?.type === "impact") {
       expect(result.details.data?.confidence).toBe("semantic");
@@ -118,7 +121,7 @@ describe("code_impact tool", () => {
         expect.arrayContaining([expect.stringContaining("code_inspect")]),
       );
       expect(result.details.data?.nextQueries).not.toEqual(
-        expect.arrayContaining([expect.stringContaining("`code_brief` with `file:")]),
+        expect.arrayContaining([expect.stringContaining("`code_orientation` with `file:")]),
       );
     }
   });
@@ -192,7 +195,7 @@ describe("code_impact tool", () => {
     });
   });
 
-  it("accepts changedFiles with includeTests without requiring an anchored target", async () => {
+  it("accepts changeSetFiles with includeTests without requiring an anchored target", async () => {
     writeFileSync(path.join(tmpDir, "src.ts"), "export const changed = true;\n");
     writeFileSync(
       path.join(tmpDir, "src.test.ts"),
@@ -204,9 +207,9 @@ describe("code_impact tool", () => {
     const impactTool = getTool(pi, "code_impact");
 
     const result = (await impactTool.execute(
-      "impact-changed-files",
+      "impact-change-set",
       {
-        changedFiles: ["src.ts"],
+        changeSetFiles: ["src.ts"],
         includeTests: true,
       },
       undefined,
@@ -228,12 +231,12 @@ describe("code_impact tool", () => {
     expect(result.details?.type).toBe("impact");
     if (result.details?.type === "impact") {
       expect(result.details.data?.nextQueries).toEqual(
-        expect.arrayContaining([expect.stringContaining("code_context")]),
+        expect.arrayContaining([expect.stringContaining("code_orientation")]),
       );
     }
   });
 
-  it("merges semantic references into changedFiles impact when available", async () => {
+  it("merges semantic references into changeSetFiles impact when available", async () => {
     mkdirSync(path.join(tmpDir, "src"), { recursive: true });
     writeFileSync(path.join(tmpDir, "src.ts"), "export const changed = true;\n");
     writeFileSync(
@@ -271,9 +274,9 @@ describe("code_impact tool", () => {
     const impactTool = getTool(pi, "code_impact");
 
     const result = (await impactTool.execute(
-      "impact-changed-files-semantic",
+      "impact-change-set-semantic",
       {
-        changedFiles: ["src.ts"],
+        changeSetFiles: ["src.ts"],
       },
       undefined,
       undefined,
@@ -311,7 +314,7 @@ describe("code_impact tool", () => {
     };
 
     expect(result.content[0].text).toContain("insufficient evidence");
-    expect(result.content[0].text).toContain("changedFiles");
+    expect(result.content[0].text).toContain("changeSetFiles");
     expect(result.content[0].text).not.toContain("heuristic");
     expect(result.details?.type).toBe("impact");
     if (result.details?.type === "impact") {
@@ -713,7 +716,7 @@ describe("code_impact tool", () => {
     }
   });
 
-  it("reports likely tests for changed-files impact with package-layout mirrors", async () => {
+  it("reports likely tests for change-set impact with package-layout mirrors", async () => {
     // Package layout: source src/tool/execute-graph.ts, test __tests__/unit/tool/execute-graph.test.ts
     mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
     writeFileSync(
@@ -733,7 +736,7 @@ describe("code_impact tool", () => {
     const result = (await impactTool.execute(
       "impact-changed-pkg",
       {
-        changedFiles: ["src/tool/execute-graph.ts"],
+        changeSetFiles: ["src/tool/execute-graph.ts"],
         includeTests: true,
       },
       undefined,
@@ -756,7 +759,7 @@ describe("code_impact tool", () => {
     }
   });
 
-  it("ignores semantic-only test references for changed-files impact", async () => {
+  it("ignores semantic-only test references for change-set impact", async () => {
     mkdirSync(path.join(tmpDir, "src", "tool"), { recursive: true });
     writeFileSync(
       path.join(tmpDir, "src/tool/execute-find.ts"),
@@ -791,7 +794,7 @@ describe("code_impact tool", () => {
     const result = (await impactTool.execute(
       "impact-changed-semantic-tests",
       {
-        changedFiles: ["src/tool/execute-find.ts"],
+        changeSetFiles: ["src/tool/execute-find.ts"],
         includeTests: true,
       },
       undefined,
@@ -836,7 +839,7 @@ describe("code_impact tool", () => {
     const result = (await impactTool.execute(
       "impact-vitest-commands",
       {
-        changedFiles: ["src/module.ts"],
+        changeSetFiles: ["src/module.ts"],
         includeTests: true,
       },
       undefined,
@@ -855,7 +858,7 @@ describe("code_impact tool", () => {
     }
   });
 
-  it("ignores semantic-only non-JavaScript test files in structural changed-files mode", async () => {
+  it("ignores semantic-only non-JavaScript test files in structural change-set mode", async () => {
     writeFileSync(
       path.join(tmpDir, "package.json"),
       JSON.stringify(
@@ -898,7 +901,7 @@ describe("code_impact tool", () => {
     const result = (await impactTool.execute(
       "impact-non-js-test-command",
       {
-        changedFiles: ["src/widget.ts"],
+        changeSetFiles: ["src/widget.ts"],
         includeTests: true,
       },
       undefined,
@@ -933,7 +936,7 @@ describe("code_impact tool", () => {
     const result = (await impactTool.execute(
       "impact-no-tests",
       {
-        changedFiles: ["src/standalone.ts"],
+        changeSetFiles: ["src/standalone.ts"],
         includeTests: true,
       },
       undefined,

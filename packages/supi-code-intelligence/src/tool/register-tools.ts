@@ -48,7 +48,7 @@ function getToolRenderer(name: string): ToolRenderer {
         renderCall: renderHealthCall,
         renderResult: renderHealthResult,
       };
-    case "code_context":
+    case "code_orientation":
       return {
         renderCall: renderContextCall,
         renderResult: renderContextResult,

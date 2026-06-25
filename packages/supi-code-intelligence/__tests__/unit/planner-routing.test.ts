@@ -35,41 +35,34 @@ describe("Planner routing", () => {
   }
 
   describe("routeFor", () => {
-    it("returns semantic-preferred route for internal code_brief routing when semantic is available", async () => {
+    it("returns semantic-preferred route for code_orientation when semantic is available", async () => {
       registerSemantic();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route: PlannerRoute = routeFor("/project", "code_brief");
+      const route: PlannerRoute = routeFor(
+        "/project",
+        "code_orientation" as CodeIntelligenceToolName,
+      );
       expect(route.semanticAvailable).toBe(true);
       expect(route.preferred).toBe("semantic");
     });
 
-    it("returns structural-preferred route for internal code_brief routing when only structural is available", async () => {
+    it("returns structural-preferred route for code_orientation when only structural is available", async () => {
       registerStructural();
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route: PlannerRoute = routeFor("/project", "code_brief");
+      const route: PlannerRoute = routeFor(
+        "/project",
+        "code_orientation" as CodeIntelligenceToolName,
+      );
       expect(route.structuralAvailable).toBe(true);
       expect(route.preferred).toBe("structural");
     });
 
-    it("returns semantic-preferred route for code_context when semantic is available", async () => {
-      registerSemantic();
+    it("returns unavailable route for code_orientation when no capability is registered", async () => {
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route: PlannerRoute = routeFor("/project", "code_context" as CodeIntelligenceToolName);
-      expect(route.semanticAvailable).toBe(true);
-      expect(route.preferred).toBe("semantic");
-    });
-
-    it("returns structural-preferred route for code_context when only structural is available", async () => {
-      registerStructural();
-      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route: PlannerRoute = routeFor("/project", "code_context" as CodeIntelligenceToolName);
-      expect(route.structuralAvailable).toBe(true);
-      expect(route.preferred).toBe("structural");
-    });
-
-    it("returns unavailable route for code_context when no capability is registered", async () => {
-      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route: PlannerRoute = routeFor("/project", "code_context" as CodeIntelligenceToolName);
+      const route: PlannerRoute = routeFor(
+        "/project",
+        "code_orientation" as CodeIntelligenceToolName,
+      );
       expect(route.preferred).toBe("unavailable");
     });
 
@@ -180,7 +173,7 @@ describe("Planner routing", () => {
 
     it("returns unavailable when no capability is registered", async () => {
       const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", "code_context" as CodeIntelligenceToolName);
+      const route = routeFor("/project", "code_orientation" as CodeIntelligenceToolName);
       expect(route.preferred).toBe("unavailable");
     });
 

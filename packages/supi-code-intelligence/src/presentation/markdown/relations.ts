@@ -8,6 +8,7 @@ import {
 } from "../../evidence-list.ts";
 import type { ReferenceCollection } from "../../use-case/support/semantic-references.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
+import { type ReadNextItem, renderReadNextSection } from "./read-next.ts";
 
 // ── Callers ──────────────────────────────────────────────────────────
 
@@ -170,6 +171,7 @@ export type GraphSection =
       content: string;
       evidenceLists?: EvidenceListMetadata[];
       tests?: TestSurfaceDetails;
+      readNext?: ReadNextItem[];
     }
   | { kind: "unavailable"; rel: GraphRelationKind; message: string; tests?: TestSurfaceDetails }
   | {
@@ -234,6 +236,8 @@ export function renderGraphResult(
       lines.push("");
     }
   }
+
+  lines.push(...renderReadNextSection(okSections.flatMap((section) => section.readNext ?? [])));
 
   return lines.join("\n");
 }

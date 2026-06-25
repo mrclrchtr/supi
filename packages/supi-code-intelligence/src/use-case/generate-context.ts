@@ -1,30 +1,19 @@
-// biome-ignore-all lint/style/noExcessiveLinesPerFile: context orchestration is kept together to share local section helpers
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: symbol-orientation section builders stay together to preserve one rendering contract
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 
-import { collectOutgoingCalls } from "../analysis/calls/service.ts";
-import { collectReferences } from "../analysis/references/service.ts";
-import {
-  buildTestSurfaceDetails,
-  discoverTestFilesForSource,
-  renderRankedTestLabelsForMarkdown,
-  type TestSurfaceDetails,
-} from "../analysis/relations/tests.ts";
-import type { CalleeScope } from "../analysis/relations/types.ts";
-import {
-  createEvidenceList,
-  type EvidenceListMetadata,
-  renderEvidenceListDisclosure,
-} from "../evidence-list.ts";
 import {
   type RenderedContextSection,
   renderContextResult,
 } from "../presentation/markdown/context.ts";
+import {
+  type ReadNextItem,
+  readNextAround,
+  readNextRange,
+} from "../presentation/markdown/read-next.ts";
 import type { ConfidenceMode, ContextDetails } from "../types.ts";
-import { formatReferenceList } from "../use-case/support/semantic-references.ts";
 import { gatherTreeSitterContext } from "./gather-context.ts";
 import { executeBrief } from "./generate-brief.ts";
-import { executeImpact } from "./generate-impact.ts";
 import type {
   BriefInput,
   ContextDeps,
@@ -34,62 +23,36 @@ import type {
   ContextUseCaseResult,
 } from "./types.ts";
 
-const DEFAULT_CONTEXT_SECTIONS: ContextSection[] = ["defs", "references", "callees"];
+const DEFAULT_TARGET_SECTIONS: ContextSection[] = ["defs", "docs", "diagnostics"];
 
 const SECTION_TITLES: Record<ContextSection, string> = {
   defs: "Definitions",
-  references: "References",
-  callees: "Callees",
-  tests: "Tests",
   docs: "Docs",
   diagnostics: "Diagnostics",
-  exports: "Exports",
-  imports: "Imports",
-  impact: "Impact Assessment",
 };
 
 /**
- * Build a code_context result.
+ * Build a code_orientation result.
  *
- * Three modes:
- * 1. **Section mode** — `include` without `task`: renders only the requested sections.
- * 2. **Orientation mode** — no `task`/`target`: returns a module/directory/file overview.
- * 3. **Task mode** — `task` + `target`: assembles an explicit task-focused context bundle.
+ * - Without a precise target, returns a neutral project/module/directory/file orientation brief.
+ * - With a precise target, returns symbol-centered orientation facts: definitions, docs, and local diagnostics.
  */
 export async function executeContext(
   input: ContextInput,
   deps: ContextDeps,
 ): Promise<ContextUseCaseResult> {
-  // Section mode: honor include without task
-  if (input.include && input.include.length > 0 && !input.task) {
-    if (!input.target) {
-      // No target available — fall back to orientation mode
-      // which handles scopes (directory/file) well.
-      const result = await executeOrientationContext(input, deps);
-      result.content = `_Note: requested sections require a precise target. Returning orientation overview for the scope._\n\n${result.content}`;
-      return result;
-    }
-    return executeSectionMode(input, deps);
+  if (!input.target) {
+    return executeOrientationContext(input, deps);
   }
 
-  // Orientation mode: full brief fallback
-  if (!input.task || !input.target) {
-    const result = await executeOrientationContext(input, deps);
-    if (input.task && !input.target) {
-      result.content = `_Note: task-focused sections require a precise target. Falling back to orientation overview._\n\n${result.content}`;
-    }
-    return result;
-  }
-
-  // Task mode: explicit bundle
-  return executeTaskContext(input, deps);
+  return executeTargetOrientation(input, deps);
 }
 
 async function executeOrientationContext(
   input: ContextInput,
   deps: ContextDeps,
 ): Promise<ContextUseCaseResult> {
-  const briefInput = toBriefInput(input, deps);
+  const briefInput = toBriefInput(input);
   const result = await executeBrief(briefInput, {
     model: deps.model,
     provider: deps.provider,
@@ -101,7 +64,7 @@ async function executeOrientationContext(
   const details: ContextDetails = {
     confidence: result.details.confidence,
     task: null,
-    focusTarget: input.target ? formatFocusTarget(input.target, deps.cwd) : null,
+    focusTarget: input.focus ?? null,
     requestedSections: [],
     renderedSections: ["orientation"],
     omittedCount: result.details.omittedCount,
@@ -114,41 +77,30 @@ async function executeOrientationContext(
   };
 }
 
-/**
- * Execute section mode — honor `include` without `task`.
- *
- * Builds a compact header and renders only the requested sections.
- * Sections that need a precise target return honest "unavailable" messages.
- */
-async function executeSectionMode(
+async function executeTargetOrientation(
   input: ContextInput,
   deps: ContextDeps,
 ): Promise<ContextUseCaseResult> {
-  const requestedSections = input.include ?? [];
-  const limit = resolveResultLimit(input.budget, input.maxResults);
-  const focusTarget = input.scope ?? null;
+  const requestedSections = DEFAULT_TARGET_SECTIONS;
+  const limit = input.maxResults ?? 10;
+  const focusTarget = input.target ? formatFocusTarget(input.target, deps.cwd) : null;
   const sections: RenderedContextSection[] = [];
 
-  let omittedCount = 0;
   let hasStructural = false;
   let hasSemantic = false;
-  let tests: TestSurfaceDetails | undefined;
-  const evidenceLists: EvidenceListMetadata[] = [];
+  const treeContext = await maybeGatherTreeContext(input.target, deps);
 
   for (const section of requestedSections) {
     const built = await buildRequestedSection({
       section,
-      input,
+      target: input.target,
       deps,
       limit,
-      treeContext: null,
+      treeContext,
     });
     sections.push(built.section);
-    omittedCount += built.omittedCount;
-    evidenceLists.push(...(built.evidenceLists ?? []));
     hasStructural = hasStructural || built.hasStructuralEvidence;
     hasSemantic = hasSemantic || built.hasSemanticEvidence;
-    tests ??= built.tests;
   }
 
   const confidence: ConfidenceMode = hasSemantic
@@ -162,82 +114,16 @@ async function executeSectionMode(
     task: null,
     focusTarget,
     requestedSections,
-    renderedSections: sections.map((s) => s.key),
-    omittedCount,
-    evidenceLists,
-    nextQueries: [],
-    tests,
-  };
-
-  return {
-    content: renderContextResult({
-      task: "Section mode",
-      focusTarget,
-      sections,
-    }),
-    details,
-  };
-}
-
-async function executeTaskContext(
-  input: ContextInput,
-  deps: ContextDeps,
-): Promise<ContextUseCaseResult> {
-  const requestedSections = input.include ?? DEFAULT_CONTEXT_SECTIONS;
-  const limit = resolveResultLimit(input.budget, input.maxResults);
-  const focusTarget = input.target
-    ? formatFocusTarget(input.target, deps.cwd)
-    : (input.scope ?? null);
-  const nextQueries = buildNextQueries(input.target, deps.cwd);
-  const sections: RenderedContextSection[] = [];
-
-  let omittedCount = 0;
-  let hasStructural = false;
-  let hasSemantic = false;
-  let tests: TestSurfaceDetails | undefined;
-  const evidenceLists: EvidenceListMetadata[] = [];
-
-  const treeContext = await maybeGatherTreeContext(input.target, deps, requestedSections);
-
-  for (const section of requestedSections) {
-    const built = await buildRequestedSection({
-      section,
-      input,
-      deps,
-      limit,
-      treeContext,
-    });
-    sections.push(built.section);
-    omittedCount += built.omittedCount;
-    evidenceLists.push(...(built.evidenceLists ?? []));
-    hasStructural = hasStructural || built.hasStructuralEvidence;
-    hasSemantic = hasSemantic || built.hasSemanticEvidence;
-    tests ??= built.tests;
-  }
-
-  const confidence: ConfidenceMode = hasSemantic
-    ? "semantic"
-    : hasStructural
-      ? "structural"
-      : "unavailable";
-
-  const details: ContextDetails = {
-    confidence,
-    task: input.task ?? null,
-    focusTarget,
-    requestedSections,
     renderedSections: sections.map((section) => section.key),
-    omittedCount,
-    evidenceLists,
-    nextQueries,
-    tests,
+    omittedCount: 0,
+    nextQueries: buildNextQueries(input.target, deps.cwd),
   };
 
   return {
     content: renderContextResult({
-      task: input.task ?? "",
       focusTarget,
       sections,
+      readNext: buildReadNextGuidance(input.target, treeContext, deps.cwd),
     }),
     details,
   };
@@ -245,115 +131,46 @@ async function executeTaskContext(
 
 async function buildRequestedSection(options: {
   section: ContextSection;
-  input: ContextInput;
+  target: ContextTarget | null | undefined;
   deps: ContextDeps;
   limit: number;
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>;
 }): Promise<{
   section: RenderedContextSection;
-  omittedCount: number;
-  evidenceLists?: EvidenceListMetadata[];
   hasStructuralEvidence: boolean;
   hasSemanticEvidence: boolean;
-  tests?: TestSurfaceDetails;
 }> {
-  const { section, input, deps, limit, treeContext } = options;
+  const { section, target, deps, limit, treeContext } = options;
 
   switch (section) {
     case "defs": {
-      const lines = await buildEnrichedDefsSection(input.target, deps, treeContext, limit);
-      const hasSemantic = deps.lspService.kind === "ready";
+      const lines = await buildEnrichedDefsSection(target, deps, treeContext, limit);
       return {
         section: { key: section, title: SECTION_TITLES[section], lines },
-        omittedCount: 0,
         hasStructuralEvidence: hasRenderableItems(lines),
-        hasSemanticEvidence: hasSemantic,
-      };
-    }
-    case "imports": {
-      const lines = buildImportLines(treeContext, limit);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines },
-        omittedCount: 0,
-        hasStructuralEvidence: hasRenderableItems(lines),
-        hasSemanticEvidence: false,
-      };
-    }
-    case "exports": {
-      const lines = buildExportLines(treeContext, limit);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines },
-        omittedCount: 0,
-        hasStructuralEvidence: hasRenderableItems(lines),
-        hasSemanticEvidence: false,
-      };
-    }
-    case "references": {
-      const result = await buildReferenceSection(input.target, deps, limit);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        omittedCount: result.omittedCount,
-        evidenceLists: result.evidenceList ? [result.evidenceList] : [],
-        hasStructuralEvidence: false,
-        hasSemanticEvidence: result.hasSemanticEvidence,
-      };
-    }
-    case "callees": {
-      const result = await buildCalleesSection(input.target, deps, limit);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        omittedCount: result.omittedCount,
-        evidenceLists: result.evidenceList ? [result.evidenceList] : [],
-        hasStructuralEvidence: result.hasStructuralEvidence,
-        hasSemanticEvidence: false,
+        hasSemanticEvidence: deps.lspService.kind === "ready",
       };
     }
     case "docs": {
-      const result = await buildDocsSection(input.target, deps, limit);
+      const result = await buildDocsSection(target, deps, limit);
       return {
         section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        omittedCount: 0,
         hasStructuralEvidence: result.hasStructuralEvidence,
         hasSemanticEvidence: false,
-      };
-    }
-    case "tests": {
-      const result = await buildTestsSection(input.target, deps, limit);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        omittedCount: 0,
-        hasStructuralEvidence: result.hasStructuralEvidence,
-        hasSemanticEvidence: false,
-        tests: result.tests,
       };
     }
     case "diagnostics": {
-      const result = await buildDiagnosticsSection(input.target, deps, limit);
+      const result = await buildDiagnosticsSection(target, deps, limit);
       return {
         section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        omittedCount: 0,
         hasStructuralEvidence: false,
         hasSemanticEvidence: result.hasSemanticEvidence,
-      };
-    }
-    case "impact": {
-      const result = await buildImpactSection(input.target, deps, input.maxResults);
-      return {
-        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
-        omittedCount: result.omittedCount,
-        hasStructuralEvidence: false,
-        hasSemanticEvidence: true,
       };
     }
   }
 }
 
-// ── Real section builders for previously-stubbed sections ───────────
-
-/**
- * Build enriched defs section: tree-sitter definitions + LSP definition
- * targets + code actions (when LSP is ready).
- */
+/** Build enriched defs section: tree-sitter definitions + LSP definition targets + code actions. */
 async function buildEnrichedDefsSection(
   target: ContextTarget | null | undefined,
   deps: ContextDeps,
@@ -364,14 +181,12 @@ async function buildEnrichedDefsSection(
 
   if (!target || deps.lspService.kind !== "ready") return lines;
 
-  // LSP definition targets — narrow the existing defs with precise go-to-definition.
-  const lspDefs = await appendDefinitionTargets(target, deps);
+  const lspDefs = await appendDefinitionTargets(target, deps, limit);
   if (lspDefs.length > 0) {
     if (lines.length > 0) lines.push("");
     lines.push(...lspDefs.slice(0, limit));
   }
 
-  // Code actions — suggest available refactors/quick-fixes at the target.
   const actions = await appendCodeActions(target, deps, limit);
   if (actions.length > 0) {
     if (lines.length > 0) lines.push("");
@@ -381,10 +196,10 @@ async function buildEnrichedDefsSection(
   return lines;
 }
 
-/** Append LSP go-to-definition targets. */
 async function appendDefinitionTargets(
   target: ContextTarget,
   deps: ContextDeps,
+  limit: number,
 ): Promise<string[]> {
   if (!deps.provider?.definition) return [];
   try {
@@ -394,7 +209,7 @@ async function appendDefinitionTargets(
     });
     if (!defs || !Array.isArray(defs) || defs.length === 0) return [];
     const lines: string[] = ["**Definition:**"];
-    for (const def of defs.slice(0, 3)) {
+    for (const def of defs.slice(0, limit)) {
       const filePath = def.uri.startsWith("file://")
         ? decodeURIComponent(def.uri.slice(7))
         : def.uri;
@@ -407,7 +222,6 @@ async function appendDefinitionTargets(
   }
 }
 
-/** Append LSP code actions at the target location. */
 async function appendCodeActions(
   target: ContextTarget,
   deps: ContextDeps,
@@ -431,77 +245,6 @@ async function appendCodeActions(
   }
 }
 
-/**
- * Build the `tests` section: find companion test files and their test functions.
- */
-async function buildTestsSection(
-  target: ContextTarget | null | undefined,
-  deps: ContextDeps,
-  limit: number,
-): Promise<{ lines: string[]; hasStructuralEvidence: boolean; tests?: TestSurfaceDetails }> {
-  if (!target) {
-    return {
-      lines: ["Tests unavailable without a precise target."],
-      hasStructuralEvidence: false,
-    };
-  }
-
-  const targetAbs = path.resolve(deps.cwd, target.file);
-  if (!existsSync(targetAbs)) {
-    return {
-      lines: ["Tests unavailable — target file not found."],
-      hasStructuralEvidence: false,
-    };
-  }
-
-  const discovery = await discoverTestFilesForSource(targetAbs, {
-    references: deps.provider?.references,
-    outline: deps.provider?.outline,
-    cwd: deps.cwd,
-    cap: limit,
-    position: { line: target.line - 1, character: target.character - 1 },
-  });
-
-  const tests = buildTestSurfaceDetails(
-    {
-      status: discovery.kind,
-      provenance: discovery.provenance,
-      files: discovery.files,
-    },
-    deps.cwd,
-    limit,
-  );
-
-  if (discovery.kind === "unavailable") {
-    return {
-      lines: ["Tests unavailable — no semantic or structural provider available."],
-      hasStructuralEvidence: false,
-      tests,
-    };
-  }
-
-  if (discovery.kind === "empty") {
-    return {
-      lines: ["No test companion files found for this target."],
-      hasStructuralEvidence: false,
-      tests,
-    };
-  }
-
-  const lines: string[] = [];
-  lines.push(`Tests (${discovery.provenance}):`);
-  const filesToScan = tests.files.slice(0, 3);
-  for (const testFile of filesToScan) {
-    lines.push(`- \`${testFile.file}\``);
-    lines.push(...renderRankedTestLabelsForMarkdown(testFile.labels, limit));
-  }
-
-  return { lines, hasStructuralEvidence: discovery.files.length > 0, tests };
-}
-
-/**
- * Build the `diagnostics` section: pull LSP diagnostics near the target.
- */
 async function buildDiagnosticsSection(
   target: ContextTarget | null | undefined,
   deps: ContextDeps,
@@ -527,32 +270,26 @@ async function buildDiagnosticsSection(
     const targetFile = path.resolve(deps.cwd, target.file);
     const diags = await deps.lspService.service.fileDiagnostics(targetFile, 4);
     if (!diags || diags.length === 0) {
-      return {
-        lines: ["No diagnostics found near this target."],
-        hasSemanticEvidence: true,
-      };
+      return { lines: ["No diagnostics found near this target."], hasSemanticEvidence: true };
+    }
+
+    const nearby = diags.filter((d) => Math.abs((d.range.start.line ?? 0) + 1 - target.line) <= 5);
+    if (nearby.length === 0) {
+      return { lines: ["No diagnostics found near this target."], hasSemanticEvidence: true };
     }
 
     const lines: string[] = [];
-    const nearby = diags.filter((d) => Math.abs((d.range.start.line ?? 0) + 1 - target.line) <= 5);
-    const chosen = nearby.length > 0 ? nearby : diags;
-    for (const d of chosen.slice(0, limit)) {
+    for (const d of nearby.slice(0, limit)) {
       const severity = (d.severity ?? 1) === 1 ? "ERROR" : "WARN";
       const line = (d.range.start.line ?? 0) + 1;
       lines.push(`- **${severity}** (L${line}): ${d.message}`);
     }
     return { lines, hasSemanticEvidence: true };
   } catch {
-    return {
-      lines: ["Diagnostics failed to load."],
-      hasSemanticEvidence: false,
-    };
+    return { lines: ["Diagnostics failed to load."], hasSemanticEvidence: false };
   }
 }
 
-/**
- * Build the `docs` section: extract JSDoc/TSDoc comment preceding the target symbol.
- */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: JSDoc parsing naturally has state-machine complexity
 async function buildDocsSection(
   target: ContextTarget | null | undefined,
@@ -560,34 +297,24 @@ async function buildDocsSection(
   limit: number,
 ): Promise<{ lines: string[]; hasStructuralEvidence: boolean }> {
   if (!target) {
-    return {
-      lines: ["Docs unavailable without a precise target."],
-      hasStructuralEvidence: false,
-    };
+    return { lines: ["Docs unavailable without a precise target."], hasStructuralEvidence: false };
   }
 
   const targetFile = path.resolve(deps.cwd, target.file);
   if (!existsSync(targetFile)) {
-    return {
-      lines: ["Docs unavailable — target file not found."],
-      hasStructuralEvidence: false,
-    };
+    return { lines: ["Docs unavailable — target file not found."], hasStructuralEvidence: false };
   }
 
   try {
     const content = readFileSync(targetFile, "utf-8");
     const lines = content.split("\n");
-
-    // Scan backward from target.line for a /** ... */ JSDoc comment
-    // LSP/pi use 1-based lines, so target.line is 1-based
-    const startIdx = Math.max(0, target.line - 2); // 0-based
+    const startIdx = Math.max(0, target.line - 2);
     let jsdocStart = -1;
     let jsdocEnd = -1;
 
     for (let i = startIdx; i >= 0; i--) {
       const line = lines[i].trim();
 
-      // Single-line JSDoc: /** Description */
       if (line.startsWith("/**") && line.endsWith("*/")) {
         jsdocStart = i;
         jsdocEnd = i;
@@ -599,17 +326,12 @@ async function buildDocsSection(
         continue;
       }
 
-      // If we already found `*/` and are now scanning for `/**`
       if (jsdocEnd !== -1) {
         if (line.startsWith("/**")) {
           jsdocStart = i;
           break;
         }
-        // Allow JSDoc body lines: *, @param, @return, etc.
-        if (line.startsWith("*") || line.startsWith("@")) {
-          continue;
-        }
-        // Hit non-JSDoc line before finding opening — no valid JSDoc
+        if (line.startsWith("*") || line.startsWith("@")) continue;
         if (line !== "") {
           jsdocStart = -1;
           jsdocEnd = -1;
@@ -618,14 +340,8 @@ async function buildDocsSection(
         continue;
       }
 
-      // Haven't found `*/` yet — skip over JSDoc body lines or break on unrelated lines
-      if (line.startsWith("*") || line.startsWith("/**")) {
-        continue;
-      }
-      if (line !== "" && !line.startsWith("//")) {
-        // Hit non-comment line before finding any JSDoc markers
-        break;
-      }
+      if (line.startsWith("*") || line.startsWith("/**")) continue;
+      if (line !== "" && !line.startsWith("//")) break;
     }
 
     if (jsdocStart === -1 || jsdocEnd === -1) {
@@ -635,19 +351,15 @@ async function buildDocsSection(
       };
     }
 
-    const startIdx2 = jsdocStart;
-    const endIdx = jsdocEnd;
-
-    // Extract the doc text
     const docLines = lines
-      .slice(startIdx2, endIdx + 1)
-      .map((l) =>
-        l
+      .slice(jsdocStart, jsdocEnd + 1)
+      .map((line) =>
+        line
           .replace(/^\s*\*\s?/, "")
           .replace(/^\s*\/\*\*\s?/, "")
           .replace(/\s*\*\/\s*$/, ""),
       )
-      .filter((l) => l.trim() !== "")
+      .filter((line) => line.trim() !== "")
       .slice(0, limit);
 
     if (docLines.length === 0) {
@@ -657,70 +369,19 @@ async function buildDocsSection(
       };
     }
 
-    return {
-      lines: ["```ts", ...docLines, "```"],
-      hasStructuralEvidence: true,
-    };
+    return { lines: ["```ts", ...docLines, "```"], hasStructuralEvidence: true };
   } catch {
-    return {
-      lines: ["Docs extraction failed."],
-      hasStructuralEvidence: false,
-    };
+    return { lines: ["Docs extraction failed."], hasStructuralEvidence: false };
   }
 }
 
-function toBriefInput(input: ContextInput, deps: ContextDeps): BriefInput {
-  if (input.target) {
-    if (input.target.name && deps.provider) {
-      return {
-        kind: "symbol",
-        symbol: input.target.name,
-        path: input.target.file,
-        maxResults: input.maxResults,
-      };
-    }
-    return {
-      kind: "file",
-      file: input.target.file,
-      maxResults: input.maxResults,
-    };
-  }
-
-  if (input.scope) {
-    return { kind: "path", path: input.scope, maxResults: input.maxResults };
-  }
-
+function toBriefInput(input: ContextInput): BriefInput {
+  if (input.focus) return { kind: "path", path: input.focus, maxResults: input.maxResults };
   return { kind: "project", maxResults: input.maxResults };
 }
 
-function resolveResultLimit(
-  budget: ContextInput["budget"],
-  maxResults: number | undefined,
-): number {
-  if (maxResults != null) {
-    return maxResults;
-  }
-
-  switch (budget) {
-    case "small":
-      return 3;
-    case "large":
-      return 15;
-    default:
-      return 8;
-  }
-}
-
-async function maybeGatherTreeContext(
-  target: ContextTarget | null | undefined,
-  deps: ContextDeps,
-  requestedSections: ContextSection[],
-) {
+async function maybeGatherTreeContext(target: ContextTarget | null | undefined, deps: ContextDeps) {
   if (!target) return null;
-  if (!requestedSections.some((section) => ["defs", "imports", "exports"].includes(section))) {
-    return null;
-  }
-
   const relPath = path.relative(deps.cwd, target.file);
   return gatherTreeSitterContext(deps.provider, relPath, target.line, target.character);
 }
@@ -730,9 +391,7 @@ function buildDefinitionLines(
   cwd: string,
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
 ): string[] {
-  if (!target) {
-    return ["No precise target context found."];
-  }
+  if (!target) return ["No precise target context found."];
 
   const lines = [`- Focus: \`${formatFocusTarget(target, cwd)}\``];
   if (target.name) {
@@ -747,203 +406,25 @@ function buildDefinitionLines(
   return lines;
 }
 
-/**
- * Format hover content for the definitions section.
- * Truncates at 600 characters to keep context bundles compact.
- */
 function formatHoverLine(contents: string): string[] {
   const trimmed = contents.trim();
   const maxHoverChars = 600;
-  if (trimmed.length <= maxHoverChars) {
-    return [`- Hover: ${trimmed}`];
-  }
+  if (trimmed.length <= maxHoverChars) return [`- Hover: ${trimmed}`];
 
   const hoverLines = trimmed.split("\n");
   if (hoverLines.length === 1) {
     return [
       `- Hover: ${trimmed.slice(0, maxHoverChars)}...`,
-      `  _(truncated, use \`code_inspect\` for full type)_`,
+      "  _(truncated, use `code_inspect` for full type)_",
     ];
   }
 
-  // Multi-line — cut at line boundary before the character limit
   let acc = "";
   for (const line of hoverLines) {
     if (acc.length + line.length + 1 > maxHoverChars && acc.length > 0) break;
     acc += (acc ? "\n" : "") + line;
   }
-  return [`- Hover: ${acc}`, `  _(truncated, use \`code_inspect\` for full type)_`];
-}
-
-function buildImportLines(
-  treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
-  limit: number,
-): string[] {
-  if (!treeContext) {
-    return ["Imports unavailable for the current focus."];
-  }
-  if (treeContext.imports.length === 0) {
-    return ["No imports context found."];
-  }
-  return treeContext.imports.slice(0, limit).map((entry) => `- \`${entry.moduleSpecifier}\``);
-}
-
-function buildExportLines(
-  treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
-  limit: number,
-): string[] {
-  if (!treeContext) {
-    return ["Exports unavailable for the current focus."];
-  }
-  if (treeContext.exports.length === 0) {
-    return ["No exports context found."];
-  }
-  return treeContext.exports
-    .slice(0, limit)
-    .map((entry) => `- \`${entry.name}\`${entry.kind ? ` (${entry.kind})` : ""}`);
-}
-
-async function buildReferenceSection(
-  target: ContextTarget | null | undefined,
-  deps: ContextDeps,
-  limit: number,
-): Promise<{
-  lines: string[];
-  omittedCount: number;
-  evidenceList?: EvidenceListMetadata;
-  hasSemanticEvidence: boolean;
-}> {
-  if (!target) {
-    return {
-      lines: ["References unavailable without a precise target."],
-      omittedCount: 0,
-      hasSemanticEvidence: false,
-    };
-  }
-
-  if (!deps.provider?.references) {
-    return {
-      lines: ["References unavailable for the current workspace."],
-      omittedCount: 0,
-      hasSemanticEvidence: false,
-    };
-  }
-
-  const refs = await collectReferences(
-    target.file,
-    { line: target.line - 1, character: target.character - 1 },
-    target.name,
-    { cwd: deps.cwd, provider: { references: deps.provider.references } },
-  );
-
-  if (refs.references.length === 0) {
-    return {
-      lines: ["No references found."],
-      omittedCount: 0,
-      hasSemanticEvidence: refs.confidence === "semantic",
-    };
-  }
-
-  const lines: string[] = [];
-  const evidenceList = formatReferenceList(
-    lines,
-    refs.references.map((ref) => ({
-      file: path.relative(deps.cwd, ref.file),
-      line: ref.line,
-    })),
-    limit,
-  );
-
-  return {
-    lines,
-    omittedCount: evidenceList?.omittedCount ?? 0,
-    evidenceList: evidenceList ?? undefined,
-    hasSemanticEvidence: refs.confidence === "semantic",
-  };
-}
-
-async function buildCalleesSection(
-  target: ContextTarget | null | undefined,
-  deps: ContextDeps,
-  limit: number,
-): Promise<{
-  lines: string[];
-  omittedCount: number;
-  evidenceList?: EvidenceListMetadata;
-  hasStructuralEvidence: boolean;
-}> {
-  if (!target) {
-    return {
-      lines: ["Callees unavailable without a precise target."],
-      omittedCount: 0,
-      hasStructuralEvidence: false,
-    };
-  }
-
-  if (target.anchorKind === "declaration") {
-    return {
-      lines: [
-        "Callees unavailable: the resolved target is a declaration anchor, not a name anchor. Re-resolve the target, or pass file + line + character anchored on the identifier.",
-      ],
-      omittedCount: 0,
-      hasStructuralEvidence: false,
-    };
-  }
-
-  if (!deps.provider?.calleesAt) {
-    return {
-      lines: ["Callees unavailable for the current workspace."],
-      omittedCount: 0,
-      hasStructuralEvidence: false,
-    };
-  }
-
-  const calls = await collectOutgoingCalls(
-    target.file,
-    target.line,
-    target.character,
-    target.name,
-    { cwd: deps.cwd, provider: { calleesAt: deps.provider.calleesAt } },
-    limit,
-  );
-
-  if (calls.calls.length === 0) {
-    return {
-      lines: [
-        `No direct structural callees found in enclosing scope \`${calls.enclosingScope.name}\` (${formatCalleeScopeRange(calls.enclosingScope)}).`,
-        "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._",
-      ],
-      omittedCount: 0,
-      hasStructuralEvidence: calls.confidence === "structural",
-    };
-  }
-
-  const evidence = createEvidenceList({
-    key: "callees.calls",
-    items: calls.calls,
-    maxResults: limit,
-  });
-  const lines = [
-    `Direct structural callees from enclosing scope \`${calls.enclosingScope.name}\` (${formatCalleeScopeRange(calls.enclosingScope)}).`,
-    "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._",
-    ...evidence.items.map((entry) => `- \`${entry.name}\` (L${entry.line})`),
-  ];
-  const disclosure = renderEvidenceListDisclosure(evidence);
-  if (disclosure) {
-    lines.push(disclosure);
-  }
-
-  return {
-    lines,
-    omittedCount: evidence.metadata.omittedCount ?? 0,
-    evidenceList: evidence.metadata,
-    hasStructuralEvidence: calls.confidence === "structural",
-  };
-}
-
-function formatCalleeScopeRange(scope: Pick<CalleeScope, "startLine" | "endLine">): string {
-  if (scope.startLine === scope.endLine) return `L${scope.startLine}`;
-  return `L${scope.startLine}–L${scope.endLine}`;
+  return [`- Hover: ${acc}`, "  _(truncated, use `code_inspect` for full type)_"];
 }
 
 function formatFocusTarget(target: ContextTarget, cwd: string): string {
@@ -952,66 +433,52 @@ function formatFocusTarget(target: ContextTarget, cwd: string): string {
 }
 
 function buildNextQueries(target: ContextTarget | null | undefined, cwd: string): string[] {
-  if (!target) {
-    return ["Use `code_context` for a neutral orientation summary."];
-  }
+  if (!target) return ["Use `code_orientation` for a neutral orientation summary."];
 
   const relPath = path.relative(cwd, target.file) || target.file;
   return [
-    `\`code_graph\` with \`file: "${relPath}"\`, \`line: ${target.line}\`, and \`character: ${target.character}\` for deeper relation follow-up`,
+    `\`code_graph\` with \`file: "${relPath}"\`, \`line: ${target.line}\`, and \`character: ${target.character}\` for relation follow-up`,
     `\`code_impact\` with \`file: "${relPath}"\`, \`line: ${target.line}\`, and \`character: ${target.character}\` for blast-radius analysis`,
   ];
 }
 
-function hasRenderableItems(lines: string[]): boolean {
-  return lines.some((line) => line.trim().startsWith("- "));
+function buildReadNextGuidance(
+  target: ContextTarget | null | undefined,
+  treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
+  cwd: string,
+): ReadNextItem[] {
+  if (!target) return [];
+  const relPath = path.relative(cwd, target.file) || target.file;
+  const enclosing = findEnclosingOutlineItem(target, treeContext);
+  if (enclosing) {
+    return [
+      readNextRange({
+        file: relPath,
+        startLine: enclosing.startLine,
+        endLine: enclosing.endLine,
+        reason: `inspect the enclosing ${enclosing.kind.toLowerCase()} \`${enclosing.name}\``,
+      }),
+    ];
+  }
+  return [readNextAround(relPath, target.line, "inspect the target implementation")];
 }
 
-/** Build a condensed inspect section from point-level inspection data. */
-/** Build a condensed impact section for a context target. */
-async function buildImpactSection(
-  target: ContextTarget | null | undefined,
-  deps: ContextDeps,
-  maxResults?: number,
-): Promise<{ lines: string[]; omittedCount: number }> {
-  if (!target) {
-    return { lines: ["_No target available for impact analysis._"], omittedCount: 0 };
-  }
-  try {
-    const result = await executeImpact(
-      {
-        file: target.file,
-        line: target.line,
-        character: target.character,
-        symbol: target.name ?? undefined,
-        includeTests: true,
-        maxResults: maxResults ?? 8,
-      },
-      { cwd: deps.cwd, provider: deps.provider, lspService: deps.lspService },
-      "impact",
-    );
-    if (result.details?.type !== "impact") {
-      return { lines: ["_Impact analysis unavailable — no provider._"], omittedCount: 0 };
-    }
-    const data = result.details.data as {
-      directCount?: number;
-      downstreamCount?: number;
-      riskLevel?: string;
-      likelyTestCommands?: string[];
-    };
-    const lines: string[] = [];
-    lines.push(
-      `**Risk: ${data.riskLevel?.toUpperCase() ?? "UNKNOWN"}** | ${data.directCount ?? 0} refs | ${data.downstreamCount ?? 0} downstream`,
-    );
-    if (data.likelyTestCommands && data.likelyTestCommands.length > 0) {
-      lines.push("");
-      lines.push("**Test Commands:**");
-      for (const cmd of data.likelyTestCommands.slice(0, 3)) {
-        lines.push(`- \`${cmd}\``);
-      }
-    }
-    return { lines, omittedCount: 0 };
-  } catch {
-    return { lines: ["_Impact analysis failed._"], omittedCount: 0 };
-  }
+function findEnclosingOutlineItem(
+  target: ContextTarget,
+  treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
+): { name: string; kind: string; startLine: number; endLine: number } | null {
+  if (!treeContext || treeContext.outline.length === 0) return null;
+  const candidates = treeContext.outline.filter(
+    (item) => item.startLine <= target.line && item.endLine >= target.line,
+  );
+  if (candidates.length === 0) return null;
+  const matchingName = candidates.find((item) => target.name && item.name === target.name);
+  if (matchingName) return matchingName;
+  return candidates.sort(
+    (left, right) => left.endLine - left.startLine - (right.endLine - right.startLine),
+  )[0];
+}
+
+function hasRenderableItems(lines: string[]): boolean {
+  return lines.some((line) => line.trim().startsWith("- "));
 }

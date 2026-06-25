@@ -53,7 +53,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
       "Inspect one precise point in code with best-effort syntax, symbol, hover, definition, diagnostics, and code-action facts.",
     schemaKey: "code_inspect",
     schemaDocs:
-      "Requires file, line, and character plus optional maxResults. It is the explicit replacement for point-inspection behavior previously reached through anchored code_context.",
+      "Requires file, line, and character plus optional maxResults. It is the explicit point-inspection surface; code_orientation handles broader orientation.",
     absorbsTools: [],
     absorbsBehaviors: ["anchored orientation inspection"],
     substrates: ["semantic", "structural", "diagnostics"],
@@ -64,17 +64,20 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     ],
   },
   {
-    name: "code_context",
+    name: "code_orientation",
     purpose:
-      "Provide task-focused context bundles with prioritized definitions, relationships, tests, docs, and diagnostics.",
-    schemaKey: "code_context",
+      "Orient around a project, discovered module, directory, file, or precise symbol before choosing surgical follow-up tools.",
+    schemaKey: "code_orientation",
     schemaDocs:
-      "Accepts optional task, targetId, scope, budget, include sections, and maxResults. When called without a task, returns a neutral orientation brief — it is now the sole surface for both orientation and task-focused context. code_brief has been merged into code_context.",
-    absorbsTools: ["code_brief"],
+      "Accepts optional focus, targetId, line, character, and maxResults. Omitted focus returns workspace orientation; focus is path-first with discovered-module lookup; focus+line+character resolves a symbol; targetId wins over focus/coordinates.",
+    absorbsTools: ["code_brief", "code_context"],
     absorbsBehaviors: [],
-    substrates: ["semantic", "structural", "search", "diagnostics"],
+    substrates: ["semantic", "structural", "diagnostics"],
     phase: "phase-2",
-    nonGoals: ["Does not promise arbitrary natural-language planning or edit generation."],
+    nonGoals: [
+      "Does not provide relation, tests, or impact sections; use code_graph and code_impact.",
+      "Does not resolve bare symbol names; use code_resolve first.",
+    ],
   },
   {
     name: "code_find",
@@ -111,13 +114,13 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
   {
     name: "code_impact",
     purpose:
-      "Estimate blast radius for a target, dirty files, or a proposed change description, including likely tests and docs.",
+      "Estimate blast radius for a target, user-supplied change set, or proposed change description, including likely tests and docs.",
     schemaKey: "code_impact",
     schemaDocs:
-      "Accepts targetId, change, or changedFiles plus includeTests/maxResults. Runtime validation later requires at least one primary subject.",
+      "Accepts targetId, change, or changeSetFiles plus includeTests/maxResults. Runtime validation later requires at least one primary subject.",
     absorbsTools: ["code_affected"],
     absorbsBehaviors: [],
-    substrates: ["semantic", "search", "git", "diagnostics"],
+    substrates: ["semantic", "structural", "search", "diagnostics"],
     phase: "phase-4",
     nonGoals: [
       "Does not guarantee perfect downstream impact inference without substrate evidence.",

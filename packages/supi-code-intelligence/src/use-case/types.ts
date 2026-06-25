@@ -69,16 +69,7 @@ export interface InspectUseCaseResult {
 
 // ── Context use-case ─────────────────────────────────────────────────
 
-export type ContextSection =
-  | "defs"
-  | "references"
-  | "callees"
-  | "tests"
-  | "docs"
-  | "diagnostics"
-  | "exports"
-  | "imports"
-  | "impact";
+export type ContextSection = "defs" | "docs" | "diagnostics";
 
 export interface ContextTarget {
   file: string;
@@ -91,16 +82,12 @@ export interface ContextTarget {
 }
 
 export interface ContextInput {
-  task?: string;
   target?: ContextTarget | null;
-  scope?: string;
-  budget?: "small" | "medium" | "large";
-  include?: ContextSection[];
+  /** Resolved orientation focus path for project/module/directory/file orientation. */
+  focus?: string;
   maxResults?: number;
   /** Show git context in orientation output. Defaults to true. */
   showGitContext?: boolean;
-  /** When present, the executor may append impact assessment. */
-  change?: string;
 }
 
 export interface ContextDeps {

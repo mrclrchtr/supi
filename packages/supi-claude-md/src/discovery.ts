@@ -123,7 +123,9 @@ export function extractPathFromToolEvent(
     }
     default: {
       if (toolName.startsWith("code_")) {
-        return readStringPath(input.file) ?? readStringPath(input.path);
+        return (
+          readStringPath(input.file) ?? readStringPath(input.path) ?? readStringPath(input.focus)
+        );
       }
       if (isFileBasedTool(toolName)) {
         return readStringPath(input.file);

@@ -6,6 +6,7 @@ import {
   renderAffectedFileLevel,
   renderAffectedSingle,
 } from "./affected.ts";
+import { readNextAround, renderReadNextSection } from "./read-next.ts";
 
 export type { ImpactAnalysis } from "./affected.ts";
 
@@ -19,9 +20,9 @@ export function renderImpactFileLevel(
   return rewriteAffectedHeading(renderAffectedFileLevel(params));
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: shared changed-files renderer combines risk, files, tests, and priority signals in one function; refactoring deferred to a later dedup pass
-export function renderChangedFilesImpact(params: {
-  changedFiles: string[];
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: shared change-set renderer combines risk, files, tests, and priority signals in one function; refactoring deferred to a later dedup pass
+export function renderChangeSetImpact(params: {
+  changeSetFiles: string[];
   analysis: ImpactAnalysis;
   prioritySignals: PrioritySignalsSummary | null;
   heading?: "Impact" | "Affected";
@@ -30,7 +31,7 @@ export function renderChangedFilesImpact(params: {
   const heading = params.heading ?? "Impact";
   const lines: string[] = [];
 
-  lines.push(`# ${heading}: changed files`);
+  lines.push(`# ${heading}: change set`);
   lines.push("");
   if (params.compatibilityNote) {
     lines.push(`_${params.compatibilityNote}_`);
@@ -38,15 +39,23 @@ export function renderChangedFilesImpact(params: {
   }
 
   lines.push(
-    `**Risk: ${params.analysis.riskLevel.toUpperCase()}** | ${params.changedFiles.length} changed file${params.changedFiles.length !== 1 ? "s" : ""} | ${params.analysis.affectedModules.size} module${params.analysis.affectedModules.size !== 1 ? "s" : ""} | ${params.analysis.downstreamCount} downstream (${params.analysis.confidence})`,
+    `**Risk: ${params.analysis.riskLevel.toUpperCase()}** | ${params.changeSetFiles.length} change-set file${params.changeSetFiles.length !== 1 ? "s" : ""} | ${params.analysis.affectedModules.size} module${params.analysis.affectedModules.size !== 1 ? "s" : ""} | ${params.analysis.downstreamCount} downstream (${params.analysis.confidence})`,
   );
   lines.push("");
 
-  lines.push("## Changed Files");
-  for (const file of params.changedFiles) {
+  lines.push("## Change Set Files");
+  for (const file of params.changeSetFiles) {
     lines.push(`- \`${file}\``);
   }
   lines.push("");
+
+  lines.push(
+    ...renderReadNextSection(
+      params.changeSetFiles
+        .slice(0, 3)
+        .map((file) => readNextAround(file, 1, "inspect the change-set file before editing")),
+    ),
+  );
 
   if (params.analysis.checkNext.length > 0) {
     lines.push("## Check Next");

@@ -1,11 +1,13 @@
 // Affected markdown renderer — consumes analysis data and produces markdown content.
 
+import * as path from "node:path";
 import type { TestSurfaceDetails } from "../../analysis/relations/tests.ts";
 import type { PrioritySignalsSummary } from "../../prioritization-signals.ts";
 import { appendPrioritySignalsSection } from "../../prioritization-signals.ts";
 import type { ResolvedTarget, ResolvedTargetGroup } from "../../target-resolution.ts";
 import type { ReferenceCollection } from "../../use-case/support/semantic-references.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
+import { readNextAround, renderReadNextSection } from "./read-next.ts";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -64,6 +66,18 @@ export function renderAffectedSingle(params: RenderSingleParams): string {
 
   addRiskSection(lines, analysis, totalRefs);
   formatReferenceList(lines, refs.refs, maxResults);
+  lines.push(
+    ...renderReadNextSection([
+      readNextAround(
+        path.relative(params.cwd, params.target.file) || params.target.file,
+        params.target.displayLine,
+        "inspect the target before editing",
+      ),
+      ...refs.refs
+        .slice(0, Math.min(2, maxResults))
+        .map((ref) => readNextAround(ref.file, ref.line, "inspect a reference site")),
+    ]),
+  );
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests, analysis.tests);
@@ -81,10 +95,11 @@ interface RenderFileLevelParams {
   analysis: ImpactAnalysis;
   maxResults: number;
   prioritySignals: PrioritySignalsSummary | null;
+  cwd: string;
 }
 
 export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
-  const { targetGroup, perTarget, aggregated, analysis, maxResults, prioritySignals } = params;
+  const { targetGroup, perTarget, aggregated, analysis, maxResults, prioritySignals, cwd } = params;
   const totalRefs = aggregated.refs.length + aggregated.externalCount;
   const refSummary =
     aggregated.externalCount > 0
@@ -111,6 +126,18 @@ export function renderAffectedFileLevel(params: RenderFileLevelParams): string {
 
   addRiskSection(lines, analysis, totalRefs);
   formatReferenceList(lines, aggregated.refs, maxResults);
+  lines.push(
+    ...renderReadNextSection([
+      readNextAround(
+        path.relative(cwd, targetGroup.file) || targetGroup.file,
+        1,
+        "inspect the target file exports before editing",
+      ),
+      ...aggregated.refs
+        .slice(0, Math.min(2, maxResults))
+        .map((ref) => readNextAround(ref.file, ref.line, "inspect a reference site")),
+    ]),
+  );
   appendPrioritySignalsSection(lines, prioritySignals);
   addCheckNextSection(lines, analysis.checkNext);
   addTestsSection(lines, analysis.likelyTests, analysis.tests);

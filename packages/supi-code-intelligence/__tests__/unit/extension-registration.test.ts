@@ -182,14 +182,14 @@ describe("focused code intelligence tool registration", () => {
     expect(props).not.toHaveProperty("path");
   });
 
-  it("registers code_context with the workflow schema shape (code_brief removed from public surface)", () => {
+  it("registers code_orientation with the workflow schema shape (code_brief removed from public surface)", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
-    const contextTool = getTool(pi, "code_context");
+    const contextTool = getTool(pi, "code_orientation");
 
     expect(contextTool).toBeDefined();
-    expect(contextTool.name).toBe("code_context");
+    expect(contextTool.name).toBe("code_orientation");
     expect(typeof contextTool.execute).toBe("function");
 
     // code_brief should NOT be registered on the public surface
@@ -199,12 +199,15 @@ describe("focused code intelligence tool registration", () => {
     const props = (contextTool as { parameters?: { properties?: Record<string, unknown> } })
       .parameters?.properties;
     expect(props).toBeDefined();
-    expect(props).toHaveProperty("task");
+    expect(props).toHaveProperty("focus");
     expect(props).toHaveProperty("targetId");
-    expect(props).toHaveProperty("scope");
-    expect(props).toHaveProperty("budget");
-    expect(props).toHaveProperty("include");
+    expect(props).toHaveProperty("line");
+    expect(props).toHaveProperty("character");
     expect(props).toHaveProperty("maxResults");
+    expect(props).not.toHaveProperty("task");
+    expect(props).not.toHaveProperty("scope");
+    expect(props).not.toHaveProperty("budget");
+    expect(props).not.toHaveProperty("include");
   });
 
   it("registers code_impact as the active workflow impact tool", () => {
@@ -222,13 +225,13 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toBeDefined();
     expect(props).toHaveProperty("targetId");
     expect(props).toHaveProperty("change");
-    expect(props).toHaveProperty("changedFiles");
+    expect(props).toHaveProperty("changeSetFiles");
     expect(props).toHaveProperty("includeTests");
     expect(props).toHaveProperty("maxResults");
 
     const includeTestsParam = props?.includeTests as { description?: string } | undefined;
     expect(includeTestsParam?.description).toContain(
-      "changedFiles analysis uses semantic references",
+      "changeSetFiles analysis uses semantic references",
     );
     expect(includeTestsParam?.description).not.toContain("no LSP/TS");
   });

@@ -7,9 +7,8 @@
 
 /** Canonical code-intelligence tool names, including internal compatibility aliases. */
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
-  "code_brief",
   "code_inspect",
-  "code_context",
+  "code_orientation",
   "code_impact",
   "code_affected",
   "code_find",
@@ -24,7 +23,7 @@ export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[num
 /** Public/model-facing tool names registered on the extension surface. */
 export const PUBLIC_CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_inspect",
-  "code_context",
+  "code_orientation",
   "code_impact",
   "code_find",
   "code_graph",

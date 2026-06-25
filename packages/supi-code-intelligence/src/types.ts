@@ -177,7 +177,7 @@ export interface ResolveDetails {
   nextQueries: string[];
 }
 
-/** Structured details metadata for code_context results. */
+/** Structured details metadata for code_orientation results. */
 export interface ContextDetails {
   confidence: ConfidenceMode;
   task: string | null;

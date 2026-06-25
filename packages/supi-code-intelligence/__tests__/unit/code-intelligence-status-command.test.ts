@@ -53,7 +53,7 @@ describe("/supi-ci-status command", () => {
   it("creates overlay with center anchor and 66% width", async () => {
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_context"]);
+    pi.setActiveTools(["code_orientation"]);
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
@@ -85,7 +85,7 @@ describe("/supi-ci-status command", () => {
   it("sets status bar with code-intelligence key when LSP ready with running servers", async () => {
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_context"]);
+    pi.setActiveTools(["code_orientation"]);
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
@@ -129,7 +129,7 @@ describe("/supi-ci-status command", () => {
   it("sets belowEditor widget when diagnostics exist", async () => {
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_context"]);
+    pi.setActiveTools(["code_orientation"]);
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
@@ -191,7 +191,7 @@ describe("/supi-ci-status command", () => {
   it("sets custom footer while overlay is open", async () => {
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_context"]);
+    pi.setActiveTools(["code_orientation"]);
 
     const setFooterMock = vi.fn();
     const ctx = makeCtx({ cwd: "/project" });
@@ -218,7 +218,7 @@ describe("/supi-ci-status command", () => {
   it("sorts diagnostics: errors first, then warnings", async () => {
     const pi = createPiMock();
     registerCiStatusCommand(pi as never);
-    pi.setActiveTools(["code_context"]);
+    pi.setActiveTools(["code_orientation"]);
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });

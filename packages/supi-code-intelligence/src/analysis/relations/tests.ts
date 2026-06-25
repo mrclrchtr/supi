@@ -2,7 +2,7 @@
 /**
  * Shared test-file discovery helpers.
  *
- * Used by `code_graph`, `code_context`, and `code_impact` to find companion
+ * Used by `code_graph` and `code_impact` to find companion
  * test files and extract recognizable test labels.
  *
  * The discovery uses two strategies:

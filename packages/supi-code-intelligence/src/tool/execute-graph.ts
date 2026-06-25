@@ -24,6 +24,7 @@ import {
 import { routeFor } from "../analysis/routing/planner.ts";
 import { renderCallsResult } from "../presentation/markdown/calls.ts";
 import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
+import { readNextAround, readNextRange } from "../presentation/markdown/read-next.ts";
 import { renderReferencesResult } from "../presentation/markdown/references.ts";
 import {
   type GraphRelationKind,
@@ -287,7 +288,7 @@ export async function executeGraphTool(
         omittedCount,
         evidenceLists,
         nextQueries: [
-          "`code_context` on individual results for deeper context",
+          "`code_orientation` on individual results for deeper orientation",
           "`code_impact` for impact analysis",
         ],
         tests,
@@ -343,6 +344,18 @@ async function collectRelation(
           count: result.references.length,
           content: rendered.content,
           evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
+          readNext: [
+            readNextAround(
+              toDisplayPath(cwd, file),
+              position.line + 1,
+              "inspect the resolved target before editing",
+            ),
+            ...result.references
+              .slice(0, Math.min(2, maxResults))
+              .map((ref) =>
+                readNextAround(toDisplayPath(cwd, ref.file), ref.line, "inspect a reference site"),
+              ),
+          ],
         };
       }
 
@@ -383,6 +396,17 @@ async function collectRelation(
           count: result.calls.length,
           content: rendered.content,
           evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
+          readNext: [
+            readNextRange({
+              file: toDisplayPath(cwd, file),
+              startLine: result.enclosingScope.startLine ?? position.line + 1,
+              endLine:
+                result.enclosingScope.endLine ??
+                result.enclosingScope.startLine ??
+                position.line + 1,
+              reason: `inspect enclosing scope \`${result.enclosingScope.name}\``,
+            }),
+          ],
         };
       }
 

@@ -231,13 +231,11 @@ describe("code_inspect tool", () => {
     if (result.details?.type === "inspect") {
       expect(result.details.data?.nextQueries).toEqual(
         expect.arrayContaining([
-          expect.stringContaining('`code_context` with `scope: "src/index.ts"`'),
+          expect.stringContaining('`code_orientation` with `focus: "src/index.ts"`'),
         ]),
       );
       expect(result.details.data?.nextQueries).not.toEqual(
-        expect.arrayContaining([
-          expect.stringContaining('`code_context` with `file: "src/index.ts"`'),
-        ]),
+        expect.arrayContaining([expect.stringContaining("`code_orientation` with `file:")]),
       );
     }
   });

@@ -142,7 +142,7 @@ function buildNextQueries(
 ): string[] {
   const next = [
     `\`code_graph\`, \`file: "${relPath}"\`, \`line: ${line}\`, and \`character: ${character}\` for relationships`,
-    `\`code_context\` with \`scope: "${relPath}"\` for broader orientation`,
+    `\`code_orientation\` with \`focus: "${relPath}"\` for broader orientation`,
   ];
   if (confidence === "unavailable") {
     next.push("Use `code_health` to inspect provider state");

@@ -1,39 +1,24 @@
-/**
- * TUI renderer for code_context — renderCall + renderResult.
- */
-
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-code-runtime/api";
-import type { CodeContextToolParams } from "../../tool/execute-context.ts";
+import type { CodeOrientationToolParams } from "../../tool/execute-context.ts";
 import { type ResultOptios, renderPartial, type ToolResult } from "./common.ts";
 
 /** ── renderCall ────────────────────────────────────────────────── */
 
 export function renderContextCall(args: unknown, theme: Theme, _context: unknown): Text {
-  const params = (args ?? {}) as CodeContextToolParams;
+  const params = (args ?? {}) as CodeOrientationToolParams;
 
-  let content = theme.fg("toolTitle", "code_context");
+  let content = theme.fg("toolTitle", "code_orientation");
 
   if (params.targetId) {
     content += ` ${theme.fg("accent", "target")}`;
-  } else if (params.file) {
-    const file = params.file.split("/").pop() ?? params.file;
-    content += ` ${theme.fg("accent", file)}`;
-    if (params.line) {
-      content += theme.fg("warning", `:${params.line}`);
-    }
-  } else if (params.task) {
-    content += ` ${theme.fg("accent", params.task.slice(0, 40))}`;
+  } else if (params.focus) {
+    const focus = params.focus.split("/").pop() ?? params.focus;
+    content += ` ${theme.fg("accent", focus)}`;
+    if (params.line) content += theme.fg("warning", `:${params.line}`);
   } else {
-    content += ` ${theme.fg("muted", "orientation")}`;
-  }
-
-  if (params.include?.length) {
-    content += theme.fg(
-      "dim",
-      ` (${params.include.slice(0, 3).join(", ")}${params.include.length > 3 ? "…" : ""})`,
-    );
+    content += ` ${theme.fg("muted", "project")}`;
   }
 
   return new Text(content, 0, 0);
@@ -48,7 +33,7 @@ export function renderContextResult(
   _context: unknown,
 ): Container | Text {
   if (options.isPartial) {
-    return renderPartial("Gathering context…", theme);
+    return renderPartial("Orienting…", theme);
   }
 
   const container = new Container();
@@ -57,7 +42,7 @@ export function renderContextResult(
   const markdownText = result.content.find((c) => c.type === "text")?.text ?? "";
 
   if (result.isError) {
-    container.addChild(new Text(theme.fg("error", "code_context failed"), 0, 0));
+    container.addChild(new Text(theme.fg("error", "code_orientation failed"), 0, 0));
     return container;
   }
 
@@ -66,7 +51,6 @@ export function renderContextResult(
     return container;
   }
 
-  // Expanded view
   container.addChild(buildHeader(data, theme));
 
   const target = data?.target as Record<string, unknown> | undefined;
@@ -113,9 +97,7 @@ export function renderContextResult(
 /** ── Helpers ───────────────────────────────────────────────────── */
 
 function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme): Text {
-  if (!data) {
-    return new Text(theme.fg("dim", "No context"), 0, 0);
-  }
+  if (!data) return new Text(theme.fg("dim", "No orientation"), 0, 0);
 
   const sections = (data?.renderedSections as string[] | undefined) ?? [];
   const confidence = (data.confidence as string) ?? "";
@@ -129,9 +111,7 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   }
 
   const target = data.target as Record<string, unknown> | undefined;
-  if (target?.name) {
-    segments.push(theme.fg("muted", String(target.name)));
-  }
+  if (target?.name) segments.push(theme.fg("muted", String(target.name)));
 
   return new Text(segments.join(` ${dot} `), 0, 0);
 }
@@ -141,14 +121,11 @@ function buildHeader(data: Record<string, unknown> | null, theme: Theme): Text {
 
   const sections = (data?.renderedSections as string[] | undefined) ?? [];
   const confidence = (data.confidence as string) ?? "";
-
   const dot = theme.fg("dim", "·");
   const parts = [
     `${theme.fg("dim", "sections")} ${theme.fg("accent", theme.bold(`${sections.length}`))}`,
   ];
-  if (confidence) {
-    parts.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
-  }
+  if (confidence) parts.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
 
   return new Text(parts.join(` ${dot} `), 0, 0);
 }

@@ -24,7 +24,7 @@ import {
   renderAffectedSingle,
 } from "../presentation/markdown/affected.ts";
 import {
-  renderChangedFilesImpact,
+  renderChangeSetImpact,
   renderImpactFileLevel,
   renderImpactSingle,
 } from "../presentation/markdown/impact.ts";
@@ -47,7 +47,7 @@ export interface ImpactInput {
   exportedOnly?: boolean;
   maxResults?: number;
   change?: string;
-  changedFiles?: string[];
+  changeSetFiles?: string[];
   includeTests?: boolean;
 }
 
@@ -75,12 +75,12 @@ interface ImpactAnalysis {
   tests?: TestSurfaceDetails;
 }
 
-interface ChangedFileEntry {
+interface ChangeSetFileEntry {
   absPath: string;
   relPath: string;
 }
 
-interface ChangedFilesSemanticImpact {
+interface ChangeSetSemanticImpact {
   targets: ResolvedTarget[];
   refs: ReferenceCollection;
   references: CodeProvider["references"];
@@ -137,17 +137,17 @@ export async function executeImpact(
 ): Promise<CodeIntelResult> {
   const resultType = surfaceResultType(surface);
 
-  if (input.changedFiles && input.changedFiles.length > 0) {
-    return executeChangedFilesImpact(input, deps.cwd, deps.provider, surface, deps.lspService);
+  if (input.changeSetFiles && input.changeSetFiles.length > 0) {
+    return executeChangeSetImpact(input, deps.cwd, deps.provider, surface, deps.lspService);
   }
 
   if (input.change && !input.file && !input.symbol) {
     return unavailableImpactResult(
       resultType,
-      "**Unavailable:** `code_impact` has insufficient evidence for a change-only request. Provide `changedFiles` or resolve a target with `code_resolve` first.",
+      "**Unavailable:** `code_impact` has insufficient evidence for a change-only request. Provide `changeSetFiles` or resolve a target with `code_resolve` first.",
       [
         "Use `code_resolve` to resolve a precise target first",
-        "Provide `changedFiles` from the workspace or diff you want to analyze",
+        "Provide `changeSetFiles` with the workspace-relative files in the change set",
       ],
     );
   }
@@ -310,6 +310,7 @@ async function executeFileLevelImpact(
           analysis,
           maxResults,
           prioritySignals,
+          cwd,
         })
       : renderAffectedFileLevel({
           targetGroup,
@@ -318,6 +319,7 @@ async function executeFileLevelImpact(
           analysis,
           maxResults,
           prioritySignals,
+          cwd,
         });
 
   const detailsData = buildDetailsData(
@@ -325,7 +327,7 @@ async function executeFileLevelImpact(
     aggregated.refs.length,
     computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, input),
     [
-      "`code_context` on the most-affected module for deeper context",
+      "`code_orientation` on the most-affected module for deeper orientation",
       "Use `code_inspect` with file + line + character to inspect one exported target precisely",
     ],
     prioritySignals,
@@ -340,30 +342,30 @@ async function executeFileLevelImpact(
   };
 }
 
-// biome-ignore lint/complexity/useMaxParams: shared changed-files orchestration keeps provider and LSP inputs explicit
-async function executeChangedFilesImpact(
+// biome-ignore lint/complexity/useMaxParams: shared change-set orchestration keeps provider and LSP inputs explicit
+async function executeChangeSetImpact(
   input: ImpactInput,
   cwd: string,
   provider: CodeProvider | null,
   surface: ImpactSurface,
   lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
-  const changedFiles = normalizeChangedFiles(input.changedFiles ?? [], cwd);
-  if (changedFiles.length === 0) {
+  const changeSetFiles = normalizeChangeSet(input.changeSetFiles ?? [], cwd);
+  if (changeSetFiles.length === 0) {
     return unavailableImpactResult(
       surfaceResultType(surface),
-      "**Unavailable:** No readable changed files were provided for impact analysis.",
+      "**Unavailable:** No readable change-set files were provided for impact analysis.",
       [
-        "Provide `changedFiles` with workspace-relative file paths",
+        "Provide `changeSetFiles` with workspace-relative file paths",
         "Use `code_resolve` when you want symbol-level impact instead",
       ],
     );
   }
 
   const model = await buildArchitectureModel(cwd);
-  const semanticImpact = await collectChangedFilesSemanticImpact(changedFiles, cwd, provider);
-  const analysis = await analyzeChangedFiles({
-    changedFiles,
+  const semanticImpact = await collectChangeSetSemanticImpact(changeSetFiles, cwd, provider);
+  const analysis = await analyzeChangeSet({
+    changeSetFiles,
     model,
     cwd,
     includeTests: shouldIncludeTests(surface, input.includeTests),
@@ -371,24 +373,24 @@ async function executeChangedFilesImpact(
   });
   const prioritySignals = summarizePrioritySignalsForFiles(
     cwd,
-    changedFiles.map((entry) => entry.absPath),
+    changeSetFiles.map((entry) => entry.absPath),
     lspService,
   );
-  const nextQueries = buildChangedFilesNextQueries(changedFiles, analysis, semanticImpact);
-  const upgradeSuggestion = buildSemanticUpgradeSuggestion(changedFiles, semanticImpact);
+  const nextQueries = buildChangeSetNextQueries(changeSetFiles, analysis, semanticImpact);
+  const upgradeSuggestion = buildSemanticUpgradeSuggestion(changeSetFiles, semanticImpact);
   const evidenceNote =
     analysis.confidence === "semantic"
-      ? "\n**Evidence: semantic+structural** — semantic references for changed-file symbols were merged with file-level module analysis and bounded test discovery.\n"
+      ? "\n**Evidence: semantic+structural** — semantic references for symbols defined in change-set files were merged with file-level module analysis and bounded test discovery.\n"
       : `\n**Evidence: structural** — impact limited to file-level module analysis and path-based test discovery.\n${upgradeSuggestion}\n`;
   const content =
     (surface === "impact"
-      ? renderChangedFilesImpact({
-          changedFiles: changedFiles.map((entry) => entry.relPath),
+      ? renderChangeSetImpact({
+          changeSetFiles: changeSetFiles.map((entry) => entry.relPath),
           analysis,
           prioritySignals,
         })
-      : renderChangedFilesImpact({
-          changedFiles: changedFiles.map((entry) => entry.relPath),
+      : renderChangeSetImpact({
+          changeSetFiles: changeSetFiles.map((entry) => entry.relPath),
           analysis,
           prioritySignals,
           heading: "Affected",
@@ -397,7 +399,7 @@ async function executeChangedFilesImpact(
 
   const detailsData = buildDetailsData(
     analysis,
-    changedFiles.length,
+    changeSetFiles.length,
     0,
     nextQueries,
     prioritySignals,
@@ -412,15 +414,15 @@ async function executeChangedFilesImpact(
   };
 }
 
-async function collectChangedFilesSemanticImpact(
-  changedFiles: ChangedFileEntry[],
+async function collectChangeSetSemanticImpact(
+  changeSetFiles: ChangeSetFileEntry[],
   cwd: string,
   provider: CodeProvider | null,
-): Promise<ChangedFilesSemanticImpact | null> {
+): Promise<ChangeSetSemanticImpact | null> {
   if (!provider?.references) return null;
 
   const targets: ResolvedTarget[] = [];
-  for (const entry of changedFiles) {
+  for (const entry of changeSetFiles) {
     try {
       const outcome = await resolveFileTargetGroup(entry.relPath, cwd, {
         semantic: provider,
@@ -430,7 +432,7 @@ async function collectChangedFilesSemanticImpact(
         targets.push(...(outcome.group.targets as ResolvedTarget[]));
       }
     } catch {
-      // Keep changedFiles analysis best-effort: structural impact still applies.
+      // Keep change-set analysis best-effort: structural impact still applies.
     }
   }
 
@@ -517,18 +519,18 @@ async function analyzeReferenceImpact(
   };
 }
 
-interface AnalyzeChangedFilesOptions {
-  changedFiles: ChangedFileEntry[];
+interface AnalyzeChangeSetOptions {
+  changeSetFiles: ChangeSetFileEntry[];
   model: Awaited<ReturnType<typeof buildArchitectureModel>>;
   cwd: string;
   includeTests: boolean;
-  semanticImpact: ChangedFilesSemanticImpact | null;
+  semanticImpact: ChangeSetSemanticImpact | null;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: changed-files impact merges structural, semantic, test, and risk evidence in one staged result.
-async function analyzeChangedFiles(options: AnalyzeChangedFilesOptions): Promise<ImpactAnalysis> {
-  const { changedFiles, model, cwd, includeTests, semanticImpact } = options;
-  const affectedFiles = new Set(changedFiles.map((entry) => entry.absPath));
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: change-set impact merges structural, semantic, test, and risk evidence in one staged result.
+async function analyzeChangeSet(options: AnalyzeChangeSetOptions): Promise<ImpactAnalysis> {
+  const { changeSetFiles, model, cwd, includeTests, semanticImpact } = options;
+  const affectedFiles = new Set(changeSetFiles.map((entry) => entry.absPath));
   if (semanticImpact) {
     for (const ref of semanticImpact.refs.refs) {
       affectedFiles.add(path.resolve(cwd, ref.file));
@@ -579,7 +581,7 @@ async function analyzeChangedFiles(options: AnalyzeChangedFilesOptions): Promise
     likelyTestCommands,
     tests,
     riskLevel: assessRisk(
-      changedFiles.length + semanticRefCount,
+      changeSetFiles.length + semanticRefCount,
       affectedModules.size,
       downstreamCount,
     ),
@@ -626,9 +628,9 @@ function analyzeModelImpact(
   return { affectedModules, checkNext, downstreamCount };
 }
 
-function normalizeChangedFiles(files: string[], cwd: string): ChangedFileEntry[] {
+function normalizeChangeSet(files: string[], cwd: string): ChangeSetFileEntry[] {
   const seen = new Set<string>();
-  const result: ChangedFileEntry[] = [];
+  const result: ChangeSetFileEntry[] = [];
 
   for (const file of files) {
     const absPath = path.resolve(cwd, file);
@@ -873,20 +875,20 @@ function buildTargetNextQueries(target: ResolvedTarget, symbolName: string, cwd:
   ];
 }
 
-function buildChangedFilesNextQueries(
-  changedFiles: ChangedFileEntry[],
+function buildChangeSetNextQueries(
+  changeSetFiles: ChangeSetFileEntry[],
   analysis: ImpactAnalysis,
-  semanticImpact: ChangedFilesSemanticImpact | null,
+  semanticImpact: ChangeSetSemanticImpact | null,
 ): string[] {
-  const firstFile = changedFiles[0]?.relPath;
+  const firstFile = changeSetFiles[0]?.relPath;
   const next: string[] = [];
   if (firstFile) {
     next.push(
-      `\`code_context\` with \`scope: "${firstFile}"\` for focused context on the changed file`,
+      `\`code_orientation\` with \`focus: "${firstFile}"\` for focused orientation on the change-set file`,
     );
   }
   if (analysis.checkNext.length > 0) {
-    next.push("`code_context` on the most-affected module for broader context");
+    next.push("`code_orientation` on the most-affected module for broader orientation");
   }
   if (analysis.confidence !== "semantic" && firstFile) {
     const symbolHint = semanticImpact?.targets[0]?.name ?? "<primary exported symbol>";
@@ -898,10 +900,10 @@ function buildChangedFilesNextQueries(
 }
 
 function buildSemanticUpgradeSuggestion(
-  changedFiles: ChangedFileEntry[],
-  semanticImpact: ChangedFilesSemanticImpact | null,
+  changeSetFiles: ChangeSetFileEntry[],
+  semanticImpact: ChangeSetSemanticImpact | null,
 ): string {
-  const firstFile = changedFiles[0]?.relPath;
+  const firstFile = changeSetFiles[0]?.relPath;
   if (!firstFile) return "";
   const symbolHint = semanticImpact?.targets[0]?.name ?? "<primary exported symbol>";
   return `For semantic impact, run \`code_resolve(query="${symbolHint}", scope="${firstFile}")\` then \`code_impact(targetId="<result>", change="<your change>")\`.`;

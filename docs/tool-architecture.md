@@ -189,11 +189,11 @@ surface. Public `tree_sitter_*` tools are no longer registered.
 ### `packages/supi-code-intelligence`
 
 Uses `src/tool/tool-specs.ts` as the single source of truth for:
-- public focused-tool names (`code_resolve`, `code_inspect`, `code_context`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_refactor_plan`, `code_refactor_apply`)
+- public focused-tool names (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_refactor_plan`, `code_refactor_apply`)
 - descriptions, snippets, and base guidance
 - parameter schemas for each public tool
 
-`code_context` absorbed the old `code_brief` orientation surface. `code_affected` remains an internal compatibility surface in the shared execution path, but it is no longer registered as a public tool.
+`code_orientation` replaced the old `code_context`/`code_brief` orientation surface. `code_affected` remains an internal compatibility surface in the shared execution path, but it is no longer registered as a public tool.
 
 `src/tool/guidance.ts`, `src/tool/register-tools.ts`, and
 `src/code-intelligence.ts` derive from those specs.

@@ -123,7 +123,7 @@ describe("relations render", () => {
 
     expect(content).toContain("# Graph of `widget`");
     expect(content).toContain("# References of `widget`");
-    expect(content).not.toContain("code_context");
+    expect(content).not.toContain("code_orientation");
     expect(content).not.toContain("code_inspect");
   });
 

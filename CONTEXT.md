@@ -68,6 +68,14 @@ _Avoid_: package table row
 The set of agent-facing capabilities that help understand, navigate, search, and refactor code.
 _Avoid_: code intel, IDE features
 
+**Orientation surface**:
+The code-intelligence surface that helps an agent establish where it is, what boundaries and landmarks matter, and what source it should inspect next before choosing more surgical tools.
+_Avoid_: context bundle, relation graph, treating orientation as target analysis
+
+**Orientation focus**:
+The project, package, directory, file, or symbol that an orientation surface is centered on. An absent focus means workspace-level orientation; a precise focus means symbol-centered orientation rather than relation analysis.
+_Avoid_: scope, path, target when referring to orientation selection
+
 **Honest correctness**:
 The code-intelligence result standard that a tool must either report evidence-backed facts or explicitly say why it cannot. Silent guessing, silent truncation, silent scope widening, and silent fallback to a weaker substrate are incorrect even when they look helpful.
 _Avoid_: best-effort correctness, "probably right", hiding degraded evidence
@@ -87,6 +95,14 @@ _Avoid_: raw capped arrays, renderer-only omission math, details-only omission m
 **Actionable list**:
 A bounded list of generated executable or check actions a user or agent may run, such as verification commands. Actionable lists are not tool evidence, but they follow the same truncation-disclosure rule because omitting actions silently can mislead follow-up work. Prose navigation hints such as `nextQueries` are guidance chrome, not actionable lists.
 _Avoid_: silently capped command lists, treating generated actions as evidence facts, treating all hints as actions
+
+**Read-next guidance**:
+A guidance-chrome section in public code-intelligence markdown that points a user or agent to exact source ranges worth inspecting after a summarized result. It is not tool evidence and does not replace reading the source before editing.
+_Avoid_: treating read suggestions as evidence, treating read suggestions as verification commands, hiding source inspection behind summaries
+
+**Change set**:
+A user-supplied set of files or targets that should be analyzed as in scope for a proposed or current code change. It is not inferred from git and carries no line-level diff evidence.
+_Avoid_: changed files, dirty files, diff input, implying git state
 
 **Evidence atom**:
 One fact that can independently support a coding decision. Evidence-list totals and omitted counts are expressed in evidence atoms, not rendered rows or grouping containers. For example, reference locations count as references even when displayed under grouped file headings, and individual diagnostic messages count as diagnostics even when grouped by file.
