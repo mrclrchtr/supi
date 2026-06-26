@@ -44,6 +44,22 @@ _Avoid_: workflow guardrails, workflow quality-of-life
 A display or report that shows how the current PI session is spending its context window.
 _Avoid_: context usage
 
-**DevTools**:
-A package-catalog tag for SuPi features aimed primarily at debugging, inspecting, or developing SuPi/PI extension behavior rather than ordinary coding workflow.
-_Avoid_: developer tools
+**DevTool**:
+A package-catalog badge for SuPi features aimed primarily at debugging, inspecting, or developing SuPi/PI extension behavior rather than ordinary coding workflow.
+_Avoid_: DevTools, developer tools
+
+**Agent-Facing**:
+A package-catalog badge for SuPi behavior the PI agent can use directly, such as model-callable tools, injected agent context, or tool-call hooks. The public README badge should be written as `Agent`.
+_Avoid_: agent-usable, passive
+
+**Human-Facing**:
+A package-catalog badge for SuPi behavior the user drives directly, such as slash commands, TUI overlays, reports, shortcuts, or configuration screens. The public README badge should be written as `Human`.
+_Avoid_: human-only
+
+**Package Badge**:
+A compact `<kbd>` label in the root README package catalog that communicates audience, maturity, or role without adding long prose.
+_Avoid_: tag, status label
+
+**Package Card**:
+A root README catalog entry that promotes one SuPi package with its README link, install command, compact badges, and a short value statement. Package cards should not duplicate each package README.
+_Avoid_: package table row
