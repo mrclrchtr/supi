@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.16.1](https://github.com/mrclrchtr/supi/compare/v1.16.0...v1.16.1) (2026-06-26)
+
+
+### Bug Fixes
+
+* **deps:** update commitlint monorepo to v21.1.0 ([99040bb](https://github.com/mrclrchtr/supi/commit/99040bbc7ab5f57c90da2927a3ebd36421c63a1c))
+* **deps:** update dependency @biomejs/biome to v2.5.1 ([ce9a3b6](https://github.com/mrclrchtr/supi/commit/ce9a3b69ec9dbe89f5821ab7a59593685b805a38))
+* **deps:** update dependency vscode-languageserver-protocol to v3.18.1 ([e0d02e3](https://github.com/mrclrchtr/supi/commit/e0d02e3abf1409211833941e6011a6d47d29b0b5))
+* **deps:** update pnpm to v11.9.0 ([cb46f61](https://github.com/mrclrchtr/supi/commit/cb46f6130ec5562a810a16e052862c5826f0f410))
+
 ## [1.16.0](https://github.com/mrclrchtr/supi/compare/v1.15.0...v1.16.0) (2026-06-25)
 
 
