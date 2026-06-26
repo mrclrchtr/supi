@@ -56,7 +56,7 @@
     "typebox": "*"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.0",
+    "@biomejs/biome": "2.5.1",
     "@commitlint/cli": "21.0.2",
     "@commitlint/config-conventional": "21.0.2",
     "@earendil-works/pi-ai": "^0.79.10",
