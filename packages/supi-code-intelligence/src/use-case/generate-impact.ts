@@ -1,7 +1,5 @@
-// biome-ignore-all lint/style/noExcessiveLinesPerFile: shared impact orchestration stays together while the preferred and compatibility surfaces reuse one engine.
+// biome-ignore-all lint/style/noExcessiveLinesPerFile: shared impact orchestration stays together in one cohesive use-case file.
 // Impact orchestration use-case — workflow-oriented blast-radius analysis.
-// Shared engine for both `code_impact` (preferred) and `code_affected`
-// (compatibility alias).
 
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
@@ -18,11 +16,6 @@ import {
 import { resolveTarget } from "../analysis/targeting/resolve-target.ts";
 import { createEvidenceList, type EvidenceListMetadata } from "../evidence-list.ts";
 import { buildArchitectureModel, findModuleForPath, getDependents } from "../model.ts";
-import {
-  AFFECTED_COMPATIBILITY_NOTE,
-  renderAffectedFileLevel,
-  renderAffectedSingle,
-} from "../presentation/markdown/affected.ts";
 import {
   renderChangeSetImpact,
   renderImpactFileLevel,
@@ -57,9 +50,7 @@ export interface ImpactDeps {
   lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState;
 }
 
-export type ImpactSurface = "impact" | "affected";
-
-type ImpactResultType = "impact" | "affected";
+export type ImpactResultType = "impact";
 
 interface ImpactAnalysis {
   confidence: ConfidenceMode;
@@ -129,21 +120,17 @@ export function findLikelyTests(
   return results.slice(0, 3);
 }
 
-/** Execute the shared impact use-case for the preferred or compatibility surface. */
+/** Execute the shared impact use-case. */
 export async function executeImpact(
   input: ImpactInput,
   deps: ImpactDeps,
-  surface: ImpactSurface = "impact",
 ): Promise<CodeIntelResult> {
-  const resultType = surfaceResultType(surface);
-
   if (input.changeSetFiles && input.changeSetFiles.length > 0) {
-    return executeChangeSetImpact(input, deps.cwd, deps.provider, surface, deps.lspService);
+    return executeChangeSetImpact(input, deps.cwd, deps.provider, deps.lspService);
   }
 
   if (input.change && !input.file && !input.symbol) {
     return unavailableImpactResult(
-      resultType,
       "**Unavailable:** `code_impact` has insufficient evidence for a change-only request. Provide `changeSetFiles` or resolve a target with `code_resolve` first.",
       [
         "Use `code_resolve` to resolve a precise target first",
@@ -153,12 +140,10 @@ export async function executeImpact(
   }
 
   const semantic = deps.provider;
-  const surfaceName = surfaceDisplayName(surface);
 
   if (!semantic) {
     return unavailableImpactResult(
-      resultType,
-      `**Error:** ${surfaceName} analysis requires an active code provider (LSP). Enable LSP and retry.`,
+      "**Error:** Impact analysis requires an active code provider (LSP). Enable LSP and retry.",
       ["Use `code_resolve` to resolve a target first"],
     );
   }
@@ -166,26 +151,16 @@ export async function executeImpact(
   const target = await resolveTarget(input, deps.cwd, semantic);
 
   if (typeof target === "string") {
-    return unavailableImpactResult(resultType, target, [
-      "Use `code_resolve` to resolve a target first",
-    ]);
+    return unavailableImpactResult(target, ["Use `code_resolve` to resolve a target first"]);
   }
 
   if (isResolvedTargetGroup(target)) {
-    return executeFileLevelImpact(target, input, deps.cwd, semantic, surface, deps.lspService);
+    return executeFileLevelImpact(target, input, deps.cwd, semantic, deps.lspService);
   }
 
   const symbolName =
     target.name ?? `symbol at ${path.relative(deps.cwd, target.file)}:${target.displayLine}`;
-  return executeSingleImpact(
-    target,
-    symbolName,
-    input,
-    deps.cwd,
-    semantic,
-    surface,
-    deps.lspService,
-  );
+  return executeSingleImpact(target, symbolName, input, deps.cwd, semantic, deps.lspService);
 }
 
 // biome-ignore lint/complexity/useMaxParams: shared impact orchestration keeps substrate inputs explicit
@@ -195,7 +170,6 @@ async function executeSingleImpact(
   input: ImpactInput,
   cwd: string,
   semantic: CodeProvider,
-  surface: ImpactSurface,
   lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
   const refs = await collectReferences(target, cwd, semantic);
@@ -204,7 +178,7 @@ async function executeSingleImpact(
     refs,
     model,
     cwd,
-    shouldIncludeTests(surface, input.includeTests),
+    input.includeTests === true,
     semantic.references,
     [target.file], // seed the target file itself as affected
     buildTestAnchorMap([{ file: target.file, position: target.position }]),
@@ -218,26 +192,15 @@ async function executeSingleImpact(
   );
 
   const maxResults = input.maxResults ?? 8;
-  const content =
-    surface === "impact"
-      ? renderImpactSingle({
-          symbolName,
-          refs,
-          analysis,
-          maxResults,
-          prioritySignals,
-          target,
-          cwd,
-        })
-      : renderAffectedSingle({
-          symbolName,
-          refs,
-          analysis,
-          maxResults,
-          prioritySignals,
-          target,
-          cwd,
-        });
+  const content = renderImpactSingle({
+    symbolName,
+    refs,
+    analysis,
+    maxResults,
+    prioritySignals,
+    target,
+    cwd,
+  });
 
   const referenceEvidence = createEvidenceList({
     key: "references.locations",
@@ -256,7 +219,7 @@ async function executeSingleImpact(
   return {
     content,
     details: {
-      type: surfaceResultType(surface),
+      type: "impact",
       data: detailsData,
     },
   };
@@ -268,7 +231,6 @@ async function executeFileLevelImpact(
   input: ImpactInput,
   cwd: string,
   semantic: CodeProvider,
-  surface: ImpactSurface,
   lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
   const perTarget = await Promise.all(
@@ -287,7 +249,7 @@ async function executeFileLevelImpact(
     aggregated,
     model,
     cwd,
-    shouldIncludeTests(surface, input.includeTests),
+    input.includeTests === true,
     semantic.references,
     targetGroup.targets.map((t) => t.file), // seed all target files
     buildTestAnchorMap(targetGroup.targets.map((t) => ({ file: t.file, position: t.position }))),
@@ -301,26 +263,15 @@ async function executeFileLevelImpact(
   );
 
   const maxResults = input.maxResults ?? 8;
-  const content =
-    surface === "impact"
-      ? renderImpactFileLevel({
-          targetGroup,
-          perTarget,
-          aggregated,
-          analysis,
-          maxResults,
-          prioritySignals,
-          cwd,
-        })
-      : renderAffectedFileLevel({
-          targetGroup,
-          perTarget,
-          aggregated,
-          analysis,
-          maxResults,
-          prioritySignals,
-          cwd,
-        });
+  const content = renderImpactFileLevel({
+    targetGroup,
+    perTarget,
+    aggregated,
+    analysis,
+    maxResults,
+    prioritySignals,
+    cwd,
+  });
 
   const detailsData = buildDetailsData(
     analysis,
@@ -336,24 +287,21 @@ async function executeFileLevelImpact(
   return {
     content,
     details: {
-      type: surfaceResultType(surface),
+      type: "impact",
       data: detailsData,
     },
   };
 }
 
-// biome-ignore lint/complexity/useMaxParams: shared change-set orchestration keeps provider and LSP inputs explicit
 async function executeChangeSetImpact(
   input: ImpactInput,
   cwd: string,
   provider: CodeProvider | null,
-  surface: ImpactSurface,
   lspService: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState,
 ): Promise<CodeIntelResult> {
   const changeSetFiles = normalizeChangeSet(input.changeSetFiles ?? [], cwd);
   if (changeSetFiles.length === 0) {
     return unavailableImpactResult(
-      surfaceResultType(surface),
       "**Unavailable:** No readable change-set files were provided for impact analysis.",
       [
         "Provide `changeSetFiles` with workspace-relative file paths",
@@ -368,7 +316,7 @@ async function executeChangeSetImpact(
     changeSetFiles,
     model,
     cwd,
-    includeTests: shouldIncludeTests(surface, input.includeTests),
+    includeTests: input.includeTests === true,
     semanticImpact,
   });
   const prioritySignals = summarizePrioritySignalsForFiles(
@@ -383,19 +331,11 @@ async function executeChangeSetImpact(
       ? "\n**Evidence: semantic+structural** — semantic references for symbols defined in change-set files were merged with file-level module analysis and bounded test discovery.\n"
       : `\n**Evidence: structural** — impact limited to file-level module analysis and path-based test discovery.\n${upgradeSuggestion}\n`;
   const content =
-    (surface === "impact"
-      ? renderChangeSetImpact({
-          changeSetFiles: changeSetFiles.map((entry) => entry.relPath),
-          analysis,
-          prioritySignals,
-        })
-      : renderChangeSetImpact({
-          changeSetFiles: changeSetFiles.map((entry) => entry.relPath),
-          analysis,
-          prioritySignals,
-          heading: "Affected",
-          compatibilityNote: AFFECTED_COMPATIBILITY_NOTE,
-        })) + evidenceNote;
+    renderChangeSetImpact({
+      changeSetFiles: changeSetFiles.map((entry) => entry.relPath),
+      analysis,
+      prioritySignals,
+    }) + evidenceNote;
 
   const detailsData = buildDetailsData(
     analysis,
@@ -408,7 +348,7 @@ async function executeChangeSetImpact(
   return {
     content,
     details: {
-      type: surfaceResultType(surface),
+      type: "impact",
       data: detailsData,
     },
   };
@@ -934,24 +874,8 @@ function buildDetailsData(
   };
 }
 
-function shouldIncludeTests(surface: ImpactSurface, includeTests: boolean | undefined): boolean {
-  return surface === "affected" || includeTests === true;
-}
-
-function surfaceResultType(surface: ImpactSurface): ImpactResultType {
-  return surface === "impact" ? "impact" : "affected";
-}
-
-function surfaceDisplayName(surface: ImpactSurface): string {
-  return surface === "impact" ? "Impact" : "Affected";
-}
-
-function unavailableImpactResult(
-  type: ImpactResultType,
-  content: string,
-  nextQueries: string[],
-): CodeIntelResult {
-  const data: AffectedDetails | ImpactDetails = {
+function unavailableImpactResult(content: string, nextQueries: string[]): CodeIntelResult {
+  const data: ImpactDetails = {
     confidence: "unavailable",
     directCount: 0,
     downstreamCount: 0,
@@ -966,7 +890,7 @@ function unavailableImpactResult(
   return {
     content,
     details: {
-      type,
+      type: "impact",
       data,
     },
   };

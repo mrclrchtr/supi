@@ -118,7 +118,7 @@ export const WORKFLOW_CODE_TOOL_SPECS = [
     schemaKey: "code_impact",
     schemaDocs:
       "Accepts targetId, change, or changeSetFiles plus includeTests/maxResults. Runtime validation later requires at least one primary subject.",
-    absorbsTools: ["code_affected"],
+    absorbsTools: [],
     absorbsBehaviors: [],
     substrates: ["semantic", "structural", "search", "diagnostics"],
     phase: "phase-4",

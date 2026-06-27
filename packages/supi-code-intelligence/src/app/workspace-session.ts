@@ -3,29 +3,18 @@
  *
  * Each cwd gets exactly one session instance. The session owns:
  * - overview-injection state (hasInjectedOverview)
- * - model-cache state (modelCache)
- * - references to semantic/structural adapter state (adapterState)
+ * - refactor plan storage (refactorPlans)
+ * - workflow target storage (workflowTargets)
+ * - coverage warning state (coverageWarningState)
  *
  * The session does NOT own the shared capability broker in
  * @mrclrchtr/supi-code-runtime — that remains the canonical broker.
  * This session coordinates local state *around* it.
  */
 
+import type { RefactorPlan } from "../analysis/refactor/plan-store.ts";
 import { CoverageWarningState } from "../lsp/coverage-warnings.ts";
-import type { LspAdapterState } from "../lsp/runtime-state.ts";
-import type { TsAdapterState } from "../tree-sitter/session-lifecycle.ts";
-
-/**
- * Adapter state slots that workspace-session coordinates.
- *
- * The actual lifecycle (init, teardown, capability publishing) is
- * owned by `lsp/runtime-state.ts` and `tree-sitter/session-lifecycle.ts`.
- * The workspace session holds references to those adapter instances.
- */
-export interface AdapterStateSlots {
-  semantic: LspAdapterState | undefined;
-  structural: TsAdapterState | undefined;
-}
+import type { TargetStoreEntry } from "../workflow/target-store.ts";
 
 /**
  * Per-cwd session-scoped app state.
@@ -40,17 +29,11 @@ export interface WorkspaceSession {
   /** Whether the hidden architecture overview has been injected. */
   hasInjectedOverview: boolean;
 
-  /** Session/workspace cache and invalidation state for architecture models. */
-  modelCache: Record<string, unknown>;
+  /** Session-scoped refactor plan storage (planId → plan). */
+  readonly refactorPlans: Map<string, RefactorPlan>;
 
-  /**
-   * References to semantic/structural adapter state.
-   *
-   * The actual adapter instances and lifecycle are managed by
-   * substrate modules. The session holds lightweight references
-   * to coordinate cleanup and access.
-   */
-  adapterState: AdapterStateSlots;
+  /** Session-scoped workflow target storage (targetId → entry). */
+  readonly workflowTargets: Map<string, TargetStoreEntry>;
 
   /**
    * Coverage warning state for deduplication and grace-period timing.
@@ -66,11 +49,8 @@ export function createWorkspaceSession(cwd: string): WorkspaceSession {
   return {
     cwd,
     hasInjectedOverview: false,
-    modelCache: {},
-    adapterState: {
-      semantic: undefined,
-      structural: undefined,
-    },
+    refactorPlans: new Map(),
+    workflowTargets: new Map(),
     coverageWarningState: new CoverageWarningState(),
   };
 }

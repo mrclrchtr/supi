@@ -6,7 +6,6 @@
  */
 
 import type {
-  AffectedDetails,
   ContextDetails,
   HealthDetails,
   ImpactDetails,
@@ -80,10 +79,10 @@ export function unavailableInspectDetails(
   };
 }
 
-export function unavailableImpactDetails(
-  type: "impact" | "affected",
-  nextQueries: string[],
-): { type: "impact" | "affected"; data: ImpactDetails | AffectedDetails } {
+export function unavailableImpactDetails(nextQueries: string[]): {
+  type: "impact";
+  data: ImpactDetails;
+} {
   const data: ImpactDetails = {
     confidence: "unavailable",
     directCount: 0,
@@ -95,7 +94,7 @@ export function unavailableImpactDetails(
     omittedCount: 0,
     nextQueries,
   };
-  return { type, data };
+  return { type: "impact", data };
 }
 
 export function unavailableHealthDetails(reason: string): {

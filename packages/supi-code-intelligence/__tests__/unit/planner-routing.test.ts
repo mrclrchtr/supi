@@ -145,20 +145,6 @@ describe("Planner routing", () => {
       expect(route.preferred).toBe("unavailable");
     });
 
-    it("routes code_affected to semantic-preferred", async () => {
-      registerSemantic();
-      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", "code_affected");
-      expect(route.preferred).toBe("semantic");
-    });
-
-    it("returns unavailable for code_affected when semantic analysis is unavailable", async () => {
-      registerStructural();
-      const { routeFor } = await import("../../src/analysis/routing/planner.ts");
-      const route = routeFor("/project", "code_affected");
-      expect(route.preferred).toBe("unavailable");
-    });
-
     it("keeps code_impact execution unavailable when only structural analysis is registered", {
       timeout: 5000,
     }, async () => {

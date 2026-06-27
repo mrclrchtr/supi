@@ -2,11 +2,12 @@
  * Shared helper for expanding targetId into existing target-oriented tool params.
  *
  * Current target-oriented tools (code_orientation, code_graph,
- * code_impact, code_affected, code_refactor_plan)
+ * code_impact, code_refactor_plan)
  * accept optional targetId that takes precedence over raw
  * file/line/character/symbol.
  */
 
+import { getOrCreateSessionForCwd } from "../app/create-code-intelligence-app.ts";
 import type { TargetStoreEntry } from "../workflow/target-store.ts";
 import { getWorkflowTarget } from "../workflow/target-store.ts";
 
@@ -77,7 +78,9 @@ export function lookupTargetId(params: { targetId?: string }, cwd: string): Targ
     return { kind: "not-provided" };
   }
 
-  const result = getWorkflowTarget(cwd, params.targetId);
+  const session = getOrCreateSessionForCwd(cwd);
+
+  const result = getWorkflowTarget(session.workflowTargets, params.targetId);
   if (result.kind === "unavailable") {
     return { kind: "error", message: `**Error:** ${result.reason}` };
   }

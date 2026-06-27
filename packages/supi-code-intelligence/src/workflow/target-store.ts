@@ -1,12 +1,12 @@
 /**
- * Workflow target store — session-scoped target and span handle registry.
+ * Workflow target store — per-session target and span handle registry.
  *
  * Provides deterministic opaque IDs derived from cwd, file, position,
  * metadata, and file fingerprint. Re-resolving the same target with
  * unchanged file contents reuses the same IDs.
  *
- * The store is cwd-scoped in-memory. Cross-session persistence is
- * intentionally not implemented in Phase 1.
+ * The store map is passed in from the caller; this module provides pure
+ * functions without module-level state.
  */
 
 import { createHash } from "node:crypto";
@@ -68,9 +68,7 @@ export type TargetLookupResult =
   | { kind: "available"; entry: TargetStoreEntry }
   | { kind: "unavailable"; reason: string };
 
-// ── In-memory store ───────────────────────────────────────────────────
-
-const store = new Map<string, Map<string, TargetStoreEntry>>();
+// ── Helpers ───────────────────────────────────────────────────────────
 
 function normalizeCwd(cwd: string): string {
   return cwd.replace(/\\/g, "/").replace(/\/$/, "");
@@ -160,7 +158,8 @@ function computeSpanId(
 // ── Public API ────────────────────────────────────────────────────────
 
 /**
- * Register a resolved target and return stable session-scoped handles.
+ * Register a resolved target in the given session-scoped store and return
+ * stable session-scoped handles.
  *
  * If the same target (same file, position, name, kind) is registered
  * and the file fingerprint matches, the same IDs are returned.
@@ -168,6 +167,7 @@ function computeSpanId(
  * Returns an error when the backing file cannot be read for fingerprinting.
  */
 export function registerWorkflowTarget(
+  store: Map<string, TargetStoreEntry>,
   cwd: string,
   input: TargetRegistrationInput,
 ): TargetRegistrationOutput {
@@ -192,8 +192,7 @@ export function registerWorkflowTarget(
   const spanId = computeSpanId(key, input.file, input.position, fingerprint);
 
   // Check for existing entry with same targetId
-  const cwdStore = store.get(key) ?? new Map<string, TargetStoreEntry>();
-  const existing = cwdStore.get(targetId);
+  const existing = store.get(targetId);
   if (existing) {
     return { targetId: existing.targetId, spanId: existing.spanId };
   }
@@ -213,14 +212,13 @@ export function registerWorkflowTarget(
     fileFingerprint: fingerprint,
   };
 
-  cwdStore.set(targetId, entry);
-  store.set(key, cwdStore);
+  store.set(targetId, entry);
 
   return { targetId, spanId };
 }
 
 /**
- * Look up a stored target by targetId.
+ * Look up a stored target by targetId in the given session-scoped store.
  *
  * Returns `{ kind: "available", entry }` when found.
  * Returns `{ kind: "unavailable", reason }` when unknown or stale.
@@ -230,14 +228,11 @@ export function registerWorkflowTarget(
  * "unfingerprinted" (file was unreadable at registration time),
  * staleness cannot be confirmed and the entry is returned as-is.
  */
-export function getWorkflowTarget(cwd: string, targetId: string): TargetLookupResult {
-  const key = normalizeCwd(cwd);
-  const cwdStore = store.get(key);
-  if (!cwdStore) {
-    return { kind: "unavailable", reason: `No targets registered for this workspace (${key}).` };
-  }
-
-  const entry = cwdStore.get(targetId);
+export function getWorkflowTarget(
+  store: Map<string, TargetStoreEntry>,
+  targetId: string,
+): TargetLookupResult {
+  const entry = store.get(targetId);
   if (!entry) {
     return {
       kind: "unavailable",
@@ -250,7 +245,7 @@ export function getWorkflowTarget(cwd: string, targetId: string): TargetLookupRe
   const current = computeFileFingerprint(entry.file);
   if (current.kind === "error") {
     // File is gone or unreadable — remove and report unavailable
-    cwdStore.delete(targetId);
+    store.delete(targetId);
     return {
       kind: "unavailable",
       reason: `${current.message} — target \`${targetId}\` is no longer available.`,
@@ -265,7 +260,7 @@ export function getWorkflowTarget(cwd: string, targetId: string): TargetLookupRe
 
   if (current.fingerprint !== entry.fileFingerprint) {
     // Stale — remove and report unavailable
-    cwdStore.delete(targetId);
+    store.delete(targetId);
     return {
       kind: "unavailable",
       reason: `Target \`${targetId}\` (\`${entry.name ?? entry.file}\`) is stale — the backing file has been modified since resolution. Re-resolve with \`code_resolve\`.`,
@@ -273,15 +268,4 @@ export function getWorkflowTarget(cwd: string, targetId: string): TargetLookupRe
   }
 
   return { kind: "available", entry };
-}
-
-/** Clear all targets for a cwd. */
-export function clearWorkflowTargets(cwd: string): void {
-  const key = normalizeCwd(cwd);
-  store.delete(key);
-}
-
-/** Clear all targets across all cwds (for test cleanup). */
-export function clearAllWorkflowTargets(): void {
-  store.clear();
 }

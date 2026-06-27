@@ -2,10 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  clearWorkflowTargets,
-  registerWorkflowTarget,
-} from "../../../src/workflow/target-store.ts";
+import { getOrCreateSessionForCwd } from "../../../src/app/create-code-intelligence-app.ts";
+import { registerWorkflowTarget } from "../../../src/workflow/target-store.ts";
 import type { ActionParams } from "../../helpers/execute-action.ts";
 import { executeAction } from "../../helpers/execute-action.ts";
 import { registerMockProvider } from "../../helpers/register-mock-runtime.ts";
@@ -18,7 +16,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  clearWorkflowTargets(tmpDir);
   rmSync(tmpDir, { recursive: true, force: true });
 });
 
@@ -171,7 +168,8 @@ describe("execute-graph (code_graph tool)", () => {
         },
       }));
       registerMockProvider(tmpDir, { calleesAt });
-      const { targetId } = registerWorkflowTarget(tmpDir, {
+      const session = getOrCreateSessionForCwd(tmpDir);
+      const { targetId } = registerWorkflowTarget(session.workflowTargets, tmpDir, {
         file: "test.ts",
         position: { line: 0, character: 0 },
         displayLine: 1,

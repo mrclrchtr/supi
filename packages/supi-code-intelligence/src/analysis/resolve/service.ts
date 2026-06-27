@@ -10,6 +10,7 @@
 import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import { getOrCreateSessionForCwd } from "../../app/create-code-intelligence-app.ts";
 import { normalizePath } from "../../search-helpers.ts";
 import { resolveAnchoredSymbolTarget } from "../../targeting/resolve-anchored.ts";
 import { resolveFileTargetGroup as resolveFile } from "../../targeting/resolve-file.ts";
@@ -139,6 +140,9 @@ function registerFromTarget(
   cwd: string,
   provenance: string,
 ): ResolvedTargetEntry {
+  const session = getOrCreateSessionForCwd(cwd);
+  const store = session.workflowTargets;
+
   const input: TargetRegistrationInput = {
     file: target.file,
     position: target.position,
@@ -151,7 +155,7 @@ function registerFromTarget(
     anchorKind: target.anchorKind,
     container: target.container,
   };
-  const { targetId, spanId } = registerWorkflowTarget(cwd, input);
+  const { targetId, spanId } = registerWorkflowTarget(store, cwd, input);
   return {
     targetId,
     spanId,
@@ -181,6 +185,9 @@ function registerCandidate(
   },
   cwd: string,
 ): DisambiguationCandidateEntry {
+  const session = getOrCreateSessionForCwd(cwd);
+  const store = session.workflowTargets;
+
   const input: TargetRegistrationInput = {
     file: resolve(cwd, c.file),
     position: { line: c.line - 1, character: c.character - 1 },
@@ -193,7 +200,7 @@ function registerCandidate(
     anchorKind: c.anchorKind,
     container: c.container,
   };
-  const { targetId } = registerWorkflowTarget(cwd, input);
+  const { targetId } = registerWorkflowTarget(store, cwd, input);
   return {
     targetId,
     name: c.name,

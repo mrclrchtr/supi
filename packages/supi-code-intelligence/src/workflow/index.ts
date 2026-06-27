@@ -36,8 +36,6 @@ export type {
   TargetStoreEntry,
 } from "./target-store.ts";
 export {
-  clearAllWorkflowTargets,
-  clearWorkflowTargets,
   getWorkflowTarget,
   registerWorkflowTarget,
 } from "./target-store.ts";

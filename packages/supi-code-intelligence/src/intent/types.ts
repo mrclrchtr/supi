@@ -5,12 +5,11 @@
  * tool layer (specs) so they live here to avoid circular dependencies.
  */
 
-/** Canonical code-intelligence tool names, including internal compatibility aliases. */
+/** Canonical code-intelligence tool names. */
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_inspect",
   "code_orientation",
   "code_impact",
-  "code_affected",
   "code_find",
   "code_graph",
   "code_health",

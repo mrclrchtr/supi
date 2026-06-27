@@ -94,8 +94,7 @@ src/
 │   ├── brief.ts                # Brief markdown renderer
 │   ├── inspect.ts              # code_inspect markdown renderer
 │   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
-│   ├── impact.ts               # Preferred workflow impact markdown renderer
-│   ├── affected.ts             # code_affected compatibility markdown renderer
+│   ├── impact.ts               # Workflow impact markdown renderer
 │   ├── pattern.ts              # Pattern/find search markdown renderer
 │   ├── refactor.ts             # Refactor result markdown renderer
 │   └── resolve.ts              # code_resolve markdown renderer (Phase 1)

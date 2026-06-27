@@ -4,7 +4,6 @@ import * as path from "node:path";
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { resolveAnchoredSymbolTarget } from "../../src/targeting/resolve-anchored.ts";
-import { clearAllWorkflowTargets } from "../../src/workflow/target-store.ts";
 
 let tmpDir: string;
 
@@ -14,7 +13,6 @@ function setup(): string {
 }
 
 function teardown(): void {
-  clearAllWorkflowTargets();
   rmSync(tmpDir, { recursive: true, force: true });
 }
 

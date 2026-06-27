@@ -370,7 +370,7 @@ Sole mutator in the refactor workflow.
 
 ## Internal compatibility paths
 
-The legacy compatibility executor (`code_affected`) remains in the source tree for migration/tests, but is no longer registered on the public tool surface.
+The `code_affected` tool has been fully removed. Use `code_impact` exclusively.
 
 ## Shared input conventions
 

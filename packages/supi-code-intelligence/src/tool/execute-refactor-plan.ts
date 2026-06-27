@@ -19,6 +19,7 @@ import {
   storePlan,
 } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
+import { getOrCreateSessionForCwd } from "../app/create-code-intelligence-app.ts";
 import { createEvidenceList } from "../evidence-list.ts";
 import { renderRefactorPlanResult } from "../presentation/markdown/refactor.ts";
 import { normalizePath } from "../search-helpers.ts";
@@ -114,7 +115,8 @@ export async function executeRefactorPlanTool(
     fileFingerprints,
     createdAt: Date.now(),
   };
-  storePlan(plan);
+  const session = getOrCreateSessionForCwd(ctx.cwd);
+  storePlan(session.refactorPlans, plan);
 
   const editEvidence = createEvidenceList({
     key: "refactor.edits",

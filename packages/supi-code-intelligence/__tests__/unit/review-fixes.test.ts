@@ -207,7 +207,7 @@ describe("focused-tool follow-up regressions", () => {
     }
   });
 
-  it("uses file coordinates for anchored code_affected follow-up hints when no symbol name is known", async () => {
+  it("uses file coordinates for anchored impact follow-up hints when no symbol name is known", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
     const srcDir = path.join(tmpDir, "src");
     mkdirSync(srcDir, { recursive: true });

@@ -9,8 +9,8 @@ import { createCodeIntelligenceApp } from "../../../src/app/create-code-intellig
  *
  * Verifies:
  * - Sessions are created once per cwd
- * - Sessions keep separate semantic/structural adapter state slots
- * - Sessions track overview-injection and model-cache state
+ * - Sessions keep separate refactor plan and workflow target stores
+ * - Sessions track overview-injection state
  * - Sessions are cleaned up on shutdown WITHOUT replacing the shared capability broker
  * - Multiple sessions for different cwds coexist
  */
@@ -50,41 +50,30 @@ describe("workspace-manager", () => {
     expect(sessionB.cwd).toBe("/project-b");
   });
 
-  it("creates sessions with distinct adapter state references", () => {
+  it("creates sessions with distinct plan stores", () => {
     const sessionA = app.createSession("/project-a");
     const sessionB = app.createSession("/project-b");
-    // Each session should have its own adapter state spaces
-    expect(sessionA).not.toBe(sessionB);
-    // Both should start with empty adapter state
-    expect(sessionA.adapterState.semantic).toBeUndefined();
-    expect(sessionA.adapterState.structural).toBeUndefined();
-    expect(sessionB.adapterState.semantic).toBeUndefined();
-    expect(sessionB.adapterState.structural).toBeUndefined();
+    // Each session should have its own refactor plan store
+    expect(sessionA.refactorPlans).not.toBe(sessionB.refactorPlans);
+    expect(sessionA.refactorPlans.size).toBe(0);
+    expect(sessionB.refactorPlans.size).toBe(0);
   });
 
-  it("allows setting semantic adapter state on a session", () => {
-    const session = app.createSession("/project-a");
-    const mockAdapter = { controller: null, inlineSeverity: 1 };
-    session.adapterState.semantic = mockAdapter as never;
-    expect(app.getSession("/project-a")!.adapterState.semantic).toBe(mockAdapter);
+  it("creates sessions with distinct target stores", () => {
+    const sessionA = app.createSession("/project-a");
+    const sessionB = app.createSession("/project-b");
+    // Each session should have its own workflow target store
+    expect(sessionA.workflowTargets).not.toBe(sessionB.workflowTargets);
+    expect(sessionA.workflowTargets.size).toBe(0);
+    expect(sessionB.workflowTargets.size).toBe(0);
   });
 
-  it("allows setting structural adapter state on a session", () => {
-    const session = app.createSession("/project-a");
-    const mockAdapter = { controller: null };
-    session.adapterState.structural = mockAdapter as never;
-    expect(app.getSession("/project-a")!.adapterState.structural).toBe(mockAdapter);
-  });
-
-  it("tracks overview-injection state and model-cache state on a session", () => {
+  it("tracks overview-injection state on a session", () => {
     const session = app.createSession("/project-a");
     expect(session.hasInjectedOverview).toBe(false);
-    expect(session.modelCache).toEqual({});
 
     session.hasInjectedOverview = true;
-    session.modelCache = { cached: "value" };
     expect(session.hasInjectedOverview).toBe(true);
-    expect(session.modelCache).toEqual({ cached: "value" });
   });
 
   it("does not replace the shared capability broker", () => {

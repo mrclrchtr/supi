@@ -57,4 +57,9 @@ export class WorkspaceManager {
   get size(): number {
     return this.#sessions.size;
   }
+
+  /** Iterate over all active sessions. */
+  allSessions(): IterableIterator<WorkspaceSession> {
+    return this.#sessions.values();
+  }
 }

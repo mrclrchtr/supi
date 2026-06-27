@@ -1,9 +1,8 @@
 /**
- * RED tests for the workflow target store.
+ * Tests for the workflow target store.
  *
- * These tests assert behavioral expectations of the target store.
- * They will fail during Phase 1 RED because the stub returns empty IDs
- * and always-unavailable lookups.
+ * Verifies that target registration, lookup, staleness detection,
+ * and cross-cwd isolation work correctly through session-scoped stores.
  */
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -11,10 +10,9 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  clearAllWorkflowTargets,
-  clearWorkflowTargets,
   getWorkflowTarget,
   registerWorkflowTarget,
+  type TargetStoreEntry,
 } from "../../src/workflow/target-store.ts";
 
 let tmpDir: string;
@@ -25,12 +23,16 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
-  clearAllWorkflowTargets();
 });
+
+function createStore(): Map<string, TargetStoreEntry> {
+  return new Map();
+}
 
 describe("workflow target store", () => {
   it("registers a target and returns a non-empty targetId and spanId", () => {
-    const result = registerWorkflowTarget(tmpDir, {
+    const store = createStore();
+    const result = registerWorkflowTarget(store, tmpDir, {
       file: path.join(tmpDir, "src/index.ts"),
       position: { line: 0, character: 14 },
       displayLine: 1,
@@ -43,7 +45,6 @@ describe("workflow target store", () => {
       container: null,
     });
 
-    // These will fail with the Phase 1 stub (returns empty strings)
     expect(result.targetId).toBeDefined();
     expect(result.targetId.length).toBeGreaterThan(0);
     expect(result.spanId).toBeDefined();
@@ -51,6 +52,7 @@ describe("workflow target store", () => {
   });
 
   it("returns the same IDs when the same target is registered again with the same file fingerprint", () => {
+    const store = createStore();
     const input = {
       file: path.join(tmpDir, "src/index.ts"),
       position: { line: 0, character: 14 },
@@ -64,11 +66,9 @@ describe("workflow target store", () => {
       container: null,
     };
 
-    const r1 = registerWorkflowTarget(tmpDir, input);
-    const r2 = registerWorkflowTarget(tmpDir, input);
+    const r1 = registerWorkflowTarget(store, tmpDir, input);
+    const r2 = registerWorkflowTarget(store, tmpDir, input);
 
-    // Will fail: stub returns empty IDs, so both are "" — but the
-    // first assertion should fail before we reach the equality check
     expect(r1.targetId.length).toBeGreaterThan(0);
     expect(r2.targetId.length).toBeGreaterThan(0);
     expect(r2.targetId).toBe(r1.targetId);
@@ -79,7 +79,8 @@ describe("workflow target store", () => {
     mkdirSync(path.join(tmpDir, "src"), { recursive: true });
     writeFileSync(path.join(tmpDir, "src", "index.ts"), "export const foo = 1;\n");
 
-    const result = registerWorkflowTarget(tmpDir, {
+    const store = createStore();
+    const result = registerWorkflowTarget(store, tmpDir, {
       file: path.join(tmpDir, "src/index.ts"),
       position: { line: 0, character: 14 },
       displayLine: 1,
@@ -92,10 +93,8 @@ describe("workflow target store", () => {
       container: null,
     });
 
-    const lookup = getWorkflowTarget(tmpDir, result.targetId);
+    const lookup = getWorkflowTarget(store, result.targetId);
 
-    // With stub, result.targetId is "" and getWorkflowTarget always
-    // returns unavailable — this will fail
     expect(lookup.kind).toBe("available");
     if (lookup.kind === "available") {
       expect(lookup.entry.targetId).toBe(result.targetId);
@@ -110,7 +109,8 @@ describe("workflow target store", () => {
   });
 
   it("rejects an unknown targetId with an explicit unavailable result", () => {
-    const lookup = getWorkflowTarget(tmpDir, "unknown-target-id");
+    const store = createStore();
+    const lookup = getWorkflowTarget(store, "unknown-target-id");
 
     expect(lookup.kind).toBe("unavailable");
     if (lookup.kind === "unavailable") {
@@ -123,7 +123,8 @@ describe("workflow target store", () => {
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(path.join(srcDir, "index.ts"), "const foo = 1;\n");
 
-    const r1 = registerWorkflowTarget(tmpDir, {
+    const store = createStore();
+    const r1 = registerWorkflowTarget(store, tmpDir, {
       file: path.join(tmpDir, "src/index.ts"),
       position: { line: 0, character: 14 },
       displayLine: 1,
@@ -136,13 +137,12 @@ describe("workflow target store", () => {
       container: null,
     });
 
-    // Will fail at length check with stub
     expect(r1.targetId.length).toBeGreaterThan(0);
 
     // Modify the file and re-register
     writeFileSync(path.join(tmpDir, "src", "index.ts"), "const foo = 2;\n");
 
-    const r2 = registerWorkflowTarget(tmpDir, {
+    const r2 = registerWorkflowTarget(store, tmpDir, {
       file: path.join(tmpDir, "src/index.ts"),
       position: { line: 0, character: 14 },
       displayLine: 1,
@@ -160,7 +160,7 @@ describe("workflow target store", () => {
     expect(r2.targetId).not.toBe(r1.targetId);
 
     // The old targetId should now be stale
-    const stale = getWorkflowTarget(tmpDir, r1.targetId);
+    const stale = getWorkflowTarget(store, r1.targetId);
     expect(stale.kind).toBe("unavailable");
     if (stale.kind === "unavailable") {
       expect(stale.reason).toContain("foo");
@@ -168,13 +168,16 @@ describe("workflow target store", () => {
     }
   });
 
-  it("clears all targets for a cwd without affecting unrelated cwds", () => {
+  it("isolates targets across different stores (simulating different cwds)", () => {
     const otherDir = mkdtempSync(path.join(os.tmpdir(), "wt-store-other-"));
     try {
       writeFileSync(path.join(tmpDir, "a.ts"), "const a = 1;\n");
       writeFileSync(path.join(otherDir, "b.ts"), "const b = 2;\n");
 
-      const r1 = registerWorkflowTarget(tmpDir, {
+      const storeA = createStore();
+      const storeB = createStore();
+
+      const r1 = registerWorkflowTarget(storeA, tmpDir, {
         file: path.join(tmpDir, "a.ts"),
         position: { line: 0, character: 0 },
         displayLine: 1,
@@ -186,7 +189,7 @@ describe("workflow target store", () => {
         anchorKind: "name",
         container: null,
       });
-      const r2 = registerWorkflowTarget(otherDir, {
+      const r2 = registerWorkflowTarget(storeB, otherDir, {
         file: path.join(otherDir, "b.ts"),
         position: { line: 0, character: 0 },
         displayLine: 1,
@@ -199,19 +202,16 @@ describe("workflow target store", () => {
         container: null,
       });
 
-      // First assertion to fail with stub
       expect(r1.targetId.length).toBeGreaterThan(0);
       expect(r2.targetId.length).toBeGreaterThan(0);
 
-      clearWorkflowTargets(tmpDir);
+      // storeA should not contain r2's target
+      const notInA = getWorkflowTarget(storeA, r2.targetId);
+      expect(notInA.kind).toBe("unavailable");
 
-      // tmpDir targets should be gone
-      const stale = getWorkflowTarget(tmpDir, r1.targetId);
-      expect(stale.kind).toBe("unavailable");
-
-      // otherDir targets should survive
-      const alive = getWorkflowTarget(otherDir, r2.targetId);
-      expect(alive.kind).toBe("available");
+      // storeB should not contain r1's target
+      const notInB = getWorkflowTarget(storeB, r1.targetId);
+      expect(notInB.kind).toBe("unavailable");
     } finally {
       rmSync(otherDir, { recursive: true, force: true });
     }
@@ -223,7 +223,8 @@ describe("workflow target store", () => {
     const filePath = path.join(srcDir, "temp.ts");
     writeFileSync(filePath, "const x = 1;\n");
 
-    const r = registerWorkflowTarget(tmpDir, {
+    const store = createStore();
+    const r = registerWorkflowTarget(store, tmpDir, {
       file: filePath,
       position: { line: 0, character: 6 },
       displayLine: 1,
@@ -237,22 +238,23 @@ describe("workflow target store", () => {
     });
 
     // Verify registered successfully
-    const lookup1 = getWorkflowTarget(tmpDir, r.targetId);
+    const lookup1 = getWorkflowTarget(store, r.targetId);
     expect(lookup1.kind).toBe("available");
 
     // Delete the backing file
     rmSync(filePath, { force: true });
 
     // Lookup should now return unavailable
-    const lookup2 = getWorkflowTarget(tmpDir, r.targetId);
+    const lookup2 = getWorkflowTarget(store, r.targetId);
     expect(lookup2.kind).toBe("unavailable");
   });
 
   it("returns unavailable when file was never readable (unfingerprinted rechecked at lookup)", () => {
     const missingFile = path.join(tmpDir, "nonexistent.ts");
+    const store = createStore();
 
     // Registration with a non-existent file stores "unfingerprinted"
-    const r = registerWorkflowTarget(tmpDir, {
+    const r = registerWorkflowTarget(store, tmpDir, {
       file: missingFile,
       position: { line: 0, character: 0 },
       displayLine: 1,
@@ -266,7 +268,7 @@ describe("workflow target store", () => {
     });
 
     // Lookup should detect the file is still missing → unavailable
-    const lookup = getWorkflowTarget(tmpDir, r.targetId);
+    const lookup = getWorkflowTarget(store, r.targetId);
     expect(lookup.kind).toBe("unavailable");
     if (lookup.kind === "unavailable") {
       expect(lookup.reason).toContain("File not found");
@@ -275,17 +277,12 @@ describe("workflow target store", () => {
 
   // ADR 0003 — targetId identity must not depend on the anchor position.
   it("reuses the same targetId when the same symbol is re-resolved at a different anchor position (position is not part of identity)", () => {
-    // nameAnchor is best-effort: the same symbol can resolve to the identifier
-    // (name anchor) on one call and fall back to the declaration anchor
-    // (the `export` keyword) on another. If position were part of the identity
-    // hash, re-resolution would yield a different targetId — violating the
-    // documented "re-resolving the same target reuses the same IDs" invariant
-    // and destabilizing plan/apply handles across re-resolve.
     const srcDir = path.join(tmpDir, "src");
     mkdirSync(srcDir, { recursive: true });
     const filePath = path.join(srcDir, "index.ts");
     writeFileSync(filePath, "export const foo = 1;\n");
 
+    const store = createStore();
     const base = {
       file: filePath,
       name: "foo",
@@ -297,14 +294,14 @@ describe("workflow target store", () => {
     };
 
     // Resolve #1: refine succeeded -> name anchor on the identifier (col 15).
-    const r1 = registerWorkflowTarget(tmpDir, {
+    const r1 = registerWorkflowTarget(store, tmpDir, {
       ...base,
       position: { line: 0, character: 14 },
       displayLine: 1,
       displayCharacter: 15,
     });
     // Resolve #2: refine fell through -> declaration anchor on `export` (col 1).
-    const r2 = registerWorkflowTarget(tmpDir, {
+    const r2 = registerWorkflowTarget(store, tmpDir, {
       ...base,
       position: { line: 0, character: 0 },
       displayLine: 1,
@@ -313,7 +310,6 @@ describe("workflow target store", () => {
 
     expect(r1.targetId.length).toBeGreaterThan(0);
     // The invariant: symbol identity is stable across anchor variance.
-    // (spanId MAY differ — a span is a range — but targetId must not.)
     expect(r2.targetId).toBe(r1.targetId);
   });
 
@@ -324,6 +320,7 @@ describe("workflow target store", () => {
     const filePath = path.join(srcDir, "index.ts");
     writeFileSync(filePath, "export class A { foo() {} } export class B { foo() {} }\n");
 
+    const store = createStore();
     const base = {
       file: filePath,
       name: "foo",
@@ -334,13 +331,13 @@ describe("workflow target store", () => {
       position: { line: 0, character: 10 },
     };
 
-    const rA = registerWorkflowTarget(tmpDir, {
+    const rA = registerWorkflowTarget(store, tmpDir, {
       ...base,
       container: "A",
       displayLine: 1,
       displayCharacter: 20,
     });
-    const rB = registerWorkflowTarget(tmpDir, {
+    const rB = registerWorkflowTarget(store, tmpDir, {
       ...base,
       container: "B",
       displayLine: 1,

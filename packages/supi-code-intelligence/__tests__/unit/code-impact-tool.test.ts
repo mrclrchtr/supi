@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
+import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
@@ -950,14 +950,6 @@ describe("code_impact tool", () => {
     expect(result.content[0].text).toContain(
       "No likely tests found by bounded companion/package discovery.",
     );
-  });
-
-  it("does not register code_affected on the public tool surface", () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const names = getTools(pi).map((tool) => tool.name);
-    expect(names).not.toContain("code_affected");
   });
 });
 

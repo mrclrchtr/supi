@@ -21,25 +21,18 @@ export interface CodeImpactToolParams {
   includeTests?: boolean;
 }
 
-export type ImpactToolSurface = "impact" | "affected";
-
-/** Execute the shared public impact tool flow for the preferred or compatibility surface. */
-export async function executeImpactLikeTool(
+/** Execute the public code_impact tool. */
+export async function executeImpactTool(
   params: CodeImpactToolParams,
   ctx: CodeIntelToolExecCtx,
-  surface: ImpactToolSurface = "impact",
 ): Promise<CodeIntelResult> {
-  const detailType = surface === "impact" ? "impact" : "affected";
-  const preferredTool = surface === "impact" ? "code_impact" : "code_affected";
-  emitToolProgress(ctx.onUpdate, `${preferredTool}: analyzing blast radius...`);
+  emitToolProgress(ctx.onUpdate, "code_impact: analyzing blast radius...");
 
   const expansion = expandTargetId(params, ctx.cwd);
   if (expansion.kind === "error") {
     return {
       content: expansion.message,
-      details: unavailableImpactDetails(detailType, [
-        "Use `code_resolve` to resolve a target first",
-      ]),
+      details: unavailableImpactDetails(["Use `code_resolve` to resolve a target first"]),
     };
   }
   if (expansion.kind === "ok") {
@@ -52,14 +45,13 @@ export async function executeImpactLikeTool(
   if (error) {
     return {
       content: error,
-      details: unavailableImpactDetails(detailType, ["Fix the input parameters and retry"]),
+      details: unavailableImpactDetails(["Fix the input parameters and retry"]),
     };
   }
 
   const hasChangeSetInputs = (params.changeSetFiles?.length || 0) > 0 || Boolean(params.change);
   if (!params.file && !params.symbol && !hasChangeSetInputs) {
     return unavailableImpactToolResult(
-      detailType,
       "**Error:** Impact analysis currently requires either anchored coordinates (`file`, `line`, `character`) or a `symbol` for discovery.",
       ["Use `code_resolve` to resolve a target first"],
     );
@@ -73,44 +65,28 @@ export async function executeImpactLikeTool(
       : { kind: "unavailable" as const, reason: "No provider" };
 
   if (hasChangeSetInputs) {
-    emitToolProgress(ctx.onUpdate, `${preferredTool}: analyzing impact input...`);
-    return executeImpact(params, { cwd: ctx.cwd, provider, lspService }, surface);
+    emitToolProgress(ctx.onUpdate, "code_impact: analyzing impact input...");
+    return executeImpact(params, { cwd: ctx.cwd, provider, lspService });
   }
 
-  const readinessResult = await waitForImpactSemanticReadiness(
-    ctx.cwd,
-    params.file,
-    detailType,
-    preferredTool,
-  );
+  const readinessResult = await waitForImpactSemanticReadiness(ctx.cwd, params.file);
   if (readinessResult) return readinessResult;
 
-  const route = routeFor(ctx.cwd, preferredTool);
+  const route = routeFor(ctx.cwd, "code_impact");
   if (route.preferred === "unavailable") {
     return unavailableImpactToolResult(
-      detailType,
       "**Error:** No semantic analysis provider is available for this workspace. Check `code_health` for LSP status or enable an LSP server.",
       ["Check LSP configuration for this workspace"],
     );
   }
 
-  emitToolProgress(ctx.onUpdate, `${preferredTool}: sweeping references...`);
-  return executeImpact(params, { cwd: ctx.cwd, provider, lspService }, surface);
-}
-
-/** Execute the preferred public code_impact tool. */
-export async function executeImpactTool(
-  params: CodeImpactToolParams,
-  ctx: CodeIntelToolExecCtx,
-): Promise<CodeIntelResult> {
-  return executeImpactLikeTool(params, ctx, "impact");
+  emitToolProgress(ctx.onUpdate, "code_impact: sweeping references...");
+  return executeImpact(params, { cwd: ctx.cwd, provider, lspService });
 }
 
 async function waitForImpactSemanticReadiness(
   cwd: string,
   file: string | undefined,
-  detailType: "impact" | "affected",
-  preferredTool: "code_impact" | "code_affected",
 ): Promise<CodeIntelResult | null> {
   const readiness = await ensureSemanticReadiness(
     cwd,
@@ -118,28 +94,21 @@ async function waitForImpactSemanticReadiness(
   );
   if (readiness.kind === "ready") return null;
   if (readiness.kind === "timeout") {
-    return unavailableImpactToolResult(
-      detailType,
-      renderSemanticReadinessTimeout(preferredTool, 15_000),
-      ["Check `code_health` for LSP status"],
-    );
+    return unavailableImpactToolResult(renderSemanticReadinessTimeout("code_impact", 15_000), [
+      "Check `code_health` for LSP status",
+    ]);
   }
   return unavailableImpactToolResult(
-    detailType,
     "**Error:** No semantic analysis provider is available for this workspace. Check `code_health` for LSP status or enable an LSP server.",
     ["Check `code_health` for LSP status or enable an LSP server."],
   );
 }
 
-function unavailableImpactToolResult(
-  type: "impact" | "affected",
-  content: string,
-  nextQueries: string[],
-): CodeIntelResult {
+function unavailableImpactToolResult(content: string, nextQueries: string[]): CodeIntelResult {
   return {
     content,
     details: {
-      type,
+      type: "impact",
       data: {
         confidence: "unavailable" as const,
         directCount: 0,

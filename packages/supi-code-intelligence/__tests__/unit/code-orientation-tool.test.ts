@@ -4,7 +4,6 @@ import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
-import { clearWorkflowTargets } from "../../src/workflow/target-store.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 const mockLspFns = vi.hoisted(() => ({
@@ -28,7 +27,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  clearWorkflowTargets(tmpDir);
   clearMockRuntime();
   rmSync(tmpDir, { recursive: true, force: true });
   vi.clearAllMocks();

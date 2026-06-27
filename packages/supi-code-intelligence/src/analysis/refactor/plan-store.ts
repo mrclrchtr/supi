@@ -1,9 +1,9 @@
 /**
- * Refactor plan storage — module-level map for plan id → plan data.
+ * Refactor plan storage — per-session map for plan id → plan data.
  *
- * Plans are stored in-memory for the session lifetime.
- * In a future iteration, plans could be persisted through pi's
- * session entries so they survive reloads.
+ * Plans are stored in-memory on the WorkspaceSession for the session lifetime.
+ * The store map is passed in from the caller; this module provides pure
+ * functions without module-level state.
  */
 
 import { createHash } from "node:crypto";
@@ -22,8 +22,6 @@ export interface RefactorPlan {
   fileFingerprints: Array<{ file: string; fingerprint: string }>;
   createdAt: number;
 }
-
-const plans = new Map<string, RefactorPlan>();
 
 /** Compute a SHA-256 hex fingerprint for a file's current contents. */
 export function computeFileFingerprint(file: string): string {
@@ -51,20 +49,20 @@ export function generatePlanId(
   return `plan-${hash}`;
 }
 
-/** Store a plan and return its id. */
-export function storePlan(plan: RefactorPlan): string {
-  plans.set(plan.id, plan);
+/** Store a plan in the given session-scoped map and return its id. */
+export function storePlan(store: Map<string, RefactorPlan>, plan: RefactorPlan): string {
+  store.set(plan.id, plan);
   return plan.id;
 }
 
-/** Retrieve a plan by id, or undefined if not found. */
-export function getPlan(id: string): RefactorPlan | undefined {
-  return plans.get(id);
+/** Retrieve a plan by id from the given session-scoped map, or undefined if not found. */
+export function getPlan(store: Map<string, RefactorPlan>, id: string): RefactorPlan | undefined {
+  return store.get(id);
 }
 
-/** Remove a plan after successful apply. */
-export function removePlan(id: string): void {
-  plans.delete(id);
+/** Remove a plan from the given session-scoped map after successful apply. */
+export function removePlan(store: Map<string, RefactorPlan>, id: string): void {
+  store.delete(id);
 }
 
 /** Check if a plan is still fresh (all file fingerprints match). */

@@ -252,7 +252,6 @@ describe("focused code intelligence tool registration", () => {
     codeIntelligenceExtension(pi as never);
 
     const names = getTools(pi).map((t: { name: string }) => t.name);
-    expect(names).not.toContain("code_affected");
 
     const substratePrefixes = ["lsp_", "tree_sitter_"];
     const substrateTools = names.filter((n) =>

@@ -742,9 +742,9 @@ describe("code_resolve targetId follow-up", () => {
       makeCtx({ cwd: tmpDir }),
     )) as { content: Array<{ type: string; text: string }> };
 
-    // Unknown targetId: workspace has no stored targets
-    expect(result.content[0].text).toContain("No targets registered");
-    expect(result.content[0].text).toContain("workspace");
+    // Unknown targetId: not found in the session store
+    expect(result.content[0].text).toContain("tg-nonexistent");
+    expect(result.content[0].text).toContain("not found");
   });
 
   it("resolves and follows up with code_graph using targetId", async () => {

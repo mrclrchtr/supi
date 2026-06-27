@@ -259,7 +259,6 @@ export interface CodeIntelResult {
     | { type: "inspect"; data: InspectDetails }
     | { type: "search"; data: SearchDetails }
     | { type: "impact"; data: ImpactDetails }
-    | { type: "affected"; data: AffectedDetails }
     | { type: "resolve"; data: ResolveDetails }
     | { type: "health"; data: HealthDetails };
 }
