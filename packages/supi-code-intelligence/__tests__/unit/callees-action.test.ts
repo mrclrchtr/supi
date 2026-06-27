@@ -28,7 +28,7 @@ describe("code_graph callees relation", () => {
       { cwd: tmpDir },
     );
     expect(result.content).toContain("Error");
-    expect(result.content).toContain("requires a target");
+    expect(result.content).toContain("At least one of");
   });
 
   it("rejects graph with file but no line/character", async () => {

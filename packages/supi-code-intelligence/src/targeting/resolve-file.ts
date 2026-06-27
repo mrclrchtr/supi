@@ -14,9 +14,9 @@ import type {
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { getCodeProvider } from "../analysis/context/request-context.ts";
-import { normalizePath } from "../search-helpers.ts";
-import { highestConfidence } from "../semantic-action-helpers.ts";
-import type { AnchorKind } from "../workflow/target-store.ts";
+import { highestConfidence } from "../analysis/helpers.ts";
+import { normalizePath } from "../analysis/search/helpers.ts";
+import type { AnchorKind } from "../session/target-store.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 
 const BINARY_EXTENSIONS = new Set([

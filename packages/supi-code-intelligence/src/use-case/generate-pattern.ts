@@ -3,11 +3,18 @@
 // returning fully rendered content + details metadata.
 
 import type { CodeProvider } from "../analysis/context/request-context.ts";
+import type { RgMatch } from "../analysis/search/helpers.ts";
+import {
+  normalizePath,
+  runRipgrep,
+  runRipgrepDetailed,
+  toDisplayPath,
+} from "../analysis/search/helpers.ts";
 import {
   getStructuredPatternMatches,
   isStructuredPatternKind,
   type StructuredPatternKind,
-} from "../pattern-structured.ts";
+} from "../analysis/search/pattern-structured.ts";
 import {
   renderPatternResults,
   renderPatternSummary,
@@ -15,9 +22,7 @@ import {
   renderStructuredEmptyState,
   renderStructuredMatches,
 } from "../presentation/markdown/pattern.ts";
-import type { CodeQueryParams } from "../query-params.ts";
-import type { RgMatch } from "../search-helpers.ts";
-import { normalizePath, runRipgrep, runRipgrepDetailed, toDisplayPath } from "../search-helpers.ts";
+import type { CodeQueryParams } from "../tool/query-params.ts";
 import type { CodeIntelResult, SearchDetails } from "../types.ts";
 
 export interface PatternInput {

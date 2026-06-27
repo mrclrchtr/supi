@@ -1,6 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
-import type { WorkflowCodeToolName } from "./names.ts";
+import type { CodeIntelligenceToolName } from "../intent/types.ts";
 
 const ScopeParam = Type.String({
   description: "Workspace-relative path, package, or directory scope for the workflow query.",
@@ -321,10 +321,10 @@ export const CodeHealthParameters = Type.Object(
   { additionalProperties: false },
 );
 
-export type WorkflowCodeToolSchemaKey = WorkflowCodeToolName;
+export type WorkflowCodeToolSchemaKey = CodeIntelligenceToolName;
 
-/** Planned V2 schemas keyed by future public tool name. */
-export const WORKFLOW_CODE_TOOL_SCHEMAS = {
+/** Code intelligence tool schemas keyed by public tool name. */
+export const CODE_INTELLIGENCE_TOOL_SCHEMAS = {
   code_resolve: CodeResolveParameters,
   code_inspect: CodeInspectParameters,
   code_orientation: CodeOrientationParameters,
@@ -334,4 +334,4 @@ export const WORKFLOW_CODE_TOOL_SCHEMAS = {
   code_refactor_plan: CodeRefactorParameters,
   code_refactor_apply: CodeApplyParameters,
   code_health: CodeHealthParameters,
-} as const satisfies Record<WorkflowCodeToolSchemaKey, TSchema>;
+} as const satisfies Record<CodeIntelligenceToolName, TSchema>;

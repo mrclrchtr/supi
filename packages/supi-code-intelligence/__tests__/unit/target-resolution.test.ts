@@ -1,7 +1,9 @@
 import * as path from "node:path";
 import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
+import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
 import { describe, expect, it, vi } from "vitest";
-import { normalizePath, resolveSymbolTarget, toZeroBased } from "../../src/target-resolution.ts";
+import { normalizePath } from "../../src/analysis/search/helpers.ts";
+import { resolveSymbolTarget } from "../../src/targeting/resolve-symbol.ts";
 
 const mockLspFns = vi.hoisted(() => ({
   getSessionLspService: vi.fn<(cwd: string) => unknown>(),
@@ -32,15 +34,15 @@ describe("normalizePath", () => {
   });
 });
 
-describe("toZeroBased", () => {
+describe("toLspPosition (formerly toZeroBased)", () => {
   it("converts 1-based to 0-based", () => {
-    const pos = toZeroBased(10, 5);
+    const pos = toLspPosition(10, 5);
     expect(pos.line).toBe(9);
     expect(pos.character).toBe(4);
   });
 
   it("handles line 1, character 1", () => {
-    const pos = toZeroBased(1, 1);
+    const pos = toLspPosition(1, 1);
     expect(pos.line).toBe(0);
     expect(pos.character).toBe(0);
   });

@@ -17,12 +17,13 @@ import {
   type RefactorPlan,
 } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
-import { createEvidenceList } from "../evidence-list.ts";
+import { normalizePath } from "../analysis/search/helpers.ts";
+import { createEvidenceList } from "../presentation/evidence-list.ts";
 import { renderRefactorPlanResult } from "../presentation/markdown/refactor.ts";
-import { normalizePath } from "../search-helpers.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { unavailableSearchDetails } from "./details-helpers.ts";
-import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
+import { gateSemanticReadiness, runPipe } from "./pipeline.ts";
+import { renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 
 export interface CodeRefactorPlanToolParams {
   targetId?: string;
@@ -58,82 +59,95 @@ export async function executeRefactorPlanTool(
   const target = resolveRefactorTarget(params, ctx.cwd, operation, ctx.session);
   if ("content" in target) return target;
 
-  const readinessResult = await waitForRefactorReadiness(ctx.cwd, target.file, invokedAs);
-  if (readinessResult) return readinessResult;
+  return runPipe(
+    params,
+    ctx as CodeIntelToolExecCtx,
+    [
+      gateSemanticReadiness("code_refactor_plan", {
+        fileParam: "file",
+        onTimeout: () => ({
+          content: renderSemanticReadinessTimeout(invokedAs, 15_000),
+          details: unavailableSearchDetails(null, ["Retry shortly or check `code_health`"]),
+        }),
+        throwOnUnavailable: true,
+      }),
+    ],
+    async (_p, c) => {
+      const provider = c.session.getSemanticProvider();
+      const resolvedFile = normalizePath(target.file, c.cwd);
+      const position = toLspPosition(target.line, target.character);
 
-  const provider = ctx.session.getSemanticProvider();
-  const resolvedFile = normalizePath(target.file, ctx.cwd);
-  const position = toLspPosition(target.line, target.character);
+      const refactorResult = await planRefactorWithProvider(provider, {
+        operation,
+        file: resolvedFile,
+        position,
+        range: params.range ? toLspRange(params.range) : undefined,
+        newName: params.newName,
+      });
 
-  const refactorResult = await planRefactorWithProvider(provider, {
-    operation,
-    file: resolvedFile,
-    position,
-    range: params.range ? toLspRange(params.range) : undefined,
-    newName: params.newName,
-  });
+      if (refactorResult.kind === "unavailable") {
+        throw new Error(`Refactor unavailable: ${refactorResult.reason}`);
+      }
 
-  if (refactorResult.kind === "unavailable") {
-    // Whole-tool capability-unavailable (no provider, or provider lacks refactor
-    // support for this operation) → throw so pi marks the call as an error.
-    throw new Error(`Refactor unavailable: ${refactorResult.reason}`);
-  }
+      if (refactorResult.kind === "ambiguous") {
+        return renderAmbiguousRefactorResult(refactorResult);
+      }
 
-  if (refactorResult.kind === "ambiguous") {
-    return renderAmbiguousRefactorResult(refactorResult);
-  }
+      const validation = validateEdit(refactorResult.edits);
+      if (!validation.safe) {
+        return {
+          content: `**Refactor safety check failed:** ${validation.reason}`,
+          details: unavailableSearchDetails(null, ["Adjust the target or range and retry"]),
+        };
+      }
 
-  const validation = validateEdit(refactorResult.edits);
-  if (!validation.safe) {
-    return {
-      content: `**Refactor safety check failed:** ${validation.reason}`,
-      details: unavailableSearchDetails(null, ["Adjust the target or range and retry"]),
-    };
-  }
+      const fileFingerprints = collectFileFingerprints(refactorResult.edits.edits);
+      const planId = generatePlanId(
+        operation,
+        resolvedFile,
+        target.line,
+        target.character,
+        params.newName ?? "",
+      );
 
-  const fileFingerprints = collectFileFingerprints(refactorResult.edits.edits);
-  const planId = generatePlanId(
-    operation,
-    resolvedFile,
-    target.line,
-    target.character,
-    params.newName ?? "",
-  );
+      const plan: RefactorPlan = {
+        id: planId,
+        operation,
+        newName: params.newName,
+        targetFile: resolvedFile,
+        targetLine: target.line,
+        targetCharacter: target.character,
+        edits: refactorResult.edits,
+        fileFingerprints,
+        createdAt: Date.now(),
+      };
+      c.session.storePlan(plan);
 
-  const plan: RefactorPlan = {
-    id: planId,
-    operation,
-    newName: params.newName,
-    targetFile: resolvedFile,
-    targetLine: target.line,
-    targetCharacter: target.character,
-    edits: refactorResult.edits,
-    fileFingerprints,
-    createdAt: Date.now(),
-  };
-  ctx.session.storePlan(plan);
+      const editEvidence = createEvidenceList({
+        key: "refactor.edits",
+        items: refactorResult.edits.edits,
+        maxResults: 5,
+      }).metadata;
+      const content = renderRefactorPlanResult(plan, c.cwd);
 
-  const editEvidence = createEvidenceList({
-    key: "refactor.edits",
-    items: refactorResult.edits.edits,
-    maxResults: 5,
-  }).metadata;
-  const content = renderRefactorPlanResult(plan, ctx.cwd);
-
-  return {
-    content,
-    details: {
-      type: "search" as const,
-      data: {
-        confidence: "semantic" as const,
-        scope: null,
-        candidateCount: refactorResult.edits.edits.length,
-        omittedCount: editEvidence.omittedCount ?? 0,
-        evidenceLists: [editEvidence],
-        nextQueries: [`Use code_refactor_apply with planId: "${planId}" to apply this refactor`],
-      },
+      return {
+        content,
+        details: {
+          type: "search" as const,
+          data: {
+            confidence: "semantic" as const,
+            scope: null,
+            candidateCount: refactorResult.edits.edits.length,
+            omittedCount: editEvidence.omittedCount ?? 0,
+            evidenceLists: [editEvidence],
+            nextQueries: [
+              `Use code_refactor_apply with planId: "${planId}" to apply this refactor`,
+            ],
+          },
+        },
+      };
     },
-  };
+  );
 }
 
 function normalizeRequestedOperation(
@@ -159,6 +173,17 @@ function normalizeRequestedOperation(
   };
 }
 
+/**
+ * Expand targetId and apply cross-field rules for code_refactor_plan.
+ *
+ * TypeBox (via pi schema validation) already enforces:
+ * - operation must be a valid StringEnum value
+ * - range shape (start/end with line/character numbers)
+ * - additionalProperties: false
+ *
+ * This covers cross-field constraints: target required, newName for
+ * rename/extract, range for extract, and range ordering.
+ */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: target expansion and operation-specific validation are kept together for clear user-facing errors.
 function resolveRefactorTarget(
   params: CodeRefactorPlanToolParams,
@@ -250,24 +275,6 @@ function resolveRefactorTarget(
     line: params.line,
     character: params.character,
   };
-}
-
-async function waitForRefactorReadiness(
-  cwd: string,
-  file: string,
-  invokedAs: "code_refactor_plan",
-): Promise<CodeIntelResult | null> {
-  const readiness = await ensureSemanticReadiness(cwd, { kind: "file", file });
-  if (readiness.kind === "ready") return null;
-  if (readiness.kind === "timeout") {
-    return {
-      content: renderSemanticReadinessTimeout(invokedAs, 15_000),
-      details: unavailableSearchDetails(null, ["Retry shortly or check `code_health`"]),
-    };
-  }
-  // Whole-tool capability-unavailable (no semantic provider) → throw. A
-  // warmup timeout above stays an error-text result.
-  throw new Error(readiness.reason);
 }
 
 function renderAmbiguousRefactorResult(

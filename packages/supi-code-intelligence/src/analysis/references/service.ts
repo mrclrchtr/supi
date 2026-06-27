@@ -5,8 +5,8 @@
  * references/usages, not callers.
  */
 
-import { uriToFile } from "../../search-helpers.ts";
-import type { ConfidenceMode } from "../../types.ts";
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import { uriToFile } from "../../analysis/search/helpers.ts";
 import { collectCallers } from "../relations/callers.ts";
 import type { RelationsServiceDeps } from "../relations/types.ts";
 

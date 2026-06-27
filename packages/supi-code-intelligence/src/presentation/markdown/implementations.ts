@@ -3,13 +3,13 @@
  */
 
 import type { ImplementationEntry } from "../../analysis/implementations/service.ts";
+import { toDisplayPath } from "../../analysis/search/helpers.ts";
+import { compactLineRanges } from "../../use-case/support/semantic-references.ts";
 import {
   createEvidenceList,
   type EvidenceListMetadata,
   renderEvidenceListDisclosure,
-} from "../../evidence-list.ts";
-import { toDisplayPath } from "../../search-helpers.ts";
-import { compactLineRanges } from "../../use-case/support/semantic-references.ts";
+} from "../evidence-list.ts";
 
 /**
  * Group implementation entries by display file path, collecting line numbers.

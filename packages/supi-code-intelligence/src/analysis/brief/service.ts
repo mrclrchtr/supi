@@ -8,10 +8,10 @@
  * that code is fully migrated into typed services.
  */
 
-import { generateFocusedBrief, generateProjectBrief } from "../../brief.ts";
-import type { ArchitectureModel } from "../../model.ts";
-import { buildArchitectureModel } from "../../model.ts";
+import type { ArchitectureModel } from "../../architecture/model.ts";
+import { buildArchitectureModel } from "../../architecture/model.ts";
 import type { BriefDetails } from "../../types.ts";
+import { generateFocusedBrief, generateProjectBrief } from "../../use-case/brief.ts";
 
 export interface BriefServiceInput {
   kind: "project" | "path" | "file" | "anchored" | "symbol";

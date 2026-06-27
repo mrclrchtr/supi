@@ -11,9 +11,9 @@ import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type { SessionLspService, SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
-import { createEvidenceList, type EvidenceListMetadata } from "../evidence-list.ts";
-import { gatherGitContext } from "../git-context.ts";
+import { resolveScope } from "../analysis/search/helpers.ts";
 import { evaluateCoverageWarnings, gatherCoverageEvalInput } from "../lsp/coverage-warnings.ts";
+import { createEvidenceList, type EvidenceListMetadata } from "../presentation/evidence-list.ts";
 import {
   type CodeActionSuggestion,
   type HealthCoverageData,
@@ -22,8 +22,11 @@ import {
   type HealthUnusedData,
   renderHealthResult,
 } from "../presentation/markdown/health.ts";
-import { type LoadedSignals, loadPrioritizationSignals } from "../prioritization-signals.ts";
-import { resolveScope } from "../search-helpers.ts";
+import { gatherGitContext } from "../project/git-context.ts";
+import {
+  type LoadedSignals,
+  loadPrioritizationSignals,
+} from "../project/prioritization-signals.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { unavailableHealthDetails } from "./details-helpers.ts";
 import { emitToolProgress } from "./progress.ts";

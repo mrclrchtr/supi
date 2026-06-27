@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { buildArchitectureModel } from "@mrclrchtr/supi-code-intelligence/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { generateFocusedBrief } from "../../src/brief.ts";
+import { generateFocusedBrief } from "../../src/use-case/brief.ts";
 
 let tmpDir: string;
 

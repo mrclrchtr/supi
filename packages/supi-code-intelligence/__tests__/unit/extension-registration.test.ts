@@ -4,8 +4,8 @@ import * as path from "node:path";
 import { createPiMock, getTool, getTools, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
+import { CODE_INTELLIGENCE_TOOL_NAMES as WORKFLOW_CODE_TOOL_NAMES } from "../../src/intent/types.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
-import { WORKFLOW_CODE_TOOL_NAMES } from "../../src/workflow/index.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 describe("focused code intelligence tool registration", () => {

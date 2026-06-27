@@ -4,8 +4,8 @@
 
 import type { ApplyResult } from "../../analysis/refactor/apply-workspace-edit.ts";
 import type { RefactorPlan } from "../../analysis/refactor/plan-store.ts";
-import { createEvidenceList, renderEvidenceListDisclosure } from "../../evidence-list.ts";
-import { toDisplayPath } from "../../search-helpers.ts";
+import { toDisplayPath } from "../../analysis/search/helpers.ts";
+import { createEvidenceList, renderEvidenceListDisclosure } from "../evidence-list.ts";
 
 export interface RefactorRenderInput {
   result: ApplyResult;

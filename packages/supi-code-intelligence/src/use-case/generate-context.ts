@@ -2,6 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import {
   type RenderedContextSection,
   renderContextResult,
@@ -11,7 +12,7 @@ import {
   readNextAround,
   readNextRange,
 } from "../presentation/markdown/read-next.ts";
-import type { ConfidenceMode, ContextDetails } from "../types.ts";
+import type { ContextDetails } from "../types.ts";
 import { gatherTreeSitterContext } from "./gather-context.ts";
 import { executeBrief } from "./generate-brief.ts";
 import type {

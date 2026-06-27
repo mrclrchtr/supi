@@ -41,7 +41,7 @@ import {
   type TargetRegistrationInput,
   type TargetRegistrationOutput,
   type TargetStoreEntry,
-} from "../workflow/target-store.ts";
+} from "./target-store.ts";
 
 // ── Re-export types consumed by callers ───────────────────────────────
 
@@ -53,7 +53,7 @@ export type {
   TargetRegistrationInput,
   TargetRegistrationOutput,
   TargetStoreEntry,
-} from "../workflow/target-store.ts";
+} from "./target-store.ts";
 
 // ── Target ID expansion result ────────────────────────────────────────
 
@@ -269,7 +269,7 @@ export class WorkspaceCodeIntelligenceSession {
   }
 }
 
-// ── Standalone helper (moved from target-id-params.ts) ────────────────
+// ── Standalone target-id expansion helper ─────────────────────────────
 
 /**
  * Expand an optional targetId into anchored file/line/character params

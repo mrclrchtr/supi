@@ -4,7 +4,7 @@
 // The single source of truth for metadata lives in tool-specs.ts; this module
 // builds the final prompt surfaces from those specs.
 
-import type { PublicCodeIntelligenceToolName } from "../intent/types.ts";
+import type { CodeIntelligenceToolName } from "../intent/types.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "./tool-specs.ts";
 
 export interface CodeIntelligenceToolPromptSurface {
@@ -14,7 +14,7 @@ export interface CodeIntelligenceToolPromptSurface {
 }
 
 export type CodeIntelligenceToolPromptSurfaceMap = Record<
-  PublicCodeIntelligenceToolName,
+  CodeIntelligenceToolName,
   CodeIntelligenceToolPromptSurface
 >;
 

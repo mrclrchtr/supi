@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import * as path from "node:path";
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import { getSupportedExtensions } from "@mrclrchtr/supi-tree-sitter/api";
-import type { CodeQueryParams as ActionParams } from "./query-params.ts";
+import type { CodeQueryParams as ActionParams } from "../../tool/query-params.ts";
 
 /** Soft file cap — warn when a workspace has more source files than this. */
 const FILE_SOFT_CAP = 5000;

@@ -5,7 +5,7 @@
  * true incoming call hierarchy or symbol-identity resolution.
  */
 
-import type { ConfidenceMode } from "../../types.ts";
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import { collectCallees } from "../relations/callees.ts";
 import type { CalleeScope, RelationsServiceDeps } from "../relations/types.ts";
 

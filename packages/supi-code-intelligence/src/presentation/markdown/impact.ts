@@ -2,9 +2,9 @@
 
 import * as path from "node:path";
 import type { TestSurfaceDetails } from "../../analysis/relations/tests.ts";
-import type { PrioritySignalsSummary } from "../../prioritization-signals.ts";
-import { appendPrioritySignalsSection } from "../../prioritization-signals.ts";
-import type { ResolvedTarget, ResolvedTargetGroup } from "../../target-resolution.ts";
+import type { PrioritySignalsSummary } from "../../project/prioritization-signals.ts";
+import { appendPrioritySignalsSection } from "../../project/prioritization-signals.ts";
+import type { ResolvedTargetData, ResolvedTargetGroupData } from "../../targeting/types.ts";
 import type { ReferenceCollection } from "../../use-case/support/semantic-references.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
 import { readNextAround, renderReadNextSection } from "./read-next.ts";
@@ -31,7 +31,7 @@ interface RenderSingleParams {
   analysis: ImpactAnalysis;
   maxResults: number;
   prioritySignals: PrioritySignalsSummary | null;
-  target: ResolvedTarget;
+  target: ResolvedTargetData;
   cwd: string;
 }
 
@@ -84,8 +84,8 @@ export function renderImpactSingle(params: RenderSingleParams): string {
 // ── File-level target group renderer ─────────────────────────────────
 
 interface RenderFileLevelParams {
-  targetGroup: ResolvedTargetGroup;
-  perTarget: Array<{ target: ResolvedTarget; refs: ReferenceCollection }>;
+  targetGroup: ResolvedTargetGroupData;
+  perTarget: Array<{ target: ResolvedTargetData; refs: ReferenceCollection }>;
   aggregated: ReferenceCollection;
   analysis: ImpactAnalysis;
   maxResults: number;

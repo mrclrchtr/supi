@@ -10,7 +10,7 @@ import type {
   SemanticProvider as SemanticSubstrate,
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { AnchorKind } from "../workflow/target-store.ts";
+import type { AnchorKind } from "../session/target-store.ts";
 
 // ── Normalized query ──────────────────────────────────────────────────
 

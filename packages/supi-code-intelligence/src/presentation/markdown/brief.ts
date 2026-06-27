@@ -1,8 +1,8 @@
 // Brief markdown renderer — consumes use-case data and produces markdown content + details metadata.
 
 import * as path from "node:path";
-import type { ArchitectureModel } from "../../model.ts";
-import { findModuleForPath } from "../../model.ts";
+import type { ArchitectureModel } from "../../architecture/model.ts";
+import { findModuleForPath } from "../../architecture/model.ts";
 import type { BriefDetails } from "../../types.ts";
 
 interface TreeSitterContext {

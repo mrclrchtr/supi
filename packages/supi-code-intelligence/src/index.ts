@@ -1,55 +1,48 @@
-// Package root exports for @mrclrchtr/supi-code-intelligence.
-// Peer extensions can import these APIs for programmatic access.
+// Package root — re-exports the public API surface.
 
-// Provider contracts and shared canonical types from the shared runtime.
-// Provider contracts also available as substrate type aliases for backward compat.
 export type {
+  AffectedDetails,
+  ArchitectureModel,
+  BriefDetails,
   CalleesData,
   CapabilityState,
+  CodeIntelResult,
   CodeLocation,
   CodePosition,
+  CodeProvider,
+  CodeProviderState,
   CodeResult,
   CodeSymbol,
   ConfidenceMode,
+  ContextDetails,
+  DependencyEdge,
+  DisambiguationCandidate,
   ExportData,
+  HealthDetails,
+  ImpactDetails,
   ImportData,
+  InspectDetails,
+  ModuleInfo,
   NodeAtData,
   OutlineData,
+  ResolveDetails,
+  ResolvedTargetData,
+  ResolvedTargetGroupData,
+  SearchDetails,
   SemanticProvider,
   SemanticProvider as SemanticSubstrate,
   SourceRange,
   StructuralProvider,
   StructuralProvider as StructuralSubstrate,
   StructuralResult,
-} from "@mrclrchtr/supi-code-runtime/api";
-// Code provider — reads capabilities from the shared workspace runtime.
-export type { CodeProvider, CodeProviderState } from "./analysis/context/request-context.ts";
-export { getCodeProvider } from "./analysis/context/request-context.ts";
-export { generateFocusedBrief, generateOverview, generateProjectBrief } from "./brief.ts";
-export type {
-  ArchitectureModel,
-  DependencyEdge,
-  ModuleInfo,
-} from "./model.ts";
+  TargetOutcome,
+  TestSurfaceDetails,
+} from "./api.ts";
 export {
   buildArchitectureModel,
   findModuleForPath,
+  getCodeProvider,
   getDependencies,
   getDependents,
-} from "./model.ts";
-export type { ResolvedTarget, TargetResolutionResult } from "./target-resolution.ts";
-export {
   normalizePath,
-  resolveSymbolTarget,
-  toZeroBased,
-} from "./target-resolution.ts";
-// Code-intelligence-specific types (not shared with the runtime)
-export type {
-  AffectedDetails,
-  BriefDetails,
-  CodeIntelResult,
-  DisambiguationCandidate,
-  InspectDetails,
-  SearchDetails,
-  TestSurfaceDetails,
-} from "./types.ts";
+} from "./api.ts";

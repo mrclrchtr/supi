@@ -5,9 +5,9 @@
  * readable markdown sections keyed by requested `include` values.
  */
 
-import type { GitContext } from "../../git-context.ts";
-import { formatGitContext } from "../../git-context.ts";
 import type { CoverageWarningReport } from "../../lsp/coverage-warnings.ts";
+import type { GitContext } from "../../project/git-context.ts";
+import { formatGitContext } from "../../project/git-context.ts";
 
 export type HealthSection = "diagnostics" | "servers" | "dirty" | "coverage" | "unused";
 

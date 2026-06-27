@@ -50,7 +50,7 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
 
   it("code_graph returns text (not throw) for a missing target", async () => {
     const result = await executeGraphTool({}, makeTestCtx(tmpDir));
-    expect(result.content).toContain("requires a target");
+    expect(result.content).toContain("At least one of");
   });
 
   it("code_find returns text (not throw) for an empty query", async () => {

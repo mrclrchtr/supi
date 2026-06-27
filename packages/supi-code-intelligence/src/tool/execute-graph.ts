@@ -1,5 +1,3 @@
-// biome-ignore-all lint/style/noExcessiveLinesPerFile: relation dispatch for 7 relation kinds stays together
-// biome-ignore-all lint/complexity/noExcessiveLinesPerFunction: relation dispatch naturally spans cases — pre-existing, split in later phase
 /**
  * Tool executor for code_graph.
  *
@@ -8,43 +6,38 @@
  * appropriate analysis service per requested relation.
  */
 
-import type { CallsResult } from "../analysis/calls/service.ts";
-import { collectOutgoingCalls } from "../analysis/calls/service.ts";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
-import {
-  collectServiceImplementations,
-  type ImplementationsResult,
-} from "../analysis/implementations/service.ts";
-import { collectReferences, type ReferencesResult } from "../analysis/references/service.ts";
-import {
-  buildTestSurfaceDetails,
-  discoverTestFilesForSource,
-  renderRankedTestLabelsForMarkdown,
-} from "../analysis/relations/tests.ts";
-import { routeFor } from "../analysis/routing/planner.ts";
-import { renderCallsResult } from "../presentation/markdown/calls.ts";
-import { renderImplementationsResult } from "../presentation/markdown/implementations.ts";
-import { readNextAround, readNextRange } from "../presentation/markdown/read-next.ts";
-import { renderReferencesResult } from "../presentation/markdown/references.ts";
+import { toDisplayPath } from "../analysis/search/helpers.ts";
 import {
   type GraphRelationKind,
   type GraphSection,
-  renderExportsResult,
   renderGraphResult,
-  renderImportsResult,
 } from "../presentation/markdown/relations.ts";
-import { resolveScope, toDisplayPath } from "../search-helpers.ts";
+import type { AnchorKind } from "../session/target-store.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
-import type { AnchorKind } from "../workflow/target-store.ts";
+import { collectRelation } from "./collect-relation.ts";
+import { composeRules, focusedToolRules, requireAtLeastOne } from "./cross-field.ts";
+import {
+  expandTargetId,
+  gateCapability,
+  resolveScopeParam,
+  runPipe,
+  validateParams,
+} from "./pipeline.ts";
 import { emitToolProgress } from "./progress.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
-import { validateFocusedToolParams } from "./validation.ts";
 
 /** Relation kinds accepted by code_graph — re-exported from relations renderer. */
 export type GraphRelation = GraphRelationKind;
 
 /** Default relation set when none specified. */
 const DEFAULT_RELATIONS: GraphRelation[] = ["references"];
+
+/** Relations that need semantic (LSP) readiness. */
+const SEMANTIC_RELATIONS: GraphRelation[] = ["references", "implements"];
+
+/** Relations that only need a file path, not a position. */
+const FILE_LEVEL_RELATIONS: GraphRelation[] = ["imports", "exports"];
 
 export interface CodeGraphToolParams {
   targetId?: string;
@@ -56,62 +49,58 @@ export interface CodeGraphToolParams {
   relations?: GraphRelation[];
   calleeDepth?: "direct" | "deep";
   maxResults?: number;
+  /** Set by pipeline expandTargetId stage. */
+  _expandedName?: string | null;
+  /** Set by pipeline expandTargetId stage. */
+  _expandedAnchorKind?: string | null;
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: orchestration with multi-stage resolution, relation dispatch, and confidence derivation
 export async function executeGraphTool(
   params: CodeGraphToolParams,
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   emitToolProgress(ctx.onUpdate, "code_graph: resolving target...");
-  // ── 1. Expand targetId via session ───────────────────────────────────
-  const expansion = ctx.session.expandTargetId(params);
-  const expandedTargetName = expansion.kind === "ok" ? expansion.targetName : null;
-  const expandedAnchorKind = expansion.kind === "ok" ? expansion.entry.anchorKind : null;
-  if (expansion.kind === "error") {
-    return errorResult(expansion.message);
-  }
-  if (expansion.kind === "ok") {
-    params.file = expansion.file;
-    params.line = expansion.line;
-    params.character = expansion.character;
-  }
 
-  // ── 2. Resolve scope and validate params ─────────────────────────────
-  const scopeResolution = resolveScope(params.scope, ctx.cwd);
-  if (scopeResolution.kind === "error") {
-    return errorResult(`**Error:** ${scopeResolution.reason}`);
-  }
-  const resolvedScope = params.scope ? scopeResolution.path : undefined;
-
-  // Map public `scope` to internal `path` for shared validation
-  const internalParams = { ...params, path: resolvedScope };
-  const error = validateFocusedToolParams(internalParams, ctx.cwd);
-  if (error) {
-    return errorResult(error);
-  }
-
-  // Must have targetId, anchored coords, or symbol (file-level relations only need file)
-  if (!params.file && !params.symbol && !params.scope) {
-    return errorResult(
-      "**Error:** `code_graph` requires a target. Provide `targetId` (from `code_resolve`), `file` + `line` + `character`, or `symbol`. Optionally pass `scope` to narrow results.",
-    );
-  }
-
-  // ── 3. Normalize relations ──────────────────────────────────────────
   const requestedRelations = params.relations ?? DEFAULT_RELATIONS;
   const relations = expandAllRelations(requestedRelations);
-  const semanticRelations: GraphRelation[] = ["references", "implements"];
-  const requestedSemanticRelations = relations.filter((r: GraphRelation) =>
-    semanticRelations.includes(r),
-  );
-  const needsSemanticRelations = requestedSemanticRelations.length > 0;
 
+  return runPipe(
+    params,
+    ctx,
+    [
+      expandTargetId((msg) => errorResult(msg)),
+      resolveScopeParam((reason) => errorResult(`**Error:** ${reason}`)),
+      validateParams(
+        composeRules(focusedToolRules(), requireAtLeastOne("file", "symbol", "scope")),
+        (msg) => errorResult(msg),
+      ),
+      gateCapability("code_graph"),
+    ],
+    (p, c) => runGraphQueries(p, c, relations),
+  );
+}
+
+// ── Core execution (extracted from runPipe callback) ──────────────────
+
+/**
+ * Run graph queries after pipeline gates have passed.
+ *
+ * Handles semantic readiness (best-effort per relation), target resolution
+ * (file-level vs position-anchored), per-relation data collection, and
+ * combined output rendering.
+ */
+async function runGraphQueries(
+  p: CodeGraphToolParams,
+  c: CodeIntelToolExecCtx,
+  relations: GraphRelation[],
+): Promise<CodeIntelResult> {
+  // Semantic readiness — degrades per-relation rather than blocking the tool.
+  const requestedSemantic = relations.some((r) => SEMANTIC_RELATIONS.includes(r));
   let semanticReadinessError: string | null = null;
-  if (needsSemanticRelations) {
+  if (requestedSemantic) {
     const readiness = await ensureSemanticReadiness(
-      ctx.cwd,
-      params.file ? { kind: "file", file: params.file } : { kind: "workspace" },
+      c.cwd,
+      p.file ? { kind: "file", file: p.file } : { kind: "workspace" },
     );
     if (readiness.kind === "timeout") {
       semanticReadinessError = renderSemanticReadinessTimeout("code_graph", 15_000);
@@ -121,132 +110,162 @@ export async function executeGraphTool(
     }
   }
 
-  // File-level relations (imports/exports) don't need a position — bare `file` is sufficient.
-  const FILE_LEVEL_RELATIONS: GraphRelation[] = ["imports", "exports"];
   const allFileLevel =
-    relations.length > 0 && relations.every((r: GraphRelation) => FILE_LEVEL_RELATIONS.includes(r));
+    relations.length > 0 && relations.every((r) => FILE_LEVEL_RELATIONS.includes(r));
 
-  // ── 4. Check provider availability ──────────────────────────────────
-  const route = routeFor(ctx.cwd, "code_graph");
-  if (route.preferred === "unavailable") {
-    // Whole-tool capability-unavailable (no provider at all) → throw so pi
-    // marks the tool call as an error rather than a successful empty result.
-    // Per-relation unavailability (e.g. semantic down, structural up) is still
-    // surfaced as best-effort notes per relation below.
-    throw new Error(
-      "No analysis provider is available for this workspace. Check `code_health` for LSP and tree-sitter status.",
-    );
-  }
-
-  const providerState = ctx.session.getProviders();
+  const providerState = c.session.getProviders();
   const provider = providerState.kind === "ready" ? providerState.provider : null;
 
-  // ── 5. Resolve target once (skip for file-level-only relations) ─────
-  let resolvedFile: string;
-  let resolvedPosition: { line: number; character: number };
-  let displayName: string;
-  let resolvedAnchorKind: AnchorKind = "name";
+  // ── Resolve target ──────────────────────────────────────────────────
+  const target = await resolveGraphTarget(p, c, provider, allFileLevel);
+  if (isErrorResult(target)) return target;
 
-  if (allFileLevel) {
-    // File-level relations only need the file path — resolve symbol/scope to file if needed.
-    if (params.file) {
-      resolvedFile = params.file;
-    } else if (params.symbol) {
-      // Resolve symbol to file via the targeting pipeline
-      const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
-      const target = await resolveTarget(
-        { ...params, path: resolvedScope },
-        ctx.cwd,
-        provider ?? undefined,
-      );
-      if (typeof target === "string") {
-        return errorResult(target);
-      }
-      if ("targets" in target) {
-        return errorResult(
-          "**Error:** `code_graph` requires a precise target for file-level relations. Use `file` or `targetId` from `code_resolve`.",
-        );
-      }
-      resolvedFile = target.file;
-    } else if (params.scope) {
-      // Scope alone isn't a file — error
-      return errorResult(
-        "**Error:** `code_graph` file-level relations require a `file` or `symbol`, not just `scope`.",
-      );
-    } else {
-      return errorResult("**Error:** `code_graph` requires a target for file-level relations.");
-    }
-    resolvedPosition = { line: 1, character: 1 };
-    displayName = expandedTargetName ?? toDisplayPath(ctx.cwd, resolvedFile);
-  } else {
-    const { resolveTarget } = await import("../analysis/targeting/resolve-target.ts");
-    const target = await resolveTarget(
-      { ...params, path: resolvedScope },
-      ctx.cwd,
-      provider ?? undefined,
-    );
-    if (typeof target === "string") {
-      return errorResult(target);
-    }
+  const { resolvedFile, resolvedPosition, displayName, resolvedAnchorKind } = target;
+  const resolvedDisplayFile = toDisplayPath(c.cwd, resolvedFile);
 
-    // File-level disambiguation — not supported for graph
-    if ("targets" in target) {
-      return {
-        content:
-          "**Error:** `code_graph` requires a precise target. Use anchored coordinates (`file`, `line`, `character`), `symbol`, or pass a `targetId` from `code_resolve`.",
-        details: {
-          type: "search" as const,
-          data: {
-            confidence: "unavailable" as const,
-            scope: null,
-            candidateCount: 0,
-            omittedCount: 0,
-            nextQueries: [],
-          },
-        },
-      };
-    }
-
-    resolvedFile = target.file;
-    resolvedPosition = target.position;
-    resolvedAnchorKind = expandedAnchorKind ?? target.anchorKind;
-    displayName =
-      target.name ??
-      expandedTargetName ??
-      `symbol at ${toDisplayPath(ctx.cwd, resolvedFile)}:${target.displayLine}`;
-  }
-
-  const resolvedDisplayFile = toDisplayPath(ctx.cwd, resolvedFile);
-
-  // ── 6. Collect results per relation ─────────────────────────────────
+  // ── Collect results per relation ────────────────────────────────────
   const sections: GraphSection[] = [];
-  const maxResults = params.maxResults ?? 8;
+  const maxResults = p.maxResults ?? 8;
 
-  emitToolProgress(ctx.onUpdate, `code_graph: collecting ${relations.length} relation(s)...`);
+  emitToolProgress(c.onUpdate, `code_graph: collecting ${relations.length} relation(s)...`);
 
   for (const rel of relations) {
     if (relations.length > 1) {
-      emitToolProgress(ctx.onUpdate, `code_graph: ${rel}...`);
+      emitToolProgress(c.onUpdate, `code_graph: ${rel}...`);
     }
-    const section = await collectRelation(
-      rel,
-      resolvedFile,
-      resolvedPosition,
+    const section = await collectRelation(rel, {
+      file: resolvedFile,
+      position: resolvedPosition,
       displayName,
-      ctx.cwd,
+      cwd: c.cwd,
       provider,
       maxResults,
       semanticReadinessError,
-      resolvedAnchorKind,
-      params.calleeDepth ?? "direct",
-    );
+      anchorKind: resolvedAnchorKind,
+      calleeDepth: p.calleeDepth,
+    });
     sections.push(section);
   }
 
-  // ── 7. Render combined output ───────────────────────────────────────
+  // ── Render combined output ──────────────────────────────────────────
+  return buildGraphResult(displayName, sections, resolvedDisplayFile, p.scope);
+}
+
+// ── Target resolution ─────────────────────────────────────────────────
+
+interface ResolvedGraphTarget {
+  resolvedFile: string;
+  resolvedPosition: { line: number; character: number };
+  displayName: string;
+  resolvedAnchorKind: AnchorKind;
+}
+
+function isErrorResult(value: ResolvedGraphTarget | CodeIntelResult): value is CodeIntelResult {
+  return "content" in value;
+}
+
+async function resolveGraphTarget(
+  p: CodeGraphToolParams,
+  c: CodeIntelToolExecCtx,
+  provider: CodeProvider | null,
+  allFileLevel: boolean,
+): Promise<ResolvedGraphTarget | CodeIntelResult> {
+  if (allFileLevel) {
+    return resolveFileLevelTarget(p, c, provider);
+  }
+  return resolvePositionAnchoredTarget(p, c, provider);
+}
+
+async function resolveFileLevelTarget(
+  p: CodeGraphToolParams,
+  c: CodeIntelToolExecCtx,
+  provider: CodeProvider | null,
+): Promise<ResolvedGraphTarget | CodeIntelResult> {
+  if (p.file) {
+    return {
+      resolvedFile: p.file,
+      resolvedPosition: { line: 1, character: 1 },
+      displayName: toDisplayPath(c.cwd, p.file),
+      resolvedAnchorKind: "name",
+    };
+  }
+
+  if (p.symbol) {
+    const { resolveTarget } = await import("../targeting/resolve-target.ts");
+    const target = await resolveTarget({ ...p, path: p.scope }, c.cwd, provider ?? undefined);
+    if (typeof target === "string") return errorResult(target);
+    if ("targets" in target) {
+      return errorResult(
+        "**Error:** `code_graph` requires a precise target for file-level relations. Use `file` or `targetId` from `code_resolve`.",
+      );
+    }
+    return {
+      resolvedFile: target.file,
+      resolvedPosition: { line: 1, character: 1 },
+      displayName: toDisplayPath(c.cwd, target.file),
+      resolvedAnchorKind: "name",
+    };
+  }
+
+  if (p.scope) {
+    return errorResult(
+      "**Error:** `code_graph` file-level relations require a `file` or `symbol`, not just `scope`.",
+    );
+  }
+
+  return errorResult("**Error:** `code_graph` requires a target for file-level relations.");
+}
+
+async function resolvePositionAnchoredTarget(
+  p: CodeGraphToolParams,
+  c: CodeIntelToolExecCtx,
+  provider: CodeProvider | null,
+): Promise<ResolvedGraphTarget | CodeIntelResult> {
+  const { resolveTarget } = await import("../targeting/resolve-target.ts");
+  const target = await resolveTarget({ ...p, path: p.scope }, c.cwd, provider ?? undefined);
+  if (typeof target === "string") return errorResult(target);
+
+  if ("targets" in target) {
+    return {
+      content:
+        "**Error:** `code_graph` requires a precise target. Use anchored coordinates (`file`, `line`, `character`), `symbol`, or pass a `targetId` from `code_resolve`.",
+      details: {
+        type: "search",
+        data: {
+          confidence: "unavailable",
+          scope: null,
+          candidateCount: 0,
+          omittedCount: 0,
+          nextQueries: [],
+        },
+      },
+    };
+  }
+
+  const resolvedAnchorKind = (p._expandedAnchorKind as AnchorKind | undefined) ?? target.anchorKind;
+  const displayName =
+    p._expandedName ??
+    target.name ??
+    `symbol at ${toDisplayPath(c.cwd, target.file)}:${target.displayLine}`;
+
+  return {
+    resolvedFile: target.file,
+    resolvedPosition: target.position,
+    displayName,
+    resolvedAnchorKind,
+  };
+}
+
+// ── Result assembly ───────────────────────────────────────────────────
+
+function buildGraphResult(
+  displayName: string,
+  sections: GraphSection[],
+  resolvedDisplayFile: string,
+  scope: string | undefined,
+): CodeIntelResult {
   const content = renderGraphResult(displayName, sections, resolvedDisplayFile);
 
-  // Derive confidence from the highest-capability successful section
   const hasStructural = sections.some(
     (s) =>
       s.kind === "ok" &&
@@ -258,11 +277,7 @@ export async function executeGraphTool(
   const hasSemantic = sections.some(
     (s) => s.kind === "ok" && (s.rel === "references" || s.rel === "implements"),
   );
-  const confidence: "semantic" | "structural" | "unavailable" = hasSemantic
-    ? "semantic"
-    : hasStructural
-      ? "structural"
-      : "unavailable";
+  const confidence = hasSemantic ? "semantic" : hasStructural ? "structural" : "unavailable";
 
   const tests = sections.find((section) => section.rel === "tests")?.tests;
   const evidenceLists = sections.flatMap((section) =>
@@ -276,14 +291,11 @@ export async function executeGraphTool(
   return {
     content,
     details: {
-      type: "search" as const,
+      type: "search",
       data: {
         confidence,
-        scope: params.scope ?? null,
-        candidateCount: sections.reduce((sum, s) => {
-          if (s.kind === "ok") return sum + s.count;
-          return sum;
-        }, 0),
+        scope: scope ?? null,
+        candidateCount: sections.reduce((sum, s) => (s.kind === "ok" ? sum + s.count : sum), 0),
         omittedCount,
         evidenceLists,
         nextQueries: [
@@ -296,286 +308,15 @@ export async function executeGraphTool(
   };
 }
 
-// ── Per-relation data collection ──────────────────────────────────────
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: relation dispatch naturally spans cases
-// biome-ignore lint/complexity/useMaxParams: orchestration needs target + provider + config
-async function collectRelation(
-  rel: GraphRelation,
-  file: string,
-  position: { line: number; character: number },
-  displayName: string,
-  cwd: string,
-  provider: CodeProvider | null,
-  maxResults: number,
-  semanticReadinessError: string | null,
-  anchorKind: AnchorKind,
-  calleeDepth: "direct" | "deep" = "direct",
-): Promise<GraphSection> {
-  if (semanticReadinessError && (rel === "references" || rel === "implements")) {
-    return { kind: "unavailable", rel, message: semanticReadinessError };
-  }
-
-  try {
-    switch (rel) {
-      case "references": {
-        if (!provider?.references) {
-          return { kind: "unavailable", rel, message: "No semantic provider for references" };
-        }
-        const result: ReferencesResult = await collectReferences(file, position, displayName, {
-          cwd,
-          provider: { references: provider.references },
-        });
-        if (result.confidence === "unavailable") {
-          return { kind: "unavailable", rel, message: "No references available" };
-        }
-        const rendered = renderReferencesResult(
-          displayName,
-          result.references,
-          result.externalCount,
-          result.confidence,
-          cwd,
-          maxResults,
-        );
-        return {
-          kind: "ok",
-          rel,
-          count: result.references.length,
-          content: rendered.content,
-          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
-          readNext: [
-            readNextAround(
-              toDisplayPath(cwd, file),
-              position.line + 1,
-              "inspect the resolved target before editing",
-            ),
-            ...result.references
-              .slice(0, Math.min(2, maxResults))
-              .map((ref) =>
-                readNextAround(toDisplayPath(cwd, ref.file), ref.line, "inspect a reference site"),
-              ),
-          ],
-        };
-      }
-
-      case "callees": {
-        if (anchorKind === "declaration") {
-          return {
-            kind: "unavailable",
-            rel,
-            message:
-              "Cannot collect callees from a declaration anchor. Re-resolve the target to a name anchor, or pass file + line + character anchored on the identifier.",
-          };
-        }
-        if (!provider?.calleesAt) {
-          return { kind: "unavailable", rel, message: "No structural provider for callees" };
-        }
-        const result: CallsResult = await collectOutgoingCalls(
-          file,
-          position.line + 1,
-          position.character + 1,
-          displayName,
-          { cwd, provider: { calleesAt: provider.calleesAt } },
-          undefined,
-          calleeDepth,
-        );
-        if (result.confidence === "unavailable") {
-          return { kind: "unavailable", rel, message: "No callees available" };
-        }
-        const rendered = renderCallsResult(
-          result.enclosingScope,
-          result.calls,
-          toDisplayPath(cwd, file),
-          maxResults,
-          result.depth,
-        );
-        return {
-          kind: "ok",
-          rel,
-          count: result.calls.length,
-          content: rendered.content,
-          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
-          readNext: [
-            readNextRange({
-              file: toDisplayPath(cwd, file),
-              startLine: result.enclosingScope.startLine ?? position.line + 1,
-              endLine:
-                result.enclosingScope.endLine ??
-                result.enclosingScope.startLine ??
-                position.line + 1,
-              reason: `inspect enclosing scope \`${result.enclosingScope.name}\``,
-            }),
-          ],
-        };
-      }
-
-      case "implements": {
-        if (!provider?.implementation) {
-          return { kind: "unavailable", rel, message: "No semantic provider for implementations" };
-        }
-        const result: ImplementationsResult = await collectServiceImplementations(
-          file,
-          position,
-          displayName,
-          { cwd, provider: { implementation: provider.implementation } },
-          maxResults,
-        );
-        if (result.confidence === "unavailable") {
-          return { kind: "unavailable", rel, message: "No implementations available" };
-        }
-        // Filter self-references: LSP returns the declaration itself as an
-        // "implementation" for non-interface symbols. Drop the target location.
-        const targetLine = position.line + 1;
-        const filtered = result.implementations.filter(
-          (impl) => !(impl.file === file && impl.line === targetLine),
-        );
-        const rendered = renderImplementationsResult(
-          filtered,
-          result.externalCount,
-          cwd,
-          maxResults,
-          displayName,
-        );
-        return {
-          kind: "ok",
-          rel,
-          count: filtered.length,
-          content: rendered.content,
-          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
-        };
-      }
-
-      case "imports": {
-        if (!provider?.imports) {
-          return { kind: "unavailable", rel, message: "No structural provider for imports" };
-        }
-        const importResult = await provider.imports(file);
-        if (importResult.kind !== "success") {
-          return { kind: "unavailable", rel, message: `Imports unavailable: ${importResult.kind}` };
-        }
-        const flatImports = importResult.data.map((entry) => ({
-          moduleSpecifier: entry.moduleSpecifier,
-          startLine: entry.startLine,
-        }));
-        const rendered = renderImportsResult(
-          displayName,
-          flatImports,
-          toDisplayPath(cwd, file),
-          maxResults,
-        );
-        return {
-          kind: "ok",
-          rel,
-          count: flatImports.length,
-          content: rendered.content,
-          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
-        };
-      }
-
-      case "exports": {
-        if (!provider?.exports) {
-          return { kind: "unavailable", rel, message: "No structural provider for exports" };
-        }
-        const exportResult = await provider.exports(file);
-        if (exportResult.kind !== "success") {
-          return { kind: "unavailable", rel, message: `Exports unavailable: ${exportResult.kind}` };
-        }
-        const flatExports = exportResult.data.map((entry) => ({
-          name: entry.name,
-          kind: entry.kind,
-          startLine: entry.startLine,
-        }));
-        const rendered = renderExportsResult(
-          displayName,
-          flatExports,
-          toDisplayPath(cwd, file),
-          maxResults,
-        );
-        return {
-          kind: "ok",
-          rel,
-          count: flatExports.length,
-          content: rendered.content,
-          evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
-        };
-      }
-
-      case "tests": {
-        const discovery = await discoverTestFilesForSource(file, {
-          references: provider?.references,
-          outline: provider?.outline,
-          cwd,
-          cap: maxResults,
-          position,
-        });
-        const tests = buildTestSurfaceDetails(
-          {
-            status: discovery.kind,
-            provenance: discovery.provenance,
-            files: discovery.files,
-          },
-          cwd,
-          maxResults,
-        );
-
-        if (discovery.kind === "unavailable") {
-          return {
-            kind: "unavailable",
-            rel,
-            message: "No test provider available — semantic and structural providers are absent",
-            tests,
-          };
-        }
-
-        if (discovery.kind === "empty") {
-          return {
-            kind: "ok",
-            rel,
-            count: 0,
-            content: `**Tests** — no companion test files found.\n`,
-            tests,
-          };
-        }
-
-        const testLines: string[] = [];
-        const filesToScan = tests.files.slice(0, 3);
-        for (const testFile of filesToScan) {
-          testLines.push(`- \`${testFile.file}\``);
-          testLines.push(...renderRankedTestLabelsForMarkdown(testFile.labels, maxResults));
-        }
-
-        const provenanceNote = `, ${discovery.provenance}`;
-        const content = `**Tests** (${discovery.files.length} companion file${discovery.files.length !== 1 ? "s" : ""}${provenanceNote})\n\n${testLines.join("\n")}\n`;
-        return {
-          kind: "ok",
-          rel,
-          count: discovery.files.length,
-          content,
-          tests,
-        };
-      }
-
-      default:
-        return { kind: "not-implemented", rel, message: `Unknown relation: ${rel}` };
-    }
-  } catch (err) {
-    return {
-      kind: "unavailable",
-      rel,
-      message: err instanceof Error ? err.message : "Unknown error",
-    };
-  }
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────
 
 function errorResult(content: string): CodeIntelResult {
   return {
     content,
     details: {
-      type: "search" as const,
+      type: "search",
       data: {
-        confidence: "unavailable" as const,
+        confidence: "unavailable",
         scope: null,
         candidateCount: 0,
         omittedCount: 0,

@@ -1,31 +1,36 @@
 // biome-ignore-all lint/style/noExcessiveLinesPerFile: shared impact orchestration stays together in one cohesive use-case file.
 // Impact orchestration use-case — workflow-oriented blast-radius analysis.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import * as path from "node:path";
-import type { CodePosition, ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
+import { isResolvedTargetGroup } from "../analysis/helpers.ts";
 import {
   buildTestSurfaceDetails,
-  type DiscoveredTestFile,
-  describeTestFile,
-  discoverTestFilesForSource,
   isTestFilePath,
   type TestSurfaceDetails,
 } from "../analysis/relations/tests.ts";
-import { resolveTarget } from "../analysis/targeting/resolve-target.ts";
-import { createEvidenceList, type EvidenceListMetadata } from "../evidence-list.ts";
-import { buildArchitectureModel, findModuleForPath, getDependents } from "../model.ts";
+import { buildArchitectureModel, findModuleForPath, getDependents } from "../architecture/model.ts";
+import { createEvidenceList, type EvidenceListMetadata } from "../presentation/evidence-list.ts";
 import {
   renderChangeSetImpact,
   renderImpactFileLevel,
   renderImpactSingle,
 } from "../presentation/markdown/impact.ts";
-import { summarizePrioritySignalsForFiles } from "../prioritization-signals.ts";
-import { isResolvedTargetGroup } from "../semantic-action-helpers.ts";
-import type { ResolvedTarget, ResolvedTargetGroup } from "../target-resolution.ts";
+import { summarizePrioritySignalsForFiles } from "../project/prioritization-signals.ts";
 import { resolveFileTargetGroup } from "../targeting/resolve-file.ts";
+import { resolveTarget } from "../targeting/resolve-target.ts";
+import type { ResolvedTargetData, ResolvedTargetGroupData } from "../targeting/types.ts";
 import type { AffectedDetails, CodeIntelResult, ImpactDetails } from "../types.ts";
+import {
+  buildLikelyTestCommands,
+  buildTestAnchorMap,
+  type ChangeSetFileEntry,
+  collectLikelyTests,
+  normalizeChangeSet,
+  type TestAnchorMap,
+} from "./support/likely-tests.ts";
 import {
   aggregatePerTarget,
   collectReferences,
@@ -66,24 +71,11 @@ interface ImpactAnalysis {
   tests?: TestSurfaceDetails;
 }
 
-interface ChangeSetFileEntry {
-  absPath: string;
-  relPath: string;
-}
-
 interface ChangeSetSemanticImpact {
-  targets: ResolvedTarget[];
+  targets: ResolvedTargetData[];
   refs: ReferenceCollection;
   references: CodeProvider["references"];
   outline?: CodeProvider["outline"];
-}
-
-type TestAnchorMap = Map<string, CodePosition[]>;
-
-interface LikelyTestsResult {
-  paths: string[];
-  files: Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">>;
-  provenance?: "semantic+conventions" | "conventions-only";
 }
 
 /** Exported for backward-compatible unit-test access. Prefer `discoverTestFilesForSource` from tests.ts. */
@@ -165,7 +157,7 @@ export async function executeImpact(
 
 // biome-ignore lint/complexity/useMaxParams: shared impact orchestration keeps substrate inputs explicit
 async function executeSingleImpact(
-  target: ResolvedTarget,
+  target: ResolvedTargetData,
   symbolName: string,
   input: ImpactInput,
   cwd: string,
@@ -227,7 +219,7 @@ async function executeSingleImpact(
 
 // biome-ignore lint/complexity/useMaxParams: shared impact orchestration keeps related substrate inputs explicit
 async function executeFileLevelImpact(
-  targetGroup: ResolvedTargetGroup,
+  targetGroup: ResolvedTargetGroupData,
   input: ImpactInput,
   cwd: string,
   semantic: CodeProvider,
@@ -361,7 +353,7 @@ async function collectChangeSetSemanticImpact(
 ): Promise<ChangeSetSemanticImpact | null> {
   if (!provider?.references) return null;
 
-  const targets: ResolvedTarget[] = [];
+  const targets: ResolvedTargetData[] = [];
   for (const entry of changeSetFiles) {
     try {
       const outcome = await resolveFileTargetGroup(entry.relPath, cwd, {
@@ -369,7 +361,7 @@ async function collectChangeSetSemanticImpact(
         structural: provider,
       });
       if (outcome.kind === "resolved") {
-        targets.push(...(outcome.group.targets as ResolvedTarget[]));
+        targets.push(...outcome.group.targets);
       }
     } catch {
       // Keep change-set analysis best-effort: structural impact still applies.
@@ -568,227 +560,6 @@ function analyzeModelImpact(
   return { affectedModules, checkNext, downstreamCount };
 }
 
-function normalizeChangeSet(files: string[], cwd: string): ChangeSetFileEntry[] {
-  const seen = new Set<string>();
-  const result: ChangeSetFileEntry[] = [];
-
-  for (const file of files) {
-    const absPath = path.resolve(cwd, file);
-    const relPath = path.relative(cwd, absPath) || file;
-    if (seen.has(absPath)) continue;
-    seen.add(absPath);
-    result.push({ absPath, relPath });
-  }
-
-  return result;
-}
-
-function buildTestAnchorMap(
-  entries: Array<{ file: string; position: CodePosition }>,
-): TestAnchorMap {
-  const map: TestAnchorMap = new Map();
-  for (const entry of entries) {
-    const key = path.resolve(entry.file);
-    const positions = map.get(key) ?? [];
-    positions.push(entry.position);
-    map.set(key, positions);
-  }
-  return map;
-}
-
-function dedupeDiscoveredTestFiles(
-  files: Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">>,
-): Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">> {
-  const byPath = new Map<
-    string,
-    Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">
-  >();
-
-  for (const file of files) {
-    const existing = byPath.get(file.absPath);
-    if (!existing) {
-      byPath.set(file.absPath, file);
-      continue;
-    }
-
-    if (existing.labelStatus !== "recognized" && file.labelStatus === "recognized") {
-      byPath.set(file.absPath, file);
-    }
-  }
-
-  return [...byPath.values()].sort((left, right) => left.absPath.localeCompare(right.absPath));
-}
-
-// biome-ignore lint/complexity/useMaxParams: shared likely-test collection keeps evidence inputs explicit
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: discovery aggregation across direct tests, semantic references, and conventions is clearest in one helper
-async function collectLikelyTests(
-  affectedFiles: Set<string>,
-  cwd: string,
-  references: CodeProvider["references"] | undefined,
-  testAnchors?: TestAnchorMap,
-  fallbackProvenance?: "semantic+conventions" | "conventions-only",
-  outline?: CodeProvider["outline"],
-): Promise<LikelyTestsResult> {
-  const seen = new Set<string>();
-  const likelyTests: string[] = [];
-  const discoveredFiles: Array<Pick<DiscoveredTestFile, "absPath" | "testNames" | "labelStatus">> =
-    [];
-  let provenance = fallbackProvenance;
-
-  for (const affFile of affectedFiles) {
-    if (isTestFilePath(affFile)) {
-      addLikelyTestPath(cwd, affFile, seen, likelyTests);
-      const described = await describeTestFile(affFile, { outline, cwd });
-      discoveredFiles.push(described);
-      continue;
-    }
-
-    const positions = testAnchors?.get(path.resolve(affFile)) ?? [];
-    const discoveries =
-      positions.length > 0
-        ? await Promise.all(
-            positions.map((position) =>
-              discoverTestFilesForSource(affFile, {
-                cwd,
-                cap: 3,
-                references,
-                outline,
-                position,
-              }),
-            ),
-          )
-        : [
-            await discoverTestFilesForSource(affFile, {
-              cwd,
-              cap: 3,
-              references,
-              outline,
-            }),
-          ];
-
-    for (const discovery of discoveries) {
-      if (discovery.kind !== "found") continue;
-      if (discovery.provenance === "semantic+conventions") {
-        provenance = "semantic+conventions";
-      } else if (!provenance) {
-        provenance = discovery.provenance;
-      }
-    }
-
-    const discovered = dedupeDiscoveredTestFiles(discoveries.flatMap((entry) => entry.files));
-    for (const testFile of discovered) {
-      addLikelyTestPath(cwd, testFile.absPath, seen, likelyTests);
-      discoveredFiles.push(testFile);
-    }
-  }
-
-  const files = dedupeDiscoveredTestFiles(discoveredFiles).slice(0, 3);
-  likelyTests.sort((a, b) => a.localeCompare(b));
-  return { paths: likelyTests.slice(0, 3), files, provenance };
-}
-
-function addLikelyTestPath(
-  cwd: string,
-  absPath: string,
-  seen: Set<string>,
-  likelyTests: string[],
-): void {
-  const relPath = path.relative(cwd, absPath) || absPath;
-  if (seen.has(relPath)) return;
-  seen.add(relPath);
-  likelyTests.push(relPath);
-}
-
-function buildLikelyTestCommands(cwd: string, likelyTests: string[]): string[] {
-  if (likelyTests.length === 0 || !detectVitestWorkspace(cwd)) {
-    return [];
-  }
-
-  return likelyTests
-    .filter((testPath) => VITEST_RUNNABLE_EXTENSIONS.has(path.extname(testPath)))
-    .slice(0, 3)
-    .map((relTest) => `pnpm vitest run ${relTest} --reporter=verbose`);
-}
-
-const VITEST_RUNNABLE_EXTENSIONS = new Set([
-  ".js",
-  ".jsx",
-  ".ts",
-  ".tsx",
-  ".mjs",
-  ".cjs",
-  ".mts",
-  ".cts",
-]);
-
-const VITEST_CONFIG_FILES = [
-  "vitest.config.ts",
-  "vitest.config.mts",
-  "vitest.config.cts",
-  "vitest.config.js",
-  "vitest.config.mjs",
-  "vitest.config.cjs",
-  "vitest.workspace.ts",
-  "vitest.workspace.mts",
-  "vitest.workspace.cts",
-  "vitest.workspace.js",
-  "vitest.workspace.mjs",
-  "vitest.workspace.cjs",
-];
-
-function detectVitestWorkspace(cwd: string): boolean {
-  let current = path.resolve(cwd);
-
-  for (;;) {
-    if (packageJsonUsesVitest(current) || hasVitestConfig(current)) {
-      return true;
-    }
-    if (existsSync(path.join(current, ".git"))) {
-      return false;
-    }
-
-    const parent = path.dirname(current);
-    if (parent === current) {
-      return false;
-    }
-    current = parent;
-  }
-}
-
-function packageJsonUsesVitest(dir: string): boolean {
-  const packageJsonPath = path.join(dir, "package.json");
-  if (!existsSync(packageJsonPath)) {
-    return false;
-  }
-
-  try {
-    const parsed = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
-      scripts?: Record<string, string>;
-      dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-      peerDependencies?: Record<string, string>;
-      optionalDependencies?: Record<string, string>;
-    };
-
-    if (Object.values(parsed.scripts ?? {}).some((script) => script.includes("vitest"))) {
-      return true;
-    }
-
-    return [
-      parsed.dependencies,
-      parsed.devDependencies,
-      parsed.peerDependencies,
-      parsed.optionalDependencies,
-    ].some((deps) => Boolean(deps?.vitest));
-  } catch {
-    return false;
-  }
-}
-
-function hasVitestConfig(dir: string): boolean {
-  return VITEST_CONFIG_FILES.some((file) => existsSync(path.join(dir, file)));
-}
-
 function assessRisk(
   totalRefs: number,
   moduleCount: number,
@@ -807,7 +578,11 @@ function computeOmittedCount(
   return externalRefs + Math.max(0, affectedFileCount - (input.maxResults ?? 8));
 }
 
-function buildTargetNextQueries(target: ResolvedTarget, symbolName: string, cwd: string): string[] {
+function buildTargetNextQueries(
+  target: ResolvedTargetData,
+  symbolName: string,
+  cwd: string,
+): string[] {
   const relPath = path.relative(cwd, target.file);
   return [
     `\`code_inspect\` with \`file: "${relPath}"\`, \`line: ${target.displayLine}\`, and \`character: ${target.displayCharacter}\` for point facts around ${symbolName}`,

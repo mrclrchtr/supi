@@ -4,7 +4,22 @@ import * as path from "node:path";
 import type { SemanticProvider as SemanticSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeLocation, CodePosition } from "@mrclrchtr/supi-core/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ResolvedTarget } from "../../src/target-resolution.ts";
+import type { ResolvedTargetData } from "../../src/targeting/types.ts";
+
+function makeTarget(
+  overrides: Partial<ResolvedTargetData> & { file: string; position: CodePosition },
+): ResolvedTargetData {
+  return {
+    displayLine: 1,
+    displayCharacter: 1,
+    name: null,
+    kind: null,
+    confidence: "semantic",
+    anchorKind: "name" as const,
+    container: null,
+    ...overrides,
+  };
+}
 
 let tmpDir: string;
 
@@ -50,15 +65,13 @@ describe("collectReferences", () => {
     const otherFile = path.join(tmpDir, "src", "other.ts");
     writeFile(otherFile);
 
-    const target: ResolvedTarget = {
+    const target = makeTarget({
       file: targetFile,
       position: makePos(5, 0),
       displayLine: 6,
       displayCharacter: 1,
       name: "myFunc",
-      kind: null,
-      confidence: "semantic",
-    };
+    });
 
     const semantic: SemanticSubstrate = {
       references: vi
@@ -86,15 +99,13 @@ describe("collectReferences", () => {
     const otherFile = path.join(tmpDir, "src", "other.ts");
     writeFile(otherFile);
 
-    const target: ResolvedTarget = {
+    const target = makeTarget({
       file: targetFile,
       position: makePos(5, 0),
       displayLine: 6,
       displayCharacter: 1,
       name: "myFunc",
-      kind: null,
-      confidence: "semantic",
-    };
+    });
 
     const semantic: SemanticSubstrate = {
       references: vi.fn().mockResolvedValue([
@@ -121,15 +132,13 @@ describe("collectReferences", () => {
     const extFile = path.join(tmpDir, "node_modules", "pkg", "index.ts");
     writeFile(extFile);
 
-    const target: ResolvedTarget = {
+    const target = makeTarget({
       file: targetFile,
       position: makePos(5, 0),
       displayLine: 6,
       displayCharacter: 1,
       name: "myFunc",
-      kind: null,
-      confidence: "semantic",
-    };
+    });
 
     const semantic: SemanticSubstrate = {
       references: vi.fn().mockResolvedValue([makeLocation(extFile, 1)]),
@@ -150,15 +159,13 @@ describe("collectReferences", () => {
     const targetFile = path.join(tmpDir, "src", "mod.ts");
     writeFile(targetFile);
 
-    const target: ResolvedTarget = {
+    const target = makeTarget({
       file: targetFile,
       position: makePos(5, 0),
       displayLine: 6,
       displayCharacter: 1,
       name: "myFunc",
-      kind: null,
-      confidence: "semantic",
-    };
+    });
 
     const semantic: SemanticSubstrate = {
       references: vi.fn().mockResolvedValue(null),
@@ -180,25 +187,21 @@ describe("collectReferences", () => {
 
 describe("aggregatePerTarget", () => {
   it("merges refs from multiple targets, deduped by file:line", async () => {
-    const targets: ResolvedTarget[] = [
-      {
+    const targets: ResolvedTargetData[] = [
+      makeTarget({
         file: "/tmp/f.ts",
         position: makePos(5, 0),
         displayLine: 6,
         displayCharacter: 1,
         name: "funcA",
-        kind: null,
-        confidence: "semantic",
-      },
-      {
+      }),
+      makeTarget({
         file: "/tmp/f.ts",
         position: makePos(20, 0),
         displayLine: 21,
         displayCharacter: 1,
         name: "funcB",
-        kind: null,
-        confidence: "semantic",
-      },
+      }),
     ];
 
     const collectFn = vi.fn().mockResolvedValue({
@@ -241,24 +244,8 @@ describe("aggregatePerTarget", () => {
     );
     const result = await aggregatePerTarget(
       [
-        {
-          file: "/f.ts",
-          position: makePos(0, 0),
-          displayLine: 1,
-          displayCharacter: 1,
-          name: null,
-          kind: null,
-          confidence: "structural",
-        },
-        {
-          file: "/g.ts",
-          position: makePos(0, 0),
-          displayLine: 1,
-          displayCharacter: 1,
-          name: null,
-          kind: null,
-          confidence: "unavailable",
-        },
+        makeTarget({ file: "/f.ts", position: makePos(0, 0), confidence: "structural" }),
+        makeTarget({ file: "/g.ts", position: makePos(0, 0), confidence: "unavailable" }),
       ],
       collectFn,
     );

@@ -25,20 +25,38 @@ import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
  */
 export type AnchorKind = "name" | "declaration";
 
-/** A stored resolved target entry with handles and metadata. */
+/**
+ * A stored resolved target entry with handles and metadata.
+ *
+ * This is the canonical post-registration target type — all tool layers
+ * (executors, renderers, details) use it directly. Computed fields like
+ * relative paths are derived at the rendering boundary.
+ */
 export interface TargetStoreEntry {
   targetId: string;
   spanId: string;
+  /** Absolute filesystem path. Compute relative paths at render time with `path.relative(cwd, file)`. */
   file: string;
+  /** 0-based position for LSP calls. */
   position: { line: number; character: number };
+  /** 1-based position for user display. */
   displayLine: number;
   displayCharacter: number;
   name: string | null;
   kind: string | null;
   confidence: ConfidenceMode;
   provenance: string;
+  /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
   fileFingerprint: string;
+  /** Symbolic container (class/namespace/module name), or null for top-level. */
+  container: string | null;
+  /**
+   * Resolution provenance — present when the target was resolved from
+   * anchored coordinates. Carries requested/resolved coordinates, whether
+   * the anchor was snapped, and the provider-backed evidence source.
+   */
+  resolution?: import("../types.ts").AnchoredResolutionMetadata;
 }
 
 /** Input shape for registering a resolved target. */
@@ -53,14 +71,21 @@ export interface TargetRegistrationInput {
   provenance: string;
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
-  /** Container scope, or null for top-level (ADR 0003 — disambiguates same-file collisions in the identity hash). */
+  /** Symbolic container (class/namespace/module name), or null for top-level (ADR 0003 — disambiguates same-file collisions in the identity hash). */
   container: string | null;
+  /**
+   * Resolution provenance — present when the target was resolved from
+   * anchored coordinates. Carries requested/resolved coordinates, whether
+   * the anchor was snapped, and the provider-backed evidence source.
+   */
+  resolution?: import("../types.ts").AnchoredResolutionMetadata;
 }
 
-/** Output from registering a target: stable session-scoped handles. */
+/** Output from registering a target: stable session-scoped handles and the full stored entry. */
 export interface TargetRegistrationOutput {
   targetId: string;
   spanId: string;
+  entry: TargetStoreEntry;
 }
 
 /** Lookup result for a target ID query. */
@@ -194,7 +219,7 @@ export function registerWorkflowTarget(
   // Check for existing entry with same targetId
   const existing = store.get(targetId);
   if (existing) {
-    return { targetId: existing.targetId, spanId: existing.spanId };
+    return { targetId: existing.targetId, spanId: existing.spanId, entry: existing };
   }
 
   const entry: TargetStoreEntry = {
@@ -210,11 +235,13 @@ export function registerWorkflowTarget(
     provenance: input.provenance,
     anchorKind: input.anchorKind,
     fileFingerprint: fingerprint,
+    container: input.container,
+    resolution: input.resolution,
   };
 
   store.set(targetId, entry);
 
-  return { targetId, spanId };
+  return { targetId, spanId, entry };
 }
 
 /**

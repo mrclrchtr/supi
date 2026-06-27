@@ -4,7 +4,7 @@ import {
   createPartialEvidenceList,
   renderEvidenceListDisclosure,
   summarizeEvidenceLists,
-} from "../../src/evidence-list.ts";
+} from "../../src/presentation/evidence-list.ts";
 
 describe("evidence lists", () => {
   it("discloses exact truncation with shared markdown and metadata", () => {

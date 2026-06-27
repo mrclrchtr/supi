@@ -1,9 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-
-import { createEvidenceList } from "../evidence-list.ts";
+import { normalizePath } from "../analysis/search/helpers.ts";
+import { createEvidenceList } from "../presentation/evidence-list.ts";
 import { renderInspectResult } from "../presentation/markdown/inspect.ts";
-import { normalizePath } from "../search-helpers.ts";
 import { gatherNearbyDiagnostics, gatherTreeSitterContext } from "./gather-context.ts";
 import type { InspectDeps, InspectInput, InspectUseCaseResult } from "./types.ts";
 

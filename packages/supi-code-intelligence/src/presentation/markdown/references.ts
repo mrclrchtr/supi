@@ -3,9 +3,9 @@
  */
 
 import type { ReferenceEntry } from "../../analysis/references/service.ts";
-import type { EvidenceListMetadata } from "../../evidence-list.ts";
-import { toDisplayPath } from "../../search-helpers.ts";
+import { toDisplayPath } from "../../analysis/search/helpers.ts";
 import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
+import type { EvidenceListMetadata } from "../evidence-list.ts";
 
 // biome-ignore lint/complexity/useMaxParams: render function with independent display parameters
 export function renderReferencesResult(

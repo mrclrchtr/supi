@@ -1,11 +1,9 @@
 import { getOrCreateSessionForCwd } from "../../src/app/create-code-intelligence-app.ts";
-import { executeApplyTool } from "../../src/tool/execute-apply.ts";
 import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executeFindTool } from "../../src/tool/execute-find.ts";
 import type { GraphRelation } from "../../src/tool/execute-graph.ts";
 import { executeGraphTool } from "../../src/tool/execute-graph.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
-import { executeRefactorTool } from "../../src/tool/execute-refactor.ts";
 import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../src/types.ts";
@@ -146,9 +144,16 @@ export async function executeAction(
         fullCtx,
       );
     case "refactor":
-      return executeRefactorTool(rest as Parameters<typeof executeRefactorTool>[0], fullCtx);
+      return executeRefactorPlanTool(
+        rest as Parameters<typeof executeRefactorPlanTool>[0],
+        fullCtx,
+        "code_refactor_plan",
+      );
     case "apply":
-      return executeApplyTool(rest as Parameters<typeof executeApplyTool>[0], fullCtx);
+      return executeRefactorApplyTool(
+        rest as Parameters<typeof executeRefactorApplyTool>[0],
+        fullCtx,
+      );
     case "refactor_plan":
       return executeRefactorPlanTool(
         rest as Parameters<typeof executeRefactorPlanTool>[0],

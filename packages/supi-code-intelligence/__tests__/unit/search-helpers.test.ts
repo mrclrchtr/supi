@@ -8,7 +8,7 @@ import {
   normalizePath,
   resolveScope,
   uriToFile,
-} from "../../src/search-helpers.ts";
+} from "../../src/analysis/search/helpers.ts";
 
 // biome-ignore lint/security/noSecrets: function name in test describe
 describe("isLowSignalPath", () => {

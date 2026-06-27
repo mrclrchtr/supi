@@ -5,12 +5,13 @@
  * with stable handles, disambiguation candidates, or actionable errors.
  */
 
+import { relative } from "node:path";
 import type {
-  DisambiguationCandidateEntry,
-  ResolvedTargetEntry,
+  DisambiguationCandidate,
   ResolveServiceResult,
 } from "../../analysis/resolve/service.ts";
-import { renderEvidenceListMetadataDisclosure } from "../../evidence-list.ts";
+import type { TargetStoreEntry } from "../../session/target-store.ts";
+import { renderEvidenceListMetadataDisclosure } from "../evidence-list.ts";
 
 /**
  * Render a provenance note for an anchored resolution, but only when the
@@ -18,7 +19,7 @@ import { renderEvidenceListMetadataDisclosure } from "../../evidence-list.ts";
  * anchor, or the evidence was structural rather than semantic. Exact
  * name-anchor hits resolved from semantic evidence stay quiet.
  */
-function renderAnchoredResolutionNote(t: ResolvedTargetEntry): string | null {
+function renderAnchoredResolutionNote(t: TargetStoreEntry): string | null {
   const r = t.resolution;
   if (!r) return null;
   const degraded = r.source !== "semantic";
@@ -33,13 +34,14 @@ function renderAnchoredResolutionNote(t: ResolvedTargetEntry): string | null {
 }
 
 /** Render the single-target resolved block (with optional provenance note). */
-function renderSingleTarget(t: ResolvedTargetEntry, confidence: string): string[] {
+function renderSingleTarget(t: TargetStoreEntry, confidence: string, cwd: string): string[] {
+  const relFile = relative(cwd, t.file) || t.file;
   const kind = t.kind ? ` \`${t.kind}\`` : "";
   const name = t.name ? ` **${t.name}**${kind}` : "";
   const lines: string[] = [
     `Resolved${name}:`,
     "",
-    `- File: \`${t.file}\``,
+    `- File: \`${relFile}\``,
     `- Line: ${t.displayLine}, Column: ${t.displayCharacter}`,
     `- Target ID: \`${t.targetId}\``,
     `- Span ID: \`${t.spanId}\``,
@@ -56,21 +58,22 @@ function renderSingleTarget(t: ResolvedTargetEntry, confidence: string): string[
 }
 
 /** Render a full resolve service result into markdown. */
-export function renderResolveResult(result: ResolveServiceResult, _cwd: string): string {
+export function renderResolveResult(result: ResolveServiceResult, cwd: string): string {
   switch (result.kind) {
     case "resolved":
-      return renderResolved(result.targets, result.omittedCount, result.confidence);
+      return renderResolved(result.targets, result.omittedCount, result.confidence, cwd);
     case "disambiguation":
-      return renderDisambiguation(result.candidates, result.omittedCount);
+      return renderDisambiguation(result.candidates, result.omittedCount, cwd);
     case "error":
       return result.message;
   }
 }
 
 function renderResolved(
-  targets: ResolvedTargetEntry[],
+  targets: TargetStoreEntry[],
   omittedCount: number,
   confidence: string,
+  cwd: string,
 ): string {
   if (targets.length === 0) {
     return "No targets resolved.";
@@ -79,16 +82,17 @@ function renderResolved(
   const lines: string[] = [];
 
   if (targets.length === 1) {
-    lines.push(...renderSingleTarget(targets[0], confidence));
+    lines.push(...renderSingleTarget(targets[0], confidence, cwd));
   } else {
     lines.push(`Resolved ${targets.length} target(s):`);
     lines.push("");
 
     for (const t of targets) {
+      const relFile = relative(cwd, t.file) || t.file;
       const kind = t.kind ? ` (\`${t.kind}\`)` : "";
       const name = t.name ?? "(unnamed)";
       lines.push(
-        `- \`${t.file}\`:${t.displayLine}:${t.displayCharacter} — **${name}**${kind} — \`${t.targetId}\``,
+        `- \`${relFile}\`:${t.displayLine}:${t.displayCharacter} — **${name}**${kind} — \`${t.targetId}\``,
       );
     }
 
@@ -109,8 +113,9 @@ function renderResolved(
 }
 
 function renderDisambiguation(
-  candidates: DisambiguationCandidateEntry[],
+  candidates: DisambiguationCandidate[],
   omittedCount: number,
+  cwd: string,
 ): string {
   const lines: string[] = [];
 
@@ -120,10 +125,11 @@ function renderDisambiguation(
   lines.push("");
 
   for (const c of candidates) {
+    const relFile = relative(cwd, c.entry.file) || c.file;
     const kind = c.kind ? ` (\`${c.kind}\`)` : "";
     const container = c.container ? ` in \`${c.container}\`` : "";
     lines.push(
-      `${c.rank}. **${c.name}**${kind}${container} — \`${c.file}\`:${c.line}:${c.character}`,
+      `${c.rank}. **${c.name}**${kind}${container} — \`${relFile}\`:${c.line}:${c.character}`,
     );
     lines.push(`   Target ID: \`${c.targetId}\``);
   }

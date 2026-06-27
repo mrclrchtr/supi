@@ -46,7 +46,7 @@ describe("executeAction validation", () => {
   it("rejects line/character without file", async () => {
     const result = await executeAction({ action: "graph", line: 1, character: 1 }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
-    expect(result.content).toContain("require `file`");
+    expect(result.content).toContain("requires `file`");
   });
 
   it("rejects file pointing to directory", async () => {
@@ -60,7 +60,7 @@ describe("executeAction validation", () => {
   it("rejects semantic action without file or symbol", async () => {
     const result = await executeAction({ action: "graph" }, { cwd: tmpDir });
     expect(result.content).toContain("Error");
-    expect(result.content).toContain("requires a target");
+    expect(result.content).toContain("At least one of");
   });
 
   it("rejects find action without query param", async () => {

@@ -1,11 +1,11 @@
 import * as path from "node:path";
-import { generateFocusedBrief, generateProjectBrief } from "../brief.ts";
-import type { ArchitectureModel } from "../model.ts";
-import { findModuleForPath } from "../model.ts";
+import { normalizePath } from "../analysis/search/helpers.ts";
+import type { ArchitectureModel } from "../architecture/model.ts";
+import { findModuleForPath } from "../architecture/model.ts";
 import { renderSymbolBrief } from "../presentation/markdown/brief.ts";
-import { normalizePath } from "../search-helpers.ts";
-import type { TargetResolutionResult } from "../target-resolution.ts";
-import { resolveSymbolTarget } from "../target-resolution.ts";
+import { resolveSymbolTarget } from "../targeting/resolve-symbol.ts";
+import type { TargetOutcome } from "../targeting/types.ts";
+import { generateFocusedBrief, generateProjectBrief } from "./brief.ts";
 import { gatherTreeSitterContext } from "./gather-context.ts";
 import type { BriefDeps, BriefInput, BriefUseCaseResult } from "./types.ts";
 
@@ -166,6 +166,21 @@ async function executeSymbolBrief(
     };
   }
 
+  if (resolved.kind === "group") {
+    return {
+      content: `**Error:** Unexpected group result from symbol resolution for \`${symbol}\`. Use \`code_orientation\` with a file focus.`,
+      details: {
+        confidence: "unavailable",
+        focusTarget: symbol,
+        startHere: [],
+        publicSurfaces: [],
+        dependencySummary: null,
+        omittedCount: 0,
+        nextQueries: ["Use `code_orientation` with `focus` for file or directory orientation"],
+      },
+    };
+  }
+
   const target = resolved.target;
   const relPath = path.relative(deps.cwd, target.file);
 
@@ -226,7 +241,7 @@ function noModelResult(): BriefUseCaseResult {
 
 function formatDisambiguation(
   symbol: string,
-  result: Extract<TargetResolutionResult, { kind: "disambiguation" }>,
+  result: Extract<TargetOutcome, { kind: "disambiguation" }>,
 ): string {
   const lines: string[] = [];
   lines.push(`# Disambiguation needed for \`${symbol}\``);

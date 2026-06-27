@@ -3,6 +3,7 @@
 
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createCodeIntelligenceApp } from "./app/create-code-intelligence-app.ts";
+import { buildArchitectureModel } from "./architecture/model.ts";
 import { evaluateCoverageWarnings, gatherCoverageEvalInput } from "./lsp/coverage-warnings.ts";
 import { registerDiagnosticInjectionHandlers } from "./lsp/diagnostic-injection.ts";
 import { registerLspFooterContribution } from "./lsp/lsp-status-bar.ts";
@@ -11,7 +12,6 @@ import { registerLspSessionLifecycle } from "./lsp/session-lifecycle.ts";
 import { registerLspSettings } from "./lsp/settings.ts";
 import { registerLspAwareToolOverrides } from "./lsp/tool-overrides.ts";
 import { registerWorkspaceRecoveryHandler } from "./lsp/workspace-recovery.ts";
-import { buildArchitectureModel } from "./model.ts";
 import { renderOverview } from "./presentation/markdown/overview.ts";
 import { registerCodeIntelligenceTools } from "./tool/register-tools.ts";
 import {

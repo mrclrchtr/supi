@@ -7,7 +7,6 @@ export type {
   CodePosition,
   CodeResult,
   CodeSymbol,
-  ConfidenceMode,
   ExportData,
   ImportData,
   NodeAtData,
@@ -20,10 +19,10 @@ export type {
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
-import type { EvidenceListMetadata } from "./evidence-list.ts";
-import type { PrioritySignalsSummary } from "./prioritization-signals.ts";
+import type { EvidenceListMetadata } from "./presentation/evidence-list.ts";
+import type { PrioritySignalsSummary } from "./project/prioritization-signals.ts";
+import type { AnchorKind, TargetStoreEntry } from "./session/target-store.ts";
 import type { WorkspaceCodeIntelligenceSession } from "./session/workspace-code-intelligence-session.ts";
-import type { AnchorKind } from "./workflow/target-store.ts";
 
 export type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
 
@@ -60,25 +59,6 @@ export interface AnchoredResolutionMetadata {
   snapped: boolean;
   /** Provider-backed evidence source that identified the target. */
   source: AnchoredResolutionSource;
-}
-
-/**
- * Resolved target metadata exposed in tool `details.data.target` for
- * coordinate and targetId inputs. Mirrors the workflow target-store entry
- * with stable handles plus resolution provenance.
- */
-export interface ResolvedTargetMetadata {
-  targetId: string;
-  spanId: string;
-  file: string;
-  displayLine: number;
-  displayCharacter: number;
-  name: string | null;
-  kind: string | null;
-  anchorKind: AnchorKind;
-  confidence: ConfidenceMode;
-  /** Resolution provenance — present when the target was resolved from anchored coordinates. */
-  resolution?: AnchoredResolutionMetadata;
 }
 
 /** Structured details metadata returned alongside markdown brief content. */
@@ -131,17 +111,8 @@ export interface AffectedDetails {
  */
 export interface ImpactDetails extends AffectedDetails {}
 
-/** Disambiguation candidate for ambiguous symbol resolution. */
-export interface DisambiguationCandidate {
-  name: string;
-  kind: string | null;
-  container: string | null;
-  file: string;
-  line: number;
-  character: number;
-  reason: string;
-  rank: number;
-}
+// Canonical disambiguation candidate — re-exported from targeting/types.ts
+export type { DisambiguationCandidateData as DisambiguationCandidate } from "./targeting/types.ts";
 
 /** Structured details metadata for code_resolve results. */
 export interface ResolveDetails {
@@ -149,9 +120,11 @@ export interface ResolveDetails {
   targetCount: number;
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
+  /** Resolved targets with relative paths (computed from {@link TargetStoreEntry} at detail-build time). */
   targets: Array<{
     targetId: string;
     spanId: string;
+    /** Workspace-relative path. */
     file: string;
     displayLine: number;
     displayCharacter: number;
@@ -163,6 +136,7 @@ export interface ResolveDetails {
     /** Resolution provenance — present when the target was resolved from anchored coordinates. */
     resolution?: AnchoredResolutionMetadata;
   }>;
+  /** Disambiguation candidates from the resolve service. */
   candidates?: Array<{
     targetId: string;
     name: string;
@@ -190,11 +164,12 @@ export interface ContextDetails {
   nextQueries: string[];
   tests?: TestSurfaceDetails;
   /**
-   * Resolved target metadata — populated for both coordinate and targetId
+   * Resolved target store entry — populated for both coordinate and targetId
    * precise-target inputs. Absent for orientation/scope-only calls and for
    * ambiguous coordinate resolution (see `candidates`).
+   * File paths are absolute; compute relative paths at render time.
    */
-  target?: ResolvedTargetMetadata;
+  target?: TargetStoreEntry;
   /**
    * Disambiguation candidates with targetIds — populated only when coordinate
    * resolution was ambiguous. No task sections are rendered in that case.

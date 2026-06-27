@@ -5,7 +5,7 @@
  * class, or abstract method.
  */
 
-import type { ConfidenceMode } from "../../types.ts";
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import { collectImplementations } from "../relations/implementations.ts";
 import type { RelationsServiceDeps } from "../relations/types.ts";
 

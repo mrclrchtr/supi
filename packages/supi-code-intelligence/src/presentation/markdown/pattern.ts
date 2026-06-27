@@ -1,18 +1,18 @@
 // Pattern search markdown renderer — all formatting for literal, regex, and structured search results.
 
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
-import {
-  createEvidenceList,
-  type EvidenceListMetadata,
-  renderEvidenceListDisclosure,
-} from "../../evidence-list.ts";
+import type { RgMatch } from "../../analysis/search/helpers.ts";
+import { groupByFile } from "../../analysis/search/helpers.ts";
 import type {
   StructuredMatch,
   StructuredPatternKind,
   StructuredPatternResult,
-} from "../../pattern-structured.ts";
-import type { RgMatch } from "../../search-helpers.ts";
-import { groupByFile } from "../../search-helpers.ts";
+} from "../../analysis/search/pattern-structured.ts";
+import {
+  createEvidenceList,
+  type EvidenceListMetadata,
+  renderEvidenceListDisclosure,
+} from "../evidence-list.ts";
 
 // ── Structured search formatting ─────────────────────────────────────
 

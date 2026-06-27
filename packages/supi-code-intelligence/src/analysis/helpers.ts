@@ -1,5 +1,5 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import type { ResolvedTarget, ResolvedTargetGroup } from "./target-resolution.ts";
+import type { ResolvedTargetData, ResolvedTargetGroupData } from "../targeting/types.ts";
 
 interface FileLineRef {
   file: string;
@@ -7,8 +7,8 @@ interface FileLineRef {
 }
 
 export function isResolvedTargetGroup(
-  target: ResolvedTarget | ResolvedTargetGroup,
-): target is ResolvedTargetGroup {
+  target: ResolvedTargetData | ResolvedTargetGroupData,
+): target is ResolvedTargetGroupData {
   return "targets" in target;
 }
 

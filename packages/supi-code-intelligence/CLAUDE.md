@@ -13,42 +13,35 @@ Surfaces:
 
 ```text
 src/
-├── code-intelligence.ts    # Extension factory — composition root over all five internal layers
+├── code-intelligence.ts    # Extension factory — composition root over all internal layers
 ├── extension.ts            # Re-exports code-intelligence.ts for pi extension discovery
 ├── index.ts                # Public API exports for programmatic consumers
 ├── api.ts                  # Re-export surface for @mrclrchtr/supi-code-intelligence/api
 ├── types.ts                # Result metadata types (BriefDetails, InspectDetails, ContextDetails, SearchDetails, etc.)
-├── brief.ts                # Public facade for brief/overview helpers (compatibility shim)
-├── brief-focused.ts        # Directory/file/symbol focused brief generation
-├── git-context.ts          # Git branch, dirty files, last commit helpers
-├── model.ts                # Project model builder for auto-injected overviews
-├── target-resolution.ts    # Backward-compat facade over targeting pipeline
-├── search-helpers.ts       # ripgrep wrapper, path normalization, URI helpers
-├── pattern-structured.ts   # Tree-sitter-based structured pattern search
-├── prioritization-signals.ts # Diagnostics, coverage, knip unused signals
-├── semantic-action-helpers.ts # Shared confidence/resolution helpers
+├── architecture/
+│   └── model.ts            # Project model builder for auto-injected overviews
+├── project/
+│   ├── git-context.ts      # Git branch, dirty files, last commit helpers
+│   └── prioritization-signals.ts # Diagnostics, coverage, knip unused signals
 ├── intent/
 │   └── types.ts            # Normalized intent and routing contracts (PlannerRoute, etc.)
-├── targeting/              # Canonical targeting pipeline (normalize-query, resolve-*, types)
-├── use-case/               # Typed orchestration modules (build-overview, generate-*)
+├── targeting/              # Canonical targeting pipeline (resolve-anchored, resolve-file, resolve-symbol, types)
+├── use-case/               # Typed orchestration modules (brief, brief-focused, build-overview, generate-*)
 ├── lsp/                    # LSP lifecycle, diagnostics, settings, tool overrides, workspace recovery
 ├── tree-sitter/            # Tree-sitter session lifecycle (substrate only)
 ├── app/
 │   ├── create-code-intelligence-app.ts  # App composition root — wires pi events
-│   ├── workspace-manager.ts  # Per-cwd workspace session lifecycle
-│   └── workspace-session.ts  # Session-scoped state (overview injection, model cache, adapter refs)
+│   └── workspace-manager.ts  # Per-cwd workspace session lifecycle
+├── session/
+│   ├── workspace-code-intelligence-session.ts  # Per-cwd session facade (ADR 0008)
+│   └── target-store.ts     # Session-scoped target/span handle registry
 ├── analysis/
+│   ├── helpers.ts           # Resolution/dedup helpers (isResolvedTargetGroup, highestConfidence)
 │   ├── context/
 │   │   └── request-context.ts  # Explicit analysis context over shared broker
 │   ├── resolve/
-│   │   └── service.ts          # code_resolve business logic (Phase 1)
-│   ├── routing/
-│   │   └── planner.ts          # Central capability router (canonical)
-│   ├── targeting/
-│   │   ├── types.ts            # Re-exported canonical targeting types
-│   │   ├── normalize-query.ts  # Re-exported query normalization
-│   │   ├── resolve-target.ts   # Unified target resolution facade
-│   │   └── disambiguation.ts   # Disambiguation formatting
+│   │   ├── service.ts          # code_resolve business logic
+│   │   └── resolve-file.ts     # File-only and path-like query resolution
 │   ├── references/             # Semantic reference collection service
 │   │   └── service.ts
 │   ├── calls/                  # Structural outgoing call service
@@ -59,7 +52,11 @@ src/
 │   │   ├── types.ts            # Shared types (CallerEvidence, RelationsServiceDeps)
 │   │   ├── callers.ts          # Semantic caller (reference) collection
 │   │   ├── implementations.ts  # Semantic implementation lookup
-│   │   └── callees.ts          # Structural callee lookup
+│   │   ├── callees.ts          # Structural callee lookup
+│   │   └── tests.ts            # Shared test discovery
+│   ├── search/
+│   │   ├── helpers.ts          # ripgrep wrapper, path normalization, URI helpers
+│   │   └── pattern-structured.ts # Tree-sitter-based structured pattern search
 │   └── refactor/
 │       ├── safety.ts           # Edit validation
 │       ├── apply-workspace-edit.ts # File mutation
@@ -69,25 +66,16 @@ src/
 │   ├── guidance.ts             # Intent-first prompt surfaces from specs
 │   ├── register-tools.ts       # Focused Pi tool registration (iterates over specs)
 │   ├── validation.ts           # Shared parameter validation
-│   ├── target-id-params.ts     # targetId expansion/lookup helpers (Phase 1)
+│   ├── query-params.ts         # Shared CodeQueryParams type
+│   ├── semantic-readiness.ts   # LSP warmup/readiness gating
 │   ├── execute-context.ts      # code_orientation tool executor
 │   ├── execute-inspect.ts      # code_inspect point-inspection executor
 │   ├── execute-graph.ts        # code_graph tool executor (unified relations)
-│   ├── execute-impact.ts       # code_impact tool executor (preferred impact surface)
+│   ├── execute-impact.ts       # code_impact tool executor
 │   ├── execute-find.ts         # code_find tool executor
-│   ├── execute-resolve.ts      # code_resolve tool executor (Phase 1)
-│   ├── execute-refactor.ts     # code_refactor_plan workflow wrapper (Phase 5)
-│   ├── execute-apply.ts        # code_refactor_apply workflow wrapper (Phase 5)
+│   ├── execute-resolve.ts      # code_resolve tool executor
 │   ├── execute-refactor-plan.ts  # preview refactor plan executor
 │   └── execute-refactor-apply.ts # plan application executor
-├── workflow/
-│   ├── names.ts               # Canonical V2 workflow tool names (all active)
-│   ├── ids.ts                 # Planned V2 workflow handle contracts (TargetId, PlanId, etc.)
-│   ├── results.ts             # Shared structured result envelope and provenance types
-│   ├── schemas.ts             # Planned V2 workflow tool parameter schemas
-│   ├── surface.ts             # Canonical V2 tool metadata (all active)
-│   ├── target-store.ts        # Session-scoped target/span handle registry (Phase 1)
-│   └── index.ts               # Internal barrel for workflow skeleton consumers/tests
 ├── presentation/markdown/
 │   ├── overview.ts             # Hidden overview markdown renderer
 │   ├── context.ts              # code_orientation markdown renderer

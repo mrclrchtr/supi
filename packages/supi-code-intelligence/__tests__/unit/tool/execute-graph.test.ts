@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getOrCreateSessionForCwd } from "../../../src/app/create-code-intelligence-app.ts";
-import { registerWorkflowTarget } from "../../../src/workflow/target-store.ts";
+import { registerWorkflowTarget } from "../../../src/session/target-store.ts";
 import type { ActionParams } from "../../helpers/execute-action.ts";
 import { executeAction } from "../../helpers/execute-action.ts";
 import { registerMockProvider } from "../../helpers/register-mock-runtime.ts";
@@ -30,7 +30,7 @@ describe("execute-graph (code_graph tool)", () => {
         cwd: tmpDir,
       });
       expect(result.content).toContain("Error");
-      expect(result.content).toContain("requires a target");
+      expect(result.content).toContain("At least one of");
     });
 
     it("rejects non-existent file", async () => {

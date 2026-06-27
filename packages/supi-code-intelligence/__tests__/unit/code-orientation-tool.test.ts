@@ -322,8 +322,8 @@ describe("code_orientation tool", () => {
     )) as { content: Array<{ text: string }> };
 
     expect(result.content[0].text).toContain("points to a directory");
-    expect(result.content[0].text).toContain("line");
-    expect(result.content[0].text).toContain("character");
+    expect(result.content[0].text).toContain("points to a directory");
+    expect(result.content[0].text).toContain("use `file`");
   });
 
   it("returns a validation error for partial coordinates", async () => {

@@ -2,12 +2,12 @@
 // Existing callers (api.ts, index.ts, code-intelligence.ts) remain compatible.
 
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import { formatGitContext, gatherGitContext } from "./git-context.ts";
-import type { ArchitectureModel } from "./model.ts";
-import { getDependents } from "./model.ts";
-import { renderOverview } from "./presentation/markdown/overview.ts";
-import type { BriefDetails } from "./types.ts";
-import { buildOverviewData } from "./use-case/build-overview.ts";
+import type { ArchitectureModel } from "../architecture/model.ts";
+import { getDependents } from "../architecture/model.ts";
+import { renderOverview } from "../presentation/markdown/overview.ts";
+import { formatGitContext, gatherGitContext } from "../project/git-context.ts";
+import type { BriefDetails } from "../types.ts";
+import { buildOverviewData } from "./build-overview.ts";
 
 // Re-export focused brief generation
 export { generateFocusedBrief } from "./brief-focused.ts";

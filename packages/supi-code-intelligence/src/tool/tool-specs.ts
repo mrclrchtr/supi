@@ -1,7 +1,16 @@
-import { StringEnum } from "@earendil-works/pi-ai";
-import { type TSchema, Type } from "typebox";
-import type { PublicCodeIntelligenceToolName } from "../intent/types.ts";
+import type { TSchema } from "typebox";
+import type { CodeIntelligenceToolName } from "../intent/types.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
+import { executeOrientationTool } from "./execute-context.ts";
+import { executeFindTool } from "./execute-find.ts";
+import { executeGraphTool } from "./execute-graph.ts";
+import { executeHealthTool } from "./execute-health.ts";
+import { executeImpactTool } from "./execute-impact.ts";
+import { executeInspectTool } from "./execute-inspect.ts";
+import { executeRefactorApplyTool } from "./execute-refactor-apply.ts";
+import { executeRefactorPlanTool } from "./execute-refactor-plan.ts";
+import { executeResolveTool } from "./execute-resolve.ts";
+import { emitToolProgress } from "./progress.ts";
 import {
   CodeApplyParameters,
   CodeFindParameters,
@@ -11,93 +20,56 @@ import {
   CodeInspectParameters,
   CodeOrientationParameters,
   CodeRefactorParameters,
-} from "../workflow/schemas.ts";
-import { executeApplyTool } from "./execute-apply.ts";
-import { executeOrientationTool } from "./execute-context.ts";
-import { executeFindTool } from "./execute-find.ts";
-import { executeGraphTool } from "./execute-graph.ts";
-import { executeHealthTool } from "./execute-health.ts";
-import { executeImpactTool } from "./execute-impact.ts";
-import { executeInspectTool } from "./execute-inspect.ts";
-import { executeRefactorTool } from "./execute-refactor.ts";
-import { executeResolveTool } from "./execute-resolve.ts";
+  CodeResolveParameters,
+} from "./schemas.ts";
 
-const _PathParam = Type.String({ description: "Scope path" });
-const FileParam = Type.String({ description: "Target file" });
-const LineParam = Type.Number({ description: "1-based line", minimum: 1 });
-const CharacterParam = Type.Number({ description: "1-based UTF-16 column", minimum: 1 });
-const _SymbolParam = Type.String({ description: "Symbol name" });
-const _PatternParam = Type.String({ description: "Search pattern" });
-const _RegexParam = Type.Boolean({ description: "Regex search" });
-const MaxResultsParam = Type.Number({ description: "Max results" });
-const _ContextLinesParam = Type.Number({ description: "Context lines" });
-const _SummaryParam = Type.Boolean({ description: "Summarize by directory" });
-const _StructuredPatternKindParam = Type.String({
-  description: "Structured kind: definition | export | import | call",
-});
-const _TargetIdParam = Type.String({
-  description:
-    "Resolved target handle from `code_resolve`. Takes precedence over file/line/character/symbol.",
-});
+/** Substrate families that power a tool's implementation. */
+export type ToolSubstrate = "semantic" | "structural" | "search" | "git" | "diagnostics";
 
-const CodeResolveParameters = Type.Object(
-  {
-    query: Type.Optional(Type.String({ description: "Human or code reference to resolve." })),
-    scope: Type.Optional(
-      Type.String({
-        description: "Workspace-relative path, package, or directory scope for the resolve query.",
-      }),
-    ),
-    kind: Type.Optional(
-      StringEnum(
-        [
-          "symbol",
-          "function",
-          "class",
-          "interface",
-          "type",
-          "file",
-          "export",
-          "variable",
-          "method",
-          "const",
-          "enum",
-        ],
-        {
-          description: "Preferred target kind when disambiguating the query.",
-        },
-      ),
-    ),
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
+/** Deployment phase for a tool. */
+export type ToolPhase = "phase-1" | "phase-2" | "phase-3" | "phase-4" | "phase-5" | "phase-6";
 
+/** Canonical spec for one code-intelligence tool — runtime config + design metadata. */
 export interface CodeIntelligenceToolDefinitionSpec {
-  name: PublicCodeIntelligenceToolName;
+  name: CodeIntelligenceToolName;
   label: string;
+  /** Full user-facing tool description shown in the prompt. */
   description: string;
   promptSnippet: string;
   basePromptGuidelines: string[];
   parameters: TSchema;
-  /** Per-spec line-limit override for the adapter's head truncation. Defaults to pi's `DEFAULT_MAX_LINES`. */
+  /** Per-spec line-limit override for the adapter's head truncation. */
   maxLines?: number;
-  /** Per-spec byte-limit override for the adapter's head truncation. Defaults to pi's `DEFAULT_MAX_BYTES`. */
+  /** Per-spec byte-limit override for the adapter's head truncation. */
   maxBytes?: number;
-  /**
-   * When true, oversized truncated output spills to a temp file whose path is
-   * appended to the truncation notice (full output preserved for `read`).
-   * Enabled for heavy-output tools (code_find, code_graph, code_impact).
-   */
+  /** When true, oversized truncated output spills to a temp file. */
   spillToTempFile?: boolean;
   run: (params: unknown, ctx: CodeIntelToolExecCtx) => Promise<CodeIntelResult> | CodeIntelResult;
+
+  // ── Design metadata (formerly workflow/surface.ts) ─────────────────
+
+  /** One-line purpose summary for docs and tests. */
+  purpose?: string;
+  /** Key into CODE_INTELLIGENCE_TOOL_SCHEMAS. */
+  schemaKey?: CodeIntelligenceToolName;
+  /** Concise schema summary for future maintainers. */
+  schemaDocs?: string;
+  /** Legacy tools this tool absorbed (empty for new tools). */
+  absorbsTools?: string[];
+  /** Legacy behaviors this tool absorbed. */
+  absorbsBehaviors?: string[];
+  /** Substrate families that power the implementation. */
+  substrates?: ToolSubstrate[];
+  /** Deployment phase. */
+  phase?: ToolPhase;
+  /** Explicit non-goals — what the tool intentionally does NOT do. */
+  nonGoals?: string[];
 }
 
-// Stubs removed — real executors from execute-refactor-plan.ts and execute-refactor-apply.ts are used below
-
+/**
+ * Canonical code-intelligence tool specs — the single source of truth
+ * for runtime registration, prompt surfaces, design documentation, and tests.
+ */
 export const CODE_INTELLIGENCE_TOOL_SPECS = [
   {
     name: "code_resolve",
@@ -113,6 +85,16 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeResolveParameters,
     run: (params, ctx) =>
       executeResolveTool(params as Parameters<typeof executeResolveTool>[0], ctx),
+    purpose:
+      "Resolve human or code references into precise file/range/symbol targets and stable target handles.",
+    schemaKey: "code_resolve",
+    schemaDocs:
+      "Accepts a query or file-based anchor plus optional scope/kind/maxResults. Later phases validate that line/character require file.",
+    absorbsTools: [],
+    absorbsBehaviors: [],
+    substrates: ["semantic", "search"],
+    phase: "phase-1",
+    nonGoals: ["Target handles do not persist across sessions."],
   },
   {
     name: "code_inspect",
@@ -128,6 +110,19 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeInspectParameters,
     run: (params, ctx) =>
       executeInspectTool(params as Parameters<typeof executeInspectTool>[0], ctx),
+    purpose:
+      "Inspect one precise point in code with best-effort syntax, symbol, hover, definition, diagnostics, and code-action facts.",
+    schemaKey: "code_inspect",
+    schemaDocs:
+      "Requires file, line, and character plus optional maxResults. It is the explicit point-inspection surface; code_orientation handles broader orientation.",
+    absorbsTools: [],
+    absorbsBehaviors: ["anchored orientation inspection"],
+    substrates: ["semantic", "structural", "diagnostics"],
+    phase: "phase-2",
+    nonGoals: [
+      "Does not accept targetId in this first pass; inspection stays point-based.",
+      "Does not apply code actions.",
+    ],
   },
   {
     name: "code_orientation",
@@ -143,6 +138,19 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeOrientationParameters,
     run: (params, ctx) =>
       executeOrientationTool(params as Parameters<typeof executeOrientationTool>[0], ctx),
+    purpose:
+      "Orient around a project, discovered module, directory, file, or precise symbol before choosing surgical follow-up tools.",
+    schemaKey: "code_orientation",
+    schemaDocs:
+      "Accepts optional focus, targetId, line, character, and maxResults. Omitted focus returns workspace orientation; focus is path-first with discovered-module lookup; focus+line+character resolves a symbol; targetId wins over focus/coordinates.",
+    absorbsTools: ["code_brief", "code_context"],
+    absorbsBehaviors: [],
+    substrates: ["semantic", "structural", "diagnostics"],
+    phase: "phase-2",
+    nonGoals: [
+      "Does not provide relation, tests, or impact sections; use code_graph and code_impact.",
+      "Does not resolve bare symbol names; use code_resolve first.",
+    ],
   },
   {
     name: "code_graph",
@@ -160,6 +168,19 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeGraphParameters,
     spillToTempFile: true,
     run: (params, ctx) => executeGraphTool(params as Parameters<typeof executeGraphTool>[0], ctx),
+    purpose:
+      "Show the graph of relationships touching a target, including references, callees, imports, exports, implementations, and tests.",
+    schemaKey: "code_graph",
+    schemaDocs:
+      "Accepts targetId plus relations and maxResults (per-relation result cap). Uses references rather than misleading callers labels.",
+    absorbsTools: ["code_references", "code_calls", "code_implementations"],
+    absorbsBehaviors: [],
+    substrates: ["semantic", "structural", "search"],
+    phase: "phase-3",
+    nonGoals: [
+      "Does not claim true incoming caller support until a real call hierarchy exists.",
+      "Does not collapse unrelated impact or search concerns into the graph surface.",
+    ],
   },
   {
     name: "code_impact",
@@ -174,6 +195,18 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeImpactParameters,
     spillToTempFile: true,
     run: (params, ctx) => executeImpactTool(params as Parameters<typeof executeImpactTool>[0], ctx),
+    purpose:
+      "Estimate blast radius for a target, user-supplied change set, or proposed change description, including likely tests and docs.",
+    schemaKey: "code_impact",
+    schemaDocs:
+      "Accepts targetId, change, or changeSetFiles plus includeTests/maxResults. Runtime validation later requires at least one primary subject.",
+    absorbsTools: [],
+    absorbsBehaviors: [],
+    substrates: ["semantic", "structural", "search", "diagnostics"],
+    phase: "phase-4",
+    nonGoals: [
+      "Does not guarantee perfect downstream impact inference without substrate evidence.",
+    ],
   },
   {
     name: "code_find",
@@ -191,6 +224,19 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeFindParameters,
     spillToTempFile: true,
     run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
+    purpose:
+      "Run unified ranked search across literal text, regex, AST, and semantic modes with one intent-level surface.",
+    schemaKey: "code_find",
+    schemaDocs:
+      "Requires query and supports scope, mode, kind, contextLines, and maxResults. Excludes speculative natural-language mode.",
+    absorbsTools: ["code_pattern"],
+    absorbsBehaviors: [],
+    substrates: ["semantic", "structural", "search"],
+    phase: "phase-2",
+    nonGoals: [
+      "Does not activate natural-language retrieval without a real implementation.",
+      "Removed code_pattern in Phase 2b (TNDM-057XHJ).",
+    ],
   },
   {
     name: "code_refactor_plan",
@@ -204,8 +250,30 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       "code_refactor_plan is a pure planner — it returns a planId. Use code_refactor_apply with that planId to execute.",
     ],
     parameters: CodeRefactorParameters,
-    run: (params, ctx) =>
-      executeRefactorTool(params as Parameters<typeof executeRefactorTool>[0], ctx),
+    run: async (params, ctx) => {
+      emitToolProgress(
+        ctx.onUpdate,
+        `code_refactor_plan: requesting ${(params as Record<string, unknown>).operation} plan from LSP...`,
+      );
+      return executeRefactorPlanTool(
+        params as Parameters<typeof executeRefactorPlanTool>[0],
+        ctx,
+        "code_refactor_plan",
+      );
+    },
+    purpose:
+      "Create precise refactor plans for named operations such as rename and extract refactors.",
+    schemaKey: "code_refactor_plan",
+    schemaDocs:
+      "Uses a scoped operation enum with target/file coordinates, optional selected range, and operation-specific options. This is the only intentional operation-style schema.",
+    absorbsTools: [],
+    absorbsBehaviors: [],
+    substrates: ["semantic", "structural", "search"],
+    phase: "phase-5",
+    nonGoals: [
+      "Does not introduce a broad action mega-tool.",
+      "code_refactor_plan is a pure planner; use code_refactor_apply to execute stored plans.",
+    ],
   },
   {
     name: "code_refactor_apply",
@@ -218,7 +286,20 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
       "Use code_refactor_plan first to obtain a planId, then code_refactor_apply to execute it.",
     ],
     parameters: CodeApplyParameters,
-    run: (params, ctx) => executeApplyTool(params as Parameters<typeof executeApplyTool>[0], ctx),
+    run: (params, ctx) =>
+      executeRefactorApplyTool(params as Parameters<typeof executeRefactorApplyTool>[0], ctx),
+    purpose: "Apply a previously stored plan through explicit, fingerprint-checked mutation.",
+    schemaKey: "code_refactor_apply",
+    schemaDocs:
+      "Requires a planId. Enforces stale-plan rejection, validation, and fingerprint checks before mutation.",
+    absorbsTools: [],
+    absorbsBehaviors: [],
+    substrates: ["semantic", "search", "git"],
+    phase: "phase-5",
+    nonGoals: [
+      "Does not bypass plan validation or fingerprint checks.",
+      "Format/verify modes are not implemented; they return explicit unavailable outcomes when added later.",
+    ],
   },
   {
     name: "code_health",
@@ -233,5 +314,18 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     ],
     parameters: CodeHealthParameters,
     run: (params, ctx) => executeHealthTool(params as Parameters<typeof executeHealthTool>[0], ctx),
+    purpose:
+      "Summarize diagnostics, provider state, dirty workspace signals, and maintenance cues from one workflow-oriented health surface.",
+    schemaKey: "code_health",
+    schemaDocs:
+      "Accepts scope, refresh, include sections, and detail level. It is the planned replacement for direct public diagnostic and recovery substrate access.",
+    absorbsTools: ["lsp_diagnostics", "lsp_recover"],
+    absorbsBehaviors: ["ci-status summary"],
+    substrates: ["semantic", "search", "git", "diagnostics"],
+    phase: "phase-6",
+    nonGoals: [
+      "Public lsp_* and tree_sitter_* tools were removed; only code_* tools remain on the public surface.",
+      "Does not act as a generic verification/test runner.",
+    ],
   },
 ] as const satisfies readonly CodeIntelligenceToolDefinitionSpec[];

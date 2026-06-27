@@ -2,9 +2,9 @@
 
 import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
-import type { ArchitectureModel } from "../model.ts";
+import type { ArchitectureModel } from "../architecture/model.ts";
+import type { AnchorKind } from "../session/target-store.ts";
 import type { BriefDetails, ContextDetails, InspectDetails } from "../types.ts";
-import type { AnchorKind } from "../workflow/target-store.ts";
 
 // ── Overview use-case ────────────────────────────────────────────────
 

@@ -8,7 +8,7 @@ import {
   createEvidenceList,
   type EvidenceListMetadata,
   renderEvidenceListDisclosure,
-} from "../../evidence-list.ts";
+} from "../evidence-list.ts";
 
 export // biome-ignore lint/complexity/useMaxParams: renderer needs target data + depth
 function renderCallsResult(

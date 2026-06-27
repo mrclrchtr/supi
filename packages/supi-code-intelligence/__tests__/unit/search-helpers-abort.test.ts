@@ -2,7 +2,11 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
-import { RipgrepAbortedError, runRipgrep, runRipgrepDetailed } from "../../src/search-helpers.ts";
+import {
+  RipgrepAbortedError,
+  runRipgrep,
+  runRipgrepDetailed,
+} from "../../src/analysis/search/helpers.ts";
 
 function withTmp(fn: (dir: string) => Promise<void>): () => Promise<void> {
   return async () => {

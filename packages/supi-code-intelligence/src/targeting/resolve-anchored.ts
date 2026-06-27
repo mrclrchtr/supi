@@ -16,8 +16,8 @@ import type {
   SemanticProvider,
   StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
+import type { AnchorKind } from "../session/target-store.ts";
 import type { AnchoredResolutionMetadata, AnchoredResolutionSource } from "../types.ts";
-import type { AnchorKind } from "../workflow/target-store.ts";
 import type { DisambiguationCandidateData, ResolvedTargetData, TargetOutcome } from "./types.ts";
 
 /** 1-based symbol anchor position (mirrors the runtime `SymbolAnchor`). */

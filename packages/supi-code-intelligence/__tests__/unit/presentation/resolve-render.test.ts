@@ -1,17 +1,21 @@
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import type {
-  DisambiguationCandidateEntry,
-  ResolvedTargetEntry,
+  DisambiguationCandidate,
   ResolveServiceResult,
 } from "../../../src/analysis/resolve/service.ts";
 import { renderResolveResult } from "../../../src/presentation/markdown/resolve.ts";
+import type { TargetStoreEntry } from "../../../src/session/target-store.ts";
 import type { AnchoredResolutionMetadata } from "../../../src/types.ts";
 
-function resolvedEntry(overrides: Partial<ResolvedTargetEntry> = {}): ResolvedTargetEntry {
+const CWD = "/cwd";
+
+function resolvedEntry(overrides: Partial<TargetStoreEntry> = {}): TargetStoreEntry {
   return {
     targetId: "tg-abc",
     spanId: "sp-abc",
-    file: "src/widget.ts",
+    file: resolve(CWD, "src/widget.ts"),
+    position: { line: 0, character: 16 },
     displayLine: 1,
     displayCharacter: 17,
     name: "widget",
@@ -19,6 +23,9 @@ function resolvedEntry(overrides: Partial<ResolvedTargetEntry> = {}): ResolvedTa
     anchorKind: "name",
     confidence: "semantic",
     provenance: "anchored",
+    fileFingerprint: "abc123",
+    container: null,
+    resolution: undefined,
     ...overrides,
   };
 }
@@ -114,7 +121,8 @@ describe("renderResolveResult — anchored resolution notes", () => {
   });
 
   it("renders disambiguation candidates with targetIds", () => {
-    const candidates: DisambiguationCandidateEntry[] = [
+    const entryBase = resolvedEntry();
+    const candidates: DisambiguationCandidate[] = [
       {
         targetId: "tg-a",
         name: "Widget",
@@ -126,6 +134,7 @@ describe("renderResolveResult — anchored resolution notes", () => {
         reason: "src/a.ts",
         rank: 1,
         anchorKind: "name",
+        entry: { ...entryBase, targetId: "tg-a", file: resolve(CWD, "src/a.ts") },
       },
       {
         targetId: "tg-b",
@@ -138,6 +147,7 @@ describe("renderResolveResult — anchored resolution notes", () => {
         reason: "src/b.ts",
         rank: 2,
         anchorKind: "name",
+        entry: { ...entryBase, targetId: "tg-b", file: resolve(CWD, "src/b.ts") },
       },
     ];
     const result: ResolveServiceResult = {

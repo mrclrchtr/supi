@@ -173,19 +173,25 @@ describe("code_find tool", () => {
 
     it.each([
       "namespace",
-    ] as const)("returns error text when ast mode uses unsupported kind %s", async (kind) => {
+    ] as const)("passes unknown kind through to provider when TypeBox is bypassed", async (kind) => {
+      // TypeBox schema validation (via pi's registerTool) enforces the kind
+      // enum. When called directly (bypassing TypeBox), the invalid kind
+      // is forwarded to the provider layer rather than rejected by the executor.
       writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
       const tool = getCodeFindTool();
 
-      const result = (await tool.execute(
-        `test-ast-unsupported-${kind}`,
-        { query: "foo", mode: "ast", kind },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult;
-
-      expect(result.content[0].text).toContain("unsupported AST kind");
+      // The invalid kind passes through since TypeBox handles enum validation.
+      // Without a tree-sitter provider, the AST executor throws.
+      // In real usage via pi, the throw is caught and surfaced as a tool error.
+      await expect(
+        tool.execute(
+          `test-ast-unsupported-${kind}`,
+          { query: "foo", mode: "ast", kind },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        ),
+      ).rejects.toThrow("unavailable");
     });
   });
 

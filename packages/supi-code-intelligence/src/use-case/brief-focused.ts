@@ -5,17 +5,17 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
-import { formatGitContext, gatherGitContext } from "./git-context.ts";
-import type { ArchitectureModel } from "./model.ts";
-import { findModuleForPath, getDependencies, getDependents } from "./model.ts";
-import { renderFileBrief, renderModuleDiagnostics } from "./presentation/markdown/brief.ts";
+import type { ArchitectureModel } from "../architecture/model.ts";
+import { findModuleForPath, getDependencies, getDependents } from "../architecture/model.ts";
+import { renderFileBrief, renderModuleDiagnostics } from "../presentation/markdown/brief.ts";
+import { formatGitContext, gatherGitContext } from "../project/git-context.ts";
 import {
   appendPrioritySignalsSection,
   summarizePrioritySignalsForFiles,
-} from "./prioritization-signals.ts";
-import type { BriefDetails } from "./types.ts";
-import { gatherBriefEnrichment } from "./use-case/brief-enrich.ts";
-import type { BriefOpts } from "./use-case/brief-models.ts";
+} from "../project/prioritization-signals.ts";
+import type { BriefDetails } from "../types.ts";
+import { gatherBriefEnrichment } from "./brief-enrich.ts";
+import type { BriefOpts } from "./brief-models.ts";
 
 /**
  * Generate a focused brief for a specific path (directory or file).

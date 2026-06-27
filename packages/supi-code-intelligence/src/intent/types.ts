@@ -7,38 +7,19 @@
 
 /** Canonical code-intelligence tool names. */
 export const CODE_INTELLIGENCE_TOOL_NAMES = [
+  "code_resolve",
   "code_inspect",
   "code_orientation",
-  "code_impact",
   "code_find",
   "code_graph",
-  "code_health",
+  "code_impact",
   "code_refactor_plan",
   "code_refactor_apply",
-  "code_resolve",
+  "code_health",
 ] as const;
+
+/** Canonical code-intelligence tool name. */
 export type CodeIntelligenceToolName = (typeof CODE_INTELLIGENCE_TOOL_NAMES)[number];
-
-/** Public/model-facing tool names registered on the extension surface. */
-export const PUBLIC_CODE_INTELLIGENCE_TOOL_NAMES = [
-  "code_inspect",
-  "code_orientation",
-  "code_impact",
-  "code_find",
-  "code_graph",
-  "code_health",
-  "code_refactor_plan",
-  "code_refactor_apply",
-  "code_resolve",
-] as const;
-export type PublicCodeIntelligenceToolName = (typeof PUBLIC_CODE_INTELLIGENCE_TOOL_NAMES)[number];
-
-/**
- * Relation kind names — no longer used in the high-level code_* surface.
- * Kept for legacy compatibility in substrate routing code.
- */
-export const CODE_RELATION_KIND_NAMES = ["callers", "callees", "implementations"] as const;
-export type CodeRelationsKind = (typeof CODE_RELATION_KIND_NAMES)[number];
 
 /**
  * A route describes how the planner recommends handling a tool intent.
@@ -58,14 +39,4 @@ export interface PlannerRoute {
    * - `unavailable`: no capability can satisfy this intent
    */
   preferred: "semantic" | "structural" | "search" | "unavailable";
-}
-
-/**
- * A resolved intents for a tool execution request.
- * Provides the normalized target and routing info together.
- */
-export interface ResolvedIntent {
-  tool: CodeIntelligenceToolName;
-  relationsKind?: CodeRelationsKind;
-  route: PlannerRoute;
 }

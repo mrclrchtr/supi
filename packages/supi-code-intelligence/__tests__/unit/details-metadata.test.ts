@@ -4,9 +4,9 @@ import * as path from "node:path";
 import { buildArchitectureModel } from "@mrclrchtr/supi-code-intelligence/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { executeOrientationTool } from "../../src/tool/execute-context.ts";
+import { generateFocusedBrief, generateProjectBrief } from "../../src/use-case/brief.ts";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
 import { executeAction, makeTestCtx } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
@@ -404,7 +404,7 @@ describe("structured details via tool adapters and action routers", () => {
           { action: "graph", relations: ["callees"] },
           { cwd: tmpDir },
         );
-        expect(result.content).toContain("requires a target");
+        expect(result.content).toContain("At least one of");
         expect(result.details).toBeDefined();
         expect(result.details?.type).toBe("search");
       });

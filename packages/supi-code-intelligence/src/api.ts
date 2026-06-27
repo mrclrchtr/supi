@@ -25,32 +25,35 @@ export type {
 // Code provider — reads capabilities from the shared workspace runtime.
 export type { CodeProvider, CodeProviderState } from "./analysis/context/request-context.ts";
 export { getCodeProvider } from "./analysis/context/request-context.ts";
-export { generateFocusedBrief, generateOverview, generateProjectBrief } from "./brief.ts";
+export { normalizePath } from "./analysis/search/helpers.ts";
 // Architecture model hosted locally in supi-code-intelligence.
 export type {
   ArchitectureModel,
   DependencyEdge,
   ModuleInfo,
-} from "./model.ts";
+} from "./architecture/model.ts";
 export {
   buildArchitectureModel,
   findModuleForPath,
   getDependencies,
   getDependents,
-} from "./model.ts";
-export type { ResolvedTarget, TargetResolutionResult } from "./target-resolution.ts";
-export {
-  normalizePath,
-  resolveSymbolTarget,
-  toZeroBased,
-} from "./target-resolution.ts";
+} from "./architecture/model.ts";
+export type {
+  ResolvedTargetData,
+  ResolvedTargetGroupData,
+  TargetOutcome,
+} from "./targeting/types.ts";
 // Code-intelligence-specific types (not shared with the runtime)
 export type {
   AffectedDetails,
   BriefDetails,
   CodeIntelResult,
+  ContextDetails,
   DisambiguationCandidate,
+  HealthDetails,
+  ImpactDetails,
   InspectDetails,
+  ResolveDetails,
   SearchDetails,
   TestSurfaceDetails,
 } from "./types.ts";

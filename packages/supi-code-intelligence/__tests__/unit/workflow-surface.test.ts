@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
-  WORKFLOW_CODE_TOOL_NAMES,
-  WORKFLOW_CODE_TOOL_SCHEMAS,
-  WORKFLOW_CODE_TOOL_SPECS,
-} from "../../src/workflow/index.ts";
+import { CODE_INTELLIGENCE_TOOL_NAMES } from "../../src/intent/types.ts";
+import { CODE_INTELLIGENCE_TOOL_SCHEMAS } from "../../src/tool/schemas.ts";
+import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../src/tool/tool-specs.ts";
 
 type SchemaCandidate = {
   enum?: unknown;
@@ -76,29 +74,29 @@ const EXPECTED_WORKFLOW_TOOL_NAMES = [
   "code_health",
 ] as const;
 
-describe("workflow surface skeleton", () => {
-  it("defines the approved V2 workflow tool names exactly", () => {
-    expect(WORKFLOW_CODE_TOOL_NAMES).toEqual(EXPECTED_WORKFLOW_TOOL_NAMES);
+describe("code intelligence tool specs", () => {
+  it("defines the approved code intelligence tool names exactly", () => {
+    expect(CODE_INTELLIGENCE_TOOL_NAMES).toEqual(EXPECTED_WORKFLOW_TOOL_NAMES);
   });
 
-  it("keeps planned workflow tool names free of lsp_ and tree_sitter_ prefixes", () => {
+  it("keeps planned tool names free of lsp_ and tree_sitter_ prefixes", () => {
     const disallowedPrefixes = ["lsp_", "tree_sitter_"] as const;
-    for (const name of WORKFLOW_CODE_TOOL_NAMES) {
+    for (const name of CODE_INTELLIGENCE_TOOL_NAMES) {
       expect(disallowedPrefixes.some((prefix) => name.startsWith(prefix))).toBe(false);
     }
   });
 
   it("documents every planned tool with purpose, schema docs, absorbed tools/behaviors, phase, and non-goals", () => {
-    expect(WORKFLOW_CODE_TOOL_SPECS).toHaveLength(WORKFLOW_CODE_TOOL_NAMES.length);
+    expect(CODE_INTELLIGENCE_TOOL_SPECS).toHaveLength(CODE_INTELLIGENCE_TOOL_NAMES.length);
 
-    const specNames = WORKFLOW_CODE_TOOL_SPECS.map((spec) => spec.name);
-    expect(new Set(specNames).size).toBe(WORKFLOW_CODE_TOOL_NAMES.length);
-    expect([...specNames].sort()).toEqual([...WORKFLOW_CODE_TOOL_NAMES].sort());
-    expect(Object.keys(WORKFLOW_CODE_TOOL_SCHEMAS).sort()).toEqual(
-      [...WORKFLOW_CODE_TOOL_NAMES].sort(),
+    const specNames = CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => spec.name);
+    expect(new Set(specNames).size).toBe(CODE_INTELLIGENCE_TOOL_NAMES.length);
+    expect([...specNames].sort()).toEqual([...CODE_INTELLIGENCE_TOOL_NAMES].sort());
+    expect(Object.keys(CODE_INTELLIGENCE_TOOL_SCHEMAS).sort()).toEqual(
+      [...CODE_INTELLIGENCE_TOOL_NAMES].sort(),
     );
 
-    for (const spec of WORKFLOW_CODE_TOOL_SPECS) {
+    for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
       expect(spec.purpose.trim().length).toBeGreaterThan(0);
       expect(spec.schemaDocs.trim().length).toBeGreaterThan(0);
       expect(spec.phase.trim().length).toBeGreaterThan(0);
@@ -106,12 +104,12 @@ describe("workflow surface skeleton", () => {
       expect(Array.isArray(spec.absorbsBehaviors)).toBe(true);
       expect(Array.isArray(spec.nonGoals)).toBe(true);
       expect(spec.nonGoals.length).toBeGreaterThan(0);
-      expect(Object.hasOwn(WORKFLOW_CODE_TOOL_SCHEMAS, spec.schemaKey)).toBe(true);
+      expect(Object.hasOwn(CODE_INTELLIGENCE_TOOL_SCHEMAS, spec.schemaKey)).toBe(true);
     }
   });
 
   it("avoids a broad action parameter and reserves operation for code_refactor_plan only", () => {
-    for (const [name, schema] of Object.entries(WORKFLOW_CODE_TOOL_SCHEMAS)) {
+    for (const [name, schema] of Object.entries(CODE_INTELLIGENCE_TOOL_SCHEMAS)) {
       const properties = (schema as { properties?: Record<string, unknown> }).properties ?? {};
       expect(properties).not.toHaveProperty("action");
       if (name === "code_refactor_plan") {
@@ -123,7 +121,7 @@ describe("workflow surface skeleton", () => {
   });
 
   it("defines code_graph relations without a misleading callers label", () => {
-    const graphSchema = WORKFLOW_CODE_TOOL_SCHEMAS.code_graph as {
+    const graphSchema = CODE_INTELLIGENCE_TOOL_SCHEMAS.code_graph as {
       properties?: Record<string, unknown>;
     };
     const relationsSchema = graphSchema.properties?.relations;
@@ -144,7 +142,7 @@ describe("workflow surface skeleton", () => {
   });
 
   it("defines code_find modes without a speculative natural-language mode", () => {
-    const findSchema = WORKFLOW_CODE_TOOL_SCHEMAS.code_find as {
+    const findSchema = CODE_INTELLIGENCE_TOOL_SCHEMAS.code_find as {
       properties?: Record<string, unknown>;
     };
     const modeSchema = findSchema.properties?.mode;

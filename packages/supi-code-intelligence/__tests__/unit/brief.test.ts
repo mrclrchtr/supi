@@ -6,7 +6,11 @@ import { buildArchitectureModel } from "@mrclrchtr/supi-code-intelligence/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { getCodeProvider } from "../../src/analysis/context/request-context.ts";
-import { generateFocusedBrief, generateOverview, generateProjectBrief } from "../../src/brief.ts";
+import {
+  generateFocusedBrief,
+  generateOverview,
+  generateProjectBrief,
+} from "../../src/use-case/brief.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;

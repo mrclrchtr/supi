@@ -6,19 +6,19 @@
  */
 
 import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
-import { normalizePath } from "../../search-helpers.ts";
-import { resolveAnchoredSymbolTarget } from "../../targeting/resolve-anchored.ts";
-import { resolveFileTargetGroup as resolveFile } from "../../targeting/resolve-file.ts";
-import { resolveSymbolTarget as resolveSymbol } from "../../targeting/resolve-symbol.ts";
+import { normalizePath } from "../analysis/search/helpers.ts";
+import { normalizeQuery, type QueryInput } from "./query.ts";
+import { resolveAnchoredSymbolTarget } from "./resolve-anchored.ts";
+import { resolveFileTargetGroup as resolveFile } from "./resolve-file.ts";
+import { resolveSymbolTarget as resolveSymbol } from "./resolve-symbol.ts";
 import type {
   NormalizedQuery,
   ResolvedTargetData,
   ResolvedTargetGroupData,
   TargetOutcome,
-} from "../../targeting/types.ts";
-import { normalizeQuery, type QueryInput } from "./normalize-query.ts";
+} from "./types.ts";
 
-export type { QueryInput } from "./normalize-query.ts";
+export type { QueryInput } from "./query.ts";
 
 /**
  * Resolve a target from action params through one canonical path.

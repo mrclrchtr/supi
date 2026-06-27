@@ -6,14 +6,14 @@ import type {
   ConfidenceMode,
   SemanticProvider as SemanticSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
+import { dedupeFileLineRefs, highestConfidence } from "../../analysis/helpers.ts";
+import { filterOutDeclaration, isInProjectPath, uriToFile } from "../../analysis/search/helpers.ts";
 import {
   createEvidenceList,
   type EvidenceListMetadata,
   renderEvidenceListDisclosure,
-} from "../../evidence-list.ts";
-import { filterOutDeclaration, isInProjectPath, uriToFile } from "../../search-helpers.ts";
-import { dedupeFileLineRefs, highestConfidence } from "../../semantic-action-helpers.ts";
-import type { ResolvedTarget } from "../../target-resolution.ts";
+} from "../../presentation/evidence-list.ts";
+import type { ResolvedTargetData } from "../../targeting/types.ts";
 
 export interface FileLineRef {
   file: string;
@@ -31,7 +31,7 @@ export interface ReferenceCollection {
  * and partitioning project vs external (node_modules/out-of-tree) references.
  */
 export async function collectReferences(
-  target: ResolvedTarget,
+  target: { file: string; position: { line: number; character: number } },
   cwd: string,
   semantic: SemanticSubstrate,
 ): Promise<ReferenceCollection> {
@@ -65,8 +65,8 @@ export async function collectReferences(
  * Deduplicates refs by file:line, merges confidence, and sums external counts.
  */
 export async function aggregatePerTarget<T extends ReferenceCollection>(
-  targets: ResolvedTarget[],
-  collectFn: (target: ResolvedTarget) => Promise<T>,
+  targets: ResolvedTargetData[],
+  collectFn: (target: ResolvedTargetData) => Promise<T>,
 ): Promise<ReferenceCollection> {
   if (targets.length === 0) {
     return { refs: [], confidence: "unavailable", externalCount: 0 };

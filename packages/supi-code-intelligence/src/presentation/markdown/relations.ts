@@ -1,13 +1,13 @@
 // Relations markdown renderer — consumes use-case data and produces markdown content.
 
 import type { TestSurfaceDetails } from "../../analysis/relations/tests.ts";
+import type { ReferenceCollection } from "../../use-case/support/semantic-references.ts";
+import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
 import {
   createEvidenceList,
   type EvidenceListMetadata,
   renderEvidenceListDisclosure,
-} from "../../evidence-list.ts";
-import type { ReferenceCollection } from "../../use-case/support/semantic-references.ts";
-import { formatReferenceList } from "../../use-case/support/semantic-references.ts";
+} from "../evidence-list.ts";
 import { type ReadNextItem, renderReadNextSection } from "./read-next.ts";
 
 // ── Callers ──────────────────────────────────────────────────────────

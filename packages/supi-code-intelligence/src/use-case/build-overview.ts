@@ -1,7 +1,7 @@
 // Typed overview data builder from ArchitectureModel.
 
-import { formatGitContext, gatherGitContext } from "../git-context.ts";
-import type { ArchitectureModel } from "../model.ts";
+import type { ArchitectureModel } from "../architecture/model.ts";
+import { formatGitContext, gatherGitContext } from "../project/git-context.ts";
 import type { OverviewData, OverviewModule } from "./types.ts";
 
 /**

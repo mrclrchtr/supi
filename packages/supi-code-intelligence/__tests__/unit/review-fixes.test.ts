@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { buildArchitectureModel, getDependents } from "@mrclrchtr/supi-code-intelligence/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runRipgrep } from "../../src/search-helpers.ts";
+import { runRipgrep } from "../../src/analysis/search/helpers.ts";
 import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeAction, makeTestCtx } from "../helpers/execute-action.ts";

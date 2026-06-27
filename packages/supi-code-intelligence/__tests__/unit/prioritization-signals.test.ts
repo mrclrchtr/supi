@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { summarizePrioritySignalsForFiles } from "../../src/prioritization-signals.ts";
+import { summarizePrioritySignalsForFiles } from "../../src/project/prioritization-signals.ts";
 
 let tmpDir: string;
 

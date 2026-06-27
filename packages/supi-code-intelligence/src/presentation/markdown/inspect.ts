@@ -2,7 +2,7 @@ import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import {
   type EvidenceListMetadata,
   renderEvidenceListMetadataDisclosure,
-} from "../../evidence-list.ts";
+} from "../evidence-list.ts";
 
 export interface InspectRenderInput {
   relPath: string;

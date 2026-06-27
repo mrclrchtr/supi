@@ -1,6 +1,6 @@
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveTarget } from "../../../src/analysis/targeting/resolve-target.ts";
+import { resolveTarget } from "../../../src/targeting/resolve-target.ts";
 
 /**
  * Resolve-target tests for the new analysis/targeting/resolve-target.ts.

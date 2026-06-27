@@ -13,7 +13,7 @@ import {
   getWorkflowTarget,
   registerWorkflowTarget,
   type TargetStoreEntry,
-} from "../../src/workflow/target-store.ts";
+} from "../../src/session/target-store.ts";
 
 let tmpDir: string;
 

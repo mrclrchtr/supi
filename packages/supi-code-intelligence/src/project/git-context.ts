@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createEvidenceList, renderEvidenceListDisclosure } from "./evidence-list.ts";
+import { createEvidenceList, renderEvidenceListDisclosure } from "../presentation/evidence-list.ts";
 
 function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next = { ...env };
