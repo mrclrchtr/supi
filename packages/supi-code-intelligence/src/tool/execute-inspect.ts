@@ -1,4 +1,3 @@
-import { getCodeProvider } from "../analysis/context/request-context.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { executeInspect } from "../use-case/generate-inspect.ts";
 import { unavailableInspectDetails } from "./details-helpers.ts";
@@ -48,7 +47,7 @@ export async function executeInspectTool(
   // Let unavailable pass through — the use-case layer handles missing
   // providers with explicit unavailable-section notes.
 
-  const providerState = getCodeProvider(ctx.cwd);
+  const providerState = ctx.session.getProviders();
   const provider = providerState.kind === "ready" ? providerState.provider : null;
   const lspService =
     providerState.kind === "ready"

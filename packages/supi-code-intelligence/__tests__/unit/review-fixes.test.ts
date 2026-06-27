@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runRipgrep } from "../../src/search-helpers.ts";
 import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
-import { executeAction } from "../helpers/execute-action.ts";
+import { executeAction, makeTestCtx } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -94,7 +94,7 @@ describe("transitive downstream impact", () => {
       ],
     });
 
-    const result = await executeImpactTool({ symbol: "shared" }, { cwd: tmpDir });
+    const result = await executeImpactTool({ symbol: "shared" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("Impact");
     expect(result.content).toContain("downstream");
@@ -193,7 +193,7 @@ describe("focused-tool follow-up regressions", () => {
 
     const result = await executeOrientationTool(
       { focus: "src/widget.ts", line: 1, character: 17 },
-      { cwd: tmpDir },
+      makeTestCtx(tmpDir),
     );
 
     expect(result.content).toContain("src/widget.ts");
@@ -219,7 +219,7 @@ describe("focused-tool follow-up regressions", () => {
 
     const result = await executeImpactTool(
       { file: "src/widget.ts", line: 1, character: 1 },
-      { cwd: tmpDir },
+      makeTestCtx(tmpDir),
     );
 
     expect(result.content).not.toContain('symbol: "symbol at src/widget.ts:1"');
@@ -328,7 +328,7 @@ describe("unified focus validation across target modes", () => {
     mkdirSync(srcDir, { recursive: true });
     writeFileSync(path.join(srcDir, "widget.ts"), "export function Widget() {\n  return 1;\n}\n");
 
-    const result = await executeOrientationTool({ line: 1, character: 17 }, { cwd: tmpDir });
+    const result = await executeOrientationTool({ line: 1, character: 17 }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("**Error:**");
     expect(result.content).toContain("focus");
@@ -338,7 +338,7 @@ describe("unified focus validation across target modes", () => {
   it("surfaces a focus-path error in orientation mode", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
 
-    const result = await executeOrientationTool({ focus: "nope/" }, { cwd: tmpDir });
+    const result = await executeOrientationTool({ focus: "nope/" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("**Error:**");
     expect(result.content).toContain("nope");

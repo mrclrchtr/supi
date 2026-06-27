@@ -5,22 +5,22 @@
  * once per cwd and reused until explicitly released or shut down.
  *
  * Does NOT own the shared capability broker in @mrclrchtr/supi-code-runtime
- * — sessions coordinate local state around that broker.
+ * — sessions read from it.
  */
 
-import { createWorkspaceSession, type WorkspaceSession } from "./workspace-session.ts";
+import { WorkspaceCodeIntelligenceSession } from "../session/workspace-code-intelligence-session.ts";
 
 /**
  * Manages per-cwd workspace session instances.
  */
 export class WorkspaceManager {
   /** Active sessions keyed by cwd. */
-  readonly #sessions = new Map<string, WorkspaceSession>();
+  readonly #sessions = new Map<string, WorkspaceCodeIntelligenceSession>();
 
   /**
    * Get the session for a cwd, or undefined if none exists.
    */
-  getSession(cwd: string): WorkspaceSession | undefined {
+  getSession(cwd: string): WorkspaceCodeIntelligenceSession | undefined {
     return this.#sessions.get(cwd);
   }
 
@@ -28,10 +28,10 @@ export class WorkspaceManager {
    * Get or create a session for the given cwd.
    * Returns the existing session if one already exists for this cwd.
    */
-  getOrCreateSession(cwd: string): WorkspaceSession {
+  getOrCreateSession(cwd: string): WorkspaceCodeIntelligenceSession {
     let session = this.#sessions.get(cwd);
     if (!session) {
-      session = createWorkspaceSession(cwd);
+      session = new WorkspaceCodeIntelligenceSession(cwd);
       this.#sessions.set(cwd, session);
     }
     return session;
@@ -59,7 +59,7 @@ export class WorkspaceManager {
   }
 
   /** Iterate over all active sessions. */
-  allSessions(): IterableIterator<WorkspaceSession> {
+  allSessions(): IterableIterator<WorkspaceCodeIntelligenceSession> {
     return this.#sessions.values();
   }
 }

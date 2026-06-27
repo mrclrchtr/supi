@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
+import { getOrCreateSessionForCwd } from "../app/create-code-intelligence-app.ts";
 import { renderContextCall, renderContextResult } from "../presentation/tui/context.ts";
 import { renderFindCall, renderFindResult } from "../presentation/tui/find.ts";
 import { renderGraphCall, renderGraphResult } from "../presentation/tui/graph.ts";
@@ -93,10 +94,12 @@ export function registerCodeIntelligenceTools(
       parameters: spec.parameters,
       // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
       execute: async (_toolCallId, params, signal, onUpdate, ctx: ExtensionContext) => {
+        const session = getOrCreateSessionForCwd(ctx.cwd);
         const { content, details } = await spec.run(params, {
           cwd: ctx.cwd,
           signal,
           onUpdate,
+          session,
         });
         const { text, truncated } = truncateToolContent(content, {
           maxLines: spec.maxLines,

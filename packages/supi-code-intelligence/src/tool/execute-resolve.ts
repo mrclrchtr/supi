@@ -67,7 +67,7 @@ export async function executeResolveTool(
     }
   }
 
-  const result = await executeResolveService({ ...params, scope: resolvedScope }, ctx.cwd);
+  const result = await executeResolveService({ ...params, scope: resolvedScope }, ctx.session);
 
   let content = renderResolveResult(result, ctx.cwd);
 

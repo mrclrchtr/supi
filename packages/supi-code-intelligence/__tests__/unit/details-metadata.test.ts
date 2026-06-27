@@ -8,7 +8,7 @@ import { generateFocusedBrief, generateProjectBrief } from "../../src/brief.ts";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executePatternAction } from "../../src/use-case/generate-pattern.ts";
-import { executeAction } from "../helpers/execute-action.ts";
+import { executeAction, makeTestCtx } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -178,7 +178,7 @@ describe("focused brief details metadata", () => {
 describe("structured details via tool adapters and action routers", () => {
   it("returns project-level orientation details when called without a target", async () => {
     setupWorkspace();
-    const result = await executeOrientationTool({}, { cwd: tmpDir });
+    const result = await executeOrientationTool({}, makeTestCtx(tmpDir));
     expect(result.content).toContain("Project Brief");
     expect(result.details).toBeDefined();
     expect(result.details?.type).toBe("context");
@@ -244,7 +244,7 @@ describe("structured details via tool adapters and action routers", () => {
 
   describe("brief action — no-result detail states", () => {
     it("returns details for no project model", async () => {
-      const result = await executeOrientationTool({}, { cwd: tmpDir });
+      const result = await executeOrientationTool({}, makeTestCtx(tmpDir));
       expect(result.details).toBeDefined();
       expect(result.details?.type).toBe("context");
       if (result.details?.type === "context") {

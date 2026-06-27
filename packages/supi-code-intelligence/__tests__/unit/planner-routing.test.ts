@@ -149,10 +149,14 @@ describe("Planner routing", () => {
       timeout: 5000,
     }, async () => {
       registerStructural();
+      const { getOrCreateSessionForCwd } = await import(
+        "../../src/app/create-code-intelligence-app.ts"
+      );
       const { executeImpactTool } = await import("../../src/tool/execute-impact.ts");
+      const session = getOrCreateSessionForCwd("/project");
       const result = await executeImpactTool(
         { file: "src/index.ts", line: 1, character: 1 },
-        { cwd: "/project" },
+        { cwd: "/project", session },
       );
       expect(result.content).toContain("No semantic analysis provider is available");
     });

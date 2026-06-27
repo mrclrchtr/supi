@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeOrientationTool } from "../../src/tool/execute-context.ts";
+import { makeTestCtx } from "../helpers/execute-action.ts";
 
 let tmpDir: string;
 
@@ -28,7 +29,7 @@ describe("directory brief enrichment", () => {
     writeFile("src/routes/home.tsx", "export default () => {};");
     writeFile("docs/readme.md", "# Docs");
 
-    const result = await executeOrientationTool({ focus: "." }, { cwd: tmpDir });
+    const result = await executeOrientationTool({ focus: "." }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("TypeScript: 2");
     expect(result.content).toContain("TSX: 1");
@@ -44,7 +45,7 @@ describe("directory brief enrichment", () => {
     writeFile("packages/app/src/main.ts", "export default function main() {}");
     writeFile("packages/app/src/routes/home.ts", "export const home = 1;");
 
-    const result = await executeOrientationTool({ focus: "packages/app" }, { cwd: tmpDir });
+    const result = await executeOrientationTool({ focus: "packages/app" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("TypeScript: 2");
     expect(result.content).toContain("JSON: 1");
@@ -59,7 +60,7 @@ describe("directory brief enrichment", () => {
     writeFile("packages/app/src/lib/util.ts", "export const util = 1;");
     writeFile("packages/app/src/lib/more.ts", "export const more = 2;");
 
-    const result = await executeOrientationTool({ focus: "packages/app/src" }, { cwd: tmpDir });
+    const result = await executeOrientationTool({ focus: "packages/app/src" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("TypeScript: 3");
   });
@@ -67,7 +68,7 @@ describe("directory brief enrichment", () => {
   it("handles file paths gracefully", async () => {
     writeFile("src/index.ts", "export const x = 1;");
 
-    const result = await executeOrientationTool({ focus: "src/index.ts" }, { cwd: tmpDir });
+    const result = await executeOrientationTool({ focus: "src/index.ts" }, makeTestCtx(tmpDir));
 
     expect(result.content).not.toContain("code_map");
     expect(result.content).toContain("index.ts");

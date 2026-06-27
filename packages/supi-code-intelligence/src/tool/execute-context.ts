@@ -2,7 +2,6 @@
 import { existsSync, statSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import type { CodeProvider } from "../analysis/context/request-context.ts";
-import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { executeResolveService } from "../analysis/resolve/service.ts";
 import { type ArchitectureModel, buildArchitectureModel } from "../model.ts";
 import { normalizePath } from "../search-helpers.ts";
@@ -17,7 +16,6 @@ import { executeContext } from "../use-case/generate-context.ts";
 import type { ContextDeps as UseCaseContextDeps } from "../use-case/types.ts";
 import { unavailableContextDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
-import { expandTargetId } from "./target-id-params.ts";
 
 export interface CodeOrientationToolParams {
   /** Workspace-relative path or discovered module name for orientation. */
@@ -127,7 +125,7 @@ async function resolveTargetIdTarget(
   ctx: CodeIntelToolExecCtx,
   hasCoords: boolean,
 ): Promise<CodeIntelResult | null> {
-  const expansion = expandTargetId(params, ctx.cwd);
+  const expansion = ctx.session.expandTargetId(params);
   if (expansion.kind === "error") {
     return {
       content: expansion.message,
@@ -178,7 +176,7 @@ async function resolveCoordinateTarget(
 
   const resolveResult = await executeResolveService(
     { file: params.focus, line: params.line, character: params.character },
-    ctx.cwd,
+    ctx.session,
   );
 
   if (resolveResult.kind === "error") {
@@ -257,7 +255,7 @@ async function prepareContextDeps(
   const readinessResult = await gateSemanticReadiness(params, ctx.cwd);
   if (readinessResult) return readinessResult;
 
-  const providerState = getCodeProvider(ctx.cwd);
+  const providerState = ctx.session.getProviders();
   const provider: CodeProvider | null =
     providerState.kind === "ready" ? providerState.provider : null;
   const lspService =

@@ -22,6 +22,7 @@ import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
 import type { EvidenceListMetadata } from "./evidence-list.ts";
 import type { PrioritySignalsSummary } from "./prioritization-signals.ts";
+import type { WorkspaceCodeIntelligenceSession } from "./session/workspace-code-intelligence-session.ts";
 import type { AnchorKind } from "./workflow/target-store.ts";
 
 export type { TestSurfaceDetails } from "./analysis/relations/tests.ts";
@@ -241,6 +242,11 @@ export interface HealthDetails {
  * it destructures only `cwd` and ignores the rest) and keep compiling; all
  * current executors use this full type, and long-running ones forward `signal`
  * to subprocesses / emit coarse `onUpdate` beats.
+ *
+ * The `session` property carries the per-workspace
+ * `WorkspaceCodeIntelligenceSession` facade (ADR 0008) for centralized
+ * provider access, target resolution, and plan management. Executors
+ * must prefer `ctx.session` over `getOrCreateSessionForCwd()`.
  */
 export interface CodeIntelToolExecCtx {
   cwd: string;
@@ -248,6 +254,18 @@ export interface CodeIntelToolExecCtx {
   signal?: AbortSignal;
   /** Progress callback; long-running executors emit coarse beats, not chatty ones. */
   onUpdate?: AgentToolUpdateCallback;
+  /**
+   * Per-workspace code-intelligence session facade.
+   *
+   * Provides centralized access to:
+   * - Provider state: {@link WorkspaceCodeIntelligenceSession.getProviders}
+   * - Target resolution: {@link WorkspaceCodeIntelligenceSession.expandTargetId}
+   * - Plan management: {@link WorkspaceCodeIntelligenceSession.storePlan}
+   *
+   * Present on every execution. Executors that need it should destructure
+   * `{ cwd, session }` from their ctx parameter.
+   */
+  session: WorkspaceCodeIntelligenceSession;
 }
 
 /** Tool result shape returned by executeAction. */

@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
+import { makeTestCtx } from "../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -937,7 +938,7 @@ describe("code_resolve targetId follow-up", () => {
     expect(targetId).toBeDefined();
     if (!targetId) return;
 
-    const impactResult = await executeImpactTool({ targetId }, { cwd: tmpDir });
+    const impactResult = await executeImpactTool({ targetId }, makeTestCtx(tmpDir));
 
     // targetId was expanded; no "Error" prefix
     expect(impactResult.content).not.toContain("**Error");
@@ -982,7 +983,10 @@ describe("code_resolve targetId follow-up", () => {
     // provider lacks refactor support) and throws — not a targetId error,
     // which would return text instead of rejecting.
     await expect(
-      executeRefactorPlanTool({ targetId, operation: "rename", newName: "bar" }, { cwd: tmpDir }),
+      executeRefactorPlanTool(
+        { targetId, operation: "rename", newName: "bar" },
+        makeTestCtx(tmpDir),
+      ),
     ).rejects.toThrow(/provider/i);
   });
 });

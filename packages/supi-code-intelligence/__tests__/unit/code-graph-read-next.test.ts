@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getOrCreateSessionForCwd } from "../../src/app/create-code-intelligence-app.ts";
 import { executeGraphTool } from "../../src/tool/execute-graph.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
@@ -44,7 +45,7 @@ describe("code_graph read-next guidance", () => {
 
     const result = await executeGraphTool(
       { file: "index.ts", line: 1, character: 17, relations: ["references", "callees"] },
-      { cwd: tmpDir },
+      { cwd: tmpDir, session: getOrCreateSessionForCwd(tmpDir) },
     );
 
     expect(result.content).toContain("## Read Next");

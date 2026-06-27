@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
-import { executeAction } from "../helpers/execute-action.ts";
+import { executeAction, makeTestCtx } from "../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -28,7 +28,7 @@ describe("references action without heuristic fallback", () => {
   it("throws when symbol discovery lacks any provider (no heuristic fallback)", async () => {
     // No provider registered — whole-tool capability-unavailable → execute() throws.
     await expect(
-      executeAction({ action: "graph", symbol: "myFunc" }, { cwd: tmpDir }),
+      executeAction({ action: "graph", symbol: "myFunc" }, makeTestCtx(tmpDir)),
     ).rejects.toThrow("No analysis provider is available");
   });
 
@@ -81,7 +81,7 @@ describe("references action without heuristic fallback", () => {
       references: async () => [],
     });
 
-    const result = await executeAction({ action: "graph", symbol: "target" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "graph", symbol: "target" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("0 references");
     expect(result.content).not.toContain("heuristic");
@@ -168,7 +168,7 @@ describe("implementations action without heuristic fallback", () => {
 
 describe("impact action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    const result = await executeImpactTool({ symbol: "Widget" }, { cwd: tmpDir });
+    const result = await executeImpactTool({ symbol: "Widget" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("No semantic analysis provider is available");
     expect(result.content).not.toContain("heuristic");
@@ -194,7 +194,7 @@ describe("impact action without heuristic fallback", () => {
       references: async () => [],
     });
 
-    const result = await executeImpactTool({ symbol: "Widget" }, { cwd: tmpDir });
+    const result = await executeImpactTool({ symbol: "Widget" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("(semantic)");
     expect(result.content).not.toContain("heuristic");

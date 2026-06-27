@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { getOrCreateSessionForCwd } from "../../src/app/create-code-intelligence-app.ts";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { findLikelyTests } from "../../src/use-case/generate-impact.ts";
@@ -91,7 +92,10 @@ describe("code_impact tool", () => {
     codeIntelligenceExtension(pi as never);
 
     const targetId = await resolveTargetId(pi);
-    const impactResult = await executeImpactTool({ targetId }, { cwd: tmpDir });
+    const impactResult = await executeImpactTool(
+      { targetId },
+      { cwd: tmpDir, session: getOrCreateSessionForCwd(tmpDir) },
+    );
     expect(impactResult.content).toContain("Impact");
 
     const impactTool = getTool(pi, "code_impact");

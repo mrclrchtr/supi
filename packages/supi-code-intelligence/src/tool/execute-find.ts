@@ -8,9 +8,8 @@
  * - semantic: LSP workspace symbols
  */
 
-import { type CodeSymbol, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
-import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { createEvidenceList, renderEvidenceListDisclosure } from "../evidence-list.ts";
 import { resolveScope } from "../search-helpers.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx, SearchDetails } from "../types.ts";
@@ -138,7 +137,7 @@ async function executeTextMode(
       maxResults: params.maxResults ?? 8,
       contextLines: params.contextLines ?? 1,
     },
-    { cwd: ctx.cwd, provider: getEffectiveProvider(ctx.cwd), signal: ctx.signal },
+    { cwd: ctx.cwd, provider: ctx.session.getProvider(), signal: ctx.signal },
   );
 }
 
@@ -157,7 +156,7 @@ async function executeRegexMode(
       maxResults: params.maxResults ?? 8,
       contextLines: params.contextLines ?? 1,
     },
-    { cwd: ctx.cwd, provider: getEffectiveProvider(ctx.cwd), signal: ctx.signal },
+    { cwd: ctx.cwd, provider: ctx.session.getProvider(), signal: ctx.signal },
   );
 }
 
@@ -167,7 +166,11 @@ async function executeAstMode(
   scopePath: string,
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
-  ensureStructuralAvailable(ctx.cwd);
+  if (!ctx.session.getStructuralProvider()) {
+    throw new Error(
+      "code_find AST search is unavailable because no structural/tree-sitter provider is active for this workspace.",
+    );
+  }
 
   return executePattern(
     {
@@ -177,7 +180,7 @@ async function executeAstMode(
       maxResults: params.maxResults ?? 8,
       contextLines: params.contextLines ?? 1,
     },
-    { cwd: ctx.cwd, provider: getEffectiveProvider(ctx.cwd), signal: ctx.signal },
+    { cwd: ctx.cwd, provider: ctx.session.getProvider(), signal: ctx.signal },
   );
 }
 
@@ -188,7 +191,11 @@ async function executeSemanticMode(
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   const cwd = ctx.cwd;
-  ensureSemanticAvailable(cwd);
+  if (!ctx.session.getSemanticProvider()) {
+    throw new Error(
+      "code_find semantic search is unavailable because no semantic/LSP provider is active for this workspace.",
+    );
+  }
 
   const readiness = await ensureSemanticReadiness(cwd, { kind: "workspace" });
   if (readiness.kind === "timeout") {
@@ -208,7 +215,7 @@ async function executeSemanticMode(
     };
   }
 
-  const providerState = getCodeProvider(cwd);
+  const providerState = ctx.session.getProviders();
   if (providerState.kind !== "ready") {
     throw new Error(
       "code_find semantic search is unavailable because no semantic/LSP provider is active for this workspace.",
@@ -253,34 +260,6 @@ function validateModeKindCombination(
 
 function filterSymbolsByScope<T extends { file: string }>(symbols: T[], scopePath: string): T[] {
   return symbols.filter((symbol) => isWithinOrEqual(scopePath, symbol.file));
-}
-
-function getEffectiveProvider(cwd: string) {
-  const state = getCodeProvider(cwd);
-  return state.kind === "ready" ? state.provider : null;
-}
-
-function ensureSemanticAvailable(cwd: string): void {
-  const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
-  const available =
-    (workspace.semantic.state.kind === "ready" || workspace.semantic.state.kind === "pending") &&
-    workspace.semantic.provider !== null;
-  if (!available) {
-    throw new Error(
-      "code_find semantic search is unavailable because no semantic/LSP provider is active for this workspace.",
-    );
-  }
-}
-
-function ensureStructuralAvailable(cwd: string): void {
-  const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
-  const available =
-    workspace.structural.state.kind === "ready" && workspace.structural.provider !== null;
-  if (!available) {
-    throw new Error(
-      "code_find AST search is unavailable because no structural/tree-sitter provider is active for this workspace.",
-    );
-  }
 }
 
 function renderSemanticEmptyResult(

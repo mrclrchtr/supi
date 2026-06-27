@@ -5,25 +5,22 @@
  * code_impact, code_refactor_plan)
  * accept optional targetId that takes precedence over raw
  * file/line/character/symbol.
+ *
+ * @deprecated Prefer calling `ctx.session.expandTargetId(params)` directly
+ * inside tool executors. These standalone functions are kept for
+ * transitional code paths and tests that don't have a session ref.
  */
 
 import { getOrCreateSessionForCwd } from "../app/create-code-intelligence-app.ts";
+import type { WorkspaceCodeIntelligenceSession } from "../session/workspace-code-intelligence-session.ts";
+import {
+  expandSessionTargetId,
+  type TargetIdExpansionResult,
+} from "../session/workspace-code-intelligence-session.ts";
 import type { TargetStoreEntry } from "../workflow/target-store.ts";
-import { getWorkflowTarget } from "../workflow/target-store.ts";
 
-/** Result of attempting to expand a targetId into tool params. */
-export type TargetIdExpansionResult =
-  | {
-      kind: "ok";
-      file: string;
-      line: number;
-      character: number;
-      targetName: string | null;
-      targetKind: string | null;
-      entry: TargetStoreEntry;
-    }
-  | { kind: "not-provided" }
-  | { kind: "error"; message: string };
+// Re-export for backward compatibility with callers that haven't migrated yet
+export type { TargetIdExpansionResult } from "../session/workspace-code-intelligence-session.ts";
 
 export type TargetIdLookupResult =
   | { kind: "ok"; entry: TargetStoreEntry }
@@ -33,20 +30,7 @@ export type TargetIdLookupResult =
 /**
  * Expand an optional targetId into anchored file/line/character params.
  *
- * Usage at the top of each target-oriented executor:
- *
- * ```ts
- * const expansion = expandTargetId(params, ctx.cwd);
- * if (expansion.kind === "error") return { content: expansion.message, ... };
- * if (expansion.kind === "ok") {
- *   params.file = expansion.file;
- *   params.line = expansion.line;
- *   params.character = expansion.character;
- * }
- * ```
- *
- * The expansion checks the workflow target store for a matching entry.
- * Unknown or stale target IDs return an explicit error message.
+ * @deprecated Use `ctx.session.expandTargetId(params)` instead.
  */
 export function expandTargetId(
   params: {
@@ -58,32 +42,42 @@ export function expandTargetId(
   },
   cwd: string,
 ): TargetIdExpansionResult {
-  const lookup = lookupTargetId(params, cwd);
-  if (lookup.kind !== "ok") return lookup;
-
-  const { entry } = lookup;
-  return {
-    kind: "ok",
-    file: entry.file,
-    line: entry.displayLine,
-    character: entry.displayCharacter,
-    targetName: entry.name,
-    targetKind: entry.kind,
-    entry,
-  };
+  const session = getOrCreateSessionForCwd(cwd);
+  return expandSessionTargetId(session, params);
 }
 
+/**
+ * Look up a targetId in the session-scoped store.
+ *
+ * @deprecated Use `ctx.session.lookupTargetEntry(targetId)` instead.
+ */
 export function lookupTargetId(params: { targetId?: string }, cwd: string): TargetIdLookupResult {
   if (params.targetId === undefined || params.targetId === null) {
     return { kind: "not-provided" };
   }
 
   const session = getOrCreateSessionForCwd(cwd);
-
-  const result = getWorkflowTarget(session.workflowTargets, params.targetId);
+  const result = session.lookupTargetEntry(params.targetId);
   if (result.kind === "unavailable") {
     return { kind: "error", message: `**Error:** ${result.reason}` };
   }
 
   return { kind: "ok", entry: result.entry };
+}
+
+/**
+ * Expanded version of expandTargetId that accepts a session directly.
+ * Use this when you already hold a session reference.
+ */
+export function expandTargetIdWithSession(
+  session: WorkspaceCodeIntelligenceSession,
+  params: {
+    targetId?: string;
+    file?: string;
+    line?: number;
+    character?: number;
+    symbol?: string;
+  },
+): TargetIdExpansionResult {
+  return expandSessionTargetId(session, params);
 }

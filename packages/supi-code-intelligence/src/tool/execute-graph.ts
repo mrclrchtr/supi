@@ -10,7 +10,7 @@
 
 import type { CallsResult } from "../analysis/calls/service.ts";
 import { collectOutgoingCalls } from "../analysis/calls/service.ts";
-import { type CodeProvider, getCodeProvider } from "../analysis/context/request-context.ts";
+import type { CodeProvider } from "../analysis/context/request-context.ts";
 import {
   collectServiceImplementations,
   type ImplementationsResult,
@@ -38,7 +38,6 @@ import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import type { AnchorKind } from "../workflow/target-store.ts";
 import { emitToolProgress } from "./progress.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
-import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 /** Relation kinds accepted by code_graph — re-exported from relations renderer. */
@@ -65,8 +64,8 @@ export async function executeGraphTool(
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
   emitToolProgress(ctx.onUpdate, "code_graph: resolving target...");
-  // ── 1. Expand targetId ──────────────────────────────────────────────
-  const expansion = expandTargetId(params, ctx.cwd);
+  // ── 1. Expand targetId via session ───────────────────────────────────
+  const expansion = ctx.session.expandTargetId(params);
   const expandedTargetName = expansion.kind === "ok" ? expansion.targetName : null;
   const expandedAnchorKind = expansion.kind === "ok" ? expansion.entry.anchorKind : null;
   if (expansion.kind === "error") {
@@ -139,7 +138,7 @@ export async function executeGraphTool(
     );
   }
 
-  const providerState = getCodeProvider(ctx.cwd);
+  const providerState = ctx.session.getProviders();
   const provider = providerState.kind === "ready" ? providerState.provider : null;
 
   // ── 5. Resolve target once (skip for file-level-only relations) ─────

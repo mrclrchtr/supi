@@ -8,6 +8,7 @@ import {
 } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it } from "vitest";
+import { getOrCreateSessionForCwd } from "../../src/app/create-code-intelligence-app.ts";
 import codeIntelligenceExtension from "../../src/code-intelligence.ts";
 import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
@@ -354,7 +355,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
         character: 1,
         newName: "newName",
       },
-      { cwd: projectDir },
+      { cwd: projectDir, session: getOrCreateSessionForCwd(projectDir) },
     );
 
     const applyTool = getTool(pi, "code_refactor_apply");
@@ -410,7 +411,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
 
     const applyResult = await executeRefactorApplyTool(
       { planId: extractPlanId(planResult.content[0].text) },
-      { cwd: projectDir },
+      { cwd: projectDir, session: getOrCreateSessionForCwd(projectDir) },
     );
 
     expect(applyResult.content).toContain("applied");

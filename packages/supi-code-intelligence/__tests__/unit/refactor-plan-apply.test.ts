@@ -9,7 +9,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
 import { executeResolveTool } from "../../src/tool/execute-resolve.ts";
-import { type ActionParams, executeAction } from "../helpers/execute-action.ts";
+import { type ActionParams, executeAction, makeTestCtx } from "../helpers/execute-action.ts";
 
 let tmpDir: string | null = null;
 
@@ -368,7 +368,7 @@ describe("code_refactor_plan anchor enforcement (ADR 0003)", () => {
     // Step 1: resolve -> get a targetId whose anchor is the declaration.
     const resolveResult = await executeResolveTool(
       { query: "oldName", kind: "function" },
-      { cwd: projectDir },
+      makeTestCtx(projectDir),
     );
     const targetId =
       resolveResult.details?.type === "resolve"
@@ -380,7 +380,7 @@ describe("code_refactor_plan anchor enforcement (ADR 0003)", () => {
     // Step 2: refactor_plan with that targetId must refuse, not plan.
     const result = await executeRefactorPlanTool(
       { operation: "rename_symbol", targetId, newName: "newName" },
-      { cwd: projectDir },
+      makeTestCtx(projectDir),
     );
 
     expect(result.content).toContain("name anchor");

@@ -7,8 +7,8 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { WorkspaceCodeIntelligenceSession } from "../session/workspace-code-intelligence-session.ts";
 import { WorkspaceManager } from "./workspace-manager.ts";
-import { createWorkspaceSession, type WorkspaceSession } from "./workspace-session.ts";
 
 /**
  * The code-intelligence app object.
@@ -25,9 +25,9 @@ import { createWorkspaceSession, type WorkspaceSession } from "./workspace-sessi
  */
 export interface CodeIntelligenceApp {
   /** Get a session by cwd, or undefined. */
-  getSession(cwd: string): WorkspaceSession | undefined;
+  getSession(cwd: string): WorkspaceCodeIntelligenceSession | undefined;
   /** Get or create a session for the given cwd. */
-  createSession(cwd: string): WorkspaceSession;
+  createSession(cwd: string): WorkspaceCodeIntelligenceSession;
   /** Release a session for the given cwd. */
   releaseSession(cwd: string): void;
   /** Release all sessions. */
@@ -37,7 +37,7 @@ export interface CodeIntelligenceApp {
 let appInstance: CodeIntelligenceApp | null = null;
 
 /** Standalone session cache — used when the app is not initialized (e.g., unit tests). */
-const standaloneSessions = new Map<string, WorkspaceSession>();
+const standaloneSessions = new Map<string, WorkspaceCodeIntelligenceSession>();
 
 /**
  * Get a workspace session for the given cwd.
@@ -46,15 +46,19 @@ const standaloneSessions = new Map<string, WorkspaceSession>();
  * standalone session for ad-hoc use (e.g., unit tests). Standalone sessions
  * are reused across calls for the same cwd so that targets registered by
  * one tool call are visible to subsequent tool calls.
+ *
+ * Prefer using the session from `CodeIntelToolExecCtx.session` inside
+ * tool executors. This function exists for the transition phase and for
+ * code paths that run outside a tool execution context.
  */
-export function getOrCreateSessionForCwd(cwd: string): WorkspaceSession {
+export function getOrCreateSessionForCwd(cwd: string): WorkspaceCodeIntelligenceSession {
   const session = appInstance?.getSession(cwd);
   if (session) return session;
 
   // Standalone mode — cache per cwd so cross-tool state (targetIds, plans) persists
   let standalone = standaloneSessions.get(cwd);
   if (!standalone) {
-    standalone = createWorkspaceSession(cwd);
+    standalone = new WorkspaceCodeIntelligenceSession(cwd);
     standaloneSessions.set(cwd, standalone);
   }
   return standalone;
@@ -101,34 +105,31 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
   pi.on("session_shutdown", () => {
     // Clear per-session stores before releasing sessions
     for (const session of manager.allSessions()) {
-      session.refactorPlans.clear();
-      session.workflowTargets.clear();
+      session.clearStores();
     }
     manager.shutdown();
   });
 
   const app: CodeIntelligenceApp = {
-    getSession(cwd: string): WorkspaceSession | undefined {
+    getSession(cwd: string): WorkspaceCodeIntelligenceSession | undefined {
       return manager.getSession(cwd);
     },
 
-    createSession(cwd: string): WorkspaceSession {
+    createSession(cwd: string): WorkspaceCodeIntelligenceSession {
       return manager.getOrCreateSession(cwd);
     },
 
     releaseSession(cwd: string): void {
       const session = manager.getSession(cwd);
       if (session) {
-        session.refactorPlans.clear();
-        session.workflowTargets.clear();
+        session.clearStores();
       }
       manager.releaseSession(cwd);
     },
 
     shutdown(): void {
       for (const session of manager.allSessions()) {
-        session.refactorPlans.clear();
-        session.workflowTargets.clear();
+        session.clearStores();
       }
       manager.shutdown();
     },

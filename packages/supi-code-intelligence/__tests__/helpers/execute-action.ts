@@ -1,3 +1,4 @@
+import { getOrCreateSessionForCwd } from "../../src/app/create-code-intelligence-app.ts";
 import { executeApplyTool } from "../../src/tool/execute-apply.ts";
 import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executeFindTool } from "../../src/tool/execute-find.ts";
@@ -7,7 +8,7 @@ import { executeImpactTool } from "../../src/tool/execute-impact.ts";
 import { executeRefactorTool } from "../../src/tool/execute-refactor.ts";
 import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
-import type { CodeIntelResult } from "../../src/types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../src/types.ts";
 
 export type TestAction =
   | "graph"
@@ -58,6 +59,26 @@ const SUPPORTED_ACTIONS = [
 ] as const satisfies readonly TestAction[];
 
 /**
+ * Build a full CodeIntelToolExecCtx from a minimal cwd-only context.
+ *
+ * Uses the shared `getOrCreateSessionForCwd` cache so targets registered
+ * via `getOrCreateSessionForCwd` in test setup are visible to tool executors.
+ */
+function buildCtx(ctx: { cwd: string }): CodeIntelToolExecCtx {
+  const session = getOrCreateSessionForCwd(ctx.cwd);
+  return { cwd: ctx.cwd, session };
+}
+
+/**
+ * Build a CodeIntelToolExecCtx from a cwd string for direct executor calls.
+ * Used in tests that call executors without going through `executeAction`.
+ */
+export function makeTestCtx(cwd: string): CodeIntelToolExecCtx {
+  const session = getOrCreateSessionForCwd(cwd);
+  return { cwd, session };
+}
+
+/**
  * Test-only legacy action shim that routes old action-shaped fixtures through the
  * current focused-tool adapters.
  */
@@ -74,6 +95,7 @@ export async function executeAction(
   }
 
   const rest = stripAction(params);
+  const fullCtx = buildCtx(ctx);
 
   switch (action) {
     case "context":
@@ -85,10 +107,10 @@ export async function executeAction(
           character: rest.character,
           maxResults: rest.maxResults,
         },
-        ctx,
+        fullCtx,
       );
     case "impact":
-      return executeImpactTool(rest, ctx);
+      return executeImpactTool(rest, fullCtx);
     case "graph":
       return executeGraphTool(
         {
@@ -101,7 +123,7 @@ export async function executeAction(
           relations: rest.relations as GraphRelation[] | undefined,
           maxResults: rest.maxResults,
         },
-        ctx,
+        fullCtx,
       );
     case "find":
       return executeFindTool(
@@ -121,16 +143,22 @@ export async function executeAction(
           maxResults: rest.maxResults,
           contextLines: rest.contextLines,
         } as Parameters<typeof executeFindTool>[0],
-        ctx,
+        fullCtx,
       );
     case "refactor":
-      return executeRefactorTool(rest as Parameters<typeof executeRefactorTool>[0], ctx);
+      return executeRefactorTool(rest as Parameters<typeof executeRefactorTool>[0], fullCtx);
     case "apply":
-      return executeApplyTool(rest as Parameters<typeof executeApplyTool>[0], ctx);
+      return executeApplyTool(rest as Parameters<typeof executeApplyTool>[0], fullCtx);
     case "refactor_plan":
-      return executeRefactorPlanTool(rest as Parameters<typeof executeRefactorPlanTool>[0], ctx);
+      return executeRefactorPlanTool(
+        rest as Parameters<typeof executeRefactorPlanTool>[0],
+        fullCtx,
+      );
     case "refactor_apply":
-      return executeRefactorApplyTool(rest as Parameters<typeof executeRefactorApplyTool>[0], ctx);
+      return executeRefactorApplyTool(
+        rest as Parameters<typeof executeRefactorApplyTool>[0],
+        fullCtx,
+      );
     default:
       return {
         content: `**Error:** Unknown action \`${action satisfies never}\`.`,

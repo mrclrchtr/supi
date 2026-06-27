@@ -38,6 +38,14 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
   registerWorkspaceRecoveryHandler(pi, lspState);
   registerTsSessionLifecycle(pi, tsState);
 
+  // ── Attach controller refs to sessions on startup (ADR 0008) ──────
+  pi.on("session_start", (_event, ctx) => {
+    const session = app.getSession(ctx.cwd);
+    if (!session) return;
+    if (lspState.controller) session.lspController = lspState.controller;
+    if (tsState.controller) session.tsController = tsState.controller;
+  });
+
   // ── Tool registration ─────────────────────────────────────────────
   registerCodeIntelligenceTools(pi);
 
@@ -54,7 +62,7 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
       if (!session) return;
 
       const report = evaluateCoverageWarnings(
-        gatherCoverageEvalInput(ctx.cwd, lspState.controller),
+        gatherCoverageEvalInput(ctx.cwd, session.lspController),
       );
       const pending = session.coverageWarningState.getPendingWarnings(report);
       if (pending.length === 0) return;

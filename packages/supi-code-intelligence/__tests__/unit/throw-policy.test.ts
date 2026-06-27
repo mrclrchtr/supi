@@ -7,6 +7,7 @@ import { executeGraphTool } from "../../src/tool/execute-graph.ts";
 import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
 import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
 import { executeResolveTool } from "../../src/tool/execute-resolve.ts";
+import { makeTestCtx } from "../helpers/execute-action.ts";
 import { clearMockRuntime } from "../helpers/register-mock-runtime.ts";
 
 describe("throw policy: whole-tool-unavailable throws, invalid usage returns text", () => {
@@ -25,13 +26,13 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
   // ── Whole-tool capability-unavailable → execute() throws ─────────────
 
   it("code_graph throws when no analysis provider is available", async () => {
-    await expect(executeGraphTool({ symbol: "foo" }, { cwd: tmpDir })).rejects.toThrow(
+    await expect(executeGraphTool({ symbol: "foo" }, makeTestCtx(tmpDir))).rejects.toThrow(
       "No analysis provider is available",
     );
   });
 
   it("code_resolve throws for query mode when no semantic provider is active", async () => {
-    await expect(executeResolveTool({ query: "foo" }, { cwd: tmpDir })).rejects.toThrow(
+    await expect(executeResolveTool({ query: "foo" }, makeTestCtx(tmpDir))).rejects.toThrow(
       /provider/i,
     );
   });
@@ -40,7 +41,7 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
     await expect(
       executeRefactorPlanTool(
         { operation: "rename_symbol", file: "a.ts", line: 1, character: 1, newName: "bar" },
-        { cwd: tmpDir },
+        makeTestCtx(tmpDir),
       ),
     ).rejects.toThrow(/provider/i);
   });
@@ -48,17 +49,17 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
   // ── Self-correctable invalid usage → returns error text (no throw) ────
 
   it("code_graph returns text (not throw) for a missing target", async () => {
-    const result = await executeGraphTool({}, { cwd: tmpDir });
+    const result = await executeGraphTool({}, makeTestCtx(tmpDir));
     expect(result.content).toContain("requires a target");
   });
 
   it("code_find returns text (not throw) for an empty query", async () => {
-    const result = await executeFindTool({ query: "" }, { cwd: tmpDir });
+    const result = await executeFindTool({ query: "" }, makeTestCtx(tmpDir));
     expect(result.content).toContain("requires a non-empty");
   });
 
   it("code_refactor_apply returns text (not throw) for a missing planId", async () => {
-    const result = await executeRefactorApplyTool({ planId: "" }, { cwd: tmpDir });
+    const result = await executeRefactorApplyTool({ planId: "" }, makeTestCtx(tmpDir));
     expect(result.content).toContain("`planId` is required");
   });
 });

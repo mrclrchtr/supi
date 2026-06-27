@@ -4,9 +4,8 @@
  */
 
 import { applyWorkspaceEdit } from "../analysis/refactor/apply-workspace-edit.ts";
-import { getPlan, isPlanFresh, removePlan } from "../analysis/refactor/plan-store.ts";
+import { isPlanFresh } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
-import { getOrCreateSessionForCwd } from "../app/create-code-intelligence-app.ts";
 import { renderRefactorApplyResult } from "../presentation/markdown/refactor.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { unavailableSearchDetails } from "./details-helpers.ts";
@@ -26,11 +25,8 @@ export async function executeRefactorApplyTool(
     };
   }
 
-  // Get the session-scoped plan store
-  const session = getOrCreateSessionForCwd(_ctx.cwd);
-
-  // Find the plan
-  const plan = getPlan(session.refactorPlans, params.planId);
+  // Find the plan in the session-scoped store
+  const plan = _ctx.session.getPlan(params.planId);
   if (!plan) {
     return {
       content: `**Error:** Plan "${params.planId}" not found. The plan may have expired or was generated in a different session. Use code_refactor_plan to generate a new plan.`,
@@ -59,7 +55,7 @@ export async function executeRefactorApplyTool(
   // Apply
   const applyResult = await applyWorkspaceEdit(plan.edits);
   if (applyResult.kind === "applied") {
-    removePlan(session.refactorPlans, plan.id);
+    _ctx.session.removePlan(plan.id);
   }
 
   const content = renderRefactorApplyResult(applyResult, plan);

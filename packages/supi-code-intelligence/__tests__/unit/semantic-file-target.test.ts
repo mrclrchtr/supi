@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
-import { executeAction } from "../helpers/execute-action.ts";
+import { executeAction, makeTestCtx } from "../helpers/execute-action.ts";
 import { registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -182,7 +182,7 @@ describe("file-level semantic targets", () => {
 
     const result = await executeImpactTool(
       { file: "index.ts", line: 1, character: 14 },
-      { cwd: tmpDir },
+      makeTestCtx(tmpDir),
     );
 
     expect(result.content).toContain("Impact");
@@ -242,7 +242,7 @@ describe("file-level semantic targets", () => {
 
     const result = await executeImpactTool(
       { file: "index.ts", line: 1, character: 14, maxResults: 1 },
-      { cwd: tmpDir },
+      makeTestCtx(tmpDir),
     );
 
     expect(result.details?.type).toBe("impact");

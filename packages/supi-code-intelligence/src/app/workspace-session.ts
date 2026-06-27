@@ -1,56 +1,32 @@
 /**
  * Workspace session state for supi-code-intelligence.
  *
- * Each cwd gets exactly one session instance. The session owns:
- * - overview-injection state (hasInjectedOverview)
- * - refactor plan storage (refactorPlans)
- * - workflow target storage (workflowTargets)
- * - coverage warning state (coverageWarningState)
+ * This module re-exports the `WorkspaceCodeIntelligenceSession` class
+ * from the new session facade (ADR 0008). Backward-compatible aliases
+ * are provided for phased migration.
  *
- * The session does NOT own the shared capability broker in
- * @mrclrchtr/supi-code-runtime — that remains the canonical broker.
- * This session coordinates local state *around* it.
+ * Prefer importing from `../session/workspace-code-intelligence-session.ts`
+ * directly in new code.
  */
 
-import type { RefactorPlan } from "../analysis/refactor/plan-store.ts";
-import { CoverageWarningState } from "../lsp/coverage-warnings.ts";
-import type { TargetStoreEntry } from "../workflow/target-store.ts";
+import { WorkspaceCodeIntelligenceSession } from "../session/workspace-code-intelligence-session.ts";
+
+// ── Backward-compatible aliases ───────────────────────────────────────
 
 /**
- * Per-cwd session-scoped app state.
- *
- * Coordinates local session state around the shared `supi-code-runtime` broker.
- * Does NOT replace or duplicate the broker.
+ * @deprecated Use `WorkspaceCodeIntelligenceSession` from
+ * `../session/workspace-code-intelligence-session.ts` instead.
  */
-export interface WorkspaceSession {
-  /** Canonical workspace directory for this session. */
-  readonly cwd: string;
-
-  /** Whether the hidden architecture overview has been injected. */
-  hasInjectedOverview: boolean;
-
-  /** Session-scoped refactor plan storage (planId → plan). */
-  readonly refactorPlans: Map<string, RefactorPlan>;
-
-  /** Session-scoped workflow target storage (targetId → entry). */
-  readonly workflowTargets: Map<string, TargetStoreEntry>;
-
-  /**
-   * Coverage warning state for deduplication and grace-period timing.
-   * Evaluated after session startup to avoid transient pending noise.
-   */
-  coverageWarningState: CoverageWarningState;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-interface -- deprecation alias
+export type WorkspaceSession = WorkspaceCodeIntelligenceSession;
 
 /**
- * Create a new workspace session for the given cwd.
+ * @deprecated Use `new WorkspaceCodeIntelligenceSession(cwd)` directly.
+ * Retained for backward-compatible import during phased migration.
  */
-export function createWorkspaceSession(cwd: string): WorkspaceSession {
-  return {
-    cwd,
-    hasInjectedOverview: false,
-    refactorPlans: new Map(),
-    workflowTargets: new Map(),
-    coverageWarningState: new CoverageWarningState(),
-  };
+export function createWorkspaceSession(cwd: string): WorkspaceCodeIntelligenceSession {
+  return new WorkspaceCodeIntelligenceSession(cwd);
 }
+
+// Re-export the class itself so existing imports from `./workspace-session.ts` keep working
+export { WorkspaceCodeIntelligenceSession } from "../session/workspace-code-intelligence-session.ts";

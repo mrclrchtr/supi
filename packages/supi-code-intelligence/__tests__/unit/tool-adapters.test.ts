@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { executeOrientationTool } from "../../src/tool/execute-context.ts";
 import { executeImpactTool } from "../../src/tool/execute-impact.ts";
-import { executeAction } from "../helpers/execute-action.ts";
+import { executeAction, makeTestCtx } from "../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -94,27 +94,27 @@ describe("executeAction validation", () => {
 describe("context action", () => {
   it("returns project brief for no-arg call", async () => {
     writeJson(tmpDir, "package.json", { name: "test-proj", description: "Test" });
-    const result = await executeOrientationTool({}, { cwd: tmpDir });
+    const result = await executeOrientationTool({}, makeTestCtx(tmpDir));
     expect(result.content).toContain("Project Brief");
     expect(result.content).toContain("test-proj");
   });
 
   it("returns error for non-existent path", async () => {
     writeJson(tmpDir, "package.json", { name: "test" });
-    const result = await executeOrientationTool({ focus: "nonexistent/" }, { cwd: tmpDir });
+    const result = await executeOrientationTool({ focus: "nonexistent/" }, makeTestCtx(tmpDir));
     expect(result.content).toContain("Error");
     expect(result.content).toContain("not found");
   });
 
   it("returns no-structure message for empty dir", async () => {
-    const result = await executeOrientationTool({}, { cwd: tmpDir });
+    const result = await executeOrientationTool({}, makeTestCtx(tmpDir));
     expect(result.content).toContain("No project structure");
   });
 });
 
 describe("impact action", () => {
   it("keeps unavailable confidence for impact symbol requests without semantic support", async () => {
-    const result = await executeImpactTool({ symbol: "Widget" }, { cwd: tmpDir });
+    const result = await executeImpactTool({ symbol: "Widget" }, makeTestCtx(tmpDir));
     expect(result.details?.type).toBe("impact");
     if (result.details?.type === "impact") {
       expect(result.details.data.confidence).toBe("unavailable");

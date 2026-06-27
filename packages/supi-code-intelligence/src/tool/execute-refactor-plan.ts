@@ -4,7 +4,6 @@
  */
 
 import {
-  getDefaultWorkspaceRuntime,
   normalizeRefactorOperation,
   type RefactorOperation,
   type RefactorResult,
@@ -16,17 +15,14 @@ import {
   computeFileFingerprint,
   generatePlanId,
   type RefactorPlan,
-  storePlan,
 } from "../analysis/refactor/plan-store.ts";
 import { validateEdit } from "../analysis/refactor/safety.ts";
-import { getOrCreateSessionForCwd } from "../app/create-code-intelligence-app.ts";
 import { createEvidenceList } from "../evidence-list.ts";
 import { renderRefactorPlanResult } from "../presentation/markdown/refactor.ts";
 import { normalizePath } from "../search-helpers.ts";
-import type { CodeIntelResult } from "../types.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { unavailableSearchDetails } from "./details-helpers.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
-import { expandTargetId } from "./target-id-params.ts";
 
 export interface CodeRefactorPlanToolParams {
   targetId?: string;
@@ -45,7 +41,7 @@ type CanonicalRefactorOperation = Exclude<RefactorOperation, "rename">;
 
 export async function executeRefactorPlanTool(
   params: CodeRefactorPlanToolParams,
-  ctx: { cwd: string },
+  ctx: Pick<CodeIntelToolExecCtx, "cwd" | "session">,
   invokedAs: "code_refactor_plan" = "code_refactor_plan",
 ): Promise<CodeIntelResult> {
   const normalizedOperation = normalizeRequestedOperation(params.operation);
@@ -59,13 +55,13 @@ export async function executeRefactorPlanTool(
   }
   const operation = normalizedOperation.operation;
 
-  const target = resolveRefactorTarget(params, ctx.cwd, operation);
+  const target = resolveRefactorTarget(params, ctx.cwd, operation, ctx.session);
   if ("content" in target) return target;
 
   const readinessResult = await waitForRefactorReadiness(ctx.cwd, target.file, invokedAs);
   if (readinessResult) return readinessResult;
 
-  const provider = getDefaultWorkspaceRuntime().getWorkspace(ctx.cwd).semantic.provider;
+  const provider = ctx.session.getSemanticProvider();
   const resolvedFile = normalizePath(target.file, ctx.cwd);
   const position = toLspPosition(target.line, target.character);
 
@@ -115,8 +111,7 @@ export async function executeRefactorPlanTool(
     fileFingerprints,
     createdAt: Date.now(),
   };
-  const session = getOrCreateSessionForCwd(ctx.cwd);
-  storePlan(session.refactorPlans, plan);
+  ctx.session.storePlan(plan);
 
   const editEvidence = createEvidenceList({
     key: "refactor.edits",
@@ -167,10 +162,11 @@ function normalizeRequestedOperation(
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: target expansion and operation-specific validation are kept together for clear user-facing errors.
 function resolveRefactorTarget(
   params: CodeRefactorPlanToolParams,
-  cwd: string,
+  _cwd: string,
   operation: CanonicalRefactorOperation,
+  session: CodeIntelToolExecCtx["session"],
 ): CodeIntelResult | { file: string; line: number; character: number } {
-  const expansion = expandTargetId(params, cwd);
+  const expansion = session.expandTargetId(params);
   if (expansion.kind === "error") {
     return {
       content: expansion.message,

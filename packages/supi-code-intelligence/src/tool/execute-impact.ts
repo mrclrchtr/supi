@@ -1,11 +1,9 @@
-import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { routeFor } from "../analysis/routing/planner.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { executeImpact } from "../use-case/generate-impact.ts";
 import { unavailableImpactDetails } from "./details-helpers.ts";
 import { emitToolProgress } from "./progress.ts";
 import { ensureSemanticReadiness, renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
-import { expandTargetId } from "./target-id-params.ts";
 import { validateFocusedToolParams } from "./validation.ts";
 
 export interface CodeImpactToolParams {
@@ -28,7 +26,7 @@ export async function executeImpactTool(
 ): Promise<CodeIntelResult> {
   emitToolProgress(ctx.onUpdate, "code_impact: analyzing blast radius...");
 
-  const expansion = expandTargetId(params, ctx.cwd);
+  const expansion = ctx.session.expandTargetId(params);
   if (expansion.kind === "error") {
     return {
       content: expansion.message,
@@ -57,7 +55,7 @@ export async function executeImpactTool(
     );
   }
 
-  const providerState = getCodeProvider(ctx.cwd);
+  const providerState = ctx.session.getProviders();
   const provider = providerState.kind === "ready" ? providerState.provider : null;
   const lspService =
     providerState.kind === "ready"

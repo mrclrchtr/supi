@@ -8,10 +8,9 @@
 import { existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
-import { type CapabilityState, getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/api";
 import type { SessionLspService, SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
-import { getCodeProvider } from "../analysis/context/request-context.ts";
 import { createEvidenceList, type EvidenceListMetadata } from "../evidence-list.ts";
 import { gatherGitContext } from "../git-context.ts";
 import { evaluateCoverageWarnings, gatherCoverageEvalInput } from "../lsp/coverage-warnings.ts";
@@ -64,10 +63,10 @@ export async function executeHealthTool(
   }
   const scopeFilter = scopeResolution.path === cwd ? null : scopeResolution.path;
 
-  const providerState = getCodeProvider(cwd);
-  const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
-  const semanticState = workspace.semantic.state;
-  const structuralState = workspace.structural.state;
+  const providerState = ctx.session.getProviders();
+  const workspaceState = ctx.session.getWorkspaceState();
+  const semanticState = workspaceState.semantic.state;
+  const structuralState = workspaceState.structural.state;
   const lspState: SessionLspServiceState =
     providerState.kind === "ready"
       ? providerState.lspService
@@ -114,8 +113,10 @@ export async function executeHealthTool(
       ? await collectCodeActions(service, scopeFilter, cwd)
       : null;
 
-  // Evaluate degraded coverage
-  const degradedCoverage = evaluateCoverageWarnings(gatherCoverageEvalInput(cwd, null));
+  // Evaluate degraded coverage through the session's LSP controller (ADR 0008)
+  const degradedCoverage = evaluateCoverageWarnings(
+    gatherCoverageEvalInput(cwd, ctx.session.lspController),
+  );
 
   const data: HealthData = {
     includedSections: included,

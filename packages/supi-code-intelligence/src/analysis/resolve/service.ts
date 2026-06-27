@@ -10,17 +10,13 @@
 import { existsSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import { getOrCreateSessionForCwd } from "../../app/create-code-intelligence-app.ts";
 import { normalizePath } from "../../search-helpers.ts";
+import type { WorkspaceCodeIntelligenceSession } from "../../session/workspace-code-intelligence-session.ts";
 import { resolveAnchoredSymbolTarget } from "../../targeting/resolve-anchored.ts";
 import { resolveFileTargetGroup as resolveFile } from "../../targeting/resolve-file.ts";
 import { resolveSymbolTarget as resolveSymbol } from "../../targeting/resolve-symbol.ts";
 import type { TargetOutcome } from "../../targeting/types.ts";
-import {
-  type AnchorKind,
-  registerWorkflowTarget,
-  type TargetRegistrationInput,
-} from "../../workflow/target-store.ts";
+import type { AnchorKind, TargetRegistrationInput } from "../../workflow/target-store.ts";
 import type { CodeProvider } from "../context/request-context.ts";
 import { getCodeProviderState } from "../context/request-context.ts";
 // ── Types ─────────────────────────────────────────────────────────────
@@ -137,11 +133,10 @@ function registerFromTarget(
     container: string | null;
     resolution?: import("../../types.ts").AnchoredResolutionMetadata;
   },
-  cwd: string,
+  session: WorkspaceCodeIntelligenceSession,
   provenance: string,
 ): ResolvedTargetEntry {
-  const session = getOrCreateSessionForCwd(cwd);
-  const store = session.workflowTargets;
+  const cwd = session.cwd;
 
   const input: TargetRegistrationInput = {
     file: target.file,
@@ -155,7 +150,7 @@ function registerFromTarget(
     anchorKind: target.anchorKind,
     container: target.container,
   };
-  const { targetId, spanId } = registerWorkflowTarget(store, cwd, input);
+  const { targetId, spanId } = session.registerTarget(input);
   return {
     targetId,
     spanId,
@@ -183,10 +178,9 @@ function registerCandidate(
     rank: number;
     anchorKind: AnchorKind;
   },
-  cwd: string,
+  session: WorkspaceCodeIntelligenceSession,
 ): DisambiguationCandidateEntry {
-  const session = getOrCreateSessionForCwd(cwd);
-  const store = session.workflowTargets;
+  const cwd = session.cwd;
 
   const input: TargetRegistrationInput = {
     file: resolve(cwd, c.file),
@@ -200,7 +194,7 @@ function registerCandidate(
     anchorKind: c.anchorKind,
     container: c.container,
   };
-  const { targetId } = registerWorkflowTarget(store, cwd, input);
+  const { targetId } = session.registerTarget(input);
   return {
     targetId,
     name: c.name,
@@ -218,11 +212,12 @@ function registerCandidate(
 /** Resolve anchored (file + line + character) input via provider-backed symbol resolution. */
 async function resolveAnchoredInput(
   params: ResolveServiceParams,
-  cwd: string,
+  session: WorkspaceCodeIntelligenceSession,
   _maxResults: number,
   provider: CodeProvider | null,
 ): Promise<ResolveServiceResult> {
   // Guard: caller ensures file/line/character are present for anchored
+  const cwd = session.cwd;
   const file = params.file;
   const line = params.line;
   const character = params.character;
@@ -244,7 +239,7 @@ async function resolveAnchoredInput(
     return { kind: "error", message: outcome.message };
   }
   if (outcome.kind === "resolved") {
-    const entry = registerFromTarget(outcome.target, cwd, "anchored");
+    const entry = registerFromTarget(outcome.target, session, "anchored");
     return {
       kind: "resolved",
       targets: [entry],
@@ -260,7 +255,7 @@ async function resolveAnchoredInput(
   // Disambiguation — register each candidate and surface targetIds.
   const disambig = outcome as Extract<TargetOutcome, { kind: "disambiguation" }>;
   const candidates = disambig.candidates.map((c) =>
-    registerCandidate({ ...c, file: relative(cwd, c.file) }, cwd),
+    registerCandidate({ ...c, file: relative(cwd, c.file) }, session),
   );
   return {
     kind: "disambiguation",
@@ -275,10 +270,11 @@ async function resolveAnchoredInput(
 /** Resolve file-only (no coordinates) input. */
 async function resolveFileOnlyInput(
   params: ResolveServiceParams,
-  cwd: string,
+  session: WorkspaceCodeIntelligenceSession,
   maxResults: number,
   provider: CodeProvider | null,
 ): Promise<ResolveServiceResult> {
+  const cwd = session.cwd;
   const file = params.file;
   if (!file) {
     return { kind: "error", message: "**Error:** File required for file-level resolution." };
@@ -297,7 +293,7 @@ async function resolveFileOnlyInput(
   const targets = outcome.group.targets
     .slice(0, maxResults)
     .map((t) =>
-      registerFromTarget({ ...t, position: t.position, confidence: t.confidence }, cwd, "file"),
+      registerFromTarget({ ...t, position: t.position, confidence: t.confidence }, session, "file"),
     );
   return {
     kind: "resolved",
@@ -313,10 +309,11 @@ async function resolveFileOnlyInput(
 /** Handle a path-like query with kind: "file". */
 async function resolvePathQuery(
   query: string,
-  cwd: string,
+  session: WorkspaceCodeIntelligenceSession,
   maxResults: number,
   provider: CodeProvider | null,
 ): Promise<ResolveServiceResult | null> {
+  const cwd = session.cwd;
   const candidatePath = resolvePathLikeQuery(query, cwd);
   if (!candidatePath) return null;
   const outcome = await resolveFile(candidatePath, cwd, {
@@ -327,7 +324,7 @@ async function resolvePathQuery(
   const targets = outcome.group.targets
     .slice(0, maxResults)
     .map((t) =>
-      registerFromTarget({ ...t, position: t.position, confidence: t.confidence }, cwd, "file"),
+      registerFromTarget({ ...t, position: t.position, confidence: t.confidence }, session, "file"),
     );
   return {
     kind: "resolved",
@@ -345,11 +342,12 @@ async function resolveQueryTarget(opts: {
   query: string;
   kind: string | undefined;
   scope: string | undefined;
-  cwd: string;
+  session: WorkspaceCodeIntelligenceSession;
   provider: CodeProvider;
   maxResults: number;
 }): Promise<ResolveServiceResult> {
-  const { query, kind, scope, cwd, provider, maxResults } = opts;
+  const { query, kind, scope, session, provider, maxResults } = opts;
+  const cwd = session.cwd;
 
   // Map public kind to internal options for resolveSymbol.
   // "symbol" means "any kind" (no filter). "export" maps to exportedOnly.
@@ -367,7 +365,7 @@ async function resolveQueryTarget(opts: {
     return { kind: "error", message: outcome.message };
   }
   if (outcome.kind === "resolved") {
-    const entry = registerFromTarget(outcome.target, cwd, "symbol");
+    const entry = registerFromTarget(outcome.target, session, "symbol");
     return {
       kind: "resolved",
       targets: [entry],
@@ -382,7 +380,7 @@ async function resolveQueryTarget(opts: {
   }
   // resolveSymbol never returns "group", so only disambiguation remains
   const disambig = outcome as Extract<TargetOutcome, { kind: "disambiguation" }>;
-  const candidates = disambig.candidates.map((c) => registerCandidate(c, cwd));
+  const candidates = disambig.candidates.map((c) => registerCandidate(c, session));
   return {
     kind: "disambiguation",
     candidates,
@@ -402,8 +400,9 @@ async function resolveQueryTarget(opts: {
  */
 export async function executeResolveService(
   params: ResolveServiceParams,
-  cwd: string,
+  session: WorkspaceCodeIntelligenceSession,
 ): Promise<ResolveServiceResult> {
+  const cwd = session.cwd;
   const validationError = validateResolveParams(params);
   if (validationError) {
     return { kind: "error", message: validationError };
@@ -413,11 +412,11 @@ export async function executeResolveService(
   const maxResults = params.maxResults ?? 10;
   // Anchored resolution
   if (params.file && params.line != null && params.character != null) {
-    return resolveAnchoredInput(params, cwd, maxResults, provider);
+    return resolveAnchoredInput(params, session, maxResults, provider);
   }
   // File-only resolution
   if (params.file && !params.query) {
-    return resolveFileOnlyInput(params, cwd, maxResults, provider);
+    return resolveFileOnlyInput(params, session, maxResults, provider);
   }
   // Query resolution
   if (!params.query) {
@@ -427,7 +426,7 @@ export async function executeResolveService(
     };
   }
   // Special case: path-like query with kind file
-  const pathResult = await tryPathLikeQuery(params, cwd, maxResults, provider);
+  const pathResult = await tryPathLikeQuery(params, session, maxResults, provider);
   if (pathResult) return pathResult;
   // Standard symbol resolution requires semantic provider
   if (provider === null) {
@@ -441,7 +440,7 @@ export async function executeResolveService(
     query: params.query,
     kind: params.kind,
     scope: params.scope,
-    cwd,
+    session,
     provider,
     maxResults,
   });
@@ -450,14 +449,14 @@ export async function executeResolveService(
 /** Attempt file-level resolution when query looks like a file path. */
 async function tryPathLikeQuery(
   params: ResolveServiceParams,
-  cwd: string,
+  session: WorkspaceCodeIntelligenceSession,
   maxResults: number,
   provider: CodeProvider | null,
 ): Promise<ResolveServiceResult | null> {
   if (params.kind !== "file" && params.kind !== "File") return null;
   const query = params.query;
   if (!query || !isPathLike(query)) return null;
-  return resolvePathQuery(query, cwd, maxResults, provider);
+  return resolvePathQuery(query, session, maxResults, provider);
 }
 // ── Helpers ───────────────────────────────────────────────────────────
 function isPathLike(query: string): boolean {

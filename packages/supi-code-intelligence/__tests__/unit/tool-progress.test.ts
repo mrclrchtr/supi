@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
+import { getOrCreateSessionForCwd } from "../../src/app/create-code-intelligence-app.ts";
 import { executeFindTool } from "../../src/tool/execute-find.ts";
 import { executeGraphTool } from "../../src/tool/execute-graph.ts";
 import { emitToolProgress } from "../../src/tool/progress.ts";
@@ -40,7 +41,10 @@ describe("executor onUpdate progress beats", () => {
     writeFileSync(path.join(dir, "a.ts"), "export function foo() { return 1; }\n");
     const { onUpdate, beats } = captureProgress();
     try {
-      await executeFindTool({ query: "foo" }, { cwd: dir, onUpdate });
+      await executeFindTool(
+        { query: "foo" },
+        { cwd: dir, onUpdate, session: getOrCreateSessionForCwd(dir) },
+      );
       expect(beats.length).toBeGreaterThanOrEqual(1);
       expect(beats.some((b) => b.includes("code_find"))).toBe(true);
     } finally {
@@ -63,7 +67,7 @@ describe("executor onUpdate progress beats", () => {
     try {
       await executeGraphTool(
         { file: "test.ts", line: 1, character: 17, relations: ["all"] },
-        { cwd: dir, onUpdate },
+        { cwd: dir, onUpdate, session: getOrCreateSessionForCwd(dir) },
       );
       expect(beats.length).toBeGreaterThanOrEqual(2);
       expect(beats.some((b) => b.includes("code_graph"))).toBe(true);
