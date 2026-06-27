@@ -23,12 +23,9 @@ export function registerLspSessionLifecycle(pi: ExtensionAPI, state: LspAdapterS
     }
 
     const lspSettings = loadLspSettings(cwd);
-    if (!lspSettings.enabled) {
-      resetDiagnosticContext(state);
-      state.lspActive = false;
-      return;
-    }
-
+    // Always-on policy: `lsp.enabled` is deprecated and ignored. Keep reading
+    // settings for severity/exclude data, but let LspRuntimeController decide
+    // startup and per-language disables.
     state.inlineSeverity = lspSettings.severity;
 
     const controller = new LspRuntimeController(cwd, runtime);

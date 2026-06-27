@@ -461,8 +461,9 @@ export class CiStatusDialog {
 
     for (const w of warnings.warnings) {
       const lang = w.language ? `${t.fg("accent", w.language)} ` : "";
+      const detail = w.detail ? t.fg("dim", ` — ${w.detail}`) : "";
       container.addChild(
-        new Text(`  ${t.fg("warning", "⚠")} ${lang}${t.fg("dim", w.message)}`, 0, 0),
+        new Text(`  ${t.fg("warning", "⚠")} ${lang}${t.fg("dim", w.message)}${detail}`, 0, 0),
       );
     }
     container.addChild(new Spacer(1));

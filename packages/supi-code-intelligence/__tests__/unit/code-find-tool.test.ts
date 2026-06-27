@@ -91,94 +91,101 @@ describe("code_find tool", () => {
   });
 
   describe("strict mode-kind contract", () => {
-    it("fails when kind is provided without mode", async () => {
+    it("returns error text when kind is provided without mode", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
       const tool = getCodeFindTool();
 
-      await expect(
-        tool.execute(
-          "test-kind-without-mode",
-          { query: "foo", kind: "definition" },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        ),
-      ).rejects.toThrow(/code_find/i);
+      const result = (await tool.execute(
+        "test-kind-without-mode",
+        { query: "foo", kind: "definition" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain("does not accept `kind`");
+      expect(result.content[0].text).toContain('mode: "text"');
     });
 
-    it("fails when kind is provided in text mode", async () => {
+    it("returns error text when kind is provided in text mode", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
       const tool = getCodeFindTool();
 
-      await expect(
-        tool.execute(
-          "test-kind-in-text-mode",
-          { query: "foo", mode: "text", kind: "definition" },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        ),
-      ).rejects.toThrow(/code_find/i);
+      const result = (await tool.execute(
+        "test-kind-in-text-mode",
+        { query: "foo", mode: "text", kind: "definition" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain("does not accept `kind`");
     });
 
-    it("fails when kind is provided in regex mode", async () => {
+    it("returns error text when kind is provided in regex mode", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const fooBar = 1;\n");
       const tool = getCodeFindTool();
 
-      await expect(
-        tool.execute(
-          "test-kind-in-regex-mode",
-          { query: "foo[A-Z]", mode: "regex", kind: "definition" },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        ),
-      ).rejects.toThrow(/code_find/i);
+      const result = (await tool.execute(
+        "test-kind-in-regex-mode",
+        { query: "foo[A-Z]", mode: "regex", kind: "definition" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain("does not accept `kind`");
+      expect(result.content[0].text).toContain('mode: "regex"');
     });
 
-    it("fails when kind is provided in semantic mode", async () => {
+    it("returns error text when kind is provided in semantic mode", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");
       const tool = getCodeFindTool();
 
-      await expect(
-        tool.execute(
-          "test-kind-in-semantic-mode",
-          { query: "foo", mode: "semantic", kind: "definition" },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        ),
-      ).rejects.toThrow(/code_find/i);
+      const result = (await tool.execute(
+        "test-kind-in-semantic-mode",
+        { query: "foo", mode: "semantic", kind: "definition" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain("does not accept `kind`");
+      expect(result.content[0].text).toContain('mode: "semantic"');
     });
 
-    it("fails when ast mode omits kind", async () => {
+    it("returns error text when ast mode omits kind", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), 'export const foo = "hello";\n');
       const tool = getCodeFindTool();
 
-      await expect(
-        tool.execute(
-          "test-ast-without-kind",
-          { query: "foo", mode: "ast" },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        ),
-      ).rejects.toThrow(/supported AST kinds|definition.*import.*export.*call/i);
+      const result = (await tool.execute(
+        "test-ast-without-kind",
+        { query: "foo", mode: "ast" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toMatch(
+        /supported AST kinds|definition.*import.*export.*call/i,
+      );
     });
 
-    it.each(["test"] as const)("fails when ast mode uses unsupported kind %s", async (kind) => {
+    it.each([
+      "namespace",
+    ] as const)("returns error text when ast mode uses unsupported kind %s", async (kind) => {
       writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
       const tool = getCodeFindTool();
 
-      await expect(
-        tool.execute(
-          `test-ast-unsupported-${kind}`,
-          { query: "foo", mode: "ast", kind },
-          undefined,
-          undefined,
-          makeCtx({ cwd: tmpDir }),
-        ),
-      ).rejects.toThrow(/code_find/i);
+      const result = (await tool.execute(
+        `test-ast-unsupported-${kind}`,
+        { query: "foo", mode: "ast", kind },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      expect(result.content[0].text).toContain("unsupported AST kind");
     });
   });
 

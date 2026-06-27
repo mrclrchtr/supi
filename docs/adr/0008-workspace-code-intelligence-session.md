@@ -1,0 +1,7 @@
+# Workspace code-intelligence session facade
+
+`packages/supi-code-intelligence` will use an internal `WorkspaceCodeIntelligenceSession` as the per-workspace facade for public `code_*` tool workflows. Tool executors receive this session explicitly through their execution context, while the session owns target handles, refactor plans, coverage-warning state, provider/readiness policy, and typed workflow outcomes; executors and presentation modules keep rendering markdown/details. LSP and Tree-sitter lifecycle modules still create and shut down their controllers, but attach controller references to the session so the session is the stable access boundary without replacing the shared workspace-runtime broker.
+
+This is an all-current-tools migration: the current nine `code_*` tools remain, but their duplicated provider lookup, target-id expansion, and capability-unavailable policy should converge on the session facade. The session remains internal for now and does not introduce an architecture-model cache in the first pass; `getArchitectureModel()` may recompute until a safe invalidation policy is needed.
+
+Considered alternatives were keeping session lookup hidden behind `getOrCreateSessionForCwd`, moving controller lifecycle fully into the session, or returning final rendered `CodeIntelResult` values from the session. Those were rejected because they preserve hidden global state, expand lifecycle risk, or turn the session into a renderer/God object rather than a workflow boundary.

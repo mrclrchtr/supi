@@ -223,6 +223,54 @@ describe("code_refactor_apply", () => {
     expect(result.content).toContain("not found");
   });
 
+  it("keeps a plan available when apply fails before writing", async () => {
+    const { projectDir, file } = createProjectFile("oldName();\n");
+    const runtime = getDefaultWorkspaceRuntime();
+    runtime.registerSemantic(
+      projectDir,
+      createSemanticProvider({
+        rename: async () => ({
+          kind: "precise",
+          edits: {
+            edits: [
+              {
+                file,
+                range: { start: { line: 99, character: 0 }, end: { line: 99, character: 1 } },
+                newText: "newName",
+              },
+            ],
+          },
+        }),
+      }),
+    );
+
+    const planResult = await executeAction(
+      {
+        action: "refactor_plan",
+        operation: "rename_symbol",
+        file: "src/index.ts",
+        line: 1,
+        character: 1,
+        newName: "newName",
+      } as unknown as ActionParams,
+      { cwd: projectDir },
+    );
+    const planId = extractPlanId(planResult.content);
+
+    const firstApply = await executeAction(
+      { action: "refactor_apply", planId } as unknown as ActionParams,
+      { cwd: projectDir },
+    );
+    const secondApply = await executeAction(
+      { action: "refactor_apply", planId } as unknown as ActionParams,
+      { cwd: projectDir },
+    );
+
+    expect(firstApply.content).toContain("Refactor apply failed");
+    expect(secondApply.content).toContain("Refactor apply failed");
+    expect(secondApply.content).not.toContain("not found");
+  });
+
   it("applies a valid rename alias plan and reports files changed", async () => {
     const { projectDir, file } = createProjectFile("oldName();\n");
     const runtime = getDefaultWorkspaceRuntime();

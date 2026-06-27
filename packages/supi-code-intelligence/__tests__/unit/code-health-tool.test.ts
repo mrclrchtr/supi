@@ -411,6 +411,47 @@ describe("code_health tool", () => {
     expect(result.content[0].text).not.toContain("### Diagnostics");
   });
 
+  it("uses custom coveragePath and unusedPath when provided", async () => {
+    registerMockProvider(tmpDir);
+    mockReadyLsp();
+    writeFileSync(
+      path.join(tmpDir, "custom-coverage.json"),
+      JSON.stringify(
+        {
+          total: { lines: { pct: 90 }, statements: { pct: 90 } },
+          "src/custom-covered.ts": { lines: { pct: 20 }, statements: { pct: 25 } },
+        },
+        null,
+        2,
+      ),
+    );
+    writeFileSync(
+      path.join(tmpDir, "custom-knip.json"),
+      JSON.stringify({ files: ["src/custom-unused.ts"] }, null, 2),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-custom-health-paths",
+      {
+        include: ["coverage", "unused"],
+        coveragePath: "custom-coverage.json",
+        unusedPath: "custom-knip.json",
+      },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    expect(result.content[0].text).toContain("src/custom-covered.ts");
+    expect(result.content[0].text).toContain("src/custom-unused.ts");
+  });
+
   it("reports missing coverage and unused artifacts explicitly when requested", async () => {
     registerMockProvider(tmpDir);
     mockReadyLsp();

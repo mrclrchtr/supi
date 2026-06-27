@@ -65,11 +65,18 @@ export default function codeIntelligenceExtension(pi: ExtensionAPI) {
       ];
       for (const w of pending) {
         const lang = w.language ? `[${w.language}] ` : "";
-        lines.push(`- ${lang}${w.message}`);
+        const detail = w.detail ? ` — ${w.detail}` : "";
+        lines.push(`- ${lang}${w.message}${detail}`);
       }
       lines.push("</extension-context>");
+      const warningContext = lines.join("\n");
 
       return {
+        message: {
+          customType: "code-intelligence-coverage",
+          display: true,
+          content: warningContext,
+        },
         systemPrompt:
           (await ctx.getSystemPrompt()) +
           `\n\nThe code intelligence stack has degraded coverage. This means some code-understanding tools (code_* tools) may return limited or structural-only information. The agent should still attempt using them, but be aware that semantic coverage for some languages may be unavailable.`,

@@ -154,10 +154,22 @@ describe("evaluateCoverageWarnings", () => {
         warnings: [{ type: "deprecated-key" as const, message: "test warning" }],
       };
 
-      // Mark as emitted
-      state.markEmitted();
-      const pending = state.getPendingWarnings(report, 0);
-      expect(pending).toEqual([]);
+      expect(state.getPendingWarnings(report, 0)).toHaveLength(1);
+      expect(state.getPendingWarnings(report, 0)).toEqual([]);
+    });
+
+    it("does not consume emission state for an empty report", async () => {
+      const { CoverageWarningState } = await import("../../src/lsp/coverage-warnings.ts");
+
+      const state = new CoverageWarningState();
+      expect(state.getPendingWarnings({ hasWarnings: false, warnings: [] }, 0)).toEqual([]);
+      expect(state.hasEmitted).toBe(false);
+
+      const warningReport = {
+        hasWarnings: true,
+        warnings: [{ type: "deprecated-key" as const, message: "test warning" }],
+      };
+      expect(state.getPendingWarnings(warningReport, 0)).toHaveLength(1);
     });
   });
 });

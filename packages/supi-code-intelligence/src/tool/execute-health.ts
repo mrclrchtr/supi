@@ -96,7 +96,10 @@ export async function executeHealthTool(
   const servers = collectServers(service, included);
   const gitContext = included.includes("dirty") ? gatherGitContext(cwd) : null;
   const prioritizationSignals = needsPrioritizationSignals(included)
-    ? loadPrioritizationSignals(cwd, lspState)
+    ? loadPrioritizationSignals(cwd, lspState, {
+        coveragePath: params.coveragePath,
+        unusedPath: params.unusedPath,
+      })
     : null;
   const coverage = included.includes("coverage")
     ? collectCoverageSection(prioritizationSignals, cwd, scopeFilter, params.coveragePath)

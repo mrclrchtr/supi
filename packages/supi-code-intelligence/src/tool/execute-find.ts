@@ -85,15 +85,16 @@ export async function executeFindTool(
   }
   const scopePath = scopeResolution.path;
 
-  const autoDetected = params.kind && !params.mode;
-  const mode = autoDetected ? "ast" : (params.mode ?? "text");
-  let inferredNote: string | null = null;
-
-  if (autoDetected) {
-    inferredNote = `_Note: \`mode: "ast"\` was auto-detected because \`kind\` was provided._`;
+  const mode = params.mode ?? "text";
+  const modeKindError = validateModeKindCombination(params, mode);
+  if (modeKindError) {
+    return {
+      content: modeKindError,
+      details: unavailableSearchDetails(params.scope ?? null, [
+        'Use `mode: "ast"` with `kind`, or remove `kind` for text/regex/semantic search',
+      ]),
+    };
   }
-
-  validateModeKindCombination(params, mode);
 
   emitToolProgress(ctx.onUpdate, `code_find: ${mode} mode...`);
 
@@ -118,9 +119,6 @@ export async function executeFindTool(
           "Use text, regex, ast, or semantic",
         ]),
       };
-  }
-  if (inferredNote && result) {
-    result.content = `${inferredNote}\n\n${result.content}`;
   }
   return result;
 }
@@ -235,26 +233,22 @@ async function executeSemanticMode(
 function validateModeKindCombination(
   params: CodeFindToolParams,
   mode: NonNullable<CodeFindToolParams["mode"]>,
-): void {
+): string | null {
   if ((mode === "text" || mode === "regex" || mode === "semantic") && params.kind) {
-    throw new Error(
-      `code_find does not accept \`kind\` with \`mode: "${mode}"\`. Use \`mode: "ast"\` with one of: ${SUPPORTED_AST_KIND_TEXT}.`,
-    );
+    return `**Error:** code_find does not accept \`kind\` with \`mode: "${mode}"\`. Use \`mode: "ast"\` with one of: ${SUPPORTED_AST_KIND_TEXT}.`;
   }
 
-  if (mode !== "ast") return;
+  if (mode !== "ast") return null;
 
   if (!params.kind) {
-    throw new Error(
-      `code_find with \`mode: "ast"\` requires \`kind\`. Supported AST kinds: ${SUPPORTED_AST_KIND_TEXT}.`,
-    );
+    return `**Error:** code_find with \`mode: "ast"\` requires \`kind\`. Supported AST kinds: ${SUPPORTED_AST_KIND_TEXT}.`;
   }
 
   if (!SUPPORTED_AST_KINDS.has(params.kind)) {
-    throw new Error(
-      `code_find unsupported AST kind \`${params.kind}\`. Supported: ${SUPPORTED_AST_KIND_TEXT}.`,
-    );
+    return `**Error:** code_find unsupported AST kind \`${params.kind}\`. Supported: ${SUPPORTED_AST_KIND_TEXT}.`;
   }
+
+  return null;
 }
 
 function filterSymbolsByScope<T extends { file: string }>(symbols: T[], scopePath: string): T[] {

@@ -18,6 +18,7 @@ export type {
   Location,
   LocationLink,
   LspConfig,
+  MissingServer,
   Position,
   ProjectServerInfo,
   Range,
@@ -37,6 +38,7 @@ export type {
   LspStartResult,
 } from "./session/runtime-controller.ts";
 export { LspRuntimeController } from "./session/runtime-controller.ts";
+export { scanMissingServers } from "./session/scanner.ts";
 export type {
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,

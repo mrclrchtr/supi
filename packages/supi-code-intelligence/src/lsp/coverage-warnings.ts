@@ -6,7 +6,9 @@
  * and code_health.
  */
 
-import type { getDeprecatedLspKeys } from "@mrclrchtr/supi-lsp/api";
+import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import { loadSupiConfigForScope } from "@mrclrchtr/supi-core/config";
+import { getDeprecatedLspKeys, loadConfig, scanMissingServers } from "@mrclrchtr/supi-lsp/api";
 
 export interface CoverageWarning {
   type: "deprecated-key" | "language-disabled" | "missing-server" | "structural-unavailable";
@@ -18,6 +20,10 @@ export interface CoverageWarning {
 export interface CoverageWarningReport {
   hasWarnings: boolean;
   warnings: CoverageWarning[];
+}
+
+export interface CoverageMissingServerSource {
+  getMissingServers(): Array<{ name: string; command: string; foundExtensions?: string[] }>;
 }
 
 /** Input needed to evaluate coverage. */
@@ -95,6 +101,7 @@ export function evaluateCoverageWarnings(input: CoverageEvalInput): CoverageWarn
  */
 export class CoverageWarningState {
   private lastWarningsHash: string | null = null;
+  private forceEmitted = false;
   private readonly startedAt: number;
 
   constructor() {
@@ -103,8 +110,12 @@ export class CoverageWarningState {
 
   /**
    * Return warnings that should be emitted to the user now.
+   *
+   * Deduplication is hash-based rather than once-per-session: if the
+   * warning set changes (e.g., a new missing server is detected), the
+   * new warnings are emitted. Identical sets are suppressed.
    * - Respects grace period (no warnings before `gracePeriodMs` has elapsed)
-   * - Deduplicates (same warning set not emitted twice)
+   * - An empty report (no warnings) does not consume emission state
    */
   getPendingWarnings(
     report: CoverageWarningReport,
@@ -115,12 +126,18 @@ export class CoverageWarningState {
       return [];
     }
 
-    // If already emitted, skip
-    if (this.hasEmitted) {
+    if (!report.hasWarnings || report.warnings.length === 0) {
       return [];
     }
 
-    this.lastWarningsHash = this.computeHash(report);
+    if (this.forceEmitted) return [];
+
+    const nextHash = this.computeHash(report);
+    if (nextHash === this.lastWarningsHash) {
+      return [];
+    }
+
+    this.lastWarningsHash = nextHash;
     return report.warnings;
   }
 
@@ -131,11 +148,13 @@ export class CoverageWarningState {
 
   /** Force the state to consider warnings as already emitted. Useful for testing. */
   markEmitted(): void {
+    this.forceEmitted = true;
     this.lastWarningsHash = "emitted";
   }
 
   /** Reset the session state. */
   reset(): void {
+    this.forceEmitted = false;
     this.lastWarningsHash = null;
   }
 
@@ -154,57 +173,18 @@ export class CoverageWarningState {
  *
  * Reads deprecated keys from supi-lsp, structural state from the
  * workspace runtime, and explicitly disabled languages / missing server
- * info from the LSP controller.
+ * info from the LSP controller or a config-based fallback scan.
  */
 export function gatherCoverageEvalInput(
   cwd: string,
-  lspController: { getMissingServers(): Array<{ name: string; command: string }> } | null,
+  lspController: CoverageMissingServerSource | null,
 ): CoverageEvalInput {
-  // Dynamic import to avoid runtime dependency on supi-lsp in test contexts
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  let getKeysFn: typeof getDeprecatedLspKeys;
-  try {
-    getKeysFn = (require("@mrclrchtr/supi-lsp/api") as typeof import("@mrclrchtr/supi-lsp/api"))
-      .getDeprecatedLspKeys;
-  } catch {
-    getKeysFn = () => ({
-      projectEnabled: false,
-      globalEnabled: false,
-      projectActive: false,
-      globalActive: false,
-    });
-  }
-  const deprecatedKeys = getKeysFn(cwd);
-
-  // Structural state
-  let structuralState: { kind: string; reason?: string } = { kind: "ready" };
-  try {
-    const { getDefaultWorkspaceRuntime } =
-      require("@mrclrchtr/supi-code-runtime/api") as typeof import("@mrclrchtr/supi-code-runtime/api");
-    structuralState = getDefaultWorkspaceRuntime().getWorkspace(cwd).structural.state;
-  } catch {
-    // best-effort
-  }
-
-  // Explicitly disabled languages from raw config
+  const deprecatedKeys = getDeprecatedLspKeys(cwd);
+  const structuralState = getDefaultWorkspaceRuntime().getWorkspace(cwd).structural.state;
   const explicitlyDisabledLanguages = detectExplicitlyDisabledLanguages(cwd);
-
-  // Missing server binaries
-  const missingServers: Array<{
-    name: string;
-    command: string;
-    foundExtensions: string[];
-  }> = [];
-  if (lspController) {
-    const raw = lspController.getMissingServers();
-    for (const m of raw) {
-      missingServers.push({
-        name: m.name,
-        command: m.command,
-        foundExtensions: [],
-      });
-    }
-  }
+  const missingServers = lspController
+    ? normalizeMissingServers(lspController.getMissingServers())
+    : scanMissingServers(loadConfig(cwd), cwd);
 
   return {
     deprecatedKeys,
@@ -214,28 +194,31 @@ export function gatherCoverageEvalInput(
   };
 }
 
+function normalizeMissingServers(
+  raw: Array<{ name: string; command: string; foundExtensions?: string[] }>,
+): Array<{ name: string; command: string; foundExtensions: string[] }> {
+  return raw.map((entry) => ({
+    name: entry.name,
+    command: entry.command,
+    foundExtensions: entry.foundExtensions ?? [],
+  }));
+}
+
 /** Read raw scoped config to find languages with `servers.<lang>.enabled: false`. */
 function detectExplicitlyDisabledLanguages(cwd: string): string[] {
   const disabled = new Set<string>();
-  try {
-    const { loadSupiConfigForScope } =
-      require("@mrclrchtr/supi-core/config") as typeof import("@mrclrchtr/supi-core/config");
-    for (const scope of ["project", "global"] as const) {
-      const raw = loadSupiConfigForScope(
-        "lsp",
-        cwd,
-        { servers: {} as Record<string, { enabled?: boolean }> },
-        { scope },
-      );
-      const servers = (raw as { servers?: Record<string, { enabled?: boolean }> }).servers;
-      if (servers) {
-        for (const [name, srv] of Object.entries(servers)) {
-          if (srv.enabled === false) disabled.add(name);
-        }
-      }
+  for (const scope of ["project", "global"] as const) {
+    const raw = loadSupiConfigForScope(
+      "lsp",
+      cwd,
+      { servers: {} as Record<string, { enabled?: boolean }> },
+      { scope },
+    );
+    const servers = (raw as { servers?: Record<string, { enabled?: boolean }> }).servers;
+    if (!servers) continue;
+    for (const [name, srv] of Object.entries(servers)) {
+      if (srv.enabled === false) disabled.add(name);
     }
-  } catch {
-    // best-effort
   }
   return [...disabled].sort();
 }

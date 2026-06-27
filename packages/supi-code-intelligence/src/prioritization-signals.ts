@@ -16,6 +16,11 @@ export interface LoadedSignals {
   unusedExports: Array<{ file: string; name: string }>;
 }
 
+export interface LoadPrioritizationSignalsOptions {
+  coveragePath?: string;
+  unusedPath?: string;
+}
+
 export function summarizePrioritySignalsForFiles(
   cwd: string,
   files: Iterable<string>,
@@ -73,12 +78,13 @@ export function summarizePrioritySignalsForFiles(
 export function loadPrioritizationSignals(
   cwd: string,
   lspService: SessionLspServiceState,
+  options: LoadPrioritizationSignalsOptions = {},
 ): LoadedSignals {
   return {
     diagnostics: loadDiagnostics(cwd, lspService),
-    coverageByFile: loadCoverageSummary(cwd),
-    unusedFiles: loadUnusedFiles(cwd),
-    unusedExports: loadUnusedExports(cwd),
+    coverageByFile: loadCoverageSummary(cwd, options.coveragePath),
+    unusedFiles: loadUnusedFiles(cwd, options.unusedPath),
+    unusedExports: loadUnusedExports(cwd, options.unusedPath),
   };
 }
 
@@ -109,8 +115,8 @@ function loadDiagnostics(
   }));
 }
 
-function loadCoverageSummary(cwd: string): Map<string, number> {
-  const coveragePath = path.join(cwd, "coverage", "coverage-summary.json");
+function loadCoverageSummary(cwd: string, coveragePathInput?: string): Map<string, number> {
+  const coveragePath = path.resolve(cwd, coveragePathInput ?? "coverage/coverage-summary.json");
   const parsed = readJsonFile(coveragePath);
   if (!parsed) return new Map();
 
@@ -125,8 +131,8 @@ function loadCoverageSummary(cwd: string): Map<string, number> {
   return map;
 }
 
-function loadUnusedFiles(cwd: string): Set<string> {
-  const parsed = loadKnipJson(cwd);
+function loadUnusedFiles(cwd: string, unusedPath?: string): Set<string> {
+  const parsed = loadKnipJson(cwd, unusedPath);
   const values = Array.isArray(parsed?.files) ? parsed.files : [];
   const files = values
     .map((value) => toPathString(value))
@@ -135,8 +141,11 @@ function loadUnusedFiles(cwd: string): Set<string> {
   return new Set(files);
 }
 
-function loadUnusedExports(cwd: string): Array<{ file: string; name: string }> {
-  const parsed = loadKnipJson(cwd);
+function loadUnusedExports(
+  cwd: string,
+  unusedPath?: string,
+): Array<{ file: string; name: string }> {
+  const parsed = loadKnipJson(cwd, unusedPath);
   const values = Array.isArray(parsed?.exports) ? parsed.exports : [];
   const exports: Array<{ file: string; name: string }> = [];
 
@@ -157,8 +166,8 @@ function loadUnusedExports(cwd: string): Array<{ file: string; name: string }> {
   return exports;
 }
 
-function loadKnipJson(cwd: string): Record<string, unknown> | null {
-  return readJsonFile(path.join(cwd, "knip.json"));
+function loadKnipJson(cwd: string, unusedPath?: string): Record<string, unknown> | null {
+  return readJsonFile(path.resolve(cwd, unusedPath ?? "knip.json"));
 }
 
 function getPct(value: object, key: string): number | null {
