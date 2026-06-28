@@ -86,7 +86,7 @@ Code intelligence:
 ```text
 code_orientation(focus="packages/my-package")
 code_orientation(focus="packages/my-package/src/tool")
-code_orientation(focus="packages/my-package/src/tool/execute-health.ts")
+code_orientation(focus="packages/my-package/src/tool/health/execute.ts")
 ```
 Orientation briefs are summaries, not source replacement; read the files before editing.
 
@@ -169,7 +169,7 @@ code_refactor_apply(planId)                                     → apply
 - **`code_impact`** — `change`-only requests (no target, no changeSetFiles) return insufficient-evidence instead of guessing.
 - **`code_find` AST test mode** — `mode: "ast"` with `kind: "test"` matches outline entries with test-like names. Does not find test blocks within untest-like wrapper functions.
 
-Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface. Historical compatibility executors remain in the source tree for migration/tests, but are no longer registered as public tools.
+Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface. Historical compatibility aliases are not registered as public tools.
 
 ## Startup performance
 
@@ -222,7 +222,7 @@ The current public surface now includes:
 - `code_refactor_plan` — **active** (Phase 5, pure refactor planner)
 - `code_refactor_apply` — **active** (Phase 5, refactor plan applier)
 
-The design source of truth lives in `src/workflow/` with types, schemas, and metadata.
+The design source of truth lives in `src/tool/` with types, schemas, and metadata.
 
 This package is for questions like:
 
@@ -302,13 +302,13 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code
 - Targeted graph results include a `Read Next` guidance section for the resolved target, enclosing scope, or top relation sites when those source ranges are known.
 - `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
 - Test-label extraction is tracked separately from discovery provenance. When a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` intentionally instead of helper or variable names.
-- Bounded package/tool-aware candidates are generated for source files at `src/tool/execute-<name>.ts`. Exact candidates such as `code-<name>-tool.test.ts`, `<name>-tool.test.ts`, and `execute-<name>.test.ts` are checked in both `__tests__/unit/` and `__tests__/integration/`. No broad search, fuzzy matching, or AI guessing is performed.
+- Bounded package/tool-aware candidates are generated for source files at `src/tool/<name>/execute.ts`. Exact candidates such as `code-<name>-tool.test.ts`, `<name>-tool.test.ts`, and `execute-<name>.test.ts` are checked in both `__tests__/unit/` and `__tests__/integration/`. No broad search, fuzzy matching, or AI guessing is performed.
 
 ### `code_impact`
 Preferred workflow-oriented impact analysis.
 
-- supports the existing target-based path (`targetId`, anchored coords, symbol)
-- adds change-set entry points for `changeSetFiles` and explicit `includeTests`
+- supports target-based analysis through a `targetId` from `code_resolve`
+- supports change-set entry points through `changeSetFiles` and explicit `includeTests`
 - `includeTests` uses the same shared test discovery as `code_graph` (import/reference evidence plus package-layout conventions)
 - **Target-based analysis** uses semantic references and fails explicitly when no LSP provider is available
 - **changeSetFiles analysis** uses structural evidence by default and, when LSP/export data is available, merges semantic references for symbols defined in change-set files. `changeSetFiles` is user-supplied; it is not inferred from git and carries no line-level diff evidence. Evidence is annotated as either `**Evidence: structural**` or `**Evidence: semantic+structural**`.
@@ -392,7 +392,7 @@ Notes:
 - line and character positions are **1-based**
 - `line` and `character` require `file`, not `scope`
 - `code_inspect` is the public point-inspection tool for `file` + `line` + `character`
-- `targetId` (from `code_resolve`) can replace raw coordinates in `code_orientation`, `code_graph`, `code_impact`, and `code_refactor_plan`. In `code_orientation`, `targetId` takes precedence over `focus`/`line`/`character`; a stale/invalid `targetId` errors and does not fall back to coordinates.
+- `targetId` (from `code_resolve`) can replace raw coordinates in `code_orientation`, `code_graph`, and `code_refactor_plan`; it is the only public target selector for `code_impact`. In `code_orientation`, `targetId` takes precedence over `focus`/`line`/`character`; a stale/invalid `targetId` errors and does not fall back to coordinates.
 - `code_orientation` accepts `focus` + `line` + `character` directly as a coordinate target mode: it resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. Coordinate mode requires all three fields when any is present; `focus` must be a file path and partial coordinates are a validation error.
 - `focus` is the selection input for `code_orientation`; other tools keep `scope` for narrowing/filtering.
 - `focus`, `scope`, and `file` use pi-style paths where applicable: a leading `@` is stripped and relative paths resolve from the current cwd
@@ -439,36 +439,26 @@ supi-code-runtime      ← shared broker + canonical provider/result contracts
 supi-lsp / supi-tree-sitter
  (semantic)   (structural)
         ↑
-supi-code-intelligence ← planner, presentation, code_* tools
+supi-code-intelligence ← analysis orchestration, UI, code_* tools
 ```
 
 ## Package surfaces
 
-- `@mrclrchtr/supi-code-intelligence/api` — reusable architecture, brief, and target-resolution helpers
+- `@mrclrchtr/supi-code-intelligence` — package-root type re-export surface
+- `@mrclrchtr/supi-code-intelligence/api` — reusable type contracts
 - `@mrclrchtr/supi-code-intelligence/extension` — pi extension entrypoint
-
-Example:
-
-```ts
-import { buildArchitectureModel, generateOverview } from "@mrclrchtr/supi-code-intelligence/api";
-
-const model = await buildArchitectureModel("/project");
-const overview = generateOverview(model);
-```
 
 ## Source
 
-- `src/code-intelligence.ts` — extension entry point: overview injection and tool registration
-- `src/use-case/` — typed orchestration modules for brief, inspect, context, relations, affected, and pattern
-- `src/presentation/markdown/` — markdown renderers that format use-case results, including inspect and task-focused context bundles
-- `src/targeting/` — typed target-resolution pipeline
-- `src/tool/tool-specs.ts` — single source of truth for the current public tool surface
-- `src/tool/register-tools.ts` — focused tool registration wiring
+- `src/extension.ts` — extension composition root: substrate lifecycle, tool registration, status UI, overview/warning injection
+- `src/app/` — app-level session lifecycle and manager wiring
+- `src/session/` — session-scoped target handles and refactor plan storage
+- `src/substrate/` — LSP and Tree-sitter adapter lifecycle/state/overrides/recovery
+- `src/analysis/` — target resolution, architecture briefs, provider composition, search/reference helpers, project signals, coverage warnings, and test discovery
+- `src/tool/specs.ts` — single source of truth for the current public tool surface
+- `src/tool/register.ts` — focused tool registration wiring
 - `src/tool/guidance.ts` — prompt surfaces derived from tool specs
-- `src/tool/execute-*.ts` — thin adapters that validate params and route to use-case/presentation layers, including the Phase 5 workflow wrappers `execute-refactor.ts` and `execute-apply.ts`
-- `src/workflow/target-store.ts` — session-scoped target/span handle registry with file-fingerprint staleness detection
-- `src/analysis/resolve/service.ts` — `code_resolve` business logic
-- `src/tool/execute-resolve.ts` — `code_resolve` public tool executor
-- `src/tool/target-id-params.ts` — shared helper for expanding `targetId` into anchored tool params
-- `src/presentation/markdown/resolve.ts` — markdown renderer for `code_resolve` results
-- `src/workflow/` — Phase 0+ V2 skeleton: planned workflow tool schemas, handle/result contracts, and future-surface metadata
+- `src/tool/<tool>/` — per-tool execution, orchestration, markdown, and TUI renderers
+- `src/tool/infra/` — tool pipeline, validation, progress, truncation, readiness messages, and error-result helpers
+- `src/ui/` — shared status UI, message/footer renderers, and non-tool-specific markdown/TUI helpers
+- `src/types/` — small cross-cutting internal type surface

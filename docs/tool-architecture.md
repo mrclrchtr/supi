@@ -81,33 +81,34 @@ Use this when one package exposes several public tools.
 Typical example:
 - `supi-lsp`
 
-The spec module should own the public metadata for each tool and, when needed,
-shared capability labels used by status views or prompt builders.
+The spec module should own the machine-readable public surface for each tool
+and, when needed, shared capability labels used by status views or prompt
+builders. Large packages may keep verbose model-facing prose in a paired
+`guidance.ts` module, but that guidance must be keyed by the same canonical
+names and covered by alignment tests.
 
 Example responsibilities:
 - tool names and labels
-- descriptions
-- `promptSnippet`
-- base `promptGuidelines`
-- parameter schemas
+- parameter schemas or schema keys
 - service-action bindings used by registration
+- concise metadata needed by validation, docs, or tests
 - displayed capability labels derived from runtime support
+- optionally descriptions, `promptSnippet`, and base `promptGuidelines` when the package does not split those into guidance modules
 
 ## What should derive from specs
 
-Once a package has a metadata module, these parts should derive from it instead
-of re-declaring literals:
+Once a package has metadata modules, these parts should derive from the
+canonical public list instead of re-declaring literals:
 
 - `StringEnum([...])` values
 - TypeBox schema fragments that only encode the public action or tool list
-- `promptSnippet`
-- `promptGuidelines`
+- paired guidance maps (`promptSnippet`, `promptGuidelines`, descriptions)
 - registration loops in `register-tools.ts` or extension entrypoints
 - ordered supported-action text in validation messages
 - capability labels shown in status UIs or dynamic prompt coverage
 
 The goal is not abstraction for its own sake. The goal is to make the public
-surface change in one place.
+surface change coherently in one place or one tightly-aligned module pair.
 
 ## What should stay out of specs
 
@@ -188,15 +189,12 @@ surface. Public `tree_sitter_*` tools are no longer registered.
 
 ### `packages/supi-code-intelligence`
 
-Uses `src/tool/tool-specs.ts` as the single source of truth for:
-- public focused-tool names (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_refactor_plan`, `code_refactor_apply`)
-- descriptions, snippets, and base guidance
-- parameter schemas for each public tool
+Uses an aligned `src/tool/` metadata pair:
+- `src/tool/specs.ts` owns public focused-tool names (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_refactor_plan`, `code_refactor_apply`), labels, schemas, and execution bindings
+- `src/tool/guidance.ts` owns verbose model-facing descriptions, snippets, and base guidance keyed by those same tool names
+- `src/tool/register.ts` joins the two maps when registering tools
 
-`code_orientation` replaced the old `code_context`/`code_brief` orientation surface. `code_affected` remains an internal compatibility surface in the shared execution path, but it is no longer registered as a public tool.
-
-`src/tool/guidance.ts`, `src/tool/register-tools.ts`, and
-`src/code-intelligence.ts` derive from those specs.
+`code_orientation` replaced the old `code_context`/`code_brief` orientation surface. `code_affected` has been removed; use `code_impact` exclusively.
 
 ### `packages/supi-lsp`
 

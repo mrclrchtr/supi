@@ -56,7 +56,7 @@ export interface TargetStoreEntry {
    * anchored coordinates. Carries requested/resolved coordinates, whether
    * the anchor was snapped, and the provider-backed evidence source.
    */
-  resolution?: import("../types.ts").AnchoredResolutionMetadata;
+  resolution?: import("../types/index.ts").AnchoredResolutionMetadata;
 }
 
 /** Input shape for registering a resolved target. */
@@ -78,7 +78,7 @@ export interface TargetRegistrationInput {
    * anchored coordinates. Carries requested/resolved coordinates, whether
    * the anchor was snapped, and the provider-backed evidence source.
    */
-  resolution?: import("../types.ts").AnchoredResolutionMetadata;
+  resolution?: import("../types/index.ts").AnchoredResolutionMetadata;
 }
 
 /** Output from registering a target: stable session-scoped handles and the full stored entry. */
@@ -101,10 +101,8 @@ function normalizeCwd(cwd: string): string {
 
 // ── File fingerprinting ───────────────────────────────────────────────
 
-const MAX_FINGERPRINT_BYTES = 1_048_576; // 1 MB — avoid hashing huge files
-
 /**
- * Compute a SHA-256 file fingerprint for staleness detection.
+ * Compute a full-file SHA-256 fingerprint for staleness detection.
  * Returns an error result when the file is missing or unreadable.
  */
 export function computeFileFingerprint(
@@ -115,10 +113,7 @@ export function computeFileFingerprint(
       return { kind: "error", message: `File not found: \`${file}\`` };
     }
     const content = readFileSync(file, { flag: "r" });
-    // Cap at MAX_FINGERPRINT_BYTES to avoid pathological files
-    const buffer =
-      content.length > MAX_FINGERPRINT_BYTES ? content.subarray(0, MAX_FINGERPRINT_BYTES) : content;
-    const hash = createHash("sha256").update(buffer).digest("hex");
+    const hash = createHash("sha256").update(content).digest("hex");
     return { kind: "ok", fingerprint: hash };
   } catch {
     return { kind: "error", message: `Cannot read file: \`${file}\`` };

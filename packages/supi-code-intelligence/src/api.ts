@@ -1,8 +1,7 @@
-// Reusable architecture and target-resolution helpers for peer extensions.
-// Non-provider contracts for the code-understanding stack.
+// Public type surface for @mrclrchtr/supi-code-intelligence.
+// Types only — no implementation exports.
 
 // Provider contracts and shared canonical types from the shared runtime.
-// Provider contracts also available as substrate type aliases for backward compat.
 export type {
   CalleesData,
   CapabilityState,
@@ -22,28 +21,21 @@ export type {
   StructuralProvider as StructuralSubstrate,
   StructuralResult,
 } from "@mrclrchtr/supi-code-runtime/api";
-// Code provider — reads capabilities from the shared workspace runtime.
-export type { CodeProvider, CodeProviderState } from "./analysis/context/request-context.ts";
-export { getCodeProvider } from "./analysis/context/request-context.ts";
-export { normalizePath } from "./analysis/search/helpers.ts";
-// Architecture model hosted locally in supi-code-intelligence.
+// Architecture model types.
 export type {
   ArchitectureModel,
   DependencyEdge,
   ModuleInfo,
-} from "./architecture/model.ts";
-export {
-  buildArchitectureModel,
-  findModuleForPath,
-  getDependencies,
-  getDependents,
-} from "./architecture/model.ts";
+} from "./analysis/architecture/model.ts";
+// Code provider types.
+export type { CodeProvider, CodeProviderState } from "./analysis/provider.ts";
+// Target resolution types.
 export type {
   ResolvedTargetData,
   ResolvedTargetGroupData,
   TargetOutcome,
-} from "./targeting/types.ts";
-// Code-intelligence-specific types (not shared with the runtime)
+} from "./analysis/target/types.ts";
+// Code-intelligence-specific result types.
 export type {
   AffectedDetails,
   BriefDetails,
@@ -56,4 +48,4 @@ export type {
   ResolveDetails,
   SearchDetails,
   TestSurfaceDetails,
-} from "./types.ts";
+} from "./types/index.ts";

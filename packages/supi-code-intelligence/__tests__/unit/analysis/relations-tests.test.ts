@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { discoverTestFilesForSource } from "../../../src/analysis/relations/tests.ts";
+import { discoverTestFilesForSource } from "../../../src/analysis/tests/test-discovery.ts";
 
 let tmpDir: string;
 
@@ -23,20 +23,20 @@ function writeSource(relPath: string, source: string): void {
 describe("shared test discovery contract", () => {
   it("discovers package-layout test file when semantic references are empty", async () => {
     // Simulate a typical package layout:
-    //   src/tool/execute-graph.ts (source)
-    //   __tests__/unit/tool/execute-graph.test.ts (test)
-    writeSource("src/tool/execute-graph.ts", "export function executeGraph() { return 1; }\n");
+    //   src/tool/graph/execute.ts (source)
+    //   __tests__/unit/execute-graph.test.ts (test — found via bounded tool candidates)
+    writeSource("src/tool/graph/execute.ts", "export function executeGraph() { return 1; }\n");
     writeSource(
-      "__tests__/unit/tool/execute-graph.test.ts",
-      "import { executeGraph } from '../../src/tool/execute-graph';\n",
+      "__tests__/unit/execute-graph.test.ts",
+      "import { executeGraph } from '../../src/tool/graph/execute';\n",
     );
     // Write a package.json to signal a package root
     writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
 
     // Semantic references return empty — no import-chain evidence.
-    // With the enhanced helper, this should still find the package-layout test file.
+    // With the enhanced helper, this should still find the bounded-candidate test file.
     const { files, provenance } = await discoverTestFilesForSource(
-      path.join(tmpDir, "src/tool/execute-graph.ts"),
+      path.join(tmpDir, "src/tool/graph/execute.ts"),
       {
         references: async () => [],
         cwd: tmpDir,
@@ -45,7 +45,7 @@ describe("shared test discovery contract", () => {
     );
 
     expect(files.length).toBeGreaterThan(0);
-    expect(files.some((f) => f.absPath.includes("__tests__/unit/tool/execute-graph.test.ts"))).toBe(
+    expect(files.some((f) => f.absPath.includes("__tests__/unit/execute-graph.test.ts"))).toBe(
       true,
     );
     // References returned empty -> provenance is conventions-only
@@ -74,14 +74,14 @@ describe("shared test discovery contract", () => {
   });
 
   it("keeps discovery provenance separate from extracted labels", async () => {
-    writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource("src/tool/find/execute.ts", "export function executeFind() { return 1; }\n");
     writeSource(
       "__tests__/code-find-tool.test.ts",
-      "import { executeFind } from '../src/tool/execute-find';\nvoid executeFind;\n",
+      "import { executeFind } from '../src/tool/find/execute';\nvoid executeFind;\n",
     );
 
     const { files, provenance } = await discoverTestFilesForSource(
-      path.join(tmpDir, "src/tool/execute-find.ts"),
+      path.join(tmpDir, "src/tool/find/execute.ts"),
       {
         references: async () => [
           {
@@ -124,7 +124,7 @@ describe("shared test discovery contract", () => {
   it("does not classify false positives as tests", async () => {
     writeSource("src/contest.ts", "export const x = 1;\n");
     writeSource("src/testing.ts", "export const y = 2;\n");
-    writeSource("src/tool/tool-specs.ts", "export const spec = true;\n");
+    writeSource("src/tool/specs.ts", "export const spec = true;\n");
 
     // With empty references, the function should not fabricate test files
     const forContest = await discoverTestFilesForSource(path.join(tmpDir, "src/contest.ts"), {
@@ -139,7 +139,7 @@ describe("shared test discovery contract", () => {
     });
     expect(forTesting.files.every((f) => !f.absPath.endsWith("src/testing.ts"))).toBe(true);
 
-    const forSpec = await discoverTestFilesForSource(path.join(tmpDir, "src/tool/tool-specs.ts"), {
+    const forSpec = await discoverTestFilesForSource(path.join(tmpDir, "src/tool/specs.ts"), {
       references: async () => [],
       cwd: tmpDir,
     });
@@ -301,16 +301,16 @@ describe("shared test discovery contract", () => {
   });
 
   it("discovers bounded tool test file via conventions-only", async () => {
-    // Source at src/tool/execute-find.ts, test at __tests__/unit/code-find-tool.test.ts
-    writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    // Source at src/tool/find/execute.ts, test at __tests__/unit/code-find-tool.test.ts
+    writeSource("src/tool/find/execute.ts", "export function executeFind() { return 1; }\n");
     writeSource(
       "__tests__/unit/code-find-tool.test.ts",
-      "import { executeFind } from '../../src/tool/execute-find';\n",
+      "import { executeFind } from '../../src/tool/find/execute';\n",
     );
     writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
 
     const { files, kind, provenance } = await discoverTestFilesForSource(
-      path.join(tmpDir, "src/tool/execute-find.ts"),
+      path.join(tmpDir, "src/tool/find/execute.ts"),
       {
         references: async () => [],
         cwd: tmpDir,
@@ -328,15 +328,15 @@ describe("shared test discovery contract", () => {
   });
 
   it("discovers root-level execute-name tool test via bounded conventions", async () => {
-    writeSource("src/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource("src/tool/find/execute.ts", "export function executeFind() { return 1; }\n");
     writeSource(
       "__tests__/unit/execute-find.test.ts",
-      "import { executeFind } from '../../src/tool/execute-find';\n",
+      "import { executeFind } from '../../src/tool/find/execute';\n",
     );
     writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
 
     const { files, provenance } = await discoverTestFilesForSource(
-      path.join(tmpDir, "src/tool/execute-find.ts"),
+      path.join(tmpDir, "src/tool/find/execute.ts"),
       {
         references: async () => [],
         cwd: tmpDir,
@@ -351,7 +351,7 @@ describe("shared test discovery contract", () => {
   });
 
   it("does not apply bounded tool aliases outside src/tool", async () => {
-    writeSource("lib/tool/execute-find.ts", "export function executeFind() { return 1; }\n");
+    writeSource("lib/tools/find/execute.ts", "export function executeFind() { return 1; }\n");
     writeSource(
       "__tests__/unit/code-find-tool.test.ts",
       "import { executeFind } from '../../lib/tool/execute-find';\n",
@@ -359,7 +359,7 @@ describe("shared test discovery contract", () => {
     writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-pkg" }));
 
     const { files, kind } = await discoverTestFilesForSource(
-      path.join(tmpDir, "lib/tool/execute-find.ts"),
+      path.join(tmpDir, "lib/tools/find/execute.ts"),
       {
         references: async () => [],
         cwd: tmpDir,

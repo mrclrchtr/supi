@@ -1,6 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
-import type { CodeIntelligenceToolName } from "../intent/types.ts";
+import type { CodeIntelligenceToolName } from "../types/index.ts";
 
 const ScopeParam = Type.String({
   description: "Workspace-relative path, package, or directory scope for the workflow query.",

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
  */
 describe("relations service", () => {
   it("returns typed caller relations from callers module", async () => {
-    const { collectCallers } = await import("../../../src/analysis/relations/callers.ts");
+    const { collectCallers } = await import("../../../src/tool/graph/references.ts");
 
     const result = await collectCallers(
       "/project/src/file.ts",
@@ -19,9 +19,7 @@ describe("relations service", () => {
   });
 
   it("returns typed implementation relations from implementations module", async () => {
-    const { collectImplementations } = await import(
-      "../../../src/analysis/relations/implementations.ts"
-    );
+    const { collectImplementations } = await import("../../../src/tool/graph/implementations.ts");
 
     const result = await collectImplementations(
       "/project/src/file.ts",
@@ -34,7 +32,7 @@ describe("relations service", () => {
   });
 
   it("returns typed callee relations from callees module", async () => {
-    const { collectCallees } = await import("../../../src/analysis/relations/callees.ts");
+    const { collectCallees } = await import("../../../src/tool/graph/callees.ts");
 
     const result = await collectCallees("/project/src/file.ts", 10, 5, "myFunction", {
       cwd: "/project",

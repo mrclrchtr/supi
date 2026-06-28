@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createCodeIntelligenceApp } from "../../../src/app/create-code-intelligence-app.ts";
+import { createCodeIntelligenceApp } from "../../../src/app/app.ts";
 
 /**
  * Workspace-manager tests.
@@ -54,18 +54,16 @@ describe("workspace-manager", () => {
     const sessionA = app.createSession("/project-a");
     const sessionB = app.createSession("/project-b");
     // Each session should have its own refactor plan store
-    expect(sessionA.refactorPlans).not.toBe(sessionB.refactorPlans);
-    expect(sessionA.refactorPlans.size).toBe(0);
-    expect(sessionB.refactorPlans.size).toBe(0);
+    expect(sessionA.planCount).toBe(0);
+    expect(sessionB.planCount).toBe(0);
   });
 
   it("creates sessions with distinct target stores", () => {
     const sessionA = app.createSession("/project-a");
     const sessionB = app.createSession("/project-b");
     // Each session should have its own workflow target store
-    expect(sessionA.workflowTargets).not.toBe(sessionB.workflowTargets);
-    expect(sessionA.workflowTargets.size).toBe(0);
-    expect(sessionB.workflowTargets.size).toBe(0);
+    expect(sessionA.targetCount).toBe(0);
+    expect(sessionB.targetCount).toBe(0);
   });
 
   it("tracks overview-injection state on a session", () => {

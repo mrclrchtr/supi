@@ -2,7 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getHandlerOrThrow } from "@mrclrchtr/supi-test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import codeIntelligenceExtension from "../../../src/code-intelligence.ts";
+import codeIntelligenceExtension from "../../../src/extension.ts";
 
 /**
  * Overview-injection tests.

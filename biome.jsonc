@@ -134,7 +134,7 @@
       }
     },
     {
-      "includes": ["packages/supi-code-intelligence/src/ui/code-intelligence-status-overlay.ts"],
+      "includes": ["packages/supi-code-intelligence/src/ui/status-overlay.ts"],
       "linter": {
         "rules": {
           "style": {

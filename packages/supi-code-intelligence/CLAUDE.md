@@ -7,90 +7,64 @@ Surfaces:
 - Historical substrate-named tools are no longer registered on the public surface as of Phase 1.5. The LSP and tree-sitter libraries remain as internal substrates.
 - Installing this package activates only `code_*` tools
 - Does **not** own a session-scoped cache or runtime service — reads capability state from the shared workspace broker (`@mrclrchtr/supi-code-runtime`)
-- `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` / `src/index.ts` exposes reusable architecture helpers
+- `@mrclrchtr/supi-code-intelligence/api` → `src/api.ts` exposes reusable type contracts
 
 ## Architecture
 
 ```text
 src/
-├── code-intelligence.ts    # Extension factory — composition root over all internal layers
-├── extension.ts            # Re-exports code-intelligence.ts for pi extension discovery
-├── index.ts                # Public API exports for programmatic consumers
-├── api.ts                  # Re-export surface for @mrclrchtr/supi-code-intelligence/api
-├── types.ts                # Result metadata types (BriefDetails, InspectDetails, ContextDetails, SearchDetails, etc.)
-├── architecture/
-│   └── model.ts            # Project model builder for auto-injected overviews
-├── project/
-│   ├── git-context.ts      # Git branch, dirty files, last commit helpers
-│   └── prioritization-signals.ts # Diagnostics, coverage, knip unused signals
-├── intent/
-│   └── types.ts            # Normalized intent and routing contracts (PlannerRoute, etc.)
-├── targeting/              # Canonical targeting pipeline (resolve-anchored, resolve-file, resolve-symbol, types)
-├── use-case/               # Typed orchestration modules (brief, brief-focused, build-overview, generate-*)
-├── lsp/                    # LSP lifecycle, diagnostics, settings, tool overrides, workspace recovery
-├── tree-sitter/            # Tree-sitter session lifecycle (substrate only)
-├── app/
-│   ├── create-code-intelligence-app.ts  # App composition root — wires pi events
-│   └── workspace-manager.ts  # Per-cwd workspace session lifecycle
-├── session/
-│   ├── workspace-code-intelligence-session.ts  # Per-cwd session facade (ADR 0008)
-│   └── target-store.ts     # Session-scoped target/span handle registry
-├── analysis/
-│   ├── helpers.ts           # Resolution/dedup helpers (isResolvedTargetGroup, highestConfidence)
-│   ├── context/
-│   │   └── request-context.ts  # Explicit analysis context over shared broker
-│   ├── resolve/
-│   │   ├── service.ts          # code_resolve business logic
-│   │   └── resolve-file.ts     # File-only and path-like query resolution
-│   ├── references/             # Semantic reference collection service
-│   │   └── service.ts
-│   ├── calls/                  # Structural outgoing call service
-│   │   └── service.ts
-│   ├── implementations/        # Semantic implementation service
-│   │   └── service.ts
-│   ├── relations/
-│   │   ├── types.ts            # Shared types (CallerEvidence, RelationsServiceDeps)
-│   │   ├── callers.ts          # Semantic caller (reference) collection
-│   │   ├── implementations.ts  # Semantic implementation lookup
-│   │   ├── callees.ts          # Structural callee lookup
-│   │   └── tests.ts            # Shared test discovery
-│   ├── search/
-│   │   ├── helpers.ts          # ripgrep wrapper, path normalization, URI helpers
-│   │   └── pattern-structured.ts # Tree-sitter-based structured pattern search
-│   └── refactor/
-│       ├── safety.ts           # Edit validation
-│       ├── apply-workspace-edit.ts # File mutation
-│       └── plan-store.ts       # Two-step refactor plan storage
-├── tool/
-│   ├── tool-specs.ts           # Single source of truth for current public tool metadata
-│   ├── guidance.ts             # Intent-first prompt surfaces from specs
-│   ├── register-tools.ts       # Focused Pi tool registration (iterates over specs)
-│   ├── validation.ts           # Shared parameter validation
-│   ├── query-params.ts         # Shared CodeQueryParams type
-│   ├── semantic-readiness.ts   # LSP warmup/readiness gating
-│   ├── execute-context.ts      # code_orientation tool executor
-│   ├── execute-inspect.ts      # code_inspect point-inspection executor
-│   ├── execute-graph.ts        # code_graph tool executor (unified relations)
-│   ├── execute-impact.ts       # code_impact tool executor
-│   ├── execute-find.ts         # code_find tool executor
-│   ├── execute-resolve.ts      # code_resolve tool executor
-│   ├── execute-refactor-plan.ts  # preview refactor plan executor
-│   └── execute-refactor-apply.ts # plan application executor
-├── presentation/markdown/
-│   ├── overview.ts             # Hidden overview markdown renderer
-│   ├── context.ts              # code_orientation markdown renderer
-│   ├── brief.ts                # Brief markdown renderer
-│   ├── inspect.ts              # code_inspect markdown renderer
-│   ├── relations.ts            # Relations markdown renderer (callers/callees/implementations)
-│   ├── impact.ts               # Workflow impact markdown renderer
-│   ├── pattern.ts              # Pattern/find search markdown renderer
-│   ├── refactor.ts             # Refactor result markdown renderer
-│   └── resolve.ts              # code_resolve markdown renderer (Phase 1)
-│   └── health.ts               # code_health markdown renderer (Phase 1.5)
-└── ui/
-    ├── code-intelligence-status-command.ts  # /supi-ci-status command
-    └── lsp-message-renderer.ts              # lsp-context custom message renderer
+├── api.ts                 # Public type-only API surface
+├── index.ts               # Package-root type re-export surface
+├── extension.ts           # pi extension entrypoint / composition root
+├── app/                   # App composition root and session lifecycle manager
+│   ├── app.ts             # CodeIntelligenceApp — wires pi session events
+│   └── manager.ts         # Per-cwd session create/release/shutdown
+├── session/               # Session-scoped state
+│   ├── session.ts         # WorkspaceCodeIntelligenceSession facade / ADR 0008
+│   ├── target-store.ts    # Target/span handle registry
+│   └── refactor-plans.ts  # In-memory refactor plan registry
+├── substrate/             # Narrow substrate adapters and lifecycle wiring
+│   ├── lsp/               # LSP lifecycle, settings, overrides, recovery, diagnostics injection
+│   └── tree-sitter/       # Tree-sitter lifecycle
+├── analysis/              # Code-analysis modules and data helpers
+│   ├── target/            # Provider-backed target resolution pipeline
+│   ├── brief/             # Project/file/directory/symbol orientation briefing
+│   ├── architecture/      # Workspace architecture model discovery
+│   ├── signals/           # Git, diagnostics, coverage, and unused-code signals
+│   ├── coverage/          # Degraded semantic/structural coverage warning evaluation
+│   ├── references/        # Semantic reference aggregation helpers
+│   ├── search/            # Ripgrep + structured search support
+│   ├── tests/             # Companion test discovery and Vitest detection
+│   ├── provider.ts        # Composite CodeProvider over runtime semantic/structural providers
+│   └── readiness.ts       # Semantic readiness gating policy
+├── tool/                  # Public code_* tool surface
+│   ├── specs.ts           # Canonical tool specs — single source of truth
+│   ├── schemas.ts         # TypeBox parameter schemas
+│   ├── guidance.ts        # Intent-first prompt surfaces from specs
+│   ├── register.ts        # Pi tool registration adapter
+│   ├── params.ts          # Shared param helpers
+│   ├── infra/             # Tool pipeline, validation, progress, truncation, error results
+│   └── <tool>/            # code_orientation, graph, find, health, impact, inspect, resolve, refactor-*
+├── ui/                    # Shared UI surfaces and renderers not colocated with a tool
+│   ├── markdown/          # Overview/brief/gather markdown helpers
+│   ├── tui/               # Shared TUI helpers/barrel
+│   ├── status-command.ts  # /supi-ci-status command
+│   ├── status-overlay.ts  # Status overlay TUI
+│   ├── message-renderer.ts# LSP-context custom message renderer
+│   └── footer.ts          # LSP footer contribution
+└── types/                 # Small cross-cutting internal type surface
+    ├── details.ts
+    ├── execution.ts
+    ├── tool-names.ts
+    └── index.ts
 ```
+
+Layering notes:
+- `extension.ts` and `app/` own pi event wiring and composition.
+- `substrate/` owns adapter lifecycle/state/recovery only; analysis logic lives elsewhere.
+- `analysis/` is pi-registration-free. Some brief modules intentionally return rendered markdown because orientation briefs are the analysis product.
+- `tool/` owns the public model-callable surface; per-tool markdown/TUI renderers stay colocated with their tool implementations.
+- `session/` owns in-memory handles and refactor plans.
 
 ## Public tool contracts
 
@@ -124,7 +98,7 @@ Unified relation-graph tool. Replaces `code_references`, `code_calls`, `code_imp
 - Each relation dispatched to appropriate substrate (semantic for references/implements, structural for callees)
 - Best-effort per relation: unavailable substrates skip with a note rather than failing the entire call
 - `callees` reports direct structural outgoing calls from the enclosing executable scope at the target anchor. It matches call expressions by source shape, not symbol identity, and excludes calls inside nested function/method/callback scopes.
-- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using the shared helper in `src/analysis/relations/tests.ts`. Discovery combines semantic import/reference evidence with deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`, same-directory companions). `code_graph` and `code_impact` use the same discovery path — any divergence is a bug.
+- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using the shared helper in `src/analysis/tests/test-discovery.ts`. Discovery combines semantic import/reference evidence with deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`, same-directory companions). `code_graph` and `code_impact` use the same discovery path — any divergence is a bug.
 - Targeted graph output includes `Read Next` guidance for the resolved target, enclosing scope, or top relation sites when those source ranges are known
 - File-level expansion not supported — requires precise target (anchored coords or targetId)
 
@@ -190,14 +164,14 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - LSP now always attempts to start detected servers — there is no global disable.
 - Per-language disable via `lsp.servers.<language>.enabled: false` is the only supported opt-out.
 - Deprecated keys are detected via `getDeprecatedLspKeys()` from `@mrclrchtr/supi-lsp/api`.
-- Coverage warnings for degraded state (deprecated keys, missing servers, explicit disables, Tree-sitter failures) are computed by `src/lsp/coverage-warnings.ts` and surfaced in:
+- Coverage warnings for degraded state (deprecated keys, missing servers, explicit disables, Tree-sitter failures) are computed by `src/analysis/coverage/coverage-warnings.ts` and surfaced in:
   - the /supi-ci-status overlay (as a "Degraded Coverage" section)
   - code_health (as a "Degraded Coverage" section)
   - a one-time chat-visible message after a short grace period (5s)
 
 ## TUI rendering
 
-- `src/presentation/tui/` contains per-tool `renderCall` and `renderResult` for all 9 tools, wired in `register-tools.ts` via `getToolRenderer()`.
+- Per-tool `renderCall` and `renderResult` live beside each tool under `src/tool/<tool>/tui.ts`, wired in `tool/register.ts` via `getToolRenderer()`; `src/ui/tui/` contains shared TUI helpers/barrels.
 - **Dual-surface**: TUI body + chrome built from `details`; markdown `content` shown as `▸ raw markdown` collapsible detail. Never parse markdown in TUI renderers — body and chrome are independent consumers of the same evidence.
 - `formatEvidenceBadge({ shownCount, totalCount, omittedCount, partialReason, label })` from `@mrclrchtr/supi-code-runtime/api` formats evidence completeness badges used in all tool result renderers.
 - `evidenceKeyToLabel()` in `graph.ts` maps structured evidence keys (`references.locations`, `resolve.targets`, etc.) to human-readable labels. Add new keys there when they appear in tool details.
@@ -218,7 +192,7 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
   - Warmup timeouts stay error-text results (transient readiness, not capability-unavailable).
 
 ### Tool adapter contract
-- The adapter in `register-tools.ts` head-truncates every executor's `content` string at pi defaults (2000 lines / 50 KB) via `truncateHead`, appending a `[truncated: kept N of M lines (X of Y)]` notice. `details` are never truncated. Per‑spec `maxLines`/`maxBytes` overrides are available on `CodeIntelligenceToolDefinitionSpec`. When `spillToTempFile: true` and truncation occurs, the full content is written to a temp file and the path is appended to the truncation notice.
+- The adapter in `tool/register.ts` head-truncates every executor's `content` string at pi defaults (2000 lines / 50 KB) via `truncateToolContent`, appending a `[truncated: kept N of M lines (X of Y)]` notice. `details` are never truncated. Per‑spec `maxLines`/`maxBytes` overrides are available on `CodeIntelligenceToolDefinitionSpec`. When `spillToTempFile: true` and truncation occurs, the full content is written to a temp file and the path is appended to the truncation notice.
 - The adapter forwards `signal` (AbortSignal) and `onUpdate` (AgentToolUpdateCallback) from pi's `execute()` through `spec.run` into every executor's `CodeIntelToolExecCtx`. Long‑running executors (`code_find` ripgrep, `code_graph:all`, `code_impact` sweeps, `code_health:refresh`, `code_refactor_plan` LSP requests) forward `signal` to abort‑aware sub‑processes and emit coarse `onUpdate` progress beats via `emitToolProgress`.
 
 ### Public-surface split
@@ -231,18 +205,18 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 
 ### Param validation
 - `code_inspect` requires `file` + `line` + `character`.
-- For `code_orientation`, `line`/`character` require `focus`. For other coordinate tools, `line`/`character` require `file`, **not** `scope`.
+- For `code_orientation`, `line`/`character` require `focus`. For public coordinate tools such as `code_inspect`, `code_graph`, and `code_refactor_plan`, `line`/`character` require `file`, **not** `scope`.
 - `code_refactor_plan` requires `operation` plus either `targetId` or `file` + `line` + `character`.
 - `newName` is required for `rename_symbol`, `extract_function`, and `extract_variable` (and for the legacy `rename` alias on `code_refactor_plan`).
 - `range` is required for `extract_function` and `extract_variable`; public range coordinates are 1-based and converted to LSP ranges internally.
 - `code_refactor_apply` requires `planId`.
 - `code_graph` requires `targetId`, `file` + `line` + `character`, or `symbol`. File-level expansion (file-only, no line/character) is not supported.
 - `code_orientation` accepts `targetId` or `focus` + `line` + `character` for precise symbol orientation. `targetId` takes precedence over focus/coordinates with a visible note; a stale/invalid `targetId` errors and does not fall back. Coordinate mode requires all three fields when any is present and `focus` must be a file path.
-- `code_orientation`, `code_impact`, and `code_refactor_plan` accept optional `targetId` that takes precedence over raw coordinates.
+- `code_orientation`, `code_graph`, `code_impact`, and `code_refactor_plan` accept optional `targetId`; for `code_impact`, `targetId` is the only public target selector.
 - `focus` is the orientation selection input for `code_orientation`; other tools keep `scope` for narrowing/filtering.
 
 ### Composite provider contract
-- `createCompositeProvider` in `src/analysis/context/request-context.ts` wraps `StructuralProvider` and `SemanticProvider` into a single `CodeProvider`. **When you add a new parameter to any provider method, update the composite wrapper to accept and pass it through.** Missing parameters are silently dropped — the wrapper uses `?` optional params, so TypeScript won't catch the mismatch at runtime (the extra argument is simply ignored).
+- `createCompositeProvider` in `src/analysis/provider.ts` wraps `StructuralProvider` and `SemanticProvider` into a single `CodeProvider`. It forwards provider method arguments via typed `...args`; when provider contracts change, update the wrapper method list itself and keep tests in `provider-compatibility.test.ts` aligned.
 
 ### Evidence provenance in test discovery
 - Test discovery results carry `provenance`: `"semantic+conventions"` if semantic references contributed files, `"conventions-only"` otherwise.
@@ -258,8 +232,8 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - `code_impact` with `changeSetFiles` appends an evidence note. It reports `semantic+structural` when semantic references for symbols defined in change-set files contributed, otherwise `structural` for file-level module analysis and path-based test discovery.
 
 ### Shared test discovery
-- `src/analysis/relations/tests.ts` is the single source of truth for test-file discovery. `code_graph` and `code_impact` route through `discoverTestFilesForSource()`. Any divergent test lookup logic in a tool file is a bug.
-- Discovery combines semantic import/reference evidence with deterministic path conventions: same-directory companions, same-directory `__tests__/` companions, package-level mirrors (`__tests__/unit/…`, `__tests__/integration/…`), and bounded tool/package-aware candidates. For source files at `src/tool/execute-<name>.ts`, exact candidates such as `code-<name>-tool`, `<name>-tool`, and `execute-<name>` are checked in both `__tests__/unit/` and `__tests__/integration/` with `.test` and `.spec` suffixes. No broad search, fuzzy matching, or AI guessing is performed.
+- `src/analysis/tests/test-discovery.ts` is the single source of truth for test-file discovery. `code_graph` and `code_impact` route through `discoverTestFilesForSource()`. Any divergent test lookup logic in a tool file is a bug.
+- Discovery combines semantic import/reference evidence with deterministic path conventions: same-directory companions, same-directory `__tests__/` companions, package-level mirrors (`__tests__/unit/…`, `__tests__/integration/…`), and bounded tool/package-aware candidates. For source files at `src/tool/<name>/execute.ts`, exact candidates such as `code-<name>-tool`, `<name>-tool`, and `execute-<name>` are checked in both `__tests__/unit/` and `__tests__/integration/` with `.test` and `.spec` suffixes. No broad search, fuzzy matching, or AI guessing is performed.
 
 ### Impact seeding
 - Target-based `code_impact` seeds the target file itself as affected evidence. A symbol with zero semantic references still reports its own file as affected and can discover likely tests through the shared test-discovery helper.
@@ -269,11 +243,11 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 ### Target resolution and handles
 - Symbol discovery is semantic-only for non-search tools.
 - File-level target expansion is allowed only when the required substrate can support it.
-- The planner delegates to the existing targeting pipeline (`resolve-target.ts` and `src/targeting/*`).
-- `code_resolve` registers targets in a session-scoped in-memory store (`src/workflow/target-store.ts`).
-- Anchored `code_resolve({ file, line, character })` resolves a **real symbol target** from provider-backed evidence via `resolveAnchoredSymbolTarget` (`src/targeting/resolve-anchored.ts`): exact identifier hit → named `name` anchor; declaration-header coordinate → snaps to the name anchor only when one provider-backed symbol is unambiguous (with a visible note + structured resolution metadata); whitespace/comment/non-symbol coordinates error and recommend `code_inspect`. It does **not** register anonymous point targets.
+- The planner delegates to the target resolution pipeline in `src/analysis/target/`.
+- `code_resolve` registers targets in a session-scoped in-memory store (`src/session/target-store.ts`).
+- Anchored `code_resolve({ file, line, character })` resolves a **real symbol target** from provider-backed evidence via `resolveAnchoredSymbolTarget` (`src/analysis/target/anchored.ts`): exact identifier hit → named `name` anchor; declaration-header coordinate → snaps to the name anchor only when one provider-backed symbol is unambiguous (with a visible note + structured resolution metadata); whitespace/comment/non-symbol coordinates error and recommend `code_inspect`. It does **not** register anonymous point targets.
 - `code_orientation` coordinate mode (`focus` + `line` + `character`) reuses the same anchored resolution + store path as `code_resolve` (via `executeResolveService`), so a one-call orientation result exposes a reusable `targetId`.
-- `code_graph` and `code_impact` coordinate mode (`file` + `line` + `character`) routes through `resolveTarget` (`src/analysis/targeting/resolve-target.ts`), whose anchored case calls the same `resolveAnchoredSymbolTarget` — all four target-oriented tools share one provider-backed symbol resolver and never produce anonymous `name:null` point targets (ADR 0003). The legacy sync `resolveAnchoredTarget` point-target resolver has been removed.
+- `code_graph` coordinate mode (`file` + `line` + `character`) routes through `resolveTarget` (`src/analysis/target/bridge.ts`), whose anchored case calls the same `resolveAnchoredSymbolTarget`. `code_impact` consumes `targetId`s produced by that same store-backed resolver rather than exposing raw coordinate targeting. The target-oriented tools never produce anonymous `name:null` point targets (ADR 0003). The legacy sync `resolveAnchoredTarget` point-target resolver has been removed.
 - Target IDs (`tg-*`) and span IDs (`sp-*`) are deterministic and stable while the backing file fingerprint is unchanged. Per ADR 0003, position is excluded from the `targetId` identity hash (name/kind/container/fingerprint), so re-resolving the same symbol reuses the same ID regardless of anchor refine success.
 - Unknown or stale target IDs return explicit unavailable messages rather than silent fallthrough. `code_orientation` and `code_graph` do **not** fall back to coordinates when a `targetId` is stale/invalid.
 - No cross-session persistence — target handles live only as long as the current process.

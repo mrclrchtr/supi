@@ -9,7 +9,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { CodeProvider } from "../../src/analysis/context/request-context.ts";
+import type { CodeProvider } from "../../src/analysis/provider.ts";
 
 /**
  * A `documentSymbols` mock that scans the file on disk and synthesizes

@@ -1,12 +1,12 @@
-import { getOrCreateSessionForCwd } from "../../src/app/create-code-intelligence-app.ts";
-import { executeOrientationTool } from "../../src/tool/execute-context.ts";
-import { executeFindTool } from "../../src/tool/execute-find.ts";
-import type { GraphRelation } from "../../src/tool/execute-graph.ts";
-import { executeGraphTool } from "../../src/tool/execute-graph.ts";
-import { executeImpactTool } from "../../src/tool/execute-impact.ts";
-import { executeRefactorApplyTool } from "../../src/tool/execute-refactor-apply.ts";
-import { executeRefactorPlanTool } from "../../src/tool/execute-refactor-plan.ts";
-import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../src/types.ts";
+import { createSessionCache } from "../../src/app/app.ts";
+import { executeFindTool } from "../../src/tool/find/execute.ts";
+import type { GraphRelation } from "../../src/tool/graph/execute.ts";
+import { executeGraphTool } from "../../src/tool/graph/execute.ts";
+import { executeImpactTool } from "../../src/tool/impact/execute.ts";
+import { executeOrientationTool } from "../../src/tool/orientation/execute.ts";
+import { executeRefactorApplyTool } from "../../src/tool/refactor-apply/execute.ts";
+import { executeRefactorPlanTool } from "../../src/tool/refactor-plan/execute.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../src/types/index.ts";
 
 export type TestAction =
   | "graph"
@@ -56,14 +56,16 @@ const SUPPORTED_ACTIONS = [
   "refactor_apply",
 ] as const satisfies readonly TestAction[];
 
+export const sessionCache = createSessionCache();
+
 /**
  * Build a full CodeIntelToolExecCtx from a minimal cwd-only context.
  *
- * Uses the shared `getOrCreateSessionForCwd` cache so targets registered
- * via `getOrCreateSessionForCwd` in test setup are visible to tool executors.
+ * Uses a module-level session cache so targets registered in one call
+ * are visible to subsequent tool calls for the same cwd.
  */
 function buildCtx(ctx: { cwd: string }): CodeIntelToolExecCtx {
-  const session = getOrCreateSessionForCwd(ctx.cwd);
+  const session = sessionCache.getOrCreate(ctx.cwd);
   return { cwd: ctx.cwd, session };
 }
 
@@ -72,7 +74,7 @@ function buildCtx(ctx: { cwd: string }): CodeIntelToolExecCtx {
  * Used in tests that call executors without going through `executeAction`.
  */
 export function makeTestCtx(cwd: string): CodeIntelToolExecCtx {
-  const session = getOrCreateSessionForCwd(cwd);
+  const session = sessionCache.getOrCreate(cwd);
   return { cwd, session };
 }
 

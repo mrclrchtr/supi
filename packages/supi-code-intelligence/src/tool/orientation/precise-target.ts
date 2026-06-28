@@ -7,14 +7,14 @@
  */
 
 import { relative } from "node:path";
-import { executeResolveService } from "../../analysis/resolve/service.ts";
+import { executeResolveService } from "../../analysis/target/service.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
-import type { CodeIntelResult, CodeIntelToolExecCtx, ContextDetails } from "../../types.ts";
-import { executeContext } from "../../use-case/generate-context.ts";
-import { orientationCoordinateRules } from "../cross-field.ts";
-import { unavailableContextDetails } from "../details-helpers.ts";
-import type { CodeOrientationToolParams } from "../execute-context.ts";
-import { prepareContextDeps } from "./context-deps.ts";
+import type { CodeIntelResult, CodeIntelToolExecCtx, ContextDetails } from "../../types/index.ts";
+import { orientationCoordinateRules } from "../infra/cross-field.ts";
+import { unavailableContextDetails } from "../infra/error-results.ts";
+import { prepareOrientationDeps } from "./deps.ts";
+import type { CodeOrientationToolParams } from "./execute.ts";
+import { executeOrientation } from "./orchestrate.ts";
 
 /**
  * A resolved precise target: the store entry (with handles) plus
@@ -26,6 +26,17 @@ export interface PreciseTarget {
 }
 
 /**
+ * Outcome of precise-target resolution in code_orientation.
+ *
+ * {@link resolvePreciseTarget} returns this discriminated union instead
+ * of {@link CodeIntelResult} | null so callers can't silently fall through
+ * on a bug that produces null unintentionally.
+ */
+export type PreciseTargetOutcome =
+  | { kind: "resolved"; result: CodeIntelResult }
+  | { kind: "fallthrough" };
+
+/**
  * Resolve a precise target ({@link CodeOrientationToolParams.targetId}
  * wins over focus/coordinates), then run symbol-centered orientation
  * sections. Falls through to orientation-mode when both targetId
@@ -35,37 +46,37 @@ export async function resolvePreciseTarget(
   params: CodeOrientationToolParams,
   ctx: CodeIntelToolExecCtx,
   hasCoords: boolean,
-): Promise<CodeIntelResult | null> {
+): Promise<PreciseTargetOutcome> {
   if (params.targetId !== undefined && params.targetId !== null) {
-    const targetIdResult = await resolveTargetIdTarget(params, ctx, hasCoords);
-    if (targetIdResult) return targetIdResult;
+    const targetIdOutcome = await resolveTargetIdTarget(params, ctx, hasCoords);
+    if (targetIdOutcome.kind === "resolved") return targetIdOutcome;
   }
 
   if (hasCoords) {
-    const coordResult = await resolveCoordinateTarget(params, ctx);
-    if (coordResult) return coordResult;
+    const coordOutcome = await resolveCoordinateTarget(params, ctx);
+    if (coordOutcome.kind === "resolved") return coordOutcome;
   }
 
-  return null;
+  return { kind: "fallthrough" };
 }
 
-/** Resolve a targetId-supplied precise target, or null to fall through. */
+/** Resolve a targetId-supplied precise target, or fallthrough. */
 async function resolveTargetIdTarget(
   params: CodeOrientationToolParams,
   ctx: CodeIntelToolExecCtx,
   hasCoords: boolean,
-): Promise<CodeIntelResult | null> {
+): Promise<PreciseTargetOutcome> {
   const expansion = ctx.session.expandTargetId(params);
   if (expansion.kind === "error") {
-    return {
+    return wrapOutcome({
       content: expansion.message,
       details: unavailableContextDetails([
         "Verify the `targetId` is valid and from this session",
         "Re-resolve with `code_resolve` to get a fresh targetId",
       ]),
-    };
+    });
   }
-  if (expansion.kind !== "ok") return null;
+  if (expansion.kind !== "ok") return { kind: "fallthrough" };
 
   const notes: string[] = [];
   if (params.focus || hasCoords) {
@@ -74,22 +85,24 @@ async function resolveTargetIdTarget(
     );
   }
 
-  return runWithContextTarget(params, ctx, { entry: expansion.entry, notes });
+  return wrapOutcome(
+    await runWithOrientationTarget(params, ctx, { entry: expansion.entry, notes }),
+  );
 }
 
-/** Resolve a focus+coordinate-supplied precise target, or null to fall through. */
+/** Resolve a focus+coordinate-supplied precise target, or fallthrough. */
 async function resolveCoordinateTarget(
   params: CodeOrientationToolParams,
   ctx: CodeIntelToolExecCtx,
-): Promise<CodeIntelResult | null> {
+): Promise<PreciseTargetOutcome> {
   const coordError = validateCoordinateParams(params, ctx.cwd);
   if (coordError) {
-    return {
+    return wrapOutcome({
       content: coordError,
       details: unavailableContextDetails([
         "Provide `focus`, `line`, and `character` together for symbol orientation",
       ]),
-    };
+    });
   }
 
   const resolveResult = await executeResolveService(
@@ -98,29 +111,34 @@ async function resolveCoordinateTarget(
   );
 
   if (resolveResult.kind === "error") {
-    return {
+    return wrapOutcome({
       content: resolveResult.message,
       details: unavailableContextDetails([
         "Use `code_inspect` for point-level facts at this coordinate",
         "Or pass the identifier coordinate of a declaration",
       ]),
-    };
+    });
   }
-  if (resolveResult.kind === "disambiguation") return disambiguationResult(resolveResult);
+  if (resolveResult.kind === "disambiguation") {
+    return wrapOutcome(disambiguationResult(resolveResult));
+  }
 
   const entry = resolveResult.targets[0];
   if (!entry) {
-    return {
+    return wrapOutcome({
       content: "**Error:** Coordinate resolution returned no target.",
       details: unavailableContextDetails(["Use `code_inspect` for point-level facts"]),
-    };
+    });
   }
 
-  return runWithContextTarget(params, ctx, { entry, notes: [] });
+  return wrapOutcome(await runWithOrientationTarget(params, ctx, { entry, notes: [] }));
 }
 
-/** Run symbol-centered orientation sections for a precise target. */
-async function runWithContextTarget(
+/** Wrap a CodeIntelResult into a resolved PreciseTargetOutcome. */
+function wrapOutcome(result: CodeIntelResult): PreciseTargetOutcome {
+  return { kind: "resolved", result };
+}
+async function runWithOrientationTarget(
   params: CodeOrientationToolParams,
   ctx: CodeIntelToolExecCtx,
   precise: PreciseTarget,
@@ -133,12 +151,12 @@ async function runWithContextTarget(
   params.targetKind = entry.kind;
   params.targetAnchorKind = entry.anchorKind;
 
-  const deps = await prepareContextDeps(params, ctx);
+  const deps = await prepareOrientationDeps(params, ctx);
   if ("content" in deps) return deps;
 
-  const result = await executeContext(
+  const result = await executeOrientation(
     {
-      target: buildContextTarget(params),
+      target: buildOrientationTarget(params),
       maxResults: params.maxResults ?? 10,
       showGitContext: false,
     },
@@ -160,7 +178,7 @@ async function runWithContextTarget(
  */
 const validateCoordinateParams = orientationCoordinateRules<CodeOrientationToolParams>();
 
-function buildContextTarget(params: CodeOrientationToolParams) {
+function buildOrientationTarget(params: CodeOrientationToolParams) {
   if (!params.file || params.line == null || params.character == null) return null;
   return {
     file: params.file,

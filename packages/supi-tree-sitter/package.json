@@ -48,7 +48,8 @@
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-code-runtime",
-    "@mrclrchtr/supi-core"
+    "@mrclrchtr/supi-core",
+    "web-tree-sitter"
   ],
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

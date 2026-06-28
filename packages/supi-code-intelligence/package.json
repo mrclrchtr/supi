@@ -36,7 +36,8 @@
     "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
-    "@mrclrchtr/supi-tree-sitter": "workspace:*"
+    "@mrclrchtr/supi-tree-sitter": "workspace:*",
+    "ts-pattern": "^5.9.0"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-code-runtime",
@@ -65,9 +66,9 @@
     }
   },
   "devDependencies": {
+    "@mrclrchtr/supi-test-utils": "workspace:*",
     "@types/node": "25.9.4",
-    "vitest": "4.1.9",
-    "@mrclrchtr/supi-test-utils": "workspace:*"
+    "vitest": "4.1.9"
   },
   "pi": {
     "extensions": [
@@ -75,8 +76,9 @@
     ],
     "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.png"
   },
-  "main": "src/api.ts",
+  "main": "src/index.ts",
   "exports": {
+    ".": "./src/index.ts",
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
     "./package.json": "./package.json"
