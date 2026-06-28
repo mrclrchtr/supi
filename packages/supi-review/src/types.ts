@@ -87,16 +87,7 @@ export interface ReviewSnapshot {
 }
 
 /** Model picked explicitly for the current review run. */
-export interface ReviewModelSelection {
-  canonicalId: string;
-  provider: string;
-  id: string;
-  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
-  model: Model<any>;
-  label: string;
-  description?: string;
-  isCurrent: boolean;
-}
+export type ReviewModelSelection = import("@mrclrchtr/supi-core/model-selection").ModelSelection;
 
 /** Structured brief synthesized from the current session history. */
 export type ReviewInstructionBlockId =

@@ -17,6 +17,8 @@ export * from "./footer-registry.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./llm.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./model-selection.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./path.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./project.ts";
@@ -28,6 +30,8 @@ export * from "./session.ts";
 export * from "./settings.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./settings-ui.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./spinner-frames.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./terminal.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel

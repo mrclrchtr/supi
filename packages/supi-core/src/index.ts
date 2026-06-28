@@ -15,6 +15,8 @@ export * from "./debug-registry.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./footer-registry.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./model-selection.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./path.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./project.ts";

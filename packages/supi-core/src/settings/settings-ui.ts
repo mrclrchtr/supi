@@ -10,10 +10,14 @@ import {
   Input,
   Key,
   matchesKey,
+  type SelectItem,
+  SelectList,
+  type SelectListTheme,
   type SettingItem,
   SettingsList,
   Text,
 } from "@earendil-works/pi-tui";
+import { getSelectableModels } from "../model-selection.ts";
 import {
   getRegisteredSettings,
   type SettingsScope,
@@ -84,10 +88,11 @@ function buildFlatItems(
   sections: SettingsSection[],
   scope: SettingsScope,
   cwd: string,
+  ctx?: ExtensionContext,
 ): SettingItem[] {
   const items: SettingItem[] = [];
   for (const section of sections) {
-    const sectionItems = section.loadValues(scope, cwd);
+    const sectionItems = section.loadValues(scope, cwd, ctx);
     for (const item of sectionItems) {
       items.push({
         ...item,
@@ -115,6 +120,7 @@ function findSectionAndId(
 // ── Component ────────────────────────────────────────────────
 
 interface SettingsOverlayDeps {
+  ctx: ExtensionContext;
   state: OverlayState;
   container: Container;
   settingsList: SettingsList | null;
@@ -125,15 +131,21 @@ interface SettingsOverlayDeps {
 
 function createSettingsList(deps: SettingsOverlayDeps): SettingsList {
   const sections = getRegisteredSettings();
-  const items = buildFlatItems(sections, deps.state.scope, deps.state.cwd);
+  const items = buildFlatItems(sections, deps.state.scope, deps.state.cwd, deps.ctx);
   const onChange = (flatId: string, newValue: string) => {
     const found = findSectionAndId(sections, flatId);
     if (found) {
-      found.section.persistChange(deps.state.scope, deps.state.cwd, found.itemId, newValue);
+      found.section.persistChange(
+        deps.state.scope,
+        deps.state.cwd,
+        found.itemId,
+        newValue,
+        deps.ctx,
+      );
     }
     // Re-read all values to reflect persisted changes, but keep the list
     // instance (and its selectedIndex) intact.
-    const updatedItems = buildFlatItems(sections, deps.state.scope, deps.state.cwd);
+    const updatedItems = buildFlatItems(sections, deps.state.scope, deps.state.cwd, deps.ctx);
     for (const updated of updatedItems) {
       const existing = items.find((i) => i.id === updated.id);
       if (existing && existing.currentValue !== updated.currentValue) {
@@ -182,6 +194,98 @@ function handleScopeToggle(deps: SettingsOverlayDeps): void {
   deps.tui.requestRender();
 }
 
+/** Minimal SelectList theme — uses identity so the parent SettingsList provides styling context. */
+const PASSTHROUGH_THEME: SelectListTheme = {
+  selectedPrefix: (text) => `› ${text}`,
+  selectedText: (text) => text,
+  description: (text) => text,
+  scrollInfo: (text) => text,
+  noMatch: (text) => text,
+};
+
+/**
+ * Create a model picker submenu for settings.
+ *
+ * Shows a scrollable list of selectable models from the scoped model set,
+ * with the current session model annotated `[current]`.  The first entry is
+ * always `"disabled"`.
+ *
+ * @param currentValue - Currently configured canonical model id or `"disabled"`.
+ * @param done - Callback invoked with the selected value, or undefined on cancel.
+ * @param ctx - Extension context for model listing.  When undefined, only
+ *   `"disabled"` is offered.
+ */
+export function createModelPickerSubmenu(
+  currentValue: string,
+  done: (selectedValue?: string) => void,
+  ctx?: ExtensionContext,
+): {
+  render: (width: number) => string[];
+  invalidate: () => void;
+  handleInput: (data: string) => boolean;
+} {
+  const items = buildModelItems(ctx);
+
+  const initialIndex =
+    currentValue === "disabled"
+      ? 0
+      : Math.max(
+          0,
+          items.findIndex((item) => item.value === currentValue),
+        );
+
+  const container = new Container();
+  container.addChild(new Text("  Select suggestion model", 1, 0));
+  container.addChild(new Text("", 1, 0));
+
+  const selectList = new SelectList(items, Math.min(items.length, 15), PASSTHROUGH_THEME);
+
+  if (initialIndex >= 0) {
+    selectList.setSelectedIndex(initialIndex);
+  }
+
+  selectList.onSelect = (item) => done(item.value);
+  selectList.onCancel = () => done();
+
+  container.addChild(selectList);
+  container.addChild(new Text("  ↑↓ navigate • enter select • esc cancel", 1, 0));
+
+  return {
+    render: (width: number) => container.render(width),
+    invalidate: () => container.invalidate(),
+    handleInput: (data: string) => {
+      selectList.handleInput(data);
+      return true;
+    },
+  };
+}
+
+/** Build selectable model items with "disabled" first. */
+function buildModelItems(ctx?: ExtensionContext): SelectItem[] {
+  const items: SelectItem[] = [
+    {
+      value: "disabled",
+      label: "disabled",
+      description: "No prompt suggestions",
+    },
+  ];
+
+  if (!ctx) return items;
+
+  const models = getSelectableModels(ctx);
+
+  for (const model of models) {
+    const suffix = model.isCurrent ? "  [current]" : "";
+    items.push({
+      value: model.canonicalId,
+      label: `${model.canonicalId}${suffix}`,
+      description: model.label !== model.canonicalId ? model.label : undefined,
+    });
+  }
+
+  return items;
+}
+
 // ── Entry point ──────────────────────────────────────────────
 
 export function openSettingsOverlay(ctx: ExtensionContext): void {
@@ -196,6 +300,7 @@ export function openSettingsOverlay(ctx: ExtensionContext): void {
     const container = new Container();
 
     const deps: SettingsOverlayDeps = {
+      ctx,
       state,
       container,
       settingsList: null,

@@ -1,0 +1,39 @@
+{
+  "name": "@mrclrchtr/supi-prompt-suggestions",
+  "version": "1.16.1",
+  "description": "Advisory ghost-text prompt suggestions for the pi coding agent",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "src/**/*.ts",
+    "!__tests__"
+  ],
+  "exports": {
+    "./extension": {
+      "types": "./src/extension.ts",
+      "import": "./src/extension.ts"
+    },
+    "./api": {
+      "types": "./src/api.ts",
+      "import": "./src/api.ts"
+    }
+  },
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ]
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "@mrclrchtr/supi-core": "workspace:*"
+  },
+  "bundledDependencies": [
+    "@mrclrchtr/supi-core"
+  ],
+  "devDependencies": {
+    "@types/node": "25.9.4",
+    "vitest": "4.1.9"
+  }
+}

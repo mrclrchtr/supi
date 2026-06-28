@@ -85,7 +85,8 @@
       "./packages/supi-debug/src/extension.ts",
       "./packages/supi-web/src/extension.ts",
       "./packages/supi-extras/src/extension.ts",
-      "./packages/supi-insights/src/extension.ts"
+      "./packages/supi-insights/src/extension.ts",
+      "./packages/supi-prompt-suggestions/src/extension.ts"
     ],
     "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/assets/supi-logo.png"
   }

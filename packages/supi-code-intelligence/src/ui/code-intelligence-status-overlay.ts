@@ -11,6 +11,7 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import { BRAILLE_SPINNER_FRAMES } from "@mrclrchtr/supi-core/spinner-frames";
 import type {
   Diagnostic,
   OutstandingDiagnosticSummaryEntry,
@@ -64,7 +65,6 @@ export interface CiStatusDialogDeps {
 const MAX_FILES_IN_LIST = 10;
 const MAX_INLINE_MESSAGES = 5;
 const MAX_OPEN_FILES_SHOWN = 3;
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const SPINNER_INTERVAL_MS = 80;
 
 export class CiStatusDialog {
@@ -192,7 +192,7 @@ export class CiStatusDialog {
     this.loading = true;
     this.spinnerFrame = 0;
     this.spinnerInterval = setInterval(() => {
-      this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
+      this.spinnerFrame = (this.spinnerFrame + 1) % BRAILLE_SPINNER_FRAMES.length;
       this.invalidate();
       this.tui.requestRender();
     }, SPINNER_INTERVAL_MS);
@@ -401,7 +401,7 @@ export class CiStatusDialog {
   private addInlineDiagnostics(container: Container, width: number): void {
     const t = this.theme;
     if (this.loading) {
-      const frame = SPINNER_FRAMES[this.spinnerFrame] ?? SPINNER_FRAMES[0];
+      const frame = BRAILLE_SPINNER_FRAMES[this.spinnerFrame] ?? BRAILLE_SPINNER_FRAMES[0];
       container.addChild(new Text(t.fg("accent", `    └ ${frame} loading…`), 0, 0));
       return;
     }

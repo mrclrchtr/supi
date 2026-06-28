@@ -5,6 +5,7 @@
 // to enable auto-generated persistChange. When all items have a configType,
 // the persistChange callback can be omitted.
 
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { SettingItem } from "@earendil-works/pi-tui";
 import type { SettingsScope } from "../settings/settings-registry.ts";
 import { registerSettings } from "../settings/settings-registry.ts";
@@ -60,7 +61,12 @@ export interface ConfigSettingsOptions<T> {
    * persistChange handling. When ALL items declare a configType,
    * the `persistChange` callback can be omitted.
    */
-  buildItems: (settings: T, scope: SettingsScope, cwd: string) => ConfigSettingItem[];
+  buildItems: (
+    settings: T,
+    scope: SettingsScope,
+    cwd: string,
+    ctx?: ExtensionContext,
+  ) => ConfigSettingItem[];
   /**
    * Handle a settings change with scoped persistence helpers.
    *
@@ -141,12 +147,12 @@ export function registerConfigSettings<T>(options: ConfigSettingsOptions<T>): vo
   registerSettings({
     id: options.id,
     label: options.label,
-    loadValues: (scope, cwd) => {
+    loadValues: (scope, cwd, ctx) => {
       const settings = loadSupiConfigForScope(options.section, cwd, options.defaults, {
         scope,
         homeDir: options.homeDir,
       });
-      const items = options.buildItems(settings, scope, cwd);
+      const items = options.buildItems(settings, scope, cwd, ctx);
       cachedItems = items;
       return items;
     },
@@ -173,7 +179,7 @@ export function registerConfigSettings<T>(options: ConfigSettingsOptions<T>): vo
       }
 
       // Auto-generate when all items are declarative
-      const items = cachedItems ?? options.buildItems(options.defaults, scope, cwd);
+      const items = cachedItems ?? options.buildItems(options.defaults, scope, cwd, undefined);
       if (areAllItemsDeclarative(items)) {
         autoPersistChange(settingId, value, helpers, items);
       }
