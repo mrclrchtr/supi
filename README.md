@@ -17,19 +17,19 @@ It is also my daily PI setup, shared as installable packages so you can use the 
 
 ## Quick Start
 
-Install the recommended SuPi stack globally:
+Install the release SuPi stack globally:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install.sh | bash
 ```
 
 Or install it project-locally into `.pi/settings.json`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash -s -- -l
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install.sh | bash -s -- -l
 ```
 
-Prefer a single package? Use any install command from the package cards below, for example:
+Want everything including beta packages? Use `install-all.sh` instead. Prefer a single package? Use any install command from the package cards below, for example:
 
 ```bash
 pi install npm:@mrclrchtr/supi-code-intelligence
@@ -271,30 +271,54 @@ These packages support the extension stack and are linked for maintainers and ex
 
 ## Install details
 
-### Recommended stack
+### Release stack
+
+Global install:
 
 ```bash
-# Global install
-curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install.sh | bash
+```
 
-# Project-local install (.pi/settings.json)
+Project-local install into `.pi/settings.json`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install.sh | bash -s -- -l
+```
+
+The release script installs the stable SuPi packages from npm.
+
+### Full stack (release + beta)
+
+Global install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash
+```
+
+Project-local install into `.pi/settings.json`:
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/install-all.sh | bash -s -- -l
 ```
 
-The script installs the recommended user-facing SuPi stack from npm. Run `/reload` in PI after installation.
+The full-stack script adds beta packages on top of the release set. Run `/reload` in PI after installation.
 
 ### Individual packages
 
 ```bash
 pi install npm:@mrclrchtr/supi-web
 pi install npm:@mrclrchtr/supi-review
-# ...or any package from the catalog above
 ```
+
+Use any package name from the catalog above.
 
 ### Full workspace from git or local path
 
 ```bash
 pi install git:github.com/mrclrchtr/supi
+```
+
+```bash
 pi install /path/to/supi
 ```
 
