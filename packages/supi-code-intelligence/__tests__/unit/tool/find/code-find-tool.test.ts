@@ -244,8 +244,11 @@ describe("code_find tool", () => {
       };
 
       const text = result.content[0].text;
-      expect(text).toContain("a.ts");
-      expect(text).not.toContain("b.ts");
+      // Only one file should appear (the other is truncated), but we can't
+      // guarantee which one ripgrep returns first across test run ordering.
+      const fileHeadings = text.match(/^### (.+)$/gm);
+      expect(fileHeadings).toHaveLength(1);
+      expect(text).toContain("**2 matches**");
       expect(text).toContain("_(showing 1 of 2; 1 omitted)_");
       expect(result.details?.data.omittedCount).toBe(1);
       expect(result.details?.data.evidenceLists).toContainEqual({
