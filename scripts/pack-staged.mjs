@@ -59,20 +59,15 @@ function parseArgs(argv) {
 function assertPackageDir(packageDir) {
   const resolvedDir = resolve(packageDir);
 
-  // Guard against path traversal: reject system directories and check
-  // that the resolved path doesn't escape via normalization tricks.
-  if (
-    resolvedDir === "/" ||
-    resolvedDir.startsWith("/etc") ||
-    resolvedDir.startsWith("/tmp") ||
-    resolvedDir.startsWith("/dev")
-  ) {
-    throw new Error(`Refusing to operate on system directory: ${resolvedDir}`);
-  }
-
   const packageJsonPath = join(resolvedDir, "package.json");
   if (!existsSync(packageJsonPath)) {
     throw new Error(`No package.json found in ${resolvedDir}`);
+  }
+
+  // Guard against accidental use on system directories (e.g. bare /etc).
+  // Check after package.json so legitimate test fixtures under /tmp pass.
+  if (resolvedDir === "/" || resolvedDir.startsWith("/etc") || resolvedDir.startsWith("/dev")) {
+    throw new Error(`Refusing to operate on system directory: ${resolvedDir}`);
   }
 
   const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8"));
