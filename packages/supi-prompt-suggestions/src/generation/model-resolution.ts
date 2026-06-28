@@ -9,9 +9,7 @@
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { loadSectionConfig } from "@mrclrchtr/supi-core/config";
 import { getSelectableModels } from "@mrclrchtr/supi-core/model-selection";
-import { CONFIG_SECTION, DEFAULTS } from "../config/config.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,20 +32,21 @@ export type AuthResolutionResult = { kind: "ok"; auth: ResolvedAuth } | AuthReso
 /**
  * Resolve model + API key for the configured suggestion model.
  *
- * Loads the `promptSuggestions` config section, finds the model in the
- * scoped set, and obtains an API key via `modelRegistry.getApiKeyAndHeaders`.
+ * Finds the model in the scoped set and obtains an API key via
+ * `modelRegistry.getApiKeyAndHeaders`.
  *
- * Returns `null` when the configured model is `"disabled"` — callers must
- * check for this before calling.
+ * The caller must check for `"disabled"` before invoking — this function
+ * assumes a valid, non-disabled model ID.
  */
-export async function resolveSuggestionAuth(ctx: ExtensionContext): Promise<AuthResolutionResult> {
-  const config = loadSectionConfig(CONFIG_SECTION, ctx.cwd, DEFAULTS);
-
-  const match = findSuggestionModel(ctx, config.model);
+export async function resolveSuggestionAuth(
+  ctx: ExtensionContext,
+  modelId: string,
+): Promise<AuthResolutionResult> {
+  const match = findSuggestionModel(ctx, modelId);
   if (!match) {
     return {
       kind: "error",
-      message: `Suggestion model "${config.model}" not in scoped set`,
+      message: `Suggestion model "${modelId}" not in scoped set`,
     };
   }
 

@@ -10,6 +10,7 @@
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { combineAbortSignals } from "@mrclrchtr/supi-core/abort-utils";
 import { loadSectionConfig } from "@mrclrchtr/supi-core/config";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
 import { CONFIG_SECTION, DEFAULTS } from "../config/config.ts";
@@ -20,34 +21,6 @@ import {
 } from "./client.ts";
 import { resolveSuggestionAuth } from "./model-resolution.ts";
 import { normalizeSuggestion } from "./normalize.ts";
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-/**
- * Combine a caller-provided abort signal with a generation timeout signal.
- *
- * Returns the combined signal and a cleanup function that removes both
- * event listeners.  Callers must invoke cleanup in a `finally` block to
- * avoid listener leaks.
- */
-function withTimeout(
-  abort: AbortController,
-  timeoutMs: number,
-): { signal: AbortSignal; cleanup: () => void } {
-  const timeoutSignal = AbortSignal.timeout(timeoutMs);
-  const combinedController = new AbortController();
-  const onAbort = () => combinedController.abort();
-  abort.signal.addEventListener("abort", onAbort, { once: true });
-  timeoutSignal.addEventListener("abort", onAbort, { once: true });
-
-  return {
-    signal: combinedController.signal,
-    cleanup: () => {
-      abort.signal.removeEventListener("abort", onAbort);
-      timeoutSignal.removeEventListener("abort", onAbort);
-    },
-  };
-}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +37,7 @@ export interface SuggestionCallbacks {
 
 interface RunOptions {
   ctx: ExtensionContext;
+  modelId: string;
   tail: string;
   id: number;
   abort: AbortController;
@@ -127,7 +101,7 @@ export class SuggestionGenerator {
     callbacks.onStatus({ kind: "generating" });
 
     // Fire-and-forget
-    void this.#run({ ctx, tail, id, abort, callbacks });
+    void this.#run({ ctx, modelId: config.model, tail, id, abort, callbacks });
   }
 
   /** Cancel in-flight generation and invalidate the current generation ID. */
@@ -154,7 +128,7 @@ export class SuggestionGenerator {
     });
 
     try {
-      const authResult = await resolveSuggestionAuth(ctx);
+      const authResult = await resolveSuggestionAuth(ctx, opts.modelId);
 
       // Discard if generation was cancelled while resolving auth
       if (id !== this.generationId || abort.signal.aborted) return;
@@ -175,7 +149,7 @@ export class SuggestionGenerator {
 
       if (id !== this.generationId || abort.signal.aborted) return;
 
-      const { signal: combinedSignal, cleanup: cleanupTimeout } = withTimeout(
+      const { signal: combinedSignal, cleanup: cleanupTimeout } = combineAbortSignals(
         abort,
         GENERATION_TIMEOUT_MS,
       );

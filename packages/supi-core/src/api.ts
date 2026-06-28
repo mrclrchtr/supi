@@ -7,6 +7,8 @@
 // (e.g. @mrclrchtr/supi-core/config, @mrclrchtr/supi-core/context).
 
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./abort-utils.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./config.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./context.ts";
@@ -32,6 +34,8 @@ export * from "./settings.ts";
 export * from "./settings-ui.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./spinner-frames.ts";
+// biome-ignore lint/performance/noReExportAll: intentional convenience barrel
+export * from "./status-spinner.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel
 export * from "./terminal.ts";
 // biome-ignore lint/performance/noReExportAll: intentional convenience barrel

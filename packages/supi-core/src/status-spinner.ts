@@ -9,16 +9,10 @@
  */
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { BRAILLE_SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "@mrclrchtr/supi-core/spinner-frames";
-
-// ── Re-exports ────────────────────────────────────────────────────────────
-
-export { BRAILLE_SPINNER_FRAMES };
-
-// ── Class ──────────────────────────────────────────────────────────────────
+import { BRAILLE_SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "./spinner-frames.ts";
 
 /**
- * Manages an animated spinner on the status bar.
+ * Manages an animated braille spinner on the status bar.
  *
  * Usage:
  * ```ts

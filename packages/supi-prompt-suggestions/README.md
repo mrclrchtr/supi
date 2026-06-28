@@ -49,7 +49,8 @@ Settings live under `/supi-settings` → **Prompt suggestions**:
 
 ## Source layout
 
-- `src/extension.ts` — pi extension entrypoint; owns the `SuggestionGenerator` instance
+- `src/extension.ts` — pi extension entrypoint: registers settings, wires events to `SessionLifecycle`
+- `src/session.ts` — `SessionLifecycle` class: owns ghost editor, status spinner, and generation orchestration
 - `src/api.ts` — package API surface (`./api` export)
 - `src/index.ts` — package root re-export
 - `src/config/config.ts` — config types and defaults
@@ -57,4 +58,5 @@ Settings live under `/supi-settings` → **Prompt suggestions**:
 - `src/editor/editor.ts` — ghost-text editor wrapper component
 - `src/generation/generator.ts` — `SuggestionGenerator` class: async orchestration with concurrency control
 - `src/generation/client.ts` — low-level model API client (pure functions)
+- `src/generation/model-resolution.ts` — model + API key resolution from scoped config
 - `src/generation/normalize.ts` — suggestion text normalization

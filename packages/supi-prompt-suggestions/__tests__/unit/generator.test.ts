@@ -47,6 +47,7 @@ const mockAuthOk = {
   auth: {
     model: { provider: "anthropic", id: "claude-sonnet-4-5" },
     apiKey: "test-key",
+    headers: undefined,
   },
 };
 

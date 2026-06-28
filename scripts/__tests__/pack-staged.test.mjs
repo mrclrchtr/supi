@@ -43,6 +43,7 @@ function makePackageWithBrokenBinLink(parentDir) {
 }
 
 const CORE_EXPORTS = {
+  "./abort-utils": "./src/abort-utils.ts",
   "./api": "./src/api.ts",
   "./config": "./src/config.ts",
   "./context": "./src/context.ts",
@@ -59,6 +60,7 @@ const CORE_EXPORTS = {
   "./settings": "./src/settings.ts",
   "./settings-ui": "./src/settings-ui.ts",
   "./spinner-frames": "./src/spinner-frames.ts",
+  "./status-spinner": "./src/status-spinner.ts",
   "./terminal": "./src/terminal.ts",
   "./tool-framework": "./src/tool-framework.ts",
   "./types": "./src/types.ts",

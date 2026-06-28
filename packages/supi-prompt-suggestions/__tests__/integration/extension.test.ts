@@ -48,7 +48,7 @@ vi.mock("../../src/generation/generator.ts", () => ({
   SuggestionGenerator: mockSuggestionGenerator,
 }));
 
-vi.mock("../../src/ui/status-spinner.ts", () => ({
+vi.mock("@mrclrchtr/supi-core/api", () => ({
   StatusSpinner: mockStatusSpinner,
 }));
 

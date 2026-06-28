@@ -2,12 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
-const mockLoadSectionConfig = vi.hoisted(() => vi.fn());
 const mockGetSelectableModels = vi.hoisted(() => vi.fn());
-
-vi.mock("@mrclrchtr/supi-core/config", () => ({
-  loadSectionConfig: mockLoadSectionConfig,
-}));
 
 vi.mock("@mrclrchtr/supi-core/model-selection", () => ({
   getSelectableModels: mockGetSelectableModels,
@@ -33,7 +28,7 @@ function makeCtx(overrides: { cwd?: string; getApiKeyAndHeaders?: ReturnType<typ
     modelRegistry: {
       getApiKeyAndHeaders:
         overrides.getApiKeyAndHeaders ??
-        vi.fn().mockResolvedValue({ ok: true, apiKey: "test-key" }),
+        vi.fn().mockResolvedValue({ ok: true, apiKey: "test-key", headers: undefined }),
     },
     model: null,
   };
@@ -47,11 +42,10 @@ describe("resolveSuggestionAuth", () => {
   });
 
   it("resolves auth when model is found and API key is available", async () => {
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
     mockGetSelectableModels.mockReturnValue([mockModelSelection]);
 
     const ctx = makeCtx();
-    const result = await resolveSuggestionAuth(ctx as never);
+    const result = await resolveSuggestionAuth(ctx as never, "anthropic/claude-sonnet-4-5");
 
     expect(result).toEqual({
       kind: "ok",
@@ -63,11 +57,10 @@ describe("resolveSuggestionAuth", () => {
   });
 
   it("reports error when model is not in scoped set", async () => {
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/nonexistent" });
     mockGetSelectableModels.mockReturnValue([]);
 
     const ctx = makeCtx();
-    const result = await resolveSuggestionAuth(ctx as never);
+    const result = await resolveSuggestionAuth(ctx as never, "anthropic/nonexistent");
 
     expect(result).toEqual({
       kind: "error",
@@ -76,13 +69,12 @@ describe("resolveSuggestionAuth", () => {
   });
 
   it("reports error when API key auth fails", async () => {
-    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
     mockGetSelectableModels.mockReturnValue([mockModelSelection]);
 
     const ctx = makeCtx({
       getApiKeyAndHeaders: vi.fn().mockResolvedValue({ ok: false }),
     });
-    const result = await resolveSuggestionAuth(ctx as never);
+    const result = await resolveSuggestionAuth(ctx as never, "anthropic/claude-sonnet-4-5");
 
     expect(result).toEqual({
       kind: "error",

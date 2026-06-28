@@ -21,14 +21,28 @@ directly rather than going through module-level wrappers.
 ### Suggestion model via completeSimple
 
 Suggestions use `completeSimple` (not `createAgentSession`). Only the last 8,000 characters of the
-final assistant message are sent. The system prompt is intentionally empty — the model receives only
-a simple `Assistant> …\nUser> ` continuation format with no PI, SuPi, project, or conversation
-context.
+final assistant message are sent. The system prompt instructs the model to write a single follow-up
+line (question, answer, or directive) or return the `NO_SUGGESTION` sentinel. The user message wraps
+the assistant text in `<assistant_message>...</assistant_message>` tags and appends `Suggestion:` —
+no PI, SuPi, project, or conversation context is included.
 
 ### Settings use registerConfigSettings
 
 The settings section uses `registerConfigSettings` from `supi-core/config`. The `buildItems` callback
 receives `ctx` as its 4th parameter to resolve the scoped model list.
+
+### Session lifecycle lives in SessionLifecycle
+
+The `SessionLifecycle` class in `src/session.ts` owns the ghost editor, status spinner, and
+suggestion generator orchestration across the session lifecycle. `extension.ts` is thin wiring —
+it creates one `SuggestionGenerator` and one `SessionLifecycle` instance, then wires the four
+event handlers.
+
+### StatusSpinner is shared from supi-core
+
+The `StatusSpinner` widget lives in `supi-core/status-spinner` (shared infrastructure). It manages
+a `setInterval`-based braille spinner via `ctx.ui.setStatus`. Recreated on every `session_start`
+with a fresh `ExtensionContext`.
 
 ### Ghost text rendering
 
@@ -46,13 +60,8 @@ The editor intercepts Right Arrow (ANSI `\x1b[C`, application `\x1bOC`, and Kitt
 forms) to accept the suggestion. Any other input dismisses it and falls through to the parent
 `CustomEditor` handling.
 
-### Spinner lifecycle
-
-The `StatusSpinner` is recreated on every `session_start` with a fresh `ExtensionContext`. On
-`session_shutdown`, the spinner is stopped and the generator dismissed to prevent interval leaks.
-
 ### Abort signal combination
 
-The `withTimeout()` helper in `generator.ts` combines the caller's abort signal with a generation
-timeout signal. It returns a cleanup function that callers must invoke in a `finally` block to avoid
-listener leaks.
+The `combineAbortSignals()` helper in `supi-core/abort-utils` combines the caller's abort signal
+with a generation timeout signal. It returns a cleanup function that callers must invoke in a
+`finally` block to avoid listener leaks.

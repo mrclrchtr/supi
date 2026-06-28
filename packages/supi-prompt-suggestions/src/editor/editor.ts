@@ -12,6 +12,7 @@ import {
   CURSOR_MARKER,
   type EditorOptions,
   type EditorTheme,
+  matchesKey,
   type TUI,
   truncateToWidth,
   visibleWidth,
@@ -61,7 +62,9 @@ export class GhostTextEditor extends CustomEditor {
 
   override handleInput(data: string): void {
     if (this.suggestion) {
-      if (isArrowRight(data)) {
+      // Use PI's matchesKey (not raw escape sequences) — it handles
+      // CSI (\x1b[C), SS3 (\x1bOC), and Kitty keyboard protocol correctly.
+      if (matchesKey(data, "right")) {
         this.insertTextAtCursor(this.suggestion);
         this.callbacks.onAccept(this.suggestion);
         this.clearGhost();
@@ -128,16 +131,6 @@ function ghostInsertPosition(line: string): number {
   const afterMarker = line.slice(cursorIdx + CURSOR_MARKER.length);
   const inverseEnd = afterMarker.indexOf("\x1b[0m");
   return cursorIdx + CURSOR_MARKER.length + (inverseEnd >= 0 ? inverseEnd + 4 : 0);
-}
-
-const ARROW_RIGHT_CSI = "\x1b[C";
-const ARROW_RIGHT_SS3 = "\x1bOC";
-// biome-ignore lint/suspicious/noControlCharactersInRegex: Kitty protocol escape in regex
-const ARROW_RIGHT_KITTY = /^\x1b\[1(;\d+)*:1?C;/;
-
-function isArrowRight(data: string): boolean {
-  // ANSI, application, and Kitty keyboard protocol forms
-  return data === ARROW_RIGHT_CSI || data === ARROW_RIGHT_SS3 || ARROW_RIGHT_KITTY.test(data);
 }
 
 function findCursorMarkerLine(lines: string[]): number {

@@ -32,19 +32,13 @@ const SYSTEM_PROMPT =
 // ── Prompt building ────────────────────────────────────────────────────
 
 /**
- * Format the tail text as a completion prompt with clear instructions.
+ * Format the tail text as a completion prompt.
  *
- * Uses explicit instructions so the model produces a follow-up user
- * message (question, answer, or directive) without pleasantries.
+ * Instructions live in {@link SYSTEM_PROMPT} — the user message
+ * only provides the assistant message content to suggest from.
  */
 export function buildPrompt(tail: string): string {
-  return (
-    "Based on the assistant's last message below, write a follow-up user message. " +
-    "It must be a direct question, answer, or directive — no greetings, thank-yous, or filler. " +
-    'If no useful follow-up exists, respond with exactly "NO_SUGGESTION".\n\n' +
-    `<assistant_message>\n${tail}\n</assistant_message>\n\n` +
-    "Suggestion:"
-  );
+  return `<assistant_message>\n${tail}\n</assistant_message>\n\nSuggestion:`;
 }
 
 // ── Types ──────────────────────────────────────────────────────────────
