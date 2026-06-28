@@ -11,6 +11,5 @@ export default [
   "packages/supi-insights",
   "packages/supi-lsp",
   "packages/supi-review",
-  "packages/supi-rtk",
   "packages/supi-tree-sitter",
 ];

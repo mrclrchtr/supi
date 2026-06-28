@@ -15,16 +15,12 @@ fi
 PACKAGES=(
   supi-code-intelligence
   supi-ask-user
-  supi-claude-md
   supi-context
   supi-settings
   supi-debug
   supi-extras
-  supi-bash-timeout
   supi-web
-  supi-cache
-  supi-insights
-  supi-review
+  supi-prompt-suggestions
 )
 
 if ! command -v pi &>/dev/null; then

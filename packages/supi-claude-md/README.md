@@ -18,6 +18,8 @@ Pi already handles root and ancestor context files in its own system prompt. Thi
 pi install npm:@mrclrchtr/supi-claude-md
 ```
 
+This is a **beta** package. Install individually.
+
 For local development:
 
 ```bash

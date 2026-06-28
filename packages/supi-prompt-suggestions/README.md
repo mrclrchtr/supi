@@ -6,8 +6,6 @@
 
 Advisory ghost-text prompt suggestions for the [pi coding agent](https://github.com/earendil-works/pi).
 
-**Experimental.** Disabled by default — no surprise background model calls.
-
 ## Install
 
 ```bash
