@@ -4,8 +4,8 @@
 
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { executeImpact } from "../use-case/generate-impact.ts";
-import { unavailableImpactDetails } from "./details-helpers.ts";
 import { focusedToolRules } from "./cross-field.ts";
+import { unavailableImpactDetails } from "./details-helpers.ts";
 import {
   expandTargetId,
   gateCapability,

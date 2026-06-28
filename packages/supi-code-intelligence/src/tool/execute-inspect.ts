@@ -4,8 +4,8 @@
 
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../types.ts";
 import { executeInspect } from "../use-case/generate-inspect.ts";
-import { unavailableInspectDetails } from "./details-helpers.ts";
 import { focusedToolRules } from "./cross-field.ts";
+import { unavailableInspectDetails } from "./details-helpers.ts";
 import { gateSemanticReadiness, runPipe, validateParams } from "./pipeline.ts";
 import { renderSemanticReadinessTimeout } from "./semantic-readiness.ts";
 
