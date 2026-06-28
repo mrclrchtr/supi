@@ -2,8 +2,9 @@
 
 ## Scope
 
-`@mrclrchtr/supi-lsp` is a **library-only** package with one explicit surface:
+`@mrclrchtr/supi-lsp` is a **library-only** package with two explicit surfaces:
 - `@mrclrchtr/supi-lsp/api` → `src/api.ts` → reusable library surface (`getSessionLspService`, `waitForSessionLspService`, `SessionLspService`, LSP types, provider interfaces, and exported semantic/diagnostic result types)
+- `@mrclrchtr/supi-lsp/provider/lsp-semantic-provider` → `src/provider/lsp-semantic-provider.ts` → shared `SemanticProvider` adapter
 
 This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Public substrate-named tools were removed from the surface; `@mrclrchtr/supi-code-intelligence` now exposes only intent-level `code_*` tools backed by this library.
 
@@ -22,11 +23,11 @@ Diagnostic severity: Error (`1`), Warning (`2`), Information (`3`), Hint (`4`). 
 ## Key files
 
 - **LSP client**: `src/client/client.ts` (init, sync, requests), `src/client/transport.ts` (JSON-RPC via vscode-jsonrpc), `src/client/client-refresh.ts`
-- **Manager**: `src/manager/manager.ts` + `manager-*.ts` (lifecycle, root, diagnostics, recovery, workspace-symbol, stale-resync, client-state)
-- **Config**: `src/config/types.ts` (re-exports vscode-lsp types), `src/config/server-config.ts` (SuPi types), `src/config/config.ts` (loadConfig), `src/config/lsp-settings.ts`
+- **Manager**: `src/manager/manager.ts` + `manager-*.ts` (lifecycle, workspace routing, client pool, diagnostic store, capability index, project info, stale resync, workspace recovery, workspace symbol, client state, recovery coordinator, helpers, types)
+- **Config**: `src/config/types.ts` (re-exports vscode-lsp types), `src/config/server-config.ts` (SuPi types), `src/config/config.ts` (loadConfig), `src/config/lsp-settings.ts`, `src/config/capabilities.ts` (server capability detection), `src/config/server-actions.ts` (code action collection), `src/config/tsconfig-scope.ts` (project resolution)
 - **Session API**: `src/session/service-registry.ts` (peer extension access, backed by supi-core), `src/session/runtime-controller.ts`, `src/session/runtime-registration.ts`, `src/session/scanner.ts`
-- **Diagnostics**: `src/diagnostics/stale-diagnostics.ts`, `src/diagnostics/suppression-diagnostics.ts`, `src/diagnostics/workspace-sentinels.ts`, `src/diagnostics/diagnostic-context.ts`, `src/manager/manager-diagnostics.ts`
-- **Provider**: `src/provider/lsp-semantic-provider.ts` (SemanticProvider impl consumed by supi-code-intelligence)
+- **Diagnostics**: `src/diagnostics/diagnostics.ts` (core collection), `src/diagnostics/stale-diagnostics.ts`, `src/diagnostics/suppression-diagnostics.ts`, `src/diagnostics/workspace-sentinels.ts`, `src/diagnostics/diagnostic-context.ts`, `src/diagnostics/diagnostic-augmentation.ts`, `src/diagnostics/diagnostic-display.ts`, `src/diagnostics/diagnostic-summary.ts`, `src/manager/manager-diagnostics.ts`
+- **Provider**: `src/provider/lsp-semantic-provider.ts` (SemanticProvider impl consumed by supi-code-intelligence), `src/provider/refactor-planning.ts` (rename refactor and code action collection helpers)
 - **Other**: `src/pattern-matcher.ts` (gitignore-style exclusion), `src/summary.ts`, `src/utils.ts`, `src/coordinates.ts`
 
 ## Architecture gotchas

@@ -7,11 +7,16 @@
 
 This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Public tool registration and session lifecycle handlers live in `@mrclrchtr/supi-code-intelligence`. The package does not depend on `supi-lsp` and must remain correct when installed independently.
 
+## Public surfaces
+
+- `@mrclrchtr/supi-tree-sitter/api` → `src/api.ts` → reusable library surface (session factory, shared service access, structural extraction functions, shared types)
+- `@mrclrchtr/supi-tree-sitter/provider/tree-sitter-provider` → `src/provider/tree-sitter-provider.ts` → shared `StructuralProvider` adapter
+
 ## WASM vendoring strategy
 
 All grammar WASM files are **vendored** in `resources/grammars/<id>/` and shipped with the package. The native `tree-sitter-*` npm packages are `devDependencies` only — they are never resolved at runtime.
 
-- **12 grammars** (javascript, typescript, tsx, python, rust, go, c, cpp, java, ruby, bash, html, r) ship `.wasm` in their npm packages — copied by `scripts/vendor-wasm.mjs`
+- **13 grammars from 12 npm packages** (javascript, typescript, tsx, python, rust, go, c, cpp, java, ruby, bash, html, r) ship `.wasm` — `tree-sitter-typescript` provides both `typescript` and `tsx`. Copied by `scripts/vendor-wasm.mjs`.
 - **Kotlin** (`tree-sitter-kotlin`) does not ship `.wasm` — built from source by `scripts/generate-kotlin-wasm.mjs` using `tree-sitter-cli`
 - **SQL** (`@derekstride/tree-sitter-sql`) does not ship `.wasm` — built from source by `scripts/generate-sql-wasm.mjs` using `tree-sitter-cli`
 
@@ -38,6 +43,7 @@ src/
     runtime-controller.ts # Tree-sitter runtime lifecycle controller
     runtime-registration.ts # Runtime registration helpers
   tool/
+    call-sites.ts     # call-site extraction
     callees.ts        # callee extraction
     exports.ts        # export extraction
     imports.ts        # import extraction
@@ -54,13 +60,14 @@ src/
 - `src/session/runtime.ts` — grammar initialization, parser reuse, parse/query services
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/session/session.ts` — runtime-backed service helpers and owned session factory
-- `src/provider/tree-sitter-provider.ts` — StructuralProvider impl (string formatting lives in `supi-code-intelligence/src/tool/families/tree-sitter/`)
+- `src/provider/tree-sitter-provider.ts` — StructuralProvider impl consumed by supi-code-intelligence
+- `src/tool/call-sites.ts` — call-site extraction (consumed by code_find AST call mode)
 - `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source
 - `scripts/generate-sql-wasm.mjs` — builds SQL WASM from source
 
 ## Supported languages
 
-14 grammars vendored in `resources/grammars/<id>/`: JavaScript/TypeScript, Python, Rust, Go, C/C++, Java, Kotlin, Ruby, Bash/Shell, HTML, R, SQL. See `resources/grammars/` for the complete file-extension mapping.
+15 grammars vendored in `resources/grammars/<id>/`: JavaScript, TypeScript, TSX, Python, Rust, Go, C, C++, Java, Kotlin, Ruby, Bash/Shell, HTML, R, SQL. See `resources/grammars/` for the complete file-extension mapping.
 
 ## Validation
 
@@ -82,7 +89,7 @@ pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json
 - `declare module "foo"` parses as a string-named `module` node; keep outline shallow and preserve the module name.
 - CRLF input needs normalized line splitting in coordinate helpers and `node_at` bounds to stay LSP-compatible.
 - Outline should stay shallow: top-level declarations plus supported class/interface/enum members, not local function bodies.
-- `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only; `node_at` and `query` work across all supported grammars, so handler documentation must describe that split explicitly.
+- `outline`, `imports`, and `exports` are currently JavaScript/TypeScript-only; `node_at` and `call-sites` work across all supported grammars. The runtime also exposes a `query()` method on `TreeSitterSession` that works across all grammars.
 - `pnpm peers check` currently reports missing `tree-sitter` peers for `@derekstride/tree-sitter-sql` and `tree-sitter-kotlin`; these grammar packages are dev-only WASM generators, so treat that warning as known workspace noise unless the vendoring strategy changes.
 
 ## Packaging

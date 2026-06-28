@@ -28,7 +28,7 @@ This package provides the parser-backed structural substrate consumed by `@mrclr
 - a shared session-scoped Tree-sitter service for structural analysis
 - an owned parsing session API for direct library consumers
 - a `StructuralProvider` adapter published through `./provider/tree-sitter-provider`
-- structural extraction helpers for outline/import/export/node/callee analysis inside the library surface
+- structural extraction helpers for outline/import/export/node/callee/call-site analysis inside the library surface
 
 It does **not** register pi tools or commands on its own.
 
@@ -103,4 +103,4 @@ if (state.kind === "ready") {
 - `src/session/session.ts` — runtime-backed service helpers and owned session API
 - `src/session/service-registry.ts` — shared session-scoped structural service registry
 - `src/provider/tree-sitter-provider.ts` — `StructuralProvider` adapter consumed by `@mrclrchtr/supi-code-intelligence`
-- `src/tool/outline.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts` — structural analyses exposed through the library surface
+- `src/tool/outline.ts`, `src/tool/imports.ts`, `src/tool/exports.ts`, `src/tool/node-at.ts`, `src/tool/callees.ts`, `src/tool/call-sites.ts` — structural analyses exposed through the library surface

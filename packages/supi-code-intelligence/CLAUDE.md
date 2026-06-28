@@ -36,6 +36,11 @@ src/
 │   ├── search/            # Ripgrep + structured search support
 │   ├── tests/             # Companion test discovery and Vitest detection
 │   ├── provider.ts        # Composite CodeProvider over runtime semantic/structural providers
+│   ├── evidence.ts        # Evidence provenance formatting
+│   ├── helpers.ts         # Shared analysis helpers
+│   ├── read-next.ts       # Read Next guidance generation
+│   ├── refactor/          # Refactor safety validation
+│   │   └── safety.ts
 │   └── readiness.ts       # Semantic readiness gating policy
 ├── tool/                  # Public code_* tool surface
 │   ├── specs.ts           # Canonical tool specs — single source of truth
@@ -270,7 +275,7 @@ No compatibility aliases remain on the public refactor surface. `code_refactor_p
 - **`@mrclrchtr/supi-core/api`** — `findProjectRoot`, `walkProject`, `isWithinOrEqual`
 - **`@mrclrchtr/supi-code-runtime/api`** — `getDefaultWorkspaceRuntime`, `SemanticProvider`, `StructuralProvider`, `RefactorResult`, `WorkspaceEdit`, `PlannerRoute`
 - **`@mrclrchtr/supi-lsp/api`** — `getSessionLspService`, `SessionLspService`, `Position`
-- **`@mrclrchtr/supi-tree-sitter/api`** — `getSessionTreeSitterService`, `createTreeSitterSession`, `TreeSitterService`
+- **`@mrclrchtr/supi-tree-sitter/api`** — `getSessionTreeSitterService`, `createTreeSitterSession`, `SessionTreeSitterService`
 - **`@earendil-works/pi-ai`** — `StringEnum` for TypeScript enum type generation
 - **`@earendil-works/pi-coding-agent`** — `ExtensionAPI`, `BeforeAgentStartEventResult`
 - **`typebox`** — `Type.Object(...)` for tool parameter schema
