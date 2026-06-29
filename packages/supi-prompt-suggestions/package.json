@@ -3,6 +3,28 @@
   "version": "2.0.0",
   "description": "Advisory ghost-text prompt suggestions for the pi coding agent",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrclrchtr/supi.git",
+    "directory": "packages/supi-prompt-suggestions"
+  },
+  "homepage": "https://github.com/mrclrchtr/supi/tree/main/packages/supi-prompt-suggestions#readme",
+  "bugs": {
+    "url": "https://github.com/mrclrchtr/supi/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "pi-extension",
+    "prompt-suggestions",
+    "prompt",
+    "suggestions",
+    "ghost-text"
+  ],
   "type": "module",
   "files": [
     "src/**/*.ts",
