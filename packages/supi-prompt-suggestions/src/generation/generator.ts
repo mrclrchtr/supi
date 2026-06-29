@@ -124,7 +124,7 @@ export class SuggestionGenerator {
       category: "generation.start",
       message: "Prompt suggestion generation started",
       cwd: ctx.cwd,
-      data: { tailLength: tail.length },
+      data: { modelId: opts.modelId, tailLength: tail.length },
     });
 
     try {
@@ -162,7 +162,7 @@ export class SuggestionGenerator {
           signal: combinedSignal,
         });
 
-        this.#handleResponse(response, id, ctx.cwd, callbacks);
+        this.#handleResponse(response, id, ctx.cwd, callbacks, opts.modelId);
       } finally {
         cleanupTimeout();
       }
@@ -185,15 +185,25 @@ export class SuggestionGenerator {
     }
   }
 
+  // biome-ignore lint/complexity/useMaxParams: private method, params are orthogonal
   #handleResponse(
     response: SuggestionClientOutput,
     id: number,
     cwd: string,
     callbacks: SuggestionCallbacks,
+    modelId: string,
   ): void {
     if (id !== this.generationId) return;
 
     if (!response.ok) {
+      recordDebugEvent({
+        source: "prompt-suggestions",
+        level: "warning",
+        category: "generation.model-error",
+        message: response.message,
+        cwd,
+        data: { modelId },
+      });
       callbacks.onStatus({ kind: "error", message: response.message });
       return;
     }

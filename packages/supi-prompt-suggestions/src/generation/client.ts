@@ -114,7 +114,7 @@ export async function callSuggestionModel(
 
   if (!textContent) {
     const contentTypes = response.content.map((c: { type: string }) => c.type);
-    const message = `Suggestion model returned no text (content types: [${contentTypes.join(", ")}])`;
+    const message = `Suggestion model returned no text (stopReason: ${response.stopReason ?? "undefined"}, content types: [${contentTypes.join(", ") || "none"}])`;
     return { ok: false, message };
   }
 
