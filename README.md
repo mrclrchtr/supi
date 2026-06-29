@@ -323,3 +323,44 @@ pi install /path/to/supi
 ```
 
 The repo root includes the workspace extension manifest for development and full-stack local installs. When installed from a local path, PI loads the working tree directly; after edits, use `/reload` or restart PI.
+
+## Uninstall
+
+### Release stack
+
+Global uninstall:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall.sh | bash
+```
+
+Project-local uninstall from `.pi/settings.json`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall.sh | bash -s -- -l
+```
+
+### Full stack (release + beta)
+
+Global uninstall:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall-all.sh | bash
+```
+
+Project-local uninstall from `.pi/settings.json`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mrclrchtr/supi/main/scripts/uninstall-all.sh | bash -s -- -l
+```
+
+The uninstall scripts also attempt to remove deprecated (`@mrclrchtr/supi`, `@mrclrchtr/supi-rtk`) and formerly-standalone (`@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`) packages as a best-effort cleanup — they show `—` instead of `✗` when not installed.
+
+### Individual packages
+
+```bash
+pi uninstall npm:@mrclrchtr/supi-web
+pi uninstall npm:@mrclrchtr/supi-review
+```
+
+Run `/reload` in PI after uninstalling extensions.
