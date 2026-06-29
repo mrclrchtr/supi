@@ -186,8 +186,8 @@ After outputting the quality report, ask user for confirmation before updating.
 
 1. **Remove or compress unnecessary content first** — Before adding anything, flag sections that MUST be removed or tightened. Never skip removals because of edit churn — a one-time edit that saves tokens every session pays for itself immediately.
    - Routine command listings (`npm install`, `npm test`, `npm run build`) — remove; they're in package.json
-   - Package/module inventories that duplicate what `code_brief` auto-delivers — MUST be removed (these waste hundreds of tokens every session)
-   - Package layout / project structure sections that just list packages with descriptions — MUST be removed; `code_intelligence` delivers this. Architecture trees that restate what `code_map` or `code_intelligence` auto-deliver are never acceptable.
+   - Package/module inventories that duplicate what the code-intelligence overview already delivers — MUST be removed (these waste hundreds of tokens every session)
+   - Package layout / project structure sections that just list packages with descriptions — MUST be removed; `code_intelligence` delivers this. Architecture trees that restate what the code-intelligence overview or `code_orientation` delivers are never acceptable.
    - Verbose explanations where a one-liner suffices — compress
    - Stale or outdated commands, file references, or architecture descriptions — remove
 

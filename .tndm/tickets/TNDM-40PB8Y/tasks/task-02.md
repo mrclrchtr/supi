@@ -40,4 +40,3 @@ Implement the in-app inspector UX for `v` with Overview as the default mode, Raw
 
 ## Test strategy
 TDD required.
-

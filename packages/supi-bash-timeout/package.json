@@ -25,6 +25,7 @@
     "tool-call",
     "guardrails"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "!__tests__"

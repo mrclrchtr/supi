@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -23,13 +23,34 @@ function listTarballEntries(tarballPath) {
   return listing.trim().split("\n").filter(Boolean);
 }
 
+function writeJson(path, value) {
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function makePackageWithBrokenBinLink(parentDir) {
+  const packageDir = join(parentDir, "dangling-bin-package");
+  mkdirSync(join(packageDir, "node_modules", ".bin"), { recursive: true });
+  mkdirSync(join(packageDir, "src"), { recursive: true });
+  writeJson(join(packageDir, "package.json"), {
+    name: "dangling-bin-package",
+    version: "0.0.0",
+    main: "src/index.js",
+    files: ["src"],
+  });
+  writeFileSync(join(packageDir, "src", "index.js"), "export const ok = true;\n");
+  symlinkSync("../vitest/vitest.mjs", join(packageDir, "node_modules", ".bin", "vitest"));
+  return packageDir;
+}
+
 const CORE_EXPORTS = {
+  "./abort-utils": "./src/abort-utils.ts",
   "./api": "./src/api.ts",
   "./config": "./src/config.ts",
   "./context": "./src/context.ts",
   "./debug": "./src/debug-registry.ts",
   "./footer-registry": "./src/footer-registry.ts",
   "./llm": "./src/llm.ts",
+  "./model-selection": "./src/model-selection.ts",
   "./package.json": "./package.json",
   "./path": "./src/path.ts",
   "./report": "./src/report.ts",
@@ -38,6 +59,8 @@ const CORE_EXPORTS = {
   "./session": "./src/session.ts",
   "./settings": "./src/settings.ts",
   "./settings-ui": "./src/settings-ui.ts",
+  "./spinner-frames": "./src/spinner-frames.ts",
+  "./status-spinner": "./src/status-spinner.ts",
   "./terminal": "./src/terminal.ts",
   "./tool-framework": "./src/tool-framework.ts",
   "./types": "./src/types.ts",
@@ -68,6 +91,17 @@ describe("packStaged clean manifest", () => {
 
   afterEach(() => {
     if (outDir) rmSync(outDir, { recursive: true, force: true });
+  });
+
+  it("removes dangling bin symlinks before copying the package tree", {
+    timeout: SLOW_TIMEOUT,
+  }, async () => {
+    const packageDir = makePackageWithBrokenBinLink(outDir);
+
+    tarball = await packStaged(packageDir, { outDir });
+
+    const entries = listTarballEntries(tarball);
+    expect(entries).toContain("package/src/index.js");
   });
 
   it("produces npm-compatible root manifest for packages/supi-lsp", {

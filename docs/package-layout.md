@@ -73,21 +73,21 @@ Guidance modules should export the relevant prompt surfaces for that tool:
 
 ### Tool metadata convention
 
-When a package has more than trivial tool metadata, keep a single source of truth for the public tool or action surface under `src/tool/`.
+When a package has more than trivial tool metadata, keep a single coherent source for the public tool or action surface under `src/tool/`. This may be one spec module or an aligned spec/guidance pair when verbose model-facing prose would make the spec module noisy.
 
 Preferred pattern:
 - one multiplexed tool with an `action` parameter → `src/tool/action-specs.ts`
-- multiple public tools in one package → `src/tool/tool-specs.ts`
+- multiple public tools in one package → `src/tool/tool-specs.ts` or `src/tool/specs.ts` plus `src/tool/guidance.ts`
 - small packages with one simple tool may keep metadata inline until duplication appears
 
-These spec modules should own the public metadata that otherwise drifts between guidance, schemas, registration, and UI:
+These spec modules should own the machine-readable public metadata that otherwise drifts between schemas, registration, validation, and UI:
 - tool or action names
 - parameter schemas or enum values
-- descriptions, `promptSnippet`, and base `promptGuidelines`
 - validation support text such as ordered action lists
 - displayed capability labels when the package surfaces runtime support to users
+- optionally descriptions, `promptSnippet`, and base `promptGuidelines` when the package does not split those into guidance modules
 
-Guidance and registration code should derive from those specs rather than re-declaring the same literals in multiple files. Keep execution logic in separate action or service modules. For the full rationale and examples, see `docs/tool-architecture.md`.
+Guidance and registration code should derive from, or be keyed by, the same canonical spec names rather than re-declaring independent tool lists. Keep execution logic in separate action or service modules. For the full rationale and examples, see `docs/tool-architecture.md`.
 
 ### Prefer domain folders over generic buckets
 
@@ -118,7 +118,7 @@ When multiple SuPi packages need the same path, URI, config, or session helper s
 | `supi-bash-timeout` | stay flat unless it grows |
 | `supi-cache` | domain-first: `forensics/`, `monitor/`, `report/`; optional `config/` later |
 | `supi-claude-md` | mostly flat; optional `config/` or `session/` if runtime state grows |
-| `supi-code-intelligence` | hybrid: root surfaces + `tool/` + `presentation/` + `use-case/` + `workspace/` |
+| `supi-code-intelligence` | hybrid: root surfaces + `app/` + `session/` + `substrate/` + `analysis/` + `tool/` + `ui/` |
 | `supi-code-runtime` | library-only: flat source with `capability/` + `workspace/`; no pi extension |
 | `supi-context` | stay flat unless it grows |
 | `supi-core` | domain-first if reorganized: `config/`, `context/`, `settings/` |

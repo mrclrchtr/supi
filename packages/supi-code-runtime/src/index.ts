@@ -6,7 +6,9 @@
  */
 
 export type {
+  CalleeDepth,
   CalleesData,
+  CallSite,
   CapabilityState,
   CodeLocation,
   CodePosition,
@@ -17,6 +19,8 @@ export type {
   ImportData,
   NodeAtData,
   OutlineData,
+  RefactorOperation,
+  RefactorRequest,
   SemanticProvider,
   SourceRange,
   StructuralProvider,
@@ -27,5 +31,6 @@ export type {
 export {
   createWorkspaceContext,
   getDefaultWorkspaceRuntime,
+  normalizeRefactorOperation,
   WorkspaceRuntime,
 } from "./api.ts";

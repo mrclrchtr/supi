@@ -169,8 +169,72 @@ describe("LspSemanticProvider", () => {
       expect(result?.[0].name).toBe("myFunc");
       expect(result?.[0].kind).toBe("Function");
       expect(result?.[0].file).toBe("/src/index.ts");
-      expect(result?.[0].line).toBe(6);
+      expect(result?.[0].declarationAnchor.line).toBe(6);
       expect(result?.[0].container).toBe("moduleA");
+    });
+  });
+
+  describe("hover", () => {
+    it("returns null when LSP returns null", async () => {
+      const lsp = createMockLsp({ hover: vi.fn().mockResolvedValue(null) });
+      const provider = createLspSemanticProvider(lsp);
+      const result = await provider.hover?.("test.ts", { line: 0, character: 0 });
+      expect(result).toBeNull();
+    });
+
+    it("converts MarkupContent hover to simplified shape", async () => {
+      const lsp = createMockLsp({
+        hover: vi.fn().mockResolvedValue({
+          contents: { kind: "markdown", value: "```ts\nconst x: number\n```" },
+          range: undefined,
+        }),
+      });
+      const provider = createLspSemanticProvider(lsp);
+      const result = await provider.hover?.("test.ts", { line: 5, character: 3 });
+      expect(result).not.toBeNull();
+      expect(result?.contents).toBe("```ts\nconst x: number\n```");
+      expect(result?.range).toBeUndefined();
+    });
+
+    it("converts string contents hover", async () => {
+      const lsp = createMockLsp({
+        hover: vi.fn().mockResolvedValue({
+          contents: "const x: number",
+        }),
+      });
+      const provider = createLspSemanticProvider(lsp);
+      const result = await provider.hover?.("test.ts", { line: 0, character: 0 });
+      expect(result?.contents).toBe("const x: number");
+    });
+
+    it("converts MarkedString array hover", async () => {
+      const lsp = createMockLsp({
+        hover: vi.fn().mockResolvedValue({
+          contents: [{ language: "ts", value: "const x: number" }, "inline docs"],
+        }),
+      });
+      const provider = createLspSemanticProvider(lsp);
+      const result = await provider.hover?.("test.ts", { line: 0, character: 0 });
+      expect(result?.contents).toBe("const x: number\ninline docs");
+    });
+
+    it("includes range when present", async () => {
+      const lsp = createMockLsp({
+        hover: vi.fn().mockResolvedValue({
+          contents: { kind: "plaintext", value: "number" },
+          range: {
+            start: { line: 10, character: 4 },
+            end: { line: 10, character: 10 },
+          },
+        }),
+      });
+      const provider = createLspSemanticProvider(lsp);
+      const result = await provider.hover?.("test.ts", { line: 10, character: 7 });
+      expect(result?.contents).toBe("number");
+      expect(result?.range).toEqual({
+        start: { line: 10, character: 4 },
+        end: { line: 10, character: 10 },
+      });
     });
   });
 });

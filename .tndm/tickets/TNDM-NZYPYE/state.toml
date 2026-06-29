@@ -1,0 +1,14 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:41:49.398811Z"
+revision = 14
+
+[document_fingerprints]
+archive = "sha256:7a5cb18e4ff96200285631692dac4378da5c3d7c3a1bfe1ddc1b43084d409862"
+content = "sha256:4c0bf218ab00a6ef5dc3415dbb5055407d0bb03dcc88033c07ace8c3118da899"
+task-01 = "sha256:00b9060bda835d24d021aea7a2b8d2297aa91e5b72a7802a5713b9b2f40c940e"
+
+[[tasks]]
+number = 1
+title = "Fix all 8 review findings"
+status = "done"

@@ -77,4 +77,3 @@ TUI-dependent code with pi-tui widgets, ctx.ui.custom(), and event emitters. Moc
 - Run `/supi-review` after migration — progress widget appears and works
 - Run `/supi-insights` after migration — working events fire, tab spinner shows activity
 - Cancel mid-operation via Escape — widget disposes, working events stop
-

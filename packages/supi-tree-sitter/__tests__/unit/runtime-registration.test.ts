@@ -142,6 +142,7 @@ function createMockTsService(): TreeSitterService {
         callees: [],
       },
     }),
+    callSites: vi.fn().mockResolvedValue({ kind: "success" as const, data: [] }),
   };
 }
 

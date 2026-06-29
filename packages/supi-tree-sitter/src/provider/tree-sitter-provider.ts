@@ -3,6 +3,7 @@
 
 import type {
   CalleesData,
+  CallSite,
   CodeResult,
   ExportData,
   ImportData,
@@ -12,6 +13,7 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   CalleesAtResult,
+  CallSiteMatch,
   ExportRecord,
   ImportRecord,
   NodeAtResult,
@@ -27,8 +29,8 @@ import type {
  */
 export function createTreeSitterProvider(service: TreeSitterService): StructuralProvider {
   return {
-    async calleesAt(file, line, character) {
-      const result = await service.calleesAt(file, line, character);
+    async calleesAt(file, line, character, depth?) {
+      const result = await service.calleesAt(file, line, character, depth);
       return mapTreeSitterResult(result, mapCalleesAtResult);
     },
 
@@ -50,6 +52,11 @@ export function createTreeSitterProvider(service: TreeSitterService): Structural
     async nodeAt(file, line, character) {
       const result = await service.nodeAt(file, line, character);
       return mapTreeSitterResult(result, mapNodeAtResult);
+    },
+
+    async callSites(file) {
+      const result = await service.callSites(file);
+      return mapTreeSitterResult(result, mapCallSites);
     },
   };
 }
@@ -140,5 +147,10 @@ function mapCalleesAtResult(result: CalleesAtResult): CalleesData {
       name: c.name,
       startLine: c.range.startLine,
     })),
+    depth: result.depth,
   };
+}
+
+function mapCallSites(matches: CallSiteMatch[]): CallSite[] {
+  return matches.map((m) => ({ name: m.name, startLine: m.startLine }));
 }

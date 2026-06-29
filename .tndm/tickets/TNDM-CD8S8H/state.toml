@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:17.149379Z"
+revision = 29
+
+[document_fingerprints]
+archive = "sha256:8234bc438909d4aaf2b584926a9a92905c804422294a6875dfd21aeb75c465e3"
+content = "sha256:e60686214a1bd9490666a3a6184decfb16d786df0748729bb702137ec6435411"
+task-01 = "sha256:e5f7bcc6ea22ad903d359031ee605f93cc8cc4d08d63a40e30f9895f4f4f1e7a"
+task-02 = "sha256:3d7c1a3a948c16f0d172d5911f41e75a11f11e876c24934ba7b1e957f1050c1c"
+task-03 = "sha256:15ef5ece146678719e9e89815f1f9bc13f8c92b18dd75ecf90cc5264758a9eeb"
+task-04 = "sha256:94a398c7021e4ed3fe27187602456e0de55c69dddeae024d062978e18e2dc7d0"
+task-05 = "sha256:a417dd058e3e50155abc48c45d8fcd2166793d2cadaad730ee2454972516816d"
+
+[[tasks]]
+number = 1
+title = "Delete 11 dead files + update test imports"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Move real tree-sitter code out of families, delete families/tree-sitter forwarders"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Collapse all remaining forwarders (planner, resolve-target, request-context, refactor, substrate, families/code, families/lsp)"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Update exports and docs"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Verify — tests, typecheck, biome, stale import scan"
+status = "done"

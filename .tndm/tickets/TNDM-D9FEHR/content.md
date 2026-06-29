@@ -1,0 +1,1 @@
+Follow-up to TNDM-WS4F5Z. Implement real file/resource refactor operations for the code refactor engine, including rename_file and move_file, with shared workspace-edit resource operations, rollback semantics, and honest provider/tool support across supi-code-runtime, supi-lsp, and supi-code-intelligence.

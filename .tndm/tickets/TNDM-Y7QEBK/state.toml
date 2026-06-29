@@ -19,61 +19,38 @@ task-08 = "sha256:3a0e8c8b4a89ab94580784318100a02a34ad60017962f2f31e3e2f058b6dd0
 number = 1
 title = "Create src/workspace-change.ts with shared workspace helpers"
 status = "done"
-files = ["packages/supi-lsp/src/workspace-change.ts"]
-verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json"
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Create handlers/session-lifecycle.ts (session_start, session_shutdown, agent_end)"
 status = "done"
-files = ["packages/supi-lsp/src/handlers/session-lifecycle.ts"]
-verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/handlers/session-lifecycle.ts"
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Create handlers/diagnostic-injection.ts (before_agent_start + context)"
 status = "done"
-files = ["packages/supi-lsp/src/handlers/diagnostic-injection.ts"]
-verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/handlers/diagnostic-injection.ts"
-detail_path = "tasks/task-03.md"
 
 [[tasks]]
 number = 4
 title = "Create handlers/workspace-recovery.ts (tool_result handler)"
 status = "done"
-files = ["packages/supi-lsp/src/handlers/workspace-recovery.ts"]
-verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/handlers/workspace-recovery.ts"
-detail_path = "tasks/task-04.md"
 
 [[tasks]]
 number = 5
 title = "Create handlers/status-command.ts (/lsp-status command)"
 status = "done"
-files = ["packages/supi-lsp/src/handlers/status-command.ts"]
-verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/handlers/status-command.ts"
-detail_path = "tasks/task-05.md"
 
 [[tasks]]
 number = 6
 title = "Rewire lsp.ts to delegate to handler modules"
 status = "done"
-files = ["packages/supi-lsp/src/lsp.ts"]
-verification = "pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec biome check packages/supi-lsp/src/lsp.ts"
-detail_path = "tasks/task-06.md"
 
 [[tasks]]
 number = 7
 title = "Update CLAUDE.md with new source layout"
 status = "done"
-files = ["packages/supi-lsp/CLAUDE.md"]
-verification = "pnpm exec biome check packages/supi-lsp/CLAUDE.md"
-detail_path = "tasks/task-07.md"
 
 [[tasks]]
 number = 8
 title = "Full workspace verification"
 status = "done"
-verification = "pnpm verify"
-detail_path = "tasks/task-08.md"

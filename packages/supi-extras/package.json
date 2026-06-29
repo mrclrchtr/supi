@@ -26,6 +26,7 @@
     "shortcuts",
     "tui"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "README.md"

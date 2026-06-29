@@ -107,4 +107,3 @@ rg "from.*supi-code-intelligence" packages/supi-lsp/src/
 rg "from.*supi-code-intelligence" packages/supi-tree-sitter/src/
 # Both should show matches
 ```
-

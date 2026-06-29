@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:45.744051Z"
+revision = 30
+
+[document_fingerprints]
+archive = "sha256:e3c4ba19923432cbc1703a5ef0f0683a9c30607f77074fb95a0d14e9ae4e1478"
+content = "sha256:92a7f7de45c31c0858527bb30deea0bf866e8a1b20ea54f886302a1a4e4e1845"
+task-01 = "sha256:8ce14e12a339f660cb0eca408525de1bbf9c3806bec1fe72f4133963ec7defbd"
+task-02 = "sha256:b053eb9040ba1b7318b9b09d100ef5413e3d8bf0ecca2f8bcc853abaf1e1f5ec"
+task-03 = "sha256:ee3e04009b44de2dd47f1dccbad5e550c48b6345486cf6328d25be64389a8f4c"
+task-04 = "sha256:500e61c10b6e1b11c04cc81a157b5a78f888ba6889ddb3d2372640ee38f1847f"
+task-05 = "sha256:5af42f895dae8cb8e183bbf77d2409b91e58766bb34f1e4315a1719957011ed5"
+
+[[tasks]]
+number = 1
+title = "Extend HealthData interface and renderer with code action support"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Add LSP code action queries to code_health detailed mode"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update CLAUDE.md to reflect absorption status"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Add unit tests for code action support in code_health"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Verify: full test suite, typecheck, lint, manual smoke test"
+status = "done"

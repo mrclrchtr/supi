@@ -14,4 +14,3 @@ In the file overview table, annotate matching files with the category: `(skip â€
 The skip-list is a filename-only heuristic. Do not inspect file contents.
 
 **TDD:** Write a unit test for `classifySkipCategory` with positive and negative cases. Test that the packet table includes skip annotations for matching files.
-

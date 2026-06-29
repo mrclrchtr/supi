@@ -1,55 +1,43 @@
 schema_version = 1
-status = "in_progress"
-updated_at = "2026-05-24T13:46:30.345708Z"
-revision = 19
+status = "done"
+updated_at = "2026-06-01T23:33:27.693001Z"
+revision = 23
 
 [document_fingerprints]
-content = "sha256:986b06722aaec85527d1fecac039b977f089b8f93242a819dc4602d41632ceb4"
+archive = "sha256:0bd5a46fd5f34ed02231d5f536d1ff6b65aa764d1c06bf6f38954b8db93d8818"
+content = "sha256:6f11379642219c479cb3524c0770b58648607296d010b2c9e72a2645f68b02b9"
 
 [[tasks]]
 number = 1
 title = "Delete packages/supi/ directory"
 status = "done"
-files = ["packages/supi/src/extension.ts", "packages/supi/src/api.ts", "packages/supi/package.json", "packages/supi/README.md", "packages/supi/CLAUDE.md", "packages/supi/tsconfig.json"]
-verification = "ls packages/supi/ should fail (directory gone); pnpm typecheck still passes"
 
 [[tasks]]
 number = 2
 title = "Remove meta-package from release-please-config.json"
 status = "done"
-files = ["release-please-config.json"]
-verification = """pnpm exec node -e "const c=require('./release-please-config.json');console.log(JSON.stringify(c.packages['.'].extra_files))" | grep -v packages/supi/package.json"""
 
 [[tasks]]
 number = 3
 title = "Remove meta-package special-casing from scripts/pack-staged.mjs"
 status = "done"
-files = ["scripts/pack-staged.mjs"]
-verification = "pnpm pack:check (all remaining packages pack without errors)"
 
 [[tasks]]
 number = 4
 title = "Remove meta-package ordering from scripts/publish-released.mjs"
 status = "done"
-files = ["scripts/publish-released.mjs"]
-verification = "pnpm exec biome check scripts/publish-released.mjs"
 
 [[tasks]]
 number = 5
 title = "Remove meta-package tests from scripts/__tests__/"
 status = "done"
-files = ["scripts/__tests__/pack-staged.test.mjs", "scripts/__tests__/bundled-extension-refs.test.mjs", "scripts/__tests__/package-import-smoke.test.mjs"]
-verification = "pnpm test scripts/__tests__/ passes"
 
 [[tasks]]
 number = 6
 title = "Remove meta-package reference from docs/benchmarking-terminal-bench.md"
 status = "done"
-files = ["docs/benchmarking-terminal-bench.md"]
-verification = 'grep -r "@mrclrchtr/supi" docs/ returns no results (except in sub-package paths like supi-core etc.)'
 
 [[tasks]]
 number = 7
 title = "Run full verification: typecheck, test, pack, biome"
 status = "done"
-verification = "pnpm typecheck && pnpm typecheck:tests && pnpm test && pnpm pack:check && pnpm pack:verify && pnpm biome"

@@ -1,0 +1,56 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:14.11729Z"
+revision = 42
+
+[document_fingerprints]
+archive = "sha256:bc897691fccdf0a905256a6497b3196346f4ae4147a2f59c6e105e47e6f49300"
+content = "sha256:6e4782df3f4913d661a2ec0ad9302f6e34e03cb97106d4dc5f2d9d782cba68ab"
+task-01 = "sha256:7743fd6e5e0e84d77a86b0c4b4c3859223ded1dd4e8ae0165133711488fb63ba"
+task-02 = "sha256:9db3d0b79cde50b54b3cc856e63cc02a47c3be983592ff47dc7ccabcac0d3c64"
+task-03 = "sha256:3e5327f7c9c7fb8a54588968bf33a03c2225b813cc61599c0504acc332640c29"
+task-04 = "sha256:b652787a5fc1784c19ab4a76e6a23990d9861e83d9aad24211716137cdfeebd5"
+task-05 = "sha256:9946938946021a3b9fa4756c92c56698e44b9483d05d0f832dff99bd9520af80"
+task-06 = "sha256:23dd18b5895b7a7529247318044cf12c243563cf42bca2ef5a7d76b3bf47aa0c"
+task-07 = "sha256:e842a99823ca8da4606d419b9a5db84dd9723727ceb0ef2818589f1cc8dbbd15"
+task-08 = "sha256:3171317b2887ceb0b9f648772b87b7a9aa5c1a19bbd5c6110813b4b4b2ce6225"
+
+[[tasks]]
+number = 1
+title = "[TDD RED] Lock the new public code tool surface and capability routing"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "[TDD GREEN] Replace public tool specs, guidance, and routing with the new surface"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "[TDD RED] Define reference, call, implementation, and affected-analysis behavior"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "[TDD GREEN] Implement references, calls, implementations, and shared affected reference evidence"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "[TDD RED] Define two-step refactor plan/apply behavior"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "[TDD GREEN] Implement refactor planning, stale-plan checks, and explicit apply"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Update docs, package guidance, and stale references to old relation/refactor names"
+status = "done"
+
+[[tasks]]
+number = 8
+title = "Final verification for the redesigned code-intelligence relation/refactor surface"
+status = "done"

@@ -7,4 +7,3 @@ Update `splitDiffSections()` to count `+` and `-` lines per diff section during 
 Export the updated `DiffSection` type so tests can import it.
 
 **TDD:** Write a unit test first with a multi-file diff input and assert each section has correct add/del counts.
-

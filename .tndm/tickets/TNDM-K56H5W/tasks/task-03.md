@@ -44,4 +44,3 @@ Re-apply only the fixes that still make sense after the revert:
 - All listed tests pass.
 - `packages/supi-tree-sitter` is again a standalone install surface for `tree_sitter_*`.
 - The package owns its own extension wiring instead of depending on `packages/supi-code-intelligence` to host it.
-

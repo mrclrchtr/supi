@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { sanitizeNpmEnv } from "./npm-env.mjs";
 import { rewriteStagedManifests } from "./staged-manifests.mjs";
 
 function parseArgs(argv) {
@@ -58,20 +59,15 @@ function parseArgs(argv) {
 function assertPackageDir(packageDir) {
   const resolvedDir = resolve(packageDir);
 
-  // Guard against path traversal: reject system directories and check
-  // that the resolved path doesn't escape via normalization tricks.
-  if (
-    resolvedDir === "/" ||
-    resolvedDir.startsWith("/etc") ||
-    resolvedDir.startsWith("/tmp") ||
-    resolvedDir.startsWith("/dev")
-  ) {
-    throw new Error(`Refusing to operate on system directory: ${resolvedDir}`);
-  }
-
   const packageJsonPath = join(resolvedDir, "package.json");
   if (!existsSync(packageJsonPath)) {
     throw new Error(`No package.json found in ${resolvedDir}`);
+  }
+
+  // Guard against accidental use on system directories (e.g. bare /etc).
+  // Check after package.json so legitimate test fixtures under /tmp pass.
+  if (resolvedDir === "/" || resolvedDir.startsWith("/etc") || resolvedDir.startsWith("/dev")) {
+    throw new Error(`Refusing to operate on system directory: ${resolvedDir}`);
   }
 
   const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8"));
@@ -85,44 +81,50 @@ function assertPackageDir(packageDir) {
 /**
  * Remove broken symlinks that would cause cp -RL to fail.
  * pnpm's hoisted linker creates dangling .bin entries (e.g.,
- * node_modules/.bin/vitest). Use find -L to follow workspace
- * symlinks and remove any broken symlinks before the copy.
+ * node_modules/.bin/vitest). find -L reports only links it cannot follow;
+ * remove them explicitly because BSD find forbids -delete with -L.
  */
 function removeKnownBrokenSymlinks(packageDir) {
   try {
-    execFileSync(
-      "find",
-      ["-L", packageDir, "-type", "l", "!", "-exec", "test", "-e", "{}", ";", "-delete"],
-      { stdio: "ignore" },
-    );
+    const output = execFileSync("find", ["-L", packageDir, "-type", "l", "-print0"], {
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+
+    for (const entryPath of output.toString("utf8").split("\0")) {
+      if (entryPath) rmSync(entryPath, { force: true });
+    }
   } catch {
     // find exits non-zero when any directory is inaccessible (harmless)
   }
 }
 
 /**
- * Remove @mrclrchtr devDependency symlinks that would create cycles.
+ * Remove @mrclrchtr symlinks that would create cp -RL cycles.
  *
- * pnpm hoists transitive devDeps into a package's node_modules/@mrclrchtr/.
- * When the package has @mrclrchtr/supi-X as a regular dep + bundledDep,
- * and supi-X has this package as a devDep, cp -RL follows the symlink
- * chain into supi-X, which has a symlink back to this package — a cycle.
+ * pnpm hoists transitive workspace packages into a package's
+ * node_modules/@mrclrchtr/. When A bundles B and B's node_modules
+ * contains a hoisted symlink back to A, cp -RL follows the symlink
+ * chain into B then back to A — a cycle.
  *
- * The same cycle can appear at any nesting depth (e.g. A → B → A, where
- * B is a regular dep of A and A is a devDep of B). This function recurses
- * into every @mrclrchtr dependency to remove devDep symlinks at every
- * level, breaking all transitive dev-dependency cycles.
+ * This happens in two flavors:
+ * 1. devDependency symlinks: supi-X appears as a devDep of supi-Y,
+ *    and supi-Y bundles supi-X. cp -RL copies supi-Y which contains
+ *    supi-X as a devDep symlink, which leads back.
+ * 2. hoisting artifacts: pnpm places supi-X in supi-Y's node_modules
+ *    even though supi-Y never declared it as a dependency. These
+ *    stray symlinks also create cycles when the hoisted package
+ *    bundles the current package.
  *
- * DevDependencies are never included in the published tarball, so it is
- * safe to remove them from the source tree before staging.
+ * The function recurses into remaining @mrclrchtr dependencies to
+ * clean nested symlinks at every level, breaking all transitive
+ * cycles. Both devDependencies and hoisted non-dependency symlinks
+ * are safe to remove: devDeps are never shipped, and hoisted
+ * non-dependency packages are pnpm artifacts that would not appear
+ * in the published tarball.
  */
-function removeCyclicDevDepSymlinks(packageDir) {
+function removeCyclicSymlinks(packageDir) {
   const visited = new Set();
 
-  /**
-   * Remove devDependency symlinks pointing to @mrclrchtr packages
-   * from the given package directory, excluding bundled dependencies.
-   */
   function removeMrclrchtrSymlink(dir, depName) {
     const symlinkPath = join(dir, "node_modules", ...depName.split("/"));
     let stat;
@@ -136,20 +138,45 @@ function removeCyclicDevDepSymlinks(packageDir) {
     }
   }
 
-  function removeMrclrchtrDevDepSymlinks(dir, pkg) {
-    const devDeps = Object.keys(pkg.devDependencies || {});
-    const bundled = new Set(pkg.bundledDependencies || []);
+  function _removeIfUndeclaredOrDev(entry, dir, declared, devDeps) {
+    if (!entry.isDirectory() && !entry.isSymbolicLink()) return;
+    const depName = `@mrclrchtr/${entry.name}`;
+    if (!declared.has(depName)) {
+      removeMrclrchtrSymlink(dir, depName);
+    } else if (devDeps.has(depName)) {
+      removeMrclrchtrSymlink(dir, depName);
+    }
+  }
 
-    for (const depName of devDeps) {
-      if (depName.startsWith("@mrclrchtr/") && !bundled.has(depName)) {
-        removeMrclrchtrSymlink(dir, depName);
-      }
+  /**
+   * Remove @mrclrchtr symlinks from node_modules that should not
+   * be copied into the staged tree:
+   * - devDependencies (never shipped)
+   * - packages not declared in dependencies or devDependencies
+   *   (pnpm hoisting artifacts that create cp -RL cycles)
+   */
+  function removeNonProductionMrclrchtrSymlinks(dir, pkg) {
+    const declared = new Set([
+      ...Object.keys(pkg.dependencies || {}),
+      ...Object.keys(pkg.devDependencies || {}),
+    ]);
+    const devDeps = new Set(Object.keys(pkg.devDependencies || {}));
+    const mrclrchtrDir = join(dir, "node_modules", "@mrclrchtr");
+    let entries;
+    try {
+      entries = readdirSync(mrclrchtrDir, { withFileTypes: true });
+    } catch {
+      return; // Directory doesn't exist — nothing to clean
+    }
+
+    for (const entry of entries) {
+      _removeIfUndeclaredOrDev(entry, dir, declared, devDeps);
     }
   }
 
   /**
    * Recurse into remaining @mrclrchtr dependencies to clean their
-   * nested devDep symlinks as well.
+   * nested symlinks as well.
    */
   function recurseIntoMrclrchtrDeps(dir) {
     const mrclrchtrDir = join(dir, "node_modules", "@mrclrchtr");
@@ -187,7 +214,7 @@ function removeCyclicDevDepSymlinks(packageDir) {
       return;
     }
 
-    removeMrclrchtrDevDepSymlinks(dir, pkg);
+    removeNonProductionMrclrchtrSymlinks(dir, pkg);
     recurseIntoMrclrchtrDeps(dir);
   }
 
@@ -196,7 +223,7 @@ function removeCyclicDevDepSymlinks(packageDir) {
 
 function copyPackageTree(sourceDir, destDir) {
   removeKnownBrokenSymlinks(sourceDir);
-  removeCyclicDevDepSymlinks(sourceDir);
+  removeCyclicSymlinks(sourceDir);
   execFileSync("cp", ["-RL", `${sourceDir}/.`, destDir]);
 }
 
@@ -313,13 +340,18 @@ export async function packStaged(packageDir, options = {}) {
 
     if (dryRun) {
       console.log(`Staged pack dry-run: ${pkg.name} (${packageDir})`);
-      execFileSync("npm", ["pack", "--dry-run"], { cwd: stageDir, stdio: "inherit" });
+      execFileSync("npm", ["pack", "--dry-run"], {
+        cwd: stageDir,
+        env: sanitizeNpmEnv(),
+        stdio: "inherit",
+      });
       return null;
     }
 
     const output = execFileSync("npm", ["pack", "--json", "--pack-destination", outDir], {
       cwd: stageDir,
       encoding: "utf8",
+      env: sanitizeNpmEnv(),
     });
     const result = JSON.parse(output);
     if (!Array.isArray(result) || result.length === 0 || !result[0]?.filename) {

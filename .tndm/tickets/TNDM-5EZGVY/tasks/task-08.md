@@ -97,4 +97,3 @@ Test-exempt — refactoring existing behavior. Existing tests cover the settings
 - `pnpm vitest run packages/supi-insights/` passes
 - `pnpm exec tsc -b` for each modified package passes
 - `pnpm exec biome check packages/supi-review/ packages/supi-bash-timeout/ packages/supi-cache/ packages/supi-claude-md/ packages/supi-rtk/` passes
-

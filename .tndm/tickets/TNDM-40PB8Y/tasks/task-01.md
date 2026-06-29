@@ -26,4 +26,3 @@ Expose structured preview data from packet-building code so the inspector can re
 
 ## Test strategy
 TDD required.
-

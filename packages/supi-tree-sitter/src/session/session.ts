@@ -2,6 +2,7 @@
 
 import { detectGrammar, isJsTsGrammar } from "../language.ts";
 import {
+  extractCallSites,
   extractExports,
   extractImports,
   extractOutline,
@@ -10,6 +11,7 @@ import {
 } from "../tool/structure.ts";
 import type {
   CalleesAtResult,
+  CallSiteMatch,
   ExportRecord,
   ImportRecord,
   NodeAtResult,
@@ -97,8 +99,13 @@ export function createTreeSitterService(runtime: TreeSitterRuntime): TreeSitterS
       file: string,
       line: number,
       character: number,
+      depth?: "direct" | "deep",
     ): Promise<TreeSitterResult<CalleesAtResult>> {
-      return lookupCalleesAt(runtime, file, line, character);
+      return lookupCalleesAt(runtime, file, line, character, depth);
+    },
+
+    async callSites(file: string): Promise<TreeSitterResult<CallSiteMatch[]>> {
+      return extractCallSites(runtime, file);
     },
   };
 }

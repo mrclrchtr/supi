@@ -21,4 +21,3 @@ Update user-facing and maintainer-facing docs so they match the new preview beha
 ## Test strategy
 Test-exempt.
 Rationale: documentation-only changes.
-

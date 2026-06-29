@@ -1,0 +1,11 @@
+schema_version = 1
+id = "TNDM-D9FEHR"
+title = "Implement file/resource operations for code refactor engine"
+type = "task"
+priority = "p3"
+depends_on = []
+tags = ["code-intelligence", "file-ops", "refactor"]
+
+[[documents]]
+name = "content"
+path = "content.md"

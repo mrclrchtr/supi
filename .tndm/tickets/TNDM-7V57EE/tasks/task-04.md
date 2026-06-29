@@ -102,4 +102,3 @@ pnpm exec biome check packages/supi-code-intelligence/
 # Pack verification (code-intelligence must pack without LSP/TS bundled)
 node scripts/publish.mjs packages/supi-code-intelligence
 ```
-

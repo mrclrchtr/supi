@@ -54,7 +54,7 @@ Use `defineTool()` for standalone constants, arrays, or SDK `customTools` where 
 
 - `description` is the main provider tool description. Include what the tool does, when to use it, preconditions, side effects, truncation, and any required sequencing/batching.
 - `promptSnippet` opts a custom tool into the default system prompt's `Available tools` list. If omitted, the active tool is still callable but not listed there.
-- `promptGuidelines` are appended flat to the default `Guidelines` section only while the tool is active. Each bullet must name the tool (`Use my_tool when ...`), because PI does not add a heading or prefix.
+- `promptGuidelines` are appended flat to the default `Guidelines` section only while the tool is active. Each bullet must name the tool (`Use my_tool when ...`), because PI does not add a heading or prefix. Parameter-style bullets must also name the tool (`Pass refresh: true to code_health to recover stale diagnostics`), not just the parameter (`Pass refresh: true to recover stale diagnostics`).
 - Token efficiency is a top goal for model-facing guidance. Treat prompt budget as scarce: make snippets/guidelines concise, concrete, and information-dense.
 - Skip low-value hints. Include negative or ordering guidance only when it materially improves tool choice or execution quality.
 - Built-in overrides do **not** inherit `promptSnippet` or `promptGuidelines`; redefine them intentionally.
@@ -73,7 +73,7 @@ Use `defineTool()` for standalone constants, arrays, or SDK `customTools` where 
 `execute(toolCallId, params, signal, onUpdate, ctx)` returns an `AgentToolResult`:
 
 - `content`: text/image blocks sent back to the model.
-- `details`: structured data for UI, logs, and state reconstruction; use `details: undefined` if there is no state.
+- `details`: structured data for UI, logs, and state reconstruction; use `details: {}` if there is no state.
 - `terminate?: true`: hint to skip the automatic follow-up LLM call **only when every finalized result in the current tool batch also terminates**.
 
 Rules:

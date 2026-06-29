@@ -1,23 +1,35 @@
 // LSP semantic provider adapter — wraps SessionLspService into the shared
 // SemanticProvider contract from supi-code-runtime.
 
-import type {
-  CodeLocation,
-  CodePosition,
-  CodeSymbol,
-  RefactorResult,
-  SemanticProvider,
+import {
+  type CodeLocation,
+  type CodePosition,
+  type CodeSymbol,
+  normalizeRefactorOperation,
+  type RefactorRequest,
+  type RefactorResult,
+  type SemanticProvider,
+  type SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type {
+  CodeAction,
   DocumentSymbol,
+  Hover,
   Location,
   LocationLink,
+  MarkupContent,
   SymbolInformation,
-  TextDocumentEdit,
-  TextEdit,
-  WorkspaceEdit,
 } from "../config/types.ts";
 import type { SessionLspService } from "../session/service-registry.ts";
+import {
+  collectCodeActionResults,
+  isDeleteDeadCodeCodeAction,
+  isExtractFunctionCodeAction,
+  isExtractVariableCodeAction,
+  isUpdateImportsCodeAction,
+  runFilteredCodeActionRefactor,
+  runRenameRefactor,
+} from "./refactor-planning.ts";
 
 /**
  * Create a SemanticProvider backed by a SessionLspService.
@@ -25,6 +37,27 @@ import type { SessionLspService } from "../session/service-registry.ts";
  */
 export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvider {
   return {
+    async definition(filePath: string, position: CodePosition): Promise<CodeLocation[] | null> {
+      const result = await lsp.definition(filePath, position);
+      if (!result) return null;
+      const normalized = Array.isArray(result) ? result : [result];
+      const mapped: CodeLocation[] = [];
+      for (const item of normalized) {
+        const loc = toCodeLocation(item);
+        if (loc) mapped.push(loc);
+      }
+      return mapped;
+    },
+
+    async hover(
+      filePath: string,
+      position: CodePosition,
+    ): Promise<{ contents: string; range?: SourceRange } | null> {
+      const result = await lsp.hover(filePath, position);
+      if (!result) return null;
+      return convertLspHover(result);
+    },
+
     async references(filePath: string, position: CodePosition): Promise<CodeLocation[] | null> {
       const refResult = await lsp.references(filePath, position);
       if (!refResult) return null;
@@ -60,135 +93,101 @@ export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvi
       return results.map((sym) => toCodeSymbol(sym as SymbolInformation));
     },
 
+    async refactor(request: RefactorRequest): Promise<RefactorResult> {
+      // Normalize defensively at the provider boundary as well as in
+      // code-intelligence. RefactorRequest still permits the legacy `rename`
+      // alias, and the provider may be invoked directly outside the public tool.
+      const operation = normalizeRefactorOperation(request.operation);
+
+      switch (operation) {
+        case "rename_symbol":
+          if (!request.newName) {
+            return {
+              kind: "unavailable",
+              reason: 'Refactor operation "rename_symbol" requires `newName`.',
+            };
+          }
+          return runRenameRefactor(lsp, request.file, request.position, request.newName);
+        case "extract_function":
+          return runExtractRefactor(lsp, request, "extract_function", isExtractFunctionCodeAction);
+        case "extract_variable":
+          return runExtractRefactor(lsp, request, "extract_variable", isExtractVariableCodeAction);
+        case "update_imports":
+          return runFilteredCodeActionRefactor({
+            lsp,
+            file: request.file,
+            position: request.position,
+            operation: "update_imports",
+            matches: isUpdateImportsCodeAction,
+          });
+        case "delete_dead_code":
+          return runFilteredCodeActionRefactor({
+            lsp,
+            file: request.file,
+            position: request.position,
+            operation: "delete_dead_code",
+            matches: isDeleteDeadCodeCodeAction,
+          });
+        case "rename_file":
+        case "move_file":
+          // TODO(TNDM-D9FEHR): Replace this explicit unavailable result once
+          // shared file/resource edits and rollback semantics exist.
+          return {
+            kind: "unavailable",
+            reason: `Refactor operation "${operation}" is not supported yet. File/resource operations are deferred.`,
+          };
+      }
+
+      return {
+        kind: "unavailable",
+        reason: `Refactor operation "${operation}" is not supported by the active semantic provider.`,
+      };
+    },
+
     async rename(file: string, position: CodePosition, newName: string): Promise<RefactorResult> {
-      const edit = await lsp.rename(file, position, newName);
-      return convertLspWorkspaceEdit(edit);
+      return runRenameRefactor(lsp, file, position, newName);
     },
 
     async codeActions(file: string, position: CodePosition): Promise<RefactorResult[]> {
       const actions = await lsp.codeActions(file, position);
       if (!actions) return [];
+      return collectCodeActionResults(actions);
+    },
 
-      const results: RefactorResult[] = [];
-      for (const action of actions) {
-        const edit = action.edit;
-        if (!edit) {
-          results.push({
-            kind: "unavailable",
-            reason: `Code action "${action.title}" has no edit`,
-          });
-          continue;
-        }
-        const converted = convertLspWorkspaceEdit(edit);
-        if (converted.kind === "precise") {
-          results.push(converted);
-        } else {
-          results.push({
-            kind: "unavailable",
-            reason: `Code action "${action.title}" could not produce precise edits`,
-          });
-        }
-      }
-      return results;
+    async codeActionTitles(
+      file: string,
+      position: CodePosition,
+    ): Promise<Array<{ title: string; kind?: string }> | null> {
+      const actions = await lsp.codeActions(file, position);
+      if (!actions) return null;
+      return actions
+        .filter((a) => a.title)
+        .map((a) => ({ title: a.title, kind: a.kind ?? undefined }));
     },
   };
 }
 
-// ── LSP WorkspaceEdit converter ─────────────────────────────────────
-
-/**
- * Convert an LSP WorkspaceEdit to the shared RefactorResult type.
- *
- * LSP WorkspaceEdit can use:
- * - `documentChanges` (preferred, with TextDocumentEdit)
- * - `changes` (legacy, URI → TextEdit[] map)
- *
- * Returns `unavailable` when both are missing or both produce zero edits.
- */
-function resolveFileFromUri(uri: string): string {
-  if (!uri.startsWith("file://")) return uri;
-  try {
-    return decodeURIComponent(uri.slice(7));
-  } catch {
-    return uri;
-  }
-}
-
-function collectDocumentChangeEdits(
-  docChanges: NonNullable<WorkspaceEdit["documentChanges"]>,
-): Array<{
-  file: string;
-  range: { start: { line: number; character: number }; end: { line: number; character: number } };
-  newText: string;
-}> {
-  const out: Array<{
-    file: string;
-    range: { start: { line: number; character: number }; end: { line: number; character: number } };
-    newText: string;
-  }> = [];
-  for (const change of docChanges) {
-    const tdEdit = change as TextDocumentEdit;
-    if (!tdEdit.textDocument || !tdEdit.edits) continue;
-    const file = resolveFileFromUri(tdEdit.textDocument.uri);
-    for (const singleEdit of tdEdit.edits) {
-      const te = singleEdit as TextEdit;
-      out.push({
-        file,
-        range: {
-          start: { line: te.range.start.line, character: te.range.start.character },
-          end: { line: te.range.end.line, character: te.range.end.character },
-        },
-        newText: te.newText,
-      });
-    }
-  }
-  return out;
-}
-
-function collectChangesEdits(changes: NonNullable<WorkspaceEdit["changes"]>): Array<{
-  file: string;
-  range: { start: { line: number; character: number }; end: { line: number; character: number } };
-  newText: string;
-}> {
-  const out: Array<{
-    file: string;
-    range: { start: { line: number; character: number }; end: { line: number; character: number } };
-    newText: string;
-  }> = [];
-  for (const [uri, textEdits] of Object.entries(changes)) {
-    if (!textEdits || textEdits.length === 0) continue;
-    const file = resolveFileFromUri(uri);
-    for (const te of textEdits) {
-      out.push({
-        file,
-        range: {
-          start: { line: te.range.start.line, character: te.range.start.character },
-          end: { line: te.range.end.line, character: te.range.end.character },
-        },
-        newText: te.newText,
-      });
-    }
-  }
-  return out;
-}
-
-function convertLspWorkspaceEdit(edit: WorkspaceEdit | null): RefactorResult {
-  if (!edit) {
-    return { kind: "unavailable", reason: "LSP server returned no edit" };
+function runExtractRefactor(
+  lsp: SessionLspService,
+  request: RefactorRequest,
+  operation: "extract_function" | "extract_variable",
+  matches: (action: CodeAction) => boolean,
+): Promise<RefactorResult> | RefactorResult {
+  if (!request.range) {
+    return {
+      kind: "unavailable",
+      reason: `Refactor operation "${operation}" requires \`range\`.`,
+    };
   }
 
-  let fileEdits = edit.documentChanges?.length
-    ? collectDocumentChangeEdits(edit.documentChanges)
-    : [];
-  if (fileEdits.length === 0 && edit.changes) {
-    fileEdits = collectChangesEdits(edit.changes);
-  }
-
-  if (fileEdits.length === 0) {
-    return { kind: "unavailable", reason: "Workspace edit contains no file edits" };
-  }
-
-  return { kind: "precise", edits: { edits: fileEdits } };
+  return runFilteredCodeActionRefactor({
+    lsp,
+    file: request.file,
+    position: request.position,
+    range: request.range,
+    operation,
+    matches,
+  });
 }
 
 // ── Type conversion helpers ───────────────────────────────────────────
@@ -257,20 +256,27 @@ function flattenDocumentSymbols(
   const result: CodeSymbol[] = [];
 
   for (const sym of symbols) {
-    // DocumentSymbol has selectionRange; SymbolInformation has location
+    // DocumentSymbol.range = full defining node (declaration anchor);
+    // .selectionRange = identifier token (name anchor). SymbolInformation has
+    // only location.range (declaration) and no selectionRange.
     const ds = sym as DocumentSymbol;
     const si = sym as SymbolInformation;
-    const start = ds.selectionRange?.start ?? si.location?.range?.start;
-    if (!start) continue;
+    const declStart = ds.range?.start ?? si.location?.range?.start;
+    if (!declStart) continue;
+    const nameStart = ds.selectionRange?.start;
 
-    result.push({
+    const symbol: CodeSymbol = {
       name: sym.name,
       kind: symbolKindName(sym.kind),
       file: filePath,
-      line: start.line + 1,
-      character: start.character + 1,
+      declarationAnchor: { line: declStart.line + 1, character: declStart.character + 1 },
       container,
-    });
+    };
+    if (nameStart) {
+      symbol.nameAnchor = { line: nameStart.line + 1, character: nameStart.character + 1 };
+    }
+
+    result.push(symbol);
 
     if (Array.isArray(ds.children) && ds.children.length > 0) {
       result.push(...flattenDocumentSymbols(ds.children, filePath, sym.name));
@@ -287,8 +293,45 @@ function toCodeSymbol(sym: SymbolInformation): CodeSymbol {
     name: sym.name,
     kind: symbolKindName(sym.kind),
     file: uri.startsWith("file://") ? decodeURIComponent(uri.slice(7)) : uri,
-    line: start ? start.line + 1 : 0,
-    character: start ? start.character + 1 : 0,
+    // SymbolInformation has no selectionRange — nameAnchor is derived later
+    // by the orchestration layer's refine, or left absent.
+    declarationAnchor: {
+      line: start ? start.line + 1 : 0,
+      character: start ? start.character + 1 : 0,
+    },
     container: sym.containerName ?? null,
   };
+}
+
+// ── Hover conversion helpers ─────────────────────────────────────────
+
+/**
+ * Convert an LSP Hover result into a simplified runtime shape.
+ * Extracts text from MarkupContent, MarkedString[], or plain string,
+ * and converts the optional LSP Range to a SourceRange.
+ */
+function convertLspHover(hover: Hover): { contents: string; range?: SourceRange } {
+  const contents = extractHoverText(hover.contents);
+  const result: { contents: string; range?: SourceRange } = { contents };
+  if (hover.range) {
+    result.range = {
+      start: { line: hover.range.start.line, character: hover.range.start.character },
+      end: { line: hover.range.end.line, character: hover.range.end.character },
+    };
+  }
+  return result;
+}
+
+function extractHoverText(contents: Hover["contents"]): string {
+  if (typeof contents === "string") return contents;
+  if (Array.isArray(contents)) {
+    return contents
+      .map((item) => {
+        if (typeof item === "string") return item;
+        return item.value;
+      })
+      .join("\n");
+  }
+  // MarkupContent
+  return (contents as MarkupContent).value ?? "";
 }

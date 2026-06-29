@@ -20,69 +20,43 @@ task-09 = "sha256:4ce78bca5aea8f537c7de64ee24708939ec805e14d02402841fcef87258c47
 number = 1
 title = "Add CodePosition and CodeLocation to supi-core"
 status = "done"
-files = ["packages/supi-core/src/substrate-types.ts", "packages/supi-core/src/api.ts", "packages/supi-core/src/index.ts", "packages/supi-core/__tests__/unit/substrate-types.test.ts"]
-verification = "pnpm vitest run packages/supi-core/__tests__/unit/substrate-types.test.ts"
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Define substrate interfaces and value types in supi-code-intelligence"
 status = "done"
-files = ["packages/supi-code-intelligence/src/substrates/types.ts"]
-verification = "pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json"
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Implement LSP semantic substrate adapter"
 status = "done"
-files = ["packages/supi-code-intelligence/src/substrates/lsp-adapter.ts", "packages/supi-code-intelligence/__tests__/unit/substrates/lsp-adapter.test.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/substrates/lsp-adapter.test.ts"
-detail_path = "tasks/task-03.md"
 
 [[tasks]]
 number = 4
 title = "Implement tree-sitter structural substrate adapter"
 status = "done"
-files = ["packages/supi-code-intelligence/src/substrates/tree-sitter-adapter.ts", "packages/supi-code-intelligence/__tests__/unit/substrates/tree-sitter-adapter.test.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/__tests__/unit/substrates/tree-sitter-adapter.test.ts"
-detail_path = "tasks/task-04.md"
 
 [[tasks]]
 number = 5
 title = "Wire substrates through tool executors"
 status = "done"
-files = ["packages/supi-code-intelligence/src/tool/execute-brief.ts", "packages/supi-code-intelligence/src/tool/execute-relations.ts", "packages/supi-code-intelligence/src/tool/execute-affected.ts", "packages/supi-code-intelligence/src/tool/execute-pattern.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/"
-detail_path = "tasks/task-05.md"
 
 [[tasks]]
 number = 6
 title = "Update action files to accept substrate parameters"
 status = "done"
-files = ["packages/supi-code-intelligence/src/actions/callers-action.ts", "packages/supi-code-intelligence/src/actions/affected-action.ts", "packages/supi-code-intelligence/src/actions/implementations-action.ts", "packages/supi-code-intelligence/src/actions/callees-action.ts", "packages/supi-code-intelligence/src/actions/brief-action.ts", "packages/supi-code-intelligence/src/pattern-structured.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/"
-detail_path = "tasks/task-06.md"
 
 [[tasks]]
 number = 7
 title = "Update target-resolution.ts to use substrates"
 status = "done"
-files = ["packages/supi-code-intelligence/src/target-resolution.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/"
-detail_path = "tasks/task-07.md"
 
 [[tasks]]
 number = 8
 title = "Delete providers, export from API, clean up test mocks"
 status = "done"
-files = ["packages/supi-code-intelligence/src/api.ts", "packages/supi-code-intelligence/src/index.ts", "packages/supi-code-intelligence/src/providers/semantic-provider.ts", "packages/supi-code-intelligence/src/providers/structural-provider.ts"]
-verification = "pnpm vitest run packages/supi-code-intelligence/ && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json"
-detail_path = "tasks/task-08.md"
 
 [[tasks]]
 number = 9
 title = "Full verification: biome, typecheck, full test suite"
 status = "done"
-verification = "pnpm exec biome check packages/supi-code-intelligence/ packages/supi-core/ && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-code-intelligence/__tests__/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-core/__tests__/tsconfig.json && pnpm vitest run packages/supi-code-intelligence/ packages/supi-core/"
-detail_path = "tasks/task-09.md"

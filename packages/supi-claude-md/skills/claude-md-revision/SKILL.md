@@ -34,7 +34,7 @@ Filter ruthlessly. Every token must earn its place in the instruction file — i
 
 **Before adding, consider removing.** Scan the file for content that MUST be removed or compressed. Never skip removals because of edit churn — a one-time edit that saves tokens every session pays for itself immediately:
 - Routine command listings that are trivially discoverable from `package.json` — MUST remove (~50–200 tokens saved per session)
-- Sections that duplicate what SuPi extensions auto-deliver (package tables, dependency graphs, project structure that just lists packages with descriptions, architecture trees that restate `code_map` output) — MUST remove; these are never "minor overlaps" — they are unconditional waste (~200–800 tokens saved per session)
+- Sections that duplicate what SuPi extensions auto-deliver (package tables, dependency graphs, project structure that just lists packages with descriptions, architecture trees that restate the code-intelligence overview or `code_orientation` output) — MUST remove; these are never "minor overlaps" — they are unconditional waste (~200–800 tokens saved per session)
 - Verbose explanations where a one-liner suffices — compress (~20–100 tokens saved)
 - Stale commands, paths, or architecture descriptions that no longer match the codebase — remove
 

@@ -1,10 +1,11 @@
 schema_version = 1
-status = "in_progress"
-updated_at = "2026-05-24T00:21:22.747259Z"
-revision = 41
+status = "done"
+updated_at = "2026-06-01T23:33:30.034038Z"
+revision = 45
 
 [document_fingerprints]
-content = "sha256:8bbec1433a3dc63e8deb5c5dbe389eab93cc8ef7253ad22c6a8d571b32550a61"
+archive = "sha256:24a144c3d8f8dacda1c2d492884f2a7f1b5bce6230f108c989faca66e51d9b1e"
+content = "sha256:6fa4bcf219fa87e562536d1c7abe59201364c523be3d515436dd0c4ae670582d"
 task-01 = "sha256:7eca0b3e2bdc0960c0a66f18a16835a34f1e9d44d1556e9a636c7c37cbcd5b33"
 task-02 = "sha256:51cec46a23bcfb9c1f1ff2669d7db1423cee1fa410b9e1ede37bd78133954d28"
 task-03 = "sha256:4d82785faed0e36a9f1be1dda76b9ee7ffdee38089b3e6890701ab007c21b57d"
@@ -19,69 +20,43 @@ task-09 = "sha256:5175d7156d66831a1c9268e7a78324c62558b31c1cb6e476f2624413ce697b
 number = 1
 title = "[TDD RED] Write failing tests for 6 focused tree_sitter tools"
 status = "done"
-files = ["packages/supi-tree-sitter/__tests__/tool-focus.test.ts"]
-verification = "pnpm vitest run packages/supi-tree-sitter/__tests__/tool-focus.test.ts (expect failures — tools not yet registered)"
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "[TDD GREEN] Implement 6 focused tree_sitter tools + refactor tree-sitter.ts"
 status = "done"
-files = ["packages/supi-tree-sitter/src/tree-sitter.ts", "packages/supi-tree-sitter/src/tool/register-tools.ts", "packages/supi-tree-sitter/src/tool/guidance.ts", "packages/supi-tree-sitter/__tests__/guidance.test.ts", "packages/supi-tree-sitter/__tests__/smoke.test.ts", "packages/supi-tree-sitter/__tests__/tool.test.ts"]
-verification = "pnpm vitest run packages/supi-tree-sitter/ (all tests pass, including new tool-focus.test.ts)"
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Update docs + downstream references for tree_sitter split"
 status = "done"
-files = ["packages/supi-tree-sitter/CLAUDE.md", "packages/supi-debug/src/status-log.ts"]
-verification = "pnpm exec biome check packages/supi-tree-sitter/CLAUDE.md packages/supi-debug/src/status-log.ts; smoke-check status-log tool list includes all 6 new names"
-detail_path = "tasks/task-03.md"
 
 [[tasks]]
 number = 4
 title = "[TDD RED] Write failing tests for 6 focused LSP tools (hover, definition, references, implementation, rename, code_actions)"
 status = "done"
-files = ["packages/supi-lsp/__tests__/unit/focused-tools.test.ts"]
-verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/focused-tools.test.ts (expect failures — tools not yet registered)"
-detail_path = "tasks/task-04.md"
 
 [[tasks]]
 number = 5
 title = "[TDD GREEN] Update LSP tool names, specs, and guidance for 6 focused tools"
 status = "done"
-files = ["packages/supi-lsp/src/tool/names.ts", "packages/supi-lsp/src/tool/tool-specs.ts", "packages/supi-lsp/src/tool/guidance.ts"]
-verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/focused-tools.test.ts (new tests pass); pnpm vitest run packages/supi-lsp/__tests__/unit/guidance.test.ts (existing tests pass with updated tool names)"
-detail_path = "tasks/task-05.md"
 
 [[tasks]]
 number = 6
 title = "[TDD GREEN] Update LSP service actions, registration, state, and extension wiring"
 status = "done"
-files = ["packages/supi-lsp/src/tool/service-actions.ts", "packages/supi-lsp/src/tool/register-tools.ts", "packages/supi-lsp/src/session/lsp-state.ts", "packages/supi-lsp/src/lsp.ts", "packages/supi-lsp/__tests__/unit/guidance.test.ts", "packages/supi-lsp/__tests__/unit/workspace-sentinel-recovery.test.ts", "packages/supi-lsp/__tests__/unit/renderer.test.ts"]
-verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/focused-tools.test.ts packages/supi-lsp/__tests__/unit/guidance.test.ts packages/supi-lsp/__tests__/unit/workspace-sentinel-recovery.test.ts packages/supi-lsp/__tests__/unit/renderer.test.ts (all pass)"
-detail_path = "tasks/task-06.md"
 
 [[tasks]]
 number = 7
 title = "Update LSP integration tests for focused tools"
 status = "done"
-files = ["packages/supi-lsp/__tests__/integration/e2e-smoke.test.ts", "packages/supi-lsp/__tests__/integration/service-actions.integration.test.ts", "packages/supi-lsp/__tests__/integration/service-actions-workspace.integration.test.ts"]
-verification = "pnpm exec vitest run packages/supi-lsp/__tests__/integration/ (expect all TypeScript tests to pass; Python/Bash skipped if binaries absent)"
-detail_path = "tasks/task-07.md"
 
 [[tasks]]
 number = 8
 title = "Update docs + downstream references for LSP splits"
 status = "done"
-files = ["packages/supi-lsp/CLAUDE.md", "packages/supi-debug/src/status-log.ts", "packages/supi-code-intelligence/src/actions/callees-action.ts"]
-verification = "pnpm exec biome check packages/supi-lsp/CLAUDE.md packages/supi-debug/src/status-log.ts packages/supi-code-intelligence/src/actions/callees-action.ts"
-detail_path = "tasks/task-08.md"
 
 [[tasks]]
 number = 9
 title = "Full workspace verification"
 status = "done"
-verification = "pnpm verify"
-detail_path = "tasks/task-09.md"

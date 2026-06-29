@@ -5,6 +5,11 @@ import { loadContextConfig } from "./config.ts";
 import { registerContextRenderer } from "./renderer.ts";
 import { registerContextSettings } from "./settings-registration.ts";
 import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidance.ts";
+import {
+  type ContextToolDetails,
+  renderContextToolCall,
+  renderContextToolResult,
+} from "./tool/render.ts";
 import { formatTokens } from "./utils.ts";
 
 export default function contextExtension(pi: ExtensionAPI) {
@@ -49,12 +54,14 @@ export default function contextExtension(pi: ExtensionAPI) {
       promptSnippet,
       parameters: Type.Object({}),
       promptGuidelines,
+      renderCall: renderContextToolCall,
+      renderResult: renderContextToolResult,
       // biome-ignore lint/complexity/useMaxParams: pi tool execute signature
       async execute(_toolCallId, _params, _signal, _onUpdate, ctx) {
         const analysis = analyzeContext(ctx, pi, cachedOptions, true);
         return {
           content: [{ type: "text", text: JSON.stringify(analysis, null, 2) }],
-          details: undefined,
+          details: { analysis } satisfies ContextToolDetails,
         };
       },
     });

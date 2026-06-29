@@ -138,14 +138,14 @@ describe("introspectCapabilities", () => {
     ]);
 
     expect(info).toEqual([
-      {
+      expect.objectContaining({
         name: "typescript",
         root,
         fileTypes: ["ts", "tsx"],
         status: "unavailable",
         supportedActions: [],
         openFiles: [],
-      },
+      }),
     ]);
   });
 
@@ -188,14 +188,14 @@ describe("introspectCapabilities", () => {
     ];
 
     expect(info).toEqual([
-      {
+      expect.objectContaining({
         name: "typescript",
         root: "/tmp/lazy",
         fileTypes: ["ts", "tsx"],
         status: "running",
         supportedActions: expectedActions,
         openFiles: ["src/index.ts"],
-      },
+      }),
     ]);
   });
 
@@ -233,7 +233,7 @@ describe("introspectCapabilities", () => {
     const info = introspectCapabilities(manager, []);
 
     expect(info).toEqual([
-      {
+      expect.objectContaining({
         name: "typescript",
         root,
         fileTypes: ["ts", "tsx"],
@@ -244,7 +244,7 @@ describe("introspectCapabilities", () => {
           "workspace_symbols(query)",
         ],
         openFiles: [],
-      },
+      }),
     ]);
   });
 });

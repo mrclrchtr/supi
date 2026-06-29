@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:45.764251Z"
+revision = 34
+
+[document_fingerprints]
+archive = "sha256:818597712abb41a5dcb942e57c4d3474b28c6d574557fe8bb1a3775e7cfa8c0f"
+content = "sha256:f904370240df92d98deee1c5c404ea0c099d5fe3b2bbf302cff5830f71b4c1dc"
+task-01 = "sha256:7778c50972a275f9e76a3bfed91fa01df6799f5c3338b1487a50dce885d4fd2e"
+task-02 = "sha256:81ddef137855a25e34261ca294d4706bab9967e7422ee3ac98ff4b2c922f8b80"
+task-03 = "sha256:7c9625197b2fbfce351ace2916edb4bdb3da2d4b09400b59be53a997b084cb0e"
+task-04 = "sha256:db90539a19a9c74e223603f616061211241afa72ed1cf3556e2a7725508d39ba"
+task-05 = "sha256:be6db110488bbea755f0361895ff8e33c7b179005603750c5c31c625ce99de91"
+task-06 = "sha256:45b09eb9cf05085526a710bd35246a56f6f83351e53544250a493b266a8f0527"
+
+[[tasks]]
+number = 1
+title = "Add code_find to intent types and tool spec array"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Implement execute-find.ts executor with mode dispatch"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Add unit tests for code_find"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Update extension registration test for code_find"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update CLAUDE.md package docs for code_find"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Full verification — tests, typecheck, extension surface"
+status = "done"

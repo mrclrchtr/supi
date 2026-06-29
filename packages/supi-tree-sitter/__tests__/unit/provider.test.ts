@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createTreeSitterProvider } from "../../src/provider/tree-sitter-provider.ts";
 import type {
   CalleesAtResult,
+  CallSiteMatch,
   ExportRecord,
   ImportRecord,
   NodeAtResult,
@@ -48,8 +49,11 @@ function mockService(overrides?: Partial<TreeSitterService>): TreeSitterService 
             range: { startLine: 1, startCharacter: 0, endLine: 10, endCharacter: 0 },
           },
           callees: [],
+          depth: "direct" as const,
         } satisfies CalleesAtResult,
       })),
+    callSites:
+      overrides?.callSites ?? (async () => ({ kind: "success", data: [] as CallSiteMatch[] })),
   };
 }
 
@@ -62,6 +66,7 @@ describe("TreeSitterProvider", () => {
     expect(typeof provider.imports).toBe("function");
     expect(typeof provider.nodeAt).toBe("function");
     expect(typeof provider.calleesAt).toBe("function");
+    expect(typeof provider.callSites).toBe("function");
   });
 
   describe("outline", () => {
@@ -246,6 +251,7 @@ describe("TreeSitterProvider", () => {
                 range: { startLine: 5, startCharacter: 0, endLine: 5, endCharacter: 10 },
               },
             ],
+            depth: "direct" as const,
           } satisfies CalleesAtResult,
         }),
       });

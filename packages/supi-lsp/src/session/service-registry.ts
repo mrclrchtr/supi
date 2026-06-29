@@ -12,12 +12,17 @@ import type {
   LocationLink,
   Position,
   ProjectServerInfo,
+  Range,
   SymbolInformation,
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
+
+function isRange(value: Position | Range): value is Range {
+  return "start" in value && "end" in value;
+}
 
 /** Workspace diagnostic summary grouped by file. */
 export interface WorkspaceDiagnosticSummaryEntry {
@@ -52,6 +57,11 @@ export type SessionLspServiceState =
   | { kind: "inactive"; service: SessionLspService }
   | { kind: "pending" }
   | { kind: "disabled" }
+  | { kind: "unavailable"; reason: string };
+
+export type SemanticReadinessResult =
+  | { kind: "ready" }
+  | { kind: "timeout" }
   | { kind: "unavailable"; reason: string };
 
 /**
@@ -122,18 +132,52 @@ export class SessionLspService {
     return client.rename(resolvedPath, position, newName);
   }
 
-  async codeActions(filePath: string, position: Position): Promise<CodeAction[] | null> {
+  async codeActions(
+    filePath: string,
+    positionOrRange: Position | Range,
+  ): Promise<CodeAction[] | null> {
     const resolvedPath = this.resolveFilePath(filePath);
     const client = await this.manager.ensureFileOpen(resolvedPath);
     if (!client) return null;
 
-    const range = { start: position, end: position };
+    const range = isRange(positionOrRange)
+      ? positionOrRange
+      : { start: positionOrRange, end: positionOrRange };
     const diagnostics = client
       .getDiagnostics(resolvedPath)
-      .filter((diagnostic) => diagnostic.range.start.line <= position.line)
-      .filter((diagnostic) => diagnostic.range.end.line >= position.line);
+      .filter((diagnostic) => diagnostic.range.end.line >= range.start.line)
+      .filter((diagnostic) => diagnostic.range.start.line <= range.end.line);
 
     return client.codeActions(resolvedPath, range, { diagnostics });
+  }
+
+  /**
+   * Wait until the LSP client that owns a file is ready for semantic queries.
+   * Performs a lightweight semantic warm-up probe before resolving.
+   */
+  async waitUntilReadyForFile(
+    filePath: string,
+    options: { timeoutMs?: number } = {},
+  ): Promise<SemanticReadinessResult> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    if (!this.manager.canServeFile(resolvedPath)) {
+      return {
+        kind: "unavailable",
+        reason: "No LSP client can serve this file",
+      };
+    }
+
+    return raceReadiness(this.manager.waitUntilFileReady(resolvedPath), options.timeoutMs);
+  }
+
+  /**
+   * Wait until all started LSP clients are ready for semantic queries.
+   * Performs one representative warm-up probe per client/root.
+   */
+  async waitUntilReadyForWorkspace(
+    options: { timeoutMs?: number } = {},
+  ): Promise<SemanticReadinessResult> {
+    return raceReadiness(this.manager.waitUntilWorkspaceReady(), options.timeoutMs);
   }
 
   // ── Project / runtime awareness ─────────────────────────────────────
@@ -190,7 +234,40 @@ export class SessionLspService {
 // ── Registry ──────────────────────────────────────────────────────────
 
 const WAIT_INTERVAL_MS = 25;
+const DEFAULT_SEMANTIC_READY_TIMEOUT_MS = 15_000;
 const registry = createSessionStateRegistry<SessionLspServiceState>("supi-lsp/session-registry");
+
+async function raceReadiness(
+  readiness: Promise<unknown>,
+  timeoutMs: number | undefined,
+): Promise<SemanticReadinessResult> {
+  const effectiveTimeoutMs = timeoutMs ?? DEFAULT_SEMANTIC_READY_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    await Promise.race([
+      readiness,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("semantic-readiness-timeout")),
+          effectiveTimeoutMs,
+        );
+      }),
+    ]);
+    return { kind: "ready" };
+  } catch (error) {
+    if (timer) clearTimeout(timer);
+    if (error instanceof Error && error.message === "semantic-readiness-timeout") {
+      return { kind: "timeout" };
+    }
+    return {
+      kind: "unavailable",
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /** Publish the LSP service state for a session cwd. */
 export function setSessionLspServiceState(cwd: string, state: SessionLspServiceState): void {

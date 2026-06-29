@@ -25,6 +25,7 @@
     "events",
     "observability"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "README.md"

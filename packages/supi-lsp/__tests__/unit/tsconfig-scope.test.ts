@@ -25,7 +25,7 @@ describe("isFileExcludedByTsconfig", () => {
     // so test files ARE included by their own tsconfig.
     // This means they won't be filtered, which is correct: test files
     // should get LSP diagnostics.
-    expect(isFileExcludedByTsconfig("packages/supi-lsp/__tests__/unit/format.test.ts", CWD)).toBe(
+    expect(isFileExcludedByTsconfig("packages/supi-lsp/__tests__/unit/config.test.ts", CWD)).toBe(
       false,
     );
   });
@@ -47,8 +47,7 @@ describe("isFileExcludedByTsconfig", () => {
 
   it("returns false for a test file that matches include **/*.ts", () => {
     // __tests__/tsconfig.json has include: ["**/*.ts"]
-    // unit/format.test.ts matches **/*.ts → included → not excluded
-    expect(isFileExcludedByTsconfig("packages/supi-lsp/__tests__/unit/format.test.ts", CWD)).toBe(
+    expect(isFileExcludedByTsconfig("packages/supi-lsp/__tests__/unit/config.test.ts", CWD)).toBe(
       false,
     );
   });

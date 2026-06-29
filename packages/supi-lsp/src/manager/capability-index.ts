@@ -1,7 +1,7 @@
 // Capability index — indexes and queries server capabilities.
 
+import { getSupportedLspServerActions } from "../config/server-actions.ts";
 import type { ServerCapabilities } from "../config/types.ts";
-import { getSupportedLspServerActions } from "../tool/tool-specs.ts";
 import type { LspManager } from "./manager.ts";
 
 /**

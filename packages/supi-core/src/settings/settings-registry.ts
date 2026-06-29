@@ -3,6 +3,7 @@
 // Extensions declare their settings via `registerSettings()` during their
 // factory function. The generic settings UI reads them via `getRegisteredSettings()`.
 
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { SettingItem } from "@earendil-works/pi-tui";
 import { createRegistry } from "../registry-utils.ts";
 
@@ -14,9 +15,15 @@ export interface SettingsSection {
   /** Human-readable label shown in the UI */
   label: string;
   /** Load current SettingItem[] for the given scope */
-  loadValues: (scope: SettingsScope, cwd: string) => SettingItem[];
+  loadValues: (scope: SettingsScope, cwd: string, ctx?: ExtensionContext) => SettingItem[];
   /** Persist a change back to config */
-  persistChange: (scope: SettingsScope, cwd: string, settingId: string, value: string) => void;
+  persistChange: (
+    scope: SettingsScope,
+    cwd: string,
+    settingId: string,
+    value: string,
+    ctx?: ExtensionContext,
+  ) => void;
 }
 
 const registry = createRegistry<SettingsSection>("settings-registry");

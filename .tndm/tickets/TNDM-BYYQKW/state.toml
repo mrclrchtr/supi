@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:34:36.068278Z"
+revision = 31
+
+[document_fingerprints]
+archive = "sha256:2d14710a718c04012d1cf6165dee6788e4fcc39c36dfd9637a063e9f0d4a5b3d"
+content = "sha256:56762bd8501b1d2ca330db9ddd630a9368316cfbc7a74f69e8cd36d3d7108cae"
+task-01 = "sha256:72ca6072cb7458813603aa8faf69a96d593f0ae8d856ed53f9b08f161fe2ff00"
+task-02 = "sha256:1e9fe83409f9f69814833b3cafcc5860026eaf919cab3e82a63f15615c4a361a"
+task-03 = "sha256:485c7ba11714e1597e3be8379ed6ee46e8a5d8af3e7938b4fcd687a278d82e37"
+task-04 = "sha256:af03c74866da8845b362bab2768a5ab3c502960aec2484498a453f024526f06a"
+task-05 = "sha256:326bc4bc83a4ea923af579d9ddaf8495907590683d2005b1df0855d445e26a09"
+
+[[tasks]]
+number = 1
+title = "Fix code_impact findLikelyTests with boundary-aware regex + companions fallback"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "Wire real tests, diagnostics, and docs data into code_context stubbed sections"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Remove direction/depth/maxNodes from code_graph schema (silent contract violation)"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Add explicit guidance when code_context task mode has no target"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Final verification: full test suite, typecheck, and lint"
+status = "done"

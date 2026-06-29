@@ -63,4 +63,3 @@ pnpm exec tsc -b packages/supi-code-intelligence/tsconfig.json
 pnpm vitest run packages/supi-code-intelligence/__tests__/unit/provider/
 pnpm exec biome check packages/supi-code-intelligence/src/provider/
 ```
-

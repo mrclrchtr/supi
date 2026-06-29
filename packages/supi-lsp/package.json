@@ -16,7 +16,6 @@
     "access": "public"
   },
   "keywords": [
-    "pi-package",
     "pi",
     "pi-coding-agent",
     "pi-extension",
@@ -27,6 +26,7 @@
     "rename",
     "diagnostics"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "src/**/*.json",
@@ -50,41 +50,14 @@
     "vscode-languageserver-protocol",
     "vscode-languageserver-types"
   ],
-  "peerDependencies": {
-    "@earendil-works/pi-ai": "*",
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*",
-    "typebox": "*"
-  },
-  "peerDependenciesMeta": {
-    "@earendil-works/pi-ai": {
-      "optional": true
-    },
-    "@earendil-works/pi-coding-agent": {
-      "optional": true
-    },
-    "@earendil-works/pi-tui": {
-      "optional": true
-    },
-    "typebox": {
-      "optional": true
-    }
-  },
+
   "devDependencies": {
-    "@mrclrchtr/supi-code-intelligence": "workspace:*",
     "@mrclrchtr/supi-test-utils": "workspace:*",
     "vitest": "4.1.9"
-  },
-  "pi": {
-    "extensions": [
-      "./src/extension.ts"
-    ],
-    "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-lsp-status.png"
   },
   "main": "src/api.ts",
   "exports": {
     "./api": "./src/api.ts",
-    "./extension": "./src/extension.ts",
     "./package.json": "./package.json",
     "./provider/lsp-semantic-provider": "./src/provider/lsp-semantic-provider.ts"
   }

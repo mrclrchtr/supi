@@ -46,4 +46,3 @@ node scripts/publish.mjs packages/supi-code-intelligence
 node scripts/publish.mjs packages/supi-lsp
 node scripts/publish.mjs packages/supi-tree-sitter
 ```
-

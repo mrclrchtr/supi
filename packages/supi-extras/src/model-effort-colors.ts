@@ -96,6 +96,10 @@ export default function modelEffortColors(pi: ExtensionAPI) {
               .getByPlacement("stats")
               .map((c) => c.render())
               .filter(Boolean);
+            const suffixContribs = footerContributions
+              .getByPlacement("stats-end")
+              .map((c) => c.render())
+              .filter(Boolean);
 
             const rawStats = buildStatsLeft({
               contextWindow,
@@ -103,6 +107,7 @@ export default function modelEffortColors(pi: ExtensionAPI) {
               usage,
               useSubscription,
               extraParts: statContribs,
+              suffixParts: suffixContribs,
             });
 
             let statsLeft = rawStats.text;

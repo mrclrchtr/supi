@@ -1,0 +1,43 @@
+schema_version = 1
+id = "TNDM-GKYTV2"
+title = "Modularize supi-code-intelligence internals under the single-extension architecture"
+type = "feature"
+priority = "p2"
+depends_on = ["TNDM-ACNZFE"]
+tags = ["architecture", "code-intelligence", "flow:done", "refactor"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
+
+[[documents]]
+name = "content"
+path = "content.md"
+
+[[documents]]
+name = "task-01"
+path = "tasks/task-01.md"
+
+[[documents]]
+name = "task-02"
+path = "tasks/task-02.md"
+
+[[documents]]
+name = "task-03"
+path = "tasks/task-03.md"
+
+[[documents]]
+name = "task-04"
+path = "tasks/task-04.md"
+
+[[documents]]
+name = "task-05"
+path = "tasks/task-05.md"
+
+[[documents]]
+name = "task-06"
+path = "tasks/task-06.md"
+
+[[documents]]
+name = "task-07"
+path = "tasks/task-07.md"

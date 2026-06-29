@@ -28,6 +28,7 @@
     "lsp",
     "tree-sitter"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts"
   ],
@@ -35,7 +36,8 @@
     "@mrclrchtr/supi-code-runtime": "workspace:*",
     "@mrclrchtr/supi-core": "workspace:*",
     "@mrclrchtr/supi-lsp": "workspace:*",
-    "@mrclrchtr/supi-tree-sitter": "workspace:*"
+    "@mrclrchtr/supi-tree-sitter": "workspace:*",
+    "ts-pattern": "^5.9.0"
   },
   "bundledDependencies": [
     "@mrclrchtr/supi-code-runtime",
@@ -46,6 +48,7 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
@@ -55,25 +58,27 @@
     "@earendil-works/pi-coding-agent": {
       "optional": true
     },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    },
     "typebox": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@mrclrchtr/supi-test-utils": "workspace:*",
     "@types/node": "25.9.4",
-    "vitest": "4.1.9",
-    "@mrclrchtr/supi-test-utils": "workspace:*"
+    "vitest": "4.1.9"
   },
   "pi": {
     "extensions": [
-      "./src/extension.ts",
-      "node_modules/@mrclrchtr/supi-lsp/src/extension.ts",
-      "node_modules/@mrclrchtr/supi-tree-sitter/src/extension.ts"
+      "./src/extension.ts"
     ],
     "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.png"
   },
-  "main": "src/api.ts",
+  "main": "src/index.ts",
   "exports": {
+    ".": "./src/index.ts",
     "./api": "./src/api.ts",
     "./extension": "./src/extension.ts",
     "./package.json": "./package.json"

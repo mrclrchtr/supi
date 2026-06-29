@@ -5,5 +5,5 @@ revision = 24
 
 [document_fingerprints]
 archive = "sha256:f4bf3c45525348c9cfa5585ea705de42c6bab18c4309bb2d31fe445fa47c99a9"
-content = "sha256:acdc68ce3714ca37de2fad115326e33dd39f53982d414c70d0b97c9871154ebe"
-plan = "sha256:b58d0e8cb45d8b86bd3459a2df9116e784aaf5520eae07feba1a0a25d1c645da"
+content = "sha256:dd683f0ab28a7d1fef6ac7ac078d4158b642cfbe5f48890692616002a5b6a09b"
+plan = "sha256:55d5f5a7d6aceeb70ae18de8f9f9af301388d3aa068d8d8c5d6495b937927d02"

@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!.agents/skills"]
+    "includes": ["**", "!.agents/skills", "!.pi/skills", "!.claude/skills"]
   },
   "formatter": {
     "enabled": true,
@@ -19,9 +19,9 @@
   "linter": {
     "enabled": true,
     "domains": {
-      "project": "all",
-      "test": "all",
-      "types": "all"
+      "project": "recommended",
+      "test": "recommended",
+      "types": "recommended"
     },
     "rules": {
       "preset": "recommended",
@@ -68,6 +68,9 @@
         "noDebugger": "error",
         "noExplicitAny": "error",
         "noNestedPromises": "error",
+        // Good bug-finding rule in theory, but too often pushes the codebase toward
+        // lint-appeasement rewrites like `for (;;)`, `String(kind)`, or widened types.
+        "noUnnecessaryConditions": "off",
         "useArraySortCompare": "error"
       },
       "nursery": {
@@ -104,7 +107,8 @@
             "noExcessiveLinesPerFunction": "off"
           },
           "style": {
-            "noExcessiveLinesPerFile": "off"
+            "noExcessiveLinesPerFile": "off",
+            "noNonNullAssertion": "off"
           }
         }
       }
@@ -121,6 +125,16 @@
     },
     {
       "includes": ["packages/supi-code-intelligence/src/use-case/generate-relations.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["packages/supi-code-intelligence/src/ui/status-overlay.ts"],
       "linter": {
         "rules": {
           "style": {

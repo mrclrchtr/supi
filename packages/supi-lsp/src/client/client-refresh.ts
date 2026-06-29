@@ -147,6 +147,11 @@ async function pullDocumentDiagnostics(
   }
 
   const previousResultId = accessClient(client).diagnosticStore.get(uri)?.resultId;
+  // Wait for server readiness before pulling diagnostics. In steady state
+  // this resolves immediately (isReady check). During active indexing, this
+  // may add extra latency on top of the per-URI timeout budget — acceptable
+  // because the server wouldn't return useful diagnostics while indexing anyway.
+  await client.getReady();
   return rpc.sendRequest(
     "textDocument/diagnostic",
     {

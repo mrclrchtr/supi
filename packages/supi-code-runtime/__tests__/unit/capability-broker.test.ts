@@ -151,6 +151,19 @@ describe("capability-broker", () => {
       expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(true);
     });
 
+    it("reports refactorAvailable=true when semantic provider has refactor", () => {
+      runtime = new WorkspaceRuntime();
+      const refactorProvider: SemanticProvider = {
+        references: async () => null,
+        implementation: async () => null,
+        documentSymbols: async () => [],
+        workspaceSymbols: async () => [],
+        refactor: async (_request) => ({ kind: "precise" as const, edits: { edits: [] } }),
+      };
+      runtime.registerSemantic("/project", refactorProvider);
+      expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(true);
+    });
+
     it("refactorAvailable is false when no semantic provider is registered", () => {
       runtime = new WorkspaceRuntime();
       expect(runtime.getWorkspace("/project").semantic.refactorAvailable).toBe(false);
@@ -200,6 +213,8 @@ function createMockStructuralProvider(): StructuralProvider {
     imports: async (_file: string) =>
       ({ kind: "unsupported-language", file: _file, message: "mock" }) as const,
     nodeAt: async (_file: string, _line: number, _char: number) =>
+      ({ kind: "unsupported-language", file: _file, message: "mock" }) as const,
+    callSites: async (_file: string) =>
       ({ kind: "unsupported-language", file: _file, message: "mock" }) as const,
   };
 }

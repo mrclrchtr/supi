@@ -25,6 +25,7 @@
     "usage-report",
     "html-report"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "!__tests__/**",

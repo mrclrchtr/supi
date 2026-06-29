@@ -5,7 +5,7 @@ revision = 24
 
 [document_fingerprints]
 archive = "sha256:48276109b5d5042239ec3e9dbe9469577b5510827299954e17294de5a06e5965"
-content = "sha256:5bf2ee48e48af786a3b4459c86c2b686a8515aeaa540ba028f1593cf288794c9"
+content = "sha256:6efb9f841dd31d1ec32ab6b0fc30f2e563ac109a53df2da99b74806b5e7ac84a"
 task-01 = "sha256:e6fd923958a30d65c61b3346ffc3f9e0fbdd4c6bb0d0058cd7741f2535ebb9ac"
 task-02 = "sha256:cc7a5dc31ad2f953ebc6f59db2c1d12b60abcf2b2a24b107cd11742000a1fd3f"
 task-03 = "sha256:49754d71468ba3cabc04bf08d6960528aeb6c3db0834e641d5859a96fdce407d"
@@ -15,34 +15,18 @@ task-04 = "sha256:1826a3c49c1c95e9f5d49904c997f9eae319d05ecf05af73a42b71bdf1cea1
 number = 1
 title = "Add note-aware result formatting tests and extend choice selection data"
 status = "done"
-files = ["packages/supi-ask-user/src/types.ts", "packages/supi-ask-user/src/render/result.ts", "packages/supi-ask-user/__tests__/unit/ask-user.test.ts", "packages/supi-ask-user/__tests__/unit/transcript.test.ts"]
-verification = "pnpm vitest run packages/supi-ask-user/__tests__/unit/ask-user.test.ts packages/supi-ask-user/__tests__/unit/transcript.test.ts -v"
-notes = "TDD task. Start by making the ask-user and transcript tests fail for note-bearing choice selections, then add the minimal type and summary-formatting changes to make them pass."
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Add controller helpers and invariants for per-option choice notes"
 status = "done"
-files = ["packages/supi-ask-user/src/session/controller.ts", "packages/supi-ask-user/__tests__/unit/controller.test.ts"]
-verification = "pnpm vitest run packages/supi-ask-user/__tests__/unit/controller.test.ts -v"
-notes = "TDD task. Write the controller assertions first so note trimming, auto-selection, and deselect cleanup fail before adding helper logic."
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Add n-driven note editing to the ask-user overlay for choice options"
 status = "done"
-files = ["packages/supi-ask-user/src/ui/overlay.ts", "packages/supi-ask-user/src/ui/overlay-view.ts", "packages/supi-ask-user/src/ui/overlay-render.ts", "packages/supi-ask-user/__tests__/unit/ui-overlay.test.ts"]
-verification = "pnpm vitest run packages/supi-ask-user/__tests__/unit/ui-overlay.test.ts -v"
-notes = "TDD task. Start by making the overlay tests fail for the new `n` keyboard path before adding the note editor mode and row markers."
-detail_path = "tasks/task-03.md"
 
 [[tasks]]
 number = 4
 title = "Document note support and run final supi-ask-user verification"
 status = "done"
-files = ["packages/supi-ask-user/README.md", "packages/supi-ask-user/src/types.ts", "packages/supi-ask-user/src/session/controller.ts", "packages/supi-ask-user/src/ui/overlay.ts", "packages/supi-ask-user/src/ui/overlay-view.ts", "packages/supi-ask-user/src/ui/overlay-render.ts", "packages/supi-ask-user/src/render/result.ts", "packages/supi-ask-user/__tests__/unit/ask-user.test.ts", "packages/supi-ask-user/__tests__/unit/controller.test.ts", "packages/supi-ask-user/__tests__/unit/transcript.test.ts", "packages/supi-ask-user/__tests__/unit/ui-overlay.test.ts"]
-verification = "pnpm vitest run packages/supi-ask-user/ -v && pnpm exec tsc --noEmit -p packages/supi-ask-user/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-ask-user/__tests__/tsconfig.json && pnpm exec biome check packages/supi-ask-user"
-notes = "Docs are test-exempt because they describe the already-implemented behavior, but the task must finish with the full package regression, typecheck, and Biome sweep above."
-detail_path = "tasks/task-04.md"

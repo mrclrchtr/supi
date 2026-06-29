@@ -104,6 +104,15 @@ describe("WorkspaceRuntime", () => {
       expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("ready");
     });
 
+    it("supports pending semantic registration before promotion to ready", () => {
+      runtime = new WorkspaceRuntime();
+      runtime.registerSemanticPending("/project", createMockSemanticProvider());
+      expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("pending");
+
+      runtime.markSemanticReady("/project");
+      expect(runtime.getWorkspace("/project")?.semantic.state.kind).toBe("ready");
+    });
+
     it("transitions back to unavailable after clearing", () => {
       runtime = new WorkspaceRuntime();
       runtime.registerSemantic("/project", createMockSemanticProvider());
@@ -210,6 +219,8 @@ function createMockStructuralProvider(): StructuralProvider {
     imports: async (_file: string) =>
       ({ kind: "unsupported-language", file: _file, message: "mock" }) as const,
     nodeAt: async (_file: string, _line: number, _char: number) =>
+      ({ kind: "unsupported-language", file: _file, message: "mock" }) as const,
+    callSites: async (_file: string) =>
       ({ kind: "unsupported-language", file: _file, message: "mock" }) as const,
   };
 }

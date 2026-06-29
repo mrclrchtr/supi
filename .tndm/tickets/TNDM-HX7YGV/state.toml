@@ -1,0 +1,38 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:34:15.838808Z"
+revision = 30
+
+[document_fingerprints]
+archive = "sha256:3623612106f80f0c80609595ab1dfa6164b5ee687f6b3d209c6bc208666e1e51"
+content = "sha256:1ab790274d23b579754f1a77df86cb255d843e92828d36e9db01b36fbae461ca"
+task-01 = "sha256:4d22c6760d842bfa5cc5f10b4756e12e027fecc6cf3dacb07335c8114695be37"
+task-02 = "sha256:7c0c60b5d9fd62abe9afd3bbe8c04f6697a2f9945e437a444a5599c9aa4093bd"
+task-03 = "sha256:8faa36e9d6bcc6aad492a44138cd7fa003c0340211ac4f2a788bbb18c3440174"
+task-04 = "sha256:e407cb9c0fb94e2215b1fe3af40022dd80cd7be7f878a604007e73518dcbd562"
+task-05 = "sha256:60f717edcc6815a1c010a15e94af65714afcbd56ca315928ec301a7097ebc948"
+
+[[tasks]]
+number = 1
+title = "RED: codify code_impact registration, schema, routing, and targetId follow-up contract"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: register code_impact and share the current target-based impact engine"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "RED: specify diff-aware code_impact inputs and honest unavailable outcomes"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "GREEN: implement diff-aware code_impact behavior and update public docs"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Final verification: full package checks and workflow smoke test for code_impact"
+status = "done"

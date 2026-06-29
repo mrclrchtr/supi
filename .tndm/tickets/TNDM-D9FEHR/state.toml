@@ -1,0 +1,7 @@
+schema_version = 1
+status = "todo"
+updated_at = "2026-06-01T23:34:04.96136Z"
+revision = 3
+
+[document_fingerprints]
+content = "sha256:db0370af9d883ebe0142d54997dde3f540f99684e151539c95b54d7767107678"

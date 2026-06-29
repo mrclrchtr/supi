@@ -16,4 +16,3 @@ Extend `buildReviewerSystemPrompt()` with two new sections:
 Skip reviewing: lockfiles, generated/bundled code (dist/, .next/, __generated__/), vendored dependencies, changelogs, snapshot files, minified bundles, and binary files.
 
 **TDD:** Write a unit test that verifies the system prompt contains the calibration section and skip-list guardrail.
-

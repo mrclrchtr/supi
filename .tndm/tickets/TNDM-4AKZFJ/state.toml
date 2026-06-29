@@ -14,21 +14,13 @@ task-03 = "sha256:b97e7e3ee98529c16521df739052a1e7a320b893aa2a846883ee3bf512c444
 number = 1
 title = "Write failing tests for tool-framework module"
 status = "done"
-files = ["packages/supi-core/__tests__/unit/tool-framework.test.ts"]
-verification = "pnpm vitest run packages/supi-core/__tests__/unit/tool-framework.test.ts (expect FAIL — module doesn't exist yet)"
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Implement src/tool-framework.ts and export from api.ts/index.ts"
 status = "done"
-files = ["packages/supi-core/src/tool-framework.ts", "packages/supi-core/src/api.ts", "packages/supi-core/src/index.ts"]
-verification = "pnpm vitest run packages/supi-core/__tests__/unit/tool-framework.test.ts (expect PASS)"
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Full verification: typecheck, biome, tests, downstream smoke test"
 status = "done"
-verification = "All commands pass: biome check (clean), tsc (no errors), vitest (all green), downstream smoke test (all green)"
-detail_path = "tasks/task-03.md"

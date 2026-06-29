@@ -85,4 +85,3 @@ A cross-package VCS restore is not meaningfully driven by a new failing unit tes
 - `package.json` restores `./packages/supi-lsp/src/extension.ts` and `./packages/supi-tree-sitter/src/extension.ts` to the root `pi.extensions` list.
 - `packages/supi-lsp/package.json` and `packages/supi-tree-sitter/package.json` again expose `./extension` and `pi.extensions`.
 - `packages/supi-code-intelligence/package.json` no longer acts as the sole runtime host for `lsp_*` and `tree_sitter_*`.
-

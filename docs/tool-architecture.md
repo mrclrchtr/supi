@@ -81,33 +81,34 @@ Use this when one package exposes several public tools.
 Typical example:
 - `supi-lsp`
 
-The spec module should own the public metadata for each tool and, when needed,
-shared capability labels used by status views or prompt builders.
+The spec module should own the machine-readable public surface for each tool
+and, when needed, shared capability labels used by status views or prompt
+builders. Large packages may keep verbose model-facing prose in a paired
+`guidance.ts` module, but that guidance must be keyed by the same canonical
+names and covered by alignment tests.
 
 Example responsibilities:
 - tool names and labels
-- descriptions
-- `promptSnippet`
-- base `promptGuidelines`
-- parameter schemas
+- parameter schemas or schema keys
 - service-action bindings used by registration
+- concise metadata needed by validation, docs, or tests
 - displayed capability labels derived from runtime support
+- optionally descriptions, `promptSnippet`, and base `promptGuidelines` when the package does not split those into guidance modules
 
 ## What should derive from specs
 
-Once a package has a metadata module, these parts should derive from it instead
-of re-declaring literals:
+Once a package has metadata modules, these parts should derive from the
+canonical public list instead of re-declaring literals:
 
 - `StringEnum([...])` values
 - TypeBox schema fragments that only encode the public action or tool list
-- `promptSnippet`
-- `promptGuidelines`
+- paired guidance maps (`promptSnippet`, `promptGuidelines`, descriptions)
 - registration loops in `register-tools.ts` or extension entrypoints
 - ordered supported-action text in validation messages
 - capability labels shown in status UIs or dynamic prompt coverage
 
 The goal is not abstraction for its own sake. The goal is to make the public
-surface change in one place.
+surface change coherently in one place or one tightly-aligned module pair.
 
 ## What should stay out of specs
 
@@ -178,54 +179,47 @@ runtime details.
 
 ### `packages/supi-tree-sitter`
 
-Uses `src/tool/tool-specs.ts` as the single source of truth for:
-- public focused-tool names (`tree_sitter_outline`, `tree_sitter_imports`, `tree_sitter_exports`, `tree_sitter_node_at`, `tree_sitter_query`, `tree_sitter_callees`)
-- descriptions, labels, prompt snippets, and prompt guidelines
-- parameter schema keys for each tool
+This package is now **library-only**. It provides the shared session-scoped
+structural service via `getSessionTreeSitterService(cwd)` so peer packages can
+reuse parsers instead of creating a fresh owned session for every operation.
 
-`src/tool/guidance.ts` and `src/tool/register-tools.ts` derive from those specs.
-The extension also publishes a shared session-scoped structural service via
-`getSessionTreeSitterService(cwd)` so peer packages can reuse parsers instead of
-creating a fresh owned session for every operation.
+If substrate metadata modules such as `src/tool/tool-specs.ts` remain in the
+package, treat them as **internal substrate plumbing**, not a public model-facing
+surface. Public `tree_sitter_*` tools are no longer registered.
 
 ### `packages/supi-code-intelligence`
 
-Uses `src/tool/tool-specs.ts` as the single source of truth for:
-- public focused-tool names (`code_brief`, `code_map`, `code_relations`, `code_affected`, `code_pattern`, `code_refactor`)
-- descriptions, snippets, and base guidance
-- parameter schemas for each public tool
+Uses an aligned `src/tool/` metadata pair:
+- `src/tool/specs.ts` owns public focused-tool names (`code_resolve`, `code_inspect`, `code_orientation`, `code_graph`, `code_impact`, `code_find`, `code_health`, `code_refactor_plan`, `code_refactor_apply`), labels, schemas, and execution bindings
+- `src/tool/guidance.ts` owns verbose model-facing descriptions, snippets, and base guidance keyed by those same tool names
+- `src/tool/register.ts` joins the two maps when registering tools
 
-`src/tool/guidance.ts`, `src/tool/register-tools.ts`, and
-`src/code-intelligence.ts` derive from those specs.
+`code_orientation` replaced the old `code_context`/`code_brief` orientation surface. `code_affected` has been removed; use `code_impact` exclusively.
 
 ### `packages/supi-lsp`
 
-Uses `src/tool/tool-specs.ts` as the single source of truth for:
-- split-tool metadata
-- parameter schemas
-- base guidance
-- service-action bindings
-- displayed server capability labels
+This package is now **library-only**. It provides the shared semantic runtime,
+service, and provider APIs consumed by `supi-code-intelligence`.
 
-`src/tool/guidance.ts`, `src/tool/register-tools.ts`, and
-`src/manager/manager-project-info.ts` derive from those specs.
+If substrate metadata modules such as `src/tool/tool-specs.ts` remain in the
+package, treat them as **internal substrate plumbing**, not a public model-facing
+surface. Public `lsp_*` tools are no longer registered.
 
 ## Package ownership and cross-family orchestration
 
 In the SuPi code-understanding stack, tool ownership follows a clear rule:
 
-- **`supi-tree-sitter`** owns the structural substrate and all `tree_sitter_*` expert tools.
-- **`supi-lsp`** owns the semantic substrate, the diagnostics lifecycle, and all `lsp_*` expert tools.
-- **`supi-code-intelligence`** owns the high-level `code_*` tools and may add **cross-family orchestration guidance** —
-  for example, steering the model toward `lsp_*` for semantic navigation, `tree_sitter_*` for structural inspection,
-  and `code_pattern` for explicit search, and `code_refactor` for direct-apply semantic rename.
+- **`supi-code-intelligence`** is the **sole pi extension exposer** for the code-understanding stack. It owns
+  the public `code_*` tool surface, the substrate wiring (LSP session lifecycle, diagnostics, recovery,
+  settings, and tool overrides), and the cross-family orchestration guidance above the semantic and
+  structural libraries.
+- **`supi-lsp`** is a **library-only** package — no pi extension surface. It provides the semantic runtime/
+  service/provider APIs that power the semantic parts of the public `code_*` tools.
+- **`supi-tree-sitter`** is a **library-only** package — no pi extension surface. It provides the structured
+  runtime/service APIs that power the structural parts of the public `code_*` tools.
 
-Cross-family orchestration guidance is intentional coupling at the prompt level, not at the code level.
-Each package still owns its own metadata and rendering. `supi-code-intelligence` does not re-own substrate
-metadata; it only adds strategy-level prompt guidelines.
-
-Installing `@mrclrchtr/supi-code-intelligence` activates all three tool families. Each tool family
-is independently installed and documented from its home package.
+Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tools. The substrate
+packages are transitive dependencies, not standalone pi installations.
 
 ## Anti-patterns
 

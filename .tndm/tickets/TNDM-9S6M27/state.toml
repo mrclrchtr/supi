@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:33:32.575997Z"
+revision = 35
+
+[document_fingerprints]
+archive = "sha256:abf6a3ff06eaa0658064cb0c51ba1ac6eb42f0ae8f78b7515e3f97b9541cd128"
+content = "sha256:7de64190b16330e0ded63a4a373eac05d68dcd79baae5debd1aa43d1637baba8"
+task-01 = "sha256:c3df76d266c5e21aeaa4e2ebe4cc89c783f1674af79a4f5df1872d5cc95a5d9b"
+task-02 = "sha256:23cf8cb1973c200d5844b105327dfba44f3a7935a54a1d81bb0c84bfa7d5420e"
+task-03 = "sha256:b388b2488fd00d5b2010627e48c75ab8bffebab216e4920826fd112817df15cd"
+task-04 = "sha256:b7e7e30621b12e39e747af2efb3a80ffb8fdf95546850eb454fe4c4f14a6bca8"
+task-05 = "sha256:de93452f0d0edcf8c61052bb895c11388122065858a48e544228ddaf9fe90908"
+task-06 = "sha256:269f1b465d258c2c8476d805447a5540b4755808d2c52ba5e9c3c0ef2c6e2da3"
+
+[[tasks]]
+number = 1
+title = "RED: Lock code_resolve and target-handle behavior in tests"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: Implement workflow target store and resolve service"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "GREEN: Register code_resolve and render resolve results"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "GREEN: Let current target-oriented code tools consume targetId"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update Phase 1 docs and maintainer guidance"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Final verification and Phase 1 handoff"
+status = "done"

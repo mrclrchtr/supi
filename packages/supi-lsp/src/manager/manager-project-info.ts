@@ -1,7 +1,7 @@
 import type { LspClient } from "../client/client.ts";
+import { getSupportedLspServerActions } from "../config/server-actions.ts";
 import type { ProjectServerInfo } from "../config/server-config.ts";
 import { displayRelativeFilePath } from "../summary.ts";
-import { getSupportedLspServerActions } from "../tool/tool-specs.ts";
 
 interface ProjectServerInfoInput {
   serverName: string;
@@ -31,5 +31,6 @@ export function buildProjectServerInfo(
     status,
     supportedActions: getSupportedLspServerActions(input.client?.serverCapabilities),
     openFiles: input.client?.openFiles.map((file) => displayRelativeFilePath(file, cwd)) ?? [],
+    ready: input.client?.ready ?? false,
   };
 }

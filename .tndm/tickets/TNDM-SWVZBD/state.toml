@@ -1,0 +1,37 @@
+schema_version = 1
+status = "in_progress"
+updated_at = "2026-06-17T17:00:50.772957Z"
+revision = 26
+
+[document_fingerprints]
+content = "sha256:4dfb73e7efd170dc1e3fed2bac1a093756fe136c0ff20f8561bd0e1ab374b16c"
+task-01 = "sha256:53404f9df4ae356a8fcd293d705ca064cff855cdc282bdc3ab67209d5e006ab3"
+task-02 = "sha256:a8c20b5e2bdde7f1e4f1e178db1b0021e780783a1069efabdec143427617afec"
+task-03 = "sha256:312d4b9a622c7b887a24e963a2980c2aed3b30a67cfc216a068d7f638d26866f"
+task-04 = "sha256:637c9871c348aed60a6824d008597dcf5a9a7006baecf8359c4a59653c61e044"
+task-05 = "sha256:fc81dd8208dc057f2ef280ebccc1060c9e25af1891527e5c1b062e5f9d77e5f6"
+
+[[tasks]]
+number = 1
+title = "RED: codify AST call support and TypeScript full-expression call-site behavior"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: implement TypeScript-family full-expression call-site extraction and align runtime messages"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update code_find public docs and metadata assertions for AST call support"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Run affected package tests and typechecks"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Final verification: full repo checks and code_find smoke test"
+status = "done"

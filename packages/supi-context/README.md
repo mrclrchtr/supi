@@ -34,7 +34,7 @@ After install, pi gets one user command and an optional agent-callable tool:
 
 The command sends a custom `supi-context` message, and this package registers a dedicated renderer so the report shows up as a structured TUI view instead of plain text.
 
-The `supi_context` tool returns the same analysis as JSON, so the agent can inspect context usage programmatically — useful for checking remaining capacity before large operations or after heavy tool results.
+The `supi_context` tool returns the same analysis as JSON, so the agent can inspect context usage programmatically — useful for checking remaining capacity before large operations or after heavy tool results. In the TUI, the tool renders a compact usage summary by default and expands into the same structured report as `/supi-context`.
 
 ## What the report shows
 
@@ -104,7 +104,9 @@ The tool is disabled by default and requires a `/reload` or restart after toggli
 - `src/format-sections.ts` — instruction file, context file, skill, guideline, tool, compaction, and provider sections
 - `src/prompt-inference.ts` — fallback recovery of context files, skills, and guideline sections from the live system prompt
 - `src/renderer.ts` — custom renderer for `supi-context` messages
+- `src/report-component.ts` — shared width-aware report component for message and tool renderers
 - `src/tool/guidance.ts` — tool description, prompt snippet, and guidelines for the agent tool
+- `src/tool/render.ts` — TUI call/result renderer for the agent tool
 - `src/utils.ts` — token and plural-format helpers
 
 Tests live under `__tests__/unit/`.

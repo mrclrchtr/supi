@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:34:13.05066Z"
+revision = 35
+
+[document_fingerprints]
+archive = "sha256:8d3e4dcccfa27c0555e8275b51e340981fbfa6c51ad80ca6e3d752c9cff55b2d"
+content = "sha256:97dad08d5674fc6470731e904d5a1fc6437c09be5e7426e83c9b5926b0914563"
+task-01 = "sha256:5e340505eac65ed3fc20e09b6874d0df2c2d765ccbdc926970b3a9ef9b9f7001"
+task-02 = "sha256:f278ba9524d44adab2a30117ea36a47e602246df370fa62f32f84fbf6a5f9485"
+task-03 = "sha256:5263950c1d1516d31ced06a3add9575a3133e2eafcfc0792f39e195eaf22ee7d"
+task-04 = "sha256:963fd60e6584698366233ac7cf21f49bd3b827fd65afd131ba307f617af434c1"
+task-05 = "sha256:1847132c406c9fcb225a3bfca68fd61e521de88cc12c939526417c4aa7191a7e"
+task-06 = "sha256:6ffd4d3da7a9b891865b5a9cc58155214e50e4e3a99758496c51dc33ad945169"
+
+[[tasks]]
+number = 1
+title = "[TDD RED] Lock the code_context public contract, registration, and routing"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "[TDD GREEN] Register code_context and wire the executor skeleton"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "[TDD RED] Define task-focused code_context bundle behavior and metadata"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "[TDD GREEN] Implement code_context orchestration, rendering, and honest section handling"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update code-intelligence docs and workflow notes for active code_context"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Final verification — full code-context package sweep and live smoke"
+status = "done"

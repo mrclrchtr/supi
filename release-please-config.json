@@ -17,6 +17,7 @@
         "packages/supi-extras/package.json",
         "packages/supi-insights/package.json",
         "packages/supi-lsp/package.json",
+        "packages/supi-prompt-suggestions/package.json",
         "packages/supi-review/package.json",
         "packages/supi-settings/package.json",
         "packages/supi-tree-sitter/package.json",

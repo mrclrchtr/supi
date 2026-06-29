@@ -33,6 +33,17 @@ describe("LspRefactorProvider", () => {
     return { ...defaultMockFields(), ...overrides } as unknown as SessionLspService;
   }
 
+  type RefactorRequest = {
+    operation: string;
+    file: string;
+    position: { line: number; character: number };
+    newName?: string;
+  };
+
+  type OperationAwareSemanticProvider = SemanticProvider & {
+    refactor?: (request: RefactorRequest) => Promise<RefactorResult>;
+  };
+
   describe("rename", () => {
     it("exposes rename on the SemanticProvider when SessionLspService supports it", () => {
       const lsp = createMockLsp({
@@ -227,6 +238,103 @@ describe("LspRefactorProvider", () => {
       await provider.rename?.("/src/index.ts", { line: 0, character: 0 }, "newName");
 
       expect(renameSpy).toHaveBeenCalledWith("/src/index.ts", { line: 0, character: 0 }, "newName");
+    });
+  });
+
+  describe("operation-aware refactor planning", () => {
+    it("exposes a generic refactor method for operation-aware planning", () => {
+      const lsp = createMockLsp();
+      const provider = createLspSemanticProvider(lsp) as OperationAwareSemanticProvider;
+
+      expect(provider.refactor).toBeDefined();
+      expect(typeof provider.refactor).toBe("function");
+    });
+
+    it("routes rename_symbol through the rename request instead of code actions", async () => {
+      const renameSpy = vi.fn().mockResolvedValue({
+        changes: {
+          "file:///src/index.ts": [
+            {
+              range: { start: { line: 0, character: 0 }, end: { line: 0, character: 7 } },
+              newText: "newName",
+            },
+          ],
+        },
+      });
+      const codeActionsSpy = vi.fn().mockResolvedValue([]);
+      const provider = createLspSemanticProvider(
+        createMockLsp({ rename: renameSpy, codeActions: codeActionsSpy }),
+      ) as OperationAwareSemanticProvider;
+
+      expect(provider.refactor).toBeDefined();
+      const result = await provider.refactor?.({
+        operation: "rename_symbol",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+        newName: "newName",
+      });
+
+      expect(renameSpy).toHaveBeenCalledWith("/src/index.ts", { line: 0, character: 0 }, "newName");
+      expect(codeActionsSpy).not.toHaveBeenCalled();
+      expect(result?.kind).toBe("precise");
+    });
+
+    it("routes update_imports through code actions instead of rename", async () => {
+      const renameSpy = vi.fn().mockResolvedValue(null);
+      const codeActionsSpy = vi.fn().mockResolvedValue([
+        {
+          title: "Organize Imports",
+          kind: "source.organizeImports",
+          edit: {
+            changes: {
+              "file:///src/index.ts": [
+                {
+                  range: { start: { line: 0, character: 0 }, end: { line: 0, character: 10 } },
+                  newText: "",
+                },
+              ],
+            },
+          },
+        },
+      ]);
+      const provider = createLspSemanticProvider(
+        createMockLsp({ rename: renameSpy, codeActions: codeActionsSpy }),
+      ) as OperationAwareSemanticProvider;
+
+      expect(provider.refactor).toBeDefined();
+      const result = await provider.refactor?.({
+        operation: "update_imports",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+      });
+
+      expect(codeActionsSpy).toHaveBeenCalled();
+      expect(renameSpy).not.toHaveBeenCalled();
+      expect(result?.kind).toBe("precise");
+    });
+
+    it("routes delete_dead_code through code actions and rejects edit-less actions", async () => {
+      const renameSpy = vi.fn().mockResolvedValue(null);
+      const codeActionsSpy = vi.fn().mockResolvedValue([
+        {
+          title: "Remove unused declaration",
+          kind: "quickfix",
+        },
+      ]);
+      const provider = createLspSemanticProvider(
+        createMockLsp({ rename: renameSpy, codeActions: codeActionsSpy }),
+      ) as OperationAwareSemanticProvider;
+
+      expect(provider.refactor).toBeDefined();
+      const result = await provider.refactor?.({
+        operation: "delete_dead_code",
+        file: "/src/index.ts",
+        position: { line: 0, character: 0 },
+      });
+
+      expect(codeActionsSpy).toHaveBeenCalled();
+      expect(renameSpy).not.toHaveBeenCalled();
+      expect(result?.kind).toBe("unavailable");
     });
   });
 });

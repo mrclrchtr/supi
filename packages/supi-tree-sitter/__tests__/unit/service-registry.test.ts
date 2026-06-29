@@ -38,8 +38,10 @@ describe("TreeSitter service registry", () => {
             range: { startLine: 1, startCharacter: 0, endLine: 1, endCharacter: 0 },
           },
           callees: [],
+          depth: "direct" as const,
         },
       }),
+      callSites: async () => ({ kind: "success" as const, data: [] }),
     };
 
     setSessionTreeSitterService("/project", mockService);
@@ -80,8 +82,10 @@ describe("TreeSitter service registry", () => {
             range: { startLine: 1, startCharacter: 0, endLine: 1, endCharacter: 0 },
           },
           callees: [],
+          depth: "direct" as const,
         },
       }),
+      callSites: async () => ({ kind: "success" as const, data: [] }),
     });
 
     const mockA = mockTemplate();

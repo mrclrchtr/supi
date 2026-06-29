@@ -71,4 +71,3 @@ Test-exempt for the migration itself (refactoring existing behavior). Verificati
 - `pnpm exec tsc -b packages/supi-insights/tsconfig.json` passes
 - `pnpm exec biome check packages/supi-insights/` passes
 - Manual: run `/supi-insights` — report generates, working events fire, progress widget shows
-

@@ -4,7 +4,11 @@ title = "Remove @mrclrchtr/supi meta-package"
 type = "task"
 priority = "p2"
 depends_on = []
-tags = ["flow:applying"]
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
 
 [[documents]]
 name = "content"

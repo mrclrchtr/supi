@@ -10,9 +10,9 @@
  * agent starts or the session shuts down.
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { BRAILLE_SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "@mrclrchtr/supi-core/spinner-frames";
 import { formatTitle, signalDone } from "@mrclrchtr/supi-core/terminal";
 
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 const AGENT_END_SETTLE_MS = 200;
 
 /** Icons shown in the terminal title when a review phase completes. */
@@ -158,11 +158,11 @@ export default function tabSpinner(pi: ExtensionAPI) {
   function start() {
     if (timer || !currentCtx) return;
     timer = setInterval(() => {
-      const icon = SPINNER_FRAMES[frame % SPINNER_FRAMES.length];
+      const icon = BRAILLE_SPINNER_FRAMES[frame % BRAILLE_SPINNER_FRAMES.length];
       const baseTitle = title();
       safelySetTitle(`${icon} ${baseTitle}`);
       frame++;
-    }, 80);
+    }, SPINNER_INTERVAL_MS);
   }
 
   function increment(ctx: ExtensionContext) {

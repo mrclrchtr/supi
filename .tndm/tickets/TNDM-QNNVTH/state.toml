@@ -1,0 +1,56 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-01T23:34:09.025242Z"
+revision = 42
+
+[document_fingerprints]
+archive = "sha256:8a7ed33833d0af285389210b2bd5588fe5bb0ca0e946285691e05ae49513aaf0"
+content = "sha256:4d90cf809c3b1e296ef731950ba0c7c28fbd379ed12a03b8e69e31c2f77d463b"
+task-01 = "sha256:bcb319bab0066b54ec2898d2476095e2d0bed753c35cf2c51232a41fa8bbc0c5"
+task-02 = "sha256:815dfcb85601369b6c6760dd422dbecc6eac9b6fdf6d5cf67a135fe9aa9f5896"
+task-03 = "sha256:de6af32be552d4f2b9b6b4532cea487ea8411cb498aa7911243ee33c620a9f51"
+task-04 = "sha256:892bce8cd5d8f11043defe0c74f1bfc15bfb4c560d309d8c2af6f8ee53032c5e"
+task-05 = "sha256:5d513ba025c32c4d34d7f8cac42486f04f8da8c4022376171360cc204e563c40"
+task-06 = "sha256:a9e4e7f165b4283790efd61080168e334d0e37c891d4f86beb2194ed5108f0a0"
+task-07 = "sha256:95ed2368891870ef34964cdd6468e398f05dbacc5c7c9744057d299060d5b320"
+task-08 = "sha256:daebdd6175d348c6a49d6997ed3e77bb19665616b934d1141545208371d76d3b"
+
+[[tasks]]
+number = 1
+title = "[TDD RED] Lock targetId follow-up fidelity regressions"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "[TDD GREEN] Refine target registration and targetId-based graph follow-ups"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "[TDD RED] Lock truthful code_health section behavior"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "[TDD GREEN] Implement truthful code_health include, coverage, and unused sections"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "[TDD RED] Lock adjacent code-only surface behavior in discovery and /ci-status"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "[TDD GREEN] Update adjacent package behavior to match the code-only public surface"
+status = "done"
+
+[[tasks]]
+number = 7
+title = "Update library-surface docs for the code-only public model"
+status = "done"
+
+[[tasks]]
+number = 8
+title = "Final verification — code-intelligence hardening sweep"
+status = "done"

@@ -1,58 +1,51 @@
-// Reusable architecture and target-resolution helpers for peer extensions.
-// Non-provider contracts for the code-understanding stack.
+// Public type surface for @mrclrchtr/supi-code-intelligence.
+// Types only — no implementation exports.
 
-// Provider contracts re-exported from the shared runtime for convenience.
+// Provider contracts and shared canonical types from the shared runtime.
 export type {
-  SemanticProvider,
-  StructuralProvider,
-  StructuralResult,
-} from "@mrclrchtr/supi-code-runtime/api";
-export { generateFocusedBrief, generateOverview, generateProjectBrief } from "./brief.ts";
-// Architecture model hosted locally in supi-code-intelligence.
-export type {
-  ArchitectureModel,
-  DependencyEdge,
-  ModuleInfo,
-} from "./model.ts";
-export {
-  buildArchitectureModel,
-  findModuleForPath,
-  getDependencies,
-  getDependents,
-} from "./model.ts";
-// Substrate adapters (type aliases for provider contracts)
-export type {
-  SemanticSubstrate,
-  StructuralSubstrate,
-} from "./substrates/types.ts";
-export type { ResolvedTarget, TargetResolutionResult } from "./target-resolution.ts";
-export {
-  normalizePath,
-  resolveAnchoredTarget,
-  resolveSymbolTarget,
-  toZeroBased,
-} from "./target-resolution.ts";
-// Shared canonical types
-export type {
-  AffectedDetails,
-  BriefDetails,
   CalleesData,
-  CodeIntelResult,
+  CapabilityState,
   CodeLocation,
   CodePosition,
   CodeResult,
   CodeSymbol,
   ConfidenceMode,
-  DisambiguationCandidate,
   ExportData,
   ImportData,
-  MapDetails,
   NodeAtData,
   OutlineData,
-  ProviderAvailability,
-  SearchDetails,
+  SemanticProvider,
+  SemanticProvider as SemanticSubstrate,
   SourceRange,
-} from "./types.ts";
-// Code provider — reads capabilities from the shared workspace runtime.
-export type { CodeProvider, CodeProviderState } from "./workspace/request-context.ts";
-export { getCodeProvider } from "./workspace/request-context.ts";
+  StructuralProvider,
+  StructuralProvider as StructuralSubstrate,
+  StructuralResult,
+} from "@mrclrchtr/supi-code-runtime/api";
+// Architecture model types.
+export type {
+  ArchitectureModel,
+  DependencyEdge,
+  ModuleInfo,
+} from "./analysis/architecture/model.ts";
+// Code provider types.
+export type { CodeProvider, CodeProviderState } from "./analysis/provider.ts";
+// Target resolution types.
+export type {
+  ResolvedTargetData,
+  ResolvedTargetGroupData,
+  TargetOutcome,
+} from "./analysis/target/types.ts";
+// Code-intelligence-specific result types.
+export type {
+  AffectedDetails,
+  BriefDetails,
+  CodeIntelResult,
+  ContextDetails,
+  DisambiguationCandidate,
+  HealthDetails,
+  ImpactDetails,
+  InspectDetails,
+  ResolveDetails,
+  SearchDetails,
+  TestSurfaceDetails,
+} from "./types/index.ts";

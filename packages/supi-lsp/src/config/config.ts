@@ -2,13 +2,15 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadSupiConfigForScope } from "@mrclrchtr/supi-core/config";
 import type { LspConfig, ServerConfig } from "./types.ts";
 
+const CONFIG_DIR = path.dirname(fileURLToPath(import.meta.url));
+
 // Load defaults at module level — resolve relative to this file.
-// pi loads extensions via jiti, which always provides __dirname.
 const DEFAULTS: LspConfig = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "defaults.json"), "utf-8"),
+  fs.readFileSync(path.join(CONFIG_DIR, "defaults.json"), "utf-8"),
 ) as LspConfig;
 
 // ── Public API ────────────────────────────────────────────────────────

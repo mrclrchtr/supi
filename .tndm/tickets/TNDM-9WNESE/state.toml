@@ -6,43 +6,27 @@ revision = 24
 [document_fingerprints]
 archive = "sha256:e496a2bc8855d7b6d4566276a6b98d35863b3bb3d6f40ac741811d76b7403a17"
 content = "sha256:08e9ec3cb9651b17b482ec26242790cd6316b7be2ccc350cca06ce760c012de7"
-task-01 = "sha256:fcb9c9f54ab75606c1a6a198c027708ce6d150992bab01a3a3e1cdedb32523c3"
-task-02 = "sha256:076d5e461473bdf5eac459b4500d8c5f3acac70c69d39626a748a27b4cea25ca"
-task-03 = "sha256:f44995886770673f638a6874e58b1a8baba89cf07faafca4c4732716a6118674"
-task-04 = "sha256:4dd49298f00326cf54b0bb7417aa7a2456c1b15cdd592abb263ba9cbd397da8f"
+task-01 = "sha256:ac5fdb2afb300708b750a5875688560cc666ec171521184ee452fcbe3c220907"
+task-02 = "sha256:ed87ce3b9fa83ef22575d118c300fb5235bfba2b53601a2adf8e7849cbb284dc"
+task-03 = "sha256:53ab98829d3465cb33fa8469415c60af518812ce3820cf54f935a8efc17dffbe"
+task-04 = "sha256:fc28ffe1fb29d1be520ee9db5470646c31de1985bb31564924337c77d5a978ff"
 
 [[tasks]]
 number = 1
 title = "Add a shared session-state registry helper to supi-core"
 status = "done"
-files = ["packages/supi-core/src/registry-utils.ts", "packages/supi-core/src/api.ts", "packages/supi-core/src/index.ts", "packages/supi-core/__tests__/unit/registry-utils.test.ts"]
-verification = "pnpm vitest run packages/supi-core/__tests__/unit/registry-utils.test.ts -v && pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-core/__tests__/tsconfig.json"
-notes = "Test-driven. Start by writing the new core unit test so it fails before the helper exists or before it normalizes cwd/module-instance sharing correctly."
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Migrate the Tree-sitter session registry to the shared core helper"
 status = "done"
-files = ["packages/supi-tree-sitter/src/session/service-registry.ts", "packages/supi-tree-sitter/__tests__/service-registry.test.ts", "packages/supi-tree-sitter/package.json"]
-verification = "pnpm vitest run packages/supi-tree-sitter/__tests__/service-registry.test.ts -v && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json"
-notes = "Test-driven. Update the existing Tree-sitter registry test first, or add the needed assertions, and watch it fail before swapping the storage implementation. This task also updates package metadata because Tree-sitter will start importing the shared helper from `@mrclrchtr/supi-core/api`."
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Migrate the LSP session registry to the shared core helper"
 status = "done"
-files = ["packages/supi-lsp/src/session/service-registry.ts", "packages/supi-lsp/__tests__/unit/service-registry.test.ts"]
-verification = "pnpm vitest run packages/supi-lsp/__tests__/unit/service-registry.test.ts -v && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json"
-notes = "Test-driven. Keep `waitForSessionLspService(...)` and all LSP-specific state unions local; only the storage backend should move to the shared helper."
-detail_path = "tasks/task-03.md"
 
 [[tasks]]
 number = 4
 title = "Update architecture notes and run targeted cross-package verification"
 status = "done"
-files = ["docs/tool-architecture.md", "packages/supi-core/CLAUDE.md", "packages/supi-lsp/CLAUDE.md", "packages/supi-tree-sitter/CLAUDE.md"]
-verification = "pnpm exec biome check packages/supi-core packages/supi-lsp packages/supi-tree-sitter --max-diagnostics=20 && pnpm vitest run packages/supi-core/__tests__/unit/registry-utils.test.ts packages/supi-lsp/__tests__/unit/service-registry.test.ts packages/supi-tree-sitter/__tests__/service-registry.test.ts -v && pnpm exec tsc --noEmit -p packages/supi-core/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-core/__tests__/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-lsp/__tests__/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-tree-sitter/__tests__/tsconfig.json && node scripts/publish.mjs packages/supi-tree-sitter"
-notes = "Test-exempt for the doc edits themselves: the behavior is exercised by the targeted lint, typecheck, unit-test, and packaging verification command above. Keep the docs narrowly focused on the new shared registry pattern rather than rewriting unrelated architecture sections."
-detail_path = "tasks/task-04.md"

@@ -43,4 +43,3 @@ RED/GREEN focused checks during the task:
 Type/style checks for touched files:
 - `RTK_DISABLED=1 pnpm -v exec biome check packages/supi-code-intelligence/src/code-intelligence.ts packages/supi-code-intelligence/src/brief.ts packages/supi-code-intelligence/src/use-case packages/supi-code-intelligence/src/presentation/markdown packages/supi-code-intelligence/__tests__/unit/brief.test.ts packages/supi-code-intelligence/__tests__/unit/extension-registration.test.ts packages/supi-code-intelligence/__tests__/unit/tool-adapters.test.ts`
 - `RTK_DISABLED=1 pnpm -v exec tsc --noEmit -p packages/supi-code-intelligence/tsconfig.json`
-

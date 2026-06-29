@@ -7,8 +7,8 @@ if [[ "${1:-}" == "-l" ]]; then
 elif [[ -n "${1:-}" ]]; then
   echo "Usage: install-all.sh [-l]"
   echo ""
-  echo "  (no args)  Install the recommended SuPi stack globally"
-  echo "  -l         Install the recommended SuPi stack project-locally (.pi/settings.json)"
+  echo "  (no args)  Install the full SuPi stack globally (release + beta)"
+  echo "  -l         Install the full SuPi stack project-locally (.pi/settings.json)"
   exit 1
 fi
 
@@ -25,6 +25,7 @@ PACKAGES=(
   supi-cache
   supi-insights
   supi-review
+  supi-prompt-suggestions
 )
 
 if ! command -v pi &>/dev/null; then
@@ -37,7 +38,7 @@ if [[ -n "$LOCAL_FLAG" ]]; then
   SCOPE="project-local"
 fi
 
-echo "Installing the recommended SuPi stack ($SCOPE)…"
+echo "Installing the full SuPi stack ($SCOPE)…"
 echo ""
 
 FAILED=()
@@ -53,7 +54,7 @@ done
 
 echo ""
 if [[ ${#FAILED[@]} -eq 0 ]]; then
-  echo "Done — ${#PACKAGES[@]} recommended packages installed ($SCOPE)."
+  echo "Done — ${#PACKAGES[@]} packages installed ($SCOPE)."
   echo ""
   echo "Run /reload in pi to pick up new extensions."
 else

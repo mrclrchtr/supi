@@ -82,4 +82,3 @@ export async function callWithJsonResponse<T extends TSchema>(
 ## Verification
 - `pnpm vitest run packages/supi-core/__tests__/unit/llm.test.ts` passes (json parsing tests)
 - `pnpm exec tsc -b packages/supi-core/tsconfig.json` passes
-

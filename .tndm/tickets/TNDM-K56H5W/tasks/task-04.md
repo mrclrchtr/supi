@@ -61,4 +61,3 @@ Return `packages/supi-code-intelligence` to owning only the `code_*` tools and i
 - All listed tests pass.
 - `packages/supi-code-intelligence` exposes only `code_*` plus its own overview/orchestration behavior.
 - `lsp_*` and `tree_sitter_*` are no longer registered from this package.
-

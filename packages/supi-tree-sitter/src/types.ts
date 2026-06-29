@@ -56,6 +56,7 @@ export interface CalleesAtResult {
     name: string;
     range: SourceRange;
   }>;
+  depth: "direct" | "deep";
 }
 
 /** Query capture result. */
@@ -64,6 +65,12 @@ export interface QueryCapture {
   nodeType: string;
   range: SourceRange;
   text: string;
+}
+
+/** A single call-site match from tree-sitter analysis. */
+export interface CallSiteMatch {
+  name: string;
+  startLine: number;
 }
 
 /** Shared Tree-sitter service surface, independent of lifecycle ownership. */
@@ -85,7 +92,10 @@ export interface TreeSitterService {
     file: string,
     line: number,
     character: number,
+    depth?: "direct" | "deep",
   ): Promise<TreeSitterResult<CalleesAtResult>>;
+  /** Extract all call-site identifiers in a file. */
+  callSites(file: string): Promise<TreeSitterResult<CallSiteMatch[]>>;
 }
 
 /** Owned Tree-sitter session that must release its runtime resources. */

@@ -15,4 +15,3 @@ Mark files as `(trivial)` when total line changes (additions + deletions) < 5.
 Use the stats from `DiffSection` computed in Task 1.
 
 **TDD:** Write a unit test that verifies the generated packet contains a file overview table with correct stats and trivial annotations.
-

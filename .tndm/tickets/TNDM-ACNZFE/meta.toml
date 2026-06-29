@@ -4,7 +4,11 @@ title = "Consolidate the install surface under supi-code-intelligence"
 type = "feature"
 priority = "p2"
 depends_on = []
-tags = ["flow:applying"]
+tags = ["flow:done"]
+
+[[documents]]
+name = "archive"
+path = "archive.md"
 
 [[documents]]
 name = "content"

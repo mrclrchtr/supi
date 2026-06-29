@@ -1,0 +1,32 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-15T23:17:51.949866Z"
+revision = 32
+
+[document_fingerprints]
+archive = "sha256:743f2ac12e0aff734f864a08b0b4ddff940ac41c9bc3f137abe233e17da7cf79"
+content = "sha256:f2d656abe195526bdfbc4091ac2980127c1f496768f8b3dc69b7b4d93856dae8"
+task-01 = "sha256:be9d36686ab95879bd82a32a9251e4f80c8096fccd0b034691724ead317c14af"
+task-02 = "sha256:881c242c1121824feb3772754dd40da38ae69c1674f3d5b051cd857d63520696"
+task-03 = "sha256:377ef3a16cad6a4af2bb2d87defa4f0c991cdd1b6ee5be4602458acd6008594b"
+task-04 = "sha256:e1ebbe1404ca68ca6bbaccf3918ae2177da066f8f8219c77cd0aaeb92ab223c4"
+
+[[tasks]]
+number = 1
+title = "RED: codify the strict code_find runtime and metadata contract"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: enforce the strict code_find matrix and aligned registered metadata"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "Update code_find docs to the strict evidence matrix"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "Final verification: package checks and full repo verify"
+status = "done"

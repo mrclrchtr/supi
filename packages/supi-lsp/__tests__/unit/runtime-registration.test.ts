@@ -1,7 +1,9 @@
 import { type StructuralProvider, WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  markLspCapabilitiesReady,
   registerLspCapabilities,
+  registerPendingLspCapabilities,
   unregisterLspCapabilities,
 } from "../../src/session/runtime-registration.ts";
 import type { SessionLspService } from "../../src/session/service-registry.ts";
@@ -21,6 +23,19 @@ describe("LSP runtime registration", () => {
     const ws = runtime.getWorkspace("/project");
     expect(ws.semantic.state.kind).toBe("ready");
     expect(ws.semantic.provider).not.toBeNull();
+  });
+
+  it("publishes semantic capability in pending state before promotion", () => {
+    const service = createMockLspService();
+
+    registerPendingLspCapabilities(runtime, "/project", service);
+
+    const ws = runtime.getWorkspace("/project");
+    expect(ws.semantic.state.kind).toBe("pending");
+    expect(ws.semantic.provider).not.toBeNull();
+
+    markLspCapabilitiesReady(runtime, "/project");
+    expect(runtime.getWorkspace("/project").semantic.state.kind).toBe("ready");
   });
 
   it("does not publish structural capability", () => {
@@ -190,6 +205,11 @@ function createMockTsService(): StructuralProvider {
       message: "mock",
     }),
     nodeAt: vi.fn().mockResolvedValue({
+      kind: "unsupported-language" as const,
+      file: "x",
+      message: "mock",
+    }),
+    callSites: vi.fn().mockResolvedValue({
       kind: "unsupported-language" as const,
       file: "x",
       message: "mock",

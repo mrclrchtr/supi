@@ -119,20 +119,29 @@ export function extractPathFromToolEvent(
     case "write":
     case "edit":
     case "ls": {
-      const p = input.path;
-      return typeof p === "string" ? p : null;
+      return readStringPath(input.path);
     }
     default: {
+      if (toolName.startsWith("code_")) {
+        return (
+          readStringPath(input.file) ?? readStringPath(input.path) ?? readStringPath(input.focus)
+        );
+      }
       if (isFileBasedTool(toolName)) {
-        const f = input.file;
-        return typeof f === "string" ? f : null;
+        return readStringPath(input.file);
       }
       return null;
     }
   }
 }
 
+function readStringPath(value: unknown): string | null {
+  return typeof value === "string" ? value : null;
+}
+
+const FILE_BASED_TOOL_PREFIXES = ["lsp_", "tree_sitter_"] as const;
+
 /** Check if a tool name uses `file` for its primary path input. */
 function isFileBasedTool(toolName: string): boolean {
-  return toolName.startsWith("lsp_") || toolName.startsWith("tree_sitter_");
+  return FILE_BASED_TOOL_PREFIXES.some((prefix) => toolName.startsWith(prefix));
 }

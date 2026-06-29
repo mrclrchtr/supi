@@ -1,0 +1,44 @@
+schema_version = 1
+status = "done"
+updated_at = "2026-06-17T00:14:01.861829Z"
+revision = 33
+
+[document_fingerprints]
+archive = "sha256:7a15e731688d74dfd205db13056e9be9f66b93a0ceb49d09f87f105ce75077dc"
+content = "sha256:f4810c2df02ac0293bc05bffb1a7ecfdbef8d6f42bd479f8e77dc9dd6ed77713"
+task-01 = "sha256:71656a70cbb6a21119cf9ff22e32e884639d402d7b790a11859c43e4714b90fe"
+task-02 = "sha256:c5ed0b91f64fbcb97744696200aaf8cc502d7dc7c96a97a26ea2350c352590a2"
+task-03 = "sha256:54abc377d5ab252d9e36cb02d9e8b01d9a76ee3ad181b1a2a2163bdb812d948d"
+task-04 = "sha256:adea8e6dd7dc393db3d31d155c348950d7861c9899e520d18b8097d829896bee"
+task-05 = "sha256:cd79451bc5e031bd64d4921facd4957da514fb6cda8f198e70ee277f015a0245"
+task-06 = "sha256:d359340f6db3c6cd138c1104e53f92970274ac7b1495292b9338da4d57b5d5b1"
+
+[[tasks]]
+number = 1
+title = "RED: codify always-on LSP policy and per-language disable behavior in supi-lsp"
+status = "done"
+
+[[tasks]]
+number = 2
+title = "GREEN: implement always-on LSP runtime policy and deprecated-key detection"
+status = "done"
+
+[[tasks]]
+number = 3
+title = "RED: codify degraded-coverage warnings, health output, and Disabled Servers settings behavior"
+status = "done"
+
+[[tasks]]
+number = 4
+title = "GREEN: implement coverage warning evaluation, startup warning flow, status surfaces, health reporting, and Disabled Servers UI"
+status = "done"
+
+[[tasks]]
+number = 5
+title = "Update LSP and code-intelligence docs for the always-on policy and degraded-coverage warnings"
+status = "done"
+
+[[tasks]]
+number = 6
+title = "Final verification: targeted package checks, repo verify, and degraded-coverage smoke test"
+status = "done"

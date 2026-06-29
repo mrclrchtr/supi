@@ -4,6 +4,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sanitizeNpmEnv } from "./npm-env.mjs";
 import { packStaged } from "./pack-staged.mjs";
 import { verifyTarball } from "./verify-tarball.mjs";
 
@@ -73,7 +74,10 @@ async function main() {
   console.log("Verified: OK");
 
   if (args.publish) {
-    execFileSync("npm", ["publish", tarballPath], { stdio: "inherit" });
+    execFileSync("npm", ["publish", tarballPath], {
+      env: sanitizeNpmEnv(),
+      stdio: "inherit",
+    });
     console.log("Published.");
   } else {
     console.log("Ready to publish.");

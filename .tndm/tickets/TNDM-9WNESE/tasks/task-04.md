@@ -15,4 +15,3 @@ These doc edits are test-exempt because they describe behavior exercised by the 
 - The focused registry tests pass.
 - Source and test typechecks pass for all three packages.
 - `node scripts/publish.mjs packages/supi-tree-sitter` succeeds, proving the new package dependency/bundling setup is correct.
-

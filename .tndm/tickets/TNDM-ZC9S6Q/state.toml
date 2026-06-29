@@ -5,7 +5,7 @@ revision = 21
 
 [document_fingerprints]
 archive = "sha256:db990ea30f65cca7d38024eba04d4b42d1422d562b4561d269a1ab45788a93f2"
-content = "sha256:58097aa4026352fba438ce5da6ae1a33cc7ec72e8bc40f4aab7ad7660e056ce9"
+content = "sha256:70ad124271bdd47f40c31e4e5a7016a94e9d5dd7d1692cffad3d281648512635"
 task-01 = "sha256:748be6562ed7435dfc865f30fd0b3953a7732b379c88b9f8560e331c66591b53"
 task-02 = "sha256:0f040f1568a5db9bcd4166479dc09c81ba1be4b1f2d51d5d2ae93447a9712850"
 task-03 = "sha256:1bb8f596746e1ed53f017b60b89ae91be32807a66820dc204532d539ab13e1e6"
@@ -14,25 +14,13 @@ task-03 = "sha256:1bb8f596746e1ed53f017b60b89ae91be32807a66820dc204532d539ab13e1
 number = 1
 title = "Replace heuristic history collection with a compaction-style session serializer"
 status = "done"
-files = ["packages/supi-review/src/history/collect.ts", "packages/supi-review/src/types.ts", "packages/supi-review/__tests__/unit/history-collect.test.ts"]
-verification = "pnpm vitest run packages/supi-review/__tests__/unit/history-collect.test.ts -v"
-notes = "TDD task. Start by rewriting `history-collect.test.ts` to assert deterministic serialization of resolved session-context messages (user, assistant, custom, compaction summary, branch summary) and bounded output, then implement the serializer to make the new tests pass."
-detail_path = "tasks/task-01.md"
 
 [[tasks]]
 number = 2
 title = "Rework brief synthesis and command wiring to consume serialized session context"
 status = "done"
-files = ["packages/supi-review/src/history/synthesize.ts", "packages/supi-review/src/review.ts", "packages/supi-review/__tests__/unit/history-synthesize.test.ts", "packages/supi-review/__tests__/unit/review-command.test.ts", "packages/supi-review/__tests__/unit/brief-runner.test.ts", "packages/supi-review/__tests__/unit/packet.test.ts", "packages/supi-review/__tests__/unit/runner.test.ts", "packages/supi-review/__tests__/unit/renderer.test.ts", "packages/supi-review/__tests__/unit/index.test.ts"]
-verification = "pnpm vitest run packages/supi-review/__tests__/unit/history-synthesize.test.ts packages/supi-review/__tests__/unit/review-command.test.ts packages/supi-review/__tests__/unit/brief-runner.test.ts packages/supi-review/__tests__/unit/packet.test.ts packages/supi-review/__tests__/unit/runner.test.ts packages/supi-review/__tests__/unit/renderer.test.ts packages/supi-review/__tests__/unit/index.test.ts -v"
-notes = "TDD task. Update the synthesis-prompt and command-wiring tests before implementation. Keep the reviewer phase behavior unchanged; only change the brief-input path and the brief type/fixtures needed to support it."
-detail_path = "tasks/task-02.md"
 
 [[tasks]]
 number = 3
 title = "Update supi-review docs and run full package verification"
 status = "done"
-files = ["packages/supi-review/README.md", "packages/supi-review/CLAUDE.md"]
-verification = "pnpm vitest run packages/supi-review/ -v && pnpm exec tsc --noEmit -p packages/supi-review/tsconfig.json && pnpm exec tsc --noEmit -p packages/supi-review/__tests__/tsconfig.json && pnpm exec biome check packages/supi-review"
-notes = "Test-exempt docs/verification task. Document the new compaction-style brief-input flow and confirm the whole package stays green after the code changes."
-detail_path = "tasks/task-03.md"

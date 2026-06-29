@@ -13,9 +13,13 @@ export type {
   StructuralProvider,
   StructuralResult,
 } from "./capability/types.ts";
+// Evidence display
+export { type EvidenceBadgeInput, formatEvidenceBadge } from "./evidence-badge.ts";
 // Shared canonical types
 export type {
+  CalleeDepth,
   CalleesData,
+  CallSite,
   CodeLocation,
   CodePosition,
   CodeResult,
@@ -27,10 +31,13 @@ export type {
   ImportData,
   NodeAtData,
   OutlineData,
+  RefactorOperation,
+  RefactorRequest,
   RefactorResult,
   SourceRange,
   WorkspaceEdit,
 } from "./types.ts";
+export { normalizeRefactorOperation } from "./types.ts";
 export type { WorkspaceContext } from "./workspace/context.ts";
 // Workspace context
 export { createWorkspaceContext } from "./workspace/context.ts";

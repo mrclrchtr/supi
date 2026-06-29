@@ -24,4 +24,3 @@ Update `package.json` scripts to use the new parallel runner and consolidate the
 pnpm pack:verify    # should invoke scripts/pack-all.mjs
 pnpm verify         # should NOT include pack:check
 ```
-

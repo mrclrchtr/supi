@@ -58,4 +58,3 @@ After the ownership revert is green package-by-package, keep only the independen
 - The retained fixes stay green after the ownership revert.
 - Root/package manifests and README copy match the actual install surfaces.
 - `pnpm verify` passes, including pack/publish checks.
-

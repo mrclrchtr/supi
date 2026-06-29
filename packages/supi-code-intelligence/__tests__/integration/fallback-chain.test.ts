@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { executeAction } from "../helpers/execute-action.ts";
+import { executeImpactTool } from "../../src/tool/impact/execute.ts";
+import { executeAction, makeTestCtx } from "../helpers/execute-action.ts";
 import { clearMockRuntime, registerMockProvider } from "../helpers/register-mock-runtime.ts";
 
 let tmpDir: string;
@@ -23,29 +24,24 @@ function createSourceFile(name: string, content: string): string {
   return filePath;
 }
 
-describe("callers action without heuristic fallback", () => {
-  it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    // No provider registered — getCodeProvider returns unavailable
-    const result = await executeAction({ action: "callers", symbol: "myFunc" }, { cwd: tmpDir });
-
-    expect(result.content).toContain("No semantic analysis provider");
-    expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("unavailable");
-      expect(result.details.data.candidateCount).toBe(0);
-    }
+describe("references action without heuristic fallback", () => {
+  it("throws when symbol discovery lacks any provider (no heuristic fallback)", async () => {
+    // No provider registered — whole-tool capability-unavailable → execute() throws.
+    await expect(
+      executeAction({ action: "graph", symbol: "myFunc" }, makeTestCtx(tmpDir)),
+    ).rejects.toThrow("No analysis provider is available");
   });
 
-  it("returns semantic confidence when LSP returns caller references", async () => {
+  it("returns semantic confidence when LSP returns reference results", async () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
     createSourceFile("src/caller.ts", "import { target } from './module';\ntarget();\n");
 
-    // Register a provider that returns caller references
     const refResult = [
       {
         uri: `file://${sourcePath}`,
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 6 } },
+        // Declaration-site ref at the `target` identifier (0-based char 16);
+        // collectReferences filters the ref at the resolved target position.
+        range: { start: { line: 0, character: 16 }, end: { line: 0, character: 22 } },
       },
       {
         uri: `file://${path.join(tmpDir, "src", "caller.ts")}`,
@@ -58,7 +54,7 @@ describe("callers action without heuristic fallback", () => {
     });
 
     const result = await executeAction(
-      { action: "callers", file: "src/module.ts", line: 1, character: 1 },
+      { action: "graph", file: "src/module.ts", line: 1, character: 1 },
       { cwd: tmpDir },
     );
 
@@ -70,7 +66,7 @@ describe("callers action without heuristic fallback", () => {
     }
   });
 
-  it("does not fall back to heuristic when semantic caller lookup finds no refs", async () => {
+  it("does not fall back to heuristic when semantic reference lookup finds no refs", async () => {
     const sourcePath = createSourceFile("src/module.ts", "export function target() {}\n");
 
     registerMockProvider(tmpDir, {
@@ -79,16 +75,15 @@ describe("callers action without heuristic fallback", () => {
           name: "target",
           kind: "Function",
           file: sourcePath,
-          line: 1,
-          character: 1,
+          declarationAnchor: { line: 1, character: 1 },
         },
       ],
       references: async () => [],
     });
 
-    const result = await executeAction({ action: "callers", symbol: "target" }, { cwd: tmpDir });
+    const result = await executeAction({ action: "graph", symbol: "target" }, makeTestCtx(tmpDir));
 
-    expect(result.content).toContain("No references found for `target` (semantic)");
+    expect(result.content).toContain("0 references");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -99,18 +94,13 @@ describe("callers action without heuristic fallback", () => {
 });
 
 describe("implementations action without heuristic fallback", () => {
-  it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    const result = await executeAction(
-      { action: "implementations", symbol: "Drawable" },
-      { cwd: tmpDir },
-    );
-
-    expect(result.content).toContain("No semantic analysis provider");
-    expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("search");
-    if (result.details?.type === "search") {
-      expect(result.details.data.confidence).toBe("unavailable");
-    }
+  it("throws when symbol discovery lacks any provider (no heuristic fallback)", async () => {
+    await expect(
+      executeAction(
+        { action: "graph", relations: ["implements"], symbol: "Drawable" },
+        { cwd: tmpDir },
+      ),
+    ).rejects.toThrow("No analysis provider is available");
   });
 
   it("returns semantic confidence when LSP returns implementation locations", async () => {
@@ -127,7 +117,13 @@ describe("implementations action without heuristic fallback", () => {
       ],
     });
     const result = await executeAction(
-      { action: "implementations", file: path.relative(tmpDir, ifacePath), line: 1, character: 1 },
+      {
+        action: "graph",
+        relations: ["implements"],
+        file: path.relative(tmpDir, ifacePath),
+        line: 1,
+        character: 1,
+      },
       { cwd: tmpDir },
     );
 
@@ -148,19 +144,19 @@ describe("implementations action without heuristic fallback", () => {
           name: "Solo",
           kind: "Interface",
           file: ifacePath,
-          line: 1,
-          character: 1,
+          declarationAnchor: { line: 1, character: 1 },
         },
       ],
       implementation: async () => [],
     });
 
     const result = await executeAction(
-      { action: "implementations", symbol: "Solo" },
+      { action: "graph", relations: ["implements"], symbol: "Solo" },
       { cwd: tmpDir },
     );
 
-    expect(result.content).toContain("No implementations found for `Solo`.");
+    expect(result.content).toContain("Implementations");
+    expect(result.content).toContain("Solo");
     expect(result.content).not.toContain("heuristic");
     expect(result.details?.type).toBe("search");
     if (result.details?.type === "search") {
@@ -170,20 +166,20 @@ describe("implementations action without heuristic fallback", () => {
   });
 });
 
-describe("affected action without heuristic fallback", () => {
+describe("impact action without heuristic fallback", () => {
   it("returns unavailable details when symbol discovery lacks active LSP", async () => {
-    const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
+    const result = await executeImpactTool({ symbol: "Widget" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("No semantic analysis provider is available");
     expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("affected");
-    if (result.details?.type === "affected") {
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
       expect(result.details.data.confidence).toBe("unavailable");
       expect(result.details.data.directCount).toBe(0);
     }
   });
 
-  it("keeps semantic confidence when affected reference gathering finds no refs", async () => {
+  it("keeps semantic confidence when impact reference gathering finds no refs", async () => {
     const targetPath = createSourceFile("src/widget.ts", "export interface Widget {}\n");
 
     registerMockProvider(tmpDir, {
@@ -192,19 +188,18 @@ describe("affected action without heuristic fallback", () => {
           name: "Widget",
           kind: "Interface",
           file: targetPath,
-          line: 1,
-          character: 1,
+          declarationAnchor: { line: 1, character: 1 },
         },
       ],
       references: async () => [],
     });
 
-    const result = await executeAction({ action: "affected", symbol: "Widget" }, { cwd: tmpDir });
+    const result = await executeImpactTool({ symbol: "Widget" }, makeTestCtx(tmpDir));
 
     expect(result.content).toContain("(semantic)");
     expect(result.content).not.toContain("heuristic");
-    expect(result.details?.type).toBe("affected");
-    if (result.details?.type === "affected") {
+    expect(result.details?.type).toBe("impact");
+    if (result.details?.type === "impact") {
       expect(result.details.data.confidence).toBe("semantic");
       expect(result.details.data.directCount).toBe(0);
     }

@@ -80,14 +80,13 @@
       "./packages/supi-context/src/extension.ts",
       "./packages/supi-settings/src/extension.ts",
       "./packages/supi-review/src/extension.ts",
-      "./packages/supi-lsp/src/extension.ts",
-      "./packages/supi-tree-sitter/src/extension.ts",
       "./packages/supi-cache/src/extension.ts",
       "./packages/supi-code-intelligence/src/extension.ts",
       "./packages/supi-debug/src/extension.ts",
       "./packages/supi-web/src/extension.ts",
       "./packages/supi-extras/src/extension.ts",
-      "./packages/supi-insights/src/extension.ts"
+      "./packages/supi-insights/src/extension.ts",
+      "./packages/supi-prompt-suggestions/src/extension.ts"
     ],
     "image": "https://raw.githubusercontent.com/mrclrchtr/supi/main/assets/supi-logo.png"
   }

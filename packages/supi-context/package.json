@@ -25,6 +25,7 @@
     "usage-report",
     "diagnostics"
   ],
+  "type": "module",
   "files": [
     "src/**/*.ts",
     "README.md"

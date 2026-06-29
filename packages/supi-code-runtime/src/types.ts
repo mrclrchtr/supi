@@ -28,13 +28,29 @@ export interface CodeLocation {
 
 // ── Symbol types ───────────────────────────────────────────────────────
 
-/** A discovered symbol / declaration. */
+/** A 1-based source position used as a symbol anchor. */
+export interface SymbolAnchor {
+  line: number;
+  character: number;
+}
+
+/**
+ * A discovered symbol / declaration.
+ *
+ * Per ADR 0003, anchors are split so position-strict substrates
+ * (structural callee lookup, LSP `rename`) cannot silently consume a
+ * declaration anchor (the `export` keyword) as if it were the identifier.
+ * - `declarationAnchor` is always present (the defining node start).
+ * - `nameAnchor` is best-effort (the identifier token), present when the
+ *   provider can derive it (LSP `selectionRange`, or a tree-sitter snap).
+ *   Strict consumers must prefer it and hard-fail when it is absent.
+ */
 export interface CodeSymbol {
   name: string;
   kind: string;
   file: string;
-  line: number;
-  character: number;
+  declarationAnchor: SymbolAnchor;
+  nameAnchor?: SymbolAnchor;
   container?: string | null;
 }
 
@@ -126,6 +142,44 @@ export interface WorkspaceEdit {
 }
 
 /**
+ * Supported refactor operation names for the current semantic planning path.
+ *
+ * `rename` is kept as a legacy alias for the public rename-only surface.
+ */
+export type RefactorOperation =
+  | "rename"
+  | "rename_symbol"
+  | "extract_function"
+  | "extract_variable"
+  | "rename_file"
+  | "move_file"
+  | "update_imports"
+  | "delete_dead_code";
+
+/** Normalize legacy refactor aliases to their canonical operation names. */
+export function normalizeRefactorOperation(
+  operation: RefactorOperation,
+): Exclude<RefactorOperation, "rename"> {
+  return operation === "rename" ? "rename_symbol" : operation;
+}
+
+/**
+ * Operation-aware refactor planning request.
+ *
+ * Consumers provide a target file/position plus operation-specific options.
+ * File/resource operations remain requestable so providers can reject them
+ * explicitly and honestly until shared workspace-edit resource ops exist.
+ */
+export interface RefactorRequest {
+  operation: RefactorOperation;
+  file: string;
+  position: CodePosition;
+  range?: SourceRange;
+  newName?: string;
+  destination?: string;
+}
+
+/**
  * A disambiguation candidate when a refactor target is ambiguous.
  */
 export interface DisambiguationCandidate {
@@ -149,7 +203,26 @@ export type RefactorResult =
 
 // ── Structural data shapes (value types, range-flattened) ──────────────
 
+/** Callee collection depth. */
+export type CalleeDepth = "direct" | "deep";
+
+/**
+ * Structural outgoing calls from the enclosing executable scope at a
+ * position. Callee names are source-shape facts, not resolved symbol
+ * identities.
+ *
+ * In `direct` depth, nested function/callback scopes are excluded from the
+ * outer scope. In `deep` depth, all callees within the enclosing scope are
+ * included, including those inside nested scopes.
+ */
 export interface CalleesData {
   enclosingScope: { name: string; startLine: number; endLine: number };
   callees: Array<{ name: string; startLine: number }>;
+  depth: CalleeDepth;
+}
+
+/** A single call-site match with name and start line. */
+export interface CallSite {
+  name: string;
+  startLine: number;
 }
