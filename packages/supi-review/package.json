@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-review",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "SuPi Review extension — structured code review via /supi-review command",
   "license": "MIT",
   "repository": {

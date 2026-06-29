@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/mrclrchtr/supi/compare/v2.0.0...v2.0.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **supi-prompt-suggestions:** add missing repository, bugs, homepage, keywords, publishConfig ([a8efd55](https://github.com/mrclrchtr/supi/commit/a8efd5537d0a9685ffe2229ec00031929522d91e))
+
 ## [2.0.0](https://github.com/mrclrchtr/supi/compare/v1.16.1...v2.0.0) (2026-06-29)
 
 
