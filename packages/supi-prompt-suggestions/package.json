@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-prompt-suggestions",
-  "version": "1.16.1",
+  "version": "2.0.0",
   "description": "Advisory ghost-text prompt suggestions for the pi coding agent",
   "license": "MIT",
   "type": "module",

@@ -1,5 +1,97 @@
 # Changelog
 
+## [2.0.0](https://github.com/mrclrchtr/supi/compare/v1.16.1...v2.0.0) (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **supi-code-intelligence:** v2 workflow tool surface ([#82](https://github.com/mrclrchtr/supi/issues/82))
+* **supi-code-intel, TNDM-A9AQF4:** remove lsp_*/tree_sitter_* from public surface, add code_health
+* **supi:** consolidate install surface under code-intelligence
+
+### Features
+
+* **supi-ci, supi-lsp:** enforce always-on coverage policy and degraded-coverage warnings ([78fc349](https://github.com/mrclrchtr/supi/commit/78fc34947918b542eec315d3577abdc1d0181344))
+* **supi-code-intel, TNDM-99VDZS:** absorb lsp_hover into code_brief anchored output ([79c5780](https://github.com/mrclrchtr/supi/commit/79c5780266a92d0b34a2bab8d040808cab042d61))
+* **supi-code-intel, TNDM-A9AQF4:** remove lsp_*/tree_sitter_* from public surface, add code_health ([004811a](https://github.com/mrclrchtr/supi/commit/004811abb5826fdf97299590d7d514cd226cbaa5))
+* **supi-code-intel, TNDM-AQSQ4R:** add code_context workflow tool ([d84d71c](https://github.com/mrclrchtr/supi/commit/d84d71cc6183e092364f1801f587cb7129af390c))
+* **supi-code-intel, TNDM-CE3914:** add code action suggestions to code_health detailed output ([3341b27](https://github.com/mrclrchtr/supi/commit/3341b27baf57e22df2e0245610eda34861495ed3))
+* **supi-code-intel, TNDM-D7KHN3:** enrich code_brief with outline, imports, exports, diagnostics ([a78da45](https://github.com/mrclrchtr/supi/commit/a78da45c9d2424ab8a5cd7fa704c9781193eb9a3))
+* **supi-code-intel, TNDM-D7KHN3:** merge code_map into code_brief as directory inventory enrichment ([c019702](https://github.com/mrclrchtr/supi/commit/c019702b05ded0e02046de17e5869c31f58bb19c))
+* **supi-code-intel, TNDM-HDP0J4:** merge references/calls/implementations into code_graph ([f94a64b](https://github.com/mrclrchtr/supi/commit/f94a64bad6130adb19461335e615f0492549b8da))
+* **supi-code-intel, TNDM-HX7YGV:** activate code_impact ([01eab40](https://github.com/mrclrchtr/supi/commit/01eab4053c9eb20fa0e230a0787ddda8ee0d8ead))
+* **supi-code-intel, TNDM-J9QHYW:** split code_relations/code_refactor into 5 focused tools ([3076c64](https://github.com/mrclrchtr/supi/commit/3076c643b9f2fc8b96ddb3191354a9d3867f9b22))
+* **supi-code-intel, TNDM-JSDGJP:** add workflow v2 skeleton ([c3f7c13](https://github.com/mrclrchtr/supi/commit/c3f7c13cf487494d424e66483c69852bb74c321b))
+* **supi-code-intel, TNDM-K58BNX:** extract code_inspect tool ([7fa5f1c](https://github.com/mrclrchtr/supi/commit/7fa5f1c67d5dea1cce968bfa37a541e79f01d0cc))
+* **supi-code-intel, TNDM-QNNVTH:** harden code-only surface ([8a7fd56](https://github.com/mrclrchtr/supi/commit/8a7fd56166746049800bff88666e51abee3141b8))
+* **supi-code-intel, TNDM-WS4F5Z:** generalize refactor plans ([0ff3a12](https://github.com/mrclrchtr/supi/commit/0ff3a1237cbf992b2cb53bf5b66640598bfb4728))
+* **supi-code-intel, TNDM-XR4Z47:** activate code_resolve with targetId handles ([837f7d1](https://github.com/mrclrchtr/supi/commit/837f7d11de0cb93e428f47690448452482d0a87c))
+* **supi-code-intel,supi-lsp:** harden workflow tool contracts ([5b17a20](https://github.com/mrclrchtr/supi/commit/5b17a2091c9b6d059af6f63eea73491365982434))
+* **supi-code-intel,supi-tree-sitter:** support AST call search ([ac3d553](https://github.com/mrclrchtr/supi/commit/ac3d55317fc9caab54fe46965e4fc3fa2fdf3180))
+* **supi-code-intel:** add TUI rendering for all code-intelligence tools ([7b855a3](https://github.com/mrclrchtr/supi/commit/7b855a3a3f5abb5a771b7c1186f1841a51fd907b))
+* **supi-code-intel:** calleeDepth, AST kinds, tool params, LSP footer ([ccf9fd4](https://github.com/mrclrchtr/supi/commit/ccf9fd45499da82a117272c3489f6a23dd589054))
+* **supi-code-intel:** chain-next resolve hints, enriched defs, staleness banner, auto-detect find ([4cb9d91](https://github.com/mrclrchtr/supi/commit/4cb9d9127feee7415be3957f01e8f1987a8af0c3))
+* **supi-code-intel:** compress reference and impact output with smart line ranges ([8ae7001](https://github.com/mrclrchtr/supi/commit/8ae700189604f35f54a6fccbae2d5b614b5b2bd7))
+* **supi-code-intel:** evidence-list truncation disclosure for public tools ([9231a4a](https://github.com/mrclrchtr/supi/commit/9231a4ad1d559601922cc5523bf5456d94aaa98d))
+* **supi-code-intel:** finalize workflow tool surface ([4eca291](https://github.com/mrclrchtr/supi/commit/4eca2912a97ca7732965775af4478e57dca5263d))
+* **supi-code-intel:** honor include in orientation mode, drop Next-steps from renderers ([a656b1e](https://github.com/mrclrchtr/supi/commit/a656b1e77cc41d6a965baf3cc40aafe4ac1952cc))
+* **supi-code-intel:** implement imports/exports in code_graph, tune context budget ([2f602d1](https://github.com/mrclrchtr/supi/commit/2f602d1bc2e36263604e471bbee6a305611fdc28))
+* **supi-code-intel:** language-agnostic structured search with tree-sitter callSites ([ae85014](https://github.com/mrclrchtr/supi/commit/ae8501428646d99e2dbe9458dc86c45b84534cde))
+* **supi-code-intelligence:** v2 workflow tool surface ([#82](https://github.com/mrclrchtr/supi/issues/82)) ([2f879f2](https://github.com/mrclrchtr/supi/commit/2f879f286f10032142a9fbf3f4f6d058f667c69e))
+* **supi-code-intel:** refuse rename on declaration anchor targets ([c4ae45d](https://github.com/mrclrchtr/supi/commit/c4ae45d2793da70b041d75f334b53d2642aff843))
+* **supi-code-intel:** resolve real symbol targets from anchored coordinates ([eefb6ea](https://github.com/mrclrchtr/supi/commit/eefb6ea1870054c2d400a52534bda4ed50df2a41))
+* **supi-code-intel:** restore CI status as interactive /supi-ci-status overlay ([b637141](https://github.com/mrclrchtr/supi/commit/b637141de5bdc6f91f505de9d9530f4f61ca0444))
+* **supi-code-intel:** tool-guidance compliance pass ([f57770b](https://github.com/mrclrchtr/supi/commit/f57770b301fec61a3d4958d48eb32b19491242bd))
+* **supi-context:** render context tool output ([ada92c1](https://github.com/mrclrchtr/supi/commit/ada92c137cac21b71fd25f4ab7cddd9eae156ad5))
+* **supi-lsp,supi-code-intel:** semantic readiness pipeline with pending state and bounded auto-wait ([6aa0aed](https://github.com/mrclrchtr/supi/commit/6aa0aed50e927cbe3c10650b0d26c855f9830730))
+* **supi-lsp:** gate semantic queries on server readiness via work-done-progress ([e58953c](https://github.com/mrclrchtr/supi/commit/e58953cb5cf90270ff1168254e458539c328e732))
+* **supi-prompt-suggestions:** add prompt-suggestions extension ([c874386](https://github.com/mrclrchtr/supi/commit/c8743867c634051d03ba5ea7ebdda801b73fd264))
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([6cfdce3](https://github.com/mrclrchtr/supi/commit/6cfdce3f99a99f46d57b19bcacf39038c4202425))
+* **pack-staged:** add missing report export, remove unused biome-ignore ([2ee70a9](https://github.com/mrclrchtr/supi/commit/2ee70a9ce3e128377371141c3724548032c5c4cc))
+* **pack:** relax system-dir guard so test fixtures in /tmp pass on Linux CI ([4ea2877](https://github.com/mrclrchtr/supi/commit/4ea28775cf4b23d60481f579aed590acb4d2be1c))
+* **pack:** remove dangling symlinks before staging ([020315a](https://github.com/mrclrchtr/supi/commit/020315a1d8a36e6150e0ba238bbd82e7918acac9))
+* **supi-code-intel, TNDM-JSDGJP:** tighten workflow skeleton contracts ([20635b1](https://github.com/mrclrchtr/supi/commit/20635b140ba8ab625b9bb4afcdc3d752af8bad01))
+* **supi-code-intel:** add container to targetId hash ([1b30cfb](https://github.com/mrclrchtr/supi/commit/1b30cfb0a1cd00d8c2053d4d32e0e0cef1ccc0ac))
+* **supi-code-intel:** address tool review — paths, filters, dead code, enum gaps ([b794397](https://github.com/mrclrchtr/supi/commit/b7943979c41fece6912e547fb9499d074d50ee64))
+* **supi-code-intel:** align trust surfaces with evidence contract ([b9f9d8f](https://github.com/mrclrchtr/supi/commit/b9f9d8fd5aef9cb22af184baf576b37ce8501469))
+* **supi-code-intel:** bounded tool/package-aware test discovery and deduplicate reference display ([fe874eb](https://github.com/mrclrchtr/supi/commit/fe874eb3b8873d4d068a4db9cb28a5a81960f9c1))
+* **supi-code-intel:** close review follow-ups ([70c3aea](https://github.com/mrclrchtr/supi/commit/70c3aeab137f4ebf23f6093428fb6f8f48897feb))
+* **supi-code-intel:** expose tests provenance and details ([7042c11](https://github.com/mrclrchtr/supi/commit/7042c11280567cb13647be67b5d2f3c0b702904c))
+* **supi-code-intel:** handle vscode-languageserver-types v3.18.0 Diagnostic.message widening ([6796467](https://github.com/mrclrchtr/supi/commit/6796467436966eefbeaf3d74c949d66ec88d5b8d))
+* **supi-code-intel:** harden code_find evidence contract and align schema ([df332da](https://github.com/mrclrchtr/supi/commit/df332da77f6b127cc8271cf1a489b7d3241abb7c))
+* **supi-code-intel:** harden evidence contract for code_graph, code_impact, and test discovery ([815603f](https://github.com/mrclrchtr/supi/commit/815603fdb0843cec78924c44f1eb010b70d67ac5))
+* **supi-code-intel:** ignore zero-count health diagnostics ([491df15](https://github.com/mrclrchtr/supi/commit/491df152e0adf16f77ea86c26105fde2f97cd761))
+* **supi-code-intel:** make truncation test order-independent to fix flaky failure ([062173f](https://github.com/mrclrchtr/supi/commit/062173f5e44c1500dbd86354936127f4287b2372))
+* **supi-code-intel:** pass resolved position to test discovery, dedupe results ([6c442fe](https://github.com/mrclrchtr/supi/commit/6c442fecc0493638e4d091088ccc841d2c75c042))
+* **supi-code-intel:** preserve positional data in code_inspect ancestry rendering ([736ff09](https://github.com/mrclrchtr/supi/commit/736ff096b08e6a72f6358963399f442de3219861))
+* **supi-code-intel:** redirect section mode to orientation when no target is available ([991a083](https://github.com/mrclrchtr/supi/commit/991a083869cca7d21bd88b61653aedceded9079c))
+* **supi-code-intel:** refine disambiguation anchors, stabilize targetId ([c7e7ee5](https://github.com/mrclrchtr/supi/commit/c7e7ee596f7780d5447d99f76c7c1ec441f7b92c))
+* **supi-code-intel:** refuse declaration anchors for code_graph and code_context callees ([da4e31b](https://github.com/mrclrchtr/supi/commit/da4e31be178fcf3628cfe578432536fbee24284e))
+* **supi-code-intel:** remove dead tests for removed refactor operations ([52403d0](https://github.com/mrclrchtr/supi/commit/52403d07721ca543f58c19e8f010e58312c1ee2a))
+* **supi-code-intel:** remove invalid kind values from code_resolve schema ([1afb121](https://github.com/mrclrchtr/supi/commit/1afb121c3c7391c6f7d1203822d5043840482cbc))
+* **supi-code-intel:** rename code_graph path param to scope for consistency ([15f2d04](https://github.com/mrclrchtr/supi/commit/15f2d04d4f401e4538d07639f31cdab32a30b27c))
+* **supi-code-intel:** replace AST file cap with ripgrep pre-filter ([4676a91](https://github.com/mrclrchtr/supi/commit/4676a9155d082466e7d7142e2897430439930669))
+* **supi-code-intel:** replace filesystem walk with ripgrep pre-filter in call-site search ([ce8aa63](https://github.com/mrclrchtr/supi/commit/ce8aa635ad0c1b7363b28a491363ff88b7d7ef22))
+* **supi-code-intel:** scope-based context, test discovery fallback, resolve token waste ([4c31dcd](https://github.com/mrclrchtr/supi/commit/4c31dcd70839c59cf8a5fcfc9193aef9f9be3db1))
+* **supi-code-intel:** shorten AST-call output note and sync docs/schema/tests ([195781c](https://github.com/mrclrchtr/supi/commit/195781ca2f9a25aeddec55a42e66fcd9f49d237c))
+* **supi-code-intel:** support file+symbol in code_graph via scoped symbol lookup ([aa85459](https://github.com/mrclrchtr/supi/commit/aa85459570cc77b7cc8155b7bf479094820e0d45))
+* **supi-code-intel:** unbrittle surface — narrow to solid, finish tests+call-sites ([0b5339e](https://github.com/mrclrchtr/supi/commit/0b5339e61b6f3b71727c29381e03b4b12c17db95))
+* **supi-code-intel:** unify likely-test discovery across tools ([b952b6f](https://github.com/mrclrchtr/supi/commit/b952b6f096c58db1dac2368952459161ec30e74d))
+* **supi-code-intel:** unify test-analysis contract and provenance across tools ([43dd5bd](https://github.com/mrclrchtr/supi/commit/43dd5bd1377cdf857e61b18fb3e03155900ced6d))
+* **supi-code-intel:** use character-based hover truncation in code_context ([9fbbdd4](https://github.com/mrclrchtr/supi/commit/9fbbdd4300e6601c459498b92f76401910156b9a))
+* **supi-lsp:** prevent unhandled promise rejections in client and transport ([2568994](https://github.com/mrclrchtr/supi/commit/2568994cdae956b9709559c1a4712835385e57d9))
+* **supi-lsp:** scope diagnostic injection to project root directory ([debd33a](https://github.com/mrclrchtr/supi/commit/debd33a1031bb6777364170db6a1a4f893c1bd83))
+* **supi:** deduplicate shared types, remove hollow alias layer ([d4c93b0](https://github.com/mrclrchtr/supi/commit/d4c93b0f17c11af451040d1eb5a767a2eaef2551))
+
+
+### Code Refactoring
+
+* **supi:** consolidate install surface under code-intelligence ([4a184bf](https://github.com/mrclrchtr/supi/commit/4a184bf46e690c4a7125c0b19e5d266d14e3bb95))
+
 ## [1.16.1](https://github.com/mrclrchtr/supi/compare/v1.16.0...v1.16.1) (2026-06-26)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-lsp",
-  "version": "1.16.1",
+  "version": "2.0.0",
   "description": "SuPi LSP extension — Language Server Protocol integration for pi",
   "license": "MIT",
   "repository": {
@@ -50,7 +50,6 @@
     "vscode-languageserver-protocol",
     "vscode-languageserver-types"
   ],
-
   "devDependencies": {
     "@mrclrchtr/supi-test-utils": "workspace:*",
     "vitest": "4.1.9"
