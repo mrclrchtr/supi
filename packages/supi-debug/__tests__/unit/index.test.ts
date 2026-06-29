@@ -74,6 +74,14 @@ describe("supi-debug extension setup", () => {
     expect(pi.tools.map((tool) => (tool as { name: string }).name)).toEqual(["supi_debug"]);
   });
 
+  it("uses a string enum schema for debug levels", () => {
+    const pi = setup();
+    const tool = pi.tools[0] as { parameters: { properties: Record<string, unknown> } };
+    const level = tool.parameters.properties.level;
+
+    expect(level).toMatchObject({ type: "string", enum: ["debug", "info", "warning", "error"] });
+  });
+
   it("configures the debug registry from merged config on load", () => {
     setup({ enabled: true, agentAccess: "raw", maxEvents: 250, notifyLevel: "warning" });
 
@@ -287,13 +295,9 @@ describe("supi-debug command and tool", () => {
     const pi = setup({ enabled: true, agentAccess: "off", maxEvents: 100, notifyLevel: "off" });
     const tool = pi.tools[0] as { name: string; execute: (...args: unknown[]) => Promise<unknown> };
 
-    const result = (await tool?.execute("id", {}, undefined, undefined, { cwd: "/repo" })) as {
-      isError?: boolean;
-      content: Array<{ text: string }>;
-    };
-
-    expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain("disabled");
+    await expect(tool?.execute("id", {}, undefined, undefined, { cwd: "/repo" })).rejects.toThrow(
+      "Agent access to SuPi debug events is disabled.",
+    );
   });
 
   it("tool returns sanitized events and reports raw denial", async () => {

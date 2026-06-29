@@ -9,7 +9,6 @@ const EXPECTED_SUPI_TOOLS = [
   "code_orientation",
   "code_graph",
   "code_impact",
-  "code_affected",
   "code_find",
   "code_health",
   "code_refactor_plan",

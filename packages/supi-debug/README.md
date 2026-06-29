@@ -72,8 +72,10 @@ keeps the conversation focused; expand only when you need the details.
 
 ### Seeing full details without expanding
 
-The agent-facing `supi_debug` tool always returns the expanded plain-text
-representation, which is useful for automated troubleshooting flows.
+The agent-facing `supi_debug` tool returns the expanded plain-text
+representation, subject to PI's standard tool-output truncation limits. This is
+useful for automated troubleshooting flows while protecting the model context
+from very large event payloads.
 
 ## Filters
 

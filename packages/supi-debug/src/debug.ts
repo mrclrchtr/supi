@@ -1,4 +1,12 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
+import {
+  DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_LINES,
+  type ExtensionAPI,
+  formatSize,
+  type TruncationResult,
+  truncateHead,
+} from "@earendil-works/pi-coding-agent";
 import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core/config";
 import { registerContextProvider } from "@mrclrchtr/supi-core/context";
 import {
@@ -207,9 +215,25 @@ function formatEvents(events: DebugEventView[], rawAccessDenied: boolean): strin
   return lines;
 }
 
-function formatEventLines(query: DebugEventQuery): string[] {
-  const { events, rawAccessDenied } = getDebugEvents(query);
-  return formatEvents(events, rawAccessDenied);
+function appendTruncationNote(content: string, truncation: TruncationResult): string {
+  if (!truncation.truncated) return content;
+
+  const omittedLines = truncation.totalLines - truncation.outputLines;
+  const omittedBytes = truncation.totalBytes - truncation.outputBytes;
+  const separator = content.length > 0 ? "\n\n" : "";
+  return `${content}${separator}[Output truncated: showing ${truncation.outputLines} of ${truncation.totalLines} lines (${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). ${omittedLines} lines (${formatSize(omittedBytes)}) omitted. Use filters or a smaller limit to narrow results.]`;
+}
+
+function truncateDebugOutput(content: string): { text: string; truncation?: TruncationResult } {
+  const truncation = truncateHead(content, {
+    maxLines: DEFAULT_MAX_LINES,
+    maxBytes: DEFAULT_MAX_BYTES,
+  });
+
+  return {
+    text: appendTruncationNote(truncation.content, truncation),
+    truncation: truncation.truncated ? truncation : undefined,
+  };
 }
 
 function buildSummaryData(): Record<string, string | number> | null {
@@ -232,24 +256,13 @@ function toolAccessAllowed(config: DebugConfig): boolean {
 
 function buildToolResult(params: DebugToolParams, config: DebugConfig) {
   if (!config.enabled) {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: "SuPi debug event capture is disabled. Enable Debug in /supi-settings to retain events.",
-        },
-      ],
-      isError: true,
-      details: { enabled: false },
-    };
+    throw new Error(
+      "SuPi debug event capture is disabled. Enable Debug in /supi-settings to retain events.",
+    );
   }
 
   if (!toolAccessAllowed(config)) {
-    return {
-      content: [{ type: "text" as const, text: "Agent access to SuPi debug events is disabled." }],
-      isError: true,
-      details: { enabled: true, agentAccess: config.agentAccess },
-    };
+    throw new Error("Agent access to SuPi debug events is disabled.");
   }
 
   const query: DebugEventQuery = {
@@ -261,14 +274,17 @@ function buildToolResult(params: DebugToolParams, config: DebugConfig) {
     allowRaw: config.agentAccess === "raw",
   };
   const result = getDebugEvents(query);
-  const lines = formatEventLines(query);
+  const output = truncateDebugOutput(
+    formatEvents(result.events, result.rawAccessDenied).join("\n"),
+  );
   return {
-    content: [{ type: "text" as const, text: lines.join("\n") }],
+    content: [{ type: "text" as const, text: output.text }],
     details: {
       enabled: true,
       agentAccess: config.agentAccess,
       rawAccessDenied: result.rawAccessDenied,
       events: result.events,
+      truncation: output.truncation,
     },
   };
 }
@@ -306,12 +322,12 @@ export default function debugExtension(pi: ExtensionAPI) {
 
       const query = parseCommandArgs(args);
       const { events, rawAccessDenied } = getDebugEvents(query);
-      const lines = formatEvents(events, rawAccessDenied);
+      const output = truncateDebugOutput(formatEvents(events, rawAccessDenied).join("\n"));
       pi.sendMessage({
         customType: DEBUG_REPORT_TYPE,
-        content: lines.join("\n"),
+        content: output.text,
         display: true,
-        details: { events, rawAccessDenied },
+        details: { events, rawAccessDenied, truncation: output.truncation },
       });
     },
   });
@@ -325,12 +341,9 @@ export default function debugExtension(pi: ExtensionAPI) {
     parameters: Type.Object({
       source: Type.Optional(Type.String({ description: "Filter by extension source, e.g. lsp" })),
       level: Type.Optional(
-        Type.Union([
-          Type.Literal("debug"),
-          Type.Literal("info"),
-          Type.Literal("warning"),
-          Type.Literal("error"),
-        ]),
+        StringEnum(["debug", "info", "warning", "error"], {
+          description: "Filter by debug level",
+        }),
       ),
       category: Type.Optional(Type.String({ description: "Filter by event category" })),
       limit: Type.Optional(Type.Number({ description: "Maximum number of events to return" })),

@@ -1,7 +1,8 @@
 // Prompt guidance and tool description for the supi_debug tool.
 
-export const toolDescription =
-  "Fetch recent session-local SuPi debug events, with optional filters and optional raw data when allowed.";
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize } from "@earendil-works/pi-coding-agent";
+
+export const toolDescription = `Fetch recent session-local SuPi debug events, with optional filters and optional raw data when allowed. Output is truncated to ${DEFAULT_MAX_LINES} lines or ${formatSize(DEFAULT_MAX_BYTES)} (whichever is hit first).`;
 
 export const promptSnippet = "supi_debug — fetch recent SuPi debug events";
 

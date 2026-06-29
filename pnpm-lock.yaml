@@ -251,6 +251,9 @@ importers:
 
   packages/supi-debug:
     dependencies:
+      '@earendil-works/pi-ai':
+        specifier: '*'
+        version: 0.80.2(ws@8.21.0)(zod@4.4.3)
       '@earendil-works/pi-coding-agent':
         specifier: '*'
         version: 0.80.2(ws@8.21.0)(zod@4.4.3)
