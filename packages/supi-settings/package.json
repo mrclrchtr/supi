@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-settings",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "SuPi Settings extension — unified settings command for SuPi extensions via /supi-settings",
   "license": "MIT",
   "repository": {

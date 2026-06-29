@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.3](https://github.com/mrclrchtr/supi/compare/v2.0.2...v2.0.3) (2026-06-29)
+
+
+### Bug Fixes
+
+* **supi-debug:** throw on denied access, truncate output, fix schema and status-log ([5713965](https://github.com/mrclrchtr/supi/commit/5713965d003a8488de914828387f4eb836a76727))
+
 ## [2.0.2](https://github.com/mrclrchtr/supi/compare/v2.0.1...v2.0.2) (2026-06-29)
 
 
