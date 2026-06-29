@@ -1,6 +1,6 @@
 // LLM facet extraction — analyze session transcripts and extract structured facets.
 
-import { complete } from "@earendil-works/pi-ai";
+import { complete } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { callWithJsonResponse } from "@mrclrchtr/supi-core/llm";
 import { Type } from "typebox";

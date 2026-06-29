@@ -7,7 +7,7 @@
  * @module
  */
 
-import type { Model } from "@earendil-works/pi-ai";
+import type { Model } from "@earendil-works/pi-ai/compat";
 import { type ExtensionContext, SettingsManager } from "@earendil-works/pi-coding-agent";
 
 // ── Types ──────────────────────────────────────────────────────────────────
