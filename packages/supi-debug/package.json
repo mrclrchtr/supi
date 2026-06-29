@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-debug",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "SuPi Debug extension — shared debug event inspection for SuPi extensions",
   "license": "MIT",
   "repository": {

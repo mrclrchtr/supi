@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.2](https://github.com/mrclrchtr/supi/compare/v2.0.1...v2.0.2) (2026-06-29)
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([bac65e2](https://github.com/mrclrchtr/supi/commit/bac65e2d8b74292a4b46b7073b8187103be9259d))
+* **supi-prompt-suggestions:** add debug logging for model errors ([c9f831e](https://github.com/mrclrchtr/supi/commit/c9f831ec73778956611a30324f25262ef0cb6055))
+
 ## [2.0.1](https://github.com/mrclrchtr/supi/compare/v2.0.0...v2.0.1) (2026-06-29)
 
 
