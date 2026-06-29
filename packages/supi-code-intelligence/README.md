@@ -24,6 +24,76 @@ pi install ./packages/supi-code-intelligence
 
 ![Code brief in action](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.png)
 
+## Quickstart
+
+### 1. Install the extension
+
+```bash
+pi install npm:@mrclrchtr/supi-code-intelligence
+```
+
+### 2. Install the language server for your project
+
+The extension auto-detects your project's language and tries to start the matching LSP server automatically. **You must install the server binary yourself** and ensure it is on your `PATH`.
+
+| Language | Binary to install |
+|---|---|
+| TypeScript / JavaScript | `typescript-language-server` (npm) |
+| Python | `pyright-langserver` (npm) |
+| Rust | `rust-analyzer` (rustup) |
+| Go | `gopls` (go install) |
+| C / C++ | `clangd` (system package manager) |
+| Bash | `bash-language-server` (npm) |
+| HTML | `vscode-html-language-server` (npm) |
+| SQL | `sql-language-server` (npm) |
+| Ruby | `ruby-lsp` (gem) |
+| Java | `jdtls` (system package manager) |
+| Kotlin | `kotlin-lsp` (Kotlin tooling) |
+| R | `R` with `languageserver` package installed |
+
+If a server binary is missing, the extension emits a warning at session start telling you exactly which command was not found and which file types are affected.
+
+### 3. Verify the stack is healthy
+
+You can check status interactively with the overlay command:
+
+```
+/supi-ci-status
+```
+
+This shows which language servers are active, which are missing, and any degraded coverage warnings in a TUI overlay.
+
+Alternatively, ask the pi agent to check for you:
+
+> *"Check the status of code intelligence servers."*
+
+The agent will run `code_health(include=["servers"])` and report back which servers are active. Semantic tools like `code_resolve` and `code_graph` need an active server for your project's language.
+
+### 4. Optional: tune or disable servers
+
+By default every detected language server starts concurrently. In polyglot repos this can spike CPU. To disable servers you do not need, run:
+
+```
+/supi-settings
+```
+
+Navigate to **LSP → Disabled Servers** and toggle off any languages you are not using. This writes per-language opt-outs into `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global).
+
+You can also edit the config file directly:
+
+```json
+{
+  "lsp": {
+    "servers": {
+      "python": { "enabled": false },
+      "rust": { "enabled": false }
+    }
+  }
+}
+```
+
+> **Note:** The global `lsp.enabled` switch and `lsp.active` allowlist are deprecated since v0.7.0 and have no effect.
+
 ## What you get
 
 After install, pi gets:
