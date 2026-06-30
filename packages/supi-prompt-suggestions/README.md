@@ -50,7 +50,6 @@ Settings live under `/supi-settings` → **Prompt suggestions**:
 - `src/extension.ts` — pi extension entrypoint: registers settings, wires events to `SessionLifecycle`
 - `src/session.ts` — `SessionLifecycle` class: owns ghost editor, status spinner, and generation orchestration
 - `src/api.ts` — package API surface (`./api` export)
-- `src/index.ts` — package root re-export
 - `src/config/config.ts` — config types and defaults
 - `src/config/settings.ts` — settings registration + model picker submenu
 - `src/editor/editor.ts` — ghost-text editor wrapper component

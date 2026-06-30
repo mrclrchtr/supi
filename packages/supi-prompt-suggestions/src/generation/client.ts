@@ -25,6 +25,8 @@ const SYSTEM_PROMPT =
   "You suggest follow-up messages for a coding assistant conversation. " +
   "Given the assistant's last message, write a single line the user would type next. " +
   "It must be a direct question, answer, or directive — nothing else. " +
+  "If the assistant asks for a decision, suggest a concise, specific answer to that decision, not the action that would follow from it. " +
+  "When answering yes/no, include the relevant constraint or option text when present. " +
   "Do NOT include greetings, thank-yous, politeness, or conversational filler. " +
   "If there is no useful follow-up, respond with exactly the word NO_SUGGESTION and nothing else. " +
   "Keep suggestions under 240 characters.";

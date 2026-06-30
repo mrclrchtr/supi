@@ -8,15 +8,36 @@ const mockGeneratorDismiss = vi.hoisted(() => vi.fn());
 const mockEditorSetSuggestion = vi.hoisted(() => vi.fn());
 const mockEditorClearGhost = vi.hoisted(() => vi.fn());
 const mockEditorAddToHistory = vi.hoisted(() => vi.fn());
+const mockEditorInstances = vi.hoisted(
+  () =>
+    [] as Array<{
+      callbacks?: {
+        onInput?: () => void;
+      };
+    }>,
+);
 const mockSpinnerStart = vi.hoisted(() => vi.fn());
 const mockSpinnerStop = vi.hoisted(() => vi.fn());
 
 const mockGhostTextEditor = vi.hoisted(
   () =>
     class {
+      callbacks?: {
+        onInput?: () => void;
+      };
       setSuggestion = mockEditorSetSuggestion;
       clearGhost = mockEditorClearGhost;
       addToHistory = mockEditorAddToHistory;
+
+      constructor(
+        _tui?: unknown,
+        _theme?: unknown,
+        _keybindings?: unknown,
+        options?: { callbacks?: { onInput?: () => void } },
+      ) {
+        this.callbacks = options?.callbacks;
+        mockEditorInstances.push(this);
+      }
     },
 );
 
@@ -115,6 +136,7 @@ function makeAgentEndEvent(text: string) {
 describe("supi-prompt-suggestions extension lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEditorInstances.length = 0;
   });
 
   // ── Handler registration ──────────────────────────────────
@@ -198,6 +220,42 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     endHandler(makeAgentEndEvent("   "), ctx);
 
     expect(mockGeneratorStart).not.toHaveBeenCalled();
+  });
+
+  it("skips generation when the editor already has text", () => {
+    const { handlers, ctx } = setup();
+    (ctx.ui.getEditorText as ReturnType<typeof vi.fn>).mockReturnValue("draft prompt");
+    const startHandler = getHandler(handlers, "session_start");
+    startHandler({}, ctx);
+
+    const endHandler = getHandler(handlers, "agent_end");
+    endHandler(makeAgentEndEvent("The bug is in the parser module."), ctx);
+
+    expect(mockGeneratorStart).not.toHaveBeenCalled();
+  });
+
+  it("aborts in-flight generation when the user types before a suggestion is ready", () => {
+    const { handlers, ctx } = setup();
+    const startHandler = getHandler(handlers, "session_start");
+    startHandler({}, ctx);
+
+    const factoryFn = (ctx.ui.setEditorComponent as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    factoryFn();
+
+    const endHandler = getHandler(handlers, "agent_end");
+    endHandler(makeAgentEndEvent("The bug is in the parser module."), ctx);
+
+    const callbacks = mockGeneratorStart.mock.calls[0][2] as {
+      onStatus: (status: { kind: "generating" }) => void;
+    };
+    callbacks.onStatus({ kind: "generating" });
+    mockGeneratorDismiss.mockClear();
+    mockSpinnerStop.mockClear();
+
+    mockEditorInstances[0]?.callbacks?.onInput?.();
+
+    expect(mockGeneratorDismiss).toHaveBeenCalled();
+    expect(mockSpinnerStop).toHaveBeenCalled();
   });
 
   // ── agent_start → clear ghost ─────────────────────────────

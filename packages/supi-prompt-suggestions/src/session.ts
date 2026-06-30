@@ -32,6 +32,7 @@ interface SessionMessageEntry {
 export class SessionLifecycle {
   private ghostEditor: GhostTextEditor | null = null;
   private statusSpinner: StatusSpinner | null = null;
+  private generationInFlight = false;
 
   constructor(private generator: SuggestionGenerator) {}
 
@@ -49,6 +50,12 @@ export class SessionLifecycle {
     const lastAssistant = extractLastAssistantText(event);
     if (!lastAssistant) {
       this.statusSpinner?.stop();
+      this.generationInFlight = false;
+      return;
+    }
+
+    if (ctx.ui.getEditorText() !== "") {
+      this.statusSpinner?.stop();
       return;
     }
 
@@ -60,6 +67,7 @@ export class SessionLifecycle {
   /** Dismiss in-flight generation, stop spinner, clear ghost text. */
   onAgentStart(): void {
     this.statusSpinner?.stop();
+    this.generationInFlight = false;
     this.generator.dismiss();
     this.ghostEditor?.clearGhost();
   }
@@ -67,6 +75,7 @@ export class SessionLifecycle {
   /** Full cleanup on session shutdown. */
   onShutdown(): void {
     this.statusSpinner?.stop();
+    this.generationInFlight = false;
     this.generator.dismiss();
     this.ghostEditor?.clearGhost();
   }
@@ -76,19 +85,23 @@ export class SessionLifecycle {
   private handleStatus(status: GenerationStatus, ctx: ExtensionContext): void {
     switch (status.kind) {
       case "generating":
+        this.generationInFlight = true;
         this.statusSpinner?.start("generating suggestion…");
         break;
       case "ready":
+        this.generationInFlight = false;
         this.statusSpinner?.stop();
         if (ctx.ui.getEditorText() === "") {
           this.ghostEditor?.setSuggestion(status.suggestion);
         }
         break;
       case "error":
+        this.generationInFlight = false;
         this.statusSpinner?.stop();
         ctx.ui.setStatus("supi-prompt-suggestions", `suggestion error: ${status.message}`);
         break;
       case "idle":
+        this.generationInFlight = false;
         this.statusSpinner?.stop();
         break;
     }
@@ -102,10 +115,19 @@ export class SessionLifecycle {
       },
       onDismiss: () => {
         this.statusSpinner?.stop();
+        this.generationInFlight = false;
         this.generator.dismiss();
         this.ghostEditor?.clearGhost();
       },
+      onInput: () => this.abortPendingGeneration(),
     };
+  }
+
+  private abortPendingGeneration(): void {
+    if (!this.generationInFlight) return;
+    this.statusSpinner?.stop();
+    this.generationInFlight = false;
+    this.generator.dismiss();
   }
 
   /**

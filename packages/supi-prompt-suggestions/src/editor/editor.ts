@@ -23,6 +23,7 @@ import {
 export interface GhostTextCallbacks {
   onAccept: (suggestion: string) => void;
   onDismiss: () => void;
+  onInput?: () => void;
 }
 
 export interface GhostTextEditorOptions extends EditorOptions {
@@ -72,6 +73,8 @@ export class GhostTextEditor extends CustomEditor {
       }
       this.clearGhost();
       this.callbacks.onDismiss();
+    } else {
+      this.callbacks.onInput?.();
     }
     super.handleInput(data);
   }

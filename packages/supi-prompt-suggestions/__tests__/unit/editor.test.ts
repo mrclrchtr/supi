@@ -8,6 +8,7 @@ function makeCallbacks() {
   return {
     onAccept: vi.fn(),
     onDismiss: vi.fn(),
+    onInput: vi.fn(),
   };
 }
 
@@ -122,17 +123,19 @@ describe("GhostTextEditor input handling", () => {
     expect(cbs.onAccept).not.toHaveBeenCalled();
   });
 
-  it("forwards all input to super when no suggestion", () => {
+  it("notifies and forwards all input to super when no suggestion", () => {
     const cbs = makeCallbacks();
     const editor = makeEditor(cbs);
 
-    // No suggestion set — all input passes through to super (CustomEditor)
-    // Just verify no crash and no callbacks called
+    // No suggestion set — all input passes through to super (CustomEditor).
+    // The lifecycle uses onInput to abort any pending generation.
     expect(() => editor.handleInput("x")).not.toThrow();
+    expect(cbs.onInput).toHaveBeenCalledTimes(1);
     expect(cbs.onAccept).not.toHaveBeenCalled();
     expect(cbs.onDismiss).not.toHaveBeenCalled();
 
     expect(() => editor.handleInput("\x1b[C")).not.toThrow();
+    expect(cbs.onInput).toHaveBeenCalledTimes(2);
     expect(cbs.onAccept).not.toHaveBeenCalled();
   });
 });
