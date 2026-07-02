@@ -218,7 +218,7 @@ importers:
         version: link:../supi-core
       typebox:
         specifier: '*'
-        version: 1.3.1
+        version: 1.3.2
     devDependencies:
       '@mrclrchtr/supi-test-utils':
         specifier: workspace:*
@@ -2334,6 +2334,9 @@ packages:
   typebox@1.3.1:
     resolution: {integrity: sha512-tHgMbqge7xNyyMYbdAXHxryHtpIilxhgM5nR/5aeQtYdOo/SjsHYqCwi/Yyqwcgccuy00kQSVJ4FL2ec0HYpnQ==}
 
+  typebox@1.3.2:
+    resolution: {integrity: sha512-/JwVcKLrZkcmqtiX7hhvhxyJxEOSs22bzuTBMdzcdEfl9qNbQ0ZL7sg/z3QLEf7vLxo0TTLyH49Ca7TjagmRvw==}
+
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
     engines: {node: '>=14.17'}
@@ -4344,6 +4347,8 @@ snapshots:
   typebox@1.1.38: {}
 
   typebox@1.3.1: {}
+
+  typebox@1.3.2: {}
 
   typescript@6.0.3: {}
 
