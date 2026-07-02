@@ -70,7 +70,7 @@
     "tree-sitter-typescript": "0.23.2",
     "typescript": "6.0.3",
     "vitest": "4.1.9",
-    "web-tree-sitter": "0.26.9"
+    "web-tree-sitter": "0.26.10"
   },
   "pi": {
     "extensions": [
