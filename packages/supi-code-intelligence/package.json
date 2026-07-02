@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-code-intelligence",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "SuPi Code Intelligence extension — architecture briefs, caller/callee analysis, impact assessment, and pattern search for pi",
   "license": "MIT",
   "repository": {
