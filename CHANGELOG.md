@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.0.4](https://github.com/mrclrchtr/supi/compare/v2.0.3...v2.0.4) (2026-07-02)
+
+
+### Bug Fixes
+
+* **deps:** update dependency hk to v1.49.0 ([227457c](https://github.com/mrclrchtr/supi/commit/227457cc4d82de2a3b201874aa3a7006731e2247))
+* **deps:** update dependency tree-sitter-cli to v0.26.10 ([899d550](https://github.com/mrclrchtr/supi/commit/899d5509880da327b22618a54a84ef3b7c851b4e))
+* **deps:** update dependency web-tree-sitter to v0.26.10 ([f9d0673](https://github.com/mrclrchtr/supi/commit/f9d0673e76cc384d1a5ad4bd9cbcf3cdc5d800f4))
+* **deps:** update dependency web-tree-sitter to v0.26.10 ([0a7ef15](https://github.com/mrclrchtr/supi/commit/0a7ef158d86cc43e2f9a230773c68cbfb306b6a0))
+
 ## [2.0.3](https://github.com/mrclrchtr/supi/compare/v2.0.2...v2.0.3) (2026-06-29)
 
 
