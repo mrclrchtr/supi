@@ -73,7 +73,7 @@
     "@types/node": "25.9.4",
     "tree-sitter-bash": "0.25.1",
     "tree-sitter-c": "0.24.1",
-    "tree-sitter-cli": "0.26.9",
+    "tree-sitter-cli": "0.26.10",
     "tree-sitter-cpp": "0.23.4",
     "tree-sitter-go": "0.25.0",
     "tree-sitter-html": "0.23.2",
