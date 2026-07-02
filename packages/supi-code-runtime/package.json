@@ -1,6 +1,6 @@
 {
   "name": "@mrclrchtr/supi-code-runtime",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "SuPi code-runtime — shared workspace context, capability contracts, and canonical types for the code-understanding stack",
   "license": "MIT",
   "repository": {
