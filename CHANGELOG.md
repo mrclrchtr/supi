@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.5](https://github.com/mrclrchtr/supi/compare/v2.0.4...v2.0.5) (2026-07-03)
+
+
+### Bug Fixes
+
+* **deps:** update commitlint monorepo to v21.2.0 ([67afb7c](https://github.com/mrclrchtr/supi/commit/67afb7cc170a6537cfcc94ca5e7db729232bdb05))
+* **deps:** update dependency vscode-jsonrpc to v9.0.1 ([0dd8bd9](https://github.com/mrclrchtr/supi/commit/0dd8bd937d687fd57592767b9e8af206aac9c84a))
+* **deps:** update dependency vscode-languageserver-protocol to v3.18.2 ([0b8ebc4](https://github.com/mrclrchtr/supi/commit/0b8ebc4a4835617ff174ac38c4dcce1fbc5fb9ae))
+
 ## [2.0.4](https://github.com/mrclrchtr/supi/compare/v2.0.3...v2.0.4) (2026-07-02)
 
 
