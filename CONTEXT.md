@@ -76,6 +76,14 @@ _Avoid_: context bundle, relation graph, treating orientation as target analysis
 The project, package, directory, file, or symbol that an orientation surface is centered on. An absent focus means workspace-level orientation; a precise focus means symbol-centered orientation rather than relation analysis.
 _Avoid_: scope, path, target when referring to orientation selection
 
+**Target workflow**:
+The code-intelligence flow that turns target input — such as a target handle, anchored coordinate, symbol query, or file reference — into evidence-backed target facts before graph, impact, orientation, or refactor analysis begins. Target workflow decisions must preserve target precedence and honest correctness before downstream analysis runs.
+_Avoid_: ad-hoc target expansion, mutating search params, treating scope as a target
+
+**Resolved target**:
+The immutable output of a target workflow: the evidence-backed file, anchor, symbol identity, confidence, provenance, and notes a downstream code-intelligence tool may rely on. A resolved target is not a public parameter bag and should not be changed by downstream tools.
+_Avoid_: expanded params, anonymous point target, mutable target
+
 **Honest correctness**:
 The code-intelligence result standard that a tool must either report evidence-backed facts or explicitly say why it cannot. Silent guessing, silent truncation, silent scope widening, and silent fallback to a weaker substrate are incorrect even when they look helpful.
 _Avoid_: best-effort correctness, "probably right", hiding degraded evidence

@@ -24,6 +24,7 @@ import type { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
 import { CoverageWarningState } from "../analysis/coverage/coverage-warnings.ts";
 import type { CodeProvider } from "../analysis/provider.ts";
 import { getCodeProvider } from "../analysis/provider.ts";
+import { type CapabilityAdapter, WorkspaceCapabilityAdapter } from "./capability-adapter.ts";
 import { getPlan, type RefactorPlan, removePlan, storePlan } from "./refactor-plans.ts";
 import {
   getWorkflowTarget,
@@ -33,11 +34,18 @@ import {
   type TargetRegistrationOutput,
   type TargetStoreEntry,
 } from "./target-store.ts";
+import {
+  resolveTargetWorkflow,
+  type TargetWorkflowInput,
+  type TargetWorkflowOutcome,
+  type TargetWorkflowPolicy,
+} from "./target-workflow.ts";
 
 // ── Re-export types consumed by callers ───────────────────────────────
 
 export type { CoverageWarningState } from "../analysis/coverage/coverage-warnings.ts";
 export type { CodeProvider, CodeProviderState } from "../analysis/provider.ts";
+export type { CapabilityAdapter } from "./capability-adapter.ts";
 export type { RefactorPlan } from "./refactor-plans.ts";
 export type {
   TargetLookupResult,
@@ -45,6 +53,11 @@ export type {
   TargetRegistrationOutput,
   TargetStoreEntry,
 } from "./target-store.ts";
+export type {
+  TargetWorkflowInput,
+  TargetWorkflowOutcome,
+  TargetWorkflowPolicy,
+} from "./target-workflow.ts";
 
 // ── Target ID expansion result ────────────────────────────────────────
 
@@ -74,6 +87,9 @@ export class WorkspaceCodeIntelligenceSession {
   /** Canonical workspace directory for this session. */
   readonly cwd: string;
 
+  /** Injected capability adapter — two adapters (production/test) justify the seam. */
+  readonly #capability: CapabilityAdapter;
+
   /** Whether the hidden architecture overview has been injected. */
   hasInjectedOverview = false;
 
@@ -100,8 +116,30 @@ export class WorkspaceCodeIntelligenceSession {
    */
   tsController: import("@mrclrchtr/supi-tree-sitter/api").TreeSitterRuntimeController | null = null;
 
-  constructor(cwd: string) {
+  constructor(cwd: string, capability?: CapabilityAdapter) {
     this.cwd = cwd;
+    this.#capability = capability ?? new WorkspaceCapabilityAdapter();
+  }
+
+  // ── Target workflow (deep seam) ───────────────────────────────────
+
+  /**
+   * Resolve target input into an immutable resolved target.
+   *
+   * This is the deep module interface. Tool executors call this instead
+   * of `expandTargetId` or direct `resolveTarget`/`resolveAnchoredSymbolTarget`
+   * calls. Returns typed outcomes — no markdown, no mutated params.
+   */
+  async resolveTarget(
+    input: TargetWorkflowInput,
+    policy: TargetWorkflowPolicy,
+  ): Promise<TargetWorkflowOutcome> {
+    return resolveTargetWorkflow(input, policy, {
+      cwd: this.cwd,
+      capability: this.#capability,
+      lookupTargetId: (id) => this.lookupTargetId(id),
+      registerTarget: (inp) => this.registerTarget(inp),
+    });
   }
 
   // ── Provider access ───────────────────────────────────────────────

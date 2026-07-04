@@ -4,10 +4,13 @@
  * Handles targetId expansion, coordinate-based symbol resolution, and
  * running the use-case layer for a resolved symbol target. Shared by
  * the main code_orientation executor.
+ *
+ * Uses the session target workflow (deep seam) instead of ad-hoc
+ * expandTargetId / executeResolveService calls.
  */
 
 import { relative } from "node:path";
-import { executeResolveService } from "../../analysis/target/service.ts";
+import type { TargetWorkflowOutcome } from "../../session/session.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx, ContextDetails } from "../../types/index.ts";
 import { orientationCoordinateRules } from "../infra/cross-field.ts";
@@ -27,14 +30,17 @@ export interface PreciseTarget {
 
 /**
  * Outcome of precise-target resolution in code_orientation.
- *
- * {@link resolvePreciseTarget} returns this discriminated union instead
- * of {@link CodeIntelResult} | null so callers can't silently fall through
- * on a bug that produces null unintentionally.
  */
 export type PreciseTargetOutcome =
   | { kind: "resolved"; result: CodeIntelResult }
   | { kind: "fallthrough" };
+
+/** Orientation target-workflow policy: file-level not for precise, name anchor not required. */
+const ORIENTATION_TARGET_POLICY = {
+  fileLevelAllowed: false,
+  nameAnchorRequired: false,
+  waitForSemantic: true,
+} as const;
 
 /**
  * Resolve a precise target ({@link CodeOrientationToolParams.targetId}
@@ -42,14 +48,39 @@ export type PreciseTargetOutcome =
  * sections. Falls through to orientation-mode when both targetId
  * expansion and coordinate resolution produce no target.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: layered resolution + disambiguation + section building stays together for clarity
 export async function resolvePreciseTarget(
   params: CodeOrientationToolParams,
   ctx: CodeIntelToolExecCtx,
   hasCoords: boolean,
 ): Promise<PreciseTargetOutcome> {
+  // ── Deep seam: resolve through session target workflow ──
   if (params.targetId !== undefined && params.targetId !== null) {
-    const targetIdOutcome = await resolveTargetIdTarget(params, ctx, hasCoords);
-    if (targetIdOutcome.kind === "resolved") return targetIdOutcome;
+    const outcome = await ctx.session.resolveTarget(
+      {
+        targetId: params.targetId,
+        file: hasCoords ? params.focus : undefined,
+        line: hasCoords ? params.line : undefined,
+        character: hasCoords ? params.character : undefined,
+      },
+      ORIENTATION_TARGET_POLICY,
+    );
+    if (outcome.kind === "resolved") {
+      const precise: PreciseTarget = {
+        entry: outcome.entry,
+        notes: outcome.notes,
+      };
+      return wrapOutcome(await runWithOrientationTarget(params, ctx, precise));
+    }
+    if (outcome.kind === "invalid-input" || outcome.kind === "unavailable") {
+      return wrapOutcome({
+        content: `**Error:** ${outcome.kind === "invalid-input" ? outcome.message : outcome.reason}`,
+        details: unavailableContextDetails([
+          "Verify the `targetId` is valid and from this session",
+          "Re-resolve with `code_resolve` to get a fresh targetId",
+        ]),
+      });
+    }
   }
 
   if (hasCoords) {
@@ -58,36 +89,6 @@ export async function resolvePreciseTarget(
   }
 
   return { kind: "fallthrough" };
-}
-
-/** Resolve a targetId-supplied precise target, or fallthrough. */
-async function resolveTargetIdTarget(
-  params: CodeOrientationToolParams,
-  ctx: CodeIntelToolExecCtx,
-  hasCoords: boolean,
-): Promise<PreciseTargetOutcome> {
-  const expansion = ctx.session.expandTargetId(params);
-  if (expansion.kind === "error") {
-    return wrapOutcome({
-      content: expansion.message,
-      details: unavailableContextDetails([
-        "Verify the `targetId` is valid and from this session",
-        "Re-resolve with `code_resolve` to get a fresh targetId",
-      ]),
-    });
-  }
-  if (expansion.kind !== "ok") return { kind: "fallthrough" };
-
-  const notes: string[] = [];
-  if (params.focus || hasCoords) {
-    notes.push(
-      "_Note: `targetId` takes precedence over the supplied focus/coordinates; focus and coordinates were ignored._",
-    );
-  }
-
-  return wrapOutcome(
-    await runWithOrientationTarget(params, ctx, { entry: expansion.entry, notes }),
-  );
 }
 
 /** Resolve a focus+coordinate-supplied precise target, or fallthrough. */
@@ -105,39 +106,42 @@ async function resolveCoordinateTarget(
     });
   }
 
-  const resolveResult = await executeResolveService(
+  const outcome = await ctx.session.resolveTarget(
     { file: params.focus, line: params.line, character: params.character },
-    ctx.session,
+    ORIENTATION_TARGET_POLICY,
   );
 
-  if (resolveResult.kind === "error") {
+  if (outcome.kind === "resolved") {
+    return wrapOutcome(
+      await runWithOrientationTarget(params, ctx, { entry: outcome.entry, notes: outcome.notes }),
+    );
+  }
+
+  if (outcome.kind === "disambiguation") {
+    return wrapOutcome(disambiguationResult(outcome));
+  }
+
+  if (outcome.kind === "invalid-input") {
     return wrapOutcome({
-      content: resolveResult.message,
+      content: outcome.message,
       details: unavailableContextDetails([
         "Use `code_inspect` for point-level facts at this coordinate",
         "Or pass the identifier coordinate of a declaration",
       ]),
     });
   }
-  if (resolveResult.kind === "disambiguation") {
-    return wrapOutcome(disambiguationResult(resolveResult));
-  }
 
-  const entry = resolveResult.targets[0];
-  if (!entry) {
-    return wrapOutcome({
-      content: "**Error:** Coordinate resolution returned no target.",
-      details: unavailableContextDetails(["Use `code_inspect` for point-level facts"]),
-    });
-  }
-
-  return wrapOutcome(await runWithOrientationTarget(params, ctx, { entry, notes: [] }));
+  return wrapOutcome({
+    content: "**Error:** Coordinate resolution returned no target.",
+    details: unavailableContextDetails(["Use `code_inspect` for point-level facts"]),
+  });
 }
 
 /** Wrap a CodeIntelResult into a resolved PreciseTargetOutcome. */
 function wrapOutcome(result: CodeIntelResult): PreciseTargetOutcome {
   return { kind: "resolved", result };
 }
+
 async function runWithOrientationTarget(
   params: CodeOrientationToolParams,
   ctx: CodeIntelToolExecCtx,
@@ -170,12 +174,7 @@ async function runWithOrientationTarget(
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-/**
- * Cross-field rule for code_orientation coordinate mode.
- *
- * TypeBox already enforces line/character types and min >= 1.
- * This covers only pairing, existence, and directory checks.
- */
+/** Cross-field rule for code_orientation coordinate mode. */
 const validateCoordinateParams = orientationCoordinateRules<CodeOrientationToolParams>();
 
 function buildOrientationTarget(params: CodeOrientationToolParams) {
@@ -215,14 +214,14 @@ function prependNotes(
 
 /** Build the ambiguous-coordinate result: candidate targetIds, no sections. */
 function disambiguationResult(
-  result: Extract<Awaited<ReturnType<typeof executeResolveService>>, { kind: "disambiguation" }>,
+  outcome: Extract<TargetWorkflowOutcome, { kind: "disambiguation" }>,
 ): CodeIntelResult {
   const lines: string[] = ["# Multiple matches found", ""];
   lines.push(
     "Coordinate resolution was ambiguous. Use `focus` + `line` + `character` for one of the candidates (pass the identifier coordinate):",
   );
   lines.push("");
-  for (const c of result.candidates) {
+  for (const c of outcome.candidates) {
     const kind = c.kind ? ` (\`${c.kind}\`)` : "";
     const container = c.container ? ` in \`${c.container}\`` : "";
     lines.push(
@@ -237,8 +236,8 @@ function disambiguationResult(
     focusTarget: null,
     requestedSections: [],
     renderedSections: [],
-    omittedCount: 0,
-    candidates: result.candidates.map((c) => ({
+    omittedCount: outcome.omittedCount,
+    candidates: outcome.candidates.map((c) => ({
       targetId: c.targetId,
       name: c.name,
       kind: c.kind,

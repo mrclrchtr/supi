@@ -73,7 +73,7 @@ export async function executeRefactorPlan(
   }
   const operation = normalizedOperation.operation;
 
-  const target = resolveRefactorTarget(input, operation, deps.session);
+  const target = await resolveRefactorTarget(input, operation, deps.session);
   if ("content" in target) return target;
 
   const resolvedFile = normalizePath(target.file, deps.cwd);
@@ -174,37 +174,41 @@ function normalizeRequestedOperation(
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: target expansion and operation-specific validation are kept together for clear user-facing errors.
-function resolveRefactorTarget(
+async function resolveRefactorTarget(
   input: RefactorPlanInput,
   operation: CanonicalRefactorOperation,
   session: WorkspaceCodeIntelligenceSession,
-): CodeIntelResult | { file: string; line: number; character: number } {
-  const expansion = session.expandTargetId(input);
-  if (expansion.kind === "error") {
-    return {
-      content: expansion.message,
-      details: unavailableSearchDetails(null, [
-        "Verify the `targetId` is valid and from this session",
-      ]),
-    };
-  }
-  if (expansion.kind === "ok") {
-    input.file = expansion.file;
-    input.line = expansion.line;
-    input.character = expansion.character;
+): Promise<CodeIntelResult | { file: string; line: number; character: number }> {
+  // ── Deep seam: resolve target through the session target workflow ──
+  if (input.targetId) {
+    const policy = {
+      fileLevelAllowed: false,
+      nameAnchorRequired: operation === "rename_symbol",
+      waitForSemantic: false,
+    } as const;
 
-    // Per ADR 0003: rename_symbol is position-strict — LSP rename requires
-    // the identifier (name anchor), and a declaration anchor silently yields
-    // empty or wrong edits. Refuse before planning.
-    if (operation === "rename_symbol" && expansion.entry.anchorKind === "declaration") {
+    const outcome = await session.resolveTarget({ targetId: input.targetId }, policy);
+    if (outcome.kind === "resolved") {
+      input.file = outcome.entry.file;
+      input.line = outcome.entry.displayLine;
+      input.character = outcome.entry.displayCharacter;
+    } else if (outcome.kind === "invalid-input") {
+      // Declaration-anchor refusal for rename_symbol comes back as invalid-input
       return {
-        content:
-          `**Cannot plan rename:** The resolved target fell back to a declaration anchor (the \`export\` keyword or similar), not an identifier (name anchor). LSP \`rename\` requires the identifier. ` +
-          `Re-resolve via \`code_resolve\` after the language server has indexed the file, ` +
-          `or pass \`file\` + \`line\` + \`character\` anchored directly on the identifier.`,
+        content: `**Cannot plan rename:** ${outcome.message}`,
         details: unavailableSearchDetails(null, [
           "Re-resolve via `code_resolve` when the LSP has indexed the file",
           "Or use `file` + `line` + `character` anchored on the identifier directly",
+        ]),
+      };
+    } else {
+      return {
+        content:
+          outcome.kind === "unavailable"
+            ? `**Error:** ${outcome.reason}`
+            : `**Error:** Target resolution failed. Verify the targetId is valid and from this session.`,
+        details: unavailableSearchDetails(null, [
+          "Verify the `targetId` is valid and from this session",
         ]),
       };
     }

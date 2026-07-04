@@ -30,6 +30,7 @@ export interface CodeImpactToolParams {
 }
 
 /** Execute the public code_impact tool. */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: target workflow + pipeline orchestration stays together for clarity
 export async function executeImpactTool(
   params: CodeImpactToolParams,
   ctx: CodeIntelToolExecCtx,
@@ -37,6 +38,32 @@ export async function executeImpactTool(
   emitToolProgress(ctx.onUpdate, "code_impact: analyzing blast radius...");
 
   const hasChangeSetInputs = (params.changeSetFiles?.length ?? 0) > 0 || Boolean(params.change);
+
+  // ── Deep seam: resolve targetId through the session target workflow ──
+  // Replaces expandTargetId pipeline stage for targetId expansion.
+  if (!hasChangeSetInputs && params.targetId) {
+    const outcome = await ctx.session.resolveTarget(
+      { targetId: params.targetId },
+      { fileLevelAllowed: false, nameAnchorRequired: false, waitForSemantic: false },
+    );
+
+    if (outcome.kind === "resolved") {
+      params.file = outcome.entry.file;
+      params.line = outcome.entry.displayLine;
+      params.character = outcome.entry.displayCharacter;
+      params.symbol = outcome.entry.name ?? undefined;
+    } else if (outcome.kind !== "no-target") {
+      const msg =
+        outcome.kind === "invalid-input"
+          ? outcome.message
+          : outcome.kind === "unavailable"
+            ? outcome.reason
+            : "Target resolution failed. Verify the targetId is valid.";
+      return impactErrorResult(msg, {
+        nextQueries: ["Use `code_resolve` to resolve a target first"],
+      });
+    }
+  }
 
   return runPipe(
     params,
