@@ -29,7 +29,7 @@ export default function cacheMonitorExtension(pi: ExtensionAPI) {
   const state = new CacheMonitorState();
 
   // Register settings synchronously during factory
-  registerCacheMonitorSettings();
+  registerCacheMonitorSettings(pi);
 
   // ── Helper: check if extension is enabled ─────────────────
 

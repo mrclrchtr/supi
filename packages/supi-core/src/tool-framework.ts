@@ -53,6 +53,16 @@ export function derivePromptSurface(spec: SuiPiToolSpec): SuiPiToolPromptSurface
   };
 }
 
+// Re-export prompt-surface types (implemented in config/prompt-surface.ts)
+export {
+  notifyToolPromptSurfaceDiagnostics,
+  type ResolveToolPromptSurfaceOptions,
+  type ResolveToolPromptSurfaceResult,
+  resolveToolPromptSurface,
+  type ToolPromptSurfaceDiagnostic,
+  type ToolPromptSurfaceDiagnosticCode,
+} from "./config/prompt-surface.ts";
+
 // ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------

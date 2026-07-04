@@ -9,7 +9,7 @@ export function registerSettingsCommand(pi: ExtensionAPI): void {
   pi.registerCommand("supi-settings", {
     description: "Manage SuPi extension settings",
     handler: async (_args, ctx) => {
-      openSettingsOverlay(ctx);
+      openSettingsOverlay(pi, ctx);
     },
   });
 }

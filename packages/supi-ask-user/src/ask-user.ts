@@ -1,4 +1,8 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import {
+  notifyToolPromptSurfaceDiagnostics,
+  resolveToolPromptSurface,
+} from "@mrclrchtr/supi-core/prompt-surface";
 import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/terminal";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { type AskUserToolResult, buildResult } from "./render/result.ts";
@@ -7,11 +11,9 @@ import { buildTreeSummaryLabel } from "./render/tree-summary.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import { ActiveQuestionnaireLock } from "./session/lock.ts";
 import {
+  ASK_USER_PROMPT_SURFACE_DEFAULTS,
   ASK_USER_TOOL_LABEL,
   ASK_USER_TOOL_NAME,
-  promptGuidelines,
-  promptSnippet,
-  toolDescription,
 } from "./tool/guidance.ts";
 import type {
   AskUserInteractionResult,
@@ -35,12 +37,34 @@ export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "
 export default function askUserExtension(pi: ExtensionAPI): void {
   const lock = new ActiveQuestionnaireLock();
 
+  // Factory-time: register with package defaults.
+  registerAskUserTool(pi, lock, ASK_USER_PROMPT_SURFACE_DEFAULTS);
+
+  // session_start: re-register with resolved prompt surface (global + trusted project config).
+  pi.on("session_start", async (_event, ctx) => {
+    const { surface, diagnostics } = resolveToolPromptSurface({
+      section: "ask-user",
+      toolName: ASK_USER_TOOL_NAME,
+      defaults: ASK_USER_PROMPT_SURFACE_DEFAULTS,
+      ctx,
+    });
+
+    registerAskUserTool(pi, lock, surface);
+    notifyToolPromptSurfaceDiagnostics(ctx, diagnostics);
+  });
+}
+
+function registerAskUserTool(
+  pi: ExtensionAPI,
+  lock: ActiveQuestionnaireLock,
+  surface: typeof ASK_USER_PROMPT_SURFACE_DEFAULTS,
+): void {
   pi.registerTool<typeof AskUserParamsSchema, AskUserToolDetails>({
     name: ASK_USER_TOOL_NAME,
     label: ASK_USER_TOOL_LABEL,
-    description: toolDescription,
-    promptSnippet,
-    promptGuidelines,
+    description: surface.description,
+    promptSnippet: surface.promptSnippet,
+    promptGuidelines: surface.promptGuidelines,
     parameters: AskUserParamsSchema,
     executionMode: "sequential",
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature

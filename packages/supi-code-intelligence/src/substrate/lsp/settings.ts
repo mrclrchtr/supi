@@ -9,7 +9,11 @@
 // - excluded patterns
 // - a "Disabled Servers" submenu that writes per-language disable config
 
-import { CONFIG_DIR_NAME, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
+import {
+  CONFIG_DIR_NAME,
+  type ExtensionAPI,
+  getSettingsListTheme,
+} from "@earendil-works/pi-coding-agent";
 import type { SettingItem } from "@earendil-works/pi-tui";
 import { Container, Key, matchesKey, SettingsList, Text } from "@earendil-works/pi-tui";
 
@@ -75,8 +79,8 @@ function getDisabledServersFromConfig(scope: SettingsScope, cwd: string): Set<st
   return disabled;
 }
 
-export function registerLspSettings(): void {
-  registerConfigSettings({
+export function registerLspSettings(pi: ExtensionAPI): void {
+  registerConfigSettings(pi, {
     id: "lsp",
     label: "LSP",
     section: "lsp",

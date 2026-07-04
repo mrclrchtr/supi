@@ -1,19 +1,34 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadSupiConfig } from "../../../src/config/config.ts";
 import { registerConfigSettings } from "../../../src/config/config-settings.ts";
-import {
-  clearRegisteredSettings,
-  getRegisteredSettings,
-} from "../../../src/settings/settings-registry.ts";
+import type { SettingsSection } from "../../../src/settings/settings-registry.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "supi-core-config-settings-test-"));
 }
 
 const opts = (dir: string) => ({ homeDir: dir });
+
+function makePi() {
+  const eventHandlers = new Map<string, Array<(data: unknown) => void>>();
+  return {
+    events: {
+      on: vi.fn((channel: string, handler: (data: unknown) => void) => {
+        const list = eventHandlers.get(channel) ?? [];
+        list.push(handler);
+        eventHandlers.set(channel, list);
+        return () => list.splice(list.indexOf(handler), 1);
+      }),
+      emit: vi.fn((channel: string, data: unknown) => {
+        for (const handler of eventHandlers.get(channel) ?? []) handler(data);
+      }),
+    },
+    on: vi.fn(),
+  };
+}
 
 interface TestConfig {
   enabled: boolean;
@@ -27,8 +42,13 @@ const TEST_DEFAULTS: TestConfig = {
   tags: [],
 };
 
-function registerTestSettings(homeDir?: string): void {
-  registerConfigSettings({
+function registerAndCollect(homeDir?: string): SettingsSection {
+  const pi = makePi();
+  let capturedSection: SettingsSection | undefined;
+
+  // registerConfigSettings registers on the event bus, but also the callback
+  // is stored so we can capture the section when the collector calls add.
+  registerConfigSettings(pi as never, {
     homeDir,
     id: "test",
     label: "Test",
@@ -79,45 +99,55 @@ function registerTestSettings(homeDir?: string): void {
       }
     },
   });
+
+  // Extract the section by emitting the collect event
+  pi.events.emit("supi:settings:collect", {
+    add(section: SettingsSection) {
+      capturedSection = section;
+    },
+  });
+  return capturedSection!;
 }
 
 describe("registerConfigSettings persistence", () => {
-  beforeEach(() => {
-    clearRegisteredSettings();
-  });
+  const testFiles: string[] = [];
 
   afterEach(() => {
-    clearRegisteredSettings();
+    for (const d of testFiles) {
+      try {
+        fs.rmSync(d, { recursive: true, force: true });
+      } catch {
+        /* ok */
+      }
+    }
+    testFiles.length = 0;
   });
 
   it("persistChange set writes to the selected scope's config", () => {
     const tmpDir = makeTempDir();
+    testFiles.push(tmpDir);
 
-    registerTestSettings();
-    const section = getRegisteredSettings()[0];
+    const section = registerAndCollect();
     section.persistChange("project", tmpDir, "severity", "3");
 
     const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
     expect(config.severity).toBe(3);
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("persistChange set writes to global scope when selected", () => {
     const tmpDir = makeTempDir();
+    testFiles.push(tmpDir);
 
-    registerTestSettings(tmpDir);
-    const section = getRegisteredSettings()[0];
+    const section = registerAndCollect(tmpDir);
     section.persistChange("global", tmpDir, "severity", "3");
 
     const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
     expect(config.severity).toBe(3);
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("persistChange unset removes the key from the selected scope's config", () => {
     const tmpDir = makeTempDir();
+    testFiles.push(tmpDir);
 
     fs.mkdirSync(path.join(tmpDir, ".pi/supi"), { recursive: true });
     fs.writeFileSync(
@@ -125,19 +155,17 @@ describe("registerConfigSettings persistence", () => {
       JSON.stringify({ test: { severity: 3, tags: ["a", "b"] } }),
     );
 
-    registerTestSettings();
-    const section = getRegisteredSettings()[0];
+    const section = registerAndCollect();
     section.persistChange("project", tmpDir, "tags", "");
 
     const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
     expect(config.severity).toBe(3);
     expect(config.tags).toEqual([]);
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("persistChange unset on global scope does not affect project scope", () => {
     const tmpDir = makeTempDir();
+    testFiles.push(tmpDir);
 
     fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
     fs.writeFileSync(
@@ -151,14 +179,11 @@ describe("registerConfigSettings persistence", () => {
       JSON.stringify({ test: { severity: 4, tags: ["project"] } }),
     );
 
-    registerTestSettings(tmpDir);
-    const section = getRegisteredSettings()[0];
+    const section = registerAndCollect(tmpDir);
     section.persistChange("global", tmpDir, "tags", "");
 
     const config = loadSupiConfig("test", tmpDir, TEST_DEFAULTS, opts(tmpDir));
     expect(config.severity).toBe(4);
     expect(config.tags).toEqual(["project"]);
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 });

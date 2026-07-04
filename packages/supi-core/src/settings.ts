@@ -1,9 +1,15 @@
-// supi-core settings domain — settings registry (lightweight, type-only pi-tui import).
+// supi-core settings domain — event-backed settings contribution types and command wiring.
 
 export { registerSettingsCommand } from "./settings/settings-command.ts";
-export type { SettingsScope, SettingsSection } from "./settings/settings-registry.ts";
+export type {
+  SettingsCollectionDiagnostic,
+  SettingsCollectionResult,
+  SettingsContributionCollector,
+  SettingsScope,
+  SettingsSection,
+} from "./settings/settings-registry.ts";
 export {
-  clearRegisteredSettings,
-  getRegisteredSettings,
-  registerSettings,
+  createSettingsContributionCollector,
+  isSettingsContributionCollector,
+  SUPI_SETTINGS_COLLECT_EVENT,
 } from "./settings/settings-registry.ts";

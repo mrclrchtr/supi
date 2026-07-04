@@ -1,6 +1,7 @@
-import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core/settings";
+import type { SettingsSection } from "@mrclrchtr/supi-core/settings";
+import { SUPI_SETTINGS_COLLECT_EVENT } from "@mrclrchtr/supi-core/settings";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import bashTimeout from "../../src/bash-timeout.ts";
 import { loadBashTimeoutConfig } from "../../src/config.ts";
 
@@ -9,29 +10,34 @@ vi.mock("../../src/config.ts", () => ({
   BASH_TIMEOUT_DEFAULTS: { defaultTimeout: 120 },
 }));
 
-describe("bashTimeout extension", () => {
-  beforeEach(() => {
-    clearRegisteredSettings();
-    vi.mocked(loadBashTimeoutConfig).mockReturnValue({ defaultTimeout: 120 });
+function collectSection(pi: ReturnType<typeof createPiMock>): SettingsSection {
+  let captured: SettingsSection | undefined;
+  pi.events.emit(SUPI_SETTINGS_COLLECT_EVENT, {
+    add(s: SettingsSection) {
+      captured = s;
+    },
   });
+  return captured!;
+}
 
+describe("bashTimeout extension", () => {
   afterEach(() => {
-    clearRegisteredSettings();
     vi.clearAllMocks();
   });
 
   it("registers settings on factory call", () => {
+    vi.mocked(loadBashTimeoutConfig).mockReturnValue({ defaultTimeout: 120 });
     const pi = createPiMock();
-    bashTimeout(pi as unknown as Parameters<typeof bashTimeout>[0]);
+    bashTimeout(pi as never);
 
-    const sections = getRegisteredSettings();
-    expect(sections).toHaveLength(1);
-    expect(sections[0]).toMatchObject({ id: "bash-timeout", label: "Bash Timeout" });
+    const section = collectSection(pi);
+    expect(section).toMatchObject({ id: "bash-timeout", label: "Bash Timeout" });
   });
 
   it("injects default timeout when LLM omits it", async () => {
+    vi.mocked(loadBashTimeoutConfig).mockReturnValue({ defaultTimeout: 120 });
     const pi = createPiMock();
-    bashTimeout(pi as unknown as Parameters<typeof bashTimeout>[0]);
+    bashTimeout(pi as never);
 
     const event = {
       toolName: "bash",
@@ -46,8 +52,9 @@ describe("bashTimeout extension", () => {
   });
 
   it("does not inject timeout when LLM already specified one", async () => {
+    vi.mocked(loadBashTimeoutConfig).mockReturnValue({ defaultTimeout: 120 });
     const pi = createPiMock();
-    bashTimeout(pi as unknown as Parameters<typeof bashTimeout>[0]);
+    bashTimeout(pi as never);
 
     const event = {
       toolName: "bash",
@@ -60,8 +67,9 @@ describe("bashTimeout extension", () => {
   });
 
   it("ignores non-bash tool calls", async () => {
+    vi.mocked(loadBashTimeoutConfig).mockReturnValue({ defaultTimeout: 120 });
     const pi = createPiMock();
-    bashTimeout(pi as unknown as Parameters<typeof bashTimeout>[0]);
+    bashTimeout(pi as never);
 
     const event = {
       toolName: "read",
@@ -78,7 +86,7 @@ describe("bashTimeout extension", () => {
     vi.mocked(loadBashTimeoutConfig).mockReturnValue({ defaultTimeout: 300 });
 
     const pi = createPiMock();
-    bashTimeout(pi as unknown as Parameters<typeof bashTimeout>[0]);
+    bashTimeout(pi as never);
 
     const event = {
       toolName: "bash",

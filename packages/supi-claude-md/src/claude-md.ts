@@ -30,7 +30,7 @@ import { formatSubdirContext, shouldInjectSubdir } from "./subdirectory.ts";
 const baseDir = dirname(dirname(fileURLToPath(import.meta.url)));
 
 export default function claudeMdExtension(pi: ExtensionAPI) {
-  registerClaudeMdSettings();
+  registerClaudeMdSettings(pi);
   const state: ClaudeMdState = createInitialState();
 
   // ── Session lifecycle ──────────────────────────────────────

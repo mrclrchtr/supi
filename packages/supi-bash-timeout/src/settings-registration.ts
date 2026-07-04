@@ -1,9 +1,10 @@
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
 import { createInputSubmenu } from "@mrclrchtr/supi-core/settings-ui";
 import { BASH_TIMEOUT_DEFAULTS } from "./config.ts";
 
-export function registerBashTimeoutSettings(): void {
-  registerConfigSettings({
+export function registerBashTimeoutSettings(pi: ExtensionAPI, homeDir?: string): void {
+  registerConfigSettings(pi, {
     id: "bash-timeout",
     label: "Bash Timeout",
     section: "bash-timeout",
@@ -19,5 +20,6 @@ export function registerBashTimeoutSettings(): void {
           createInputSubmenu(currentValue, "Timeout in seconds:", done),
       },
     ],
+    ...(homeDir ? { homeDir } : {}),
   });
 }

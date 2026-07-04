@@ -16,7 +16,7 @@ export default function contextExtension(pi: ExtensionAPI) {
   let cachedOptions: BuildSystemPromptOptions | undefined;
 
   // Register settings synchronously during factory
-  registerContextSettings();
+  registerContextSettings(pi);
 
   pi.on("before_agent_start", async (event) => {
     cachedOptions = event.systemPromptOptions;

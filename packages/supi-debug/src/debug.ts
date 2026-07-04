@@ -110,8 +110,8 @@ function syncLiveDebugRegistry(cwd: string): DebugConfig {
   return config;
 }
 
-function registerDebugSettings(): void {
-  registerConfigSettings({
+function registerDebugSettings(pi: ExtensionAPI): void {
+  registerConfigSettings(pi, {
     id: "debug",
     label: "Debug",
     section: DEBUG_SECTION,
@@ -147,7 +147,7 @@ function registerDebugSettings(): void {
       },
     ],
     // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
-    persistChange: (_scope, cwd, settingId, value, helpers) => {
+    persistChange: (_scope, _cwd, settingId, value, helpers) => {
       if (settingId === "enabled") {
         helpers.set("enabled", value === "on");
       } else if (settingId === "agentAccess") {
@@ -157,7 +157,8 @@ function registerDebugSettings(): void {
       } else if (settingId === "notifyLevel") {
         helpers.set("notifyLevel", normalizeNotifyLevel(value));
       }
-
+    },
+    afterPersist: ({ cwd }) => {
       syncLiveDebugRegistry(cwd);
     },
   });
@@ -292,7 +293,7 @@ function buildToolResult(params: DebugToolParams, config: DebugConfig) {
 /** Register the shared SuPi debug command, settings, context summary, and agent tool. */
 export default function debugExtension(pi: ExtensionAPI) {
   applyDebugConfig(process.cwd());
-  registerDebugSettings();
+  registerDebugSettings(pi);
   registerDebugMessageRenderer(pi);
 
   registerContextProvider({

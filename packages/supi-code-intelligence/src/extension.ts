@@ -38,7 +38,7 @@ export default function codeIntelligenceExtension(
   const tsState = createTsAdapterState();
 
   // ── Substrate wiring ──────────────────────────────────────────────
-  registerLspSettings();
+  registerLspSettings(pi);
   registerLspSessionLifecycle(pi, lspState);
   registerLspAwareToolOverrides(pi, lspState);
   registerDiagnosticInjectionHandlers(pi, lspState);

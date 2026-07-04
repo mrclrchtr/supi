@@ -7,6 +7,7 @@
  * @module
  */
 
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
 import { createModelPickerSubmenu } from "@mrclrchtr/supi-core/settings-ui";
 import { CONFIG_SECTION, DEFAULTS } from "./config.ts";
@@ -14,8 +15,8 @@ import { CONFIG_SECTION, DEFAULTS } from "./config.ts";
 const MODEL_ITEM_ID = "model";
 
 /** Register the prompt-suggestions settings section. */
-export function registerPromptSuggestionsSettings(): void {
-  registerConfigSettings({
+export function registerPromptSuggestionsSettings(pi: ExtensionAPI): void {
+  registerConfigSettings(pi, {
     id: "promptSuggestions",
     label: "Prompt suggestions",
     section: CONFIG_SECTION,

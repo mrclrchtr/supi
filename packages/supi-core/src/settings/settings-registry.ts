@@ -1,48 +1,70 @@
-// Settings registry for SuPi extensions.
+// Event-backed settings contribution types for SuPi extensions.
 //
-// Extensions declare their settings via `registerSettings()` during their
-// factory function. The generic settings UI reads them via `getRegisteredSettings()`.
+// Extensions contribute config-backed settings sections through PI's shared
+// event bus. The public helper is registerConfigSettings(pi, ...); this module
+// owns the internal collector protocol used by /supi-settings.
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { SettingItem } from "@earendil-works/pi-tui";
-import { createRegistry } from "../registry-utils.ts";
+
+export const SUPI_SETTINGS_COLLECT_EVENT = "supi:settings:collect";
 
 export type SettingsScope = "project" | "global";
 
 export interface SettingsSection {
-  /** Extension identifier — e.g. "lsp", "claude-md" */
+  /** Stable contribution identifier — e.g. "lsp", "claude-md". */
   id: string;
-  /** Human-readable label shown in the UI */
+  /** Human-readable label shown in the UI. */
   label: string;
-  /** Load current SettingItem[] for the given scope */
+  /** Load current SettingItem[] for the given scope. */
   loadValues: (scope: SettingsScope, cwd: string, ctx?: ExtensionContext) => SettingItem[];
-  /** Persist a change back to config */
-  persistChange: (
-    scope: SettingsScope,
-    cwd: string,
-    settingId: string,
-    value: string,
-    ctx?: ExtensionContext,
-  ) => void;
+  /** Persist a UI value back to SuPi config. */
+  persistChange: (scope: SettingsScope, cwd: string, settingId: string, value: string) => void;
 }
 
-const registry = createRegistry<SettingsSection>("settings-registry");
-
-/**
- * Register a settings section for an extension.
- * Call during the extension factory function (not async handlers).
- * Duplicate ids replace the previous registration.
- */
-export function registerSettings(section: SettingsSection): void {
-  registry.register(section.id, section);
+export interface SettingsContributionCollector {
+  add(section: SettingsSection): void;
 }
 
-/** Get all registered settings sections in registration order. */
-export function getRegisteredSettings(): SettingsSection[] {
-  return registry.getAll();
+export interface SettingsCollectionDiagnostic {
+  kind: "warning";
+  message: string;
 }
 
-/** Clear the registry — used by tests. */
-export function clearRegisteredSettings(): void {
-  registry.clear();
+export interface SettingsCollectionResult {
+  sections: SettingsSection[];
+  diagnostics: SettingsCollectionDiagnostic[];
+}
+
+export function isSettingsContributionCollector(
+  value: unknown,
+): value is SettingsContributionCollector {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as { add?: unknown }).add === "function"
+  );
+}
+
+/** Create a collector with last-wins duplicate handling and warning diagnostics. */
+export function createSettingsContributionCollector(): SettingsContributionCollector & {
+  result(): SettingsCollectionResult;
+} {
+  const sections = new Map<string, SettingsSection>();
+  const diagnostics: SettingsCollectionDiagnostic[] = [];
+
+  return {
+    add(section: SettingsSection): void {
+      if (sections.has(section.id)) {
+        diagnostics.push({
+          kind: "warning",
+          message: `Duplicate SuPi settings contribution "${section.id}"; using the last contribution.`,
+        });
+      }
+      sections.set(section.id, section);
+    },
+    result(): SettingsCollectionResult {
+      return { sections: Array.from(sections.values()), diagnostics: [...diagnostics] };
+    },
+  };
 }

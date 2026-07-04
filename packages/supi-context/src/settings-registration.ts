@@ -1,11 +1,12 @@
 // supi-context settings registration for the supi settings registry.
 
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
 import { CONTEXT_DEFAULTS } from "./config.ts";
 
 /** Register supi-context settings with the supi settings registry. */
-export function registerContextSettings(homeDir?: string): void {
-  registerConfigSettings({
+export function registerContextSettings(pi: ExtensionAPI, homeDir?: string): void {
+  registerConfigSettings(pi, {
     id: "context",
     label: "Context",
     section: "context",

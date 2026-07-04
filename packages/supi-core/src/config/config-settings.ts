@@ -1,14 +1,17 @@
-// Config-aware settings helper for SuPi config-backed settings sections.
-// Wraps registerSettings() and centralizes selected-scope loading + scoped persistence.
+// Config-aware settings contribution helper for SuPi packages.
 //
-// Setting items can declare a `configType` ("boolean" | "number" | "stringList")
-// to enable auto-generated persistChange. When all items have a configType,
-// the persistChange callback can be omitted.
+// Registers config-backed settings sections through PI's shared event bus so
+// /supi-settings can collect contributions from all loaded extensions without
+// relying on a shared supi-core module instance.
 
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { SettingItem } from "@earendil-works/pi-tui";
-import type { SettingsScope } from "../settings/settings-registry.ts";
-import { registerSettings } from "../settings/settings-registry.ts";
+import {
+  isSettingsContributionCollector,
+  type SettingsScope,
+  type SettingsSection,
+  SUPI_SETTINGS_COLLECT_EVENT,
+} from "../settings/settings-registry.ts";
 import { loadSupiConfigForScope, removeSupiConfigKey, writeSupiConfig } from "./config.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -22,22 +25,13 @@ import { loadSupiConfigForScope, removeSupiConfigKey, writeSupiConfig } from "./
  */
 export type ConfigSettingType = "boolean" | "number" | "stringList";
 
-/**
- * Extended setting item that can declare its config type for auto-generated
- * persistence handling.
- */
+/** Extended setting item that can declare its config type for persistence. */
 export interface ConfigSettingItem extends SettingItem {
-  /**
-   * When set, persistChange for this item is auto-generated.
-   * All items must declare a configType for auto-generation to activate.
-   */
+  /** Config value type used for auto-generated persistence. */
   configType?: ConfigSettingType;
 }
 
-/**
- * Helpers provided to the persistChange callback for writing or removing
- * scoped config values.
- */
+/** Helpers provided to persistChange for scoped SuPi config writes. */
 export interface ConfigSettingsHelpers {
   /** Write a key to the selected scope's config section. */
   set(key: string, value: unknown): void;
@@ -45,22 +39,23 @@ export interface ConfigSettingsHelpers {
   unset(key: string): void;
 }
 
+export interface ConfigSettingsPersistedChange {
+  scope: SettingsScope;
+  cwd: string;
+  settingId: string;
+  value: string;
+}
+
 export interface ConfigSettingsOptions<T> {
-  /** Extension identifier — e.g. "lsp", "claude-md" */
+  /** Settings contribution identifier — e.g. "lsp", "claude-md". */
   id: string;
-  /** Human-readable label shown in the UI */
+  /** Human-readable label shown in the UI. */
   label: string;
-  /** SuPi config section name — e.g. "lsp", "claude-md" */
+  /** SuPi config section name — e.g. "lsp", "claude-md". */
   section: string;
-  /** Default config values */
+  /** Default config values. */
   defaults: T;
-  /**
-   * Build SettingItem[] from scoped config. Called by loadValues.
-   *
-   * Items can include a `configType` property for auto-generated
-   * persistChange handling. When ALL items declare a configType,
-   * the `persistChange` callback can be omitted.
-   */
+  /** Build SettingItem[] from scoped config. */
   buildItems: (
     settings: T,
     scope: SettingsScope,
@@ -68,10 +63,10 @@ export interface ConfigSettingsOptions<T> {
     ctx?: ExtensionContext,
   ) => ConfigSettingItem[];
   /**
-   * Handle a settings change with scoped persistence helpers.
+   * Convert a UI value into scoped SuPi config writes.
    *
-   * Optional when all items returned by `buildItems` declare a `configType`.
-   * Required when any item lacks a `configType`.
+   * Optional when every item returned by `buildItems` declares `configType`.
+   * Required when any item lacks `configType`.
    */
   persistChange?: (
     scope: SettingsScope,
@@ -80,6 +75,8 @@ export interface ConfigSettingsOptions<T> {
     value: string,
     helpers: ConfigSettingsHelpers,
   ) => void;
+  /** Optional live runtime sync after successful persistence. */
+  afterPersist?: (change: ConfigSettingsPersistedChange) => void;
   /** Optional home directory for config resolution (testing). */
   homeDir?: string;
 }
@@ -128,23 +125,27 @@ function areAllItemsDeclarative(items: ConfigSettingItem[]): boolean {
   return items.length > 0 && items.every((i) => i.configType !== undefined);
 }
 
-// ── Registration ───────────────────────────────────────────────────────────
+function createHelpers<T>(options: ConfigSettingsOptions<T>, scope: SettingsScope, cwd: string) {
+  return {
+    set: (key: string, val: unknown) => {
+      writeSupiConfig(
+        { section: options.section, scope, cwd },
+        { [key]: val },
+        { homeDir: options.homeDir },
+      );
+    },
+    unset: (key: string) => {
+      removeSupiConfigKey({ section: options.section, scope, cwd }, key, {
+        homeDir: options.homeDir,
+      });
+    },
+  } satisfies ConfigSettingsHelpers;
+}
 
-/**
- * Register a config-backed settings section.
- *
- * Loads display values from the selected scope only (`defaults <- selected scope`)
- * instead of merged effective runtime config. Provides scoped `set` / `unset`
- * persistence helpers so extensions don't need to wire `writeSupiConfig` /
- * `removeSupiConfigKey` by hand.
- *
- * When every item returned by `buildItems` declares a `configType`, the
- * `persistChange` callback is optional and will be auto-generated.
- */
-export function registerConfigSettings<T>(options: ConfigSettingsOptions<T>): void {
+function toSettingsSection<T>(options: ConfigSettingsOptions<T>): SettingsSection {
   let cachedItems: ConfigSettingItem[] | undefined;
 
-  registerSettings({
+  return {
     id: options.id,
     label: options.label,
     loadValues: (scope, cwd, ctx) => {
@@ -157,32 +158,50 @@ export function registerConfigSettings<T>(options: ConfigSettingsOptions<T>): vo
       return items;
     },
     persistChange: (scope, cwd, settingId, value) => {
-      const helpers: ConfigSettingsHelpers = {
-        set: (key, val) => {
-          writeSupiConfig(
-            { section: options.section, scope, cwd },
-            { [key]: val },
-            { homeDir: options.homeDir },
-          );
-        },
-        unset: (key) => {
-          removeSupiConfigKey({ section: options.section, scope, cwd }, key, {
-            homeDir: options.homeDir,
-          });
-        },
-      };
+      const helpers = createHelpers(options, scope, cwd);
 
-      // Use manual persistChange when provided
       if (options.persistChange) {
         options.persistChange(scope, cwd, settingId, value, helpers);
-        return;
-      }
-
-      // Auto-generate when all items are declarative
-      const items = cachedItems ?? options.buildItems(options.defaults, scope, cwd, undefined);
-      if (areAllItemsDeclarative(items)) {
+      } else {
+        const items = cachedItems ?? options.buildItems(options.defaults, scope, cwd, undefined);
+        if (!areAllItemsDeclarative(items)) {
+          throw new Error(
+            `Settings contribution "${options.id}" needs persistChange or configType on every item.`,
+          );
+        }
         autoPersistChange(settingId, value, helpers, items);
       }
+
+      try {
+        options.afterPersist?.({ scope, cwd, settingId, value });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Saved setting, but live sync failed: ${message}`, { cause: error });
+      }
     },
+  };
+}
+
+// ── Registration ───────────────────────────────────────────────────────────
+
+/**
+ * Register a config-backed settings contribution for `/supi-settings`.
+ *
+ * Contributions are collected through PI's process-local event bus. Call this
+ * during the extension factory function, not in async session handlers.
+ */
+export function registerConfigSettings<T>(
+  pi: ExtensionAPI,
+  options: ConfigSettingsOptions<T>,
+): void {
+  const section = toSettingsSection(options);
+  const dispose = pi.events.on(SUPI_SETTINGS_COLLECT_EVENT, (collector) => {
+    if (isSettingsContributionCollector(collector)) {
+      collector.add(section);
+    }
+  });
+
+  pi.on("session_shutdown", () => {
+    dispose();
   });
 }

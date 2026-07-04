@@ -1,5 +1,6 @@
 // Cache-monitor settings registration for the supi settings registry.
 
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
 import { CACHE_MONITOR_DEFAULTS } from "./config.ts";
 
@@ -7,8 +8,8 @@ const THRESHOLD_VALUES = ["5", "10", "15", "20", "25", "30", "35", "40", "45", "
 const IDLE_THRESHOLD_VALUES = ["1", "2", "3", "5", "10", "15", "20", "30", "45", "60"];
 
 /** Register supi-cache settings with the supi settings registry. */
-export function registerCacheMonitorSettings(homeDir?: string): void {
-  registerConfigSettings({
+export function registerCacheMonitorSettings(pi: ExtensionAPI, homeDir?: string): void {
+  registerConfigSettings(pi, {
     id: "cache",
     label: "Cache",
     section: "cache",

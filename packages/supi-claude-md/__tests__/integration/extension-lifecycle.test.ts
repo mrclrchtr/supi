@@ -20,7 +20,6 @@ vi.mock("@mrclrchtr/supi-core/api", () => ({
       : null,
   loadSupiConfig: vi.fn(),
   registerConfigSettings: vi.fn(),
-  registerSettings: vi.fn(),
   removeSupiConfigKey: vi.fn(),
   writeSupiConfig: vi.fn(),
 }));

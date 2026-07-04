@@ -1,48 +1,69 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { clearRegisteredSettings, getRegisteredSettings } from "@mrclrchtr/supi-core/settings";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { SettingsSection } from "@mrclrchtr/supi-core/settings";
+import { SUPI_SETTINGS_COLLECT_EVENT } from "@mrclrchtr/supi-core/settings";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { registerClaudeMdSettings } from "../../src/settings-registration.ts";
 
 function makeTempDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "claude-md-settings-test-"));
 }
 
-function withHomeDir<T>(homeDir: string, run: () => T): T {
-  const prevHome = process.env.HOME;
-  process.env.HOME = homeDir;
-  try {
-    return run();
-  } finally {
-    if (prevHome === undefined) {
-      delete process.env.HOME;
-    } else {
-      process.env.HOME = prevHome;
-    }
-  }
+function makePi() {
+  const eventHandlers = new Map<string, Array<(data: unknown) => void>>();
+  return {
+    events: {
+      on: vi.fn((_channel: string, handler: (data: unknown) => void) => {
+        const list = eventHandlers.get(SUPI_SETTINGS_COLLECT_EVENT) ?? [];
+        list.push(handler);
+        eventHandlers.set(SUPI_SETTINGS_COLLECT_EVENT, list);
+        return () => void 0;
+      }),
+      emit: vi.fn((channel: string, data: unknown) => {
+        for (const handler of eventHandlers.get(channel) ?? []) handler(data);
+      }),
+    },
+    on: vi.fn(),
+  };
 }
 
+function collect(pi: ReturnType<typeof makePi>): SettingsSection {
+  let captured: SettingsSection | undefined;
+  pi.events.emit(SUPI_SETTINGS_COLLECT_EVENT, {
+    add(s: SettingsSection) {
+      captured = s;
+    },
+  });
+  return captured!;
+}
+
+const testFiles: string[] = [];
+
+afterEach(() => {
+  for (const d of testFiles) {
+    try {
+      fs.rmSync(d, { recursive: true, force: true });
+    } catch {
+      /* ok */
+    }
+  }
+  testFiles.length = 0;
+});
+
 describe("registerClaudeMdSettings", () => {
-  beforeEach(() => {
-    clearRegisteredSettings();
-  });
-
-  afterEach(() => {
-    clearRegisteredSettings();
-  });
-
   it("registers a Claude-MD settings section", () => {
-    registerClaudeMdSettings();
-    const sections = getRegisteredSettings();
+    const pi = makePi();
+    registerClaudeMdSettings(pi as never);
+    const section = collect(pi);
 
-    expect(sections).toHaveLength(1);
-    expect(sections[0]).toMatchObject({ id: "claude-md", label: "Claude-MD" });
+    expect(section).toMatchObject({ id: "claude-md", label: "Claude-MD" });
   });
 
   it("loadValues returns two setting items", () => {
-    registerClaudeMdSettings();
-    const section = getRegisteredSettings()[0];
+    const pi = makePi();
+    registerClaudeMdSettings(pi as never);
+    const section = collect(pi);
     const items = section.loadValues("project", "/tmp");
 
     expect(items.map((item) => item.id)).toEqual(["subdirs", "fileNames"]);
@@ -50,6 +71,7 @@ describe("registerClaudeMdSettings", () => {
 
   it("loadValues reads the selected scope instead of merged effective config", () => {
     const tmpDir = makeTempDir();
+    testFiles.push(tmpDir);
 
     fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
     fs.writeFileSync(
@@ -73,25 +95,23 @@ describe("registerClaudeMdSettings", () => {
       }),
     );
 
-    withHomeDir(tmpDir, () => {
-      registerClaudeMdSettings();
-      const section = getRegisteredSettings()[0];
+    const pi = makePi();
+    registerClaudeMdSettings(pi as never, tmpDir);
+    const section = collect(pi);
 
-      const globalItems = section.loadValues("global", tmpDir);
-      const projectItems = section.loadValues("project", tmpDir);
+    const globalItems = section.loadValues("global", tmpDir);
+    const projectItems = section.loadValues("project", tmpDir);
 
-      expect(globalItems.find((item) => item.id === "subdirs")?.currentValue).toBe("off");
-      expect(globalItems.find((item) => item.id === "fileNames")?.currentValue).toBe("GLOBAL.md");
+    expect(globalItems.find((item) => item.id === "subdirs")?.currentValue).toBe("off");
+    expect(globalItems.find((item) => item.id === "fileNames")?.currentValue).toBe("GLOBAL.md");
 
-      expect(projectItems.find((item) => item.id === "subdirs")?.currentValue).toBe("on");
-      expect(projectItems.find((item) => item.id === "fileNames")?.currentValue).toBe("PROJECT.md");
-    });
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    expect(projectItems.find((item) => item.id === "subdirs")?.currentValue).toBe("on");
+    expect(projectItems.find((item) => item.id === "fileNames")?.currentValue).toBe("PROJECT.md");
   });
 
   it("project scope falls back to defaults when only global config exists", () => {
     const tmpDir = makeTempDir();
+    testFiles.push(tmpDir);
 
     fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
     fs.writeFileSync(
@@ -103,17 +123,14 @@ describe("registerClaudeMdSettings", () => {
       }),
     );
 
-    withHomeDir(tmpDir, () => {
-      registerClaudeMdSettings();
-      const section = getRegisteredSettings()[0];
-      const projectItems = section.loadValues("project", tmpDir);
+    const pi = makePi();
+    registerClaudeMdSettings(pi as never, tmpDir);
+    const section = collect(pi);
+    const projectItems = section.loadValues("project", tmpDir);
 
-      expect(projectItems.find((item) => item.id === "subdirs")?.currentValue).toBe("on");
-      expect(projectItems.find((item) => item.id === "fileNames")?.currentValue).toBe(
-        "CLAUDE.md, AGENTS.md",
-      );
-    });
-
-    fs.rmSync(tmpDir, { recursive: true, force: true });
+    expect(projectItems.find((item) => item.id === "subdirs")?.currentValue).toBe("on");
+    expect(projectItems.find((item) => item.id === "fileNames")?.currentValue).toBe(
+      "CLAUDE.md, AGENTS.md",
+    );
   });
 });

@@ -21,6 +21,15 @@ function getProjectConfigPath(cwd: string): string {
   return path.join(cwd, PROJECT_CONFIG_DIR, CONFIG_FILE);
 }
 
+/** Return the SuPi config file path for one scope. */
+export function getSupiConfigPath(
+  scope: "global" | "project",
+  cwd: string,
+  options?: SupiConfigOptions,
+): string {
+  return scope === "global" ? getGlobalConfigPath(options?.homeDir) : getProjectConfigPath(cwd);
+}
+
 export function readJsonFile(filePath: string): Record<string, unknown> | null {
   let content: string;
   try {
@@ -95,13 +104,20 @@ export function loadSupiConfigForScope<T>(
   defaults: T,
   options: { scope: "global" | "project" } & SupiConfigOptions,
 ): T {
-  const config =
-    options.scope === "global"
-      ? readJsonFile(getGlobalConfigPath(options.homeDir))
-      : readJsonFile(getProjectConfigPath(cwd));
+  const config = readJsonFile(getSupiConfigPath(options.scope, cwd, { homeDir: options.homeDir }));
 
   const scopedSection = extractSection(config, section);
   return shallowMerge(defaults, scopedSection);
+}
+
+/** Load the raw object for one config section and one scope. */
+export function loadSupiConfigSectionForScope(
+  section: string,
+  cwd: string,
+  options: { scope: "global" | "project" } & SupiConfigOptions,
+): Record<string, unknown> | null {
+  const config = readJsonFile(getSupiConfigPath(options.scope, cwd, { homeDir: options.homeDir }));
+  return extractSection(config, section);
 }
 
 export interface SupiConfigLocation {
@@ -118,8 +134,7 @@ export function writeSupiConfig(
   value: Record<string, unknown>,
   options?: SupiConfigOptions,
 ): void {
-  const configPath =
-    loc.scope === "global" ? getGlobalConfigPath(options?.homeDir) : getProjectConfigPath(loc.cwd);
+  const configPath = getSupiConfigPath(loc.scope, loc.cwd, options);
 
   const dir = path.dirname(configPath);
   fs.mkdirSync(dir, { recursive: true });
@@ -142,8 +157,7 @@ export function removeSupiConfigKey(
   key: string,
   options?: SupiConfigOptions,
 ): void {
-  const configPath =
-    loc.scope === "global" ? getGlobalConfigPath(options?.homeDir) : getProjectConfigPath(loc.cwd);
+  const configPath = getSupiConfigPath(loc.scope, loc.cwd, options);
 
   const existing = readJsonFile(configPath);
   if (!existing) return;

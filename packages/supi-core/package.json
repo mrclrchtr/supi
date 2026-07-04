@@ -74,6 +74,7 @@
     "./status-spinner": "./src/status-spinner.ts",
     "./terminal": "./src/terminal.ts",
     "./tool-framework": "./src/tool-framework.ts",
+    "./prompt-surface": "./src/prompt-surface.ts",
     "./types": "./src/types.ts"
   }
 }

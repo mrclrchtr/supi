@@ -76,7 +76,7 @@ function getConfig(cwd: string): InsightsConfig {
 
 export default function insightsExtension(pi: ExtensionAPI) {
   // Register config-backed settings for /supi-settings
-  registerConfigSettings<InsightsConfig>({
+  registerConfigSettings<InsightsConfig>(pi, {
     id: "insights",
     label: "Insights",
     section: "insights",

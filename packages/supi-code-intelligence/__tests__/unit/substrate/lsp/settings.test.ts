@@ -45,10 +45,10 @@ describe("LSP settings UI", () => {
     timeout: 30_000,
   }, async () => {
     const { registerLspSettings } = await import("../../../../src/substrate/lsp/settings.ts");
-    registerLspSettings();
+    registerLspSettings({ on: vi.fn(), events: { on: vi.fn(), emit: vi.fn() } } as never);
 
     expect(registerConfigSettingsSpy).toHaveBeenCalledTimes(1);
-    const callArgs = registerConfigSettingsSpy.mock.calls[0]?.[0] as {
+    const callArgs = registerConfigSettingsSpy.mock.calls[0]?.[1] as {
       buildItems?: (
         settings: unknown,
         scope: string,

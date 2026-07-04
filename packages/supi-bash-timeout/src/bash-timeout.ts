@@ -14,7 +14,7 @@ import { loadBashTimeoutConfig } from "./config.ts";
 import { registerBashTimeoutSettings } from "./settings-registration.ts";
 
 export default function bashTimeout(pi: ExtensionAPI) {
-  registerBashTimeoutSettings();
+  registerBashTimeoutSettings(pi);
 
   pi.on("tool_call", async (event, ctx) => {
     if (!isToolCallEventType("bash", event)) return;

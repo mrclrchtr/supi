@@ -47,6 +47,6 @@ describe("registerSettingsCommand", () => {
     const ctx = { cwd: "/tmp", ui: {} };
     await handler?.([], ctx);
 
-    expect(mockFns.openSettingsOverlay).toHaveBeenCalledWith(ctx);
+    expect(mockFns.openSettingsOverlay).toHaveBeenCalledWith(pi, ctx);
   });
 });

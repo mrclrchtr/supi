@@ -140,7 +140,7 @@ describe("supi-debug settings", () => {
   it("builds setting items and persists typed values", () => {
     setup({ enabled: false, agentAccess: "raw", maxEvents: 250, notifyLevel: "error" });
 
-    const options = mockFns.registerConfigSettings.mock.calls[0][0];
+    const options = mockFns.registerConfigSettings.mock.calls[0][1];
     expect(
       options.buildItems({
         enabled: false,
@@ -164,9 +164,28 @@ describe("supi-debug settings", () => {
       notifyLevel: "warning",
     });
     options.persistChange("project", "/repo", "enabled", "on", helpers);
+    options.afterPersist?.({ scope: "project", cwd: "/repo", settingId: "enabled", value: "on" });
     options.persistChange("project", "/repo", "agentAccess", "raw", helpers);
+    options.afterPersist?.({
+      scope: "project",
+      cwd: "/repo",
+      settingId: "agentAccess",
+      value: "raw",
+    });
     options.persistChange("project", "/repo", "maxEvents", "500", helpers);
+    options.afterPersist?.({
+      scope: "project",
+      cwd: "/repo",
+      settingId: "maxEvents",
+      value: "500",
+    });
     options.persistChange("project", "/repo", "notifyLevel", "warning", helpers);
+    options.afterPersist?.({
+      scope: "project",
+      cwd: "/repo",
+      settingId: "notifyLevel",
+      value: "warning",
+    });
 
     expect(helpers.set.mock.calls).toEqual([
       ["enabled", true],
@@ -185,7 +204,7 @@ describe("supi-debug settings", () => {
   it("reconfigures the live registry immediately and clears events when disabling", () => {
     setup();
 
-    const options = mockFns.registerConfigSettings.mock.calls[0][0];
+    const options = mockFns.registerConfigSettings.mock.calls[0][1];
     const helpers = { set: vi.fn(), unset: vi.fn() };
     mockFns.configureDebugRegistry.mockClear();
     mockFns.clearDebugEvents.mockClear();
@@ -197,6 +216,7 @@ describe("supi-debug settings", () => {
     });
 
     options.persistChange("project", "/repo", "enabled", "off", helpers);
+    options.afterPersist?.({ scope: "project", cwd: "/repo", settingId: "enabled", value: "off" });
 
     expect(helpers.set).toHaveBeenCalledWith("enabled", false);
     expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({

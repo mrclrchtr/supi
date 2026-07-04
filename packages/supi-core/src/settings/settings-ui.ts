@@ -3,7 +3,7 @@
 // Uses pi-tui's SettingsList with scope toggle (Tab), extension grouping,
 // and search. Each extension declares its settings via registerSettings().
 
-import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getSettingsListTheme } from "@earendil-works/pi-coding-agent";
 import {
   Container,
@@ -19,9 +19,11 @@ import {
 } from "@earendil-works/pi-tui";
 import { getSelectableModels } from "../model-selection.ts";
 import {
-  getRegisteredSettings,
+  createSettingsContributionCollector,
+  type SettingsCollectionDiagnostic,
   type SettingsScope,
   type SettingsSection,
+  SUPI_SETTINGS_COLLECT_EVENT,
 } from "./settings-registry.ts";
 
 // ── Input submenu component ──────────────────────────────────
@@ -73,9 +75,15 @@ export function createInputSubmenu(
 
 // ── Types ────────────────────────────────────────────────────
 
+interface OverlayStatus {
+  kind: "warning" | "error";
+  message: string;
+}
+
 interface OverlayState {
   scope: SettingsScope;
   cwd: string;
+  status?: OverlayStatus;
 }
 
 // ── Pure helpers ─────────────────────────────────────────────
@@ -117,10 +125,27 @@ function findSectionAndId(
   return { section, itemId };
 }
 
+function collectSettingsSections(pi: ExtensionAPI) {
+  const collector = createSettingsContributionCollector();
+  pi.events.emit(SUPI_SETTINGS_COLLECT_EVENT, collector);
+  return collector.result();
+}
+
+function latestStatus(diagnostics: SettingsCollectionDiagnostic[]): OverlayStatus | undefined {
+  const latest = diagnostics.at(-1);
+  return latest ? { kind: latest.kind, message: latest.message } : undefined;
+}
+
+function formatSettingsError(settingId: string, error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return `Could not save SuPi setting "${settingId}": ${message}`;
+}
+
 // ── Component ────────────────────────────────────────────────
 
 interface SettingsOverlayDeps {
   ctx: ExtensionContext;
+  sections: SettingsSection[];
   state: OverlayState;
   container: Container;
   settingsList: SettingsList | null;
@@ -130,22 +155,23 @@ interface SettingsOverlayDeps {
 }
 
 function createSettingsList(deps: SettingsOverlayDeps): SettingsList {
-  const sections = getRegisteredSettings();
-  const items = buildFlatItems(sections, deps.state.scope, deps.state.cwd, deps.ctx);
+  const items = buildFlatItems(deps.sections, deps.state.scope, deps.state.cwd, deps.ctx);
   const onChange = (flatId: string, newValue: string) => {
-    const found = findSectionAndId(sections, flatId);
-    if (found) {
-      found.section.persistChange(
-        deps.state.scope,
-        deps.state.cwd,
-        found.itemId,
-        newValue,
-        deps.ctx,
-      );
+    const found = findSectionAndId(deps.sections, flatId);
+    try {
+      if (found) {
+        found.section.persistChange(deps.state.scope, deps.state.cwd, found.itemId, newValue);
+        deps.state.status = undefined;
+      }
+    } catch (error) {
+      deps.state.status = {
+        kind: "error",
+        message: formatSettingsError(found?.itemId ?? flatId, error),
+      };
     }
     // Re-read all values to reflect persisted changes, but keep the list
     // instance (and its selectedIndex) intact.
-    const updatedItems = buildFlatItems(sections, deps.state.scope, deps.state.cwd, deps.ctx);
+    const updatedItems = buildFlatItems(deps.sections, deps.state.scope, deps.state.cwd, deps.ctx);
     for (const updated of updatedItems) {
       const existing = items.find((i) => i.id === updated.id);
       if (existing && existing.currentValue !== updated.currentValue) {
@@ -171,6 +197,7 @@ function rebuildSettingsList(deps: SettingsOverlayDeps): SettingsList {
 
   deps.container.clear();
   deps.container.addChild(createHeaderComponent(deps));
+  deps.container.addChild(createStatusComponent(deps));
   deps.container.addChild(settingsList);
 
   return settingsList;
@@ -186,6 +213,20 @@ function createHeaderComponent(deps: SettingsOverlayDeps): Text {
     0,
   );
   return headerText;
+}
+
+function createStatusComponent(deps: SettingsOverlayDeps): {
+  render: () => string[];
+  invalidate: () => void;
+} {
+  return {
+    render: () => {
+      const status = deps.state.status;
+      if (!status) return [];
+      return [deps.theme.fg(status.kind, status.message)];
+    },
+    invalidate: () => {},
+  };
 }
 
 function handleScopeToggle(deps: SettingsOverlayDeps): void {
@@ -288,19 +329,24 @@ function buildModelItems(ctx?: ExtensionContext): SelectItem[] {
 
 // ── Entry point ──────────────────────────────────────────────
 
-export function openSettingsOverlay(ctx: ExtensionContext): void {
-  const sections = getRegisteredSettings();
-  if (sections.length === 0) {
+export function openSettingsOverlay(pi: ExtensionAPI, ctx: ExtensionContext): void {
+  const collection = collectSettingsSections(pi);
+  if (collection.sections.length === 0) {
     ctx.ui.notify("No settings registered by SuPi extensions", "info");
     return;
   }
 
   void ctx.ui.custom<void>((tui, theme, _kb, done) => {
-    const state: OverlayState = { scope: "project", cwd: ctx.cwd };
+    const state: OverlayState = {
+      scope: "project",
+      cwd: ctx.cwd,
+      status: latestStatus(collection.diagnostics),
+    };
     const container = new Container();
 
     const deps: SettingsOverlayDeps = {
       ctx,
+      sections: collection.sections,
       state,
       container,
       settingsList: null,

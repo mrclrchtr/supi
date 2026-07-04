@@ -64,7 +64,7 @@ function makeFormCtx(result: unknown): FormCtx {
 }
 
 describe("ask_user tool", () => {
-  it("registers the ask_user tool with blocking guidance metadata", () => {
+  it("registers the ask_user tool with blocking guidance metadata at factory time", () => {
     const pi = createPiMock() as unknown as PiApi;
     askUserExtension(pi);
     const tool = getTool(pi, "ask_user");
@@ -75,6 +75,13 @@ describe("ask_user tool", () => {
     expect(tool.description).toContain("truncated");
     expect(tool.promptSnippet).toContain("ask_user");
     expect(tool.promptGuidelines?.every((guideline) => guideline.includes("ask_user"))).toBe(true);
+  });
+
+  it("registers a session_start handler for configurable prompt-surface resolution", () => {
+    const pi = createPiMock() as unknown as PiApi;
+    askUserExtension(pi);
+    const handler = pi.getHandlers("session_start");
+    expect(handler).toHaveLength(1);
   });
 
   it("throws for invalid forms", async () => {

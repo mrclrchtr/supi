@@ -16,3 +16,10 @@ export const promptGuidelines = [
   "Use ask_user `choice` for fixed/yes-no options and `text` for short freeform input.",
   "In ask_user, use stable ids/values; recommendations are single-choice string (omitted = first option), multi-choice array (omitted = none), or text string; unanswered questions return `needs_discussion`.",
 ];
+
+/** Package defaults for the ask_user prompt surface (used by the config resolver). */
+export const ASK_USER_PROMPT_SURFACE_DEFAULTS = {
+  description: toolDescription,
+  promptSnippet,
+  promptGuidelines: [...promptGuidelines],
+};

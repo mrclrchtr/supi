@@ -1,13 +1,14 @@
 // Claude-MD settings registration for the supi settings registry.
 
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
 import { createInputSubmenu } from "@mrclrchtr/supi-core/settings-ui";
 import { CLAUDE_MD_DEFAULTS } from "./config.ts";
 
 // ── Settings registration ────────────────────────────────────
 
-export function registerClaudeMdSettings(): void {
-  registerConfigSettings({
+export function registerClaudeMdSettings(pi: ExtensionAPI, homeDir?: string): void {
+  registerConfigSettings(pi, {
     id: "claude-md",
     label: "Claude-MD",
     section: "claude-md",
@@ -31,5 +32,6 @@ export function registerClaudeMdSettings(): void {
           createInputSubmenu(currentValue, "File names (comma-separated):", done),
       },
     ],
+    ...(homeDir ? { homeDir } : {}),
   });
 }

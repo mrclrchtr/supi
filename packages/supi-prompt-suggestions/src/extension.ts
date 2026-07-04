@@ -14,7 +14,7 @@ import { SuggestionGenerator } from "./generation/generator.ts";
 import { SessionLifecycle } from "./session.ts";
 
 export default function (pi: ExtensionAPI): void {
-  registerPromptSuggestionsSettings();
+  registerPromptSuggestionsSettings(pi);
 
   const generator = new SuggestionGenerator();
   const session = new SessionLifecycle(generator);
