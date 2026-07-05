@@ -15,8 +15,8 @@ import {
   gatherCoverageEvalInput,
 } from "../../analysis/coverage/coverage-warnings.ts";
 import { loadPrioritizationSignals } from "../../analysis/signals/project.ts";
-import type { CodeIntelResult, HealthDetails } from "../../types/index.ts";
-import type { HealthData, HealthSection } from "./markdown.ts";
+import type { CodeIntelResult } from "../../types/index.ts";
+import { assembleHealthResult, type HealthData, type HealthSection } from "../result/health.ts";
 import { renderHealthResult } from "./markdown.ts";
 import { collectCodeActions, collectDiagnostics } from "./sections/diagnostics.ts";
 import {
@@ -138,22 +138,14 @@ export async function executeHealth(
     diagnosticAgeSeconds,
   };
 
-  const evidenceLists = buildHealthEvidenceLists(gitContext);
-  const content = renderHealthResult(data, cwd);
+  const assembly = assembleHealthResult(data, buildHealthEvidenceLists(gitContext));
+  const content = renderHealthResult(assembly, cwd);
 
   return {
     content,
     details: {
       type: "health",
-      data: {
-        lspAvailable: data.lspAvailable,
-        lspStatus: data.lspStatus,
-        recovered: data.recovered,
-        structuralStatus: data.structuralStatus,
-        diagnosticFileCount: data.diagnostics.length,
-        serverCount: data.servers.length,
-        evidenceLists,
-      } satisfies HealthDetails,
+      data: assembly.details,
     },
   };
 }

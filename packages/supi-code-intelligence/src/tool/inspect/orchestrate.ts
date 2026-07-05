@@ -4,6 +4,7 @@ import { createEvidenceList } from "../../analysis/evidence.ts";
 import { normalizePath } from "../../analysis/search/ripgrep.ts";
 import { gatherNearbyDiagnostics, gatherTreeSitterContext } from "../../ui/markdown/gather.ts";
 import type { InspectDeps, InspectInput, InspectUseCaseResult } from "../../ui/markdown/types.ts";
+import { assembleInspectResult } from "../result/inspect.ts";
 import { renderInspectResult } from "./markdown.ts";
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: inspect orchestration keeps data gathering and unavailable-section derivation in one place
@@ -89,37 +90,35 @@ export async function executeInspect(
   });
 
   const nextQueries = buildNextQueries(relPath, input.line, input.character, confidence);
-  const content = renderInspectResult({
-    relPath,
-    line: input.line,
-    character: input.character,
-    confidence,
-    node: context.nodeInfo,
-    enclosingSymbol: enclosing
-      ? {
-          name: enclosing.name,
-          kind: enclosing.kind,
-          startLine: enclosing.startLine,
-          endLine: enclosing.endLine,
-        }
-      : null,
-    hover: context.hover?.contents ?? null,
-    definitions,
-    diagnostics,
-    codeActions: codeActions.items,
-    codeActionEvidence: codeActions.metadata,
-    unavailableSections: dedupe(unavailableSections),
-  });
+  const assembly = assembleInspectResult(
+    {
+      relPath,
+      line: input.line,
+      character: input.character,
+      confidence,
+      node: context.nodeInfo,
+      enclosingSymbol: enclosing
+        ? {
+            name: enclosing.name,
+            kind: enclosing.kind,
+            startLine: enclosing.startLine,
+            endLine: enclosing.endLine,
+          }
+        : null,
+      hover: context.hover?.contents ?? null,
+      definitions,
+      diagnostics,
+      codeActions: codeActions.items,
+      codeActionEvidence: codeActions.metadata,
+      unavailableSections: dedupe(unavailableSections),
+    },
+    nextQueries,
+  );
+  const content = renderInspectResult(assembly);
 
   return {
     content,
-    details: {
-      confidence,
-      focusTarget: `${relPath}:${input.line}:${input.character}`,
-      unavailableSections: dedupe(unavailableSections),
-      evidenceLists: [codeActions.metadata],
-      nextQueries,
-    },
+    details: assembly.details,
   };
 }
 

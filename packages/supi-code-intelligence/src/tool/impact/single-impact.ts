@@ -10,7 +10,8 @@ import { summarizePrioritySignalsForFiles } from "../../analysis/signals/project
 import type { ResolvedTargetData } from "../../analysis/target/types.ts";
 import { buildTestAnchorMap } from "../../analysis/tests/likely-tests.ts";
 import type { CodeIntelResult } from "../../types/index.ts";
-import { analyzeReferenceImpact, buildDetailsData, computeOmittedCount } from "./analysis.ts";
+import { assembleImpactDetails } from "../result/impact.ts";
+import { analyzeReferenceImpact, computeOmittedCount } from "./analysis.ts";
 import { renderImpactSingle } from "./markdown.ts";
 import type { ImpactInput } from "./types.ts";
 
@@ -58,7 +59,7 @@ export async function executeSingleImpact(
     items: refs.refs,
     maxResults,
   }).metadata;
-  const detailsData = buildDetailsData(
+  const detailsData = assembleImpactDetails(
     analysis,
     refs.refs.length,
     computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, input.maxResults),

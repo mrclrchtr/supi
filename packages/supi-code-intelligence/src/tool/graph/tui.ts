@@ -15,6 +15,7 @@ import {
   renderEvidenceLines,
   renderMarkdownDetail,
   renderPartial,
+  renderStructuredDetailBody,
   type ToolResult,
 } from "../../ui/tui/common.ts";
 import type { CodeGraphToolParams, GraphRelation } from "./execute.ts";
@@ -83,6 +84,7 @@ export function renderGraphResult(
     container.addChild(buildTestsSection(details.tests as Record<string, unknown>, theme));
   }
 
+  renderStructuredDetailBody(container, details ?? undefined, theme);
   renderMarkdownDetail(container, result, theme);
 
   return container;

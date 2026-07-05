@@ -15,8 +15,9 @@ import {
   runRipgrepDetailed,
   toDisplayPath,
 } from "../../analysis/search/ripgrep.ts";
-import type { CodeIntelResult, SearchDetails } from "../../types/index.ts";
+import type { CodeIntelResult } from "../../types/index.ts";
 import type { CodeQueryParams } from "../params.ts";
+import { assembleFindResult } from "../result/find.ts";
 import {
   renderPatternResults,
   renderPatternSummary,
@@ -97,14 +98,18 @@ export async function executePattern(
       });
 
   if (typeof matches === "string") {
-    const errorDetails: SearchDetails = {
-      confidence: "unavailable",
-      scope: input.path ?? null,
-      candidateCount: 0,
-      omittedCount: 0,
-      nextQueries: ["Fix the regex pattern and retry"],
+    return {
+      content: matches,
+      details: {
+        type: "search",
+        data: assembleFindResult({
+          confidence: "unavailable",
+          scope: input.path ?? null,
+          candidateCount: 0,
+          nextQueries: ["Fix the regex pattern and retry"],
+        }),
+      },
     };
-    return { content: matches, details: { type: "search", data: errorDetails } };
   }
 
   if (matches.length === 0) {
@@ -123,7 +128,7 @@ export async function executePattern(
       }
     : renderPatternResults(input.pattern, relScope, displayMatches, maxResults);
 
-  const details: SearchDetails = {
+  const details = assembleFindResult({
     confidence: "heuristic",
     scope: input.path ?? null,
     candidateCount: matches.length,
@@ -132,7 +137,7 @@ export async function executePattern(
     nextQueries: input.regex
       ? ["Set `regex: false` for literal matching"]
       : ["Set `regex: true` for regex matching"],
-  };
+  });
   return { content: rendered.content, details: { type: "search" as const, data: details } };
 }
 
@@ -164,14 +169,18 @@ async function executeStructuredSearch(
   );
 
   if (typeof structured === "string") {
-    const errorDetails: SearchDetails = {
-      confidence: "unavailable",
-      scope: input.path ?? null,
-      candidateCount: 0,
-      omittedCount: 0,
-      nextQueries: ["Fix the regex pattern and retry"],
+    return {
+      content: structured,
+      details: {
+        type: "search",
+        data: assembleFindResult({
+          confidence: "unavailable",
+          scope: input.path ?? null,
+          candidateCount: 0,
+          nextQueries: ["Fix the regex pattern and retry"],
+        }),
+      },
     };
-    return { content: structured, details: { type: "search", data: errorDetails } };
   }
 
   if (!structured || structured.matches.length === 0) {
@@ -186,7 +195,7 @@ async function executeStructuredSearch(
       content,
       details: {
         type: "search",
-        data: {
+        data: assembleFindResult({
           confidence: "structural",
           scope: input.path ?? null,
           candidateCount: 0,
@@ -195,7 +204,7 @@ async function executeStructuredSearch(
             "Try a broader `pattern`, or omit `kind` for plain text search",
             "Narrow `path` if the structured scan was partial",
           ],
-        },
+        }),
       },
     };
   }
@@ -206,7 +215,7 @@ async function executeStructuredSearch(
     content: rendered.content,
     details: {
       type: "search",
-      data: {
+      data: assembleFindResult({
         confidence: "structural",
         scope: input.path ?? null,
         candidateCount: structured.matches.length,
@@ -222,7 +231,7 @@ async function executeStructuredSearch(
                 "Omit `kind` for plain text matches",
                 "Widen `scope` or raise `maxResults` for broader coverage",
               ],
-      },
+      }),
     },
   };
 }
@@ -236,15 +245,14 @@ function hasRegexChars(pattern: string): boolean {
 }
 
 function formatEmptyResult(input: PatternInput, relScope: string): CodeIntelResult {
-  const emptyDetails: SearchDetails = {
+  const emptyDetails = assembleFindResult({
     confidence: "heuristic",
     scope: input.path ?? null,
     candidateCount: 0,
-    omittedCount: 0,
     nextQueries: input.regex
       ? ["Set `regex: false` for literal matching"]
       : ["Set `regex: true` for regex matching"],
-  };
+  });
   const hint = input.regex
     ? ""
     : hasRegexChars(input.pattern)

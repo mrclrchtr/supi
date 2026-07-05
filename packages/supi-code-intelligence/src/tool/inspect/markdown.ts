@@ -1,46 +1,9 @@
-import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import {
-  type EvidenceListMetadata,
-  renderEvidenceListMetadataDisclosure,
-} from "../../analysis/evidence.ts";
-
-export interface InspectRenderInput {
-  relPath: string;
-  line: number;
-  character: number;
-  confidence: ConfidenceMode;
-  node: {
-    type: string;
-    text: string;
-    startLine: number;
-    startCharacter: number;
-    ancestry?: Array<
-      | string
-      | {
-          type: string;
-          startLine: number;
-          startCharacter: number;
-          endLine?: number;
-          endCharacter?: number;
-        }
-    >;
-  } | null;
-  enclosingSymbol: {
-    name: string;
-    kind: string;
-    startLine: number;
-    endLine: number;
-  } | null;
-  hover: string | null;
-  definitions: Array<{ file: string; line: number; character: number }>;
-  diagnostics: Array<{ line: number; severity: number | string; message: string }>;
-  codeActions: Array<{ title: string; kind?: string }>;
-  codeActionEvidence?: EvidenceListMetadata;
-  unavailableSections: string[];
-}
+import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
+import type { InspectResultAssembly } from "../result/inspect.ts";
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: inspect rendering keeps section ordering and unavailable-state handling explicit
-export function renderInspectResult(input: InspectRenderInput): string {
+export function renderInspectResult(assembly: InspectResultAssembly): string {
+  const input = assembly.data;
   const lines: string[] = [];
   lines.push(`# Inspect: ${input.relPath}:${input.line}:${input.character}`);
   lines.push("");

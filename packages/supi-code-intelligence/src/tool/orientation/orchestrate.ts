@@ -19,6 +19,7 @@ import type {
   OrientationTarget,
   OrientationUseCaseResult,
 } from "../../ui/markdown/types.ts";
+import { assembleOrientationDetails } from "../result/orientation.ts";
 import { type RenderedOrientationSection, renderOrientationResult } from "./markdown.ts";
 
 const DEFAULT_TARGET_SECTIONS: OrientationSection[] = ["defs", "docs", "diagnostics"];
@@ -59,15 +60,13 @@ async function executeOrientationContext(
     lspService: deps.lspService,
   });
 
-  const details: ContextDetails = {
+  const details: ContextDetails = assembleOrientationDetails({
     confidence: result.details.confidence,
-    task: null,
     focusTarget: input.focus ?? null,
-    requestedSections: [],
     renderedSections: ["orientation"],
     omittedCount: result.details.omittedCount,
     nextQueries: result.details.nextQueries,
-  };
+  });
 
   return {
     content: result.content,
@@ -107,15 +106,13 @@ async function executeTargetOrientation(
       ? "structural"
       : "unavailable";
 
-  const details: ContextDetails = {
+  const details: ContextDetails = assembleOrientationDetails({
     confidence,
-    task: null,
     focusTarget,
     requestedSections,
     renderedSections: sections.map((section) => section.key),
-    omittedCount: 0,
     nextQueries: buildNextQueries(input.target, deps.cwd),
-  };
+  });
 
   return {
     content: renderOrientationResult({

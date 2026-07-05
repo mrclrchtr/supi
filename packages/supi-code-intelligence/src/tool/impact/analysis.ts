@@ -4,7 +4,6 @@
 import * as path from "node:path";
 import type { buildArchitectureModel } from "../../analysis/architecture/discovery.ts";
 import { findModuleForPath, getDependents } from "../../analysis/architecture/model.ts";
-import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import type { ReferenceCollection } from "../../analysis/references/semantic-refs.ts";
 import type { ResolvedTargetData } from "../../analysis/target/types.ts";
@@ -16,7 +15,6 @@ import {
   type TestAnchorMap,
 } from "../../analysis/tests/likely-tests.ts";
 import { buildTestSurfaceDetails } from "../../analysis/tests/test-discovery.ts";
-import type { AffectedDetails, ImpactDetails } from "../../types/index.ts";
 import type { ImpactAnalysis } from "./types.ts";
 
 // ── Shared analysis ────────────────────────────────────────────────────
@@ -219,29 +217,4 @@ export function computeOmittedCount(
   maxResults?: number,
 ): number {
   return externalRefs + Math.max(0, affectedFileCount - (maxResults ?? 8));
-}
-
-// biome-ignore lint/complexity/useMaxParams: detail assembly keeps shared counts, queries, and signals explicit for both surfaces
-export function buildDetailsData(
-  analysis: ImpactAnalysis,
-  directCount: number,
-  omittedCount: number,
-  nextQueries: string[],
-  prioritySignals: AffectedDetails["prioritySignals"],
-  evidenceLists: EvidenceListMetadata[] = [],
-): AffectedDetails | ImpactDetails {
-  return {
-    confidence: analysis.confidence,
-    directCount,
-    downstreamCount: analysis.downstreamCount,
-    riskLevel: analysis.riskLevel,
-    checkNext: analysis.checkNext,
-    likelyTests: analysis.likelyTests,
-    likelyTestCommands: analysis.likelyTestCommands,
-    omittedCount,
-    evidenceLists,
-    nextQueries,
-    prioritySignals,
-    tests: analysis.tests,
-  };
 }

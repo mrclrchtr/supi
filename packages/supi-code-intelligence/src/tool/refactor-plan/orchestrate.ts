@@ -17,7 +17,6 @@ import {
   type SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { toLspPosition } from "@mrclrchtr/supi-lsp/api";
-import { createEvidenceList } from "../../analysis/evidence.ts";
 import { validateEdit } from "../../analysis/refactor/safety.ts";
 import { normalizePath } from "../../analysis/search/ripgrep.ts";
 import {
@@ -28,6 +27,7 @@ import {
 import type { WorkspaceCodeIntelligenceSession } from "../../session/session.ts";
 import type { CodeIntelResult } from "../../types/index.ts";
 import { unavailableSearchDetails } from "../infra/error-results.ts";
+import { assembleRefactorPlanDetails } from "../result/refactor.ts";
 import { renderRefactorPlanResult } from "./markdown.ts";
 
 type CanonicalRefactorOperation = Exclude<RefactorOperation, "rename">;
@@ -125,25 +125,13 @@ export async function executeRefactorPlan(
   };
   deps.session.storePlan(plan);
 
-  const editEvidence = createEvidenceList({
-    key: "refactor.edits",
-    items: refactorResult.edits.edits,
-    maxResults: 5,
-  }).metadata;
   const content = renderRefactorPlanResult(plan, deps.cwd);
 
   return {
     content,
     details: {
       type: "search" as const,
-      data: {
-        confidence: "semantic" as const,
-        scope: null,
-        candidateCount: refactorResult.edits.edits.length,
-        omittedCount: editEvidence.omittedCount ?? 0,
-        evidenceLists: [editEvidence],
-        nextQueries: [`Use code_refactor_apply with planId: "${planId}" to apply this refactor`],
-      },
+      data: assembleRefactorPlanDetails(refactorResult.edits, planId),
     },
   };
 }

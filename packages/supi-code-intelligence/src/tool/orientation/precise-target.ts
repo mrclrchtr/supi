@@ -15,6 +15,7 @@ import type { TargetStoreEntry } from "../../session/target-store.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx, ContextDetails } from "../../types/index.ts";
 import { orientationCoordinateRules } from "../infra/cross-field.ts";
 import { unavailableContextDetails } from "../infra/error-results.ts";
+import { assembleOrientationDetails } from "../result/orientation.ts";
 import { prepareOrientationDeps } from "./deps.ts";
 import type { CodeOrientationToolParams } from "./execute.ts";
 import { executeOrientation } from "./orchestrate.ts";
@@ -230,12 +231,8 @@ function disambiguationResult(
     lines.push(`   Target ID: \`${c.targetId}\``);
   }
 
-  const details: ContextDetails = {
+  const details: ContextDetails = assembleOrientationDetails({
     confidence: "semantic",
-    task: null,
-    focusTarget: null,
-    requestedSections: [],
-    renderedSections: [],
     omittedCount: outcome.omittedCount,
     candidates: outcome.candidates.map((c) => ({
       targetId: c.targetId,
@@ -250,7 +247,7 @@ function disambiguationResult(
     nextQueries: [
       "Use `focus` + `line` + `character` for one of the candidates above (pass the identifier coordinate)",
     ],
-  };
+  });
 
   return { content: lines.join("\n"), details: { type: "context", data: details } };
 }

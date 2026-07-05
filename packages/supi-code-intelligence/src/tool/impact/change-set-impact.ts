@@ -10,7 +10,8 @@ import type { ResolvedTargetData } from "../../analysis/target/types.ts";
 import type { ChangeSetFileEntry } from "../../analysis/tests/likely-tests.ts";
 import { normalizeChangeSet } from "../../analysis/tests/likely-tests.ts";
 import type { CodeIntelResult } from "../../types/index.ts";
-import { analyzeChangeSet, buildDetailsData, type ChangeSetSemanticImpact } from "./analysis.ts";
+import { assembleImpactDetails } from "../result/impact.ts";
+import { analyzeChangeSet, type ChangeSetSemanticImpact } from "./analysis.ts";
 import { renderChangeSetImpact } from "./markdown.ts";
 import { unavailableImpactResult } from "./result.ts";
 import type { ImpactAnalysis, ImpactInput } from "./types.ts";
@@ -59,7 +60,7 @@ export async function executeChangeSetImpact(
       prioritySignals,
     }) + evidenceNote;
 
-  const detailsData = buildDetailsData(
+  const detailsData = assembleImpactDetails(
     analysis,
     changeSetFiles.length,
     0,

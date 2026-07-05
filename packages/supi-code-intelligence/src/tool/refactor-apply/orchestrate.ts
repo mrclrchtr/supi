@@ -15,6 +15,7 @@ import type { WorkspaceCodeIntelligenceSession } from "../../session/session.ts"
 import type { CodeIntelResult } from "../../types/index.ts";
 import { unavailableSearchDetails } from "../infra/error-results.ts";
 import { renderRefactorApplyResult } from "../refactor-plan/markdown.ts";
+import { assembleRefactorApplyDetails } from "../result/refactor.ts";
 import { applyWorkspaceEdit } from "./apply.ts";
 
 export interface RefactorApplyInput {
@@ -77,13 +78,7 @@ export async function executeRefactorApply(
     content,
     details: {
       type: "search" as const,
-      data: {
-        confidence: "semantic" as const,
-        scope: null,
-        candidateCount: applyResult.kind === "applied" ? applyResult.totalEdits : 0,
-        omittedCount: 0,
-        nextQueries: ["`code_health` to check for new issues after the refactor"],
-      },
+      data: assembleRefactorApplyDetails(applyResult),
     },
   };
 }

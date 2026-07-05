@@ -8,7 +8,8 @@ import { summarizePrioritySignalsForFiles } from "../../analysis/signals/project
 import type { ResolvedTargetGroupData } from "../../analysis/target/types.ts";
 import { buildTestAnchorMap } from "../../analysis/tests/likely-tests.ts";
 import type { CodeIntelResult } from "../../types/index.ts";
-import { analyzeReferenceImpact, buildDetailsData, computeOmittedCount } from "./analysis.ts";
+import { assembleImpactDetails } from "../result/impact.ts";
+import { analyzeReferenceImpact, computeOmittedCount } from "./analysis.ts";
 import { renderImpactFileLevel } from "./markdown.ts";
 import type { ImpactInput } from "./types.ts";
 
@@ -60,7 +61,7 @@ export async function executeFileLevelImpact(
     cwd,
   });
 
-  const detailsData = buildDetailsData(
+  const detailsData = assembleImpactDetails(
     analysis,
     aggregated.refs.length,
     computeOmittedCount(analysis.externalRefs, analysis.affectedFiles.size, input.maxResults),

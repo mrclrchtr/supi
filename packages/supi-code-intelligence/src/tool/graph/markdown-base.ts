@@ -5,10 +5,10 @@ import {
   type EvidenceListMetadata,
   renderEvidenceListDisclosure,
 } from "../../analysis/evidence.ts";
-import { type ReadNextItem, renderReadNextSection } from "../../analysis/read-next.ts";
+import { renderReadNextSection } from "../../analysis/read-next.ts";
 import type { ReferenceCollection } from "../../analysis/references/semantic-refs.ts";
 import { formatReferenceList } from "../../analysis/references/semantic-refs.ts";
-import type { TestSurfaceDetails } from "../../analysis/tests/test-discovery.ts";
+import type { GraphResultAssembly, GraphSection } from "../result/graph.ts";
 
 // ── Callers ──────────────────────────────────────────────────────────
 
@@ -152,46 +152,14 @@ export function renderExportsResult(
 
 // ── Combined graph ───────────────────────────────────────────────────
 
-/** Relation families accepted by code_graph. */
-export type GraphRelationKind =
-  | "all"
-  | "references"
-  | "callees"
-  | "imports"
-  | "exports"
-  | "implements"
-  | "tests";
-
-/** A section in the combined graph output. */
-export type GraphSection =
-  | {
-      kind: "ok";
-      rel: GraphRelationKind;
-      count: number;
-      content: string;
-      evidenceLists?: EvidenceListMetadata[];
-      tests?: TestSurfaceDetails;
-      readNext?: ReadNextItem[];
-    }
-  | { kind: "unavailable"; rel: GraphRelationKind; message: string; tests?: TestSurfaceDetails }
-  | {
-      kind: "not-implemented";
-      rel: GraphRelationKind;
-      message: string;
-      tests?: TestSurfaceDetails;
-    };
-
 /**
- * Render a combined graph result from multiple relation sections.
+ * Render an assembled graph result.
  *
  * Produces a unified markdown output with a summary header, per-section
  * pre-rendered content, and a footer with follow-up hints.
  */
-export function renderGraphResult(
-  displayName: string,
-  sections: GraphSection[],
-  resolvedFile: string,
-): string {
+export function renderGraphResult(assembly: GraphResultAssembly): string {
+  const { displayName, sections, resolvedDisplayFile: resolvedFile } = assembly;
   const lines: string[] = [];
 
   // Header

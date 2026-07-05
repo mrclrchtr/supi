@@ -19,12 +19,13 @@ import {
   renderRankedTestLabelsForMarkdown,
 } from "../../analysis/tests/test-discovery.ts";
 import type { AnchorKind } from "../../session/target-store.ts";
+import type { GraphSection } from "../result/graph.ts";
 import { collectCallees } from "./callees.ts";
 import { renderCallsResult } from "./calls-md.ts";
 import type { GraphRelation } from "./execute.ts";
 import { collectImplementations } from "./implementations.ts";
 import { renderImplementationsResult } from "./implementations-md.ts";
-import { type GraphSection, renderExportsResult, renderImportsResult } from "./markdown-base.ts";
+import { renderExportsResult, renderImportsResult } from "./markdown-base.ts";
 import { collectCallers } from "./references.ts";
 import { renderReferencesResult } from "./references-md.ts";
 import type { CallEntry } from "./types.ts";

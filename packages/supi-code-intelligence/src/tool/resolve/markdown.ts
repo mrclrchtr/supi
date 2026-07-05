@@ -7,11 +7,9 @@
 
 import { relative } from "node:path";
 import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
-import type {
-  DisambiguationCandidate,
-  ResolveServiceResult,
-} from "../../analysis/target/service.ts";
+import type { DisambiguationCandidate } from "../../analysis/target/service.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
+import type { ResolveResultAssembly } from "../result/resolve.ts";
 
 /**
  * Render a provenance note for an anchored resolution, but only when the
@@ -57,8 +55,9 @@ function renderSingleTarget(t: TargetStoreEntry, confidence: string, cwd: string
   return lines;
 }
 
-/** Render a full resolve service result into markdown. */
-export function renderResolveResult(result: ResolveServiceResult, cwd: string): string {
+/** Render an assembled resolve result into markdown. */
+export function renderResolveResult(assembly: ResolveResultAssembly): string {
+  const { result, cwd } = assembly;
   switch (result.kind) {
     case "resolved":
       return renderResolved(result.targets, result.omittedCount, result.confidence, cwd);

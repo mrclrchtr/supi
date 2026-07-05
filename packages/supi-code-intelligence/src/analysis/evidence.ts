@@ -1,3 +1,16 @@
+/**
+ * Evidence-list helpers — the shared leaf utility for bounded tool-evidence
+ * collections with explicit completeness metadata.
+ *
+ * These helpers (types, builders, disclosure renderers) are consumed by both
+ * the `analysis/` layer (brief/reference/git formatters that produce markdown
+ * fragments) and the `tool/` layer (markdown/TUI renderers and tool-result
+ * assembly). They live here, at the lower layer, so `analysis/` never imports
+ * upward into `tool/`. The tool-result *assembly* (`assemble*` functions and
+ * details types) lives in `src/tool/result/`; this module is the shared
+ * evidence-list primitive beneath it.
+ */
+
 export type EvidencePartialReason = "timeout" | "safety-limit" | "interrupted" | "provider-limited";
 
 export interface EvidenceListMetadata {

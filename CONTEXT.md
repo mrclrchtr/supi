@@ -96,6 +96,10 @@ _Avoid_: silent truncation, hidden caps, treating capped output as complete evid
 The facts in a public code-intelligence result that a user or agent may rely on to make a coding decision, such as matched targets, references, diagnostics, test files, test labels, imports, exports, callees, implementations, affected files, source-file listings, dependency facts, planned refactor edits, or exposed code-action facts. Decorative summaries, next-step hints, and UI-only chrome are not tool evidence.
 _Avoid_: treating every rendered list as evidence, hiding evidence limits in presentation details
 
+**Tool result assembly**:
+The code-intelligence flow that turns collected facts into public result evidence: typed result sections, evidence lists, omission metadata, confidence, read-next guidance, and details data. Tool result assembly stops before presentation; markdown and TUI rendering are adapters over the assembled evidence.
+_Avoid_: markdown-first result building, generic result builder, mixing evidence collection with rendering
+
 **Evidence list**:
 A bounded collection of tool evidence with explicit completeness metadata: which evidence atoms are shown and whether the list is complete. Normal public-tool paths compute exact totals and omitted counts. Unknown totals are reserved for exceptional interruption or provider-limited results, such as timeout, safety-limit, interrupted enumeration, or an upstream provider that cannot expose a true total, and must carry an explicit partial reason instead of pretending exact completeness. Markdown and structured details should describe the same evidence list rather than computing truncation separately.
 _Avoid_: raw capped arrays, renderer-only omission math, details-only omission math, inventing exact totals, using unknown totals as a routine performance shortcut

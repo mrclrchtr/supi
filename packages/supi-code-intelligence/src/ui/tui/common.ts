@@ -147,9 +147,9 @@ function buildExpandedView(
   if (lists && lists.length > 0) {
     container.addChild(new Spacer(1));
     renderEvidenceLines(container, lists, theme);
-    container.addChild(new Spacer(1));
   }
 
+  renderStructuredDetailBody(container, data, theme);
   renderMarkdownDetail(container, result, theme);
 
   return container;
@@ -187,6 +187,50 @@ export function buildSimpleCompact(
   }
 
   return new Text(segments.join(` ${dot} `), 0, 0);
+}
+
+export function renderStructuredDetailBody(
+  container: Container,
+  data: Record<string, unknown> | undefined,
+  theme: Theme,
+): void {
+  if (!data) return;
+  const lines = structuredDetailLines(data);
+  if (lines.length === 0) return;
+  container.addChild(new Spacer(1));
+  for (const line of lines) {
+    container.addChild(new Text(theme.fg("muted", line), 0, 0));
+  }
+}
+
+function structuredDetailLines(data: Record<string, unknown>): string[] {
+  const lines: string[] = [];
+  const focusTarget = data.focusTarget;
+  if (typeof focusTarget === "string" && focusTarget.length > 0) {
+    lines.push(`target: ${focusTarget}`);
+  }
+
+  const unavailable = data.unavailableSections;
+  if (Array.isArray(unavailable) && unavailable.length > 0) {
+    lines.push(`unavailable: ${unavailable.join(", ")}`);
+  }
+
+  const checkNext = data.checkNext;
+  if (Array.isArray(checkNext) && checkNext.length > 0) {
+    lines.push(`check next: ${checkNext.slice(0, 3).join(" · ")}`);
+  }
+
+  const likelyTests = data.likelyTests;
+  if (Array.isArray(likelyTests) && likelyTests.length > 0) {
+    lines.push(`likely tests: ${likelyTests.slice(0, 3).join(" · ")}`);
+  }
+
+  const nextQueries = data.nextQueries;
+  if (Array.isArray(nextQueries) && nextQueries.length > 0) {
+    lines.push(`next: ${nextQueries.slice(0, 2).join(" · ")}`);
+  }
+
+  return lines;
 }
 
 export function buildSimpleHeader(

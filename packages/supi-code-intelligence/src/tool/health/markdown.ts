@@ -5,77 +5,19 @@
  * readable markdown sections keyed by requested `include` values.
  */
 
-import type { CoverageWarningReport } from "../../analysis/coverage/coverage-warnings.ts";
-import type { GitContext } from "../../analysis/signals/git.ts";
 import { formatGitContext } from "../../analysis/signals/git.ts";
+import type { HealthData, HealthResultAssembly } from "../result/health.ts";
 
-export type HealthSection = "diagnostics" | "servers" | "dirty" | "coverage" | "unused";
+export type {
+  CodeActionSuggestion,
+  HealthCoverageData,
+  HealthData,
+  HealthSection,
+  HealthUnusedData,
+} from "../result/health.ts";
 
-export interface HealthServerInfo {
-  name: string;
-  root: string;
-  fileTypes: string[];
-  status: string;
-}
-
-export interface HealthDiagnosticEntry {
-  file: string;
-  errors: number;
-  warnings: number;
-}
-
-export interface HealthCoverageEntry {
-  file: string;
-  pct: number;
-}
-
-export interface HealthCoverageData {
-  available: boolean;
-  entries: HealthCoverageEntry[];
-}
-
-export interface HealthUnusedExportEntry {
-  file: string;
-  name: string;
-}
-
-export interface HealthUnusedData {
-  available: boolean;
-  files: string[];
-  exports: HealthUnusedExportEntry[];
-}
-
-/** A suggested code action at a specific diagnostic location. */
-export interface CodeActionSuggestion {
-  file: string;
-  line: number;
-  title: string;
-  kind?: string;
-}
-
-export interface HealthData {
-  includedSections: HealthSection[];
-  lspAvailable: boolean;
-  lspStatus: string;
-  recovered: boolean;
-  /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */
-  structuralStatus?: string;
-  diagnostics: HealthDiagnosticEntry[];
-  servers: HealthServerInfo[];
-  gitContext: GitContext | null;
-  scopeFilter: string | null;
-  level: "summary" | "detailed";
-  /** Code action suggestions collected from LSP (only populated in detailed mode). */
-  codeActions: CodeActionSuggestion[] | null;
-  coverage: HealthCoverageData | null;
-  unused: HealthUnusedData | null;
-  /** Coverage warnings for degraded semantic/structural substrate. Undefined when fully healthy. */
-  degradedCoverage?: CoverageWarningReport;
-  /** Seconds since diagnostics were last refreshed, or undefined if never refreshed. */
-  diagnosticAgeSeconds?: number;
-}
-
-export function renderHealthResult(data: HealthData, cwd: string): string {
+export function renderHealthResult(result: HealthResultAssembly, cwd: string): string {
+  const data = result.data;
   const lines: string[] = ["## Code Health", ""];
 
   renderStatusLine(lines, data);

@@ -17,6 +17,7 @@ import type { CodeIntelResult } from "../../types/index.ts";
 import { searchErrorResult } from "../infra/error-results.ts";
 import { emitToolProgress } from "../infra/progress.ts";
 import { renderSemanticReadinessTimeout } from "../infra/readiness-message.ts";
+import { assembleGraphResult } from "../result/graph.ts";
 import { type CollectRelationOptions, collectRelation } from "./collect-relation.ts";
 import type { GraphRelation } from "./execute.ts";
 import { renderGraphResult } from "./markdown-base.ts";
@@ -231,46 +232,19 @@ function buildGraphResult(
   resolvedDisplayFile: string,
   scope: string | undefined,
 ): CodeIntelResult {
-  const content = renderGraphResult(displayName, sections, resolvedDisplayFile);
-
-  const hasStructural = sections.some(
-    (s) =>
-      s.kind === "ok" &&
-      (s.rel === "callees" ||
-        s.rel === "imports" ||
-        s.rel === "exports" ||
-        (s.rel === "tests" && s.count > 0)),
-  );
-  const hasSemantic = sections.some(
-    (s) => s.kind === "ok" && (s.rel === "references" || s.rel === "implements"),
-  );
-  const confidence = hasSemantic ? "semantic" : hasStructural ? "structural" : "unavailable";
-
-  const tests = sections.find((section) => section.rel === "tests")?.tests;
-  const evidenceLists = sections.flatMap((section) =>
-    section.kind === "ok" ? (section.evidenceLists ?? []) : [],
-  );
-  const omittedCount = evidenceLists.reduce(
-    (sum, evidenceList) => sum + (evidenceList.omittedCount ?? 0),
-    0,
-  );
+  const assembly = assembleGraphResult({
+    displayName,
+    sections,
+    resolvedDisplayFile,
+    scope,
+  });
+  const content = renderGraphResult(assembly);
 
   return {
     content,
     details: {
       type: "search",
-      data: {
-        confidence,
-        scope: scope ?? null,
-        candidateCount: sections.reduce((sum, s) => (s.kind === "ok" ? sum + s.count : sum), 0),
-        omittedCount,
-        evidenceLists,
-        nextQueries: [
-          "`code_orientation` on individual results for deeper orientation",
-          "`code_impact` for impact analysis",
-        ],
-        tests,
-      },
+      data: assembly.details,
     },
   };
 }

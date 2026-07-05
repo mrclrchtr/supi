@@ -6,6 +6,7 @@ import type {
 } from "../../../src/analysis/target/service.ts";
 import type { TargetStoreEntry } from "../../../src/session/target-store.ts";
 import { renderResolveResult } from "../../../src/tool/resolve/markdown.ts";
+import { assembleResolveResult } from "../../../src/tool/result/resolve.ts";
 import type { AnchoredResolutionMetadata } from "../../../src/types/index.ts";
 
 const CWD = "/cwd";
@@ -52,7 +53,7 @@ describe("renderResolveResult — anchored resolution notes", () => {
       nextQueries: [],
     };
 
-    const md = renderResolveResult(result, "/cwd");
+    const md = renderResolveResult(assembleResolveResult(result, "/cwd"));
 
     expect(md).toContain("Target ID:");
     expect(md).toContain("Span ID:");
@@ -77,7 +78,7 @@ describe("renderResolveResult — anchored resolution notes", () => {
       nextQueries: [],
     };
 
-    const md = renderResolveResult(result, "/cwd");
+    const md = renderResolveResult(assembleResolveResult(result, "/cwd"));
 
     expect(md).toContain("Target ID:");
     expect(md).not.toContain("snapped");
@@ -93,7 +94,7 @@ describe("renderResolveResult — anchored resolution notes", () => {
       nextQueries: [],
     };
 
-    const md = renderResolveResult(result, "/cwd");
+    const md = renderResolveResult(assembleResolveResult(result, "/cwd"));
 
     expect(md).toContain("Target ID:");
     expect(md).not.toContain("snapped");
@@ -114,7 +115,7 @@ describe("renderResolveResult — anchored resolution notes", () => {
       nextQueries: [],
     };
 
-    const md = renderResolveResult(result, "/cwd");
+    const md = renderResolveResult(assembleResolveResult(result, "/cwd"));
 
     expect(md).toContain("snapped");
     expect(md).toContain("structural");
@@ -157,7 +158,7 @@ describe("renderResolveResult — anchored resolution notes", () => {
       nextQueries: [],
     };
 
-    const md = renderResolveResult(result, "/cwd");
+    const md = renderResolveResult(assembleResolveResult(result, "/cwd"));
 
     expect(md).toContain("Multiple matches");
     expect(md).toContain("tg-a");

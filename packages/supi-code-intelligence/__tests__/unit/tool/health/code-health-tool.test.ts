@@ -17,6 +17,7 @@ import {
   type HealthData,
   renderHealthResult,
 } from "../../../../src/tool/health/markdown.ts";
+import { assembleHealthResult } from "../../../../src/tool/result/health.ts";
 import { clearMockRuntime, registerMockProvider } from "../../../helpers/register-mock-runtime.ts";
 
 const mockLspFns = vi.hoisted(() => ({
@@ -636,7 +637,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: actions,
     });
 
-    const result = renderHealthResult(data, "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
     expect(result).toContain("### Code Actions");
     expect(result).toContain("Remove unused import");
@@ -648,7 +649,7 @@ describe("renderHealthResult code actions", () => {
   it("renders structural readiness in the status line when structuralStatus is set", () => {
     const data = makeBaseData({ lspStatus: "ready", structuralStatus: "ready" });
 
-    const result = renderHealthResult(data, "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
     expect(result).toContain("**LSP**: ready");
     expect(result).toContain("**Structural**: ready");
@@ -657,7 +658,7 @@ describe("renderHealthResult code actions", () => {
   it("omits the structural status line when structuralStatus is unset", () => {
     const data = makeBaseData({ lspStatus: "ready" });
 
-    const result = renderHealthResult(data, "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
     expect(result).toContain("**LSP**: ready");
     expect(result).not.toContain("**Structural**");
@@ -669,7 +670,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: null,
     });
 
-    const result = renderHealthResult(data, "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
     expect(result).not.toContain("### Code Actions");
     expect(result).not.toContain("suggestions only");
@@ -681,7 +682,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: [],
     });
 
-    const result = renderHealthResult(data, "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
     expect(result).not.toContain("### Code Actions");
   });
@@ -699,7 +700,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: actions,
     });
 
-    const result = renderHealthResult(data, "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
     // Summary mode doesn't call renderDiagnosticDetails, so no code actions section
     expect(result).not.toContain("### Code Actions");

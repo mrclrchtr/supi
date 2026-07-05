@@ -11,7 +11,8 @@ import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { createEvidenceList, renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import { normalizePath } from "../../analysis/search/ripgrep.ts";
-import type { CodeIntelResult, SearchDetails } from "../../types/index.ts";
+import type { CodeIntelResult } from "../../types/index.ts";
+import { assembleFindResult } from "../result/find.ts";
 import type { PatternInput } from "./orchestrate.ts";
 
 export async function executeSemanticSearch(
@@ -51,16 +52,15 @@ function renderSemanticEmptyResult(input: PatternInput): CodeIntelResult {
     content: `**Semantic search** — \`${input.pattern}\`\n\nNo semantic results found in \`${relPath}\`.`,
     details: {
       type: "search",
-      data: {
+      data: assembleFindResult({
         confidence: "semantic",
         scope: input.path ?? null,
         candidateCount: 0,
-        omittedCount: 0,
         nextQueries: [
           'Use `mode: "text"` for literal text search',
           'Use `mode: "ast"` with `kind` for structural filtering',
         ],
-      } satisfies SearchDetails,
+      }),
     },
   };
 }
@@ -98,7 +98,7 @@ function renderSemanticResults(
     content: lines.join("\n"),
     details: {
       type: "search",
-      data: {
+      data: assembleFindResult({
         confidence: "semantic",
         scope: input.path ?? null,
         candidateCount: symbols.length,
@@ -108,7 +108,7 @@ function renderSemanticResults(
           'Use `mode: "text"` for literal text search',
           'Use `mode: "ast"` with `kind` for structural filtering',
         ],
-      } satisfies SearchDetails,
+      }),
     },
   };
 }

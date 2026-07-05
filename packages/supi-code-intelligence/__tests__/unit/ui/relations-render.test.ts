@@ -5,6 +5,7 @@ import {
   renderGraphResult,
   renderImportsResult,
 } from "../../../src/tool/graph/markdown-base.ts";
+import { assembleGraphResult } from "../../../src/tool/result/graph.ts";
 
 type RelationsResult =
   | {
@@ -109,16 +110,19 @@ describe("relations render", () => {
 
   it("renders graph result with references section and no footer", () => {
     const content = renderGraphResult(
-      "widget",
-      [
-        {
-          kind: "ok",
-          rel: "references",
-          count: 1,
-          content: "# References of `widget`\n\n- src/widget.ts:2",
-        },
-      ],
-      "src/widget.ts",
+      assembleGraphResult({
+        displayName: "widget",
+        resolvedDisplayFile: "src/widget.ts",
+        scope: undefined,
+        sections: [
+          {
+            kind: "ok",
+            rel: "references",
+            count: 1,
+            content: "# References of `widget`\n\n- src/widget.ts:2",
+          },
+        ],
+      }),
     );
 
     expect(content).toContain("# Graph of `widget`");

@@ -36,7 +36,7 @@ src/
 │   ├── search/            # Ripgrep + structured search support
 │   ├── tests/             # Companion test discovery and Vitest detection
 │   ├── provider.ts        # Composite CodeProvider over runtime semantic/structural providers
-│   ├── evidence.ts        # Evidence provenance formatting
+│   ├── evidence.ts        # Evidence-list helpers (builders, metadata, disclosure renderers)
 │   ├── helpers.ts         # Shared analysis helpers
 │   ├── read-next.ts       # Read Next guidance generation
 │   ├── refactor/          # Refactor safety validation
@@ -49,6 +49,7 @@ src/
 │   ├── register.ts        # Pi tool registration adapter
 │   ├── params.ts          # Shared param helpers
 │   ├── infra/             # Tool pipeline, validation, progress, truncation, error results
+│   ├── result/            # Tool-result assembly — per-tool evidence/details assembly + error factories
 │   └── <tool>/            # code_orientation, graph, find, health, impact, inspect, resolve, refactor-*
 ├── ui/                    # Shared UI surfaces and renderers not colocated with a tool
 │   ├── markdown/          # Overview/brief/gather markdown helpers
