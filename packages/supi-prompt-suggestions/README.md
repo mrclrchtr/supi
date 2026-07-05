@@ -22,6 +22,10 @@ pi install ./packages/supi-prompt-suggestions
 
 After install and configuration, suggested next user prompts appear as dim **ghost text** in the editor after each assistant response.
 
+<p align="center">
+  <video src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-suggestions/assets/demo.mp4" controls width="100%" alt="Demo of ghost-text prompt suggestions"></video>
+</p>
+
 - **Right Arrow** — accept the suggestion without submitting
 - **Escape** or **any keystroke** — dismiss the suggestion
 
