@@ -56,7 +56,7 @@ function renderProjectAreasHtml(insights: InsightResults): string {
       insights.projectAreas as
         | { areas?: Array<{ name: string; sessionCount: number; description: string }> }
         | undefined
-    )?.areas || [];
+    )?.areas ?? [];
 
   if (projectAreas.length === 0) return "";
 
