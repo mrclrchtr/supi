@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.6](https://github.com/mrclrchtr/supi/compare/v2.0.5...v2.0.6) (2026-07-05)
+
+
+### Bug Fixes
+
+* **deps:** update dependency typebox to v1.3.3 ([9ed0178](https://github.com/mrclrchtr/supi/commit/9ed017807fd562fa16179f27a78847b8ed000751))
+
 ## [2.0.5](https://github.com/mrclrchtr/supi/compare/v2.0.4...v2.0.5) (2026-07-03)
 
 
