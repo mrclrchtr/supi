@@ -116,35 +116,25 @@ describe("focused code intelligence tool registration", () => {
     expect(modeParam?.enum).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
 
     const kindParam = props?.kind;
-    expect(tool.description).toContain('mode: "ast"');
+    expect(tool.description).toContain('mode:"ast"');
     expect(tool.description).toContain("requires `kind`");
-    expect(tool.description).toContain("definition");
-    expect(tool.description).toContain("import");
-    expect(tool.description).toContain("export");
-    expect(tool.description).toContain("call");
+    expect(tool.description).toContain("definition/import/export/call");
     expect(tool.description).toContain("does not silently fall back");
     expect(tool.description).toContain("not by symbol identity");
+    expect(tool.description).toContain("symbol-identity-aware callers");
     expect(tool.description).not.toContain("advisory-only");
 
     const guidanceText = tool.promptGuidelines?.join("\n") ?? "";
-    expect(guidanceText).toContain('code_find with `mode: "ast"` requires `kind`');
-    expect(guidanceText).toContain('code_find with `mode: "semantic"` does not fall back');
-    expect(guidanceText).toContain(
-      'code_find with `mode: "text"`, `mode: "regex"`, or `mode: "semantic"` does not accept `kind`',
-    );
-    expect(guidanceText).toContain("symbol-identity-aware callers");
+    expect(guidanceText).toContain('For code_find, pass kind only with mode:"ast"');
+    expect(guidanceText).toContain('mode:"semantic" never falls back');
+    expect(guidanceText).toContain("symbol-identity callers");
     expect(guidanceText).not.toContain("kind is ignored");
     expect(guidanceText).not.toContain("call-site matching via ripgrep");
 
-    expect(modeParam?.description).toContain('mode: "ast" requires `kind`');
-    expect(kindParam?.description).toContain('Only valid with `mode: "ast"`');
-    expect(kindParam?.description).toContain("definition");
-    expect(kindParam?.description).toContain("import");
-    expect(kindParam?.description).toContain("export");
-    expect(kindParam?.description).toContain("call");
-    expect(kindParam?.description).toContain("type");
-    expect(kindParam?.description).toContain("interface");
-    expect(kindParam?.description).toContain("not by symbol identity");
+    expect(modeParam?.description).toContain('mode:"ast" requires `kind`');
+    expect(kindParam?.description).toContain('only valid with mode:"ast"');
+    expect(kindParam?.description).not.toContain("definition");
+    expect(kindParam?.description).not.toContain("not by symbol identity");
 
     expect(kindParam?.enum).toBeDefined();
     expect(kindParam?.enum).toEqual([
@@ -230,9 +220,8 @@ describe("focused code intelligence tool registration", () => {
     expect(props).toHaveProperty("maxResults");
 
     const includeTestsParam = props?.includeTests as { description?: string } | undefined;
-    expect(includeTestsParam?.description).toContain(
-      "changeSetFiles analysis uses semantic references",
-    );
+    expect(includeTestsParam?.description).toContain("Include likely tests");
+    expect(includeTestsParam?.description).toContain("semantic references");
     expect(includeTestsParam?.description).not.toContain("no LSP/TS");
   });
 

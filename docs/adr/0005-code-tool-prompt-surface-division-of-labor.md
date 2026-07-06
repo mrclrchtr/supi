@@ -32,7 +32,7 @@ execution quality.
   not "trim" them by moving mechanics into guidelines.
 - When adding a new `code_*` tool, put the full contract in `description` and
   keep `promptGuidelines` to selection + key execution rules.
-- Tests in `extension-registration.test.ts` pin specific substrings
-  (`requires \`kind\``, the six AST kinds, `does not silently fall back`,
+- Tests in `extension-registration.test.ts` pin the high-risk prompt-contract
+  substrings (`mode:"ast"`, `does not silently fall back`,
   `not by symbol identity`, `symbol-identity-aware callers`, `code_health`
-  coverage/unused); tightening must preserve that set.
+  coverage/unused); compression must preserve those safety cues.

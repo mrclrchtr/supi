@@ -12,6 +12,10 @@ _Avoid_: token-saving layer, generic plugin collection
 A SuPi design principle: extensions should be developed with the initial context window size always in mind. Prefer concise tool descriptions, focused guidelines, and package-level installation choices so useful capability does not automatically mean a larger starting prompt.
 _Avoid_: token saving, prompt minimalism
 
+**Prompt Surface Compression**:
+A Context Efficiency practice that reduces a tool's model-facing prompt surface while preserving its callable behavior and honest usage contract.
+_Avoid_: dumbing down tools, removing capability, token shaving
+
 **Capability Family**:
 A README grouping that explains SuPi packages by the user problem they solve rather than by package internals or install order. Each family should point readers to the relevant package README files for full details.
 _Avoid_: package category, module group

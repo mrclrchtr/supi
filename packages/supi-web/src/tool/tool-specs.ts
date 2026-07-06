@@ -77,7 +77,7 @@ export const WEB_TOOL_SPECS = [
   {
     name: WEB_FETCH_MD_TOOL_NAME,
     label: "Web Fetch",
-    description: `Fetch public http(s) URL as Markdown. Not for login/private pages; ask for allowed source. auto: inline <=${WEB_FETCH_INLINE_MAX_CHARS.toLocaleString()} chars else temp; inline: may truncate; file: temp path. Links absolute by default. ${MODEL_OUTPUT_LIMIT_DESCRIPTION}`,
+    description: `Fetch public http(s) URL as Markdown. Not for login/private pages. output_mode auto inlines <=${WEB_FETCH_INLINE_MAX_CHARS.toLocaleString()} chars else temp; inline may truncate; file returns a temp path. Links are absolute by default. ${MODEL_OUTPUT_LIMIT_DESCRIPTION}`,
     promptSnippet: "web_fetch_md: public URL to Markdown",
     promptGuidelines: ["Use web_fetch_md only for public http(s); ask if login/private."],
     parameters: WebFetchMdParameters,
@@ -93,9 +93,11 @@ export const WEB_TOOL_SPECS = [
   {
     name: WEB_DOCS_FETCH_TOOL_NAME,
     label: "Web Docs Fetch",
-    description: `Fetch focused Context7 docs for known library_id; Markdown default, raw=true JSON snippets. Search first if unknown. ${MODEL_OUTPUT_LIMIT_DESCRIPTION}`,
+    description: `Fetch focused Context7 docs for a known Context7 library_id. Markdown by default; raw=true returns JSON snippets. Search first if unknown. ${MODEL_OUTPUT_LIMIT_DESCRIPTION}`,
     promptSnippet: "web_docs_fetch: focused Context7 docs",
-    promptGuidelines: ["Use web_docs_fetch with known ID and narrow query; raw only for JSON."],
+    promptGuidelines: [
+      "Use web_docs_fetch with a known library_id and narrow query; raw only for JSON.",
+    ],
     parameters: WebDocsFetchParameters,
   },
 ] as const satisfies readonly WebToolSpec[];

@@ -3,27 +3,26 @@ import { type TSchema, Type } from "typebox";
 import type { CodeIntelligenceToolName } from "../types/index.ts";
 
 const ScopeParam = Type.String({
-  description: "Workspace-relative path, package, or directory scope for the workflow query.",
+  description: "Workspace-relative file or directory scope.",
 });
 const FindScopeParam = Type.Union(
   [
     Type.String({
-      description: "Workspace-relative path, package, or directory scope for the search query.",
+      description: "Workspace-relative search scope.",
     }),
     Type.Array(
       Type.String({
-        description: "Workspace-relative path, package, or directory search scope.",
+        description: "Workspace-relative search scope.",
       }),
       {
-        description: "One or more workspace-relative paths, packages, or directories to search.",
+        description: "One or more workspace-relative search scopes.",
         minItems: 1,
         uniqueItems: true,
       },
     ),
   ],
   {
-    description:
-      "Workspace-relative path, package, directory, or array of scopes for the search query.",
+    description: "Workspace-relative search scope or scope list.",
   },
 );
 const FileParam = Type.String({ description: "Target file path." });
@@ -36,13 +35,13 @@ const CharacterParam = Type.Number({
   minimum: 1,
 });
 const MaxResultsParam = Type.Number({
-  description: "Maximum number of ranked results.",
+  description: "Maximum results.",
   minimum: 1,
 });
 const SymbolParam = Type.String({ description: "Symbol name" });
 const TargetIdParam = Type.String({
   description:
-    "Resolved target handle from `code_resolve`. Takes precedence over file/line/character/symbol.",
+    "Resolved target handle from `code_resolve`; takes precedence over other target inputs.",
 });
 const RangeParam = Type.Object(
   {
@@ -114,25 +113,23 @@ export const CodeOrientationParameters = Type.Object(
   {
     focus: Type.Optional(
       Type.String({
-        description:
-          "Workspace-relative path or discovered module name to orient around. Omit for project orientation.",
+        description: "Workspace-relative path or module name; omit for workspace orientation.",
       }),
     ),
     targetId: Type.Optional(
       Type.String({
-        description:
-          "Resolved target handle from `code_resolve`. Takes precedence over `focus`/`line`/`character`. If invalid or stale, the call errors and does not fall back to coordinates.",
+        description: "Resolved target handle; takes precedence, stale IDs error.",
       }),
     ),
     line: Type.Optional(
       Type.Number({
-        description: "1-based line for symbol orientation. Requires `focus` and `character`.",
+        description: "1-based line for symbol orientation with `focus`.",
         minimum: 1,
       }),
     ),
     character: Type.Optional(
       Type.Number({
-        description: "1-based UTF-16 column for symbol orientation. Requires `focus` and `line`.",
+        description: "1-based UTF-16 column for symbol orientation with `focus`.",
         minimum: 1,
       }),
     ),
@@ -153,8 +150,7 @@ export const CodeFindParameters = Type.Object(
     scope: Type.Optional(FindScopeParam),
     mode: Type.Optional(
       StringEnum(["text", "regex", "ast", "semantic"], {
-        description:
-          'Search mode. Omit for literal text search. mode: "ast" requires `kind`; mode: "text", mode: "regex", and mode: "semantic" do not accept `kind`.',
+        description: 'Search mode; omit for literal text. mode:"ast" requires `kind`.',
       }),
     ),
     kind: Type.Optional(
@@ -172,13 +168,12 @@ export const CodeFindParameters = Type.Object(
           "test",
         ],
         {
-          description:
-            'Only valid with `mode: "ast"`. Supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, `enum`, `test`. AST `call` matches call-site identifiers by name, not by symbol identity.',
+          description: 'AST kind; only valid with mode:"ast".',
         },
       ),
     ),
     contextLines: Type.Optional(
-      Type.Number({ description: "Context lines to include around matches.", minimum: 0 }),
+      Type.Number({ description: "Context lines around matches.", minimum: 0 }),
     ),
     maxResults: Type.Optional(MaxResultsParam),
   },
@@ -205,11 +200,10 @@ export const CodeGraphParameters = Type.Object(
     relations: Type.Optional(
       Type.Array(
         StringEnum(["all", "references", "callees", "imports", "exports", "implements", "tests"], {
-          description:
-            'Relation families to include in the graph. Use `"all"` to expand to every relation family. `callees` is direct structural outgoing-call evidence: source-shape calls in the enclosing scope, not symbol-identity resolution.',
+          description: "Relation family.",
         }),
         {
-          description: 'Requested relation families. Defaults to ["references"] when omitted.',
+          description: 'Requested relation families; defaults to ["references"].',
           uniqueItems: true,
         },
       ),
@@ -217,8 +211,7 @@ export const CodeGraphParameters = Type.Object(
     maxResults: Type.Optional(MaxResultsParam),
     calleeDepth: Type.Optional(
       StringEnum(["direct", "deep"], {
-        description:
-          'Depth for callee collection. `"direct"` (default): only direct calls from the enclosing scope, excluding nested function/callback scopes. `"deep"`: include all callees within the enclosing scope, including those inside nested scopes.',
+        description: '`"direct"` excludes nested scopes; `"deep"` includes them.',
       }),
     ),
   },
@@ -241,8 +234,7 @@ export const CodeImpactParameters = Type.Object(
     ),
     changeSetFiles: Type.Optional(
       Type.Array(Type.String({ description: "Workspace-relative file in the change set." }), {
-        description:
-          "User-supplied files to analyze as the change set. This is not inferred from git and carries no line-level diff evidence.",
+        description: "Explicit change-set files; not inferred from git and no line-level diff.",
         minItems: 1,
         uniqueItems: true,
       }),
@@ -250,7 +242,7 @@ export const CodeImpactParameters = Type.Object(
     includeTests: Type.Optional(
       Type.Boolean({
         description:
-          "Whether likely tests should be included in the impact set. changeSetFiles analysis uses semantic references when available plus deterministic conventions; target-based analysis may combine semantic references with deterministic conventions.",
+          "Include likely tests using semantic references and deterministic conventions.",
       }),
     ),
     maxResults: Type.Optional(MaxResultsParam),
@@ -272,8 +264,7 @@ export const CodeImpactParameters = Type.Object(
 export const CodeRefactorParameters = Type.Object(
   {
     operation: StringEnum(["rename", "rename_symbol", "extract_function", "extract_variable"], {
-      description:
-        "Precise refactor operation to plan. `rename` is accepted as a compatibility alias for `rename_symbol`.",
+      description: "Refactor operation; `rename` is an alias for `rename_symbol`.",
     }),
     targetId: Type.Optional(
       Type.String({ description: "Resolved target handle from `code_resolve`." }),
@@ -329,13 +320,12 @@ export const CodeHealthParameters = Type.Object(
     ),
     coveragePath: Type.Optional(
       Type.String({
-        description:
-          "Workspace-relative path to a coverage summary JSON file. Defaults to `coverage/coverage-summary.json`.",
+        description: "Coverage summary path; defaults to `coverage/coverage-summary.json`.",
       }),
     ),
     unusedPath: Type.Optional(
       Type.String({
-        description: "Workspace-relative path to a knip JSON report. Defaults to `knip.json`.",
+        description: "Knip report path; defaults to `knip.json`.",
       }),
     ),
   },
