@@ -401,7 +401,7 @@ Unified ranked search tool with a strict evidence contract.
 - AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers
 - unsupported mode/kind combinations fail explicitly instead of being broadened into best-effort search
 
-Supports `query` (required), `scope`, `mode`, `kind`, `contextLines`, and `maxResults`.
+Supports `query` (required), `scope` (one path or an array of paths), `mode`, `kind`, `contextLines`, and `maxResults`.
 
 ### `code_health`
 Health/status summary for the current workspace or a scoped path.

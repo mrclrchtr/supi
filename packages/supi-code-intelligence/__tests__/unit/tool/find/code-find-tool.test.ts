@@ -796,6 +796,49 @@ describe("code_find tool", () => {
       expect(text).toContain("src/a.ts");
       expect(text).not.toContain("other/a.ts");
     });
+
+    it("filters semantic results across multiple scopes", async () => {
+      mkdirSync(path.join(tmpDir, "src"), { recursive: true });
+      mkdirSync(path.join(tmpDir, "docs"), { recursive: true });
+      mkdirSync(path.join(tmpDir, "other"), { recursive: true });
+      registerMockProvider(tmpDir, {
+        workspaceSymbols: async () => [
+          {
+            name: "multiScoped",
+            kind: "function",
+            file: path.join(tmpDir, "src/a.ts"),
+            declarationAnchor: { line: 1, character: 17 },
+          },
+          {
+            name: "multiScoped",
+            kind: "function",
+            file: path.join(tmpDir, "docs/a.ts"),
+            declarationAnchor: { line: 1, character: 17 },
+          },
+          {
+            name: "multiScoped",
+            kind: "function",
+            file: path.join(tmpDir, "other/a.ts"),
+            declarationAnchor: { line: 1, character: 17 },
+          },
+        ],
+      });
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-semantic-multiple-scope-filter",
+        { query: "multiScoped", mode: "semantic", scope: ["src", "docs"] },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult & { details?: { type: "search"; data: { scope: string | null } } };
+
+      const text = result.content[0].text;
+      expect(text).toContain("src/a.ts");
+      expect(text).toContain("docs/a.ts");
+      expect(text).not.toContain("other/a.ts");
+      expect(result.details?.data.scope).toBe("src, docs");
+    });
   });
 
   describe("mode: scope filtering", () => {
@@ -818,6 +861,50 @@ describe("code_find tool", () => {
       const text = result.content[0].text;
       expect(text).toContain("bar");
       expect(text).toContain("nested.ts");
+    });
+
+    it("searches multiple scope paths in text mode", async () => {
+      mkdirSync(path.join(tmpDir, "docs"), { recursive: true });
+      mkdirSync(path.join(tmpDir, "packages"), { recursive: true });
+      mkdirSync(path.join(tmpDir, "other"), { recursive: true });
+      writeFileSync(path.join(tmpDir, "docs/a.md"), "promptSurface docs\n");
+      writeFileSync(path.join(tmpDir, "packages/a.ts"), "const promptSurface = true;\n");
+      writeFileSync(path.join(tmpDir, "other/a.ts"), "const promptSurface = false;\n");
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-multiple-scope-filter",
+        { query: "promptSurface", scope: ["docs", "packages"] },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult & { details?: { type: "search"; data: { scope: string | null } } };
+
+      const text = result.content[0].text;
+      expect(text).toContain("packages/a.ts");
+      expect(text).not.toContain("other/a.ts");
+      expect(result.details?.data.scope).toBe("docs, packages");
+    });
+
+    it("splits delimiter-separated scope strings when no exact path exists", async () => {
+      mkdirSync(path.join(tmpDir, "docs"), { recursive: true });
+      mkdirSync(path.join(tmpDir, "packages"), { recursive: true });
+      writeFileSync(path.join(tmpDir, "docs/a.md"), "token budget\n");
+      writeFileSync(path.join(tmpDir, "packages/a.ts"), "const tokenBudget = true;\n");
+      const tool = getCodeFindTool();
+
+      const result = (await tool.execute(
+        "test-delimited-scope-filter",
+        { query: "token", scope: "docs packages" },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+
+      const text = result.content[0].text;
+      expect(text).toContain("docs/a.md");
+      expect(text).toContain("packages/a.ts");
+      expect(text).not.toContain("Scope accepts a single");
     });
   });
 });

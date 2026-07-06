@@ -5,6 +5,27 @@ import type { CodeIntelligenceToolName } from "../types/index.ts";
 const ScopeParam = Type.String({
   description: "Workspace-relative path, package, or directory scope for the workflow query.",
 });
+const FindScopeParam = Type.Union(
+  [
+    Type.String({
+      description: "Workspace-relative path, package, or directory scope for the search query.",
+    }),
+    Type.Array(
+      Type.String({
+        description: "Workspace-relative path, package, or directory search scope.",
+      }),
+      {
+        description: "One or more workspace-relative paths, packages, or directories to search.",
+        minItems: 1,
+        uniqueItems: true,
+      },
+    ),
+  ],
+  {
+    description:
+      "Workspace-relative path, package, directory, or array of scopes for the search query.",
+  },
+);
 const FileParam = Type.String({ description: "Target file path." });
 const QueryParam = Type.String({
   description: "Human or code reference to resolve or search for.",
@@ -129,7 +150,7 @@ export const CodeOrientationParameters = Type.Object(
 export const CodeFindParameters = Type.Object(
   {
     query: QueryParam,
-    scope: Type.Optional(ScopeParam),
+    scope: Type.Optional(FindScopeParam),
     mode: Type.Optional(
       StringEnum(["text", "regex", "ast", "semantic"], {
         description:

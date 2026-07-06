@@ -128,7 +128,7 @@ Unified ranked code search with strict mode dispatch — the sole search tool.
 - supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, `enum`, `test`
 - AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers
 - unsupported combinations fail explicitly instead of widening into best-effort search
-- `scope?` — workspace-relative path, package, or directory to limit search
+- `scope?` — one workspace-relative path/package/directory or an array of scopes to limit search
 - `contextLines?` — context lines around matches (default 1)
 - `maxResults?` — result cap (default 8)
 

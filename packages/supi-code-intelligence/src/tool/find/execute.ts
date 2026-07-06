@@ -16,7 +16,7 @@ import { findModeKindRules } from "../infra/cross-field.ts";
 import { unavailableSearchDetails } from "../infra/error-results.ts";
 import {
   gateSemanticReadiness,
-  resolveScopeParam,
+  resolveScopeSetParam,
   runPipe,
   validateParams,
 } from "../infra/pipeline.ts";
@@ -26,7 +26,7 @@ import { executePattern } from "./orchestrate.ts";
 
 export interface CodeFindToolParams {
   query: string;
-  scope?: string;
+  scope?: string | string[];
   mode?: "text" | "regex" | "ast" | "semantic";
   kind?:
     | "definition"
@@ -43,6 +43,16 @@ export interface CodeFindToolParams {
   maxResults?: number;
 }
 
+interface CodeFindPipelineParams extends CodeFindToolParams {
+  _resolvedScopePaths?: string[];
+  _resolvedScopeDisplay?: string | null;
+}
+
+function scopeForDetails(scope: CodeFindToolParams["scope"]): string | null {
+  if (Array.isArray(scope)) return scope.join(", ");
+  return scope ?? null;
+}
+
 export async function executeFindTool(
   params: CodeFindToolParams,
   ctx: CodeIntelToolExecCtx,
@@ -50,7 +60,7 @@ export async function executeFindTool(
   if (!params.query || params.query.trim().length === 0) {
     return {
       content: "**Error:** `code_find` requires a non-empty `query` parameter.",
-      details: unavailableSearchDetails(params.scope ?? null, [
+      details: unavailableSearchDetails(scopeForDetails(params.scope), [
         "Provide a non-empty `query` parameter",
       ]),
     };
@@ -61,20 +71,22 @@ export async function executeFindTool(
   const mode = params.mode ?? "text";
   const needsSemanticReadiness = mode === "semantic";
 
+  const pipelineParams = params as CodeFindPipelineParams;
+
   return runPipe(
-    params,
+    pipelineParams,
     ctx,
     [
       validateParams(findModeKindRules(), (msg) => ({
         content: msg,
-        details: unavailableSearchDetails(params.scope ?? null, [
+        details: unavailableSearchDetails(scopeForDetails(params.scope), [
           'Use `mode: "ast"` with `kind`, or remove `kind` for text/regex/semantic search',
         ]),
       })),
-      resolveScopeParam((reason) => ({
+      resolveScopeSetParam((reason) => ({
         content: `**Error:** ${reason}`,
-        details: unavailableSearchDetails(params.scope ?? null, [
-          "Verify the `scope` path exists and is within the workspace",
+        details: unavailableSearchDetails(scopeForDetails(params.scope), [
+          "Verify each `scope` path exists and is within the workspace",
         ]),
       })),
       ...(needsSemanticReadiness
@@ -82,7 +94,7 @@ export async function executeFindTool(
             gateSemanticReadiness("code_find", {
               onTimeout: () => ({
                 content: renderSemanticReadinessTimeout("code_find", 15_000),
-                details: unavailableSearchDetails(params.scope ?? null, [
+                details: unavailableSearchDetails(scopeForDetails(params.scope), [
                   "Retry shortly or check `code_health`",
                 ]),
               }),
@@ -104,7 +116,8 @@ export async function executeFindTool(
       return executePattern(
         {
           pattern: p.query,
-          path: p.scope ?? c.cwd,
+          paths: p._resolvedScopePaths ?? [c.cwd],
+          scopeLabel: p._resolvedScopeDisplay ?? null,
           regex: mode === "regex",
           kind: p.kind,
           mode,

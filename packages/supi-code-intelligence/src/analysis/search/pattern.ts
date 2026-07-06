@@ -64,7 +64,7 @@ export function isStructuredPatternKind(kind: string | undefined): kind is Struc
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: enumeration-interrupted, cap, timeout, and error branches are each necessary
 export async function getStructuredPatternMatches(
   params: StructuredPatternParams,
-  scopePath: string,
+  scopePath: string | readonly string[],
   cwd: string,
   relScope: string,
   structural: StructuralSubstrate,
@@ -143,7 +143,10 @@ interface FileEnumeration {
  * Enumerate all tree-sitter-supported source files in scopePath using rg --files.
  * Returns null if ripgrep is not available.
  */
-function enumerateSourceFiles(scopePath: string, cwd: string): FileEnumeration | null {
+function enumerateSourceFiles(
+  scopePath: string | readonly string[],
+  cwd: string,
+): FileEnumeration | null {
   const extensions = getSupportedExtensions();
   // Strip leading dots — ripgrep -g expects ".ext" without the dot prefix
   const globPattern = `*.{${Array.from(extensions)
@@ -151,18 +154,14 @@ function enumerateSourceFiles(scopePath: string, cwd: string): FileEnumeration |
     .join(",")}}`;
 
   try {
-    const output = execFileSync("rg", ["--files", "-g", globPattern, scopePath], {
+    const output = execFileSync("rg", ["--files", "-g", globPattern, ...scopePathArgs(scopePath)], {
       encoding: "utf-8",
       cwd,
       timeout: 5000,
       stdio: ["pipe", "pipe", "pipe"],
     });
     return {
-      files: output
-        .split("\n")
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .sort((a, b) => a.localeCompare(b)),
+      files: normalizeEnumeratedFiles(output),
       interrupted: false,
     };
   } catch (err: unknown) {
@@ -174,16 +173,28 @@ function enumerateSourceFiles(scopePath: string, cwd: string): FileEnumeration |
       const stdout = typeof err.stdout === "string" ? err.stdout : "";
       const wasKilled = (err as { killed?: boolean }).killed === true;
       return {
-        files: stdout
-          .split("\n")
-          .map((line) => line.trim())
-          .filter((line) => line.length > 0)
-          .sort((a, b) => a.localeCompare(b)),
+        files: normalizeEnumeratedFiles(stdout),
         interrupted: wasKilled,
       };
     }
     return { files: [], interrupted: false };
   }
+}
+
+function scopePathArgs(scopePath: string | readonly string[]): string[] {
+  const paths = Array.isArray(scopePath) ? scopePath : [scopePath];
+  return paths.length > 0 ? [...paths] : ["."];
+}
+
+function normalizeEnumeratedFiles(output: string): string[] {
+  return [
+    ...new Set(
+      output
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
 }
 
 // biome-ignore lint/complexity/useMaxParams: helper takes explicit collection inputs to avoid intermediate objects in the hot path

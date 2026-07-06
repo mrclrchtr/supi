@@ -10,7 +10,6 @@ import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
 import { createEvidenceList, renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
-import { normalizePath } from "../../analysis/search/ripgrep.ts";
 import type { CodeIntelResult } from "../../types/index.ts";
 import { assembleFindResult } from "../result/find.ts";
 import type { PatternInput } from "./orchestrate.ts";
@@ -33,28 +32,43 @@ export async function executeSemanticSearch(
     );
   }
 
-  const scopePath = input.path ? normalizePath(input.path, cwd) : cwd;
-  const scopedSymbols = filterSymbolsByScope(symbols, scopePath);
+  const scope = getSemanticScope(input, cwd);
+  const scopedSymbols = filterSymbolsByScopes(symbols, scope.paths);
   if (scopedSymbols.length === 0) {
-    return renderSemanticEmptyResult(input);
+    return renderSemanticEmptyResult(input, scope.label);
   }
 
   return renderSemanticResults(input, scopedSymbols, cwd);
 }
 
-function filterSymbolsByScope<T extends { file: string }>(symbols: T[], scopePath: string): T[] {
-  return symbols.filter((symbol) => isWithinOrEqual(scopePath, symbol.file));
+function filterSymbolsByScopes<T extends { file: string }>(
+  symbols: T[],
+  scopePaths: string[],
+): T[] {
+  return symbols.filter((symbol) =>
+    scopePaths.some((scopePath) => isWithinOrEqual(scopePath, symbol.file)),
+  );
 }
 
-function renderSemanticEmptyResult(input: PatternInput): CodeIntelResult {
-  const relPath = input.path ?? ".";
+function getSemanticScope(input: PatternInput, cwd: string): { paths: string[]; label: string } {
+  if (input.paths && input.paths.length > 0) {
+    return { paths: input.paths, label: input.scopeLabel ?? input.paths.join(", ") };
+  }
+  return { paths: [cwd], label: "." };
+}
+
+function getDetailScope(input: PatternInput): string | null {
+  return input.scopeLabel ?? null;
+}
+
+function renderSemanticEmptyResult(input: PatternInput, relPath: string): CodeIntelResult {
   return {
     content: `**Semantic search** — \`${input.pattern}\`\n\nNo semantic results found in \`${relPath}\`.`,
     details: {
       type: "search",
       data: assembleFindResult({
         confidence: "semantic",
-        scope: input.path ?? null,
+        scope: getDetailScope(input),
         candidateCount: 0,
         nextQueries: [
           'Use `mode: "text"` for literal text search',
@@ -100,7 +114,7 @@ function renderSemanticResults(
       type: "search",
       data: assembleFindResult({
         confidence: "semantic",
-        scope: input.path ?? null,
+        scope: getDetailScope(input),
         candidateCount: symbols.length,
         omittedCount: evidence.metadata.omittedCount ?? 0,
         evidenceLists: [evidence.metadata],

@@ -23,7 +23,7 @@
 
 import { match } from "ts-pattern";
 import { ensureSemanticReadiness } from "../../analysis/readiness.ts";
-import { resolveScope } from "../../analysis/search/ripgrep.ts";
+import { resolveScope, resolveScopeSet } from "../../analysis/search/ripgrep.ts";
 import { routeFor } from "../../analysis/target/planner.ts";
 import type {
   CodeIntelligenceToolName,
@@ -150,6 +150,15 @@ export interface HasScopeParam {
   scope?: string;
 }
 
+/** Minimum parameter shape needed by `resolveScopeSetParam`. */
+export interface HasScopeSetParam {
+  scope?: string | string[];
+  /** Set by resolveScopeSetParam — absolute search roots for code_find. */
+  _resolvedScopePaths?: string[];
+  /** Set by resolveScopeSetParam — display label for requested search roots. */
+  _resolvedScopeDisplay?: string | null;
+}
+
 /**
  * Resolve the `scope` parameter to an absolute path.
  *
@@ -171,6 +180,20 @@ export function resolveScopeParam<P extends HasScopeParam>(
     if (result.kind === "error") return { kind: "error", result: onError(result.reason) };
 
     setParam(params, paramName, result.path);
+    return { kind: "continue" };
+  };
+}
+
+/** Resolve code_find's one-or-many `scope` input to absolute search roots. */
+export function resolveScopeSetParam<P extends HasScopeSetParam>(
+  onError: (reason: string) => CodeIntelResult,
+): PipeStage<P> {
+  return (params, ctx) => {
+    const result = resolveScopeSet(params.scope, ctx.cwd);
+    if (result.kind === "error") return { kind: "error", result: onError(result.reason) };
+
+    params._resolvedScopePaths = [...result.paths];
+    params._resolvedScopeDisplay = result.display;
     return { kind: "continue" };
   };
 }

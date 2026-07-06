@@ -47,6 +47,11 @@ export function isInProjectPath(filePath: string, cwd: string): boolean {
 /** Result of resolving a user-provided `scope` value to an absolute path. */
 export type ScopeResolution = { kind: "ok"; path: string } | { kind: "error"; reason: string };
 
+/** Result of resolving a code_find `scope` value to one or more absolute paths. */
+export type ScopeSetResolution =
+  | { kind: "ok"; paths: string[]; display: string | null }
+  | { kind: "error"; reason: string };
+
 /**
  * Resolve a `scope` value to an absolute path using pi scope semantics:
  * - strip leading `@`
@@ -61,11 +66,74 @@ export function resolveScope(scope: string | undefined, cwd: string): ScopeResol
       reason: `Scope accepts a single directory or file path, not multiple: \`${scope}\``,
     };
   }
+  return resolveSingleScope(scope, cwd);
+}
+
+/**
+ * Resolve a code_find scope input to one or more absolute paths.
+ *
+ * `code_find` is intentionally more flexible than other code-intelligence tools:
+ * it accepts `scope: ["docs", "packages"]` and also splits delimiter-separated
+ * strings such as `"docs packages"` only when no exact path by that name exists.
+ */
+export function resolveScopeSet(
+  scope: string | readonly string[] | undefined,
+  cwd: string,
+): ScopeSetResolution {
+  if (scope === undefined) {
+    return { kind: "ok", paths: [cwd], display: null };
+  }
+
+  const labels = typeof scope === "string" ? splitScopeString(scope, cwd) : [...scope];
+  if (labels.length === 0) {
+    return { kind: "error", reason: "Scope must include at least one directory or file path." };
+  }
+
+  const resolved: Array<{ label: string; path: string }> = [];
+  for (const label of labels) {
+    const trimmed = label.trim();
+    if (!trimmed) {
+      return { kind: "error", reason: "Scope must not include empty path entries." };
+    }
+    const single = resolveSingleScope(trimmed, cwd);
+    if (single.kind === "error") return single;
+    resolved.push({ label: trimmed, path: single.path });
+  }
+
+  const byPath = new Map<string, string>();
+  for (const entry of resolved) {
+    if (!byPath.has(entry.path)) byPath.set(entry.path, entry.label);
+  }
+  const paths = [...byPath.keys()];
+  const uniqueLabels = paths.map((p) => byPath.get(p) ?? p);
+
+  return {
+    kind: "ok",
+    paths,
+    display: uniqueLabels.length > 0 ? uniqueLabels.join(", ") : null,
+  };
+}
+
+function resolveSingleScope(scope: string, cwd: string): ScopeResolution {
   const resolved = normalizePath(scope, cwd);
   if (!existsSync(resolved)) {
     return { kind: "error", reason: `Scope path not found: \`${scope}\`` };
   }
   return { kind: "ok", path: resolved };
+}
+
+function splitScopeString(scope: string, cwd: string): string[] {
+  const trimmed = scope.trim();
+  if (!trimmed) return [];
+
+  const exact = resolveSingleScope(trimmed, cwd);
+  if (exact.kind === "ok") return [trimmed];
+
+  const parts = trimmed
+    .split(/[,;\s]+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 1 ? parts : [trimmed];
 }
 
 /** Escape regex special characters. */
@@ -152,7 +220,7 @@ export class RipgrepAbortedError extends Error {
  */
 export async function runRipgrep(
   pattern: string,
-  scopePath: string,
+  scopePath: string | readonly string[],
   cwd: string,
   opts?: RipgrepOptions,
 ): Promise<RgMatch[]> {
@@ -166,7 +234,7 @@ export async function runRipgrep(
  */
 export async function runRipgrepDetailed(
   pattern: string,
-  scopePath: string,
+  scopePath: string | readonly string[],
   cwd: string,
   opts?: RipgrepOptions,
 ): Promise<RipgrepRunResult> {
@@ -195,16 +263,16 @@ export async function runRipgrepDetailed(
       };
     case "ok":
     case "nomatch":
-      return { matches: parseRgJson(proc.stdout, filter) };
+      return { matches: dedupeMatches(parseRgJson(proc.stdout, filter)) };
     case "timeout":
       // Timeout: yield any partial stdout matches with no error surfaced — an
       // improvement over the prior execFileSync path, which discarded partial
       // output on timeout (the timeout error lacked a `status`, so the old
       // handleRipgrepError returned an empty match set).
-      return { matches: proc.stdout ? parseRgJson(proc.stdout, filter) : [] };
+      return { matches: proc.stdout ? dedupeMatches(parseRgJson(proc.stdout, filter)) : [] };
     case "error":
       return {
-        matches: proc.stdout ? parseRgJson(proc.stdout, filter) : [],
+        matches: proc.stdout ? dedupeMatches(parseRgJson(proc.stdout, filter)) : [],
         ...(proc.stderr.trim() ? { error: proc.stderr.trim() } : {}),
       };
   }
@@ -212,7 +280,7 @@ export async function runRipgrepDetailed(
 
 function buildRipgrepArgs(
   pattern: string,
-  scopePath: string,
+  scopePath: string | readonly string[],
   opts?: { maxMatches?: number; contextLines?: number; literal?: boolean },
 ): string[] {
   const args = ["--json", "-m", String(opts?.maxMatches ?? 30)];
@@ -222,8 +290,13 @@ function buildRipgrepArgs(
   if (opts?.literal) {
     args.push("-F");
   }
-  args.push("-e", pattern, scopePath);
+  args.push("-e", pattern, ...normalizeScopePathArgs(scopePath));
   return args;
+}
+
+function normalizeScopePathArgs(scopePath: string | readonly string[]): string[] {
+  const paths = Array.isArray(scopePath) ? scopePath : [scopePath];
+  return paths.length > 0 ? [...paths] : ["."];
 }
 
 /** Discriminated result of a single ripgrep process run (see {@link runRgProcess}). */
@@ -430,6 +503,18 @@ function parseRgJson(output: string, filterLowSignal: boolean): RgMatch[] {
   }
 
   return matches;
+}
+
+function dedupeMatches(matches: RgMatch[]): RgMatch[] {
+  const seen = new Set<string>();
+  const deduped: RgMatch[] = [];
+  for (const match of matches) {
+    const key = `${match.file}\u0000${match.line}\u0000${match.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(match);
+  }
+  return deduped;
 }
 
 /**

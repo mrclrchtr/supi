@@ -9,12 +9,7 @@ import {
   type StructuredPatternKind,
 } from "../../analysis/search/pattern.ts";
 import type { RgMatch } from "../../analysis/search/ripgrep.ts";
-import {
-  normalizePath,
-  runRipgrep,
-  runRipgrepDetailed,
-  toDisplayPath,
-} from "../../analysis/search/ripgrep.ts";
+import { runRipgrep, runRipgrepDetailed, toDisplayPath } from "../../analysis/search/ripgrep.ts";
 import type { CodeIntelResult } from "../../types/index.ts";
 import type { CodeQueryParams } from "../params.ts";
 import { assembleFindResult } from "../result/find.ts";
@@ -29,7 +24,10 @@ import { executeSemanticSearch } from "./semantic-search.ts";
 
 export interface PatternInput {
   pattern: string;
-  path?: string;
+  /** One or more resolved search roots. */
+  paths?: string[];
+  /** Human-readable requested scope label for markdown/details. */
+  scopeLabel?: string | null;
   regex?: boolean;
   kind?: string;
   mode?: "text" | "regex" | "ast" | "semantic";
@@ -46,7 +44,6 @@ export interface PatternDeps {
 }
 
 /** Execute the pattern search use-case. */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: mode dispatch branches are linear, not nested
 export async function executePattern(
   input: PatternInput,
   deps: PatternDeps,
@@ -65,16 +62,15 @@ export async function executePattern(
 
   const maxResults = input.maxResults ?? 8;
   const contextLines = input.contextLines ?? 1;
-  const scopePath = input.path ? normalizePath(input.path, deps.cwd) : deps.cwd;
-  const relScope = input.path ?? ".";
+  const scope = getPatternScope(input, deps.cwd);
 
   if (isStructuredPatternKind(input.kind)) {
     return executeStructuredSearch(
       input,
       input.kind,
-      scopePath,
+      scope.paths,
       deps.cwd,
-      relScope,
+      scope.label,
       maxResults,
       deps.provider,
     );
@@ -83,14 +79,14 @@ export async function executePattern(
   const matches = input.regex
     ? await getRegexMatches({
         pattern: input.pattern,
-        scopePath,
+        scopePath: scope.paths,
         cwd: deps.cwd,
         maxResults,
         contextLines,
         summary: input.summary,
         signal: deps.signal,
       })
-    : await runRipgrep(input.pattern, scopePath, deps.cwd, {
+    : await runRipgrep(input.pattern, scope.paths, deps.cwd, {
         contextLines,
         literal: true,
         filterLowSignal: true,
@@ -104,7 +100,7 @@ export async function executePattern(
         type: "search",
         data: assembleFindResult({
           confidence: "unavailable",
-          scope: input.path ?? null,
+          scope: getDetailScope(input),
           candidateCount: 0,
           nextQueries: ["Fix the regex pattern and retry"],
         }),
@@ -113,7 +109,7 @@ export async function executePattern(
   }
 
   if (matches.length === 0) {
-    return formatEmptyResult(input, relScope);
+    return formatEmptyResult(input, scope.label);
   }
 
   const displayMatches = matches.map((m) => ({
@@ -123,14 +119,14 @@ export async function executePattern(
 
   const rendered = input.summary
     ? {
-        content: renderPatternSummary(input.pattern, relScope, displayMatches, maxResults),
+        content: renderPatternSummary(input.pattern, scope.label, displayMatches, maxResults),
         evidenceList: undefined,
       }
-    : renderPatternResults(input.pattern, relScope, displayMatches, maxResults);
+    : renderPatternResults(input.pattern, scope.label, displayMatches, maxResults);
 
   const details = assembleFindResult({
     confidence: "heuristic",
-    scope: input.path ?? null,
+    scope: getDetailScope(input),
     candidateCount: matches.length,
     omittedCount: rendered.evidenceList?.omittedCount ?? 0,
     evidenceLists: rendered.evidenceList ? [rendered.evidenceList] : [],
@@ -147,7 +143,7 @@ export async function executePattern(
 async function executeStructuredSearch(
   input: PatternInput,
   kind: StructuredPatternKind,
-  scopePath: string,
+  scopePaths: readonly string[],
   cwd: string,
   relScope: string,
   maxResults: number,
@@ -162,7 +158,7 @@ async function executeStructuredSearch(
 
   const structured = await getStructuredPatternMatches(
     { ...input, pattern: input.pattern, kind },
-    scopePath,
+    scopePaths,
     cwd,
     relScope,
     provider,
@@ -175,7 +171,7 @@ async function executeStructuredSearch(
         type: "search",
         data: assembleFindResult({
           confidence: "unavailable",
-          scope: input.path ?? null,
+          scope: getDetailScope(input),
           candidateCount: 0,
           nextQueries: ["Fix the regex pattern and retry"],
         }),
@@ -197,7 +193,7 @@ async function executeStructuredSearch(
         type: "search",
         data: assembleFindResult({
           confidence: "structural",
-          scope: input.path ?? null,
+          scope: getDetailScope(input),
           candidateCount: 0,
           omittedCount: structured?.omittedCount ?? 0,
           nextQueries: [
@@ -217,7 +213,7 @@ async function executeStructuredSearch(
       type: "search",
       data: assembleFindResult({
         confidence: "structural",
-        scope: input.path ?? null,
+        scope: getDetailScope(input),
         candidateCount: structured.matches.length,
         omittedCount: structured.omittedCount + (rendered.evidenceList.omittedCount ?? 0),
         evidenceLists: [rendered.evidenceList],
@@ -238,6 +234,17 @@ async function executeStructuredSearch(
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+function getPatternScope(input: PatternInput, cwd: string): { paths: string[]; label: string } {
+  if (input.paths && input.paths.length > 0) {
+    return { paths: input.paths, label: input.scopeLabel ?? input.paths.join(", ") };
+  }
+  return { paths: [cwd], label: "." };
+}
+
+function getDetailScope(input: PatternInput): string | null {
+  return input.scopeLabel ?? null;
+}
+
 const REGEX_HINT_CHARS = /[|.*+?^${}()[\]\\]/;
 
 function hasRegexChars(pattern: string): boolean {
@@ -247,7 +254,7 @@ function hasRegexChars(pattern: string): boolean {
 function formatEmptyResult(input: PatternInput, relScope: string): CodeIntelResult {
   const emptyDetails = assembleFindResult({
     confidence: "heuristic",
-    scope: input.path ?? null,
+    scope: getDetailScope(input),
     candidateCount: 0,
     nextQueries: input.regex
       ? ["Set `regex: false` for literal matching"]
@@ -266,7 +273,7 @@ function formatEmptyResult(input: PatternInput, relScope: string): CodeIntelResu
 
 async function getRegexMatches(options: {
   pattern: string;
-  scopePath: string;
+  scopePath: string | readonly string[];
   cwd: string;
   maxResults: number;
   contextLines: number;
@@ -286,12 +293,9 @@ async function getRegexMatches(options: {
   return result.matches;
 }
 
-// ── Backward-compatible wrapper for test migrations ────────────────
+// ── Test helper wrapper ─────────────────────────────────────────────
 
-/**
- * Backward-compatible wrapper for tests that call the old (params, cwd) signature.
- * Prefer {@link executePattern} with the typed PatternInput/PatternDeps interface.
- */
+/** Prefer {@link executePattern} with the typed PatternInput/PatternDeps interface. */
 export async function executePatternAction(
   params: CodeQueryParams,
   cwd: string,
@@ -300,7 +304,8 @@ export async function executePatternAction(
   return executePattern(
     {
       pattern: params.pattern ?? "",
-      path: params.path,
+      paths: params.path ? [params.path] : undefined,
+      scopeLabel: params.path ?? null,
       regex: params.regex,
       kind: params.kind,
       maxResults: params.maxResults,
