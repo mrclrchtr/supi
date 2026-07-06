@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.0](https://github.com/mrclrchtr/supi/compare/v2.0.6...v2.1.0) (2026-07-06)
+
+
+### Features
+
+* **supi-code-intelligence:** support multi-scope code_find ([84aea5f](https://github.com/mrclrchtr/supi/commit/84aea5fb0e69a65fe8fcbfb5d1f1119818cacd4c))
+* **supi-core:** migrate settings to event-bus, add prompt-surface overrides ([50dfed2](https://github.com/mrclrchtr/supi/commit/50dfed2948cbdf37ae8627a7f8dbc515cf7f5428))
+* **supi-prompt-suggestions:** improve prompt specificity and skip/abort generation on input ([bf88bc2](https://github.com/mrclrchtr/supi/commit/bf88bc2b305ef16e67d2163943b80dcdafd557fc))
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([d6169c7](https://github.com/mrclrchtr/supi/commit/d6169c722e8e8c601313acf42a824fe7731dcf47))
+* **deps:** update dependency @biomejs/biome to v2.5.2 ([1adcaee](https://github.com/mrclrchtr/supi/commit/1adcaeef359503ac30d150b69a78aeeee85cb924))
+
 ## [2.0.6](https://github.com/mrclrchtr/supi/compare/v2.0.5...v2.0.6) (2026-07-05)
 
 
