@@ -16,6 +16,7 @@ src/
 ├── api.ts                 # Public type-only API surface
 ├── index.ts               # Package-root type re-export surface
 ├── extension.ts           # pi extension entrypoint / composition root
+├── config.ts              # code-intelligence config + /supi-settings registration
 ├── app/                   # App composition root and session lifecycle manager
 │   ├── app.ts             # CodeIntelligenceApp — wires pi session events
 │   └── manager.ts         # Per-cwd session create/release/shutdown
@@ -30,6 +31,7 @@ src/
 │   ├── target/            # Provider-backed target resolution pipeline
 │   ├── brief/             # Project/file/directory/symbol orientation briefing
 │   ├── architecture/      # Workspace architecture model discovery
+│   ├── instruction-files.ts # Directory-local instruction-file discovery/rendering
 │   ├── signals/           # Git, diagnostics, coverage, and unused-code signals
 │   ├── coverage/          # Degraded semantic/structural coverage warning evaluation
 │   ├── references/        # Semantic reference aggregation helpers
@@ -80,11 +82,13 @@ Primary orientation surface. Use it for first-pass project/module/directory/file
 - accepts `focus`, `targetId`, `line`, `character`, and `maxResults`
 - omit `focus` for workspace/project orientation
 - `focus` is path-first and language-agnostic; if no path exists, discovered module-name lookup is attempted and ambiguity/errors are reported honestly
+- directory focus surfaces applicable instruction files (`code-intelligence.instructionFileNames`, default `CLAUDE.md`, `AGENTS.md`) near the top of the output; files walk from cwd to focus, use first match per directory, skip native-loaded context paths and dirs already surfaced since latest compaction, and truncate each file to 200 lines
 - `focus` + `line` + `character` resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId` in `details.data.target`
 - `targetId` takes precedence over `focus`/coordinates with a visible ignored-focus note; stale/invalid `targetId` errors and does not fall back
 - symbol orientation renders definitions, JSDoc/TSDoc docs, local diagnostics near the target, and Read Next guidance
 - relation/test evidence belongs to `code_graph`; impact evidence belongs to `code_impact`; full health/status belongs to `code_health`
 - `maxResults` defaults to 10 and caps each rendered list independently
+- instruction files are guidance chrome, not tool evidence; metadata lives in `details.data.instructions`
 - `code_orientation` replaces `code_brief` and the old `code_context`; no compatibility alias is kept
 
 ### `code_inspect`

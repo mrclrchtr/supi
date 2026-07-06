@@ -67,12 +67,11 @@ Why: Environment-specific knowledge.
 
 ## What SuPi Extensions Already Deliver
 
-When auditing or updating CLAUDE.md in a project using SuPi extensions, these sections are redundant because they're auto-injected on every session:
+When auditing or updating CLAUDE.md in a project using SuPi extensions, these sections are redundant because they're already delivered by the session or explicit orientation workflow:
 
-| Extension | What It Injects | When |
+| Extension | What It Delivers | When |
 |-----------|----------------|------|
-| `supi-code-intelligence` | Workspace module graph (names, descriptions, paths, dependency edges) | First `before_agent_start` per session |
-| `supi-claude-md` | Subdirectory `CLAUDE.md` files wrapped in `<extension-context>` | On `read`/`edit`/`lsp`/`tree_sitter` to subdirectories |
+| `supi-code-intelligence` | Workspace module graph (names, descriptions, paths, dependency edges) and directory instruction-file sections | First `before_agent_start` per session for overview; explicit directory `code_orientation` for instruction files |
 | `supi-core` | `findProjectRoot`, `walkProject`, XML `<extension-context>` tagging | Available to all extensions |
 
 **Implication:** A root CLAUDE.md doesn't need to document what the code-intelligence overview or `code_orientation` would say. Focus instead on:

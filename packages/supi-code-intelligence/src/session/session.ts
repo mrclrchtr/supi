@@ -15,6 +15,8 @@
  * @mrclrchtr/supi-code-intelligence — internal, not exported via api.ts
  */
 
+import * as path from "node:path";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import {
   getDefaultWorkspaceRuntime,
   type SemanticProvider,
@@ -104,6 +106,12 @@ export class WorkspaceCodeIntelligenceSession {
    */
   readonly coverageWarningState = new CoverageWarningState();
 
+  /** Absolute instruction files already loaded by PI's native context-file mechanism. */
+  readonly nativeInstructionPaths = new Set<string>();
+
+  /** Absolute directories whose instruction files were already surfaced by code_orientation. */
+  readonly surfacedInstructionDirs = new Set<string>();
+
   /**
    * Optional LSP controller reference — attached by LSP lifecycle module
    * for coverage evaluation and server management.
@@ -140,6 +148,38 @@ export class WorkspaceCodeIntelligenceSession {
       lookupTargetId: (id) => this.lookupTargetId(id),
       registerTarget: (inp) => this.registerTarget(inp),
     });
+  }
+
+  // ── Instruction-file state ───────────────────────────────────────
+
+  /** Remember instruction/context file paths already loaded by PI natively. */
+  captureNativeInstructionPaths(files: Array<{ path: string }>): void {
+    for (const file of files) {
+      this.nativeInstructionPaths.add(path.resolve(this.cwd, file.path));
+    }
+  }
+
+  /** Mark directory-local instruction files as surfaced after a successful orientation render. */
+  markInstructionDirsSurfaced(directories: string[]): void {
+    for (const directory of directories) {
+      this.surfacedInstructionDirs.add(path.resolve(this.cwd, directory));
+    }
+  }
+
+  /** Clear instruction-file dedup state after compaction. */
+  resetSurfacedInstructionDirs(): void {
+    this.surfacedInstructionDirs.clear();
+  }
+
+  /** Reconstruct surfaced instruction directories from branch tool-result details after compaction. */
+  reconstructInstructionState(branch: SessionEntry[]): void {
+    this.surfacedInstructionDirs.clear();
+    const entries = entriesAfterLatestCompaction(branch);
+    for (const entry of entries) {
+      for (const directory of extractInstructionDirectories(entry)) {
+        this.surfacedInstructionDirs.add(path.resolve(this.cwd, directory));
+      }
+    }
   }
 
   // ── Provider access ───────────────────────────────────────────────
@@ -290,7 +330,34 @@ export class WorkspaceCodeIntelligenceSession {
   clearStores(): void {
     this.#refactorPlans.clear();
     this.#workflowTargets.clear();
+    this.surfacedInstructionDirs.clear();
+    this.nativeInstructionPaths.clear();
   }
+}
+
+function entriesAfterLatestCompaction(branch: SessionEntry[]): SessionEntry[] {
+  let start = 0;
+  for (let i = 0; i < branch.length; i++) {
+    if (branch[i]?.type === "compaction") start = i + 1;
+  }
+  return branch.slice(start);
+}
+
+function extractInstructionDirectories(entry: SessionEntry): string[] {
+  if (entry.type !== "message" || entry.message.role !== "toolResult") return [];
+  if (entry.message.toolName !== "code_orientation") return [];
+
+  const details = entry.message.details as
+    | { type?: string; data?: { instructions?: { files?: Array<{ directory?: unknown }> } } }
+    | undefined;
+  if (details?.type !== "context") return [];
+
+  const files = details.data?.instructions?.files;
+  if (!Array.isArray(files)) return [];
+
+  return files
+    .map((file) => file.directory)
+    .filter((directory): directory is string => typeof directory === "string");
 }
 
 // ── Standalone target-id expansion helper ─────────────────────────────

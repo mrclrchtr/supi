@@ -1,7 +1,7 @@
 {
   "name": "@mrclrchtr/supi-claude-md",
   "version": "2.1.0",
-  "description": "SuPi claude-md extension — automatic subdirectory context injection for pi",
+  "description": "SuPi claude-md skills — CLAUDE.md/AGENTS.md maintenance workflows for pi",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -23,7 +23,7 @@
     "claude-md",
     "agents-md",
     "context-files",
-    "context-injection",
+    "instruction-files",
     "skills"
   ],
   "type": "module",
@@ -32,21 +32,11 @@
     "skills",
     "!__tests__"
   ],
-  "dependencies": {
-    "@mrclrchtr/supi-core": "workspace:*"
-  },
-  "bundledDependencies": [
-    "@mrclrchtr/supi-core"
-  ],
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-coding-agent": "*"
   },
   "peerDependenciesMeta": {
     "@earendil-works/pi-coding-agent": {
-      "optional": true
-    },
-    "@earendil-works/pi-tui": {
       "optional": true
     }
   },

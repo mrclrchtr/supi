@@ -32,6 +32,10 @@ _Avoid_: internal package, hidden package
 A user-facing SuPi package whose main role is to make other SuPi packages easier to configure and inspect. It should be described as a control surface rather than as a standalone capability family.
 _Avoid_: meta package
 
+**Configuration Section ID**:
+The stable namespace for one SuPi package's shared configuration values.
+_Avoid_: config category, settings group
+
 **Settings Contribution**:
 A SuPi extension's runtime-declared, config-backed settings section for a Configuration Surface to collect and render. A contribution describes editable SuPi config values and scoped persistence behavior; it is not itself the stored configuration.
 _Avoid_: global settings singleton, arbitrary settings UI registry, assuming one shared package instance
@@ -67,6 +71,10 @@ _Avoid_: tool behavior override, UI customization
 **Trust-Gated Prompt Surface Override**:
 A project-scoped Prompt Surface Override that SuPi honors only when PI project trust is active and the project has a PI-recognized trust-gated resource such as `.pi/settings.json`. Global prompt-surface overrides are user-scoped and do not require project trust.
 _Avoid_: treating project prompt text as trusted by location alone, runtime behavior override
+
+**Instruction File**:
+A directory-local agent guidance file, such as `CLAUDE.md` or `AGENTS.md`, that gives maintainers and agents local working instructions for a workspace area.
+_Avoid_: claude-md file, context file
 
 **Human-Facing**:
 A package-catalog badge for SuPi behavior the user drives directly, such as slash commands, TUI overlays, reports, shortcuts, or configuration screens. The public README badge should be written as `Human`.

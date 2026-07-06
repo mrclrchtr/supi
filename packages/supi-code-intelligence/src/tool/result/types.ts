@@ -1,5 +1,6 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
+import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { PrioritySignalsSummary } from "../../analysis/signals/project.ts";
 import type { TestSurfaceDetails } from "../../analysis/tests/test-discovery.ts";
 import type { AnchorKind, TargetStoreEntry } from "../../session/target-store.ts";
@@ -143,6 +144,8 @@ export interface ContextDetails {
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
   tests?: TestSurfaceDetails;
+  /** Directory-local instruction files surfaced during directory orientation. */
+  instructions?: InstructionFilesMetadata;
   /**
    * Resolved target store entry — populated for both coordinate and targetId
    * precise-target inputs. Absent for orientation/scope-only calls and for

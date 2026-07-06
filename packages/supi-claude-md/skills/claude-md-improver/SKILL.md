@@ -17,14 +17,13 @@ Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure PI has 
 
 **Purpose:** This baseline review is the primary evidence for scoring Criterion 7 (Auto-Delivered Overlap) in Phase 3. Its goal is to identify which information categories are already delivered automatically by SuPi extensions or native pi, so you do NOT recommend adding that same content to CLAUDE.md. If you skip this step, you will inflate scores and propose redundant additions that already appear in every session.
 
-**Step 1 — Detect auto-injected sources.** Scan the conversation context for:
+**Step 1 — Detect auto-delivered sources.** Scan the conversation context for:
 
 | Source identifier | What to look for | Typical content |
 |-------------------|------------------|---------------|
-| `supi-code-intelligence` | Workspace module graphs, package lists, dependency arrows, file counts | `## Modules` tables, architecture overviews, root directory trees |
-| `supi-claude-md` | `<extension-context source="supi-claude-md">` blocks | Subdirectory CLAUDE.md/AGENTS.md content already injected below cwd |
+| `supi-code-intelligence` | Workspace module graphs, package lists, dependency arrows, file counts, orientation instruction sections | `## Modules` tables, architecture overviews, root directory trees, `## Instructions` in directory orientation |
 | `native-pi` | Root CLAUDE.md or AGENTS.md loaded into the system prompt | Project-wide instructions from the repository root |
-| Other extensions | `<extension-context source="...">` blocks | Any other extension-injected context |
+| Other extensions | `<extension-context source="...">` blocks | Any other extension-delivered context |
 
 **Step 2 — Build the baseline.** For each source found, record what it already covers:
 
@@ -32,7 +31,7 @@ Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure PI has 
 |--------|------------------|----------------|-------|
 | `supi-code-intelligence` | Module graph | Package names, descriptions, dependency relationships | **Root-level** |
 | `supi-code-intelligence` | Workspace overview | File counts, root directory tree, top-level landmarks | **Root-level** |
-| `supi-claude-md` | Subdirectory instructions | `packages/*/CLAUDE.md` content injected during this session | **Package-specific** |
+| `supi-code-intelligence` | Directory instruction files | `packages/*/CLAUDE.md` / `AGENTS.md` shown by explicit directory orientation | **Package-specific** |
 | `native-pi` | Root instructions | `./CLAUDE.md`, `./AGENTS.md` in system prompt | **Root-level** |
 
 Add rows for any additional categories visible in context.
@@ -46,8 +45,8 @@ Add rows for any additional categories visible in context.
   - Dependency graphs from manifests (from `supi-code-intelligence`)
   - High-level architecture without project-specific reasoning (from `supi-code-intelligence`)
 
-- **Package-specific high risk** (already auto-delivered; do NOT recommend for that package's `CLAUDE.md`):
-  - Subdirectory CLAUDE.md/AGENTS.md already injected by `supi-claude-md` during this session
+- **Package-specific high risk** (already surfaced by directory orientation; do NOT recommend for that package's `CLAUDE.md`):
+  - Subdirectory CLAUDE.md/AGENTS.md already shown by `code_orientation` during this session
 
 - **Low risk** (not auto-delivered; safe to recommend in CLAUDE.md at any scope):
   - Non-obvious commands and workflows (not routine build/test/lint — those are in package.json)

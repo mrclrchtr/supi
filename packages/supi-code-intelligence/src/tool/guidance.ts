@@ -40,10 +40,13 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
   },
   code_orientation: {
     description:
-      "Orient around the workspace, module, directory, file, or resolved symbol before surgical work. Omit focus for workspace orientation; use focus for a path/module, or targetId/focus+line+character for symbol orientation. targetId wins and stale IDs error. Returns landmarks, docs, local diagnostics, and read-next guidance; relations/impact/health belong in code_graph/code_impact/code_health. maxResults caps lists; truncates at 2000 lines/50KB.",
+      "Orient around the workspace, module, directory, file, or resolved symbol before surgical work. Omit focus for workspace orientation; use focus for a path/module, or targetId/focus+line+character for symbol orientation. Directory focus may surface local instruction files (CLAUDE.md, AGENTS.md). targetId wins and stale IDs error. Returns landmarks, docs, local diagnostics, and read-next guidance; relations/impact/health belong in code_graph/code_impact/code_health. maxResults caps lists; output is truncated to 2000 lines / 50KB.",
     promptSnippet: "code_orientation — project/module/file/symbol orientation",
     promptGuidelines: [
-      "Use code_orientation first for workspace/package/file/symbol orientation; use code_inspect for exact point facts.",
+      "Use `code_orientation({ focus })` for first-pass project/package/directory/file orientation before `bash`/`read`.",
+      "Use directory focus (for example `packages/foo`) to surface local instruction files before package work.",
+      "Use code_resolve first for bare symbol names, then pass the resulting targetId to code_orientation.",
+      "Use code_graph/code_impact/code_health for relations, impact, or full health instead of asking code_orientation for those sections.",
     ],
   },
   code_graph: {

@@ -8,6 +8,7 @@ import {
   gatherCoverageEvalInput,
 } from "./analysis/coverage/coverage-warnings.ts";
 import { createCodeIntelligenceApp } from "./app/app.ts";
+import { registerCodeIntelligenceSettings } from "./config.ts";
 import type { WorkspaceCodeIntelligenceSession } from "./session/session.ts";
 import { registerDiagnosticInjectionHandlers } from "./substrate/lsp/diagnostic-injection.ts";
 import { registerLspSessionLifecycle } from "./substrate/lsp/lifecycle.ts";
@@ -38,6 +39,7 @@ export default function codeIntelligenceExtension(
   const tsState = createTsAdapterState();
 
   // ── Substrate wiring ──────────────────────────────────────────────
+  registerCodeIntelligenceSettings(pi);
   registerLspSettings(pi);
   registerLspSessionLifecycle(pi, lspState);
   registerLspAwareToolOverrides(pi, lspState);
@@ -63,6 +65,12 @@ export default function codeIntelligenceExtension(
   registerLspMessageRenderer(pi);
   registerCiStatusCommand(pi);
   registerLspFooterContribution(lspState);
+
+  // ── Native context path capture for instruction-file dedup ─────────
+  pi.on("before_agent_start", (event, ctx) => {
+    const session = app.getSession(ctx.cwd) ?? app.createSession(ctx.cwd);
+    session.captureNativeInstructionPaths(event.systemPromptOptions.contextFiles ?? []);
+  });
 
   // ── Coverage warning emission ─────────────────────────────────────
   pi.on(

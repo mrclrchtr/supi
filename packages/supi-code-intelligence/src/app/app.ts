@@ -77,8 +77,9 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
   pi.on("session_start", (_event, ctx) => {
     const session = manager.getOrCreateSession(ctx.cwd);
 
-    // Check if the branch already contains an overview
+    // Check if the branch already contains an overview and restore branch-local instruction state.
     const branch = ctx.sessionManager.getBranch();
+    session.reconstructInstructionState(branch);
     for (const entry of branch) {
       if (
         entry.type === "custom_message" &&
@@ -88,6 +89,10 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
         break;
       }
     }
+  });
+
+  pi.on("session_compact", (_event, ctx) => {
+    manager.getSession(ctx.cwd)?.resetSurfacedInstructionDirs();
   });
 
   pi.on("session_shutdown", () => {

@@ -1,76 +1,32 @@
 # supi-claude-md
 
-Subdirectory context injection for the pi coding agent.
+CLAUDE.md/AGENTS.md maintenance skills for the pi coding agent.
 
 ## Architecture
 
-One capability wired into a single extension:
+This package is skills-only in behavior. Its thin extension registers bundled skills through `resources_discover`; it does not inject instruction files, register tools, or expose settings.
 
-1. **Subdirectory discovery**: `tool_result` handler augments `read`/`write`/`edit`/`ls`/`lsp`/`tree_sitter` tool results with CLAUDE.md/AGENTS.md content from subdirectories below cwd
-
-Root and ancestor instruction files are loaded natively by pi into the system prompt on every turn. SuPi does not re-inject them.
+Runtime instruction-file surfacing is owned by `@mrclrchtr/supi-code-intelligence`: `code_orientation` with a directory focus surfaces applicable `CLAUDE.md`/`AGENTS.md` files as part of explicit orientation.
 
 ## Key files
 
-- `index.ts`: extension entry point, all event handlers
-- `config.ts`: config interface, defaults, `loadClaudeMdConfig()`
-- `settings-registration.ts`: registers claude-md settings with the supi-core settings registry
-- `state.ts`: `ClaudeMdState` type, `createInitialState()`, `reconstructState()` from real pi `SessionEntry[]` branch data
-- `discovery.ts`: `findSubdirContextFiles()`, `filterAlreadyLoaded()`, `extractPathFromToolEvent()`
-- `subdirectory.ts`: `formatSubdirContext()`, `shouldInjectSubdir()`
-
-## Dependencies
-
-- `@mrclrchtr/supi-core`: `wrapExtensionContext()`, `loadSupiConfig()`, `writeSupiConfig()`, `removeSupiConfigKey()`, `registerSettings()`
-
-> Note: `@earendil-works/pi-tui` remains in `peerDependencies` for historical installs but is no longer imported by this package.
+- `src/claude-md.ts`: resource-discovery-only extension entry point
+- `src/extension.ts`: package extension export
+- `src/index.ts` / `src/api.ts`: package re-export surfaces
+- `skills/claude-md-improver`: bulk audit and scoring workflow for CLAUDE.md files
+- `skills/claude-md-revision`: targeted session-capture additions to CLAUDE.md/AGENTS.md
 
 ## Skills
 
 Two skills are shipped under `skills/`:
 
-- `claude-md-improver`: bulk audit and scoring of CLAUDE.md files across the repo. Includes SuPi-aware baseline review: compares CLAUDE.md sections against the context already delivered by `supi-code-intelligence` (workspace module graph) and `supi-claude-md` (subdirectory injection), then flags redundant sections or compressible overlap
+- `claude-md-improver`: bulk audit and scoring of CLAUDE.md files across the repo. Includes SuPi-aware baseline review: compares CLAUDE.md sections against the context already delivered by `supi-code-intelligence` (workspace module graph and directory instruction-file orientation), then flags redundant sections or compressible overlap
 - `claude-md-revision`: targeted session-capture additions to CLAUDE.md
 
 Both skills share a set of reference files (`references/quality-criteria.md`, `references/templates.md`, `references/update-guidelines.md`). The revision skill duplicates these for self-containment. **When editing one copy, keep the other in sync**; `__tests__/unit/skill-references-sync.test.ts` enforces this.
 
-## Config
-
-Global: `~/.pi/agent/supi/config.json`; project: `.pi/supi/config.json`
-
-```json
-{
-  "claude-md": {
-    "subdirs": true,
-    "fileNames": ["CLAUDE.md", "AGENTS.md"]
-  }
-}
-```
-
-## Testing
-
-- Unit tests in `__tests__/unit/`: pure function tests for config, discovery, subdirectory, state, settings-registration, and skill-reference sync
-- Integration tests in `__tests__/integration/`: pi lifecycle, tool result handling, and resource discovery with mocked pi
-- Shared test helpers in `__tests__/helpers/`
-- Config tests use temp directories with `homeDir` parameter injection
-
 ## Gotchas
 
-- Settings are managed via `/supi-settings` (unified SuPi settings command): claude-md registers its section via `registerClaudeMdSettings()` in the supi-core registry, with `fileNames` edited through `SettingItem.submenu` text inputs
-- `reconstructState()` must parse real Pi `SessionEntry[]` branch entries (`message` + nested `message.role`, `custom_message`) and restore subdirectory injection state from tool-result `<extension-context>` tags
-- Path-aware tool discovery should treat `tree_sitter` like `lsp` (`input.file`) so AST-first workflows still inject subdirectory context
-- `systemPromptOptions` now uses pi's upstream `BuildSystemPromptOptions` typing directly; `contextFiles` entries have required `path` and `content` fields in current pi releases
-- `os.homedir()` cannot be mocked in ESM: config functions accept optional `homeDir` parameter for testability
-- Root/native context files are never re-injected by this extension; they live in pi's system prompt. Use `/reload` or restart the session to pick up changes to root instruction files
-- Subdirectory context is injected from path-aware tool activity such as reads, writes, edits, LSP operations, and Tree-sitter operations
-- Each directory is injected at most once per session. After a session compact, previously seen directories can be re-discovered
-
-## Injection pipeline
-
-The extension operates through three stages on `tool_result` events:
-
-1. **Path extraction** (`discovery.ts`): identifies file paths from tool input (reads, writes, edits, LSP, and Tree-sitter operations). Determines parent directories to scan.
-2. **Subdirectory scan** (`discovery.ts`): walks from the deepest subdirectory up to (but not including) cwd, checking for ordered `fileNames`. Skips directories already injected this session.
-3. **Context formatting** (`subdirectory.ts`): wraps discovered file content in `<extension-context source="supi-claude-md">` blocks and appends them to the tool result.
-
-Root and ancestor files are handled natively by pi's system prompt. This extension never re-injects them. Use `/reload` to refresh native root context.
+- Do not reintroduce automatic `tool_result` instruction injection here. ADR 0013 moved instruction-file surfacing into explicit `code_orientation` directory focus.
+- This package intentionally has no `/supi-settings` section. `code-intelligence.instructionFileNames` config belongs to `supi-code-intelligence`.
+- The extension entry point remains necessary even though the package is skills-only in behavior, because SuPi resources self-register via `resources_discover` rather than static `pi.skills` manifest entries.

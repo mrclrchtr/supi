@@ -94,11 +94,25 @@ You can also edit the config file directly:
 
 > **Note:** The global `lsp.enabled` switch and `lsp.active` allowlist are deprecated since v0.7.0 and have no effect.
 
+### 5. Optional: tune instruction-file names
+
+Directory `code_orientation` surfaces local instruction files using the `code-intelligence.instructionFileNames` setting. Defaults:
+
+```json
+{
+  "code-intelligence": {
+    "instructionFileNames": ["CLAUDE.md", "AGENTS.md"]
+  }
+}
+```
+
+Edit this through `/supi-settings` → **Code Intelligence**, or directly in `.pi/supi/config.json` / `~/.pi/agent/supi/config.json`.
+
 ## What you get
 
 After install, pi gets:
 
-- `code_orientation` — first-pass orientation for projects, discovered modules, directories, files, or precise symbols (`code_brief` and the old `code_context` surface have been replaced)
+- `code_orientation` — first-pass orientation for projects, discovered modules, directories, files, or precise symbols; directory focus also surfaces applicable local instruction files such as `CLAUDE.md`/`AGENTS.md` (`code_brief` and the old `code_context` surface have been replaced)
 - `code_inspect` — factual point inspection for one precise file position
 - `code_graph` — unified relation graph (references, callees, imports, exports, implementations, tests) from a resolved target
 - `code_impact` — preferred workflow-oriented blast radius, downstream impact, and user-supplied change-set analysis
@@ -158,7 +172,7 @@ code_orientation(focus="packages/my-package")
 code_orientation(focus="packages/my-package/src/tool")
 code_orientation(focus="packages/my-package/src/tool/health/execute.ts")
 ```
-Orientation briefs are summaries, not source replacement; read the files before editing.
+Directory orientation includes applicable local instruction files, shallowest first and deepest last, so package-local guidance is visible before editing. Orientation briefs are summaries, not source replacement; read the files before editing.
 
 ### Estimate impact before a change
 
@@ -193,7 +207,7 @@ code_orientation(targetId)                       → orient around the symbol
 
 ### Understand a package before editing
 ```
-code_orientation(focus="packages/my-package")           → package orientation
+code_orientation(focus="packages/my-package")           → package orientation + local instruction files
 code_orientation(focus="packages/my-package/src/tool")   → directory drill-down
 code_health(scope="packages/my-package", refresh=true) → check diagnostics
 ```

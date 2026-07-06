@@ -6,10 +6,17 @@
  * orientation.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import type { ArchitectureModel } from "../../analysis/architecture/model.ts";
+import {
+  findInstructionFilesForDirectory,
+  insertInstructionsNearTop,
+  renderInstructionFiles,
+} from "../../analysis/instruction-files.ts";
 import { normalizePath } from "../../analysis/search/ripgrep.ts";
+import { loadCodeIntelligenceConfig } from "../../config.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
+import type { OrientationUseCaseResult } from "../../ui/markdown/types.ts";
 import { unavailableContextDetails } from "../infra/error-results.ts";
 import { prepareOrientationDeps } from "./deps.ts";
 import type { CodeOrientationToolParams } from "./execute.ts";
@@ -50,8 +57,52 @@ export async function runOrientationMode(
     },
     { ...deps, cwd: ctx.cwd },
   );
+  const withInstructions = addInstructionFilesForDirectoryFocus(result, focusResolution.path, ctx);
 
-  return { content: result.content, details: { type: "context", data: result.details } };
+  return {
+    content: withInstructions.content,
+    details: { type: "context", data: withInstructions.details },
+  };
+}
+
+function addInstructionFilesForDirectoryFocus(
+  result: OrientationUseCaseResult,
+  focusPath: string | undefined,
+  ctx: CodeIntelToolExecCtx,
+): OrientationUseCaseResult {
+  if (!focusPath || !isDirectory(focusPath)) return result;
+
+  const config = loadCodeIntelligenceConfig(ctx.cwd);
+  const matches = findInstructionFilesForDirectory({
+    directory: focusPath,
+    cwd: ctx.cwd,
+    fileNames: config.instructionFileNames,
+    nativeContextPaths: ctx.session.nativeInstructionPaths,
+    surfacedDirectories: ctx.session.surfacedInstructionDirs,
+  });
+  if (matches.length === 0) return result;
+
+  const rendered = renderInstructionFiles(matches);
+  if (!rendered) return result;
+
+  ctx.session.markInstructionDirsSurfaced(rendered.metadata.files.map((file) => file.directory));
+
+  return {
+    content: insertInstructionsNearTop(result.content, rendered.markdown),
+    details: {
+      ...result.details,
+      renderedSections: ["instructions", ...result.details.renderedSections],
+      instructions: rendered.metadata,
+    },
+  };
+}
+
+function isDirectory(filePath: string): boolean {
+  try {
+    return statSync(filePath).isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 /**

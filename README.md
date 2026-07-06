@@ -139,7 +139,7 @@ pi install npm:@mrclrchtr/supi-web
 
 <kbd>Agent</kbd> <kbd>Beta</kbd>
 
-Automatic subdirectory context-file discovery plus bundled skills for maintaining repository-specific agent guidance.
+Bundled skills for auditing and revising repository-specific `CLAUDE.md`/`AGENTS.md` guidance.
 
 ```bash
 pi install npm:@mrclrchtr/supi-claude-md

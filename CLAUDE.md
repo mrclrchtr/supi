@@ -133,7 +133,7 @@ Extensions register settings via `registerSettings()` from `@mrclrchtr/supi-core
 - `tsc -b` (build mode) and `--noEmit` are incompatible — use `pnpm typecheck:ai` instead of raw `tsc` commands.
 - Per PI docs, signal real tool failures by throwing from `execute()` — returning error text is still a successful tool call. Only throw for actual invalid usage or capability-unavailable conditions, not for valid searches that find zero results.
 
-> For per-package gotchas (session entry parsing, message rendering, config patterns, WASM quirks), see individual `packages/*/CLAUDE.md` files — injected automatically by supi-claude-md when working in that directory.
+> For per-package gotchas (session entry parsing, message rendering, config patterns, WASM quirks), see individual `packages/*/CLAUDE.md` files — surfaced by `code_orientation(focus="packages/...")` when the agent orients into that directory.
 ## Publish pipeline
 
 Published npm tarballs must produce npm-compatible manifests because PI installs packages via `npm install`. The pipeline has four stages:

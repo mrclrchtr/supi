@@ -60,7 +60,7 @@ It includes:
   - tool snippets
   - append text
 - instruction-file details with token cost, line count, and detected origin (`project` vs `global`)
-- injected subdirectory context files from `supi-claude-md`, including turn number, line count, and token cost
+- legacy injected subdirectory context files from older `supi-claude-md` sessions, when present
 - active skill names with per-skill token counts
 - guideline bullet previews, plus source attribution for PI defaults, known built-in tools (`read`, `write`, `edit`), and `other`
 - active tool definitions with per-tool definition token counts and snippet-token columns when available

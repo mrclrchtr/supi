@@ -1,63 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const mockFns = vi.hoisted(() => ({
-  loadClaudeMdConfig: vi.fn(),
-  extractPathFromToolEvent: vi.fn(),
-  filterAlreadyLoaded: vi.fn(),
-  findSubdirContextFiles: vi.fn(),
-  formatSubdirContext: vi.fn(),
-  shouldInjectSubdir: vi.fn(),
-  reconstructState: vi.fn(),
-}));
-
-vi.mock("@mrclrchtr/supi-core/api", () => ({
-  createInputSubmenu: vi.fn(),
-  getContextToken: (details: unknown) =>
-    details && typeof details === "object"
-      ? ((details as { contextToken?: string }).contextToken ?? null)
-      : null,
-  loadSupiConfig: vi.fn(),
-  registerConfigSettings: vi.fn(),
-  removeSupiConfigKey: vi.fn(),
-  writeSupiConfig: vi.fn(),
-}));
-
-vi.mock("../../src/config.ts", () => ({
-  CLAUDE_MD_DEFAULTS: {
-    subdirs: true,
-    fileNames: ["CLAUDE.md", "AGENTS.md"],
-  },
-  loadClaudeMdConfig: mockFns.loadClaudeMdConfig,
-}));
-
-vi.mock("../../src/discovery.ts", () => ({
-  extractPathFromToolEvent: mockFns.extractPathFromToolEvent,
-  filterAlreadyLoaded: mockFns.filterAlreadyLoaded,
-  findSubdirContextFiles: mockFns.findSubdirContextFiles,
-}));
-
-vi.mock("../../src/subdirectory.ts", () => ({
-  formatSubdirContext: mockFns.formatSubdirContext,
-  shouldInjectSubdir: mockFns.shouldInjectSubdir,
-}));
-
-vi.mock("../../src/state.ts", () => ({
-  createInitialState: () => ({
-    injectedDirs: new Set(),
-    nativeContextPaths: new Set(),
-    firstAgentStart: true,
-  }),
-  reconstructState: mockFns.reconstructState,
-}));
-
 import claudeMdExtension from "../../src/claude-md.ts";
-
-const DEFAULT_CONFIG = {
-  subdirs: true,
-  fileNames: ["CLAUDE.md", "AGENTS.md"],
-};
 
 type DiscoverResult = {
   skillPaths?: string[];
@@ -68,12 +12,6 @@ function setup(): Map<string, (...args: unknown[]) => unknown> {
   const pi = {
     on(event: string, handler: (...args: unknown[]) => unknown) {
       handlers.set(event, handler);
-    },
-    registerCommand() {},
-    sendUserMessage() {},
-    events: {
-      on: vi.fn(() => () => {}),
-      emit: vi.fn(),
     },
   };
   claudeMdExtension(pi as never);
@@ -89,12 +27,11 @@ function getDiscoverHandler(handlers: Map<string, (...args: unknown[]) => unknow
 describe("supi-claude-md resources_discover", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFns.loadClaudeMdConfig.mockReturnValue({ ...DEFAULT_CONFIG });
   });
 
-  it("registers a resources_discover handler", () => {
+  it("registers only a resources_discover handler", () => {
     const handlers = setup();
-    expect(handlers.has("resources_discover")).toBe(true);
+    expect([...handlers.keys()]).toEqual(["resources_discover"]);
   });
 
   it("returns absolute skill paths", async () => {
