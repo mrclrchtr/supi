@@ -12,9 +12,6 @@ import {
 import type { LspAdapterState } from "./state.ts";
 import { diagnosticMessageString } from "./utils.ts";
 
-// LSP_TOOL_NAMES removed — lsp_* tools are no longer registered (TNDM-A9AQF4)
-const LSP_TOOL_NAMES: readonly string[] = [];
-
 export function registerDiagnosticInjectionHandlers(
   pi: ExtensionAPI,
   state: LspAdapterState,
@@ -22,19 +19,7 @@ export function registerDiagnosticInjectionHandlers(
   pi.on("before_agent_start", async (_event, _ctx: ExtensionContext) => {
     const manager = state.controller?.manager;
     if (!manager || !state.lspActive) {
-      const activeTools = pi.getActiveTools();
-      const nextTools = activeTools.filter(
-        (t: string) => !LSP_TOOL_NAMES.includes(t as (typeof LSP_TOOL_NAMES)[number]),
-      );
-      if (nextTools.length !== activeTools.length) {
-        pi.setActiveTools(nextTools);
-      }
       return;
-    }
-
-    const missing = LSP_TOOL_NAMES.filter((name) => !pi.getActiveTools().includes(name));
-    if (missing.length > 0) {
-      pi.setActiveTools([...pi.getActiveTools(), ...missing]);
     }
 
     // Sentinel refresh: detect lockfile/tsconfig/d.ts changes from outside write/edit

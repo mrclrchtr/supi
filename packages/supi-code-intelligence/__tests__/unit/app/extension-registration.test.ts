@@ -125,8 +125,8 @@ describe("focused code intelligence tool registration", () => {
     expect(tool.description).not.toContain("advisory-only");
 
     const guidanceText = tool.promptGuidelines?.join("\n") ?? "";
-    expect(guidanceText).toContain('For code_find, pass kind only with mode:"ast"');
-    expect(guidanceText).toContain('mode:"semantic" never falls back');
+    // mode:"ast" / no-silent-fallback safety cues are pinned on the description above;
+    // the guideline that restated them was removed (ADR 0005: no mechanics in guidelines).
     expect(guidanceText).toContain("symbol-identity callers");
     expect(guidanceText).not.toContain("kind is ignored");
     expect(guidanceText).not.toContain("call-site matching via ripgrep");

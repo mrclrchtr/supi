@@ -8,5 +8,4 @@ export const promptSnippet =
 
 export const promptGuidelines = [
   "Use supi_context before large operations or when context usage is near the limit.",
-  "Prefer supi_context over asking the user to run /supi-context.",
 ];
