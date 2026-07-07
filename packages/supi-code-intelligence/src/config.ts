@@ -1,13 +1,13 @@
 // Code Intelligence configuration and settings registration.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core/config";
-import { createInputSubmenu } from "@mrclrchtr/supi-core/settings-ui";
+import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
+import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
 
 const CODE_INTELLIGENCE_SECTION = "code-intelligence";
 
 /** User-facing configuration for the code-intelligence extension. */
-export interface CodeIntelligenceConfig {
+export interface CodeIntelligenceConfig extends Record<string, unknown> {
   /** Ordered directory-local instruction file names to surface during directory orientation. */
   instructionFileNames: string[];
 }
@@ -24,20 +24,17 @@ export function loadCodeIntelligenceConfig(cwd: string, homeDir?: string): CodeI
 
 /** Register code-intelligence settings with the shared SuPi settings registry. */
 export function registerCodeIntelligenceSettings(pi: ExtensionAPI, homeDir?: string): void {
-  registerConfigSettings(pi, {
+  registerDeclarativeSettings(pi, {
     id: CODE_INTELLIGENCE_SECTION,
     label: "Code Intelligence",
     section: CODE_INTELLIGENCE_SECTION,
     defaults: CODE_INTELLIGENCE_DEFAULTS,
-    buildItems: (settings) => [
+    fields: [
       {
-        id: "instructionFileNames",
+        kind: "stringList" as const,
+        key: "instructionFileNames",
         label: "Instruction File Names",
         description: "Directory-local instruction file names shown by directory orientation",
-        currentValue: settings.instructionFileNames.join(", "),
-        configType: "stringList" as const,
-        submenu: (currentValue, done) =>
-          createInputSubmenu(currentValue, "Instruction file names (comma-separated):", done),
       },
     ],
     ...(homeDir ? { homeDir } : {}),

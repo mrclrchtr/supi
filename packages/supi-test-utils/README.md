@@ -95,7 +95,7 @@ vi.mock("@mrclrchtr/supi-core", async (importOriginal) => {
   return {
     ...actual,
     loadSupiConfig: vi.fn(),
-    registerConfigSettings: vi.fn(),
+    registerDeclarativeSettings: vi.fn(),
   };
 });
 ```

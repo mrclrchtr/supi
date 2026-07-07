@@ -39,14 +39,17 @@ Config file locations:
 
 ### Settings helpers
 
-- `registerConfigSettings(pi, options)` — contribute a config-backed settings section with scoped persistence helpers
+- `registerDeclarativeSettings(pi, options)` — contribute a config-backed declarative settings section with source-aware scoped persistence
 - `registerSettingsCommand(pi)` — register `/supi-settings` (used by `@mrclrchtr/supi-settings`)
 - `openSettingsOverlay(pi, ctx)` — open the shared settings UI directly
 - `createInputSubmenu()` — helper for simple text-entry submenus
+- `createModelPickerSubmenu()` — helper for scoped model selection submenus
 
 The built-in settings UI supports:
 
 - project/global scope toggle
+- source badges for project, global, and default values
+- Inherit/Reset actions that delete scoped config keys
 - grouped extension sections
 - searchable setting lists
 
@@ -83,24 +86,22 @@ The built-in settings UI supports:
 
 ```ts
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { loadSupiConfig, registerConfigSettings, wrapExtensionContext } from "@mrclrchtr/supi-core/api";
+import { loadSupiConfig, registerDeclarativeSettings, wrapExtensionContext } from "@mrclrchtr/supi-core/api";
 
 export default function myExtension(pi: ExtensionAPI) {
   const defaults = { enabled: true };
   const config = loadSupiConfig("my-extension", process.cwd(), defaults);
 
-  registerConfigSettings(pi, {
+  registerDeclarativeSettings(pi, {
     id: "my-extension",
     label: "My Extension",
     section: "my-extension",
     defaults,
-    buildItems: (settings) => [
+    fields: [
       {
-        id: "enabled",
+        kind: "boolean" as const,
+        key: "enabled",
         label: "Enabled",
-        currentValue: settings.enabled ? "on" : "off",
-        values: ["on", "off"],
-        configType: "boolean" as const,
       },
     ],
   });

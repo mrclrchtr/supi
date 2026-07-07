@@ -12,16 +12,24 @@ vi.mock("@earendil-works/pi-coding-agent", async () => {
 
 import type { SettingsSection } from "../../../src/settings/settings-registry.ts";
 import { SUPI_SETTINGS_COLLECT_EVENT } from "../../../src/settings/settings-registry.ts";
+import type { BoolField, ScopedFieldValue } from "../../../src/settings/settings-schema.ts";
 import { createInputSubmenu, openSettingsOverlay } from "../../../src/settings/settings-ui.ts";
+
+const booleanField: BoolField = { kind: "boolean", key: "enabled", label: "Enable" };
 
 function makeSection(overrides: Partial<SettingsSection> = {}): SettingsSection {
   return {
-    id: "claude-md",
-    label: "Claude-MD",
+    id: "test",
+    label: "Test",
     loadValues: () => [
-      { id: "enabled", label: "Enable", currentValue: "on", values: ["on", "off"] },
+      {
+        field: booleanField,
+        displayValue: "on (default)",
+        editValue: "on",
+        source: "default",
+      } satisfies ScopedFieldValue,
     ],
-    persistChange: vi.fn(),
+    handleAction: vi.fn(),
     ...overrides,
   };
 }
@@ -100,7 +108,14 @@ describe("openSettingsOverlay", () => {
       makeSection({
         loadValues: (scope) => {
           loadScopes.push(scope);
-          return [{ id: "enabled", label: "Enable", currentValue: "on", values: ["on", "off"] }];
+          return [
+            {
+              field: booleanField,
+              displayValue: "on (default)",
+              editValue: "on",
+              source: "default",
+            } satisfies ScopedFieldValue,
+          ];
         },
       }),
     ]);
@@ -123,7 +138,7 @@ describe("openSettingsOverlay", () => {
     expect(requestRender).toHaveBeenCalled();
   });
 
-  it("delegates Escape to the underlying settings list", () => {
+  it("delegates Escape to close", () => {
     const pi = makePi([makeSection()]);
     let component: { handleInput?: (data: string) => boolean } | undefined;
     const done = vi.fn();
@@ -152,9 +167,6 @@ describe("openSettingsOverlay", () => {
 
     openSettingsOverlay(pi as never, { cwd: "/tmp", ui: { custom, notify: vi.fn() } } as never);
 
-    // The duplicate warnings should be in the diagnostics. Since the mock
-    // sections cause the SettingsList to crash on empty render, we verify
-    // the overlay was opened (custom was called) and the diagnostics exist.
     expect(custom).toHaveBeenCalledOnce();
   });
 });

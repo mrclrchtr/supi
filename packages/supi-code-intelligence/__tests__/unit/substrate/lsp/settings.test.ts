@@ -9,14 +9,21 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const registerConfigSettingsSpy = vi.fn();
+const registerDeclarativeSettingsSpy = vi.fn();
+
+vi.mock("@mrclrchtr/supi-core/settings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@mrclrchtr/supi-core/settings")>();
+  return {
+    ...actual,
+    registerDeclarativeSettings: registerDeclarativeSettingsSpy,
+  };
+});
 
 vi.mock("@mrclrchtr/supi-core/config", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-core/config")>();
   return {
     ...actual,
-    registerConfigSettings: registerConfigSettingsSpy,
-    loadSupiConfigForScope: vi.fn(() => ({
+    loadSupiConfigSectionForScope: vi.fn(() => ({
       enabled: true,
       severity: 1,
       active: [],
@@ -47,37 +54,34 @@ describe("LSP settings UI", () => {
     const { registerLspSettings } = await import("../../../../src/substrate/lsp/settings.ts");
     registerLspSettings({ on: vi.fn(), events: { on: vi.fn(), emit: vi.fn() } } as never);
 
-    expect(registerConfigSettingsSpy).toHaveBeenCalledTimes(1);
-    const callArgs = registerConfigSettingsSpy.mock.calls[0]?.[1] as {
-      buildItems?: (
-        settings: unknown,
-        scope: string,
-        cwd: string,
-      ) => Array<{ id: string; submenu?: unknown }>;
+    expect(registerDeclarativeSettingsSpy).toHaveBeenCalledTimes(1);
+    const callArgs = registerDeclarativeSettingsSpy.mock.calls[0]?.[1] as {
+      fields?: Array<{ key: string; kind: string; submenu?: unknown }>;
     };
-    const buildItems = callArgs?.buildItems;
-    if (!buildItems) {
-      throw new Error("buildItems is required");
+    const fields = callArgs?.fields;
+    if (!fields) {
+      throw new Error("fields is required");
     }
 
-    const items = buildItems(
-      { enabled: true, severity: 1, active: [], exclude: [] },
-      "project",
-      "/tmp",
-    );
-    const ids = items.map((i) => i.id);
+    const keys = fields.map((f) => f.key);
 
     // Removed items
-    expect(ids).not.toContain("enabled");
-    expect(ids).not.toContain("active");
+    expect(keys).not.toContain("enabled");
+    expect(keys).not.toContain("active");
 
     // Added items
-    expect(ids).toContain("severity");
-    expect(ids).toContain("disabled_servers");
-    expect(ids).toContain("exclude");
+    expect(keys).toContain("severity");
+    expect(keys).toContain("disabled_servers");
+    expect(keys).toContain("exclude");
 
-    // Disabled Servers has a submenu
-    const disabledServers = items.find((i) => i.id === "disabled_servers");
+    // Disabled Servers is a custom field with a submenu
+    const disabledServers = fields.find((f) => f.key === "disabled_servers");
+    expect(disabledServers?.kind).toBe("custom");
     expect(disabledServers?.submenu).toBeDefined();
+
+    // Severity is a number field with discrete values
+    const severity = fields.find((f) => f.key === "severity");
+    expect(severity?.kind).toBe("number");
+    expect((severity as { values?: string[] })?.values).toEqual(["1", "2", "3", "4"]);
   });
 });

@@ -1,6 +1,6 @@
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 
-export interface BashTimeoutConfig {
+export interface BashTimeoutConfig extends Record<string, unknown> {
   defaultTimeout: number;
 }
 

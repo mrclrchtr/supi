@@ -7,7 +7,7 @@
 
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 
-export interface ContextConfig {
+export interface ContextConfig extends Record<string, unknown> {
   /** Enable the supi_context agent-callable tool. Default: false */
   agentToolEnabled: boolean;
 }

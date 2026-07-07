@@ -26,7 +26,7 @@ After install, pi gets one new slash command:
 
 - **`/supi-settings`** — open a searchable settings overlay for registered SuPi extension settings
 
-The overlay groups settings by extension, shows current values, and lets you switch between **project** and **global** scopes with `Tab`.
+The overlay groups settings by extension, shows current values with source badges like `(project)`, `(global)`, and `(default)`, and lets you switch between **project** and **global** scopes with `Tab`. Row actions can explicitly set a scoped value or delete it with **Inherit** / **Reset to default**.
 
 ## How it works
 

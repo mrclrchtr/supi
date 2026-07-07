@@ -6,13 +6,16 @@ const mockFns = vi.hoisted(() => ({
   getDebugEvents: vi.fn(),
   getDebugSummary: vi.fn(),
   loadSupiConfig: vi.fn(),
-  registerConfigSettings: vi.fn(),
+  registerDeclarativeSettings: vi.fn(),
   registerContextProvider: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-core/config", () => ({
   loadSupiConfig: mockFns.loadSupiConfig,
-  registerConfigSettings: mockFns.registerConfigSettings,
+}));
+
+vi.mock("@mrclrchtr/supi-core/settings", () => ({
+  registerDeclarativeSettings: mockFns.registerDeclarativeSettings,
 }));
 
 vi.mock("@mrclrchtr/supi-core/context", () => ({

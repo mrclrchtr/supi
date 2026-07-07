@@ -97,12 +97,12 @@ Extension packages with prompts/skills:
 
 ## Settings registry
 
-Extensions register settings via `registerSettings()` from `@mrclrchtr/supi-core/api`. Call it during the factory function (not async handlers). Prefer `registerConfigSettings()` for config-backed sections over manual `registerSettings()` + scoped-load + write wiring.
+Extensions register config-backed settings via `registerDeclarativeSettings()` from `@mrclrchtr/supi-core/settings`. Call it during the factory function (not async handlers).
 
-- The registry stores `SettingItem[]` compatible with pi-tui's `SettingsList`.
+- The registry stores declarative `SettingsField[]` contributions that `/supi-settings` resolves into source-aware rows.
 - `/supi-settings` (from `supi-settings`) renders all registered sections.
-- Scope toggle (Tab) switches between project/global; values are strings, extensions handle conversion.
-- Submenus use `SettingItem.submenu` returning a pi-tui `Component`; Escape confirms, empty-string done() cancels.
+- Scope toggle (Tab) switches between project/global; rows show source badges such as `(project)`, `(global)`, and `(default)`.
+- Enter opens row actions; Space cycles concrete values; Inherit/Reset actions delete the scoped key. Explicit values are distinct from inherited/default values.
 
 ## Shared gotchas
 
@@ -183,7 +183,7 @@ Single-context — one `CONTEXT.md` at repo root + `docs/adr/`. See `docs/agents
 - Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils` for pi mocks instead of defining local factories — includes `events`, `getActiveTools`, `sendMessage`, `registerShortcut`, `exec`, `emit`, and `getAllTools`
 - Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
 - Package-scoped commands: `pnpm vitest run packages/<pkg>/`, `pnpm exec biome check packages/<pkg>`, `pnpm exec tsc -b packages/<pkg>/tsconfig.json`. For shared-config changes, sweep `packages/supi-core/ packages/supi-lsp/ packages/supi-claude-md/`.
-- Global-scope tests for `registerConfigSettings` should pass `homeDir` in the options object rather than mutating `process.env.HOME`.
+- Global-scope tests for `registerDeclarativeSettings` should pass `homeDir` in the options object rather than mutating `process.env.HOME`.
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports. `--max-diagnostics=20` caps output when the full check OOMs.
 - `ctx.ui.select()` accepts only `string[]`; use label-encoding (e.g. `"[id] name"`) if you need metadata
 - `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` — required to trigger `setInterval` callbacks in vitest

@@ -24,15 +24,18 @@ src/
   tool-framework.ts   — shared tool-spec/registration framework + runWithProgressWidget
   config/
     config.ts         — loadSupiConfig*(), writeSupiConfig(), removeSupiConfigKey()
-    config-settings.ts — registerConfigSettings() helper
   context/
     context-messages.ts   — context token/prompt-content helpers
     context-provider-registry.ts — context provider registry
     context-tag.ts        — extension-context wrapping
   settings/
-    settings-registry.ts — global settings registry
-    settings-command.ts  — /supi-settings command wiring
-    settings-ui.ts       — settings overlay and submenu UI
+    settings-registry.ts    — settings contribution collector protocol
+    settings-schema.ts      — registerDeclarativeSettings() and source-aware field resolution
+    scoped-settings-list.ts — SuPi-owned source-aware settings list component
+    settings-action-menu.ts — row action menu construction
+    settings-submenus.ts    — reusable input/model picker submenus
+    settings-command.ts     — /supi-settings command wiring
+    settings-ui.ts          — settings overlay orchestration
 ```
 
 ## Test layout
@@ -68,15 +71,15 @@ __tests__/
 - `loadSupiConfigForScope()` is for settings UIs that need raw scope values; `loadSupiConfig()` is for effective merged runtime config.
 - Config merges are shallow per section; do not assume nested objects deep-merge.
 - In tests, pass `homeDir` instead of trying to mock `os.homedir()`.
-- `registerConfigSettings()` forwards `homeDir` through to scoped config loads and writes; prefer passing `homeDir` in tests over mutating `process.env.HOME`.
+- `registerDeclarativeSettings()` forwards `homeDir` through to scoped config loads and writes; prefer passing `homeDir` in tests over mutating `process.env.HOME`.
 
 ## Shared behavior gotchas
 
 - The settings registry lives on `globalThis` with `Symbol.for("@mrclrchtr/supi-core/settings-registry")` so registrations survive jiti/symlinked duplicate module instances.
 - `createSessionStateRegistry()` is the shared helper for workspace-keyed session state; substrate packages should keep package-specific state unions and wait semantics local, and share only the normalized-cwd storage plumbing.
-- Call `registerSettings()` during the extension factory function, not async handlers.
-- `settings-ui.ts` prefixes flat item ids with `section.id` to avoid collisions, then strips the prefix before calling `persistChange()`.
-- `registerConfigSettings()` wraps `registerSettings()` and owns selected-scope loading (`loadSupiConfigForScope`) and scoped persistence (`set`/`unset` helpers); extensions only build `SettingItem[]` and handle string↔typed parsing.
+- Call `registerDeclarativeSettings()` during the extension factory function, not async handlers.
+- `settings-schema.ts` owns source resolution (`project`/`global`/`default`), typed parsing, scoped writes, Inherit/Reset deletion, and structured `afterPersist` notifications.
+- `ScopedFieldValue.displayValue` includes the source badge for rendering; use `editValue` for editor prefills and concrete-choice comparisons. Do not parse the badge back out of display text.
 - Adding a new runtime export to `supi-core/index.ts` requires updating every `vi.mock("@mrclrchtr/supi-core")` factory in downstream test files; missing exports cause cryptic "No X export is defined on the mock" errors.
 - Extensions using custom message renderers should keep display text in `content` and raw model text in `details.promptContent`; `restorePromptContent()` swaps the raw text back before the model sees it.
 - `pruneAndReorderContextMessages()` keeps only the active token for a `customType` and moves the live context message before the last user message.

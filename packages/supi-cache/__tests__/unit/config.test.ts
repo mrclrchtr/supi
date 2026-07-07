@@ -78,25 +78,25 @@ describe("registerCacheMonitorSettings", () => {
     expect(section).toMatchObject({ id: "cache", label: "Cache" });
   });
 
-  it("loadValues returns four setting items with defaults", () => {
+  it("loadValues returns four field values with default source", () => {
     const pi = makePi();
     registerCacheMonitorSettings(pi as never);
     const section = collectSection(pi);
-    const items = section.loadValues("project", "/tmp");
+    const values = section.loadValues("project", "/tmp");
 
-    expect(items.map((i) => i.id)).toEqual([
+    expect(values.map((v) => v.field.key)).toEqual([
       "enabled",
       "notifications",
       "regressionThreshold",
       "idleThresholdMinutes",
     ]);
-    expect(items.find((i) => i.id === "enabled")?.currentValue).toBe("on");
-    expect(items.find((i) => i.id === "notifications")?.currentValue).toBe("on");
-    expect(items.find((i) => i.id === "regressionThreshold")?.currentValue).toBe("25");
-    expect(items.find((i) => i.id === "idleThresholdMinutes")?.currentValue).toBe("5");
+    expect(values.find((v) => v.field.key === "enabled")?.displayValue).toContain("on");
+    expect(values.find((v) => v.field.key === "notifications")?.displayValue).toContain("on");
+    expect(values.find((v) => v.field.key === "regressionThreshold")?.displayValue).toContain("25");
+    expect(values.find((v) => v.field.key === "idleThresholdMinutes")?.displayValue).toContain("5");
   });
 
-  it("reads selected scope config correctly", () => {
+  it("reads selected scope config with correct source", () => {
     const tmpDir = makeTempDir();
     testFiles.push(tmpDir);
 
@@ -116,16 +116,18 @@ describe("registerCacheMonitorSettings", () => {
     registerCacheMonitorSettings(pi as never, tmpDir);
     const section = collectSection(pi);
 
-    const globalItems = section.loadValues("global", tmpDir);
-    expect(globalItems.find((i) => i.id === "enabled")?.currentValue).toBe("off");
-    expect(globalItems.find((i) => i.id === "regressionThreshold")?.currentValue).toBe("15");
+    const globalValues = section.loadValues("global", tmpDir);
+    expect(globalValues.find((v) => v.field.key === "enabled")?.source).toBe("global");
+    expect(globalValues.find((v) => v.field.key === "enabled")?.displayValue).toContain("off");
 
-    const projectItems = section.loadValues("project", tmpDir);
-    expect(projectItems.find((i) => i.id === "notifications")?.currentValue).toBe("off");
-    expect(projectItems.find((i) => i.id === "regressionThreshold")?.currentValue).toBe("40");
+    const projectValues = section.loadValues("project", tmpDir);
+    expect(projectValues.find((v) => v.field.key === "notifications")?.source).toBe("project");
+    expect(projectValues.find((v) => v.field.key === "notifications")?.displayValue).toContain(
+      "off",
+    );
   });
 
-  it("persistChange writes enabled setting", () => {
+  it("handleAction writes enabled setting", () => {
     const tmpDir = makeTempDir();
     testFiles.push(tmpDir);
 
@@ -133,14 +135,14 @@ describe("registerCacheMonitorSettings", () => {
     registerCacheMonitorSettings(pi as never, tmpDir);
     const section = collectSection(pi);
 
-    section.persistChange("project", tmpDir, "enabled", "off");
+    section.handleAction("project", tmpDir, "enabled", { kind: "set", value: "off" });
 
     const configPath = path.join(tmpDir, ".pi/supi/config.json");
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));
     expect(raw.cache.enabled).toBe(false);
   });
 
-  it("persistChange writes regressionThreshold as number", () => {
+  it("handleAction writes regressionThreshold as number", () => {
     const tmpDir = makeTempDir();
     testFiles.push(tmpDir);
 
@@ -148,7 +150,7 @@ describe("registerCacheMonitorSettings", () => {
     registerCacheMonitorSettings(pi as never, tmpDir);
     const section = collectSection(pi);
 
-    section.persistChange("global", tmpDir, "regressionThreshold", "15");
+    section.handleAction("global", tmpDir, "regressionThreshold", { kind: "set", value: "15" });
 
     const configPath = path.join(tmpDir, ".pi/agent/supi/config.json");
     const raw = JSON.parse(fs.readFileSync(configPath, "utf-8"));

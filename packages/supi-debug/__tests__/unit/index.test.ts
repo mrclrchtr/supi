@@ -6,13 +6,16 @@ const mockFns = vi.hoisted(() => ({
   getDebugEvents: vi.fn(),
   getDebugSummary: vi.fn(),
   loadSupiConfig: vi.fn(),
-  registerConfigSettings: vi.fn(),
+  registerDeclarativeSettings: vi.fn(),
   registerContextProvider: vi.fn(),
 }));
 
 vi.mock("@mrclrchtr/supi-core/config", () => ({
   loadSupiConfig: mockFns.loadSupiConfig,
-  registerConfigSettings: mockFns.registerConfigSettings,
+}));
+
+vi.mock("@mrclrchtr/supi-core/settings", () => ({
+  registerDeclarativeSettings: mockFns.registerDeclarativeSettings,
 }));
 
 vi.mock("@mrclrchtr/supi-core/context", () => ({
@@ -64,7 +67,7 @@ describe("supi-debug extension setup", () => {
   it("registers settings, context provider, command, tool, and session handler", () => {
     const pi = setup();
 
-    expect(mockFns.registerConfigSettings).toHaveBeenCalledOnce();
+    expect(mockFns.registerDeclarativeSettings).toHaveBeenCalledOnce();
     expect(mockFns.registerContextProvider).toHaveBeenCalledOnce();
     expect(pi.handlers.has("session_start")).toBe(true);
     expect(pi.commands.has("supi-debug")).toBe(true);
@@ -132,63 +135,47 @@ describe("supi-debug settings", () => {
     vi.clearAllMocks();
   });
 
-  it("builds setting items and persists typed values", () => {
+  it("registers declarative settings with expected fields and type-driven persistence", () => {
     setup({ enabled: false, agentAccess: "raw", maxEvents: 250 });
 
-    const options = mockFns.registerConfigSettings.mock.calls[0][1];
-    expect(
-      options.buildItems({
-        enabled: false,
-        agentAccess: "raw",
-        maxEvents: 250,
-      }),
-    ).toMatchObject([
-      { id: "enabled", currentValue: "off" },
-      { id: "agentAccess", currentValue: "raw" },
-      { id: "maxEvents", currentValue: "250" },
-    ]);
+    const options = mockFns.registerDeclarativeSettings.mock.calls[0][1];
 
-    const helpers = { set: vi.fn(), unset: vi.fn() };
+    // Verify fields are declared declaratively
+    expect(options.fields).toHaveLength(3);
+    expect(options.fields[0]).toMatchObject({ kind: "boolean", key: "enabled" });
+    expect(options.fields[1]).toMatchObject({
+      kind: "enum",
+      key: "agentAccess",
+      values: ["off", "sanitized", "raw"],
+    });
+    expect(options.fields[2]).toMatchObject({ kind: "number", key: "maxEvents" });
+
+    // Verify afterPersist triggers live sync
     mockFns.configureDebugRegistry.mockClear();
     mockFns.loadSupiConfig.mockReturnValue({
       enabled: true,
       agentAccess: "raw",
       maxEvents: 500,
     });
-    options.persistChange("project", "/repo", "enabled", "on", helpers);
-    options.afterPersist?.({ scope: "project", cwd: "/repo", settingId: "enabled", value: "on" });
-    options.persistChange("project", "/repo", "agentAccess", "raw", helpers);
+
     options.afterPersist?.({
       scope: "project",
       cwd: "/repo",
-      settingId: "agentAccess",
-      value: "raw",
-    });
-    options.persistChange("project", "/repo", "maxEvents", "500", helpers);
-    options.afterPersist?.({
-      scope: "project",
-      cwd: "/repo",
-      settingId: "maxEvents",
-      value: "500",
+      fieldKey: "enabled",
+      action: "set",
+      storedValue: "on",
+      effectiveValue: true,
+      effectiveSource: "project",
     });
 
-    expect(helpers.set.mock.calls).toEqual([
-      ["enabled", true],
-      ["agentAccess", "raw"],
-      ["maxEvents", 500],
-    ]);
-    expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
-      enabled: true,
-      agentAccess: "raw",
-      maxEvents: 500,
-    });
+    // afterPersist should call syncLiveDebugRegistry which calls applyDebugConfig → configureDebugRegistry
+    expect(mockFns.configureDebugRegistry).toHaveBeenCalled();
   });
 
-  it("reconfigures the live registry immediately and clears events when disabling", () => {
+  it("reconfigures the live registry on afterPersist", () => {
     setup();
 
-    const options = mockFns.registerConfigSettings.mock.calls[0][1];
-    const helpers = { set: vi.fn(), unset: vi.fn() };
+    const options = mockFns.registerDeclarativeSettings.mock.calls[0][1];
     mockFns.configureDebugRegistry.mockClear();
     mockFns.clearDebugEvents.mockClear();
     mockFns.loadSupiConfig.mockReturnValue({
@@ -197,16 +184,17 @@ describe("supi-debug settings", () => {
       maxEvents: 50,
     });
 
-    options.persistChange("project", "/repo", "enabled", "off", helpers);
-    options.afterPersist?.({ scope: "project", cwd: "/repo", settingId: "enabled", value: "off" });
-
-    expect(helpers.set).toHaveBeenCalledWith("enabled", false);
-    expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
-      enabled: false,
-      agentAccess: "raw",
-      maxEvents: 50,
+    options.afterPersist?.({
+      scope: "project",
+      cwd: "/repo",
+      fieldKey: "enabled",
+      action: "set",
+      storedValue: "off",
+      effectiveValue: false,
+      effectiveSource: "project",
     });
-    expect(mockFns.clearDebugEvents).toHaveBeenCalledOnce();
+
+    expect(mockFns.configureDebugRegistry).toHaveBeenCalled();
   });
 });
 

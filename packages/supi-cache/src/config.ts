@@ -10,7 +10,7 @@
 
 import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 
-export interface CacheMonitorConfig {
+export interface CacheMonitorConfig extends Record<string, unknown> {
   /** Enable/disable cache monitoring. Default: true */
   enabled: boolean;
   /** Show regression warning notifications. Default: true */

@@ -8,34 +8,23 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
-import { createModelPickerSubmenu } from "@mrclrchtr/supi-core/settings-ui";
+import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
 import { CONFIG_SECTION, DEFAULTS } from "./config.ts";
-
-const MODEL_ITEM_ID = "model";
 
 /** Register the prompt-suggestions settings section. */
 export function registerPromptSuggestionsSettings(pi: ExtensionAPI): void {
-  registerConfigSettings(pi, {
+  registerDeclarativeSettings(pi, {
     id: "promptSuggestions",
     label: "Prompt suggestions",
     section: CONFIG_SECTION,
     defaults: DEFAULTS,
-    buildItems: (settings, _scope, _cwd, ctx) => [
+    fields: [
       {
-        id: MODEL_ITEM_ID,
+        kind: "modelPicker" as const,
+        key: "model",
         label: "Suggestion model",
         description: "Model used for ghost-text suggestions. Select 'disabled' to turn off.",
-        currentValue: settings.model,
-        submenu: (currentValue: string, done: (selectedValue?: string) => void) =>
-          createModelPickerSubmenu(currentValue, done, ctx),
       },
     ],
-    // biome-ignore lint/complexity/useMaxParams: callback shape mandated by registerConfigSettings API
-    persistChange: (_scope, _cwd, settingId, value, helpers) => {
-      if (settingId === MODEL_ITEM_ID) {
-        helpers.set(MODEL_ITEM_ID, value);
-      }
-    },
   });
 }

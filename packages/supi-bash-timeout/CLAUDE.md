@@ -8,7 +8,7 @@ A single `tool_call` handler intercepting `bash` events:
 
 1. Checks if the LLM already specified a `timeout` parameter — skips if set
 2. Otherwise injects the configured default timeout (120s by default)
-3. Timeout is configurable via `/supi-settings` (uses `registerConfigSettings` from `supi-core`)
+3. Timeout is configurable via `/supi-settings` (uses `registerDeclarativeSettings` from `supi-core`)
 
 ## Key files
 

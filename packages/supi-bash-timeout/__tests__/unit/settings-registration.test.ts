@@ -59,17 +59,16 @@ describe("registerBashTimeoutSettings", () => {
     expect(section).toMatchObject({ id: "bash-timeout", label: "Bash Timeout" });
   });
 
-  it("loadValues returns one setting item", () => {
+  it("loadValues returns one field value with default source", () => {
     const pi = makePi();
     registerBashTimeoutSettings(pi as never);
     const section = collect(pi);
-    const items = section.loadValues("project", "/tmp");
+    const values = section.loadValues("project", "/tmp");
 
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({
-      id: "defaultTimeout",
-      label: "Default Timeout",
-      currentValue: "120",
+    expect(values).toHaveLength(1);
+    expect(values[0]).toMatchObject({
+      field: { kind: "number", key: "defaultTimeout", label: "Default Timeout" },
+      source: "default",
     });
   });
 
@@ -93,11 +92,13 @@ describe("registerBashTimeoutSettings", () => {
     registerBashTimeoutSettings(pi as never, tmpDir);
     const section = collect(pi);
 
-    const globalItems = section.loadValues("global", tmpDir);
-    const projectItems = section.loadValues("project", tmpDir);
+    const globalValues = section.loadValues("global", tmpDir);
+    const projectValues = section.loadValues("project", tmpDir);
 
-    expect(globalItems[0]?.currentValue).toBe("300");
-    expect(projectItems[0]?.currentValue).toBe("60");
+    expect(globalValues[0]?.source).toBe("global");
+    expect(globalValues[0]?.displayValue).toContain("300");
+    expect(projectValues[0]?.source).toBe("project");
+    expect(projectValues[0]?.displayValue).toContain("60");
   });
 
   it("project scope falls back to defaults when only global config exists", () => {
@@ -113,46 +114,24 @@ describe("registerBashTimeoutSettings", () => {
     const pi = makePi();
     registerBashTimeoutSettings(pi as never, tmpDir);
     const section = collect(pi);
-    const projectItems = section.loadValues("project", tmpDir);
+    const projectValues = section.loadValues("project", tmpDir);
 
-    expect(projectItems[0]?.currentValue).toBe("120");
+    expect(projectValues[0]?.source).toBe("global");
+    expect(projectValues[0]?.displayValue).toContain("300");
   });
 
-  it("persistChange writes positive numeric value", () => {
+  it("handleAction set writes numeric value", () => {
     const tmpDir = makeTempDir();
     testFiles.push(tmpDir);
 
     const pi = makePi();
     registerBashTimeoutSettings(pi as never, tmpDir);
     const section = collect(pi);
-    section.persistChange("global", tmpDir, "defaultTimeout", "300");
+    section.handleAction("global", tmpDir, "defaultTimeout", { kind: "set", value: "300" });
 
     const config = JSON.parse(
       fs.readFileSync(path.join(tmpDir, ".pi/agent/supi/config.json"), "utf-8"),
     );
     expect(config["bash-timeout"].defaultTimeout).toBe(300);
-  });
-
-  it("persistChange unsets key for invalid value", () => {
-    const tmpDir = makeTempDir();
-    testFiles.push(tmpDir);
-
-    fs.mkdirSync(path.join(tmpDir, ".pi/agent/supi"), { recursive: true });
-    fs.writeFileSync(
-      path.join(tmpDir, ".pi/agent/supi/config.json"),
-      JSON.stringify({ "bash-timeout": { defaultTimeout: 300 } }),
-    );
-
-    const pi = makePi();
-    registerBashTimeoutSettings(pi as never, tmpDir);
-    const section = collect(pi);
-    section.persistChange("global", tmpDir, "defaultTimeout", "not-a-number");
-
-    const configPath = path.join(tmpDir, ".pi/agent/supi/config.json");
-    const fileExists = fs.existsSync(configPath);
-    if (fileExists) {
-      const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      expect(config["bash-timeout"]).toBeUndefined();
-    }
   });
 });

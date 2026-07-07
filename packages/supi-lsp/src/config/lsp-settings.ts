@@ -8,7 +8,7 @@ import { loadSupiConfig, loadSupiConfigForScope } from "@mrclrchtr/supi-core/con
 
 // ── Types ────────────────────────────────────────────────────
 
-export interface LspSettings {
+export interface LspSettings extends Record<string, unknown> {
   enabled: boolean;
   severity: number;
   active: string[];

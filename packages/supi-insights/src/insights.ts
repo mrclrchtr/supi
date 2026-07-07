@@ -12,7 +12,8 @@ import type {
   SessionInfo,
 } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core/config";
+import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
+import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
 import { aggregateData } from "./aggregator.ts";
 import {
   loadCachedFacets,
@@ -76,7 +77,7 @@ function getConfig(cwd: string): InsightsConfig {
 
 export default function insightsExtension(pi: ExtensionAPI) {
   // Register config-backed settings for /supi-settings
-  registerConfigSettings<InsightsConfig>(pi, {
+  registerDeclarativeSettings(pi, {
     id: "insights",
     label: "Insights",
     section: "insights",
@@ -85,27 +86,23 @@ export default function insightsExtension(pi: ExtensionAPI) {
       maxSessions: MAX_SESSIONS_TO_ANALYZE,
       maxFacets: MAX_FACET_EXTRACTIONS,
     },
-    buildItems: (settings, _scope, _cwd) => [
+    fields: [
       {
-        id: "enabled",
+        kind: "boolean" as const,
+        key: "enabled",
         label: "Enable insights",
-        currentValue: settings.enabled ? "on" : "off",
-        values: ["on", "off"],
-        configType: "boolean" as const,
       },
       {
-        id: "maxSessions",
+        kind: "number" as const,
+        key: "maxSessions",
         label: "Max sessions to analyze",
-        currentValue: String(settings.maxSessions),
         values: ["50", "100", "200", "500"],
-        configType: "number" as const,
       },
       {
-        id: "maxFacets",
+        kind: "number" as const,
+        key: "maxFacets",
         label: "Max facet extractions",
-        currentValue: String(settings.maxFacets),
         values: ["20", "50", "100"],
-        configType: "number" as const,
       },
     ],
   });

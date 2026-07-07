@@ -142,6 +142,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["packages/supi-core/src/settings/settings-schema.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noExcessiveLinesPerFile": "off"
+          }
+        }
+      }
     }
   ]
 }

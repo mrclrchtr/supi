@@ -7,7 +7,7 @@ import {
   type TruncationResult,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import { loadSupiConfig, registerConfigSettings } from "@mrclrchtr/supi-core/config";
+import { loadSupiConfig } from "@mrclrchtr/supi-core/config";
 import { registerContextProvider } from "@mrclrchtr/supi-core/context";
 import {
   clearDebugEvents,
@@ -20,6 +20,7 @@ import {
   getDebugEvents,
   getDebugSummary,
 } from "@mrclrchtr/supi-core/debug";
+import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
 import { Type } from "typebox";
 import { formatDataLines } from "./format.ts";
 import { registerDebugMessageRenderer } from "./renderer.ts";
@@ -29,7 +30,7 @@ import { promptGuidelines, promptSnippet, toolDescription } from "./tool/guidanc
 const DEBUG_SECTION = "debug";
 const DEBUG_REPORT_TYPE = "supi-debug-report";
 
-interface DebugConfig {
+interface DebugConfig extends Record<string, unknown> {
   enabled: boolean;
   agentAccess: DebugAgentAccess;
   maxEvents: number;
@@ -104,44 +105,33 @@ function syncLiveDebugRegistry(cwd: string): DebugConfig {
 }
 
 function registerDebugSettings(pi: ExtensionAPI): void {
-  registerConfigSettings(pi, {
+  registerDeclarativeSettings(pi, {
     id: "debug",
     label: "Debug",
     section: DEBUG_SECTION,
     defaults: DEBUG_DEFAULTS,
-    buildItems: (settings) => [
+    fields: [
       {
-        id: "enabled",
+        kind: "boolean" as const,
+        key: "enabled",
         label: "Enabled",
         description: "Enable/disable session-local SuPi debug event capture",
-        currentValue: settings.enabled ? "on" : "off",
-        values: ["on", "off"],
       },
       {
-        id: "agentAccess",
+        kind: "enum" as const,
+        key: "agentAccess",
         label: "Agent Access",
         description: "Control whether the agent can fetch sanitized or raw debug events",
-        currentValue: normalizeAgentAccess(String(settings.agentAccess)),
         values: ["off", "sanitized", "raw"],
       },
       {
-        id: "maxEvents",
+        kind: "number" as const,
+        key: "maxEvents",
         label: "Max Events",
         description: "Maximum session-local debug events retained in memory",
-        currentValue: String(normalizeMaxEvents(settings.maxEvents)),
         values: ["50", "100", "250", "500"],
       },
     ],
-    // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
-    persistChange: (_scope, _cwd, settingId, value, helpers) => {
-      if (settingId === "enabled") {
-        helpers.set("enabled", value === "on");
-      } else if (settingId === "agentAccess") {
-        helpers.set("agentAccess", normalizeAgentAccess(value));
-      } else if (settingId === "maxEvents") {
-        helpers.set("maxEvents", normalizeMaxEvents(value));
-      }
-    },
     afterPersist: ({ cwd }) => {
       syncLiveDebugRegistry(cwd);
     },

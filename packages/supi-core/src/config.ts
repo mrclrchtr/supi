@@ -1,12 +1,11 @@
-// supi-core config domain — config loading and config-settings helpers.
+// supi-core config domain — config loading.
 export type { SupiConfigLocation, SupiConfigOptions } from "./config/config.ts";
 export {
   loadSectionConfig,
   loadSupiConfig,
   loadSupiConfigForScope,
+  loadSupiConfigSectionForScope,
   readJsonFile,
   removeSupiConfigKey,
   writeSupiConfig,
 } from "./config/config.ts";
-export type { ConfigSettingsHelpers, ConfigSettingsOptions } from "./config/config-settings.ts";
-export { registerConfigSettings } from "./config/config-settings.ts";

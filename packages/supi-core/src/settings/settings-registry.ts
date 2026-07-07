@@ -1,11 +1,11 @@
 // Event-backed settings contribution types for SuPi extensions.
 //
-// Extensions contribute config-backed settings sections through PI's shared
-// event bus. The public helper is registerConfigSettings(pi, ...); this module
+// Extensions contribute declarative settings sections through PI's shared
+// event bus. The public helper is registerDeclarativeSettings(pi, ...); this module
 // owns the internal collector protocol used by /supi-settings.
 
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import type { SettingItem } from "@earendil-works/pi-tui";
+import type { ScopedFieldValue, SettingsFieldAction } from "./settings-schema.ts";
 
 export const SUPI_SETTINGS_COLLECT_EVENT = "supi:settings:collect";
 
@@ -16,10 +16,16 @@ export interface SettingsSection {
   id: string;
   /** Human-readable label shown in the UI. */
   label: string;
-  /** Load current SettingItem[] for the given scope. */
-  loadValues: (scope: SettingsScope, cwd: string, ctx?: ExtensionContext) => SettingItem[];
-  /** Persist a UI value back to SuPi config. */
-  persistChange: (scope: SettingsScope, cwd: string, settingId: string, value: string) => void;
+  /** Load current ScopedFieldValue[] for the given scope. */
+  loadValues: (scope: SettingsScope, cwd: string, ctx?: ExtensionContext) => ScopedFieldValue[];
+  /** Handle a user action on a field in the selected scope. */
+  handleAction: (
+    scope: SettingsScope,
+    cwd: string,
+    fieldKey: string,
+    action: SettingsFieldAction,
+    ctx?: ExtensionContext,
+  ) => void;
 }
 
 export interface SettingsContributionCollector {

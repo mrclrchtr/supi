@@ -80,30 +80,31 @@ describe("registerCodeIntelligenceSettings", () => {
     expect(section).toMatchObject({ id: "code-intelligence", label: "Code Intelligence" });
   });
 
-  it("loads instructionFileNames as a string-list setting", () => {
+  it("loads instructionFileNames as a declarative field with default source", () => {
     const pi = makePi();
     registerCodeIntelligenceSettings(pi as never);
 
     const section = collectSection(pi);
-    const items = section.loadValues("project", "/tmp");
+    const values = section.loadValues("project", "/tmp");
 
-    expect(items).toHaveLength(1);
-    expect(items[0]).toMatchObject({
-      id: "instructionFileNames",
-      currentValue: "CLAUDE.md, AGENTS.md",
-      configType: "stringList",
+    expect(values).toHaveLength(1);
+    expect(values[0]).toMatchObject({
+      field: { kind: "stringList", key: "instructionFileNames" },
+      source: "default",
     });
   });
 
-  it("persists instructionFileNames to the selected scope", () => {
+  it("persists instructionFileNames via handleAction", () => {
     const tmpDir = makeTempDir();
     tempDirs.push(tmpDir);
     const pi = makePi();
     registerCodeIntelligenceSettings(pi as never, tmpDir);
 
     const section = collectSection(pi);
-    section.loadValues("project", tmpDir);
-    section.persistChange("project", tmpDir, "instructionFileNames", "RULES.md, NOTES.md");
+    section.handleAction("project", tmpDir, "instructionFileNames", {
+      kind: "set",
+      value: "RULES.md, NOTES.md",
+    });
 
     const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, ".pi/supi/config.json"), "utf-8"));
     expect(raw["code-intelligence"].instructionFileNames).toEqual(["RULES.md", "NOTES.md"]);

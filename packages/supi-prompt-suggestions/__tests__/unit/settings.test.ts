@@ -1,27 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 
-const mockRegisterConfigSettings = vi.hoisted(() => vi.fn());
-const mockCreateModelPickerSubmenu = vi.hoisted(() => vi.fn());
+const mockRegisterDeclarativeSettings = vi.hoisted(() => vi.fn());
 
-vi.mock("@mrclrchtr/supi-core/config", () => ({
-  registerConfigSettings: mockRegisterConfigSettings,
-}));
-
-vi.mock("@mrclrchtr/supi-core/settings-ui", () => ({
-  createModelPickerSubmenu: mockCreateModelPickerSubmenu,
+vi.mock("@mrclrchtr/supi-core/settings", () => ({
+  registerDeclarativeSettings: mockRegisterDeclarativeSettings,
 }));
 
 import { registerPromptSuggestionsSettings } from "../../src/config/settings.ts";
 
 describe("registerPromptSuggestionsSettings", () => {
-  it("persists disabled as an explicit scoped value", () => {
+  it("uses declarative modelPicker so disabled is an explicit value, not a signal to unset", () => {
     registerPromptSuggestionsSettings({} as never);
 
-    const options = mockRegisterConfigSettings.mock.calls[0][1];
-    const helpers = { set: vi.fn(), unset: vi.fn() };
-    options.persistChange("project", "/repo", "model", "disabled", helpers);
+    expect(mockRegisterDeclarativeSettings).toHaveBeenCalledOnce();
+    const options = mockRegisterDeclarativeSettings.mock.calls[0][1];
 
-    expect(helpers.set).toHaveBeenCalledWith("model", "disabled");
-    expect(helpers.unset).not.toHaveBeenCalled();
+    expect(options.fields).toHaveLength(1);
+    expect(options.fields[0]).toMatchObject({
+      kind: "modelPicker",
+      key: "model",
+    });
+
+    // With the declarative schema, all values (including "disabled") are explicit;
+    // only the Inherit action deletes the key.
   });
 });

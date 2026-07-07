@@ -4,13 +4,21 @@ import {
   isSettingsContributionCollector,
   type SettingsSection,
 } from "../../../src/settings/settings-registry.ts";
+import type { BoolField, ScopedFieldValue } from "../../../src/settings/settings-schema.ts";
 
 function section(id: string, label = id): SettingsSection {
   return {
     id,
     label,
-    loadValues: () => [],
-    persistChange: () => {},
+    loadValues: () => [
+      {
+        field: { kind: "boolean", key: "test", label: "Test" } satisfies BoolField,
+        displayValue: "on (default)",
+        editValue: "on",
+        source: "default",
+      } satisfies ScopedFieldValue,
+    ],
+    handleAction: () => {},
   };
 }
 

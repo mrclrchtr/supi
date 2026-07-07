@@ -40,6 +40,38 @@ _Avoid_: config category, settings group
 A SuPi extension's runtime-declared, config-backed settings section for a Configuration Surface to collect and render. A contribution describes editable SuPi config values and scoped persistence behavior; it is not itself the stored configuration.
 _Avoid_: global settings singleton, arbitrary settings UI registry, assuming one shared package instance
 
+**Declarative Settings Schema**:
+A Settings Contribution shape where an extension describes configurable values and edit controls, while the shared settings module owns scope inheritance, persistence, and rendering semantics.
+_Avoid_: per-package settings UI logic, raw SettingItem factory for config-backed values
+
+**Project Override**:
+A project-scoped SuPi configuration value that intentionally replaces the value inherited from broader configuration for the current workspace. It remains an override even when its value text matches a package default.
+_Avoid_: project setting when the presence or absence of an override matters, local value
+
+**Explicit Value**:
+A stored value chosen in a specific configuration scope. It is semantically different from an Inherited Value even when both render to the same user-facing value.
+_Avoid_: treating default-looking values as unset, conflating disabled with inherit
+
+**Inherited Value**:
+The effective value used for a configurable setting when the selected scope has no stored value of its own; it comes from the next broader applicable configuration source.
+_Avoid_: unset value, blank value, override when the setting lacks a scoped stored value
+
+**Inheritance Source**:
+The broader configuration source that supplies an Inherited Value: Global configuration when a user value exists there, otherwise package defaults.
+_Avoid_: parent setting, fallback source when discussing scoped settings
+
+**Value Source State**:
+A settings UI state that identifies whether the displayed value comes from the selected scope, Global configuration, or package defaults. Declarative and custom settings controls should report this state consistently.
+_Avoid_: inferring source from display text, treating custom controls as source-less rows
+
+**Inherit Action**:
+A source-aware settings UI action that removes a Project Override so the setting uses its Inherited Value again; it may be labeled "Inherit from global" or "Use default" depending on the resulting Inheritance Source.
+_Avoid_: reset if it may not restore a default, unset as user-facing copy
+
+**Reset to Default Action**:
+A settings UI action that removes a Global configuration value so package defaults supply the setting again.
+_Avoid_: inherit when no broader user scope exists, unset as user-facing copy
+
 **Structured Decision**:
 A fixed-form agent-user interaction used when the agent needs a focused choice or short answer before it can continue. It should be described concretely rather than as a vague handoff.
 _Avoid_: clearer handoff

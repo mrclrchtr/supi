@@ -1,7 +1,7 @@
 // Cache-monitor settings registration for the supi settings registry.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
+import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
 import { CACHE_MONITOR_DEFAULTS } from "./config.ts";
 
 const THRESHOLD_VALUES = ["5", "10", "15", "20", "25", "30", "35", "40", "45", "50"];
@@ -9,43 +9,37 @@ const IDLE_THRESHOLD_VALUES = ["1", "2", "3", "5", "10", "15", "20", "30", "45",
 
 /** Register supi-cache settings with the supi settings registry. */
 export function registerCacheMonitorSettings(pi: ExtensionAPI, homeDir?: string): void {
-  registerConfigSettings(pi, {
+  registerDeclarativeSettings(pi, {
     id: "cache",
     label: "Cache",
     section: "cache",
     defaults: CACHE_MONITOR_DEFAULTS,
-    buildItems: (settings) => [
+    fields: [
       {
-        id: "enabled",
+        kind: "boolean" as const,
+        key: "enabled",
         label: "Enabled",
         description: "Enable/disable prompt cache health monitoring",
-        currentValue: settings.enabled ? "on" : "off",
-        values: ["on", "off"],
-        configType: "boolean" as const,
       },
       {
-        id: "notifications",
+        kind: "boolean" as const,
+        key: "notifications",
         label: "Notifications",
         description: "Show warning notifications on cache regressions",
-        currentValue: settings.notifications ? "on" : "off",
-        values: ["on", "off"],
-        configType: "boolean" as const,
       },
       {
-        id: "regressionThreshold",
+        kind: "number" as const,
+        key: "regressionThreshold",
         label: "Regression Threshold",
         description: "Percentage-point drop that triggers a regression warning",
-        currentValue: String(settings.regressionThreshold),
         values: THRESHOLD_VALUES,
-        configType: "number" as const,
       },
       {
-        id: "idleThresholdMinutes",
+        kind: "number" as const,
+        key: "idleThresholdMinutes",
         label: "Idle Threshold",
         description: "Minutes of inactivity to classify as idle-time regression",
-        currentValue: String(settings.idleThresholdMinutes),
         values: IDLE_THRESHOLD_VALUES,
-        configType: "number" as const,
       },
     ],
     ...(homeDir ? { homeDir } : {}),

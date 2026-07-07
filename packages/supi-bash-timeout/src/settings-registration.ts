@@ -1,23 +1,19 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { registerConfigSettings } from "@mrclrchtr/supi-core/config";
-import { createInputSubmenu } from "@mrclrchtr/supi-core/settings-ui";
+import { registerDeclarativeSettings } from "@mrclrchtr/supi-core/settings";
 import { BASH_TIMEOUT_DEFAULTS } from "./config.ts";
 
 export function registerBashTimeoutSettings(pi: ExtensionAPI, homeDir?: string): void {
-  registerConfigSettings(pi, {
+  registerDeclarativeSettings(pi, {
     id: "bash-timeout",
     label: "Bash Timeout",
     section: "bash-timeout",
     defaults: BASH_TIMEOUT_DEFAULTS,
-    buildItems: (settings) => [
+    fields: [
       {
-        id: "defaultTimeout",
+        kind: "number" as const,
+        key: "defaultTimeout",
         label: "Default Timeout",
         description: "Default timeout for bash tool calls in seconds",
-        currentValue: String(settings.defaultTimeout),
-        configType: "number" as const,
-        submenu: (currentValue, done) =>
-          createInputSubmenu(currentValue, "Timeout in seconds:", done),
       },
     ],
     ...(homeDir ? { homeDir } : {}),
