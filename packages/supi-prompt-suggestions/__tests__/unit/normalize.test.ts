@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { normalizeSuggestion } from "../../src/generation/normalize.ts";
+import {
+  normalizeSuggestion,
+  normalizeSuggestionDetailed,
+} from "../../src/generation/normalize.ts";
 
 describe("normalizeSuggestion", () => {
   it("trims whitespace", () => {
@@ -34,14 +37,19 @@ describe("normalizeSuggestion", () => {
     expect(normalizeSuggestion("   \n  ")).toBeNull();
   });
 
-  it("truncates strings over 240 characters", () => {
-    const result = normalizeSuggestion("a".repeat(241));
-    expect(result).toBe("a".repeat(240));
+  it("does not truncate ordinary long strings", () => {
+    const text = "a".repeat(241);
+    expect(normalizeSuggestion(text)).toBe(text);
   });
 
-  it("accepts strings at exactly 240 characters", () => {
-    const max = "a".repeat(240);
-    expect(normalizeSuggestion(max)).toBe(max);
+  it("safety-caps runaway output at 2,000 graphemes", () => {
+    const result = normalizeSuggestionDetailed("😀".repeat(2001));
+    expect(result).toEqual({
+      text: "😀".repeat(2000),
+      wasSafetyCapped: true,
+      originalGraphemeCount: 2001,
+      graphemeCount: 2000,
+    });
   });
 
   it("accepts mixed case with special chars", () => {

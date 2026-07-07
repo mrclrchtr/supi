@@ -18,6 +18,7 @@ export interface ResolvedAuth {
   model: any;
   apiKey: string;
   headers?: Record<string, string>;
+  env?: Record<string, string>;
 }
 
 export interface AuthResolutionError {
@@ -51,7 +52,7 @@ export async function resolveSuggestionAuth(
   }
 
   const auth = await ctx.modelRegistry.getApiKeyAndHeaders(match.model);
-  if (!auth.ok) {
+  if (!auth.ok || !hasConfiguredAuth(ctx, match.model, auth.apiKey)) {
     return {
       kind: "error",
       message: `No API key configured for ${match.canonicalId}`,
@@ -60,7 +61,7 @@ export async function resolveSuggestionAuth(
 
   return {
     kind: "ok",
-    auth: { model: match.model, apiKey: auth.apiKey ?? "", headers: auth.headers },
+    auth: { model: match.model, apiKey: auth.apiKey ?? "", headers: auth.headers, env: auth.env },
   };
 }
 
@@ -69,4 +70,14 @@ export async function resolveSuggestionAuth(
 function findSuggestionModel(ctx: ExtensionContext, modelId: string) {
   const models = getSelectableModels(ctx);
   return models.find((m) => m.canonicalId === modelId);
+}
+
+function hasConfiguredAuth(
+  ctx: ExtensionContext,
+  // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
+  model: any,
+  apiKey?: string,
+): boolean {
+  if (apiKey) return true;
+  return ctx.modelRegistry.hasConfiguredAuth(model);
 }

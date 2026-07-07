@@ -73,6 +73,9 @@ export class GhostTextEditor extends CustomEditor {
       }
       this.clearGhost();
       this.callbacks.onDismiss();
+      if (matchesKey(data, "escape")) {
+        return;
+      }
     } else {
       this.callbacks.onInput?.();
     }
@@ -96,7 +99,7 @@ export class GhostTextEditor extends CustomEditor {
     const available = width - visibleWidth(markerLine.slice(0, cursorPos));
     const maxGhost = Math.min(available - 1, Math.floor(width / 2));
     if (maxGhost <= 0) return lines;
-    const plainSuggestion = truncateToWidth(this.suggestion, maxGhost, "");
+    const plainSuggestion = truncateGhostPreview(this.suggestion, maxGhost);
     if (!plainSuggestion) return lines;
     const ghost = `\x1b[2m${plainSuggestion}\x1b[0m`;
     const gw = visibleWidth(plainSuggestion);
@@ -138,4 +141,26 @@ function ghostInsertPosition(line: string): number {
 
 function findCursorMarkerLine(lines: string[]): number {
   return lines.findIndex((l) => l.includes(CURSOR_MARKER));
+}
+
+function truncateGhostPreview(text: string, maxWidth: number): string {
+  if (maxWidth <= 0) return "";
+  if (visibleWidth(text) <= maxWidth) return text;
+
+  const ellipsis = "…";
+  const ellipsisWidth = visibleWidth(ellipsis);
+  if (maxWidth <= ellipsisWidth) return "";
+
+  const targetWidth = maxWidth - ellipsisWidth;
+  let preview = "";
+  let width = 0;
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  for (const { segment } of segmenter.segment(text)) {
+    const segmentWidth = visibleWidth(segment);
+    if (width + segmentWidth > targetWidth) break;
+    preview += segment;
+    width += segmentWidth;
+  }
+
+  return preview ? `${preview}${ellipsis}` : "";
 }

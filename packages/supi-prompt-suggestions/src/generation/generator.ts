@@ -19,8 +19,8 @@ import {
   GENERATION_TIMEOUT_MS,
   type SuggestionClientOutput,
 } from "./client.ts";
-import { resolveSuggestionAuth } from "./model-resolution.ts";
-import { normalizeSuggestion } from "./normalize.ts";
+import { type ResolvedAuth, resolveSuggestionAuth } from "./model-resolution.ts";
+import { normalizeSuggestionDetailed } from "./normalize.ts";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -141,7 +141,7 @@ export class SuggestionGenerator {
           message: authResult.message,
           cwd: ctx.cwd,
         });
-        callbacks.onStatus({ kind: "error", message: authResult.message });
+        callbacks.onStatus({ kind: "idle" });
         return;
       }
 
@@ -149,23 +149,10 @@ export class SuggestionGenerator {
 
       if (id !== this.generationId || abort.signal.aborted) return;
 
-      const { signal: combinedSignal, cleanup: cleanupTimeout } = combineAbortSignals(
-        abort,
-        GENERATION_TIMEOUT_MS,
-      );
+      const response = await this.#callModelWithTimeout(opts, auth);
+      if (!response) return;
 
-      try {
-        const response = await callSuggestionModel({
-          model: auth.model,
-          auth: { apiKey: auth.apiKey, headers: auth.headers },
-          tail,
-          signal: combinedSignal,
-        });
-
-        this.#handleResponse(response, id, ctx.cwd, callbacks, opts.modelId);
-      } finally {
-        cleanupTimeout();
-      }
+      this.#handleResponse(response, id, ctx.cwd, callbacks, opts.modelId);
     } catch (err) {
       if (id !== this.generationId) return;
       const message = err instanceof Error ? err.message : String(err);
@@ -183,6 +170,62 @@ export class SuggestionGenerator {
         this.currentAbort = null;
       }
     }
+  }
+
+  async #callModelWithTimeout(
+    opts: RunOptions,
+    auth: ResolvedAuth,
+  ): Promise<SuggestionClientOutput | null> {
+    const { signal: combinedSignal, cleanup: cleanupTimeout } = combineAbortSignals(
+      opts.abort,
+      GENERATION_TIMEOUT_MS,
+    );
+
+    try {
+      return await callSuggestionModel({
+        model: auth.model,
+        auth: { apiKey: auth.apiKey, headers: auth.headers, env: auth.env },
+        tail: opts.tail,
+        signal: combinedSignal,
+      });
+    } catch (err) {
+      if (opts.id !== this.generationId) return null;
+      if (opts.abort.signal.aborted) {
+        this.#recordGenerationAbort(opts);
+        opts.callbacks.onStatus({ kind: "idle" });
+        return null;
+      }
+      if (combinedSignal.aborted) {
+        this.#recordGenerationTimeout(opts);
+        opts.callbacks.onStatus({ kind: "idle" });
+        return null;
+      }
+      throw err;
+    } finally {
+      cleanupTimeout();
+    }
+  }
+
+  #recordGenerationAbort(opts: RunOptions): void {
+    recordDebugEvent({
+      source: "prompt-suggestions",
+      level: "debug",
+      category: "generation.aborted",
+      message: "Prompt suggestion generation aborted",
+      cwd: opts.ctx.cwd,
+      data: { modelId: opts.modelId },
+    });
+  }
+
+  #recordGenerationTimeout(opts: RunOptions): void {
+    recordDebugEvent({
+      source: "prompt-suggestions",
+      level: "debug",
+      category: "generation.timeout",
+      message: "Prompt suggestion generation timed out",
+      cwd: opts.ctx.cwd,
+      data: { modelId: opts.modelId, timeoutMs: GENERATION_TIMEOUT_MS },
+    });
   }
 
   // biome-ignore lint/complexity/useMaxParams: private method, params are orthogonal
@@ -208,13 +251,13 @@ export class SuggestionGenerator {
       return;
     }
 
-    const normalized = normalizeSuggestion(response.text);
+    const normalized = normalizeSuggestionDetailed(response.text);
     if (!normalized) {
       recordDebugEvent({
         source: "prompt-suggestions",
         level: "debug",
         category: "generation.rejected",
-        message: `Prompt suggestion rejected: empty after normalization (${response.text.length} raw chars)`,
+        message: "Prompt suggestion rejected after normalization",
         cwd,
         data: { rawLength: response.text.length },
       });
@@ -226,10 +269,17 @@ export class SuggestionGenerator {
       source: "prompt-suggestions",
       level: "debug",
       category: "generation.done",
-      message: `Prompt suggestion ready: "${normalized}"`,
+      message: "Prompt suggestion ready",
       cwd,
-      data: { suggestion: normalized, length: normalized.length },
+      data: {
+        modelId,
+        rawLength: response.text.length,
+        length: normalized.text.length,
+        graphemeCount: normalized.graphemeCount,
+        originalGraphemeCount: normalized.originalGraphemeCount,
+        wasSafetyCapped: normalized.wasSafetyCapped,
+      },
     });
-    callbacks.onStatus({ kind: "ready", suggestion: normalized });
+    callbacks.onStatus({ kind: "ready", suggestion: normalized.text });
   }
 }

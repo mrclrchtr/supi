@@ -157,8 +157,8 @@ A generated candidate user prompt offered after an assistant response for the us
 _Avoid_: next prompt, auto prompt, generated prompt, prefilled prompt
 
 **Ghost text**:
-A presentation of a prompt suggestion as dim inline preview text in the editor that is not part of the editor contents until accepted.
-_Avoid_: treating ghost text as editor text, autocomplete item, prefill
+A presentation of a prompt suggestion as dim inline preview text in the editor that is not part of the editor contents until accepted. Ghost text may truncate the visual preview for display, but accepting it inserts the underlying prompt suggestion rather than the truncated preview.
+_Avoid_: treating ghost text as editor text, autocomplete item, prefill, treating visual truncation as prompt content
 
 **Suggestion source**:
 The component responsible for producing prompt suggestions. A suggestion source may be model-backed, heuristic, disabled, or test-only, and is distinct from PI model providers and autocomplete providers.

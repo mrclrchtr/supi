@@ -109,7 +109,7 @@ describe("SuggestionGenerator", () => {
 
   // ── Auth error ──────────────────────────────────────────────
 
-  it("reports error when auth resolution fails", async () => {
+  it("reports idle when auth resolution fails", async () => {
     const onStatus = vi.fn();
     mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
     mockResolveSuggestionAuth.mockResolvedValue({
@@ -122,11 +122,11 @@ describe("SuggestionGenerator", () => {
     expect(onStatus).toHaveBeenCalledWith({ kind: "generating" });
 
     await vi.waitFor(() => {
-      expect(onStatus).toHaveBeenCalledWith({
-        kind: "error",
-        message: 'Suggestion model "anthropic/nonexistent" not in scoped set',
-      });
+      expect(onStatus).toHaveBeenCalledWith({ kind: "idle" });
     });
+    expect(mockRecordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "generation.auth-failure", level: "warning" }),
+    );
   });
 
   // ── Successful generation ────────────────────────────────────
@@ -146,6 +146,43 @@ describe("SuggestionGenerator", () => {
         kind: "ready",
         suggestion: "fix the bug",
       });
+    });
+
+    expect(mockRecordDebugEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: "generation.done",
+        message: "Prompt suggestion ready",
+        data: expect.not.objectContaining({ suggestion: expect.any(String) }),
+      }),
+    );
+  });
+
+  it("passes provider-scoped auth environment to the model call", async () => {
+    const onStatus = vi.fn();
+    mockLoadSectionConfig.mockReturnValue({ model: "anthropic/claude-sonnet-4-5" });
+    mockResolveSuggestionAuth.mockResolvedValue({
+      kind: "ok",
+      auth: {
+        model: { provider: "anthropic", id: "claude-sonnet-4-5" },
+        apiKey: "test-key",
+        headers: { "x-test": "true" },
+        env: { ANTHROPIC_BASE_URL: "https://example.invalid" },
+      },
+    });
+    mockCallSuggestionModel.mockResolvedValue({ ok: true, text: "fix the bug" });
+
+    generator.start(makeCtx() as never, "some text", { onStatus });
+
+    await vi.waitFor(() => {
+      expect(mockCallSuggestionModel).toHaveBeenCalledWith(
+        expect.objectContaining({
+          auth: {
+            apiKey: "test-key",
+            headers: { "x-test": "true" },
+            env: { ANTHROPIC_BASE_URL: "https://example.invalid" },
+          },
+        }),
+      );
     });
   });
 

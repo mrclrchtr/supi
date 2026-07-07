@@ -8,15 +8,18 @@ Ghost-text prompt suggestions in the PI editor.
 
 The extension installs a `GhostTextEditor` (extends `CustomEditor`) via `setEditorComponent` on every
 `session_start` (including `/reload`). This creates a fresh editor instance, discarding the previous
-editor's in-memory history. History is re-seeded from `sessionManager.getEntries()` — see
+editor's in-memory history. History is re-seeded from the active `sessionManager.getBranch()` — see
 `seedHistoryFromSession`.
 
 ### Fire-and-forget suggestion generation
 
 `SuggestionGenerator.start()` is fire-and-forget — callers do not await the returned promise. The
 class manages concurrency with an internal abort controller and generation ID. Calling `start` or
-`dismiss` cancels any in-flight generation. `extension.ts` owns the `SuggestionGenerator` instance
-directly rather than going through module-level wrappers.
+`dismiss` cancels any in-flight generation. Generation is TUI-only; print, JSON, and RPC modes do
+not install the ghost editor or make background suggestion model calls. `extension.ts` owns the
+`SuggestionGenerator` instance directly rather than going through module-level wrappers. Generation
+failures stop the spinner and are recorded through SuPi debug events; they do not leave persistent
+footer error status.
 
 ### Suggestion model via completeSimple
 
@@ -29,7 +32,8 @@ no PI, SuPi, project, or conversation context is included.
 ### Settings use registerConfigSettings
 
 The settings section uses `registerConfigSettings` from `supi-core/config`. The `buildItems` callback
-receives `ctx` as its 4th parameter to resolve the scoped model list.
+receives `ctx` as its 4th parameter to resolve the scoped model list. Selecting `disabled` persists
+`model: "disabled"` explicitly so project scope can override a globally enabled suggestion model.
 
 ### Session lifecycle lives in SessionLifecycle
 
@@ -57,8 +61,9 @@ cursor rendering changes, that helper must be updated.
 ### Right Arrow acceptance
 
 The editor intercepts Right Arrow (ANSI `\x1b[C`, application `\x1bOC`, and Kitty keyboard protocol
-forms) to accept the suggestion. Any other input dismisses it and falls through to the parent
-`CustomEditor` handling.
+forms) to accept the suggestion. Escape dismisses the suggestion and is consumed; a later Escape
+without ghost text reaches PI's normal interrupt/double-escape handling. Any other input dismisses
+it and falls through to the parent `CustomEditor` handling.
 
 ### Abort signal combination
 

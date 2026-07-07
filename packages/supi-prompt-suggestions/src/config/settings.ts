@@ -34,11 +34,7 @@ export function registerPromptSuggestionsSettings(pi: ExtensionAPI): void {
     // biome-ignore lint/complexity/useMaxParams: callback shape mandated by registerConfigSettings API
     persistChange: (_scope, _cwd, settingId, value, helpers) => {
       if (settingId === MODEL_ITEM_ID) {
-        if (value === "disabled") {
-          helpers.unset(MODEL_ITEM_ID);
-        } else {
-          helpers.set(MODEL_ITEM_ID, value);
-        }
+        helpers.set(MODEL_ITEM_ID, value);
       }
     },
   });

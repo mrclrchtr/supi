@@ -14,7 +14,7 @@ function makeCallbacks() {
 
 // GhostTextEditor extends CustomEditor which requires real TUI/theme/keybindings.
 // We use minimal stubs that satisfy the CustomEditor constructor.
-function makeStubs() {
+function makeStubs(matches: (data: string, action: string) => boolean = () => false) {
   return {
     tui: {
       terminal: { rows: 40 },
@@ -35,14 +35,17 @@ function makeStubs() {
       },
     },
     keybindings: {
-      matches: () => false,
+      matches,
       getKeys: () => [],
     },
   };
 }
 
-function makeEditor(callbacks = makeCallbacks()) {
-  const { tui, theme, keybindings } = makeStubs();
+function makeEditor(
+  callbacks = makeCallbacks(),
+  matches?: (data: string, action: string) => boolean,
+) {
+  const { tui, theme, keybindings } = makeStubs(matches);
   return new GhostTextEditor(tui as never, theme as never, keybindings as never, { callbacks });
 }
 
@@ -80,6 +83,19 @@ describe("GhostTextEditor rendering", () => {
     expect(line).toContain("\x1b[2msuggest\x1b[0m");
   });
 
+  it("truncates only the visual ghost preview with an ellipsis", () => {
+    const editor = makeEditor();
+    editor.focused = true;
+    const suggestion = "alpha beta gamma delta epsilon";
+    editor.setSuggestion(suggestion);
+
+    const result = editor.render(20);
+    const line = result.find((l) => l.includes(CURSOR_MARKER));
+
+    expect(line).toContain("…");
+    expect(line).not.toContain(suggestion);
+  });
+
   it("does not inject ghost when CURSOR_MARKER is absent", () => {
     // Editor is not focused, so no CURSOR_MARKER emitted
     const editor = makeEditor();
@@ -113,6 +129,17 @@ describe("GhostTextEditor input handling", () => {
     expect(cbs.onAccept).toHaveBeenCalledWith("suggest");
   });
 
+  it("inserts the full suggestion even when the visual preview would be truncated", () => {
+    const cbs = makeCallbacks();
+    const editor = makeEditor(cbs);
+    const suggestion = "alpha beta gamma delta epsilon";
+    editor.setSuggestion(suggestion);
+
+    editor.handleInput("\x1b[C");
+
+    expect(cbs.onAccept).toHaveBeenCalledWith(suggestion);
+  });
+
   it("dismisses suggestion on any other input", () => {
     const cbs = makeCallbacks();
     const editor = makeEditor(cbs);
@@ -121,6 +148,19 @@ describe("GhostTextEditor input handling", () => {
     editor.handleInput("h");
     expect(cbs.onDismiss).toHaveBeenCalled();
     expect(cbs.onAccept).not.toHaveBeenCalled();
+  });
+
+  it("consumes Escape after dismissing a suggestion", () => {
+    const cbs = makeCallbacks();
+    const editor = makeEditor(cbs, (data, action) => data === "\x1b" && action === "app.interrupt");
+    const onEscape = vi.fn();
+    editor.onEscape = onEscape;
+    editor.setSuggestion("suggest");
+
+    editor.handleInput("\x1b");
+
+    expect(cbs.onDismiss).toHaveBeenCalled();
+    expect(onEscape).not.toHaveBeenCalled();
   });
 
   it("notifies and forwards all input to super when no suggestion", () => {

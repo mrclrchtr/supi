@@ -91,6 +91,7 @@ function setup() {
 
   const ctx = {
     cwd: "/fake/project",
+    mode: "tui",
     ui: {
       setEditorComponent: vi.fn((factory: (...args: unknown[]) => unknown) => {
         editorFactory = factory;
@@ -99,7 +100,7 @@ function setup() {
       setStatus: vi.fn(),
     },
     sessionManager: {
-      getEntries: vi.fn(() => []),
+      getBranch: vi.fn(() => []),
     },
   };
 
@@ -119,12 +120,13 @@ function getHandler(
   return list[0];
 }
 
-function makeAgentEndEvent(text: string) {
+function makeAgentEndEvent(text: string, stopReason = "stop") {
   return {
     messages: [
       { role: "user", content: [{ type: "text", text: "hello" }] },
       {
         role: "assistant",
+        stopReason,
         content: [{ type: "text", text }],
       },
     ],
@@ -180,7 +182,7 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
   it("seeds editor history from session entries on session_start", () => {
     const { handlers, ctx } = setup();
     const userMessage = { type: "text", text: "previous user message" };
-    (ctx.sessionManager.getEntries as ReturnType<typeof vi.fn>).mockReturnValue([
+    (ctx.sessionManager.getBranch as ReturnType<typeof vi.fn>).mockReturnValue([
       {
         type: "message",
         message: { role: "user", content: [userMessage] },
@@ -195,6 +197,16 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
     factoryFn();
 
     expect(mockEditorAddToHistory).toHaveBeenCalledWith("previous user message");
+  });
+
+  it("does not install editor outside TUI mode", () => {
+    const { handlers, ctx } = setup();
+    ctx.mode = "json";
+    const handler = getHandler(handlers, "session_start");
+
+    handler({}, ctx);
+
+    expect(ctx.ui.setEditorComponent).not.toHaveBeenCalled();
   });
 
   // ── agent_end → suggestion generation ─────────────────────
@@ -218,6 +230,27 @@ describe("supi-prompt-suggestions extension lifecycle", () => {
 
     const endHandler = getHandler(handlers, "agent_end");
     endHandler(makeAgentEndEvent("   "), ctx);
+
+    expect(mockGeneratorStart).not.toHaveBeenCalled();
+  });
+
+  it("skips generation when the assistant did not complete normally", () => {
+    const { handlers, ctx } = setup();
+    const startHandler = getHandler(handlers, "session_start");
+    startHandler({}, ctx);
+
+    const endHandler = getHandler(handlers, "agent_end");
+    endHandler(makeAgentEndEvent("Partial output", "aborted"), ctx);
+
+    expect(mockGeneratorStart).not.toHaveBeenCalled();
+  });
+
+  it("skips generation outside TUI mode", () => {
+    const { handlers, ctx } = setup();
+    ctx.mode = "json";
+
+    const endHandler = getHandler(handlers, "agent_end");
+    endHandler(makeAgentEndEvent("The bug is in the parser module."), ctx);
 
     expect(mockGeneratorStart).not.toHaveBeenCalled();
   });

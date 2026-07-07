@@ -60,7 +60,7 @@ export type SuggestionClientOutput = SuggestionClientResult | SuggestionClientEr
 export interface SuggestionClientOptions {
   // biome-ignore lint/suspicious/noExplicitAny: Model<any> is pi's canonical type
   model: any;
-  auth: { apiKey: string; headers?: Record<string, string> };
+  auth: { apiKey: string; headers?: Record<string, string>; env?: Record<string, string> };
   tail: string;
   signal: AbortSignal;
 }
@@ -94,21 +94,22 @@ export async function callSuggestionModel(
     {
       apiKey: auth.apiKey,
       headers: auth.headers,
+      env: auth.env,
       signal,
     },
   );
+
+  if (response?.stopReason === "error") {
+    const message = `Suggestion model failed: ${response.errorMessage ?? response.stopReason}`;
+    return { ok: false, message };
+  }
 
   if (!response?.content) {
     const message = `Suggestion model returned no content (stopReason: ${response?.stopReason ?? "undefined"})`;
     return { ok: false, message };
   }
 
-  if (response.stopReason === "error") {
-    const message = `Suggestion model failed: ${response.errorMessage ?? response.stopReason}`;
-    return { ok: false, message };
-  }
-
-  // Prefer text blocks; fall back to thinking blocks for reasoning-only models.
+  // Prompt suggestions are taken from normal user-visible text only.
   const textContent = response.content
     .filter((c: { type: string }) => c.type === "text")
     .map((c: { type: string; text?: string }) => c.text)

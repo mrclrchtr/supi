@@ -14,10 +14,16 @@ import type { GenerationStatus, SuggestionGenerator } from "./generation/generat
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+type SessionTextContent = string | { type: string; text?: string }[] | undefined;
+
 /** Narrow shape for session message entries used in history seeding. */
 interface SessionMessageEntry {
   type: "message";
-  message?: { role?: string; content?: { type: string; text?: string }[] };
+  message?: {
+    role?: string;
+    stopReason?: string;
+    content?: SessionTextContent;
+  };
 }
 
 // ── SessionLifecycle ───────────────────────────────────────────────────────
@@ -41,12 +47,18 @@ export class SessionLifecycle {
   /** Install the ghost editor wrapper, seed UP-arrow history, and recreate the spinner. */
   onStart(ctx: ExtensionContext): void {
     this.statusSpinner?.stop();
+    this.statusSpinner = null;
+    this.ghostEditor = null;
+    if (ctx.mode !== "tui") return;
+
     this.statusSpinner = new StatusSpinner(ctx, "supi-prompt-suggestions");
     this.installEditor(ctx);
   }
 
   /** Extract the last assistant message and fire suggestion generation. */
   onAgentEnd(event: AgentEndEvent, ctx: ExtensionContext): void {
+    if (ctx.mode !== "tui") return;
+
     const lastAssistant = extractLastAssistantText(event);
     if (!lastAssistant) {
       this.statusSpinner?.stop();
@@ -98,7 +110,6 @@ export class SessionLifecycle {
       case "error":
         this.generationInFlight = false;
         this.statusSpinner?.stop();
-        ctx.ui.setStatus("supi-prompt-suggestions", `suggestion error: ${status.message}`);
         break;
       case "idle":
         this.generationInFlight = false;
@@ -136,8 +147,9 @@ export class SessionLifecycle {
    * The Editor base class stores history in-memory via `addToHistory()` when
    * messages are submitted.  Since `setEditorComponent` replaces the editor
    * with a fresh instance on every `session_start` (including `/reload`), the
-   * in-memory history is lost.  Reading from `sessionManager.getEntries()`
-   * repopulates it from the persistent session file so history survives reloads.
+   * in-memory history is lost.  Reading from `sessionManager.getBranch()`
+   * repopulates it from the current conversation path so history survives
+   * reloads without pulling prompts from abandoned branches.
    *
    * Cross-module save/restore (capturing the old editor's history in
    * `session_shutdown` and restoring in `session_start`) does not work here
@@ -145,16 +157,12 @@ export class SessionLifecycle {
    * closure variables are destroyed before the new module can read them.
    */
   private seedHistoryFromSession(editor: GhostTextEditor, ctx: ExtensionContext): void {
-    const entries = ctx.sessionManager.getEntries();
+    const entries = ctx.sessionManager.getBranch();
     for (const entry of entries) {
       if (entry.type !== "message") continue;
       const msg = (entry as SessionMessageEntry).message;
       if (msg?.role !== "user") continue;
-      const text = msg.content
-        ?.filter((c) => c.type === "text")
-        .map((c) => c.text ?? "")
-        .join("")
-        .trim();
+      const text = extractTextContent(msg.content).trim();
       if (text) editor.addToHistory(text);
     }
   }
@@ -178,13 +186,20 @@ function extractLastAssistantText(event: AgentEndEvent): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
     if (msg?.role === "assistant") {
-      const textContent = msg.content
-        ?.filter((c: { type: string; text?: string }) => c.type === "text")
-        .map((c: { type: string; text?: string }) => c.text)
-        .join("")
-        .trim();
+      if (msg.stopReason !== "stop") return null;
+      const textContent = extractTextContent(msg.content).trim();
       return textContent || null;
     }
   }
   return null;
+}
+
+function extractTextContent(content: SessionTextContent): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+
+  return content
+    .filter((c) => c.type === "text")
+    .map((c) => c.text ?? "")
+    .join("\n");
 }
