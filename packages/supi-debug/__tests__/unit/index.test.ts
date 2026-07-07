@@ -26,7 +26,6 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
     enabled: false,
     agentAccess: "sanitized",
     maxEvents: 100,
-    notifyLevel: "off",
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
@@ -39,14 +38,12 @@ const ENABLED_CONFIG = {
   enabled: true,
   agentAccess: "sanitized",
   maxEvents: 100,
-  notifyLevel: "off",
 } as const;
 
 type MockDebugConfig = {
   enabled: unknown;
   agentAccess: unknown;
   maxEvents: unknown;
-  notifyLevel: unknown;
 };
 
 function setup(config: MockDebugConfig = ENABLED_CONFIG) {
@@ -83,24 +80,22 @@ describe("supi-debug extension setup", () => {
   });
 
   it("configures the debug registry from merged config on load", () => {
-    setup({ enabled: true, agentAccess: "raw", maxEvents: 250, notifyLevel: "warning" });
+    setup({ enabled: true, agentAccess: "raw", maxEvents: 250 });
 
     expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
       enabled: true,
       agentAccess: "raw",
       maxEvents: 250,
-      notifyLevel: "warning",
     });
   });
 
   it("treats string enabled values explicitly instead of using truthiness", () => {
-    setup({ enabled: "false", agentAccess: "raw", maxEvents: 250, notifyLevel: "warning" });
+    setup({ enabled: "false", agentAccess: "raw", maxEvents: 250 });
 
     expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
       enabled: false,
       agentAccess: "raw",
       maxEvents: 250,
-      notifyLevel: "warning",
     });
   });
 
@@ -138,7 +133,7 @@ describe("supi-debug settings", () => {
   });
 
   it("builds setting items and persists typed values", () => {
-    setup({ enabled: false, agentAccess: "raw", maxEvents: 250, notifyLevel: "error" });
+    setup({ enabled: false, agentAccess: "raw", maxEvents: 250 });
 
     const options = mockFns.registerConfigSettings.mock.calls[0][1];
     expect(
@@ -146,13 +141,11 @@ describe("supi-debug settings", () => {
         enabled: false,
         agentAccess: "raw",
         maxEvents: 250,
-        notifyLevel: "error",
       }),
     ).toMatchObject([
       { id: "enabled", currentValue: "off" },
       { id: "agentAccess", currentValue: "raw" },
       { id: "maxEvents", currentValue: "250" },
-      { id: "notifyLevel", currentValue: "error" },
     ]);
 
     const helpers = { set: vi.fn(), unset: vi.fn() };
@@ -161,7 +154,6 @@ describe("supi-debug settings", () => {
       enabled: true,
       agentAccess: "raw",
       maxEvents: 500,
-      notifyLevel: "warning",
     });
     options.persistChange("project", "/repo", "enabled", "on", helpers);
     options.afterPersist?.({ scope: "project", cwd: "/repo", settingId: "enabled", value: "on" });
@@ -179,25 +171,16 @@ describe("supi-debug settings", () => {
       settingId: "maxEvents",
       value: "500",
     });
-    options.persistChange("project", "/repo", "notifyLevel", "warning", helpers);
-    options.afterPersist?.({
-      scope: "project",
-      cwd: "/repo",
-      settingId: "notifyLevel",
-      value: "warning",
-    });
 
     expect(helpers.set.mock.calls).toEqual([
       ["enabled", true],
       ["agentAccess", "raw"],
       ["maxEvents", 500],
-      ["notifyLevel", "warning"],
     ]);
     expect(mockFns.configureDebugRegistry).toHaveBeenCalledWith({
       enabled: true,
       agentAccess: "raw",
       maxEvents: 500,
-      notifyLevel: "warning",
     });
   });
 
@@ -212,7 +195,6 @@ describe("supi-debug settings", () => {
       enabled: false,
       agentAccess: "raw",
       maxEvents: 50,
-      notifyLevel: "error",
     });
 
     options.persistChange("project", "/repo", "enabled", "off", helpers);
@@ -223,7 +205,6 @@ describe("supi-debug settings", () => {
       enabled: false,
       agentAccess: "raw",
       maxEvents: 50,
-      notifyLevel: "error",
     });
     expect(mockFns.clearDebugEvents).toHaveBeenCalledOnce();
   });
@@ -239,7 +220,6 @@ describe("supi-debug command and tool", () => {
       enabled: false,
       agentAccess: "sanitized",
       maxEvents: 100,
-      notifyLevel: "off",
     });
 
     const cmd = pi.commands.get("supi-debug") as {
@@ -312,7 +292,7 @@ describe("supi-debug command and tool", () => {
   });
 
   it("tool denies access when agent access is off", async () => {
-    const pi = setup({ enabled: true, agentAccess: "off", maxEvents: 100, notifyLevel: "off" });
+    const pi = setup({ enabled: true, agentAccess: "off", maxEvents: 100 });
     const tool = pi.tools[0] as { name: string; execute: (...args: unknown[]) => Promise<unknown> };
 
     await expect(tool?.execute("id", {}, undefined, undefined, { cwd: "/repo" })).rejects.toThrow(
@@ -361,7 +341,7 @@ describe("supi-debug command and tool", () => {
   });
 
   it("tool requests raw events when raw access is enabled", async () => {
-    const pi = setup({ enabled: true, agentAccess: "raw", maxEvents: 100, notifyLevel: "off" });
+    const pi = setup({ enabled: true, agentAccess: "raw", maxEvents: 100 });
     const tool = pi.tools[0] as { name: string; execute: (...args: unknown[]) => Promise<unknown> };
 
     await tool?.execute("id", { includeRaw: true }, undefined, undefined, { cwd: "/repo" });
@@ -377,7 +357,7 @@ describe("supi-debug command and tool", () => {
   });
 
   it("tool renders resilient payload formatting for raw events", async () => {
-    const pi = setup({ enabled: true, agentAccess: "raw", maxEvents: 100, notifyLevel: "off" });
+    const pi = setup({ enabled: true, agentAccess: "raw", maxEvents: 100 });
     const circular: Record<string, unknown> = { count: 2n };
     circular.self = circular;
     mockFns.getDebugEvents.mockReturnValue({

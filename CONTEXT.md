@@ -60,6 +60,22 @@ _Avoid_: context usage
 A package-catalog badge for SuPi features aimed primarily at debugging, inspecting, or developing SuPi/PI extension behavior rather than ordinary coding workflow.
 _Avoid_: DevTools, developer tools
 
+**Debug Registry**:
+The session-local SuPi buffer that stores diagnostic events emitted by extension packages for later inspection.
+_Avoid_: log sink, event log, telemetry store
+
+**Debug Event Producer**:
+A SuPi extension package that records diagnostic events into the Debug Registry while doing its own primary work. Producers emit events only; they do not own registry reset, retention, or exposure policy.
+_Avoid_: logger, debug source, registry owner
+
+**Debug Surface**:
+The SuPi extension package role that owns debug-event configuration, user/model inspection surfaces, and registry reset policy.
+_Avoid_: debug producer, generic observability package
+
+**Load Status Marker**:
+A versioned SuPi diagnostic marker emitted for external harnesses as an observed inventory of loaded SuPi tools and commands. It is not a Debug Event, is not governed by Debug Registry settings, and does not decide whether a particular harness's expected resources are present.
+_Avoid_: debug event, registry event, telemetry, policy checker
+
 **Agent-Facing**:
 A package-catalog badge for SuPi behavior the PI agent can use directly, such as model-callable tools, injected agent context, or tool-call hooks. The public README badge should be written as `Agent`.
 _Avoid_: agent-usable, passive

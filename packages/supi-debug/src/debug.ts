@@ -17,7 +17,6 @@ import {
   type DebugEventQuery,
   type DebugEventView,
   type DebugLevel,
-  type DebugNotifyLevel,
   getDebugEvents,
   getDebugSummary,
 } from "@mrclrchtr/supi-core/debug";
@@ -34,7 +33,6 @@ interface DebugConfig {
   enabled: boolean;
   agentAccess: DebugAgentAccess;
   maxEvents: number;
-  notifyLevel: DebugNotifyLevel;
 }
 
 const DEBUG_DEFAULTS: DebugConfig = { ...DEBUG_REGISTRY_DEFAULTS };
@@ -43,10 +41,6 @@ type DebugToolParams = DebugEventQuery;
 
 function normalizeAgentAccess(value: string): DebugAgentAccess {
   return value === "off" || value === "raw" ? value : "sanitized";
-}
-
-function normalizeNotifyLevel(value: string): DebugNotifyLevel {
-  return value === "warning" || value === "error" ? value : "off";
 }
 
 function normalizeMaxEvents(value: string | number): number {
@@ -92,7 +86,6 @@ function loadDebugConfig(cwd: string): DebugConfig {
     enabled: normalizeEnabled(config.enabled),
     agentAccess: normalizeAgentAccess(String(config.agentAccess)),
     maxEvents: normalizeMaxEvents(config.maxEvents),
-    notifyLevel: normalizeNotifyLevel(String(config.notifyLevel)),
   };
 }
 
@@ -138,13 +131,6 @@ function registerDebugSettings(pi: ExtensionAPI): void {
         currentValue: String(normalizeMaxEvents(settings.maxEvents)),
         values: ["50", "100", "250", "500"],
       },
-      {
-        id: "notifyLevel",
-        label: "Notify Level",
-        description: "Minimum debug event severity that may notify the user",
-        currentValue: normalizeNotifyLevel(String(settings.notifyLevel)),
-        values: ["off", "warning", "error"],
-      },
     ],
     // biome-ignore lint/complexity/useMaxParams: ConfigSettingsOptions interface callback
     persistChange: (_scope, _cwd, settingId, value, helpers) => {
@@ -154,8 +140,6 @@ function registerDebugSettings(pi: ExtensionAPI): void {
         helpers.set("agentAccess", normalizeAgentAccess(value));
       } else if (settingId === "maxEvents") {
         helpers.set("maxEvents", normalizeMaxEvents(value));
-      } else if (settingId === "notifyLevel") {
-        helpers.set("notifyLevel", normalizeNotifyLevel(value));
       }
     },
     afterPersist: ({ cwd }) => {

@@ -99,7 +99,6 @@ Available settings:
 - `enabled` — turn session-local event capture on or off
 - `agentAccess` — `off`, `sanitized`, or `raw`
 - `maxEvents` — maximum retained events in memory
-- `notifyLevel` — minimum severity that may notify the user: `off`, `warning`, or `error`
 
 Defaults come from the shared debug registry:
 
@@ -108,15 +107,14 @@ Defaults come from the shared debug registry:
   "debug": {
     "enabled": false,
     "agentAccess": "sanitized",
-    "maxEvents": 100,
-    "notifyLevel": "off"
+    "maxEvents": 100
   }
 }
 ```
 
 ## Extra status logging
 
-If `SUPI_LOG_STATUS` is enabled in the environment, the package emits a SuPi load-status marker to stderr on `session_start` and appends the same payload as a session entry.
+If `SUPI_LOG_STATUS` is enabled in the environment, the package emits a versioned SuPi load-status marker to stderr on `session_start` and appends the same payload as a session entry. Version 2 reports observed tool and command inventory only; external harnesses decide which resources they require.
 
 ## Source
 

@@ -26,7 +26,6 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
     enabled: false,
     agentAccess: "sanitized",
     maxEvents: 100,
-    notifyLevel: "off",
   },
   getDebugEvents: mockFns.getDebugEvents,
   getDebugSummary: mockFns.getDebugSummary,
@@ -35,9 +34,7 @@ vi.mock("@mrclrchtr/supi-core/debug", () => ({
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import debugExtension from "../../src/debug.ts";
 
-function setup(
-  config = { enabled: true, agentAccess: "sanitized", maxEvents: 100, notifyLevel: "off" },
-) {
+function setup(config = { enabled: true, agentAccess: "sanitized", maxEvents: 100 }) {
   mockFns.loadSupiConfig.mockReturnValue(config);
   mockFns.configureDebugRegistry.mockImplementation((value) => value);
   mockFns.getDebugEvents.mockReturnValue({ events: [], rawAccessDenied: false });
@@ -61,7 +58,6 @@ describe("supi-debug tool output", () => {
       enabled: false,
       agentAccess: "sanitized",
       maxEvents: 100,
-      notifyLevel: "off",
     });
     const tool = makeTool(pi);
 

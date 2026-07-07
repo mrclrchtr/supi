@@ -6,8 +6,6 @@
 
 export type DebugLevel = "debug" | "info" | "warning" | "error";
 export type DebugAgentAccess = "off" | "sanitized" | "raw";
-export type DebugNotifyLevel = "off" | "warning" | "error";
-
 export interface DebugRegistryConfig {
   /** Whether producers should retain debug events. */
   enabled: boolean;
@@ -15,15 +13,12 @@ export interface DebugRegistryConfig {
   agentAccess: DebugAgentAccess;
   /** Maximum number of session-local events to keep in memory. */
   maxEvents: number;
-  /** Minimum level that should notify the user; interpreted by UI extensions. */
-  notifyLevel: DebugNotifyLevel;
 }
 
 export const DEBUG_REGISTRY_DEFAULTS: DebugRegistryConfig = {
   enabled: false,
   agentAccess: "sanitized",
   maxEvents: 100,
-  notifyLevel: "off",
 };
 
 export interface DebugEventInput {

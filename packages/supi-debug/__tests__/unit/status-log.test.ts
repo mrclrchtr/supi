@@ -7,7 +7,7 @@ describe("supi-debug status log", () => {
     vi.restoreAllMocks();
   });
 
-  it("does not expect the removed code_affected tool", () => {
+  it("emits a versioned inventory without expected-resource policy", () => {
     vi.stubEnv("SUPI_LOG_STATUS", "1");
     vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const appendEntry = vi.fn();
@@ -15,17 +15,25 @@ describe("supi-debug status log", () => {
     maybeLogLoadStatus(
       {
         appendEntry,
-        getAllTools: () => [{ name: "code_impact" }],
-        getActiveTools: () => ["code_impact"],
+        getAllTools: () => [{ name: "code_impact" }, { name: "supi_debug" }],
+        getActiveTools: () => ["supi_debug"],
         getCommands: () => [{ name: "supi-debug" }],
       } as never,
       "/repo",
     );
 
     const status = appendEntry.mock.calls[0]?.[1] as {
-      expectedTools: Record<string, unknown>;
+      version: number;
+      tools: { registered: string[]; active: string[] };
+      commands: string[];
+      expectedTools?: unknown;
+      expectedCommands?: unknown;
     };
-    expect(status.expectedTools).toHaveProperty("code_impact");
-    expect(status.expectedTools).not.toHaveProperty("code_affected");
+    expect(status.version).toBe(2);
+    expect(status.tools.registered).toEqual(["code_impact", "supi_debug"]);
+    expect(status.tools.active).toEqual(["supi_debug"]);
+    expect(status.commands).toEqual(["supi-debug"]);
+    expect(status.expectedTools).toBeUndefined();
+    expect(status.expectedCommands).toBeUndefined();
   });
 });

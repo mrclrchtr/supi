@@ -8,7 +8,7 @@ Registers three surfaces:
 
 1. **`supi_debug` tool** — agent-callable tool for querying recent debug events with source/level/category filters
 2. **`/supi-debug` command** — user-facing command for browsing debug events in the TUI
-3. **Settings** — `/supi-settings` integration for enable/disable, agent access level (off/sanitized/raw), max events, notify level
+3. **Settings** — `/supi-settings` integration for enable/disable, agent access level (off/sanitized/raw), and max events
 
 Uses `supi-core`'s shared debug registry (`configureDebugRegistry`, `getDebugEvents`, `getDebugSummary`) and `registerContextProvider` for the TUI context summary.
 

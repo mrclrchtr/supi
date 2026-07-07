@@ -13,11 +13,11 @@ elif [[ -n "${1:-}" ]]; then
 fi
 
 PACKAGES=(
+  supi-debug
   supi-code-intelligence
   supi-ask-user
   supi-context
   supi-settings
-  supi-debug
   supi-extras
   supi-web
   supi-prompt-suggestions

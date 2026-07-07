@@ -2,28 +2,6 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 const STATUS_LOG_PREFIX = "SUPI_STATUS ";
 const STATUS_LOG_ENV = "SUPI_LOG_STATUS";
-const EXPECTED_SUPI_TOOLS = [
-  "ask_user",
-  "code_resolve",
-  "code_inspect",
-  "code_orientation",
-  "code_graph",
-  "code_impact",
-  "code_find",
-  "code_health",
-  "code_refactor_plan",
-  "code_refactor_apply",
-  "supi_debug",
-];
-const EXPECTED_SUPI_COMMANDS = [
-  "supi-settings",
-  "supi-debug",
-  "supi-context",
-  "supi-cache",
-  "supi-ci-status",
-  "supi-review",
-];
-
 function byName(a: string, b: string): number {
   return a.localeCompare(b);
 }
@@ -35,7 +13,10 @@ function statusLogEnabled(): boolean {
 }
 
 /**
- * Emit a stderr-only SuPi load status marker for external log inspection.
+ * Emit a stderr-only SuPi load status inventory marker for external log inspection.
+ *
+ * The marker reports observed tools and commands only; consumers own their
+ * harness-specific validation policy.
  *
  * This deliberately does not call `pi.sendMessage()`: custom messages are part
  * of pi's session history and are converted into LLM-visible user messages.
@@ -55,21 +36,9 @@ export function maybeLogLoadStatus(pi: ExtensionAPI, cwd: string): void {
 
   const status = {
     type: "supi_status",
-    version: 1,
+    version: 2,
     phase: "session_start",
     cwd,
-    expectedTools: Object.fromEntries(
-      EXPECTED_SUPI_TOOLS.map((tool) => [
-        tool,
-        {
-          registered: registeredToolNames.includes(tool),
-          active: activeToolNames.includes(tool),
-        },
-      ]),
-    ),
-    expectedCommands: Object.fromEntries(
-      EXPECTED_SUPI_COMMANDS.map((command) => [command, commandNames.includes(command)]),
-    ),
     tools: {
       registered: registeredToolNames,
       active: activeToolNames,
