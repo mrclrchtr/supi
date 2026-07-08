@@ -11,7 +11,9 @@
 Advisory ghost-text prompt suggestions for the [pi coding agent](https://github.com/earendil-works/pi).
 
 <p align="center">
-  <video src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-suggestions/assets/demo.mp4" controls width="100%" alt="Demo of ghost-text prompt suggestions"></video>
+  <a href="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-suggestions/assets/demo.mp4">
+    <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-prompt-suggestions/assets/demo.gif" width="100%" alt="Demo of ghost-text prompt suggestions">
+  </a>
 </p>
 
 ## Install
