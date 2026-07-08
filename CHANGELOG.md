@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.2.0](https://github.com/mrclrchtr/supi/compare/v2.1.0...v2.2.0) (2026-07-08)
+
+
+### Features
+
+* **supi-core:** declarative settings schema with source-aware inheritance ([054a4ee](https://github.com/mrclrchtr/supi/commit/054a4ee5a0b2d14ee55232c03b94b796236bf5f9))
+* **supi-prompt-suggestions:** secure ghost-suggestion lifecycle, auth, and TUI gating ([7de8194](https://github.com/mrclrchtr/supi/commit/7de81946efbc51ac1613f2a31aa21761028343de))
+
+
+### Bug Fixes
+
+* **deps:** update dependency hk to v1.50.0 ([a5949f3](https://github.com/mrclrchtr/supi/commit/a5949f3239056099475176200e5fb109ce435127))
+* **deps:** update dependency typebox to v1.3.4 ([4b58167](https://github.com/mrclrchtr/supi/commit/4b58167b22f530c9896d627c05a2e22e2c16a6ed))
+* **deps:** update pnpm to v11.10.0 ([3b5a545](https://github.com/mrclrchtr/supi/commit/3b5a54549c303b12f174e437084261cfc944a192))
+* **supi-review:** compute SelectList primary column width from actual labels ([8e93987](https://github.com/mrclrchtr/supi/commit/8e9398791ad885fd364b41a9368219940a9d63d4))
+* **supi:** truncate TUI lines in footer stats and context report file rows ([13cc6ab](https://github.com/mrclrchtr/supi/commit/13cc6ab7fb2d29884165a5afc92a11b0c015686a))
+
 ## [2.1.0](https://github.com/mrclrchtr/supi/compare/v2.0.6...v2.1.0) (2026-07-06)
 
 
