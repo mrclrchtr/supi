@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.2.1](https://github.com/mrclrchtr/supi/compare/v2.2.0...v2.2.1) (2026-07-08)
+
+
+### Bug Fixes
+
+* **deps:** update dependency pkl to v0.32.0 ([be321b5](https://github.com/mrclrchtr/supi/commit/be321b52cb6fb21690b84b5e9859c7d44bbf781b))
+* **supi-lsp:** prevent orphaned LSP servers after PI shutdown ([16544d7](https://github.com/mrclrchtr/supi/commit/16544d7e90f54e56506191a19350290a2097edab))
+* **supi-review:** increase reviewer timeout from 20m to 60m ([db7e769](https://github.com/mrclrchtr/supi/commit/db7e769d6150fbbf8173d417fab8942a913cd053))
+
 ## [2.2.0](https://github.com/mrclrchtr/supi/compare/v2.1.0...v2.2.0) (2026-07-08)
 
 
