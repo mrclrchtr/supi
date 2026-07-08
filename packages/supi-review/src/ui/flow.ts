@@ -1,5 +1,5 @@
 import { DynamicBorder, type ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { Container, type SelectItem, SelectList, Text } from "@earendil-works/pi-tui";
+import { Container, type SelectItem, SelectList, Text, visibleWidth } from "@earendil-works/pi-tui";
 import { getLocalBranches, getRecentCommits } from "../git.ts";
 import { getSelectableReviewModels } from "../model.ts";
 import type { ReviewModelSelection, ReviewPlan, ReviewTargetSpec } from "../types.ts";
@@ -19,18 +19,26 @@ function selectFromList<T>(
   options: SelectFromListOptions<T>,
 ): Promise<T | undefined> {
   const { items, title, maxHeight, onSelect, initialIndex } = options;
+  const widestLabel = items.reduce((w, item) => Math.max(w, visibleWidth(item.label)), 0);
+  const maxPrimaryColumnWidth = Math.max(widestLabel + 4, 32);
+
   return ctx.ui.custom<T | undefined>((tui, theme, _kb, done) => {
     const container = new Container();
     container.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
     container.addChild(new Text(theme.fg("accent", title), 1, 0));
 
-    const selectList = new SelectList(items, Math.min(items.length, maxHeight), {
-      selectedPrefix: (text) => theme.fg("accent", text),
-      selectedText: (text) => theme.fg("accent", text),
-      description: (text) => theme.fg("muted", text),
-      scrollInfo: (text) => theme.fg("dim", text),
-      noMatch: (text) => theme.fg("warning", text),
-    });
+    const selectList = new SelectList(
+      items,
+      Math.min(items.length, maxHeight),
+      {
+        selectedPrefix: (text) => theme.fg("accent", text),
+        selectedText: (text) => theme.fg("accent", text),
+        description: (text) => theme.fg("muted", text),
+        scrollInfo: (text) => theme.fg("dim", text),
+        noMatch: (text) => theme.fg("warning", text),
+      },
+      { maxPrimaryColumnWidth },
+    );
     if (initialIndex !== undefined) {
       selectList.setSelectedIndex(initialIndex);
     }
