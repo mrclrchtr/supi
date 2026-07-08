@@ -31,7 +31,7 @@ Audit, evaluate, and improve CLAUDE.md files across a codebase to ensure PI has 
 |--------|------------------|----------------|-------|
 | `supi-code-intelligence` | Module graph | Package names, descriptions, dependency relationships | **Root-level** |
 | `supi-code-intelligence` | Workspace overview | File counts, root directory tree, top-level landmarks | **Root-level** |
-| `supi-code-intelligence` | Directory instruction files | `packages/*/CLAUDE.md` / `AGENTS.md` shown by explicit directory orientation | **Package-specific** |
+| `supi-code-intelligence` | Instruction-File Surfacing | `code_orientation` with directory focus surfaces `CLAUDE.md`/`AGENTS.md`; 200-line per-file limit, guidance chrome (not tool evidence) | **Package-specific** |
 | `native-pi` | Root instructions | `./CLAUDE.md`, `./AGENTS.md` in system prompt | **Root-level** |
 
 Add rows for any additional categories visible in context.
@@ -116,6 +116,10 @@ For each CLAUDE.md file found in Phase 2, evaluate against quality criteria, inc
 | Actionability | High | Are instructions executable, not vague? |
 | Auto-delivered overlap | Low | Does it duplicate what SuPi extensions already inject? **Use the Phase 1 Redundancy Risk Assessment as primary evidence.** |
 
+**Phase 1 enforcement for Criterion 7:**
+- **Package-specific CLAUDE.md files** that Phase 1 identified as already surfaced by `code_orientation` → base score 3/10 (the surfaced file itself does not earn context-window space — `code_orientation` already delivers it). Add points for unique content: unique gotchas (+3), non-obvious commands/workflows (+2), cross-package patterns or ownership rules (+2). Maximum 10/10 only if the file is predominantly unique guidance, not restating what orientation already shows.
+- **Root-level content** that Phase 1 classified as root-level high risk → must be flagged for removal, not scored as "minor overlap."
+
 **Quality Scores:**
 - **A (90-100)**: Comprehensive, current, actionable
 - **B (70-89)**: Good coverage, minor gaps
@@ -180,6 +184,8 @@ Format:
 **Core principle: every token must earn its place in the instruction file.** If content doesn't save future sessions more time than it costs to read, remove it. No instruction file should exceed 200 lines — above that, every line must fight for its place against removal.
 
 After outputting the quality report, ask user for confirmation before updating.
+
+**Before recommending removals, verify flagged overlaps.** When Phase 3 flagged a file for potential auto-delivered overlap (Criterion 7 ≤ 6/10), run `code_orientation({ focus: "<package-directory>" })` on that package. Compare the orientation output against the file — if the flagged sections genuinely duplicate what orientation already shows, the removal recommendation is confirmed. If orientation reveals context the file uniquely adds, adjust the recommendation.
 
 **Update Guidelines (Critical):**
 

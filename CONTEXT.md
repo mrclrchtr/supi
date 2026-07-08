@@ -124,6 +124,10 @@ _Avoid_: treating project prompt text as trusted by location alone, runtime beha
 A directory-local agent guidance file, such as `CLAUDE.md` or `AGENTS.md`, that gives maintainers and agents local working instructions for a workspace area.
 _Avoid_: claude-md file, context file
 
+**Instruction-File Surfacing**:
+The mechanism by which `code_orientation` with directory focus surfaces directory-local instruction files into agent context. Surfaced files are guidance chrome, not tool evidence, and have a 200-line per-file display limit. Root instruction files are loaded by pi's system prompt, not by this mechanism.
+_Avoid_: instruction-file injection, auto-context, CLAUDE.md injection
+
 **Human-Facing**:
 A package-catalog badge for SuPi behavior the user drives directly, such as slash commands, TUI overlays, reports, shortcuts, or configuration screens. The public README badge should be written as `Human`.
 _Avoid_: human-only

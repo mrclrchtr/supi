@@ -101,6 +101,12 @@ Score this criterion after a **context baseline review**: compare the CLAUDE.md 
 
 **0 points**: Large sections are almost entirely duplicated generated context (module lists with descriptions, dense dependency tables, long root directory trees).
 
+**Scoring for package-specific files surfaced by `code_orientation`**: When Phase 1 identifies that `code_orientation` already surfaces a package's CLAUDE.md (directory focus), the surfaced file itself does not earn context-window space. Score additively from a base of 3/10, then add:
+- +3 for unique gotchas not derivable from manifests or `code_orientation` output
+- +2 for non-obvious commands or workflows (gotcha flags, hook behaviors, ordering — not routine npm install/test/build)
+- +2 for cross-package patterns or ownership rules
+Maximum 10/10 only if the file is predominantly unique guidance. Files that are purely structural overviews with no unique content stay at 3/10.
+
 **What is NOT overlap:** Gotchas specific to a package's behavior; cross-package patterns that aren't discoverable from manifests; non-obvious commands and workflows (gotcha flags, hook behaviors, ordering requirements — not routine npm install/test/build); human-curated "Start Here" guidance with reasoning; concise structure notes that explain boundaries, ownership, initialization order, or important exceptions; and sections classified as **unique** during the baseline review.
 
 **What IS overlap:** Monorepo package tables where every row is `{name, description, path}`; root-level "Modules" or "Packages" sections with >5 entries; the **fully redundant** portion of a section during baseline review; root `## Project structure` / `## Architecture` trees that mostly restate folders, packages, or module layout already visible from the code-intelligence overview or `code_orientation`; high-level architecture overviews that don't add relationships, gotchas, conventions, or exceptions beyond what's in `package.json`; and dependency graphs that could be generated from `pnpm-workspace.yaml`.

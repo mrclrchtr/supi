@@ -65,10 +65,6 @@ src/
 - `scripts/generate-kotlin-wasm.mjs` — builds Kotlin WASM from source
 - `scripts/generate-sql-wasm.mjs` — builds SQL WASM from source
 
-## Supported languages
-
-15 grammars vendored in `resources/grammars/<id>/`: JavaScript, TypeScript, TSX, Python, Rust, Go, C, C++, Java, Kotlin, Ruby, Bash/Shell, HTML, R, SQL. See `resources/grammars/` for the complete file-extension mapping.
-
 ## Validation
 
 ```bash

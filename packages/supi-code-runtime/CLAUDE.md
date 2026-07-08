@@ -24,6 +24,13 @@
 - `RefactorResult` is a discriminated union: `precise` edits for safe direct apply, `ambiguous` candidates for disambiguation, and `unavailable` for when no refactor is possible.
 - File/resource operations such as `rename_file` and `move_file` should stay explicit unavailable results until shared resource-edit and rollback semantics exist in the runtime.
 
+## Gotchas
+
+- The workspace runtime uses `Symbol.for("@mrclrchtr/supi-code-runtime/runtime")` for a process-wide singleton — jiti/symlinked duplicate modules share the same broker instance; never create multiple brokers for the same workspace.
+- Capability interfaces (`SemanticProvider`, `StructuralProvider`) are interfaces, not classes — the broker accepts any object satisfying the contract, enabling test fakes and adapter composition without coupling to a base class.
+- `RefactorResult` is a discriminated union (`precise | ambiguous | unavailable`) — consumers must exhaustively narrow on the `kind` field; adding a new variant breaks all non-exhaustive consumers.
+- File/resource operations such as `rename_file` and `move_file` return explicit `unavailable` results — shared resource-edit and rollback semantics don't exist yet in the runtime; do not add partial implementations.
+
 ## No pi extension
 
 This package must remain a pure library: no `pi.extensions`, no `src/extension.ts`, no tool registration.

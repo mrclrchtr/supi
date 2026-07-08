@@ -28,19 +28,21 @@ Identify what context would have helped this session go smoother. Scan the conve
 - One-off fixes unlikely to recur ("fixed typo on line 42")
 - Routine/easy-to-find commands: `npm install`, `npm test`, `npm run build` — these are in package.json or README and don't earn their place in the context window
 - Verbose explanations — one line per concept; link to docs for detail
-- Content that SuPi extensions already auto-deliver (package tables, module graphs, dependency lists from manifests — see update guidelines)
+- Content that SuPi extensions already auto-deliver: package/module tables (code-intelligence overview), dependency graphs, project structure trees, and instruction files already surfaced by `code_orientation` directory focus (package-level) or pi's system prompt (root-level)
 
 Filter ruthlessly. Every token must earn its place in the instruction file — if content doesn't save future sessions more time than it costs to read, remove it.
 
 **Before adding, consider removing.** Scan the file for content that MUST be removed or compressed. Never skip removals because of edit churn — a one-time edit that saves tokens every session pays for itself immediately:
 - Routine command listings that are trivially discoverable from `package.json` — MUST remove (~50–200 tokens saved per session)
-- Sections that duplicate what SuPi extensions auto-deliver (package tables, dependency graphs, project structure that just lists packages with descriptions, architecture trees that restate the code-intelligence overview or `code_orientation` output) — MUST remove; these are never "minor overlaps" — they are unconditional waste (~200–800 tokens saved per session)
+- Sections that duplicate what SuPi extensions auto-deliver (package tables, dependency graphs, project structure that just lists packages with descriptions, architecture trees that restate the code-intelligence overview or `code_orientation` output, and instruction-file content already surfaced by `code_orientation` directory focus or pi's system prompt) — MUST remove; these are never "minor overlaps" — they are unconditional waste (~200–800 tokens saved per session)
 - Verbose explanations where a one-liner suffices — compress (~20–100 tokens saved)
 - Stale commands, paths, or architecture descriptions that no longer match the codebase — remove
 
 Removing unnecessary content is as valuable as adding useful content. Do both.
 
 > See also: [detailed update guidelines](references/update-guidelines.md) and [quality criteria](references/quality-criteria.md)
+
+**Step 1.5: Discover what the model already receives.** Before proposing changes to a CLAUDE.md, run `code_orientation({ focus: "<directory>" })` on the target directory. This shows exactly what instruction files and module context the model receives via `code_orientation` (package-level) or pi's system prompt (root-level). Compare your proposed changes against this output — do not add content that orientation already delivers, and flag existing content in the file that duplicates what orientation shows.
 
 ### Step 2: Find Context Files
 
