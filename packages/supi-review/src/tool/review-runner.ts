@@ -16,7 +16,7 @@ import { buildReviewerSystemPrompt } from "./review-system-prompt.ts";
 import { type LifecycleCtx, runWithLifecycle } from "./session-lifecycle.ts";
 import { createSnapshotDiffTool, createSnapshotFileTool } from "./snapshot-tools.ts";
 
-const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
+const DEFAULT_TIMEOUT_MS = 60 * 60 * 1_000;
 const GRACE_TURNS = 3;
 const STEER_MESSAGE = "Time limit reached. Wrap up and submit your review now.";
 const HARD_ABORT_GRACE_MS = 120_000;

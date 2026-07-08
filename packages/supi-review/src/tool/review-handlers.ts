@@ -20,7 +20,7 @@ import { reviewOutputSchema } from "./schemas.ts";
 
 const STEER_SUBMIT_MESSAGE =
   "You stopped without calling submit_review. Call submit_review now with your findings.";
-const DEFAULT_TIMEOUT_MS = 20 * 60 * 1_000;
+const DEFAULT_TIMEOUT_MS = 60 * 60 * 1_000;
 
 // ---------------------------------------------------------------------------
 // Runner-specific context combining lifecycle-managed fields with
