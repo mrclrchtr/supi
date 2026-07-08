@@ -177,8 +177,7 @@ Single-context — one `CONTEXT.md` at repo root + `docs/adr/`. See `docs/agents
 
 ## Testing patterns
 
-- `vi.hoisted()` callbacks execute before imports — must be inline arrow functions, cannot reference imported values; supports both single-value (`vi.hoisted(() => vi.fn())`) and object (`vi.hoisted(() => ({ fn: vi.fn() }))`) patterns
-- Each test file that mocks modules needs its own top-level `vi.hoisted` + `vi.mock` calls; can't share through helper functions
+- `vi.hoisted()` callbacks execute before imports — must be inline arrow functions, cannot reference imported values; each test file needs its own top-level `vi.hoisted` + `vi.mock` calls (supports single-value and object patterns, can't share through helpers)
 - Biome enforces `noExcessiveLinesPerFunction` (120) and `noExcessiveLinesPerFile` (400, style) on test files too — split large describe blocks into separate test files
 - Use `createPiMock()` / `makeCtx()` from `@mrclrchtr/supi-test-utils` for pi mocks instead of defining local factories — includes `events`, `getActiveTools`, `sendMessage`, `registerShortcut`, `exec`, `emit`, and `getAllTools`
 - Extension integration tests: mock internal modules, create fake `pi` object capturing handlers via `Map`, then call handlers directly
@@ -187,16 +186,11 @@ Single-context — one `CONTEXT.md` at repo root + `docs/adr/`. See `docs/agents
 - `pnpm exec biome check --write --unsafe <files>` — auto-fix unused imports. `--max-diagnostics=20` caps output when the full check OOMs.
 - `ctx.ui.select()` accepts only `string[]`; use label-encoding (e.g. `"[id] name"`) if you need metadata
 - `vi.useFakeTimers()` + `vi.advanceTimersByTime(ms)` — required to trigger `setInterval` callbacks in vitest
-- In Vitest 4.x, constructor mocks inside `vi.mock` factories must use `class` — `vi.fn().mockImplementation(() => ({}))` silently returns `this` instead of the object
-- `vi.mock` hoisting errors propagate from the importing module (e.g. `runner.ts:2:1`), not the test file's `vi.mock` call site — check the Caused-by chain
-- Shared `createPiMock` stores handlers as `Map<string, handler[]>` — access as `handlers.get(event)?.[0]`, not `handlers.get(event)!`
-- `pi.handlers.get("event")?.[0]!` triggers Biome `noNonNullAssertedOptionalChain` (blocks CI); use `getHandlerOrThrow(pi, event)` from `@mrclrchtr/supi-test-utils` instead
+- Vitest 4.x: constructor mocks inside `vi.mock` factories must use `class` (not `vi.fn().mockImplementation`), hoisting errors propagate from the importing module (check the Caused-by chain), and prefer static `import { x }` over dynamic `await import()` — dynamic imports interact inconsistently with `vi.mock` hoisting
+- Shared `createPiMock` stores handlers as `Map<string, handler[]>`; access via `handlers.get(event)?.[0]` — use `getHandlerOrThrow(pi, event)` from `@mrclrchtr/supi-test-utils` to avoid Biome `noNonNullAssertedOptionalChain` (blocks CI)
 - `pnpm vitest run` strips types (esbuild) — always run per-package `pnpm exec tsc -b packages/<pkg>/tsconfig.json packages/<pkg>/__tests__/tsconfig.json` alongside.
-- Adding exports to `supi-core/index.ts` or deleting source files breaks downstream `vi.mock` factories — audit all consuming test files.
-- **Deleting a source file breaks every test with `vi.mock("../<file>")` referencing it** — audit all test files for stale mock factories after module deletion
+- Adding exports to `supi-core/index.ts` or deleting source files breaks every downstream `vi.mock` factory — audit all consuming test files for stale mocks after module changes
 - **Removing code may leave `// biome-ignore` suppression comments unused** — Biome flags these; remove them
 - **Changing state shape requires updating every `createInitialState` mock in test files** — keep mock shapes in sync with real types
-- New workspace package: add `package.json` + `tsconfig.json` + `__tests__/tsconfig.json`, wire into root `pi.extensions` array, run `pnpm install`
-- Package-scoped test tsconfig: `{"extends": "../../../tsconfig.json", "include": ["*.ts"], "exclude": []}`
-- Module-level `let`/`const` state (e.g., lazy-init singleton client) persists across Vitest tests because ES modules are cached — use behavioral verification (what the function returns or calls) instead of counting constructor invocations
-- Prefer `import { x } from "../src/module.ts"` over `const { x } = await import("../src/module.ts")` in test files — dynamic imports interact inconsistently with `vi.mock` hoisting in some Vitest 4.x edge cases
+- New workspace package: add `package.json` + `tsconfig.json` + `__tests__/tsconfig.json` (`{"extends": "../../../tsconfig.json", "include": ["*.ts"], "exclude": []}`), wire into root `pi.extensions` array, run `pnpm install`
+- Module-level `let`/`const` state persists across Vitest tests (ES modules are cached) — use behavioral verification instead of counting constructor invocations

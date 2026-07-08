@@ -38,23 +38,6 @@ src/
     settings-ui.ts          — settings overlay orchestration
 ```
 
-## Test layout
-
-```text
-__tests__/
-  unit/
-    config/             — tests for src/config/*
-    context/            — tests for src/context/*
-    settings/           — tests for src/settings/*
-    debug-registry.test.ts
-    path-utils.test.ts
-    project-roots.test.ts
-    registry-utils.test.ts
-    session-utils.test.ts
-    terminal.test.ts
-    tool-framework.test.ts
-```
-
 ### Key paths
 
 - `api.ts`, `index.ts` — public export surface; keep the shared API deliberate and small
