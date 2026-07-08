@@ -2,7 +2,7 @@
 // Handles initialize handshake, document sync, shutdown, and crash recovery.
 
 // biome-ignore lint/style/noExcessiveLinesPerFile: LspClient remains a cohesive stateful wrapper; refresh logic is already split out.
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { recordDebugEvent } from "@mrclrchtr/supi-core/debug";
@@ -36,6 +36,31 @@ import { JsonRpcClient, JsonRpcRequestError } from "./transport.ts";
 
 const SHUTDOWN_TIMEOUT_MS = 5_000;
 const DIAGNOSTIC_WAIT_MS = 3_000;
+
+// ── Process-tree cleanup ──────────────────────────────────────────────
+
+/**
+ * Kill a process and all its descendants.
+ *
+ * On Unix, sends SIGTERM to the process group (negative PID).
+ * This requires the child to be spawned with `detached: true`.
+ * On Windows, uses `taskkill /T /F` to force-kill the entire tree.
+ */
+function killProcessTree(pid: number): void {
+  if (process.platform === "win32") {
+    try {
+      execSync(`taskkill /PID ${pid} /T /F`, { stdio: "ignore" });
+    } catch {
+      // Process may have already exited — ignore.
+    }
+    return;
+  }
+  try {
+    process.kill(-pid, "SIGTERM");
+  } catch {
+    // Process group may already be dead — ignore.
+  }
+}
 
 // ── Types ─────────────────────────────────────────────────────────────
 export type ClientStatus = "initializing" | "running" | "error" | "shutdown";
@@ -116,6 +141,10 @@ export class LspClient {
         cwd: this.root,
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env },
+        // Run the server in its own process group so we can atomically
+        // kill the entire tree (server + subprocesses like tsserver)
+        // with `process.kill(-pid, signal)` on Unix or `taskkill /T` on Windows.
+        detached: true,
       });
     } catch (err) {
       this._status = "error";
@@ -209,18 +238,26 @@ export class LspClient {
 
     this.rpc.dispose();
 
-    // Wait briefly for clean exit, then force kill
-    if (this.process.exitCode === null) {
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(() => {
-          this.process?.kill("SIGTERM");
-          resolve();
-        }, 1_000);
-        this.process?.on("exit", () => {
-          clearTimeout(timer);
-          resolve();
+    // Kill the entire process tree (server + subprocesses like tsserver).
+    // The LSP shutdown/exit protocol above should trigger a graceful exit,
+    // but the process-group kill ensures no orphans survive.
+    const pid = this.process.pid;
+    if (this.process.exitCode === null && pid) {
+      killProcessTree(pid);
+      if (process.platform !== "win32") {
+        // Escalate to SIGKILL after a brief grace period on Unix.
+        // Windows taskkill /F is already forceful.
+        await new Promise<void>((resolve) => {
+          setTimeout(() => {
+            try {
+              process.kill(-pid, "SIGKILL");
+            } catch {
+              // Already dead — ignore.
+            }
+            resolve();
+          }, 500);
         });
-      });
+      }
     }
 
     this.openDocs.clear();

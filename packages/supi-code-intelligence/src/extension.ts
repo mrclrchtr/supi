@@ -137,4 +137,23 @@ export default function codeIntelligenceExtension(
       };
     },
   );
+
+  // ── Process-exit safety net ─────────────────────────────────────────
+  //
+  // If the Node process exits without `session_shutdown` firing (crash,
+  // unhandled rejection, SIGINT), make a best-effort synchronous attempt
+  // to terminate the LSP and Tree-sitter controller trees.
+  //
+  // `process.on("exit")` handlers are synchronous — we cannot await
+  // controller shutdown, but `process.kill(-pid, "SIGTERM")` fires
+  // synchronously and the SIGKILL escalation in LspClient is handled
+  // by the kernel after process termination.
+  let cleaningUp = false;
+  process.once("exit", () => {
+    if (cleaningUp) return;
+    cleaningUp = true;
+    // Fire and forget — the critical kill calls are synchronous.
+    void lspState.controller?.shutdown();
+    void tsState.controller?.shutdown();
+  });
 }
