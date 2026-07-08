@@ -7,6 +7,13 @@ const mockTheme = {
   fg: (color: string, text: string) => `[${color}]${text}[/${color}]`,
 } as unknown as Theme;
 
+// Pass-through theme for tests that only check content presence (not color tags).
+// Prevents mock tag inflation from interfering with truncateToWidth in file sections.
+const plainTheme = {
+  fg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
+} as unknown as Theme;
+
 function makeAnalysis(overrides?: Partial<ContextAnalysis>): ContextAnalysis {
   return {
     modelName: "Test Model",
@@ -182,7 +189,8 @@ describe("formatContextReport", () => {
 
   it("shows injected files section when present", () => {
     const analysis = makeAnalysis();
-    const lines = formatContextReport(analysis, mockTheme);
+    // Use plainTheme — mock tags inflate visibleWidth and cause early truncation
+    const lines = formatContextReport(analysis, plainTheme);
 
     expect(lines.some((l) => l.includes("injected · supi-claude-md"))).toBe(true);
     expect(lines.some((l) => l.includes("packages/foo/CLAUDE.md"))).toBe(true);

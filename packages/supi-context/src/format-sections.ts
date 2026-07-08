@@ -49,7 +49,10 @@ function renderFileSection(options: FileSectionOptions): string[] {
     const pctCol = padLeft(pct(file.tokens, total), pctWidth);
     const extra = extraWidth ? `  ${theme.fg("dim", padRight(file.extra ?? "", extraWidth))}` : "";
     lines.push(
-      `  ${theme.fg("text", path)}  ${theme.fg("dim", lineCol)}  ${theme.fg("dim", tokenCol)}${extra}  ${theme.fg("dim", pctCol)}`,
+      truncateToWidth(
+        `  ${theme.fg("text", path)}  ${theme.fg("dim", lineCol)}  ${theme.fg("dim", tokenCol)}${extra}  ${theme.fg("dim", pctCol)}`,
+        width,
+      ),
     );
   }
 

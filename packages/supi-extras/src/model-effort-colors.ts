@@ -147,10 +147,10 @@ export default function modelEffortColors(pi: ExtensionAPI) {
               theme.fg("dim", "..."),
             );
 
-            const lines = [
-              pwdLine,
-              theme.fg("dim", statsLeft) + theme.fg("dim", laidOut.padding) + laidOut.styled,
-            ];
+            const statsLine =
+              theme.fg("dim", statsLeft) + theme.fg("dim", laidOut.padding) + laidOut.styled;
+
+            const lines = [pwdLine, truncateToWidth(statsLine, width, theme.fg("dim", "..."))];
 
             // Extension statuses
             buildStatusLine(lines, footerData, width, theme);

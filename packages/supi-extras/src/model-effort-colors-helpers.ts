@@ -282,10 +282,9 @@ export function layoutRightSide(params: {
     return { styled: "", padding: "" };
   }
 
-  const finalStyled = truncateToWidth(styled, avail + (styled.length - plain.length), "");
-  const finalPlain = truncateToWidth(plain, avail, "");
+  const finalStyled = truncateToWidth(styled, avail, "");
   const padding = " ".repeat(
-    Math.max(0, availableWidth - statsLeftWidth - visibleWidth(finalPlain)),
+    Math.max(0, availableWidth - statsLeftWidth - visibleWidth(finalStyled)),
   );
   return { styled: finalStyled, padding };
 }
