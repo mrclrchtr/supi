@@ -171,9 +171,17 @@ Root cause for the staging pipeline: direct `pnpm pack` on workspace packages pr
 
 ## Agent skills
 
+### Issue tracker
+
+GitHub Issues (`gh` CLI). External PRs are not a triage surface. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
 ### Domain docs
 
-Single-context — one `CONTEXT.md` at repo root + `docs/adr/`. See `docs/agents/domain.md`.
+Multi-context — `CONTEXT-MAP.md` at root pointing to per-package `CONTEXT.md` files + per-package `docs/adr/`. See `docs/agents/domain.md`.
 
 ## Testing patterns
 
