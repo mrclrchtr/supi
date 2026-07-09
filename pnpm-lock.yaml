@@ -52,8 +52,8 @@ importers:
         specifier: 6.0.3
         version: 6.0.3
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
       web-tree-sitter:
         specifier: 0.26.10
         version: 0.26.10
@@ -77,8 +77,8 @@ importers:
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-bash-timeout:
     dependencies:
@@ -99,8 +99,8 @@ importers:
         specifier: 25.9.4
         version: 25.9.4
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-cache:
     dependencies:
@@ -124,8 +124,8 @@ importers:
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-claude-md:
     dependencies:
@@ -140,8 +140,8 @@ importers:
         specifier: 25.9.4
         version: 25.9.4
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-code-intelligence:
     dependencies:
@@ -180,8 +180,8 @@ importers:
         specifier: 25.9.4
         version: 25.9.4
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-code-runtime:
     dependencies:
@@ -196,8 +196,8 @@ importers:
         specifier: 25.9.4
         version: 25.9.4
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-context:
     dependencies:
@@ -218,8 +218,8 @@ importers:
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-core:
     dependencies:
@@ -240,8 +240,8 @@ importers:
         specifier: 25.9.4
         version: 25.9.4
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-debug:
     dependencies:
@@ -265,8 +265,8 @@ importers:
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-extras:
     dependencies:
@@ -287,8 +287,8 @@ importers:
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-insights:
     dependencies:
@@ -312,8 +312,8 @@ importers:
         specifier: 25.9.4
         version: 25.9.4
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-lsp:
     dependencies:
@@ -343,8 +343,8 @@ importers:
         specifier: workspace:*
         version: link:../supi-test-utils
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-prompt-suggestions:
     dependencies:
@@ -365,8 +365,8 @@ importers:
         specifier: 25.9.4
         version: 25.9.4
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-review:
     dependencies:
@@ -387,8 +387,8 @@ importers:
         version: 1.3.1
     devDependencies:
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-settings:
     dependencies:
@@ -409,8 +409,8 @@ importers:
         specifier: 25.9.4
         version: 25.9.4
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-test-utils:
     dependencies:
@@ -501,8 +501,8 @@ importers:
         specifier: 0.23.2
         version: 0.23.2(tree-sitter@0.25.0)
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/supi-web:
     dependencies:
@@ -544,8 +544,8 @@ importers:
         specifier: 5.0.6
         version: 5.0.6
       vitest:
-        specifier: 4.1.9
-        version: 4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+        specifier: 4.1.10
+        version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
 
 packages:
 
@@ -1323,8 +1323,22 @@ packages:
   '@types/turndown@5.0.6':
     resolution: {integrity: sha512-ru00MoyeeouE5BX4gRL+6m/BsDfbRayOskWqUvh7CLGW+UXxHQItqALa38kKnOiZPqJrtzJUgAC2+F0rL1S4Pg==}
 
+  '@vitest/expect@4.1.10':
+    resolution: {integrity: sha512-YsCn+qAk1GWjQOWFEsEcL2gNQ0zmVmQu3T03qP6UyjhtmdtwtbuI+DASn/7iQB3HGTXkdBwGddzxPlmiql5vlA==}
+
   '@vitest/expect@4.1.9':
     resolution: {integrity: sha512-vl/rYsUKcBr3SnQn166+XR5ZQcgMx3DQhFWdfli/cWpLnLUmbxZvyrJZotLFUryib+LtArYMSTJ5RbQ57ZqrlA==}
+
+  '@vitest/mocker@4.1.10':
+    resolution: {integrity: sha512-v0xaezt+DKEmKfaxg133ldzADrwLGd7Ze1MfQQTYfvs8OqZIwbxyxaYURivwV7sWy5fqn3rH5uOrSp07bp44Ow==}
+    peerDependencies:
+      msw: ^2.4.9
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
+    peerDependenciesMeta:
+      msw:
+        optional: true
+      vite:
+        optional: true
 
   '@vitest/mocker@4.1.9':
     resolution: {integrity: sha512-EVkXzBjrPGM+cK8/ANWgBrkUCfJfb38/EfTSO8h7pWvKkyPkpWxvR7BkD2MyItMF62C97zAEoqdpUixwR/e+Rw==}
@@ -1337,17 +1351,32 @@ packages:
       vite:
         optional: true
 
+  '@vitest/pretty-format@4.1.10':
+    resolution: {integrity: sha512-W1HsjSH4MXQ9YfmmhLAoIYf1HRfekQCGngeIgcei6MP5QQGWUe0gkopdZQaVCFO+JDJMrAJGwa5pRpNpvy4P8Q==}
+
   '@vitest/pretty-format@4.1.9':
     resolution: {integrity: sha512-s0iufns3iIFitdgm+YR7g1whCAaGtXz459VS9/PqyKDEEFgYIhsHOQmXgIgDuYCt7DeQmiZT0Qe2OA2p4ZPu5A==}
+
+  '@vitest/runner@4.1.10':
+    resolution: {integrity: sha512-IKI6kpIH+LmpROplyLwBBaCfMgOZOMsygVa6BARD6ahA04VRuJSa6OaVG7kRvSEMD870Vd91rSSw0eegtWyLGg==}
 
   '@vitest/runner@4.1.9':
     resolution: {integrity: sha512-KXLMDtc7oe70+3mJfGrPUWPesswH+3sTxAMAMl8DG7I8IUQT4XW718dY5ID3vPUcmlu27CcKfY4P3h3I29SLJg==}
 
+  '@vitest/snapshot@4.1.10':
+    resolution: {integrity: sha512-xRkfOT1qpTAi/Ti4Y1LtfRc3kEuqxGw59eN2jN9pRWMtS/XDevekhcFSqvQqjUNGksfjMJu3Y+oJ+4Ypn2OaJw==}
+
   '@vitest/snapshot@4.1.9':
     resolution: {integrity: sha512-Jc7RKGNBo8Z28WYIm0Niej4xdSPByRf6mU58VpHQkd6Zh05rlnA+twjbK5HyeIGHxrzsc3mJgS43uM0CZKzaIA==}
 
+  '@vitest/spy@4.1.10':
+    resolution: {integrity: sha512-PLf/Ugvoq5wO/b4rwYCR1h2PSIdXz7wnkQFMiUpLdtM7l6pqVFcQIBEHyT1+l+cj7mNwAfZHzqXqDyjvOuwbDw==}
+
   '@vitest/spy@4.1.9':
     resolution: {integrity: sha512-fHpsS6mIi+PiEW+vcRVOMkX1oSaPKne3VOclSFICPcGOmfKgXPU5iAah+wcNcj2xPrCCmfq99IDGf+EojhhvhA==}
+
+  '@vitest/utils@4.1.10':
+    resolution: {integrity: sha512-fy9am/HWxbaGt/Sawrp90vt6Y6jQwf1RX77cz3uwoJwJVMli/e1IEwRPnMNJ7vKfPTwo0diXifkpPvwH9v7nGA==}
 
   '@vitest/utils@4.1.9':
     resolution: {integrity: sha512-A51o8ymO5PpqlWNnBP9ZHPXDIpuMtTLlGSjN7la4US+LJzoUMyhwjA5QXlm39JexgwHKW4Xjs8Z2d3dLCXOeuA==}
@@ -2335,9 +2364,6 @@ packages:
   typebox@1.3.1:
     resolution: {integrity: sha512-tHgMbqge7xNyyMYbdAXHxryHtpIilxhgM5nR/5aeQtYdOo/SjsHYqCwi/Yyqwcgccuy00kQSVJ4FL2ec0HYpnQ==}
 
-  typebox@1.3.3:
-    resolution: {integrity: sha512-URXGUE31PJDQC+PtRMJeLdF4kmmOdFoVPikPCtV2oOIhUpNpppEdIz7W8bH8cFYPYHdDpaRvqwdegMTmHliudg==}
-
   typebox@1.3.4:
     resolution: {integrity: sha512-j3MCKfJMIHdrr4ZQMzaJnvXrUbMNuncwssmQkny3Cv5vxrDE1o1WhZFEqGSlU884xtYS5sAa3O/XsUPbUbPWKQ==}
 
@@ -2409,6 +2435,47 @@ packages:
       tsx:
         optional: true
       yaml:
+        optional: true
+
+  vitest@4.1.10:
+    resolution: {integrity: sha512-R9jUTe5S4Qb0HCd4TNqpC7oGcrMssMRGXLW80ubjWsW9VH5GF8y1Y0SFLY9AbqSk6nt0PnOx4H4WNJYZ13GUPw==}
+    engines: {node: ^20.0.0 || ^22.0.0 || >=24.0.0}
+    hasBin: true
+    peerDependencies:
+      '@edge-runtime/vm': '*'
+      '@opentelemetry/api': ^1.9.0
+      '@types/node': ^20.0.0 || ^22.0.0 || >=24.0.0
+      '@vitest/browser-playwright': 4.1.10
+      '@vitest/browser-preview': 4.1.10
+      '@vitest/browser-webdriverio': 4.1.10
+      '@vitest/coverage-istanbul': 4.1.10
+      '@vitest/coverage-v8': 4.1.10
+      '@vitest/ui': 4.1.10
+      happy-dom: '*'
+      jsdom: '*'
+      vite: ^6.0.0 || ^7.0.0 || ^8.0.0
+    peerDependenciesMeta:
+      '@edge-runtime/vm':
+        optional: true
+      '@opentelemetry/api':
+        optional: true
+      '@types/node':
+        optional: true
+      '@vitest/browser-playwright':
+        optional: true
+      '@vitest/browser-preview':
+        optional: true
+      '@vitest/browser-webdriverio':
+        optional: true
+      '@vitest/coverage-istanbul':
+        optional: true
+      '@vitest/coverage-v8':
+        optional: true
+      '@vitest/ui':
+        optional: true
+      happy-dom:
+        optional: true
+      jsdom:
         optional: true
 
   vitest@4.1.9:
@@ -3447,6 +3514,15 @@ snapshots:
 
   '@types/turndown@5.0.6': {}
 
+  '@vitest/expect@4.1.10':
+    dependencies:
+      '@standard-schema/spec': 1.1.0
+      '@types/chai': 5.2.3
+      '@vitest/spy': 4.1.10
+      '@vitest/utils': 4.1.10
+      chai: 6.2.2
+      tinyrainbow: 3.1.0
+
   '@vitest/expect@4.1.9':
     dependencies:
       '@standard-schema/spec': 1.1.0
@@ -3456,6 +3532,14 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
+  '@vitest/mocker@4.1.10(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))':
+    dependencies:
+      '@vitest/spy': 4.1.10
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0)
+
   '@vitest/mocker@4.1.9(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))':
     dependencies:
       '@vitest/spy': 4.1.9
@@ -3464,13 +3548,29 @@ snapshots:
     optionalDependencies:
       vite: 8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0)
 
+  '@vitest/pretty-format@4.1.10':
+    dependencies:
+      tinyrainbow: 3.1.0
+
   '@vitest/pretty-format@4.1.9':
     dependencies:
       tinyrainbow: 3.1.0
 
+  '@vitest/runner@4.1.10':
+    dependencies:
+      '@vitest/utils': 4.1.10
+      pathe: 2.0.3
+
   '@vitest/runner@4.1.9':
     dependencies:
       '@vitest/utils': 4.1.9
+      pathe: 2.0.3
+
+  '@vitest/snapshot@4.1.10':
+    dependencies:
+      '@vitest/pretty-format': 4.1.10
+      '@vitest/utils': 4.1.10
+      magic-string: 0.30.21
       pathe: 2.0.3
 
   '@vitest/snapshot@4.1.9':
@@ -3480,7 +3580,15 @@ snapshots:
       magic-string: 0.30.21
       pathe: 2.0.3
 
+  '@vitest/spy@4.1.10': {}
+
   '@vitest/spy@4.1.9': {}
+
+  '@vitest/utils@4.1.10':
+    dependencies:
+      '@vitest/pretty-format': 4.1.10
+      convert-source-map: 2.0.0
+      tinyrainbow: 3.1.0
 
   '@vitest/utils@4.1.9':
     dependencies:
@@ -4353,8 +4461,6 @@ snapshots:
 
   typebox@1.3.1: {}
 
-  typebox@1.3.3: {}
-
   typebox@1.3.4: {}
 
   typescript@6.0.3: {}
@@ -4385,6 +4491,35 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.7.0
       yaml: 2.9.0
+
+  vitest@4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0)):
+    dependencies:
+      '@vitest/expect': 4.1.10
+      '@vitest/mocker': 4.1.10(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0))
+      '@vitest/pretty-format': 4.1.10
+      '@vitest/runner': 4.1.10
+      '@vitest/snapshot': 4.1.10
+      '@vitest/spy': 4.1.10
+      '@vitest/utils': 4.1.10
+      es-module-lexer: 2.1.0
+      expect-type: 1.4.0
+      magic-string: 0.30.21
+      obug: 2.1.3
+      pathe: 2.0.3
+      picomatch: 4.0.5
+      std-env: 4.1.0
+      tinybench: 2.9.0
+      tinyexec: 1.2.4
+      tinyglobby: 0.2.17
+      tinyrainbow: 3.1.0
+      vite: 8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0)
+      why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.0
+      '@types/node': 25.9.4
+      jsdom: 29.1.1
+    transitivePeerDependencies:
+      - msw
 
   vitest@4.1.9(@opentelemetry/api@1.9.0)(@types/node@25.9.4)(jsdom@29.1.1)(vite@8.1.0(@types/node@25.9.4)(jiti@2.7.0)(yaml@2.9.0)):
     dependencies:
