@@ -7,7 +7,6 @@ import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/terminal";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { type AskUserToolResult, buildResult } from "./render/result.ts";
 import { renderAskUserCall, renderAskUserResult } from "./render/transcript.ts";
-import { buildTreeSummaryLabel } from "./render/tree-summary.ts";
 import { type AskUserParams, AskUserParamsSchema } from "./schema.ts";
 import { ActiveQuestionnaireLock } from "./session/lock.ts";
 import {
@@ -36,6 +35,29 @@ export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "
 
 export default function askUserExtension(pi: ExtensionAPI): void {
   const lock = new ActiveQuestionnaireLock();
+
+  // Label ask_user tool results so they're visible and filterable in /tree.
+  // Use a non-awaited setTimeout: the agent awaits our handler's return before
+  // it appends the tool result to the session, so we must let the handler resolve
+  // first and label from a deferred callback.
+  pi.on("tool_result", (event, ctx) => {
+    if (event.toolName !== ASK_USER_TOOL_NAME) return;
+    const toolCallId = event.toolCallId;
+    setTimeout(() => {
+      const entries = ctx.sessionManager.getEntries();
+      const entry = [...entries]
+        .reverse()
+        .find(
+          (e) =>
+            e.type === "message" &&
+            e.message.role === "toolResult" &&
+            e.message.toolCallId === toolCallId,
+        );
+      if (entry) {
+        pi.setLabel(entry.id, "decision");
+      }
+    }, 0);
+  });
 
   // Factory-time: register with package defaults.
   registerAskUserTool(pi, lock, ASK_USER_PROMPT_SURFACE_DEFAULTS);
@@ -135,7 +157,10 @@ export async function executeAskUser(
       throw new Error("The user interaction was cancelled.");
     }
 
-    pi.appendEntry(buildTreeSummaryLabel(questionnaire));
+    pi.appendEntry("ask_user", {
+      title: questionnaire.title,
+      questions: questionnaire.questions.length,
+    });
     return buildResult(questionnaire, outcome);
   } finally {
     ctx.ui.setWorkingVisible?.(true);

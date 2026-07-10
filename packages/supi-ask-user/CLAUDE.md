@@ -27,7 +27,7 @@ Entrypoint: `src/ask-user.ts`
 3. **Headless state** — `src/session/controller.ts`
 4. **Renderer selection** — `src/ui/choose-renderer.ts`
 5. **UI renderers** — `src/ui/form*.ts`
-6. **Result + transcript** — `src/render/result.ts`, `src/render/transcript.ts`, `src/render/tree-summary.ts`
+6. **Result + transcript** — `src/render/result.ts`, `src/render/transcript.ts`
 7. **Tool guidance** — `src/tool/guidance.ts` (model-facing description, single source of truth)
 
 ## Package surfaces
@@ -52,5 +52,5 @@ import { normalizeQuestionnaire, AskUserController } from "@mrclrchtr/supi-ask-u
 - Option comments are **preserved on deselection** — only removed when explicitly cleared. Only touched options (selected and/or commented) appear in responses.
 - In comment editors, `Esc` discards unsaved edits and returns to form/review **without cancelling the interaction**.
 - `recommendation` on single-select defaults to first option; on multi-select defaults to none.
-- Completed forms are summarized in the session tree. In chat history, results can be expanded read-only with `Ctrl+O` — this does not reopen the live form.
+- Completed forms are labeled `decision` in the session tree for visibility and filtering (`labeled-only` filter mode in `/tree`). Results are persisted as a custom session entry (`pi.appendEntry("ask_user", ...)`) for state tracking. In chat history, results can be expanded read-only with `Ctrl+O` — this does not reopen the live form.
 - Model-visible result summaries are truncated to Pi's default 2,000-line / 50KB tool-output limits with a clear truncation notice.
