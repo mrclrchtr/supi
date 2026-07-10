@@ -101,7 +101,7 @@ describe("normalizeQuestionnaire", () => {
             prompt: "Choose one",
             options: [
               { value: " biome ", label: " Biome ", description: "fast" },
-              { value: "prettier", label: "Prettier", preview: "stable" },
+              { value: "prettier", label: "Prettier", details: "stable" },
               { value: "rome", label: "Rome" },
             ],
             recommendation: "biome",
@@ -118,7 +118,7 @@ describe("normalizeQuestionnaire", () => {
             id: "formatter",
             options: [
               { value: "biome", label: "Biome", description: "fast" },
-              { value: "prettier", label: "Prettier", preview: "stable" },
+              { value: "prettier", label: "Prettier", details: "stable" },
               { value: "rome", label: "Rome" },
             ],
             recommendedIndexes: [0],
@@ -344,7 +344,7 @@ describe("normalizeQuestionnaire", () => {
           prompt: "Choose one",
           options: [
             { value: " biome ", label: " Biome ", description: "fast" },
-            { value: "prettier", label: "Prettier", preview: "stable" },
+            { value: "prettier", label: "Prettier", details: "stable" },
           ],
           recommendation: "biome",
         },
@@ -367,7 +367,7 @@ describe("normalizeQuestionnaire", () => {
           id: "formatter",
           options: [
             { value: "biome", label: "Biome", description: "fast" },
-            { value: "prettier", label: "Prettier", preview: "stable" },
+            { value: "prettier", label: "Prettier", details: "stable" },
           ],
           recommendedIndexes: [0],
         },

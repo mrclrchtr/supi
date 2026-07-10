@@ -22,7 +22,7 @@ export interface RenderFormFrameArgs {
   editor: Editor;
   choiceFocusIndex: number;
   reviewFocusIndex: number;
-  previewText?: string;
+  detailsText?: string;
   editorLabel?: string;
   editorContext?: string;
 }
@@ -130,8 +130,8 @@ function renderChoiceScreen(args: RenderFormFrameArgs): string[] {
   }
   lines.push("");
 
-  if (args.previewText && args.width >= 80) {
-    lines.push(...renderChoiceWithPreview(args, question));
+  if (args.detailsText && args.width >= 80) {
+    lines.push(...renderChoiceWithDetails(args, question));
     return lines;
   }
 
@@ -139,15 +139,15 @@ function renderChoiceScreen(args: RenderFormFrameArgs): string[] {
     lines.push(...renderChoiceOptionLines(args, question, i, args.width));
   }
 
-  if (args.previewText) {
+  if (args.detailsText) {
     lines.push("");
-    lines.push(...renderPreviewCard(args.theme, args.previewText, args.width));
+    lines.push(...renderDetailsCard(args.theme, args.detailsText, args.width));
   }
 
   return lines;
 }
 
-function renderChoiceWithPreview(
+function renderChoiceWithDetails(
   args: RenderFormFrameArgs,
   question: NormalizedChoiceQuestion,
 ): string[] {
@@ -155,10 +155,10 @@ function renderChoiceWithPreview(
   const divider = args.theme.fg("borderMuted", "│");
   const dividerWidth = 1;
   const minLeftWidth = 28;
-  const preferredPreviewWidth = Math.max(30, Math.floor(args.width * 0.38));
+  const preferredDetailsWidth = Math.max(30, Math.floor(args.width * 0.38));
   const rightWidth = Math.max(
     22,
-    Math.min(preferredPreviewWidth, args.width - gap - dividerWidth - gap - minLeftWidth),
+    Math.min(preferredDetailsWidth, args.width - gap - dividerWidth - gap - minLeftWidth),
   );
   const leftWidth = Math.max(1, args.width - gap - dividerWidth - gap - rightWidth);
 
@@ -167,13 +167,13 @@ function renderChoiceWithPreview(
     optionLines.push(...renderChoiceOptionLines(args, question, i, leftWidth));
   }
 
-  const previewLines = renderPreviewCard(args.theme, args.previewText ?? "", rightWidth);
+  const detailsLines = renderDetailsCard(args.theme, args.detailsText ?? "", rightWidth);
 
   const merged: string[] = [];
-  const maxRows = Math.max(optionLines.length, previewLines.length);
+  const maxRows = Math.max(optionLines.length, detailsLines.length);
   for (let i = 0; i < maxRows; i += 1) {
     const left = optionLines[i] ?? "";
-    const right = previewLines[i] ?? "";
+    const right = detailsLines[i] ?? "";
     const mergedLine = `${padRight(left, leftWidth)}${" ".repeat(gap)}${divider}${" ".repeat(gap)}${right}`;
     merged.push(truncateToWidth(mergedLine, args.width));
   }
@@ -251,9 +251,9 @@ function renderEditorScreen(args: RenderFormFrameArgs): string[] {
   return lines;
 }
 
-function renderPreviewCard(theme: Theme, previewText: string, width: number): string[] {
+function renderDetailsCard(theme: Theme, detailsText: string, width: number): string[] {
   const innerWidth = Math.max(1, safeWidth(width) - 4);
-  return renderMiniBox(theme, "Preview", renderPrompt(previewText, innerWidth), width);
+  return renderMiniBox(theme, "Details", renderPrompt(detailsText, innerWidth), width);
 }
 
 function renderFooter(args: RenderFormFrameArgs): string {

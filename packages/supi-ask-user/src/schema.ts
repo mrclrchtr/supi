@@ -11,9 +11,10 @@ const OptionSchema = Type.Object({
       description: "Optional helper text",
     }),
   ),
-  preview: Type.Optional(
+  details: Type.Optional(
     Type.String({
-      description: "Optional focused-option preview",
+      description:
+        "Extended details shown when focused — trade-offs, code snippets, or consequences",
     }),
   ),
 });

@@ -6,7 +6,7 @@ export interface NormalizedOption {
   value: string;
   label: string;
   description?: string;
-  preview?: string;
+  details?: string;
 }
 
 interface BaseQuestion {

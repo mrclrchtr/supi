@@ -41,8 +41,8 @@ The model-visible result summary is bounded to Pi's default tool-output limits: 
 <table>
   <tr>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-choice-preview.png" width="100%" alt="Choice question with side preview" />
-      <br/>Choice question with side preview
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-choice-details.png" width="100%" alt="Choice question with side details" />
+      <br/>Choice question with side details
     </td>
     <td align="center">
       <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-question-comment.png" width="100%" alt="Question comment editor" />
@@ -51,8 +51,8 @@ The model-visible result summary is bounded to Pi's default tool-output limits: 
   </tr>
   <tr>
     <td align="center">
-      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-multi-choice-preview.png" width="100%" alt="Multi-select with preview" />
-      <br/>Multi-select with preview
+      <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-multi-choice-details.png" width="100%" alt="Multi-select with details" />
+      <br/>Multi-select with details
     </td>
     <td align="center">
       <img src="https://raw.githubusercontent.com/mrclrchtr/supi/main/packages/supi-ask-user/assets/ask-user-text-input.png" width="100%" alt="Text input with recommendation" />
@@ -110,4 +110,4 @@ The model-visible result summary is bounded to Pi's default tool-output limits: 
 | `Enter` | Save comment and return |
 | `Esc` | Discard comment edits and return |
 
-The recommended option is labeled `[recommended]`. On wide terminals, option previews render side-by-side with the list; on narrow terminals they stack below.
+The recommended option is labeled `[recommended]`. On wide terminals, option details render side-by-side with the list; on narrow terminals they stack below.

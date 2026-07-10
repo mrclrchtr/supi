@@ -72,7 +72,7 @@ export class AskUserForm implements Component, Focusable {
       editor: this.editor,
       choiceFocusIndex: this.choiceFocusIndex,
       reviewFocusIndex: this.reviewFocusIndex,
-      previewText: this.currentPreviewText(),
+      detailsText: this.currentDetailsText(),
       editorLabel: this.currentEditorLabel(),
       editorContext: this.editorContext,
     });
@@ -539,11 +539,11 @@ export class AskUserForm implements Component, Focusable {
     this.args.tui.requestRender();
   }
 
-  private currentPreviewText(): string | undefined {
+  private currentDetailsText(): string | undefined {
     if (this.mode !== "choice") return undefined;
     const question = this.args.controller.currentQuestion;
     if (question.type !== "choice") return undefined;
-    return question.options[this.choiceFocusIndex]?.preview;
+    return question.options[this.choiceFocusIndex]?.details;
   }
 
   private currentEditorLabel(): string | undefined {

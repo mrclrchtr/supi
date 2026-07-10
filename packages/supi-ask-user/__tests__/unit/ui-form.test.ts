@@ -15,7 +15,7 @@ const questionnaire: NormalizedQuestionnaire = {
       header: "Formatter",
       prompt: "Pick one",
       options: [
-        { value: "biome", label: "Biome", preview: "Fast and integrated" },
+        { value: "biome", label: "Biome", details: "Fast and integrated" },
         { value: "prettier", label: "Prettier" },
         { value: "rome", label: "Rome" },
       ],
@@ -951,8 +951,8 @@ describe("runFormQuestionnaire", () => {
     });
   });
 
-  describe("choice preview layout", () => {
-    it("renders preview side-by-side with options on wide terminals", async () => {
+  describe("choice details layout", () => {
+    it("renders details side-by-side with options on wide terminals", async () => {
       const { captured, ctx } = makeFormCtx();
       void runFormQuestionnaire(questionnaire, {
         ui: ctx.ui as unknown as AskUserUiContext,
@@ -968,7 +968,7 @@ describe("runFormQuestionnaire", () => {
       expect(text).toContain("Biome");
     });
 
-    it("stacks preview below options on narrow terminals", async () => {
+    it("stacks details below options on narrow terminals", async () => {
       const { captured, ctx } = makeFormCtx();
       void runFormQuestionnaire(questionnaire, {
         ui: ctx.ui as unknown as AskUserUiContext,
@@ -979,7 +979,7 @@ describe("runFormQuestionnaire", () => {
 
       const lines = captured.value.render(60);
       expect(lines.some((line) => line.includes("Fast and integrated"))).toBe(true);
-      expect(lines.some((line) => line.includes("Biome") && line.includes("Preview"))).toBe(false);
+      expect(lines.some((line) => line.includes("Biome") && line.includes("Details"))).toBe(false);
     });
   });
 

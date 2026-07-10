@@ -13,6 +13,7 @@ export const promptGuidelines = [
   "Use ask_user only when blocked after inspecting what can be inspected; not for status updates or broad surveys.",
   "Use ask_user for one decision form; combine related choice/text questions and avoid sibling tool calls that depend on the answer.",
   "In ask_user, use stable ids/values; recommendations must match question type, and unanswered questions return `needs_discussion`.",
+  "Set option.details on ask_user choice questions for trade-offs, code samples, or context the user needs to decide.",
 ];
 
 /** Package defaults for the ask_user prompt surface (used by the config resolver). */

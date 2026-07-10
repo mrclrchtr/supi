@@ -195,7 +195,7 @@ function normalizeOptions(
       value,
       label,
       description: trimOptional(option.description),
-      preview: trimOptional(option.preview),
+      details: trimOptional(option.details),
     };
   });
 }
