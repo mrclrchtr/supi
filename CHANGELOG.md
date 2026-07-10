@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.3.0](https://github.com/mrclrchtr/supi/compare/v2.2.1...v2.3.0) (2026-07-10)
+
+
+### Features
+
+* **supi-ask-user:** label tool results with "decision" for tree visibility ([15c5782](https://github.com/mrclrchtr/supi/commit/15c57823ec5ae89ff413b0e0b913d8e4c7eaa651))
+* **supi-ask-user:** rename option.preview to option.details with model-facing guidance ([f8ede36](https://github.com/mrclrchtr/supi/commit/f8ede363c27bd546367cd930d90fd3a07082d121))
+
+
+### Bug Fixes
+
+* **deps:** update dependency vitest to v4.1.10 ([0d87e50](https://github.com/mrclrchtr/supi/commit/0d87e5082c0500a4ba60be85323177f318c9f805))
+
 ## [2.2.1](https://github.com/mrclrchtr/supi/compare/v2.2.0...v2.2.1) (2026-07-08)
 
 
