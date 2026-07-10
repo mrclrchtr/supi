@@ -3,6 +3,7 @@ import {
   notifyToolPromptSurfaceDiagnostics,
   resolveToolPromptSurface,
 } from "@mrclrchtr/supi-core/prompt-surface";
+import { createSessionNameTracker } from "@mrclrchtr/supi-core/session";
 import { formatTitle, signalWaiting } from "@mrclrchtr/supi-core/terminal";
 import { AskUserValidationError, normalizeQuestionnaire } from "./normalize.ts";
 import { type AskUserToolResult, buildResult } from "./render/result.ts";
@@ -35,6 +36,7 @@ export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "
 
 export default function askUserExtension(pi: ExtensionAPI): void {
   const lock = new ActiveQuestionnaireLock();
+  const getSessionName = createSessionNameTracker(pi);
 
   // Label ask_user tool results so they're visible and filterable in /tree.
   // Use a non-awaited setTimeout: the agent awaits our handler's return before
@@ -60,7 +62,7 @@ export default function askUserExtension(pi: ExtensionAPI): void {
   });
 
   // Factory-time: register with package defaults.
-  registerAskUserTool(pi, lock, ASK_USER_PROMPT_SURFACE_DEFAULTS);
+  registerAskUserTool(pi, lock, ASK_USER_PROMPT_SURFACE_DEFAULTS, getSessionName);
 
   // session_start: re-register with resolved prompt surface (global + trusted project config).
   pi.on("session_start", async (_event, ctx) => {
@@ -71,7 +73,7 @@ export default function askUserExtension(pi: ExtensionAPI): void {
       ctx,
     });
 
-    registerAskUserTool(pi, lock, surface);
+    registerAskUserTool(pi, lock, surface, getSessionName);
     notifyToolPromptSurfaceDiagnostics(ctx, diagnostics);
   });
 }
@@ -80,6 +82,7 @@ function registerAskUserTool(
   pi: ExtensionAPI,
   lock: ActiveQuestionnaireLock,
   surface: typeof ASK_USER_PROMPT_SURFACE_DEFAULTS,
+  getSessionName: () => string | undefined,
 ): void {
   pi.registerTool<typeof AskUserParamsSchema, AskUserToolDetails>({
     name: ASK_USER_TOOL_NAME,
@@ -91,7 +94,7 @@ function registerAskUserTool(
     executionMode: "sequential",
     // biome-ignore lint/complexity/useMaxParams: pi ToolDefinition.execute signature
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      return executeAskUser(params, signal, ctx, lock, pi);
+      return executeAskUser(params, signal, ctx, lock, pi, getSessionName());
     },
     renderCall: (args, theme) => renderAskUserCall(args, theme),
     renderResult: (result, options, theme, context) =>
@@ -106,6 +109,7 @@ export async function executeAskUser(
   ctx: AskUserExecutionContext,
   lock: ActiveQuestionnaireLock,
   pi: ExtensionAPI,
+  sessionName?: string,
 ): Promise<AskUserToolResult> {
   let questionnaire: NormalizedQuestionnaire;
   try {
@@ -165,7 +169,7 @@ export async function executeAskUser(
   } finally {
     ctx.ui.setWorkingVisible?.(true);
     pi.events.emit("supi:ask-user:end", { source: "supi-ask-user" });
-    restoreTerminalTitle(ctx, pi);
+    restoreTerminalTitle(ctx, sessionName);
     lock.release();
   }
 }
@@ -184,8 +188,8 @@ function signalAttention(ctx: AskUserExecutionContext): void {
   signalWaiting(ctx, "pi — waiting for your input");
 }
 
-function restoreTerminalTitle(ctx: AskUserExecutionContext, pi: ExtensionAPI): void {
-  ctx.ui.setTitle?.(formatTitle(pi.getSessionName(), ctx.cwd));
+function restoreTerminalTitle(ctx: AskUserExecutionContext, sessionName: string | undefined): void {
+  ctx.ui.setTitle?.(formatTitle(sessionName, ctx.cwd));
 }
 
 function asFunction<T extends (...args: never[]) => unknown>(value: unknown): T | undefined {

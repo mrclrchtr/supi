@@ -44,6 +44,11 @@ describe("tabSpinner extension", () => {
       },
     });
 
+    // Fire session_start so the session name tracker (and rememberContext) initialise
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
+
     const agStart = pi.handlers.get("agent_start")?.[0] as (
       event: unknown,
       context: unknown,
@@ -103,11 +108,9 @@ describe("tabSpinner extension", () => {
       },
     });
 
-    const sessionStart = pi.handlers.get("session_start")?.[0] as (
-      event: unknown,
-      context: unknown,
-    ) => Promise<unknown>;
-    await sessionStart({}, ctx);
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
 
     pi.events.emit("supi:working:start", { source: "supi-review" });
     vi.advanceTimersByTime(80);
@@ -151,22 +154,25 @@ describe("tabSpinner extension", () => {
       },
     });
 
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
+
     const agStart = pi.handlers.get("agent_start")?.[0] as (
       event: unknown,
       context: unknown,
     ) => Promise<unknown>;
-    const shutdown = pi.handlers.get("session_shutdown")?.[0] as (
-      ...args: unknown[]
-    ) => Promise<unknown>;
     expect(agStart).toBeDefined();
-    expect(shutdown).toBeDefined();
 
     await agStart({}, ctx);
     vi.advanceTimersByTime(80);
     expect(titles.length).toBeGreaterThanOrEqual(1);
 
-    // Shutdown calls stop() which clears the spinner and shows the base title
-    await shutdown({}, ctx);
+    // Shutdown calls stop() which clears the spinner and shows the base title.
+    // Fire all session_shutdown handlers (tracker + tab-spinner).
+    for (const h of pi.getHandlers("session_shutdown")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
     const lastTitle = titles[titles.length - 1];
     expect(lastTitle).toBe("π - tmp");
   });
@@ -181,17 +187,14 @@ describe("tabSpinner extension", () => {
       ui: { setTitle: (title: string) => titles.push(title) },
     });
 
-    const sessionStart = pi.handlers.get("session_start")?.[0] as (
-      event: unknown,
-      context: unknown,
-    ) => Promise<unknown>;
-    const shutdown = pi.handlers.get("session_shutdown")?.[0] as (
-      event: unknown,
-      context: unknown,
-    ) => Promise<unknown>;
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
 
-    await sessionStart({}, ctx);
-    await shutdown({}, ctx);
+    // Fire all session_shutdown handlers so the tab-spinner unregisters its event-bus listeners
+    for (const h of pi.getHandlers("session_shutdown")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
     titles.length = 0;
 
     pi.events.emit("supi:working:start", { source: "supi-review" });
@@ -209,16 +212,15 @@ describe("tabSpinner extension", () => {
       ui: { setTitle: (title: string) => titles.push(title) },
     });
 
-    const sessionStart = pi.handlers.get("session_start")?.[0] as (
-      event: unknown,
-      context: unknown,
-    ) => Promise<unknown>;
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
+
     const agentStart = pi.handlers.get("agent_start")?.[0] as (
       event: unknown,
       context: unknown,
     ) => Promise<unknown>;
 
-    await sessionStart({}, ctx);
     await agentStart({}, ctx);
     vi.advanceTimersByTime(80);
     expect(titles.at(-1)).toBe("⠋ π - stale-test - tmp");
@@ -242,6 +244,10 @@ describe("tabSpinner extension", () => {
       cwd: "/tmp",
       ui: { setTitle: (t: string) => titles.push(t) },
     });
+
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
     await startHandlers[0]({}, ctx);
     titles.length = 0;
     vi.advanceTimersByTime(80);
@@ -272,6 +278,10 @@ describe("tabSpinner extension", () => {
       cwd: "/tmp",
       ui: { setTitle: (t: string) => titles.push(t) },
     });
+
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
     await startHandlers[0]({}, ctx);
     titles.length = 0;
     vi.advanceTimersByTime(80);
@@ -303,6 +313,10 @@ describe("tabSpinner extension", () => {
       ui: { setTitle: (t: string) => titles.push(t) },
     });
 
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
+
     await startHandlers[0]({}, ctx);
     vi.advanceTimersByTime(80);
     titles.length = 0;
@@ -332,6 +346,10 @@ describe("tabSpinner extension", () => {
       ui: { setTitle: (t: string) => titles.push(t) },
     });
 
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
+
     await startHandlers[0]({}, ctx);
     vi.advanceTimersByTime(80);
     titles.length = 0;
@@ -341,5 +359,39 @@ describe("tabSpinner extension", () => {
     expect(titles).toHaveLength(3);
     expect(titles.at(-1)).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - my-project - tmp$/);
     expect(titles).not.toContain("✓ π - my-project - tmp");
+  });
+
+  it("updates the spinner title when session_info_changed fires after session_start", async () => {
+    const pi = createPiMock({ sessionName: "before" });
+    tabSpinner(pi as unknown as Parameters<typeof tabSpinner>[0]);
+
+    const titles: string[] = [];
+    const ctx = makeCtx({
+      cwd: "/tmp",
+      ui: { setTitle: (t: string) => titles.push(t) },
+    });
+
+    // Initialise via session_start + agent_start
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
+    const agStart = pi.handlers.get("agent_start")?.[0] as (
+      e: unknown,
+      c: unknown,
+    ) => Promise<unknown>;
+    await agStart?.({}, ctx);
+    vi.advanceTimersByTime(80);
+    expect(titles.at(-1)).toContain("before");
+
+    // Rename via session_info_changed — spinner should use the new name
+    const changedHandler = pi.handlers.get("session_info_changed")?.[0] as (
+      event: { name?: string },
+      ctx: unknown,
+    ) => Promise<unknown>;
+    await changedHandler?.({ name: "after" }, ctx);
+
+    titles.length = 0;
+    vi.advanceTimersByTime(80);
+    expect(titles[0]).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] π - after - tmp$/);
   });
 });

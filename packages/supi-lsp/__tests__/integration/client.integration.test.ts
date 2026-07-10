@@ -1,5 +1,5 @@
 // Integration tests — spawn real LSP servers against temp projects.
-// These require typescript-language-server + tsserver on PATH.
+// Require typescript-language-server on PATH and typescript in workspace node_modules.
 // Skip with: pnpm test -- --testPathIgnorePatterns integration
 
 import * as fs from "node:fs";
@@ -12,11 +12,20 @@ import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provi
 import type { SessionLspService } from "../../src/session/service-registry.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
 
+// typescript-language-server resolves tsserver from the project root's
+// node_modules. The test's temp project has no node_modules, so we pass
+// tsserver.path explicitly via initialization options.
+const TSSERVER = path.resolve(
+  import.meta.dirname,
+  "../../../../node_modules/typescript/lib/tsserver.js",
+);
+
 const TS_SERVER_CONFIG: ServerConfig = {
   command: "typescript-language-server",
   args: ["--stdio"],
   fileTypes: ["ts"],
   rootMarkers: ["tsconfig.json", "package.json"],
+  initializationOptions: { tsserver: { path: TSSERVER } },
 };
 
 // ── Fixture Setup ─────────────────────────────────────────────────────
@@ -25,7 +34,7 @@ let tmpDir: string;
 let goodFile: string;
 let badFile: string;
 
-const HAS_TS_LSP = hasCommand("typescript-language-server") && hasCommand("tsserver");
+const HAS_TS_LSP = hasCommand("typescript-language-server") && fs.existsSync(TSSERVER);
 
 beforeAll(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "lsp-integration-"));

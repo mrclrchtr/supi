@@ -1,5 +1,5 @@
 // Integration tests for LspManager — tests the server pool against real LSP.
-// Requires typescript-language-server + tsserver on PATH.
+// Requires typescript-language-server on PATH and typescript in workspace node_modules.
 
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -10,7 +10,15 @@ import type { Diagnostic } from "../../src/config/types.ts";
 import { LspManager } from "../../src/manager/manager.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
 
-const HAS_TS_LSP = hasCommand("typescript-language-server") && hasCommand("tsserver");
+// typescript-language-server resolves tsserver from the project root's
+// node_modules. The test's temp project has no node_modules, so we write
+// a supi config that passes tsserver.path via initialization options.
+const TSSERVER = path.resolve(
+  import.meta.dirname,
+  "../../../../node_modules/typescript/lib/tsserver.js",
+);
+
+const HAS_TS_LSP = hasCommand("typescript-language-server") && fs.existsSync(TSSERVER);
 
 let tmpDir: string;
 
@@ -44,6 +52,23 @@ beforeAll(() => {
   );
 
   fs.writeFileSync(path.join(tmpDir, "broken.ts"), 'export const n: number = "string";\n');
+
+  // Point typescript-language-server at the workspace's tsserver so the
+  // temp project (which has no node_modules) still resolves TypeScript.
+  const supiDir = path.join(tmpDir, ".pi", "supi");
+  fs.mkdirSync(supiDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(supiDir, "config.json"),
+    JSON.stringify({
+      lsp: {
+        servers: {
+          typescript: {
+            initializationOptions: { tsserver: { path: TSSERVER } },
+          },
+        },
+      },
+    }),
+  );
 });
 
 afterAll(() => {

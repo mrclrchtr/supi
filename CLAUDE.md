@@ -110,7 +110,8 @@ Extensions register config-backed settings via `registerDeclarativeSettings()` f
 - pi loads these extensions from the working tree directly; after edits, use `/reload` or restart pi.
 - `pi.on("tool_result")` can modify tool output after execution; `pi.on("tool_call")` runs before execution — it can mutate input parameters (e.g. inject defaults) or block the call, but cannot add result content.
 - Session cleanup event is `session_shutdown`, not `session_end`.
-- PI internal events like `session_info_changed` are consumed by the interactive mode only; they are **not** forwarded to extension handlers via `pi.on()`. The `pi.events` EventBus is strictly for extension-to-extension communication.
+- `session_info_changed` fires when the session display name is set via `/name`, RPC, or `pi.setSessionName()`. Extensions can subscribe to it for reactive title updates.
+- `pi.events` EventBus is for extension-to-extension communication; prefer `pi.on()` for pi lifecycle events.
 - `createAgentSession()` child sessions do NOT bubble `agent_start`/`agent_end` to parent extension handlers; use `pi.events` to signal activity from programmatic sub-sessions.
 - `pi.events.emit("supi:working:start", { source: "supi-<pkg>" })` / `pi.events.emit("supi:working:end", { source: "supi-<pkg>" })` — generic SuPi convention for indicating long-running work across extensions; `tab-spinner` listens to these. Emitters must ensure `end` always fires (success, failure, cancel, timeout).
 

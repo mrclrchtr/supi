@@ -203,6 +203,30 @@ describe("modelEffortColors extension", () => {
       const lines = renderer.render(120);
       expect(lines[1]).toContain("high");
     });
+
+    it("shows max thinking level for reasoning models", async () => {
+      const pi = createPiMock();
+      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      (pi as unknown as Record<string, unknown>).getThinkingLevel = vi.fn(() => "max");
+
+      let footerFactory: FooterFactory | undefined;
+      const ctx = makeFooterCtx({
+        model: { provider: "anthropic", id: "claude-sonnet", reasoning: true },
+        ui: uiCapturingFooter((f) => {
+          footerFactory = f;
+        }),
+      });
+
+      const startHandler = pi.handlers.get("session_start")?.[0] as (
+        _e: unknown,
+        c: unknown,
+      ) => Promise<unknown>;
+      await startHandler?.({}, ctx);
+      const factory = footerFactory as FooterFactory;
+      const renderer = factory(mockTui, mockTheme, makeFooterData());
+      const lines = renderer.render(120);
+      expect(lines[1]).toContain("max");
+    });
   });
 
   describe("footer rendering", () => {

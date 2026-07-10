@@ -81,7 +81,8 @@ describe("ask_user tool", () => {
     const pi = createPiMock() as unknown as PiApi;
     askUserExtension(pi);
     const handler = pi.getHandlers("session_start");
-    expect(handler).toHaveLength(1);
+    // Two handlers: createSessionNameTracker (from supi-core/session) + ask-user's own
+    expect(handler).toHaveLength(2);
   });
 
   it("throws for invalid forms", async () => {
@@ -296,5 +297,52 @@ describe("ask_user tool", () => {
     expect(result.content[0]?.text).toContain("Need more context");
     expect(result.content[0]?.text).toContain("Need formatter trade-offs");
     expect(result.content[0]?.text).toContain("May fit the team better");
+  });
+
+  it("restores the terminal title with the session name from session_info_changed", async () => {
+    const pi = createPiMock({ sessionName: "before-rename" }) as unknown as PiApi;
+    askUserExtension(pi);
+
+    const setTitleCalls: string[] = [];
+    const ctx = makeFormCtx({
+      outcome: "submitted",
+      responses: [
+        {
+          questionId: "formatter",
+          answer: {
+            kind: "choice",
+            answered: true,
+            options: [{ value: "biome", label: "Biome", selected: true }],
+          },
+        },
+      ],
+    });
+    (ctx as Record<string, unknown>).sessionManager = {
+      getBranch: vi.fn(() => []),
+      getSessionId: vi.fn(() => "sid-1"),
+    };
+    (ctx.ui as { setTitle: (title: string) => void }).setTitle = (title: string) =>
+      setTitleCalls.push(title);
+
+    // Fire session_start so the tracker + re-registration runs
+    for (const h of pi.getHandlers("session_start")) {
+      await (h as (...args: unknown[]) => unknown)({}, ctx);
+    }
+
+    // Rename via session_info_changed
+    const changedHandler = pi.handlers.get("session_info_changed")?.[0] as (
+      event: { name?: string },
+      ctx: unknown,
+    ) => Promise<unknown>;
+    await changedHandler?.({ name: "after-rename" }, ctx);
+
+    // Execute the re-registered tool (after session_start)
+    const tool = getTool(pi, "ask_user");
+    await tool.execute("tc-rename", request, undefined, undefined, ctx);
+
+    // The finally block should call restoreTerminalTitle with the renamed session
+    expect(setTitleCalls.length).toBeGreaterThanOrEqual(1);
+    expect(setTitleCalls.at(-1)).toContain("after-rename");
+    expect(setTitleCalls.at(-1)).not.toContain("before-rename");
   });
 });

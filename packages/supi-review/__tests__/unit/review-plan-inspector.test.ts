@@ -53,6 +53,7 @@ const ALL_FG_COLORS = {
   thinkingMedium: 0,
   thinkingHigh: 0,
   thinkingXhigh: 0,
+  thinkingMax: 0,
   bashMode: 0,
 } as const;
 

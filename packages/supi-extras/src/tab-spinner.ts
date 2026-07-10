@@ -10,6 +10,7 @@
  * agent starts or the session shuts down.
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { createSessionNameTracker } from "@mrclrchtr/supi-core/session";
 import { BRAILLE_SPINNER_FRAMES, SPINNER_INTERVAL_MS } from "@mrclrchtr/supi-core/spinner-frames";
 import { formatTitle, signalDone } from "@mrclrchtr/supi-core/terminal";
 
@@ -29,6 +30,8 @@ type ReviewTitleState =
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: spinner state and event wiring are intentionally colocated
 export default function tabSpinner(pi: ExtensionAPI) {
+  const getSessionName = createSessionNameTracker(pi);
+
   let timer: ReturnType<typeof setInterval> | null = null;
   let pendingAgentEndTimer: ReturnType<typeof setTimeout> | null = null;
   let frame = 0;
@@ -38,7 +41,6 @@ export default function tabSpinner(pi: ExtensionAPI) {
   let askUserActive = 0;
   let reviewTitleState: ReviewTitleState = { kind: "none" };
   let currentCtx: ExtensionContext | undefined;
-  let cachedSessionName: string | undefined;
   let cachedCwd: string | undefined;
   const unregisterBusHandlers: Array<() => void> = [];
 
@@ -106,19 +108,17 @@ export default function tabSpinner(pi: ExtensionAPI) {
   function rememberContext(ctx: ExtensionContext) {
     currentCtx = ctx;
     cachedCwd = ctx.cwd;
-    cachedSessionName = getSessionNameSafe();
   }
 
   function getSessionNameSafe(): string | undefined {
     try {
-      const next = pi.getSessionName();
-      if (next !== undefined) {
-        cachedSessionName = next;
-      }
-      return cachedSessionName;
+      // Call pi.getSessionName() as a canary — throws if context is stale.
+      // The actual name is maintained reactively via createSessionNameTracker.
+      pi.getSessionName();
+      return getSessionName();
     } catch {
       handleStaleContext();
-      return cachedSessionName;
+      return getSessionName();
     }
   }
 
