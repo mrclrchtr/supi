@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.3.1](https://github.com/mrclrchtr/supi/compare/v2.3.0...v2.3.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @biomejs/biome to v2.5.3 ([086327e](https://github.com/mrclrchtr/supi/commit/086327e554a203b41052dc3395a995c5dcd83b61))
+* **deps:** update dependency @commitlint/cli to v21.2.1 ([c85d835](https://github.com/mrclrchtr/supi/commit/c85d83558a39898edc25c560d03513cb902a0b97))
+* **deps:** update dependency @types/node to v25.9.5 ([a927397](https://github.com/mrclrchtr/supi/commit/a9273974fde53138c127e18c2e9bc5c6406ae096))
+* **deps:** update dependency typebox to v1.3.5 ([78d8663](https://github.com/mrclrchtr/supi/commit/78d8663a1cce0405a62b57f1c55b18f252efc6a6))
+
 ## [2.3.0](https://github.com/mrclrchtr/supi/compare/v2.2.1...v2.3.0) (2026-07-10)
 
 
