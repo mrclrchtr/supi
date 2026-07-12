@@ -1,7 +1,7 @@
 import { footerContributions } from "@mrclrchtr/supi-core/footer-registry";
 import { createPiMock } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import modelEffortColors from "../../src/model-effort-colors.ts";
+import supiFooter from "../../src/supi-footer.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -96,7 +96,7 @@ function makeFooterCtx(overrides: Record<string, unknown> = {}) {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("modelEffortColors extension", () => {
+describe("supiFooter extension", () => {
   beforeEach(() => {
     vi.stubEnv("HOME", "/home/user");
   });
@@ -109,7 +109,7 @@ describe("modelEffortColors extension", () => {
   describe("color mapping", () => {
     it("maps Anthropic/Claude to accent", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -134,7 +134,7 @@ describe("modelEffortColors extension", () => {
 
     it("maps OpenAI/GPT to success", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -157,7 +157,7 @@ describe("modelEffortColors extension", () => {
 
     it("maps unknown provider to dim", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -182,7 +182,7 @@ describe("modelEffortColors extension", () => {
   describe("thinking level coloring", () => {
     it("shows thinking level for reasoning models", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
       (pi as unknown as Record<string, unknown>).getThinkingLevel = vi.fn(() => "high");
 
       let footerFactory: FooterFactory | undefined;
@@ -206,7 +206,7 @@ describe("modelEffortColors extension", () => {
 
     it("shows max thinking level for reasoning models", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
       (pi as unknown as Record<string, unknown>).getThinkingLevel = vi.fn(() => "max");
 
       let footerFactory: FooterFactory | undefined;
@@ -232,7 +232,7 @@ describe("modelEffortColors extension", () => {
   describe("footer rendering", () => {
     it("returns three lines when extension statuses exist", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -267,7 +267,7 @@ describe("modelEffortColors extension", () => {
 
     it("returns two lines when no extension statuses", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -289,7 +289,7 @@ describe("modelEffortColors extension", () => {
 
     it("shows git branch in cwd line", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -317,7 +317,7 @@ describe("modelEffortColors extension", () => {
 
     it("shows context window percentage with warning threshold", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -347,7 +347,7 @@ describe("modelEffortColors extension", () => {
   describe("event handling", () => {
     it("re-renders on model_select", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -376,7 +376,7 @@ describe("modelEffortColors extension", () => {
 
     it("re-renders on thinking_level_select", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -406,7 +406,7 @@ describe("modelEffortColors extension", () => {
 
     it("cleans up on session_shutdown", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -442,7 +442,7 @@ describe("modelEffortColors extension", () => {
   describe("stats line", () => {
     it("includes CH when cache data is present", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -484,7 +484,7 @@ describe("modelEffortColors extension", () => {
 
     it("omits CH when no cache data", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       let footerFactory: FooterFactory | undefined;
       const ctx = makeFooterCtx({
@@ -525,7 +525,7 @@ describe("modelEffortColors extension", () => {
 
     it("places extra parts after CH and before cost/context", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       // Register a real stats contribution before rendering
       footerContributions.register({
@@ -582,7 +582,7 @@ describe("modelEffortColors extension", () => {
 
     it("renders TCH from real registry after CH", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       // Simulate what supi-cache does: register a stats contribution
       footerContributions.register({
@@ -633,7 +633,7 @@ describe("modelEffortColors extension", () => {
 
     it("places priority-0 contribution before default-priority ones", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       // TCH at priority 0, another at default 100
       footerContributions.register({
@@ -692,7 +692,7 @@ describe("modelEffortColors extension", () => {
 
     it("omits stats contributions that return empty strings", async () => {
       const pi = createPiMock();
-      modelEffortColors(pi as unknown as Parameters<typeof modelEffortColors>[0]);
+      supiFooter(pi as unknown as Parameters<typeof supiFooter>[0]);
 
       footerContributions.register({
         key: "empty",

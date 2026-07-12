@@ -15,8 +15,8 @@ src/
 ├── clipboard.ts
 ├── copy-prompt.ts
 ├── git-editor.ts
-├── model-effort-colors.ts
-├── model-effort-colors-helpers.ts
+├── supi-footer.ts
+├── supi-footer-helpers.ts
 ├── prompt-stash.ts
 ├── skill-shortcut.ts
 └── tab-spinner.ts
@@ -26,7 +26,7 @@ __tests__/
 │   ├── clipboard.test.ts
 │   ├── copy-prompt.test.ts
 │   ├── git-editor.test.ts
-│   ├── model-effort-colors.test.ts
+│   ├── supi-footer.test.ts
 │   ├── prompt-stash.test.ts
 │   └── tab-spinner.test.ts
 └── integration/
@@ -46,8 +46,8 @@ __tests__/
 | `git-editor.ts` | Sets `GIT_EDITOR=true` to prevent git from blocking on interactive editors |
 | `aliases.ts` | `/exit`, `/clear` (→ `/new`), `/e` (→ `/exit`) command aliases |
 | `skill-shortcut.ts` | `$skill-name` → `/skill:skill-name` expansion + fuzzy autocomplete |
-| `model-effort-colors.ts` | PI-theme-native footer coloring — model name colored by provider, thinking level colored by intensity |
-| `model-effort-colors-helpers.ts` | Pure helpers (color mapping, stats, layout) for the footer extension |
+| `supi-footer.ts` | PI-theme-native footer replacement — model name colored by provider, thinking level delegated to Pi's `theme.getThinkingBorderColor` |
+| `supi-footer-helpers.ts` | Pure helpers (provider color mapping, stats, layout) for the footer extension |
 
 ## Gotchas
 

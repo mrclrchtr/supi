@@ -63,9 +63,9 @@ If the stash file cannot be read or written, the feature degrades to in-memory u
 
 While the agent is working, the package animates a spinner in the terminal tab title. When the turn finishes, it shows a done marker. If `ask_user` is active, the spinner pauses so the waiting-for-input title is not overwritten.
 
-### Footer model and effort colors
+### Footer replacement
 
-The footer keeps pi's existing information but recolors the active model and reasoning level using theme tokens.
+The package replaces pi's default footer. The model name is colored by provider using theme tokens; thinking level coloring delegates to Pi's theme.
 
 ### Headless git safety
 
@@ -83,5 +83,6 @@ That prevents git subprocesses from hanging while waiting for an interactive edi
 - `src/skill-shortcut.ts` — `$skill-name` expansion and autocomplete
 - `src/tab-spinner.ts` — terminal tab-title spinner
 - `src/copy-prompt.ts` and `src/clipboard.ts` — copy-to-clipboard shortcut and helper
-- `src/model-effort-colors.ts` — footer recoloring
+- `src/supi-footer.ts` — footer replacement
+- `src/supi-footer-helpers.ts` — pure helpers
 - `src/git-editor.ts` — git editor environment guard

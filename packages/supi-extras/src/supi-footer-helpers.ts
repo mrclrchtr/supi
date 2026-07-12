@@ -1,5 +1,5 @@
 /**
- * Pure helpers for model-effort-colors extension.
+ * Pure helpers for supi-footer extension.
  * Extracted to keep the extension entrypoint under complexity / line-count limits.
  */
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";

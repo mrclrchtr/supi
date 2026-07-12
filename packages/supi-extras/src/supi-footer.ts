@@ -1,10 +1,10 @@
 /**
- * Model/effort footer coloring for pi.
+ * SuPi footer for pi.
  *
- * Colors the model name in the footer by semantically mapping the provider
- * to PI theme tokens, and colors the thinking/effort level using PI's
- * built-in thinking-level theme tokens. No hardcoded hex colors, no
- * animations.
+ * Replaces pi's default footer. Colors the model name by provider using
+ * theme tokens, delegates thinking-level coloring to Pi's
+ * theme.getThinkingBorderColor, and integrates stats contributions from
+ * the footer registry. No hardcoded hex colors, no animations.
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
@@ -22,13 +22,13 @@ import {
   sanitizeStatusText,
   styleRightSide,
   type UsageEntry,
-} from "./model-effort-colors-helpers.ts";
+} from "./supi-footer-helpers.ts";
 
 // ---------------------------------------------------------------------------
 // Extension
 // ---------------------------------------------------------------------------
 
-export default function modelEffortColors(pi: ExtensionAPI) {
+export default function supiFooter(pi: ExtensionAPI) {
   let currentModel: unknown;
   let requestRender: (() => void) | undefined;
 
