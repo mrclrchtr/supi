@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.2](https://github.com/mrclrchtr/supi/compare/v2.3.1...v2.3.2) (2026-07-12)
+
+
+### Bug Fixes
+
+* **deps:** update dependency typebox to v1.3.6 ([df48a20](https://github.com/mrclrchtr/supi/commit/df48a20b86799665d8a72ee7df2bcc1439658590))
+* **supi-extras:** rename model-effort-colors to supi-footer ([7509f52](https://github.com/mrclrchtr/supi/commit/7509f5210db21a22c2319ff99f17ec0130c1853a))
+
 ## [2.3.1](https://github.com/mrclrchtr/supi/compare/v2.3.0...v2.3.1) (2026-07-11)
 
 
