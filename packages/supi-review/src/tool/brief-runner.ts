@@ -69,7 +69,7 @@ async function createBriefSession(
     cwd: invocation.cwd,
     model: invocation.model,
     modelRegistry: invocation.modelRegistry,
-    thinkingLevel: clampThinkingLevel(invocation.model, "xhigh"),
+    thinkingLevel: clampThinkingLevel(invocation.model, "max"),
     tools: ["submit_review_brief"],
     customTools: [submitBriefTool],
     resourceLoader,

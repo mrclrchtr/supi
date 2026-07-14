@@ -44,7 +44,8 @@ const model = {
   provider: "anthropic",
   id: "claude-sonnet-4",
   name: "Claude Sonnet 4",
-  reasoning: false,
+  reasoning: true,
+  thinkingLevelMap: { max: "max" },
   contextWindow: 200_000,
   api: {} as never,
   baseUrl: "",
@@ -111,6 +112,7 @@ describe("runBriefSynthesis", () => {
     });
 
     await vi.advanceTimersByTimeAsync(5);
+    expect(mockCreateAgentSession.mock.calls[0]?.[0]).toMatchObject({ thinkingLevel: "max" });
     const submitTool = capturedCustomTools[0];
     expect(submitTool).toBeDefined();
 

@@ -71,7 +71,8 @@ const model = {
     provider: "anthropic",
     id: "claude-sonnet-4",
     name: "Claude Sonnet 4",
-    reasoning: false,
+    reasoning: true,
+    thinkingLevelMap: { max: "max" },
     contextWindow: 200_000,
     api: {} as never,
     baseUrl: "",
@@ -188,6 +189,7 @@ describe("runReviewer", () => {
     await resultPromise;
 
     const callOpts = mockCreateAgentSession.mock.calls[0]?.[0];
+    expect(callOpts).toMatchObject({ thinkingLevel: "max" });
     expect(callOpts.tools).toEqual([
       "read",
       "grep",
