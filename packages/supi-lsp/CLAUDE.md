@@ -15,12 +15,10 @@ There is no PI extension entrypoint and no model-callable `lsp_*` tool surface. 
 
 `WorkspaceLspRuntime` is an exported interface. `DefaultWorkspaceLspRuntime`, clients, and `LspManager` remain internal. Never add manager/client access to the public runtime.
 
-Focused internal interfaces:
-
-- `ClientPool` — track/close/prune files, refresh open diagnostics, workspace notifications, shutdown
-- `WorkspaceRouter` — file support and project-server inventory
-- `DiagnosticStore` — synchronized diagnostic reads and summaries
-- `RecoveryCoordinator` — stale assessment and recovery
+The private `DefaultWorkspaceLspRuntime` is the single operational seam. It normalizes
+paths, coordinates readiness, semantic requests, tracked files, diagnostics, recovery,
+and owner-controlled shutdown around the package-internal `LspManager`. Clients and the
+manager never cross the public runtime interface.
 
 The registry uses the shared core session-state helper and retains explicit ready, pending, inactive, disabled, and unavailable states. Pending polling uses `waitForWorkspaceLspRuntime(cwd)`.
 
@@ -31,8 +29,7 @@ Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when st
 - `src/client/` — protocol client, transport, refresh, and request handling
 - `src/config/` — server definitions, settings, capabilities, actions, protocol types, and tsconfig scope
 - `src/diagnostics/` — stale/suppression diagnostics and workspace sentinels
-- `src/manager/manager.ts` + `manager-*.ts` — package-internal lifecycle, routing, diagnostics, and recovery
-- `src/manager/client-pool.ts`, `workspace-router.ts`, `diagnostic-store.ts`, `recovery-coordinator.ts` — focused internal interfaces
+- `src/manager/manager.ts` + `manager-*.ts` — package-internal server pool, routing, diagnostics, and recovery mechanics
 - `src/provider/lsp-semantic-provider.ts` — semantic-provider adapter
 - `src/provider/refactor-planning.ts` — precise rename/code-action edit conversion
 - `src/session/runtime-controller.ts` — lifecycle/status

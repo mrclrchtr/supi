@@ -1,12 +1,10 @@
 import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LspClient } from "../../src/client/client.ts";
-import type { DocumentSymbol, Hover, Location, SymbolInformation } from "../../src/config/types.ts";
+import { getWorkspaceLspRuntime } from "../../src/index.ts";
 import type { LspManager } from "../../src/manager/manager.ts";
 import {
   clearWorkspaceLspRuntime,
   createWorkspaceLspRuntimeOwner,
-  getWorkspaceLspRuntime,
   setWorkspaceLspRuntimeState,
   waitForWorkspaceLspRuntime,
 } from "../../src/session/runtime-registry.ts";
@@ -15,83 +13,67 @@ function createWorkspaceLspRuntime(manager: LspManager) {
   return createWorkspaceLspRuntimeOwner(manager).runtime;
 }
 
-describe("session registry", () => {
+describe("workspace LSP runtime registry", () => {
   beforeEach(() => {
     clearWorkspaceLspRuntime("/test");
     clearWorkspaceLspRuntime("/other");
     clearWorkspaceLspRuntime("/module-copy-test");
   });
 
-  it("returns unavailable when no state is set", () => {
-    const state = getWorkspaceLspRuntime("/test");
-    expect(state.kind).toBe("unavailable");
-    if (state.kind === "unavailable") {
-      expect(state.reason).toContain("No LSP session initialized");
-    }
-  });
-
-  it("returns ready state with operational runtime methods only", () => {
-    const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
-    const service = createWorkspaceLspRuntime(manager);
-    setWorkspaceLspRuntimeState("/test", { kind: "ready", runtime: service });
-
-    const state = getWorkspaceLspRuntime("/test");
-    expect(state.kind).toBe("ready");
-    if (state.kind === "ready") {
-      expect(state.runtime).toBe(service);
-      expect(state.runtime).not.toHaveProperty("shutdown");
-    }
-  });
-
-  it("returns pending state", () => {
-    setWorkspaceLspRuntimeState("/test", { kind: "pending" });
-    const state = getWorkspaceLspRuntime("/test");
-    expect(state.kind).toBe("pending");
-  });
-
-  it("returns inactive state", () => {
-    const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
-    setWorkspaceLspRuntimeState("/test", {
-      kind: "inactive",
-      runtime: createWorkspaceLspRuntime(manager),
+  it("publishes an unavailable state when no session exists", () => {
+    expect(getWorkspaceLspRuntime("/test")).toEqual({
+      kind: "unavailable",
+      reason: "No LSP session initialized for this workspace",
     });
-    const state = getWorkspaceLspRuntime("/test");
-    expect(state.kind).toBe("inactive");
   });
 
-  it("returns disabled state", () => {
-    setWorkspaceLspRuntimeState("/test", { kind: "disabled" });
-    const state = getWorkspaceLspRuntime("/test");
-    expect(state.kind).toBe("disabled");
-  });
-
-  it("clears state for a specific cwd", () => {
-    setWorkspaceLspRuntimeState("/test", { kind: "pending" });
-    clearWorkspaceLspRuntime("/test");
-    expect(getWorkspaceLspRuntime("/test").kind).toBe("unavailable");
-  });
-
-  it("isolates state by cwd", () => {
+  it("publishes a ready runtime without exposing shutdown", () => {
     const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
-    setWorkspaceLspRuntimeState("/test", {
-      kind: "ready",
-      runtime: createWorkspaceLspRuntime(manager),
-    });
-    setWorkspaceLspRuntimeState("/other", { kind: "pending" });
+    const runtime = createWorkspaceLspRuntime(manager);
 
-    expect(getWorkspaceLspRuntime("/test").kind).toBe("ready");
-    expect(getWorkspaceLspRuntime("/other").kind).toBe("pending");
+    setWorkspaceLspRuntimeState("/test", { kind: "ready", runtime });
+
+    expect(getWorkspaceLspRuntime("/test")).toEqual({ kind: "ready", runtime });
+    expect(runtime).not.toHaveProperty("shutdown");
   });
 
-  it("normalizes cwd aliases", () => {
+  it.each([
+    ["pending", { kind: "pending" }],
+    ["disabled", { kind: "disabled" }],
+  ] as const)("publishes %s state", (_label, state) => {
+    setWorkspaceLspRuntimeState("/test", state);
+    expect(getWorkspaceLspRuntime("/test")).toEqual(state);
+  });
+
+  it("publishes inactive state with its runtime", () => {
+    const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
+    const runtime = createWorkspaceLspRuntime(manager);
+
+    setWorkspaceLspRuntimeState("/test", { kind: "inactive", runtime });
+
+    expect(getWorkspaceLspRuntime("/test")).toEqual({ kind: "inactive", runtime });
+  });
+
+  it("isolates and normalizes workspace keys", () => {
     const root = path.join(process.cwd(), "tmp", "lsp-registry");
-    const alias = path.join(root, "..", "lsp-registry");
-    setWorkspaceLspRuntimeState(alias, { kind: "pending" });
+    setWorkspaceLspRuntimeState(path.join(root, "..", "lsp-registry"), { kind: "pending" });
+    setWorkspaceLspRuntimeState("/other", { kind: "disabled" });
 
-    expect(getWorkspaceLspRuntime(root).kind).toBe("pending");
+    expect(getWorkspaceLspRuntime(root)).toEqual({ kind: "pending" });
+    expect(getWorkspaceLspRuntime("/other")).toEqual({ kind: "disabled" });
   });
 
-  it("shares registry state across module instances", async () => {
+  it("clears one workspace without affecting another", () => {
+    setWorkspaceLspRuntimeState("/test", { kind: "pending" });
+    setWorkspaceLspRuntimeState("/other", { kind: "disabled" });
+
+    clearWorkspaceLspRuntime("/test");
+
+    expect(getWorkspaceLspRuntime("/test").kind).toBe("unavailable");
+    expect(getWorkspaceLspRuntime("/other")).toEqual({ kind: "disabled" });
+  });
+
+  it("shares state across module instances", async () => {
     vi.resetModules();
     const first = await import("../../src/session/runtime-registry.ts");
     first.setWorkspaceLspRuntimeState("/module-copy-test", { kind: "pending" });
@@ -99,277 +81,39 @@ describe("session registry", () => {
     vi.resetModules();
     const second = await import("../../src/session/runtime-registry.ts");
 
-    expect(second.getWorkspaceLspRuntime("/module-copy-test").kind).toBe("pending");
+    expect(second.getWorkspaceLspRuntime("/module-copy-test")).toEqual({ kind: "pending" });
     second.clearWorkspaceLspRuntime("/module-copy-test");
   });
-});
 
-describe("WorkspaceLspRuntime semantic operations", () => {
-  function makeManager(mockClient?: Partial<LspClient> | null): LspManager {
-    return {
-      getCwd: vi.fn().mockReturnValue("/project"),
-      ensureFileOpen: vi.fn().mockResolvedValue(mockClient ?? null),
-      workspaceSymbol: vi.fn().mockResolvedValue(null),
-      canServeFile: vi.fn().mockReturnValue(true),
-      isSupportedSourceFile: vi.fn().mockReturnValue(true),
-      getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
-      getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([]),
-      getKnownProjectServers: vi.fn().mockReturnValue([]),
-      getDiagnosticSummary: vi.fn().mockReturnValue([]),
-      syncFileAndGetDiagnostics: vi.fn().mockResolvedValue([]),
-      waitUntilFileReady: vi.fn().mockResolvedValue(mockClient ?? null),
-      waitUntilWorkspaceReady: vi.fn().mockResolvedValue(undefined),
-      recoverWorkspaceDiagnostics: vi.fn().mockResolvedValue({
-        refreshedClients: 0,
-        restartedClients: 0,
-        staleAssessment: { suspected: false, matchedFiles: [], warning: null },
-      }),
-    } as unknown as LspManager;
-  }
-
-  it("delegates hover to the client", async () => {
-    const hover: Hover = { contents: "hover text" };
-    const client = { hover: vi.fn().mockResolvedValue(hover) } as unknown as LspClient;
-    const manager = makeManager(client);
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.hover("src/index.ts", { line: 0, character: 0 });
-    expect(result).toBe(hover);
-    expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/src/index.ts");
-    expect(client.hover).toHaveBeenCalledWith("/project/src/index.ts", { line: 0, character: 0 });
-  });
-
-  it("strips a leading @ from semantic file paths", async () => {
-    const hover: Hover = { contents: "hover text" };
-    const client = { hover: vi.fn().mockResolvedValue(hover) } as unknown as LspClient;
-    const manager = makeManager(client);
-    const service = createWorkspaceLspRuntime(manager);
-
-    await service.hover("@src/index.ts", { line: 0, character: 0 });
-
-    expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/src/index.ts");
-    expect(client.hover).toHaveBeenCalledWith("/project/src/index.ts", { line: 0, character: 0 });
-  });
-
-  it("returns null hover when no client is available", async () => {
-    const manager = makeManager(null);
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.hover("src/index.ts", { line: 0, character: 0 });
-    expect(result).toBeNull();
-  });
-
-  it("delegates definition to the client", async () => {
-    const location: Location = {
-      uri: "file:///project/src/other.ts",
-      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
-    };
-    const client = { definition: vi.fn().mockResolvedValue(location) } as unknown as LspClient;
-    const manager = makeManager(client);
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.definition("src/index.ts", { line: 5, character: 10 });
-    expect(result).toBe(location);
-    expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/src/index.ts");
-    expect(client.definition).toHaveBeenCalledWith("/project/src/index.ts", {
-      line: 5,
-      character: 10,
-    });
-  });
-
-  it("delegates references to the client", async () => {
-    const locations: Location[] = [
-      {
-        uri: "file:///project/src/a.ts",
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
-      },
-    ];
-    const client = { references: vi.fn().mockResolvedValue(locations) } as unknown as LspClient;
-    const manager = makeManager(client);
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.references("src/index.ts", { line: 1, character: 2 });
-    expect(result).toBe(locations);
-    expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/src/index.ts");
-    expect(client.references).toHaveBeenCalledWith("/project/src/index.ts", {
-      line: 1,
-      character: 2,
-    });
-  });
-
-  it("delegates documentSymbols to the client", async () => {
-    const symbols: DocumentSymbol[] = [
-      {
-        name: "foo",
-        kind: 12,
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
-        selectionRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
-      },
-    ];
-    const client = { documentSymbols: vi.fn().mockResolvedValue(symbols) } as unknown as LspClient;
-    const manager = makeManager(client);
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.documentSymbols("src/index.ts");
-    expect(result).toBe(symbols);
-    expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/src/index.ts");
-    expect(client.documentSymbols).toHaveBeenCalledWith("/project/src/index.ts");
-  });
-
-  it("delegates workspaceSymbol to the manager", async () => {
-    const symbols: SymbolInformation[] = [
-      {
-        name: "foo",
-        kind: 12,
-        location: {
-          uri: "file:///project/src/a.ts",
-          range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } },
-        },
-      },
-    ];
-    const manager = makeManager();
-    manager.workspaceSymbol = vi.fn().mockResolvedValue(symbols);
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.workspaceSymbol("foo");
-    expect(result).toBe(symbols);
-    expect(manager.workspaceSymbol).toHaveBeenCalledWith("foo");
-  });
-
-  it("delegates getProjectServers to the manager", () => {
-    const manager = makeManager();
-    const service = createWorkspaceLspRuntime(manager);
-
-    service.getProjectServers();
-    expect(manager.getKnownProjectServers).toHaveBeenCalledWith([]);
-  });
-
-  it("delegates explicit semantic support checks to the manager", () => {
-    const manager = makeManager();
-    const service = createWorkspaceLspRuntime(manager);
-
-    service.isSupportedSourceFile("src/index.ts");
-    expect(manager.canServeFile).toHaveBeenCalledWith("/project/src/index.ts");
-  });
-
-  it("delegates getOutstandingDiagnostics to the manager", () => {
-    const manager = makeManager();
-    const service = createWorkspaceLspRuntime(manager);
-
-    service.getOutstandingDiagnostics(2);
-    expect(manager.getOutstandingDiagnostics).toHaveBeenCalledWith(2);
-  });
-
-  it("delegates getOutstandingDiagnosticSummary to the manager", () => {
-    const manager = makeManager();
-    const service = createWorkspaceLspRuntime(manager);
-
-    service.getOutstandingDiagnosticSummary(1);
-    expect(manager.getOutstandingDiagnosticSummary).toHaveBeenCalledWith(1);
-  });
-
-  it("waits for file readiness through the manager", async () => {
-    const manager = makeManager();
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.waitUntilReadyForFile("src/index.ts", { timeoutMs: 100 });
-
-    expect(result.kind).toBe("ready");
-    expect(manager.canServeFile).toHaveBeenCalledWith("/project/src/index.ts");
-    expect(manager.waitUntilFileReady).toHaveBeenCalledWith("/project/src/index.ts");
-  });
-
-  it("returns unavailable readiness when the target file has no serving LSP", async () => {
-    const manager = makeManager();
-    manager.canServeFile = vi.fn().mockReturnValue(false);
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.waitUntilReadyForFile("src/index.ts", { timeoutMs: 100 });
-
-    expect(result).toEqual({ kind: "unavailable", reason: "No LSP client can serve this file" });
-  });
-
-  it("waits for workspace readiness through the manager", async () => {
-    const manager = makeManager();
-    const service = createWorkspaceLspRuntime(manager);
-
-    const result = await service.waitUntilReadyForWorkspace({ timeoutMs: 100 });
-
-    expect(result.kind).toBe("ready");
-    expect(manager.waitUntilWorkspaceReady).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("WorkspaceLspRuntime implementation support", () => {
-  it("delegates implementation to the client when available", async () => {
-    const locations: Location[] = [
-      {
-        uri: "file:///project/src/impl.ts",
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 5 } },
-      },
-    ];
-    const client = { implementation: vi.fn().mockResolvedValue(locations) } as unknown as LspClient;
-    const manager = {
-      getCwd: vi.fn().mockReturnValue("/project"),
-      ensureFileOpen: vi.fn().mockResolvedValue(client),
-    } as unknown as LspManager;
-
-    const service = createWorkspaceLspRuntime(manager);
-    const result = await service.implementation("src/index.ts", { line: 2, character: 3 });
-
-    expect(result).toBe(locations);
-    expect(manager.ensureFileOpen).toHaveBeenCalledWith("/project/src/index.ts");
-    expect(client.implementation).toHaveBeenCalledWith("/project/src/index.ts", {
-      line: 2,
-      character: 3,
-    });
-  });
-
-  it("returns null implementation when no client is available", async () => {
-    const manager = {
-      getCwd: vi.fn().mockReturnValue("/project"),
-      ensureFileOpen: vi.fn().mockResolvedValue(null),
-    } as unknown as LspManager;
-
-    const service = createWorkspaceLspRuntime(manager);
-    const result = await service.implementation("src/index.ts", { line: 0, character: 0 });
-    expect(result).toBeNull();
-  });
-});
-
-describe("runtime registry wait", () => {
-  it("resolves a pending service once it becomes ready", async () => {
+  it("waits for a pending workspace to publish its runtime", async () => {
     setWorkspaceLspRuntimeState("/test", { kind: "pending" });
     const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
-    const service = createWorkspaceLspRuntime(manager);
+    const runtime = createWorkspaceLspRuntime(manager);
 
     setTimeout(() => {
-      setWorkspaceLspRuntimeState("/test", { kind: "ready", runtime: service });
+      setWorkspaceLspRuntimeState("/test", { kind: "ready", runtime });
     }, 10);
 
-    const state = await waitForWorkspaceLspRuntime("/test", 100);
-    expect(state.kind).toBe("ready");
+    await expect(waitForWorkspaceLspRuntime("/test", 100)).resolves.toEqual({
+      kind: "ready",
+      runtime,
+    });
   });
 
-  it("does not wait when the service is inactive", async () => {
+  it("returns an inactive runtime without polling", async () => {
     const manager = { getCwd: vi.fn().mockReturnValue("/test") } as unknown as LspManager;
-    const service = createWorkspaceLspRuntime(manager);
-    setWorkspaceLspRuntimeState("/test", { kind: "inactive", runtime: service });
+    const runtime = createWorkspaceLspRuntime(manager);
+    setWorkspaceLspRuntimeState("/test", { kind: "inactive", runtime });
 
-    const state = await waitForWorkspaceLspRuntime("/test", 100);
-    expect(state.kind).toBe("inactive");
+    await expect(waitForWorkspaceLspRuntime("/test", 100)).resolves.toEqual({
+      kind: "inactive",
+      runtime,
+    });
   });
 });
 
-describe("public API imports from package root", () => {
-  it("exports the runtime registry without exposing its implementation", async () => {
-    const mod = await import("../../src/index.ts");
-    expect(mod.getWorkspaceLspRuntime).toBeInstanceOf(Function);
-  });
-
-  it("can import public types from the package root", async () => {
-    const mod = await import("../../src/index.ts");
-    // Type-only exports vanish at runtime; just verify the module loads
-    expect(mod).toBeDefined();
+describe("public LSP API", () => {
+  it("exports the workspace registry", () => {
+    expect(getWorkspaceLspRuntime).toBeInstanceOf(Function);
   });
 });

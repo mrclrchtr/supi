@@ -18,14 +18,7 @@ import type {
   WorkspaceEdit,
   WorkspaceSymbol,
 } from "../config/types.ts";
-import { type ClientPool, createClientPool } from "../manager/client-pool.ts";
-import { createDiagnosticStore, type DiagnosticStore } from "../manager/diagnostic-store.ts";
 import type { LspManager } from "../manager/manager.ts";
-import {
-  createRecoveryCoordinator,
-  type RecoveryCoordinator,
-} from "../manager/recovery-coordinator.ts";
-import { createWorkspaceRouter, type WorkspaceRouter } from "../manager/workspace-router.ts";
 import { resolveSessionPath } from "../utils.ts";
 
 function isRange(value: Position | Range): value is Range {
@@ -125,17 +118,7 @@ export interface WorkspaceLspRuntime {
 }
 
 class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
-  readonly #clients: ClientPool;
-  readonly #diagnostics: DiagnosticStore;
-  readonly #recovery: RecoveryCoordinator;
-  readonly #router: WorkspaceRouter;
-
-  constructor(private readonly manager: LspManager) {
-    this.#clients = createClientPool(manager);
-    this.#diagnostics = createDiagnosticStore(manager);
-    this.#recovery = createRecoveryCoordinator(manager);
-    this.#router = createWorkspaceRouter(manager);
-  }
+  constructor(private readonly manager: LspManager) {}
 
   static createOwner(manager: LspManager) {
     const runtime = new DefaultWorkspaceLspRuntime(manager);
@@ -249,36 +232,38 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   }
 
   getProjectServers(): ProjectServerInfo[] {
-    return this.#router.getProjectServers();
+    return this.manager.getKnownProjectServers([]);
   }
 
   /** Check whether the file can be served semantically for explicit LSP operations. */
   isSupportedSourceFile(filePath: string): boolean {
-    return this.#router.canServeFile(this.resolveFilePath(filePath));
+    return this.manager.canServeFile(this.resolveFilePath(filePath));
   }
 
   /** Track a file in its routed client without exposing that client. */
   async trackFile(filePath: string): Promise<boolean> {
-    return this.#clients.trackFile(this.resolveFilePath(filePath));
+    const resolvedPath = this.resolveFilePath(filePath);
+    return (await this.manager.ensureFileOpen(resolvedPath)) !== null;
   }
 
   /** Stop tracking a file and clear its cached diagnostics. */
   closeFile(filePath: string): void {
-    this.#clients.closeFile(this.resolveFilePath(filePath));
+    this.manager.closeFile(this.resolveFilePath(filePath));
   }
 
   /** Remove missing files from runtime tracking. */
   pruneMissingFiles(): readonly string[] {
-    return this.#clients.pruneMissingFiles();
+    return this.manager.pruneMissingFiles();
   }
 
   /** Notify routed clients of workspace file changes and reset pull state. */
   noteWorkspaceChanges(changes: FileEvent[]): void {
-    this.#clients.noteWorkspaceChanges(changes);
+    this.manager.clearAllPullResultIds();
+    this.manager.notifyWorkspaceFileChanges(changes);
   }
 
   async #shutdown(): Promise<void> {
-    await this.#clients.shutdownAll();
+    await this.manager.shutdownAll();
   }
 
   // ── Diagnostics and recovery ────────────────────────────────────────
@@ -286,8 +271,8 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   /** Sync a file through LSP and return diagnostics up to the supplied severity threshold. */
   async fileDiagnostics(filePath: string, maxSeverity: number = 4): Promise<Diagnostic[] | null> {
     const resolvedPath = this.resolveFilePath(filePath);
-    if (!this.#router.canServeFile(resolvedPath)) return null;
-    return this.#diagnostics.syncFile(resolvedPath, maxSeverity);
+    if (!this.manager.canServeFile(resolvedPath)) return null;
+    return this.manager.syncFileAndGetDiagnostics(resolvedPath, maxSeverity);
   }
 
   /** Sync a file and include diagnostics cascading into other tracked files. */
@@ -295,29 +280,32 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     filePath: string,
     maxSeverity: number = 4,
   ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>> {
-    return this.#diagnostics.syncFileWithCascade(this.resolveFilePath(filePath), maxSeverity);
+    return this.manager.syncFileAndGetCascadingDiagnostics(
+      this.resolveFilePath(filePath),
+      maxSeverity,
+    );
   }
 
   /** Re-sync every open document and wait for diagnostics to settle. */
   async refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void> {
-    await this.#clients.refreshOpenDiagnostics(options);
+    await this.manager.refreshOpenDiagnostics(options);
   }
 
   /** Get a lightweight workspace diagnostic summary for all tracked files. */
   getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSummaryEntry[] {
-    return this.#diagnostics.getDiagnosticSummary();
+    return this.manager.getDiagnosticSummary();
   }
 
   /** Get outstanding diagnostics grouped by file at or above the supplied severity threshold. */
   getOutstandingDiagnostics(
     maxSeverity: number = 1,
   ): Array<{ file: string; diagnostics: Diagnostic[] }> {
-    return this.#diagnostics.getOutstandingDiagnostics(maxSeverity);
+    return this.manager.getOutstandingDiagnostics(maxSeverity);
   }
 
   /** Get outstanding diagnostic counts grouped by file. */
   getOutstandingDiagnosticSummary(maxSeverity: number = 1): OutstandingDiagnosticSummaryEntry[] {
-    return this.#diagnostics.getOutstandingDiagnosticSummary(maxSeverity);
+    return this.manager.getOutstandingDiagnosticSummary(maxSeverity);
   }
 
   /** Trigger a workspace-wide diagnostics refresh and stale-state recovery pass. */
@@ -326,7 +314,7 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
     maxWaitMs?: number;
     quietMs?: number;
   }): Promise<RecoverDiagnosticsResult> {
-    return this.#recovery.recover(options);
+    return this.manager.recoverWorkspaceDiagnostics(options);
   }
 
   private resolveFilePath(filePath: string): string {

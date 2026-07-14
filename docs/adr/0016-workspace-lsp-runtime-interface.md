@@ -17,14 +17,10 @@ A ready controller publishes `{ kind: "ready", runtime }`. Pending, inactive, di
 
 `WorkspaceLspRuntime` is exported as an interface. `DefaultWorkspaceLspRuntime` and `LspManager` remain package-internal. Callers cannot obtain clients or the manager through the public seam.
 
-The runtime implementation delegates focused ownership to internal interfaces:
-
-- `ClientPool` owns tracked-file and client-lifecycle operations.
-- `WorkspaceRouter` owns file support and project-server inventory.
-- `DiagnosticStore` owns synchronized diagnostic reads.
-- `RecoveryCoordinator` owns stale-diagnostic assessment and recovery.
-
-These interfaces add depth by hiding routing and synchronization choices while keeping locality inside `supi-lsp`.
+The private `DefaultWorkspaceLspRuntime` is the single operational implementation. It
+normalizes paths, coordinates readiness and semantic requests, and composes the
+package-internal manager's client, diagnostic, and recovery mechanics. The manager and
+clients remain implementation details rather than additional runtime seams.
 
 ## Consequences
 
@@ -32,6 +28,7 @@ These interfaces add depth by hiding routing and synchronization choices while k
 - Lifecycle/status policy stays separate from workspace query policy.
 - Internal implementation changes do not expand the public seam.
 - Runtime tests assert observable operations and state publication; forwarding-only tests are removed.
+- The runtime owns the cross-cutting ordering and policy that consumers rely on, including path normalization, readiness timeouts, pull-state invalidation, and owner-controlled shutdown.
 - `supi-code-runtime` still brokers semantic and structural capability state. It does not absorb LSP lifecycle or diagnostics.
 
 ## Rejected alternatives

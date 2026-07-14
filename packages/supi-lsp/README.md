@@ -90,12 +90,10 @@ supi-lsp                semantic lifecycle + Workspace LSP runtime
 supi-code-intelligence  Workspace session + public code_* tools
 ```
 
-Focused internal interfaces keep locality:
-
-- `ClientPool` — tracked files and client lifecycle
-- `WorkspaceRouter` — file routing and project inventory
-- `DiagnosticStore` — synchronized diagnostic reads
-- `RecoveryCoordinator` — stale-diagnostic assessment and recovery
+The private `DefaultWorkspaceLspRuntime` is the single operational seam. It normalizes
+paths and coordinates readiness, semantic requests, tracked files, diagnostics, recovery,
+and owner-controlled shutdown around the package-internal manager. Clients and the manager
+remain hidden from consumers.
 
 See [`docs/adr/0016-workspace-lsp-runtime-interface.md`](../../docs/adr/0016-workspace-lsp-runtime-interface.md).
 
@@ -109,7 +107,7 @@ See [`docs/adr/0016-workspace-lsp-runtime-interface.md`](../../docs/adr/0016-wor
 - `src/client/` — protocol client, transport, refresh, and requests
 - `src/config/` — server configuration and protocol types
 - `src/diagnostics/` — stale diagnostics and workspace sentinels
-- `src/manager/` — package-internal manager plus focused runtime interfaces
+- `src/manager/` — package-internal server pool and routing, diagnostic, and recovery mechanics
 - `src/provider/` — semantic and refactor adapters
 - `src/session/runtime-controller.ts` — lifecycle/status
 - `src/session/runtime-registry.ts` — `WorkspaceLspRuntime` and registry
