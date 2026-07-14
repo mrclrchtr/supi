@@ -35,7 +35,7 @@ async function orientDirectory(
   const tool = getTool(pi, "code_orientation");
   const result = (await tool.execute(
     "orientation-instructions",
-    { focus },
+    { focus: { path: focus } },
     undefined,
     undefined,
     makeCtx({ cwd: tmpDir }),

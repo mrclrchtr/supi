@@ -8,17 +8,17 @@ import { type ResultOptios, renderSimpleResult, type ToolResult } from "../../ui
 /** ── renderCall ────────────────────────────────────────────────── */
 
 export function renderInspectCall(args: unknown, theme: Theme, _context: unknown): Text {
-  const params = (args ?? {}) as { file?: string; line?: number; character?: number };
+  const params = (args ?? {}) as {
+    point?: { file: string; line: number; character: number };
+  };
 
   let content = theme.fg("toolTitle", "code_inspect");
 
-  if (params.file) {
-    const file = params.file.split("/").pop() ?? params.file;
+  if (params.point) {
+    const file = params.point.file.split("/").pop() ?? params.point.file;
     content += ` ${theme.fg("accent", file)}`;
-    if (params.line) {
-      content += theme.fg("warning", `:${params.line}`);
-      if (params.character) content += theme.fg("dim", `:${params.character}`);
-    }
+    content += theme.fg("warning", `:${params.point.line}`);
+    content += theme.fg("dim", `:${params.point.character}`);
   }
 
   return new Text(content, 0, 0);

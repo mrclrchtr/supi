@@ -2,7 +2,7 @@
 //
 // This controller owns session start/shutdown for one cwd:
 //   - Creates and disposes the LspManager
-//   - Publishes SessionLspService states through the existing registry
+//   - Publishes WorkspaceLspRuntime states through the existing registry
 //   - Exposes the data the umbrella adapter will need later
 //
 // It does NOT import pi event types or ExtensionAPI.
@@ -19,12 +19,13 @@ import {
   registerPendingLspCapabilities,
   unregisterLspCapabilities,
 } from "./runtime-registration.ts";
-import { scanMissingServers, scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
 import {
-  clearSessionLspService,
-  SessionLspService,
-  setSessionLspServiceState,
-} from "./service-registry.ts";
+  clearWorkspaceLspRuntime,
+  createWorkspaceLspRuntimeOwner,
+  setWorkspaceLspRuntimeState,
+  type WorkspaceLspRuntime,
+} from "./runtime-registry.ts";
+import { scanMissingServers, scanProjectCapabilities, startDetectedServers } from "./scanner.ts";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -44,10 +45,12 @@ interface LspControllerPending {
   kind: "pending";
 }
 
+type WorkspaceLspRuntimeOwner = ReturnType<typeof createWorkspaceLspRuntimeOwner>;
+
 interface LspControllerReady {
   kind: "ready";
-  manager: LspManager;
-  service: SessionLspService;
+  runtimeOwner: WorkspaceLspRuntimeOwner;
+  workspaceRuntime: WorkspaceLspRuntime;
   projectServers: ProjectServerInfo[];
   detectedServers: DetectedProjectServer[];
   settings: LspSettings;
@@ -65,9 +68,13 @@ interface LspControllerUnavailable {
 
 /** Result type from {@link LspRuntimeController.start}. */
 export type LspStartResult =
-  | { kind: "ready"; manager: LspManager; service: SessionLspService }
+  | { kind: "ready"; runtime: WorkspaceLspRuntime }
   | { kind: "disabled"; message: string }
   | { kind: "unavailable"; reason: string };
+
+function supersededStartResult(): LspStartResult {
+  return { kind: "unavailable", reason: "LSP startup was superseded by a newer lifecycle event." };
+}
 
 // ── Controller ────────────────────────────────────────────────────────
 
@@ -82,7 +89,7 @@ export type LspStartResult =
  * const controller = new LspRuntimeController(cwd);
  * const result = await controller.start();
  * if (result.kind === "ready") {
- *   // use controller.manager, controller.service
+ *   // use result.runtime for workspace LSP operations
  * }
  * // later
  * await controller.shutdown();
@@ -91,13 +98,14 @@ export type LspStartResult =
 export class LspRuntimeController {
   readonly #cwd: string;
   #state: LspControllerState;
-  #runtime: WorkspaceRuntime | null;
+  #capabilityRuntime: WorkspaceRuntime | null;
+  /** Monotonic ownership token for starts, shutdowns, and async warm-up. */
   #readinessGeneration = 0;
 
   constructor(cwd: string, runtime?: WorkspaceRuntime) {
     this.#cwd = cwd;
     this.#state = { kind: "initial" };
-    this.#runtime = runtime ?? null;
+    this.#capabilityRuntime = runtime ?? null;
   }
 
   /** The workspace cwd this controller was created for. */
@@ -110,14 +118,9 @@ export class LspRuntimeController {
     return this.#state.kind;
   }
 
-  /** The LspManager, only available when state is "ready". */
-  get manager(): LspManager | null {
-    return this.#state.kind === "ready" ? this.#state.manager : null;
-  }
-
-  /** The SessionLspService, only available when state is "ready". */
-  get service(): SessionLspService | null {
-    return this.#state.kind === "ready" ? this.#state.service : null;
+  /** Workspace LSP operations, only available when state is "ready". */
+  get workspaceRuntime(): WorkspaceLspRuntime | null {
+    return this.#state.kind === "ready" ? this.#state.workspaceRuntime : null;
   }
 
   /** Project server info, only available when state is "ready". */
@@ -139,13 +142,13 @@ export class LspRuntimeController {
   }
 
   /** The WorkspaceRuntime registered for this session's cwd. */
-  get runtime(): WorkspaceRuntime | null {
-    return this.#runtime;
+  get capabilityRuntime(): WorkspaceRuntime | null {
+    return this.#capabilityRuntime;
   }
 
-  /** Attach a WorkspaceRuntime for capability registration. */
+  /** Attach the capability broker used for semantic registration. */
   setRuntime(runtime: WorkspaceRuntime): void {
-    this.#runtime = runtime;
+    this.#capabilityRuntime = runtime;
   }
 
   /**
@@ -161,10 +164,12 @@ export class LspRuntimeController {
    * Returns the start result and updates the controller's state.
    */
   async start(): Promise<LspStartResult> {
+    const generation = ++this.#readinessGeneration;
     clearTsconfigCache();
 
     // Restart safety: shut down any existing session before creating a new one
     await this.cleanupExistingSession();
+    if (generation !== this.#readinessGeneration) return supersededStartResult();
 
     const lspSettings = loadLspSettings(this.#cwd);
     // Note: lspSettings.enabled is ignored — the global switch is deprecated.
@@ -175,9 +180,9 @@ export class LspRuntimeController {
     const config = loadConfig(this.#cwd);
 
     try {
-      return await this.initializeLspSession(config, lspSettings);
+      return await this.initializeLspSession(config, lspSettings, generation);
     } catch (error: unknown) {
-      return this.setUnavailable(error);
+      return this.setUnavailable(error, generation);
     }
   }
 
@@ -185,18 +190,18 @@ export class LspRuntimeController {
    * Shut down any existing LSP session before starting a new one.
    */
   private async cleanupExistingSession(): Promise<void> {
-    this.#readinessGeneration++;
     if (this.#state.kind !== "ready") return;
-    await this.#state.manager.shutdownAll();
-    if (this.#runtime) unregisterLspCapabilities(this.#runtime, this.#cwd);
-    clearSessionLspService(this.#cwd);
+    await this.#state.runtimeOwner.shutdown();
+    if (this.#capabilityRuntime) unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
+    clearWorkspaceLspRuntime(this.#cwd);
   }
 
   /** Set controller state to unavailable with the given error. */
-  private setUnavailable(error: unknown): LspStartResult {
+  private setUnavailable(error: unknown, generation: number): LspStartResult {
+    if (generation !== this.#readinessGeneration) return supersededStartResult();
     const reason = error instanceof Error ? error.message : String(error);
     this.#state = { kind: "unavailable", reason };
-    setSessionLspServiceState(this.#cwd, { kind: "unavailable", reason });
+    setWorkspaceLspRuntimeState(this.#cwd, { kind: "unavailable", reason });
     return { kind: "unavailable", reason };
   }
 
@@ -207,68 +212,82 @@ export class LspRuntimeController {
   private async initializeLspSession(
     config: LspConfig,
     settings: LspSettings,
+    generation: number,
   ): Promise<LspStartResult> {
-    clearSessionLspService(this.#cwd);
+    if (generation !== this.#readinessGeneration) return supersededStartResult();
+    clearWorkspaceLspRuntime(this.#cwd);
     this.#state = { kind: "pending" };
 
     const manager = new LspManager(config, this.#cwd);
     manager.setExcludePatterns(settings.exclude);
-    setSessionLspServiceState(this.#cwd, { kind: "pending" });
+    setWorkspaceLspRuntimeState(this.#cwd, { kind: "pending" });
 
     const detectedServers = scanProjectCapabilities(config, this.#cwd);
     manager.registerDetectedServers(detectedServers);
     await startDetectedServers(manager, detectedServers);
+    if (generation !== this.#readinessGeneration) {
+      await manager.shutdownAll();
+      return supersededStartResult();
+    }
 
     scanWorkspaceSentinels(this.#cwd);
 
-    const service = new SessionLspService(manager);
-    setSessionLspServiceState(this.#cwd, { kind: "ready", service });
+    const runtimeOwner = createWorkspaceLspRuntimeOwner(manager);
+    const workspaceRuntime = runtimeOwner.runtime;
+    setWorkspaceLspRuntimeState(this.#cwd, { kind: "ready", runtime: workspaceRuntime });
 
-    if (this.#runtime) {
-      registerPendingLspCapabilities(this.#runtime, this.#cwd, service);
+    if (this.#capabilityRuntime) {
+      registerPendingLspCapabilities(this.#capabilityRuntime, this.#cwd, workspaceRuntime);
     }
 
-    const projectServers = manager.getKnownProjectServers(detectedServers);
+    const projectServers = workspaceRuntime.getProjectServers();
 
     this.#state = {
       kind: "ready",
-      manager,
-      service,
+      runtimeOwner,
+      workspaceRuntime,
       projectServers,
       detectedServers,
       settings,
     };
 
-    const readinessGeneration = ++this.#readinessGeneration;
-    void this.promoteSemanticReadiness(manager, detectedServers, readinessGeneration);
+    void this.promoteSemanticReadiness(workspaceRuntime, generation);
 
-    return { kind: "ready", manager, service };
+    return { kind: "ready", runtime: workspaceRuntime };
   }
 
   private async promoteSemanticReadiness(
-    manager: LspManager,
-    detectedServers: DetectedProjectServer[],
+    workspaceRuntime: WorkspaceLspRuntime,
     readinessGeneration: number,
   ): Promise<void> {
     try {
-      await manager.waitUntilWorkspaceReady();
+      const readiness = await workspaceRuntime.waitUntilReadyForWorkspace();
+      if (readiness.kind !== "ready") throw new Error(readiness.kind);
     } catch {
-      this.retractPendingCapabilities();
+      if (this.isCurrentRuntime(workspaceRuntime, readinessGeneration)) {
+        this.retractPendingCapabilities();
+      }
       return;
     }
 
-    if (
-      readinessGeneration !== this.#readinessGeneration ||
-      this.#state.kind !== "ready" ||
-      this.#state.manager !== manager
-    ) {
-      return;
-    }
+    if (!this.isCurrentRuntime(workspaceRuntime, readinessGeneration)) return;
+    if (this.#state.kind !== "ready") return;
 
-    this.#state.projectServers = manager.getKnownProjectServers(detectedServers);
-    if (this.#runtime) {
-      markLspCapabilitiesReady(this.#runtime, this.#cwd);
+    this.#state.projectServers = workspaceRuntime.getProjectServers();
+    if (this.#capabilityRuntime) {
+      markLspCapabilitiesReady(this.#capabilityRuntime, this.#cwd);
     }
+  }
+
+  private isCurrentRuntime(
+    workspaceRuntime: WorkspaceLspRuntime,
+    readinessGeneration: number,
+  ): boolean {
+    return (
+      readinessGeneration === this.#readinessGeneration &&
+      this.#state.kind === "ready" &&
+      this.#state.workspaceRuntime === workspaceRuntime
+    );
   }
 
   /**
@@ -277,10 +296,10 @@ export class LspRuntimeController {
    * failure rather than an orphaned pending capability.
    */
   private retractPendingCapabilities(): void {
-    if (this.#runtime) {
-      unregisterLspCapabilities(this.#runtime, this.#cwd);
+    if (this.#capabilityRuntime) {
+      unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
     }
-    setSessionLspServiceState(this.#cwd, {
+    setWorkspaceLspRuntimeState(this.#cwd, {
       kind: "unavailable",
       reason: "LSP warm-up failed. Check code_health for server status.",
     });
@@ -296,16 +315,16 @@ export class LspRuntimeController {
     this.#readinessGeneration++;
     clearTsconfigCache();
 
-    if (this.#runtime) {
-      unregisterLspCapabilities(this.#runtime, this.#cwd);
+    if (this.#capabilityRuntime) {
+      unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
     }
 
     if (this.#cwd) {
-      clearSessionLspService(this.#cwd);
+      clearWorkspaceLspRuntime(this.#cwd);
     }
 
     if (this.#state.kind === "ready") {
-      await this.#state.manager.shutdownAll();
+      await this.#state.runtimeOwner.shutdown();
     }
 
     this.#state = { kind: "initial" };

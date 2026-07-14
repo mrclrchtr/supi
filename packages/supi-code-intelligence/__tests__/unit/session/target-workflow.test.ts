@@ -100,7 +100,7 @@ function makeTestSemantic(
 }
 
 describe("target-workflow (deep session seam)", () => {
-  describe("targetId lookup", () => {
+  describe("handle lookup", () => {
     it("resolves a stored targetId and returns the entry", async () => {
       writeSource("src/mod.ts", "export const x = 1;\n");
       const { entry } = registerTarget({
@@ -119,11 +119,7 @@ describe("target-workflow (deep session seam)", () => {
       const adapter = new TestCapabilityAdapter({});
       const deps = buildDeps(adapter);
 
-      const outcome = await resolveTargetWorkflow(
-        { targetId: entry.targetId },
-        DEFAULT_POLICY,
-        deps,
-      );
+      const outcome = await resolveTargetWorkflow({ handle: entry.targetId }, DEFAULT_POLICY, deps);
 
       expect(outcome.kind).toBe("resolved");
       if (outcome.kind === "resolved") {
@@ -138,7 +134,7 @@ describe("target-workflow (deep session seam)", () => {
       const adapter = new TestCapabilityAdapter({});
       const deps = buildDeps(adapter);
 
-      const outcome = await resolveTargetWorkflow({ targetId: "tg-unknown" }, DEFAULT_POLICY, deps);
+      const outcome = await resolveTargetWorkflow({ handle: "tg-unknown" }, DEFAULT_POLICY, deps);
 
       expect(outcome.kind).toBe("invalid-input");
       if (outcome.kind === "invalid-input") {
@@ -146,43 +142,17 @@ describe("target-workflow (deep session seam)", () => {
       }
     });
 
-    it("returns notes when targetId overrides file/line/char", async () => {
-      writeSource("src/mod.ts", "export const x = 1;\n");
-      const { entry } = registerTarget({
-        file: "src/mod.ts",
-        position: { line: 0, character: 6 },
-        displayLine: 1,
-        displayCharacter: 7,
-        name: "x",
-        kind: "const",
-        confidence: "semantic",
-        provenance: "test",
-        anchorKind: "name",
-        container: null,
-      });
-
+    it("rejects selectors with more than one branch", async () => {
       const adapter = new TestCapabilityAdapter({});
       const deps = buildDeps(adapter);
-
       const outcome = await resolveTargetWorkflow(
-        {
-          targetId: entry.targetId,
-          file: "other.ts",
-          line: 10,
-          character: 5,
-        },
+        { handle: "tg-any", file: "other.ts" } as never,
         DEFAULT_POLICY,
         deps,
       );
-
-      expect(outcome.kind).toBe("resolved");
-      if (outcome.kind === "resolved") {
-        expect(outcome.notes).toEqual(
-          expect.arrayContaining([
-            expect.stringContaining("targetId"),
-            expect.stringContaining("ignored"),
-          ]),
-        );
+      expect(outcome.kind).toBe("invalid-input");
+      if (outcome.kind === "invalid-input") {
+        expect(outcome.message).toContain("exactly one");
       }
     });
   });
@@ -207,7 +177,7 @@ describe("target-workflow (deep session seam)", () => {
       const deps = buildDeps(adapter);
 
       const outcome = await resolveTargetWorkflow(
-        { targetId: entry.targetId },
+        { handle: entry.targetId },
         { ...DEFAULT_POLICY, nameAnchorRequired: true },
         deps,
       );
@@ -237,7 +207,7 @@ describe("target-workflow (deep session seam)", () => {
       const deps = buildDeps(adapter);
 
       const outcome = await resolveTargetWorkflow(
-        { targetId: entry.targetId },
+        { handle: entry.targetId },
         { ...DEFAULT_POLICY, nameAnchorRequired: true },
         deps,
       );
@@ -262,7 +232,11 @@ describe("target-workflow (deep session seam)", () => {
       const adapter = new TestCapabilityAdapter({ semantic });
       const deps = buildDeps(adapter);
 
-      const outcome = await resolveTargetWorkflow({ symbol: "foo" }, DEFAULT_POLICY, deps);
+      const outcome = await resolveTargetWorkflow(
+        { symbol: { query: "foo" } },
+        DEFAULT_POLICY,
+        deps,
+      );
 
       expect(outcome.kind).toBe("resolved");
       if (outcome.kind === "resolved") {
@@ -294,7 +268,11 @@ describe("target-workflow (deep session seam)", () => {
       const adapter = new TestCapabilityAdapter({ semantic });
       const deps = buildDeps(adapter);
 
-      const outcome = await resolveTargetWorkflow({ symbol: "bar" }, DEFAULT_POLICY, deps);
+      const outcome = await resolveTargetWorkflow(
+        { symbol: { query: "bar" } },
+        DEFAULT_POLICY,
+        deps,
+      );
 
       expect(outcome.kind).toBe("disambiguation");
       if (outcome.kind === "disambiguation") {
@@ -307,11 +285,15 @@ describe("target-workflow (deep session seam)", () => {
       const adapter = new TestCapabilityAdapter({ semantic: null });
       const deps = buildDeps(adapter);
 
-      const outcome = await resolveTargetWorkflow({ symbol: "foo" }, DEFAULT_POLICY, deps);
+      const outcome = await resolveTargetWorkflow(
+        { symbol: { query: "foo" } },
+        DEFAULT_POLICY,
+        deps,
+      );
 
       expect(outcome.kind).toBe("unavailable");
       if (outcome.kind === "unavailable") {
-        expect(outcome.reason).toContain("LSP");
+        expect(outcome.reason).toContain("semantic provider");
       }
     });
   });
@@ -326,7 +308,7 @@ describe("target-workflow (deep session seam)", () => {
 
       expect(outcome.kind).toBe("invalid-input");
       if (outcome.kind === "invalid-input") {
-        expect(outcome.message).toContain("File-level target");
+        expect(outcome.message).toContain("requires a handle");
       }
     });
 
@@ -368,13 +350,13 @@ describe("target-workflow (deep session seam)", () => {
     });
   });
 
-  describe("no-target", () => {
-    it("returns no-target when no input is provided", async () => {
+  describe("exact-one validation", () => {
+    it("rejects an empty selector", async () => {
       const adapter = new TestCapabilityAdapter({});
       const deps = buildDeps(adapter);
 
-      const outcome = await resolveTargetWorkflow({}, DEFAULT_POLICY, deps);
-      expect(outcome.kind).toBe("no-target");
+      const outcome = await resolveTargetWorkflow({} as never, DEFAULT_POLICY, deps);
+      expect(outcome.kind).toBe("invalid-input");
     });
   });
 
@@ -395,7 +377,7 @@ describe("target-workflow (deep session seam)", () => {
       const deps = buildDeps(adapter);
 
       const outcome = await resolveTargetWorkflow(
-        { file: "src/mod.ts", line: 1, character: 17 },
+        { anchor: { file: "src/mod.ts", line: 1, character: 17 } },
         DEFAULT_POLICY,
         deps,
       );
@@ -412,7 +394,7 @@ describe("target-workflow (deep session seam)", () => {
       const deps = buildDeps(adapter);
 
       const outcome = await resolveTargetWorkflow(
-        { file: "nonexistent.ts", line: 1, character: 1 },
+        { anchor: { file: "nonexistent.ts", line: 1, character: 1 } },
         DEFAULT_POLICY,
         deps,
       );

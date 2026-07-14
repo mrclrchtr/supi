@@ -37,15 +37,12 @@ export type {
 } from "./analysis/target/types.ts";
 // Code-intelligence-specific result types.
 export type {
-  AffectedDetails,
   BriefDetails,
   CodeIntelResult,
   ContextDetails,
   DisambiguationCandidate,
   HealthDetails,
-  ImpactDetails,
   InspectDetails,
   ResolveDetails,
   SearchDetails,
-  TestSurfaceDetails,
 } from "./types/index.ts";

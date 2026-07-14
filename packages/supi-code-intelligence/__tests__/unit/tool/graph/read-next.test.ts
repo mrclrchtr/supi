@@ -44,7 +44,10 @@ describe("code_graph read-next guidance", () => {
     });
 
     const result = await executeGraphTool(
-      { file: "index.ts", line: 1, character: 17, relations: ["references", "callees"] },
+      {
+        target: { anchor: { file: "index.ts", line: 1, character: 17 } },
+        relations: ["references", "callees"],
+      },
       { cwd: tmpDir, session: sessionCache.getOrCreate(tmpDir) },
     );
 

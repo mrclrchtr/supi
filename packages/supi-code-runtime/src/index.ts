@@ -28,9 +28,4 @@ export type {
   WorkspaceCapabilities,
   WorkspaceContext,
 } from "./api.ts";
-export {
-  createWorkspaceContext,
-  getDefaultWorkspaceRuntime,
-  normalizeRefactorOperation,
-  WorkspaceRuntime,
-} from "./api.ts";
+export { createWorkspaceContext, getDefaultWorkspaceRuntime, WorkspaceRuntime } from "./api.ts";

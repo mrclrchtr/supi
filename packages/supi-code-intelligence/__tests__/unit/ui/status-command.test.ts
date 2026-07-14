@@ -1,5 +1,5 @@
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import { getSessionLspService, type SessionLspService } from "@mrclrchtr/supi-lsp/api";
+import { getWorkspaceLspRuntime, type WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
 import { createPiMock, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { registerCiStatusCommand } from "../../../src/ui/status-command.ts";
@@ -8,7 +8,7 @@ vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
   return {
     ...actual,
-    getSessionLspService: vi.fn(),
+    getWorkspaceLspRuntime: vi.fn(),
   };
 });
 
@@ -35,7 +35,7 @@ describe("/supi-ci-status command", () => {
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
-    vi.mocked(getSessionLspService).mockReturnValue({
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
       kind: "unavailable",
       reason: "no LSP session",
     });
@@ -57,7 +57,7 @@ describe("/supi-ci-status command", () => {
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
-    vi.mocked(getSessionLspService).mockReturnValue({
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
       kind: "unavailable",
       reason: "no LSP",
     });
@@ -103,11 +103,11 @@ describe("/supi-ci-status command", () => {
       ]),
       getOutstandingDiagnosticSummary: vi.fn(() => []),
       getOutstandingDiagnostics: vi.fn(async () => []),
-    } as unknown as SessionLspService;
+    } as unknown as WorkspaceLspRuntime;
 
-    vi.mocked(getSessionLspService).mockReturnValue({
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
       kind: "ready",
-      service: mockService,
+      runtime: mockService,
     });
 
     const cmd = pi.getCommandHandler("supi-ci-status") as (
@@ -140,11 +140,11 @@ describe("/supi-ci-status command", () => {
         { file: "src/index.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
       ]),
       getOutstandingDiagnostics: vi.fn(async () => []),
-    } as unknown as SessionLspService;
+    } as unknown as WorkspaceLspRuntime;
 
-    vi.mocked(getSessionLspService).mockReturnValue({
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
       kind: "ready",
-      service: mockService,
+      runtime: mockService,
     });
 
     const cmd = pi.getCommandHandler("supi-ci-status") as (
@@ -170,7 +170,7 @@ describe("/supi-ci-status command", () => {
 
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: vi.fn() });
-    vi.mocked(getSessionLspService).mockReturnValue({
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
       kind: "unavailable",
       reason: "no LSP",
     });
@@ -197,7 +197,7 @@ describe("/supi-ci-status command", () => {
     const ctx = makeCtx({ cwd: "/project" });
     Object.assign(ctx.ui, { setFooter: setFooterMock });
 
-    vi.mocked(getSessionLspService).mockReturnValue({
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
       kind: "unavailable",
       reason: "no LSP",
     });
@@ -231,11 +231,11 @@ describe("/supi-ci-status command", () => {
         { file: "src/mixed.ts", total: 3, errors: 1, warnings: 2, information: 0, hints: 0 },
       ]),
       getOutstandingDiagnostics: vi.fn(async () => []),
-    } as unknown as SessionLspService;
+    } as unknown as WorkspaceLspRuntime;
 
-    vi.mocked(getSessionLspService).mockReturnValue({
+    vi.mocked(getWorkspaceLspRuntime).mockReturnValue({
       kind: "ready",
-      service: mockService,
+      runtime: mockService,
     });
 
     const cmd = pi.getCommandHandler("supi-ci-status") as (

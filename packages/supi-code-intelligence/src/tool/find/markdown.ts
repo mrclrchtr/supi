@@ -2,9 +2,8 @@
 
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import {
-  createEvidenceList,
   type EvidenceListMetadata,
-  renderEvidenceListDisclosure,
+  renderEvidenceListMetadataDisclosure,
 } from "../../analysis/evidence.ts";
 import type {
   StructuredMatch,
@@ -67,15 +66,11 @@ export function renderStructuredMatches(
   kind: StructuredPatternKind,
   relScope: string,
   result: StructuredPatternResult,
-  maxResults: number,
+  evidenceMetadata: EvidenceListMetadata,
 ): { content: string; evidenceList: EvidenceListMetadata } {
-  const evidence = createEvidenceList({
-    key: "find.astMatches",
-    items: result.matches,
-    maxResults,
-  });
+  const shownMatches = result.matches.slice(0, evidenceMetadata.shownCount);
   const grouped = new Map<string, StructuredMatch[]>();
-  for (const match of evidence.items) {
+  for (const match of shownMatches) {
     const group = grouped.get(match.file) ?? [];
     group.push(match);
     grouped.set(match.file, group);
@@ -104,8 +99,12 @@ export function renderStructuredMatches(
   const lines: string[] = [];
   lines.push(`# Pattern ${kindLabel}: \`${pattern}\``);
   lines.push("");
+  const matchCount =
+    evidenceMetadata.totalCount === null
+      ? `At least ${result.matches.length} collected match${result.matches.length !== 1 ? "es" : ""}`
+      : `${result.matches.length} match${result.matches.length !== 1 ? "es" : ""}`;
   lines.push(
-    `**${result.matches.length} match${result.matches.length !== 1 ? "es" : ""}** across **${grouped.size} file${grouped.size !== 1 ? "s" : ""}** in \`${relScope}\``,
+    `**${matchCount}** across **${grouped.size} file${grouped.size !== 1 ? "s" : ""}** in \`${relScope}\``,
   );
   if (kind === "call") {
     lines.push("");
@@ -135,12 +134,12 @@ export function renderStructuredMatches(
     lines.push("");
   }
 
-  const disclosure = renderEvidenceListDisclosure(evidence);
+  const disclosure = renderEvidenceListMetadataDisclosure(evidenceMetadata);
   if (disclosure) {
     lines.push(disclosure);
   }
 
-  return { content: lines.join("\n"), evidenceList: evidence.metadata };
+  return { content: lines.join("\n"), evidenceList: evidenceMetadata };
 }
 
 function addDuplicateSummary(lines: string[], matches: StructuredMatch[]): void {
@@ -193,20 +192,19 @@ export function renderPatternResults(
   pattern: string,
   relScope: string,
   matches: RgMatch[],
-  maxResults: number,
+  evidenceMetadata: EvidenceListMetadata,
 ): { content: string; evidenceList: EvidenceListMetadata } {
   const lines: string[] = [];
   lines.push(`# Pattern: \`${pattern}\``);
   lines.push("");
-  lines.push(`**${matches.length} match${matches.length > 1 ? "es" : ""}** in \`${relScope}\``);
+  const matchCount =
+    evidenceMetadata.totalCount === null
+      ? `At least ${matches.length} collected match${matches.length !== 1 ? "es" : ""}`
+      : `${matches.length} match${matches.length !== 1 ? "es" : ""}`;
+  lines.push(`**${matchCount}** in \`${relScope}\``);
   lines.push("");
 
-  const evidence = createEvidenceList({
-    key: "find.textMatches",
-    items: matches,
-    maxResults,
-  });
-  const byFile = groupByFile(evidence.items);
+  const byFile = groupByFile(matches.slice(0, evidenceMetadata.shownCount));
   for (const [file, fileMatches] of byFile) {
     lines.push(`### ${file}`);
     const renderedLines = new Set<number>();
@@ -217,12 +215,12 @@ export function renderPatternResults(
     lines.push("");
   }
 
-  const disclosure = renderEvidenceListDisclosure(evidence);
+  const disclosure = renderEvidenceListMetadataDisclosure(evidenceMetadata);
   if (disclosure) {
     lines.push(disclosure);
   }
   lines.push("");
-  return { content: lines.join("\n"), evidenceList: evidence.metadata };
+  return { content: lines.join("\n"), evidenceList: evidenceMetadata };
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: context-line rendering with before/after/skip logic is clearer as one function

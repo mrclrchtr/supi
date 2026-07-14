@@ -1,20 +1,11 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-
-let applyWorkspaceEdit: (
-  edit: WorkspaceEdit,
-) => Promise<{ kind: string; filesChanged?: number; totalEdits?: number; reason?: string }>;
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { applyWorkspaceEdit } from "../../../../src/analysis/refactor/apply.ts";
 
 describe("applyWorkspaceEdit", () => {
   let tmpDir: string;
-
-  beforeAll(async () => {
-    const mod = await import("../../../../src/tool/refactor-apply/apply.ts");
-    applyWorkspaceEdit = mod.applyWorkspaceEdit;
-  });
 
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(os.tmpdir(), "apply-workspace-edit-"));

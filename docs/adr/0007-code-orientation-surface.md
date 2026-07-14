@@ -1,18 +1,31 @@
-# code_orientation is the orientation surface
+# code_orientation is the Orientation surface
 
-Replace `code_context` with `code_orientation` as the first-pass orientation surface for code intelligence. The tool is intentionally narrower than the old context bundle: it orients around a project, discovered module, directory, file, or precise symbol, while relation evidence belongs to `code_graph`, impact evidence belongs to `code_impact`, and health/status belongs to `code_health`.
+`code_orientation` is the first-pass Orientation surface for code intelligence. It orients around a workspace, discovered module, directory, file, or resolved symbol. Relationship evidence belongs to `code_graph`; point facts belong to `code_inspect`; diagnostics and maintenance evidence belong to `code_health`.
+
+## Decision
+
+Omitting `focus` means workspace Orientation. Otherwise `focus` accepts exactly one nested branch:
+
+- `{ path }` for a directory or file
+- `{ module }` for discovered-module lookup
+- `{ target: TargetSelector }` for a handle, anchored point, or symbol query
+
+No flat `targetId`, `file`, `line`, or `character` fields are accepted. No input wins by precedence; contradictory shapes are invalid. Bare symbol strings are not Orientation focus values.
+
+The Workspace code-intelligence session collects typed Orientation blocks, target facts, instruction-file metadata, and read-next actions. Markdown and TUI remain presentation adapters over assembled facts.
 
 ## Considered Options
 
-- **Keep `code_context` as an aggregator** — rejected because its name and broad section list prime target-analysis and duplicate sibling tools, so agents miss the orientation-first workflow.
-- **Rename but keep the old bundle shape** — rejected because it preserves the same shallow interface under a clearer name.
-- **Use `scope`/`file`/`task`/`include`/`budget`** — rejected for the orientation surface; `focus`, top-level `line`/`character`, top-level `targetId`, and explicit `maxResults` are smaller and clearer.
+- **Keep `code_context` as an aggregator** — rejected because a broad bundle duplicates sibling tools and weakens tool choice.
+- **Rename while keeping the old flat shape** — rejected because it preserves hidden precedence.
+- **Use one string for both path and module lookup** — rejected because ambiguity would depend on filesystem state.
+- **Return rendered markdown from the session** — rejected because it couples workflow policy to one presentation adapter.
 
 ## Consequences
 
-- No compatibility alias is kept; SuPi is pre-release and the public surface should stay sharp.
-- `focus` is path-first and language-agnostic, with discovered-module lookup as a convenience that fails honestly when unavailable or ambiguous.
-- `targetId` wins over `focus` and coordinates, with a visible ignored-focus note.
-- Bare symbol-name orientation is not supported; use `code_resolve` first and pass the resulting `targetId`.
-- `maxResults` defaults to 10 and caps each rendered evidence list independently.
-- Orientation output includes Read Next guidance for landmark files, entrypoints, or the enclosing source range; relation-site guidance remains owned by `code_graph`.
+- No compatibility alias or dual shape is kept.
+- Path and module lookup fail honestly when missing or ambiguous.
+- Symbol Orientation uses the shared target workflow and returns a stored target handle in details.
+- `maxResults` defaults to 10 and caps rendered evidence lists independently.
+- Directory Orientation may surface local instruction files once per session branch.
+- Orientation includes read-next guidance for landmarks, entrypoints, or an enclosing source range; relationship-site guidance remains owned by `code_graph`.

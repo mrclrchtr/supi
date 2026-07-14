@@ -31,11 +31,11 @@ export type {
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
   SemanticReadinessResult,
-  SessionLspServiceState,
   WorkspaceDiagnosticSummaryEntry,
-} from "./session/service-registry.ts";
+  WorkspaceLspRuntime,
+  WorkspaceLspRuntimeState,
+} from "./session/runtime-registry.ts";
 export {
-  getSessionLspService,
-  SessionLspService,
-  waitForSessionLspService,
-} from "./session/service-registry.ts";
+  getWorkspaceLspRuntime,
+  waitForWorkspaceLspRuntime,
+} from "./session/runtime-registry.ts";

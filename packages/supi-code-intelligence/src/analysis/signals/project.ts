@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import { readJsonFile } from "@mrclrchtr/supi-core/config";
-import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 
 export interface PrioritySignalsSummary {
   diagnosticsCount: number;
@@ -24,9 +24,9 @@ export interface LoadPrioritizationSignalsOptions {
 export function summarizePrioritySignalsForFiles(
   cwd: string,
   files: Iterable<string>,
-  lspService: SessionLspServiceState,
+  lspRuntime: WorkspaceLspRuntimeState,
 ): PrioritySignalsSummary | null {
-  const loaded = loadPrioritizationSignals(cwd, lspService);
+  const loaded = loadPrioritizationSignals(cwd, lspRuntime);
   const relevantFiles = new Set([...files].map((file) => path.resolve(cwd, file)));
   if (relevantFiles.size === 0) return null;
 
@@ -77,11 +77,11 @@ export function summarizePrioritySignalsForFiles(
 
 export function loadPrioritizationSignals(
   cwd: string,
-  lspService: SessionLspServiceState,
+  lspRuntime: WorkspaceLspRuntimeState,
   options: LoadPrioritizationSignalsOptions = {},
 ): LoadedSignals {
   return {
-    diagnostics: loadDiagnostics(cwd, lspService),
+    diagnostics: loadDiagnostics(cwd, lspRuntime),
     coverageByFile: loadCoverageSummary(cwd, options.coveragePath),
     unusedFiles: loadUnusedFiles(cwd, options.unusedPath),
     unusedExports: loadUnusedExports(cwd, options.unusedPath),
@@ -102,12 +102,12 @@ export function appendPrioritySignalsSection(
 
 function loadDiagnostics(
   cwd: string,
-  lspService: SessionLspServiceState,
+  lspRuntime: WorkspaceLspRuntimeState,
 ): Array<{ file: string; total: number; errors: number; warnings: number }> {
-  if (lspService.kind !== "ready") return [];
-  if (typeof lspService.service.getOutstandingDiagnosticSummary !== "function") return [];
+  if (lspRuntime.kind !== "ready") return [];
+  if (typeof lspRuntime.runtime.getOutstandingDiagnosticSummary !== "function") return [];
 
-  return lspService.service.getOutstandingDiagnosticSummary(2).map((entry) => ({
+  return lspRuntime.runtime.getOutstandingDiagnosticSummary(2).map((entry) => ({
     file: path.resolve(cwd, entry.file),
     total: entry.total,
     errors: entry.errors,

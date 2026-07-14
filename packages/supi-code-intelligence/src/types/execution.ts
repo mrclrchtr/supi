@@ -4,7 +4,6 @@ import type {
   BriefDetails,
   ContextDetails,
   HealthDetails,
-  ImpactDetails,
   InspectDetails,
   ResolveDetails,
   SearchDetails,
@@ -22,9 +21,9 @@ import type {
  * to subprocesses / emit coarse `onUpdate` beats.
  *
  * The `session` property carries the per-workspace
- * `WorkspaceCodeIntelligenceSession` facade (ADR 0008) for centralized
- * provider access, target resolution, and plan management. Executors
- * must prefer `ctx.session` over ad-hoc session factories.
+ * `WorkspaceCodeIntelligenceSession` seam (ADR 0015) for workflow policy,
+ * target resolution, and plan management. Executors must prefer
+ * `ctx.session` over ad-hoc session factories.
  */
 export interface CodeIntelToolExecCtx {
   cwd: string;
@@ -33,15 +32,10 @@ export interface CodeIntelToolExecCtx {
   /** Progress callback; long-running executors emit coarse beats, not chatty ones. */
   onUpdate?: AgentToolUpdateCallback;
   /**
-   * Per-workspace code-intelligence session facade.
+   * Per-workspace code-intelligence session.
    *
-   * Provides centralized access to:
-   * - Provider state: {@link WorkspaceCodeIntelligenceSession.getProviders}
-   * - Target resolution: {@link WorkspaceCodeIntelligenceSession.expandTargetId}
-   * - Plan management: {@link WorkspaceCodeIntelligenceSession.storePlan}
-   *
-   * Present on every execution. Executors that need it should destructure
-   * `{ cwd, session }` from their ctx parameter.
+   * Exposes typed intent workflows while keeping providers, mutable targets,
+   * plans, and runtime policy internal. Present on every execution.
    */
   session: WorkspaceCodeIntelligenceSession;
 }
@@ -54,7 +48,6 @@ export interface CodeIntelResult {
     | { type: "context"; data: ContextDetails }
     | { type: "inspect"; data: InspectDetails }
     | { type: "search"; data: SearchDetails }
-    | { type: "impact"; data: ImpactDetails }
     | { type: "resolve"; data: ResolveDetails }
     | { type: "health"; data: HealthDetails };
 }

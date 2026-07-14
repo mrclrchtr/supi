@@ -1,15 +1,14 @@
-// LSP semantic provider adapter — wraps SessionLspService into the shared
+// LSP semantic provider adapter — wraps WorkspaceLspRuntime into the shared
 // SemanticProvider contract from supi-code-runtime.
 
-import {
-  type CodeLocation,
-  type CodePosition,
-  type CodeSymbol,
-  normalizeRefactorOperation,
-  type RefactorRequest,
-  type RefactorResult,
-  type SemanticProvider,
-  type SourceRange,
+import type {
+  CodeLocation,
+  CodePosition,
+  CodeSymbol,
+  RefactorRequest,
+  RefactorResult,
+  SemanticProvider,
+  SourceRange,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type {
   CodeAction,
@@ -20,7 +19,7 @@ import type {
   MarkupContent,
   SymbolInformation,
 } from "../config/types.ts";
-import type { SessionLspService } from "../session/service-registry.ts";
+import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
 import {
   collectCodeActionResults,
   isDeleteDeadCodeCodeAction,
@@ -32,10 +31,10 @@ import {
 } from "./refactor-planning.ts";
 
 /**
- * Create a SemanticProvider backed by a SessionLspService.
+ * Create a SemanticProvider backed by a WorkspaceLspRuntime.
  * Maps LSP types into the shared code-runtime types.
  */
-export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvider {
+export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticProvider {
   return {
     async definition(filePath: string, position: CodePosition): Promise<CodeLocation[] | null> {
       const result = await lsp.definition(filePath, position);
@@ -94,12 +93,7 @@ export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvi
     },
 
     async refactor(request: RefactorRequest): Promise<RefactorResult> {
-      // Normalize defensively at the provider boundary as well as in
-      // code-intelligence. RefactorRequest still permits the legacy `rename`
-      // alias, and the provider may be invoked directly outside the public tool.
-      const operation = normalizeRefactorOperation(request.operation);
-
-      switch (operation) {
+      switch (request.operation) {
         case "rename_symbol":
           if (!request.newName) {
             return {
@@ -134,13 +128,13 @@ export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvi
           // shared file/resource edits and rollback semantics exist.
           return {
             kind: "unavailable",
-            reason: `Refactor operation "${operation}" is not supported yet. File/resource operations are deferred.`,
+            reason: `Refactor operation "${request.operation}" is not supported yet. File/resource operations are deferred.`,
           };
       }
 
       return {
         kind: "unavailable",
-        reason: `Refactor operation "${operation}" is not supported by the active semantic provider.`,
+        reason: `Refactor operation "${request.operation}" is not supported by the active semantic provider.`,
       };
     },
 
@@ -168,7 +162,7 @@ export function createLspSemanticProvider(lsp: SessionLspService): SemanticProvi
 }
 
 function runExtractRefactor(
-  lsp: SessionLspService,
+  lsp: WorkspaceLspRuntime,
   request: RefactorRequest,
   operation: "extract_function" | "extract_variable",
   matches: (action: CodeAction) => boolean,

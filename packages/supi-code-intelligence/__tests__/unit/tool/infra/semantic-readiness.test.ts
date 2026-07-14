@@ -1,9 +1,9 @@
 import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import {
-  clearSessionLspService,
-  type SessionLspServiceState,
-  setSessionLspServiceState,
+  clearWorkspaceLspRuntime,
+  setWorkspaceLspRuntimeState,
+  type WorkspaceLspRuntimeState,
 } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ensureSemanticReadiness } from "../../../../src/analysis/readiness.ts";
@@ -12,7 +12,7 @@ import { renderSemanticReadinessTimeout } from "../../../../src/tool/infra/readi
 describe("ensureSemanticReadiness", () => {
   afterEach(() => {
     getDefaultWorkspaceRuntime().clearAll();
-    clearSessionLspService("/test");
+    clearWorkspaceLspRuntime("/test");
   });
 
   function registerReadySemantic(cwd: string) {
@@ -41,7 +41,7 @@ describe("ensureSemanticReadiness", () => {
 
   it("returns timeout when session service stays pending beyond the deadline", async () => {
     registerPendingSemantic("/test");
-    setSessionLspServiceState("/test", { kind: "pending" });
+    setWorkspaceLspRuntimeState("/test", { kind: "pending" });
 
     const result = await ensureSemanticReadiness("/test", { kind: "workspace" }, 100);
     expect(result.kind).toBe("timeout");
@@ -51,19 +51,19 @@ describe("ensureSemanticReadiness", () => {
     vi.useFakeTimers();
     try {
       registerPendingSemantic("/test");
-      setSessionLspServiceState("/test", { kind: "pending" });
+      setWorkspaceLspRuntimeState("/test", { kind: "pending" });
 
       // Advance most of the deadline before the session service becomes ready
       const resultPromise = ensureSemanticReadiness("/test", { kind: "workspace" }, 200);
       await vi.advanceTimersByTimeAsync(190);
 
       // Now make the session service ready — only 10ms of budget remains
-      setSessionLspServiceState("/test", {
+      setWorkspaceLspRuntimeState("/test", {
         kind: "ready",
-        service: {
+        runtime: {
           waitUntilReadyForWorkspace: vi.fn().mockResolvedValue({ kind: "ready" }),
         },
-      } as unknown as SessionLspServiceState);
+      } as unknown as WorkspaceLspRuntimeState);
 
       // The workspace-level wait should get at most ~10ms budget
       await vi.advanceTimersByTimeAsync(50);
@@ -78,7 +78,7 @@ describe("ensureSemanticReadiness", () => {
 
   it("returns unavailable when the LSP service is in disabled state", async () => {
     registerPendingSemantic("/test");
-    setSessionLspServiceState("/test", { kind: "disabled" });
+    setWorkspaceLspRuntimeState("/test", { kind: "disabled" });
 
     const result = await ensureSemanticReadiness("/test", { kind: "workspace" }, 100);
     expect(result.kind).toBe("unavailable");

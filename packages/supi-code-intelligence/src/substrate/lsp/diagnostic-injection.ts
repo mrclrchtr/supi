@@ -17,27 +17,27 @@ export function registerDiagnosticInjectionHandlers(
   state: LspAdapterState,
 ): void {
   pi.on("before_agent_start", async (_event, _ctx: ExtensionContext) => {
-    const manager = state.controller?.manager;
-    if (!manager || !state.lspActive) {
+    const runtime = state.controller?.workspaceRuntime;
+    if (!runtime || !state.lspActive) {
       return;
     }
 
     // Sentinel refresh: detect lockfile/tsconfig/d.ts changes from outside write/edit
-    applySentinelChanges(state, manager);
+    applySentinelChanges(state, runtime);
 
     // Stale-module resync: force-reopen files with "Cannot find module" errors
     await resyncStaleModuleFiles(state);
 
     // Two-pass prune/refresh for diagnostics
-    manager.pruneMissingFiles();
+    runtime.pruneMissingFiles();
     try {
-      await manager.refreshOpenDiagnostics();
+      await runtime.refreshOpenDiagnostics();
     } catch {
       /* best-effort */
     }
-    manager.pruneMissingFiles();
+    runtime.pruneMissingFiles();
 
-    const diagnostics = manager.getOutstandingDiagnosticSummary(state.inlineSeverity);
+    const diagnostics = runtime.getOutstandingDiagnosticSummary(state.inlineSeverity);
     if (!diagnostics || diagnostics.length === 0) {
       state.lastDiagnosticsFingerprint = null;
       state.currentContextToken = null;
@@ -46,7 +46,7 @@ export function registerDiagnosticInjectionHandlers(
 
     state.currentContextToken = `lsp-context-${++state.contextCounter}`;
 
-    const detailedDiagnostics = manager
+    const detailedDiagnostics = runtime
       .getOutstandingDiagnostics(state.inlineSeverity)
       .map((entry) => ({
         file: entry.file,
@@ -101,9 +101,12 @@ export function registerDiagnosticInjectionHandlers(
   });
 }
 
-/** Diff sentinel snapshot and notify manager of changes. */
-// biome-ignore lint/suspicious/noExplicitAny: callback accepts FileEvent[] which satisfies the structural type
-function applySentinelChanges(state: LspAdapterState, manager: any): void {
+/** Diff the sentinel snapshot and notify the workspace runtime of changes. */
+function applySentinelChanges(
+  state: LspAdapterState,
+  runtime: NonNullable<LspAdapterState["controller"]>["workspaceRuntime"],
+): void {
+  if (!runtime) return;
   const controller = state.controller;
   if (!controller) return;
 
@@ -116,8 +119,7 @@ function applySentinelChanges(state: LspAdapterState, manager: any): void {
   if (changes.length === 0) return;
 
   clearTsconfigCache();
-  manager.clearAllPullResultIds();
-  manager.notifyWorkspaceFileChanges(changes);
+  runtime.noteWorkspaceChanges(changes);
 
   state.staleSuspected = true;
   state.lastDiagnosticsFingerprint = null;
@@ -127,10 +129,10 @@ function applySentinelChanges(state: LspAdapterState, manager: any): void {
 
 /** Re-open files with stale module-resolution errors. */
 async function resyncStaleModuleFiles(state: LspAdapterState): Promise<void> {
-  const manager = state.controller?.manager;
-  if (!manager) return;
+  const runtime = state.controller?.workspaceRuntime;
+  if (!runtime) return;
 
-  const outstanding = manager.getOutstandingDiagnostics(1);
+  const outstanding = runtime.getOutstandingDiagnostics(1);
   const staleFiles: string[] = [];
 
   for (const entry of outstanding) {
@@ -145,12 +147,12 @@ async function resyncStaleModuleFiles(state: LspAdapterState): Promise<void> {
   const cwd = state.controller?.cwd ?? "";
   for (const file of staleFiles) {
     const filePath = nodePath.resolve(cwd, file);
-    manager.closeFile(filePath);
-    await manager.ensureFileOpen(filePath);
+    runtime.closeFile(filePath);
+    await runtime.trackFile(filePath);
   }
 
   try {
-    await manager.refreshOpenDiagnostics({ quietMs: 300, maxWaitMs: 2000 });
+    await runtime.refreshOpenDiagnostics({ quietMs: 300, maxWaitMs: 2000 });
   } catch {
     /* best-effort */
   }

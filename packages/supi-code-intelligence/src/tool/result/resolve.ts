@@ -1,81 +1,132 @@
 import { relative } from "node:path";
-import type { ResolveServiceResult } from "../../analysis/target/service.ts";
+import type { TargetWorkflowOutcome } from "../../session/target-workflow.ts";
+import {
+  assembledNextQueries,
+  assembleToolResult,
+  type ResultProvenance,
+  type ToolResultAssembly,
+} from "./assembly.ts";
 import type { ResolveDetails } from "./types.ts";
 
+/** Presentation-neutral assembled code_resolve result. */
 export interface ResolveResultAssembly {
-  result: ResolveServiceResult;
-  cwd: string;
-  details: ResolveDetails;
+  readonly outcome: TargetWorkflowOutcome;
+  readonly cwd: string;
+  readonly assembled: ToolResultAssembly<TargetWorkflowOutcome>;
+  readonly details: ResolveDetails;
 }
 
-/** Assemble code_resolve evidence/details before markdown and TUI adapters render it. */
+/** Assemble resolved-target facts before markdown and TUI adapters render them. */
 export function assembleResolveResult(
-  result: ResolveServiceResult,
+  outcome: TargetWorkflowOutcome,
   cwd: string,
 ): ResolveResultAssembly {
-  return { result, cwd, details: buildResolveDetails(result, cwd) };
+  const details = buildResolveDetails(outcome, cwd);
+  const provenance = resolveProvenance(outcome);
+  const assembled = assembleToolResult({
+    data: outcome,
+    sections: [
+      {
+        key: outcome.kind === "disambiguation" ? "resolve.candidates" : "resolve.targets",
+        title: outcome.kind === "disambiguation" ? "Candidates" : "Resolved target",
+        status:
+          outcome.kind === "resolved" || outcome.kind === "disambiguation"
+            ? "complete"
+            : "unavailable",
+        items:
+          outcome.kind === "resolved"
+            ? [outcome.entry]
+            : outcome.kind === "disambiguation"
+              ? outcome.candidates
+              : [],
+        confidence: details.confidence,
+        provenance,
+      },
+    ],
+    evidenceLists: details.evidenceLists,
+    nextQueries: details.nextQueries,
+    candidateCount: details.targetCount,
+    confidence: details.confidence,
+    provenance,
+  });
+  return Object.freeze({
+    outcome,
+    cwd,
+    assembled,
+    details: {
+      ...details,
+      omittedCount: assembled.totals.omittedCount,
+      evidenceLists: [...assembled.evidenceLists],
+      nextQueries: assembledNextQueries(assembled),
+    },
+  });
 }
 
-function buildResolveDetails(result: ResolveServiceResult, cwd: string): ResolveDetails {
-  if (result.kind === "resolved") {
+function buildResolveDetails(outcome: TargetWorkflowOutcome, cwd: string): ResolveDetails {
+  if (outcome.kind === "resolved") {
+    const target = outcome.entry;
     return {
-      confidence: result.confidence,
-      targetCount: result.targets.length + result.omittedCount,
-      omittedCount: result.omittedCount,
+      confidence: target.confidence,
+      targetCount: 1,
+      omittedCount: 0,
       evidenceLists: [
         {
           key: "resolve.targets",
-          totalCount: result.targets.length + result.omittedCount,
-          shownCount: result.targets.length,
-          omittedCount: result.omittedCount,
+          totalCount: 1,
+          shownCount: 1,
+          omittedCount: 0,
           partialReason: null,
         },
       ],
-      targets: result.targets.map((t) => ({
-        targetId: t.targetId,
-        spanId: t.spanId,
-        file: relative(cwd, t.file) || t.file,
-        displayLine: t.displayLine,
-        displayCharacter: t.displayCharacter,
-        name: t.name,
-        kind: t.kind,
-        anchorKind: t.anchorKind,
-        confidence: t.confidence,
-        provenance: t.provenance,
-        resolution: t.resolution,
-      })),
-      nextQueries: result.nextQueries,
+      targets: [
+        {
+          targetId: target.targetId,
+          spanId: target.spanId,
+          file: relative(cwd, target.file) || target.file,
+          displayLine: target.displayLine,
+          displayCharacter: target.displayCharacter,
+          name: target.name,
+          kind: target.kind,
+          anchorKind: target.anchorKind,
+          confidence: target.confidence,
+          provenance: target.provenance,
+          resolution: target.resolution,
+        },
+      ],
+      nextQueries: buildResolveNextQueries(target.targetId, target.kind),
     };
   }
 
-  if (result.kind === "disambiguation") {
+  if (outcome.kind === "disambiguation") {
     return {
       confidence: "semantic",
-      targetCount: result.candidates.length + result.omittedCount,
-      omittedCount: result.omittedCount,
+      targetCount: outcome.candidates.length + outcome.omittedCount,
+      omittedCount: outcome.omittedCount,
       evidenceLists: [
         {
           key: "resolve.candidates",
-          totalCount: result.candidates.length + result.omittedCount,
-          shownCount: result.candidates.length,
-          omittedCount: result.omittedCount,
+          totalCount: outcome.candidates.length + outcome.omittedCount,
+          shownCount: outcome.candidates.length,
+          omittedCount: outcome.omittedCount,
           partialReason: null,
         },
       ],
       targets: [],
-      candidates: result.candidates.map((cand) => ({
-        targetId: cand.targetId,
-        name: cand.name,
-        kind: cand.kind,
-        container: cand.container,
-        file: cand.file,
-        line: cand.line,
-        character: cand.character,
-        reason: cand.reason,
-        rank: cand.rank,
-        anchorKind: cand.anchorKind,
+      candidates: outcome.candidates.map((candidate) => ({
+        targetId: candidate.targetId,
+        name: candidate.name,
+        kind: candidate.kind,
+        container: candidate.container,
+        file: candidate.file,
+        line: candidate.line,
+        character: candidate.character,
+        reason: candidate.file,
+        rank: candidate.rank,
+        anchorKind: candidate.anchorKind,
       })),
-      nextQueries: result.nextQueries,
+      nextQueries: [
+        "Choose one candidate handle, or narrow the symbol selector with scope or symbolKind",
+      ],
     };
   }
 
@@ -85,30 +136,42 @@ function buildResolveDetails(result: ResolveServiceResult, cwd: string): Resolve
     omittedCount: 0,
     targets: [],
     nextQueries: [
-      "Refine the `query` or `scope`",
-      "Use anchored `file` + `line` + `character` for a precise target",
+      "Refine the target selector",
+      "Use an anchor target when you already know an identifier coordinate",
     ],
   };
 }
 
-/** Suggested `code_graph` relations for a resolved symbol kind. */
-export function suggestedResolveRelations(kind: string | undefined | null): string[] | undefined {
+function resolveProvenance(outcome: TargetWorkflowOutcome): ResultProvenance[] {
+  if (outcome.kind !== "resolved") return [];
+  return [
+    {
+      source: outcome.entry.confidence === "semantic" ? "semantic" : "structural",
+      detail: outcome.entry.provenance,
+    },
+  ];
+}
+
+/** Suggested surviving graph relations for a resolved symbol kind. */
+export function suggestedResolveRelations(kind: string | undefined | null): string[] {
   switch (kind?.toLowerCase()) {
     case "function":
     case "method":
     case "constructor":
-      return ["references", "callees", "tests"];
+      return ["references", "callees"];
     case "class":
     case "interface":
     case "type":
     case "enum":
       return ["references", "implements"];
-    case "file":
-    case "module":
-      return ["imports", "exports"];
-    case "test":
-      return ["tests"];
     default:
-      return undefined;
+      return ["references"];
   }
+}
+
+function buildResolveNextQueries(targetId: string, kind: string | null): string[] {
+  const relations = suggestedResolveRelations(kind);
+  return [
+    `Use code_graph with target.handle "${targetId}" and relations ${JSON.stringify(relations)}`,
+  ];
 }

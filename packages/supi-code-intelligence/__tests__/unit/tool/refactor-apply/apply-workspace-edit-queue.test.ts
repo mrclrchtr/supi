@@ -1,10 +1,8 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
-import { beforeAll, describe, expect, it, vi } from "vitest";
-
-let applyWorkspaceEdit: (edit: WorkspaceEdit) => Promise<{ kind: string }>;
+import { describe, expect, it, vi } from "vitest";
+import { applyWorkspaceEdit } from "../../../../src/analysis/refactor/apply.ts";
 
 // Hoisted shared state: the mock records every file path whose queue is acquired,
 // in acquisition order, while still running the real fn so the apply happens.
@@ -23,11 +21,6 @@ vi.mock("@earendil-works/pi-coding-agent", async (importOriginal) => {
 });
 
 describe("applyWorkspaceEdit file-mutation queue", () => {
-  beforeAll(async () => {
-    const mod = await import("../../../../src/tool/refactor-apply/apply.ts");
-    applyWorkspaceEdit = mod.applyWorkspaceEdit;
-  });
-
   it("acquires withFileMutationQueue for every involved file in sorted path order", async () => {
     const tmpDir = mkdtempSync(path.join(os.tmpdir(), "apply-queue-"));
     const a = path.join(tmpDir, "a.ts");

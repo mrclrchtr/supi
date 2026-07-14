@@ -11,14 +11,15 @@ export function renderOrientationCall(args: unknown, theme: Theme, _context: unk
 
   let content = theme.fg("toolTitle", "code_orientation");
 
-  if (params.targetId) {
-    content += ` ${theme.fg("accent", "target")}`;
-  } else if (params.focus) {
-    const focus = params.focus.split("/").pop() ?? params.focus;
+  if (!params.focus) {
+    content += ` ${theme.fg("muted", "workspace")}`;
+  } else if ("path" in params.focus) {
+    const focus = params.focus.path.split("/").pop() ?? params.focus.path;
     content += ` ${theme.fg("accent", focus)}`;
-    if (params.line) content += theme.fg("warning", `:${params.line}`);
+  } else if ("module" in params.focus) {
+    content += ` ${theme.fg("accent", params.focus.module)}`;
   } else {
-    content += ` ${theme.fg("muted", "project")}`;
+    content += ` ${theme.fg("accent", "target")}`;
   }
 
   return new Text(content, 0, 0);

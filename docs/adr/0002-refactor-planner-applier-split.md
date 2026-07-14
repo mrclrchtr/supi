@@ -4,11 +4,11 @@
 
 **Decision.** Split the refactor surface into two tools joined by a session-scoped plan handle.
 
-- `code_refactor_plan` is a **pure planner**: it computes precise semantic edits (`rename_symbol`, `extract_function`, `extract_variable`) via the semantic provider's `refactor` / `rename` entrypoints and returns a `planId`. It never mutates files. It requires a **name anchor** (per ADR 0003) — LSP `rename` needs the identifier; a declaration anchor is refused with an observable note.
-- `code_refactor_apply` is the **sole mutator**: it applies a previously stored plan by `planId`. It does not require a live semantic provider — validity is enforced by comparing stored SHA-256 file fingerprints to current contents (`isPlanFresh` in `src/analysis/refactor/plan-store.ts`) and by re-validating edit ranges/overlap before writing. Stale plans (any fingerprint mismatch) are rejected with an explicit message to regenerate via `code_refactor_plan`. No heuristic text fallback.
-- Plans live in an in-memory, session-scoped map (`src/analysis/refactor/plan-store.ts`). `planId` is `plan-<12hex>` derived from operation + target coordinates + a `Date.now()` discriminator. Plans are removed after successful apply. No cross-session persistence — `planId` mirrors the `targetId` lifecycle (session-scoped, fingerprint-checked).
+- `code_refactor_plan` is a **pure planner**: it computes precise semantic edits for exactly one nested operation payload (`rename_symbol`, `extract_function`, or `extract_variable`) and returns a `planId`. It never mutates files. It requires a **name anchor** (per ADR 0003) — LSP rename needs the identifier; a declaration anchor is refused with an observable note.
+- `code_refactor_apply` is the **sole mutator**: it applies a previously stored plan by `planId`. It does not require a live semantic provider. The Workspace code-intelligence session checks stored SHA-256 file fingerprints (`isPlanFresh` in `src/session/refactor-plans.ts`) and revalidates edit ranges and overlap before writing. Stale plans are rejected with an explicit request to regenerate. No heuristic text fallback.
+- Plans live in the Workspace code-intelligence session's in-memory map. `planId` is `plan-<12hex>` derived from operation, target coordinates, and a time discriminator. Plans are removed after successful apply and are never persisted across sessions.
 
-**The planner/applier invariant.** Planning and mutation are separate tools; the only path from a plan to the filesystem is `code_refactor_apply` with a fresh `planId`. `code_refactor_plan` has no write capability; `code_refactor_apply` has no planning capability.
+**The planner/applier invariant.** Planning and mutation are separate tools; the only path from a plan to the filesystem is `code_refactor_apply` with a fresh `planId`. `code_refactor_plan` has no write capability; `code_refactor_apply` has no planning capability. Application acquires PI's per-file mutation queues in sorted path order and rolls back already-written files if a later write fails (ADR 0006).
 
 **Considered Options (rejected).**
 

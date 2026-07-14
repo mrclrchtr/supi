@@ -1,33 +1,28 @@
-// Recovery coordinator — orchestrates stale diagnostic recovery.
+// Recovery coordinator — owns stale-diagnostic refresh and restart policy.
 
+import type { Diagnostic } from "../config/types.ts";
 import type { LspManager } from "./manager.ts";
 
-/**
- * Orchestrates stale diagnostic detection and recovery.
- */
+export interface RecoveryResult {
+  readonly refreshedClients: number;
+  readonly restartedClients: number;
+  readonly staleAssessment: {
+    readonly suspected: boolean;
+    readonly matchedFiles: Array<{ file: string; diagnostics: Diagnostic[] }>;
+    readonly warning: string | null;
+  };
+}
+
+/** Workspace stale-state recovery interface. */
 export interface RecoveryCoordinator {
-  /**
-   * Trigger a workspace-wide diagnostics refresh.
-   * Returns info about refreshed/restarted clients and stale assessment.
-   */
   recover(options?: {
     restartIfStillStale?: boolean;
     maxWaitMs?: number;
     quietMs?: number;
-  }): Promise<{
-    refreshedClients: number;
-    restartedClients: number;
-    staleAssessment: {
-      suspected: boolean;
-      matchedFiles: Array<{ file: string; diagnostics: unknown[] }>;
-      warning: string | null;
-    };
-  }>;
+  }): Promise<RecoveryResult>;
 }
 
-/**
- * Create a RecoveryCoordinator backed by LspManager.
- */
+/** Create the recovery interface around the package-internal manager. */
 export function createRecoveryCoordinator(manager: LspManager): RecoveryCoordinator {
   return {
     async recover(options) {

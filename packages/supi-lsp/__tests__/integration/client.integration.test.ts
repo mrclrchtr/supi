@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { LspClient } from "../../src/client/client.ts";
 import type { Diagnostic, ServerConfig } from "../../src/config/types.ts";
 import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
-import type { SessionLspService } from "../../src/session/service-registry.ts";
+import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 import { hasCommand, waitFor } from "../helpers/integration-utils.ts";
 
 // typescript-language-server resolves tsserver from the project root's
@@ -217,7 +217,7 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     // Re-open after the "closes a document" test above.
     client.didOpen(goodFile, fs.readFileSync(goodFile, "utf-8"));
 
-    const semantic = createLspSemanticProvider(client as unknown as SessionLspService);
+    const semantic = createLspSemanticProvider(client as unknown as WorkspaceLspRuntime);
     const symbols = await semantic.documentSymbols(goodFile);
     expect(symbols).not.toBeNull();
     expect(symbols?.length).toBeGreaterThan(0);

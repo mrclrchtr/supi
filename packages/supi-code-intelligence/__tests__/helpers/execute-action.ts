@@ -1,8 +1,8 @@
 import { createSessionCache } from "../../src/app/app.ts";
+import type { GraphTargetInput, TargetInput } from "../../src/session/target-input.ts";
 import { executeFindTool } from "../../src/tool/find/execute.ts";
 import type { GraphRelation } from "../../src/tool/graph/execute.ts";
 import { executeGraphTool } from "../../src/tool/graph/execute.ts";
-import { executeImpactTool } from "../../src/tool/impact/execute.ts";
 import { executeOrientationTool } from "../../src/tool/orientation/execute.ts";
 import { executeRefactorApplyTool } from "../../src/tool/refactor-apply/execute.ts";
 import { executeRefactorPlanTool } from "../../src/tool/refactor-plan/execute.ts";
@@ -11,7 +11,6 @@ import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../src/types/inde
 export type TestAction =
   | "graph"
   | "context"
-  | "impact"
   | "find"
   | "refactor"
   | "apply"
@@ -30,10 +29,8 @@ export interface ActionParams {
   query?: string;
   regex?: boolean;
   kind?: string;
-  exportedOnly?: boolean;
   maxResults?: number;
   contextLines?: number;
-  summary?: boolean;
   relations?: string[];
   operation?: string;
   range?: {
@@ -42,13 +39,11 @@ export interface ActionParams {
   };
   newName?: string;
   planId?: string;
-  mode?: "apply";
 }
 
 const SUPPORTED_ACTIONS = [
   "graph",
   "context",
-  "impact",
   "find",
   "refactor",
   "apply",
@@ -58,30 +53,15 @@ const SUPPORTED_ACTIONS = [
 
 export const sessionCache = createSessionCache();
 
-/**
- * Build a full CodeIntelToolExecCtx from a minimal cwd-only context.
- *
- * Uses a module-level session cache so targets registered in one call
- * are visible to subsequent tool calls for the same cwd.
- */
 function buildCtx(ctx: { cwd: string }): CodeIntelToolExecCtx {
-  const session = sessionCache.getOrCreate(ctx.cwd);
-  return { cwd: ctx.cwd, session };
+  return { cwd: ctx.cwd, session: sessionCache.getOrCreate(ctx.cwd) };
 }
 
-/**
- * Build a CodeIntelToolExecCtx from a cwd string for direct executor calls.
- * Used in tests that call executors without going through `executeAction`.
- */
 export function makeTestCtx(cwd: string): CodeIntelToolExecCtx {
-  const session = sessionCache.getOrCreate(cwd);
-  return { cwd, session };
+  return { cwd, session: sessionCache.getOrCreate(cwd) };
 }
 
-/**
- * Test-only legacy action shim that routes old action-shaped fixtures through the
- * current focused-tool adapters.
- */
+/** Route compact test fixtures through the focused public Tool adapters. */
 export async function executeAction(
   params: ActionParams,
   ctx: { cwd: string },
@@ -101,25 +81,15 @@ export async function executeAction(
     case "context":
       return executeOrientationTool(
         {
-          focus: rest.path ?? rest.file,
-          targetId: rest.targetId,
-          line: rest.line,
-          character: rest.character,
+          focus: toOrientationFocus(rest),
           maxResults: rest.maxResults,
         },
         fullCtx,
       );
-    case "impact":
-      return executeImpactTool(rest, fullCtx);
     case "graph":
       return executeGraphTool(
         {
-          targetId: rest.targetId,
-          file: rest.file,
-          line: rest.line,
-          character: rest.character,
-          symbol: rest.symbol,
-          scope: rest.path,
+          target: toGraphTarget(rest),
           relations: rest.relations as GraphRelation[] | undefined,
           maxResults: rest.maxResults,
         },
@@ -129,49 +99,78 @@ export async function executeAction(
       return executeFindTool(
         {
           query: rest.query ?? rest.pattern ?? "",
-          scope: rest.path,
+          scope: rest.path ? [rest.path] : undefined,
           mode: rest.regex ? "regex" : "text",
-          kind: rest.kind as
-            | "definition"
-            | "import"
-            | "export"
-            | "call"
-            | "type"
-            | "interface"
-            | "test"
-            | undefined,
           maxResults: rest.maxResults,
           contextLines: rest.contextLines,
-        } as Parameters<typeof executeFindTool>[0],
+        },
         fullCtx,
       );
     case "refactor":
-      return executeRefactorPlanTool(
-        rest as Parameters<typeof executeRefactorPlanTool>[0],
-        fullCtx,
-        "code_refactor_plan",
-      );
-    case "apply":
-      return executeRefactorApplyTool(
-        rest as Parameters<typeof executeRefactorApplyTool>[0],
-        fullCtx,
-      );
     case "refactor_plan":
-      return executeRefactorPlanTool(
-        rest as Parameters<typeof executeRefactorPlanTool>[0],
-        fullCtx,
-      );
+      return executeRefactorPlanTool(toRefactorParams(rest), fullCtx);
+    case "apply":
     case "refactor_apply":
-      return executeRefactorApplyTool(
-        rest as Parameters<typeof executeRefactorApplyTool>[0],
-        fullCtx,
-      );
+      return executeRefactorApplyTool({ planId: rest.planId ?? "" }, fullCtx);
     default:
       return {
-        content: `**Error:** Unknown action \`${action satisfies never}\`.`,
+        content: `**Error:** Unknown action \`${String(action)}\`.`,
         details: undefined,
       };
   }
+}
+
+function toOrientationFocus(rest: Omit<ActionParams, "action">) {
+  if (rest.targetId) return { target: { handle: rest.targetId } } as const;
+  if (rest.file && rest.line && rest.character) {
+    return {
+      target: {
+        anchor: { file: rest.file, line: rest.line, character: rest.character },
+      },
+    } as const;
+  }
+  const path = rest.path ?? rest.file;
+  return path ? ({ path } as const) : undefined;
+}
+
+function toGraphTarget(rest: Omit<ActionParams, "action">): GraphTargetInput {
+  const target = toTarget(rest);
+  if ("file" in target) {
+    return { anchor: { file: target.file, line: rest.line ?? 1, character: rest.character ?? 1 } };
+  }
+  return target;
+}
+
+function toTarget(rest: Omit<ActionParams, "action">): TargetInput {
+  if (rest.targetId) return { handle: rest.targetId };
+  if (rest.file && rest.line && rest.character) {
+    return { anchor: { file: rest.file, line: rest.line, character: rest.character } };
+  }
+  if (rest.symbol) return { symbol: { query: rest.symbol, scope: rest.path } };
+  return { file: rest.file ?? rest.path ?? "." };
+}
+
+function toRefactorParams(rest: Omit<ActionParams, "action">) {
+  const target = toTarget(rest);
+  const operation = rest.operation ?? "rename_symbol";
+  if (operation === "extract_function" || operation === "extract_variable") {
+    return {
+      target,
+      operation: {
+        [operation]: {
+          newName: rest.newName ?? "extracted",
+          range: rest.range ?? {
+            start: { line: rest.line ?? 1, character: rest.character ?? 1 },
+            end: { line: rest.line ?? 1, character: (rest.character ?? 1) + 1 },
+          },
+        },
+      },
+    } as Parameters<typeof executeRefactorPlanTool>[0];
+  }
+  return {
+    target,
+    operation: { rename_symbol: { newName: rest.newName ?? "renamed" } },
+  } as Parameters<typeof executeRefactorPlanTool>[0];
 }
 
 function isSupportedAction(action: string | undefined): action is TestAction {

@@ -12,7 +12,7 @@ import type { RefactorOperation, WorkspaceEdit } from "@mrclrchtr/supi-code-runt
 
 export interface RefactorPlan {
   id: string;
-  operation: Exclude<RefactorOperation, "rename">;
+  operation: RefactorOperation;
   newName?: string;
   destination?: string;
   targetFile: string;

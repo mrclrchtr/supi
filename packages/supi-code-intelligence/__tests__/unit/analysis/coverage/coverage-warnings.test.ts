@@ -5,25 +5,13 @@
  * the evaluateCoverageWarnings API contract.
  */
 
-import { beforeAll, describe, expect, it } from "vitest";
-import type {
-  CoverageEvalInput,
-  CoverageWarningState as CoverageWarningStateType,
+import { describe, expect, it } from "vitest";
+import {
+  CoverageWarningState,
+  evaluateCoverageWarnings,
 } from "../../../../src/analysis/coverage/coverage-warnings.ts";
 
-let evaluateCoverageWarnings: (input: CoverageEvalInput) => {
-  hasWarnings: boolean;
-  warnings: Array<{ type: string; message: string; language?: string }>;
-};
-let CoverageWarningState: typeof CoverageWarningStateType;
-
 describe("evaluateCoverageWarnings", () => {
-  beforeAll(async () => {
-    const mod = await import("../../../../src/analysis/coverage/coverage-warnings.ts");
-    evaluateCoverageWarnings = mod.evaluateCoverageWarnings;
-    CoverageWarningState = mod.CoverageWarningState;
-  });
-
   it("returns deprecation warning when lsp.enabled is present in config", () => {
     const result = evaluateCoverageWarnings({
       deprecatedKeys: {

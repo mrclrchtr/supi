@@ -1,136 +1,91 @@
-/**
- * Markdown renderer for code_resolve results.
- *
- * Produces compact, agent-friendly markdown showing resolved targets
- * with stable handles, disambiguation candidates, or actionable errors.
- */
+/** Markdown adapter for assembled code_resolve outcomes. */
 
 import { relative } from "node:path";
 import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
-import type { DisambiguationCandidate } from "../../analysis/target/service.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
 import type { ResolveResultAssembly } from "../result/resolve.ts";
 
-/**
- * Render a provenance note for an anchored resolution, but only when the
- * resolution was non-obvious — i.e. the coordinate was snapped to a different
- * anchor, or the evidence was structural rather than semantic. Exact
- * name-anchor hits resolved from semantic evidence stay quiet.
- */
-function renderAnchoredResolutionNote(t: TargetStoreEntry): string | null {
-  const r = t.resolution;
-  if (!r) return null;
-  const degraded = r.source !== "semantic";
-  if (!r.snapped && !degraded) return null;
-
-  const req = `${r.requested.line}:${r.requested.character}`;
-  const res = `${r.resolved.line}:${r.resolved.character}`;
-  if (r.snapped) {
-    return `_Note: snapped from requested coordinate ${req} to name anchor ${res} (evidence: ${r.source})._`;
-  }
-  return `_Note: resolved from ${r.source} evidence; confirm with \`code_inspect\` if you need point-level facts._`;
-}
-
-/** Render the single-target resolved block (with optional provenance note). */
-function renderSingleTarget(t: TargetStoreEntry, confidence: string, cwd: string): string[] {
-  const relFile = relative(cwd, t.file) || t.file;
-  const kind = t.kind ? ` \`${t.kind}\`` : "";
-  const name = t.name ? ` **${t.name}**${kind}` : "";
-  const lines: string[] = [
-    `Resolved${name}:`,
-    "",
-    `- File: \`${relFile}\``,
-    `- Line: ${t.displayLine}, Column: ${t.displayCharacter}`,
-    `- Target ID: \`${t.targetId}\``,
-    `- Span ID: \`${t.spanId}\``,
-    `- Confidence: \`${confidence}\``,
-    `- Provenance: \`${t.provenance}\``,
-  ];
-  const note = renderAnchoredResolutionNote(t);
-  if (note) {
-    lines.push("");
-    lines.push(note);
-  }
-  lines.push("");
-  return lines;
-}
-
 /** Render an assembled resolve result into markdown. */
 export function renderResolveResult(assembly: ResolveResultAssembly): string {
-  const { result, cwd } = assembly;
-  switch (result.kind) {
+  const { outcome, cwd } = assembly;
+  switch (outcome.kind) {
     case "resolved":
-      return renderResolved(result.targets, result.omittedCount, result.confidence, cwd);
+      return renderResolved(outcome.entry, outcome.notes, cwd);
     case "disambiguation":
-      return renderDisambiguation(result.candidates, result.omittedCount, cwd);
-    case "error":
-      return result.message;
+      return renderDisambiguation(outcome.candidates, outcome.omittedCount);
+    case "invalid-input":
+      return `**Error:** ${outcome.message}`;
+    case "unavailable":
+      return `**Unavailable:** ${outcome.reason}`;
   }
 }
 
 function renderResolved(
-  targets: TargetStoreEntry[],
-  omittedCount: number,
-  confidence: string,
+  target: Readonly<TargetStoreEntry>,
+  notes: readonly string[],
   cwd: string,
 ): string {
-  if (targets.length === 0) {
-    return "No targets resolved.";
-  }
+  const relFile = relative(cwd, target.file) || target.file;
+  const kind = target.kind ? ` \`${target.kind}\`` : "";
+  const name = target.name ? ` **${target.name}**${kind}` : "";
+  const lines = [
+    `Resolved${name}:`,
+    "",
+    `- File: \`${relFile}\``,
+    `- Line: ${target.displayLine}, Column: ${target.displayCharacter}`,
+    `- Target ID: \`${target.targetId}\``,
+    `- Span ID: \`${target.spanId}\``,
+    `- Confidence: \`${target.confidence}\``,
+    `- Provenance: \`${target.provenance}\``,
+  ];
 
-  const lines: string[] = [];
-
-  if (targets.length === 1) {
-    lines.push(...renderSingleTarget(targets[0], confidence, cwd));
-  } else {
-    lines.push(`Resolved ${targets.length} target(s):`);
-    lines.push("");
-
-    for (const t of targets) {
-      const relFile = relative(cwd, t.file) || t.file;
-      const kind = t.kind ? ` (\`${t.kind}\`)` : "";
-      const name = t.name ?? "(unnamed)";
-      lines.push(
-        `- \`${relFile}\`:${t.displayLine}:${t.displayCharacter} — **${name}**${kind} — \`${t.targetId}\``,
-      );
-    }
-
-    const disclosure = renderEvidenceListMetadataDisclosure({
-      key: "resolve.targets",
-      totalCount: targets.length + omittedCount,
-      shownCount: targets.length,
-      omittedCount,
-      partialReason: null,
-    });
-    if (disclosure) {
-      lines.push(disclosure);
-    }
-    lines.push("");
-  }
-
+  const resolutionNote = renderAnchoredResolutionNote(target);
+  if (resolutionNote) lines.push("", resolutionNote);
+  for (const note of notes) lines.push("", `_Note: ${note}_`);
   return lines.join("\n");
 }
 
+function renderAnchoredResolutionNote(target: Readonly<TargetStoreEntry>): string | null {
+  const resolution = target.resolution;
+  if (!resolution) return null;
+  const degraded = resolution.source !== "semantic";
+  if (!resolution.snapped && !degraded) return null;
+
+  const requested = `${resolution.requested.line}:${resolution.requested.character}`;
+  const resolved = `${resolution.resolved.line}:${resolution.resolved.character}`;
+  if (resolution.snapped) {
+    return `_Note: snapped from requested coordinate ${requested} to name anchor ${resolved} (evidence: ${resolution.source})._`;
+  }
+  return `_Note: resolved from ${resolution.source} evidence; use code_inspect for point-level facts._`;
+}
+
 function renderDisambiguation(
-  candidates: DisambiguationCandidate[],
+  candidates: ReadonlyArray<{
+    targetId: string;
+    name: string;
+    kind: string | null;
+    container: string | null;
+    file: string;
+    line: number;
+    character: number;
+    rank: number;
+  }>,
   omittedCount: number,
-  cwd: string,
 ): string {
-  const lines: string[] = [];
+  const lines = [
+    "# Multiple matches found",
+    "",
+    "Choose one handle, or narrow target.symbol with scope or symbolKind:",
+    "",
+  ];
 
-  lines.push("# Multiple matches found");
-  lines.push("");
-  lines.push("Resolve by file + line + character, or refine with scope/kind:");
-  lines.push("");
-
-  for (const c of candidates) {
-    const relFile = relative(cwd, c.entry.file) || c.file;
-    const kind = c.kind ? ` (\`${c.kind}\`)` : "";
-    const container = c.container ? ` in \`${c.container}\`` : "";
+  for (const candidate of candidates) {
+    const kind = candidate.kind ? ` (\`${candidate.kind}\`)` : "";
+    const container = candidate.container ? ` in \`${candidate.container}\`` : "";
     lines.push(
-      `${c.rank}. **${c.name}**${kind}${container} — \`${relFile}\`:${c.line}:${c.character}`,
+      `${candidate.rank}. **${candidate.name}**${kind}${container} — \`${candidate.file}\`:${candidate.line}:${candidate.character}`,
+      `   Target ID: \`${candidate.targetId}\``,
     );
-    lines.push(`   Target ID: \`${c.targetId}\``);
   }
 
   const disclosure = renderEvidenceListMetadataDisclosure({
@@ -140,10 +95,6 @@ function renderDisambiguation(
     omittedCount,
     partialReason: null,
   });
-  if (disclosure) {
-    lines.push("");
-    lines.push(disclosure);
-  }
-
+  if (disclosure) lines.push("", disclosure);
   return lines.join("\n");
 }

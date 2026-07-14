@@ -43,17 +43,17 @@ export async function generateFileBrief(
   const isEntrypoint =
     mod?.entrypoints.some((ep) => path.resolve(mod.root, ep) === resolvedPath) ?? false;
 
-  const lspService =
-    opts?.lspService ??
+  const lspRuntime =
+    opts?.lspRuntime ??
     ({
       kind: "unavailable" as const,
       reason: "No LSP service",
-    } as import("@mrclrchtr/supi-lsp/api").SessionLspServiceState);
+    } as import("@mrclrchtr/supi-lsp/api").WorkspaceLspRuntimeState);
   const enrichment = await gatherBriefEnrichment(
     opts?.provider ?? null,
     relPath,
     opts?.maxResults,
-    lspService,
+    lspRuntime,
   );
 
   const renderedContent = renderFileBrief({

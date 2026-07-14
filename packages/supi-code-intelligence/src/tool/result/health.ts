@@ -1,76 +1,22 @@
-import type { CoverageWarningReport } from "../../analysis/coverage/coverage-warnings.ts";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
-import type { GitContext } from "../../analysis/signals/git.ts";
+import type { HealthData } from "../../session/health-types.ts";
+import { assembleToolResult, type ResultProvenance, type ToolResultAssembly } from "./assembly.ts";
 import type { HealthDetails } from "./types.ts";
 
-export type HealthSection = "diagnostics" | "servers" | "dirty" | "coverage" | "unused";
-
-export interface HealthServerInfo {
-  name: string;
-  root: string;
-  fileTypes: string[];
-  status: string;
-}
-
-export interface HealthDiagnosticEntry {
-  file: string;
-  errors: number;
-  warnings: number;
-}
-
-export interface HealthCoverageEntry {
-  file: string;
-  pct: number;
-}
-
-export interface HealthCoverageData {
-  available: boolean;
-  entries: HealthCoverageEntry[];
-}
-
-export interface HealthUnusedExportEntry {
-  file: string;
-  name: string;
-}
-
-export interface HealthUnusedData {
-  available: boolean;
-  files: string[];
-  exports: HealthUnusedExportEntry[];
-}
-
-/** A suggested code action at a specific diagnostic location. */
-export interface CodeActionSuggestion {
-  file: string;
-  line: number;
-  title: string;
-  kind?: string;
-}
-
-export interface HealthData {
-  includedSections: HealthSection[];
-  lspAvailable: boolean;
-  lspStatus: string;
-  recovered: boolean;
-  /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */
-  structuralStatus?: string;
-  diagnostics: HealthDiagnosticEntry[];
-  servers: HealthServerInfo[];
-  gitContext: GitContext | null;
-  scopeFilter: string | null;
-  level: "summary" | "detailed";
-  /** Code action suggestions collected from LSP (only populated in detailed mode). */
-  codeActions: CodeActionSuggestion[] | null;
-  coverage: HealthCoverageData | null;
-  unused: HealthUnusedData | null;
-  /** Coverage warnings for degraded semantic/structural substrate. Undefined when fully healthy. */
-  degradedCoverage?: CoverageWarningReport;
-  /** Seconds since diagnostics were last refreshed, or undefined if never refreshed. */
-  diagnosticAgeSeconds?: number;
-}
+export type {
+  CodeActionSuggestion,
+  HealthCodeActions,
+  HealthCoverageData,
+  HealthData,
+  HealthDiagnosticEntry,
+  HealthSection,
+  HealthServerInfo,
+  HealthUnusedData,
+} from "../../session/health-types.ts";
 
 export interface HealthResultAssembly {
   data: HealthData;
+  assembled: ToolResultAssembly<HealthData>;
   details: HealthDetails;
 }
 
@@ -79,8 +25,38 @@ export function assembleHealthResult(
   data: HealthData,
   evidenceLists: EvidenceListMetadata[],
 ): HealthResultAssembly {
+  const provenance: ResultProvenance[] = [
+    ...(data.lspAvailable ? [{ source: "semantic" as const, capability: "LSP" }] : []),
+    ...(data.structuralStatus
+      ? [{ source: "structural" as const, capability: "tree-sitter" }]
+      : []),
+    { source: "runtime", capability: "workspace-health" },
+  ];
+  const sections = [
+    { key: "health.servers", title: "Servers", items: data.servers },
+    { key: "health.diagnostics", title: "Diagnostics", items: data.diagnostics },
+  ].map((section) => ({
+    ...section,
+    status: "complete" as const,
+    confidence: data.lspAvailable ? ("semantic" as const) : ("unavailable" as const),
+    provenance,
+  }));
+  const assembled = assembleToolResult({
+    data,
+    sections,
+    evidenceLists,
+    candidateCount: data.diagnostics.length + data.servers.length,
+    confidence: data.lspAvailable
+      ? "semantic"
+      : data.structuralStatus
+        ? "structural"
+        : "unavailable",
+    provenance,
+  });
+
   return {
     data,
+    assembled,
     details: {
       lspAvailable: data.lspAvailable,
       lspStatus: data.lspStatus,
@@ -88,7 +64,7 @@ export function assembleHealthResult(
       structuralStatus: data.structuralStatus,
       diagnosticFileCount: data.diagnostics.length,
       serverCount: data.servers.length,
-      evidenceLists,
+      evidenceLists: [...assembled.evidenceLists],
     },
   };
 }

@@ -7,12 +7,12 @@ import codeIntelligenceExtension from "../../../../src/extension.ts";
 import { clearMockRuntime, registerMockProvider } from "../../../helpers/register-mock-runtime.ts";
 
 const mockLspFns = vi.hoisted(() => ({
-  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
+  getWorkspaceLspRuntime: vi.fn<(cwd: string) => unknown>(),
 }));
 
 vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
-  return { ...actual, getSessionLspService: mockLspFns.getSessionLspService };
+  return { ...actual, getWorkspaceLspRuntime: mockLspFns.getWorkspaceLspRuntime };
 });
 
 let tmpDir: string;
@@ -20,7 +20,7 @@ let tmpDir: string;
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-orientation-"));
   writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "ctx-ws" }, null, 2));
-  mockLspFns.getSessionLspService.mockReturnValue({
+  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
     kind: "unavailable",
     reason: "no active session",
   });
@@ -47,7 +47,7 @@ async function resolveTargetId(
   const resolveTool = getTool(pi, "code_resolve");
   const resolveResult = (await resolveTool.execute(
     "orientation-resolve",
-    { file, line, character },
+    { target: { anchor: { file, line, character } } },
     undefined,
     undefined,
     makeCtx({ cwd: tmpDir }),
@@ -119,7 +119,7 @@ describe("code_orientation tool", () => {
 
     const result = (await tool.execute(
       "module-orientation",
-      { focus: "app" },
+      { focus: { module: "app" } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -144,13 +144,13 @@ describe("code_orientation tool", () => {
 
     const result = (await tool.execute(
       "ambiguous-module-focus",
-      { focus: "app" },
+      { focus: { module: "app" } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
     )) as { content: Array<{ text: string }> };
 
-    expect(result.content[0].text).toContain("Focus is ambiguous");
+    expect(result.content[0].text).toContain("Module focus is ambiguous");
     expect(result.content[0].text).toContain("@t/app");
     expect(result.content[0].text).toContain("@scope/app");
   });
@@ -170,9 +170,9 @@ describe("code_orientation tool", () => {
       ].join("\n"),
     );
     registerBasicSymbolProvider();
-    mockLspFns.getSessionLspService.mockReturnValue({
+    mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
-      service: {
+      runtime: {
         fileDiagnostics: vi.fn(async () => [
           {
             severity: 1,
@@ -191,7 +191,7 @@ describe("code_orientation tool", () => {
 
     const result = (await tool.execute(
       "symbol-orientation",
-      { focus: "src/widget.ts", line: 8, character: 17 },
+      { focus: { target: { anchor: { file: "src/widget.ts", line: 8, character: 17 } } } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -226,9 +226,9 @@ describe("code_orientation tool", () => {
         },
       ],
     });
-    mockLspFns.getSessionLspService.mockReturnValue({
+    mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
-      service: {
+      runtime: {
         fileDiagnostics: vi.fn(async () => [
           {
             severity: 1,
@@ -247,7 +247,7 @@ describe("code_orientation tool", () => {
 
     const result = (await tool.execute(
       "near-diagnostics",
-      { focus: "src/widget.ts", line: 1, character: 17 },
+      { focus: { target: { anchor: { file: "src/widget.ts", line: 1, character: 17 } } } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -257,7 +257,7 @@ describe("code_orientation tool", () => {
     expect(result.content[0].text).not.toContain("Far diagnostic");
   });
 
-  it("lets targetId win over supplied focus and coordinates", async () => {
+  it("orients by a handle returned from code_resolve", async () => {
     writeSource("src/widget.ts", "export function widget() { return 1; }\n");
     registerMockProvider(tmpDir, {
       documentSymbols: async () => [
@@ -279,15 +279,13 @@ describe("code_orientation tool", () => {
 
     const result = (await tool.execute(
       "targetid-wins",
-      { targetId, focus: "missing.ts", line: 99, character: 1 },
+      { focus: { target: { handle: targetId } } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
     )) as { content: Array<{ text: string }> };
 
     expect(result.content[0].text).not.toContain("**Error");
-    expect(result.content[0].text).toContain("targetId");
-    expect(result.content[0].text).toContain("ignored");
     expect(result.content[0].text).toContain("widget");
   });
 
@@ -298,50 +296,12 @@ describe("code_orientation tool", () => {
 
     const result = (await tool.execute(
       "invalid-focus",
-      { focus: "does-not-exist" },
+      { focus: { path: "does-not-exist" } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
     )) as { content: Array<{ text: string }> };
 
-    expect(result.content[0].text).toContain("Focus not found");
-  });
-
-  it("returns a validation error when coordinates are supplied for a directory focus", async () => {
-    mkdirSync(path.join(tmpDir, "src"), { recursive: true });
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_orientation");
-
-    const result = (await tool.execute(
-      "directory-coords",
-      { focus: "src", line: 1, character: 1 },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as { content: Array<{ text: string }> };
-
-    expect(result.content[0].text).toContain("points to a directory");
-    expect(result.content[0].text).toContain("points to a directory");
-    expect(result.content[0].text).toContain("use `file`");
-  });
-
-  it("returns a validation error for partial coordinates", async () => {
-    writeSource("src/widget.ts", "export function widget() { return 1; }\n");
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_orientation");
-
-    const result = (await tool.execute(
-      "partial-coords",
-      { focus: "src/widget.ts", line: 1 },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as { content: Array<{ text: string }> };
-
-    expect(result.content[0].text).toContain("focus");
-    expect(result.content[0].text).toContain("line");
-    expect(result.content[0].text).toContain("character");
+    expect(result.content[0].text).toContain("Focus path not found");
   });
 });

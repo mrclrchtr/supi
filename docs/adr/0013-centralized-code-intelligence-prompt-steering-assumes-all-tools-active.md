@@ -18,7 +18,8 @@ This makes two-sided steering (e.g. `code_resolve` saying "use me first for
 ambiguous targets" and `code_orientation` saying "use `code_resolve` first, then
 pass `targetId` to me") *look* duplicative, because both sides are always
 visible. Under the per-tool-active model that duplication is the cost of staying
-correct for a narrowed-active future that SuPi does not use.
+correct for a narrowed-active future that SuPi does not use. Target references now
+use the nested `target.handle` shape; no flat target input is retained.
 
 ## Decision
 
@@ -27,8 +28,8 @@ rule once, on its natural-home tool (typically the tool it recommends), and
 accept **empty `promptGuidelines`** for tools whose selection is fully covered by
 their self-sufficient `description` plus a co-visible sibling bullet. Concretely,
 `code_inspect` and `code_graph` ship with `promptGuidelines: []`; their selection
-is steered by `code_orientation`'s bullet and `code_impact`'s "use `code_graph`
-instead of `code_impact`" bullet respectively, both always co-visible.
+is steered by `code_orientation`'s point-facts and relationship bullets, which are
+always co-visible.
 
 This also removes mechanics that ADR 0005 forbids in guidelines (e.g. the
 `code_find` bullet restating `mode:"ast"` / no-silent-fallback, which already

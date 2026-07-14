@@ -177,11 +177,12 @@ export interface RipgrepRunResult {
   matches: RgMatch[];
   /** Non-no-match ripgrep execution error text, such as invalid regex syntax. */
   error?: string;
+  /** Enumeration stopped before completion, so a true total is unavailable. */
+  partialReason?: "timeout";
 }
 
 /** Options for {@link runRipgrep} / {@link runRipgrepDetailed}. */
 export interface RipgrepOptions {
-  maxMatches?: number;
   contextLines?: number;
   literal?: boolean;
   filterLowSignal?: boolean;
@@ -265,11 +266,10 @@ export async function runRipgrepDetailed(
     case "nomatch":
       return { matches: dedupeMatches(parseRgJson(proc.stdout, filter)) };
     case "timeout":
-      // Timeout: yield any partial stdout matches with no error surfaced — an
-      // improvement over the prior execFileSync path, which discarded partial
-      // output on timeout (the timeout error lacked a `status`, so the old
-      // handleRipgrepError returned an empty match set).
-      return { matches: proc.stdout ? dedupeMatches(parseRgJson(proc.stdout, filter)) : [] };
+      return {
+        matches: proc.stdout ? dedupeMatches(parseRgJson(proc.stdout, filter)) : [],
+        partialReason: "timeout",
+      };
     case "error":
       return {
         matches: proc.stdout ? dedupeMatches(parseRgJson(proc.stdout, filter)) : [],
@@ -281,9 +281,11 @@ export async function runRipgrepDetailed(
 function buildRipgrepArgs(
   pattern: string,
   scopePath: string | readonly string[],
-  opts?: { maxMatches?: number; contextLines?: number; literal?: boolean },
+  opts?: { contextLines?: number; literal?: boolean },
 ): string[] {
-  const args = ["--json", "-m", String(opts?.maxMatches ?? 30)];
+  // Result caps belong to Tool-result assembly, not collection. Limiting
+  // ripgrep here would make omitted matches indistinguishable from no match.
+  const args = ["--json"];
   if ((opts?.contextLines ?? 0) > 0) {
     args.push("-C", String(opts?.contextLines ?? 0));
   }

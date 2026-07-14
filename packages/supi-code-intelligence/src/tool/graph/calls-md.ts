@@ -7,7 +7,7 @@ import {
   type EvidenceListMetadata,
   renderEvidenceListDisclosure,
 } from "../../analysis/evidence.ts";
-import type { CallEntry, CalleeScope } from "./types.ts";
+import type { CallEntry, CalleeScope } from "../../analysis/relations/types.ts";
 
 export // biome-ignore lint/complexity/useMaxParams: renderer needs target data + depth
 function renderCallsResult(

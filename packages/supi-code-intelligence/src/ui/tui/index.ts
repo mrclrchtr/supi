@@ -15,10 +15,6 @@ export {
   renderHealthResult,
 } from "../../tool/health/tui.ts";
 export {
-  renderImpactCall,
-  renderImpactResult,
-} from "../../tool/impact/tui.ts";
-export {
   renderInspectCall,
   renderInspectResult,
 } from "../../tool/inspect/tui.ts";

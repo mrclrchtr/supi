@@ -1,9 +1,9 @@
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import {
-  getSessionLspService,
+  getWorkspaceLspRuntime,
   type SemanticReadinessResult,
-  type SessionLspServiceState,
-  waitForSessionLspService,
+  type WorkspaceLspRuntimeState,
+  waitForWorkspaceLspRuntime,
 } from "@mrclrchtr/supi-lsp/api";
 
 export const DEFAULT_SEMANTIC_STARTUP_TIMEOUT_MS = 15_000;
@@ -59,15 +59,15 @@ export async function ensureSemanticReadiness(
     return { kind: "timeout" };
   }
   return scope.kind === "workspace"
-    ? lspState.service.waitUntilReadyForWorkspace({ timeoutMs: remainingAfterLsp })
-    : lspState.service.waitUntilReadyForFile(scope.file, { timeoutMs: remainingAfterLsp });
+    ? lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs: remainingAfterLsp })
+    : lspState.runtime.waitUntilReadyForFile(scope.file, { timeoutMs: remainingAfterLsp });
 }
 
 async function resolveSemanticServiceState(
   cwd: string,
   timeoutMs: number,
-): Promise<SessionLspServiceState> {
-  const initialState = getSessionLspService(cwd);
+): Promise<WorkspaceLspRuntimeState> {
+  const initialState = getWorkspaceLspRuntime(cwd);
   if (initialState.kind !== "pending") return initialState;
-  return waitForSessionLspService(cwd, timeoutMs);
+  return waitForWorkspaceLspRuntime(cwd, timeoutMs);
 }

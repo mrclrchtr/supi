@@ -37,7 +37,6 @@ export type {
   SourceRange,
   WorkspaceEdit,
 } from "./types.ts";
-export { normalizeRefactorOperation } from "./types.ts";
 export type { WorkspaceContext } from "./workspace/context.ts";
 // Workspace context
 export { createWorkspaceContext } from "./workspace/context.ts";

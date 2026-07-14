@@ -3,8 +3,8 @@ import type { AgentToolUpdateCallback } from "@earendil-works/pi-coding-agent";
 /**
  * Emit a coarse progress beat to the agent runtime via `onUpdate`.
  *
- * Long-running code-intelligence executors (code_find ripgrep, code_impact
- * sweeps, code_graph `relations:["all"]`, code_health `refresh`, and
+ * Long-running code-intelligence executors (code_find ripgrep,
+ * code_graph `relations:["all"]`, code_health `refresh`, and
  * code_refactor_plan LSP requests) call this at a few natural checkpoints —
  * a start beat plus a couple of progress beats — so the UI can show the tool
  * is working. Beats must stay coarse: not chatty.

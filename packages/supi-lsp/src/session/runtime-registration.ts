@@ -1,14 +1,14 @@
 /**
  * LSP-to-runtime capability registration.
  *
- * Adapts a SessionLspService into the runtime's SemanticProvider interface
+ * Adapts a WorkspaceLspRuntime into the runtime's SemanticProvider interface
  * and registers/unregisters it with the shared WorkspaceRuntime at session
  * lifecycle boundaries.
  */
 
 import type { WorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { createLspSemanticProvider } from "../provider/lsp-semantic-provider.ts";
-import type { SessionLspService } from "./service-registry.ts";
+import type { WorkspaceLspRuntime } from "./runtime-registry.ts";
 
 /**
  * Register LSP capabilities for a workspace cwd in pending state.
@@ -20,7 +20,7 @@ import type { SessionLspService } from "./service-registry.ts";
 export function registerPendingLspCapabilities(
   runtime: WorkspaceRuntime,
   cwd: string,
-  service: SessionLspService,
+  service: WorkspaceLspRuntime,
 ): void {
   const provider = createLspSemanticProvider(service);
   runtime.registerSemanticPending(cwd, provider);
@@ -29,7 +29,7 @@ export function registerPendingLspCapabilities(
 /**
  * Register LSP capabilities for a workspace cwd as ready.
  *
- * Wraps SessionLspService into a SemanticProvider via the existing semantic
+ * Wraps WorkspaceLspRuntime into a SemanticProvider via the existing semantic
  * adapter and publishes it into the shared workspace runtime so that
  * code-intelligence and other consumers can discover semantic analysis
  * availability.
@@ -37,7 +37,7 @@ export function registerPendingLspCapabilities(
 export function registerLspCapabilities(
   runtime: WorkspaceRuntime,
   cwd: string,
-  service: SessionLspService,
+  service: WorkspaceLspRuntime,
 ): void {
   const provider = createLspSemanticProvider(service);
   runtime.registerSemantic(cwd, provider);

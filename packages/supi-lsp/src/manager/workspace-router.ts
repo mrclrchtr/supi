@@ -1,44 +1,29 @@
-// Workspace router — routes files to the correct LSP client based on project root.
+// Workspace router — classifies file support and exposes routed project status.
 
-import type { ProjectServerInfo } from "../config/server-config.ts";
+import type { ProjectServerInfo } from "../config/types.ts";
 import type { LspManager } from "./manager.ts";
 
-/**
- * Routes file paths to the correct LSP client and tracks
- * which project roots are known.
- */
+/** File routing and workspace-project inventory. */
 export interface WorkspaceRouter {
-  /** Check whether a file can be served by any active server. */
+  /** Check whether a file can be served by a configured server. */
   canServeFile(filePath: string): boolean;
-
-  /** Check whether a source file type is supported. */
+  /** Check whether runtime guidance should track this source file. */
   isSupportedSourceFile(filePath: string): boolean;
-
-  /** Get known project server info. */
+  /** Get known project server state. */
   getProjectServers(): ProjectServerInfo[];
-
-  /** Register detected servers from the workspace scan. */
-  registerDetectedServers(servers: Array<{ language: string; root: string }>): void;
 }
 
-/**
- * Create a WorkspaceRouter backed by LspManager.
- */
+/** Create the routing interface around the package-internal manager. */
 export function createWorkspaceRouter(manager: LspManager): WorkspaceRouter {
   return {
-    canServeFile(filePath: string) {
+    canServeFile(filePath) {
       return manager.canServeFile(filePath);
     },
-    isSupportedSourceFile(filePath: string) {
+    isSupportedSourceFile(filePath) {
       return manager.isSupportedSourceFile(filePath);
     },
-    getProjectServers(): ProjectServerInfo[] {
+    getProjectServers() {
       return manager.getKnownProjectServers([]);
-    },
-    registerDetectedServers(servers: Array<{ language: string; root: string }>) {
-      manager.registerDetectedServers(
-        servers as unknown as Parameters<typeof manager.registerDetectedServers>[0],
-      );
     },
   };
 }

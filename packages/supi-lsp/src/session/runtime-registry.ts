@@ -1,0 +1,411 @@
+// Shared session-scoped LSP service registry.
+// Peer extensions can import `getWorkspaceLspRuntime` from the package root
+// to reuse the active LSP runtime without starting duplicate servers.
+
+import { createSessionStateRegistry } from "@mrclrchtr/supi-core/session";
+import type {
+  CodeAction,
+  Diagnostic,
+  DocumentSymbol,
+  FileEvent,
+  Hover,
+  Location,
+  LocationLink,
+  Position,
+  ProjectServerInfo,
+  Range,
+  SymbolInformation,
+  WorkspaceEdit,
+  WorkspaceSymbol,
+} from "../config/types.ts";
+import { type ClientPool, createClientPool } from "../manager/client-pool.ts";
+import { createDiagnosticStore, type DiagnosticStore } from "../manager/diagnostic-store.ts";
+import type { LspManager } from "../manager/manager.ts";
+import {
+  createRecoveryCoordinator,
+  type RecoveryCoordinator,
+} from "../manager/recovery-coordinator.ts";
+import { createWorkspaceRouter, type WorkspaceRouter } from "../manager/workspace-router.ts";
+import { resolveSessionPath } from "../utils.ts";
+
+function isRange(value: Position | Range): value is Range {
+  return "start" in value && "end" in value;
+}
+
+/** Workspace diagnostic summary grouped by file. */
+export interface WorkspaceDiagnosticSummaryEntry {
+  file: string;
+  errors: number;
+  warnings: number;
+}
+
+/** Outstanding diagnostics grouped by file, including info and hint counts. */
+export interface OutstandingDiagnosticSummaryEntry {
+  file: string;
+  total: number;
+  errors: number;
+  warnings: number;
+  information: number;
+  hints: number;
+}
+
+/** Result from a workspace diagnostic recovery pass. */
+export interface RecoverDiagnosticsResult {
+  refreshedClients: number;
+  restartedClients: number;
+  staleAssessment: {
+    suspected: boolean;
+    matchedFiles: Array<{ file: string; diagnostics: Diagnostic[] }>;
+    warning: string | null;
+  };
+}
+
+export type WorkspaceLspRuntimeState =
+  | { kind: "ready"; runtime: WorkspaceLspRuntime }
+  | { kind: "inactive"; runtime: WorkspaceLspRuntime }
+  | { kind: "pending" }
+  | { kind: "disabled" }
+  | { kind: "unavailable"; reason: string };
+
+export type SemanticReadinessResult =
+  | { kind: "ready" }
+  | { kind: "timeout" }
+  | { kind: "unavailable"; reason: string };
+
+/**
+ * Workspace-scoped LSP interface that owns routing, readiness, semantic operations,
+ * diagnostics, and recovery without exposing clients or the mutable manager.
+ * File path inputs may be absolute or session-cwd-relative; a leading `@` is stripped
+ * to match pi's built-in path-tool convention. Position arguments use raw 0-based LSP
+ * coordinates; use `toLspPosition()` from `@mrclrchtr/supi-lsp/api` when starting from
+ * user-facing 1-based line and character values.
+ */
+export interface WorkspaceLspRuntime {
+  hover(filePath: string, position: Position): Promise<Hover | null>;
+  definition(
+    filePath: string,
+    position: Position,
+  ): Promise<Location | Location[] | LocationLink[] | null>;
+  references(filePath: string, position: Position): Promise<Location[] | null>;
+  implementation(
+    filePath: string,
+    position: Position,
+  ): Promise<Location | Location[] | LocationLink[] | null>;
+  documentSymbols(filePath: string): Promise<DocumentSymbol[] | SymbolInformation[] | null>;
+  workspaceSymbol(query: string): Promise<SymbolInformation[] | WorkspaceSymbol[] | null>;
+  rename(filePath: string, position: Position, newName: string): Promise<WorkspaceEdit | null>;
+  codeActions(filePath: string, positionOrRange: Position | Range): Promise<CodeAction[] | null>;
+  waitUntilReadyForFile(
+    filePath: string,
+    options?: { timeoutMs?: number },
+  ): Promise<SemanticReadinessResult>;
+  waitUntilReadyForWorkspace(options?: { timeoutMs?: number }): Promise<SemanticReadinessResult>;
+  getProjectServers(): ProjectServerInfo[];
+  isSupportedSourceFile(filePath: string): boolean;
+  trackFile(filePath: string): Promise<boolean>;
+  closeFile(filePath: string): void;
+  pruneMissingFiles(): readonly string[];
+  noteWorkspaceChanges(changes: FileEvent[]): void;
+  fileDiagnostics(filePath: string, maxSeverity?: number): Promise<Diagnostic[] | null>;
+  fileDiagnosticsWithCascade(
+    filePath: string,
+    maxSeverity?: number,
+  ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>>;
+  refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void>;
+  getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSummaryEntry[];
+  getOutstandingDiagnostics(
+    maxSeverity?: number,
+  ): Array<{ file: string; diagnostics: Diagnostic[] }>;
+  getOutstandingDiagnosticSummary(maxSeverity?: number): OutstandingDiagnosticSummaryEntry[];
+  recoverDiagnostics(options?: {
+    restartIfStillStale?: boolean;
+    maxWaitMs?: number;
+    quietMs?: number;
+  }): Promise<RecoverDiagnosticsResult>;
+}
+
+class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
+  readonly #clients: ClientPool;
+  readonly #diagnostics: DiagnosticStore;
+  readonly #recovery: RecoveryCoordinator;
+  readonly #router: WorkspaceRouter;
+
+  constructor(private readonly manager: LspManager) {
+    this.#clients = createClientPool(manager);
+    this.#diagnostics = createDiagnosticStore(manager);
+    this.#recovery = createRecoveryCoordinator(manager);
+    this.#router = createWorkspaceRouter(manager);
+  }
+
+  static createOwner(manager: LspManager) {
+    const runtime = new DefaultWorkspaceLspRuntime(manager);
+    return { runtime: runtime as WorkspaceLspRuntime, shutdown: () => runtime.#shutdown() };
+  }
+
+  // ── Semantic lookups ────────────────────────────────────────────────
+
+  async hover(filePath: string, position: Position): Promise<Hover | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+    return client.hover(resolvedPath, position);
+  }
+
+  async definition(
+    filePath: string,
+    position: Position,
+  ): Promise<Location | Location[] | LocationLink[] | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+    return client.definition(resolvedPath, position);
+  }
+
+  async references(filePath: string, position: Position): Promise<Location[] | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+    return client.references(resolvedPath, position);
+  }
+
+  async implementation(
+    filePath: string,
+    position: Position,
+  ): Promise<Location | Location[] | LocationLink[] | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+    return client.implementation(resolvedPath, position);
+  }
+
+  async documentSymbols(filePath: string): Promise<DocumentSymbol[] | SymbolInformation[] | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+    return client.documentSymbols(resolvedPath);
+  }
+
+  async workspaceSymbol(query: string): Promise<SymbolInformation[] | WorkspaceSymbol[] | null> {
+    return this.manager.workspaceSymbol(query);
+  }
+
+  async rename(
+    filePath: string,
+    position: Position,
+    newName: string,
+  ): Promise<WorkspaceEdit | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+    return client.rename(resolvedPath, position, newName);
+  }
+
+  async codeActions(
+    filePath: string,
+    positionOrRange: Position | Range,
+  ): Promise<CodeAction[] | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    const client = await this.manager.ensureFileOpen(resolvedPath);
+    if (!client) return null;
+
+    const range = isRange(positionOrRange)
+      ? positionOrRange
+      : { start: positionOrRange, end: positionOrRange };
+    const diagnostics = client
+      .getDiagnostics(resolvedPath)
+      .filter((diagnostic) => diagnostic.range.end.line >= range.start.line)
+      .filter((diagnostic) => diagnostic.range.start.line <= range.end.line);
+
+    return client.codeActions(resolvedPath, range, { diagnostics });
+  }
+
+  /**
+   * Wait until the LSP client that owns a file is ready for semantic queries.
+   * Performs a lightweight semantic warm-up probe before resolving.
+   */
+  async waitUntilReadyForFile(
+    filePath: string,
+    options: { timeoutMs?: number } = {},
+  ): Promise<SemanticReadinessResult> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    if (!this.manager.canServeFile(resolvedPath)) {
+      return {
+        kind: "unavailable",
+        reason: "No LSP client can serve this file",
+      };
+    }
+
+    return raceReadiness(this.manager.waitUntilFileReady(resolvedPath), options.timeoutMs);
+  }
+
+  /**
+   * Wait until all started LSP clients are ready for semantic queries.
+   * Performs one representative warm-up probe per client/root.
+   */
+  async waitUntilReadyForWorkspace(
+    options: { timeoutMs?: number } = {},
+  ): Promise<SemanticReadinessResult> {
+    return raceReadiness(this.manager.waitUntilWorkspaceReady(), options.timeoutMs);
+  }
+
+  getProjectServers(): ProjectServerInfo[] {
+    return this.#router.getProjectServers();
+  }
+
+  /** Check whether the file can be served semantically for explicit LSP operations. */
+  isSupportedSourceFile(filePath: string): boolean {
+    return this.#router.canServeFile(this.resolveFilePath(filePath));
+  }
+
+  /** Track a file in its routed client without exposing that client. */
+  async trackFile(filePath: string): Promise<boolean> {
+    return this.#clients.trackFile(this.resolveFilePath(filePath));
+  }
+
+  /** Stop tracking a file and clear its cached diagnostics. */
+  closeFile(filePath: string): void {
+    this.#clients.closeFile(this.resolveFilePath(filePath));
+  }
+
+  /** Remove missing files from runtime tracking. */
+  pruneMissingFiles(): readonly string[] {
+    return this.#clients.pruneMissingFiles();
+  }
+
+  /** Notify routed clients of workspace file changes and reset pull state. */
+  noteWorkspaceChanges(changes: FileEvent[]): void {
+    this.#clients.noteWorkspaceChanges(changes);
+  }
+
+  async #shutdown(): Promise<void> {
+    await this.#clients.shutdownAll();
+  }
+
+  // ── Diagnostics and recovery ────────────────────────────────────────
+
+  /** Sync a file through LSP and return diagnostics up to the supplied severity threshold. */
+  async fileDiagnostics(filePath: string, maxSeverity: number = 4): Promise<Diagnostic[] | null> {
+    const resolvedPath = this.resolveFilePath(filePath);
+    if (!this.#router.canServeFile(resolvedPath)) return null;
+    return this.#diagnostics.syncFile(resolvedPath, maxSeverity);
+  }
+
+  /** Sync a file and include diagnostics cascading into other tracked files. */
+  async fileDiagnosticsWithCascade(
+    filePath: string,
+    maxSeverity: number = 4,
+  ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>> {
+    return this.#diagnostics.syncFileWithCascade(this.resolveFilePath(filePath), maxSeverity);
+  }
+
+  /** Re-sync every open document and wait for diagnostics to settle. */
+  async refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void> {
+    await this.#clients.refreshOpenDiagnostics(options);
+  }
+
+  /** Get a lightweight workspace diagnostic summary for all tracked files. */
+  getWorkspaceDiagnosticSummary(): WorkspaceDiagnosticSummaryEntry[] {
+    return this.#diagnostics.getDiagnosticSummary();
+  }
+
+  /** Get outstanding diagnostics grouped by file at or above the supplied severity threshold. */
+  getOutstandingDiagnostics(
+    maxSeverity: number = 1,
+  ): Array<{ file: string; diagnostics: Diagnostic[] }> {
+    return this.#diagnostics.getOutstandingDiagnostics(maxSeverity);
+  }
+
+  /** Get outstanding diagnostic counts grouped by file. */
+  getOutstandingDiagnosticSummary(maxSeverity: number = 1): OutstandingDiagnosticSummaryEntry[] {
+    return this.#diagnostics.getOutstandingDiagnosticSummary(maxSeverity);
+  }
+
+  /** Trigger a workspace-wide diagnostics refresh and stale-state recovery pass. */
+  async recoverDiagnostics(options?: {
+    restartIfStillStale?: boolean;
+    maxWaitMs?: number;
+    quietMs?: number;
+  }): Promise<RecoverDiagnosticsResult> {
+    return this.#recovery.recover(options);
+  }
+
+  private resolveFilePath(filePath: string): string {
+    return resolveSessionPath(this.manager.getCwd(), filePath);
+  }
+}
+
+export function createWorkspaceLspRuntimeOwner(manager: LspManager) {
+  return DefaultWorkspaceLspRuntime.createOwner(manager);
+}
+
+const WAIT_INTERVAL_MS = 25;
+const DEFAULT_SEMANTIC_READY_TIMEOUT_MS = 15_000;
+const registry = createSessionStateRegistry<WorkspaceLspRuntimeState>("supi-lsp/session-registry");
+
+async function raceReadiness(
+  readiness: Promise<unknown>,
+  timeoutMs: number | undefined,
+): Promise<SemanticReadinessResult> {
+  const effectiveTimeoutMs = timeoutMs ?? DEFAULT_SEMANTIC_READY_TIMEOUT_MS;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    await Promise.race([
+      readiness,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("semantic-readiness-timeout")),
+          effectiveTimeoutMs,
+        );
+      }),
+    ]);
+    return { kind: "ready" };
+  } catch (error) {
+    if (timer) clearTimeout(timer);
+    if (error instanceof Error && error.message === "semantic-readiness-timeout") {
+      return { kind: "timeout" };
+    }
+    return {
+      kind: "unavailable",
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** Publish the LSP service state for a session cwd. */
+export function setWorkspaceLspRuntimeState(cwd: string, state: WorkspaceLspRuntimeState): void {
+  registry.set(cwd, state);
+}
+
+/** Acquire the LSP service state for a session cwd. */
+export function getWorkspaceLspRuntime(cwd: string): WorkspaceLspRuntimeState {
+  return (
+    registry.get(cwd) ?? {
+      kind: "unavailable",
+      reason: "No LSP session initialized for this workspace",
+    }
+  );
+}
+
+/** Wait briefly for a pending session-scoped LSP service to become ready. */
+export async function waitForWorkspaceLspRuntime(
+  cwd: string,
+  timeoutMs: number = 250,
+): Promise<WorkspaceLspRuntimeState> {
+  const deadline = Date.now() + Math.max(0, timeoutMs);
+  let state = getWorkspaceLspRuntime(cwd);
+
+  while (state.kind === "pending" && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, WAIT_INTERVAL_MS));
+    state = getWorkspaceLspRuntime(cwd);
+  }
+
+  return state;
+}
+
+/** Remove the LSP service state for a session cwd. */
+export function clearWorkspaceLspRuntime(cwd: string): void {
+  registry.clear(cwd);
+}

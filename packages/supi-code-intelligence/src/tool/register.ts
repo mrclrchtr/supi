@@ -11,7 +11,6 @@ import {
   type CodeIntelligenceToolPromptSurfaceMap,
 } from "./guidance.ts";
 import { renderHealthCall, renderHealthResult } from "./health/tui.ts";
-import { renderImpactCall, renderImpactResult } from "./impact/tui.ts";
 import { truncateToolContent } from "./infra/truncate.ts";
 import { renderInspectCall, renderInspectResult } from "./inspect/tui.ts";
 import { renderOrientationCall, renderOrientationResult } from "./orientation/tui.ts";
@@ -51,8 +50,6 @@ function getToolRenderer(name: string): ToolRenderer {
       return { renderCall: renderInspectCall, renderResult: renderInspectResult };
     case "code_find":
       return { renderCall: renderFindCall, renderResult: renderFindResult };
-    case "code_impact":
-      return { renderCall: renderImpactCall, renderResult: renderImpactResult };
     case "code_refactor_plan":
       return {
         renderCall: renderRefactorPlanCall,

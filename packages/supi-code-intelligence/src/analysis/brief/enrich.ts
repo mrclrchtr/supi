@@ -5,7 +5,7 @@
 // - enrichDiagnosticContext(cwd, file, maxResults) — LSP diagnostics
 // - gatherBriefEnrichment(provider, cwd, file, maxResults) — orchestrates both
 
-import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import { diagnosticMessageString } from "../../substrate/lsp/utils.ts";
 import type { CodeProvider } from "../provider.ts";
 import type { BriefDiagnostic, BriefEnrichment } from "./models.ts";
@@ -104,16 +104,16 @@ async function tryExports(
 export async function enrichDiagnosticContext(
   file: string | undefined,
   maxResults: number | undefined,
-  lspService: SessionLspServiceState,
+  lspRuntime: WorkspaceLspRuntimeState,
 ): Promise<Pick<BriefEnrichment, "diagnostics">> {
   if (!file) return { diagnostics: [] };
 
   const capN = cap(maxResults, DEFAULT_DIAGNOSTICS_CAP);
 
   try {
-    if (lspService.kind !== "ready") return { diagnostics: [] };
+    if (lspRuntime.kind !== "ready") return { diagnostics: [] };
 
-    const diags = await lspService.service.fileDiagnostics(file, 2);
+    const diags = await lspRuntime.runtime.fileDiagnostics(file, 2);
     if (!diags || diags.length === 0) return { diagnostics: [] };
 
     // Map to our DTO shape (1-based line for display)
@@ -138,7 +138,7 @@ export async function gatherBriefEnrichment(
   provider: CodeProvider | null,
   file: string,
   maxResults: number | undefined,
-  lspService: SessionLspServiceState,
+  lspRuntime: WorkspaceLspRuntimeState,
 ): Promise<BriefEnrichment> {
   // Structural context (outline, imports, exports) needs a provider
   const structural = provider
@@ -146,7 +146,7 @@ export async function gatherBriefEnrichment(
     : { outline: [], imports: [], exports: [] };
 
   // Diagnostics can work independently of provider (reaches LSP directly)
-  const diagnostic = await enrichDiagnosticContext(file, maxResults, lspService);
+  const diagnostic = await enrichDiagnosticContext(file, maxResults, lspRuntime);
 
   return {
     outline: structural.outline,

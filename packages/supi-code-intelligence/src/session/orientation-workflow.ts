@@ -1,0 +1,261 @@
+/** Session-owned Orientation workflow. */
+
+import { existsSync, statSync } from "node:fs";
+import { relative } from "node:path";
+import { buildArchitectureModel } from "../analysis/architecture/discovery.ts";
+import type { ArchitectureModel } from "../analysis/architecture/model.ts";
+import {
+  collectInstructionFiles,
+  findInstructionFilesForDirectory,
+} from "../analysis/instruction-files.ts";
+import { normalizePath } from "../analysis/search/ripgrep.ts";
+import { loadCodeIntelligenceConfig } from "../config.ts";
+import type { CapabilityAdapter } from "./capability-adapter.ts";
+import { parseOrientationWorkflowInput } from "./input/workflows.ts";
+import { executeOrientation } from "./orientation/collect.ts";
+import type {
+  OrientationBlock,
+  OrientationFocusInput,
+  OrientationResultData,
+  OrientationWorkflowInput,
+  OrientationWorkflowOutcome,
+} from "./orientation-types.ts";
+import type { TargetStoreEntry } from "./target-store.ts";
+import { resolveTargetWorkflow, type TargetWorkflowDeps } from "./target-workflow.ts";
+import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow-control.ts";
+
+export interface OrientationWorkflowDeps extends TargetWorkflowDeps {
+  readonly capability: CapabilityAdapter;
+  readonly nativeInstructionPaths: Set<string>;
+  readonly surfacedInstructionDirs: Set<string>;
+  readonly markInstructionDirsSurfaced: (directories: string[]) => void;
+  readonly showGitContext: boolean;
+}
+
+/** Resolve the Orientation focus and collect immutable facts for presentation adapters. */
+export async function runOrientationWorkflow(
+  input: OrientationWorkflowInput,
+  deps: OrientationWorkflowDeps,
+  control?: WorkflowControl,
+): Promise<OrientationWorkflowOutcome> {
+  const parsed = parseOrientationWorkflowInput(input);
+  if (parsed.kind === "invalid-input") return parsed;
+  const request = parsed.value;
+  throwIfAborted(control);
+  reportProgress(control, {
+    intent: "orientation",
+    phase: "model",
+    message: "Building workspace orientation model",
+  });
+  const model = await buildArchitectureModel(deps.cwd);
+  const provider = deps.capability.getProvider(deps.cwd);
+  const lspRuntime = deps.capability.getLspRuntimeState(deps.cwd);
+  const maxResults = request.maxResults ?? 10;
+
+  if (!request.focus) {
+    const result = await executeOrientation(
+      { maxResults, showGitContext: deps.showGitContext },
+      { model, provider, lspRuntime, cwd: deps.cwd },
+    );
+    return { kind: "completed", data: result };
+  }
+
+  if ("target" in request.focus) {
+    return orientTarget({ targetInput: request.focus.target, maxResults, model, deps, control });
+  }
+
+  const focus = resolveContextFocus(request.focus, deps.cwd, model);
+  if (focus.kind === "invalid-input") return focus;
+  const result = await executeOrientation(
+    {
+      focus: focus.path,
+      maxResults,
+      showGitContext: deps.showGitContext,
+    },
+    { model, provider, lspRuntime, cwd: deps.cwd },
+  );
+  const withInstructions = addInstructionFiles(result, focus.path, deps);
+  return { kind: "completed", data: withInstructions };
+}
+
+async function orientTarget(options: {
+  targetInput: Extract<OrientationFocusInput, { target: unknown }>["target"];
+  maxResults: number;
+  model: ArchitectureModel | null;
+  deps: OrientationWorkflowDeps;
+  control?: WorkflowControl;
+}): Promise<OrientationWorkflowOutcome> {
+  const { targetInput, maxResults, model, deps, control } = options;
+  reportProgress(control, {
+    intent: "orientation",
+    phase: "target",
+    message: "Resolving precise Orientation target",
+  });
+  const target = await resolveTargetWorkflow(
+    targetInput,
+    {
+      fileLevelAllowed: false,
+      nameAnchorRequired: false,
+      waitForSemantic: true,
+      maxResults,
+    },
+    deps,
+  );
+  if (target.kind === "disambiguation") {
+    return {
+      kind: "disambiguation",
+      omittedCount: target.omittedCount,
+      candidates: target.candidates.map((candidate) => ({
+        targetId: candidate.targetId,
+        name: candidate.name,
+        kind: candidate.kind,
+        container: candidate.container,
+        file: candidate.file,
+        line: candidate.line,
+        character: candidate.character,
+        rank: candidate.rank,
+      })),
+    };
+  }
+  if (target.kind !== "resolved") return target;
+  throwIfAborted(control);
+
+  const entry = target.entry;
+  const result = await executeOrientation(
+    {
+      target: {
+        file: entry.file,
+        line: entry.displayLine,
+        character: entry.displayCharacter,
+        name: entry.name,
+        kind: entry.kind,
+        anchorKind: entry.anchorKind,
+      },
+      maxResults,
+      showGitContext: false,
+    },
+    {
+      model,
+      provider: deps.capability.getProvider(deps.cwd),
+      lspRuntime: deps.capability.getLspRuntimeState(deps.cwd),
+      cwd: deps.cwd,
+    },
+  );
+  return {
+    kind: "completed",
+    data: addTargetSummary(result, entry, target.notes, deps.cwd),
+  };
+}
+
+function resolveContextFocus(
+  focus: Exclude<OrientationFocusInput, { target: unknown }>,
+  cwd: string,
+  model: ArchitectureModel | null,
+): { kind: "resolved"; path: string } | { kind: "invalid-input"; message: string } {
+  if ("path" in focus) {
+    const path = normalizePath(focus.path, cwd);
+    return existsSync(path)
+      ? { kind: "resolved", path }
+      : { kind: "invalid-input", message: `Focus path not found: \`${focus.path}\`.` };
+  }
+
+  const matches =
+    model?.modules.filter(
+      (module) =>
+        module.name === focus.module || module.name.replace(/^@[^/]+\//, "") === focus.module,
+    ) ?? [];
+  if (matches.length === 1) return { kind: "resolved", path: matches[0].root };
+  if (matches.length > 1) {
+    return {
+      kind: "invalid-input",
+      message: `Module focus is ambiguous: ${matches.map((module) => module.name).join(", ")}.`,
+    };
+  }
+  return { kind: "invalid-input", message: `Module focus not found: \`${focus.module}\`.` };
+}
+
+function addInstructionFiles(
+  result: Awaited<ReturnType<typeof executeOrientation>>,
+  focusPath: string,
+  deps: OrientationWorkflowDeps,
+): Awaited<ReturnType<typeof executeOrientation>> {
+  if (!isDirectory(focusPath)) return result;
+  const config = loadCodeIntelligenceConfig(deps.cwd);
+  const matches = findInstructionFilesForDirectory({
+    directory: focusPath,
+    cwd: deps.cwd,
+    fileNames: config.instructionFileNames,
+    nativeContextPaths: deps.nativeInstructionPaths,
+    surfacedDirectories: deps.surfacedInstructionDirs,
+  });
+  const collected = collectInstructionFiles(matches);
+  if (!collected) return result;
+  deps.markInstructionDirsSurfaced(collected.metadata.files.map((file) => file.directory));
+  return {
+    ...result,
+    blocks: insertInstructionBlocks(result.blocks, collected.files),
+    renderedSections: ["instructions", ...result.renderedSections],
+    instructions: collected.metadata,
+  };
+}
+
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function addTargetSummary(
+  result: OrientationResultData,
+  entry: Readonly<TargetStoreEntry>,
+  notes: readonly string[],
+  cwd: string,
+): OrientationResultData {
+  const name = entry.name ? ` ${entry.name}` : "";
+  const summary: OrientationBlock[] = [
+    ...notes.map((note): OrientationBlock => ({ kind: "paragraph", text: `Note: ${note}` })),
+    {
+      kind: "paragraph",
+      text: `Resolved target${name}: ${relative(cwd, entry.file) || entry.file}:${entry.displayLine}:${entry.displayCharacter} — Target ID: ${entry.targetId}`,
+    },
+    { kind: "blank" },
+  ];
+  return { ...result, blocks: [...summary, ...result.blocks], target: { ...entry } };
+}
+
+function insertInstructionBlocks(
+  existing: readonly OrientationBlock[],
+  files: readonly {
+    path: string;
+    content: string;
+    truncated: boolean;
+    shownLines: number;
+    totalLines: number;
+  }[],
+): OrientationBlock[] {
+  const blocks: OrientationBlock[] = [
+    { kind: "heading", level: 2, text: "Instructions" },
+    { kind: "blank" },
+  ];
+  for (const file of files) {
+    blocks.push(
+      { kind: "heading", level: 3, text: file.path },
+      { kind: "code", language: null, lines: file.content.split("\n") },
+    );
+    if (file.truncated) {
+      blocks.push({
+        kind: "paragraph",
+        text: `Instruction file truncated to ${file.shownLines} of ${file.totalLines} lines. Read ${file.path} for the full file.`,
+      });
+    }
+    blocks.push({ kind: "blank" });
+  }
+
+  const insertion = existing.findIndex(
+    (block, index) => index > 0 && block.kind === "heading" && block.level === 2,
+  );
+  if (insertion < 0) return [...existing, ...blocks];
+  return [...existing.slice(0, insertion), ...blocks, ...existing.slice(insertion)];
+}

@@ -11,7 +11,6 @@ import type {
   CodeIntelResult,
   ContextDetails,
   HealthDetails,
-  ImpactDetails,
   InspectDetails,
   ResolveDetails,
   SearchDetails,
@@ -100,25 +99,6 @@ export function inspectErrorResult(
   };
 }
 
-/** Full error result for code_impact. */
-export function impactErrorResult(
-  content: string,
-  opts?: { nextQueries?: string[] },
-): CodeIntelResult {
-  const data: ImpactDetails = {
-    confidence: "unavailable",
-    directCount: 0,
-    downstreamCount: 0,
-    riskLevel: "low",
-    checkNext: [],
-    likelyTests: [],
-    likelyTestCommands: [],
-    omittedCount: 0,
-    nextQueries: opts?.nextQueries ?? [],
-  };
-  return { content, details: { type: "impact" as const, data } };
-}
-
 /** Full error result for code_health. */
 export function healthErrorResult(content: string, reason?: string): CodeIntelResult {
   return {
@@ -175,16 +155,6 @@ export function unavailableInspectDetails(
   return inspectErrorResult("", { focusTarget, nextQueries }).details as {
     type: "inspect";
     data: InspectDetails;
-  };
-}
-
-export function unavailableImpactDetails(nextQueries: string[]): {
-  type: "impact";
-  data: ImpactDetails;
-} {
-  return impactErrorResult("", { nextQueries }).details as {
-    type: "impact";
-    data: ImpactDetails;
   };
 }
 

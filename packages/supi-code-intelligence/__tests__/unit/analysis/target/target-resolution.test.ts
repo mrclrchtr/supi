@@ -5,18 +5,6 @@ import { describe, expect, it, vi } from "vitest";
 import { normalizePath } from "../../../../src/analysis/search/ripgrep.ts";
 import { resolveSymbolTarget } from "../../../../src/analysis/target/symbol.ts";
 
-const mockLspFns = vi.hoisted(() => ({
-  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
-}));
-
-vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
-  return {
-    ...actual,
-    getSessionLspService: mockLspFns.getSessionLspService,
-  };
-});
-
 describe("normalizePath", () => {
   it("resolves relative path against cwd", () => {
     const result = normalizePath("src/index.ts", "/project");
@@ -50,11 +38,6 @@ describe("toLspPosition (formerly toZeroBased)", () => {
 
 describe("resolveSymbolTarget", () => {
   it("returns an explicit error when semantic symbol discovery is unavailable", async () => {
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "unavailable",
-      reason: "No LSP session initialized for this workspace",
-    });
-
     const result = await resolveSymbolTarget("Widget", "/project", {
       workspaceSymbols: vi.fn().mockResolvedValue(null),
     } as unknown as SemanticSubstrate);
@@ -66,30 +49,6 @@ describe("resolveSymbolTarget", () => {
   });
 
   it("returns disambiguation from semantic workspace symbols without text-search fallback", async () => {
-    mockLspFns.getSessionLspService.mockReturnValue({
-      kind: "ready",
-      service: {
-        workspaceSymbol: vi.fn().mockResolvedValue([
-          {
-            name: "Widget",
-            kind: 5,
-            location: {
-              uri: "file:///project/src/a.ts",
-              range: { start: { line: 1, character: 2 }, end: { line: 1, character: 8 } },
-            },
-          },
-          {
-            name: "Widget",
-            kind: 5,
-            location: {
-              uri: "file:///project/src/b.ts",
-              range: { start: { line: 4, character: 1 }, end: { line: 4, character: 7 } },
-            },
-          },
-        ]),
-      },
-    });
-
     const result = await resolveSymbolTarget("Widget", "/project", {
       workspaceSymbols: vi.fn().mockResolvedValue([
         {

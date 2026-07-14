@@ -1,82 +1,82 @@
 # @mrclrchtr/supi-code-intelligence
 
-Architecture briefs, factual inspection, reference tracing, call analysis, impact assessment, search, and semantic refactoring for pi. Registers all `code_*` tools.
+Code understanding, navigation, search, health, and semantic refactoring for PI. Registers exactly eight public `code_*` tools.
 
-Surfaces: `./extension` (tool registration), `./api` (reusable type contracts). Reads capability state from `@mrclrchtr/supi-code-runtime` — does not own a session-scoped cache.
+Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts). Reads capability state from `@mrclrchtr/supi-code-runtime` and attaches the workspace LSP runtime; it does not expose providers, clients, or managers through workflow outcomes.
 
-## Source layering
+## Source modules
 
-Use `code_orientation` for detailed file layout. Key domains:
+| Module | Directory | Role |
+|---|---|---|
+| Entry | `src/extension.ts`, `src/app/` | PI wiring, composition, session lifecycle |
+| Public tools | `src/tool/<tool>/` | Thin executors and presentation adapters |
+| Tool metadata | `src/tool/specs.ts`, `schemas.ts`, `guidance.ts` | Canonical eight-tool surface |
+| Result assembly | `src/tool/result/` | Sections, evidence lists, totals, provenance, actions, details |
+| Workflows | `src/session/` | Workspace session, typed outcomes, target handles, refactor plans |
+| Analysis | `src/analysis/` | PI-free evidence collection and refactor safety |
+| Substrates | `src/substrate/` | LSP and Tree-sitter lifecycle adapters |
+| Shared UI | `src/ui/` | Status, footer, and shared TUI/markdown helpers |
 
-| Layer | Directory | Role |
-|-------|-----------|------|
-| Entry | `src/extension.ts`, `src/app/` | Pi event wiring, composition, session lifecycle |
-| Public surface | `src/tool/<tool>/` | Each `code_*` tool with colocated TUI renderers |
-| Analysis | `src/analysis/` | Pi-free logic — targets, briefs, references, search, tests, coverage, refactor safety |
-| Substrates | `src/substrate/lsp/`, `src/substrate/tree-sitter/` | Adapter lifecycle only — no analysis logic |
-| Session | `src/session/` | In-memory target/span handles and refactor plans |
-| Shared UI | `src/ui/` | TUI helpers, markdown, status overlay, footer |
+## Public tool gotchas
 
-## Tool gotchas (non-obvious per tool)
+- **`code_orientation`**: omitted `focus` means workspace. Otherwise use exactly one of `focus.path`, `focus.module`, or `focus.target`. Directory focus surfaces configured instruction files once per session branch.
+- **`code_inspect`**: requires `point: { file, line, character }`; it reports local facts and throws when every inspection substrate is unavailable.
+- **`code_graph`**: accepts exactly one target handle/anchor/symbol. Relations are only `references`, structural `callees`, and `implements`; `all` means exactly those three. Callees are source-shape calls, not symbol identity.
+- **`code_find`**: AST `call` matches by written name. Modes never silently fall back. Scope is always an explicit non-empty string array.
+- **`code_resolve`**: anchored resolution requires a real symbol. Whitespace/comment coordinates fail and recommend `code_inspect`. Handle identity excludes position and includes the file fingerprint.
+- **`code_refactor_plan`**: target is exactly one handle or anchor; operation is exactly one nested `rename_symbol`, `extract_function`, or `extract_variable` payload. No `rename` alias.
+- **`code_refactor_apply`**: revalidates SHA-256 fingerprints and edit safety. It acquires sorted per-file mutation queues and preserves cross-file rollback.
+- **`code_health`**: coverage and unused-report paths are locators only; a miss means unavailable at that path, not global absence.
 
-- **`code_orientation`**: `focus` + `line` + `character` resolves real symbol targets (same path as `code_resolve`); `targetId` takes precedence. Directory focus surfaces `CLAUDE.md`/`AGENTS.md`.
-- **`code_graph`**: `callees` matches call-site identifiers by source shape, not symbol identity. File-level expansion not supported — requires precise target. `code_graph` and `code_impact` share `src/analysis/tests/test-discovery.ts`; any divergence is a bug.
-- **`code_impact`**: `changeSetFiles` is not inferred from git. `change`-only requests return insufficient-evidence. `includeTests` emits `likelyTestCommands` only when Vitest is detected.
-- **`code_find`**: AST `call` mode matches by name, not symbol identity — use `code_graph` references for identity-aware callers. Unsupported mode/kind combos fail explicitly.
-- **`code_resolve`**: Anchored resolution requires a real symbol target (exact identifier hit or unambiguous declaration header). Whitespace/comment coords error and recommend `code_inspect`. Target IDs are content-hash based (position excluded) — stable across reloads.
-- **`code_refactor_plan`**: Throws for `unavailable` (provider can't produce precise edits). Returns `ambiguous` result for multi-target matches. Uses LSP code actions; no heuristic text fallback.
-- **`code_refactor_apply`**: Revalidates SHA-256 fingerprints before apply. Acquires `withFileMutationQueue` per ADR 0006. Text-edit-only — no file/resource operations.
+`code_impact` and old flat input shapes are removed, not aliased.
+
+## Workspace session and result assembly
+
+`WorkspaceCodeIntelligenceSession` owns target resolution, readiness, provider selection, workflow coordination, target/plan state, cancellation/progress, and overview/instruction deduplication. Workflows return immutable typed outcomes.
+
+`src/tool/result/assembly.ts` is the sole shared result-policy module. Markdown and TUI consume assembled facts independently. Do not collect evidence in renderers or parse markdown in TUI code.
+
+Whole-workflow capability unavailable → throw from `execute()` so PI marks a real tool failure. Invalid usage → return error text so the model can self-correct. Zero matches are successful results.
+
+## Tool adapter contract
+
+- `src/tool/register.ts` truncates content at PI defaults (2000 lines / 50 KB); details remain structured and untruncated. Full content spills to a temporary file.
+- Forward `signal` and `onUpdate` through `toWorkflowControl()`.
+- PI schema validation is not enough: workflow validation must protect direct callers.
+- Exact-one schemas use closed one-key objects rather than TypeBox unions/literals for model-provider compatibility.
+
+## Target resolution
+
+- Target selectors are nested; there is no input precedence.
+- Anchored resolution and symbol resolution converge in `src/session/target-workflow.ts` and `target-store.ts`.
+- Position-strict consumers require a name anchor (ADR 0003).
+- Unknown or stale handles fail explicitly; no fallback to another selector.
+
+## Provider/runtime contract
+
+`WorkspaceCapabilityAdapter` reads `supi-code-runtime` capability state and the `WorkspaceLspRuntime`. `TestCapabilityAdapter` is the in-memory workflow-test seam. When provider contracts change, update the composite provider and behavior tests together.
 
 ## Always-on LSP policy
 
-- `lsp.enabled` / `lsp.active` are deprecated and ignored. LSP always attempts to start detected servers.
-- Per-language disable: `lsp.servers.<language>.enabled: false` only.
-- Deprecated keys surface via `supi-ci-status` overlay, `code_health`, and a one-time chat message (5s grace).
+- `lsp.enabled` and `lsp.active` are deprecated and ignored.
+- Per-language opt-out is `lsp.servers.<language>.enabled: false`.
+- Deprecated keys surface through `/supi-ci-status`, `code_health`, and a one-time message after the grace period.
+
+## Refactor safety
+
+Planning and application remain separate (ADR 0002). `validateEditAgainstFiles()` rejects invalid/overlapping edits. Application holds sorted file queues while rereading, validating, transforming, and committing. If a later write fails, earlier writes are rolled back.
+
+## First-turn overview
+
+The hidden architecture overview is claimed atomically through session behavior and injected with `display: false`. Reload/resume reconstruction scans for the existing `code-intelligence-overview` custom message. Do not expose session state fields to app wiring.
 
 ## TUI rendering
 
-- Per-tool `renderCall`/`renderResult` colocated under `src/tool/<tool>/tui.ts`. Dual-surface: TUI body from `details`, markdown `content` as collapsible detail.
-- **`renderShell: "self"` strips pi's Box entirely.** Avoid unless the tool needs full-screen control.
+Per-tool `renderCall`/`renderResult` live under `src/tool/<tool>/tui.ts`. `renderShell: "self"` strips PI's Box entirely; avoid it unless full-screen control is required.
 
-## Key gotchas
+## Verification
 
-### Planner routing & error policy
-- Central router in `planner.ts` returns `PlannerRoute` per intent. `unavailable` → **throw** from `execute()` (pi marks `isError: true`). Invalid usage (bad scope, stale targetId, malformed range) → return error text so model can retry. Partial unavailability → best-effort notes, no throw.
-- `code_refactor_plan` checks `refactorAvailable`; warmup timeouts are transient readiness, not capability-unavailable.
-
-### Tool adapter contract
-- `tool/register.ts` head-truncates content at pi defaults (2000 lines / 50 KB); `details` never truncated. `spillToTempFile: true` writes full content on truncation.
-- `signal` (AbortSignal) and `onUpdate` forwarded to every executor. Long-running executors forward to sub-processes.
-
-### Param validation
-- `code_inspect`, `code_graph`, `code_refactor_plan`: `line`/`character` require `file`, not `scope`.
-- `code_orientation`: `line`/`character` require `focus`. `targetId` takes precedence; stale/invalid `targetId` errors without fallback.
-- `code_graph` requires `targetId`, anchored coords, or `symbol` — no file-only expansion.
-- `code_impact`: `targetId` is the only public target selector.
-- Extract operations require 1-based `range` + `newName`; coordinates converted to LSP ranges internally.
-
-### Target resolution and handles
-- `code_resolve` and `code_orientation` coordinate mode share the same `resolveAnchoredSymbolTarget` → `target-store.ts` path. Never produces anonymous `name:null` point targets (ADR 0003).
-- Target IDs (`tg-*`) deterministic while file fingerprint unchanged; position excluded from hash. No cross-session persistence. Unknown/stale IDs return explicit unavailable — no silent fallthrough.
-
-### Composite provider contract
-- `createCompositeProvider` in `src/analysis/provider.ts` wraps `StructuralProvider` + `SemanticProvider`. When provider contracts change, update the wrapper method list and `provider-compatibility.test.ts`.
-
-### Test discovery
-- `src/analysis/tests/test-discovery.ts` is single source of truth. `code_graph` and `code_impact` share it — any divergent lookup is a bug.
-- Provenance: `"semantic+conventions"` (semantic references contributed) or `"conventions-only"`. Describes file discovery only, not label extraction.
-- `conventions-only` + zero files → `unavailable` only when no semantic/structural support exists; otherwise honest empty result. Zero recognized test blocks → `_(no recognized test blocks)_` placeholder.
-
-### Impact seeding & evidence
-- Target-based `code_impact` seeds the target file itself as affected (zero references still reports own file).
-- `changeSetFiles` impact appends evidence note: `semantic+structural` when semantic refs contributed, otherwise `structural`.
-
-### Refactor safety
-- `validateEdit()` rejects empty edits and invalid ranges. Plans revalidate SHA-256 fingerprints + ranges before apply. `withFileMutationQueue` per ADR 0006; cross-file rollback preserved.
-- No heuristic text fallback for refactors.
-
-### First-turn overview
-- Injected via `before_agent_start` with `display: false` (agent-visible, TUI-invisible). Deduplicated by `hasInjectedOverview`. Reload/resume scans for existing `code-intelligence-overview` custom message.
+Use focused TypeScript/Vitest commands while iterating, then run `pnpm verify:ai`.
 
 ## License
 

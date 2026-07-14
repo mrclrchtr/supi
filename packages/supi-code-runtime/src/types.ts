@@ -143,11 +143,8 @@ export interface WorkspaceEdit {
 
 /**
  * Supported refactor operation names for the current semantic planning path.
- *
- * `rename` is kept as a legacy alias for the public rename-only surface.
  */
 export type RefactorOperation =
-  | "rename"
   | "rename_symbol"
   | "extract_function"
   | "extract_variable"
@@ -155,13 +152,6 @@ export type RefactorOperation =
   | "move_file"
   | "update_imports"
   | "delete_dead_code";
-
-/** Normalize legacy refactor aliases to their canonical operation names. */
-export function normalizeRefactorOperation(
-  operation: RefactorOperation,
-): Exclude<RefactorOperation, "rename"> {
-  return operation === "rename" ? "rename_symbol" : operation;
-}
 
 /**
  * Operation-aware refactor planning request.

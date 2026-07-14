@@ -38,18 +38,18 @@ export type {
   LspStartResult,
 } from "./session/runtime-controller.ts";
 export { LspRuntimeController } from "./session/runtime-controller.ts";
-export { scanMissingServers } from "./session/scanner.ts";
 export type {
   OutstandingDiagnosticSummaryEntry,
   RecoverDiagnosticsResult,
   SemanticReadinessResult,
-  SessionLspServiceState,
   WorkspaceDiagnosticSummaryEntry,
-} from "./session/service-registry.ts";
+  WorkspaceLspRuntime,
+  WorkspaceLspRuntimeState,
+} from "./session/runtime-registry.ts";
 export {
-  clearSessionLspService,
-  getSessionLspService,
-  SessionLspService,
-  setSessionLspServiceState,
-  waitForSessionLspService,
-} from "./session/service-registry.ts";
+  clearWorkspaceLspRuntime,
+  getWorkspaceLspRuntime,
+  setWorkspaceLspRuntimeState,
+  waitForWorkspaceLspRuntime,
+} from "./session/runtime-registry.ts";
+export { scanMissingServers } from "./session/scanner.ts";

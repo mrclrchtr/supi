@@ -10,19 +10,19 @@ describe("client-pool", () => {
     } as unknown as LspManager;
 
     const pool = createClientPool(manager);
-    expect(typeof pool.ensureFileOpen).toBe("function");
+    expect(typeof pool.trackFile).toBe("function");
     expect(typeof pool.shutdownAll).toBe("function");
   });
 
-  it("delegates ensureFileOpen to the manager", async () => {
+  it("tracks a file without exposing the routed client", async () => {
     const manager = {
       ensureFileOpen: vi.fn().mockResolvedValue({}),
       shutdownAll: vi.fn().mockResolvedValue(undefined),
     } as unknown as LspManager;
 
     const pool = createClientPool(manager);
-    const result = await pool.ensureFileOpen("/test/file.ts");
+    const result = await pool.trackFile("/test/file.ts");
     expect(manager.ensureFileOpen).toHaveBeenCalledWith("/test/file.ts");
-    expect(result).toEqual({});
+    expect(result).toBe(true);
   });
 });

@@ -1,26 +1,17 @@
-/**
- * Tool executor for code_health.
- *
- * Thin executor: validates scope, extracts provider state from the
- * session, and delegates to the health use-case which handles data
- * collection, rendering, and details construction.
- */
+/** Thin Pi adapter for the session-owned code_health workflow. */
 
-import { resolveScope } from "../../analysis/search/ripgrep.ts";
+import { buildHealthEvidenceLists } from "../../analysis/health/recovery.ts";
+import type { HealthSection, HealthWorkflowInput } from "../../session/health-types.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { unavailableHealthDetails } from "../infra/error-results.ts";
-import { emitToolProgress } from "../infra/progress.ts";
-import {
-  executeHealth,
-  getLastHealthRefresh,
-  type HealthInput,
-  trackHealthRefresh,
-} from "./orchestrate.ts";
+import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { assembleHealthResult } from "../result/health.ts";
+import { renderHealthResult } from "./markdown.ts";
 
 export interface CodeHealthToolParams {
   scope?: string;
   refresh?: boolean;
-  include?: string[];
+  include?: HealthSection[];
   level?: "summary" | "detailed";
   coveragePath?: string;
   unusedPath?: string;
@@ -30,47 +21,21 @@ export async function executeHealthTool(
   params: CodeHealthToolParams,
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
-  const cwd = ctx.cwd;
-  emitToolProgress(ctx.onUpdate, "code_health: gathering workspace health...");
-
-  const scopeResolution = resolveScope(params.scope, cwd);
-  if (scopeResolution.kind === "error") {
+  const outcome = await ctx.session.health(params as HealthWorkflowInput, toWorkflowControl(ctx));
+  if (outcome.kind === "unavailable") throw new Error(outcome.reason);
+  if (outcome.kind === "invalid-input") {
     return {
-      content: `**Error:** ${scopeResolution.reason}`,
-      details: unavailableHealthDetails("scope not found"),
+      content: `**Error:** ${outcome.message}`,
+      details: unavailableHealthDetails("invalid input"),
     };
   }
-  const scopeFilter = scopeResolution.path === cwd ? null : scopeResolution.path;
 
-  if (params.refresh) {
-    trackHealthRefresh(cwd);
-  }
-
-  const providerState = ctx.session.getProviders();
-  const workspaceState = ctx.session.getWorkspaceState();
-  const lspState =
-    providerState.kind === "ready"
-      ? providerState.lspService
-      : { kind: "unavailable" as const, reason: "No provider" };
-
-  const input: HealthInput = {
-    scope: params.scope,
-    refresh: params.refresh,
-    include: params.include,
-    level: params.level,
-    coveragePath: params.coveragePath,
-    unusedPath: params.unusedPath,
+  const assembly = assembleHealthResult(
+    outcome.data,
+    buildHealthEvidenceLists(outcome.data.gitContext, outcome.data.codeActions),
+  );
+  return {
+    content: renderHealthResult(assembly, ctx.cwd),
+    details: { type: "health", data: assembly.details },
   };
-
-  return executeHealth(input, {
-    cwd,
-    lspState,
-    providerAvailable: providerState.kind === "ready",
-    semanticStateKind: workspaceState.semantic.state.kind,
-    structuralState: workspaceState.structural.state,
-    lspController: ctx.session.lspController,
-    onUpdate: ctx.onUpdate,
-    scopeFilter,
-    lastRefresh: getLastHealthRefresh(cwd),
-  });
 }

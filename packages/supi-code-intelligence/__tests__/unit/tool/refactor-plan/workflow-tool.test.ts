@@ -63,7 +63,16 @@ function createSemanticProvider(
   return {
     references: async () => null,
     implementation: async () => null,
-    documentSymbols: async () => [],
+    documentSymbols: async (file) => [
+      {
+        name: "oldName",
+        kind: "Function",
+        file,
+        declarationAnchor: { line: 1, character: 1 },
+        nameAnchor: { line: 1, character: 1 },
+        container: null,
+      },
+    ],
     workspaceSymbols: async () => [],
     rename: overrides.rename,
     ...(overrides.refactor ? { refactor: overrides.refactor } : {}),
@@ -98,11 +107,8 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const result = (await tool.execute(
       "workflow-refactor-1",
       {
-        operation: "rename_symbol",
-        file: "src/index.ts",
-        line: 1,
-        character: 1,
-        newName: "newName",
+        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+        operation: { rename_symbol: { newName: "newName" } },
       },
       undefined,
       undefined,
@@ -150,10 +156,13 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const result = (await tool.execute(
       "workflow-refactor-extract-function",
       {
-        operation: "extract_function",
-        file: "src/index.ts",
-        range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
-        newName: "computeValue",
+        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+        operation: {
+          extract_function: {
+            range: { start: { line: 1, character: 15 }, end: { line: 1, character: 20 } },
+            newName: "computeValue",
+          },
+        },
       },
       undefined,
       undefined,
@@ -192,11 +201,8 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const result = (await tool.execute(
       "workflow-refactor-truncated-preview",
       {
-        operation: "rename_symbol",
-        file: "src/index.ts",
-        line: 1,
-        character: 1,
-        newName: "newName",
+        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+        operation: { rename_symbol: { newName: "newName" } },
       },
       undefined,
       undefined,
@@ -230,7 +236,7 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     });
   });
 
-  it("accepts the legacy rename alias on code_refactor_plan and canonicalizes it", async () => {
+  it("accepts the canonical rename_symbol operation", async () => {
     const { projectDir, file } = createProjectFile();
     getDefaultWorkspaceRuntime().registerSemantic(
       projectDir,
@@ -255,13 +261,10 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const tool = getTool(pi, "code_refactor_plan");
 
     const result = (await tool.execute(
-      "workflow-refactor-rename-alias",
+      "workflow-refactor-rename-symbol",
       {
-        operation: "rename",
-        file: "src/index.ts",
-        line: 1,
-        character: 1,
-        newName: "newName",
+        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+        operation: { rename_symbol: { newName: "newName" } },
       },
       undefined,
       undefined,
@@ -300,11 +303,8 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const planResult = (await refactorTool.execute(
       "workflow-refactor-2",
       {
-        operation: "rename_symbol",
-        file: "src/index.ts",
-        line: 1,
-        character: 1,
-        newName: "newName",
+        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+        operation: { rename_symbol: { newName: "newName" } },
       },
       undefined,
       undefined,
@@ -349,11 +349,8 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
 
     const planResult = await executeRefactorPlanTool(
       {
-        operation: "rename",
-        file: "src/index.ts",
-        line: 1,
-        character: 1,
-        newName: "newName",
+        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+        operation: { rename_symbol: { newName: "newName" } },
       },
       { cwd: projectDir, session: sessionCache.getOrCreate(projectDir) },
     );
@@ -398,11 +395,8 @@ describe("code_refactor_plan / code_refactor_apply workflow wrappers", () => {
     const planResult = (await refactorTool.execute(
       "workflow-cross-compat-3",
       {
-        operation: "rename_symbol",
-        file: "src/index.ts",
-        line: 1,
-        character: 1,
-        newName: "newName",
+        target: { anchor: { file: "src/index.ts", line: 1, character: 1 } },
+        operation: { rename_symbol: { newName: "newName" } },
       },
       undefined,
       undefined,

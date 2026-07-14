@@ -5,11 +5,13 @@
  * readable markdown sections keyed by requested `include` values.
  */
 
+import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
 import { formatGitContext } from "../../analysis/signals/git.ts";
-import type { HealthData, HealthResultAssembly } from "../result/health.ts";
+import type { HealthCodeActions, HealthData, HealthResultAssembly } from "../result/health.ts";
 
 export type {
   CodeActionSuggestion,
+  HealthCodeActions,
   HealthCoverageData,
   HealthData,
   HealthSection,
@@ -122,26 +124,53 @@ function renderDiagnosticDetails(lines: string[], data: HealthData, cwd: string)
 }
 
 function renderCodeActionsSection(lines: string[], data: HealthData, cwd: string): void {
-  if (!data.codeActions || data.codeActions.length === 0) return;
+  const codeActions = data.codeActions;
+  if (!codeActions) return;
+  const disclosure = renderEvidenceListMetadataDisclosure(codeActions.evidence);
+  if (codeActions.items.length === 0 && !disclosure) return;
 
   if (data.level === "summary") {
-    const count = data.codeActions.length;
-    lines.push(
-      `_${count} suggested fix${count !== 1 ? "es" : ""} available. Use \`level: "detailed"\` to see them._`,
-    );
+    renderCodeActionsSummary(lines, codeActions, disclosure);
     return;
   }
+  renderDetailedCodeActions(lines, codeActions, cwd, disclosure);
+}
 
+function renderCodeActionsSummary(
+  lines: string[],
+  codeActions: HealthCodeActions,
+  disclosure: string | null,
+): void {
+  const count = codeActions.items.length;
+  const summary =
+    count > 0
+      ? `${count} suggested fix${count !== 1 ? "es" : ""} available. Use \`level: "detailed"\` to see them.`
+      : "No suggested fixes were collected.";
+  lines.push(`_${summary}_`);
+  if (disclosure) lines.push(disclosure);
+}
+
+function renderDetailedCodeActions(
+  lines: string[],
+  codeActions: HealthCodeActions,
+  cwd: string,
+  disclosure: string | null,
+): void {
   lines.push("");
   lines.push("### Code Actions");
   lines.push("");
-  lines.push("Available fixes (suggestions only — not applied):");
-  lines.push("");
-  for (const action of data.codeActions) {
-    const relPath = makeRelative(cwd, action.file);
-    const kindLabel = action.kind ? ` (${action.kind})` : "";
-    lines.push(`- \`${relPath}:${action.line}\` — "${action.title}"${kindLabel}`);
+  if (codeActions.items.length === 0) {
+    lines.push("No code-action suggestions were collected.");
+  } else {
+    lines.push("Available fixes (suggestions only — not applied):");
+    lines.push("");
+    for (const action of codeActions.items) {
+      const relPath = makeRelative(cwd, action.file);
+      const kindLabel = action.kind ? ` (${action.kind})` : "";
+      lines.push(`- \`${relPath}:${action.line}\` — "${action.title}"${kindLabel}`);
+    }
   }
+  if (disclosure) lines.push(disclosure);
 }
 
 function renderCoverageSection(lines: string[], data: HealthData, cwd: string): void {
@@ -149,7 +178,9 @@ function renderCoverageSection(lines: string[], data: HealthData, cwd: string): 
   lines.push("");
 
   if (!data.coverage?.available) {
-    lines.push("No coverage report found.");
+    lines.push(
+      `Coverage report unavailable at \`${makeRelative(cwd, data.coverage?.reportPath ?? "coverage/coverage-summary.json")}\`; this locator does not establish that no coverage report exists elsewhere.`,
+    );
     lines.push("");
     return;
   }
@@ -171,7 +202,9 @@ function renderUnusedSection(lines: string[], data: HealthData, cwd: string): vo
   lines.push("");
 
   if (!data.unused?.available) {
-    lines.push("No unused report found.");
+    lines.push(
+      `Unused-code report unavailable at \`${makeRelative(cwd, data.unused?.reportPath ?? "knip.json")}\`; this locator does not establish that no unused-code report exists elsewhere.`,
+    );
     lines.push("");
     return;
   }

@@ -1,73 +1,56 @@
-/**
- * Tool executor for the preview-only refactor planning path.
- *
- * Thin executor: validates semantic readiness via pipeline, then delegates
- * to the refactor plan use-case for operation normalization, target resolution,
- * provider interaction, and plan storage. Returns a planId for code_refactor_apply.
- */
+/** Thin Pi adapter for session-owned refactor planning. */
 
+import type {
+  RefactorOperationInput,
+  RefactorPlanWorkflowInput,
+} from "../../session/refactor-types.ts";
+import type { RefactorTargetInput } from "../../session/target-input.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { gateSemanticReadiness, runPipe } from "../infra/pipeline.ts";
-import { renderSemanticReadinessTimeout } from "../infra/readiness-message.ts";
-import { executeRefactorPlan } from "./orchestrate.ts";
+import { unavailableSearchDetails } from "../infra/error-results.ts";
+import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { assembleRefactorPlanDetails } from "../result/refactor.ts";
+import { renderRefactorPlanResult } from "./markdown.ts";
 
 export interface CodeRefactorPlanToolParams {
-  targetId?: string;
-  operation: string;
-  file?: string;
-  line?: number;
-  character?: number;
-  range?: {
-    start: { line: number; character: number };
-    end: { line: number; character: number };
-  };
-  newName?: string;
+  target: RefactorTargetInput;
+  operation: RefactorOperationInput;
 }
 
 export async function executeRefactorPlanTool(
   params: CodeRefactorPlanToolParams,
   ctx: CodeIntelToolExecCtx,
-  invokedAs: "code_refactor_plan" = "code_refactor_plan",
+  _invokedAs: "code_refactor_plan" = "code_refactor_plan",
 ): Promise<CodeIntelResult> {
-  return runPipe(
-    params,
-    ctx,
-    [
-      gateSemanticReadiness("code_refactor_plan", {
-        fileParam: "file",
-        onTimeout: () => ({
-          content: renderSemanticReadinessTimeout(invokedAs, 15_000),
-          details: {
-            type: "search" as const,
-            data: {
-              confidence: "unavailable" as const,
-              scope: null,
-              candidateCount: 0,
-              omittedCount: 0,
-              nextQueries: ["Retry shortly or check `code_health`"],
-            },
-          },
-        }),
-        throwOnUnavailable: true,
-      }),
-    ],
-    async (_p, c) => {
-      return executeRefactorPlan(
-        {
-          targetId: params.targetId,
-          operation: params.operation,
-          file: params.file,
-          line: params.line,
-          character: params.character,
-          range: params.range,
-          newName: params.newName,
-        },
-        {
-          cwd: c.cwd,
-          session: c.session,
-          provider: c.session.getSemanticProvider(),
-        },
-      );
-    },
+  const outcome = await ctx.session.planRefactor(
+    params as RefactorPlanWorkflowInput,
+    toWorkflowControl(ctx),
   );
+  if (outcome.kind === "unavailable") throw new Error(outcome.reason);
+  if (outcome.kind === "invalid-input") {
+    return {
+      content: `**Error:** ${outcome.message}`,
+      details: unavailableSearchDetails(null, ["Fix the target or operation and retry"]),
+    };
+  }
+  if (outcome.kind === "ambiguous") {
+    const candidates = outcome.candidates
+      .map(
+        (candidate, index) =>
+          `${index + 1}. ${candidate.description} (${candidate.file}:${candidate.line})`,
+      )
+      .join("\n");
+    return {
+      content: `**Refactor ambiguous:**\n${candidates}`,
+      details: unavailableSearchDetails(null, ["Use a precise target handle or anchor"]),
+    };
+  }
+
+  const assembly = assembleRefactorPlanDetails(outcome.plan.edits, outcome.plan.id);
+  return {
+    content: renderRefactorPlanResult(outcome.plan, ctx.cwd),
+    details: {
+      type: "search",
+      data: assembly.details,
+    },
+  };
 }

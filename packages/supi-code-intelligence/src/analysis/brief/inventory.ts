@@ -50,7 +50,7 @@ export function addInventoryToLines(lines: string[], inventory: DirectoryInvento
 
   const sortedExts = [...inventory.byExtension.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
   for (const [ext, count] of sortedExts) {
-    const label = EXTENSION_LABELS.get(ext) ?? (ext || "(no extension)");
+    const label = inventoryExtensionLabel(ext);
     lines.push(`- ${label}: ${count}`);
   }
   if (inventory.byExtension.size > 10) {
@@ -65,6 +65,11 @@ export function addInventoryToLines(lines: string[], inventory: DirectoryInvento
       lines.push(`- \`${f}\``);
     }
   }
+}
+
+/** Render one inventory extension as a stable human-readable label. */
+export function inventoryExtensionLabel(extension: string): string {
+  return EXTENSION_LABELS.get(extension) ?? (extension || "(no extension)");
 }
 
 // ── Internal helpers ──────────────────────────────────────────────────

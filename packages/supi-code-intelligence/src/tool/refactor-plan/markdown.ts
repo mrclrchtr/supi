@@ -3,9 +3,9 @@
  */
 
 import { createEvidenceList, renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
+import type { ApplyResult } from "../../analysis/refactor/apply.ts";
 import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
 import type { RefactorPlan } from "../../session/refactor-plans.ts";
-import type { ApplyResult } from "../refactor-apply/apply.ts";
 
 export interface RefactorRenderInput {
   result: ApplyResult;
@@ -33,7 +33,7 @@ export function renderRefactorResult(input: RefactorRenderInput): string {
 /**
  * Render a refactor plan preview.
  */
-export function renderRefactorPlanResult(plan: RefactorPlan, cwd: string): string {
+export function renderRefactorPlanResult(plan: Readonly<RefactorPlan>, cwd: string): string {
   const lines: string[] = [];
   const changedFiles = collectChangedFiles(plan);
   const fileCount = changedFiles.length;
@@ -89,7 +89,10 @@ export function renderRefactorPlanResult(plan: RefactorPlan, cwd: string): strin
 /**
  * Render a refactor apply result.
  */
-export function renderRefactorApplyResult(applyResult: ApplyResult, plan: RefactorPlan): string {
+export function renderRefactorApplyResult(
+  applyResult: ApplyResult,
+  plan: Readonly<RefactorPlan>,
+): string {
   if (applyResult.kind === "error") {
     return `**Refactor apply failed:** ${applyResult.reason}`;
   }
@@ -109,7 +112,7 @@ export function renderRefactorApplyResult(applyResult: ApplyResult, plan: Refact
   return lines.join("\n");
 }
 
-function collectChangedFiles(plan: RefactorPlan): Array<[file: string, count: number]> {
+function collectChangedFiles(plan: Readonly<RefactorPlan>): Array<[file: string, count: number]> {
   const counts = new Map<string, number>();
   for (const edit of plan.edits.edits) {
     counts.set(edit.file, (counts.get(edit.file) ?? 0) + 1);

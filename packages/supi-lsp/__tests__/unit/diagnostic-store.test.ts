@@ -16,7 +16,7 @@ describe("diagnostic-store", () => {
     const store = createDiagnosticStore(manager);
     expect(typeof store.getDiagnosticSummary).toBe("function");
     expect(typeof store.getOutstandingDiagnostics).toBe("function");
-    expect(typeof store.syncAndGetDiagnostics).toBe("function");
+    expect(typeof store.syncFile).toBe("function");
   });
 
   it("delegates getDiagnosticSummary", () => {
@@ -26,10 +26,10 @@ describe("diagnostic-store", () => {
     expect(manager.getDiagnosticSummary).toHaveBeenCalled();
   });
 
-  it("delegates syncAndGetDiagnostics", async () => {
+  it("delegates syncFile", async () => {
     const manager = makeManager();
     const store = createDiagnosticStore(manager);
-    await store.syncAndGetDiagnostics("test.ts", 4);
+    await store.syncFile("test.ts", 4);
     expect(manager.syncFileAndGetDiagnostics).toHaveBeenCalledWith("test.ts", 4);
   });
 });

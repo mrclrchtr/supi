@@ -85,7 +85,7 @@ export function createCodeIntelligenceApp(pi: ExtensionAPI): CodeIntelligenceApp
         entry.type === "custom_message" &&
         (entry as { customType?: string }).customType === OVERVIEW_CUSTOM_TYPE
       ) {
-        session.hasInjectedOverview = true;
+        session.restoreOverviewInjection();
         break;
       }
     }

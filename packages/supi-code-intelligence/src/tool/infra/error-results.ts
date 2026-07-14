@@ -8,13 +8,11 @@
 export {
   contextErrorResult,
   healthErrorResult,
-  impactErrorResult,
   inspectErrorResult,
   resolveErrorResult,
   searchErrorResult,
   unavailableContextDetails,
   unavailableHealthDetails,
-  unavailableImpactDetails,
   unavailableInspectDetails,
   unavailableResolveDetails,
   unavailableSearchDetails,

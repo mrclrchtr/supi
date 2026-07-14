@@ -12,10 +12,10 @@ import type { LspAdapterState } from "../substrate/lsp/state.ts";
 /** Build the LSP status text: "λ lsp • 2 servers • 5 open files" */
 export function buildLspStatusText(lspState: LspAdapterState): string | undefined {
   const controller = lspState.controller;
-  const service = controller?.service;
-  if (!service) return undefined;
+  const runtime = controller?.workspaceRuntime;
+  if (!runtime) return undefined;
 
-  const servers = service.getProjectServers();
+  const servers = runtime.getProjectServers();
   const runningServers = servers.filter((s) => s.status === "running").length;
   const openFiles = servers.reduce((sum, s) => sum + s.openFiles.length, 0);
 

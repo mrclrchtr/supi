@@ -80,7 +80,7 @@ describe("code_find tool", () => {
 
     const result = (await tool.execute(
       "test-scope-missing",
-      { query: "something", scope: "nonexistent/dir" },
+      { query: "something", scope: ["nonexistent/dir"] },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -103,8 +103,8 @@ describe("code_find tool", () => {
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("does not accept `kind`");
-      expect(result.content[0].text).toContain('mode: "text"');
+      expect(result.content[0].text).toContain("kind is not valid");
+      expect(result.content[0].text).toContain('mode "text"');
     });
 
     it("returns error text when kind is provided in text mode", async () => {
@@ -119,7 +119,7 @@ describe("code_find tool", () => {
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("does not accept `kind`");
+      expect(result.content[0].text).toContain("kind is not valid");
     });
 
     it("returns error text when kind is provided in regex mode", async () => {
@@ -134,8 +134,8 @@ describe("code_find tool", () => {
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("does not accept `kind`");
-      expect(result.content[0].text).toContain('mode: "regex"');
+      expect(result.content[0].text).toContain("kind is not valid");
+      expect(result.content[0].text).toContain('mode "regex"');
     });
 
     it("returns error text when kind is provided in semantic mode", async () => {
@@ -150,8 +150,8 @@ describe("code_find tool", () => {
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toContain("does not accept `kind`");
-      expect(result.content[0].text).toContain('mode: "semantic"');
+      expect(result.content[0].text).toContain("kind is not valid");
+      expect(result.content[0].text).toContain('mode "semantic"');
     });
 
     it("returns error text when ast mode omits kind", async () => {
@@ -166,34 +166,27 @@ describe("code_find tool", () => {
         makeCtx({ cwd: tmpDir }),
       )) as TextToolResult;
 
-      expect(result.content[0].text).toMatch(
-        /supported AST kinds|definition.*import.*export.*call/i,
-      );
+      expect(result.content[0].text).toContain('mode "ast" requires kind');
     });
 
-    it.each(["namespace"] as const)(
-      "passes unknown kind through to provider when TypeBox is bypassed",
-      async (kind) => {
-        // TypeBox schema validation (via pi's registerTool) enforces the kind
-        // enum. When called directly (bypassing TypeBox), the invalid kind
-        // is forwarded to the provider layer rather than rejected by the executor.
-        writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
-        const tool = getCodeFindTool();
+    it.each([
+      "namespace",
+    ] as const)("returns invalid-input for an unknown kind when TypeBox is bypassed", async (kind) => {
+      // PI's TypeBox schema normally rejects this before execution. The
+      // session parser must return the same agent-correctable failure when a
+      // direct call bypasses that adapter validation.
+      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
+      const tool = getCodeFindTool();
 
-        // The invalid kind passes through since TypeBox handles enum validation.
-        // Without a tree-sitter provider, the AST executor throws.
-        // In real usage via pi, the throw is caught and surfaced as a tool error.
-        await expect(
-          tool.execute(
-            `test-ast-unsupported-${kind}`,
-            { query: "foo", mode: "ast", kind },
-            undefined,
-            undefined,
-            makeCtx({ cwd: tmpDir }),
-          ),
-        ).rejects.toThrow("unavailable");
-      },
-    );
+      const result = (await tool.execute(
+        `test-ast-unsupported-${kind}`,
+        { query: "foo", mode: "ast", kind },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult;
+      expect(result.content[0].text).toContain("Unsupported AST kind");
+    });
   });
 
   describe("mode: text and regex", () => {
@@ -534,7 +527,7 @@ describe("code_find tool", () => {
       expect(nextQueries).toEqual(
         expect.arrayContaining([
           expect.stringContaining("code_graph"),
-          expect.stringContaining('"references"'),
+          expect.stringContaining("symbol-identity"),
         ]),
       );
       expect(nextQueries.some((q) => q.includes("summary"))).toBe(false);
@@ -626,7 +619,7 @@ describe("code_find tool", () => {
       try {
         const result = (await tool.execute(
           "test-ast-call-integration",
-          { query: "params.query.trim", mode: "ast", kind: "call", scope: "src" },
+          { query: "params.query.trim", mode: "ast", kind: "call", scope: ["src"] },
           undefined,
           undefined,
           makeCtx({ cwd: tmpDir }),
@@ -787,7 +780,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-semantic-scope-filter",
-        { query: "scopedFunc", mode: "semantic", scope: "@src" },
+        { query: "scopedFunc", mode: "semantic", scope: ["@src"] },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -853,7 +846,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-scope-filter",
-        { query: "bar", scope: "sub" },
+        { query: "bar", scope: ["sub"] },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
@@ -887,7 +880,7 @@ describe("code_find tool", () => {
       expect(result.details?.data.scope).toBe("docs, packages");
     });
 
-    it("splits delimiter-separated scope strings when no exact path exists", async () => {
+    it("accepts multiple explicit scope paths", async () => {
       mkdirSync(path.join(tmpDir, "docs"), { recursive: true });
       mkdirSync(path.join(tmpDir, "packages"), { recursive: true });
       writeFileSync(path.join(tmpDir, "docs/a.md"), "token budget\n");
@@ -896,7 +889,7 @@ describe("code_find tool", () => {
 
       const result = (await tool.execute(
         "test-delimited-scope-filter",
-        { query: "token", scope: "docs packages" },
+        { query: "token", scope: ["docs", "packages"] },
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),

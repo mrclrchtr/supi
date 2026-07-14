@@ -2,10 +2,7 @@ import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { PrioritySignalsSummary } from "../../analysis/signals/project.ts";
-import type { TestSurfaceDetails } from "../../analysis/tests/test-discovery.ts";
 import type { AnchorKind, TargetStoreEntry } from "../../session/target-store.ts";
-
-export type { TestSurfaceDetails } from "../../analysis/tests/test-discovery.ts";
 
 // ── Anchored coordinate resolution metadata ───────────────────────────
 
@@ -63,34 +60,7 @@ export interface SearchDetails {
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
-  tests?: TestSurfaceDetails;
 }
-
-/** Structured details metadata for affected analysis results. */
-export interface AffectedDetails {
-  confidence: ConfidenceMode;
-  directCount: number;
-  downstreamCount: number;
-  riskLevel: "low" | "medium" | "high";
-  checkNext: string[];
-  likelyTests: string[];
-  /** Concrete test commands to run relevant verification. */
-  likelyTestCommands: string[];
-  omittedCount: number;
-  evidenceLists?: EvidenceListMetadata[];
-  nextQueries: string[];
-  prioritySignals?: PrioritySignalsSummary | null;
-  tests?: TestSurfaceDetails;
-}
-
-/**
- * Structured details metadata for workflow-oriented impact analysis results.
- *
- * Currently structurally identical to `AffectedDetails`. When adding own fields,
- * audit callers in `orchestrate.ts` that construct `{ type: "impact", data }`
- * so they return `ImpactDetails`, not just `AffectedDetails`.
- */
-export interface ImpactDetails extends AffectedDetails {}
 
 // Canonical disambiguation candidate — re-exported from resolution/types.ts
 export type { DisambiguationCandidateData as DisambiguationCandidate } from "../../analysis/target/types.ts";
@@ -143,7 +113,6 @@ export interface ContextDetails {
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
-  tests?: TestSurfaceDetails;
   /** Directory-local instruction files surfaced during directory orientation. */
   instructions?: InstructionFilesMetadata;
   /**

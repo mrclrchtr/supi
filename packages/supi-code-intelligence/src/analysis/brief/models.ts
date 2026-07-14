@@ -71,5 +71,5 @@ export interface BriefOpts {
   /** Show git context in orientation output. Defaults to true. */
   showGitContext?: boolean;
   /** LSP service state for diagnostic access. */
-  lspService?: import("@mrclrchtr/supi-lsp/api").SessionLspServiceState;
+  lspRuntime?: import("@mrclrchtr/supi-lsp/api").WorkspaceLspRuntimeState;
 }

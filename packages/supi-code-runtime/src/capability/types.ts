@@ -85,8 +85,8 @@ export interface SemanticProvider {
    * Optional rename capability. When present, the provider supports
    * precise semantic symbol-rename operations.
    *
-   * Kept as a low-level substrate helper for compatibility while the public
-   * tool surface still exposes a legacy `rename` alias.
+   * This remains a lower-level substrate helper for providers that expose
+   * symbol rename independently of their general refactor planner.
    */
   rename?(file: string, position: CodePosition, newName: string): Promise<RefactorResult>;
 

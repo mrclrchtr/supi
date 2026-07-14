@@ -22,25 +22,6 @@ function writeSource(fileName: string, source: string): void {
 }
 
 describe("code_graph callees relation", () => {
-  it("rejects graph without file and without symbol", async () => {
-    const result = await executeAction(
-      { action: "graph", relations: ["callees"] } as unknown as ActionParams,
-      { cwd: tmpDir },
-    );
-    expect(result.content).toContain("Error");
-    expect(result.content).toContain("At least one of");
-  });
-
-  it("rejects graph with file but no line/character", async () => {
-    writeSource("test.ts", "export const x = 1;");
-    const result = await executeAction(
-      { action: "graph", file: "test.ts", relations: ["callees"] } as unknown as ActionParams,
-      { cwd: tmpDir },
-    );
-    expect(result.content).toContain("Error");
-    expect(result.content).toContain("line");
-  });
-
   it("rejects non-existent file", async () => {
     const result = await executeAction(
       {

@@ -13,7 +13,7 @@ function makeTempRoot(): string {
   writeFileSync(join(root, "package.json"), JSON.stringify({ name: "test" }));
   const sourceFile = join(root, "src", "index.ts");
   mkdirSync(dirname(sourceFile), { recursive: true });
-  writeFileSync(sourceFile, "export const SessionLspService = 1;\n");
+  writeFileSync(sourceFile, "export const Widget = 1;\n");
   return root;
 }
 
@@ -69,7 +69,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     );
 
     const symbol = {
-      name: "SessionLspService",
+      name: "Widget",
       kind: 12,
       location: {
         uri: `file://${join(root, "src", "index.ts")}`,
@@ -90,7 +90,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
         .mockResolvedValue([symbol]),
       documentSymbols: vi.fn().mockResolvedValue([
         {
-          name: "SessionLspService",
+          name: "Widget",
           kind: 12,
           selectionRange: {
             start: { line: 0, character: 13 },
@@ -110,7 +110,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
         return client as never;
       });
 
-    const result = await manager.workspaceSymbol("SessionLspService");
+    const result = await manager.workspaceSymbol("Widget");
 
     expect(result).toEqual([symbol]);
     expect(ensureFileOpen).toHaveBeenCalledWith(join(root, "src", "index.ts"));
@@ -121,7 +121,7 @@ describe("LspManager.workspaceSymbol cold warm-up", () => {
     });
     expect(client.workspaceSymbol).toHaveBeenCalledTimes(2);
 
-    await manager.workspaceSymbol("SessionLspService");
+    await manager.workspaceSymbol("Widget");
     expect(ensureFileOpen).toHaveBeenCalledTimes(1);
   });
 });

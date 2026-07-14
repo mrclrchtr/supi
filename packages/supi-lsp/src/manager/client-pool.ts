@@ -1,33 +1,45 @@
-// Client pool — manages LSP client lifecycle (start, stop, reconnect).
+// Client pool — owns routed client tracking without exposing LSP clients.
 
+import type { FileEvent } from "../config/types.ts";
 import type { LspManager } from "./manager.ts";
 
-/**
- * Manages the lifecycle of LSP client instances for a workspace.
- * Currently delegates to LspManager; the extraction will grow
- * as responsibilities are migrated from manager.ts.
- */
+/** Workspace client lifecycle and open-document operations. */
 export interface ClientPool {
-  /**
-   * Ensure a file has an active client and return it.
-   * Returns null if no server can serve the file.
-   */
-  ensureFileOpen(filePath: string): ReturnType<LspManager["ensureFileOpen"]>;
-
+  /** Track a file in its routed client. */
+  trackFile(filePath: string): Promise<boolean>;
+  /** Stop tracking one file. */
+  closeFile(filePath: string): void;
+  /** Remove missing files from client state. */
+  pruneMissingFiles(): readonly string[];
+  /** Re-sync tracked documents and wait for diagnostics. */
+  refreshOpenDiagnostics(options?: { maxWaitMs?: number; quietMs?: number }): Promise<void>;
+  /** Notify clients of workspace changes and invalidate pull result ids. */
+  noteWorkspaceChanges(changes: FileEvent[]): void;
   /** Shut down all active clients. */
   shutdownAll(): Promise<void>;
 }
 
-/**
- * Create a ClientPool backed by LspManager.
- */
+/** Create the client-lifecycle interface around the package-internal manager. */
 export function createClientPool(manager: LspManager): ClientPool {
   return {
-    async ensureFileOpen(filePath: string) {
-      return manager.ensureFileOpen(filePath);
+    async trackFile(filePath) {
+      return (await manager.ensureFileOpen(filePath)) !== null;
+    },
+    closeFile(filePath) {
+      manager.closeFile(filePath);
+    },
+    pruneMissingFiles() {
+      return manager.pruneMissingFiles();
+    },
+    async refreshOpenDiagnostics(options) {
+      await manager.refreshOpenDiagnostics(options);
+    },
+    noteWorkspaceChanges(changes) {
+      manager.clearAllPullResultIds();
+      manager.notifyWorkspaceFileChanges(changes);
     },
     async shutdownAll() {
-      return manager.shutdownAll();
+      await manager.shutdownAll();
     },
   };
 }

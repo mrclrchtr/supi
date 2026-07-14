@@ -1,7 +1,7 @@
 /**
- * Workspace code-intelligence session facade.
+ * Workspace code-intelligence session.
  *
- * Per-workspace facade that owns session-scoped state (targets, plans,
+ * Per-workspace module that owns session-scoped state (targets, plans,
  * coverage warnings) and provides typed workflow methods for all
  * public code_* tools. Tool executors receive this session explicitly
  * through their execution context; the session centralizes provider
@@ -17,17 +17,34 @@
 
 import * as path from "node:path";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
-import {
-  getDefaultWorkspaceRuntime,
-  type SemanticProvider,
-  type StructuralProvider,
-} from "@mrclrchtr/supi-code-runtime/api";
 import type { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
-import { CoverageWarningState } from "../analysis/coverage/coverage-warnings.ts";
-import type { CodeProvider } from "../analysis/provider.ts";
-import { getCodeProvider } from "../analysis/provider.ts";
+import {
+  type CoverageWarning,
+  CoverageWarningState,
+  evaluateCoverageWarnings,
+  gatherCoverageEvalInput,
+} from "../analysis/coverage/coverage-warnings.ts";
 import { type CapabilityAdapter, WorkspaceCapabilityAdapter } from "./capability-adapter.ts";
+import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
+import { runFindWorkflow } from "./find-workflow.ts";
+import type { GraphWorkflowInput, GraphWorkflowOutcome } from "./graph-types.ts";
+import { runGraphWorkflow } from "./graph-workflow.ts";
+import type { HealthWorkflowInput, HealthWorkflowOutcome } from "./health-types.ts";
+import { runHealthWorkflow } from "./health-workflow.ts";
+import { parseResolveRequest } from "./input/common.ts";
+import type { InspectWorkflowInput, InspectWorkflowOutcome } from "./inspect-types.ts";
+import { runInspectWorkflow } from "./inspect-workflow.ts";
+import type { OrientationWorkflowInput, OrientationWorkflowOutcome } from "./orientation-types.ts";
+import { runOrientationWorkflow } from "./orientation-workflow.ts";
 import { getPlan, type RefactorPlan, removePlan, storePlan } from "./refactor-plans.ts";
+import type {
+  RefactorApplyWorkflowInput,
+  RefactorApplyWorkflowOutcome,
+  RefactorPlanWorkflowInput,
+  RefactorPlanWorkflowOutcome,
+} from "./refactor-types.ts";
+import { runRefactorApplyWorkflow, runRefactorPlanWorkflow } from "./refactor-workflow.ts";
+import type { ResolveTargetInput, TargetInput } from "./target-input.ts";
 import {
   getWorkflowTarget,
   registerWorkflowTarget,
@@ -38,43 +55,75 @@ import {
 } from "./target-store.ts";
 import {
   resolveTargetWorkflow,
-  type TargetWorkflowInput,
   type TargetWorkflowOutcome,
   type TargetWorkflowPolicy,
 } from "./target-workflow.ts";
+import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow-control.ts";
 
 // ── Re-export types consumed by callers ───────────────────────────────
 
 export type { CoverageWarningState } from "../analysis/coverage/coverage-warnings.ts";
-export type { CodeProvider, CodeProviderState } from "../analysis/provider.ts";
 export type { CapabilityAdapter } from "./capability-adapter.ts";
+export type {
+  FindMode,
+  FindWorkflowData,
+  FindWorkflowInput,
+  FindWorkflowOutcome,
+} from "./find-types.ts";
+export type {
+  GraphRelationKind,
+  GraphSection,
+  GraphWorkflowInput,
+  GraphWorkflowOutcome,
+  RequestedGraphRelation,
+} from "./graph-types.ts";
+export type {
+  CodeActionSuggestion,
+  HealthCodeActions,
+  HealthCoverageData,
+  HealthData,
+  HealthSection,
+  HealthUnusedData,
+  HealthWorkflowInput,
+  HealthWorkflowOutcome,
+} from "./health-types.ts";
+export type {
+  InspectResultData,
+  InspectWorkflowInput,
+  InspectWorkflowOutcome,
+} from "./inspect-types.ts";
+export type {
+  OrientationFocusInput,
+  OrientationWorkflowInput,
+  OrientationWorkflowOutcome,
+} from "./orientation-types.ts";
 export type { RefactorPlan } from "./refactor-plans.ts";
+export type {
+  PublicSourceRange,
+  RefactorApplyWorkflowInput,
+  RefactorApplyWorkflowOutcome,
+  RefactorOperationInput,
+  RefactorPlanWorkflowInput,
+  RefactorPlanWorkflowOutcome,
+} from "./refactor-types.ts";
+export type {
+  GraphTargetInput,
+  OrientationTargetInput,
+  RefactorTargetInput,
+  ResolveTargetInput,
+  SourcePointInput,
+  SymbolTargetInput,
+  TargetInput,
+  TargetSymbolKind,
+} from "./target-input.ts";
 export type {
   TargetLookupResult,
   TargetRegistrationInput,
   TargetRegistrationOutput,
   TargetStoreEntry,
 } from "./target-store.ts";
-export type {
-  TargetWorkflowInput,
-  TargetWorkflowOutcome,
-  TargetWorkflowPolicy,
-} from "./target-workflow.ts";
-
-// ── Target ID expansion result ────────────────────────────────────────
-
-export type TargetIdExpansionResult =
-  | {
-      kind: "ok";
-      file: string;
-      line: number;
-      character: number;
-      targetName: string | null;
-      targetKind: string | null;
-      entry: TargetStoreEntry;
-    }
-  | { kind: "not-provided" }
-  | { kind: "error"; message: string };
+export type { TargetWorkflowOutcome, TargetWorkflowPolicy } from "./target-workflow.ts";
+export type { WorkflowControl, WorkflowProgressEvent } from "./workflow-control.ts";
 
 // ── Session class ─────────────────────────────────────────────────────
 
@@ -93,7 +142,13 @@ export class WorkspaceCodeIntelligenceSession {
   readonly #capability: CapabilityAdapter;
 
   /** Whether the hidden architecture overview has been injected. */
-  hasInjectedOverview = false;
+  #hasInjectedOverview = false;
+
+  /** Whether Orientation already included git context for this session. */
+  #hasShownOrientationGitContext = false;
+
+  /** Time of the most recent explicit health refresh. */
+  #lastHealthRefresh: number | undefined;
 
   /** Session-scoped workflow target storage (targetId → entry). */
   readonly #workflowTargets = new Map<string, TargetStoreEntry>();
@@ -104,29 +159,46 @@ export class WorkspaceCodeIntelligenceSession {
   /**
    * Coverage warning state for deduplication and grace-period timing.
    */
-  readonly coverageWarningState = new CoverageWarningState();
+  readonly #coverageWarningState = new CoverageWarningState();
 
   /** Absolute instruction files already loaded by PI's native context-file mechanism. */
-  readonly nativeInstructionPaths = new Set<string>();
+  readonly #nativeInstructionPaths = new Set<string>();
 
   /** Absolute directories whose instruction files were already surfaced by code_orientation. */
-  readonly surfacedInstructionDirs = new Set<string>();
+  readonly #surfacedInstructionDirs = new Set<string>();
 
   /**
    * Optional LSP controller reference — attached by LSP lifecycle module
    * for coverage evaluation and server management.
    */
-  lspController: LspRuntimeController | null = null;
-
-  /**
-   * Optional Tree-sitter controller reference — attached by TS lifecycle
-   * module for structural provider lifecycle management.
-   */
-  tsController: import("@mrclrchtr/supi-tree-sitter/api").TreeSitterRuntimeController | null = null;
+  #lspController: LspRuntimeController | null = null;
 
   constructor(cwd: string, capability?: CapabilityAdapter) {
     this.cwd = cwd;
     this.#capability = capability ?? new WorkspaceCapabilityAdapter();
+  }
+
+  /** Attach lifecycle-owned LSP state without exposing it to Tool adapters. */
+  attachLspController(controller: LspRuntimeController | null): void {
+    this.#lspController = controller;
+  }
+
+  /** Restore overview state from the active session branch. */
+  restoreOverviewInjection(): void {
+    this.#hasInjectedOverview = true;
+  }
+
+  /** Atomically claim first-turn overview injection for this workspace session. */
+  claimOverviewInjection(): boolean {
+    if (this.#hasInjectedOverview) return false;
+    this.#hasInjectedOverview = true;
+    return true;
+  }
+
+  /** Evaluate and deduplicate coverage warnings behind the session seam. */
+  pendingCoverageWarnings(): readonly CoverageWarning[] {
+    const report = evaluateCoverageWarnings(gatherCoverageEvalInput(this.cwd, this.#lspController));
+    return this.#coverageWarningState.getPendingWarnings(report);
   }
 
   // ── Target workflow (deep seam) ───────────────────────────────────
@@ -134,20 +206,133 @@ export class WorkspaceCodeIntelligenceSession {
   /**
    * Resolve target input into an immutable resolved target.
    *
-   * This is the deep module interface. Tool executors call this instead
-   * of `expandTargetId` or direct `resolveTarget`/`resolveAnchoredSymbolTarget`
-   * calls. Returns typed outcomes — no markdown, no mutated params.
+   * This is the deep module interface. Tool executors use it instead of
+   * bypassing session policy through one-off target adapters. Returns typed
+   * outcomes — no markdown and no mutated parameters.
    */
   async resolveTarget(
-    input: TargetWorkflowInput,
+    input: TargetInput,
     policy: TargetWorkflowPolicy,
   ): Promise<TargetWorkflowOutcome> {
-    return resolveTargetWorkflow(input, policy, {
+    return resolveTargetWorkflow(input, policy, this.targetWorkflowDeps());
+  }
+
+  /** Resolve one public target source and register its session-scoped handle. */
+  async resolve(
+    input: { readonly target: ResolveTargetInput; readonly maxResults?: number },
+    control?: WorkflowControl,
+  ): Promise<TargetWorkflowOutcome> {
+    const parsed = parseResolveRequest(input);
+    if (parsed.kind === "invalid-input") return parsed;
+    const request = parsed.value;
+    throwIfAborted(control);
+    reportProgress(control, {
+      intent: "resolve",
+      phase: "target",
+      message: "Resolving target evidence",
+    });
+    return resolveTargetWorkflow(
+      request.target,
+      {
+        fileLevelAllowed: true,
+        nameAnchorRequired: false,
+        waitForSemantic: "symbol" in request.target || "anchor" in request.target,
+        maxResults: request.maxResults,
+      },
+      this.targetWorkflowDeps(),
+    );
+  }
+
+  /** Collect evidence-backed workspace health facts. */
+  async health(
+    input: HealthWorkflowInput,
+    control?: WorkflowControl,
+  ): Promise<HealthWorkflowOutcome> {
+    return runHealthWorkflow(
+      input,
+      {
+        cwd: this.cwd,
+        capability: this.#capability,
+        lspController: this.#lspController,
+        lastRefresh: this.#lastHealthRefresh,
+        trackRefresh: () => {
+          this.#lastHealthRefresh = Date.now();
+        },
+      },
+      control,
+    );
+  }
+
+  /** Search one explicit text, regex, structural, or semantic substrate. */
+  async find(input: FindWorkflowInput, control?: WorkflowControl): Promise<FindWorkflowOutcome> {
+    return runFindWorkflow(input, { cwd: this.cwd, capability: this.#capability }, control);
+  }
+
+  /** Orient around the workspace or one exact focus. */
+  async orient(
+    input: OrientationWorkflowInput,
+    control?: WorkflowControl,
+  ): Promise<OrientationWorkflowOutcome> {
+    const showGitContext = !this.#hasShownOrientationGitContext;
+    this.#hasShownOrientationGitContext = true;
+    return runOrientationWorkflow(
+      input,
+      {
+        ...this.targetWorkflowDeps(),
+        nativeInstructionPaths: this.#nativeInstructionPaths,
+        surfacedInstructionDirs: this.#surfacedInstructionDirs,
+        markInstructionDirsSurfaced: (directories) => this.markInstructionDirsSurfaced(directories),
+        showGitContext,
+      },
+      control,
+    );
+  }
+
+  /** Plan one precise semantic refactor without mutating files. */
+  async planRefactor(
+    input: RefactorPlanWorkflowInput,
+    control?: WorkflowControl,
+  ): Promise<RefactorPlanWorkflowOutcome> {
+    return runRefactorPlanWorkflow(input, this.refactorWorkflowDeps(), control);
+  }
+
+  /** Revalidate and apply one stored refactor plan. */
+  async applyRefactor(
+    input: RefactorApplyWorkflowInput,
+    control?: WorkflowControl,
+  ): Promise<RefactorApplyWorkflowOutcome> {
+    return runRefactorApplyWorkflow(input, this.refactorWorkflowDeps(), control);
+  }
+
+  /** Inspect one exact source point with available semantic and structural evidence. */
+  async inspect(
+    input: InspectWorkflowInput,
+    control?: WorkflowControl,
+  ): Promise<InspectWorkflowOutcome> {
+    return runInspectWorkflow(input, { cwd: this.cwd, capability: this.#capability }, control);
+  }
+
+  /** Collect evidence-backed relations for one exact target. */
+  async graph(input: GraphWorkflowInput, control?: WorkflowControl): Promise<GraphWorkflowOutcome> {
+    return runGraphWorkflow(input, this.targetWorkflowDeps(), control);
+  }
+
+  private refactorWorkflowDeps() {
+    return {
+      ...this.targetWorkflowDeps(),
+      storePlan: (plan: RefactorPlan) => this.#storePlan(plan),
+      getPlan: (id: string) => this.#getPlan(id),
+      removePlan: (id: string) => this.#removePlan(id),
+    };
+  }
+
+  private targetWorkflowDeps() {
+    return {
       cwd: this.cwd,
       capability: this.#capability,
-      lookupTargetId: (id) => this.lookupTargetId(id),
-      registerTarget: (inp) => this.registerTarget(inp),
-    });
+      lookupTargetId: (id: string) => this.#lookupTargetId(id),
+      registerTarget: (input: TargetRegistrationInput) => this.#registerTarget(input),
+    };
   }
 
   // ── Instruction-file state ───────────────────────────────────────
@@ -155,173 +340,53 @@ export class WorkspaceCodeIntelligenceSession {
   /** Remember instruction/context file paths already loaded by PI natively. */
   captureNativeInstructionPaths(files: Array<{ path: string }>): void {
     for (const file of files) {
-      this.nativeInstructionPaths.add(path.resolve(this.cwd, file.path));
+      this.#nativeInstructionPaths.add(path.resolve(this.cwd, file.path));
     }
   }
 
   /** Mark directory-local instruction files as surfaced after a successful orientation render. */
   markInstructionDirsSurfaced(directories: string[]): void {
     for (const directory of directories) {
-      this.surfacedInstructionDirs.add(path.resolve(this.cwd, directory));
+      this.#surfacedInstructionDirs.add(path.resolve(this.cwd, directory));
     }
   }
 
   /** Clear instruction-file dedup state after compaction. */
   resetSurfacedInstructionDirs(): void {
-    this.surfacedInstructionDirs.clear();
+    this.#surfacedInstructionDirs.clear();
   }
 
   /** Reconstruct surfaced instruction directories from branch tool-result details after compaction. */
   reconstructInstructionState(branch: SessionEntry[]): void {
-    this.surfacedInstructionDirs.clear();
+    this.#surfacedInstructionDirs.clear();
     const entries = entriesAfterLatestCompaction(branch);
     for (const entry of entries) {
       for (const directory of extractInstructionDirectories(entry)) {
-        this.surfacedInstructionDirs.add(path.resolve(this.cwd, directory));
+        this.#surfacedInstructionDirs.add(path.resolve(this.cwd, directory));
       }
     }
   }
 
-  // ── Provider access ───────────────────────────────────────────────
+  // ── Private session stores ───────────────────────────────────────
 
-  /**
-   * Get the composite code provider state for this workspace.
-   * Combines semantic (LSP) and structural (tree-sitter) capabilities
-   * along with LSP service state.
-   */
-  getProviders(): import("../analysis/provider.ts").CodeProviderState {
-    return getCodeProvider(this.cwd);
-  }
-
-  /**
-   * Get the ready composite code provider, or null if unavailable.
-   */
-  getProvider(): CodeProvider | null {
-    const state = this.getProviders();
-    return state.kind === "ready" ? state.provider : null;
-  }
-
-  /**
-   * Get the semantic provider from the shared runtime.
-   */
-  getSemanticProvider(): SemanticProvider | null {
-    const ws = getDefaultWorkspaceRuntime().getWorkspace(this.cwd);
-    if (
-      (ws.semantic.state.kind === "ready" || ws.semantic.state.kind === "pending") &&
-      ws.semantic.provider !== null
-    ) {
-      return ws.semantic.provider as SemanticProvider;
-    }
-    return null;
-  }
-
-  /**
-   * Get the structural provider from the shared runtime.
-   */
-  getStructuralProvider(): StructuralProvider | null {
-    const ws = getDefaultWorkspaceRuntime().getWorkspace(this.cwd);
-    if (ws.structural.state.kind === "ready" && ws.structural.provider !== null) {
-      return ws.structural.provider as StructuralProvider;
-    }
-    return null;
-  }
-
-  /**
-   * Get the raw workspace state from the shared runtime.
-   *
-   * Exposes semantic/structural state and provider refs for tools
-   * that need detailed status (e.g. code_health). Prefer higher-level
-   * methods (`getProvider()`, `getSemanticProvider()`) when you only
-   * need a ready provider reference.
-   */
-  getWorkspaceState() {
-    return getDefaultWorkspaceRuntime().getWorkspace(this.cwd);
-  }
-
-  // ── Target resolution ─────────────────────────────────────────────
-
-  /**
-   * Look up a stored target by targetId in this session's store.
-   */
-  lookupTargetId(targetId: string): TargetLookupResult {
+  #lookupTargetId(targetId: string): TargetLookupResult {
     return getWorkflowTarget(this.#workflowTargets, targetId);
   }
 
-  /**
-   * Register a resolved target in this session's store and return
-   * stable session-scoped handles.
-   */
-  registerTarget(input: TargetRegistrationInput): TargetRegistrationOutput {
+  #registerTarget(input: TargetRegistrationInput): TargetRegistrationOutput {
     return registerWorkflowTarget(this.#workflowTargets, this.cwd, input);
   }
 
-  /**
-   * Expand an optional targetId from tool params into anchored
-   * file/line/character.
-   *
-   * Usage at the top of each target-oriented executor:
-   *
-   * ```ts
-   * const expansion = session.expandTargetId(params);
-   * if (expansion.kind === "error") return errorResult(expansion.message);
-   * if (expansion.kind === "ok") {
-   *   params.file = expansion.file;
-   *   params.line = expansion.line;
-   *   params.character = expansion.character;
-   * }
-   * ```
-   */
-  expandTargetId(params: {
-    targetId?: string;
-    file?: string;
-    line?: number;
-    character?: number;
-    symbol?: string;
-  }): TargetIdExpansionResult {
-    return expandSessionTargetId(this, params);
-  }
-
-  /**
-   * Look up a targetId without expanding into file/line/character.
-   * Returns the raw store entry or an error.
-   */
-  lookupTargetEntry(targetId: string): TargetLookupResult {
-    return getWorkflowTarget(this.#workflowTargets, targetId);
-  }
-
-  // ── Plan store ────────────────────────────────────────────────────
-
-  /**
-   * Store a refactor plan and return its planId.
-   */
-  storePlan(plan: RefactorPlan): string {
+  #storePlan(plan: RefactorPlan): string {
     return storePlan(this.#refactorPlans, plan);
   }
 
-  /**
-   * Retrieve a plan by id, or undefined.
-   */
-  getPlan(id: string): RefactorPlan | undefined {
+  #getPlan(id: string): RefactorPlan | undefined {
     return getPlan(this.#refactorPlans, id);
   }
 
-  /**
-   * Remove a plan after successful apply.
-   */
-  removePlan(id: string): void {
+  #removePlan(id: string): void {
     removePlan(this.#refactorPlans, id);
-  }
-
-  // ── Introspection (for tests / debugging) ───────────────────────
-
-  /** Number of stored targets (for test isolation checks). */
-  get targetCount(): number {
-    return this.#workflowTargets.size;
-  }
-
-  /** Number of stored refactor plans (for test isolation checks). */
-  get planCount(): number {
-    return this.#refactorPlans.size;
   }
 
   // ── Cleanup ───────────────────────────────────────────────────────
@@ -330,8 +395,10 @@ export class WorkspaceCodeIntelligenceSession {
   clearStores(): void {
     this.#refactorPlans.clear();
     this.#workflowTargets.clear();
-    this.surfacedInstructionDirs.clear();
-    this.nativeInstructionPaths.clear();
+    this.#surfacedInstructionDirs.clear();
+    this.#nativeInstructionPaths.clear();
+    this.#coverageWarningState.reset();
+    this.#lspController = null;
   }
 }
 
@@ -358,48 +425,4 @@ function extractInstructionDirectories(entry: SessionEntry): string[] {
   return files
     .map((file) => file.directory)
     .filter((directory): directory is string => typeof directory === "string");
-}
-
-// ── Standalone target-id expansion helper ─────────────────────────────
-
-/**
- * Expand an optional targetId into anchored file/line/character params
- * using the given session's store.
- *
- * Exported separately so executors that already hold a session ref
- * can call it directly, without going through an ad-hoc session factory.
- */
-export function expandSessionTargetId(
-  session: WorkspaceCodeIntelligenceSession,
-  params: {
-    targetId?: string;
-    file?: string;
-    line?: number;
-    character?: number;
-    symbol?: string;
-  },
-): TargetIdExpansionResult {
-  const targetId = params.targetId;
-  if (targetId === undefined || targetId === null) {
-    return { kind: "not-provided" };
-  }
-
-  const result = session.lookupTargetEntry(targetId);
-  if (result.kind === "unavailable") {
-    return {
-      kind: "error",
-      message: `**Error:** ${result.reason}`,
-    };
-  }
-
-  const { entry } = result;
-  return {
-    kind: "ok",
-    file: entry.file,
-    line: entry.displayLine,
-    character: entry.displayCharacter,
-    targetName: entry.name,
-    targetKind: entry.kind,
-    entry,
-  };
 }

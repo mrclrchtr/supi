@@ -1,12 +1,10 @@
-/**
- * Tool executor for the stored-plan application path.
- *
- * Thin executor: delegates to the refactor apply use-case for plan lookup,
- * freshness checking, safety validation, and workspace edit application.
- */
+/** Thin Pi adapter for session-owned refactor application. */
 
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { executeRefactorApply } from "./orchestrate.ts";
+import { unavailableSearchDetails } from "../infra/error-results.ts";
+import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { renderRefactorApplyResult } from "../refactor-plan/markdown.ts";
+import { assembleRefactorApplyDetails } from "../result/refactor.ts";
 
 export interface CodeRefactorApplyToolParams {
   planId: string;
@@ -14,7 +12,23 @@ export interface CodeRefactorApplyToolParams {
 
 export async function executeRefactorApplyTool(
   params: CodeRefactorApplyToolParams,
-  _ctx: CodeIntelToolExecCtx,
+  ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
-  return executeRefactorApply({ planId: params.planId }, { session: _ctx.session });
+  const outcome = await ctx.session.applyRefactor(params, toWorkflowControl(ctx));
+  if (outcome.kind === "unavailable") throw new Error(outcome.reason);
+  if (outcome.kind === "invalid-input") {
+    return {
+      content: `**Error:** ${outcome.message}`,
+      details: unavailableSearchDetails(null, ["Generate a fresh plan with code_refactor_plan"]),
+    };
+  }
+
+  const assembly = assembleRefactorApplyDetails(outcome.result);
+  return {
+    content: renderRefactorApplyResult(outcome.result, outcome.plan),
+    details: {
+      type: "search",
+      data: assembly.details,
+    },
+  };
 }

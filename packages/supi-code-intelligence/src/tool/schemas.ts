@@ -5,145 +5,176 @@ import type { CodeIntelligenceToolName } from "../types/index.ts";
 const ScopeParam = Type.String({
   description: "Workspace-relative file or directory scope.",
 });
-const FindScopeParam = Type.Union(
-  [
-    Type.String({
-      description: "Workspace-relative search scope.",
-    }),
-    Type.Array(
-      Type.String({
-        description: "Workspace-relative search scope.",
-      }),
-      {
-        description: "One or more workspace-relative search scopes.",
-        minItems: 1,
-        uniqueItems: true,
-      },
-    ),
-  ],
+const FindScopeParam = Type.Array(
+  Type.String({ description: "Workspace-relative search scope." }),
   {
-    description: "Workspace-relative search scope or scope list.",
+    description: "One or more workspace-relative search scopes.",
+    minItems: 1,
+    uniqueItems: true,
   },
 );
 const FileParam = Type.String({ description: "Target file path." });
 const QueryParam = Type.String({
   description: "Human or code reference to resolve or search for.",
+  minLength: 1,
 });
-const LineParam = Type.Number({ description: "1-based line.", minimum: 1 });
-const CharacterParam = Type.Number({
+const LineParam = Type.Integer({ description: "1-based line.", minimum: 1 });
+const CharacterParam = Type.Integer({
   description: "1-based UTF-16 column.",
   minimum: 1,
 });
-const MaxResultsParam = Type.Number({
-  description: "Maximum results.",
+const MaxResultsParam = Type.Integer({
+  description: "Maximum displayed results.",
   minimum: 1,
 });
-const SymbolParam = Type.String({ description: "Symbol name" });
-const TargetIdParam = Type.String({
-  description:
-    "Resolved target handle from `code_resolve`; takes precedence over other target inputs.",
-});
-const RangeParam = Type.Object(
-  {
-    start: Type.Object({ line: LineParam, character: CharacterParam }),
-    end: Type.Object({ line: LineParam, character: CharacterParam }),
-  },
-  { description: "1-based selected source range for extract refactors." },
+
+const SourcePointParam = Type.Object(
+  { file: FileParam, line: LineParam, character: CharacterParam },
+  { description: "A precise 1-based source point.", additionalProperties: false },
 );
 
-/**
- * Planned `code_resolve` parameters.
- *
- * Runtime rule for future executors:
- * - require `query` or `file`
- * - require `file` when `line` or `character` is provided
- */
-export const CodeResolveParameters = Type.Object(
+const SymbolTargetParam = Type.Object(
   {
-    query: Type.Optional(QueryParam),
+    query: QueryParam,
     scope: Type.Optional(ScopeParam),
-    kind: Type.Optional(
+    symbolKind: Type.Optional(
       StringEnum(
-        [
-          "symbol",
-          "function",
-          "class",
-          "interface",
-          "file",
-          "export",
-          "variable",
-          "method",
-          "const",
-          "enum",
-        ],
-        {
-          description: "Preferred target kind when disambiguating the query.",
-        },
+        ["symbol", "function", "class", "interface", "type", "variable", "method", "const", "enum"],
+        { description: "Preferred symbol kind when disambiguating the query." },
       ),
     ),
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
+  },
+  {
+    description: "Semantic symbol query and optional workspace-relative scope.",
+    additionalProperties: false,
+  },
+);
+
+/**
+ * Build a model-provider-friendly exact-one selector without Type.Union/Type.Literal.
+ * Pi validates min/max properties before execution; the session owns semantic validation.
+ */
+function exactOneSelector(properties: Record<string, TSchema>, description: string): TSchema {
+  const optionalProperties: Record<string, TSchema> = {};
+  for (const [key, schema] of Object.entries(properties)) {
+    optionalProperties[key] = Type.Optional(schema);
+  }
+  return Type.Object(optionalProperties, {
+    description,
+    minProperties: 1,
+    maxProperties: 1,
+    additionalProperties: false,
+  });
+}
+
+const ResolveTargetParam = exactOneSelector(
+  {
+    anchor: SourcePointParam,
+    symbol: SymbolTargetParam,
+    file: FileParam,
+  },
+  "Exactly one target source: provider-backed anchor, semantic symbol query, or file.",
+);
+
+const GraphTargetParam = exactOneSelector(
+  {
+    handle: Type.String({ description: "Target handle returned by code_resolve." }),
+    anchor: SourcePointParam,
+    symbol: SymbolTargetParam,
+  },
+  "Exactly one graph target: handle, provider-backed anchor, or semantic symbol query.",
+);
+
+const OrientationTargetParam = exactOneSelector(
+  {
+    handle: Type.String({ description: "Target handle returned by code_resolve." }),
+    anchor: SourcePointParam,
+    symbol: SymbolTargetParam,
+  },
+  "Exactly one precise Orientation target: handle, provider-backed anchor, or semantic symbol query.",
+);
+
+const OrientationFocusParam = exactOneSelector(
+  {
+    path: Type.String({
+      description: "Workspace-relative project, package, directory, or file path.",
+    }),
+    module: Type.String({ description: "Discovered module name." }),
+    target: OrientationTargetParam,
+  },
+  "Exactly one Orientation focus: path, discovered module, or precise target.",
+);
+
+const RefactorTargetParam = exactOneSelector(
+  {
+    handle: Type.String({ description: "Target handle returned by code_resolve." }),
+    anchor: SourcePointParam,
+  },
+  "Exactly one refactor target: handle or provider-backed anchor.",
+);
+
+const RangeParam = Type.Object(
+  {
+    start: Type.Object(
+      { line: LineParam, character: CharacterParam },
+      { additionalProperties: false },
+    ),
+    end: Type.Object(
+      { line: LineParam, character: CharacterParam },
+      { additionalProperties: false },
+    ),
+  },
+  { description: "1-based selected source range.", additionalProperties: false },
+);
+
+const NewNameParam = Type.String({ description: "New symbol name.", minLength: 1 });
+
+const RefactorOperationParam = exactOneSelector(
+  {
+    rename_symbol: Type.Object(
+      { newName: NewNameParam },
+      { description: "Rename a semantic symbol.", additionalProperties: false },
+    ),
+    extract_function: Type.Object(
+      { newName: NewNameParam, range: RangeParam },
+      { description: "Extract the selected range into a function.", additionalProperties: false },
+    ),
+    extract_variable: Type.Object(
+      { newName: NewNameParam, range: RangeParam },
+      { description: "Extract the selected range into a variable.", additionalProperties: false },
+    ),
+  },
+  "Exactly one precise refactor operation.",
+);
+
+/** Resolve a semantic/file target and return session-scoped handles. */
+export const CodeResolveParameters = Type.Object(
+  {
+    target: ResolveTargetParam,
     maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
 );
 
-/** Planned `code_inspect` parameters. Requires a precise point in one file. */
+/** Inspect one precise point. */
 export const CodeInspectParameters = Type.Object(
   {
-    file: FileParam,
-    line: LineParam,
-    character: CharacterParam,
+    point: SourcePointParam,
     maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
 );
 
-/**
- * `code_orientation` parameters.
- *
- * Runtime rules:
- * - no focus means workspace-level orientation
- * - `focus` is a workspace-relative path or discovered module name
- * - `focus` + `line` + `character` resolves a real symbol target through the same path as `code_resolve`
- * - `targetId` takes precedence over focus/coordinates; stale target IDs do not fall back
- */
+/** Orient around the workspace or one exact focus. */
 export const CodeOrientationParameters = Type.Object(
   {
-    focus: Type.Optional(
-      Type.String({
-        description: "Workspace-relative path or module name; omit for workspace orientation.",
-      }),
-    ),
-    targetId: Type.Optional(
-      Type.String({
-        description: "Resolved target handle; takes precedence, stale IDs error.",
-      }),
-    ),
-    line: Type.Optional(
-      Type.Number({
-        description: "1-based line for symbol orientation with `focus`.",
-        minimum: 1,
-      }),
-    ),
-    character: Type.Optional(
-      Type.Number({
-        description: "1-based UTF-16 column for symbol orientation with `focus`.",
-        minimum: 1,
-      }),
-    ),
+    focus: Type.Optional(OrientationFocusParam),
     maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
 );
 
-/**
- * Planned `code_find` parameters.
- *
- * Phase 0 intentionally excludes speculative natural-language search. A future phase
- * may add it only after a real implementation exists.
- */
+/** Unified literal, regex, structural, and semantic search. */
 export const CodeFindParameters = Type.Object(
   {
     query: QueryParam,
@@ -167,46 +198,28 @@ export const CodeFindParameters = Type.Object(
           "enum",
           "test",
         ],
-        {
-          description: 'AST kind; only valid with mode:"ast".',
-        },
+        { description: 'AST kind; only valid with mode:"ast".' },
       ),
     ),
     contextLines: Type.Optional(
-      Type.Number({ description: "Context lines around matches.", minimum: 0 }),
+      Type.Integer({ description: "Context lines around matches.", minimum: 0 }),
     ),
     maxResults: Type.Optional(MaxResultsParam),
   },
   { additionalProperties: false },
 );
 
-/**
- * `code_graph` parameters.
- *
- * Phase 0 uses `references` rather than `callers` so the public contract stays honest
- * until a true incoming-call hierarchy exists.
- *
- * Runtime rule for future executors:
- * - require `targetId`, `file` + `line` + `character`, `symbol`, or `scope`
- */
+/** Provider-backed and explicitly structural relations for one target. */
 export const CodeGraphParameters = Type.Object(
   {
-    targetId: Type.Optional(TargetIdParam),
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
-    symbol: Type.Optional(SymbolParam),
-    scope: Type.Optional(ScopeParam),
+    target: GraphTargetParam,
     relations: Type.Optional(
-      Type.Array(
-        StringEnum(["all", "references", "callees", "imports", "exports", "implements", "tests"], {
-          description: "Relation family.",
-        }),
-        {
-          description: 'Requested relation families; defaults to ["references"].',
-          uniqueItems: true,
-        },
-      ),
+      Type.Array(StringEnum(["all", "references", "callees", "implements"]), {
+        description:
+          'Requested relations; defaults to ["references"]. "all" must be the only item.',
+        minItems: 1,
+        uniqueItems: true,
+      }),
     ),
     maxResults: Type.Optional(MaxResultsParam),
     calleeDepth: Type.Optional(
@@ -218,84 +231,27 @@ export const CodeGraphParameters = Type.Object(
   { additionalProperties: false },
 );
 
-/**
- * Planned `code_impact` parameters.
- *
- * Runtime rule for future executors:
- * - require at least one of `targetId`, `change`, or `changeSetFiles`
- */
-export const CodeImpactParameters = Type.Object(
-  {
-    targetId: Type.Optional(
-      Type.String({ description: "Resolved target handle from `code_resolve`." }),
-    ),
-    change: Type.Optional(
-      Type.String({ description: "Proposed change description for blast-radius analysis." }),
-    ),
-    changeSetFiles: Type.Optional(
-      Type.Array(Type.String({ description: "Workspace-relative file in the change set." }), {
-        description: "Explicit change-set files; not inferred from git and no line-level diff.",
-        minItems: 1,
-        uniqueItems: true,
-      }),
-    ),
-    includeTests: Type.Optional(
-      Type.Boolean({
-        description:
-          "Include likely tests using semantic references and deterministic conventions.",
-      }),
-    ),
-    maxResults: Type.Optional(MaxResultsParam),
-  },
-  { additionalProperties: false },
-);
-
-/**
- * Planned `code_refactor_plan` parameters.
- *
- * `operation` is the only intentional operation-style enum in the V2 skeleton.
- * Phase 0 does not introduce a generic action mega-tool.
- *
- * Runtime rules for future executors:
- * - require `targetId` or anchored `file` + `line` + `character`
- * - `rename` (legacy alias), `rename_symbol`, and extract operations require `newName`
- * - extract operations require `range`
- */
+/** Preview one precise semantic refactor without mutating files. */
 export const CodeRefactorParameters = Type.Object(
   {
-    operation: StringEnum(["rename", "rename_symbol", "extract_function", "extract_variable"], {
-      description: "Refactor operation; `rename` is an alias for `rename_symbol`.",
-    }),
-    targetId: Type.Optional(
-      Type.String({ description: "Resolved target handle from `code_resolve`." }),
-    ),
-    file: Type.Optional(FileParam),
-    line: Type.Optional(LineParam),
-    character: Type.Optional(CharacterParam),
-    range: Type.Optional(RangeParam),
-    newName: Type.Optional(
-      Type.String({ description: "New symbol name for rename/extract operations." }),
-    ),
+    target: RefactorTargetParam,
+    operation: RefactorOperationParam,
   },
   { additionalProperties: false },
 );
 
-/** Planned `code_refactor_apply` parameters. `planId` is required. */
+/** Apply a stored plan after freshness and fingerprint validation. */
 export const CodeApplyParameters = Type.Object(
   {
     planId: Type.String({
-      description: "Stored plan identifier returned by a previous refactor/plan step.",
+      description: "Stored plan identifier returned by code_refactor_plan.",
+      minLength: 1,
     }),
   },
   { additionalProperties: false },
 );
 
-/**
- * Planned `code_health` parameters.
- *
- * This is the future diagnostics/status surface that will eventually replace direct
- * public substrate diagnostics and recovery tools.
- */
+/** Report evidence-backed workspace health signals. */
 export const CodeHealthParameters = Type.Object(
   {
     scope: Type.Optional(ScopeParam),
@@ -307,10 +263,7 @@ export const CodeHealthParameters = Type.Object(
         StringEnum(["diagnostics", "servers", "dirty", "coverage", "unused"], {
           description: "Health signals to include.",
         }),
-        {
-          description: "Requested health-signal sections.",
-          uniqueItems: true,
-        },
+        { description: "Requested health-signal sections.", uniqueItems: true },
       ),
     ),
     level: Type.Optional(
@@ -320,13 +273,11 @@ export const CodeHealthParameters = Type.Object(
     ),
     coveragePath: Type.Optional(
       Type.String({
-        description: "Coverage summary path; defaults to `coverage/coverage-summary.json`.",
+        description: "Coverage summary path; defaults to coverage/coverage-summary.json.",
       }),
     ),
     unusedPath: Type.Optional(
-      Type.String({
-        description: "Knip report path; defaults to `knip.json`.",
-      }),
+      Type.String({ description: "Knip report path; defaults to knip.json." }),
     ),
   },
   { additionalProperties: false },
@@ -341,7 +292,6 @@ export const CODE_INTELLIGENCE_TOOL_SCHEMAS = {
   code_orientation: CodeOrientationParameters,
   code_find: CodeFindParameters,
   code_graph: CodeGraphParameters,
-  code_impact: CodeImpactParameters,
   code_refactor_plan: CodeRefactorParameters,
   code_refactor_apply: CodeApplyParameters,
   code_health: CodeHealthParameters,

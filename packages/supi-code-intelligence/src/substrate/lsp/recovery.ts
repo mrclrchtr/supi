@@ -1,6 +1,6 @@
 // Workspace recovery handler — tool_result event that recovers LSP state after write/edit.
 //
-// Notifies the LSP manager about file changes so diagnostics stay fresh.
+// Notifies the workspace LSP runtime about file changes so diagnostics stay fresh.
 
 import * as nodePath from "node:path";
 import type {
@@ -13,8 +13,8 @@ import type { LspAdapterState } from "./state.ts";
 
 export function registerWorkspaceRecoveryHandler(pi: ExtensionAPI, state: LspAdapterState): void {
   pi.on("tool_result", async (event: ToolResultEvent, _ctx: ExtensionContext) => {
-    const manager = state.controller?.manager;
-    if (!manager || event.isError) return;
+    const runtime = state.controller?.workspaceRuntime;
+    if (!runtime || event.isError) return;
 
     const filePath = getFilePathFromToolResult(event);
     if (!filePath) return;
@@ -29,8 +29,7 @@ export function registerWorkspaceRecoveryHandler(pi: ExtensionAPI, state: LspAda
       clearTsconfigCache();
     }
 
-    manager.clearAllPullResultIds();
-    manager.notifyWorkspaceFileChanges([{ uri: filePathToUri(resolved), type: 2 }]);
+    runtime.noteWorkspaceChanges([{ uri: filePathToUri(resolved), type: 2 }]);
 
     state.staleSuspected = true;
     state.lastDiagnosticsFingerprint = null;

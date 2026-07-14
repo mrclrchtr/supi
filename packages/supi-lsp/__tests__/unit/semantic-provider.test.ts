@@ -1,7 +1,7 @@
 import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
-import type { SessionLspService } from "../../src/session/service-registry.ts";
+import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 
 // biome-ignore lint/security/noSecrets: false positive on "LspSemanticProvider" describe name
 describe("LspSemanticProvider", () => {
@@ -30,11 +30,11 @@ describe("LspSemanticProvider", () => {
     };
   }
 
-  function createMockLsp(overrides?: Partial<SessionLspService>): SessionLspService {
-    return { ...defaultMockFields(), ...overrides } as unknown as SessionLspService;
+  function createMockLsp(overrides?: Partial<WorkspaceLspRuntime>): WorkspaceLspRuntime {
+    return { ...defaultMockFields(), ...overrides } as unknown as WorkspaceLspRuntime;
   }
 
-  it("creates a SemanticProvider from a SessionLspService", () => {
+  it("creates a SemanticProvider from a WorkspaceLspRuntime", () => {
     const lsp = createMockLsp();
     const provider: SemanticProvider = createLspSemanticProvider(lsp);
     expect(typeof provider.references).toBe("function");

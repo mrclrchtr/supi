@@ -179,7 +179,7 @@ describe("LspRuntimeController", () => {
     expect(typeof getDeprecatedLspKeys).toBe("function");
   });
 
-  it("exposes manager and service in ready state after start", async () => {
+  it("exposes only the workspace runtime in ready state after start", async () => {
     const tmpDir = makeProjectDir();
     fs.writeFileSync(path.join(tmpDir, "package.json"), JSON.stringify({ name: "test-project" }));
 
@@ -188,9 +188,9 @@ describe("LspRuntimeController", () => {
 
     if (result.kind === "ready") {
       expect(controller.kind).toBe("ready");
-      expect(controller.manager).toBeTruthy();
-      expect(controller.service).toBeTruthy();
+      expect(controller.workspaceRuntime).toBe(result.runtime);
       expect(controller.projectServers).toBeDefined();
+      expect(controller).not.toHaveProperty("manager");
     }
     // In CI without any language servers, it may be "unavailable" or "ready" with no servers
     // Either is valid — we just test the shape

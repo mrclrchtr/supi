@@ -107,32 +107,15 @@ function findFirstInstructionFile(
   return null;
 }
 
-/** Render instruction files as a markdown section and structured metadata. */
-export function renderInstructionFiles(
+/** Read bounded instruction-file facts for session-owned Orientation. */
+export function collectInstructionFiles(
   files: InstructionFileMatch[],
   lineLimit = INSTRUCTION_FILE_LINE_LIMIT,
-): { markdown: string; metadata: InstructionFilesMetadata } | null {
+): { files: RenderedInstructionFile[]; metadata: InstructionFilesMetadata } | null {
   const rendered = files.map((file) => renderInstructionFile(file, lineLimit)).filter(isRendered);
   if (rendered.length === 0) return null;
-
-  const lines: string[] = [];
-  lines.push("## Instructions");
-  lines.push("");
-  for (const file of rendered) {
-    lines.push(`### ${file.path}`);
-    lines.push("");
-    lines.push(file.content);
-    if (file.truncated) {
-      lines.push("");
-      lines.push(
-        `_Instruction file truncated to ${file.shownLines} of ${file.totalLines} lines. Use \`read\` on \`${file.path}\` for the full file._`,
-      );
-    }
-    lines.push("");
-  }
-
   return {
-    markdown: lines.join("\n").trimEnd(),
+    files: rendered,
     metadata: {
       files: rendered.map(({ content: _content, ...metadata }) => metadata),
     },
@@ -172,23 +155,4 @@ function renderInstructionFile(
 
 function isRendered(value: RenderedInstructionFile | null): value is RenderedInstructionFile {
   return value !== null;
-}
-
-/** Insert instruction markdown after the opening title/summary block of a brief. */
-export function insertInstructionsNearTop(content: string, instructionsMarkdown: string): string {
-  const lines = content.split("\n");
-  const insertAt = findFirstSectionIndexAfterTitle(lines);
-  const before = lines.slice(0, insertAt).join("\n").trimEnd();
-  const after = lines.slice(insertAt).join("\n").trimStart();
-
-  if (!before) return `${instructionsMarkdown}\n\n${after}`.trimEnd();
-  if (!after) return `${before}\n\n${instructionsMarkdown}`.trimEnd();
-  return `${before}\n\n${instructionsMarkdown}\n\n${after}`.trimEnd();
-}
-
-function findFirstSectionIndexAfterTitle(lines: string[]): number {
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].startsWith("## ")) return i;
-  }
-  return lines.length;
 }

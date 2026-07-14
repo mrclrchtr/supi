@@ -3,10 +3,6 @@
 
 import type { BeforeAgentStartEventResult, ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { buildArchitectureModel } from "./analysis/architecture/discovery.ts";
-import {
-  evaluateCoverageWarnings,
-  gatherCoverageEvalInput,
-} from "./analysis/coverage/coverage-warnings.ts";
 import { createCodeIntelligenceApp } from "./app/app.ts";
 import { registerCodeIntelligenceSettings } from "./config.ts";
 import type { WorkspaceCodeIntelligenceSession } from "./session/session.ts";
@@ -28,6 +24,53 @@ import { registerLspMessageRenderer } from "./ui/message-renderer.ts";
 import { registerCiStatusCommand } from "./ui/status-command.ts";
 
 const OVERVIEW_CUSTOM_TYPE = "code-intelligence-overview";
+const PROCESS_EXIT_SAFETY_NET = Symbol.for("supi-code-intelligence/process-exit-safety-net");
+
+interface ProcessExitSafetyNet {
+  cleanup: (() => void) | null;
+  handlerRegistered: boolean;
+  handler: () => void;
+}
+
+/**
+ * Keep one process-exit listener across `/reload` extension instances.
+ * Pi hosts one active extension API per process; replacing its cleanup callback
+ * prevents old adapter state from being retained after reload.
+ */
+function registerProcessExitSafetyNet(cleanup: () => void): () => void {
+  const host = globalThis as Record<symbol, ProcessExitSafetyNet | undefined>;
+  const safetyNet = host[PROCESS_EXIT_SAFETY_NET] ?? createProcessExitSafetyNet();
+  host[PROCESS_EXIT_SAFETY_NET] = safetyNet;
+
+  safetyNet.cleanup = cleanup;
+  if (!safetyNet.handlerRegistered) {
+    process.once("exit", safetyNet.handler);
+    safetyNet.handlerRegistered = true;
+  }
+
+  return () => {
+    if (safetyNet.cleanup !== cleanup) return;
+    safetyNet.cleanup = null;
+    if (!safetyNet.handlerRegistered) return;
+    process.off("exit", safetyNet.handler);
+    safetyNet.handlerRegistered = false;
+  };
+}
+
+function createProcessExitSafetyNet(): ProcessExitSafetyNet {
+  const safetyNet: ProcessExitSafetyNet = {
+    cleanup: null,
+    handlerRegistered: false,
+    handler: () => {},
+  };
+  safetyNet.handler = () => {
+    safetyNet.handlerRegistered = false;
+    const activeCleanup = safetyNet.cleanup;
+    safetyNet.cleanup = null;
+    activeCleanup?.();
+  };
+  return safetyNet;
+}
 
 export default function codeIntelligenceExtension(
   pi: ExtensionAPI,
@@ -51,8 +94,7 @@ export default function codeIntelligenceExtension(
   pi.on("session_start", (_event, ctx) => {
     const session = app.getSession(ctx.cwd);
     if (!session) return;
-    if (lspState.controller) session.lspController = lspState.controller;
-    if (tsState.controller) session.tsController = tsState.controller;
+    session.attachLspController(lspState.controller);
   });
 
   // ── Tool registration ─────────────────────────────────────────────
@@ -79,10 +121,7 @@ export default function codeIntelligenceExtension(
       const session = app.getSession(ctx.cwd);
       if (!session) return;
 
-      const report = evaluateCoverageWarnings(
-        gatherCoverageEvalInput(ctx.cwd, session.lspController),
-      );
-      const pending = session.coverageWarningState.getPendingWarnings(report);
+      const pending = session.pendingCoverageWarnings();
       if (pending.length === 0) return;
 
       const lines = [
@@ -116,8 +155,7 @@ export default function codeIntelligenceExtension(
     async (_event, ctx): Promise<BeforeAgentStartEventResult | undefined> => {
       const session = app.getSession(ctx.cwd);
       if (!session) return;
-      if (session.hasInjectedOverview) return;
-      session.hasInjectedOverview = true;
+      if (!session.claimOverviewInjection()) return;
 
       const model = await buildArchitectureModel(ctx.cwd);
       if (!model || model.modules.length === 0) return;
@@ -139,21 +177,14 @@ export default function codeIntelligenceExtension(
   );
 
   // ── Process-exit safety net ─────────────────────────────────────────
-  //
-  // If the Node process exits without `session_shutdown` firing (crash,
-  // unhandled rejection, SIGINT), make a best-effort synchronous attempt
-  // to terminate the LSP and Tree-sitter controller trees.
-  //
-  // `process.on("exit")` handlers are synchronous — we cannot await
-  // controller shutdown, but `process.kill(-pid, "SIGTERM")` fires
-  // synchronously and the SIGKILL escalation in LspClient is handled
-  // by the kernel after process termination.
   let cleaningUp = false;
-  process.once("exit", () => {
+  const unregisterExitSafetyNet = registerProcessExitSafetyNet(() => {
     if (cleaningUp) return;
     cleaningUp = true;
-    // Fire and forget — the critical kill calls are synchronous.
+    // Exit handlers cannot await. Controller shutdown begins synchronous
+    // process cleanup before its first await.
     void lspState.controller?.shutdown();
     void tsState.controller?.shutdown();
   });
+  pi.on("session_shutdown", unregisterExitSafetyNet);
 }

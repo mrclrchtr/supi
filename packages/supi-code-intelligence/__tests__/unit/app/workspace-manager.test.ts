@@ -33,7 +33,7 @@ describe("workspace-manager", () => {
     const session = app.createSession("/project-a");
     expect(session).toBeDefined();
     expect(session.cwd).toBe("/project-a");
-    expect(session.hasInjectedOverview).toBe(false);
+    expect(session.claimOverviewInjection()).toBe(true);
   });
 
   it("returns the same session for the same cwd on repeated calls", () => {
@@ -50,28 +50,16 @@ describe("workspace-manager", () => {
     expect(sessionB.cwd).toBe("/project-b");
   });
 
-  it("creates sessions with distinct plan stores", () => {
-    const sessionA = app.createSession("/project-a");
-    const sessionB = app.createSession("/project-b");
-    // Each session should have its own refactor plan store
-    expect(sessionA.planCount).toBe(0);
-    expect(sessionB.planCount).toBe(0);
-  });
-
-  it("creates sessions with distinct target stores", () => {
-    const sessionA = app.createSession("/project-a");
-    const sessionB = app.createSession("/project-b");
-    // Each session should have its own workflow target store
-    expect(sessionA.targetCount).toBe(0);
-    expect(sessionB.targetCount).toBe(0);
-  });
-
-  it("tracks overview-injection state on a session", () => {
+  it("claims overview injection once per session", () => {
     const session = app.createSession("/project-a");
-    expect(session.hasInjectedOverview).toBe(false);
+    expect(session.claimOverviewInjection()).toBe(true);
+    expect(session.claimOverviewInjection()).toBe(false);
+  });
 
-    session.hasInjectedOverview = true;
-    expect(session.hasInjectedOverview).toBe(true);
+  it("restores overview state from branch history", () => {
+    const session = app.createSession("/project-a");
+    session.restoreOverviewInjection();
+    expect(session.claimOverviewInjection()).toBe(false);
   });
 
   it("does not replace the shared capability broker", () => {

@@ -6,7 +6,7 @@ import {
   registerPendingLspCapabilities,
   unregisterLspCapabilities,
 } from "../../src/session/runtime-registration.ts";
-import type { SessionLspService } from "../../src/session/service-registry.ts";
+import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 
 describe("LSP runtime registration", () => {
   let runtime: WorkspaceRuntime;
@@ -150,13 +150,13 @@ describe("LSP runtime registration", () => {
       registerLspCapabilities(runtime, "/project", service);
 
       const ws = runtime.getWorkspace("/project");
-      // SessionLspService always has rename and codeActions → adapter always exposes them → refactorAvailable is true
+      // WorkspaceLspRuntime always has rename and codeActions → adapter always exposes them → refactorAvailable is true
       expect(ws.semantic.refactorAvailable).toBe(true);
     });
   });
 });
 
-function createMockLspService(overrides?: Partial<SessionLspService>): SessionLspService {
+function createMockLspService(overrides?: Partial<WorkspaceLspRuntime>): WorkspaceLspRuntime {
   const defaults: Record<string, unknown> = {
     references: vi.fn().mockResolvedValue(null),
     implementation: vi.fn().mockResolvedValue(null),
@@ -179,7 +179,7 @@ function createMockLspService(overrides?: Partial<SessionLspService>): SessionLs
     }),
     resolveFilePath: vi.fn().mockImplementation((f: string) => f),
   };
-  return { ...defaults, ...overrides } as unknown as SessionLspService;
+  return { ...defaults, ...overrides } as unknown as WorkspaceLspRuntime;
 }
 
 function createMockTsService(): StructuralProvider {

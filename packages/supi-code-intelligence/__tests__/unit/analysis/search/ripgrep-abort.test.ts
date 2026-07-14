@@ -69,7 +69,7 @@ describe("abort-aware ripgrep", () => {
         writeFileSync(path.join(dir, `f${i}.ts`), `export function foo${i}() { return ${i}; }\n`);
       }
       const ac = new AbortController();
-      const p = runRipgrepDetailed("foo", dir, dir, { maxMatches: 1000, signal: ac.signal });
+      const p = runRipgrepDetailed("foo", dir, dir, { signal: ac.signal });
       ac.abort();
       await expect(p).rejects.toBeInstanceOf(RipgrepAbortedError);
     }),

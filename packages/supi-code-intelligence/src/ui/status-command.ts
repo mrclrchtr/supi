@@ -4,7 +4,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import {
   evaluateCoverageWarnings,
   gatherCoverageEvalInput,
@@ -53,9 +53,9 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
               tui,
               fetchDetailedDiagnostics: async (maxSeverity) => {
                 const ps = getCodeProvider(ctx.cwd);
-                const lspState = ps.kind === "ready" ? ps.lspService : null;
+                const lspState = ps.kind === "ready" ? ps.lspRuntime : null;
                 if (lspState?.kind !== "ready") return [];
-                return lspState.service.getOutstandingDiagnostics(maxSeverity);
+                return lspState.runtime.getOutstandingDiagnostics(maxSeverity);
               },
               onRefresh: async () => {
                 const fresh = await gatherCiStatusData(ctx.cwd, pi);
@@ -93,12 +93,12 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
 async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStatusData> {
   const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
   const providerState = getCodeProvider(cwd);
-  const lspState = providerState.kind === "ready" ? providerState.lspService : null;
+  const lspState = providerState.kind === "ready" ? providerState.lspRuntime : null;
 
-  const servers = lspState && lspState.kind === "ready" ? lspState.service.getProjectServers() : [];
+  const servers = lspState && lspState.kind === "ready" ? lspState.runtime.getProjectServers() : [];
   const diagnostics =
     lspState && lspState.kind === "ready"
-      ? lspState.service.getOutstandingDiagnosticSummary(1)
+      ? lspState.runtime.getOutstandingDiagnosticSummary(1)
       : [];
   const semanticState = deriveSemanticCapabilityState(workspace, lspState);
 
@@ -143,7 +143,7 @@ function deriveSemanticCapabilityState(
       provider: unknown | null;
     };
   },
-  lspState: SessionLspServiceState | null,
+  lspState: WorkspaceLspRuntimeState | null,
 ): CiStatusData["capabilities"]["semantic"] {
   if (lspState?.kind === "ready") {
     return {

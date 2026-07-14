@@ -1,22 +1,14 @@
-// Diagnostic store — stores, aggregates, and queries diagnostics.
+// Diagnostic store — owns diagnostic queries and synchronized collection.
 
 import type { Diagnostic } from "../config/types.ts";
 import type { LspManager } from "./manager.ts";
 
-/**
- * Stores and queries diagnostics per file.
- * Currently delegates to LspManager methods.
- */
+/** Workspace diagnostic reads and synchronized collection. */
 export interface DiagnosticStore {
-  /** Get workspace diagnostic summary grouped by file. */
   getDiagnosticSummary(): Array<{ file: string; errors: number; warnings: number }>;
-
-  /** Get outstanding diagnostics at or above severity. */
   getOutstandingDiagnostics(
     maxSeverity?: number,
   ): Array<{ file: string; diagnostics: Diagnostic[] }>;
-
-  /** Get outstanding diagnostic summary grouped by file. */
   getOutstandingDiagnosticSummary(maxSeverity?: number): Array<{
     file: string;
     total: number;
@@ -25,14 +17,14 @@ export interface DiagnosticStore {
     information: number;
     hints: number;
   }>;
-
-  /** Sync a file and return its diagnostics. */
-  syncAndGetDiagnostics(filePath: string, maxSeverity?: number): Promise<Diagnostic[] | null>;
+  syncFile(filePath: string, maxSeverity?: number): Promise<Diagnostic[] | null>;
+  syncFileWithCascade(
+    filePath: string,
+    maxSeverity?: number,
+  ): Promise<Array<{ file: string; diagnostics: Diagnostic[] }>>;
 }
 
-/**
- * Create a DiagnosticStore backed by LspManager.
- */
+/** Create the diagnostics interface around the package-internal manager. */
 export function createDiagnosticStore(manager: LspManager): DiagnosticStore {
   return {
     getDiagnosticSummary() {
@@ -44,8 +36,11 @@ export function createDiagnosticStore(manager: LspManager): DiagnosticStore {
     getOutstandingDiagnosticSummary(maxSeverity = 1) {
       return manager.getOutstandingDiagnosticSummary(maxSeverity);
     },
-    async syncAndGetDiagnostics(filePath: string, maxSeverity = 4) {
+    async syncFile(filePath, maxSeverity = 4) {
       return manager.syncFileAndGetDiagnostics(filePath, maxSeverity);
+    },
+    async syncFileWithCascade(filePath, maxSeverity = 4) {
+      return manager.syncFileAndGetCascadingDiagnostics(filePath, maxSeverity);
     },
   };
 }

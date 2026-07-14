@@ -1,10 +1,10 @@
 // Shared typed data interfaces between use-case and presentation layers.
 
-import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import type { ArchitectureModel } from "../../analysis/architecture/model.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import type { AnchorKind } from "../../session/target-store.ts";
-import type { ContextDetails, InspectDetails } from "../../types/details.ts";
+import type { InspectDetails } from "../../types/details.ts";
 
 // ── Overview use-case ────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ export interface InspectInput {
 export interface InspectDeps {
   provider: CodeProvider | null;
   cwd: string;
-  lspService: SessionLspServiceState;
+  lspRuntime: WorkspaceLspRuntimeState;
 }
 
 export interface InspectUseCaseResult {
@@ -71,10 +71,5 @@ export interface OrientationDeps {
   model: ArchitectureModel | null;
   provider: CodeProvider | null;
   cwd: string;
-  lspService: SessionLspServiceState;
-}
-
-export interface OrientationUseCaseResult {
-  content: string;
-  details: ContextDetails;
+  lspRuntime: WorkspaceLspRuntimeState;
 }

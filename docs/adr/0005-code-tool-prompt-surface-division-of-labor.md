@@ -1,38 +1,31 @@
 # code_* prompt surface: mechanics in description, steering in guidelines
 
-For the `code_*` tools in `supi-code-intelligence`, the full tool mechanics
-(mode/kind matrix, anchored-resolution snapping, `targetId`-precedence, side
-effects, truncation limits, ordering) live in `description` — the always-on
-provider tool description. `promptGuidelines` shrink to ≤5 bullets that each
-name the tool and carry only sibling-selection steering ("use code_graph
-instead of code_impact when …") plus the one or two execution rules that most
-prevent misuse at call time. No mechanics are re-listed in guidelines.
+For the eight `code_*` tools in `supi-code-intelligence`, complete call mechanics live in `description`, the always-visible provider tool description. This includes exact-one nested selectors, mode/kind matrices, result limits, side effects, and evidence semantics.
 
-`promptGuidelines` are appended to the `Guidelines` section **only while the
-tool is active**, so any mechanic that lived solely in guidelines would be
-invisible at tool-selection time. Keeping the contract self-sufficient in
-`description` guarantees correct selection; trimming guidelines to
-high-leverage steering removes the description↔guidelines duplication that was
-the real token waste. This tensions pure token-efficiency (descriptions stay
-longer than a minimal skeleton) but follows the tool-guidance rule: keep
-negative/ordering guidance only when it materially improves tool choice or
-execution quality.
+`promptGuidelines` stay at five or fewer bullets per tool. They carry sibling-selection steering and only the execution rules that most prevent misuse. Mechanics are not repeated there.
+
+The public family is:
+
+- `code_resolve`
+- `code_inspect`
+- `code_orientation`
+- `code_graph`
+- `code_find`
+- `code_health`
+- `code_refactor_plan`
+- `code_refactor_apply`
+
+`promptGuidelines` are appended to the Guidelines section only while a tool is active. A mechanic that exists solely in guidelines would therefore be invisible during tool selection. Keeping each `description` self-sufficient preserves selection correctness; concise guidelines reduce prompt duplication.
 
 ## Considered Options
 
-- **Guidelines summarize mechanics too** — rejected: duplicates the
-  description and the checklist flags this as token waste.
-- **Mechanics in guidelines, description high-level** — rejected: mechanics
-  vanish when the tool is inactive, weakening selection; description becomes
-  too thin to self-describe.
+- **Guidelines summarize mechanics too** — rejected because it duplicates descriptions and wastes prompt tokens.
+- **Mechanics in guidelines, description high-level** — rejected because mechanics vanish when the tool is inactive.
+- **Keep guidance for retired tools or flat inputs** — rejected because stale steering is worse than omitted steering.
 
 ## Consequences
 
-- Descriptions are deliberately longer than a "minimal skeleton" rewrite; do
-  not "trim" them by moving mechanics into guidelines.
-- When adding a new `code_*` tool, put the full contract in `description` and
-  keep `promptGuidelines` to selection + key execution rules.
-- Tests in `extension-registration.test.ts` pin the high-risk prompt-contract
-  substrings (`mode:"ast"`, `does not silently fall back`,
-  `not by symbol identity`, `symbol-identity-aware callers`, `code_health`
-  coverage/unused); compression must preserve those safety cues.
+- Descriptions are deliberately longer than a minimal skeleton; do not shorten them by moving mechanics into guidelines.
+- `src/tool/specs.ts` and `src/tool/guidance.ts` must remain aligned with the exact eight-tool list.
+- Prompt tests pin high-risk cues: AST mode requirements, no silent fallback, structural callees versus symbol identity, exact-one target shapes, and planner/applier separation.
+- Adding or removing a tool updates schemas, descriptions, guidelines, registration, and active-tool tests in the same change.

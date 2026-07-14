@@ -26,21 +26,24 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
   // ── Whole-tool capability-unavailable → execute() throws ─────────────
 
   it("code_graph throws when no analysis provider is available", async () => {
-    await expect(executeGraphTool({ symbol: "foo" }, makeTestCtx(tmpDir))).rejects.toThrow(
-      "No analysis provider is available",
-    );
+    await expect(
+      executeGraphTool({ target: { symbol: { query: "foo" } } }, makeTestCtx(tmpDir)),
+    ).rejects.toThrow("No semantic/LSP provider is active");
   });
 
   it("code_resolve throws for query mode when no semantic provider is active", async () => {
-    await expect(executeResolveTool({ query: "foo" }, makeTestCtx(tmpDir))).rejects.toThrow(
-      /provider/i,
-    );
+    await expect(
+      executeResolveTool({ target: { symbol: { query: "foo" } } }, makeTestCtx(tmpDir)),
+    ).rejects.toThrow(/provider/i);
   });
 
   it("code_refactor_plan throws when no semantic provider is active", async () => {
     await expect(
       executeRefactorPlanTool(
-        { operation: "rename_symbol", file: "a.ts", line: 1, character: 1, newName: "bar" },
+        {
+          target: { anchor: { file: "a.ts", line: 1, character: 1 } },
+          operation: { rename_symbol: { newName: "bar" } },
+        },
         makeTestCtx(tmpDir),
       ),
     ).rejects.toThrow(/provider/i);
@@ -48,18 +51,13 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
 
   // ── Self-correctable invalid usage → returns error text (no throw) ────
 
-  it("code_graph returns text (not throw) for a missing target", async () => {
-    const result = await executeGraphTool({}, makeTestCtx(tmpDir));
-    expect(result.content).toContain("At least one of");
-  });
-
   it("code_find returns text (not throw) for an empty query", async () => {
     const result = await executeFindTool({ query: "" }, makeTestCtx(tmpDir));
-    expect(result.content).toContain("requires a non-empty");
+    expect(result.content).toContain("query must not be empty");
   });
 
   it("code_refactor_apply returns text (not throw) for a missing planId", async () => {
     const result = await executeRefactorApplyTool({ planId: "" }, makeTestCtx(tmpDir));
-    expect(result.content).toContain("`planId` is required");
+    expect(result.content).toContain("planId is required");
   });
 });

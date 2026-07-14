@@ -9,7 +9,7 @@
  */
 
 import * as path from "node:path";
-import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import { renderModuleDiagnostics } from "../../ui/markdown/brief.ts";
 import type { ArchitectureModel } from "../architecture/model.ts";
 import { findModuleForPath, getDependencies, getDependents } from "../architecture/model.ts";
@@ -146,13 +146,13 @@ function addDependentsSection(
       const depShort = dep.name.replace(/^@[^/]+\//, "");
       lines.push(`- ${depShort} (\`${dep.relativePath}\`)`);
     }
-    nextQueries.push("`code_impact` before modifying exports from this module");
+    nextQueries.push("Use `code_resolve` then `code_graph` references before modifying exports");
   }
 
   if (mod.entrypoints.length > 0) {
     const ep = mod.entrypoints[0];
     nextQueries.push(
-      `\`code_orientation\` with \`focus: "${mod.relativePath}/${ep.replace(/^\.\//, "")}"\` for entrypoint details`,
+      `\`code_orientation\` with \`focus: { path: "${mod.relativePath}/${ep.replace(/^\.\//, "")}" }\` for entrypoint details`,
     );
   }
 }
@@ -279,8 +279,8 @@ async function enrichModuleWithDiagnostics(
     sourceFiles,
     dirPath,
     opts.cwd,
-    opts.lspService ??
-      ({ kind: "unavailable" as const, reason: "No LSP service" } as SessionLspServiceState),
+    opts.lspRuntime ??
+      ({ kind: "unavailable" as const, reason: "No LSP service" } as WorkspaceLspRuntimeState),
     opts.maxResults,
   );
   if (enrichmentDiags) {
@@ -288,23 +288,23 @@ async function enrichModuleWithDiagnostics(
   }
 }
 
-// biome-ignore lint/complexity/useMaxParams: lspService is a DI seam, not a logic parameter
+// biome-ignore lint/complexity/useMaxParams: lspRuntime is a DI seam, not a logic parameter
 async function gatherModuleDiagnostics(
   sourceFiles: string[],
   dirPath: string,
   cwd: string,
-  lspService: SessionLspServiceState,
+  lspRuntime: WorkspaceLspRuntimeState,
   maxResults?: number,
 ): Promise<string | null> {
   try {
-    if (lspService.kind !== "ready") return null;
+    if (lspRuntime.kind !== "ready") return null;
 
     const fileDiags: Array<{ file: string; errors: number; warnings: number }> = [];
     for (const basename of sourceFiles) {
       const fullPath = path.join(dirPath, basename);
       const relPath = path.relative(cwd, fullPath);
       try {
-        const diags = await lspService.service.fileDiagnostics(relPath, 2);
+        const diags = await lspRuntime.runtime.fileDiagnostics(relPath, 2);
         if (!diags || diags.length === 0) continue;
         const errors = diags.filter((d) => (d.severity ?? 1) === 1).length;
         const warnings = diags.filter((d) => (d.severity ?? 1) === 2).length;

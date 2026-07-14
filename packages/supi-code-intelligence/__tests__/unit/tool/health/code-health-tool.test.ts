@@ -11,9 +11,14 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createEvidenceList,
+  createPartialEvidenceList,
+} from "../../../../src/analysis/evidence.ts";
 import codeIntelligenceExtension from "../../../../src/extension.ts";
 import {
   type CodeActionSuggestion,
+  type HealthCodeActions,
   type HealthData,
   renderHealthResult,
 } from "../../../../src/tool/health/markdown.ts";
@@ -21,14 +26,14 @@ import { assembleHealthResult } from "../../../../src/tool/result/health.ts";
 import { clearMockRuntime, registerMockProvider } from "../../../helpers/register-mock-runtime.ts";
 
 const mockLspFns = vi.hoisted(() => ({
-  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
+  getWorkspaceLspRuntime: vi.fn<(cwd: string) => unknown>(),
 }));
 
 vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
   return {
     ...actual,
-    getSessionLspService: mockLspFns.getSessionLspService,
+    getWorkspaceLspRuntime: mockLspFns.getWorkspaceLspRuntime,
   };
 });
 
@@ -37,7 +42,7 @@ let tmpDir: string;
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(os.tmpdir(), "code-health-"));
   // Default: LSP unavailable for existing tests
-  mockLspFns.getSessionLspService.mockReturnValue({
+  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
     kind: "unavailable",
     reason: "no active session",
   });
@@ -59,7 +64,7 @@ function mockReadyLsp(
     recoverDiagnostics: ReturnType<typeof vi.fn>;
   }> = {},
 ) {
-  const service = {
+  const runtime = {
     codeActions: vi.fn().mockResolvedValue([]),
     getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
     getProjectServers: vi
@@ -73,12 +78,12 @@ function mockReadyLsp(
     ...overrides,
   };
 
-  mockLspFns.getSessionLspService.mockReturnValue({
+  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
     kind: "ready",
-    service,
+    runtime,
   });
 
-  return service;
+  return runtime;
 }
 
 function writeCoverageSummary(
@@ -105,6 +110,24 @@ function writeKnipSummary(content: {
   exports?: Array<{ file: string; name: string }>;
 }) {
   writeFileSync(path.join(tmpDir, "knip.json"), JSON.stringify(content, null, 2));
+}
+
+function makeCodeActions(items: CodeActionSuggestion[]): HealthCodeActions {
+  return {
+    items,
+    evidence: createEvidenceList({ key: "health.codeActions", items }).metadata,
+  };
+}
+
+function makePartialCodeActions(items: CodeActionSuggestion[]): HealthCodeActions {
+  return {
+    items,
+    evidence: createPartialEvidenceList({
+      key: "health.codeActions",
+      items,
+      partialReason: "safety-limit",
+    }).metadata,
+  };
 }
 
 describe("code_health tool", () => {
@@ -472,9 +495,16 @@ describe("code_health tool", () => {
     };
 
     expect(result.content[0].text).toContain("### Coverage");
-    expect(result.content[0].text).toContain("No coverage report");
+    expect(result.content[0].text).toContain("Coverage report unavailable");
+    expect(result.content[0].text).toContain("coverage/coverage-summary.json");
+    expect(result.content[0].text).toContain(
+      "does not establish that no coverage report exists elsewhere",
+    );
     expect(result.content[0].text).toContain("### Unused");
-    expect(result.content[0].text).toContain("No unused report");
+    expect(result.content[0].text).toContain("Unused-code report unavailable");
+    expect(result.content[0].text).toContain(
+      "does not establish that no unused-code report exists elsewhere",
+    );
     expect(result.content[0].text).not.toContain("### Diagnostics");
   });
 
@@ -634,7 +664,7 @@ describe("renderHealthResult code actions", () => {
 
     const data = makeBaseData({
       diagnostics: [{ file: "/tmp/src/file.ts", errors: 2, warnings: 0 }],
-      codeActions: actions,
+      codeActions: makeCodeActions(actions),
     });
 
     const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
@@ -679,12 +709,25 @@ describe("renderHealthResult code actions", () => {
   it("does not render code actions section when codeActions is empty", () => {
     const data = makeBaseData({
       diagnostics: [{ file: "/tmp/src/file.ts", errors: 2, warnings: 0 }],
-      codeActions: [],
+      codeActions: makeCodeActions([]),
     });
 
     const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
     expect(result).not.toContain("### Code Actions");
+  });
+
+  it("discloses a partial code-action collection even when it has no suggestions", () => {
+    const data = makeBaseData({
+      diagnostics: [{ file: "/tmp/src/file.ts", errors: 1, warnings: 0 }],
+      codeActions: makePartialCodeActions([]),
+    });
+
+    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
+
+    expect(result).toContain("### Code Actions");
+    expect(result).toContain("No code-action suggestions were collected");
+    expect(result).toContain("_(showing 0; more may exist — safety-limit)_");
   });
 
   it("does not render code actions section in summary level even when populated", () => {
@@ -697,7 +740,7 @@ describe("renderHealthResult code actions", () => {
     const data = makeBaseData({
       level: "summary",
       diagnostics: [{ file: "/tmp/src/file.ts", errors: 1, warnings: 0 }],
-      codeActions: actions,
+      codeActions: makeCodeActions(actions),
     });
 
     const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
@@ -713,9 +756,9 @@ describe("code_health detailed mode with code actions", () => {
   });
 
   it("includes code action titles when LSP returns actions in detailed mode", async () => {
-    mockLspFns.getSessionLspService.mockReturnValue({
+    mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
-      service: {
+      runtime: {
         codeActions: vi.fn().mockResolvedValue([
           { title: "Remove unused import", kind: "quickfix" },
           { title: "Fix all auto-fixable problems", kind: "source.fixAll" },
@@ -762,9 +805,9 @@ describe("code_health detailed mode with code actions", () => {
   it("does not include code actions in summary mode", async () => {
     const codeActionsSpy = vi.fn().mockResolvedValue([]);
 
-    mockLspFns.getSessionLspService.mockReturnValue({
+    mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
-      service: {
+      runtime: {
         codeActions: codeActionsSpy,
         getOutstandingDiagnostics: vi.fn().mockReturnValue([]),
         getProjectServers: vi.fn().mockReturnValue([]),
@@ -791,9 +834,9 @@ describe("code_health detailed mode with code actions", () => {
   });
 
   it("handles codeActions returning null gracefully", async () => {
-    mockLspFns.getSessionLspService.mockReturnValue({
+    mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
-      service: {
+      runtime: {
         codeActions: vi.fn().mockResolvedValue(null),
         getOutstandingDiagnostics: vi.fn().mockReturnValue([
           {
@@ -833,9 +876,9 @@ describe("code_health detailed mode with code actions", () => {
   });
 
   it("handles codeActions throwing gracefully", async () => {
-    mockLspFns.getSessionLspService.mockReturnValue({
+    mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
-      service: {
+      runtime: {
         codeActions: vi.fn().mockRejectedValue(new Error("LSP timeout")),
         getOutstandingDiagnostics: vi.fn().mockReturnValue([
           {

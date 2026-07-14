@@ -1,9 +1,9 @@
 import type { CodePosition, RefactorResult, SourceRange } from "@mrclrchtr/supi-code-runtime/api";
 import type { CodeAction, TextDocumentEdit, TextEdit, WorkspaceEdit } from "../config/types.ts";
-import type { SessionLspService } from "../session/service-registry.ts";
+import type { WorkspaceLspRuntime } from "../session/runtime-registry.ts";
 
 export async function runRenameRefactor(
-  lsp: SessionLspService,
+  lsp: WorkspaceLspRuntime,
   file: string,
   position: CodePosition,
   newName: string,
@@ -37,7 +37,7 @@ export function collectCodeActionResults(actions: CodeAction[]): RefactorResult[
 }
 
 export async function runFilteredCodeActionRefactor(options: {
-  lsp: SessionLspService;
+  lsp: WorkspaceLspRuntime;
   file: string;
   position: CodePosition;
   operation: "update_imports" | "delete_dead_code" | "extract_function" | "extract_variable";

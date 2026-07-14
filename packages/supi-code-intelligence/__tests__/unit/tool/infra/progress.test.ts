@@ -46,7 +46,7 @@ describe("executor onUpdate progress beats", () => {
         { cwd: dir, onUpdate, session: sessionCache.getOrCreate(dir) },
       );
       expect(beats.length).toBeGreaterThanOrEqual(1);
-      expect(beats.some((b) => b.includes("code_find"))).toBe(true);
+      expect(beats.some((b) => b.includes("find:"))).toBe(true);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -66,11 +66,14 @@ describe("executor onUpdate progress beats", () => {
     const { onUpdate, beats } = captureProgress();
     try {
       await executeGraphTool(
-        { file: "test.ts", line: 1, character: 17, relations: ["all"] },
+        {
+          target: { anchor: { file: "test.ts", line: 1, character: 17 } },
+          relations: ["all"],
+        },
         { cwd: dir, onUpdate, session: sessionCache.getOrCreate(dir) },
       );
       expect(beats.length).toBeGreaterThanOrEqual(2);
-      expect(beats.some((b) => b.includes("code_graph"))).toBe(true);
+      expect(beats.some((b) => b.includes("graph:"))).toBe(true);
       // "all" expands to >1 relation, so per-relation beats fire.
       expect(beats.some((b) => b.includes("references"))).toBe(true);
     } finally {

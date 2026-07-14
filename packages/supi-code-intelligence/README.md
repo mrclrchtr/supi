@@ -8,7 +8,7 @@
 
 # @mrclrchtr/supi-code-intelligence
 
-Adds a focused code-understanding toolset to the [pi coding agent](https://github.com/earendil-works/pi).
+Focused code understanding, navigation, search, health, and refactoring tools for the [pi coding agent](https://github.com/earendil-works/pi).
 
 ## Install
 
@@ -22,64 +22,192 @@ For local development:
 pi install ./packages/supi-code-intelligence
 ```
 
-![Code brief in action](https://raw.githubusercontent.com/mrclrchtr/supi/main/screenshots/supi-code-intelligence.png)
-
 ## Quickstart
 
-### 1. Install the extension
+The extension detects project languages and starts matching language servers. Install the required server binaries on `PATH`:
 
-```bash
-pi install npm:@mrclrchtr/supi-code-intelligence
-```
-
-### 2. Install the language server for your project
-
-The extension auto-detects your project's language and tries to start the matching LSP server automatically. **You must install the server binary yourself** and ensure it is on your `PATH`.
-
-| Language | Binary to install |
+| Language | Binary |
 |---|---|
-| TypeScript / JavaScript | `typescript-language-server` (npm) |
-| Python | `pyright-langserver` (npm) |
-| Rust | `rust-analyzer` (rustup) |
-| Go | `gopls` (go install) |
-| C / C++ | `clangd` (system package manager) |
-| Bash | `bash-language-server` (npm) |
-| HTML | `vscode-html-language-server` (npm) |
-| SQL | `sql-language-server` (npm) |
-| Ruby | `ruby-lsp` (gem) |
-| Java | `jdtls` (system package manager) |
-| Kotlin | `kotlin-lsp` (Kotlin tooling) |
-| R | `R` with `languageserver` package installed |
+| TypeScript / JavaScript | `typescript-language-server` |
+| Python | `pyright-langserver` |
+| Rust | `rust-analyzer` |
+| Go | `gopls` |
+| C / C++ | `clangd` |
+| Bash | `bash-language-server` |
+| HTML | `vscode-html-language-server` |
+| SQL | `sql-language-server` |
+| Ruby | `ruby-lsp` |
+| Java | `jdtls` |
+| Kotlin | `kotlin-lsp` |
+| R | `R` with `languageserver` |
 
-If a server binary is missing, the extension emits a warning at session start telling you exactly which command was not found and which file types are affected.
+Check runtime status with:
 
-### 3. Verify the stack is healthy
-
-You can check status interactively with the overlay command:
-
-```
+```text
 /supi-ci-status
 ```
 
-This shows which language servers are active, which are missing, and any degraded coverage warnings in a TUI overlay.
+Use `/supi-settings` to disable unneeded language servers or configure instruction filenames. The default instruction files are `CLAUDE.md` and `AGENTS.md`.
 
-Alternatively, ask the pi agent to check for you:
+## Public tools
 
-> *"Check the status of code intelligence servers."*
+The extension registers exactly eight `code_*` tools:
 
-The agent will run `code_health(include=["servers"])` and report back which servers are active. Semantic tools like `code_resolve` and `code_graph` need an active server for your project's language.
+- `code_resolve` — resolve a semantic symbol, anchored position, or file into stable session handles
+- `code_inspect` — inspect exact point facts
+- `code_orientation` — orient around a workspace, module, directory, file, or resolved symbol
+- `code_graph` — collect references, structural callees, and implementations
+- `code_find` — explicit text, regex, AST, or semantic search
+- `code_health` — report diagnostics, servers, dirty files, coverage, and unused-code evidence
+- `code_refactor_plan` — preview a precise semantic refactor without mutation
+- `code_refactor_apply` — apply a stored plan after freshness checks
 
-### 4. Optional: tune or disable servers
+`code_impact`, `code_context`, `code_brief`, `code_references`, `code_calls`, and `code_implementations` are not compatibility aliases.
 
-By default every detected language server starts concurrently. In polyglot repos this can spike CPU. To disable servers you do not need, run:
+A lightweight architecture overview may be injected once near session start when a project model is available.
 
+## Exact-one target selectors
+
+Target-taking tools use nested, exact-one selectors. Depending on the tool, the accepted branch is one of:
+
+```text
+{ target: { handle: "tg-…" } }
+{ target: { anchor: { file: "src/a.ts", line: 10, character: 5 } } }
+{ target: { symbol: { query: "myFunction", scope: "src" } } }
+{ target: { file: "src/a.ts" } }          # code_resolve only
 ```
-/supi-settings
+
+No flat `targetId`, `file`, `line`, `character`, or `symbol` target fields are accepted. There is no precedence between contradictory inputs.
+
+Coordinates are 1-based; `character` is a UTF-16 column.
+
+### Handle lifecycle
+
+Target and plan handles are:
+
+- session-scoped
+- fingerprint-checked
+- stale after a touched file changes
+- not persisted across sessions
+
+A stale handle fails explicitly. Re-run `code_resolve` or `code_refactor_plan` to obtain a fresh handle.
+
+## Common workflows
+
+### Resolve and inspect relationships
+
+```text
+code_resolve({ target: { symbol: { query: "myFunction", scope: "packages/app" } } })
+  → capture targetId
+
+code_graph({
+  target: { handle: "tg-…" },
+  relations: ["references", "callees"]
+})
 ```
 
-Navigate to **LSP → Disabled Servers** and toggle off any languages you are not using. This writes per-language opt-outs into `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global).
+Use the result's Read Next ranges with `read` before editing.
 
-You can also edit the config file directly:
+### Orient before editing
+
+```text
+code_orientation({ focus: { path: "packages/my-package" } })
+code_orientation({ focus: { module: "@scope/my-package" } })
+code_orientation({ focus: { target: { handle: "tg-…" } } })
+```
+
+Omit `focus` for workspace Orientation. Directory Orientation also surfaces applicable local instruction files once per session branch.
+
+### Inspect one source point
+
+```text
+code_inspect({
+  point: { file: "src/index.ts", line: 12, character: 8 },
+  maxResults: 10
+})
+```
+
+Point inspection may include syntax, an enclosing symbol, hover/type facts, definitions, nearby diagnostics, and code-action titles. It does not invent heuristic substitutes when every required substrate is unavailable.
+
+### Search explicitly
+
+```text
+code_find({ query: "widget" })
+code_find({ query: "widget.*", mode: "regex", scope: ["src"] })
+code_find({ query: "widget", mode: "semantic" })
+code_find({ query: "widget", mode: "ast", kind: "definition" })
+```
+
+Modes never silently fall back:
+
+- omitted mode / `text` — literal text; rejects `kind`
+- `regex` — ripgrep regex; rejects `kind`
+- `semantic` — workspace symbols; rejects `kind`
+- `ast` — structured search; requires `kind`
+
+AST `call` finds written call-site names, not symbol identity. Use `code_graph` references on a resolved target for symbol-identity relationships.
+
+### Check health
+
+```text
+code_health({ refresh: true, include: ["diagnostics", "servers", "dirty"] })
+code_health({ include: ["coverage", "unused"] })
+```
+
+Coverage defaults to `coverage/coverage-summary.json`; unused-code evidence defaults to `knip.json`. Missing reports are disclosed.
+
+### Plan and apply a rename
+
+```text
+code_refactor_plan({
+  target: { handle: "tg-…" },
+  operation: { rename_symbol: { newName: "newName" } }
+})
+  → review edits and capture planId
+
+code_refactor_apply({ planId: "plan-…" })
+```
+
+Extract operations use the same exact-one operation shape:
+
+```text
+operation: {
+  extract_function: {
+    newName: "computeValue",
+    range: {
+      start: { line: 10, character: 3 },
+      end: { line: 12, character: 20 }
+    }
+  }
+}
+```
+
+Planning never writes files. Application is the sole mutator, acquires sorted per-file mutation queues, revalidates fingerprints and edit safety, and rolls back earlier writes if a later write fails.
+
+## Graph evidence
+
+`code_graph.relations` accepts only:
+
+- `references` — semantic, symbol-identity evidence
+- `callees` — structural outgoing calls as written in source
+- `implements` — semantic implementation evidence
+- `all` — exactly the three relations above and must be the only list item
+
+`calleeDepth: "direct"` excludes nested function/method/callback scopes; `"deep"` includes them. Structural callees are not callers and are not symbol-identity relationships.
+
+Imports, exports, and tests remain available as explicit AST search kinds in `code_find`; they are not graph relation families.
+
+## Honest correctness
+
+- Semantic, structural, and text evidence retain their provenance.
+- Required capability failures are explicit; tools do not silently switch substrates.
+- `maxResults` is a display cap. Results disclose shown, total, and omitted evidence when known.
+- A deterministic convention may locate an artifact, but cannot prove a classification, relationship, or absence claim.
+- Zero matches are successful searches, not tool failures.
+
+## Startup and settings
+
+Detected language servers start concurrently. In polyglot workspaces, disable unneeded servers in `.pi/supi/config.json` or `~/.pi/agent/supi/config.json`:
 
 ```json
 {
@@ -92,457 +220,25 @@ You can also edit the config file directly:
 }
 ```
 
-> **Note:** The global `lsp.enabled` switch and `lsp.active` allowlist are deprecated since v0.7.0 and have no effect.
-
-### 5. Optional: tune instruction-file names
-
-Directory `code_orientation` surfaces local instruction files using the `code-intelligence.instructionFileNames` setting. Defaults:
-
-```json
-{
-  "code-intelligence": {
-    "instructionFileNames": ["CLAUDE.md", "AGENTS.md"]
-  }
-}
-```
-
-Edit this through `/supi-settings` → **Code Intelligence**, or directly in `.pi/supi/config.json` / `~/.pi/agent/supi/config.json`.
-
-## What you get
-
-After install, pi gets:
-
-- `code_orientation` — first-pass orientation for projects, discovered modules, directories, files, or precise symbols; directory focus also surfaces applicable local instruction files such as `CLAUDE.md`/`AGENTS.md` (`code_brief` and the old `code_context` surface have been replaced)
-- `code_inspect` — factual point inspection for one precise file position
-- `code_graph` — unified relation graph (references, callees, imports, exports, implementations, tests) from a resolved target
-- `code_impact` — preferred workflow-oriented blast radius, downstream impact, and user-supplied change-set analysis
-- `code_find` — unified ranked search (text, regex, AST, semantic)
-- `code_health` — diagnostics, server status, dirty workspace, coverage, and unused-code health signals
-- `code_refactor_plan` — pure planner; preview an operation-aware semantic refactor plan without mutating files
-- `code_refactor_apply` — sole mutator; apply a previously stored, validated plan by `planId`
-- `code_resolve` — resolve human/code references into precise targets with stable target handles for follow-up calls
-- a lightweight hidden architecture overview injected near the start of a session when a project model can be built
-- bundled support from `@mrclrchtr/supi-lsp`, `@mrclrchtr/supi-tree-sitter`, and `@mrclrchtr/supi-core`
-
-## Coming from standard tools?
-
-| Standard approach | `code_*` equivalent |
-|---|---|
-| `rg "symbol" --type ts` | `code_resolve(query="symbol")` → `code_graph(targetId, relations=["references"])` |
-| `read` + manual symbol tracing | `code_inspect(file, line, character)` for point facts, then `read` the suggested source range |
-| manual dependency/reference tracing | `code_graph(targetId, relations=["references", "callees", "tests"])` |
-| `git status` + diagnostics commands | `code_health(refresh=true, include=["diagnostics", "servers", "dirty"])` |
-| `rg` + counting + intuition | `code_impact(targetId, change="...")` or `code_impact(changeSetFiles=[...])` |
-| `rg` for defs/imports/exports | `code_find(mode="ast", kind="definition")` |
-| Multi-file find-and-replace | `code_refactor_plan` → review → `code_refactor_apply` |
-| `ls` + `read` to explore a package | `code_orientation(focus="packages/...")`, then inspect identified entrypoints |
-| `rg "symbolName"` (ambiguous) | `code_resolve(query="symbolName")` |
-
-> 💡 **Key insight:** `code_resolve` → `targetId` → `code_graph`/`code_orientation`/`code_impact` is the core chained workflow. `code_*` tools summarize and prioritize; use `read` on the suggested ranges before editing.
-
-## Standard-tools cookbook
-
-### Find references to a symbol
-
-Standard:
-```bash
-rg -n "myFunction" packages/my-package
-```
-Then manually separate declarations, docs, imports, and actual symbol uses.
-
-Code intelligence:
-```text
-code_resolve(query="myFunction", scope="packages/my-package") → targetId
-code_graph(targetId, relations=["references", "tests"])
-```
-Use the `Read Next` section to inspect the resolved target or top reference sites.
-
-### Understand a package or module
-
-Standard:
-```bash
-find packages/my-package -maxdepth 3 -type f
-cat packages/my-package/package.json
-```
-Then read likely entrypoints by hand.
-
-Code intelligence:
-```text
-code_orientation(focus="packages/my-package")
-code_orientation(focus="packages/my-package/src/tool")
-code_orientation(focus="packages/my-package/src/tool/health/execute.ts")
-```
-Directory orientation includes applicable local instruction files, shallowest first and deepest last, so package-local guidance is visible before editing. Orientation briefs are summaries, not source replacement; read the files before editing.
-
-### Estimate impact before a change
-
-Standard: run `rg`, inspect consumers, infer test files, and decide risk manually.
-
-Code intelligence:
-```text
-code_resolve(query="myFunction") → targetId
-code_impact(targetId, change="change output formatting", includeTests=true)
-```
-For already-known files, use `code_impact(changeSetFiles=["packages/.../file.ts"], includeTests=true)`.
-
-### Check health quickly
-
-Standard: combine editor diagnostics, `git status`, coverage files, and project commands.
-
-Code intelligence:
-```text
-code_health(refresh=true, include=["diagnostics", "servers", "dirty"])
-code_health(include=["coverage", "unused"])
-```
-`code_health` is a quick status surface; it does not replace the project's required verification commands after edits.
-
-## Quick start — three most common workflows
-
-### Find references and trace usage
-```
-code_resolve(query="myFunction")              → capture targetId
-code_graph(targetId, relations=["references"]) → inspect usage
-code_orientation(targetId)                       → orient around the symbol
-```
-
-### Understand a package before editing
-```
-code_orientation(focus="packages/my-package")           → package orientation + local instruction files
-code_orientation(focus="packages/my-package/src/tool")   → directory drill-down
-code_health(scope="packages/my-package", refresh=true) → check diagnostics
-```
-
-### Safe rename refactoring
-```
-code_resolve(query="oldName")                                  → capture targetId
-code_impact(targetId, change="rename to newName")              → estimate blast radius
-code_refactor_plan(targetId, operation="rename_symbol", newName="newName") → preview
-code_refactor_apply(planId)                                     → apply
-```
-
-## ⚠️ `targetId` lifecycle — essential for chained workflows
-
-> 💡 **Every chained workflow — references, impact, refactoring — flows through `targetId`. Spend 30 seconds here.**
-
-`targetId` handles are the backbone of the chained workflow:
-
-- **Session-scoped** — handles live only within the current agent session. A new session resolves targets fresh.
-- **Fingerprint-gated** — when the backing file is modified, the stored fingerprint no longer matches and the handle becomes stale. Re-run `code_resolve` to obtain a fresh handle.
-- **Content-hash based** — `targetId`s are derived from the symbol's name, kind, container, and file fingerprint (position is excluded). Re-resolving the same symbol across reloads produces the same ID.
-- **No cross-session persistence** — `planId` handles follow the same lifecycle.
-
-```text
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│ code_resolve │ ──→ │  targetId    │ ──→ │ code_graph  │
-│              │     │  (stable)    │     │ code_orientation│
-└─────────────┘     └──────────────┘     │ code_impact │
-       ↑                  │              └─────────────┘
-       │  re-resolve       │  stale after
-       └───────────────────┘  file edit
-```
-
-## When each tool won't help you
-
-- **No silent fallback:** non-search tools do not silently turn semantic requests into grep. If the required provider is unavailable, results say so or the tool errors.
-- **LSP warmup/provider gaps:** `code_resolve` symbol queries, semantic `code_find`, references, implementations, impact, and refactor planning need an active semantic/LSP provider. Retry after warmup or check `code_health`.
-- **Tree-sitter/structural gaps:** AST `code_find`, callees, imports, exports, outlines, and structural test-label extraction need the structural provider.
-- **`code_graph` callees** — won't find calls inside nested functions, callbacks, or method bodies unless `calleeDepth: "deep"` is requested. Callees are structural source-shape evidence, not symbol identity.
-- **`code_find` semantic mode** — fails when no LSP provider is active. It does not fall back to text search — use `mode: "text"` explicitly.
-- **`code_refactor_plan`** — requires LSP precise edit support. When the LSP can't produce semantic edits for the target, the tool throws — there is no text fallback.
-- **`code_health` coverage/unused** — depends on `coverage/coverage-summary.json` and `knip.json` at the project root. Use `coveragePath` and `unusedPath` params for non-standard locations.
-- **`code_impact`** — `change`-only requests (no target, no changeSetFiles) return insufficient-evidence instead of guessing.
-- **`code_find` AST test mode** — `mode: "ast"` with `kind: "test"` matches outline entries with test-like names. Does not find test blocks within untest-like wrapper functions.
-
-Installing `@mrclrchtr/supi-code-intelligence` activates only the public `code_*` tool surface. `@mrclrchtr/supi-lsp` and `@mrclrchtr/supi-tree-sitter` remain bundled library substrates that power the semantic and structural parts of that surface. Historical compatibility aliases are not registered as public tools.
-
-## Startup performance
-
-LSP language servers start automatically on session open. By default, every server with matching source files in the project is started **concurrently** — in polyglot repos or monorepos with multiple language footprints, this parallel startup can cause a significant CPU spike.
-
-**If you experience high CPU on startup:**
-
-**Disable specific language servers** you don't need by adding per-language opt-outs to your config:
-
-```json
-{
-  "lsp": {
-    "servers": {
-      "python": { "enabled": false },
-      "rust": { "enabled": false }
-    }
-  }
-}
-```
-
-Add this to `.pi/supi/config.json` (project) or `~/.pi/agent/supi/config.json` (global). Only the listed language servers are excluded; all others start normally.
-
-> **Note:** The global `lsp.enabled` switch and `lsp.active` allowlist are deprecated and ignored since v0.7.0. LSP now always attempts to start detected servers. If your config still has `lsp.enabled` or `lsp.active` keys, a one-time deprecation warning will appear at session start, but the keys have no runtime effect.
-
-### Degraded coverage warnings
-
-When the code-intelligence stack cannot provide full coverage for a workspace, you will see:
-
-- **Deprecated key warnings** — if `lsp.enabled` or `lsp.active` are present in your config (ignored keys)
-- **Language-scoped semantic warnings** — when a detected language's LSP server binary is missing from PATH, or has been explicitly disabled via `lsp.servers.<language>.enabled: false`
-- **Structural warnings** — when Tree-sitter initialization fails (structural coverage unavailable)
-
-These warnings appear once near session start and are also visible in:
-- `/supi-ci-status` — the interactive overlay
-- `code_health` — the health check tool
-
-## V2 workflow roadmap
-
-The workflow-oriented surface is rolling out incrementally.
-
-The current public surface now includes:
-
-- `code_resolve` — **active** (Phase 1)
-- `code_inspect` — **active** (explicit point inspection tool)
-- `code_orientation` — **active** (orientation surface; replaces `code_brief` and old `code_context`)
-- `code_find` — **active** (Phase 2a, supersedes code_pattern)
-- `code_health` — **active** (Phase 1.5)
-- `code_graph` — **active** (Phase 3, supersedes code_references/code_calls/code_implementations)
-- `code_impact` — **active** (Phase 4, preferred workflow impact tool)
-- `code_refactor_plan` — **active** (Phase 5, pure refactor planner)
-- `code_refactor_apply` — **active** (Phase 5, refactor plan applier)
-
-The design source of truth lives in `src/tool/` with types, schemas, and metadata.
-
-This package is for questions like:
-
-- what is in this package or directory?
-- where is this symbol referenced?
-- what does this function call?
-- what are the implementations of this interface?
-- what is the likely blast radius of a change?
-- where is this pattern defined, imported, or exported?
-
-- `@mrclrchtr/supi-lsp` provides the semantic library substrate used by the public `code_*` tools
-- `@mrclrchtr/supi-tree-sitter` provides the structural library substrate used by the public `code_*` tools
-- `@mrclrchtr/supi-code-intelligence` owns the public `code_*` tool surface and the orchestration layer above those substrates
-
-## Workflow cookbook
-
-### Trace a symbol and prepare a change
-
-1. `code_resolve(query="executeHealthTool")` → capture `targetId`
-2. `code_graph(targetId, relations=["references", "callees", "tests"])` → inspect usage
-3. `code_impact(targetId, change="add coverage unused section")` → estimate blast radius
-4. `code_orientation(targetId)` → orient around definitions, docs, and local diagnostics
-5. Edit files, then `code_health(scope="packages/...", refresh=true)` → verify diagnostics
-
-### Context from a known source location (one call)
-
-When you already know the file and identifier coordinate, skip the separate `code_resolve` turn and pass coordinates directly to `code_orientation`:
-
-1. `code_orientation(focus="packages/.../execute-health.ts", line=42, character=17)` → resolves the target, renders the sections, and returns a reusable `targetId`
-2. `code_graph(targetId, relations=["references"])` → follow up using the `targetId` from step 1
-
-### Understand a package before editing
-
-1. `code_orientation(focus="packages/supi-code-intelligence")` → package orientation
-2. `code_orientation(focus="packages/supi-code-intelligence/src/tool")` → directory drill-down
-3. `code_orientation(focus="packages/.../execute-graph.ts")` → file overview
-
-### Safe refactoring
-
-1. `code_resolve(query="oldFunctionName")` → capture `targetId`
-2. `code_graph(targetId, relations=["references"])` → confirm scope
-3. `code_refactor_plan(targetId, operation="rename_symbol", newName="newFunctionName")` → preview plan
-4. `code_refactor_apply(planId)` → apply after reviewing the plan
-
-## Tool overview
-
-### `code_orientation`
-Primary orientation surface for understanding where you are before choosing surgical tools.
-
-- accepts `focus`, `targetId`, `line`, `character`, and `maxResults`
-- omit `focus` for project orientation
-- `focus` is path-first and language-agnostic; if no path exists, discovered module-name lookup is attempted
-- `focus` + `line` + `character` resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`
-- `targetId` takes precedence over `focus`/coordinates; stale target IDs error and do not fall back
-- symbol orientation renders definitions, JSDoc/TSDoc docs, local diagnostics near the target, and Read Next guidance
-- use `code_graph` for references/callees/imports/exports/tests, `code_impact` for blast radius, and `code_health` for full health/status
-- `maxResults` defaults to 10 and caps each rendered list independently
-- `code_orientation` replaces `code_brief` and the old `code_context` public surface; there is no compatibility alias
-
-### `code_inspect`
-Factual point-inspection tool for one precise file position.
-
-- requires `file`, `line`, and `character`
-- returns best-effort syntax, enclosing symbol, hover/type info, definition target(s), nearby diagnostics, and code-action titles
-- stays honest when providers are missing by rendering explicit unavailable sections instead of heuristic guesses
-- keeps diagnostics summary/refresh on `code_health`; `code_inspect` only reports local facts near the inspected point
-
-### `code_graph`
-Unified relation-graph tool. Replaces `code_references`, `code_calls`, and `code_implementations`. Resolves one target and dispatches to the appropriate substrate per requested relation.
-
-- **targetId** (preferred from `code_resolve`) or file+line+character or symbol
-- **relations**: `["all", "references", "callees", "imports", "exports", "implements", "tests"]` — default `["references"]`; use `["all"]` for the full graph in one call
-- Each relation is best-effort: unavailable substrates skip with a note rather than failing the call
-- **Each relation annotates its evidence source** in the output. For the `tests` relation, provenance describes **file discovery only** — `semantic+conventions` means semantic references contributed, `conventions-only` means only deterministic path/layout conventions contributed.
-- `callees` reports **structural outgoing calls** from the enclosing executable scope at the target anchor. It matches call expressions by source shape, not symbol identity. By default (`calleeDepth: "direct"`), calls inside nested function/method/callback scopes are excluded. Pass `calleeDepth: "deep"` to include all callees within the enclosing scope, including those inside nested scopes.
-- Test-producing surfaces also include a small structured tests metadata shape in tool details: discovery status/provenance plus per-file label status and extracted labels.
-- Targeted graph results include a `Read Next` guidance section for the resolved target, enclosing scope, or top relation sites when those source ranges are known.
-- `imports` and `exports` use file-level tree-sitter analysis; `tests` discovers companion tests using semantic import/reference evidence plus deterministic package-layout conventions (`__tests__/unit/…`, `__tests__/integration/…`)
-- Test-label extraction is tracked separately from discovery provenance. When a discovered test file has no recognized `describe` / `it` / `test` / `spec` blocks, user-facing output shows `_(no recognized test blocks)_` intentionally instead of helper or variable names.
-- Bounded package/tool-aware candidates are generated for source files at `src/tool/<name>/execute.ts`. Exact candidates such as `code-<name>-tool.test.ts`, `<name>-tool.test.ts`, and `execute-<name>.test.ts` are checked in both `__tests__/unit/` and `__tests__/integration/`. No broad search, fuzzy matching, or AI guessing is performed.
-
-### `code_impact`
-Preferred workflow-oriented impact analysis.
-
-- supports target-based analysis through a `targetId` from `code_resolve`
-- supports change-set entry points through `changeSetFiles` and explicit `includeTests`
-- `includeTests` uses the same shared test discovery as `code_graph` (import/reference evidence plus package-layout conventions)
-- **Target-based analysis** uses semantic references and fails explicitly when no LSP provider is available
-- **changeSetFiles analysis** uses structural evidence by default and, when LSP/export data is available, merges semantic references for symbols defined in change-set files. `changeSetFiles` is user-supplied; it is not inferred from git and carries no line-level diff evidence. Evidence is annotated as either `**Evidence: structural**` or `**Evidence: semantic+structural**`.
-- **test list annotations** — when likely tests are shown, impact headings annotate discovery provenance explicitly (`Likely Tests (semantic+conventions)` or `Likely Tests (conventions-only)`)
-- **explicit empty-test note** — when `includeTests: true` is set and bounded companion/package discovery completes without finding any test files, an explicit `No likely tests found by bounded companion/package discovery.` note appears instead of silently omitting test information. This note is not shown when `includeTests` is omitted or unavailable.
-- **target-based analysis seeds the target file itself** — zero-reference targets still report affected evidence and likely tests
-- target and change-set impact results include a `Read Next` guidance section for source ranges worth inspecting before editing
-- when the workspace clearly uses Vitest, likely test files also come with concrete `pnpm vitest run … --reporter=verbose` commands
-- `change`-only requests stay honest and return an explicit insufficient-evidence result instead of heuristic guessing
-- uses real workspace/provider evidence only; no heuristic grep fallback
-
-### `code_find`
-Unified ranked search tool with a strict evidence contract.
-
-- omitted `mode` or `mode: "text"` → literal text search; `kind` is not accepted
-- `mode: "regex"` → ripgrep regex search; `kind` is not accepted
-- `mode: "semantic"` → LSP workspace symbol search; `kind` is not accepted and semantic mode does not fall back to text search
-- `mode: "ast"` → tree-sitter structured search; requires explicit `kind`
-- supported AST kinds: `definition`, `import`, `export`, `call`, `type`, `interface`, `class`, `method`, `enum`, `test`
-- AST `call` mode matches call-site identifiers by name, not by symbol identity; use `code_graph` with `relations: ["references"]` on a resolved target for identity-aware callers
-- unsupported mode/kind combinations fail explicitly instead of being broadened into best-effort search
-
-Supports `query` (required), `scope` (one path or an array of paths), `mode`, `kind`, `contextLines`, and `maxResults`.
-
-### `code_health`
-Health/status summary for the current workspace or a scoped path.
-
-- defaults to diagnostics + servers when `include` is omitted
-- `include` can request `diagnostics`, `servers`, `dirty`, `coverage`, and `unused`
-- `coverage` reads `coverage/coverage-summary.json` when present and reports low-coverage files
-- `unused` reads `knip.json` when present and reports unused files/exports
-- when a requested coverage/unused report is missing, the result says so explicitly instead of silently falling back to diagnostics
-
-### `code_refactor_plan`
-Pure refactor planner.
-
-- previews a precise semantic refactor plan without mutating files
-- returns a `planId` for follow-up `code_refactor_apply`
-- uses the workflow schema (`operation`, target/file coords, optional selected `range`, and operation-specific fields)
-- legacy `operation: "rename"` is accepted as a compatibility alias for `rename_symbol`
-- extract operations require a 1-based `range`, `newName`, and an LSP code action that returns precise text edits
-
-Supported operations:
-- `rename_symbol`
-- `extract_function`
-- `extract_variable`
-
-Notes:
-- only precise semantic text edits become plans
-- `targetId` from `code_resolve` can replace raw file + line + character targeting
-- this tool never mutates files
-
-### `code_refactor_apply`
-Sole mutator in the refactor workflow.
-
-- applies a previously stored plan by `planId`
-- rejects stale plans using file fingerprints and re-validates ranges/overlap before mutation
-- this is the only tool in the refactor workflow that writes files
-
-## Internal compatibility paths
-
-The `code_affected` tool has been fully removed. Use `code_impact` exclusively.
-
-## Shared input conventions
-
-Depending on the tool, inputs may include:
-- `scope`
-- `file`
-- `line`
-- `character`
-- `query`
-- `symbol`
-- `kind`
-- `targetId`
-- `changeSetFiles`
-- `includeTests`
-- `maxResults`
-- `contextLines`
-
-Notes:
-- line and character positions are **1-based**
-- `line` and `character` require `file`, not `scope`
-- `code_inspect` is the public point-inspection tool for `file` + `line` + `character`
-- `targetId` (from `code_resolve`) can replace raw coordinates in `code_orientation`, `code_graph`, and `code_refactor_plan`; it is the only public target selector for `code_impact`. In `code_orientation`, `targetId` takes precedence over `focus`/`line`/`character`; a stale/invalid `targetId` errors and does not fall back to coordinates.
-- `code_orientation` accepts `focus` + `line` + `character` directly as a coordinate target mode: it resolves a real symbol target through the same provider-backed path as `code_resolve` and exposes a reusable `targetId`. Coordinate mode requires all three fields when any is present; `focus` must be a file path and partial coordinates are a validation error.
-- `focus` is the selection input for `code_orientation`; other tools keep `scope` for narrowing/filtering.
-- `focus`, `scope`, and `file` use pi-style paths where applicable: a leading `@` is stripped and relative paths resolve from the current cwd
-- non-search tools do **not** silently fall back to heuristic grep behavior
-
-### `code_resolve` anchored coordinate resolution
-
-`code_resolve({ file, line, character })` resolves a **real symbol target** from provider-backed evidence, not an anonymous point target:
-
-- an exact coordinate on a symbol identifier resolves to a named `name` anchor with a stable `targetId`.
-- a coordinate on a declaration header/modifier (such as an `export` keyword) snaps to the symbol's name anchor **only when** provider-backed evidence identifies exactly one enclosing symbol. Snapped results carry a visible note and structured resolution metadata (requested vs. resolved coordinate and evidence source).
-- ambiguous coordinates return ranked candidates with `targetId`s and do not pick one silently.
-- whitespace, comment, or other non-symbol coordinates return an explicit error and recommend `code_inspect` for point-level facts — `code_resolve` does not register anonymous point targets.
-
-### Target handle lifecycle
-
-- `targetId` handles are session-scoped; they are valid only within the current agent session.
-- A handle becomes stale when its backing file is modified and the stored fingerprint no longer matches. Stale handles return an explicit error — re-run `code_resolve` to obtain a fresh handle.
-- Handles have no cross-session persistence; a new session resolves targets fresh.
-- `planId` handles follow the same session-scoped, fingerprint-checked lifecycle. See `docs/adr/0002-refactor-planner-applier-split.md` for the planner/applier invariant.
-
-## Result style
-
-Results report evidence provenance such as:
-
-- `semantic` — backed by LSP/semantic provider
-- `structural` — backed by tree-sitter/structural provider
-- `heuristic` — pattern-based, may include false positives
-- `unavailable` — the required provider or substrate was absent
-
-`heuristic` results may appear from `code_find` in text/regex modes. The other tools prefer explicit unavailable states over silent search fallbacks.
-
-**Evidence-strictness principle:** Every tool result that depends on LSP or TreeSitter explicitly declares its evidence source. For test discovery, provenance describes how companion test files were found: `semantic+conventions` means semantic references contributed, `conventions-only` means only path-based conventions ran. Test-label extraction is a separate concern; `_(no recognized test blocks)_` is an intentional honest placeholder, not silent degradation.
+The old global `lsp.enabled` and `lsp.active` keys are deprecated and ignored. Missing binaries, disabled languages, and structural startup failures appear in `/supi-ci-status` and `code_health`.
 
 ## Architecture
 
-`@mrclrchtr/supi-code-intelligence` is the **orchestration layer** that consumes
-semantic and structural providers through the shared workspace broker and routes
-user intents through a planner.
+- `supi-code-intelligence` owns the Workspace code-intelligence session, workflow policy, Tool result assembly, and public tool family.
+- `supi-code-runtime` owns canonical provider contracts and workspace capability state.
+- `supi-lsp` owns semantic lifecycle and the Workspace LSP runtime.
+- `supi-tree-sitter` owns structural parser reuse.
 
-```text
-supi-code-runtime      ← shared broker + canonical provider/result contracts
-        ↑
-supi-lsp / supi-tree-sitter
- (semantic)   (structural)
-        ↑
-supi-code-intelligence ← analysis orchestration, UI, code_* tools
-```
+Markdown and TUI are adapters over assembled typed results. Providers, clients, mutable targets, and the LSP manager do not cross the workflow seam.
 
-## Package surfaces
+See:
 
-- `@mrclrchtr/supi-code-intelligence` — package-root type re-export surface
+- [`docs/adr/0015-workspace-session-and-tool-result-assembly.md`](../../docs/adr/0015-workspace-session-and-tool-result-assembly.md)
+- [`docs/adr/0016-workspace-lsp-runtime-interface.md`](../../docs/adr/0016-workspace-lsp-runtime-interface.md)
+- [`docs/adr/0017-focused-code-tools-and-evidence-policy.md`](../../docs/adr/0017-focused-code-tools-and-evidence-policy.md)
+- [`docs/adr/0002-refactor-planner-applier-split.md`](../../docs/adr/0002-refactor-planner-applier-split.md)
+
+## Package exports
+
 - `@mrclrchtr/supi-code-intelligence/api` — reusable type contracts
-- `@mrclrchtr/supi-code-intelligence/extension` — pi extension entrypoint
-
-## Source
-
-- `src/extension.ts` — extension composition root: substrate lifecycle, tool registration, status UI, overview/warning injection
-- `src/app/` — app-level session lifecycle and manager wiring
-- `src/session/` — session-scoped target handles and refactor plan storage
-- `src/substrate/` — LSP and Tree-sitter adapter lifecycle/state/overrides/recovery
-- `src/analysis/` — target resolution, architecture briefs, provider composition, search/reference helpers, project signals, coverage warnings, and test discovery
-- `src/tool/specs.ts` — single source of truth for the current public tool surface
-- `src/tool/register.ts` — focused tool registration wiring
-- `src/tool/guidance.ts` — prompt surfaces derived from tool specs
-- `src/tool/<tool>/` — per-tool execution, orchestration, markdown, and TUI renderers
-- `src/tool/infra/` — tool pipeline, validation, progress, truncation, readiness messages, and error-result helpers
-- `src/ui/` — shared status UI, message/footer renderers, and non-tool-specific markdown/TUI helpers
-- `src/types/` — small cross-cutting internal type surface
+- `@mrclrchtr/supi-code-intelligence/extension` — PI extension entrypoint

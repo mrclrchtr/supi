@@ -8,9 +8,13 @@
  * @mrclrchtr/supi-code-intelligence — internal, not exported via api.ts
  */
 
-import type { SemanticProvider, StructuralProvider } from "@mrclrchtr/supi-code-runtime/api";
+import type {
+  CapabilityState,
+  SemanticProvider,
+  StructuralProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import {
   type CodeProvider,
   type CodeProviderState,
@@ -50,6 +54,15 @@ export interface CapabilityAdapter {
 
   /** Get the raw structural provider, or null. */
   getStructuralProvider(cwd: string): StructuralProvider | null;
+
+  /** Get the workspace LSP operational state for diagnostics and recovery workflows. */
+  getLspRuntimeState(cwd: string): WorkspaceLspRuntimeState;
+
+  /** Get semantic and structural capability states without exposing providers. */
+  getCapabilityStates(cwd: string): {
+    semantic: CapabilityState;
+    structural: CapabilityState;
+  };
 
   /**
    * Wait for semantic (LSP) readiness. Returns a typed outcome so
@@ -101,11 +114,18 @@ export class WorkspaceCapabilityAdapter implements CapabilityAdapter {
     return result;
   }
 
-  /** Convenience: LSP service state for impact/health consumers still using it directly. */
-  getLspService(cwd: string): SessionLspServiceState {
+  getCapabilityStates(cwd: string): {
+    semantic: CapabilityState;
+    structural: CapabilityState;
+  } {
+    const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
+    return { semantic: workspace.semantic.state, structural: workspace.structural.state };
+  }
+
+  getLspRuntimeState(cwd: string): WorkspaceLspRuntimeState {
     const state = this.getProviderState(cwd);
     return state.kind === "ready"
-      ? state.lspService
+      ? state.lspRuntime
       : { kind: "unavailable" as const, reason: "No provider" };
   }
 }
@@ -122,18 +142,18 @@ export class TestCapabilityAdapter implements CapabilityAdapter {
   readonly #semantic: SemanticProvider | null;
   readonly #structural: StructuralProvider | null;
   readonly #readiness: ReadinessOutcome;
-  readonly #lspService: SessionLspServiceState;
+  readonly #lspRuntime: WorkspaceLspRuntimeState;
 
   constructor(options: {
     semantic?: SemanticProvider | null;
     structural?: StructuralProvider | null;
     readiness?: ReadinessOutcome;
-    lspService?: SessionLspServiceState;
+    lspRuntime?: WorkspaceLspRuntimeState;
   }) {
     this.#semantic = options.semantic ?? null;
     this.#structural = options.structural ?? null;
     this.#readiness = options.readiness ?? { kind: "ready" };
-    this.#lspService = options.lspService ?? {
+    this.#lspRuntime = options.lspRuntime ?? {
       kind: "unavailable" as const,
       reason: "no test LSP",
     };
@@ -146,7 +166,7 @@ export class TestCapabilityAdapter implements CapabilityAdapter {
     return {
       kind: "ready",
       provider: this.getProvider(_cwd) as CodeProvider,
-      lspService: this.#lspService,
+      lspRuntime: this.#lspRuntime,
     };
   }
 
@@ -210,6 +230,21 @@ export class TestCapabilityAdapter implements CapabilityAdapter {
 
   getStructuralProvider(_cwd: string): StructuralProvider | null {
     return this.#structural;
+  }
+
+  getLspRuntimeState(_cwd: string): WorkspaceLspRuntimeState {
+    return this.#lspRuntime;
+  }
+
+  getCapabilityStates(_cwd: string): {
+    semantic: CapabilityState;
+    structural: CapabilityState;
+  } {
+    const unavailable: CapabilityState = { kind: "unavailable", reason: "not configured" };
+    return {
+      semantic: this.#semantic ? { kind: "ready" } : unavailable,
+      structural: this.#structural ? { kind: "ready" } : unavailable,
+    };
   }
 
   async ensureSemanticReadiness(_cwd: string, _scope: ReadinessScope): Promise<ReadinessOutcome> {

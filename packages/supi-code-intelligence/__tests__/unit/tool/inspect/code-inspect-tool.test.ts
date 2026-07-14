@@ -7,14 +7,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../../src/extension.ts";
 
 const mockLspFns = vi.hoisted(() => ({
-  getSessionLspService: vi.fn<(cwd: string) => unknown>(),
+  getWorkspaceLspRuntime: vi.fn<(cwd: string) => unknown>(),
 }));
 
 vi.mock("@mrclrchtr/supi-lsp/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@mrclrchtr/supi-lsp/api")>();
   return {
     ...actual,
-    getSessionLspService: mockLspFns.getSessionLspService,
+    getWorkspaceLspRuntime: mockLspFns.getWorkspaceLspRuntime,
   };
 });
 
@@ -29,7 +29,7 @@ beforeEach(() => {
     ["export function widget() {", "  const foo = 1;", "  return foo;", "}", ""].join("\n"),
   );
 
-  mockLspFns.getSessionLspService.mockReturnValue({
+  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
     kind: "unavailable",
     reason: "no active session",
   });
@@ -47,18 +47,18 @@ function mockReadyLsp(
     recoverDiagnostics: ReturnType<typeof vi.fn>;
   }> = {},
 ) {
-  const service = {
+  const runtime = {
     fileDiagnostics: vi.fn().mockResolvedValue([]),
     recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
     ...overrides,
   };
 
-  mockLspFns.getSessionLspService.mockReturnValue({
+  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
     kind: "ready",
-    service,
+    runtime,
   });
 
-  return service;
+  return runtime;
 }
 
 function registerInspectProviders() {
@@ -160,32 +160,14 @@ describe("code_inspect tool", () => {
 
     const props = tool.parameters?.properties;
     expect(props).toBeDefined();
-    expect(props).toHaveProperty("file");
-    expect(props).toHaveProperty("line");
-    expect(props).toHaveProperty("character");
+    expect(props).toHaveProperty("point");
     expect(props).toHaveProperty("maxResults");
+    expect(props).not.toHaveProperty("file");
+    expect(props).not.toHaveProperty("line");
+    expect(props).not.toHaveProperty("character");
     expect(props).not.toHaveProperty("targetId");
     expect(props).not.toHaveProperty("symbol");
     expect(props).not.toHaveProperty("path");
-  });
-
-  it("requires file, line, and character", async () => {
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-
-    const tool = getTool(pi, "code_inspect");
-    const result = (await tool.execute(
-      "inspect-missing-anchor",
-      { file: "src/index.ts" },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
-
-    expect(result.content[0].text).toContain("line");
-    expect(result.content[0].text).toContain("character");
   });
 
   it("returns best-effort point inspection sections with nearby diagnostics", async () => {
@@ -209,7 +191,7 @@ describe("code_inspect tool", () => {
     const tool = getTool(pi, "code_inspect");
     const result = (await tool.execute(
       "inspect-best-effort",
-      { file: "src/index.ts", line: 2, character: 10 },
+      { point: { file: "src/index.ts", line: 2, character: 10 } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -231,7 +213,7 @@ describe("code_inspect tool", () => {
     if (result.details?.type === "inspect") {
       expect(result.details.data?.nextQueries).toEqual(
         expect.arrayContaining([
-          expect.stringContaining('`code_orientation` with `focus: "src/index.ts"`'),
+          expect.stringContaining('code_orientation with focus.path "src/index.ts"'),
         ]),
       );
       expect(result.details.data?.nextQueries).not.toEqual(
@@ -261,7 +243,7 @@ describe("code_inspect tool", () => {
     const tool = getTool(pi, "code_inspect");
     const result = (await tool.execute(
       "inspect-code-actions-truncated",
-      { file: "src/index.ts", line: 2, character: 10, maxResults: 1 },
+      { point: { file: "src/index.ts", line: 2, character: 10 }, maxResults: 1 },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
@@ -292,23 +274,20 @@ describe("code_inspect tool", () => {
     });
   });
 
-  it("reports explicit unavailable sections instead of heuristic guesses", async () => {
+  it("throws when every inspection substrate is unavailable", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
 
     const tool = getTool(pi, "code_inspect");
-    const result = (await tool.execute(
-      "inspect-unavailable",
-      { file: "src/index.ts", line: 2, character: 10 },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
-
-    expect(result.content[0].text).toContain("Unavailable");
-    expect(result.content[0].text).not.toContain("heuristic");
+    await expect(
+      tool.execute(
+        "inspect-unavailable",
+        { point: { file: "src/index.ts", line: 2, character: 10 } },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      ),
+    ).rejects.toThrow("No semantic, structural, or diagnostic provider");
   });
 
   it("renders ancestry with positional data instead of collapsing to type names", async () => {
@@ -321,7 +300,7 @@ describe("code_inspect tool", () => {
     const tool = getTool(pi, "code_inspect");
     const result = (await tool.execute(
       "inspect-ancestry-positions",
-      { file: "src/index.ts", line: 2, character: 10 },
+      { point: { file: "src/index.ts", line: 2, character: 10 } },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),

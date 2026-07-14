@@ -1,102 +1,102 @@
-# CLAUDE.md
+# @mrclrchtr/supi-lsp
 
 ## Scope
 
-`@mrclrchtr/supi-lsp` is a **library-only** package with two explicit surfaces:
-- `@mrclrchtr/supi-lsp/api` → `src/api.ts` → reusable library surface (`getSessionLspService`, `waitForSessionLspService`, `SessionLspService`, LSP types, provider interfaces, and exported semantic/diagnostic result types)
-- `@mrclrchtr/supi-lsp/provider/lsp-semantic-provider` → `src/provider/lsp-semantic-provider.ts` → shared `SemanticProvider` adapter
+This is a library-only package with two explicit exports:
 
-This package has **no pi extension surface** — no `pi.extensions`, no `src/extension.ts`, no `./extension` export. Public substrate-named tools were removed from the surface; `@mrclrchtr/supi-code-intelligence` now exposes only intent-level `code_*` tools backed by this library.
+- `@mrclrchtr/supi-lsp/api` → controller, `WorkspaceLspRuntime` types, registry operations, configuration, coordinates, and diagnostics types
+- `@mrclrchtr/supi-lsp/provider/lsp-semantic-provider` → the shared semantic-provider adapter
 
-## Semantic substrate role
+There is no PI extension entrypoint and no model-callable `lsp_*` tool surface. `supi-code-intelligence` owns the public `code_*` family.
 
-This package does not register pi tools. It provides the `SessionLspService` and `SemanticProvider` implementation consumed by `@mrclrchtr/supi-code-intelligence`.
+## Runtime architecture
 
-For first-wave refactors, `src/provider/lsp-semantic-provider.ts` maps:
-- `rename_symbol` (and legacy `rename`) → `textDocument/rename`
-- `update_imports` → precise organize-imports/source actions only
-- `delete_dead_code` → precise quickfix/refactor-rewrite actions only
-- `rename_file` / `move_file` → explicit unavailable results for now
+`LspRuntimeController` owns lifecycle and status. `WorkspaceLspRuntime` owns routing, semantic readiness and operations, tracked files, diagnostics, and recovery. A ready controller publishes `{ kind: "ready", runtime }`.
 
-Diagnostic severity: Error (`1`), Warning (`2`), Information (`3`), Hint (`4`). The default threshold is `1` (errors only).
+`WorkspaceLspRuntime` is an exported interface. `DefaultWorkspaceLspRuntime`, clients, and `LspManager` remain internal. Never add manager/client access to the public runtime.
+
+Focused internal interfaces:
+
+- `ClientPool` — track/close/prune files, refresh open diagnostics, workspace notifications, shutdown
+- `WorkspaceRouter` — file support and project-server inventory
+- `DiagnosticStore` — synchronized diagnostic reads and summaries
+- `RecoveryCoordinator` — stale assessment and recovery
+
+The registry uses the shared core session-state helper and retains explicit ready, pending, inactive, disabled, and unavailable states. Pending polling uses `waitForWorkspaceLspRuntime(cwd)`.
+
+Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when starting from 1-based tool coordinates.
 
 ## Key files
 
-- **LSP client**: `src/client/client.ts` (init, sync, requests), `src/client/transport.ts` (JSON-RPC via vscode-jsonrpc), `src/client/client-refresh.ts`
-- **Manager**: `src/manager/manager.ts` + `manager-*.ts` (lifecycle, workspace routing, client pool, diagnostic store, capability index, project info, stale resync, workspace recovery, workspace symbol, client state, recovery coordinator, helpers, types)
-- **Config**: `src/config/types.ts` (re-exports vscode-lsp types), `src/config/server-config.ts` (SuPi types), `src/config/config.ts` (loadConfig), `src/config/lsp-settings.ts`, `src/config/capabilities.ts` (server capability detection), `src/config/server-actions.ts` (code action collection), `src/config/tsconfig-scope.ts` (project resolution)
-- **Session API**: `src/session/service-registry.ts` (peer extension access, backed by supi-core), `src/session/runtime-controller.ts`, `src/session/runtime-registration.ts`, `src/session/scanner.ts`
-- **Diagnostics**: `src/diagnostics/diagnostics.ts` (core collection), `src/diagnostics/stale-diagnostics.ts`, `src/diagnostics/suppression-diagnostics.ts`, `src/diagnostics/workspace-sentinels.ts`, `src/diagnostics/diagnostic-context.ts`, `src/diagnostics/diagnostic-augmentation.ts`, `src/diagnostics/diagnostic-display.ts`, `src/diagnostics/diagnostic-summary.ts`, `src/manager/manager-diagnostics.ts`
-- **Provider**: `src/provider/lsp-semantic-provider.ts` (SemanticProvider impl consumed by supi-code-intelligence), `src/provider/refactor-planning.ts` (rename refactor and code action collection helpers)
-- **Other**: `src/pattern-matcher.ts` (gitignore-style exclusion), `src/summary.ts`, `src/utils.ts`, `src/coordinates.ts`
+- `src/client/` — protocol client, transport, refresh, and request handling
+- `src/config/` — server definitions, settings, capabilities, actions, protocol types, and tsconfig scope
+- `src/diagnostics/` — stale/suppression diagnostics and workspace sentinels
+- `src/manager/manager.ts` + `manager-*.ts` — package-internal lifecycle, routing, diagnostics, and recovery
+- `src/manager/client-pool.ts`, `workspace-router.ts`, `diagnostic-store.ts`, `recovery-coordinator.ts` — focused internal interfaces
+- `src/provider/lsp-semantic-provider.ts` — semantic-provider adapter
+- `src/provider/refactor-planning.ts` — precise rename/code-action edit conversion
+- `src/session/runtime-controller.ts` — lifecycle/status
+- `src/session/runtime-registry.ts` — Workspace runtime implementation and registry
+- `src/session/runtime-registration.ts` — capability-broker registration
+- `src/session/scanner.ts` — workspace detection and startup
 
-## Architecture gotchas
+## Semantic and refactor behavior
 
-`SessionLspService` is the stable wrapper for peer extensions and must not leak `LspManager` internals. Its position arguments are raw 0-based LSP coordinates; use `toLspPosition()` from `@mrclrchtr/supi-lsp/api` when starting from 1-based user coordinates. The session registry reuses the shared `supi-core` session-state helper for normalized-cwd storage, but LSP keeps its own `pending` polling through `waitForSessionLspService(cwd)`.
+The provider maps semantic requests to `WorkspaceLspRuntime`. Public code-intelligence refactors currently use:
 
-The library surface behind `src/api.ts` / `src/index.ts` must not import extension-only modules. The `/api` surface is limited to `session/service-registry.ts`, `client/`, `manager/`, `config/`, and `diagnostics/` utilities. Tool registration, guidance, overrides, settings registration, and pi event handlers are the responsibility of `@mrclrchtr/supi-code-intelligence`.
+- `rename_symbol` → `textDocument/rename`
+- `extract_function` → matching precise code action
+- `extract_variable` → matching precise code action
 
-`client/transport.ts` wraps `vscode-jsonrpc`'s `createMessageConnection`. `JsonRpcRequestError` is an alias for `ResponseError` — it preserves JSON-RPC error codes when thrown from server-initiated request handlers. Timeouts use `CancellationTokenSource` plus `Promise.race` so callers never hang, and the token is passed to `sendRequest` so the connection can short-circuit on cancellation. The `vscode-jsonrpc` writer may emit a `Cannot call write after a stream was destroyed` unhandled rejection during shutdown when the server process writes after the stream is closed — this is harmless cleanup noise, not a bug.
+Only precise text edits cross into refactor plans. Resource/file operations remain unavailable.
 
-## Diagnostic behavior gotchas
+Diagnostic severity: Error (`1`), Warning (`2`), Information (`3`), Hint (`4`). The default threshold is `1`.
 
-`before_agent_start` uses a two-pass prune, refresh, prune flow. Late `publishDiagnostics` notifications can recreate stale entries after the first prune, so `getAllDiagnostics()` also filters with `existsSync` as a read-side guard. Workspace sentinel scanning covers `package.json`, root lockfiles, `tsconfig*`, and generated `*.d.ts` files. Immediate soft recovery after tool results is triggered for successful `write` and `edit` calls that affect (a) workspace sentinel paths or (b) source files whose extension matches any configured language server's `fileTypes` (e.g., `.ts`, `.py`, `.rs`). This keeps the LSP server aware of new source files so cross-file diagnostics are recomputed. `recover` restarts clients only when the stale cluster survives that soft recovery.
+## Transport gotchas
 
-Pull diagnostic sync should use pull when `diagnosticProvider` is available and fall back to push waits otherwise. Clear the `resultId` cache after file creation so cross-file diagnostics are recomputed. Cleanup paths such as `didClose`, prune, refresh deletion, and shutdown must release pending waiters instead of only deleting waiter maps. Stale suppression diagnostics, including "Suppression comment has no effect" and unused `@ts-expect-error`, still show up when inline diagnostics are error-only. Inline diagnostics after `write` and `edit` can include cascade updates from `relatedDocuments`, and severity-1 results are augmented with hover and code actions at the first error position.
+`client/transport.ts` wraps `vscode-jsonrpc`'s `createMessageConnection`. `JsonRpcRequestError` aliases `ResponseError` so server-request handlers retain JSON-RPC error codes. Timeouts use `CancellationTokenSource` plus `Promise.race`, and pass the token to `sendRequest`.
 
+During shutdown, `vscode-jsonrpc` may emit `Cannot call write after a stream was destroyed` when a server writes after stream closure. This is harmless cleanup noise.
 
-## Package-specific conventions
+## Diagnostic behavior
 
-Keep summary and relevance formatting out of `manager.ts`; use focused helpers such as `summary.ts` or `manager-*.ts` modules. `ctx.cwd` is threaded through `LspManager` and formatting utilities, so do not use `process.cwd()` for path resolution.
+- Session startup uses prune → refresh → prune because late `publishDiagnostics` can recreate stale entries.
+- Diagnostic reads also filter missing files with `existsSync`.
+- Workspace sentinels include `package.json`, root lockfiles, `tsconfig*`, and generated `*.d.ts` files.
+- Successful `write`/`edit` calls trigger soft recovery for sentinels and configured source extensions.
+- Recovery restarts clients only if stale clusters survive soft recovery.
+- Pull diagnostics are preferred when `diagnosticProvider` exists; otherwise wait for push diagnostics.
+- Clear pull `resultId` state after file creation so cross-file diagnostics recompute.
+- `didClose`, prune, refresh deletion, and shutdown must release pending waiters.
+- Inline diagnostics may include `relatedDocuments` cascade updates and severity-1 hover/code-action augmentation.
 
-`loadConfig()` reads server definitions from supi config (`~/.pi/agent/supi/config.json` and `.pi/supi/config.json`) under `lsp.servers`. `.pi-lsp.json` is no longer read. Keys are language names such as `typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, and `kotlin`, not server binary names. Each language entry merges independently against built-in defaults, and omitted fields fall back to the code default for that language.
+## Configuration
 
-### Always-on LSP policy
+`loadConfig()` reads `lsp.servers` from SuPi project/global config. `.pi-lsp.json` is not read. Keys are language names (`typescript`, `python`, `rust`, `c`, `cpp`, `ruby`, `java`, `kotlin`), not binary names.
 
-- The global `lsp.enabled` switch is **deprecated and ignored** — LSP always attempts to start detected servers.
-- The `lsp.active` allowlist is **deprecated and ignored** — all detected servers are started.
-- Per-language disable through `lsp.servers.<language>.enabled: false` is the only supported opt-out.
-- Deprecated keys (`lsp.enabled`, `lsp.active`) are detected at session start via `getDeprecatedLspKeys()` from `@mrclrchtr/supi-lsp/api`. Downstream packages (e.g., `supi-code-intelligence`) use this to emit one-time deprecation warnings.
+Always-on policy:
 
-User exclusion patterns live under `lsp.exclude` as gitignore-style glob strings. They are loaded in `session_start`, stored on `LspManager` through `setExcludePatterns()`, and applied only by diagnostic and coverage collection methods; explicit semantic requests issued through the public `code_*` tools are not filtered. `isGlobMatch()` in `pattern-matcher.ts` supports leading `/` for anchored matches, trailing `/` for directory-only matches, `**` for recursive wildcards, and `*` for single-segment wildcards.
+- `lsp.enabled` is deprecated and ignored.
+- `lsp.active` is deprecated and ignored.
+- `lsp.servers.<language>.enabled: false` is the only opt-out.
+- `getDeprecatedLspKeys()` lets downstream packages report old keys.
 
-## Integration test coverage
+`lsp.exclude` contains gitignore-style patterns used only by diagnostics and coverage. Explicit semantic requests are not filtered. `isGlobMatch()` supports anchored `/`, directory-only trailing `/`, `**`, and single-segment `*`.
 
-### Required vs optional
+Thread `ctx.cwd` through manager and formatting code; do not use `process.cwd()` for workspace path resolution.
 
-- **Required (CI)**: TypeScript integration tests (`client.integration.test.ts`, `manager.integration.test.ts`, `service-actions.integration.test.ts`, `service-actions-workspace.integration.test.ts`) — these use `typescript-language-server` + `tsserver`, which must be available.
-- **Optional (local)**: Python (`client.integration.python.test.ts`) and Bash (`client.integration.bash.test.ts`) tests that skip gracefully when the corresponding server binary is not on `PATH`.
+## Tests
 
-All integration tests use `describe.skipIf(!HAS_COMMAND)` so they are transparently skipped when the server is unavailable. The missing-server test in `client.integration.bash.test.ts` always runs because it tests behavior when a nonexistent binary is configured.
+Required TypeScript integration tests use `typescript-language-server` and `tsserver`. Python and Bash integration tests skip when their binaries are unavailable. All optional suites use `describe.skipIf(!HAS_COMMAND)`.
 
-### Test coverage by language
-
-| Language | Server | Tests |
-|----------|--------|-------|
-| TypeScript | `typescript-language-server` | Client start/shutdown, hover, definition, document symbols, diagnostics (valid + broken), fix-and-verify, code actions, workspace symbols |
-| Python | `pyright-langserver` | Client start/shutdown, hover (function + parameter), definition, document symbols, diagnostics (valid + broken), fix-and-verify, workspace symbols, shutdown-after-error |
-| Bash | `bash-language-server` | Client start/shutdown, diagnostics, document symbols, missing-binary robustness |
-
-## Focused test commands
+Focused commands:
 
 ```bash
-# Public API and registry lifecycle
-pnpm exec vitest run packages/supi-lsp/__tests__/unit/service-registry.test.ts
-# Client lifecycle and transport
+pnpm exec vitest run packages/supi-lsp/__tests__/unit/runtime-registry.test.ts
+pnpm exec vitest run packages/supi-lsp/__tests__/unit/runtime-controller.test.ts
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/client-refresh.test.ts packages/supi-lsp/__tests__/unit/client-pull-diagnostics.test.ts packages/supi-lsp/__tests__/unit/transport.test.ts
-# Diagnostics, suppression, stale detection
 pnpm exec vitest run packages/supi-lsp/__tests__/unit/diagnostic-cascade.test.ts packages/supi-lsp/__tests__/unit/suppression-diagnostics.test.ts packages/supi-lsp/__tests__/unit/stale-diagnostics.test.ts
-# Config and manager
-pnpm exec vitest run packages/supi-lsp/__tests__/unit/config.test.ts packages/supi-lsp/__tests__/unit/manager-workspace-recovery.test.ts
-```
-
-### Running cross-language integration tests
-
-```bash
-# Full suite (will skip servers not on PATH)
 pnpm exec vitest run packages/supi-lsp/__tests__/integration/*.integration.*.test.ts
-# Python only
-pnpm exec vitest run packages/supi-lsp/__tests__/integration/client.integration.python.test.ts
-# Bash only
-pnpm exec vitest run packages/supi-lsp/__tests__/integration/client.integration.bash.test.ts
 ```
+
+After structural changes, run package TypeScript tests and `pnpm verify:ai`.

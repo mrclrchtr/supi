@@ -5,7 +5,6 @@ export const CODE_INTELLIGENCE_TOOL_NAMES = [
   "code_orientation",
   "code_find",
   "code_graph",
-  "code_impact",
   "code_refactor_plan",
   "code_refactor_apply",
   "code_health",
@@ -28,7 +27,7 @@ export interface PlannerRoute {
    * The preferred execution strategy for this intent.
    * - `semantic`: use LSP first
    * - `structural`: use tree-sitter first
-   * - `search`: use explicit text/heuristic search
+   * - `search`: use explicit text or regex search
    * - `unavailable`: no capability can satisfy this intent
    */
   preferred: "semantic" | "structural" | "search" | "unavailable";

@@ -90,7 +90,7 @@ export function renderInspectResult(assembly: InspectResultAssembly): string {
 }
 
 function normalizeAncestry(
-  ancestry: Array<
+  ancestry: ReadonlyArray<
     | string
     | {
         type: string;

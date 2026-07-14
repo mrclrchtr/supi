@@ -1,82 +1,36 @@
-/**
- * Tool executor for code_resolve.
- *
- * Thin adapter: validates params, gates readiness, delegates to orchestrate.
- */
+/** Thin Pi adapter for code_resolve. */
 
+import type { ResolveTargetInput } from "../../session/target-input.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
-import { resolveCrossFieldRules } from "../infra/cross-field.ts";
-import { unavailableResolveDetails } from "../infra/error-results.ts";
-import {
-  expandTargetId,
-  gateSemanticReadiness,
-  resolveScopeParam,
-  runPipe,
-  validateParams,
-} from "../infra/pipeline.ts";
-import { renderSemanticReadinessTimeout } from "../infra/readiness-message.ts";
-import { orchestrateResolve } from "./orchestrate.ts";
+import { toWorkflowControl } from "../infra/workflow-control.ts";
+import { assembleResolveResult, suggestedResolveRelations } from "../result/resolve.ts";
+import { renderResolveResult } from "./markdown.ts";
 
 export interface CodeResolveToolParams {
-  query?: string;
-  scope?: string;
-  kind?: string;
-  file?: string;
-  line?: number;
-  character?: number;
+  target: ResolveTargetInput;
   maxResults?: number;
-  targetId?: string;
 }
 
 export async function executeResolveTool(
   params: CodeResolveToolParams,
   ctx: CodeIntelToolExecCtx,
 ): Promise<CodeIntelResult> {
-  const needsSemantic = Boolean(params.query) && params.kind !== "file" && params.kind !== "File";
+  const outcome = await ctx.session.resolve(params, toWorkflowControl(ctx));
+  if (outcome.kind === "unavailable") {
+    throw new Error(outcome.reason);
+  }
 
-  return runPipe(
-    params,
-    ctx,
-    [
-      expandTargetId((msg) => ({
-        content: msg,
-        details: unavailableResolveDetails([
-          "Fix the input parameters and retry",
-          "Use anchored `file` + `line` + `character` or a `query` for resolution",
-        ]),
-      })),
-      resolveScopeParam((reason) => ({
-        content: `**Error:** ${reason}`,
-        details: unavailableResolveDetails([
-          "Verify the `scope` path exists and is within the workspace",
-          "Use an existing workspace-relative file or directory path",
-        ]),
-      })),
-      validateParams(resolveCrossFieldRules, (msg) => ({
-        content: msg,
-        details: unavailableResolveDetails([
-          "Fix the input parameters and retry",
-          "Use anchored `file` + `line` + `character` or a `query` for resolution",
-        ]),
-      })),
-      ...(needsSemantic
-        ? [
-            gateSemanticReadiness("code_resolve", {
-              onTimeout: () => ({
-                content: renderSemanticReadinessTimeout("code_resolve", 15_000),
-                details: unavailableResolveDetails(["Retry shortly or check `code_health`"]),
-              }),
-              throwOnUnavailable: true,
-            }),
-          ]
-        : []),
-    ],
-    async (p, c) => {
-      return orchestrateResolve({
-        params: { ...p, scope: p.scope },
-        session: c.session,
-        cwd: c.cwd,
-      });
-    },
-  );
+  const assembly = assembleResolveResult(outcome, ctx.cwd);
+  let content = renderResolveResult(assembly);
+  if (outcome.kind === "resolved") {
+    const relations = suggestedResolveRelations(outcome.entry.kind);
+    content +=
+      `\n\nChain next: \`code_graph({ target: { handle: "${outcome.entry.targetId}" }, ` +
+      `relations: ${JSON.stringify(relations)} })\``;
+  }
+
+  return {
+    content,
+    details: { type: "resolve", data: assembly.details },
+  };
 }

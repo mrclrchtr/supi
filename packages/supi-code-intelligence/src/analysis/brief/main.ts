@@ -82,16 +82,16 @@ async function generateDirectoryFocused(
   const isModuleRoot = mod && mod.root === resolvedPath;
 
   // Priority signals
-  const lspService =
-    opts?.lspService ??
+  const lspRuntime =
+    opts?.lspRuntime ??
     ({
       kind: "unavailable" as const,
       reason: "No LSP service",
-    } as import("@mrclrchtr/supi-lsp/api").SessionLspServiceState);
+    } as import("@mrclrchtr/supi-lsp/api").WorkspaceLspRuntimeState);
   const prioritySignals = summarizePrioritySignalsForFiles(
     model.root,
     summarizeDirectoryRecursively(resolvedPath).allFiles,
-    lspService,
+    lspRuntime,
   );
   appendPrioritySignalsSection(lines, prioritySignals);
 
@@ -137,13 +137,13 @@ async function generateFileFocused(
   } = await generateFileBrief(model, resolvedPath, opts);
 
   // Priority signals
-  const lspService =
-    opts?.lspService ??
+  const lspRuntime =
+    opts?.lspRuntime ??
     ({
       kind: "unavailable" as const,
       reason: "No LSP service",
-    } as import("@mrclrchtr/supi-lsp/api").SessionLspServiceState);
-  const prioritySignals = summarizePrioritySignalsForFiles(model.root, [resolvedPath], lspService);
+    } as import("@mrclrchtr/supi-lsp/api").WorkspaceLspRuntimeState);
+  const prioritySignals = summarizePrioritySignalsForFiles(model.root, [resolvedPath], lspRuntime);
   const extraLines: string[] = [];
   if (prioritySignals) {
     appendPrioritySignalsSection(extraLines, prioritySignals);

@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { summarizePrioritySignalsForFiles } from "../../../../src/analysis/signals/project.ts";
 
@@ -63,9 +63,9 @@ describe("prioritization signals", () => {
     mkdirSync(path.join(tmpDir, "src"), { recursive: true });
     writeFileSync(path.join(tmpDir, "src", "payment.ts"), "export const paymentLoader = 1;\n");
 
-    const lspService = {
+    const lspRuntime = {
       kind: "ready" as const,
-      service: {
+      runtime: {
         getOutstandingDiagnosticSummary: vi.fn().mockReturnValue([
           {
             file: "src/payment.ts",
@@ -82,7 +82,7 @@ describe("prioritization signals", () => {
     const summary = summarizePrioritySignalsForFiles(
       tmpDir,
       [path.join(tmpDir, "src", "payment.ts")],
-      lspService as unknown as SessionLspServiceState,
+      lspRuntime as unknown as WorkspaceLspRuntimeState,
     );
 
     expect(summary).not.toBeNull();

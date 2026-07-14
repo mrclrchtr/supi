@@ -47,9 +47,10 @@ function makeReadExecutor(state: LspAdapterState) {
   ) => {
     const originalRead = createReadTool(ctx.cwd);
     const result = await originalRead.execute(toolCallId, params, signal, onUpdate);
-    if (!state.lspActive || !state.controller?.manager) return result;
+    const runtime = state.controller?.workspaceRuntime;
+    if (!state.lspActive || !runtime) return result;
     try {
-      await state.controller.manager.ensureFileOpen(resolveSessionPath(ctx.cwd, params.path));
+      await runtime.trackFile(resolveSessionPath(ctx.cwd, params.path));
     } catch {
       /* never block the agent */
     }
@@ -93,13 +94,13 @@ async function appendInlineDiagnostics<T extends { content: unknown[]; details: 
   filePath: string,
   result: T,
 ): Promise<T> {
-  const manager = state.controller?.manager;
-  if (!manager) return result;
+  const runtime = state.controller?.workspaceRuntime;
+  if (!runtime) return result;
 
   try {
     const resolved = resolveSessionPath(cwd, filePath);
     const effectiveSeverity = Math.max(state.inlineSeverity, 2);
-    const entries = await manager.syncFileAndGetCascadingDiagnostics(resolved, effectiveSeverity);
+    const entries = await runtime.fileDiagnosticsWithCascade(resolved, effectiveSeverity);
     if (entries.length === 0) return result;
 
     // biome-ignore format: manual formatting for readability

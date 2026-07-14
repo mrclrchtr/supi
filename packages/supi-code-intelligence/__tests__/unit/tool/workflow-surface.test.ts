@@ -68,7 +68,6 @@ const EXPECTED_WORKFLOW_TOOL_NAMES = [
   "code_orientation",
   "code_find",
   "code_graph",
-  "code_impact",
   "code_refactor_plan",
   "code_refactor_apply",
   "code_health",
@@ -86,7 +85,7 @@ describe("code intelligence tool specs", () => {
     }
   });
 
-  it("documents every planned tool with purpose, schema docs, absorbed tools/behaviors, phase, and non-goals", () => {
+  it("documents every tool with purpose, schema docs, substrates, and non-goals", () => {
     expect(CODE_INTELLIGENCE_TOOL_SPECS).toHaveLength(CODE_INTELLIGENCE_TOOL_NAMES.length);
 
     const specNames = CODE_INTELLIGENCE_TOOL_SPECS.map((spec) => spec.name);
@@ -99,12 +98,11 @@ describe("code intelligence tool specs", () => {
     for (const spec of CODE_INTELLIGENCE_TOOL_SPECS) {
       expect(spec.purpose.trim().length).toBeGreaterThan(0);
       expect(spec.schemaDocs.trim().length).toBeGreaterThan(0);
-      expect(spec.phase.trim().length).toBeGreaterThan(0);
-      expect(Array.isArray(spec.absorbsTools)).toBe(true);
-      expect(Array.isArray(spec.absorbsBehaviors)).toBe(true);
+      expect(Array.isArray(spec.substrates)).toBe(true);
+      expect(spec.substrates.length).toBeGreaterThan(0);
       expect(Array.isArray(spec.nonGoals)).toBe(true);
       expect(spec.nonGoals.length).toBeGreaterThan(0);
-      expect(Object.hasOwn(CODE_INTELLIGENCE_TOOL_SCHEMAS, spec.schemaKey)).toBe(true);
+      expect(Object.hasOwn(CODE_INTELLIGENCE_TOOL_SCHEMAS, spec.name)).toBe(true);
     }
   });
 
@@ -127,18 +125,16 @@ describe("code intelligence tool specs", () => {
     const relationsSchema = graphSchema.properties?.relations;
     const values = collectStringValues(relationsSchema);
 
-    expect(values).toEqual(
-      expect.arrayContaining([
-        "all",
-        "references",
-        "callees",
-        "imports",
-        "exports",
-        "implements",
-        "tests",
-      ]),
-    );
+    expect(values.sort((left, right) => left.localeCompare(right))).toEqual([
+      "all",
+      "callees",
+      "implements",
+      "references",
+    ]);
     expect(values).not.toContain("callers");
+    expect(values).not.toContain("tests");
+    expect(values).not.toContain("imports");
+    expect(values).not.toContain("exports");
   });
 
   it("defines code_find modes without a speculative natural-language mode", () => {

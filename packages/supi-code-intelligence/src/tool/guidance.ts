@@ -1,12 +1,4 @@
-// Prompt guidance and tool descriptions for the focused code-intelligence tool surface.
-//
-// Each code_* tool owns its complete promptGuidelines here.
-// Runtime registration data (name, parameters, run) lives in specs.ts.
-//
-// Cross-tool steering is centralized (authored once on its natural-home tool) and
-// some tools have empty promptGuidelines by design: all code_* tools are always
-// active together, so a steering bullet on one tool is always co-visible. See
-// docs/adr/0013-centralized-code-intelligence-prompt-steering-assumes-all-tools-active.md.
+// Model-facing descriptions and concise sibling-selection guidance.
 
 import type { CodeIntelligenceToolName } from "../types/index.ts";
 
@@ -24,78 +16,64 @@ export type CodeIntelligenceToolPromptSurfaceMap = Record<
 export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptSurfaceMap = {
   code_resolve: {
     description:
-      "Resolve references to evidence-backed code targets and stable targetId/spanId handles for follow-up code_* tools. Accepts query/symbol/file or anchored file+line+character; anchored resolution snaps only to real provider-backed symbols, and whitespace/comment/non-symbol points fail with code_inspect guidance. No text-search fallback; ambiguous results return ranked candidates. Truncates at 2000 lines/50KB.",
-    promptSnippet: "code_resolve — resolve references into precise targets and target handles",
+      "Resolve exactly one evidence-backed target source into a session-scoped handle. target accepts one key: anchor ({file,line,character}), symbol ({query,scope?,symbolKind?}), or file. Anchors snap only to real provider-backed symbols; symbol lookup never falls back to text search. Ambiguous results return ranked candidate handles.",
+    promptSnippet: "code_resolve — resolve one precise target and return a handle",
     promptGuidelines: [
-      "Use code_resolve first for ambiguous or symbol-only targets, before graph/impact/refactor/orientation; if resolve returns ranked candidates, narrow with a candidate file + line + character.",
+      "Use code_resolve when a symbol query may be ambiguous or when later calls should share a stable target handle.",
     ],
   },
   code_inspect: {
     description:
-      "Inspect one exact file position for syntax, symbol, hover/definition, nearby diagnostics, and code-action titles. Requires file, line, and character; use for point facts, not broad orientation. Unavailable providers are disclosed; code actions are advisory only. Truncates at 2000 lines/50KB.",
+      "Inspect one exact point ({file,line,character}) for syntax, enclosing symbol, hover, definition, nearby diagnostics, and advisory code-action titles. Use for point facts rather than broad Orientation. Missing substrates are disclosed and no code action is applied.",
     promptSnippet: "code_inspect — factual point inspection",
-    // No guidelines: selection is steered by code_orientation's bullet plus this
-    // self-sufficient description. See ADR 0013 (all code_* tools always active).
     promptGuidelines: [],
   },
   code_orientation: {
     description:
-      "Orient around the workspace, module, directory, file, or resolved symbol before surgical work. Omit focus for workspace orientation; use focus for a path/module, or targetId/focus+line+character for symbol orientation. Directory focus may surface local instruction files (CLAUDE.md, AGENTS.md). targetId wins and stale IDs error. Returns landmarks, docs, local diagnostics, and read-next guidance; relations/impact/health belong in code_graph/code_impact/code_health. maxResults caps lists; output is truncated to 2000 lines / 50KB.",
-    promptSnippet: "code_orientation — project/module/file/symbol orientation",
+      "Orient around the workspace or one exact focus before surgical work. Omit focus for workspace Orientation; otherwise choose one focus key: path, module, or target. focus.target accepts one handle, anchor, or symbol selector. Directory focus may surface local instruction files. Relation evidence belongs to code_graph and health belongs to code_health.",
+    promptSnippet: "code_orientation — workspace/path/module/symbol Orientation",
     promptGuidelines: [
-      "Use `code_orientation({ focus })` for first-pass project/package/directory/file orientation before `bash`/`read`.",
-      "Use directory focus (for example `packages/foo`) to surface local instruction files before package work.",
-      "Use code_resolve first for bare symbol names, then pass the resulting targetId to code_orientation.",
-      "Use code_graph/code_impact/code_health for relations, impact, or full health instead of asking code_orientation for those sections.",
+      "Use code_orientation before broad file reading when you need project, package, directory, file, or symbol landmarks.",
+      "Use focus.path for a known workspace path, focus.module for a discovered module name, and focus.target for a precise symbol.",
+      "Use code_graph for relationships and code_health for provider or diagnostic state.",
     ],
   },
   code_graph: {
     description:
-      'Analyze relation evidence for a resolved target or coordinates: references, structural callees, imports/exports, implementations, and tests. Defaults to references; relations:["all"] expands all families. Per-relation substrate failures are disclosed. Callees are syntax/direct-scope source-shape calls, not symbol identity; calleeDepth:"deep" includes nested scopes. Scope narrows by workspace path; targetId from code_resolve is preferred. Truncates at 2000 lines/50KB.',
-    promptSnippet: "code_graph — semantic and structural relation graph",
-    // No guidelines: selection is steered by this self-sufficient description plus
-    // code_impact's "use code_graph instead of code_impact" bullet. See ADR 0013.
+      'Collect relation evidence for exactly one target.handle, target.anchor, or target.symbol. Relations are references, structural callees, and implementations; defaults to references and relations:["all"] expands exactly those three. "all" cannot be mixed with named relations. Callees are source-shape calls, not symbol identity; calleeDepth:"deep" includes nested scopes. Per-relation failures are disclosed without inventing edges.',
+    promptSnippet: "code_graph — provider-backed and structural relation evidence",
     promptGuidelines: [],
-  },
-  code_impact: {
-    description:
-      "Estimate blast radius for a resolved target or user-supplied changeSetFiles before editing. changeSetFiles are explicit files, not inferred from git and no line-level diff; change-only requests report insufficient evidence. Uses semantic references plus deterministic test discovery when available; no heuristic search fallback. Output includes read-next guidance; truncates at 2000 lines/50KB.",
-    promptSnippet: "code_impact — blast radius and impact",
-    promptGuidelines: [
-      "Use code_graph instead of code_impact when you only need a plain reference list.",
-    ],
   },
   code_find: {
     description:
-      'Search code with explicit modes: text literal (default), regex, semantic workspace-symbol, or ast structured. mode:"ast" requires `kind` (definition/import/export/call/type/interface/class/method/enum/test); text/regex/semantic reject kind. Semantic mode uses LSP only and does not silently fall back. AST call matches written call-site names, not by symbol identity; use code_graph references on a resolved target for symbol-identity-aware callers. Truncates at 2000 lines/50KB.',
-    promptSnippet: "code_find — unified ranked code search",
+      'Search explicit evidence using text literal (default), regex, semantic workspace symbols, or ast structure. scope is a non-empty array of workspace-relative paths. mode:"ast" requires kind (definition/import/export/call/type/interface/class/method/enum/test); other modes reject kind. Modes never silently fall back. AST call matches written names, not symbol identity.',
+    promptSnippet: "code_find — explicit text, regex, structural, or semantic search",
     promptGuidelines: [
-      "Use code_find for explicit text, regex, semantic symbol, or AST search; use code_graph references for symbol-identity callers.",
-    ],
-  },
-  code_refactor_plan: {
-    description:
-      "Preview a semantic refactor plan and return planId; never mutates files. Supports rename_symbol (rename alias) and extract_function/extract_variable when LSP returns precise edits. Requires targetId or anchored file+line+character, plus operation-specific newName/range. Apply separately with code_refactor_apply. Truncates at 2000 lines/50KB.",
-    promptSnippet: "code_refactor_plan — preview a precise workflow refactor plan",
-    promptGuidelines: [
-      "Use code_refactor_plan to preview rename/extract edits only; mutate later with code_refactor_apply and the returned planId.",
-    ],
-  },
-  code_refactor_apply: {
-    description:
-      "Apply a stored refactor plan by planId. Revalidates plan freshness and file fingerprints before mutating; does not compose new plans. Truncates at 2000 lines/50KB.",
-    promptSnippet: "code_refactor_apply — apply a stored refactor plan",
-    promptGuidelines: [
-      "Use code_refactor_apply only with a planId returned by code_refactor_plan.",
+      "Use code_find for direct search evidence; use code_graph references for symbol-identity relationships.",
     ],
   },
   code_health: {
     description:
-      "Report workspace health: diagnostics, language-server status, dirty files, coverage, and unused code. Use scope/include/level to narrow; refresh:true recovers stale diagnostics. Missing coverage/unused reports are disclosed. Truncates at 2000 lines/50KB.",
-    promptSnippet:
-      "code_health — diagnostics, server status, coverage, unused-code, and workspace health",
+      "Report diagnostics, language-server status, dirty files, coverage, and unused-code evidence. scope/include/level narrow the report; refresh:true runs diagnostic recovery. Default coverage and unused paths are evidence locators only: a miss means unavailable at that location, not global absence.",
+    promptSnippet: "code_health — workspace diagnostics and maintenance evidence",
     promptGuidelines: [
-      "Use code_health for diagnostics/server/dirty/coverage/unused health; pass refresh:true to code_health before relying on stale diagnostics.",
+      "Use code_health with refresh:true before relying on potentially stale diagnostics.",
+    ],
+  },
+  code_refactor_plan: {
+    description:
+      "Preview one precise semantic refactor and return a planId without mutating files. target accepts exactly one handle or anchor. operation accepts exactly one rename_symbol ({newName}), extract_function ({newName,range}), or extract_variable ({newName,range}) payload. Unavailable precise edits fail without text fallback.",
+    promptSnippet: "code_refactor_plan — preview a precise semantic refactor",
+    promptGuidelines: [
+      "Use code_refactor_plan for preview only, then explicitly call code_refactor_apply with its planId.",
+    ],
+  },
+  code_refactor_apply: {
+    description:
+      "Apply one stored refactor plan by planId. Revalidates plan freshness, file fingerprints, ranges, and overlap inside sorted per-file mutation queues. It does not compose or silently regenerate plans.",
+    promptSnippet: "code_refactor_apply — apply a fresh stored refactor plan",
+    promptGuidelines: [
+      "Use code_refactor_apply only with a planId returned by code_refactor_plan.",
     ],
   },
 };

@@ -13,16 +13,13 @@ export type { CodeIntelResult, CodeIntelToolExecCtx } from "./execution.ts";
 // ── Detail types ────────────────────────────────────────────────────────
 
 export type {
-  AffectedDetails,
   AnchoredResolutionMetadata,
   AnchoredResolutionSource,
   BriefDetails,
   ContextDetails,
   DisambiguationCandidate,
   HealthDetails,
-  ImpactDetails,
   InspectDetails,
   ResolveDetails,
   SearchDetails,
-  TestSurfaceDetails,
 } from "./details.ts";

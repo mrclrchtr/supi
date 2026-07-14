@@ -7,7 +7,7 @@
 
 import { resolve } from "node:path";
 import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
-import type { SessionLspServiceState } from "@mrclrchtr/supi-lsp/api";
+import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import { diagnosticMessageString } from "../../substrate/lsp/utils.ts";
 
@@ -150,18 +150,18 @@ export interface NearbyDiagnostic {
   message: string;
 }
 
-// biome-ignore lint/complexity/useMaxParams: lspService is a DI seam, not a logic parameter
+// biome-ignore lint/complexity/useMaxParams: lspRuntime is a DI seam, not a logic parameter
 export async function gatherNearbyDiagnostics(
   cwd: string,
   file: string,
   line: number,
   maxResults: number,
-  lspService: SessionLspServiceState,
+  lspRuntime: WorkspaceLspRuntimeState,
 ): Promise<NearbyDiagnostic[]> {
-  if (lspService.kind !== "ready") return [];
+  if (lspRuntime.kind !== "ready") return [];
 
   try {
-    const diagnostics = await lspService.service.fileDiagnostics(resolve(cwd, file), 4);
+    const diagnostics = await lspRuntime.runtime.fileDiagnostics(resolve(cwd, file), 4);
     if (!diagnostics || diagnostics.length === 0) return [];
 
     const nearby = diagnostics.filter((d) => Math.abs(d.range.start.line + 1 - line) <= 2);

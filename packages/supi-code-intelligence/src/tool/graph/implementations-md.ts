@@ -8,8 +8,8 @@ import {
   renderEvidenceListDisclosure,
 } from "../../analysis/evidence.ts";
 import { compactLineRanges } from "../../analysis/references/semantic-refs.ts";
+import type { ImplementationEntry } from "../../analysis/relations/types.ts";
 import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
-import type { ImplementationEntry } from "./types.ts";
 
 /**
  * Group implementation entries by display file path, collecting line numbers.

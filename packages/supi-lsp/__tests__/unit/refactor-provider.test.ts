@@ -1,7 +1,7 @@
 import type { RefactorResult, SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
-import type { SessionLspService } from "../../src/session/service-registry.ts";
+import type { WorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 
 describe("LspRefactorProvider", () => {
   function defaultMockFields(): Record<string, unknown> {
@@ -29,8 +29,8 @@ describe("LspRefactorProvider", () => {
     };
   }
 
-  function createMockLsp(overrides?: Partial<SessionLspService>): SessionLspService {
-    return { ...defaultMockFields(), ...overrides } as unknown as SessionLspService;
+  function createMockLsp(overrides?: Partial<WorkspaceLspRuntime>): WorkspaceLspRuntime {
+    return { ...defaultMockFields(), ...overrides } as unknown as WorkspaceLspRuntime;
   }
 
   type RefactorRequest = {
@@ -45,7 +45,7 @@ describe("LspRefactorProvider", () => {
   };
 
   describe("rename", () => {
-    it("exposes rename on the SemanticProvider when SessionLspService supports it", () => {
+    it("exposes rename on the SemanticProvider when WorkspaceLspRuntime supports it", () => {
       const lsp = createMockLsp({
         rename: vi.fn().mockResolvedValue({
           changes: {},
@@ -154,7 +154,7 @@ describe("LspRefactorProvider", () => {
   });
 
   describe("codeActions", () => {
-    it("exposes codeActions on the SemanticProvider when SessionLspService supports it", () => {
+    it("exposes codeActions on the SemanticProvider when WorkspaceLspRuntime supports it", () => {
       const lsp = createMockLsp({
         codeActions: vi.fn().mockResolvedValue([]),
       });
@@ -220,7 +220,7 @@ describe("LspRefactorProvider", () => {
   });
 
   describe("rename is absent when LSP does not support it", () => {
-    it("does not expose rename when SessionLspService.rename returns null always", () => {
+    it("does not expose rename when WorkspaceLspRuntime.rename returns null always", () => {
       const lsp = createMockLsp({
         rename: vi.fn().mockResolvedValue(null),
       });

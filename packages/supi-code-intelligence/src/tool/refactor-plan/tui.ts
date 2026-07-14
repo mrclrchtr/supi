@@ -9,22 +9,21 @@ import { type ResultOptios, renderSimpleResult, type ToolResult } from "../../ui
 
 export function renderRefactorPlanCall(args: unknown, theme: Theme, _context: unknown): Text {
   const params = (args ?? {}) as {
-    operation?: string;
-    newName?: string;
-    file?: string;
+    operation?: Record<string, { newName?: string }>;
+    target?: { anchor?: { file: string }; handle?: string };
   };
 
   let content = theme.fg("toolTitle", "code_refactor_plan");
-
-  if (params.operation) {
-    content += ` ${theme.fg("accent", params.operation)}`;
+  const operation = params.operation ? Object.entries(params.operation)[0] : undefined;
+  if (operation) {
+    content += ` ${theme.fg("accent", operation[0])}`;
+    if (operation[1].newName) content += ` ${theme.fg("muted", operation[1].newName)}`;
   }
-
-  if (params.newName) {
-    content += ` ${theme.fg("muted", params.newName)}`;
-  } else if (params.file) {
-    const file = params.file.split("/").pop() ?? params.file;
+  if (params.target?.anchor) {
+    const file = params.target.anchor.file.split("/").pop() ?? params.target.anchor.file;
     content += ` ${theme.fg("muted", file)}`;
+  } else if (params.target?.handle) {
+    content += ` ${theme.fg("muted", params.target.handle)}`;
   }
 
   return new Text(content, 0, 0);

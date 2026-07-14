@@ -79,11 +79,6 @@ export function renderGraphResult(
     renderEvidenceLines(container, evidenceLists, theme);
   }
 
-  if (details?.tests) {
-    container.addChild(new Spacer(1));
-    container.addChild(buildTestsSection(details.tests as Record<string, unknown>, theme));
-  }
-
   renderStructuredDetailBody(container, details ?? undefined, theme);
   renderMarkdownDetail(container, result, theme);
 
@@ -100,23 +95,12 @@ function formatRelations(relations: GraphRelation[]): string {
 }
 
 function formatTarget(params: CodeGraphToolParams): string {
-  if (params.symbol) return `of ${params.symbol}`;
-  if (params.file) {
-    const file = params.file.split("/").pop() ?? params.file;
-    if (params.line) return `at ${file}:${params.line}`;
-    return `of ${file}`;
+  if ("symbol" in params.target) return `of ${params.target.symbol.query}`;
+  if ("anchor" in params.target) {
+    const point = params.target.anchor;
+    const file = point.file.split("/").pop() ?? point.file;
+    return `at ${file}:${point.line}`;
   }
+  if ("handle" in params.target) return `of ${params.target.handle}`;
   return "";
-}
-
-function buildTestsSection(tests: Record<string, unknown>, theme: Theme): Text {
-  const fileCount = (tests.files as Array<unknown> | undefined)?.length ?? 0;
-  if (fileCount === 0) {
-    return new Text(theme.fg("dim", "No companion test files found"), 0, 0);
-  }
-  return new Text(
-    theme.fg("dim", `${fileCount} companion test file${fileCount !== 1 ? "s" : ""}`),
-    0,
-    0,
-  );
 }
