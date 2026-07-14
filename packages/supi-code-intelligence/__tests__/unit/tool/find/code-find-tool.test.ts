@@ -75,6 +75,21 @@ describe("code_find tool", () => {
     expect(result.content[0].text).toContain("query");
   });
 
+  it("rejects an all-whitespace query with an error result", async () => {
+    const tool = getCodeFindTool();
+
+    const result = (await tool.execute(
+      "test-whitespace-query",
+      { query: " \t " },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as TextToolResult;
+
+    expect(result.content[0].text).toContain("Error");
+    expect(result.content[0].text).toContain("query");
+  });
+
   it("returns an error result when scope is missing", async () => {
     const tool = getCodeFindTool();
 
@@ -202,13 +217,41 @@ describe("code_find tool", () => {
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult;
+      )) as TextToolResult & {
+        details?: { type: "search"; data: { confidence: string } };
+      };
 
       const text = result.content[0].text;
       expect(text).toContain("foo");
       expect(text).toContain("a.ts");
       expect(text).toContain("b.ts");
       expect(text).not.toContain("c.ts");
+      expect(text).toContain("**Confidence:** `heuristic`");
+      expect(result.details?.data.confidence).toBe("heuristic");
+    });
+
+    it.each([
+      "text",
+      "regex",
+    ] as const)("preserves significant query whitespace in %s mode", async (mode) => {
+      writeFileSync(path.join(tmpDir, "a.ts"), "foo\n");
+      const tool = getCodeFindTool();
+      const query = " foo ";
+
+      const result = (await tool.execute(
+        `test-${mode}-whitespace-query`,
+        { query, mode },
+        undefined,
+        undefined,
+        makeCtx({ cwd: tmpDir }),
+      )) as TextToolResult & {
+        details?: { type: "search"; data: { confidence: string } };
+      };
+
+      const text = result.content[0].text;
+      expect(text).toContain(`No matches found for \`${query}\``);
+      expect(text).toContain("**Confidence:** `heuristic`");
+      expect(result.details?.data.confidence).toBe("heuristic");
     });
 
     it("discloses truncated text matches in markdown and details", async () => {
@@ -316,10 +359,14 @@ describe("code_find tool", () => {
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult;
+      )) as TextToolResult & {
+        details?: { type: "search"; data: { confidence: string } };
+      };
 
       expect(result.content[0].text).toContain("foo");
       expect(result.content[0].text).toContain("a.ts");
+      expect(result.content[0].text).toContain("**Confidence:** `structural`");
+      expect(result.details?.data.confidence).toBe("structural");
     });
 
     it("finds exports when structural support is available", async () => {
@@ -692,11 +739,15 @@ describe("code_find tool", () => {
         undefined,
         undefined,
         makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult;
+      )) as TextToolResult & {
+        details?: { type: "search"; data: { confidence: string } };
+      };
 
       const text = result.content[0].text;
       expect(text).toContain("myFunc");
       expect(text).toContain("a.ts");
+      expect(text).toContain("**Confidence:** `semantic`");
+      expect(result.details?.data.confidence).toBe("semantic");
     });
 
     it("discloses truncated semantic symbols in markdown and details", async () => {

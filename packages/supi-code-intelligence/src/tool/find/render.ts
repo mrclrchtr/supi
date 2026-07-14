@@ -16,30 +16,34 @@ export function renderFindResult(assembly: FindResultAssembly): string {
   const evidence = assembly.assembled.evidenceLists[0];
   if (!evidence) return "**Unavailable:** Search evidence metadata was not assembled.";
 
-  switch (outcome.data.kind) {
-    case "text":
-    case "regex":
-      return renderTextOrRegexResult(assembly, evidence);
-    case "ast":
-      if (outcome.data.result.matches.length === 0) {
-        return renderStructuredEmptyState(
+  const content = (() => {
+    switch (outcome.data.kind) {
+      case "text":
+      case "regex":
+        return renderTextOrRegexResult(assembly, evidence);
+      case "ast":
+        if (outcome.data.result.matches.length === 0) {
+          return renderStructuredEmptyState(
+            outcome.query,
+            outcome.data.astKind,
+            outcome.scopeLabel,
+            undefined,
+            outcome.data.result,
+          );
+        }
+        return renderStructuredMatches(
           outcome.query,
           outcome.data.astKind,
           outcome.scopeLabel,
-          undefined,
           outcome.data.result,
-        );
-      }
-      return renderStructuredMatches(
-        outcome.query,
-        outcome.data.astKind,
-        outcome.scopeLabel,
-        outcome.data.result,
-        evidence,
-      ).content;
-    case "semantic":
-      return renderSemantic(assembly, evidence);
-  }
+          evidence,
+        ).content;
+      case "semantic":
+        return renderSemantic(assembly, evidence);
+    }
+  })();
+
+  return `**Confidence:** \`${assembly.assembled.confidence}\`\n\n${content}`;
 }
 
 function renderTextOrRegexResult(

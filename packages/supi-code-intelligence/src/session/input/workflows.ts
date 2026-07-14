@@ -171,7 +171,7 @@ export function parseFindWorkflowInput(value: unknown): InputValidation<FindWork
   const maxResults = optionalPositiveInteger(record.value.maxResults, "maxResults");
   if (maxResults.kind === "invalid-input") return maxResults;
   return valid({
-    query: query.value.trim(),
+    query: query.value,
     ...(scope.value === undefined ? {} : { scope: scope.value }),
     ...(mode.value === "text" && record.value.mode === undefined ? {} : { mode: mode.value }),
     ...(patternKind.value === undefined ? {} : { kind: patternKind.value }),

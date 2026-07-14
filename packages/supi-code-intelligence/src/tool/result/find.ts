@@ -34,7 +34,12 @@ export function assembleFindWorkflowResult(
   outcome: Extract<FindWorkflowOutcome, { kind: "completed" }>,
 ): FindResultAssembly {
   const evidence = createFindEvidence(outcome);
-  const confidence: ConfidenceMode = outcome.data.kind === "semantic" ? "semantic" : "structural";
+  const confidence: ConfidenceMode =
+    outcome.data.kind === "semantic"
+      ? "semantic"
+      : outcome.data.kind === "ast"
+        ? "structural"
+        : "heuristic";
   const nextQueries =
     outcome.data.kind === "ast" && outcome.data.astKind === "call"
       ? [

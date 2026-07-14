@@ -5,10 +5,28 @@ import {
   parseRefactorPlanWorkflowInput,
 } from "../../../src/session/input/health-refactor.ts";
 import {
+  parseFindWorkflowInput,
   parseGraphWorkflowInput,
   parseInspectWorkflowInput,
   parseOrientationWorkflowInput,
 } from "../../../src/session/input/workflows.ts";
+
+describe("code_find query validation", () => {
+  it.each(["text", "regex"] as const)("preserves significant whitespace in %s mode", (mode) => {
+    const query = " foo ";
+    const outcome = parseFindWorkflowInput({ query, mode });
+
+    expect(outcome.kind).toBe("valid");
+    if (outcome.kind === "valid") expect(outcome.value.query).toBe(query);
+  });
+
+  it.each(["", "   ", "\t\n"])("rejects an all-whitespace query (%j)", (query) => {
+    expect(parseFindWorkflowInput({ query })).toEqual({
+      kind: "invalid-input",
+      message: "query must not be empty.",
+    });
+  });
+});
 
 describe("session runtime input validation", () => {
   it.each([
