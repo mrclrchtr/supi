@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.4.0](https://github.com/mrclrchtr/supi/compare/v2.3.2...v2.4.0) (2026-07-14)
+
+
+### Features
+
+* **supi-review:** use max thinking for child sessions ([faa09cc](https://github.com/mrclrchtr/supi/commit/faa09ccbc98a8d13afc94d9be05f168592df1e7b))
+
+
+### Bug Fixes
+
+* **deps:** lock file maintenance ([d06669b](https://github.com/mrclrchtr/supi/commit/d06669b3438f626e7398b03a25df0f68ef2b49b1))
+* **deps:** update actions/setup-node action to v6.5.0 ([caafb53](https://github.com/mrclrchtr/supi/commit/caafb531ccb17a19a789ba41f68a24da4c714c84))
+* **deps:** update actions/setup-node action to v7 ([0ea0e0b](https://github.com/mrclrchtr/supi/commit/0ea0e0bdb55f2e8f73a6c66307e8ea29b88603af))
+* **deps:** update dependency hk to v1.51.0 ([29d3a79](https://github.com/mrclrchtr/supi/commit/29d3a79e9b517e872026148163e83828cf127126))
+* **deps:** update pnpm to v11.11.0 ([6a6ab73](https://github.com/mrclrchtr/supi/commit/6a6ab73e29372839c5e86fd0ef6eb8af20b3d73c))
+
 ## [2.3.2](https://github.com/mrclrchtr/supi/compare/v2.3.1...v2.3.2) (2026-07-12)
 
 
