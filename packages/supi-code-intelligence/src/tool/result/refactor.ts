@@ -1,41 +1,58 @@
-import type { WorkspaceEdit } from "@mrclrchtr/supi-code-runtime/api";
-import { createEvidenceList } from "../../analysis/evidence.ts";
+import type { FileEdit } from "@mrclrchtr/supi-code-runtime/api";
+import { createEvidenceList, type EvidenceList } from "../../analysis/evidence.ts";
 import type { ApplyResult } from "../../analysis/refactor/apply.ts";
+import type { RefactorPlan } from "../../session/refactor-plans.ts";
 import { assembledNextQueries, assembleToolResult, type ToolResultAssembly } from "./assembly.ts";
 import type { SearchDetails } from "./types.ts";
 
-export interface RefactorResultAssembly<T> {
-  readonly assembled: ToolResultAssembly<T>;
+export interface RefactorPlanAssemblyData {
+  readonly plan: Readonly<RefactorPlan>;
+  readonly cwd: string;
+  readonly edits: EvidenceList<FileEdit>;
+}
+
+export interface RefactorPlanResultAssembly {
+  readonly assembled: ToolResultAssembly<RefactorPlanAssemblyData>;
   readonly details: SearchDetails;
 }
 
+export interface RefactorApplyAssemblyData {
+  readonly plan: Readonly<RefactorPlan>;
+  readonly result: Readonly<ApplyResult>;
+}
+
+export interface RefactorApplyResultAssembly {
+  readonly assembled: ToolResultAssembly<RefactorApplyAssemblyData>;
+  readonly details: SearchDetails;
+}
+
+/** Assemble a bounded refactor plan and all facts needed by its renderers. */
 export function assembleRefactorPlanDetails(
-  edits: WorkspaceEdit,
-  planId: string,
+  plan: Readonly<RefactorPlan>,
+  cwd: string,
   maxResults = 5,
-): RefactorResultAssembly<WorkspaceEdit> {
-  const editEvidence = createEvidenceList({
+): RefactorPlanResultAssembly {
+  const edits = createEvidenceList({
     key: "refactor.edits",
-    items: edits.edits,
+    items: [...plan.edits.edits],
     maxResults,
-  }).metadata;
-  const nextQueries = [`Use code_refactor_apply with planId: "${planId}" to apply this refactor`];
+  });
   const provenance = [{ source: "semantic" as const, capability: "LSP refactor" }];
   const assembled = assembleToolResult({
-    data: edits,
+    data: { plan, cwd, edits },
     sections: [
       {
         key: "refactor.edits",
         title: "Proposed edits",
         status: "complete",
-        items: edits.edits,
+        items: edits.items,
         confidence: "semantic",
         provenance,
       },
     ],
-    evidenceLists: [editEvidence],
-    nextQueries,
-    candidateCount: edits.edits.length,
+    evidenceLists: [edits.metadata],
+    nextQueries: [`Use code_refactor_apply with planId: "${plan.id}" to apply this refactor`],
+    candidateCount: edits.metadata.totalCount ?? edits.metadata.shownCount,
     confidence: "semantic",
     provenance,
   });
@@ -43,9 +60,9 @@ export function assembleRefactorPlanDetails(
   return {
     assembled,
     details: {
-      confidence: "semantic",
+      confidence: assembled.confidence,
       scope: null,
-      candidateCount: edits.edits.length,
+      candidateCount: assembled.totals.candidateCount,
       omittedCount: assembled.totals.omittedCount,
       evidenceLists: [...assembled.evidenceLists],
       nextQueries: assembledNextQueries(assembled),
@@ -53,13 +70,15 @@ export function assembleRefactorPlanDetails(
   };
 }
 
+/** Assemble a refactor apply outcome with the originating plan and follow-up action. */
 export function assembleRefactorApplyDetails(
   applyResult: ApplyResult,
-): RefactorResultAssembly<ApplyResult> {
+  plan: Readonly<RefactorPlan>,
+): RefactorApplyResultAssembly {
   const candidateCount = applyResult.kind === "applied" ? applyResult.totalEdits : 0;
   const provenance = [{ source: "runtime" as const, capability: "file-mutation-queue" }];
   const assembled = assembleToolResult({
-    data: applyResult,
+    data: { plan, result: applyResult },
     sections: [
       {
         key: "refactor.apply",
@@ -70,7 +89,10 @@ export function assembleRefactorApplyDetails(
         provenance,
       },
     ],
-    nextQueries: ["Use code_health to check for new issues after the refactor"],
+    nextQueries:
+      applyResult.kind === "applied"
+        ? ["Use code_health to check for new issues after the refactor"]
+        : [],
     candidateCount,
     confidence: applyResult.kind === "applied" ? "semantic" : "unavailable",
     provenance,
@@ -81,7 +103,7 @@ export function assembleRefactorApplyDetails(
     details: {
       confidence: assembled.confidence,
       scope: null,
-      candidateCount,
+      candidateCount: assembled.totals.candidateCount,
       omittedCount: assembled.totals.omittedCount,
       evidenceLists: [...assembled.evidenceLists],
       nextQueries: assembledNextQueries(assembled),

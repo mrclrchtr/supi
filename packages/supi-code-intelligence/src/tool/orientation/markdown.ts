@@ -1,8 +1,10 @@
 import { renderReadNextSection } from "../../analysis/read-next.ts";
-import type { OrientationResultData } from "../../session/orientation-types.ts";
+import { assembledReadNext } from "../result/assembly.ts";
+import type { OrientationResultAssembly } from "../result/orientation.ts";
 
 /** Render assembled Orientation blocks into the model-facing markdown adapter. */
-export function renderOrientationResult(data: OrientationResultData): string {
+export function renderOrientationResult(assembly: OrientationResultAssembly): string {
+  const data = assembly.assembled.data;
   const lines: string[] = [];
   for (const block of data.blocks) {
     switch (block.kind) {
@@ -23,6 +25,6 @@ export function renderOrientationResult(data: OrientationResultData): string {
         break;
     }
   }
-  lines.push(...renderReadNextSection([...data.readNext]));
+  lines.push(...renderReadNextSection(assembledReadNext(assembly.assembled)));
   return lines.join("\n").trimEnd();
 }

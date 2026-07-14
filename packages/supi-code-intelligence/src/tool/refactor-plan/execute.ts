@@ -45,9 +45,9 @@ export async function executeRefactorPlanTool(
     };
   }
 
-  const assembly = assembleRefactorPlanDetails(outcome.plan.edits, outcome.plan.id);
+  const assembly = assembleRefactorPlanDetails(outcome.plan, ctx.cwd);
   return {
-    content: renderRefactorPlanResult(outcome.plan, ctx.cwd),
+    content: renderRefactorPlanResult(assembly),
     details: {
       type: "search",
       data: assembly.details,

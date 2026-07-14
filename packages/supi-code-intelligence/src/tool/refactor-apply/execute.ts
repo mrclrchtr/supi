@@ -23,9 +23,9 @@ export async function executeRefactorApplyTool(
     };
   }
 
-  const assembly = assembleRefactorApplyDetails(outcome.result);
+  const assembly = assembleRefactorApplyDetails(outcome.result, outcome.plan);
   return {
-    content: renderRefactorApplyResult(outcome.result, outcome.plan),
+    content: renderRefactorApplyResult(assembly),
     details: {
       type: "search",
       data: assembly.details,

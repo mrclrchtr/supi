@@ -33,6 +33,7 @@ export const EVIDENCE_KEY_LABELS: Record<string, string> = {
   "inspect.codeActions": "code actions",
   "references.locations": "references",
   "refactor.edits": "edits",
+  "orientation.sections": "sections",
   "resolve.candidates": "candidates",
   "resolve.targets": "targets",
 };
@@ -155,9 +156,77 @@ function buildExpandedView(
   return container;
 }
 
+/** Canonical evidence counts projected from structured result details. */
+export interface EvidenceSummary {
+  shownCount: number;
+  totalCount: number | null;
+  omittedCount: number | null;
+  partialReason: string | null;
+  label: string;
+}
+
+/** Read evidence bounds without inventing a second truncation policy in a renderer. */
+export function summarizeEvidenceDetails(
+  data: Record<string, unknown> | undefined,
+  fallbackOmittedCount = 0,
+): EvidenceSummary {
+  const entries = getEvidenceEntries(data?.evidenceLists);
+  return entries
+    ? summarizeEvidenceEntries(entries)
+    : summarizeFallbackEvidence(data, fallbackOmittedCount);
+}
+
+function getEvidenceEntries(value: unknown): EvidenceEntry[] | null {
+  return Array.isArray(value) && value.length > 0 ? (value as EvidenceEntry[]) : null;
+}
+
+interface EvidenceAccumulator {
+  shownCount: number;
+  totalCount: number | null;
+  omittedCount: number;
+  partialReason: string | null;
+}
+
+function summarizeEvidenceEntries(entries: EvidenceEntry[]): EvidenceSummary {
+  const totals = entries.reduce<EvidenceAccumulator>(
+    (summary, entry) => ({
+      shownCount: summary.shownCount + Number(entry.shownCount ?? 0),
+      totalCount:
+        entry.totalCount == null || summary.totalCount === null
+          ? null
+          : summary.totalCount + Number(entry.totalCount),
+      omittedCount: summary.omittedCount + Number(entry.omittedCount ?? 0),
+      partialReason:
+        summary.partialReason ??
+        (typeof entry.partialReason === "string" ? entry.partialReason : null),
+    }),
+    { shownCount: 0, totalCount: 0, omittedCount: 0, partialReason: null },
+  );
+  const first = entries[0];
+  return {
+    ...totals,
+    omittedCount: totals.totalCount === null ? null : totals.omittedCount,
+    label: entries.length === 1 ? evidenceLabel(String(first?.key ?? "")) : "results",
+  };
+}
+
+function summarizeFallbackEvidence(
+  data: Record<string, unknown> | undefined,
+  omittedCount: number,
+): EvidenceSummary {
+  const candidateCount = (data?.candidateCount as number) ?? (data?.targetCount as number) ?? 0;
+  return {
+    shownCount: candidateCount,
+    totalCount: candidateCount + omittedCount,
+    omittedCount,
+    partialReason: null,
+    label: "results",
+  };
+}
+
 /** Options for {@link buildSimpleCompact} and {@link buildSimpleHeader}. */
 export interface SimpleResultOptions {
-  /** Omitted count for the evidence badge. Defaults to 0. */
+  /** Omitted count for the evidence badge when details have no evidence list. */
   omittedCount?: number;
 }
 
@@ -168,16 +237,15 @@ export function buildSimpleCompact(
 ): Text {
   if (!data) return new Text(theme.fg("dim", "No results"), 0, 0);
 
-  const candidateCount = (data.candidateCount as number) ?? (data.targetCount as number) ?? 0;
-  const omittedCount = opts?.omittedCount ?? 0;
+  const evidence = summarizeEvidenceDetails(data, opts?.omittedCount ?? 0);
   const confidence = (data.confidence as string) ?? "";
 
   const badge = formatEvidenceBadge({
-    shownCount: candidateCount,
-    totalCount: candidateCount + omittedCount,
-    omittedCount,
-    partialReason: null,
-    label: "results",
+    shownCount: evidence.shownCount,
+    totalCount: evidence.totalCount,
+    omittedCount: evidence.omittedCount,
+    partialReason: evidence.partialReason,
+    label: evidence.label,
   });
 
   const dot = theme.fg("dim", "·");
@@ -240,20 +308,18 @@ export function buildSimpleHeader(
 ): Text | null {
   if (!data) return null;
 
-  const candidateCount = (data.candidateCount as number) ?? (data.targetCount as number) ?? 0;
-  const omittedCount = opts?.omittedCount ?? 0;
+  const evidence = summarizeEvidenceDetails(data, opts?.omittedCount ?? 0);
   const confidence = (data.confidence as string) ?? "";
 
-  if (candidateCount === 0 && !confidence) return null;
+  if (evidence.shownCount === 0 && !confidence) return null;
 
   const badge = formatEvidenceBadge({
-    shownCount: candidateCount,
-    totalCount: candidateCount + omittedCount,
-    omittedCount,
-    partialReason: null,
-    label: "results",
+    shownCount: evidence.shownCount,
+    totalCount: evidence.totalCount,
+    omittedCount: evidence.omittedCount,
+    partialReason: evidence.partialReason,
+    label: evidence.label,
   });
-
   const dot = theme.fg("dim", "·");
   const segments = [theme.fg("accent", theme.bold(badge))];
   if (confidence) {

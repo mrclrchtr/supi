@@ -1,39 +1,14 @@
-/**
- * Markdown renderer for refactor results.
- */
-
-import { createEvidenceList, renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
-import type { ApplyResult } from "../../analysis/refactor/apply.ts";
+import { renderEvidenceListDisclosure } from "../../analysis/evidence.ts";
 import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
-import type { RefactorPlan } from "../../session/refactor-plans.ts";
+import { assembledNextQueries } from "../result/assembly.ts";
+import type {
+  RefactorApplyResultAssembly,
+  RefactorPlanResultAssembly,
+} from "../result/refactor.ts";
 
-export interface RefactorRenderInput {
-  result: ApplyResult;
-  operation: string;
-  targetDescription: string;
-}
-
-/**
- * Render a refactor result as human-readable markdown.
- */
-export function renderRefactorResult(input: RefactorRenderInput): string {
-  const { result, operation, targetDescription } = input;
-
-  if (result.kind === "error") {
-    return `**Refactor failed:** ${result.reason}`;
-  }
-
-  return [
-    `**Refactor applied:** ${operation} on ${targetDescription}`,
-    `- Files changed: ${result.filesChanged}`,
-    `- Total edits: ${result.totalEdits}`,
-  ].join("\n");
-}
-
-/**
- * Render a refactor plan preview.
- */
-export function renderRefactorPlanResult(plan: Readonly<RefactorPlan>, cwd: string): string {
+/** Render a refactor plan from its canonical assembled evidence. */
+export function renderRefactorPlanResult(assembly: RefactorPlanResultAssembly): string {
+  const { plan, cwd, edits } = assembly.assembled.data;
   const lines: string[] = [];
   const changedFiles = collectChangedFiles(plan);
   const fileCount = changedFiles.length;
@@ -51,8 +26,11 @@ export function renderRefactorPlanResult(plan: Readonly<RefactorPlan>, cwd: stri
   if (plan.destination) {
     lines.push(`**Destination:** \`${plan.destination}\``);
   }
+  lines.push(`**Confidence:** \`${assembly.assembled.confidence}\``);
   lines.push(`**Files to change:** ${fileCount} file${fileCount !== 1 ? "s" : ""}`);
-  lines.push(`**Total edits:** ${plan.edits.edits.length}`);
+  lines.push(`**Total edits:** ${assembly.assembled.totals.candidateCount}`);
+  lines.push(`**Shown edits:** ${edits.metadata.shownCount}`);
+  lines.push(`**Omitted edits:** ${assembly.assembled.totals.omittedCount}`);
   lines.push("");
 
   lines.push("## Files");
@@ -62,45 +40,38 @@ export function renderRefactorPlanResult(plan: Readonly<RefactorPlan>, cwd: stri
   lines.push("");
   lines.push("## Preview");
   lines.push("");
-  const editEvidence = createEvidenceList({
-    key: "refactor.edits",
-    items: plan.edits.edits,
-    maxResults: 5,
-  });
-  for (const edit of editEvidence.items) {
+  for (const edit of edits.items) {
     const range = edit.range;
     lines.push(
       `- \`${toDisplayPath(cwd, edit.file)}\` L${range.start.line + 1}:${range.start.character} → L${range.end.line + 1}:${range.end.character}`,
     );
     lines.push("  ```");
-    lines.push(`  ${edit.newText.slice(0, 80).split("\n").join("\n  ")}`);
+    lines.push(`  ${edit.newText.split("\n").join("\n  ")}`);
     lines.push("  ```");
   }
-  const disclosure = renderEvidenceListDisclosure(editEvidence);
+  const disclosure = renderEvidenceListDisclosure(edits);
   if (disclosure) {
     lines.push(disclosure);
   }
   lines.push("");
   lines.push("**This is a preview. No files were changed.**");
-  lines.push(`Use code_refactor_apply with planId: "${plan.id}" to apply this refactor.`);
+  lines.push(...assembledNextQueries(assembly.assembled));
   return lines.join("\n");
 }
 
-/**
- * Render a refactor apply result.
- */
-export function renderRefactorApplyResult(
-  applyResult: ApplyResult,
-  plan: Readonly<RefactorPlan>,
-): string {
-  if (applyResult.kind === "error") {
-    return `**Refactor apply failed:** ${applyResult.reason}`;
+/** Render a refactor apply outcome from its canonical assembled facts. */
+export function renderRefactorApplyResult(assembly: RefactorApplyResultAssembly): string {
+  const { plan, result } = assembly.assembled.data;
+  if (result.kind === "error") {
+    return `**Refactor apply failed:** ${result.reason}`;
   }
+
   const lines = [
     `**Refactor applied successfully.** Plan: \`${plan.id}\``,
     `- Operation: \`${plan.operation}\``,
-    `- Files changed: ${applyResult.filesChanged}`,
-    `- Total edits: ${applyResult.totalEdits}`,
+    `- Confidence: \`${assembly.assembled.confidence}\``,
+    `- Files changed: ${result.filesChanged}`,
+    `- Total edits: ${result.totalEdits}`,
   ];
   if (plan.newName) {
     lines.push(`- New name: \`${plan.newName}\``);
@@ -108,11 +79,14 @@ export function renderRefactorApplyResult(
   if (plan.destination) {
     lines.push(`- Destination: \`${plan.destination}\``);
   }
-  lines.push("", "Verify the changes before continuing with other work.");
+  const followUps = assembledNextQueries(assembly.assembled);
+  if (followUps.length > 0) lines.push("", ...followUps);
   return lines.join("\n");
 }
 
-function collectChangedFiles(plan: Readonly<RefactorPlan>): Array<[file: string, count: number]> {
+function collectChangedFiles(
+  plan: RefactorPlanResultAssembly["assembled"]["data"]["plan"],
+): Array<[file: string, count: number]> {
   const counts = new Map<string, number>();
   for (const edit of plan.edits.edits) {
     counts.set(edit.file, (counts.get(edit.file) ?? 0) + 1);

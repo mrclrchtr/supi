@@ -132,18 +132,27 @@ describe("canonical Tool result assembly", () => {
   it("assembles refactor evidence and apply guidance", () => {
     const assembly = assembleRefactorPlanDetails(
       {
-        edits: [
-          {
-            file: "/repo/src/a.ts",
-            range: {
-              start: { line: 0, character: 0 },
-              end: { line: 0, character: 3 },
+        id: "plan-1",
+        operation: "rename_symbol",
+        targetFile: "/repo/src/a.ts",
+        targetLine: 1,
+        targetCharacter: 1,
+        edits: {
+          edits: [
+            {
+              file: "/repo/src/a.ts",
+              range: {
+                start: { line: 0, character: 0 },
+                end: { line: 0, character: 3 },
+              },
+              newText: "bar",
             },
-            newText: "bar",
-          },
-        ],
+          ],
+        },
+        fileFingerprints: [],
+        createdAt: 0,
       },
-      "plan-1",
+      "/repo",
     );
 
     expect(assembly.details.candidateCount).toBe(1);

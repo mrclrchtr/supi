@@ -1,10 +1,17 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
+import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type {
   OrientationCandidate,
   OrientationResultData,
 } from "../../session/orientation-types.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
-import { assembledNextQueries, assembleToolResult, type ToolResultAssembly } from "./assembly.ts";
+import {
+  assembledNextQueries,
+  assembledReadNext,
+  assembleToolResult,
+  type ToolResultAssembly,
+} from "./assembly.ts";
 import type { ContextDetails } from "./types.ts";
 
 export interface OrientationDetailsInput {
@@ -14,7 +21,9 @@ export interface OrientationDetailsInput {
   readonly requestedSections?: readonly string[];
   readonly renderedSections?: readonly string[];
   readonly omittedCount?: number;
+  readonly evidenceLists?: readonly EvidenceListMetadata[];
   readonly nextQueries: readonly string[];
+  readonly readNext?: readonly ReadNextItem[];
   readonly target?: Readonly<TargetStoreEntry>;
   readonly candidates?: readonly OrientationCandidate[];
   readonly instructions?: OrientationResultData["instructions"];
@@ -33,33 +42,37 @@ export function assembleOrientationResult(data: OrientationResultData): Orientat
       capability: data.confidence === "semantic" ? "LSP" : "workspace-analysis",
     },
   ];
+  const sectionEvidence = createOrientationEvidence(data);
   const assembled = assembleToolResult({
     data,
     sections: data.renderedSections.map((section) => ({
       key: section,
       title: section,
       status: "complete" as const,
-      items: data.blocks,
+      items: [section],
       confidence: data.confidence,
       provenance,
     })),
+    evidenceLists: [sectionEvidence],
     nextQueries: data.nextQueries,
     readNext: data.readNext,
-    candidateCount: data.blocks.length,
+    candidateCount: sectionEvidence.totalCount ?? sectionEvidence.shownCount,
     confidence: data.confidence,
     provenance,
   });
   return {
     assembled,
     details: assembleOrientationDetails({
-      confidence: data.confidence,
-      focusTarget: data.focusTarget,
-      requestedSections: data.requestedSections,
-      renderedSections: data.renderedSections,
-      omittedCount: data.omittedCount,
+      confidence: assembled.confidence,
+      focusTarget: assembled.data.focusTarget,
+      requestedSections: assembled.data.requestedSections,
+      renderedSections: assembled.data.renderedSections,
+      omittedCount: assembled.totals.omittedCount,
+      evidenceLists: assembled.evidenceLists,
       nextQueries: assembledNextQueries(assembled),
-      target: data.target,
-      instructions: data.instructions,
+      readNext: assembledReadNext(assembled),
+      target: assembled.data.target,
+      instructions: assembled.data.instructions,
     }),
   };
 }
@@ -73,7 +86,9 @@ export function assembleOrientationDetails(input: OrientationDetailsInput): Cont
     requestedSections: [...(input.requestedSections ?? [])],
     renderedSections: [...(input.renderedSections ?? [])],
     omittedCount: input.omittedCount ?? 0,
+    evidenceLists: input.evidenceLists ? [...input.evidenceLists] : undefined,
     nextQueries: [...input.nextQueries],
+    readNext: input.readNext ? [...input.readNext] : undefined,
     target: input.target ? { ...input.target } : undefined,
     instructions: input.instructions,
     candidates: input.candidates?.map((candidate) => ({
@@ -86,5 +101,16 @@ export function assembleOrientationDetails(input: OrientationDetailsInput): Cont
       character: candidate.character,
       rank: candidate.rank,
     })),
+  };
+}
+
+function createOrientationEvidence(data: OrientationResultData): EvidenceListMetadata {
+  const omittedCount = Math.max(0, data.omittedCount);
+  return {
+    key: "orientation.sections",
+    totalCount: data.renderedSections.length + omittedCount,
+    shownCount: data.renderedSections.length,
+    omittedCount,
+    partialReason: null,
   };
 }

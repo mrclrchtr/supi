@@ -102,3 +102,18 @@ export function assembledNextQueries(result: ToolResultAssembly<unknown>): strin
     .filter((action): action is Extract<ResultAction, { kind: "query" }> => action.kind === "query")
     .map((action) => action.instruction);
 }
+
+/** Read-next source ranges projected from canonical assembled actions. */
+export function assembledReadNext(result: ToolResultAssembly<unknown>): ReadNextItem[] {
+  return result.actions
+    .filter(
+      (action): action is Extract<ResultAction, { kind: "read-next" }> =>
+        action.kind === "read-next",
+    )
+    .map(({ kind: _kind, file, startLine, endLine, reason }) => ({
+      file,
+      startLine,
+      endLine,
+      reason,
+    }));
+}

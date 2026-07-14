@@ -1,7 +1,12 @@
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { formatEvidenceBadge } from "@mrclrchtr/supi-code-runtime/api";
-import { type ResultOptios, renderPartial, type ToolResult } from "../../ui/tui/common.ts";
+import {
+  type ResultOptios,
+  renderPartial,
+  summarizeEvidenceDetails,
+  type ToolResult,
+} from "../../ui/tui/common.ts";
 import type { CodeOrientationToolParams } from "./execute.ts";
 
 /** ── renderCall ────────────────────────────────────────────────── */
@@ -75,16 +80,8 @@ export function renderOrientationResult(
     container.addChild(new Text(theme.fg("dim", `Sections: ${sections.join(", ")}`), 0, 0));
   }
 
-  if (data?.omittedCount) {
-    const badge = formatEvidenceBadge({
-      shownCount: sections.length,
-      totalCount: sections.length + Number(data.omittedCount),
-      omittedCount: Number(data.omittedCount),
-      partialReason: null,
-      label: "sections",
-    });
-    container.addChild(new Text(theme.fg("dim", badge), 0, 0));
-  }
+  const evidenceSummary = renderEvidenceSummary(orientationEvidence(data), theme);
+  if (evidenceSummary) container.addChild(evidenceSummary);
 
   if (markdownText) {
     container.addChild(new Spacer(1));
@@ -100,12 +97,10 @@ export function renderOrientationResult(
 function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme): Text {
   if (!data) return new Text(theme.fg("dim", "No orientation"), 0, 0);
 
-  const sections = (data?.renderedSections as string[] | undefined) ?? [];
+  const evidence = orientationEvidence(data);
   const confidence = (data.confidence as string) ?? "";
   const dot = theme.fg("dim", "·");
-  const segments: string[] = [
-    `${theme.fg("dim", "sections")} ${theme.fg("success", theme.bold(`${sections.length}`))}`,
-  ];
+  const segments: string[] = [theme.fg("success", theme.bold(formatEvidenceBadge(evidence)))];
 
   if (confidence) {
     segments.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
@@ -120,13 +115,31 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
 function buildHeader(data: Record<string, unknown> | null, theme: Theme): Text {
   if (!data) return new Text("", 0, 0);
 
-  const sections = (data?.renderedSections as string[] | undefined) ?? [];
+  const evidence = orientationEvidence(data);
   const confidence = (data.confidence as string) ?? "";
   const dot = theme.fg("dim", "·");
-  const parts = [
-    `${theme.fg("dim", "sections")} ${theme.fg("accent", theme.bold(`${sections.length}`))}`,
-  ];
+  const parts = [theme.fg("accent", theme.bold(formatEvidenceBadge(evidence)))];
   if (confidence) parts.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
 
   return new Text(parts.join(` ${dot} `), 0, 0);
+}
+
+function orientationEvidence(data: Record<string, unknown> | null) {
+  const evidence = summarizeEvidenceDetails(data ?? undefined);
+  return { ...evidence, label: "sections" };
+}
+
+function renderEvidenceSummary(
+  evidence: ReturnType<typeof orientationEvidence>,
+  theme: Theme,
+): Text | null {
+  if (evidence.totalCount === null && !evidence.partialReason) return null;
+  const badge = formatEvidenceBadge({
+    shownCount: evidence.shownCount,
+    totalCount: evidence.totalCount,
+    omittedCount: evidence.omittedCount,
+    partialReason: evidence.partialReason,
+    label: evidence.label,
+  });
+  return new Text(theme.fg("dim", badge), 0, 0);
 }

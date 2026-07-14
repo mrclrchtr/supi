@@ -48,7 +48,7 @@ export async function executeOrientationTool(
   }
   const assembly = assembleOrientationResult(outcome.data);
   return {
-    content: renderOrientationResult(outcome.data),
+    content: renderOrientationResult(assembly),
     details: { type: "context", data: assembly.details },
   };
 }

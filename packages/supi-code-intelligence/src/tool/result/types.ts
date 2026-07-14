@@ -1,6 +1,7 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
+import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type { PrioritySignalsSummary } from "../../analysis/signals/project.ts";
 import type { AnchorKind, TargetStoreEntry } from "../../session/target-store.ts";
 
@@ -113,6 +114,8 @@ export interface ContextDetails {
   omittedCount: number;
   evidenceLists?: EvidenceListMetadata[];
   nextQueries: string[];
+  /** Source ranges projected from the assembled read-next actions. */
+  readNext?: ReadNextItem[];
   /** Directory-local instruction files surfaced during directory orientation. */
   instructions?: InstructionFilesMetadata;
   /**
