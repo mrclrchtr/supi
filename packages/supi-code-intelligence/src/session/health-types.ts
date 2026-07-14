@@ -60,6 +60,8 @@ export interface HealthData {
   readonly lspAvailable: boolean;
   readonly lspStatus: string;
   readonly recovered: boolean;
+  /** True only when the structural capability is explicitly ready. */
+  readonly structuralAvailable?: boolean;
   readonly structuralStatus?: string;
   readonly diagnostics: readonly HealthDiagnosticEntry[];
   readonly servers: readonly HealthServerInfo[];

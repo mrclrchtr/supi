@@ -19,7 +19,12 @@ import type { CodeHealthToolParams } from "./execute.ts";
 
 export function renderHealthCall(args: unknown, theme: Theme, _context: unknown): Text {
   const params = (args ?? {}) as CodeHealthToolParams;
-  const sections = params.include?.length ? params.include.join(", ") : "diag, servers";
+  const sections =
+    params.include === undefined
+      ? "diag, servers"
+      : params.include.length > 0
+        ? params.include.join(", ")
+        : "none";
 
   let content = theme.fg("toolTitle", "code_health");
   content += ` ${theme.fg("accent", sections)}`;
@@ -61,6 +66,7 @@ export function renderHealthResult(
   container.addChild(buildStatusBar(data, theme));
   container.addChild(new Spacer(1));
   container.addChild(buildDiagnosticSummary(data, theme));
+  container.addChild(buildHealthSectionSummary(data, theme));
 
   const lists = data?.evidenceLists as EvidenceEntry[] | undefined;
   if (lists && lists.length > 0) {
@@ -75,33 +81,54 @@ export function renderHealthResult(
 
 /** ── Helpers ───────────────────────────────────────────────────── */
 
+interface HealthSectionSummary {
+  key: string;
+  status: "complete" | "partial" | "unavailable";
+  itemCount: number;
+  available: boolean;
+  locator?: string;
+}
+
 function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme): Text {
-  if (!data) {
+  const sections = readHealthSections(data);
+  if (sections.length === 0) {
     return new Text(theme.fg("dim", "No health data"), 0, 0);
   }
 
-  const diagCount = (data.diagnosticFileCount as number) ?? 0;
-  const serverCount = (data.serverCount as number) ?? 0;
-  const lspStatus = (data.lspStatus as string) ?? "unknown";
+  const semanticRequested = sections.some(
+    (section) => section.key === "diagnostics" || section.key === "servers",
+  );
+  const segments = sections.map((section) => formatSectionSummary(section, theme));
+  if (semanticRequested) {
+    const lspStatus = readLspStatus(data);
+    const statusColor = lspStatus.startsWith("ready") ? "success" : "warning";
+    segments.push(`${theme.fg("dim", "lsp")} ${theme.fg(statusColor, lspStatus)}`);
+  }
 
-  const statusColor = lspStatus === "ready" ? "success" : "warning";
   const dot = theme.fg("dim", "·");
-
-  const segments = [
-    `${theme.fg("dim", "diag")} ${theme.fg("success", theme.bold(`${diagCount}`))}${theme.fg("muted", " with issues")}`,
-    `${theme.fg("dim", "servers")} ${theme.fg("muted", `${serverCount}`)}`,
-    `${theme.fg("dim", "lsp")} ${theme.fg(statusColor, lspStatus)}`,
-  ];
-
   return new Text(segments.join(` ${dot} `), 0, 0);
 }
 
-function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Text {
-  if (!data) return new Text("", 0, 0);
+function formatSectionSummary(section: HealthSectionSummary, theme: Theme): string {
+  const label = sectionLabel(section.key);
+  if (section.status === "unavailable" || !section.available) {
+    return `${theme.fg("dim", label)} ${theme.fg("warning", "unavailable")}`;
+  }
 
-  const lspStatus = (data.lspStatus as string) ?? "unknown";
-  const structuralStatus = (data.structuralStatus as string) ?? "unknown";
-  const recovered = data.recovered;
+  const suffix = section.key === "diagnostics" ? " with issues" : "";
+  return `${theme.fg("dim", label)} ${theme.fg("success", theme.bold(`${section.itemCount}`))}${theme.fg("muted", suffix)}`;
+}
+
+function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Text {
+  const sections = readHealthSections(data);
+  const semanticRequested = sections.some(
+    (section) => section.key === "diagnostics" || section.key === "servers",
+  );
+  if (!data || !semanticRequested) return new Text("", 0, 0);
+
+  const lspStatus = readLspStatus(data);
+  const structuralStatus = readString(data, "structuralStatus");
+  const recovered = data.recovered === true;
 
   const lspColor = lspStatus.startsWith("ready") ? "success" : "warning";
   const structuralColor = structuralStatus === "ready" ? "success" : "muted";
@@ -109,29 +136,94 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
   const lspLabel =
     lspStatus.includes("(recovered)") || !recovered ? lspStatus : `${lspStatus} (recovered)`;
 
-  const lines: string[] = [
-    `LSP: ${theme.fg(lspColor, lspLabel)}`,
-    `Tree-sitter: ${theme.fg(structuralColor, structuralStatus)}`,
-  ];
+  const lines: string[] = [`LSP: ${theme.fg(lspColor, lspLabel)}`];
+  if (structuralStatus) {
+    lines.push(`Tree-sitter: ${theme.fg(structuralColor, structuralStatus)}`);
+  }
 
   return new Text(lines.join("  "), 0, 0);
 }
 
-function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: Theme): Text {
-  if (!data) return new Text("", 0, 0);
+function buildHealthSectionSummary(data: Record<string, unknown> | null, theme: Theme): Text {
+  const sections = readHealthSections(data).filter((section) => section.key !== "diagnostics");
+  if (sections.length === 0) return new Text("", 0, 0);
 
-  const diagCount = (data.diagnosticFileCount as number) ?? 0;
-  if (diagCount === 0) {
+  const lines = sections.map((section) => {
+    const label = sectionLabel(section.key);
+    if (section.status === "unavailable" || !section.available) {
+      const locator = section.locator ? ` at ${section.locator}` : "";
+      return `${label} unavailable${locator}`;
+    }
+    return `${label} ${section.itemCount}`;
+  });
+  return new Text(theme.fg("muted", lines.join("  ")), 0, 0);
+}
+
+function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: Theme): Text {
+  const section = readHealthSections(data).find((entry) => entry.key === "diagnostics");
+  if (!section) return new Text("", 0, 0);
+  if (section.status === "unavailable" || !section.available) {
+    return new Text(theme.fg("warning", "Diagnostics unavailable"), 0, 0);
+  }
+  if (section.itemCount === 0) {
     return new Text(theme.fg("success", "No diagnostics found"), 0, 0);
   }
 
   const badge = formatEvidenceBadge({
-    shownCount: diagCount,
-    totalCount: diagCount,
+    shownCount: section.itemCount,
+    totalCount: section.itemCount,
     omittedCount: 0,
     partialReason: null,
     label: "files with issues",
   });
 
   return new Text(theme.fg("warning", theme.bold(badge)), 0, 0);
+}
+
+function readHealthSections(data: Record<string, unknown> | null): HealthSectionSummary[] {
+  const value = data?.sections;
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const record = entry as Record<string, unknown>;
+    const rawKey = typeof record.key === "string" ? record.key : "";
+    const key = rawKey.startsWith("health.") ? rawKey.slice("health.".length) : rawKey;
+    if (!key) return [];
+    return [
+      {
+        key,
+        status: isSectionStatus(record.status) ? record.status : "unavailable",
+        itemCount: typeof record.itemCount === "number" ? record.itemCount : 0,
+        available: record.available === true,
+        ...(typeof record.locator === "string" ? { locator: record.locator } : {}),
+      },
+    ];
+  });
+}
+
+function isSectionStatus(value: unknown): value is HealthSectionSummary["status"] {
+  return value === "complete" || value === "partial" || value === "unavailable";
+}
+
+function readLspStatus(data: Record<string, unknown> | null): string {
+  const status = readString(data, "lspStatus") ?? "unknown";
+  return data?.lspAvailable === false && status === "ready" ? "unavailable" : status;
+}
+
+function readString(data: Record<string, unknown> | null, key: string): string | null {
+  const value = data?.[key];
+  return typeof value === "string" ? value : null;
+}
+
+const SECTION_LABELS: Record<string, string> = {
+  diagnostics: "diag",
+  servers: "servers",
+  dirty: "dirty",
+  coverage: "coverage",
+  unused: "unused",
+};
+
+function sectionLabel(key: string): string {
+  return SECTION_LABELS[key] ?? key;
 }

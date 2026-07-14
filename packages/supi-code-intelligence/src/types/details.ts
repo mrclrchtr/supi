@@ -11,6 +11,7 @@ export type {
   ContextDetails,
   DisambiguationCandidate,
   HealthDetails,
+  HealthSectionDetails,
   InspectDetails,
   ResolveDetails,
   SearchDetails,

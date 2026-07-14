@@ -3,7 +3,9 @@ import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type { PrioritySignalsSummary } from "../../analysis/signals/project.ts";
+import type { HealthSection } from "../../session/health-types.ts";
 import type { AnchorKind, TargetStoreEntry } from "../../session/target-store.ts";
+import type { ResultProvenance } from "./assembly.ts";
 
 // ── Anchored coordinate resolution metadata ───────────────────────────
 
@@ -150,14 +152,44 @@ export interface InspectDetails {
   nextQueries: string[];
 }
 
+/** One requested health signal projected into structured result details. */
+export interface HealthSectionDetails {
+  key: HealthSection;
+  title: string;
+  status: "complete" | "partial" | "unavailable";
+  confidence: ConfidenceMode;
+  provenance: ResultProvenance[];
+  itemCount: number;
+  available: boolean;
+  /** Exact report path checked when this section is an artifact locator. */
+  locator?: string;
+}
+
 /** Structured details metadata for code_health results. */
 export interface HealthDetails {
+  includedSections: HealthSection[];
+  sections: HealthSectionDetails[];
+  confidence: ConfidenceMode;
+  provenance: ResultProvenance[];
+  candidateCount: number;
+  omittedCount: number;
   lspAvailable: boolean;
   lspStatus: string;
   recovered: boolean;
+  structuralAvailable: boolean;
   /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */
   structuralStatus?: string;
   diagnosticFileCount: number;
   serverCount: number;
+  dirtyFileCount: number | null;
+  coverage: { available: boolean; entryCount: number; reportPath: string } | null;
+  unused: {
+    available: boolean;
+    fileCount: number;
+    exportCount: number;
+    reportPath: string;
+  } | null;
+  /** Null means advisory code actions were not requested or collected. */
+  codeActionCount: number | null;
   evidenceLists?: EvidenceListMetadata[];
 }

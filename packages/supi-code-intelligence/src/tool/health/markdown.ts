@@ -7,7 +7,12 @@
 
 import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
 import { formatGitContext } from "../../analysis/signals/git.ts";
-import type { HealthCodeActions, HealthData, HealthResultAssembly } from "../result/health.ts";
+import type {
+  HealthCodeActions,
+  HealthData,
+  HealthResultAssembly,
+  HealthSection,
+} from "../result/health.ts";
 
 export type {
   CodeActionSuggestion,
@@ -21,31 +26,41 @@ export type {
 export function renderHealthResult(result: HealthResultAssembly, cwd: string): string {
   const data = result.data;
   const lines: string[] = ["## Code Health", ""];
+  const hasSection = (key: HealthSection): boolean =>
+    result.assembled.sections.some((section) => section.key === `health.${key}`);
+  const semanticRequested = hasSection("diagnostics") || hasSection("servers");
 
-  renderStatusLine(lines, data);
-  renderStalenessBanner(lines, data);
+  renderStatusLine(lines, data, semanticRequested);
+  renderStalenessBanner(lines, data, sectionStatus(result, "diagnostics"));
 
-  if (data.includedSections.includes("diagnostics")) {
-    renderDiagnosticsSection(lines, data, cwd);
+  if (hasSection("diagnostics")) {
+    renderDiagnosticsSection(lines, data, cwd, sectionStatus(result, "diagnostics"));
   }
-  if (data.includedSections.includes("coverage")) {
+  if (hasSection("coverage")) {
     renderCoverageSection(lines, data, cwd);
   }
-  if (data.includedSections.includes("unused")) {
+  if (hasSection("unused")) {
     renderUnusedSection(lines, data, cwd);
   }
-  renderDegradedCoverageSection(lines, data);
-  if (data.includedSections.includes("servers")) {
-    renderServersSection(lines, data);
+  if (semanticRequested) {
+    renderDegradedCoverageSection(lines, data);
   }
-  if (data.includedSections.includes("dirty")) {
-    renderDirtySection(lines, data);
+  if (hasSection("servers")) {
+    renderServersSection(lines, data, sectionStatus(result, "servers"));
+  }
+  if (hasSection("dirty")) {
+    renderDirtySection(lines, data, sectionStatus(result, "dirty"));
   }
 
   return lines.join("\n");
 }
 
-function renderStalenessBanner(lines: string[], data: HealthData): void {
+function renderStalenessBanner(
+  lines: string[],
+  data: HealthData,
+  status: "complete" | "partial" | "unavailable" | undefined,
+): void {
+  if (status !== "complete" && status !== "partial") return;
   if (data.diagnosticAgeSeconds == null) {
     lines.push("⚠ Diagnostics have not been refreshed this session. Use `refresh: true` to check.");
     lines.push("");
@@ -76,8 +91,10 @@ function renderDegradedCoverageSection(lines: string[], data: HealthData): void 
   lines.push("");
 }
 
-function renderStatusLine(lines: string[], data: HealthData): void {
-  lines.push(`**LSP**: ${data.lspStatus}`);
+function renderStatusLine(lines: string[], data: HealthData, semanticRequested: boolean): void {
+  if (!semanticRequested) return;
+
+  lines.push(`**LSP**: ${displayLspStatus(data)}`);
   if (data.structuralStatus) {
     lines.push(`**Structural**: ${data.structuralStatus}`);
   }
@@ -87,11 +104,18 @@ function renderStatusLine(lines: string[], data: HealthData): void {
   lines.push("");
 }
 
-function renderDiagnosticsSection(lines: string[], data: HealthData, cwd: string): void {
+function renderDiagnosticsSection(
+  lines: string[],
+  data: HealthData,
+  cwd: string,
+  status: "complete" | "partial" | "unavailable" | undefined,
+): void {
   lines.push("### Diagnostics");
   lines.push("");
 
-  if (data.diagnostics.length === 0) {
+  if (status === "unavailable") {
+    lines.push(`Diagnostics unavailable — ${displayLspStatus(data)}.`);
+  } else if (data.diagnostics.length === 0) {
     lines.push("No diagnostics found.");
   } else if (data.level === "summary") {
     renderDiagnosticSummary(lines, data);
@@ -125,29 +149,11 @@ function renderDiagnosticDetails(lines: string[], data: HealthData, cwd: string)
 
 function renderCodeActionsSection(lines: string[], data: HealthData, cwd: string): void {
   const codeActions = data.codeActions;
-  if (!codeActions) return;
+  if (!codeActions || data.level !== "detailed" || !data.lspAvailable) return;
   const disclosure = renderEvidenceListMetadataDisclosure(codeActions.evidence);
   if (codeActions.items.length === 0 && !disclosure) return;
 
-  if (data.level === "summary") {
-    renderCodeActionsSummary(lines, codeActions, disclosure);
-    return;
-  }
   renderDetailedCodeActions(lines, codeActions, cwd, disclosure);
-}
-
-function renderCodeActionsSummary(
-  lines: string[],
-  codeActions: HealthCodeActions,
-  disclosure: string | null,
-): void {
-  const count = codeActions.items.length;
-  const summary =
-    count > 0
-      ? `${count} suggested fix${count !== 1 ? "es" : ""} available. Use \`level: "detailed"\` to see them.`
-      : "No suggested fixes were collected.";
-  lines.push(`_${summary}_`);
-  if (disclosure) lines.push(disclosure);
 }
 
 function renderDetailedCodeActions(
@@ -224,10 +230,19 @@ function renderUnusedSection(lines: string[], data: HealthData, cwd: string): vo
   lines.push("");
 }
 
-function renderServersSection(lines: string[], data: HealthData): void {
+function renderServersSection(
+  lines: string[],
+  data: HealthData,
+  status: "complete" | "partial" | "unavailable" | undefined,
+): void {
   lines.push("### Servers");
   lines.push("");
 
+  if (status === "unavailable") {
+    lines.push(`Server status unavailable — ${displayLspStatus(data)}.`);
+    lines.push("");
+    return;
+  }
   if (data.servers.length === 0) {
     lines.push("No servers found.");
     lines.push("");
@@ -242,9 +257,30 @@ function renderServersSection(lines: string[], data: HealthData): void {
   lines.push("");
 }
 
-function renderDirtySection(lines: string[], data: HealthData): void {
-  if (!data.gitContext) return;
+function renderDirtySection(
+  lines: string[],
+  data: HealthData,
+  status: "complete" | "partial" | "unavailable" | undefined,
+): void {
+  if (status === "unavailable" || !data.gitContext) {
+    lines.push("### Dirty");
+    lines.push("");
+    lines.push("Git context unavailable; this workspace is not a readable Git repository.");
+    lines.push("");
+    return;
+  }
   lines.push(formatGitContext(data.gitContext));
+}
+
+function displayLspStatus(data: HealthData): string {
+  return !data.lspAvailable && data.lspStatus === "ready" ? "unavailable" : data.lspStatus;
+}
+
+function sectionStatus(
+  result: HealthResultAssembly,
+  key: HealthSection,
+): "complete" | "partial" | "unavailable" | undefined {
+  return result.assembled.sections.find((section) => section.key === `health.${key}`)?.status;
 }
 
 function makeRelative(cwd: string, file: string): string {

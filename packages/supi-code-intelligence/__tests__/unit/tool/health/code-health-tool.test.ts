@@ -334,6 +334,31 @@ describe("code_health tool", () => {
     expect(result.content[0].text).toContain("### Servers");
   });
 
+  it("preserves an explicitly empty include list instead of applying defaults", async () => {
+    registerMockProvider(tmpDir);
+    mockReadyLsp();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const tool = getTool(pi, "code_health");
+
+    const result = (await tool.execute(
+      "test-empty-include",
+      { include: [] },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ type: string; text: string }>;
+      details?: { type: "health"; data: { includedSections: string[]; sections: unknown[] } };
+    };
+
+    expect(result.content[0].text).not.toContain("### Diagnostics");
+    expect(result.content[0].text).not.toContain("### Servers");
+    expect(result.details?.data.includedSections).toEqual([]);
+    expect(result.details?.data.sections).toEqual([]);
+  });
+
   it("ignores workspace diagnostic summary entries with zero errors and warnings", async () => {
     registerMockProvider(tmpDir);
     mockReadyLsp({
@@ -644,6 +669,7 @@ describe("renderHealthResult code actions", () => {
       lspAvailable: false,
       lspStatus: "unavailable",
       recovered: false,
+      structuralAvailable: false,
       diagnostics: [],
       servers: [],
       gitContext: null,
@@ -663,6 +689,8 @@ describe("renderHealthResult code actions", () => {
     ];
 
     const data = makeBaseData({
+      lspAvailable: true,
+      lspStatus: "ready",
       diagnostics: [{ file: "/tmp/src/file.ts", errors: 2, warnings: 0 }],
       codeActions: makeCodeActions(actions),
     });
@@ -677,7 +705,12 @@ describe("renderHealthResult code actions", () => {
   });
 
   it("renders structural readiness in the status line when structuralStatus is set", () => {
-    const data = makeBaseData({ lspStatus: "ready", structuralStatus: "ready" });
+    const data = makeBaseData({
+      lspAvailable: true,
+      lspStatus: "ready",
+      structuralAvailable: true,
+      structuralStatus: "ready",
+    });
 
     const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
@@ -686,7 +719,7 @@ describe("renderHealthResult code actions", () => {
   });
 
   it("omits the structural status line when structuralStatus is unset", () => {
-    const data = makeBaseData({ lspStatus: "ready" });
+    const data = makeBaseData({ lspAvailable: true, lspStatus: "ready" });
 
     const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
 
@@ -719,6 +752,8 @@ describe("renderHealthResult code actions", () => {
 
   it("discloses a partial code-action collection even when it has no suggestions", () => {
     const data = makeBaseData({
+      lspAvailable: true,
+      lspStatus: "ready",
       diagnostics: [{ file: "/tmp/src/file.ts", errors: 1, warnings: 0 }],
       codeActions: makePartialCodeActions([]),
     });

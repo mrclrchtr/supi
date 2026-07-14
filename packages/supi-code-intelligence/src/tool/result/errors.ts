@@ -106,11 +106,22 @@ export function healthErrorResult(content: string, reason?: string): CodeIntelRe
     details: {
       type: "health" as const,
       data: {
+        includedSections: [],
+        sections: [],
+        confidence: "unavailable",
+        provenance: [],
+        candidateCount: 0,
+        omittedCount: 0,
         lspAvailable: false,
         lspStatus: reason ?? content,
         recovered: false,
+        structuralAvailable: false,
         diagnosticFileCount: 0,
         serverCount: 0,
+        dirtyFileCount: null,
+        coverage: null,
+        unused: null,
+        codeActionCount: null,
       },
     },
   };
