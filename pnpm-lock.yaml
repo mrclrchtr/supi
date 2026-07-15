@@ -55,8 +55,8 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@opentelemetry/api@1.9.0)(@types/node@25.9.5)(jsdom@29.1.1)(vite@8.1.4(@types/node@25.9.5)(jiti@2.7.0)(yaml@2.9.0))
       web-tree-sitter:
-        specifier: 0.26.10
-        version: 0.26.10
+        specifier: 0.26.11
+        version: 0.26.11
 
   packages/supi-ask-user:
     dependencies:
@@ -2444,6 +2444,9 @@ packages:
   web-tree-sitter@0.26.10:
     resolution: {integrity: sha512-vengBGYS7FpAerkR3o04oBL4L8MkVmjawK50AFBu7v0HZBkmF9ZavPGKoXLSSmRhp7T/YgsJ7joAS3yAxHPEqQ==}
 
+  web-tree-sitter@0.26.11:
+    resolution: {integrity: sha512-Q5Dm3YTIXSXuH6FxX6RuzX2Qwpc4DPGiYMU87Wg5Z8OIStiQFiUex4zMDc0vBTw78EphaYJacncJghCHzbZptg==}
+
   webidl-conversions@8.0.1:
     resolution: {integrity: sha512-BMhLD/Sw+GbJC21C/UgyaZX41nPt8bUTg+jWyDeg7e7YN4xOM05YPSIXceACnXVtqyEw/LMClUQMtMZ+PGGpqQ==}
     engines: {node: '>=20'}
@@ -4371,6 +4374,8 @@ snapshots:
   web-streams-polyfill@3.3.3: {}
 
   web-tree-sitter@0.26.10: {}
+
+  web-tree-sitter@0.26.11: {}
 
   webidl-conversions@8.0.1: {}
 
