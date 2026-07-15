@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.1](https://github.com/mrclrchtr/supi/compare/v2.4.0...v2.4.1) (2026-07-15)
+
+
+### Bug Fixes
+
+* **deps:** update dependency tree-sitter-cli to v0.26.11 ([f11d93b](https://github.com/mrclrchtr/supi/commit/f11d93b7d988c045f2bb5ce6466272c7791436ed))
+* **deps:** update dependency web-tree-sitter to v0.26.11 ([508bbb5](https://github.com/mrclrchtr/supi/commit/508bbb5ec28fe6751bbccd18d916e4dad9c8bdcc))
+* **deps:** update dependency web-tree-sitter to v0.26.11 ([973acbd](https://github.com/mrclrchtr/supi/commit/973acbd6e428c17eaff4aa776eb63df6ce198464))
+* **deps:** update pnpm to v11.12.0 ([40b1a1f](https://github.com/mrclrchtr/supi/commit/40b1a1fab470f6d502be9c523bd68572b34487ee))
+* **deps:** update pnpm to v11.13.0 ([098655f](https://github.com/mrclrchtr/supi/commit/098655f0eed310e6971d6074a19bfc54e0ee5ae8))
+
 ## [2.4.0](https://github.com/mrclrchtr/supi/compare/v2.3.2...v2.4.0) (2026-07-14)
 
 
