@@ -1,6 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { renderOrientationResult } from "../../../src/tool/orientation/markdown.ts";
+import { initTheme } from "@earendil-works/pi-coding-agent";
+import { beforeAll, describe, expect, it } from "vitest";
+import { renderOrientationResult as renderOrientationMarkdown } from "../../../src/tool/orientation/markdown.ts";
+import { renderOrientationResult as renderOrientationTui } from "../../../src/tool/orientation/tui.ts";
 import { assembleOrientationResult } from "../../../src/tool/result/orientation.ts";
+
+const testTheme = {
+  fg: (_color: string, text: string) => text,
+  bold: (text: string) => text,
+} as never;
+
+beforeAll(() => initTheme("dark"));
 
 describe("Orientation result projections", () => {
   it("projects assembled read-next actions into markdown and structured details", () => {
@@ -21,7 +30,7 @@ describe("Orientation result projections", () => {
       readNext: [readNext],
     });
 
-    const markdown = renderOrientationResult(assembly);
+    const markdown = renderOrientationMarkdown(assembly);
 
     expect(markdown).toContain("## Read Next");
     expect(markdown).toContain("`src/index.ts` L4–L12");
@@ -32,5 +41,30 @@ describe("Orientation result projections", () => {
       nextQueries: ['Use code_orientation with focus.module "app"'],
       readNext: [readNext],
     });
+  });
+
+  it.each([
+    false,
+    true,
+  ])("does not invent orientation bounds when assembled evidence is absent and expanded is %s", (expanded) => {
+    const rendered = renderOrientationTui(
+      {
+        content: [{ type: "text", text: "# Multiple Orientation targets" }],
+        details: {
+          type: "context",
+          data: {
+            confidence: "semantic",
+            candidates: [{ name: "first" }],
+          },
+        },
+      },
+      { expanded, isPartial: false },
+      testTheme,
+      undefined,
+    );
+
+    const text = rendered.render(120).join("\n");
+    expect(text).toContain("confidence semantic");
+    expect(text).not.toContain("0 sections");
   });
 });

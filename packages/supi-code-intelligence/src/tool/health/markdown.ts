@@ -5,7 +5,10 @@
  * readable markdown sections keyed by requested `include` values.
  */
 
-import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
+import {
+  type EvidenceListMetadata,
+  renderEvidenceListMetadataDisclosure,
+} from "../../analysis/evidence.ts";
 import { formatGitContext } from "../../analysis/signals/git.ts";
 import type {
   HealthCodeActions,
@@ -29,12 +32,17 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
   const hasSection = (key: HealthSection): boolean =>
     result.assembled.sections.some((section) => section.key === `health.${key}`);
   const semanticRequested = hasSection("diagnostics") || hasSection("servers");
+  const evidenceFor = (key: string): EvidenceListMetadata | undefined =>
+    result.assembled.evidenceLists.find((evidence) => evidence.key === key);
 
   renderStatusLine(lines, data, semanticRequested);
   renderStalenessBanner(lines, data, sectionStatus(result, "diagnostics"));
 
   if (hasSection("diagnostics")) {
-    renderDiagnosticsSection(lines, data, cwd, sectionStatus(result, "diagnostics"));
+    renderDiagnosticsSection(lines, data, cwd, {
+      status: sectionStatus(result, "diagnostics"),
+      codeActionEvidence: evidenceFor("health.codeActions"),
+    });
   }
   if (hasSection("coverage")) {
     renderCoverageSection(lines, data, cwd);
@@ -49,7 +57,12 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
     renderServersSection(lines, data, sectionStatus(result, "servers"));
   }
   if (hasSection("dirty")) {
-    renderDirtySection(lines, data, sectionStatus(result, "dirty"));
+    renderDirtySection(
+      lines,
+      data,
+      sectionStatus(result, "dirty"),
+      evidenceFor("health.dirtyFiles"),
+    );
   }
 
   return lines.join("\n");
@@ -104,16 +117,21 @@ function renderStatusLine(lines: string[], data: HealthData, semanticRequested: 
   lines.push("");
 }
 
+interface DiagnosticRenderOptions {
+  status: "complete" | "partial" | "unavailable" | undefined;
+  codeActionEvidence: EvidenceListMetadata | undefined;
+}
+
 function renderDiagnosticsSection(
   lines: string[],
   data: HealthData,
   cwd: string,
-  status: "complete" | "partial" | "unavailable" | undefined,
+  options: DiagnosticRenderOptions,
 ): void {
   lines.push("### Diagnostics");
   lines.push("");
 
-  if (status === "unavailable") {
+  if (options.status === "unavailable") {
     lines.push(`Diagnostics unavailable — ${displayLspStatus(data)}.`);
   } else if (data.diagnostics.length === 0) {
     lines.push("No diagnostics found.");
@@ -123,7 +141,7 @@ function renderDiagnosticsSection(
     renderDiagnosticDetails(lines, data, cwd);
   }
 
-  renderCodeActionsSection(lines, data, cwd);
+  renderCodeActionsSection(lines, data, cwd, options.codeActionEvidence);
   lines.push("");
 }
 
@@ -147,10 +165,15 @@ function renderDiagnosticDetails(lines: string[], data: HealthData, cwd: string)
   }
 }
 
-function renderCodeActionsSection(lines: string[], data: HealthData, cwd: string): void {
+function renderCodeActionsSection(
+  lines: string[],
+  data: HealthData,
+  cwd: string,
+  evidence: EvidenceListMetadata | undefined,
+): void {
   const codeActions = data.codeActions;
   if (!codeActions || data.level !== "detailed" || !data.lspAvailable) return;
-  const disclosure = renderEvidenceListMetadataDisclosure(codeActions.evidence);
+  const disclosure = evidence ? renderEvidenceListMetadataDisclosure(evidence) : null;
   if (codeActions.items.length === 0 && !disclosure) return;
 
   renderDetailedCodeActions(lines, codeActions, cwd, disclosure);
@@ -261,6 +284,7 @@ function renderDirtySection(
   lines: string[],
   data: HealthData,
   status: "complete" | "partial" | "unavailable" | undefined,
+  evidence: EvidenceListMetadata | undefined,
 ): void {
   if (status === "unavailable" || !data.gitContext) {
     lines.push("### Dirty");
@@ -269,7 +293,12 @@ function renderDirtySection(
     lines.push("");
     return;
   }
-  lines.push(formatGitContext(data.gitContext));
+  if (!evidence) {
+    lines.push("Dirty-file evidence metadata was unavailable.");
+    lines.push("");
+    return;
+  }
+  lines.push(formatGitContext(data.gitContext, evidence));
 }
 
 function displayLspStatus(data: HealthData): string {

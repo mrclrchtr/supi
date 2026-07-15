@@ -62,15 +62,13 @@ export function renderGraphResult(
     return container;
   }
 
-  const omittedCount = (details?.omittedCount as number) ?? 0;
-
   if (!options.expanded) {
-    container.addChild(buildSimpleCompact(details ?? undefined, theme, { omittedCount }));
+    container.addChild(buildSimpleCompact(details ?? undefined, theme));
     return container;
   }
 
   // Expanded view
-  const header = buildSimpleHeader(details ?? undefined, theme, { omittedCount });
+  const header = buildSimpleHeader(details ?? undefined, theme);
   if (header) container.addChild(header);
 
   const evidenceLists = details?.evidenceLists as EvidenceEntry[] | undefined;

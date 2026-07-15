@@ -1,5 +1,5 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
-import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
+import { createEvidenceList, type EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { HealthData, HealthSection } from "../../session/health-types.ts";
 import {
   assembleToolResult,
@@ -36,14 +36,11 @@ const SECTION_TITLES: Record<HealthSection, string> = {
 };
 
 /** Assemble public code_health evidence and details before presentation adapters render it. */
-export function assembleHealthResult(
-  data: HealthData,
-  evidenceLists: EvidenceListMetadata[],
-): HealthResultAssembly {
+export function assembleHealthResult(data: HealthData): HealthResultAssembly {
   const projections = data.includedSections.map((section) => projectSection(section, data));
   const sections = projections.map((projection) => projection.section);
   const sectionDetails = projections.map((projection) => projection.details);
-  const filteredEvidenceLists = filterEvidenceLists(data, evidenceLists);
+  const evidenceLists = collectHealthEvidenceLists(data);
   const capabilityProvenance = collectCapabilityProvenance(data);
   const provenance = uniqueProvenance([
     ...capabilityProvenance,
@@ -54,7 +51,7 @@ export function assembleHealthResult(
   const assembled = assembleToolResult({
     data,
     sections,
-    evidenceLists: filteredEvidenceLists,
+    evidenceLists,
     candidateCount: sections.reduce((sum, section) => sum + section.items.length, 0),
     confidence,
     provenance,
@@ -236,23 +233,26 @@ function healthConfidence(
   return "unavailable";
 }
 
-function filterEvidenceLists(
-  data: HealthData,
-  evidenceLists: readonly EvidenceListMetadata[],
-): EvidenceListMetadata[] {
-  return evidenceLists.filter((list) => {
-    if (list.key === "health.dirtyFiles") {
-      return data.includedSections.includes("dirty") && data.gitContext !== null;
-    }
-    if (list.key === "health.codeActions") {
-      return (
-        data.includedSections.includes("diagnostics") &&
-        data.level === "detailed" &&
-        data.codeActions !== null
-      );
-    }
-    return true;
-  });
+function collectHealthEvidenceLists(data: HealthData): EvidenceListMetadata[] {
+  const dirtyFiles =
+    data.includedSections.includes("dirty") && data.gitContext !== null
+      ? [
+          createEvidenceList({
+            key: "health.dirtyFiles",
+            items: [...data.gitContext.dirtyFiles],
+            maxResults: 5,
+          }).metadata,
+        ]
+      : [];
+  const codeActions =
+    data.includedSections.includes("diagnostics") &&
+    data.level === "detailed" &&
+    data.codeActions !== null &&
+    (data.codeActions.items.length > 0 || data.codeActions.evidence.partialReason !== null)
+      ? [data.codeActions.evidence]
+      : [];
+
+  return [...dirtyFiles, ...codeActions];
 }
 
 function uniqueProvenance(provenance: readonly ResultProvenance[]): ResultProvenance[] {

@@ -1,6 +1,5 @@
 /** Thin Pi adapter for the session-owned code_health workflow. */
 
-import { buildHealthEvidenceLists } from "../../analysis/health/recovery.ts";
 import type { HealthSection, HealthWorkflowInput } from "../../session/health-types.ts";
 import type { CodeIntelResult, CodeIntelToolExecCtx } from "../../types/index.ts";
 import { unavailableHealthDetails } from "../infra/error-results.ts";
@@ -30,10 +29,7 @@ export async function executeHealthTool(
     };
   }
 
-  const assembly = assembleHealthResult(
-    outcome.data,
-    buildHealthEvidenceLists(outcome.data.gitContext, outcome.data.codeActions),
-  );
+  const assembly = assembleHealthResult(outcome.data);
   return {
     content: renderHealthResult(assembly, ctx.cwd),
     details: { type: "health", data: assembly.details },

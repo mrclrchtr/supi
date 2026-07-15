@@ -1,5 +1,9 @@
 import { execFileSync } from "node:child_process";
-import { createEvidenceList, renderEvidenceListDisclosure } from "../evidence.ts";
+import {
+  createEvidenceList,
+  type EvidenceListMetadata,
+  renderEvidenceListMetadataDisclosure,
+} from "../evidence.ts";
 
 function scrubGitEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next = { ...env };
@@ -48,27 +52,31 @@ export function gatherGitContext(cwd: string): GitContext | null {
   }
 }
 
-export function formatGitContext(ctx: GitContext): string {
+/**
+ * Render Git context, using already assembled dirty-file metadata when the
+ * caller has it so every presentation surface shares the same evidence bounds.
+ */
+export function formatGitContext(ctx: GitContext, evidence?: EvidenceListMetadata): string {
+  const dirtyEvidence =
+    evidence ??
+    createEvidenceList({
+      key: "health.dirtyFiles",
+      items: ctx.dirtyFiles,
+      maxResults: 5,
+    }).metadata;
   const lines: string[] = [];
   lines.push("## Git Context");
   lines.push("");
   lines.push(`Branch: \`${ctx.branch}\``);
-  if (ctx.dirtyFiles.length > 0) {
-    lines.push(
-      `Uncommitted: ${ctx.dirtyFiles.length} file${ctx.dirtyFiles.length !== 1 ? "s" : ""}`,
-    );
-    const evidence = createEvidenceList({
-      key: "health.dirtyFiles",
-      items: ctx.dirtyFiles,
-      maxResults: 5,
-    });
-    for (const f of evidence.items) {
-      lines.push(`- \`${f}\``);
+  if (dirtyEvidence.shownCount > 0) {
+    const total = dirtyEvidence.totalCount ?? dirtyEvidence.shownCount;
+    const countLabel = dirtyEvidence.totalCount === null ? `at least ${total}` : String(total);
+    lines.push(`Uncommitted: ${countLabel} file${total !== 1 ? "s" : ""}`);
+    for (const file of ctx.dirtyFiles.slice(0, dirtyEvidence.shownCount)) {
+      lines.push(`- \`${file}\``);
     }
-    const disclosure = renderEvidenceListDisclosure(evidence);
-    if (disclosure) {
-      lines.push(disclosure);
-    }
+    const disclosure = renderEvidenceListMetadataDisclosure(dirtyEvidence);
+    if (disclosure) lines.push(disclosure);
   } else {
     lines.push("Working tree clean.");
   }

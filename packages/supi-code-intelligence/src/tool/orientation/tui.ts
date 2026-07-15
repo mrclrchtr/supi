@@ -1,10 +1,11 @@
 import { getMarkdownTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
-import { formatEvidenceBadge } from "@mrclrchtr/supi-code-runtime/api";
 import {
+  type EvidenceEntry,
+  formatEvidenceEntry,
   type ResultOptios,
+  readEvidenceEntries,
   renderPartial,
-  summarizeEvidenceDetails,
   type ToolResult,
 } from "../../ui/tui/common.ts";
 import type { CodeOrientationToolParams } from "./execute.ts";
@@ -80,9 +81,6 @@ export function renderOrientationResult(
     container.addChild(new Text(theme.fg("dim", `Sections: ${sections.join(", ")}`), 0, 0));
   }
 
-  const evidenceSummary = renderEvidenceSummary(orientationEvidence(data), theme);
-  if (evidenceSummary) container.addChild(evidenceSummary);
-
   if (markdownText) {
     container.addChild(new Spacer(1));
     container.addChild(new Text(theme.fg("dim", "▸ raw markdown"), 0, 0));
@@ -97,11 +95,28 @@ export function renderOrientationResult(
 function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme): Text {
   if (!data) return new Text(theme.fg("dim", "No orientation"), 0, 0);
 
-  const evidence = orientationEvidence(data);
-  const confidence = (data.confidence as string) ?? "";
-  const dot = theme.fg("dim", "·");
-  const segments: string[] = [theme.fg("success", theme.bold(formatEvidenceBadge(evidence)))];
+  const segments = summarySegments(data, theme, "success");
+  if (segments.length === 0) return new Text(theme.fg("dim", "No assembled evidence"), 0, 0);
+  return new Text(segments.join(` ${theme.fg("dim", "·")} `), 0, 0);
+}
 
+function buildHeader(data: Record<string, unknown> | null, theme: Theme): Text {
+  if (!data) return new Text("", 0, 0);
+  return new Text(summarySegments(data, theme, "accent").join(` ${theme.fg("dim", "·")} `), 0, 0);
+}
+
+function summarySegments(
+  data: Record<string, unknown>,
+  theme: Theme,
+  badgeColor: "accent" | "success",
+): string[] {
+  const segments: string[] = [];
+  const evidence = orientationEvidence(data);
+  if (evidence) {
+    segments.push(theme.fg(badgeColor, theme.bold(formatEvidenceEntry(evidence))));
+  }
+
+  const confidence = typeof data.confidence === "string" ? data.confidence : "";
   if (confidence) {
     segments.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
   }
@@ -109,37 +124,13 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   const target = data.target as Record<string, unknown> | undefined;
   if (target?.name) segments.push(theme.fg("muted", String(target.name)));
 
-  return new Text(segments.join(` ${dot} `), 0, 0);
+  return segments;
 }
 
-function buildHeader(data: Record<string, unknown> | null, theme: Theme): Text {
-  if (!data) return new Text("", 0, 0);
-
-  const evidence = orientationEvidence(data);
-  const confidence = (data.confidence as string) ?? "";
-  const dot = theme.fg("dim", "·");
-  const parts = [theme.fg("accent", theme.bold(formatEvidenceBadge(evidence)))];
-  if (confidence) parts.push(`${theme.fg("dim", "confidence")} ${theme.fg("muted", confidence)}`);
-
-  return new Text(parts.join(` ${dot} `), 0, 0);
-}
-
-function orientationEvidence(data: Record<string, unknown> | null) {
-  const evidence = summarizeEvidenceDetails(data ?? undefined);
-  return { ...evidence, label: "sections" };
-}
-
-function renderEvidenceSummary(
-  evidence: ReturnType<typeof orientationEvidence>,
-  theme: Theme,
-): Text | null {
-  if (evidence.totalCount === null && !evidence.partialReason) return null;
-  const badge = formatEvidenceBadge({
-    shownCount: evidence.shownCount,
-    totalCount: evidence.totalCount,
-    omittedCount: evidence.omittedCount,
-    partialReason: evidence.partialReason,
-    label: evidence.label,
-  });
-  return new Text(theme.fg("dim", badge), 0, 0);
+function orientationEvidence(data: Record<string, unknown>): EvidenceEntry | null {
+  return (
+    readEvidenceEntries(data.evidenceLists).find(
+      (evidence) => evidence.key === "orientation.sections",
+    ) ?? null
+  );
 }

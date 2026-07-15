@@ -1,11 +1,8 @@
-// Recovery, state description, and evidence helpers for code_health.
+// Recovery and state description helpers for code_health.
 // Extracted from orchestrate.ts.
 
 import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntime, WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
-import type { HealthCodeActions } from "../../session/health-types.ts";
-import { createEvidenceList, type EvidenceListMetadata } from "../evidence.ts";
-import type { GitContext } from "../signals/git.ts";
 
 // ── Recovery ──────────────────────────────────────────────────────────
 
@@ -36,28 +33,6 @@ export async function maybeRecover(
   }
 
   return { recovered, lspStatus };
-}
-
-// ── Evidence lists ────────────────────────────────────────────────────
-
-export function buildHealthEvidenceLists(
-  gitContext: GitContext | null,
-  codeActions: HealthCodeActions | null,
-): EvidenceListMetadata[] {
-  return [
-    ...(gitContext
-      ? [
-          createEvidenceList({
-            key: "health.dirtyFiles",
-            items: gitContext.dirtyFiles,
-            maxResults: 5,
-          }).metadata,
-        ]
-      : []),
-    ...(codeActions && (codeActions.items.length > 0 || codeActions.evidence.partialReason)
-      ? [codeActions.evidence]
-      : []),
-  ];
 }
 
 // ── State description helpers ─────────────────────────────────────────

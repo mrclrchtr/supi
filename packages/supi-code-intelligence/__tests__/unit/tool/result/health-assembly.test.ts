@@ -40,7 +40,6 @@ describe("code_health result assembly", () => {
           entries: [{ file: "/repo/src/index.ts", pct: 20 }],
         },
       }),
-      [],
     );
 
     expect(assembly.assembled.sections.map((section) => section.key)).toEqual([
@@ -89,6 +88,15 @@ describe("code_health result assembly", () => {
         expect.objectContaining({ key: "dirty", itemCount: 1, status: "complete" }),
         expect.objectContaining({ key: "coverage", itemCount: 1, status: "complete" }),
       ]),
+      evidenceLists: [
+        {
+          key: "health.dirtyFiles",
+          totalCount: 1,
+          shownCount: 1,
+          omittedCount: 0,
+          partialReason: null,
+        },
+      ],
     });
   });
 
@@ -108,7 +116,7 @@ describe("code_health result assembly", () => {
         exports: [],
       },
     });
-    const assembly = assembleHealthResult(data, []);
+    const assembly = assembleHealthResult(data);
     const markdown = renderHealthResult(assembly, "/repo");
 
     expect(assembly.assembled.sections.map((section) => section.key)).toEqual([
@@ -153,15 +161,11 @@ describe("code_health result assembly", () => {
         partialReason: null,
       },
     };
-    const evidenceLists = [codeActions.evidence];
-
     const serverAssembly = assembleHealthResult(
       makeHealthData({ includedSections: ["servers"], level: "detailed", codeActions }),
-      evidenceLists,
     );
     const summaryAssembly = assembleHealthResult(
       makeHealthData({ includedSections: ["diagnostics"], codeActions }),
-      evidenceLists,
     );
 
     expect(serverAssembly.assembled.evidenceLists).toEqual([]);

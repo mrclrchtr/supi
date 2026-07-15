@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { initTheme } from "@earendil-works/pi-coding-agent";
+import { beforeAll, describe, expect, it } from "vitest";
 import type { ApplyResult } from "../../../src/analysis/refactor/apply.ts";
 import type { RefactorPlan } from "../../../src/session/refactor-plans.ts";
 import {
@@ -15,6 +16,8 @@ const testTheme = {
   fg: (_color: string, text: string) => text,
   bold: (text: string) => text,
 } as never;
+
+beforeAll(() => initTheme("dark"));
 
 function makePlan(): RefactorPlan {
   return {
@@ -79,10 +82,10 @@ describe("refactor result projections", () => {
     expect(assembly.assembled.data.result).toBe(applyResult);
   });
 
-  it("uses structured edit bounds in the compact TUI projection", () => {
+  it.each([false, true])("uses structured edit bounds when expanded is %s", (expanded) => {
     const rendered = renderRefactorPlanTui(
       {
-        content: [{ type: "text", text: "" }],
+        content: [{ type: "text", text: "_(showing 2 of 3; 1 omitted)_" }],
         details: {
           type: "search",
           data: {
@@ -101,11 +104,13 @@ describe("refactor result projections", () => {
           },
         },
       },
-      { expanded: false, isPartial: false },
+      { expanded, isPartial: false },
       testTheme,
       undefined,
     );
 
-    expect(rendered.render(120).join("\n")).toContain("2 of 3 edits (1 omitted)");
+    const text = rendered.render(120).join("\n");
+    expect(text).toContain("2 of 3 edits (1 omitted)");
+    if (expanded) expect(text).toContain("showing 2 of 3; 1 omitted");
   });
 });

@@ -695,7 +695,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: makeCodeActions(actions),
     });
 
-    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data), "/tmp");
 
     expect(result).toContain("### Code Actions");
     expect(result).toContain("Remove unused import");
@@ -712,7 +712,7 @@ describe("renderHealthResult code actions", () => {
       structuralStatus: "ready",
     });
 
-    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data), "/tmp");
 
     expect(result).toContain("**LSP**: ready");
     expect(result).toContain("**Structural**: ready");
@@ -721,7 +721,7 @@ describe("renderHealthResult code actions", () => {
   it("omits the structural status line when structuralStatus is unset", () => {
     const data = makeBaseData({ lspAvailable: true, lspStatus: "ready" });
 
-    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data), "/tmp");
 
     expect(result).toContain("**LSP**: ready");
     expect(result).not.toContain("**Structural**");
@@ -733,7 +733,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: null,
     });
 
-    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data), "/tmp");
 
     expect(result).not.toContain("### Code Actions");
     expect(result).not.toContain("suggestions only");
@@ -745,7 +745,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: makeCodeActions([]),
     });
 
-    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data), "/tmp");
 
     expect(result).not.toContain("### Code Actions");
   });
@@ -758,7 +758,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: makePartialCodeActions([]),
     });
 
-    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data), "/tmp");
 
     expect(result).toContain("### Code Actions");
     expect(result).toContain("No code-action suggestions were collected");
@@ -778,7 +778,7 @@ describe("renderHealthResult code actions", () => {
       codeActions: makeCodeActions(actions),
     });
 
-    const result = renderHealthResult(assembleHealthResult(data, []), "/tmp");
+    const result = renderHealthResult(assembleHealthResult(data), "/tmp");
 
     // Summary mode doesn't call renderDiagnosticDetails, so no code actions section
     expect(result).not.toContain("### Code Actions");

@@ -4,10 +4,11 @@
 
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { Container, Spacer, Text } from "@earendil-works/pi-tui";
-import { formatEvidenceBadge } from "@mrclrchtr/supi-code-runtime/api";
 import {
   type EvidenceEntry,
+  formatEvidenceEntry,
   type ResultOptios,
+  readEvidenceEntries,
   renderEvidenceLines,
   renderMarkdownDetail,
   renderPartial,
@@ -95,10 +96,20 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
     return new Text(theme.fg("dim", "No health data"), 0, 0);
   }
 
+  const evidence = readEvidenceEntries(data?.evidenceLists);
+  const usedEvidence = new Set<EvidenceEntry>();
   const semanticRequested = sections.some(
     (section) => section.key === "diagnostics" || section.key === "servers",
   );
-  const segments = sections.map((section) => formatSectionSummary(section, theme));
+  const segments = sections.map((section) => {
+    const sectionEvidence = evidenceForSection(section, evidence);
+    if (sectionEvidence) usedEvidence.add(sectionEvidence);
+    return formatSectionSummary(section, sectionEvidence, theme);
+  });
+  for (const entry of evidence) {
+    if (usedEvidence.has(entry)) continue;
+    segments.push(theme.fg("success", theme.bold(formatEvidenceEntry(entry))));
+  }
   if (semanticRequested) {
     const lspStatus = readLspStatus(data);
     const statusColor = lspStatus.startsWith("ready") ? "success" : "warning";
@@ -109,11 +120,16 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
   return new Text(segments.join(` ${dot} `), 0, 0);
 }
 
-function formatSectionSummary(section: HealthSectionSummary, theme: Theme): string {
+function formatSectionSummary(
+  section: HealthSectionSummary,
+  evidence: EvidenceEntry | undefined,
+  theme: Theme,
+): string {
   const label = sectionLabel(section.key);
   if (section.status === "unavailable" || !section.available) {
     return `${theme.fg("dim", label)} ${theme.fg("warning", "unavailable")}`;
   }
+  if (evidence) return theme.fg("success", theme.bold(formatEvidenceEntry(evidence)));
 
   const suffix = section.key === "diagnostics" ? " with issues" : "";
   return `${theme.fg("dim", label)} ${theme.fg("success", theme.bold(`${section.itemCount}`))}${theme.fg("muted", suffix)}`;
@@ -169,15 +185,20 @@ function buildDiagnosticSummary(data: Record<string, unknown> | null, theme: The
     return new Text(theme.fg("success", "No diagnostics found"), 0, 0);
   }
 
-  const badge = formatEvidenceBadge({
-    shownCount: section.itemCount,
-    totalCount: section.itemCount,
-    omittedCount: 0,
-    partialReason: null,
-    label: "files with issues",
-  });
+  const fileLabel = section.itemCount === 1 ? "file" : "files";
+  return new Text(
+    theme.fg("warning", theme.bold(`${section.itemCount} ${fileLabel} with issues`)),
+    0,
+    0,
+  );
+}
 
-  return new Text(theme.fg("warning", theme.bold(badge)), 0, 0);
+function evidenceForSection(
+  section: HealthSectionSummary,
+  evidence: readonly EvidenceEntry[],
+): EvidenceEntry | undefined {
+  if (section.key !== "dirty") return undefined;
+  return evidence.find((entry) => entry.key === "health.dirtyFiles");
 }
 
 function readHealthSections(data: Record<string, unknown> | null): HealthSectionSummary[] {

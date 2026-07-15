@@ -134,4 +134,60 @@ describe("code_health TUI projection", () => {
     expect(text).not.toContain("diag");
     expect(text).not.toContain("LSP:");
   });
+
+  it.each([false, true])("projects bounded dirty-file evidence when expanded is %s", (expanded) => {
+    const text = render(
+      makeDetails({
+        includedSections: ["dirty"],
+        sections: [
+          {
+            key: "dirty",
+            title: "Dirty",
+            status: "complete",
+            confidence: "heuristic",
+            provenance: [{ source: "git" }],
+            itemCount: 6,
+            available: true,
+          },
+        ],
+        evidenceLists: [
+          {
+            key: "health.dirtyFiles",
+            totalCount: 6,
+            shownCount: 5,
+            omittedCount: 1,
+            partialReason: null,
+          },
+        ],
+      }),
+      expanded,
+      "## Code Health\n\n_(showing 5 of 6; 1 omitted)_",
+    );
+
+    expect(text).toContain("5 of 6 dirty files (1 omitted)");
+  });
+
+  it.each([
+    false,
+    true,
+  ])("keeps an unknown code-action remainder explicit when expanded is %s", (expanded) => {
+    const text = render(
+      makeDetails({
+        evidenceLists: [
+          {
+            key: "health.codeActions",
+            totalCount: null,
+            shownCount: 0,
+            omittedCount: null,
+            partialReason: "safety-limit",
+          },
+        ],
+      }),
+      expanded,
+      "## Code Health\n\n_(showing 0; more may exist — safety-limit)_",
+    );
+
+    expect(text).toContain("0 code actions (more may exist — safety-limit)");
+    expect(text).not.toContain("0 of 0 code actions");
+  });
 });
