@@ -75,10 +75,9 @@ export async function executeInspect(
   }
 
   const confidence = deriveConfidence({
-    hasSemantic: Boolean(
-      context.hover || definitions.length > 0 || (context.codeActions?.length ?? 0) > 0,
-    ),
-    hasStructural: Boolean(context.nodeInfo || enclosing),
+    hasSemantic:
+      context.hover !== null || definitions.length > 0 || (context.codeActions?.length ?? 0) > 0,
+    hasStructural: context.nodeInfo !== null || enclosing !== undefined,
     hasDiagnostics: diagnostics.length > 0,
   });
 
