@@ -143,22 +143,22 @@ describe("LspManager concurrency guard", () => {
     }
   });
 
-  it.each([
-    "start-failed",
-    "runtime-error",
-  ] as const)("returns null immediately for an already-%s server:root", async (reason) => {
-    const sessionCwd = makeTempRoot();
-    const manager = new LspManager(MINIMAL_CONFIG, sessionCwd);
-    const key = `typescript:${sessionCwd}`;
+  it.each(["start-failed", "runtime-error"] as const)(
+    "returns null immediately for an already-%s server:root",
+    async (reason) => {
+      const sessionCwd = makeTempRoot();
+      const manager = new LspManager(MINIMAL_CONFIG, sessionCwd);
+      const key = `typescript:${sessionCwd}`;
 
-    getUnavailable(manager).set(key, reason);
+      getUnavailable(manager).set(key, reason);
 
-    const result = await manager.startServerForRoot("typescript", sessionCwd);
-    expect(result).toBeNull();
-    expect(getPendingStarts(manager).has(key)).toBe(false);
+      const result = await manager.startServerForRoot("typescript", sessionCwd);
+      expect(result).toBeNull();
+      expect(getPendingStarts(manager).has(key)).toBe(false);
 
-    rmSync(sessionCwd, { recursive: true, force: true });
-  });
+      rmSync(sessionCwd, { recursive: true, force: true });
+    },
+  );
 
   it("does not add to pendingStarts if client exists or the root is sticky-unavailable", async () => {
     const sessionCwd = makeTempRoot();
