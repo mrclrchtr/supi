@@ -16,6 +16,8 @@ export async function runFormQuestionnaire(
     return controller.abort();
   }
 
+  const editorFactory = opts.ui.getEditorComponent?.();
+
   return opts.ui.custom?.<AskUserOutcome | AskUserInteractionResult>(
     (tui, theme, kb, done) =>
       new AskUserForm({
@@ -26,6 +28,7 @@ export async function runFormQuestionnaire(
         signal: opts.signal,
         keybindings: kb,
         onToggleToolsExpanded: opts.onToggleToolsExpanded,
+        editorFactory,
       }),
   );
 }

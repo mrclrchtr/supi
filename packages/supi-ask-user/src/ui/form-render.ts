@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { type Editor, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
+import { type EditorComponent, truncateToWidth, wrapTextWithAnsi } from "@earendil-works/pi-tui";
 import type { AskUserController } from "../session/controller.ts";
 import type { NormalizedChoiceQuestion } from "../types.ts";
 import {
@@ -19,7 +19,7 @@ export interface RenderFormFrameArgs {
   controller: AskUserController;
   mode: FormMode;
   focus: FocusTarget;
-  editor: Editor;
+  editor: EditorComponent;
   choiceFocusIndex: number;
   reviewFocusIndex: number;
   detailsText?: string;

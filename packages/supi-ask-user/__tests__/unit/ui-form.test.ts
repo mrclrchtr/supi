@@ -2,8 +2,39 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { NormalizedQuestionnaire } from "../../src/types.ts";
 import { runFormQuestionnaire } from "../../src/ui/form.ts";
-import type { AskUserUiContext } from "../../src/ui/types.ts";
+import type { AskUserUiContext, EditorFactory } from "../../src/ui/types.ts";
 import { makeFormCtx } from "../helpers/index.ts";
+
+class FakeEditor {
+  text = "";
+  onChange?: (text: string) => void;
+  onSubmit?: (text: string) => void;
+  handledInputs: string[] = [];
+
+  render(_width: number): string[] {
+    return [`FAKE_EDITOR:${this.text}`];
+  }
+
+  invalidate(): void {}
+
+  getText(): string {
+    return this.text;
+  }
+
+  setText(value: string): void {
+    this.text = value;
+  }
+
+  handleInput(data: string): void {
+    this.handledInputs.push(data);
+    if (data === "\r") {
+      this.onSubmit?.(this.text);
+      return;
+    }
+    this.text += data;
+    this.onChange?.(this.text);
+  }
+}
 
 const questionnaire: NormalizedQuestionnaire = {
   title: "Formatter",
@@ -1072,6 +1103,82 @@ describe("runFormQuestionnaire", () => {
       });
 
       expect(outcome).toMatchObject({ kind: "abort" });
+    });
+  });
+
+  describe("registered custom editor", () => {
+    it("routes text-question keystrokes to a registered custom editor", async () => {
+      const fakeEditor = new FakeEditor();
+      let factoryCalls = 0;
+      const editorFactory: EditorFactory = (tui, theme, keybindings) => {
+        factoryCalls += 1;
+        expect(tui).toBeDefined();
+        expect(theme).toBeDefined();
+        expect(keybindings).toBeDefined();
+        return fakeEditor as unknown as ReturnType<EditorFactory>;
+      };
+
+      const { captured, ctx, outcomePromise } = makeFormCtx();
+      const uiWithEditor = {
+        ...ctx.ui,
+        getEditorComponent: () => editorFactory,
+      } as unknown as AskUserUiContext;
+
+      void runFormQuestionnaire(
+        {
+          questions: [
+            {
+              type: "text",
+              id: "reason",
+              header: "Reason",
+              prompt: "Type the reason.",
+            },
+          ],
+        },
+        {
+          ui: uiWithEditor,
+        },
+      );
+
+      await Promise.resolve();
+      if (!captured.value) throw new Error("form component was not created");
+      expect(factoryCalls).toBe(1);
+
+      const rendered = captured.value.render(100).join("\n");
+      expect(rendered).toContain("FAKE_EDITOR:");
+
+      for (const char of "vim answer") captured.value.handleInput?.(char);
+      expect(fakeEditor.handledInputs).toContain("v");
+      captured.value.handleInput?.(enterKey());
+      captured.value.handleInput?.(enterKey());
+
+      const outcome2 = await outcomePromise;
+      if (!("outcome" in outcome2)) throw new Error("Expected submitted outcome");
+      expect(outcome2.responses[0]?.answer).toMatchObject({
+        kind: "text",
+        answered: true,
+        value: "vim answer",
+      });
+    });
+
+    it("falls back to the default editor when no custom editor is registered", async () => {
+      const { captured, ctx, outcomePromise } = makeFormCtx();
+
+      void runFormQuestionnaire(textQuestionnaire, {
+        ui: ctx.ui as unknown as AskUserUiContext,
+      });
+
+      await Promise.resolve();
+      if (!captured.value) throw new Error("form component was not created");
+
+      const rendered = captured.value.render(100).join("\n");
+      expect(rendered).not.toContain("FAKE_EDITOR:");
+
+      captured.value.handleInput?.(enterKey());
+      captured.value.handleInput?.(enterKey());
+      const outcome = await outcomePromise;
+      if (!("outcome" in outcome)) throw new Error("Expected outcome");
+      expect(outcome.responses[0]?.answer).toMatchObject({ kind: "text", answered: true });
     });
   });
 });
