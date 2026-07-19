@@ -172,7 +172,7 @@ function renderCodeActionsSection(
   evidence: EvidenceListMetadata | undefined,
 ): void {
   const codeActions = data.codeActions;
-  if (!codeActions || data.level !== "detailed" || !data.lspAvailable) return;
+  if (!codeActions || data.level !== "detailed" || !data.semanticAvailable) return;
   const disclosure = evidence ? renderEvidenceListMetadataDisclosure(evidence) : null;
   if (codeActions.items.length === 0 && !disclosure) return;
 
@@ -302,7 +302,7 @@ function renderDirtySection(
 }
 
 function displayLspStatus(data: HealthData): string {
-  return !data.lspAvailable && data.lspStatus === "ready" ? "unavailable" : data.lspStatus;
+  return data.lspStatus;
 }
 
 function sectionStatus(

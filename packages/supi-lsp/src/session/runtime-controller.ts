@@ -196,6 +196,16 @@ export class LspRuntimeController {
     clearWorkspaceLspRuntime(this.#cwd);
   }
 
+  /** Publish an explicit disabled state when no language-server routes remain enabled. */
+  private setDisabled(generation: number): LspStartResult {
+    if (generation !== this.#readinessGeneration) return supersededStartResult();
+    const message = "All language servers are disabled by configuration.";
+    if (this.#capabilityRuntime) unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
+    this.#state = { kind: "disabled", message };
+    setWorkspaceLspRuntimeState(this.#cwd, { kind: "disabled" });
+    return { kind: "disabled", message };
+  }
+
   /** Set controller state to unavailable with the given error. */
   private setUnavailable(error: unknown, generation: number): LspStartResult {
     if (generation !== this.#readinessGeneration) return supersededStartResult();
@@ -216,6 +226,7 @@ export class LspRuntimeController {
   ): Promise<LspStartResult> {
     if (generation !== this.#readinessGeneration) return supersededStartResult();
     clearWorkspaceLspRuntime(this.#cwd);
+    if (Object.keys(config.servers).length === 0) return this.setDisabled(generation);
     this.#state = { kind: "pending" };
 
     const manager = new LspManager(config, this.#cwd);
@@ -262,11 +273,8 @@ export class LspRuntimeController {
   ): Promise<void> {
     try {
       const readiness = await workspaceRuntime.waitUntilReadyForWorkspace();
-      if (readiness.kind !== "ready") throw new Error(readiness.kind);
+      if (readiness.kind !== "ready") return;
     } catch {
-      if (this.isCurrentRuntime(workspaceRuntime, readinessGeneration)) {
-        this.retractPendingCapabilities();
-      }
       return;
     }
 
@@ -288,21 +296,6 @@ export class LspRuntimeController {
       this.#state.kind === "ready" &&
       this.#state.workspaceRuntime === workspaceRuntime
     );
-  }
-
-  /**
-   * Retract the pending semantic registration when warm-up fails.
-   * Leaves the workspace in unavailable state so callers see a definitive
-   * failure rather than an orphaned pending capability.
-   */
-  private retractPendingCapabilities(): void {
-    if (this.#capabilityRuntime) {
-      unregisterLspCapabilities(this.#capabilityRuntime, this.#cwd);
-    }
-    setWorkspaceLspRuntimeState(this.#cwd, {
-      kind: "unavailable",
-      reason: "LSP warm-up failed. Check code_health for server status.",
-    });
   }
 
   /**

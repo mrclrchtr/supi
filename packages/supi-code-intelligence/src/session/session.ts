@@ -236,7 +236,6 @@ export class WorkspaceCodeIntelligenceSession {
       {
         fileLevelAllowed: true,
         nameAnchorRequired: false,
-        waitForSemantic: "symbol" in request.target || "anchor" in request.target,
         maxResults: request.maxResults,
       },
       this.targetWorkflowDeps(),

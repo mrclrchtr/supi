@@ -49,6 +49,8 @@ function makeTui() {
 function makeData(overrides: Partial<CiStatusData> = {}): CiStatusData {
   return {
     servers: [],
+    serverInventoryAvailable: true,
+    semanticAvailable: true,
     diagnostics: [],
     capabilities: baseCapabilities,
     activeTools: [],
@@ -90,6 +92,8 @@ describe("CiStatusDialog", () => {
       const dialog = createCiStatusDialog(
         makeData({
           servers: [],
+          serverInventoryAvailable: false,
+          semanticAvailable: false,
           diagnostics: [],
           capabilities: {
             semantic: { kind: "unavailable", providerAvailable: false },

@@ -6,10 +6,19 @@
  */
 
 import { resolve } from "node:path";
-import type { SourceRange } from "@mrclrchtr/supi-code-runtime/api";
+import type {
+  SemanticProvider,
+  SourceRange,
+  StructuralProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
 import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
-import type { CodeProvider } from "../../analysis/provider.ts";
 import { diagnosticMessageString } from "../../substrate/lsp/utils.ts";
+
+export type ContextGatherProvider = Pick<
+  StructuralProvider,
+  "nodeAt" | "outline" | "imports" | "exports"
+> &
+  Partial<Pick<SemanticProvider, "hover" | "definition" | "codeActionTitles">>;
 
 export interface TreeSitterContext {
   nodeInfo: {
@@ -38,7 +47,7 @@ export interface TreeSitterContext {
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: best-effort substrate gathering with independent try/catch blocks kept together for readability
 export async function gatherTreeSitterContext(
-  provider: CodeProvider | null,
+  provider: ContextGatherProvider | null,
   relPath: string,
   line: number,
   character: number,

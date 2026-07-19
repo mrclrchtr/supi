@@ -44,23 +44,21 @@ export function renderGraphResult(assembly: GraphResultAssembly): string {
 
     switch (section.rel) {
       case "references": {
-        const rendered = renderReferencesResult(
-          assembly.displayName,
-          [...section.data.references],
-          section.data.externalCount,
-          section.data.confidence,
-          assembly.cwd,
-          assembly.maxResults,
-        );
+        const rendered = renderReferencesResult({
+          symbolName: assembly.displayName,
+          references: section.evidence,
+          externalCount: section.data.externalCount,
+          confidence: section.data.confidence,
+          cwd: assembly.cwd,
+        });
         lines.push(rendered.content, "");
         break;
       }
       case "callees": {
         const rendered = renderCallsResult(
           section.data.enclosingScope,
-          [...section.data.calls],
+          section.evidence,
           assembly.resolvedDisplayFile,
-          assembly.maxResults,
           section.data.depth,
         );
         lines.push(rendered.content, "");
@@ -68,10 +66,9 @@ export function renderGraphResult(assembly: GraphResultAssembly): string {
       }
       case "implements": {
         const rendered = renderImplementationsResult(
-          [...section.data.implementations],
+          section.evidence,
           section.data.externalCount,
           assembly.cwd,
-          assembly.maxResults,
           assembly.displayName,
         );
         lines.push(rendered.content, "");
@@ -87,12 +84,5 @@ export function renderGraphResult(assembly: GraphResultAssembly): string {
 function sectionCount(
   section: Extract<GraphResultAssembly["sections"][number], { kind: "ok" }>,
 ): number {
-  switch (section.rel) {
-    case "references":
-      return section.data.references.length;
-    case "callees":
-      return section.data.calls.length;
-    case "implements":
-      return section.data.implementations.length;
-  }
+  return section.evidence.metadata.totalCount ?? section.evidence.metadata.shownCount;
 }

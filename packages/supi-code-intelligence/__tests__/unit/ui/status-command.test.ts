@@ -22,6 +22,18 @@ function registerMinimalSemantic(cwd: string) {
   });
 }
 
+function readyProjectServer() {
+  return {
+    name: "typescript",
+    root: "/project",
+    status: "running",
+    ready: true,
+    fileTypes: ["ts", "tsx"],
+    supportedActions: [],
+    openFiles: [],
+  };
+}
+
 describe("/supi-ci-status command", () => {
   afterEach(() => {
     getDefaultWorkspaceRuntime().clearAll();
@@ -91,16 +103,7 @@ describe("/supi-ci-status command", () => {
     Object.assign(ctx.ui, { setFooter: vi.fn() });
     registerMinimalSemantic("/project");
     const mockService = {
-      getProjectServers: vi.fn(() => [
-        {
-          name: "typescript",
-          root: "/project",
-          status: "running",
-          fileTypes: ["ts", "tsx"],
-          supportedActions: [],
-          openFiles: [],
-        },
-      ]),
+      getProjectServers: vi.fn(() => [readyProjectServer()]),
       getOutstandingDiagnosticSummary: vi.fn(() => []),
       getOutstandingDiagnostics: vi.fn(async () => []),
     } as unknown as WorkspaceLspRuntime;
@@ -135,7 +138,7 @@ describe("/supi-ci-status command", () => {
     Object.assign(ctx.ui, { setFooter: vi.fn() });
     registerMinimalSemantic("/project");
     const mockService = {
-      getProjectServers: vi.fn(() => []),
+      getProjectServers: vi.fn(() => [readyProjectServer()]),
       getOutstandingDiagnosticSummary: vi.fn(() => [
         { file: "src/index.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },
       ]),
@@ -224,7 +227,7 @@ describe("/supi-ci-status command", () => {
     Object.assign(ctx.ui, { setFooter: vi.fn() });
     registerMinimalSemantic("/project");
     const mockService = {
-      getProjectServers: vi.fn(() => []),
+      getProjectServers: vi.fn(() => [readyProjectServer()]),
       getOutstandingDiagnosticSummary: vi.fn(() => [
         { file: "src/warn.ts", total: 1, errors: 0, warnings: 1, information: 0, hints: 0 },
         { file: "src/err.ts", total: 2, errors: 2, warnings: 0, information: 0, hints: 0 },

@@ -64,10 +64,15 @@ export async function runRefactorPlanWorkflow(
     {
       fileLevelAllowed: false,
       nameAnchorRequired: parsed.operation === "rename_symbol",
-      waitForSemantic: true,
     },
     deps,
   );
+  if (target.kind === "target-group") {
+    return {
+      kind: "invalid-input",
+      message: "Refactor planning requires one member handle from a Target group.",
+    };
+  }
   if (target.kind === "disambiguation") {
     return {
       kind: "invalid-input",

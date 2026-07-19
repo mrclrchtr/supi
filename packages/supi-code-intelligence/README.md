@@ -53,7 +53,7 @@ Use `/supi-settings` to disable unneeded language servers or configure instructi
 
 The extension registers exactly eight `code_*` tools:
 
-- `code_resolve` — resolve a semantic symbol, anchored position, or file into stable session handles
+- `code_resolve` — resolve an anchored/symbol target or discover a file’s declarations as stable session handles
 - `code_inspect` — inspect exact point facts
 - `code_orientation` — orient around a workspace, module, directory, file, or resolved symbol
 - `code_graph` — collect references, structural callees, and implementations
@@ -79,7 +79,9 @@ Target-taking tools use nested, exact-one selectors. Depending on the tool, the 
 
 No flat `targetId`, `file`, `line`, `character`, or `symbol` target fields are accepted. There is no precedence between contradictory inputs.
 
-Coordinates are 1-based; `character` is a UTF-16 column.
+Coordinates are 1-based; `character` is a UTF-16 column. Establishing or refining a target requires ready semantic capability. Tree-sitter may supplement LSP evidence after readiness, but cannot create targets in a structural-only workspace.
+
+A file selector enumerates all provider-reported declarations, including nested declarations, then returns a bounded Target group with exact total/omitted metadata. Only visible members are materialized as handles. Semantic and structural declarations are matched through canonical declaration identity; semantic facts win duplicates while each member reports semantic, structural, or combined provenance. Declaration line/occurrence keeps overload handles distinct without tying identity to the preferred display anchor. The group itself is not a handle; choose one member handle for precise graph or refactor work. A file with no declarations returns a successful empty group.
 
 ### Handle lifecycle
 
@@ -90,9 +92,18 @@ Target and plan handles are:
 - stale after a touched file changes
 - not persisted across sessions
 
-A stale handle fails explicitly. Re-run `code_resolve` or `code_refactor_plan` to obtain a fresh handle.
+A stale handle fails explicitly. Re-run `code_resolve` or `code_refactor_plan` to obtain a fresh handle. A fresh existing handle remains usable for structural consumers if LSP later becomes unavailable; mixed tools suppress unavailable semantic/diagnostic sections, and semantic consumers still require a concrete live client.
 
 ## Common workflows
+
+### Discover targets in a known file
+
+```text
+code_resolve({ target: { file: "src/billing.ts" }, maxResults: 10 })
+  → choose one member targetId from the returned Target group
+```
+
+Use `code_orientation({ focus: { path: "src/billing.ts" } })` instead when you want file context rather than reusable symbol handles.
 
 ### Resolve and inspect relationships
 
@@ -220,7 +231,7 @@ Detected language servers start concurrently. In polyglot workspaces, disable un
 }
 ```
 
-The old global `lsp.enabled` and `lsp.active` keys are deprecated and ignored. Missing binaries, disabled languages, and structural startup failures appear in `/supi-ci-status` and `code_health`.
+The old global `lsp.enabled` and `lsp.active` keys are deprecated and ignored. Missing binaries, disabled languages, and structural startup failures appear in `/supi-ci-status` and `code_health`. If every language-server definition is disabled, the LSP runtime publishes an explicit disabled state and semantic capability remains unavailable. A ready runtime owner may have only lazy routes: server inventory remains status evidence, while diagnostics require an active ready project server or successful file-scoped readiness. `refresh: true` attempts recovery before that availability decision is finalized.
 
 ## Architecture
 

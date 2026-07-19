@@ -14,7 +14,7 @@ import type {
   StructuralProvider,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
+import { getWorkspaceLspRuntime, type WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import {
   type CodeProvider,
   type CodeProviderState,
@@ -123,10 +123,7 @@ export class WorkspaceCapabilityAdapter implements CapabilityAdapter {
   }
 
   getLspRuntimeState(cwd: string): WorkspaceLspRuntimeState {
-    const state = this.getProviderState(cwd);
-    return state.kind === "ready"
-      ? state.lspRuntime
-      : { kind: "unavailable" as const, reason: "No provider" };
+    return getWorkspaceLspRuntime(cwd);
   }
 }
 

@@ -73,7 +73,7 @@ const ResolveTargetParam = exactOneSelector(
     symbol: SymbolTargetParam,
     file: FileParam,
   },
-  "Exactly one target source: provider-backed anchor, semantic symbol query, or file.",
+  "Exactly one target source: provider-backed anchor, semantic symbol query, or file declaration group.",
 );
 
 const GraphTargetParam = exactOneSelector(
@@ -147,7 +147,7 @@ const RefactorOperationParam = exactOneSelector(
   "Exactly one precise refactor operation.",
 );
 
-/** Resolve a semantic/file target and return session-scoped handles. */
+/** Resolve one target or enumerate a file declaration group as session-scoped handles. */
 export const CodeResolveParameters = Type.Object(
   {
     target: ResolveTargetParam,

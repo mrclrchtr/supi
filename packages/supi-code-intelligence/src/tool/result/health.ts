@@ -41,9 +41,7 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
   const sections = projections.map((projection) => projection.section);
   const sectionDetails = projections.map((projection) => projection.details);
   const evidenceLists = collectHealthEvidenceLists(data);
-  const capabilityProvenance = collectCapabilityProvenance(data);
   const provenance = uniqueProvenance([
-    ...capabilityProvenance,
     ...sections.flatMap((section) => section.provenance),
     { source: "runtime", capability: "workspace-health" },
   ]);
@@ -67,7 +65,8 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
       provenance: [...assembled.provenance],
       candidateCount: assembled.totals.candidateCount,
       omittedCount: assembled.totals.omittedCount,
-      lspAvailable: data.lspAvailable,
+      semanticAvailable: data.semanticAvailable,
+      serverInventoryAvailable: data.serverInventoryAvailable,
       lspStatus: data.lspStatus,
       recovered: data.recovered,
       structuralAvailable: structuralCapabilityReady(data),
@@ -137,17 +136,19 @@ function collectSectionFacts(key: HealthSection, data: HealthData): HealthSectio
   switch (key) {
     case "diagnostics":
       return {
-        available: data.lspAvailable,
+        available: data.semanticAvailable,
         items: data.diagnostics,
         confidence: "semantic",
-        provenance: data.lspAvailable ? [{ source: "semantic", capability: "LSP" }] : [],
+        provenance: data.semanticAvailable ? [{ source: "semantic", capability: "LSP" }] : [],
       };
     case "servers":
       return {
-        available: data.lspAvailable,
+        available: data.serverInventoryAvailable,
         items: data.servers,
-        confidence: "semantic",
-        provenance: data.lspAvailable ? [{ source: "semantic", capability: "LSP" }] : [],
+        confidence: "heuristic",
+        provenance: data.serverInventoryAvailable
+          ? [{ source: "runtime", capability: "language-server-status" }]
+          : [],
       };
     case "dirty":
       return {
@@ -193,37 +194,17 @@ function collectSectionFacts(key: HealthSection, data: HealthData): HealthSectio
 
 /** Accept only the explicit ready state; arbitrary status text is not provenance. */
 function structuralCapabilityReady(data: HealthData): boolean {
-  return data.structuralAvailable === true || data.structuralStatus === "ready";
-}
-
-function collectCapabilityProvenance(data: HealthData): ResultProvenance[] {
-  const semanticRequested = data.includedSections.some(
-    (section) => section === "diagnostics" || section === "servers",
-  );
-  return [
-    ...(semanticRequested && data.lspAvailable
-      ? [{ source: "semantic" as const, capability: "LSP" }]
-      : []),
-    ...(semanticRequested && structuralCapabilityReady(data)
-      ? [{ source: "structural" as const, capability: "tree-sitter" }]
-      : []),
-  ];
+  return data.structuralAvailable === true;
 }
 
 function healthConfidence(
-  data: HealthData,
+  _data: HealthData,
   sections: readonly HealthSectionDetails[],
 ): ConfidenceMode {
   if (
     sections.some((section) => section.status === "complete" && section.confidence === "semantic")
   ) {
     return "semantic";
-  }
-  if (
-    data.includedSections.some((section) => section === "diagnostics" || section === "servers") &&
-    structuralCapabilityReady(data)
-  ) {
-    return "structural";
   }
   if (
     sections.some((section) => section.status === "complete" && section.confidence === "heuristic")

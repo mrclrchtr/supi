@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { getLspDisabledMessage, loadLspSettings } from "../../src/config/lsp-settings.ts";
 import { LspRuntimeController } from "../../src/session/runtime-controller.ts";
+import { getWorkspaceLspRuntime } from "../../src/session/runtime-registry.ts";
 
 const TMP_DIRS: string[] = [];
 
@@ -170,6 +171,45 @@ describe("LspRuntimeController", () => {
     // Should not be disabled — per-language disable still allows other servers
     expect(result.kind).not.toBe("disabled");
     expect(["ready", "unavailable"]).toContain(result.kind);
+  });
+
+  it("publishes disabled when every language-server route is disabled", async () => {
+    const tmpDir = makeProjectDir();
+    const languages = [
+      "bash",
+      "c",
+      "go",
+      "html",
+      "java",
+      "kotlin",
+      "python",
+      "r",
+      "ruby",
+      "rust",
+      "sql",
+      "typescript",
+    ];
+    fs.mkdirSync(path.join(tmpDir, ".pi", "supi"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, ".pi", "supi", "config.json"),
+      JSON.stringify({
+        lsp: {
+          servers: Object.fromEntries(languages.map((language) => [language, { enabled: false }])),
+        },
+      }),
+    );
+
+    const controller = new LspRuntimeController(tmpDir);
+    const result = await controller.start();
+
+    expect(result).toEqual({
+      kind: "disabled",
+      message: "All language servers are disabled by configuration.",
+    });
+    expect(controller.kind).toBe("disabled");
+    expect(controller.workspaceRuntime).toBeNull();
+    expect(getWorkspaceLspRuntime(tmpDir)).toEqual({ kind: "disabled" });
+    await controller.shutdown();
   });
 
   it("exposes deprecated keys info for downstream consumers", async () => {

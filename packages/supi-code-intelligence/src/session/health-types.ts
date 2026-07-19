@@ -18,6 +18,7 @@ export interface HealthServerInfo {
   readonly root: string;
   readonly fileTypes: readonly string[];
   readonly status: string;
+  readonly ready: boolean;
 }
 
 export interface HealthDiagnosticEntry {
@@ -57,7 +58,10 @@ export interface HealthCodeActions {
 /** Presentation-neutral health facts. */
 export interface HealthData {
   readonly includedSections: readonly HealthSection[];
-  readonly lspAvailable: boolean;
+  /** Whether semantic diagnostics are currently evidence-backed for the requested scope. */
+  readonly semanticAvailable: boolean;
+  /** Whether server inventory was observed from a live owner or explicit disabled state. */
+  readonly serverInventoryAvailable: boolean;
   readonly lspStatus: string;
   readonly recovered: boolean;
   /** True only when the structural capability is explicitly ready. */

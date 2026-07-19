@@ -9,6 +9,11 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { CodeSymbol } from "@mrclrchtr/supi-code-runtime/api";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  clearWorkspaceLspRuntime,
+  setWorkspaceLspRuntimeState,
+  type WorkspaceLspRuntime,
+} from "@mrclrchtr/supi-lsp/api";
 import type { CodeProvider } from "../../src/analysis/provider.ts";
 
 /**
@@ -73,12 +78,19 @@ function kindForKeyword(keyword: string): string {
   }
 }
 
+const mockCwds = new Set<string>();
+
 /**
  * Register a mock CodeProvider's worth of capabilities for cwd.
  * Sets up both semantic and structural mock providers in the shared runtime.
  */
 export function registerMockProvider(cwd: string, overrides: Partial<CodeProvider> = {}): void {
   const runtime = getDefaultWorkspaceRuntime();
+  mockCwds.add(cwd);
+  setWorkspaceLspRuntimeState(cwd, {
+    kind: "ready",
+    runtime: createReadyTestLspRuntime(cwd),
+  });
 
   const noopSemantic = async () => null;
   const noopStructural = async (_file: string) =>
@@ -107,4 +119,24 @@ export function registerMockProvider(cwd: string, overrides: Partial<CodeProvide
 /** Clear all mock capabilities from the shared runtime. */
 export function clearMockRuntime(): void {
   getDefaultWorkspaceRuntime().clearAll();
+  for (const cwd of mockCwds) clearWorkspaceLspRuntime(cwd);
+  mockCwds.clear();
+}
+
+function createReadyTestLspRuntime(cwd: string): WorkspaceLspRuntime {
+  return {
+    waitUntilReadyForFile: async () => ({ kind: "ready" }),
+    waitUntilReadyForWorkspace: async () => ({ kind: "ready" }),
+    getProjectServers: () => [
+      {
+        name: "test-lsp",
+        root: cwd,
+        fileTypes: ["ts"],
+        status: "running",
+        supportedActions: [],
+        openFiles: [],
+        ready: true,
+      },
+    ],
+  } as unknown as WorkspaceLspRuntime;
 }

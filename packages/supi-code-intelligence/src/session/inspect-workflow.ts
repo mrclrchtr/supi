@@ -40,14 +40,22 @@ export async function runInspectWorkflow(
     phase: "providers",
     message: "Collecting point facts",
   });
-  await deps.capability.ensureSemanticReadiness(deps.cwd, {
+  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
     kind: "file",
     file: resolvedFile,
   });
   throwIfAborted(control);
 
-  const provider = deps.capability.getProvider(deps.cwd);
-  const lspState = deps.capability.getLspRuntimeState(deps.cwd);
+  const semanticReady = readiness.kind === "ready";
+  const provider = semanticReady
+    ? deps.capability.getProvider(deps.cwd)
+    : deps.capability.getStructuralProvider(deps.cwd);
+  const lspState = semanticReady
+    ? deps.capability.getLspRuntimeState(deps.cwd)
+    : {
+        kind: "unavailable" as const,
+        reason: readiness.kind === "timeout" ? "Semantic readiness timed out" : readiness.reason,
+      };
   const relPath = relative(deps.cwd, resolvedFile);
   const context = await gatherTreeSitterContext(provider, relPath, point.line, point.character);
   const diagnostics = await gatherNearbyDiagnostics(
@@ -136,7 +144,7 @@ function mapDefinitions(
 
 function collectUnavailableSections(options: {
   context: Awaited<ReturnType<typeof gatherTreeSitterContext>>;
-  provider: ReturnType<CapabilityAdapter["getProvider"]>;
+  provider: Parameters<typeof gatherTreeSitterContext>[0];
   definitions: InspectResultData["definitions"];
   diagnostics: InspectResultData["diagnostics"];
   lspReady: boolean;

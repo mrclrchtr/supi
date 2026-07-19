@@ -12,7 +12,17 @@ const mocks = vi.hoisted(() => ({
   unregister: vi.fn(),
 }));
 
-vi.mock("../../src/config/config.ts", () => ({ loadConfig: vi.fn().mockReturnValue({}) }));
+vi.mock("../../src/config/config.ts", () => ({
+  loadConfig: vi.fn().mockReturnValue({
+    servers: {
+      typescript: {
+        command: "typescript-language-server",
+        fileTypes: ["ts"],
+        rootMarkers: ["package.json"],
+      },
+    },
+  }),
+}));
 vi.mock("../../src/config/lsp-settings.ts", () => ({
   loadLspSettings: vi.fn().mockReturnValue({ enabled: true, severity: 1, active: [], exclude: [] }),
 }));
@@ -65,6 +75,34 @@ afterEach(() => {
 });
 
 describe("LspRuntimeController warm-up ownership", () => {
+  it("keeps a lazy runtime owner pending when no workspace client is ready", async () => {
+    const owner = {
+      runtime: {
+        getProjectServers: vi.fn().mockReturnValue([]),
+        waitUntilReadyForWorkspace: vi
+          .fn()
+          .mockResolvedValue({ kind: "unavailable", reason: "No active LSP clients" }),
+      },
+      shutdown: vi.fn().mockResolvedValue(undefined),
+    };
+    mocks.createOwner.mockReturnValueOnce(owner);
+
+    const controller = new LspRuntimeController("/project", new WorkspaceRuntime());
+    const result = await controller.start();
+    await flushAsyncWork();
+
+    expect(result.kind).toBe("ready");
+    expect(mocks.registerPending).toHaveBeenCalledOnce();
+    expect(mocks.markReady).not.toHaveBeenCalled();
+    expect(mocks.unregister).not.toHaveBeenCalled();
+    expect(mocks.setRuntimeState).not.toHaveBeenCalledWith(
+      "/project",
+      expect.objectContaining({ kind: "unavailable" }),
+    );
+
+    await controller.shutdown();
+  });
+
   it("does not retract a newer runtime when an older warm-up fails", async () => {
     const firstWarmup = deferred<{ kind: "ready" }>();
     const secondWarmup = deferred<{ kind: "ready" }>();

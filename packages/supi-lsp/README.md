@@ -61,7 +61,7 @@ if (state.kind === "ready") {
 }
 ```
 
-Runtime methods use raw 0-based LSP positions. `toLspPosition()` converts user-facing 1-based coordinates.
+Runtime methods use raw 0-based LSP positions. `toLspPosition()` converts user-facing 1-based coordinates. A ready runtime owner may contain only lazy routes: workspace semantic readiness requires at least one active ready client, while file readiness requires the routed client for that file to start successfully. Empty client sets and failed (`null`) routes are unavailable, not vacuously ready.
 
 ## Startup performance
 
@@ -78,7 +78,7 @@ Detected servers start concurrently. In a polyglot workspace, disable unneeded l
 }
 ```
 
-The old `lsp.enabled` and `lsp.active` settings are deprecated and ignored.
+The old `lsp.enabled` and `lsp.active` settings are deprecated and ignored. If every server definition is disabled, the controller publishes an explicit `disabled` runtime state instead of an empty `ready` runtime. When a ready owner has no active client yet, it stays published for lazy routing while semantic capability remains pending.
 
 ## Architecture
 

@@ -15,9 +15,15 @@ function makeTarget(
     name: null,
     kind: null,
     confidence: "semantic",
+    provenance: ["semantic"],
+    declarationOccurrence: 0,
     anchorKind: "name" as const,
     container: null,
     ...overrides,
+    declarationAnchor: overrides.declarationAnchor ?? {
+      line: overrides.position.line + 1,
+      character: overrides.position.character + 1,
+    },
   };
 }
 

@@ -20,6 +20,7 @@ import type {
 } from "../config/types.ts";
 import type { LspManager } from "../manager/manager.ts";
 import { resolveSessionPath } from "../utils.ts";
+import { raceReadinessValue } from "./readiness.ts";
 
 function isRange(value: Position | Range): value is Range {
   return "start" in value && "end" in value;
@@ -88,10 +89,12 @@ export interface WorkspaceLspRuntime {
   workspaceSymbol(query: string): Promise<SymbolInformation[] | WorkspaceSymbol[] | null>;
   rename(filePath: string, position: Position, newName: string): Promise<WorkspaceEdit | null>;
   codeActions(filePath: string, positionOrRange: Position | Range): Promise<CodeAction[] | null>;
+  /** Succeeds only when the concrete routed client exists and is query-ready. */
   waitUntilReadyForFile(
     filePath: string,
     options?: { timeoutMs?: number },
   ): Promise<SemanticReadinessResult>;
+  /** Succeeds only when at least one concrete workspace client is active and query-ready. */
   waitUntilReadyForWorkspace(options?: { timeoutMs?: number }): Promise<SemanticReadinessResult>;
   getProjectServers(): ProjectServerInfo[];
   isSupportedSourceFile(filePath: string): boolean;
@@ -218,7 +221,18 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
       };
     }
 
-    return raceReadiness(this.manager.waitUntilFileReady(resolvedPath), options.timeoutMs);
+    const readiness = await raceReadinessValue(
+      this.manager.waitUntilFileReady(resolvedPath),
+      options.timeoutMs,
+    );
+    if (readiness.kind !== "resolved") return readiness;
+    if (readiness.value === null) {
+      return {
+        kind: "unavailable",
+        reason: "The routed LSP client could not be started for this file",
+      };
+    }
+    return { kind: "ready" };
   }
 
   /**
@@ -228,7 +242,18 @@ class DefaultWorkspaceLspRuntime implements WorkspaceLspRuntime {
   async waitUntilReadyForWorkspace(
     options: { timeoutMs?: number } = {},
   ): Promise<SemanticReadinessResult> {
-    return raceReadiness(this.manager.waitUntilWorkspaceReady(), options.timeoutMs);
+    const readiness = await raceReadinessValue(
+      this.manager.waitUntilWorkspaceReady(),
+      options.timeoutMs,
+    );
+    if (readiness.kind !== "resolved") return readiness;
+    if (readiness.value === 0) {
+      return {
+        kind: "unavailable",
+        reason: "No active LSP clients are ready for this workspace",
+      };
+    }
+    return { kind: "ready" };
   }
 
   getProjectServers(): ProjectServerInfo[] {
@@ -327,40 +352,7 @@ export function createWorkspaceLspRuntimeOwner(manager: LspManager) {
 }
 
 const WAIT_INTERVAL_MS = 25;
-const DEFAULT_SEMANTIC_READY_TIMEOUT_MS = 15_000;
 const registry = createSessionStateRegistry<WorkspaceLspRuntimeState>("supi-lsp/session-registry");
-
-async function raceReadiness(
-  readiness: Promise<unknown>,
-  timeoutMs: number | undefined,
-): Promise<SemanticReadinessResult> {
-  const effectiveTimeoutMs = timeoutMs ?? DEFAULT_SEMANTIC_READY_TIMEOUT_MS;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  try {
-    await Promise.race([
-      readiness,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error("semantic-readiness-timeout")),
-          effectiveTimeoutMs,
-        );
-      }),
-    ]);
-    return { kind: "ready" };
-  } catch (error) {
-    if (timer) clearTimeout(timer);
-    if (error instanceof Error && error.message === "semantic-readiness-timeout") {
-      return { kind: "timeout" };
-    }
-    return {
-      kind: "unavailable",
-      reason: error instanceof Error ? error.message : String(error),
-    };
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
 
 /** Publish the LSP service state for a session cwd. */
 export function setWorkspaceLspRuntimeState(cwd: string, state: WorkspaceLspRuntimeState): void {

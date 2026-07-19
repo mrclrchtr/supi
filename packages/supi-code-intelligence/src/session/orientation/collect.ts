@@ -120,11 +120,11 @@ async function buildRequestedSection(options: {
 
   switch (section) {
     case "defs": {
-      const lines = await buildEnrichedDefsSection(target, deps, treeContext, limit);
+      const result = await buildEnrichedDefsSection(target, deps, treeContext, limit);
       return {
-        section: { key: section, title: SECTION_TITLES[section], lines },
-        hasStructuralEvidence: hasRenderableItems(lines),
-        hasSemanticEvidence: deps.lspRuntime.kind === "ready",
+        section: { key: section, title: SECTION_TITLES[section], lines: result.lines },
+        hasStructuralEvidence: hasRenderableItems(result.lines),
+        hasSemanticEvidence: result.hasSemanticEvidence,
       };
     }
     case "docs": {
@@ -152,10 +152,17 @@ async function buildEnrichedDefsSection(
   deps: OrientationDeps,
   treeContext: Awaited<ReturnType<typeof maybeGatherTreeContext>>,
   limit: number,
-): Promise<string[]> {
+): Promise<{ lines: string[]; hasSemanticEvidence: boolean }> {
   const lines = buildDefinitionLines(target, deps.cwd, treeContext);
+  const contextHasSemanticEvidence = Boolean(
+    treeContext?.hover ||
+      (treeContext?.definition?.length ?? 0) > 0 ||
+      (treeContext?.codeActions?.length ?? 0) > 0,
+  );
 
-  if (!target || deps.lspRuntime.kind !== "ready") return lines;
+  if (!target || deps.lspRuntime.kind !== "ready") {
+    return { lines, hasSemanticEvidence: contextHasSemanticEvidence };
+  }
 
   const lspDefs = await appendDefinitionTargets(target, deps, limit);
   if (lspDefs.length > 0) {
@@ -169,7 +176,10 @@ async function buildEnrichedDefsSection(
     lines.push(...actions.slice(0, limit));
   }
 
-  return lines;
+  return {
+    lines,
+    hasSemanticEvidence: contextHasSemanticEvidence || lspDefs.length > 0 || actions.length > 0,
+  };
 }
 
 async function appendDefinitionTargets(
@@ -245,7 +255,13 @@ async function buildDiagnosticsSection(
   try {
     const targetFile = path.resolve(deps.cwd, target.file);
     const diags = await deps.lspRuntime.runtime.fileDiagnostics(targetFile, 4);
-    if (!diags || diags.length === 0) {
+    if (diags === null) {
+      return {
+        lines: ["Diagnostics unavailable for this target."],
+        hasSemanticEvidence: false,
+      };
+    }
+    if (diags.length === 0) {
       return { lines: ["No diagnostics found near this target."], hasSemanticEvidence: true };
     }
 

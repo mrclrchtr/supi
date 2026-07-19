@@ -1,22 +1,23 @@
 /**
- * File-surface target resolution — discovers actionable targets within a file
- * using injected semantic (LSP document symbols) and structural (Tree-sitter exports)
- * substrates with explicit fallback policy.
+ * File target discovery — collects every evidence-backed declaration in one
+ * file after the Target workflow has established semantic readiness.
  *
- * Policy: LSP document symbols preferred (semantic). Falls back to Tree-sitter
- * exports (structural) when LSP is unavailable or returns no results.
+ * Semantic and structural facts are merged. Semantic facts win duplicate
+ * members; structural outline facts may supplement declarations omitted by
+ * the language server.
  */
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 import type {
+  CodeSymbol,
+  OutlineData,
   SemanticProvider as SemanticSubstrate,
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
-import { highestConfidence } from "../helpers.ts";
-import { getCodeProvider } from "../provider.ts";
 import { normalizePath } from "../search/ripgrep.ts";
+import { canonicalDeclarationKind } from "./identity.ts";
 import type { ResolvedTargetData, ResolvedTargetGroupData } from "./types.ts";
 
 const BINARY_EXTENSIONS = new Set([
@@ -46,18 +47,26 @@ const BINARY_EXTENSIONS = new Set([
   ".node",
 ]);
 
-function isBinaryFile(filePath: string): boolean {
-  return BINARY_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+interface DiscoveryResult {
+  readonly available: boolean;
+  readonly targets: ResolvedTargetData[];
 }
 
-/**
- * Resolve a file into a group of discoverable targets.
- *
- * @param file - the file path (absolute or cwd-relative)
- * @param cwd - session working directory
- * @param deps - injected substrates (both optional)
- * @returns typed group outcome or error
- */
+/** Validated file-discovery input with its normalized absolute path. */
+export type FileDiscoveryValidation =
+  | { kind: "valid"; file: string }
+  | { kind: "invalid-input"; message: string };
+
+/** Validate a file selector before any semantic startup or provider call. */
+export function validateFileTargetDiscovery(file: string, cwd: string): FileDiscoveryValidation {
+  const resolvedFile = normalizePath(file, cwd);
+  const validationError = validateDiscoveryFile(resolvedFile, file);
+  return validationError
+    ? { kind: "invalid-input", message: validationError }
+    : { kind: "valid", file: resolvedFile };
+}
+
+/** Discover a Target group for one file without rendering or registering handles. */
 export async function resolveFileTargetGroup(
   file: string,
   cwd: string,
@@ -66,149 +75,197 @@ export async function resolveFileTargetGroup(
     structural?: StructuralSubstrate;
   } = {},
 ): Promise<
-  { kind: "resolved"; group: ResolvedTargetGroupData } | { kind: "error"; message: string }
+  | { kind: "resolved"; group: ResolvedTargetGroupData }
+  | { kind: "invalid-input"; message: string }
+  | { kind: "unavailable"; message: string }
 > {
-  const resolvedFile = normalizePath(file, cwd);
+  const validation = validateFileTargetDiscovery(file, cwd);
+  if (validation.kind === "invalid-input") return validation;
+  const resolvedFile = validation.file;
 
-  if (!fs.existsSync(resolvedFile)) {
-    return { kind: "error", message: `File not found: \`${file}\`` };
-  }
-
-  if (isBinaryFile(resolvedFile)) {
+  const [semantic, structural] = await Promise.all([
+    discoverSemantic(resolvedFile, deps.semantic),
+    discoverStructural(resolvedFile, deps.structural),
+  ]);
+  if (!semantic.available && !structural.available) {
+    const displayFile = path.relative(cwd, resolvedFile) || file;
     return {
-      kind: "error",
-      message: `File type not supported for semantic analysis: \`${file}\`. Use \`code_find\` with \`mode: "text"\` for explicit text search.`,
+      kind: "unavailable",
+      message: `Declaration discovery is unavailable for \`${displayFile}\`.`,
     };
   }
 
-  const relPath = path.relative(cwd, resolvedFile);
-
-  // Try structure-based discovery first (faster, no LSP needed)
-  const structuralTargets = await resolveViaStructral(relPath, resolvedFile, cwd, deps.structural);
-
-  // Try semantic discovery (richer), preferring it over structural
-  const semanticTargets = await resolveViaSemantic(resolvedFile, deps.semantic, structuralTargets);
-
-  const targets = semanticTargets ?? structuralTargets;
-
-  if (!targets || targets.length === 0) {
-    return {
-      kind: "error",
-      message:
-        `**Error:** File-level semantic exploration is not available for \`${file}\`. ` +
-        "Provide `line` and `character`, or a `symbol` for discovery.",
-    };
-  }
-
+  const targets = mergeDiscoveries(structural.targets, semantic.targets);
   return {
     kind: "resolved",
     group: {
       file: resolvedFile,
-      displayName: relPath,
+      displayName: path.relative(cwd, resolvedFile) || resolvedFile,
       targets,
-      confidence: highestConfidence(targets.map((t) => t.confidence)),
+      confidence: semantic.available ? "semantic" : "structural",
     },
   };
 }
 
-// ── Resolution helpers ───────────────────────────────────────────────
-
-async function resolveViaSemantic(
-  resolvedFile: string,
-  semantic?: SemanticSubstrate,
-  structuralTargets: ResolvedTargetData[] | null = null,
-): Promise<ResolvedTargetData[] | null> {
-  if (!semantic) return structuralTargets;
-
+function validateDiscoveryFile(resolvedFile: string, requestedFile: string): string | null {
+  if (!fs.existsSync(resolvedFile)) return `File not found: \`${requestedFile}\``;
   try {
-    const symbols = await semantic.documentSymbols(resolvedFile);
-    if (!symbols || symbols.length === 0) return structuralTargets;
-
-    const topLevel = symbols
-      .filter((s) => !s.container)
-      .map((s) => {
-        const a = s.nameAnchor ?? s.declarationAnchor;
-        return {
-          file: resolvedFile,
-          position: { line: a.line - 1, character: a.character - 1 },
-          displayLine: a.line,
-          displayCharacter: a.character,
-          name: s.name,
-          kind: s.kind,
-          confidence: "semantic" as const,
-          anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
-          container: s.container ?? null,
-        };
-      });
-
-    if (topLevel.length === 0) return structuralTargets;
-
-    // Semantic symbols are available — prefer them over structural exports.
-    // Only fall back to structural targets that have no semantic counterpart
-    // (different position).
-    if (!structuralTargets || structuralTargets.length === 0) return dedupeTargets(topLevel);
-
-    // Build a position-based dedup: for each position, prefer the semantic entry.
-    const byPos = new Map<string, ResolvedTargetData>();
-    for (const t of structuralTargets) {
-      byPos.set(`${t.position.line}:${t.position.character}`, t);
-    }
-    for (const t of topLevel) {
-      byPos.set(`${t.position.line}:${t.position.character}`, t);
-    }
-    return [...byPos.values()];
+    if (!fs.statSync(resolvedFile).isFile()) return `Not a file: \`${requestedFile}\``;
   } catch {
-    return structuralTargets;
+    return `Cannot access file: \`${requestedFile}\``;
+  }
+  if (!BINARY_EXTENSIONS.has(path.extname(resolvedFile).toLowerCase())) return null;
+  return `File type not supported for code analysis: \`${requestedFile}\`. Use \`code_find\` with \`mode: "text"\` for explicit text search.`;
+}
+
+async function discoverSemantic(
+  file: string,
+  semantic: SemanticSubstrate | undefined,
+): Promise<DiscoveryResult> {
+  if (!semantic) return { available: false, targets: [] };
+  try {
+    const symbols = await semantic.documentSymbols(file);
+    if (symbols === null) return { available: false, targets: [] };
+    return {
+      available: true,
+      targets: symbols.map((symbol) => targetFromSymbol(file, symbol)),
+    };
+  } catch {
+    return { available: false, targets: [] };
   }
 }
 
-async function resolveViaStructral(
-  relPath: string,
-  resolvedFile: string,
-  cwd: string,
-  structural?: StructuralSubstrate,
-): Promise<ResolvedTargetData[] | null> {
-  // Resolve a substrate to use — prefer injected, fall back to auto-created
-  const substrate = structural ?? createFallbackSubstrate(cwd);
-  if (!substrate) return null;
+function targetFromSymbol(file: string, symbol: CodeSymbol): ResolvedTargetData {
+  const anchor = symbol.nameAnchor ?? symbol.declarationAnchor;
+  return {
+    file,
+    position: { line: anchor.line - 1, character: anchor.character - 1 },
+    displayLine: anchor.line,
+    displayCharacter: anchor.character,
+    declarationAnchor: { ...symbol.declarationAnchor },
+    declarationOccurrence: 0,
+    name: symbol.name,
+    kind: symbol.kind,
+    confidence: "semantic",
+    provenance: ["semantic"],
+    anchorKind: (symbol.nameAnchor ? "name" : "declaration") as AnchorKind,
+    container: symbol.container ?? null,
+  };
+}
 
+async function discoverStructural(
+  file: string,
+  structural: StructuralSubstrate | undefined,
+): Promise<DiscoveryResult> {
+  if (!structural) return { available: false, targets: [] };
   try {
-    const exportsResult = await substrate.exports(relPath);
-    if (exportsResult.kind !== "success" || exportsResult.data.length === 0) return null;
+    const result = await structural.outline(file);
+    if (result.kind !== "success") return { available: false, targets: [] };
+    return { available: true, targets: flattenOutline(file, result.data) };
+  } catch {
+    return { available: false, targets: [] };
+  }
+}
 
-    return dedupeTargets(
-      exportsResult.data.map((record) => ({
-        file: resolvedFile,
-        position: { line: record.startLine - 1, character: record.startCharacter - 1 },
-        displayLine: record.startLine,
-        displayCharacter: record.startCharacter,
-        name: record.name,
-        kind: record.kind,
-        confidence: "structural" as const,
-        // Structural exports use the node start (startLine/startCharacter) =
-        // declaration anchor; no name anchor is derivable from exports alone.
-        anchorKind: "declaration",
-        container: null,
-      })),
+function flattenOutline(
+  file: string,
+  items: readonly OutlineData[],
+  container: string | null = null,
+): ResolvedTargetData[] {
+  return items.flatMap((item) => {
+    const target: ResolvedTargetData = {
+      file,
+      position: { line: item.startLine - 1, character: item.startCharacter - 1 },
+      displayLine: item.startLine,
+      displayCharacter: item.startCharacter,
+      declarationAnchor: { line: item.startLine, character: item.startCharacter },
+      declarationOccurrence: 0,
+      name: item.name,
+      kind: item.kind,
+      confidence: "structural",
+      provenance: ["structural"],
+      anchorKind: "declaration",
+      container,
+    };
+    return [target, ...flattenOutline(file, item.children ?? [], item.name)];
+  });
+}
+
+/**
+ * Merge duplicate provider observations without collapsing repeated declarations.
+ * Semantic facts win a matched pair while retaining both provider sources.
+ */
+function mergeDiscoveries(
+  structural: readonly ResolvedTargetData[],
+  semantic: readonly ResolvedTargetData[],
+): ResolvedTargetData[] {
+  const unmatchedSemantic = new Set(semantic.map((_target, index) => index));
+  const mergedStructural = structural.flatMap((structuralTarget) => {
+    const semanticIndex = findSemanticMatch(structuralTarget, semantic, unmatchedSemantic);
+    if (semanticIndex === null) return [structuralTarget];
+    unmatchedSemantic.delete(semanticIndex);
+    return [
+      {
+        ...semantic[semanticIndex],
+        provenance: ["semantic", "structural"] as const,
+      },
+    ];
+  });
+  const semanticOnly = semantic.filter((_target, index) => unmatchedSemantic.has(index));
+  return assignDeclarationOccurrences(
+    [...mergedStructural, ...semanticOnly].sort(compareDeclarations),
+  );
+}
+
+function findSemanticMatch(
+  structural: ResolvedTargetData,
+  semantic: readonly ResolvedTargetData[],
+  unmatched: ReadonlySet<number>,
+): number | null {
+  const matches = semantic
+    .map((target, index) => ({ target, index }))
+    .filter(({ target, index }) => unmatched.has(index) && sameDeclaration(target, structural))
+    .sort(
+      (left, right) =>
+        Math.abs(left.target.declarationAnchor.character - structural.declarationAnchor.character) -
+          Math.abs(
+            right.target.declarationAnchor.character - structural.declarationAnchor.character,
+          ) || left.index - right.index,
     );
-  } catch {
-    return null;
-  }
+  return matches[0]?.index ?? null;
 }
 
-/** Create a fallback substrate from a working directory using the unified registry. */
-function createFallbackSubstrate(dir: string): StructuralSubstrate | null {
-  const state = getCodeProvider(dir);
-  return state.kind === "ready" ? state.provider : null;
+function sameDeclaration(left: ResolvedTargetData, right: ResolvedTargetData): boolean {
+  return (
+    left.name === right.name &&
+    left.container === right.container &&
+    left.declarationAnchor.line === right.declarationAnchor.line &&
+    canonicalDeclarationKind(left.kind) === canonicalDeclarationKind(right.kind)
+  );
 }
 
-function dedupeTargets(targets: ResolvedTargetData[]): ResolvedTargetData[] {
-  const deduped = new Map<string, ResolvedTargetData>();
-  for (const target of targets) {
-    const key = `${target.name ?? ""}:${target.displayLine}:${target.displayCharacter}`;
-    if (!deduped.has(key)) {
-      deduped.set(key, target);
-    }
-  }
-  return [...deduped.values()];
+function assignDeclarationOccurrences(
+  targets: readonly ResolvedTargetData[],
+): ResolvedTargetData[] {
+  const occurrences = new Map<string, number>();
+  return targets.map((target) => {
+    const key = [
+      target.declarationAnchor.line,
+      target.name ?? "",
+      canonicalDeclarationKind(target.kind),
+      target.container ?? "",
+    ].join("\0");
+    const occurrence = occurrences.get(key) ?? 0;
+    occurrences.set(key, occurrence + 1);
+    return { ...target, declarationOccurrence: occurrence };
+  });
+}
+
+function compareDeclarations(left: ResolvedTargetData, right: ResolvedTargetData): number {
+  return (
+    left.displayLine - right.displayLine ||
+    left.displayCharacter - right.displayCharacter ||
+    (left.name ?? "").localeCompare(right.name ?? "") ||
+    (left.kind ?? "").localeCompare(right.kind ?? "")
+  );
 }

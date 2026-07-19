@@ -33,6 +33,10 @@ export interface CiDialogTheme {
 
 export interface CiStatusData {
   servers: ProjectServerInfo[];
+  /** Whether the server list is complete status evidence. */
+  serverInventoryAvailable: boolean;
+  /** Whether diagnostics and semantic absence claims are currently supported. */
+  semanticAvailable: boolean;
   /** Sorted: errors desc, then warnings desc, then info desc, then hints desc. */
   diagnostics: OutstandingDiagnosticSummaryEntry[];
   capabilities: {
@@ -296,12 +300,17 @@ export class CiStatusDialog {
 
   private addEmptyServerRow(container: Container): void {
     const t = this.theme;
-    const sem = this.data.capabilities.semantic;
-    if (sem.kind !== "ready") {
-      container.addChild(new Text(t.fg("dim", "  no LSP session for this workspace"), 1, 0));
-    } else {
-      container.addChild(new Text(t.fg("dim", "  no configured language servers"), 1, 0));
+    if (!this.data.serverInventoryAvailable) {
+      container.addChild(new Text(t.fg("dim", "  server inventory unavailable"), 1, 0));
+      return;
     }
+    if (this.data.capabilities.semantic.kind === "disabled") {
+      container.addChild(new Text(t.fg("dim", "  all language servers disabled"), 1, 0));
+      return;
+    }
+    container.addChild(
+      new Text(t.fg("dim", "  no active project servers; routes may start lazily"), 1, 0),
+    );
   }
 
   private addServerRow(container: Container, server: ProjectServerInfo): void {
@@ -362,9 +371,8 @@ export class CiStatusDialog {
 
   private addEmptyProblemsRow(container: Container): void {
     const t = this.theme;
-    const sem = this.data.capabilities.semantic;
-    if (sem.kind !== "ready") {
-      container.addChild(new Text(t.fg("dim", "  (LSP not ready)"), 1, 0));
+    if (!this.data.semanticAvailable) {
+      container.addChild(new Text(t.fg("dim", "  (diagnostics unavailable)"), 1, 0));
     } else {
       container.addChild(new Text(t.fg("success", "  ✓ no issues"), 1, 0));
     }

@@ -39,6 +39,9 @@ export interface TargetStoreEntry {
   file: string;
   /** 0-based position for LSP calls. */
   position: { line: number; character: number };
+  /** Stable 0-based declaration occurrence used to distinguish overloads. */
+  declarationPosition?: { line: number; character: number } | null;
+  declarationOccurrence?: number;
   /** 1-based position for user display. */
   displayLine: number;
   displayCharacter: number;
@@ -63,10 +66,20 @@ export interface TargetStoreEntry {
 export interface TargetRegistrationInput {
   file: string;
   position: { line: number; character: number };
+  /**
+   * Stable 0-based declaration occurrence. Provider-backed registrations
+   * supply this so overloads remain distinct while name refinement retains
+   * the same target identity.
+   */
+  declarationPosition?: { line: number; character: number };
+  /** Zero-based occurrence among matching declarations on the same line. */
+  declarationOccurrence?: number;
   displayLine: number;
   displayCharacter: number;
   name: string | null;
   kind: string | null;
+  /** Provider-independent declaration kind used only for stable identity. */
+  identityKind?: string;
   confidence: ConfidenceMode;
   provenance: string;
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
@@ -79,6 +92,8 @@ export interface TargetRegistrationInput {
    * the anchor was snapped, and the provider-backed evidence source.
    */
   resolution?: import("../types/index.ts").AnchoredResolutionMetadata;
+  /** Reuse one verified fingerprint across a bounded registration batch. */
+  fileFingerprint?: string;
 }
 
 /** Output from registering a target: stable session-scoped handles and the full stored entry. */
@@ -125,19 +140,20 @@ export function computeFileFingerprint(
 /**
  * Build a deterministic target handle from target identity fields.
  *
- * Per ADR 0003, position is intentionally excluded from symbol identity:
- * nameAnchor is best-effort, so the same symbol can resolve to a name
- * anchor or fall back to the declaration anchor across calls; including
- * position would break the "re-resolve reuses the same IDs" invariant.
- * Identity is cwd, file path, name, kind, container, and fingerprint.
+ * Per ADR 0003, the preferred display/name-anchor position is excluded from
+ * symbol identity because it may refine. Identity uses cwd, file path, name,
+ * canonical provider-independent kind, container, stable declaration line and
+ * same-line occurrence, and fingerprint. The occurrence keeps overloads
+ * distinct without coupling identity to provider-specific declaration columns.
  */
 function computeTargetId(opts: {
   cwd: string;
   file: string;
-  position: { line: number; character: number };
   name: string | null;
-  kind: string | null;
+  identityKind: string;
   container: string | null;
+  declarationPosition: { line: number; character: number } | null;
+  declarationOccurrence: number;
   fingerprint: string;
 }): string {
   const hash = createHash("sha256");
@@ -147,9 +163,15 @@ function computeTargetId(opts: {
   hash.update("\0");
   hash.update(opts.name ?? "");
   hash.update("\0");
-  hash.update(opts.kind ?? "");
+  hash.update(opts.identityKind);
   hash.update("\0");
   hash.update(opts.container ?? "");
+  hash.update("\0");
+  hash.update(
+    opts.declarationPosition
+      ? `${opts.declarationPosition.line}:${opts.declarationOccurrence}`
+      : "",
+  );
   hash.update("\0");
   hash.update(opts.fingerprint);
   return `tg-${hash.digest("hex").slice(0, 28)}`;
@@ -181,10 +203,10 @@ function computeSpanId(
  * Register a resolved target in the given session-scoped store and return
  * stable session-scoped handles.
  *
- * If the same target (same file, position, name, kind) is registered
- * and the file fingerprint matches, the same IDs are returned.
- *
- * Returns an error when the backing file cannot be read for fingerprinting.
+ * If the same target identity (file, name, canonical kind, container,
+ * declaration occurrence, and fingerprint) is registered again, its stable
+ * target ID is reused and compatible facts are merged monotonically.
+ * Unreadable files are registered as unfingerprinted and rechecked on lookup.
  */
 export function registerWorkflowTarget(
   store: Map<string, TargetStoreEntry>,
@@ -196,32 +218,30 @@ export function registerWorkflowTarget(
 
   // Compute fingerprint; if unavailable, still allow registration but
   // mark as unfingerprinted so stale checks know the fingerprint is absent
-  const fingerprintResult = computeFileFingerprint(absFile);
+  const fingerprintResult = input.fileFingerprint ? null : computeFileFingerprint(absFile);
   const fingerprint =
-    fingerprintResult.kind === "ok" ? fingerprintResult.fingerprint : "unfingerprinted";
+    input.fileFingerprint ??
+    (fingerprintResult?.kind === "ok" ? fingerprintResult.fingerprint : "unfingerprinted");
 
   const targetId = computeTargetId({
     cwd: key,
     file: input.file,
-    position: input.position,
     name: input.name,
-    kind: input.kind,
+    identityKind: input.identityKind ?? input.kind ?? "",
     container: input.container,
+    declarationPosition: input.declarationPosition ?? null,
+    declarationOccurrence: input.declarationOccurrence ?? 0,
     fingerprint,
   });
   const spanId = computeSpanId(key, input.file, input.position, fingerprint);
 
-  // Check for existing entry with same targetId
-  const existing = store.get(targetId);
-  if (existing) {
-    return { targetId: existing.targetId, spanId: existing.spanId, entry: existing };
-  }
-
-  const entry: TargetStoreEntry = {
+  const incoming: TargetStoreEntry = {
     targetId,
     spanId,
     file: absFile,
     position: { line: input.position.line, character: input.position.character },
+    declarationPosition: input.declarationPosition ? { ...input.declarationPosition } : null,
+    declarationOccurrence: input.declarationOccurrence ?? 0,
     displayLine: input.displayLine,
     displayCharacter: input.displayCharacter,
     name: input.name,
@@ -234,9 +254,75 @@ export function registerWorkflowTarget(
     resolution: input.resolution,
   };
 
+  const existing = store.get(targetId);
+  const entry = existing ? mergeTargetRefinement(existing, incoming) : incoming;
   store.set(targetId, entry);
 
-  return { targetId, spanId, entry };
+  return { targetId, spanId: entry.spanId, entry };
+}
+
+/**
+ * Merge compatible facts behind one stable target ID without losing a more
+ * precise anchor. Name anchors are monotonic refinements; semantic confidence
+ * may improve independently from the positional anchor.
+ */
+function mergeTargetRefinement(
+  existing: TargetStoreEntry,
+  incoming: TargetStoreEntry,
+): TargetStoreEntry {
+  const anchorSource = selectAnchorSource(existing, incoming);
+  const evidenceSource = selectEvidenceSource(existing, incoming);
+
+  return {
+    ...existing,
+    spanId: anchorSource.spanId,
+    position: { ...anchorSource.position },
+    displayLine: anchorSource.displayLine,
+    displayCharacter: anchorSource.displayCharacter,
+    anchorKind: anchorSource.anchorKind,
+    resolution: anchorSource.resolution,
+    confidence: evidenceSource.confidence,
+    provenance: evidenceSource.provenance,
+  };
+}
+
+function selectAnchorSource(
+  existing: TargetStoreEntry,
+  incoming: TargetStoreEntry,
+): TargetStoreEntry {
+  if (existing.anchorKind === "declaration" && incoming.anchorKind === "name") return incoming;
+  if (existing.anchorKind === "name" && incoming.anchorKind === "declaration") return existing;
+  if (!existing.resolution && incoming.resolution) return incoming;
+  return existing;
+}
+
+function selectEvidenceSource(
+  existing: TargetStoreEntry,
+  incoming: TargetStoreEntry,
+): TargetStoreEntry {
+  const confidenceDelta = confidenceRank(incoming.confidence) - confidenceRank(existing.confidence);
+  if (confidenceDelta > 0) return incoming;
+  if (confidenceDelta < 0) return existing;
+  return provenanceBreadth(incoming.provenance) > provenanceBreadth(existing.provenance)
+    ? incoming
+    : existing;
+}
+
+function provenanceBreadth(provenance: string): number {
+  return new Set(provenance.split("+").filter(Boolean)).size;
+}
+
+function confidenceRank(confidence: ConfidenceMode): number {
+  switch (confidence) {
+    case "semantic":
+      return 3;
+    case "structural":
+      return 2;
+    case "heuristic":
+      return 1;
+    case "unavailable":
+      return 0;
+  }
 }
 
 /**

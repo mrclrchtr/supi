@@ -6,7 +6,8 @@ import { assembleHealthResult } from "../../../../src/tool/result/health.ts";
 function makeHealthData(overrides: Partial<HealthData> = {}): HealthData {
   return {
     includedSections: ["diagnostics", "servers"],
-    lspAvailable: true,
+    semanticAvailable: true,
+    serverInventoryAvailable: true,
     lspStatus: "ready",
     recovered: false,
     structuralAvailable: false,
@@ -28,7 +29,7 @@ describe("code_health result assembly", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
         includedSections: ["dirty", "coverage"],
-        lspAvailable: false,
+        semanticAvailable: false,
         gitContext: {
           branch: "main",
           dirtyFiles: ["src/index.ts"],
@@ -100,10 +101,60 @@ describe("code_health result assembly", () => {
     });
   });
 
+  it("separates complete disabled server status from unavailable semantic diagnostics", () => {
+    const data = makeHealthData({
+      includedSections: ["diagnostics", "servers"],
+      semanticAvailable: false,
+      lspStatus: "disabled by configuration",
+      diagnostics: [],
+      servers: [],
+    });
+    const assembly = assembleHealthResult(data);
+    const markdown = renderHealthResult(assembly, "/repo");
+
+    expect(assembly.details.sections).toEqual([
+      expect.objectContaining({ key: "diagnostics", status: "unavailable", available: false }),
+      expect.objectContaining({
+        key: "servers",
+        status: "complete",
+        available: true,
+        confidence: "heuristic",
+        provenance: [{ source: "runtime", capability: "language-server-status" }],
+      }),
+    ]);
+    expect(assembly.details.provenance).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ source: "semantic" })]),
+    );
+    expect(markdown).toContain("**LSP**: disabled by configuration");
+    expect(markdown).toContain("Diagnostics unavailable");
+    expect(markdown).toContain("No servers found.");
+    expect(markdown).not.toContain("Server status unavailable");
+  });
+
+  it("does not turn an unavailable runtime into a complete empty server inventory", () => {
+    const assembly = assembleHealthResult(
+      makeHealthData({
+        semanticAvailable: false,
+        serverInventoryAvailable: false,
+        lspStatus: "unavailable — no LSP session",
+        diagnostics: [],
+        servers: [],
+      }),
+    );
+    const markdown = renderHealthResult(assembly, "/repo");
+
+    expect(assembly.details.sections).toEqual([
+      expect.objectContaining({ key: "diagnostics", status: "unavailable" }),
+      expect.objectContaining({ key: "servers", status: "unavailable", available: false }),
+    ]);
+    expect(markdown).toContain("Server status unavailable");
+    expect(markdown).not.toContain("No servers found.");
+  });
+
   it("keeps a missing report as an unavailable locator check", () => {
     const data = makeHealthData({
       includedSections: ["diagnostics", "coverage", "unused"],
-      lspAvailable: false,
+      semanticAvailable: false,
       coverage: {
         reportPath: "/repo/missing-coverage.json",
         available: false,

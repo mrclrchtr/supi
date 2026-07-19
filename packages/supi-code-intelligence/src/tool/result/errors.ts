@@ -70,6 +70,7 @@ export function resolveErrorResult(
     details: {
       type: "resolve" as const,
       data: {
+        resultKind: "unavailable" as const,
         confidence: "unavailable" as const,
         targetCount: 0,
         omittedCount: 0,
@@ -112,7 +113,8 @@ export function healthErrorResult(content: string, reason?: string): CodeIntelRe
         provenance: [],
         candidateCount: 0,
         omittedCount: 0,
-        lspAvailable: false,
+        semanticAvailable: false,
+        serverInventoryAvailable: false,
         lspStatus: reason ?? content,
         recovered: false,
         structuralAvailable: false,

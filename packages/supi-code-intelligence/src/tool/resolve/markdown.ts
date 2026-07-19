@@ -4,6 +4,7 @@ import { relative } from "node:path";
 import { renderEvidenceListMetadataDisclosure } from "../../analysis/evidence.ts";
 import type { TargetStoreEntry } from "../../session/target-store.ts";
 import type { ResolveResultAssembly } from "../result/resolve.ts";
+import type { ResolveDetails } from "../result/types.ts";
 
 /** Render an assembled resolve result into markdown. */
 export function renderResolveResult(assembly: ResolveResultAssembly): string {
@@ -11,8 +12,10 @@ export function renderResolveResult(assembly: ResolveResultAssembly): string {
   switch (outcome.kind) {
     case "resolved":
       return renderResolved(outcome.entry, outcome.notes, cwd);
+    case "target-group":
+      return renderTargetGroup(assembly.details);
     case "disambiguation":
-      return renderDisambiguation(outcome.candidates, outcome.omittedCount);
+      return renderDisambiguation(assembly.details);
     case "invalid-input":
       return `**Error:** ${outcome.message}`;
     case "unavailable":
@@ -45,6 +48,28 @@ function renderResolved(
   return lines.join("\n");
 }
 
+function renderTargetGroup(details: ResolveDetails): string {
+  const lines = [`# Targets in \`${details.groupFile ?? "file"}\``, ""];
+  if (details.targets.length === 0) {
+    lines.push("No declarations were reported for this file.");
+  } else {
+    lines.push(
+      `**${details.targetCount} declaration${details.targetCount === 1 ? "" : "s"} discovered**`,
+      "",
+    );
+    for (const target of details.targets) {
+      const kind = target.kind ? ` (\`${target.kind}\`)` : "";
+      const container = target.container ? ` in \`${target.container}\`` : "";
+      lines.push(
+        `- **${target.name ?? "anonymous"}**${kind}${container} — \`${target.file}:${target.displayLine}:${target.displayCharacter}\``,
+        `  Target ID: \`${target.targetId}\` (${target.anchorKind} anchor, ${target.confidence}, provenance: ${target.provenance})`,
+      );
+    }
+  }
+  appendDisclosure(lines, details);
+  return lines.join("\n");
+}
+
 function renderAnchoredResolutionNote(target: Readonly<TargetStoreEntry>): string | null {
   const resolution = target.resolution;
   if (!resolution) return null;
@@ -59,19 +84,7 @@ function renderAnchoredResolutionNote(target: Readonly<TargetStoreEntry>): strin
   return `_Note: resolved from ${resolution.source} evidence; use code_inspect for point-level facts._`;
 }
 
-function renderDisambiguation(
-  candidates: ReadonlyArray<{
-    targetId: string;
-    name: string;
-    kind: string | null;
-    container: string | null;
-    file: string;
-    line: number;
-    character: number;
-    rank: number;
-  }>,
-  omittedCount: number,
-): string {
+function renderDisambiguation(details: ResolveDetails): string {
   const lines = [
     "# Multiple matches found",
     "",
@@ -79,7 +92,7 @@ function renderDisambiguation(
     "",
   ];
 
-  for (const candidate of candidates) {
+  for (const candidate of details.candidates ?? []) {
     const kind = candidate.kind ? ` (\`${candidate.kind}\`)` : "";
     const container = candidate.container ? ` in \`${candidate.container}\`` : "";
     lines.push(
@@ -88,13 +101,12 @@ function renderDisambiguation(
     );
   }
 
-  const disclosure = renderEvidenceListMetadataDisclosure({
-    key: "resolve.candidates",
-    totalCount: candidates.length + omittedCount,
-    shownCount: candidates.length,
-    omittedCount,
-    partialReason: null,
-  });
-  if (disclosure) lines.push("", disclosure);
+  appendDisclosure(lines, details);
   return lines.join("\n");
+}
+
+function appendDisclosure(lines: string[], details: ResolveDetails): void {
+  const evidence = details.evidenceLists?.[0];
+  const disclosure = evidence ? renderEvidenceListMetadataDisclosure(evidence) : null;
+  if (disclosure) lines.push("", disclosure);
 }

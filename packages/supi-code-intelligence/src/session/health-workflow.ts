@@ -5,7 +5,11 @@ import {
   evaluateCoverageWarnings,
   gatherCoverageEvalInput,
 } from "../analysis/coverage/coverage-warnings.ts";
-import { collectCodeActions, collectDiagnostics } from "../analysis/health/diagnostics.ts";
+import {
+  collectCodeActions,
+  collectDiagnostics,
+  isScopedFile,
+} from "../analysis/health/diagnostics.ts";
 import { describeStructuralState, maybeRecover } from "../analysis/health/recovery.ts";
 import {
   collectCoverageSection,
@@ -48,7 +52,6 @@ export async function runHealthWorkflow(
   const { request, scopeFilter, included, level } = prepared.value;
   const semanticRequested = healthNeedsSemantic(included);
   throwIfAborted(control);
-  if (shouldTrackDiagnosticRefresh(request, included)) deps.trackRefresh();
 
   reportProgress(control, {
     intent: "health",
@@ -59,17 +62,35 @@ export async function runHealthWorkflow(
   const lspState = deps.capability.getLspRuntimeState(deps.cwd);
   const capabilityStates = deps.capability.getCapabilityStates(deps.cwd);
   const runtime = lspState.kind === "ready" ? lspState.runtime : null;
+  const serverInventoryAvailable = lspState.kind === "ready" || lspState.kind === "disabled";
+  const refreshAttempted = await prepareDiagnosticRefresh({
+    runtime,
+    request,
+    included,
+    scopeFilter,
+  });
   const recovery = await recoverHealthState({
-    semanticRequested,
+    semanticRequested: refreshAttempted,
     runtime,
     request,
     lspState,
     semanticStateKind: capabilityStates.semantic.kind,
     control,
   });
+  if (refreshAttempted) deps.trackRefresh();
+  const semanticAvailable = await establishSemanticHealthAvailability(
+    semanticRequested,
+    runtime,
+    scopeFilter,
+  );
   throwIfAborted(control);
 
-  const diagnostics = await collectDiagnostics(runtime, included, scopeFilter, deps.cwd);
+  const diagnostics = await collectDiagnostics(
+    semanticAvailable ? runtime : null,
+    included,
+    scopeFilter,
+    deps.cwd,
+  );
   const servers = collectServers(runtime, included);
   const gitContext = collectGitContext(included, deps.cwd);
   const artifacts = collectHealthArtifacts({
@@ -82,17 +103,22 @@ export async function runHealthWorkflow(
   const codeActions = await collectOptionalCodeActions({
     level,
     included,
-    runtime,
+    runtime: semanticAvailable ? runtime : null,
     scopeFilter,
     cwd: deps.cwd,
   });
   const degradedCoverage = collectDegradedCoverage(semanticRequested, deps);
-  const diagnosticAgeSeconds = getDiagnosticAgeSeconds(request, included, deps.lastRefresh);
+  const diagnosticAgeSeconds = getDiagnosticAgeSeconds(
+    included,
+    deps.lastRefresh,
+    refreshAttempted,
+  );
 
   const data: HealthData = {
     includedSections: included,
-    lspAvailable: runtime !== null,
-    lspStatus: recovery.lspStatus,
+    semanticAvailable,
+    serverInventoryAvailable,
+    lspStatus: displaySemanticStatus(recovery.lspStatus, semanticAvailable),
     recovered: recovery.recovered,
     structuralAvailable: capabilityStates.structural.kind === "ready",
     structuralStatus: describeStructuralState(capabilityStates.structural),
@@ -115,11 +141,42 @@ function healthNeedsSemantic(included: readonly HealthSection[]): boolean {
   return included.includes("diagnostics") || included.includes("servers");
 }
 
-function shouldTrackDiagnosticRefresh(
-  request: HealthWorkflowInput,
-  included: readonly HealthSection[],
-): boolean {
-  return request.refresh === true && included.includes("diagnostics");
+async function establishSemanticHealthAvailability(
+  requested: boolean,
+  runtime: WorkspaceLspRuntime | null,
+  scopeFilter: string | null,
+): Promise<boolean> {
+  if (!requested || !runtime) return false;
+  if (isScopedFile(scopeFilter)) {
+    const readiness = await runtime.waitUntilReadyForFile(scopeFilter);
+    return readiness.kind === "ready";
+  }
+  return runtime
+    .getProjectServers()
+    .some((server) => server.status === "running" && server.ready === true);
+}
+
+function displaySemanticStatus(status: string, semanticAvailable: boolean): string {
+  if (semanticAvailable || !status.startsWith("ready")) return status;
+  return "ready — no active, ready project servers";
+}
+
+async function prepareDiagnosticRefresh(options: {
+  runtime: WorkspaceLspRuntime | null;
+  request: HealthWorkflowInput;
+  included: readonly HealthSection[];
+  scopeFilter: string | null;
+}): Promise<boolean> {
+  const requested = options.request.refresh === true && options.included.includes("diagnostics");
+  if (!requested || !options.runtime) return false;
+  if (isScopedFile(options.scopeFilter)) {
+    try {
+      await options.runtime.waitUntilReadyForFile(options.scopeFilter);
+    } catch {
+      // Recovery still gets a chance to restart a failed routed client.
+    }
+  }
+  return true;
 }
 
 async function recoverHealthState(options: {
@@ -204,12 +261,12 @@ function collectDegradedCoverage(
 }
 
 function getDiagnosticAgeSeconds(
-  request: HealthWorkflowInput,
   included: readonly HealthSection[],
   lastRefresh: number | undefined,
+  refreshAttempted: boolean,
 ): number | undefined {
   if (!included.includes("diagnostics")) return undefined;
-  const refreshTime = request.refresh ? Date.now() : lastRefresh;
+  const refreshTime = refreshAttempted ? Date.now() : lastRefresh;
   return refreshTime == null ? undefined : Math.round((Date.now() - refreshTime) / 1000);
 }
 

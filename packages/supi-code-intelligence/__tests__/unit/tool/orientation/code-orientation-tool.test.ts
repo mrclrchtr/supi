@@ -58,6 +58,16 @@ async function resolveTargetId(
   return targetId as string;
 }
 
+function markLspReady(runtimeOverrides: Record<string, unknown> = {}): void {
+  mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
+    kind: "ready",
+    runtime: {
+      waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
+      ...runtimeOverrides,
+    },
+  });
+}
+
 function registerBasicSymbolProvider(): void {
   registerMockProvider(tmpDir, {
     documentSymbols: async () => [
@@ -72,6 +82,7 @@ function registerBasicSymbolProvider(): void {
     ],
     hover: async () => ({ contents: "function widget(): number" }),
   });
+  markLspReady();
 }
 
 describe("code_orientation tool", () => {
@@ -173,6 +184,7 @@ describe("code_orientation tool", () => {
     mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
       runtime: {
+        waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
         fileDiagnostics: vi.fn(async () => [
           {
             severity: 1,
@@ -229,6 +241,7 @@ describe("code_orientation tool", () => {
     mockLspFns.getWorkspaceLspRuntime.mockReturnValue({
       kind: "ready",
       runtime: {
+        waitUntilReadyForFile: vi.fn(async () => ({ kind: "ready" })),
         fileDiagnostics: vi.fn(async () => [
           {
             severity: 1,
@@ -257,6 +270,82 @@ describe("code_orientation tool", () => {
     expect(result.content[0].text).not.toContain("Far diagnostic");
   });
 
+  it("keeps stored-handle Orientation structural when live file readiness is lost", async () => {
+    writeSource("src/widget.ts", "export function widget() { return 1; }\n");
+    const hover = vi.fn(async () => ({ contents: "function widget(): number" }));
+    const definition = vi.fn(async () => []);
+    registerMockProvider(tmpDir, {
+      documentSymbols: async () => [
+        {
+          name: "widget",
+          kind: "Function",
+          file: path.join(tmpDir, "src/widget.ts"),
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 17 },
+          container: null,
+        },
+      ],
+      hover,
+      definition,
+      nodeAt: async () => ({
+        kind: "success",
+        data: {
+          type: "identifier",
+          text: "widget",
+          startLine: 1,
+          startCharacter: 17,
+          endLine: 1,
+          endCharacter: 23,
+          ancestry: [],
+        },
+      }),
+      outline: async () => ({
+        kind: "success",
+        data: [
+          {
+            name: "widget",
+            kind: "function",
+            startLine: 1,
+            startCharacter: 8,
+            endLine: 1,
+            endCharacter: 40,
+          },
+        ],
+      }),
+    });
+    markLspReady();
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const targetId = await resolveTargetId(pi, "src/widget.ts", 1, 17);
+    const fileDiagnostics = vi.fn(async () => null);
+    markLspReady({
+      waitUntilReadyForFile: vi.fn(async () => ({
+        kind: "unavailable",
+        reason: "file client lost",
+      })),
+      fileDiagnostics,
+      codeActions: vi.fn(async () => []),
+    });
+
+    const result = (await getTool(pi, "code_orientation").execute(
+      "degraded-handle-orientation",
+      { focus: { target: { handle: targetId } } },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ text: string }>;
+      details?: { type: "context"; data: { confidence: string } };
+    };
+
+    expect(hover).not.toHaveBeenCalled();
+    expect(definition).not.toHaveBeenCalled();
+    expect(fileDiagnostics).not.toHaveBeenCalled();
+    expect(result.details?.data.confidence).toBe("structural");
+    expect(result.content[0].text).toContain("diagnostics require a live language server");
+  });
+
   it("orients by a handle returned from code_resolve", async () => {
     writeSource("src/widget.ts", "export function widget() { return 1; }\n");
     registerMockProvider(tmpDir, {
@@ -271,6 +360,7 @@ describe("code_orientation tool", () => {
         },
       ],
     });
+    markLspReady();
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);

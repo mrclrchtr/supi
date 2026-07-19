@@ -70,6 +70,9 @@ export type { DisambiguationCandidateData as DisambiguationCandidate } from "../
 
 /** Structured details metadata for code_resolve results. */
 export interface ResolveDetails {
+  resultKind: "resolved" | "target-group" | "disambiguation" | "invalid-input" | "unavailable";
+  /** Workspace-relative source file for a file-derived Target group. */
+  groupFile?: string;
   confidence: ConfidenceMode;
   targetCount: number;
   omittedCount: number;
@@ -84,6 +87,7 @@ export interface ResolveDetails {
     displayCharacter: number;
     name: string | null;
     kind: string | null;
+    container: string | null;
     anchorKind: AnchorKind;
     confidence: ConfidenceMode;
     provenance: string;
@@ -173,7 +177,8 @@ export interface HealthDetails {
   provenance: ResultProvenance[];
   candidateCount: number;
   omittedCount: number;
-  lspAvailable: boolean;
+  semanticAvailable: boolean;
+  serverInventoryAvailable: boolean;
   lspStatus: string;
   recovered: boolean;
   structuralAvailable: boolean;

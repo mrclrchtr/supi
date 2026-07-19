@@ -33,10 +33,26 @@ describe("ensureSemanticReadiness", () => {
     }
   });
 
-  it("returns ready immediately when semantic state is already ready", async () => {
+  it("returns ready when both semantic capability and the LSP runtime are ready", async () => {
     registerReadySemantic("/test");
+    const waitUntilReadyForWorkspace = vi.fn().mockResolvedValue({ kind: "ready" });
+    setWorkspaceLspRuntimeState("/test", {
+      kind: "ready",
+      runtime: { waitUntilReadyForWorkspace },
+    } as unknown as WorkspaceLspRuntimeState);
+
     const result = await ensureSemanticReadiness("/test", { kind: "workspace" }, 100);
+
     expect(result.kind).toBe("ready");
+    expect(waitUntilReadyForWorkspace).toHaveBeenCalledWith({ timeoutMs: 100 });
+  });
+
+  it("returns unavailable when a ready semantic provider has no live LSP runtime", async () => {
+    registerReadySemantic("/test");
+
+    const result = await ensureSemanticReadiness("/test", { kind: "workspace" }, 100);
+
+    expect(result.kind).toBe("unavailable");
   });
 
   it("returns timeout when session service stays pending beyond the deadline", async () => {

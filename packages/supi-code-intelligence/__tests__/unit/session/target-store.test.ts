@@ -303,8 +303,40 @@ describe("workflow target store", () => {
     }
   });
 
-  // ADR 0003 — targetId identity must not depend on the anchor position.
-  it("reuses the same targetId when the same symbol is re-resolved at a different anchor position (position is not part of identity)", () => {
+  it("keeps repeated declaration occurrences on distinct stable handles", () => {
+    const filePath = path.join(tmpDir, "overloads.ts");
+    writeFileSync(filePath, "function same(): void;\nfunction same(value: string): void;\n");
+    const store = createStore();
+    const base = {
+      file: filePath,
+      name: "same",
+      kind: "Function",
+      confidence: "semantic" as const,
+      provenance: "semantic",
+      anchorKind: "name" as const,
+      container: null,
+    };
+
+    const first = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      position: { line: 0, character: 9 },
+      displayLine: 1,
+      displayCharacter: 10,
+      declarationPosition: { line: 0, character: 0 },
+    });
+    const second = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      position: { line: 1, character: 9 },
+      displayLine: 2,
+      displayCharacter: 10,
+      declarationPosition: { line: 1, character: 0 },
+    });
+
+    expect(second.targetId).not.toBe(first.targetId);
+  });
+
+  // ADR 0003 — targetId identity must not depend on the preferred anchor position.
+  it("upgrades a stable target from declaration to name anchor", () => {
     const srcDir = path.join(tmpDir, "src");
     mkdirSync(srcDir, { recursive: true });
     const filePath = path.join(srcDir, "index.ts");
@@ -317,28 +349,99 @@ describe("workflow target store", () => {
       kind: "const",
       confidence: "semantic" as const,
       provenance: "symbol",
-      anchorKind: "name" as const,
       container: null,
+      declarationPosition: { line: 0, character: 0 },
     };
-
-    // Resolve #1: refine succeeded -> name anchor on the identifier (col 15).
-    const r1 = registerWorkflowTarget(store, tmpDir, {
-      ...base,
-      position: { line: 0, character: 14 },
-      displayLine: 1,
-      displayCharacter: 15,
-    });
-    // Resolve #2: refine fell through -> declaration anchor on `export` (col 1).
-    const r2 = registerWorkflowTarget(store, tmpDir, {
+    const declaration = registerWorkflowTarget(store, tmpDir, {
       ...base,
       position: { line: 0, character: 0 },
       displayLine: 1,
       displayCharacter: 1,
+      anchorKind: "declaration",
+    });
+    const refined = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      position: { line: 0, character: 13 },
+      displayLine: 1,
+      displayCharacter: 14,
+      anchorKind: "name",
     });
 
-    expect(r1.targetId.length).toBeGreaterThan(0);
-    // The invariant: symbol identity is stable across anchor variance.
-    expect(r2.targetId).toBe(r1.targetId);
+    expect(refined.targetId).toBe(declaration.targetId);
+    expect(refined.spanId).not.toBe(declaration.spanId);
+    expect(refined.entry).toMatchObject({
+      anchorKind: "name",
+      position: { line: 0, character: 13 },
+      displayCharacter: 14,
+    });
+    expect(getWorkflowTarget(store, refined.targetId)).toMatchObject({
+      kind: "available",
+      entry: { anchorKind: "name", position: { line: 0, character: 13 } },
+    });
+  });
+
+  it("enriches equal-confidence provenance without changing target identity", () => {
+    const filePath = path.join(tmpDir, "index.ts");
+    writeFileSync(filePath, "export const foo = 1;\n");
+    const store = createStore();
+    const base = {
+      file: filePath,
+      position: { line: 0, character: 13 },
+      declarationPosition: { line: 0, character: 0 },
+      displayLine: 1,
+      displayCharacter: 14,
+      name: "foo",
+      kind: "Variable",
+      identityKind: "value",
+      confidence: "semantic" as const,
+      anchorKind: "name" as const,
+      container: null,
+    };
+    const semantic = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      provenance: "semantic",
+    });
+    const merged = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      provenance: "semantic+structural",
+    });
+
+    expect(merged.targetId).toBe(semantic.targetId);
+    expect(merged.entry.provenance).toBe("semantic+structural");
+  });
+
+  it("never downgrades a stable name anchor to a declaration anchor", () => {
+    const filePath = path.join(tmpDir, "index.ts");
+    writeFileSync(filePath, "export const foo = 1;\n");
+    const store = createStore();
+    const base = {
+      file: filePath,
+      name: "foo",
+      kind: "const",
+      confidence: "semantic" as const,
+      provenance: "symbol",
+      container: null,
+      declarationPosition: { line: 0, character: 0 },
+    };
+    const named = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      position: { line: 0, character: 13 },
+      displayLine: 1,
+      displayCharacter: 14,
+      anchorKind: "name",
+    });
+    const weaker = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      position: { line: 0, character: 0 },
+      displayLine: 1,
+      displayCharacter: 1,
+      anchorKind: "declaration",
+    });
+
+    expect(weaker.targetId).toBe(named.targetId);
+    expect(weaker.spanId).toBe(named.spanId);
+    expect(weaker.entry.anchorKind).toBe("name");
+    expect(weaker.entry.position).toEqual({ line: 0, character: 13 });
   });
 
   // ADR 0003, slice B2 — container distinguishes same-name same-file symbols.

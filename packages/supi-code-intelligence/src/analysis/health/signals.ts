@@ -27,6 +27,7 @@ export function collectServers(
     root: s.root,
     fileTypes: s.fileTypes,
     status: s.status,
+    ready: s.ready,
   }));
 }
 

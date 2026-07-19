@@ -30,6 +30,26 @@ _Avoid_: ad-hoc target expansion, mutating search params, treating scope as a ta
 The immutable output of a target workflow: the evidence-backed file, anchor, symbol identity, confidence, provenance, and notes a downstream code-intelligence tool may rely on. A resolved target is not a public parameter bag and should not be changed by downstream tools.
 _Avoid_: expanded params, anonymous point target, mutable target
 
+**Target group**:
+A bounded public collection derived from all evidence-backed declarations discovered within one file when no single symbol was selected, including nested declarations. Discovery retains exact total/omitted completeness, but only visible members are materialized as handles. The group is not itself a Resolved target; downstream precise intents select one member.
+_Avoid_: file handle, synthetic target, unbounded handle batch, treating a file coordinate as a symbol
+
+**Declaration occurrence identity**:
+The provider-independent identity of one declaration within a file: canonical kind, symbolic container, declaration line, and deterministic occurrence among otherwise identical declarations on that line. It distinguishes overloads while remaining stable when semantic evidence replaces structural evidence or a declaration anchor refines to a name anchor.
+_Avoid_: display position identity, raw provider kind, treating all same-name declarations as one target
+
+**LSP-first target resolution**:
+The rule that ready semantic capability is required when a Resolved target or Target group is established or refined. A fresh stored target may still support structural consumers, while semantic consumers require live semantic readiness.
+_Avoid_: structural-only target creation, treating a structural identifier as semantic identity
+
+**Server status evidence**:
+Runtime facts about LSP state and server inventory. A live runtime owner or explicit disabled state can establish complete inventory status; pending, inactive, or unavailable state cannot establish an empty inventory. Complete inventory may report disabled capability or zero servers and does not imply semantic code evidence.
+_Avoid_: semantic evidence, treating unknown inventory as empty, treating disabled as unknown, inferring capability from runtime presence
+
+**Semantic health availability**:
+Workspace diagnostics are available only when at least one project language server is active and ready; a file-scoped health check may establish a concrete routed client for that file. Runtime or configuration presence alone is insufficient. When diagnostic refresh is requested, recovery runs before this fact is finalized and availability is recomputed afterward.
+_Avoid_: runtime availability, configured-route availability, vacuous readiness, optimistic diagnostics
+
 **Honest correctness**:
 The code-intelligence result standard that a tool must either report evidence-backed facts or explicitly say why it cannot. A deterministic convention may locate evidence, but it cannot create a classification, relationship, or claim; heuristic and convention-based inferences are guidance chrome, not Tool evidence. Silent guessing, truncation, scope widening, and fallback to a weaker substrate are incorrect even when they look helpful.
 _Avoid_: best-effort correctness, "probably right", inferred facts, treating a locator as evidence, hiding degraded evidence
@@ -67,8 +87,8 @@ One fact that can independently support a coding decision. Evidence-list totals 
 _Avoid_: counting visual rows as facts, treating file groups as references
 
 **Result cap**:
-A display limit for public tool evidence, not a normal-path collection limit. A capped result may show fewer evidence atoms than exist, but it must still disclose the exact total and omitted count unless exceptional interruption prevents exact counting.
-_Avoid_: treating `maxResults` as permission to stop counting evidence, silent early-stop search
+A display limit for public tool evidence, not a normal-path enumeration limit. A capped result may show fewer evidence atoms than exist, but it must still disclose the exact total and omitted count unless exceptional interruption prevents exact counting. For Target groups, enumeration completes before the cap and only visible declarations are materialized as handles.
+_Avoid_: treating `maxResults` as permission to stop counting evidence, registering hidden handles, silent early-stop search
 
 **Evidence ordering**:
 The rule for choosing which evidence atoms are shown when a result cap applies. Domain-specific ranking is preserved when it is meaningful, such as semantic/search relevance; otherwise evidence atoms are ordered deterministically by stable facts such as file, line, or name.

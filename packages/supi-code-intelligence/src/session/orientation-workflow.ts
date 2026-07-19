@@ -8,6 +8,7 @@ import {
   collectInstructionFiles,
   findInstructionFilesForDirectory,
 } from "../analysis/instruction-files.ts";
+import { createStructuralCodeProvider } from "../analysis/provider.ts";
 import { normalizePath } from "../analysis/search/ripgrep.ts";
 import { loadCodeIntelligenceConfig } from "../config.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
@@ -96,11 +97,16 @@ async function orientTarget(options: {
     {
       fileLevelAllowed: false,
       nameAnchorRequired: false,
-      waitForSemantic: true,
       maxResults,
     },
     deps,
   );
+  if (target.kind === "target-group") {
+    return {
+      kind: "invalid-input",
+      message: "Precise Orientation requires one member handle from a Target group.",
+    };
+  }
   if (target.kind === "disambiguation") {
     return {
       kind: "disambiguation",
@@ -121,6 +127,20 @@ async function orientTarget(options: {
   throwIfAborted(control);
 
   const entry = target.entry;
+  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
+    kind: "file",
+    file: entry.file,
+  });
+  const semanticReady = readiness.kind === "ready";
+  const provider = semanticReady
+    ? deps.capability.getProvider(deps.cwd)
+    : createStructuralCodeProvider(deps.capability.getStructuralProvider(deps.cwd));
+  const lspRuntime = semanticReady
+    ? deps.capability.getLspRuntimeState(deps.cwd)
+    : {
+        kind: "unavailable" as const,
+        reason: readiness.kind === "timeout" ? "Semantic readiness timed out" : readiness.reason,
+      };
   const result = await executeOrientation(
     {
       target: {
@@ -136,8 +156,8 @@ async function orientTarget(options: {
     },
     {
       model,
-      provider: deps.capability.getProvider(deps.cwd),
-      lspRuntime: deps.capability.getLspRuntimeState(deps.cwd),
+      provider,
+      lspRuntime,
       cwd: deps.cwd,
     },
   );

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { renderGraphResult } from "../../../../src/tool/graph/markdown-base.ts";
+import { renderResolveResult } from "../../../../src/tool/resolve/markdown.ts";
 import { assembleToolResult } from "../../../../src/tool/result/assembly.ts";
 import { assembleGraphResult } from "../../../../src/tool/result/graph.ts";
 import { assembleOrientationResult } from "../../../../src/tool/result/orientation.ts";
@@ -60,15 +62,6 @@ describe("canonical Tool result assembly", () => {
           kind: "ok",
           rel: "references",
           data: { references: [], externalCount: 0, confidence: "semantic" },
-          evidenceLists: [
-            {
-              key: "graph.references",
-              totalCount: 0,
-              shownCount: 0,
-              omittedCount: 0,
-              partialReason: null,
-            },
-          ],
           readNext: [{ file: "src/a.ts", startLine: 1, endLine: 2, reason: "target" }],
         },
       ],
@@ -78,6 +71,69 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.assembled.sections[0]?.key).toBe("references");
     expect(assembly.assembled.actions.some((action) => action.kind === "read-next")).toBe(true);
     expect(assembly.details.candidateCount).toBe(0);
+  });
+
+  it("bounds every graph relation once for markdown and structured details", () => {
+    const assembly = assembleGraphResult({
+      displayName: "foo",
+      resolvedDisplayFile: "src/a.ts",
+      maxResults: 1,
+      cwd: "/repo",
+      sections: [
+        {
+          kind: "ok",
+          rel: "references",
+          data: {
+            references: [
+              { name: "foo", file: "/repo/src/ref-a.ts", line: 1, character: 1 },
+              { name: "foo", file: "/repo/src/ref-b.ts", line: 2, character: 1 },
+            ],
+            externalCount: 0,
+            confidence: "semantic",
+          },
+          readNext: [],
+        },
+        {
+          kind: "ok",
+          rel: "callees",
+          data: {
+            enclosingScope: { name: "foo", file: "/repo/src/a.ts", startLine: 1, endLine: 5 },
+            calls: [
+              { name: "callA", file: "/repo/src/a.ts", line: 2 },
+              { name: "callB", file: "/repo/src/a.ts", line: 3 },
+            ],
+            depth: "direct",
+          },
+          readNext: [],
+        },
+        {
+          kind: "ok",
+          rel: "implements",
+          data: {
+            implementations: [
+              { name: "ImplA", file: "/repo/src/impl-a.ts", line: 1, character: 1 },
+              { name: "ImplB", file: "/repo/src/impl-b.ts", line: 1, character: 1 },
+            ],
+            externalCount: 0,
+          },
+          readNext: [],
+        },
+      ],
+    });
+    const markdown = renderGraphResult(assembly);
+
+    expect(assembly.details.evidenceLists).toEqual([
+      expect.objectContaining({ key: "references.locations", shownCount: 1, omittedCount: 1 }),
+      expect.objectContaining({ key: "callees.calls", shownCount: 1, omittedCount: 1 }),
+      expect.objectContaining({ key: "implements.locations", shownCount: 1, omittedCount: 1 }),
+    ]);
+    expect(markdown).toContain("ref-a.ts");
+    expect(markdown).not.toContain("ref-b.ts");
+    expect(markdown).toContain("callA");
+    expect(markdown).not.toContain("callB");
+    expect(markdown).toContain("impl-a.ts");
+    expect(markdown).not.toContain("impl-b.ts");
+    expect(markdown.match(/showing 1 of 2; 1 omitted/g)).toHaveLength(3);
   });
 
   it("assembles a resolved target with provenance and a follow-up query", () => {
@@ -107,6 +163,56 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.details.targets[0]?.file).toBe("src/a.ts");
     expect(assembly.assembled.provenance[0]?.source).toBe("semantic");
     expect(assembly.assembled.actions[0]?.kind).toBe("query");
+  });
+
+  it("assembles a bounded file Target group without synthetic handles", () => {
+    const makeTarget = (name: string, line: number) => ({
+      targetId: `tg-${name}`,
+      spanId: `sp-${name}`,
+      file: "/repo/src/a.ts",
+      position: { line: line - 1, character: 7 },
+      displayLine: line,
+      displayCharacter: 8,
+      name,
+      kind: "Function",
+      container: null,
+      confidence: "semantic" as const,
+      provenance: "semantic+structural",
+      anchorKind: "name" as const,
+      fileFingerprint: "fp",
+    });
+    const assembly = assembleResolveResult(
+      {
+        kind: "target-group",
+        file: "/repo/src/a.ts",
+        confidence: "semantic",
+        targets: [makeTarget("one", 1)],
+        totalCount: 2,
+        omittedCount: 1,
+      },
+      "/repo",
+    );
+    const markdown = renderResolveResult(assembly);
+
+    expect(assembly.details).toMatchObject({
+      resultKind: "target-group",
+      groupFile: "src/a.ts",
+      targetCount: 2,
+      omittedCount: 1,
+      targets: [{ targetId: "tg-one" }],
+    });
+    expect(assembly.details.evidenceLists).toContainEqual({
+      key: "resolve.targets",
+      totalCount: 2,
+      shownCount: 1,
+      omittedCount: 1,
+      partialReason: null,
+    });
+    expect(markdown).toContain("Targets in `src/a.ts`");
+    expect(markdown).toContain("tg-one");
+    expect(markdown).toContain("provenance: semantic+structural");
+    expect(markdown).not.toContain("tg-two");
+    expect(markdown).toContain("showing 1 of 2; 1 omitted");
   });
 
   it("assembles Orientation blocks before markdown rendering", () => {

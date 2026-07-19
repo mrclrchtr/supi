@@ -98,7 +98,7 @@ describe("error result factories", () => {
 
       expect(result.content).toBe("msg");
       expect(result.details?.type).toBe("health");
-      expect(data.lspAvailable).toBe(false);
+      expect(data.semanticAvailable).toBe(false);
       expect(data.lspStatus).toBe("no providers");
       expect(data.recovered).toBe(false);
       expect(data.diagnosticFileCount).toBe(0);
@@ -153,7 +153,7 @@ describe("error result factories", () => {
       const data = details.data as HealthDetails;
 
       expect(details.type).toBe("health");
-      expect(data.lspAvailable).toBe(false);
+      expect(data.semanticAvailable).toBe(false);
       expect(data.lspStatus).toBe("no LSP");
     });
   });

@@ -229,7 +229,7 @@ function isSectionStatus(value: unknown): value is HealthSectionSummary["status"
 
 function readLspStatus(data: Record<string, unknown> | null): string {
   const status = readString(data, "lspStatus") ?? "unknown";
-  return data?.lspAvailable === false && status === "ready" ? "unavailable" : status;
+  return status;
 }
 
 function readString(data: Record<string, unknown> | null, key: string): string | null {

@@ -1,4 +1,8 @@
 import { relative } from "node:path";
+import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
+import { createEvidenceList } from "../../analysis/evidence.ts";
+import type { TargetStoreEntry } from "../../session/target-store.ts";
 import type { TargetWorkflowOutcome } from "../../session/target-workflow.ts";
 import {
   assembledNextQueries,
@@ -16,45 +20,48 @@ export interface ResolveResultAssembly {
   readonly details: ResolveDetails;
 }
 
+interface ResolveProjection {
+  readonly key: string;
+  readonly title: string;
+  readonly status: "complete" | "unavailable";
+  readonly items: readonly unknown[];
+  readonly confidence: ConfidenceMode;
+  readonly evidence: EvidenceListMetadata | null;
+  readonly details: ResolveDetails;
+}
+
 /** Assemble resolved-target facts before markdown and TUI adapters render them. */
 export function assembleResolveResult(
   outcome: TargetWorkflowOutcome,
   cwd: string,
 ): ResolveResultAssembly {
-  const details = buildResolveDetails(outcome, cwd);
+  const projection = projectResolveOutcome(outcome, cwd);
   const provenance = resolveProvenance(outcome);
   const assembled = assembleToolResult({
     data: outcome,
     sections: [
       {
-        key: outcome.kind === "disambiguation" ? "resolve.candidates" : "resolve.targets",
-        title: outcome.kind === "disambiguation" ? "Candidates" : "Resolved target",
-        status:
-          outcome.kind === "resolved" || outcome.kind === "disambiguation"
-            ? "complete"
-            : "unavailable",
-        items:
-          outcome.kind === "resolved"
-            ? [outcome.entry]
-            : outcome.kind === "disambiguation"
-              ? outcome.candidates
-              : [],
-        confidence: details.confidence,
+        key: projection.key,
+        title: projection.title,
+        status: projection.status,
+        items: projection.items,
+        confidence: projection.confidence,
         provenance,
       },
     ],
-    evidenceLists: details.evidenceLists,
-    nextQueries: details.nextQueries,
-    candidateCount: details.targetCount,
-    confidence: details.confidence,
+    evidenceLists: projection.evidence ? [projection.evidence] : [],
+    nextQueries: projection.details.nextQueries,
+    candidateCount: projection.details.targetCount,
+    confidence: projection.confidence,
     provenance,
   });
+
   return Object.freeze({
     outcome,
     cwd,
     assembled,
     details: {
-      ...details,
+      ...projection.details,
       omittedCount: assembled.totals.omittedCount,
       evidenceLists: [...assembled.evidenceLists],
       nextQueries: assembledNextQueries(assembled),
@@ -62,55 +69,103 @@ export function assembleResolveResult(
   });
 }
 
-function buildResolveDetails(outcome: TargetWorkflowOutcome, cwd: string): ResolveDetails {
-  if (outcome.kind === "resolved") {
-    const target = outcome.entry;
-    return {
+function projectResolveOutcome(outcome: TargetWorkflowOutcome, cwd: string): ResolveProjection {
+  switch (outcome.kind) {
+    case "resolved":
+      return projectResolved(outcome.entry, cwd);
+    case "target-group":
+      return projectTargetGroup(outcome, cwd);
+    case "disambiguation":
+      return projectDisambiguation(outcome);
+    case "invalid-input":
+    case "unavailable":
+      return projectFailure(outcome.kind);
+  }
+}
+
+function projectResolved(target: Readonly<TargetStoreEntry>, cwd: string): ResolveProjection {
+  const evidence = createEvidenceList({ key: "resolve.targets", items: [target] }).metadata;
+  return {
+    key: "resolve.targets",
+    title: "Resolved target",
+    status: "complete",
+    items: [target],
+    confidence: target.confidence,
+    evidence,
+    details: {
+      resultKind: "resolved",
       confidence: target.confidence,
       targetCount: 1,
       omittedCount: 0,
-      evidenceLists: [
-        {
-          key: "resolve.targets",
-          totalCount: 1,
-          shownCount: 1,
-          omittedCount: 0,
-          partialReason: null,
-        },
-      ],
-      targets: [
-        {
-          targetId: target.targetId,
-          spanId: target.spanId,
-          file: relative(cwd, target.file) || target.file,
-          displayLine: target.displayLine,
-          displayCharacter: target.displayCharacter,
-          name: target.name,
-          kind: target.kind,
-          anchorKind: target.anchorKind,
-          confidence: target.confidence,
-          provenance: target.provenance,
-          resolution: target.resolution,
-        },
-      ],
+      evidenceLists: [evidence],
+      targets: [toTargetDetails(target, cwd)],
       nextQueries: buildResolveNextQueries(target.targetId, target.kind),
-    };
-  }
+    },
+  };
+}
 
-  if (outcome.kind === "disambiguation") {
-    return {
-      confidence: "semantic",
-      targetCount: outcome.candidates.length + outcome.omittedCount,
+function projectTargetGroup(
+  outcome: Extract<TargetWorkflowOutcome, { kind: "target-group" }>,
+  cwd: string,
+): ResolveProjection {
+  const evidence = {
+    key: "resolve.targets",
+    items: [...outcome.targets],
+    metadata: {
+      key: "resolve.targets",
+      totalCount: outcome.totalCount,
+      shownCount: outcome.targets.length,
       omittedCount: outcome.omittedCount,
-      evidenceLists: [
-        {
-          key: "resolve.candidates",
-          totalCount: outcome.candidates.length + outcome.omittedCount,
-          shownCount: outcome.candidates.length,
-          omittedCount: outcome.omittedCount,
-          partialReason: null,
-        },
-      ],
+      partialReason: null,
+    },
+  };
+  return {
+    key: "resolve.target-group",
+    title: "Target group",
+    status: "complete",
+    items: evidence.items,
+    confidence: outcome.confidence,
+    evidence: evidence.metadata,
+    details: {
+      resultKind: "target-group",
+      groupFile: relative(cwd, outcome.file) || outcome.file,
+      confidence: outcome.confidence,
+      targetCount: outcome.totalCount,
+      omittedCount: evidence.metadata.omittedCount,
+      evidenceLists: [evidence.metadata],
+      targets: evidence.items.map((target) => toTargetDetails(target, cwd)),
+      nextQueries:
+        outcome.totalCount > 0
+          ? ["Choose one Target group member handle for precise graph or refactor work"]
+          : ["Use code_inspect for point facts or code_find for explicit source evidence"],
+    },
+  };
+}
+
+function projectDisambiguation(
+  outcome: Extract<TargetWorkflowOutcome, { kind: "disambiguation" }>,
+): ResolveProjection {
+  const totalCount = outcome.candidates.length + outcome.omittedCount;
+  const evidence: EvidenceListMetadata = {
+    key: "resolve.candidates",
+    totalCount,
+    shownCount: outcome.candidates.length,
+    omittedCount: outcome.omittedCount,
+    partialReason: null,
+  };
+  return {
+    key: "resolve.candidates",
+    title: "Candidates",
+    status: "complete",
+    items: outcome.candidates,
+    confidence: "semantic",
+    evidence,
+    details: {
+      resultKind: "disambiguation",
+      confidence: "semantic",
+      targetCount: totalCount,
+      omittedCount: outcome.omittedCount,
+      evidenceLists: [evidence],
       targets: [],
       candidates: outcome.candidates.map((candidate) => ({
         targetId: candidate.targetId,
@@ -127,28 +182,65 @@ function buildResolveDetails(outcome: TargetWorkflowOutcome, cwd: string): Resol
       nextQueries: [
         "Choose one candidate handle, or narrow the symbol selector with scope or symbolKind",
       ],
-    };
-  }
+    },
+  };
+}
 
+function projectFailure(kind: "invalid-input" | "unavailable"): ResolveProjection {
   return {
+    key: "resolve.targets",
+    title: "Resolved target",
+    status: "unavailable",
+    items: [],
     confidence: "unavailable",
-    targetCount: 0,
-    omittedCount: 0,
-    targets: [],
-    nextQueries: [
-      "Refine the target selector",
-      "Use an anchor target when you already know an identifier coordinate",
-    ],
+    evidence: null,
+    details: {
+      resultKind: kind,
+      confidence: "unavailable",
+      targetCount: 0,
+      omittedCount: 0,
+      targets: [],
+      nextQueries: [
+        "Refine the target selector",
+        "Use an anchor target when you already know an identifier coordinate",
+      ],
+    },
+  };
+}
+
+function toTargetDetails(target: Readonly<TargetStoreEntry>, cwd: string) {
+  return {
+    targetId: target.targetId,
+    spanId: target.spanId,
+    file: relative(cwd, target.file) || target.file,
+    displayLine: target.displayLine,
+    displayCharacter: target.displayCharacter,
+    name: target.name,
+    kind: target.kind,
+    container: target.container,
+    anchorKind: target.anchorKind,
+    confidence: target.confidence,
+    provenance: target.provenance,
+    resolution: target.resolution,
   };
 }
 
 function resolveProvenance(outcome: TargetWorkflowOutcome): ResultProvenance[] {
-  if (outcome.kind !== "resolved") return [];
+  const entries =
+    outcome.kind === "resolved"
+      ? [outcome.entry]
+      : outcome.kind === "target-group"
+        ? outcome.targets
+        : [];
+  const sources = new Set(entries.map((entry) => entry.confidence));
+  if (outcome.kind === "target-group" && entries.length === 0) sources.add(outcome.confidence);
   return [
-    {
-      source: outcome.entry.confidence === "semantic" ? "semantic" : "structural",
-      detail: outcome.entry.provenance,
-    },
+    ...(sources.has("semantic")
+      ? [{ source: "semantic" as const, detail: "target-workflow" }]
+      : []),
+    ...(sources.has("structural")
+      ? [{ source: "structural" as const, detail: "target-workflow" }]
+      : []),
   ];
 }
 

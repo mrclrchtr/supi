@@ -4,12 +4,11 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth } from "@earendil-works/pi-tui";
 import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
-import type { WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
+import { getWorkspaceLspRuntime, type WorkspaceLspRuntimeState } from "@mrclrchtr/supi-lsp/api";
 import {
   evaluateCoverageWarnings,
   gatherCoverageEvalInput,
 } from "../analysis/coverage/coverage-warnings.ts";
-import { getCodeProvider } from "../analysis/provider.ts";
 import { type CiStatusData, createCiStatusDialog } from "./status-overlay.ts";
 
 const STATUS_KEY = "code-intelligence";
@@ -20,10 +19,9 @@ interface InspectorState {
   close: (() => void) | null;
 }
 
-const inspector: InspectorState = { handle: null, close: null };
-
 /** Register the interactive /supi-ci-status overlay command. */
 export function registerCiStatusCommand(pi: ExtensionAPI): void {
+  const inspector: InspectorState = { handle: null, close: null };
   pi.registerCommand("supi-ci-status", {
     description: "Toggle code intelligence status — LSP and structural analysis state",
     handler: async (_args: string, ctx: ExtensionContext) => {
@@ -52,9 +50,8 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
               done: () => done(undefined),
               tui,
               fetchDetailedDiagnostics: async (maxSeverity) => {
-                const ps = getCodeProvider(ctx.cwd);
-                const lspState = ps.kind === "ready" ? ps.lspRuntime : null;
-                if (lspState?.kind !== "ready") return [];
+                const lspState = getWorkspaceLspRuntime(ctx.cwd);
+                if (lspState.kind !== "ready") return [];
                 return lspState.runtime.getOutstandingDiagnostics(maxSeverity);
               },
               onRefresh: async () => {
@@ -92,15 +89,17 @@ export function registerCiStatusCommand(pi: ExtensionAPI): void {
 /** Gather a snapshot of LSP and structural state for the dialog. */
 async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStatusData> {
   const workspace = getDefaultWorkspaceRuntime().getWorkspace(cwd);
-  const providerState = getCodeProvider(cwd);
-  const lspState = providerState.kind === "ready" ? providerState.lspRuntime : null;
-
-  const servers = lspState && lspState.kind === "ready" ? lspState.runtime.getProjectServers() : [];
+  const lspState = getWorkspaceLspRuntime(cwd);
+  const serverInventoryAvailable = lspState.kind === "ready" || lspState.kind === "disabled";
+  const servers = lspState.kind === "ready" ? lspState.runtime.getProjectServers() : [];
+  const semanticAvailable = servers.some(
+    (server) => server.status === "running" && server.ready === true,
+  );
   const diagnostics =
-    lspState && lspState.kind === "ready"
+    lspState.kind === "ready" && semanticAvailable
       ? lspState.runtime.getOutstandingDiagnosticSummary(1)
       : [];
-  const semanticState = deriveSemanticCapabilityState(workspace, lspState);
+  const semanticState = deriveSemanticCapabilityState(workspace, lspState, semanticAvailable);
 
   // Sort: errors desc, warnings desc, info desc, hints desc
   diagnostics.sort((a, b) => {
@@ -122,6 +121,8 @@ async function gatherCiStatusData(cwd: string, pi: ExtensionAPI): Promise<CiStat
   return {
     servers,
     diagnostics,
+    serverInventoryAvailable,
+    semanticAvailable,
     capabilities: {
       semantic: semanticState,
       structural: {
@@ -143,24 +144,31 @@ function deriveSemanticCapabilityState(
       provider: unknown | null;
     };
   },
-  lspState: WorkspaceLspRuntimeState | null,
+  lspState: WorkspaceLspRuntimeState,
+  semanticAvailable: boolean,
 ): CiStatusData["capabilities"]["semantic"] {
-  if (lspState?.kind === "ready") {
-    return {
-      kind: workspace.semantic.state.kind === "pending" ? "pending" : "ready",
-      providerAvailable: workspace.semantic.provider !== null,
-    };
+  if (lspState.kind === "ready") {
+    return semanticAvailable
+      ? {
+          kind: "ready",
+          providerAvailable: workspace.semantic.provider !== null,
+        }
+      : {
+          kind: "pending",
+          reason: "No active, ready project servers",
+          providerAvailable: workspace.semantic.provider !== null,
+        };
   }
-  if (workspace.semantic.state.kind === "pending" || lspState?.kind === "pending") {
+  if (workspace.semantic.state.kind === "pending" || lspState.kind === "pending") {
     return {
       kind: "pending",
       providerAvailable: workspace.semantic.provider !== null,
     };
   }
-  if (lspState?.kind === "inactive") {
+  if (lspState.kind === "inactive") {
     return { kind: "inactive", providerAvailable: workspace.semantic.provider !== null };
   }
-  if (lspState?.kind === "disabled") {
+  if (lspState.kind === "disabled") {
     return {
       kind: "disabled",
       reason: "LSP is disabled in settings",
@@ -169,7 +177,7 @@ function deriveSemanticCapabilityState(
   }
   return {
     kind: workspace.semantic.state.kind,
-    reason: lspState && "reason" in lspState ? lspState.reason : "No LSP service",
+    reason: "reason" in lspState ? lspState.reason : "No LSP service",
     providerAvailable: workspace.semantic.provider !== null,
   };
 }

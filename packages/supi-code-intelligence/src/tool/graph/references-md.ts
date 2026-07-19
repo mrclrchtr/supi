@@ -1,34 +1,38 @@
-/**
- * References markdown renderer — labels results as references/usages, not callers.
- */
+/** References markdown renderer over assembled semantic evidence. */
 
-import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
-import { formatReferenceList } from "../../analysis/references/semantic-refs.ts";
+import type { EvidenceList, EvidenceListMetadata } from "../../analysis/evidence.ts";
+import { formatAssembledReferenceList } from "../../analysis/references/semantic-refs.ts";
 import type { ReferenceEntry } from "../../analysis/relations/types.ts";
 import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
 
-// biome-ignore lint/complexity/useMaxParams: render function with independent display parameters
-export function renderReferencesResult(
-  symbolName: string,
-  refs: ReferenceEntry[],
-  externalCount: number,
-  confidence: string,
-  cwd: string,
-  maxResults: number,
-): { content: string; evidenceList: EvidenceListMetadata | null } {
-  const lines: string[] = [];
-  lines.push(`# References of \`${symbolName}\``);
-  lines.push("");
-  lines.push(`**${refs.length} reference${refs.length !== 1 ? "s" : ""}** (${confidence})`);
-  if (externalCount > 0) {
-    lines.push(`_+${externalCount} external reference${externalCount !== 1 ? "s" : ""}_`);
+export function renderReferencesResult(options: {
+  symbolName: string;
+  references: EvidenceList<ReferenceEntry>;
+  externalCount: number;
+  confidence: string;
+  cwd: string;
+}): { content: string; evidenceList: EvidenceListMetadata | null } {
+  const total = options.references.metadata.totalCount ?? options.references.metadata.shownCount;
+  const lines = [
+    `# References of \`${options.symbolName}\``,
+    "",
+    `**${total} reference${total === 1 ? "" : "s"}** (${options.confidence})`,
+  ];
+  if (options.externalCount > 0) {
+    lines.push(
+      `_+${options.externalCount} external reference${options.externalCount === 1 ? "" : "s"}_`,
+    );
   }
   lines.push("");
 
-  const refLines: Array<{ file: string; line: number }> = refs.map((r) => ({
-    file: toDisplayPath(cwd, r.file),
-    line: r.line,
-  }));
-  const evidenceList = formatReferenceList(lines, refLines, maxResults);
+  const displayEvidence = {
+    key: options.references.key,
+    items: options.references.items.map((reference) => ({
+      file: toDisplayPath(options.cwd, reference.file),
+      line: reference.line,
+    })),
+    metadata: options.references.metadata,
+  };
+  const evidenceList = formatAssembledReferenceList(lines, displayEvidence);
   return { content: lines.join("\n"), evidenceList };
 }

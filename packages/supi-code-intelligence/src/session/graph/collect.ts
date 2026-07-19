@@ -1,6 +1,5 @@
 /** Presentation-neutral relation collection used by the session-owned graph workflow. */
 
-import { createEvidenceList } from "../../analysis/evidence.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
 import {
   readNextEnclosingScope,
@@ -76,12 +75,6 @@ async function collectReferences(options: CollectRelationOptions): Promise<Graph
       reference.line !== targetLine ||
       reference.character !== targetCharacter,
   );
-  const evidence = createEvidenceList({
-    key: "references.locations",
-    items: references,
-    maxResults: options.maxResults,
-  }).metadata;
-
   return {
     kind: "ok",
     rel: "references",
@@ -90,7 +83,6 @@ async function collectReferences(options: CollectRelationOptions): Promise<Graph
       externalCount: result.externalCount,
       confidence: "semantic",
     },
-    evidenceLists: [evidence],
     readNext: [
       readNextTarget(
         toDisplayPath(options.cwd, options.file),
@@ -146,17 +138,10 @@ async function collectCalleesRelation(options: CollectRelationOptions): Promise<
     file: callee.file,
     line: callee.line,
   }));
-  const evidence = createEvidenceList({
-    key: "callees.calls",
-    items: calls,
-    maxResults: options.maxResults,
-  }).metadata;
-
   return {
     kind: "ok",
     rel: "callees",
     data: { enclosingScope, calls, depth: result.depth },
-    evidenceLists: [evidence],
     readNext: [
       readNextEnclosingScope(
         toDisplayPath(options.cwd, options.file),
@@ -190,17 +175,10 @@ async function collectImplementationsRelation(
   const implementations = result.implementations.filter(
     (implementation) => implementation.file !== options.file || implementation.line !== targetLine,
   );
-  const evidence = createEvidenceList({
-    key: "implements.locations",
-    items: implementations,
-    maxResults: options.maxResults,
-  }).metadata;
-
   return {
     kind: "ok",
     rel: "implements",
     data: { implementations, externalCount: result.externalCount },
-    evidenceLists: [evidence],
     readNext: [],
   };
 }

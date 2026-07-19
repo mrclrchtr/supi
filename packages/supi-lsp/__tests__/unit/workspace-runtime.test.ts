@@ -127,13 +127,15 @@ describe("workspace runtime behavior", () => {
     expect(supportedPaths).toEqual(["/project/src/index.ts"]);
   });
 
-  it("reports readiness for a normalized file and preserves timeout behavior", async () => {
+  it("reports file readiness only when routing establishes a concrete client", async () => {
     const readyPaths: string[] = [];
+    const client = {} as LspClient;
     const readyRuntime = createRuntime(
       makeManager({
         canServeFile: (filePath: string) => filePath === "/project/src/index.ts",
         waitUntilFileReady: async (filePath: string) => {
           readyPaths.push(filePath);
+          return client;
         },
       }),
     );
@@ -143,21 +145,35 @@ describe("workspace runtime behavior", () => {
     ).resolves.toEqual({ kind: "ready" });
     expect(readyPaths).toEqual(["/project/src/index.ts"]);
 
+    const failedRouteRuntime = createRuntime(
+      makeManager({
+        canServeFile: () => true,
+        waitUntilFileReady: async () => null,
+      }),
+    );
+    await expect(
+      failedRouteRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 100 }),
+    ).resolves.toMatchObject({ kind: "unavailable" });
+
     const timeoutRuntime = createRuntime(
       makeManager({
         canServeFile: () => true,
         waitUntilFileReady: () => new Promise<never>(() => {}),
       }),
     );
-
     await expect(
       timeoutRuntime.waitUntilReadyForFile("src/index.ts", { timeoutMs: 1 }),
     ).resolves.toEqual({ kind: "timeout" });
+  });
 
-    const workspaceRuntime = createRuntime(
-      makeManager({ waitUntilWorkspaceReady: async () => undefined }),
-    );
-    await expect(workspaceRuntime.waitUntilReadyForWorkspace({ timeoutMs: 100 })).resolves.toEqual({
+  it("reports workspace readiness only when at least one live client is ready", async () => {
+    const emptyRuntime = createRuntime(makeManager({ waitUntilWorkspaceReady: async () => 0 }));
+    await expect(
+      emptyRuntime.waitUntilReadyForWorkspace({ timeoutMs: 100 }),
+    ).resolves.toMatchObject({ kind: "unavailable" });
+
+    const readyRuntime = createRuntime(makeManager({ waitUntilWorkspaceReady: async () => 1 }));
+    await expect(readyRuntime.waitUntilReadyForWorkspace({ timeoutMs: 100 })).resolves.toEqual({
       kind: "ready",
     });
   });

@@ -11,7 +11,7 @@ There is no PI extension entrypoint and no model-callable `lsp_*` tool surface. 
 
 ## Runtime architecture
 
-`LspRuntimeController` owns lifecycle and status. `WorkspaceLspRuntime` owns routing, semantic readiness and operations, tracked files, diagnostics, and recovery. A ready controller publishes `{ kind: "ready", runtime }`.
+`LspRuntimeController` owns lifecycle and status. `WorkspaceLspRuntime` owns routing, semantic readiness and operations, tracked files, diagnostics, and recovery. A ready controller publishes `{ kind: "ready", runtime }`; when every configured server definition is disabled, the controller publishes `{ kind: "disabled", reason }` without creating a runtime owner. Runtime ownership is not semantic readiness: workspace readiness requires at least one concrete active-ready client, and file readiness requires a non-null routed client.
 
 `WorkspaceLspRuntime` is an exported interface. `DefaultWorkspaceLspRuntime`, clients, and `LspManager` remain internal. Never add manager/client access to the public runtime.
 
@@ -20,7 +20,7 @@ paths, coordinates readiness, semantic requests, tracked files, diagnostics, rec
 and owner-controlled shutdown around the package-internal `LspManager`. Clients and the
 manager never cross the public runtime interface.
 
-The registry uses the shared core session-state helper and retains explicit ready, pending, inactive, disabled, and unavailable states. Pending polling uses `waitForWorkspaceLspRuntime(cwd)`.
+The registry uses the shared core session-state helper and retains explicit ready, pending, inactive, disabled, and unavailable states. Pending polling uses `waitForWorkspaceLspRuntime(cwd)`. Empty workspace warm-up leaves the ready owner published and semantic registration pending so a lazy file route can still start; never promote via `Promise.all([])` or retract the owner solely because no client was proactive.
 
 Runtime positions are raw 0-based LSP coordinates. Use `toLspPosition()` when starting from 1-based tool coordinates.
 
@@ -76,6 +76,7 @@ Always-on policy:
 - `lsp.enabled` is deprecated and ignored.
 - `lsp.active` is deprecated and ignored.
 - `lsp.servers.<language>.enabled: false` is the only opt-out.
+- If every server definition is disabled, startup is a successful disabled state, not a ready runtime with zero servers.
 - `getDeprecatedLspKeys()` lets downstream packages report old keys.
 
 `lsp.exclude` contains gitignore-style patterns used only by diagnostics and coverage. Explicit semantic requests are not filtered. `isGlobMatch()` supports anchored `/`, directory-only trailing `/`, `**`, and single-segment `*`.

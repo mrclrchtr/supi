@@ -8,6 +8,7 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import {
   createEvidenceList,
+  type EvidenceList,
   type EvidenceListMetadata,
   renderEvidenceListDisclosure,
 } from "../evidence.ts";
@@ -123,6 +124,16 @@ export function formatReferenceList(
     maxResults,
   });
 
+  return formatAssembledReferenceList(lines, evidence);
+}
+
+/** Render a reference list whose items and completeness were already assembled. */
+export function formatAssembledReferenceList(
+  lines: string[],
+  evidence: EvidenceList<FileLineRef>,
+): EvidenceListMetadata | null {
+  if (evidence.metadata.totalCount === 0 && evidence.items.length === 0) return null;
+
   const byFile = new Map<string, number[]>();
   for (const ref of evidence.items) {
     const group = byFile.get(ref.file) ?? [];
@@ -132,15 +143,11 @@ export function formatReferenceList(
 
   for (const [file, locations] of byFile) {
     lines.push(`### ${file}`);
-    const label = compactLineRanges(locations);
-    lines.push(`- ${label}`);
+    lines.push(`- ${compactLineRanges(locations)}`);
     lines.push("");
   }
 
   const disclosure = renderEvidenceListDisclosure(evidence);
-  if (disclosure) {
-    lines.push(disclosure);
-  }
-
+  if (disclosure) lines.push(disclosure);
   return evidence.metadata;
 }

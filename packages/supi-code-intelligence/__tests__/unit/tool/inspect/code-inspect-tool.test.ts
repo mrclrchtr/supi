@@ -1,7 +1,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
+import {
+  getDefaultWorkspaceRuntime,
+  type SemanticProvider,
+} from "@mrclrchtr/supi-code-runtime/api";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import codeIntelligenceExtension from "../../../../src/extension.ts";
@@ -43,11 +46,13 @@ afterEach(() => {
 
 function mockReadyLsp(
   overrides: Partial<{
+    waitUntilReadyForFile: ReturnType<typeof vi.fn>;
     fileDiagnostics: ReturnType<typeof vi.fn>;
     recoverDiagnostics: ReturnType<typeof vi.fn>;
   }> = {},
 ) {
   const runtime = {
+    waitUntilReadyForFile: vi.fn().mockResolvedValue({ kind: "ready" }),
     fileDiagnostics: vi.fn().mockResolvedValue([]),
     recoverDiagnostics: vi.fn().mockResolvedValue({ recovered: false }),
     ...overrides,
@@ -61,7 +66,11 @@ function mockReadyLsp(
   return runtime;
 }
 
-function registerInspectProviders() {
+function registerInspectProviders(
+  semanticOverrides: Partial<
+    Pick<SemanticProvider, "hover" | "definition" | "codeActionTitles">
+  > = {},
+) {
   const runtime = getDefaultWorkspaceRuntime();
 
   runtime.registerSemantic(tmpDir, {
@@ -80,6 +89,7 @@ function registerInspectProviders() {
       },
     ],
     codeActionTitles: async () => [{ title: "Remove unused import", kind: "quickfix" }],
+    ...semanticOverrides,
   });
 
   runtime.registerStructural(tmpDir, {
@@ -168,6 +178,42 @@ describe("code_inspect tool", () => {
     expect(props).not.toHaveProperty("targetId");
     expect(props).not.toHaveProperty("symbol");
     expect(props).not.toHaveProperty("path");
+  });
+
+  it("suppresses semantic sections when file readiness fails but keeps structural facts", async () => {
+    const hover = vi.fn(async () => ({ contents: "const foo: number" }));
+    const definition = vi.fn(async () => []);
+    const codeActionTitles = vi.fn(async () => []);
+    registerInspectProviders({ hover, definition, codeActionTitles });
+    const fileDiagnostics = vi.fn(async () => null);
+    mockReadyLsp({
+      waitUntilReadyForFile: vi
+        .fn()
+        .mockResolvedValue({ kind: "unavailable", reason: "file client lost" }),
+      fileDiagnostics,
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const result = (await getTool(pi, "code_inspect").execute(
+      "inspect-degraded",
+      { point: { file: "src/index.ts", line: 2, character: 9 } },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as {
+      content: Array<{ text: string }>;
+      details?: { type: "inspect"; data: { confidence: string; unavailableSections: string[] } };
+    };
+
+    expect(hover).not.toHaveBeenCalled();
+    expect(definition).not.toHaveBeenCalled();
+    expect(codeActionTitles).not.toHaveBeenCalled();
+    expect(fileDiagnostics).not.toHaveBeenCalled();
+    expect(result.details?.data.confidence).toBe("structural");
+    expect(result.details?.data.unavailableSections).toEqual(
+      expect.arrayContaining(["hover", "definition", "diagnostics", "codeActions"]),
+    );
   });
 
   it("returns best-effort point inspection sections with nearby diagnostics", async () => {

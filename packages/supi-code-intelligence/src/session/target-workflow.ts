@@ -8,18 +8,24 @@
 import { existsSync } from "node:fs";
 import { normalizePath, resolveScope } from "../analysis/search/ripgrep.ts";
 import { resolveAnchoredSymbolTarget } from "../analysis/target/anchored.ts";
-import { resolveFileTargetGroup } from "../analysis/target/file.ts";
+import { resolveFileTargetGroup, validateFileTargetDiscovery } from "../analysis/target/file.ts";
+import { canonicalDeclarationKind } from "../analysis/target/identity.ts";
 import { resolveSymbolTarget } from "../analysis/target/symbol.ts";
-import type { ResolvedTargetData, TargetOutcome } from "../analysis/target/types.ts";
+import type {
+  ResolvedTargetData,
+  ResolvedTargetGroupData,
+  TargetOutcome,
+} from "../analysis/target/types.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseTargetInput } from "./input/common.ts";
 import type { TargetInput } from "./target-input.ts";
-import type {
-  AnchorKind,
-  TargetLookupResult,
-  TargetRegistrationInput,
-  TargetRegistrationOutput,
-  TargetStoreEntry,
+import {
+  type AnchorKind,
+  computeFileFingerprint,
+  type TargetLookupResult,
+  type TargetRegistrationInput,
+  type TargetRegistrationOutput,
+  type TargetStoreEntry,
 } from "./target-store.ts";
 
 export type { TargetInput } from "./target-input.ts";
@@ -30,8 +36,6 @@ export interface TargetWorkflowPolicy {
   readonly fileLevelAllowed: boolean;
   /** Whether a strict name anchor is required. */
   readonly nameAnchorRequired: boolean;
-  /** Whether semantic readiness should be awaited before provider-backed resolution. */
-  readonly waitForSemantic: boolean;
   /** Maximum displayed disambiguation candidates. */
   readonly maxResults?: number;
 }
@@ -39,6 +43,14 @@ export interface TargetWorkflowPolicy {
 /** Typed Target workflow outcome. */
 export type TargetWorkflowOutcome =
   | { kind: "resolved"; entry: Readonly<TargetStoreEntry>; notes: readonly string[] }
+  | {
+      kind: "target-group";
+      file: string;
+      confidence: ResolvedTargetData["confidence"];
+      targets: ReadonlyArray<Readonly<TargetStoreEntry>>;
+      totalCount: number;
+      omittedCount: number;
+    }
   | {
       kind: "disambiguation";
       candidates: ReadonlyArray<{
@@ -65,7 +77,11 @@ export interface TargetWorkflowDeps {
   readonly registerTarget: (input: TargetRegistrationInput) => TargetRegistrationOutput;
 }
 
-/** Resolve exactly one canonical selector into target facts or a typed failure. */
+/**
+ * Resolve exactly one canonical selector into target facts or a typed failure.
+ * New and refined targets are always LSP-first; handle lookup deliberately
+ * bypasses readiness so existing handles can still serve structural consumers.
+ */
 export async function resolveTargetWorkflow(
   input: TargetInput,
   policy: TargetWorkflowPolicy,
@@ -90,7 +106,7 @@ export async function resolveTargetWorkflow(
       message: "This workflow requires a handle, anchored point, or symbol target.",
     };
   }
-  return resolveFileOnlyWorkflow(target.file, deps);
+  return resolveFileOnlyWorkflow(target.file, policy.maxResults ?? 10, deps);
 }
 
 function resolveHandle(
@@ -123,20 +139,18 @@ async function resolveAnchoredWorkflow(
     return { kind: "invalid-input", message: `File not found: \`${anchor.file}\`` };
   }
 
-  if (policy.waitForSemantic) {
-    const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-      kind: "file",
-      file,
-    });
-    if (readiness.kind === "timeout") {
-      return {
-        kind: "unavailable",
-        reason: "LSP readiness timed out. Retry shortly or inspect code_health.",
-      };
-    }
-    if (readiness.kind === "unavailable") {
-      return { kind: "unavailable", reason: readiness.reason };
-    }
+  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
+    kind: "file",
+    file,
+  });
+  if (readiness.kind === "timeout") {
+    return {
+      kind: "unavailable",
+      reason: "LSP readiness timed out. Retry shortly or inspect code_health.",
+    };
+  }
+  if (readiness.kind === "unavailable") {
+    return { kind: "unavailable", reason: readiness.reason };
   }
 
   const outcome = await resolveAnchoredSymbolTarget(
@@ -166,20 +180,17 @@ async function resolveSymbolWorkflow(
     scope = resolved.path;
   }
 
-  let provider = deps.capability.getSemanticProvider(deps.cwd);
-  if (!provider && policy.waitForSemantic) {
-    const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
-      kind: "workspace",
-    });
-    if (readiness.kind === "timeout") {
-      return { kind: "unavailable", reason: "LSP readiness timed out. Retry shortly." };
-    }
-    if (readiness.kind === "unavailable") {
-      return { kind: "unavailable", reason: readiness.reason };
-    }
-    provider = deps.capability.getSemanticProvider(deps.cwd);
+  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
+    kind: "workspace",
+  });
+  if (readiness.kind === "timeout") {
+    return { kind: "unavailable", reason: "LSP readiness timed out. Retry shortly." };
+  }
+  if (readiness.kind === "unavailable") {
+    return { kind: "unavailable", reason: readiness.reason };
   }
 
+  const provider = deps.capability.getSemanticProvider(deps.cwd);
   if (!provider) {
     return {
       kind: "unavailable",
@@ -197,35 +208,34 @@ async function resolveSymbolWorkflow(
 
 async function resolveFileOnlyWorkflow(
   requestedFile: string,
+  maxResults: number,
   deps: TargetWorkflowDeps,
 ): Promise<TargetWorkflowOutcome> {
-  const file = normalizePath(requestedFile, deps.cwd);
-  if (!existsSync(file)) {
-    return { kind: "invalid-input", message: `File not found: \`${requestedFile}\`` };
+  const validation = validateFileTargetDiscovery(requestedFile, deps.cwd);
+  if (validation.kind === "invalid-input") return validation;
+  const file = validation.file;
+
+  const readiness = await deps.capability.ensureSemanticReadiness(deps.cwd, {
+    kind: "file",
+    file,
+  });
+  if (readiness.kind === "timeout") {
+    return { kind: "unavailable", reason: "LSP readiness timed out. Retry shortly." };
+  }
+  if (readiness.kind === "unavailable") {
+    return { kind: "unavailable", reason: readiness.reason };
   }
 
   const result = await resolveFileTargetGroup(file, deps.cwd, {
     semantic: deps.capability.getSemanticProvider(deps.cwd) ?? undefined,
     structural: deps.capability.getStructuralProvider(deps.cwd) ?? undefined,
   });
-  if (result.kind === "error") {
-    return { kind: "invalid-input", message: result.message };
+  if (result.kind === "invalid-input") return result;
+  if (result.kind === "unavailable") {
+    return { kind: "unavailable", reason: result.message };
   }
 
-  const group = result.group;
-  const registered = deps.registerTarget({
-    file: group.file,
-    position: { line: 0, character: 0 },
-    displayLine: 1,
-    displayCharacter: 1,
-    name: group.displayName ?? null,
-    kind: null,
-    confidence: "structural",
-    provenance: "file-level",
-    anchorKind: "name",
-    container: null,
-  });
-  return { kind: "resolved", entry: immutableEntry(registered.entry), notes: [] };
+  return registerTargetGroup(result.group, deps, maxResults);
 }
 
 function toWorkflowOutcome(
@@ -254,20 +264,23 @@ function toWorkflowOutcome(
   }
 
   if (outcome.kind === "group") {
-    return {
-      kind: "invalid-input",
-      message: "This workflow requires one precise target rather than a file target group.",
-    };
+    return registerTargetGroup(outcome.group, deps, policy.maxResults ?? 10);
   }
 
   const candidates = outcome.candidates.map((candidate, index) => {
     const registered = deps.registerTarget({
       file: candidate.file,
       position: { line: candidate.line - 1, character: candidate.character - 1 },
+      declarationPosition: {
+        line: candidate.declarationAnchor.line - 1,
+        character: candidate.declarationAnchor.character - 1,
+      },
+      declarationOccurrence: candidate.declarationOccurrence,
       displayLine: candidate.line,
       displayCharacter: candidate.character,
       name: candidate.name,
       kind: candidate.kind,
+      identityKind: canonicalDeclarationKind(candidate.kind),
       confidence: "semantic",
       provenance: "symbol-query",
       anchorKind: candidate.anchorKind ?? "declaration",
@@ -292,6 +305,28 @@ function toWorkflowOutcome(
   };
 }
 
+function registerTargetGroup(
+  group: ResolvedTargetGroupData,
+  deps: TargetWorkflowDeps,
+  maxResults: number,
+): TargetWorkflowOutcome {
+  const totalCount = group.targets.length;
+  const visibleTargets = group.targets.slice(0, Math.max(0, maxResults));
+  const fingerprint = computeFileFingerprint(group.file);
+  const fileFingerprint = fingerprint.kind === "ok" ? fingerprint.fingerprint : "unfingerprinted";
+  const targets = visibleTargets.map((target) =>
+    immutableEntry(registerFromTargetData(target, deps, fileFingerprint).entry),
+  );
+  return Object.freeze({
+    kind: "target-group",
+    file: group.file,
+    confidence: group.confidence,
+    targets: Object.freeze(targets),
+    totalCount,
+    omittedCount: totalCount - targets.length,
+  });
+}
+
 function buildResolutionNotes(target: ResolvedTargetData): readonly string[] {
   const notes: string[] = [];
   if (target.resolution?.snapped) {
@@ -308,19 +343,27 @@ function buildResolutionNotes(target: ResolvedTargetData): readonly string[] {
 function registerFromTargetData(
   target: ResolvedTargetData,
   deps: TargetWorkflowDeps,
+  fileFingerprint?: string,
 ): TargetRegistrationOutput {
   return deps.registerTarget({
     file: target.file,
     position: target.position,
+    declarationPosition: {
+      line: target.declarationAnchor.line - 1,
+      character: target.declarationAnchor.character - 1,
+    },
+    declarationOccurrence: target.declarationOccurrence,
     displayLine: target.displayLine,
     displayCharacter: target.displayCharacter,
     name: target.name,
     kind: target.kind,
+    identityKind: canonicalDeclarationKind(target.kind),
     confidence: target.confidence,
-    provenance: "target-workflow",
+    provenance: target.provenance.join("+"),
     anchorKind: target.anchorKind,
     container: target.container,
     resolution: target.resolution,
+    fileFingerprint,
   });
 }
 
@@ -328,6 +371,9 @@ function immutableEntry(entry: TargetStoreEntry): Readonly<TargetStoreEntry> {
   return Object.freeze({
     ...entry,
     position: Object.freeze({ ...entry.position }),
+    declarationPosition: entry.declarationPosition
+      ? Object.freeze({ ...entry.declarationPosition })
+      : entry.declarationPosition,
     resolution: entry.resolution
       ? Object.freeze({
           ...entry.resolution,

@@ -13,7 +13,11 @@ Separate lifecycle from workspace operations with two interfaces:
 - `LspRuntimeController` owns start, shutdown, settings, detected-server inventory, and published status.
 - `WorkspaceLspRuntime` owns workspace operations: routing, readiness, semantic requests, tracked files, diagnostics, and recovery.
 
-A ready controller publishes `{ kind: "ready", runtime }`. Pending, inactive, disabled, and unavailable states remain explicit in the workspace registry.
+A ready controller publishes `{ kind: "ready", runtime }`. Pending, inactive, disabled, and unavailable states remain explicit in the workspace registry. When the effective configuration contains no enabled language-server definitions, the controller publishes `disabled` and does not register semantic capability. A ready runtime may still have no proactively started clients because configured routes can start lazily; consumers must not infer semantic evidence from runtime presence alone.
+
+Runtime readiness requires a concrete live client: workspace readiness requires at least one active ready client, and file readiness succeeds only when routing starts or finds the client for that file. A zero-client workspace or a routed `null` client is unavailable, not vacuously ready. When workspace warm-up finds no live client, the runtime owner remains published and semantic capability remains pending so a later file-scoped request may start a lazy route; the controller does not promote or retract it merely because workspace warm-up was empty.
+
+Server-inventory evidence and semantic availability are separate facts. A live runtime owner or explicit disabled state establishes complete inventory status; pending, inactive, and unavailable states do not establish an empty inventory. Health may report a known disabled state and empty server inventory as complete runtime-status evidence, but that status carries no semantic provenance. Workspace diagnostics claim semantic availability only when at least one project server is active and ready; a file-scoped check may first establish readiness for that file. Requested diagnostic recovery runs before the final availability decision and availability is recomputed afterward.
 
 `WorkspaceLspRuntime` is exported as an interface. `DefaultWorkspaceLspRuntime` and `LspManager` remain package-internal. Callers cannot obtain clients or the manager through the public seam.
 

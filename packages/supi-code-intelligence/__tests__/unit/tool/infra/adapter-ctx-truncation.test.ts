@@ -1,3 +1,5 @@
+import { readFileSync, rmSync } from "node:fs";
+import { dirname } from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
 import { Type } from "typebox";
 import { describe, expect, it } from "vitest";
@@ -48,7 +50,7 @@ describe("registerCodeIntelligenceTools adapter", () => {
     expect(captured[0].onUpdate).toBe(onUpdate);
   });
 
-  it("head-truncates oversized content with a notice and passes details through untouched", async () => {
+  it("head-truncates oversized content, spills the full result, and preserves details", async () => {
     const pi = createPiMock();
     const big = `${Array.from({ length: 3000 }, (_, i) => `line ${i}`).join("\n")}\n`;
     registerCodeIntelligenceTools(pi as never, sessionCache.getOrCreate, undefined, [
@@ -77,6 +79,10 @@ describe("registerCodeIntelligenceTools adapter", () => {
     const text = res.content[0].text;
     expect(text).toMatch(/\[truncated: kept \d+ of \d+ lines \([^)]+\)\]/);
     expect(text.startsWith("line 0\n")).toBe(true);
+    const spillPath = text.match(/Full output saved to: `([^`]+)`/)?.[1];
+    expect(spillPath).toBeDefined();
+    expect(readFileSync(spillPath as string, "utf8")).toBe(big);
+    rmSync(dirname(spillPath as string), { recursive: true, force: true });
     // details passed through untouched (not truncated)
     expect(res.details).toMatchObject({ type: "search", data: { candidateCount: 0 } });
   });

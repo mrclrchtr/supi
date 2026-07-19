@@ -1,51 +1,38 @@
-/**
- * Calls markdown renderer — renders direct structural calls.
- */
+/** Calls markdown renderer — renders assembled structural-call evidence. */
 
 import {
-  createEvidenceList,
+  type EvidenceList,
   type EvidenceListMetadata,
-  renderEvidenceListDisclosure,
+  renderEvidenceListMetadataDisclosure,
 } from "../../analysis/evidence.ts";
 import type { CallEntry, CalleeScope } from "../../analysis/relations/types.ts";
 
-export // biome-ignore lint/complexity/useMaxParams: renderer needs target data + depth
-function renderCallsResult(
+export function renderCallsResult(
   enclosingScope: CalleeScope,
-  calls: CallEntry[],
+  calls: EvidenceList<CallEntry>,
   relPath: string,
-  maxResults: number,
   depth: "direct" | "deep" = "direct",
-): { content: string; evidenceList: EvidenceListMetadata | null } {
+): { content: string; evidenceList: EvidenceListMetadata } {
   const lines: string[] = [];
   const depthLabel = depth === "deep" ? "Deep structural calls" : "Direct structural calls";
   const depthNote =
     depth === "deep"
       ? "_Deep: includes calls from nested function/method/callback scopes within the enclosing scope._"
       : "_Structural only: call expressions are reported by source shape, not symbol identity; calls inside nested function/method/callback scopes are excluded from this enclosing scope._";
+  const total = calls.metadata.totalCount ?? calls.metadata.shownCount;
 
-  lines.push(`# ${depthLabel} from \`${enclosingScope.name}\``);
-  lines.push("");
+  lines.push(`# ${depthLabel} from \`${enclosingScope.name}\``, "");
   lines.push(
-    `**${calls.length} ${depth === "deep" ? "" : "direct "}structural call${calls.length !== 1 ? "s" : ""}** from enclosing scope \`${enclosingScope.name}\` (${formatScopeRange(enclosingScope)}) in \`${relPath}\``,
+    `**${total} ${depth === "deep" ? "" : "direct "}structural call${total === 1 ? "" : "s"}** from enclosing scope \`${enclosingScope.name}\` (${formatScopeRange(enclosingScope)}) in \`${relPath}\``,
+    "",
+    depthNote,
+    "",
   );
-  lines.push("");
-  lines.push(depthNote);
-  lines.push("");
 
-  const evidence = createEvidenceList({
-    key: "callees.calls",
-    items: calls,
-    maxResults,
-  });
-  for (const c of evidence.items) {
-    lines.push(`- \`${c.name}\` (L${c.line})`);
-  }
-  const disclosure = renderEvidenceListDisclosure(evidence);
-  if (disclosure) {
-    lines.push(disclosure);
-  }
-  return { content: lines.join("\n"), evidenceList: evidence.metadata };
+  for (const call of calls.items) lines.push(`- \`${call.name}\` (L${call.line})`);
+  const disclosure = renderEvidenceListMetadataDisclosure(calls.metadata);
+  if (disclosure) lines.push(disclosure);
+  return { content: lines.join("\n"), evidenceList: calls.metadata };
 }
 
 function formatScopeRange(scope: CalleeScope): string {

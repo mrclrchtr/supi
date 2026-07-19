@@ -93,6 +93,13 @@ export const getCodeProvider = getCodeProviderState;
  * provider methods are forwarded automatically — no need to update
  * the composite wrapper.
  */
+/** Build a composite facade that deliberately exposes structural evidence only. */
+export function createStructuralCodeProvider(
+  structural: StructuralProvider | null,
+): CodeProvider | null {
+  return structural ? createCompositeProvider(null, structural) : null;
+}
+
 function createCompositeProvider(
   semantic: SemanticProvider | null,
   structural: StructuralProvider | null,

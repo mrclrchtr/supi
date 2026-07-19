@@ -15,5 +15,9 @@ The lifecycle/status module for one workspace. It starts and shuts down language
 _Avoid_: Workspace LSP runtime, semantic provider, query router
 
 **Runtime state**:
-The explicit registry state for a workspace: ready, pending, inactive, disabled, or unavailable. Ready and inactive states may carry a Workspace LSP runtime; callers must not infer readiness from runtime presence alone.
-_Avoid_: nullable runtime, implicit startup, manager availability
+The explicit registry state for a workspace: ready, pending, inactive, disabled, or unavailable. Disabled means no enabled language-server definitions remain; a ready runtime may still have no proactively started clients because configured routes can start lazily. Runtime readiness and semantic readiness are therefore distinct.
+_Avoid_: nullable runtime, implicit startup, manager availability, inferring semantic evidence from runtime presence
+
+**Concrete semantic readiness**:
+Evidence that a live LSP client is ready: workspace readiness requires at least one active ready client, while file readiness requires the routed client for that file to exist and finish startup. An empty client set and a routed `null` result are unavailable, never vacuously ready. Failed workspace warm-up leaves the runtime owner published and semantic registration pending so a lazy file route may still start later.
+_Avoid_: owner readiness, `Promise.all([])` readiness, treating a configured route as a live client

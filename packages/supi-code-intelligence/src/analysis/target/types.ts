@@ -12,6 +12,9 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 
+/** Provider families that contributed evidence to one resolved target. */
+export type TargetProviderProvenance = "semantic" | "structural";
+
 // ── Normalized query ──────────────────────────────────────────────────
 
 /**
@@ -69,9 +72,18 @@ export interface ResolvedTargetData {
   /** 1-based position for user display */
   displayLine: number;
   displayCharacter: number;
+  /**
+   * Stable 1-based declaration occurrence used for target identity. Unlike
+   * the preferred display anchor, this does not move during name refinement.
+   */
+  declarationAnchor: { line: number; character: number };
+  /** Zero-based occurrence among otherwise-identical declarations on that line. */
+  declarationOccurrence: number;
   name: string | null;
   kind: string | null;
   confidence: "semantic" | "structural" | "heuristic" | "unavailable";
+  /** Provider families that established this declaration, strongest first. */
+  provenance: readonly TargetProviderProvenance[];
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
   /** Symbolic container (class/namespace/module name), or null for top-level. */
@@ -85,7 +97,7 @@ export interface ResolvedTargetData {
 }
 
 /**
- * A file-level target group with one or more discoverable targets.
+ * A file-derived Target group with zero or more evidence-backed declarations.
  */
 export interface ResolvedTargetGroupData {
   file: string;
@@ -104,6 +116,10 @@ export interface DisambiguationCandidateData {
   file: string;
   line: number;
   character: number;
+  /** Stable 1-based declaration occurrence for target identity. */
+  declarationAnchor: { line: number; character: number };
+  /** Zero-based occurrence among otherwise-identical declarations on that line. */
+  declarationOccurrence: number;
   reason: string;
   rank: number;
   /** Which anchor this candidate carries (ADR 0003). */

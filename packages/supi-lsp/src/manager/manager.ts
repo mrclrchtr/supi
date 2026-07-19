@@ -361,8 +361,11 @@ export class LspManager {
     return client;
   }
 
-  /** Wait until all started clients are query-ready, then warm one project file per client/root. */
-  async waitUntilWorkspaceReady(): Promise<void> {
+  /**
+   * Wait until all started clients are query-ready, then warm one project file per client/root.
+   * Returns the number of concrete clients that reached readiness.
+   */
+  async waitUntilWorkspaceReady(): Promise<number> {
     const activeClients = Array.from(this.clients.values()).filter(
       (client) => client.status === "running",
     );
@@ -379,6 +382,7 @@ export class LspManager {
       if (!target) continue;
       await this.warmSemanticProject(client, target.file);
     }
+    return activeClients.length;
   }
   async syncFileAndGetDiagnostics(
     filePath: string,

@@ -18,6 +18,7 @@ import type {
 } from "@mrclrchtr/supi-code-runtime/api";
 import type { AnchorKind } from "../../session/target-store.ts";
 import type { AnchoredResolutionMetadata, AnchoredResolutionSource } from "../../types/index.ts";
+import { canonicalDeclarationKind } from "./identity.ts";
 import type { DisambiguationCandidateData, ResolvedTargetData, TargetOutcome } from "./types.ts";
 
 /** 1-based symbol anchor position (mirrors the runtime `SymbolAnchor`). */
@@ -149,7 +150,12 @@ function buildResolution(
 function resolvedFromSymbol(
   file: string,
   s: CodeSymbol,
-  opts: { snapped: boolean; requested: Anchor; source: AnchoredResolutionSource },
+  opts: {
+    snapped: boolean;
+    requested: Anchor;
+    source: AnchoredResolutionSource;
+    declarationOccurrence: number;
+  },
 ): { kind: "resolved"; target: ResolvedTargetData } {
   const a = (s.nameAnchor ?? s.declarationAnchor) as Anchor;
   return {
@@ -159,9 +165,12 @@ function resolvedFromSymbol(
       position: { line: a.line - 1, character: a.character - 1 },
       displayLine: a.line,
       displayCharacter: a.character,
+      declarationAnchor: { ...s.declarationAnchor },
+      declarationOccurrence: opts.declarationOccurrence,
       name: s.name,
       kind: s.kind,
       confidence: "semantic",
+      provenance: ["semantic"],
       anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
       container: s.container ?? null,
       resolution: buildResolution(opts.requested, a, opts.snapped, opts.source),
@@ -172,9 +181,11 @@ function resolvedFromSymbol(
 function candidatesFromSymbols(
   file: string,
   matched: CodeSymbol[],
+  allSymbols: readonly CodeSymbol[],
 ): { kind: "disambiguation"; candidates: DisambiguationCandidateData[]; omittedCount: number } {
   const candidates = matched.map((s, idx) => {
     const a = (s.nameAnchor ?? s.declarationAnchor) as Anchor;
+    const declarationOccurrence = declarationOccurrenceOf(s, allSymbols);
     return {
       name: s.name,
       kind: s.kind,
@@ -182,6 +193,8 @@ function candidatesFromSymbols(
       file,
       line: a.line,
       character: a.character,
+      declarationAnchor: { ...s.declarationAnchor },
+      declarationOccurrence,
       reason: `${a.line}:${a.character}`,
       rank: idx + 1,
       anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
@@ -214,14 +227,41 @@ async function resolveFromSemantic(
   }
 
   if (exact.length === 1) {
-    return resolvedFromSymbol(file, exact[0], { snapped: false, requested, source: "semantic" });
+    return resolvedFromSymbol(file, exact[0], {
+      snapped: false,
+      requested,
+      source: "semantic",
+      declarationOccurrence: declarationOccurrenceOf(exact[0], symbols),
+    });
   }
-  if (exact.length > 1) return candidatesFromSymbols(file, exact);
+  if (exact.length > 1) return candidatesFromSymbols(file, exact, symbols);
   if (snap.length === 1) {
-    return resolvedFromSymbol(file, snap[0], { snapped: true, requested, source: "semantic" });
+    return resolvedFromSymbol(file, snap[0], {
+      snapped: true,
+      requested,
+      source: "semantic",
+      declarationOccurrence: declarationOccurrenceOf(snap[0], symbols),
+    });
   }
-  if (snap.length > 1) return candidatesFromSymbols(file, snap);
+  if (snap.length > 1) return candidatesFromSymbols(file, snap, symbols);
   return null;
+}
+
+function declarationOccurrenceOf(symbol: CodeSymbol, allSymbols: readonly CodeSymbol[]): number {
+  const matching = allSymbols
+    .filter(
+      (candidate) =>
+        candidate.name === symbol.name &&
+        canonicalDeclarationKind(candidate.kind) === canonicalDeclarationKind(symbol.kind) &&
+        (candidate.container ?? null) === (symbol.container ?? null) &&
+        candidate.declarationAnchor.line === symbol.declarationAnchor.line,
+    )
+    .sort(
+      (left, right) =>
+        left.declarationAnchor.character - right.declarationAnchor.character ||
+        (left.nameAnchor?.character ?? 0) - (right.nameAnchor?.character ?? 0),
+    );
+  return Math.max(0, matching.indexOf(symbol));
 }
 
 /** Layer 2: classify the coordinate via tree-sitter `nodeAt`. Returns null to fall through. */
@@ -277,9 +317,15 @@ async function resolveFromStructural(
       position: { line: nameAnchor.line - 1, character: nameAnchor.character - 1 },
       displayLine: nameAnchor.line,
       displayCharacter: nameAnchor.character,
+      declarationAnchor: {
+        line: declAncestor.startLine,
+        character: declAncestor.startCharacter,
+      },
+      declarationOccurrence: 0,
       name: node.text,
       kind: kindFromDeclarationType(declAncestor.type),
       confidence: "structural",
+      provenance: ["structural"],
       anchorKind: "name",
       container: null,
       resolution: buildResolution(requested, nameAnchor, snapped, "structural-identifier"),

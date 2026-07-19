@@ -43,7 +43,6 @@ function buildDeps(adapter: CapabilityAdapter): TargetWorkflowDeps {
 const DEFAULT_POLICY: TargetWorkflowPolicy = {
   fileLevelAllowed: false,
   nameAnchorRequired: false,
-  waitForSemantic: false,
 };
 
 beforeEach(() => {
@@ -61,6 +60,18 @@ function writeSource(relPath: string, content: string): void {
   const absPath = path.join(tmpDir, relPath);
   mkdirSync(path.dirname(absPath), { recursive: true });
   writeFileSync(absPath, content);
+}
+
+function makeTestStructural(overrides: Partial<StructuralProvider> = {}): StructuralProvider {
+  return {
+    exports: async () => ({ kind: "success", data: [] }),
+    outline: async () => ({ kind: "success", data: [] }),
+    imports: async () => ({ kind: "success", data: [] }),
+    calleesAt: async () => ({ kind: "runtime-error", message: "unused" }),
+    nodeAt: async () => ({ kind: "runtime-error", message: "unused" }),
+    callSites: async () => ({ kind: "success", data: [] }),
+    ...overrides,
+  };
 }
 
 function makeTestSemantic(
@@ -128,6 +139,33 @@ describe("target-workflow (deep session seam)", () => {
         expect(outcome.entry.anchorKind).toBe("name");
         expect(outcome.entry.file).toContain("src/mod.ts");
       }
+    });
+
+    it("keeps a fresh handle usable by structural consumers after LSP loss", async () => {
+      writeSource("src/mod.ts", "export const x = 1;\n");
+      const { entry } = registerTarget({
+        file: "src/mod.ts",
+        position: { line: 0, character: 13 },
+        displayLine: 1,
+        displayCharacter: 14,
+        name: "x",
+        kind: "const",
+        confidence: "semantic",
+        provenance: "test",
+        anchorKind: "name",
+        container: null,
+      });
+      const adapter = new TestCapabilityAdapter({
+        readiness: { kind: "unavailable", reason: "LSP crashed" },
+      });
+
+      const outcome = await resolveTargetWorkflow(
+        { handle: entry.targetId },
+        DEFAULT_POLICY,
+        buildDeps(adapter),
+      );
+
+      expect(outcome).toMatchObject({ kind: "resolved", entry: { targetId: entry.targetId } });
     });
 
     it("returns invalid-input for unknown targetId", async () => {
@@ -299,6 +337,24 @@ describe("target-workflow (deep session seam)", () => {
   });
 
   describe("file-level policy", () => {
+    it("rejects unsupported binary files as invalid input before semantic readiness", async () => {
+      writeSource("image.png", "not-an-image");
+      const outcome = await resolveTargetWorkflow(
+        { file: "image.png" },
+        { ...DEFAULT_POLICY, fileLevelAllowed: true },
+        buildDeps(
+          new TestCapabilityAdapter({
+            readiness: { kind: "unavailable", reason: "No semantic server" },
+          }),
+        ),
+      );
+
+      expect(outcome).toMatchObject({
+        kind: "invalid-input",
+        message: expect.stringContaining('code_find` with `mode: "text"'),
+      });
+    });
+
     it("rejects file-only input when fileLevelAllowed is false", async () => {
       writeSource("src/mod.ts", "export const x = 1;\n");
       const adapter = new TestCapabilityAdapter({});
@@ -328,7 +384,19 @@ describe("target-workflow (deep session seam)", () => {
             },
           ],
         }),
-        outline: async () => ({ kind: "success" as const, data: [] }),
+        outline: async () => ({
+          kind: "success" as const,
+          data: [
+            {
+              name: "x",
+              kind: "const",
+              startLine: 1,
+              startCharacter: 8,
+              endLine: 1,
+              endCharacter: 19,
+            },
+          ],
+        }),
         imports: async () => ({ kind: "success" as const, data: [] }),
         calleesAt: async () => ({ kind: "unavailable" as const, message: "no" }),
         nodeAt: async () => ({ kind: "unavailable" as const, message: "no" }),
@@ -343,10 +411,134 @@ describe("target-workflow (deep session seam)", () => {
         deps,
       );
 
-      expect(outcome.kind).toBe("resolved");
-      if (outcome.kind === "resolved") {
-        expect(outcome.entry.file).toContain("src/mod.ts");
+      expect(outcome.kind).toBe("target-group");
+      if (outcome.kind === "target-group") {
+        expect(outcome.file).toContain("src/mod.ts");
+        expect(outcome.targets).toHaveLength(1);
+        expect(outcome.targets[0]?.name).toBe("x");
+        expect(outcome.targets[0]?.provenance).toBe("structural");
+        expect(outcome.targets[0]?.position).not.toEqual({ line: 0, character: 0 });
       }
+    });
+
+    it("keeps overload declarations on distinct member handles", async () => {
+      writeSource(
+        "src/mod.ts",
+        "export function same(): void; export function same(value: string): void;\n",
+      );
+      const semantic = makeTestSemantic([
+        {
+          name: "same",
+          kind: "Function",
+          file: path.join(tmpDir, "src/mod.ts"),
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 17 },
+        },
+        {
+          name: "same",
+          kind: "Function",
+          file: path.join(tmpDir, "src/mod.ts"),
+          declarationAnchor: { line: 1, character: 31 },
+          nameAnchor: { line: 1, character: 47 },
+        },
+      ]);
+      const deps = buildDeps(new TestCapabilityAdapter({ semantic }));
+      const outcome = await resolveTargetWorkflow(
+        { file: "src/mod.ts" },
+        { ...DEFAULT_POLICY, fileLevelAllowed: true },
+        deps,
+      );
+
+      expect(outcome.kind).toBe("target-group");
+      if (outcome.kind !== "target-group") return;
+      expect(new Set(outcome.targets.map((target) => target.targetId))).toHaveLength(2);
+      expect(outcome.targets.map((target) => target.displayLine)).toEqual([1, 1]);
+      expect(outcome.targets.map((target) => target.provenance)).toEqual(["semantic", "semantic"]);
+
+      const anchored = await resolveTargetWorkflow(
+        { anchor: { file: "src/mod.ts", line: 1, character: 47 } },
+        DEFAULT_POLICY,
+        deps,
+      );
+      expect(anchored).toMatchObject({
+        kind: "resolved",
+        entry: { targetId: outcome.targets[1]?.targetId, displayCharacter: 47 },
+      });
+    });
+
+    it("reuses a structural member handle when semantic facts appear later", async () => {
+      writeSource("src/mod.ts", "const helper = () => 1;\n");
+      const structural = makeTestStructural({
+        outline: async () => ({
+          kind: "success",
+          data: [
+            {
+              name: "helper",
+              kind: "function",
+              startLine: 1,
+              startCharacter: 7,
+              endLine: 1,
+              endCharacter: 24,
+            },
+          ],
+        }),
+      });
+      const first = await resolveTargetWorkflow(
+        { file: "src/mod.ts" },
+        { ...DEFAULT_POLICY, fileLevelAllowed: true },
+        buildDeps(new TestCapabilityAdapter({ semantic: makeTestSemantic([]), structural })),
+      );
+      expect(first.kind).toBe("target-group");
+      if (first.kind !== "target-group") return;
+
+      const semantic = makeTestSemantic([
+        {
+          name: "helper",
+          kind: "Variable",
+          file: path.join(tmpDir, "src/mod.ts"),
+          declarationAnchor: { line: 1, character: 1 },
+          nameAnchor: { line: 1, character: 7 },
+        },
+      ]);
+      const refined = await resolveTargetWorkflow(
+        { file: "src/mod.ts" },
+        { ...DEFAULT_POLICY, fileLevelAllowed: true },
+        buildDeps(new TestCapabilityAdapter({ semantic, structural })),
+      );
+      expect(refined.kind).toBe("target-group");
+      if (refined.kind !== "target-group") return;
+
+      expect(refined.targets[0]?.targetId).toBe(first.targets[0]?.targetId);
+      expect(refined.targets[0]).toMatchObject({
+        anchorKind: "name",
+        confidence: "semantic",
+        provenance: "semantic+structural",
+      });
+    });
+
+    it("registers only bounded group members while retaining exact completeness", async () => {
+      writeSource("src/mod.ts", "const one = 1;\nconst two = 2;\nconst three = 3;\n");
+      const semantic = makeTestSemantic(
+        ["one", "two", "three"].map((name, index) => ({
+          name,
+          kind: "Variable",
+          file: path.join(tmpDir, "src/mod.ts"),
+          declarationAnchor: { line: index + 1, character: 1 },
+          nameAnchor: { line: index + 1, character: 7 },
+        })),
+      );
+      const outcome = await resolveTargetWorkflow(
+        { file: "src/mod.ts" },
+        { ...DEFAULT_POLICY, fileLevelAllowed: true, maxResults: 1 },
+        buildDeps(new TestCapabilityAdapter({ semantic })),
+      );
+
+      expect(outcome.kind).toBe("target-group");
+      if (outcome.kind !== "target-group") return;
+      expect(outcome.targets).toHaveLength(1);
+      expect(store).toHaveLength(1);
+      expect(outcome.totalCount).toBe(3);
+      expect(outcome.omittedCount).toBe(2);
     });
   });
 
@@ -387,6 +579,92 @@ describe("target-workflow (deep session seam)", () => {
         expect(outcome.entry.name).toBe("foo");
         expect(outcome.entry.anchorKind).toBe("name");
       }
+    });
+
+    it("requires LSP readiness before structural anchor supplementation", async () => {
+      writeSource("src/mod.ts", "export function foo() {}\n");
+      let structuralCalls = 0;
+      const structural = makeTestStructural({
+        nodeAt: async () => {
+          structuralCalls++;
+          return {
+            kind: "success",
+            data: {
+              type: "identifier",
+              startLine: 1,
+              startCharacter: 17,
+              endLine: 1,
+              endCharacter: 20,
+              text: "foo",
+              ancestry: [
+                {
+                  type: "function_declaration",
+                  startLine: 1,
+                  startCharacter: 8,
+                  endLine: 1,
+                  endCharacter: 25,
+                },
+              ],
+            },
+          };
+        },
+      });
+      const adapter = new TestCapabilityAdapter({
+        structural,
+        readiness: { kind: "unavailable", reason: "LSP disabled" },
+      });
+
+      const outcome = await resolveTargetWorkflow(
+        { anchor: { file: "src/mod.ts", line: 1, character: 17 } },
+        DEFAULT_POLICY,
+        buildDeps(adapter),
+      );
+
+      expect(outcome).toEqual({ kind: "unavailable", reason: "LSP disabled" });
+      expect(structuralCalls).toBe(0);
+    });
+
+    it("allows structural anchor supplementation after LSP readiness", async () => {
+      writeSource("src/mod.ts", "export function foo() {}\n");
+      const semantic = makeTestSemantic([]);
+      const structural = makeTestStructural({
+        nodeAt: async () => ({
+          kind: "success",
+          data: {
+            type: "identifier",
+            startLine: 1,
+            startCharacter: 17,
+            endLine: 1,
+            endCharacter: 20,
+            text: "foo",
+            ancestry: [
+              {
+                type: "function_declaration",
+                startLine: 1,
+                startCharacter: 8,
+                endLine: 1,
+                endCharacter: 25,
+              },
+            ],
+          },
+        }),
+      });
+      const adapter = new TestCapabilityAdapter({
+        semantic,
+        structural,
+        readiness: { kind: "ready" },
+      });
+
+      const outcome = await resolveTargetWorkflow(
+        { anchor: { file: "src/mod.ts", line: 1, character: 17 } },
+        DEFAULT_POLICY,
+        buildDeps(adapter),
+      );
+
+      expect(outcome).toMatchObject({
+        kind: "resolved",
+        entry: { name: "foo", anchorKind: "name", confidence: "structural" },
+      });
     });
 
     it("returns invalid-input for non-existent file", async () => {

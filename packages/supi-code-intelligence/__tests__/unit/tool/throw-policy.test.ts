@@ -17,6 +17,7 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
     clearMockRuntime();
     tmpDir = mkdtempSync(path.join(os.tmpdir(), "ci-throw-policy-"));
     writeFileSync(path.join(tmpDir, "a.ts"), "export function foo() { return 1; }\n");
+    writeFileSync(path.join(tmpDir, "image.png"), "not-an-image");
   });
 
   afterEach(() => {
@@ -50,6 +51,16 @@ describe("throw policy: whole-tool-unavailable throws, invalid usage returns tex
   });
 
   // ── Self-correctable invalid usage → returns error text (no throw) ────
+
+  it("code_resolve returns corrective invalid-input text for an unsupported file", async () => {
+    const result = await executeResolveTool({ target: { file: "image.png" } }, makeTestCtx(tmpDir));
+
+    expect(result.content).toContain('code_find` with `mode: "text"');
+    expect(result.details).toMatchObject({
+      type: "resolve",
+      data: { resultKind: "invalid-input" },
+    });
+  });
 
   it("code_find returns text (not throw) for an empty query", async () => {
     const result = await executeFindTool({ query: "" }, makeTestCtx(tmpDir));

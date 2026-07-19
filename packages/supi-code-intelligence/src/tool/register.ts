@@ -19,6 +19,9 @@ import { renderRefactorPlanCall, renderRefactorPlanResult } from "./refactor-pla
 import { renderResolveCall, renderResolveResult } from "./resolve/tui.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS, type CodeIntelligenceToolDefinitionSpec } from "./specs.ts";
 
+const TOOL_OUTPUT_CONTRACT =
+  " Output is truncated at 2000 lines or 50KB; full Markdown is saved to a temporary file when truncated.";
+
 interface ToolRenderer {
   // biome-ignore lint/suspicious/noExplicitAny: pi render call/result signatures vary per tool; spread into pi.registerTool where concrete typing handles variance
   renderCall?: (...args: any[]) => Component;
@@ -82,7 +85,7 @@ export function registerCodeIntelligenceTools(
     pi.registerTool({
       name: spec.name,
       label: spec.label,
-      description: surface.description,
+      description: surface.description + TOOL_OUTPUT_CONTRACT,
       promptSnippet: surface.promptSnippet,
       promptGuidelines: surface.promptGuidelines,
       parameters: spec.parameters,
@@ -99,7 +102,7 @@ export function registerCodeIntelligenceTools(
           maxLines: spec.maxLines,
           maxBytes: spec.maxBytes,
         });
-        if (truncated && spec.spillToTempFile && content.length > 0) {
+        if (truncated && content.length > 0) {
           const dir = mkdtempSync(join(tmpdir(), "supi-ci-"));
           const spillPath = join(dir, `${spec.name}-output.md`);
           writeFileSync(spillPath, content, "utf-8");

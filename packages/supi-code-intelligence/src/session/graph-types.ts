@@ -1,4 +1,3 @@
-import type { EvidenceListMetadata } from "../analysis/evidence.ts";
 import type { ReadNextItem } from "../analysis/read-next.ts";
 import type {
   CallEntry,
@@ -31,7 +30,6 @@ export type GraphSection =
         readonly externalCount: number;
         readonly confidence: "semantic";
       };
-      readonly evidenceLists: readonly EvidenceListMetadata[];
       readonly readNext: readonly ReadNextItem[];
     }
   | {
@@ -42,7 +40,6 @@ export type GraphSection =
         readonly calls: readonly CallEntry[];
         readonly depth: "direct" | "deep";
       };
-      readonly evidenceLists: readonly EvidenceListMetadata[];
       readonly readNext: readonly ReadNextItem[];
     }
   | {
@@ -52,7 +49,6 @@ export type GraphSection =
         readonly implementations: readonly ImplementationEntry[];
         readonly externalCount: number;
       };
-      readonly evidenceLists: readonly EvidenceListMetadata[];
       readonly readNext: readonly ReadNextItem[];
     }
   | {
@@ -73,4 +69,4 @@ export interface CompletedGraphWorkflow {
 /** Graph workflow outcome, preserving target disambiguation and failure states. */
 export type GraphWorkflowOutcome =
   | CompletedGraphWorkflow
-  | Exclude<TargetWorkflowOutcome, { kind: "resolved" }>;
+  | Exclude<TargetWorkflowOutcome, { kind: "resolved" } | { kind: "target-group" }>;

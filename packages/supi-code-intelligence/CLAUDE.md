@@ -23,7 +23,7 @@ Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts).
 - **`code_inspect`**: requires `point: { file, line, character }`; it reports local facts and throws when every inspection substrate is unavailable.
 - **`code_graph`**: accepts exactly one target handle/anchor/symbol. Relations are only `references`, structural `callees`, and `implements`; `all` means exactly those three. Callees are source-shape calls, not symbol identity.
 - **`code_find`**: AST `call` matches by written name. Modes never silently fall back. Scope is always an explicit non-empty string array.
-- **`code_resolve`**: anchored resolution requires a real symbol. Whitespace/comment coordinates fail and recommend `code_inspect`. Handle identity excludes position and includes the file fingerprint.
+- **`code_resolve`**: anchored resolution requires a real symbol. Whitespace/comment coordinates fail and recommend `code_inspect`. File selectors enumerate all declarations but materialize handles only for the bounded visible Target group, never a synthetic file-position handle. Canonical declaration line/occurrence distinguishes overloads; preferred display/name-anchor position is not identity.
 - **`code_refactor_plan`**: target is exactly one handle or anchor; operation is exactly one nested `rename_symbol`, `extract_function`, or `extract_variable` payload. No `rename` alias.
 - **`code_refactor_apply`**: revalidates SHA-256 fingerprints and edit safety. It acquires sorted per-file mutation queues and preserves cross-file rollback.
 - **`code_health`**: coverage and unused-report paths are locators only; a miss means unavailable at that path, not global absence.
@@ -34,7 +34,7 @@ Surfaces: `./extension` (PI registration) and `./api` (reusable type contracts).
 
 `WorkspaceCodeIntelligenceSession` owns target resolution, readiness, provider selection, workflow coordination, target/plan state, cancellation/progress, and overview/instruction deduplication. Workflows return immutable typed outcomes.
 
-`src/tool/result/assembly.ts` is the sole shared result-policy module. Markdown and TUI consume assembled facts independently. Do not collect evidence in renderers or parse markdown in TUI code.
+`src/tool/result/assembly.ts` is the sole shared result-policy module. Graph evidence is bounded there once so Markdown and structured details consume the same list metadata. Markdown and TUI consume assembled facts independently. Do not collect evidence in renderers or parse markdown in TUI code.
 
 Whole-workflow capability unavailable → throw from `execute()` so PI marks a real tool failure. Invalid usage → return error text so the model can self-correct. Zero matches are successful results.
 
@@ -48,9 +48,11 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 ## Target resolution
 
 - Target selectors are nested; there is no input precedence.
+- Establishment and refinement are LSP-first. Readiness requires a concrete active workspace client or successfully routed file client; runtime ownership is insufficient. Tree-sitter only supplements after semantic readiness and cannot create a target by itself.
 - Anchored resolution and symbol resolution converge in `src/session/target-workflow.ts` and `target-store.ts`.
-- Position-strict consumers require a name anchor (ADR 0003).
-- Unknown or stale handles fail explicitly; no fallback to another selector.
+- File discovery returns a bounded Target group derived from every provider-reported declaration (including nested declarations), with exact completeness, canonical cross-provider matching, and per-member provenance. It fingerprints once and registers only visible members. Empty files return successful empty groups.
+- Position-strict consumers require a name anchor (ADR 0003); repeated observations refine declaration anchors, confidence, and provenance monotonically without collapsing overloads.
+- Unknown or stale handles fail explicitly; no fallback to another selector. Existing fresh handles may still serve structural consumers after LSP loss.
 
 ## Provider/runtime contract
 
@@ -59,7 +61,8 @@ Whole-workflow capability unavailable → throw from `execute()` so PI marks a r
 ## Always-on LSP policy
 
 - `lsp.enabled` and `lsp.active` are deprecated and ignored.
-- Per-language opt-out is `lsp.servers.<language>.enabled: false`.
+- Per-language opt-out is `lsp.servers.<language>.enabled: false`; if all definitions are disabled, the controller publishes `disabled`, not `ready`.
+- Server-inventory evidence is distinct from semantic availability. Only a live owner or explicit disabled state establishes complete inventory; diagnostics require an active ready server, not merely a ready runtime owner. Diagnostic refresh attempts recovery before availability is recomputed.
 - Deprecated keys surface through `/supi-ci-status`, `code_health`, and a one-time message after the grace period.
 
 ## Refactor safety

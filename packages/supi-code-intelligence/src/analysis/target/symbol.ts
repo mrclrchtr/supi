@@ -144,9 +144,12 @@ export async function resolveSymbolTarget(
         position: { line: a.line - 1, character: a.character - 1 },
         displayLine: a.line,
         displayCharacter: a.character,
+        declarationAnchor: { ...c.declarationAnchor },
+        declarationOccurrence: 0,
         name: c.name,
         kind: c.kind,
         confidence: "semantic",
+        provenance: ["semantic"],
         anchorKind: (c.nameAnchor ? "name" : "declaration") as AnchorKind,
         container: c.container ?? null,
       },
@@ -172,9 +175,19 @@ export async function resolveSymbolTarget(
   const refined = await Promise.all(
     candidates.slice(0, cap).map((c) => refineResolvedSymbolAnchor(c, semantic)),
   );
+  const occurrences = new Map<string, number>();
   const candidatesOut = refined.map((c, idx) => {
     const relFile = path.relative(cwd, c.file);
     const a = anchorOf(c);
+    const occurrenceKey = [
+      relFile,
+      c.declarationAnchor.line,
+      c.name,
+      c.kind,
+      c.container ?? "",
+    ].join("\0");
+    const declarationOccurrence = occurrences.get(occurrenceKey) ?? 0;
+    occurrences.set(occurrenceKey, declarationOccurrence + 1);
     return {
       name: c.name,
       kind: c.kind,
@@ -182,6 +195,8 @@ export async function resolveSymbolTarget(
       file: relFile,
       line: a.line,
       character: a.character,
+      declarationAnchor: { ...c.declarationAnchor },
+      declarationOccurrence,
       reason: relFile,
       rank: idx + 1,
       anchorKind: (c.nameAnchor ? "name" : "declaration") as AnchorKind,

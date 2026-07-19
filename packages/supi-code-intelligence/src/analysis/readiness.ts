@@ -24,7 +24,7 @@ export async function ensureSemanticReadiness(
   }
 
   if (workspace.semantic.state.kind === "ready") {
-    return { kind: "ready" };
+    return resolveReadySemanticState(cwd, scope, timeoutMs);
   }
 
   if (workspace.semantic.state.kind !== "pending") {
@@ -61,6 +61,26 @@ export async function ensureSemanticReadiness(
   return scope.kind === "workspace"
     ? lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs: remainingAfterLsp })
     : lspState.runtime.waitUntilReadyForFile(scope.file, { timeoutMs: remainingAfterLsp });
+}
+
+function resolveReadySemanticState(
+  cwd: string,
+  scope: SemanticStartupScope,
+  timeoutMs: number,
+): Promise<SemanticReadinessResult> | SemanticReadinessResult {
+  const lspState = getWorkspaceLspRuntime(cwd);
+  if (lspState.kind === "ready") {
+    return scope.kind === "workspace"
+      ? lspState.runtime.waitUntilReadyForWorkspace({ timeoutMs })
+      : lspState.runtime.waitUntilReadyForFile(scope.file, { timeoutMs });
+  }
+  return {
+    kind: "unavailable",
+    reason:
+      lspState.kind === "unavailable"
+        ? lspState.reason
+        : `LSP service is ${lspState.kind} for this workspace.`,
+  };
 }
 
 async function resolveSemanticServiceState(

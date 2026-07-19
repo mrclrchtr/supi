@@ -51,11 +51,16 @@ export async function runGraphWorkflow(
     {
       fileLevelAllowed: false,
       nameAnchorRequired: false,
-      waitForSemantic: "anchor" in request.target || "symbol" in request.target,
       maxResults: request.maxResults,
     },
     deps,
   );
+  if (targetOutcome.kind === "target-group") {
+    return {
+      kind: "invalid-input",
+      message: "Graph analysis requires one member handle from a Target group.",
+    };
+  }
   if (targetOutcome.kind !== "resolved") return targetOutcome;
 
   const entry = targetOutcome.entry;
@@ -142,6 +147,6 @@ async function getSemanticReadinessError(
 /** Narrow helper retained for session method typing. */
 export function isTargetFailure(
   outcome: TargetWorkflowOutcome,
-): outcome is Exclude<TargetWorkflowOutcome, { kind: "resolved" }> {
-  return outcome.kind !== "resolved";
+): outcome is Exclude<TargetWorkflowOutcome, { kind: "resolved" } | { kind: "target-group" }> {
+  return outcome.kind !== "resolved" && outcome.kind !== "target-group";
 }

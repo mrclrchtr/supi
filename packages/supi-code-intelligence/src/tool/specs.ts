@@ -33,7 +33,6 @@ export interface CodeIntelligenceToolDefinitionSpec {
   parameters: TSchema;
   maxLines?: number;
   maxBytes?: number;
-  spillToTempFile?: boolean;
   run: (params: unknown, ctx: CodeIntelToolExecCtx) => Promise<CodeIntelResult> | CodeIntelResult;
   purpose: string;
   schemaDocs: string;
@@ -49,10 +48,14 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     parameters: CodeResolveParameters,
     run: (params, ctx) =>
       executeResolveTool(params as Parameters<typeof executeResolveTool>[0], ctx),
-    purpose: "Resolve one evidence-backed anchor, symbol query, or file into a session handle.",
+    purpose:
+      "Resolve an anchor/symbol into handles or enumerate a file's declarations as a Target group.",
     schemaDocs: "Requires one exact target selector: anchor, symbol, or file.",
     substrates: ["semantic", "structural"],
-    nonGoals: ["Handles do not persist across sessions.", "No text-search fallback."],
+    nonGoals: [
+      "Handles do not persist across sessions.",
+      "No text-search or structural-only target creation fallback.",
+    ],
   },
   {
     name: "code_inspect",
@@ -80,7 +83,6 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_graph",
     label: "Code Graph",
     parameters: CodeGraphParameters,
-    spillToTempFile: true,
     run: (params, ctx) => executeGraphTool(params as Parameters<typeof executeGraphTool>[0], ctx),
     purpose: "Collect references, structural callees, and implementations for one exact target.",
     schemaDocs:
@@ -92,7 +94,6 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     name: "code_find",
     label: "Code Find",
     parameters: CodeFindParameters,
-    spillToTempFile: true,
     run: (params, ctx) => executeFindTool(params as Parameters<typeof executeFindTool>[0], ctx),
     purpose: "Search literal text, regex, structural declarations, or semantic symbols explicitly.",
     schemaDocs:
