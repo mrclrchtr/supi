@@ -43,28 +43,28 @@ describe("Orientation result projections", () => {
     });
   });
 
-  it.each([
-    false,
-    true,
-  ])("does not invent orientation bounds when assembled evidence is absent and expanded is %s", (expanded) => {
-    const rendered = renderOrientationTui(
-      {
-        content: [{ type: "text", text: "# Multiple Orientation targets" }],
-        details: {
-          type: "context",
-          data: {
-            confidence: "semantic",
-            candidates: [{ name: "first" }],
+  it.each([false, true])(
+    "does not invent orientation bounds when assembled evidence is absent and expanded is %s",
+    (expanded) => {
+      const rendered = renderOrientationTui(
+        {
+          content: [{ type: "text", text: "# Multiple Orientation targets" }],
+          details: {
+            type: "context",
+            data: {
+              confidence: "semantic",
+              candidates: [{ name: "first" }],
+            },
           },
         },
-      },
-      { expanded, isPartial: false },
-      testTheme,
-      undefined,
-    );
+        { expanded, isPartial: false },
+        testTheme,
+        undefined,
+      );
 
-    const text = rendered.render(120).join("\n");
-    expect(text).toContain("confidence semantic");
-    expect(text).not.toContain("0 sections");
-  });
+      const text = rendered.render(120).join("\n");
+      expect(text).toContain("confidence semantic");
+      expect(text).not.toContain("0 sections");
+    },
+  );
 });

@@ -184,24 +184,25 @@ describe("code_find tool", () => {
       expect(result.content[0].text).toContain('mode "ast" requires kind');
     });
 
-    it.each([
-      "namespace",
-    ] as const)("returns invalid-input for an unknown kind when TypeBox is bypassed", async (kind) => {
-      // PI's TypeBox schema normally rejects this before execution. The
-      // session parser must return the same agent-correctable failure when a
-      // direct call bypasses that adapter validation.
-      writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
-      const tool = getCodeFindTool();
+    it.each(["namespace"] as const)(
+      "returns invalid-input for an unknown kind when TypeBox is bypassed",
+      async (kind) => {
+        // PI's TypeBox schema normally rejects this before execution. The
+        // session parser must return the same agent-correctable failure when a
+        // direct call bypasses that adapter validation.
+        writeFileSync(path.join(tmpDir, "a.ts"), "function foo() {}\n");
+        const tool = getCodeFindTool();
 
-      const result = (await tool.execute(
-        `test-ast-unsupported-${kind}`,
-        { query: "foo", mode: "ast", kind },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult;
-      expect(result.content[0].text).toContain("Unsupported AST kind");
-    });
+        const result = (await tool.execute(
+          `test-ast-unsupported-${kind}`,
+          { query: "foo", mode: "ast", kind },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        )) as TextToolResult;
+        expect(result.content[0].text).toContain("Unsupported AST kind");
+      },
+    );
   });
 
   describe("mode: text and regex", () => {
@@ -230,29 +231,29 @@ describe("code_find tool", () => {
       expect(result.details?.data.confidence).toBe("heuristic");
     });
 
-    it.each([
-      "text",
-      "regex",
-    ] as const)("preserves significant query whitespace in %s mode", async (mode) => {
-      writeFileSync(path.join(tmpDir, "a.ts"), "foo\n");
-      const tool = getCodeFindTool();
-      const query = " foo ";
+    it.each(["text", "regex"] as const)(
+      "preserves significant query whitespace in %s mode",
+      async (mode) => {
+        writeFileSync(path.join(tmpDir, "a.ts"), "foo\n");
+        const tool = getCodeFindTool();
+        const query = " foo ";
 
-      const result = (await tool.execute(
-        `test-${mode}-whitespace-query`,
-        { query, mode },
-        undefined,
-        undefined,
-        makeCtx({ cwd: tmpDir }),
-      )) as TextToolResult & {
-        details?: { type: "search"; data: { confidence: string } };
-      };
+        const result = (await tool.execute(
+          `test-${mode}-whitespace-query`,
+          { query, mode },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        )) as TextToolResult & {
+          details?: { type: "search"; data: { confidence: string } };
+        };
 
-      const text = result.content[0].text;
-      expect(text).toContain(`No matches found for \`${query}\``);
-      expect(text).toContain("**Confidence:** `heuristic`");
-      expect(result.details?.data.confidence).toBe("heuristic");
-    });
+        const text = result.content[0].text;
+        expect(text).toContain(`No matches found for \`${query}\``);
+        expect(text).toContain("**Confidence:** `heuristic`");
+        expect(result.details?.data.confidence).toBe("heuristic");
+      },
+    );
 
     it("discloses truncated text matches in markdown and details", async () => {
       writeFileSync(path.join(tmpDir, "a.ts"), "const foo = 1;\n");

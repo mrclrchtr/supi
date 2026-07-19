@@ -24,15 +24,14 @@ function render(data: Record<string, unknown>, expanded: boolean, content = ""):
 }
 
 describe("code_find result rendering", () => {
-  it.each([
-    "heuristic",
-    "structural",
-    "semantic",
-  ] as const)("exposes %s confidence from structured details", (confidence) => {
-    expect(render({ candidateCount: 1, omittedCount: 0, confidence }, false)).toContain(
-      `confidence ${confidence}`,
-    );
-  });
+  it.each(["heuristic", "structural", "semantic"] as const)(
+    "exposes %s confidence from structured details",
+    (confidence) => {
+      expect(render({ candidateCount: 1, omittedCount: 0, confidence }, false)).toContain(
+        `confidence ${confidence}`,
+      );
+    },
+  );
 
   it.each([
     {
@@ -61,26 +60,24 @@ describe("code_find result rendering", () => {
       renderedMarkdown: "showing 1; more may exist — timeout",
       badge: "1 matches (more may exist — timeout)",
     },
-  ])("projects $label from serialized evidence in compact and expanded views", ({
-    evidence,
-    markdown,
-    renderedMarkdown,
-    badge,
-  }) => {
-    for (const expanded of [false, true]) {
-      const text = render(
-        {
-          candidateCount: 99,
-          confidence: "heuristic",
-          evidenceLists: [evidence],
-          omittedCount: 98,
-        },
-        expanded,
-        markdown,
-      );
+  ])(
+    "projects $label from serialized evidence in compact and expanded views",
+    ({ evidence, markdown, renderedMarkdown, badge }) => {
+      for (const expanded of [false, true]) {
+        const text = render(
+          {
+            candidateCount: 99,
+            confidence: "heuristic",
+            evidenceLists: [evidence],
+            omittedCount: 98,
+          },
+          expanded,
+          markdown,
+        );
 
-      expect(text).toContain(badge);
-      if (expanded) expect(text).toContain(renderedMarkdown);
-    }
-  });
+        expect(text).toContain(badge);
+        if (expanded) expect(text).toContain(renderedMarkdown);
+      }
+    },
+  );
 });
