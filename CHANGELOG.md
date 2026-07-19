@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.5.0](https://github.com/mrclrchtr/supi/compare/v2.4.1...v2.5.0) (2026-07-19)
+
+
+### Features
+
+* **ask-user:** reuse registered custom editor for the dialog text field ([4012414](https://github.com/mrclrchtr/supi/commit/40124143d288b6233eed3a9f554eb521b6a1d8dd)), closes [#195](https://github.com/mrclrchtr/supi/issues/195)
+
+
+### Bug Fixes
+
+* **ask-user:** preserve modal custom editor behavior ([58478b7](https://github.com/mrclrchtr/supi/commit/58478b7cce5a74d9eca6258184b96adf2d5bd622))
+* **ci:** adapt to biome 2.5.4 ([2b763a2](https://github.com/mrclrchtr/supi/commit/2b763a294189f40fb3c8c547f5cb4bb65ffbf9fc))
+* **deps:** update dependency @biomejs/biome to v2.5.4 ([0b3406b](https://github.com/mrclrchtr/supi/commit/0b3406bac70e6d4d76aa86e913caed50e0c30826))
+* **deps:** update pnpm to v11.13.1 ([c393580](https://github.com/mrclrchtr/supi/commit/c393580781ef8bb4912288333057b902b92b1ea1))
+* **test-utils:** stabilize makeCtx declaration type ([1f37694](https://github.com/mrclrchtr/supi/commit/1f37694cdc882c5a95b174cfe489f956c18bef08))
+
 ## [2.4.1](https://github.com/mrclrchtr/supi/compare/v2.4.0...v2.4.1) (2026-07-15)
 
 
