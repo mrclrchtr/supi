@@ -51,6 +51,8 @@ import { normalizeQuestionnaire, AskUserController } from "@mrclrchtr/supi-ask-u
 - Text questions reserve printable input for the editor; use `Alt+C` for question comments and `Alt+U` for unanswered. On choice questions, plain `c` and `u` work.
 - Option comments are **preserved on deselection** — only removed when explicitly cleared. Only touched options (selected and/or commented) appear in responses.
 - In comment editors, `Esc` discards unsaved edits and returns to form/review **without cancelling the interaction**.
+- A registered custom editor is instantiated once per form and reused for text answers and every comment surface. Invalid or throwing factories warn and fall back to the default editor.
+- Embedded `CustomEditor` instances receive `Esc` first for modal transitions; delegated interrupts return to Ask User's cancel/discard behavior. Main-prompt action handlers are not reproduced inside the form.
 - `recommendation` on single-select defaults to first option; on multi-select defaults to none.
 - Completed forms are labeled `decision` in the session tree for visibility and filtering (`labeled-only` filter mode in `/tree`). Results are persisted as a custom session entry (`pi.appendEntry("ask_user", ...)`) for state tracking. In chat history, results can be expanded read-only with `Ctrl+O` — this does not reopen the live form.
 - Model-visible result summaries are truncated to Pi's default 2,000-line / 50KB tool-output limits with a clear truncation notice.

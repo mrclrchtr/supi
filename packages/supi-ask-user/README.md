@@ -30,7 +30,7 @@ All questions are expected to be answered before the form can be submitted. If y
 
 You can also add comments to individual questions, options, or the whole form if you want to explain your thinking.
 
-If you have configured a custom Pi editor, such as a Vim or Emacs editor, Ask User reuses it for text answers and all comment fields. The decision form keeps ownership of its navigation shortcuts; main-prompt actions such as model switching are not reproduced inside the form.
+If you have configured a custom Pi editor, such as a Vim or Emacs editor, Ask User creates one editor instance per form and reuses it for text answers and all comment fields. If the custom editor cannot be initialized or does not satisfy Pi's editor contract, Ask User warns and uses the default editor for that form. The decision form keeps ownership of its navigation shortcuts; main-prompt actions such as model switching are not reproduced inside the form.
 
 ## Agent-facing behavior
 
