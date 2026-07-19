@@ -29,6 +29,7 @@ export async function runFormQuestionnaire(
         keybindings: kb,
         onToggleToolsExpanded: opts.onToggleToolsExpanded,
         editorFactory,
+        notify: opts.ui.notify,
       }),
   );
 }

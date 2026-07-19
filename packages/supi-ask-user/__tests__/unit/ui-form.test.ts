@@ -1,11 +1,11 @@
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { type EditorComponent, visibleWidth } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 import type { NormalizedQuestionnaire } from "../../src/types.ts";
 import { runFormQuestionnaire } from "../../src/ui/form.ts";
 import type { AskUserUiContext, EditorFactory } from "../../src/ui/types.ts";
 import { makeFormCtx } from "../helpers/index.ts";
 
-class FakeEditor {
+class FakeEditor implements EditorComponent {
   text = "";
   onChange?: (text: string) => void;
   onSubmit?: (text: string) => void;
@@ -33,6 +33,23 @@ class FakeEditor {
     }
     this.text += data;
     this.onChange?.(this.text);
+  }
+}
+
+class FakeModalEditor extends FakeEditor {
+  mode: "insert" | "normal" = "insert";
+  onEscape?: () => void;
+
+  override handleInput(data: string): void {
+    if (data === "\u001b") {
+      if (this.mode === "insert") {
+        this.mode = "normal";
+      } else {
+        this.onEscape?.();
+      }
+      return;
+    }
+    super.handleInput(data);
   }
 }
 
@@ -1115,7 +1132,7 @@ describe("runFormQuestionnaire", () => {
         expect(tui).toBeDefined();
         expect(theme).toBeDefined();
         expect(keybindings).toBeDefined();
-        return fakeEditor as unknown as ReturnType<EditorFactory>;
+        return fakeEditor;
       };
 
       const { captured, ctx, outcomePromise } = makeFormCtx();
@@ -1159,6 +1176,94 @@ describe("runFormQuestionnaire", () => {
         answered: true,
         value: "vim answer",
       });
+    });
+
+    it("lets a modal editor leave insert mode before cancelling the form", async () => {
+      const modalEditor = new FakeModalEditor();
+      const editorFactory: EditorFactory = () => modalEditor;
+      const { captured, ctx, outcomePromise } = makeFormCtx();
+      const uiWithEditor = {
+        ...ctx.ui,
+        getEditorComponent: () => editorFactory,
+      } as unknown as AskUserUiContext;
+
+      void runFormQuestionnaire(textQuestionnaire, { ui: uiWithEditor });
+
+      await Promise.resolve();
+      if (!captured.value) throw new Error("form component was not created");
+
+      captured.value.handleInput?.(escKey());
+      expect(modalEditor.mode).toBe("normal");
+
+      captured.value.handleInput?.(escKey());
+      await expect(outcomePromise).resolves.toMatchObject({ kind: "cancel" });
+    });
+
+    it("reuses the modal editor for every comment surface", async () => {
+      const modalEditor = new FakeModalEditor();
+      let factoryCalls = 0;
+      const editorFactory: EditorFactory = () => {
+        factoryCalls += 1;
+        return modalEditor;
+      };
+      const { captured, ctx } = makeFormCtx();
+      const uiWithEditor = {
+        ...ctx.ui,
+        getEditorComponent: () => editorFactory,
+      } as unknown as AskUserUiContext;
+
+      void runFormQuestionnaire(questionnaire, { ui: uiWithEditor });
+
+      await Promise.resolve();
+      if (!captured.value) throw new Error("form component was not created");
+
+      captured.value.handleInput?.("c");
+      expect(captured.value.render(100).join("\n")).toContain("FAKE_EDITOR:");
+      captured.value.handleInput?.(escKey());
+      captured.value.handleInput?.(escKey());
+
+      captured.value.handleInput?.("n");
+      expect(captured.value.render(100).join("\n")).toContain("FAKE_EDITOR:");
+      captured.value.handleInput?.(escKey());
+
+      captured.value.handleInput?.(enterKey());
+      captured.value.handleInput?.("c");
+      expect(captured.value.render(100).join("\n")).toContain("FAKE_EDITOR:");
+      expect(modalEditor.mode).toBe("normal");
+      expect(factoryCalls).toBe(1);
+    });
+
+    it.each([
+      [
+        "throws",
+        (() => {
+          throw new Error("broken editor");
+        }) satisfies EditorFactory,
+      ],
+      ["returns an invalid component", (() => ({})) as unknown as EditorFactory],
+    ])("warns and uses the default editor when the custom factory %s", async (_case, factory) => {
+      const { captured, ctx, outcomePromise } = makeFormCtx();
+      const uiWithEditor = {
+        ...ctx.ui,
+        getEditorComponent: () => factory,
+      } as unknown as AskUserUiContext;
+      let rejection: unknown;
+
+      void runFormQuestionnaire(textQuestionnaire, { ui: uiWithEditor }).catch((error: unknown) => {
+        rejection = error;
+      });
+
+      await Promise.resolve();
+      expect(rejection).toBeUndefined();
+      if (!captured.value) throw new Error("form component was not created");
+      expect(ctx.ui.notify).toHaveBeenCalledWith(
+        expect.stringContaining("using the default editor"),
+        "warning",
+      );
+
+      captured.value.handleInput?.(enterKey());
+      captured.value.handleInput?.(enterKey());
+      await expect(outcomePromise).resolves.toMatchObject({ outcome: "submitted" });
     });
 
     it("falls back to the default editor when no custom editor is registered", async () => {

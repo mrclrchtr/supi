@@ -29,6 +29,7 @@ type FormCtx = Omit<ReturnType<typeof makeCtx>, "ui"> & {
       ) => unknown,
     ) => Promise<unknown>;
     setWorkingVisible: ReturnType<typeof vi.fn>;
+    getEditorComponent?: ReturnType<typeof vi.fn>;
   };
 };
 
@@ -161,6 +162,30 @@ describe("ask_user tool", () => {
     expect(result.content[0]?.text).toContain("Prettier");
     expect(result.content[0]?.text).toContain("Avoid here");
     expect(ctx.abort).not.toHaveBeenCalled();
+  });
+
+  it("forwards the configured editor lookup to the form renderer", async () => {
+    const pi = createPiMock() as unknown as PiApi;
+    askUserExtension(pi);
+    const tool = getTool(pi, "ask_user");
+    const ctx = makeFormCtx({
+      outcome: "submitted",
+      responses: [
+        {
+          questionId: "formatter",
+          answer: {
+            kind: "choice",
+            answered: true,
+            options: [{ value: "biome", label: "Biome", selected: true }],
+          },
+        },
+      ],
+    });
+    ctx.ui.getEditorComponent = vi.fn(() => undefined);
+
+    await tool.execute("tc-editor", request, undefined, undefined, ctx);
+
+    expect(ctx.ui.getEditorComponent).toHaveBeenCalledTimes(1);
   });
 
   it("aborts the turn when the form returns an internal cancel result", async () => {

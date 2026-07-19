@@ -19,6 +19,7 @@ export class AskUserForm implements Component, Focusable {
   private mode: FormMode = "choice";
   private focus: FocusTarget = "choices";
   private readonly editor: EditorComponent;
+  private readonly editorHandlesEscape: boolean;
   private settingEditorText: boolean = false;
   private choiceFocusIndex = 0;
   private readonly choiceFocusByQuestionId = new Map<string, number>();
@@ -36,16 +37,17 @@ export class AskUserForm implements Component, Focusable {
   private readonly onAbort: () => void;
 
   constructor(private readonly args: FormArgs) {
-    const editorTheme = makeEditorTheme(args);
-    this.editor = args.editorFactory
-      ? args.editorFactory(args.tui, editorTheme, args.keybindings)
-      : new Editor(args.tui, editorTheme);
-    this.editor.onChange = () => {
-      if (this.settingEditorText) return;
-      this.syncTextAnswerFromEditor();
-      this.refresh();
-    };
-    this.editor.onSubmit = (value) => this.handleEditorSubmit(value);
+    const { editor, handlesEscape } = createFormEditor(args, {
+      onChange: () => {
+        if (this.settingEditorText) return;
+        this.syncTextAnswerFromEditor();
+        this.refresh();
+      },
+      onSubmit: (value) => this.handleEditorSubmit(value),
+      onEscape: () => this.handleEditorEscape(),
+    });
+    this.editor = editor;
+    this.editorHandlesEscape = handlesEscape;
     this.syncCurrentQuestion();
     this.onAbort = () => {
       this.args.controller.abort();
@@ -117,6 +119,12 @@ export class AskUserForm implements Component, Focusable {
   private handleEscapeKey(data: string): boolean {
     if (!matchesKey(data, Key.escape)) return false;
 
+    if (this.editorHandlesEscape && (this.mode === "text" || this.isCommentEditorMode())) {
+      this.editor.handleInput(data);
+      if (!this.closed) this.refresh();
+      return true;
+    }
+
     if (this.isCommentEditorMode()) {
       this.returnFromCommentEditor();
       this.refresh();
@@ -138,6 +146,18 @@ export class AskUserForm implements Component, Focusable {
     this.args.controller.cancel();
     this.finish();
     return true;
+  }
+
+  private handleEditorEscape(): void {
+    if (this.isCommentEditorMode()) {
+      this.returnFromCommentEditor();
+      this.refresh();
+      return;
+    }
+    if (this.mode === "text") {
+      this.args.controller.cancel();
+      this.finish();
+    }
   }
 
   private handleNavigationKey(data: string): boolean {
@@ -566,6 +586,62 @@ export class AskUserForm implements Component, Focusable {
         return undefined;
     }
   }
+}
+
+interface FormEditorCallbacks {
+  onChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+  onEscape: () => void;
+}
+
+function createFormEditor(
+  args: FormArgs,
+  callbacks: FormEditorCallbacks,
+): { editor: EditorComponent; handlesEscape: boolean } {
+  const editorTheme = makeEditorTheme(args);
+  const createDefault = () => {
+    const editor = new Editor(args.tui, editorTheme);
+    configureFormEditor(editor, callbacks, false);
+    return { editor, handlesEscape: false };
+  };
+  if (!args.editorFactory) return createDefault();
+
+  try {
+    const editor: unknown = args.editorFactory(args.tui, editorTheme, args.keybindings);
+    if (!isEditorComponent(editor)) {
+      throw new Error("factory returned an invalid EditorComponent");
+    }
+    const handlesEscape = "onEscape" in editor;
+    configureFormEditor(editor, callbacks, handlesEscape);
+    return { editor, handlesEscape };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    args.notify?.(
+      `Custom editor unavailable in ask_user; using the default editor: ${reason}`,
+      "warning",
+    );
+    return createDefault();
+  }
+}
+
+function configureFormEditor(
+  editor: EditorComponent,
+  callbacks: FormEditorCallbacks,
+  handlesEscape: boolean,
+): void {
+  editor.onChange = callbacks.onChange;
+  editor.onSubmit = callbacks.onSubmit;
+  if (handlesEscape) {
+    (editor as EditorComponent & { onEscape: () => void }).onEscape = callbacks.onEscape;
+  }
+}
+
+function isEditorComponent(value: unknown): value is EditorComponent {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return ["render", "invalidate", "getText", "setText", "handleInput"].every(
+    (method) => typeof candidate[method] === "function",
+  );
 }
 
 function makeEditorTheme(args: FormArgs): EditorTheme {

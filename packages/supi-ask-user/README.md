@@ -30,6 +30,8 @@ All questions are expected to be answered before the form can be submitted. If y
 
 You can also add comments to individual questions, options, or the whole form if you want to explain your thinking.
 
+If you have configured a custom Pi editor, such as a Vim or Emacs editor, Ask User reuses it for text answers and all comment fields. The decision form keeps ownership of its navigation shortcuts; main-prompt actions such as model switching are not reproduced inside the form.
+
 ## Agent-facing behavior
 
 `ask_user` is an interactive TUI-only handoff. The agent should use one form for one focused decision, combine related questions instead of opening multiple forms, and wait for the result before doing work that depends on your answer. Only one form can be active at a time.
@@ -109,5 +111,7 @@ The model-visible result summary is bounded to Pi's default tool-output limits: 
 |-----|--------|
 | `Enter` | Save comment and return |
 | `Esc` | Discard comment edits and return |
+
+With a modal custom editor, `Esc` is offered to the editor first so it can leave insert mode. When the editor delegates the interrupt, Ask User performs the cancel or discard action shown above.
 
 The recommended option is labeled `[recommended]`. On wide terminals, option details render side-by-side with the list; on narrow terminals they stack below.
