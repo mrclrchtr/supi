@@ -116,6 +116,39 @@ export interface PiMockOptions {
   sessionName?: string;
 }
 
+interface MockHandlerContext {
+  cwd: string;
+  model: { provider: string; id: string; name: string };
+  ui: {
+    setStatus: (...args: unknown[]) => unknown;
+    notify: (...args: unknown[]) => unknown;
+    setTitle: (...args: unknown[]) => unknown;
+    setWidget: (...args: unknown[]) => unknown;
+    removeWidget: (...args: unknown[]) => unknown;
+    getEditorText: () => string;
+    setEditorText: (...args: unknown[]) => unknown;
+    input: () => Promise<string | undefined>;
+    custom: (...args: unknown[]) => Promise<unknown>;
+    theme: {
+      accent: string;
+      dim: string;
+      error: string;
+      warning: string;
+      success: string;
+      fg: (color: string, text: string) => string;
+      bg: (color: string, text: string) => string;
+      bold: (text: string) => string;
+    };
+  };
+  sessionManager: {
+    getBranch: () => unknown[];
+  };
+  getContextUsage: () =>
+    | { tokens: number | null; contextWindow: number; percent: number | null }
+    | undefined;
+  getSystemPrompt: () => string;
+}
+
 export interface PiMock {
   on: (event: string, handler: (...args: unknown[]) => unknown) => void;
   registerCommand: (name: string, spec: unknown) => void;
@@ -161,7 +194,7 @@ export interface PiMock {
  * const ctx = makeCtx({ getContextUsage: () => ({ tokens: 1000, contextWindow: 100000, percent: 1 }) });
  * ```
  */
-export function makeCtx(overrides: Record<string, unknown> = {}) {
+export function makeCtx(overrides: Record<string, unknown> = {}): MockHandlerContext {
   return {
     cwd: "/project",
     model: { provider: "openai", id: "gpt-4", name: "GPT-4" },
