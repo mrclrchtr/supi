@@ -2,8 +2,10 @@
 import {
   type Component,
   Editor,
+  type EditorComponent,
   type EditorTheme,
   type Focusable,
+  isFocusable,
   Key,
   matchesKey,
 } from "@earendil-works/pi-tui";
@@ -16,7 +18,7 @@ export class AskUserForm implements Component, Focusable {
   focused: boolean = false;
   private mode: FormMode = "choice";
   private focus: FocusTarget = "choices";
-  private readonly editor: Editor;
+  private readonly editor: EditorComponent;
   private settingEditorText: boolean = false;
   private choiceFocusIndex = 0;
   private readonly choiceFocusByQuestionId = new Map<string, number>();
@@ -34,7 +36,10 @@ export class AskUserForm implements Component, Focusable {
   private readonly onAbort: () => void;
 
   constructor(private readonly args: FormArgs) {
-    this.editor = new Editor(args.tui, makeEditorTheme(args));
+    const editorTheme = makeEditorTheme(args);
+    this.editor = args.editorFactory
+      ? args.editorFactory(args.tui, editorTheme, args.keybindings)
+      : new Editor(args.tui, editorTheme);
     this.editor.onChange = () => {
       if (this.settingEditorText) return;
       this.syncTextAnswerFromEditor();
@@ -51,7 +56,7 @@ export class AskUserForm implements Component, Focusable {
 
   render(width: number): string[] {
     const editorFocused = this.focused && this.focus === "editor";
-    this.editor.focused = editorFocused;
+    if (isFocusable(this.editor)) this.editor.focused = editorFocused;
 
     if (
       this.cachedWidth === width &&
@@ -497,7 +502,10 @@ export class AskUserForm implements Component, Focusable {
     if (this.mode !== "text") return;
     const question = this.args.controller.currentQuestion;
     if (question.type !== "text") return;
-    this.args.controller.setTextAnswer(question.id, this.editor.getExpandedText());
+    this.args.controller.setTextAnswer(
+      question.id,
+      this.editor.getExpandedText?.() ?? this.editor.getText(),
+    );
   }
 
   private restoreChoiceFocus(

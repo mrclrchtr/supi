@@ -22,6 +22,7 @@ import type {
   NormalizedQuestionnaire,
 } from "./types.ts";
 import { runQuestionnaire } from "./ui/choose-renderer.ts";
+import type { EditorFactory } from "./ui/types.ts";
 
 export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "mode" | "abort"> & {
   ui: {
@@ -31,6 +32,7 @@ export type AskUserExecutionContext = Pick<ExtensionContext, "cwd" | "hasUI" | "
     setTitle?(title: string): void;
     getToolsExpanded?(): boolean;
     setToolsExpanded?(expanded: boolean): void;
+    getEditorComponent?(): EditorFactory | undefined;
   };
 };
 
@@ -141,6 +143,9 @@ export async function executeAskUser(
       ui: {
         custom: asFunction(ctx.ui.custom),
         notify: ctx.ui.notify,
+        getEditorComponent: ctx.ui.getEditorComponent
+          ? () => ctx.ui.getEditorComponent?.()
+          : undefined,
       },
       signal,
       onToggleToolsExpanded:

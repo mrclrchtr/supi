@@ -1,4 +1,8 @@
-import type { KeybindingsManager, Theme } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionUIContext,
+  KeybindingsManager,
+  Theme,
+} from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import type { AskUserController } from "../session/controller.ts";
 import type {
@@ -7,8 +11,13 @@ import type {
   NormalizedQuestionnaire,
 } from "../types.ts";
 
+// `EditorFactory` isn't re-exported from the package root; derive it from the
+// interface method that is exported.
+export type EditorFactory = NonNullable<ReturnType<ExtensionUIContext["getEditorComponent"]>>;
+
 export interface AskUserUiContext {
   notify?(message: string, type?: "info" | "warning" | "error"): void;
+  getEditorComponent?(): EditorFactory | undefined;
   custom?<T>(
     factory: (
       tui: TUI,
@@ -39,4 +48,5 @@ export interface FormArgs {
   signal?: AbortSignal;
   keybindings: KeybindingsManager;
   onToggleToolsExpanded?: () => void;
+  editorFactory?: EditorFactory;
 }
