@@ -49,4 +49,5 @@ export interface FormArgs {
   keybindings: KeybindingsManager;
   onToggleToolsExpanded?: () => void;
   editorFactory?: EditorFactory;
+  notify?: AskUserUiContext["notify"];
 }
