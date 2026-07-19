@@ -165,6 +165,46 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.assembled.actions[0]?.kind).toBe("query");
   });
 
+  it("renders one note for structural identifier resolution", () => {
+    const assembly = assembleResolveResult(
+      {
+        kind: "resolved",
+        notes: [
+          "Resolved from provider-backed structural identifier evidence.",
+          "Independent workflow note.",
+        ],
+        entry: {
+          targetId: "tg-structural",
+          spanId: "sp-structural",
+          file: "/repo/src/a.ts",
+          position: { line: 0, character: 16 },
+          displayLine: 1,
+          displayCharacter: 17,
+          name: "foo",
+          kind: "Function",
+          container: null,
+          confidence: "semantic",
+          provenance: "semantic+structural",
+          anchorKind: "name",
+          fileFingerprint: "fp",
+          resolution: {
+            requested: { line: 1, character: 17 },
+            resolved: { line: 1, character: 17 },
+            snapped: false,
+            source: "structural-identifier",
+          },
+        },
+      },
+      "/repo",
+    );
+
+    const markdown = renderResolveResult(assembly);
+
+    expect(markdown.match(/_Note:/g)).toHaveLength(2);
+    expect(markdown).toContain("structural-identifier evidence");
+    expect(markdown).toContain("Independent workflow note");
+  });
+
   it("assembles a bounded file Target group without synthetic handles", () => {
     const makeTarget = (name: string, line: number) => ({
       targetId: `tg-${name}`,

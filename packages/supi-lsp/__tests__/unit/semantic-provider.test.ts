@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { SemanticProvider } from "@mrclrchtr/supi-code-runtime/api";
 import { describe, expect, it, vi } from "vitest";
 import { createLspSemanticProvider } from "../../src/provider/lsp-semantic-provider.ts";
@@ -138,6 +141,34 @@ describe("LspSemanticProvider", () => {
       expect(result?.[0].kind).toBe("Class");
       expect(result?.[1].name).toBe("myMethod");
       expect(result?.[1].container).toBe("myClass");
+    });
+
+    it("repairs a selection range that starts at the declaration instead of the symbol name", async () => {
+      const tmpDir = mkdtempSync(path.join(os.tmpdir(), "semantic-provider-anchor-"));
+      const file = path.join(tmpDir, "overload.ts");
+      writeFileSync(file, "export function liveOverload(value: number): number;\n");
+      const lsp = createMockLsp({
+        documentSymbols: vi.fn().mockResolvedValue([
+          {
+            name: "liveOverload",
+            kind: 12,
+            range: { start: { line: 0, character: 0 }, end: { line: 0, character: 52 } },
+            selectionRange: {
+              start: { line: 0, character: 0 },
+              end: { line: 0, character: 52 },
+            },
+          },
+        ]),
+      });
+
+      try {
+        const result = await createLspSemanticProvider(lsp).documentSymbols(file);
+
+        expect(result?.[0].declarationAnchor).toEqual({ line: 1, character: 1 });
+        expect(result?.[0].nameAnchor).toEqual({ line: 1, character: 17 });
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
     });
   });
 

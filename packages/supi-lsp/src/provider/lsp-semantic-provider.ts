@@ -1,6 +1,7 @@
 // LSP semantic provider adapter — wraps WorkspaceLspRuntime into the shared
 // SemanticProvider contract from supi-code-runtime.
 
+import { readFile } from "node:fs/promises";
 import type {
   CodeLocation,
   CodePosition,
@@ -83,7 +84,8 @@ export function createLspSemanticProvider(lsp: WorkspaceLspRuntime): SemanticPro
     async documentSymbols(filePath: string): Promise<CodeSymbol[] | null> {
       const symbols = await lsp.documentSymbols(filePath);
       if (!symbols) return null;
-      return flattenDocumentSymbols(symbols, filePath);
+      const sourceLines = await readSourceLines(filePath);
+      return flattenDocumentSymbols(symbols, filePath, null, sourceLines);
     },
 
     async workspaceSymbols(query: string): Promise<CodeSymbol[] | null> {
@@ -246,6 +248,7 @@ function flattenDocumentSymbols(
   symbols: DocumentSymbol[] | SymbolInformation[],
   filePath: string,
   container: string | null = null,
+  sourceLines: readonly string[] | null = null,
 ): CodeSymbol[] {
   const result: CodeSymbol[] = [];
 
@@ -257,7 +260,7 @@ function flattenDocumentSymbols(
     const si = sym as SymbolInformation;
     const declStart = ds.range?.start ?? si.location?.range?.start;
     if (!declStart) continue;
-    const nameStart = ds.selectionRange?.start;
+    const nameStart = resolveDocumentSymbolNameStart(ds, sourceLines);
 
     const symbol: CodeSymbol = {
       name: sym.name,
@@ -273,11 +276,50 @@ function flattenDocumentSymbols(
     result.push(symbol);
 
     if (Array.isArray(ds.children) && ds.children.length > 0) {
-      result.push(...flattenDocumentSymbols(ds.children, filePath, sym.name));
+      result.push(...flattenDocumentSymbols(ds.children, filePath, sym.name, sourceLines));
     }
   }
 
   return result;
+}
+
+async function readSourceLines(filePath: string): Promise<readonly string[] | null> {
+  try {
+    return (await readFile(filePath, "utf-8")).split(/\r?\n/);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validate the LSP selection range against source text. Some servers return
+ * the full overload declaration as selectionRange; recover the exact symbol
+ * token on that line rather than labeling the declaration start as a name.
+ */
+function resolveDocumentSymbolNameStart(
+  symbol: DocumentSymbol,
+  sourceLines: readonly string[] | null,
+): { line: number; character: number } | null {
+  const selectionStart = symbol.selectionRange?.start;
+  if (!selectionStart) return null;
+  if (!sourceLines) return selectionStart;
+
+  const sourceLine = sourceLines[selectionStart.line];
+  if (sourceLine === undefined) return null;
+  if (
+    sourceLine.slice(selectionStart.character, selectionStart.character + symbol.name.length) ===
+    symbol.name
+  ) {
+    return selectionStart;
+  }
+
+  const rangeStart = symbol.range?.start;
+  const rangeEnd = symbol.range?.end;
+  const from = rangeStart?.line === selectionStart.line ? rangeStart.character : 0;
+  const until = rangeEnd?.line === selectionStart.line ? rangeEnd.character : sourceLine.length;
+  const repairedCharacter = sourceLine.indexOf(symbol.name, from);
+  if (repairedCharacter < 0 || repairedCharacter + symbol.name.length > until) return null;
+  return { line: selectionStart.line, character: repairedCharacter };
 }
 
 function toCodeSymbol(sym: SymbolInformation): CodeSymbol {

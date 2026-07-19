@@ -33,6 +33,7 @@ const TS_SERVER_CONFIG: ServerConfig = {
 let tmpDir: string;
 let goodFile: string;
 let badFile: string;
+let overloadFile: string;
 
 const HAS_TS_LSP = hasCommand("typescript-language-server") && fs.existsSync(TSSERVER);
 
@@ -58,6 +59,19 @@ beforeAll(() => {
   // A file with a type error
   badFile = path.join(tmpDir, "bad.ts");
   fs.writeFileSync(badFile, 'export const x: number = "not a number";\n');
+
+  overloadFile = path.join(tmpDir, "overload.ts");
+  fs.writeFileSync(
+    overloadFile,
+    [
+      "export function liveOverload(value: string): string;",
+      "export function liveOverload(value: number): number;",
+      "export function liveOverload(value: string | number): string | number {",
+      "  return value;",
+      "}",
+      "",
+    ].join("\n"),
+  );
 });
 
 afterAll(() => {
@@ -231,6 +245,17 @@ describe.skipIf(!HAS_TS_LSP)("LspClient integration (typescript-language-server)
     if (addFn?.nameAnchor) {
       expect(addFn.nameAnchor.character).toBeGreaterThan(1);
     }
+  }, 10_000);
+
+  it("repairs declaration-wide overload selection ranges to identifier anchors", async () => {
+    client.didOpen(overloadFile, fs.readFileSync(overloadFile, "utf-8"));
+
+    const semantic = createLspSemanticProvider(client as unknown as WorkspaceLspRuntime);
+    const symbols = await semantic.documentSymbols(overloadFile);
+    const overloads = symbols?.filter((symbol) => symbol.name === "liveOverload") ?? [];
+
+    expect(overloads).toHaveLength(3);
+    expect(overloads.map((symbol) => symbol.nameAnchor?.character)).toEqual([17, 17, 17]);
   }, 10_000);
 
   it("shuts down cleanly", async () => {

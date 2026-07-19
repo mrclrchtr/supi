@@ -399,6 +399,9 @@ function buildDefinitionLines(
 function formatHoverLine(contents: string): string[] {
   const trimmed = contents.trim();
   const maxHoverChars = 600;
+  if (trimmed.startsWith("```")) {
+    return formatFencedHover(trimmed, maxHoverChars);
+  }
   if (trimmed.length <= maxHoverChars) return [`- Hover: ${trimmed}`];
 
   const hoverLines = trimmed.split("\n");
@@ -415,6 +418,24 @@ function formatHoverLine(contents: string): string[] {
     acc += (acc ? "\n" : "") + line;
   }
   return [`- Hover: ${acc}`, "  _(truncated, use `code_inspect` for full type)_"];
+}
+
+/** Keep provider-supplied Markdown fences at block boundaries understood by sectionBlocks(). */
+function formatFencedHover(contents: string, maxChars: number): string[] {
+  const sourceLines = contents.split("\n");
+  if (contents.length <= maxChars) return ["- Hover:", ...sourceLines];
+
+  const lines = [sourceLines[0]];
+  let length = sourceLines[0].length;
+  let closed = false;
+  for (const line of sourceLines.slice(1)) {
+    if (length + line.length + 1 > maxChars) break;
+    lines.push(line);
+    length += line.length + 1;
+    if (line.startsWith("```")) closed = true;
+  }
+  if (!closed) lines.push("```");
+  return ["- Hover:", ...lines, "_(truncated, use `code_inspect` for full type)_"];
 }
 
 function formatFocusTarget(target: OrientationTarget, cwd: string): string {

@@ -4,7 +4,7 @@
 
 **Decision.** `CodeSymbol` carries an always-present `declarationAnchor` and an optional `nameAnchor`.
 
-- Providers populate `declarationAnchor` and use `selectionRange` for `nameAnchor` when available.
+- Providers populate `declarationAnchor` and use `selectionRange` for `nameAnchor` when available. When source text is available, selection ranges are validated against it; a declaration-wide range is repaired only when the exact symbol token is present on that line, otherwise `nameAnchor` remains absent.
 - Target-oriented workflows require ready semantic capability when establishing or refining a target.
 - After semantic readiness, the target workflow may refine a workspace-symbol hit through document symbols, then use a structural identifier snap when provider-backed syntax can establish the name.
 - Single-target and disambiguation paths apply the same refinement policy; structural evidence supplements LSP-first resolution but does not enable structural-only target creation.

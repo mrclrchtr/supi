@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import * as path from "node:path";
 import type { StructuralProvider as StructuralSubstrate } from "@mrclrchtr/supi-code-runtime/api";
 import { getSupportedExtensions } from "@mrclrchtr/supi-tree-sitter/api";
+import { callableExpressionForMatching } from "./call-name.ts";
 
 /** Soft file cap — warn when a workspace has more source files than this. */
 const FILE_SOFT_CAP = 5000;
@@ -250,7 +251,7 @@ async function collectMatchesForFile(
     const callResult = await structural.callSites(relFile);
     if (!handleStructuralResult(callResult, relFile, recordFailure)) return;
     for (const cs of callResult.data) {
-      if (!matcher(cs.name)) continue;
+      if (!matcher(callableExpressionForMatching(cs.name))) continue;
       matches.push({ file: relFile, name: cs.name, kind: "call", line: cs.startLine });
     }
     return;

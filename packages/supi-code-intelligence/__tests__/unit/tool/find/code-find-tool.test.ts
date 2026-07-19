@@ -681,6 +681,52 @@ describe("code_find tool", () => {
         session.dispose();
       }
     });
+
+    it("does not match a call name that appears only inside another call's arguments", async () => {
+      const srcDir = path.join(tmpDir, "src");
+      mkdirSync(srcDir, { recursive: true });
+      writeFileSync(
+        path.join(srcDir, "target.ts"),
+        [
+          "declare const values: string[];",
+          "declare function canonicalDeclarationKind(value: string): string;",
+          "const selected = values",
+          "  .filter((value) => canonicalDeclarationKind(value))",
+          "  .sort();",
+          // biome-ignore lint/security/noSecrets: source fixture exercises a nested string argument
+          'const joined = [canonicalDeclarationKind("x")].join(",");',
+          "void selected;",
+          "void joined;",
+          "",
+        ].join("\n"),
+      );
+
+      const session = createTreeSitterSession(tmpDir);
+      getDefaultWorkspaceRuntime().registerStructural(tmpDir, createTreeSitterProvider(session));
+      const tool = getCodeFindTool();
+
+      try {
+        const result = (await tool.execute(
+          "test-ast-call-argument-name",
+          {
+            query: "canonicalDeclarationKind",
+            mode: "ast",
+            kind: "call",
+            scope: ["src"],
+          },
+          undefined,
+          undefined,
+          makeCtx({ cwd: tmpDir }),
+        )) as TextToolResult;
+
+        const text = result.content[0].text;
+        expect(text).toContain("`canonicalDeclarationKind` (call)");
+        expect(text).not.toContain("values .filter");
+        expect(text).not.toContain("].join");
+      } finally {
+        session.dispose();
+      }
+    });
   });
 
   describe("mode: semantic", () => {

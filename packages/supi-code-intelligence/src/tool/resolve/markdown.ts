@@ -44,8 +44,18 @@ function renderResolved(
 
   const resolutionNote = renderAnchoredResolutionNote(target);
   if (resolutionNote) lines.push("", resolutionNote);
-  for (const note of notes) lines.push("", `_Note: ${note}_`);
+  for (const note of notes) {
+    if (resolutionNote && isResolutionMetadataNote(note)) continue;
+    lines.push("", `_Note: ${note}_`);
+  }
   return lines.join("\n");
+}
+
+function isResolutionMetadataNote(note: string): boolean {
+  return (
+    note.startsWith("Resolved from a declaration header and snapped to the identifier") ||
+    note === "Resolved from provider-backed structural identifier evidence."
+  );
 }
 
 function renderTargetGroup(details: ResolveDetails): string {
