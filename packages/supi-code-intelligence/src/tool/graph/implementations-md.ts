@@ -8,6 +8,7 @@ import {
 import { compactLineRanges } from "../../analysis/references/semantic-refs.ts";
 import type { ImplementationEntry } from "../../analysis/relations/types.ts";
 import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
+import { renderInvalidProviderLocations } from "./provider-location-md.ts";
 
 function groupByFile(impls: readonly ImplementationEntry[], cwd: string): Map<string, number[]> {
   const byFile = new Map<string, number[]>();
@@ -20,34 +21,37 @@ function groupByFile(impls: readonly ImplementationEntry[], cwd: string): Map<st
   return byFile;
 }
 
-export function renderImplementationsResult(
-  implementations: EvidenceList<ImplementationEntry>,
-  externalCount: number,
-  cwd: string,
-  targetName?: string,
-): { content: string; evidenceList: EvidenceListMetadata } {
+export function renderImplementationsResult(options: {
+  implementations: EvidenceList<ImplementationEntry>;
+  externalCount: number;
+  cwd: string;
+  targetName?: string;
+}): { content: string; evidenceList: EvidenceListMetadata } {
   const lines: string[] = [
-    targetName
-      ? `# Implementations of \`${targetName}\` (semantic)`
+    options.targetName
+      ? `# Implementations of \`${options.targetName}\` (semantic)`
       : "# Implementations (semantic)",
     "",
   ];
-  const total = implementations.metadata.totalCount ?? implementations.metadata.shownCount;
+  const total =
+    options.implementations.metadata.totalCount ?? options.implementations.metadata.shownCount;
   if (total > 0) {
     lines.push(`**${total} implementation${total === 1 ? "" : "s"}** in the project`, "");
-    for (const [file, locations] of groupByFile(implementations.items, cwd)) {
+    for (const [file, locations] of groupByFile(options.implementations.items, options.cwd)) {
       lines.push(`### ${file}`, `- ${compactLineRanges(locations)}`, "");
     }
-    const disclosure = renderEvidenceListMetadataDisclosure(implementations.metadata);
+    const disclosure = renderEvidenceListMetadataDisclosure(options.implementations.metadata);
     if (disclosure) lines.push(disclosure);
   }
 
-  if (externalCount > 0) {
+  if (options.externalCount > 0) {
     lines.push(
-      `_+${externalCount} external location${externalCount === 1 ? "" : "s"} (outside this project)_`,
+      `_+${options.externalCount} external location${options.externalCount === 1 ? "" : "s"} (outside this project)_`,
       "",
     );
   }
+  const invalidDisclosure = renderInvalidProviderLocations(options.implementations.metadata);
+  if (invalidDisclosure) lines.push(invalidDisclosure, "");
 
-  return { content: lines.join("\n"), evidenceList: implementations.metadata };
+  return { content: lines.join("\n"), evidenceList: options.implementations.metadata };
 }

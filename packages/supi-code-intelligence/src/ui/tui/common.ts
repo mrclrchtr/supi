@@ -53,6 +53,7 @@ export interface EvidenceEntry {
   totalCount: number | null;
   omittedCount: number | null;
   partialReason: string | null;
+  invalidLocationCount?: number;
 }
 
 /**
@@ -72,17 +73,25 @@ export function readEvidenceEntries(value: unknown): EvidenceEntry[] {
 function readEvidenceEntry(value: unknown): EvidenceEntry | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  const { key, shownCount, totalCount, omittedCount, partialReason } = record;
+  const { key, shownCount, totalCount, omittedCount, partialReason, invalidLocationCount } = record;
   if (
     typeof key !== "string" ||
     typeof shownCount !== "number" ||
     !isNullableNumber(totalCount) ||
     !isNullableNumber(omittedCount) ||
-    !isNullableString(partialReason)
+    !isNullableString(partialReason) ||
+    !isOptionalCount(invalidLocationCount)
   ) {
     return null;
   }
-  return { key, shownCount, totalCount, omittedCount, partialReason };
+  return {
+    key,
+    shownCount,
+    totalCount,
+    omittedCount,
+    partialReason,
+    ...(invalidLocationCount === undefined ? {} : { invalidLocationCount }),
+  };
 }
 
 function isNullableNumber(value: unknown): value is number | null {
@@ -93,15 +102,25 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
 }
 
+function isOptionalCount(value: unknown): value is number | undefined {
+  return (
+    value === undefined || (typeof value === "number" && Number.isInteger(value) && value >= 0)
+  );
+}
+
 /** Format one assembled evidence list without recomputing its bounds. */
 export function formatEvidenceEntry(entry: EvidenceEntry): string {
-  return formatEvidenceBadge({
+  const badge = formatEvidenceBadge({
     shownCount: entry.shownCount,
     totalCount: entry.totalCount,
     omittedCount: entry.omittedCount,
     partialReason: entry.partialReason,
     label: evidenceLabel(entry.key),
   });
+  if (!entry.invalidLocationCount) return badge;
+  const noun = entry.invalidLocationCount === 1 ? "location" : "locations";
+  const reason = entry.partialReason ? ` — ${entry.partialReason}` : "";
+  return `${badge}; ${entry.invalidLocationCount} invalid provider ${noun} omitted${reason}`;
 }
 
 /** Append formatted evidence badge lines to a container. */

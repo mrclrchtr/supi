@@ -11,7 +11,12 @@
  * evidence-list primitive beneath it.
  */
 
-export type EvidencePartialReason = "timeout" | "safety-limit" | "interrupted" | "provider-limited";
+export type EvidencePartialReason =
+  | "timeout"
+  | "safety-limit"
+  | "interrupted"
+  | "provider-limited"
+  | "invalid-provider-location";
 
 export interface EvidenceListMetadata {
   key: string;
@@ -19,6 +24,8 @@ export interface EvidenceListMetadata {
   shownCount: number;
   omittedCount: number | null;
   partialReason: EvidencePartialReason | null;
+  /** Unusable semantic-provider locations excluded from valid evidence totals. */
+  invalidLocationCount?: number;
 }
 
 export interface EvidenceList<T> {

@@ -215,6 +215,7 @@ Imports, exports, and tests remain available as explicit AST search kinds in `co
 - Semantic, structural, and text evidence retain their provenance.
 - Required capability failures are explicit; tools do not silently switch substrates.
 - `maxResults` is a display cap. Results disclose shown, total, and omitted evidence when known.
+- Invalid semantic-provider locations are omitted from project/external facts and disclosed separately as partial evidence.
 - `code_health` reports live observations and does not infer analyzer results from conventional report files.
 - Zero matches are successful searches, not tool failures.
 

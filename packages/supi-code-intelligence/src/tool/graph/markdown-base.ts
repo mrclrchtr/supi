@@ -65,12 +65,12 @@ export function renderGraphResult(assembly: GraphResultAssembly): string {
         break;
       }
       case "implements": {
-        const rendered = renderImplementationsResult(
-          section.evidence,
-          section.data.externalCount,
-          assembly.cwd,
-          assembly.displayName,
-        );
+        const rendered = renderImplementationsResult({
+          implementations: section.evidence,
+          externalCount: section.data.externalCount,
+          cwd: assembly.cwd,
+          targetName: assembly.displayName,
+        });
         lines.push(rendered.content, "");
         break;
       }

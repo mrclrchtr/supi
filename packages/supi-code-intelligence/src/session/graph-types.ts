@@ -1,4 +1,5 @@
 import type { ReadNextItem } from "../analysis/read-next.ts";
+import type { RelationLocationPartialReason } from "../analysis/relations/provider-locations.ts";
 import type {
   CallEntry,
   CalleeScope,
@@ -28,6 +29,8 @@ export type GraphSection =
       readonly data: {
         readonly references: readonly ReferenceEntry[];
         readonly externalCount: number;
+        readonly invalidLocationCount: number;
+        readonly partialReason: RelationLocationPartialReason | null;
         readonly confidence: "semantic";
       };
       readonly readNext: readonly ReadNextItem[];
@@ -48,6 +51,8 @@ export type GraphSection =
       readonly data: {
         readonly implementations: readonly ImplementationEntry[];
         readonly externalCount: number;
+        readonly invalidLocationCount: number;
+        readonly partialReason: RelationLocationPartialReason | null;
       };
       readonly readNext: readonly ReadNextItem[];
     }

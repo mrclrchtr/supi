@@ -4,6 +4,7 @@ import type { EvidenceList, EvidenceListMetadata } from "../../analysis/evidence
 import { formatAssembledReferenceList } from "../../analysis/references/semantic-refs.ts";
 import type { ReferenceEntry } from "../../analysis/relations/types.ts";
 import { toDisplayPath } from "../../analysis/search/ripgrep.ts";
+import { renderInvalidProviderLocations } from "./provider-location-md.ts";
 
 export function renderReferencesResult(options: {
   symbolName: string;
@@ -23,6 +24,8 @@ export function renderReferencesResult(options: {
       `_+${options.externalCount} external reference${options.externalCount === 1 ? "" : "s"}_`,
     );
   }
+  const invalidDisclosure = renderInvalidProviderLocations(options.references.metadata);
+  if (invalidDisclosure) lines.push(invalidDisclosure);
   lines.push("");
 
   const displayEvidence = {

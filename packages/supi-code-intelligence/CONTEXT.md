@@ -90,6 +90,10 @@ _Avoid_: best-effort correctness, "probably right", inferred facts, treating a c
 The honest-correctness invariant that a partial result must say it is partial. When a tool omits matching evidence because of a result cap, the user and agent must be able to distinguish "there are no more results" from "more results exist but were not shown".
 _Avoid_: silent truncation, hidden caps, treating capped output as complete evidence
 
+**Invalid provider location**:
+A semantic-provider location whose URI, path, or position cannot be converted into a canonical source location. It is counted and disclosed as partial evidence, but establishes neither project nor external evidence.
+_Avoid_: external location, silently dropped location, guessed source location
+
 **Tool evidence**:
 The facts in a public code-intelligence result that a user or agent may rely on to make a coding decision, such as matched targets, references, diagnostics, structurally recognized test declarations, imports, exports, callees, implementations, source-file listings, manifest dependency facts, planned refactor edits, or exposed code-action facts. Decorative summaries, next-step hints, and UI-only chrome are not Tool evidence.
 _Avoid_: treating every rendered list as evidence, convention-derived relationships, hiding evidence limits in presentation details
@@ -99,7 +103,7 @@ The code-intelligence flow that turns collected facts into public result evidenc
 _Avoid_: markdown-first result building, generic result builder, mixing evidence collection with rendering
 
 **Evidence list**:
-A bounded collection of tool evidence with explicit completeness metadata: which evidence atoms are shown and whether the list is complete. Normal public-tool paths compute exact totals and omitted counts. Unknown totals are reserved for exceptional interruption or provider-limited results, such as timeout, safety-limit, interrupted enumeration, or an upstream provider that cannot expose a true total, and must carry an explicit partial reason instead of pretending exact completeness. Markdown and structured details should describe the same evidence list rather than computing truncation separately.
+A bounded collection of tool evidence with explicit completeness metadata: which evidence atoms are shown and whether the list is complete. Normal public-tool paths compute exact totals and omitted counts. Unknown totals are reserved for exceptional interruption or provider-limited results, such as timeout, safety-limit, interrupted enumeration, or an upstream provider that cannot expose a true total, and must carry an explicit partial reason instead of pretending exact completeness. Rejected provider locations are tracked separately: valid normalized evidence retains exact counts while `invalidLocationCount` and an explicit partial reason disclose unusable provider atoms. Markdown and structured details should describe the same evidence list rather than computing truncation separately.
 _Avoid_: raw capped arrays, renderer-only omission math, details-only omission math, inventing exact totals, using unknown totals as a routine performance shortcut
 
 **Actionable list**:

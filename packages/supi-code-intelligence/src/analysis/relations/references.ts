@@ -5,6 +5,12 @@
  * ("semantic-references" since we use LSP references as caller evidence).
  */
 
+import {
+  isTargetLocation,
+  normalizeProviderLocations,
+  normalizeTargetFile,
+  type RelationLocationPartialReason,
+} from "./provider-locations.ts";
 import type { CallerEvidence, CallerReference, RelationsServiceDeps } from "./types.ts";
 
 export interface CallersResult {
@@ -12,6 +18,9 @@ export interface CallersResult {
   targetName: string;
   references: CallerReference[];
   externalCount: number;
+  /** Provider locations omitted because their URI or position was unusable. */
+  invalidLocationCount: number;
+  partialReason: RelationLocationPartialReason | null;
   evidence: CallerEvidence;
   confidence: "semantic" | "unavailable";
 }
@@ -33,6 +42,8 @@ export async function collectCallers(
       targetName: targetName ?? "symbol",
       references: [],
       externalCount: 0,
+      invalidLocationCount: 0,
+      partialReason: null,
       evidence: "semantic-references",
       confidence: "unavailable",
     };
@@ -45,28 +56,18 @@ export async function collectCallers(
       targetName: targetName ?? "symbol",
       references: [],
       externalCount: 0,
+      invalidLocationCount: 0,
+      partialReason: null,
       evidence: "semantic-references",
       confidence: "semantic",
     };
   }
 
-  const inProject: CallerReference[] = [];
-  let externalCount = 0;
-
-  for (const ref of refs) {
-    const uri = ref.uri ?? "";
-    const filePath = uri.startsWith("file://") ? uri.slice(7) : uri;
-    if (filePath.startsWith(deps.cwd)) {
-      inProject.push({
-        file: filePath,
-        line: ref.range.start.line + 1,
-        character: ref.range.start.character + 1,
-        name: targetName,
-      });
-    } else {
-      externalCount++;
-    }
-  }
+  const normalized = normalizeProviderLocations(refs, deps.cwd);
+  const normalizedTargetFile = normalizeTargetFile(targetFile, deps.cwd);
+  const inProject: CallerReference[] = normalized.project
+    .filter((reference) => !isTargetLocation(reference, normalizedTargetFile, targetPosition))
+    .map((reference) => ({ ...reference, name: targetName }));
 
   void maxResults;
 
@@ -74,7 +75,9 @@ export async function collectCallers(
     kind: "callers",
     targetName: targetName ?? "symbol",
     references: inProject,
-    externalCount,
+    externalCount: normalized.external.length,
+    invalidLocationCount: normalized.invalidLocationCount,
+    partialReason: normalized.partialReason,
     evidence: "semantic-references",
     confidence: "semantic",
   };

@@ -2,6 +2,12 @@
  * Semantic implementation lookup — finds implementations of a target.
  */
 
+import {
+  isTargetLocation,
+  normalizeProviderLocations,
+  normalizeTargetFile,
+  type RelationLocationPartialReason,
+} from "./provider-locations.ts";
 import type { ImplementationEntry, RelationsServiceDeps } from "./types.ts";
 
 export interface ImplementationsResult {
@@ -9,6 +15,9 @@ export interface ImplementationsResult {
   targetName: string;
   implementations: ImplementationEntry[];
   externalCount: number;
+  /** Provider locations omitted because their URI or position was unusable. */
+  invalidLocationCount: number;
+  partialReason: RelationLocationPartialReason | null;
   confidence: "semantic" | "unavailable";
 }
 
@@ -29,6 +38,8 @@ export async function collectImplementations(
       targetName: targetName ?? "symbol",
       implementations: [],
       externalCount: 0,
+      invalidLocationCount: 0,
+      partialReason: null,
       confidence: "unavailable",
     };
   }
@@ -40,29 +51,19 @@ export async function collectImplementations(
       targetName: targetName ?? "symbol",
       implementations: [],
       externalCount: 0,
+      invalidLocationCount: 0,
+      partialReason: null,
       confidence: "semantic",
     };
   }
 
-  const project: ImplementationEntry[] = [];
-  let externalCount = 0;
-
-  for (const loc of impls) {
-    const uri = loc.uri ?? loc.targetUri ?? "";
-    const filePath = uri.startsWith("file://") ? uri.slice(7) : uri;
-    const line = (loc.range?.start?.line ?? loc.targetRange?.start?.line ?? 0) + 1;
-
-    if (filePath?.startsWith(deps.cwd)) {
-      project.push({
-        file: filePath,
-        line,
-        character: 0,
-        name: targetName,
-      });
-    } else {
-      externalCount++;
-    }
-  }
+  const normalized = normalizeProviderLocations(impls, deps.cwd);
+  const normalizedTargetFile = normalizeTargetFile(targetFile, deps.cwd);
+  const project: ImplementationEntry[] = normalized.project
+    .filter(
+      (implementation) => !isTargetLocation(implementation, normalizedTargetFile, targetPosition),
+    )
+    .map((implementation) => ({ ...implementation, name: targetName }));
 
   void maxResults;
 
@@ -70,7 +71,9 @@ export async function collectImplementations(
     kind: "implementations",
     targetName: targetName ?? "symbol",
     implementations: project,
-    externalCount,
+    externalCount: normalized.external.length,
+    invalidLocationCount: normalized.invalidLocationCount,
+    partialReason: normalized.partialReason,
     confidence: "semantic",
   };
 }

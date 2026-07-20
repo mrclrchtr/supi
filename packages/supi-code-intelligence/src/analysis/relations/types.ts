@@ -66,8 +66,18 @@ export interface RelationsServiceDeps {
     ) => Promise<Array<{
       uri?: string;
       targetUri?: string;
-      range?: { start: { line: number }; end?: { line: number } };
-      targetRange?: { start: { line: number }; end?: { line: number } };
+      range?: {
+        start: { line: number; character: number };
+        end?: { line: number; character: number };
+      };
+      targetSelectionRange?: {
+        start: { line: number; character: number };
+        end?: { line: number; character: number };
+      };
+      targetRange?: {
+        start: { line: number; character: number };
+        end?: { line: number; character: number };
+      };
     }> | null>;
     calleesAt?: (
       file: string,

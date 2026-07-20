@@ -68,19 +68,15 @@ async function collectReferences(options: CollectRelationOptions): Promise<Graph
   }
 
   const targetLine = options.position.line + 1;
-  const targetCharacter = options.position.character + 1;
-  const references = result.references.filter(
-    (reference) =>
-      reference.file !== options.file ||
-      reference.line !== targetLine ||
-      reference.character !== targetCharacter,
-  );
+  const references = result.references;
   return {
     kind: "ok",
     rel: "references",
     data: {
       references,
       externalCount: result.externalCount,
+      invalidLocationCount: result.invalidLocationCount,
+      partialReason: result.partialReason,
       confidence: "semantic",
     },
     readNext: [
@@ -171,14 +167,15 @@ async function collectImplementationsRelation(
     return { kind: "unavailable", rel: "implements", message: "Implementations unavailable" };
   }
 
-  const targetLine = options.position.line + 1;
-  const implementations = result.implementations.filter(
-    (implementation) => implementation.file !== options.file || implementation.line !== targetLine,
-  );
   return {
     kind: "ok",
     rel: "implements",
-    data: { implementations, externalCount: result.externalCount },
+    data: {
+      implementations: result.implementations,
+      externalCount: result.externalCount,
+      invalidLocationCount: result.invalidLocationCount,
+      partialReason: result.partialReason,
+    },
     readNext: [],
   };
 }

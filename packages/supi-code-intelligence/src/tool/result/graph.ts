@@ -1,5 +1,6 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import { createEvidenceList, type EvidenceList } from "../../analysis/evidence.ts";
+import type { RelationLocationPartialReason } from "../../analysis/relations/provider-locations.ts";
 import type {
   CallEntry,
   ImplementationEntry,
@@ -99,10 +100,12 @@ function assembleGraphSection(section: GraphSection, maxResults: number): Assemb
     case "references":
       return {
         ...section,
-        evidence: createEvidenceList({
+        evidence: createRelationEvidenceList({
           key: "references.locations",
           items: [...section.data.references],
           maxResults,
+          invalidLocationCount: section.data.invalidLocationCount,
+          partialReason: section.data.partialReason,
         }),
       };
     case "callees":
@@ -117,13 +120,38 @@ function assembleGraphSection(section: GraphSection, maxResults: number): Assemb
     case "implements":
       return {
         ...section,
-        evidence: createEvidenceList({
+        evidence: createRelationEvidenceList({
           key: "implements.locations",
           items: [...section.data.implementations],
           maxResults,
+          invalidLocationCount: section.data.invalidLocationCount,
+          partialReason: section.data.partialReason,
         }),
       };
   }
+}
+
+function createRelationEvidenceList<T>(params: {
+  key: string;
+  items: T[];
+  maxResults: number;
+  invalidLocationCount: number;
+  partialReason: RelationLocationPartialReason | null;
+}): EvidenceList<T> {
+  const evidence = createEvidenceList({
+    key: params.key,
+    items: params.items,
+    maxResults: params.maxResults,
+  });
+  if (params.partialReason === null) return evidence;
+  return {
+    ...evidence,
+    metadata: {
+      ...evidence.metadata,
+      partialReason: params.partialReason,
+      invalidLocationCount: params.invalidLocationCount,
+    },
+  };
 }
 
 function evidenceTotal(evidence: EvidenceList<unknown>): number {
