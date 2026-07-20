@@ -106,10 +106,13 @@ export const CODE_INTELLIGENCE_TOOL_SPECS = [
     label: "Code Health",
     parameters: CodeHealthParameters,
     run: (params, ctx) => executeHealthTool(params as Parameters<typeof executeHealthTool>[0], ctx),
-    purpose: "Report diagnostics, runtime, git, coverage, and unused-code evidence.",
-    schemaDocs: "Optional scope, refresh, include, level, and explicit report paths.",
+    purpose: "Report live diagnostic, runtime, and Git health observations.",
+    schemaDocs: "Optional scope, refresh, include, and level; diagnostics and servers are default.",
     substrates: ["semantic", "structural", "git", "diagnostics"],
-    nonGoals: ["Does not run tests or verification commands."],
+    nonGoals: [
+      "Does not run tests or verification commands.",
+      "Does not load precomputed coverage or unused-code reports.",
+    ],
   },
   {
     name: "code_refactor_plan",

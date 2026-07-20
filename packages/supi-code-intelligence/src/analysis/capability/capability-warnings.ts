@@ -1,8 +1,8 @@
 /**
- * Coverage warning evaluation for degraded structural and semantic coverage.
+ * Capability Warning evaluation for reduced semantic and structural analysis.
  *
  * Normalizes LSP startup state, Tree-sitter health, and deprecated config keys
- * into a structured warning report consumed by chat warnings, /supi-ci-status,
+ * into a structured report consumed by the startup notice, /supi-ci-status,
  * and code_health.
  */
 
@@ -10,42 +10,37 @@ import { getDefaultWorkspaceRuntime } from "@mrclrchtr/supi-code-runtime/api";
 import { loadSupiConfigForScope } from "@mrclrchtr/supi-core/config";
 import { getDeprecatedLspKeys, loadConfig, scanMissingServers } from "@mrclrchtr/supi-lsp/api";
 
-export interface CoverageWarning {
+/** One actionable warning about reduced Code intelligence capability. */
+export interface CapabilityWarning {
   type: "deprecated-key" | "language-disabled" | "missing-server" | "structural-unavailable";
   message: string;
   language?: string;
   detail?: string;
 }
 
-export interface CoverageWarningReport {
+/** Current Capability Warnings and their aggregate presence flag. */
+export interface CapabilityWarningReport {
   hasWarnings: boolean;
-  warnings: CoverageWarning[];
+  warnings: CapabilityWarning[];
 }
 
-export interface CoverageMissingServerSource {
+/** Minimal LSP-controller surface needed to discover missing servers. */
+export interface CapabilityWarningMissingServerSource {
   getMissingServers(): Array<{ name: string; command: string; foundExtensions?: string[] }>;
 }
 
-/** Input needed to evaluate coverage. */
-export interface CoverageEvalInput {
+/** Current runtime/config facts needed to evaluate Capability Warnings. */
+export interface CapabilityWarningInput {
   deprecatedKeys: ReturnType<typeof getDeprecatedLspKeys>;
   explicitlyDisabledLanguages: string[];
   missingServers: Array<{ name: string; command: string; foundExtensions: string[] }>;
   structuralState: { kind: string; reason?: string };
 }
 
-// ── Evaluation ───────────────────────────────────────────────
+/** Evaluate current capability/configuration facts into a structured warning report. */
+export function evaluateCapabilityWarnings(input: CapabilityWarningInput): CapabilityWarningReport {
+  const warnings: CapabilityWarning[] = [];
 
-/**
- * Evaluate the current coverage state and return a structured warning report.
- *
- * Does not handle deduplication or grace period — callers are responsible
- * for managing emission timing through CoverageWarningState.
- */
-export function evaluateCoverageWarnings(input: CoverageEvalInput): CoverageWarningReport {
-  const warnings: CoverageWarning[] = [];
-
-  // 1. Deprecated keys
   if (input.deprecatedKeys.projectEnabled || input.deprecatedKeys.globalEnabled) {
     warnings.push({
       type: "deprecated-key",
@@ -61,16 +56,14 @@ export function evaluateCoverageWarnings(input: CoverageEvalInput): CoverageWarn
     });
   }
 
-  // 2. Explicitly disabled languages
-  for (const lang of input.explicitlyDisabledLanguages) {
+  for (const language of input.explicitlyDisabledLanguages) {
     warnings.push({
       type: "language-disabled",
-      language: lang,
-      message: `Semantic coverage reduced: "${lang}" servers are disabled via lsp.servers.${lang}.enabled: false`,
+      language,
+      message: `Semantic capability reduced: "${language}" servers are disabled via lsp.servers.${language}.enabled: false`,
     });
   }
 
-  // 3. Missing server binaries
   for (const server of input.missingServers) {
     warnings.push({
       type: "missing-server",
@@ -83,102 +76,73 @@ export function evaluateCoverageWarnings(input: CoverageEvalInput): CoverageWarn
     });
   }
 
-  // 4. Structural (Tree-sitter) failure
   if (input.structuralState.kind === "unavailable") {
     warnings.push({
       type: "structural-unavailable",
-      message: `Structural coverage unavailable: ${input.structuralState.reason ?? "Tree-sitter initialization failed"}`,
+      message: `Structural capability unavailable: ${input.structuralState.reason ?? "Tree-sitter initialization failed"}`,
     });
   }
 
   return { hasWarnings: warnings.length > 0, warnings };
 }
 
-// ── Session state (deduplication + grace period) ─────────────
-
-/**
- * Per-session state for managing warning emission timing and deduplication.
- */
-export class CoverageWarningState {
+/** Per-session state for warning grace-period timing and deduplication. */
+export class CapabilityWarningState {
   private lastWarningsHash: string | null = null;
   private forceEmitted = false;
-  private readonly startedAt: number;
-
-  constructor() {
-    this.startedAt = Date.now();
-  }
+  private readonly startedAt = Date.now();
 
   /**
-   * Return warnings that should be emitted to the user now.
+   * Return warnings that should be emitted now.
    *
-   * Deduplication is hash-based rather than once-per-session: if the
-   * warning set changes (e.g., a new missing server is detected), the
-   * new warnings are emitted. Identical sets are suppressed.
-   * - Respects grace period (no warnings before `gracePeriodMs` has elapsed)
-   * - An empty report (no warnings) does not consume emission state
+   * Changed warning sets may emit again; identical sets are suppressed. Empty
+   * reports do not consume emission state, and startup honors a grace period.
    */
   getPendingWarnings(
-    report: CoverageWarningReport,
+    report: CapabilityWarningReport,
     gracePeriodMs: number = 5_000,
-  ): CoverageWarning[] {
-    // Grace period: don't emit during initial pending/settling state
-    if (Date.now() - this.startedAt < gracePeriodMs) {
-      return [];
-    }
-
-    if (!report.hasWarnings || report.warnings.length === 0) {
-      return [];
-    }
-
+  ): CapabilityWarning[] {
+    if (Date.now() - this.startedAt < gracePeriodMs) return [];
+    if (!report.hasWarnings || report.warnings.length === 0) return [];
     if (this.forceEmitted) return [];
 
     const nextHash = this.computeHash(report);
-    if (nextHash === this.lastWarningsHash) {
-      return [];
-    }
+    if (nextHash === this.lastWarningsHash) return [];
 
     this.lastWarningsHash = nextHash;
     return report.warnings;
   }
 
-  /** Check whether a warning has already been emitted this session. */
+  /** Whether any warning set has been emitted in this session. */
   get hasEmitted(): boolean {
     return this.lastWarningsHash !== null;
   }
 
-  /** Force the state to consider warnings as already emitted. Useful for testing. */
+  /** Force warnings to be considered emitted. Useful for tests. */
   markEmitted(): void {
     this.forceEmitted = true;
     this.lastWarningsHash = "emitted";
   }
 
-  /** Reset the session state. */
+  /** Reset warning emission state. */
   reset(): void {
     this.forceEmitted = false;
     this.lastWarningsHash = null;
   }
 
-  private computeHash(report: CoverageWarningReport): string {
+  private computeHash(report: CapabilityWarningReport): string {
     return report.warnings
-      .map((w) => `${w.type}:${w.language ?? ""}:${w.message}`)
-      .sort((a, b) => a.localeCompare(b))
+      .map((warning) => `${warning.type}:${warning.language ?? ""}:${warning.message}`)
+      .sort((left, right) => left.localeCompare(right))
       .join("|");
   }
 }
 
-// ── Runtime state gathering ─────────────────────────────────
-
-/**
- * Gather the coverage evaluation input from current runtime state.
- *
- * Reads deprecated keys from supi-lsp, structural state from the
- * workspace runtime, and explicitly disabled languages / missing server
- * info from the LSP controller or a config-based fallback scan.
- */
-export function gatherCoverageEvalInput(
+/** Gather current runtime/config facts for Capability Warning evaluation. */
+export function gatherCapabilityWarningInput(
   cwd: string,
-  lspController: CoverageMissingServerSource | null,
-): CoverageEvalInput {
+  lspController: CapabilityWarningMissingServerSource | null,
+): CapabilityWarningInput {
   const deprecatedKeys = getDeprecatedLspKeys(cwd);
   const structuralState = getDefaultWorkspaceRuntime().getWorkspace(cwd).structural.state;
   const explicitlyDisabledLanguages = detectExplicitlyDisabledLanguages(cwd);
@@ -204,7 +168,6 @@ function normalizeMissingServers(
   }));
 }
 
-/** Read raw scoped config to find languages with `servers.<lang>.enabled: false`. */
 function detectExplicitlyDisabledLanguages(cwd: string): string[] {
   const disabled = new Set<string>();
   for (const scope of ["project", "global"] as const) {
@@ -216,8 +179,8 @@ function detectExplicitlyDisabledLanguages(cwd: string): string[] {
     );
     const servers = (raw as { servers?: Record<string, { enabled?: boolean }> }).servers;
     if (!servers) continue;
-    for (const [name, srv] of Object.entries(servers)) {
-      if (srv.enabled === false) disabled.add(name);
+    for (const [name, server] of Object.entries(servers)) {
+      if (server.enabled === false) disabled.add(name);
     }
   }
   return [...disabled].sort();

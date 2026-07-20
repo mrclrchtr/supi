@@ -58,7 +58,7 @@ The extension registers exactly eight `code_*` tools:
 - `code_orientation` — orient around a workspace, module, directory, file, or resolved symbol
 - `code_graph` — collect references, structural callees, and implementations
 - `code_find` — explicit text, regex, AST, or semantic search
-- `code_health` — report diagnostics, servers, dirty files, coverage, and unused-code evidence
+- `code_health` — report live diagnostics, server status, dirty files, and supplemental Capability Warnings
 - `code_refactor_plan` — preview a precise semantic refactor without mutation
 - `code_refactor_apply` — apply a stored plan after freshness checks
 
@@ -164,10 +164,10 @@ AST `call` finds written call-site names, not symbol identity. Use `code_graph` 
 
 ```text
 code_health({ refresh: true, include: ["diagnostics", "servers", "dirty"] })
-code_health({ include: ["coverage", "unused"] })
+code_health({ include: ["dirty"] })
 ```
 
-Coverage defaults to `coverage/coverage-summary.json`; unused-code evidence defaults to `knip.json`. Missing reports are disclosed.
+Omitting `include` requests `diagnostics` and `servers`. The selectable sections are `diagnostics`, `servers`, and `dirty`; Capability Warnings supplement diagnostic/server requests rather than acting as another section. `code_health` does not discover precomputed coverage or unused-code reports. A future batch-analyzer integration must collect its observations when called.
 
 ### Plan and apply a rename
 
@@ -215,7 +215,7 @@ Imports, exports, and tests remain available as explicit AST search kinds in `co
 - Semantic, structural, and text evidence retain their provenance.
 - Required capability failures are explicit; tools do not silently switch substrates.
 - `maxResults` is a display cap. Results disclose shown, total, and omitted evidence when known.
-- A deterministic convention may locate an artifact, but cannot prove a classification, relationship, or absence claim.
+- `code_health` reports live observations and does not infer analyzer results from conventional report files.
 - Zero matches are successful searches, not tool failures.
 
 ## Startup and settings
@@ -233,7 +233,7 @@ Detected language servers start concurrently. In polyglot workspaces, disable un
 }
 ```
 
-The old global `lsp.enabled` and `lsp.active` keys are deprecated and ignored. Missing binaries, disabled languages, and structural startup failures appear in `/supi-ci-status` and `code_health`. If every language-server definition is disabled, the LSP runtime publishes an explicit disabled state and semantic capability remains unavailable. A ready runtime owner may have only lazy routes: server inventory remains status evidence, while diagnostics require an active ready project server or successful file-scoped readiness. `refresh: true` attempts recovery before the final Semantic health state is derived. Public health details expose one authoritative `semanticState` (`ready`, `pending`, `inactive`, `disabled`, or `unavailable`) rather than an independently computed boolean/status pair.
+The old global `lsp.enabled` and `lsp.active` keys are deprecated and ignored. Missing binaries, disabled languages, structural startup failures, and obsolete settings appear as Capability Warnings in `/supi-ci-status`, diagnostic/server `code_health` results, and the existing one-time startup notice. If every language-server definition is disabled, the LSP runtime publishes an explicit disabled state and semantic capability remains unavailable. A ready runtime owner may have only lazy routes: server inventory remains status evidence, while diagnostics require an active ready project server or successful file-scoped readiness. `refresh: true` attempts recovery before the final Semantic health state is derived. Public health details expose one authoritative `semanticState` (`ready`, `pending`, `inactive`, `disabled`, or `unavailable`) plus structured `capabilityWarnings` supplemental status.
 
 ## Architecture
 

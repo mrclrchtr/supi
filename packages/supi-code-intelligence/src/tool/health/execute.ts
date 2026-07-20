@@ -12,8 +12,6 @@ export interface CodeHealthToolParams {
   refresh?: boolean;
   include?: HealthSection[];
   level?: "summary" | "detailed";
-  coveragePath?: string;
-  unusedPath?: string;
 }
 
 export async function executeHealthTool(

@@ -64,6 +64,13 @@ describe("focused code intelligence tool registration", () => {
     expect(orientation).not.toHaveProperty("line");
   });
 
+  it("does not translate removed code_health inputs through argument preparation", () => {
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+
+    expect(getTool(pi, "code_health")).not.toHaveProperty("prepareArguments");
+  });
+
   it("uses an exact-one nested refactor operation and a plan-only apply input", () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);

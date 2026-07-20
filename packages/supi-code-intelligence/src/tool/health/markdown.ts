@@ -5,6 +5,7 @@
  * readable markdown sections keyed by requested `include` values.
  */
 
+import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
 import {
   type EvidenceListMetadata,
   renderEvidenceListMetadataDisclosure,
@@ -21,10 +22,8 @@ import { formatSemanticHealthState } from "./semantic-state.ts";
 export type {
   CodeActionSuggestion,
   HealthCodeActions,
-  HealthCoverageData,
   HealthData,
   HealthSection,
-  HealthUnusedData,
   SemanticHealthState,
 } from "../result/health.ts";
 
@@ -46,14 +45,8 @@ export function renderHealthResult(result: HealthResultAssembly, cwd: string): s
       codeActionEvidence: evidenceFor("health.codeActions"),
     });
   }
-  if (hasSection("coverage")) {
-    renderCoverageSection(lines, data, cwd);
-  }
-  if (hasSection("unused")) {
-    renderUnusedSection(lines, data, cwd);
-  }
   if (semanticRequested) {
-    renderDegradedCoverageSection(lines, data);
+    renderCapabilityWarningsSection(lines, result.details.capabilityWarnings);
   }
   if (hasSection("servers")) {
     renderServersSection(lines, data, sectionStatus(result, "servers"));
@@ -90,13 +83,16 @@ function renderStalenessBanner(
   lines.push("");
 }
 
-function renderDegradedCoverageSection(lines: string[], data: HealthData): void {
-  if (!data.degradedCoverage?.hasWarnings) return;
+function renderCapabilityWarningsSection(
+  lines: string[],
+  report: CapabilityWarningReport | null,
+): void {
+  if (!report?.hasWarnings) return;
 
-  lines.push("### Degraded Coverage");
+  lines.push("### Capability Warnings");
   lines.push("");
 
-  for (const warning of data.degradedCoverage.warnings) {
+  for (const warning of report.warnings) {
     const lang = warning.language ? `[${warning.language}] ` : "";
     lines.push(`- ⚠ ${lang}${warning.message}`);
     if (warning.detail) {
@@ -202,57 +198,6 @@ function renderDetailedCodeActions(
     }
   }
   if (disclosure) lines.push(disclosure);
-}
-
-function renderCoverageSection(lines: string[], data: HealthData, cwd: string): void {
-  lines.push("### Coverage");
-  lines.push("");
-
-  if (!data.coverage?.available) {
-    lines.push(
-      `Coverage report unavailable at \`${makeRelative(cwd, data.coverage?.reportPath ?? "coverage/coverage-summary.json")}\`; this locator does not establish that no coverage report exists elsewhere.`,
-    );
-    lines.push("");
-    return;
-  }
-
-  if (data.coverage.entries.length === 0) {
-    lines.push("No low-coverage files found.");
-    lines.push("");
-    return;
-  }
-
-  for (const entry of data.coverage.entries) {
-    lines.push(`- \`${makeRelative(cwd, entry.file)}\` — ${entry.pct.toFixed(0)}%`);
-  }
-  lines.push("");
-}
-
-function renderUnusedSection(lines: string[], data: HealthData, cwd: string): void {
-  lines.push("### Unused");
-  lines.push("");
-
-  if (!data.unused?.available) {
-    lines.push(
-      `Unused-code report unavailable at \`${makeRelative(cwd, data.unused?.reportPath ?? "knip.json")}\`; this locator does not establish that no unused-code report exists elsewhere.`,
-    );
-    lines.push("");
-    return;
-  }
-
-  if (data.unused.files.length === 0 && data.unused.exports.length === 0) {
-    lines.push("No unused files or exports reported.");
-    lines.push("");
-    return;
-  }
-
-  for (const file of data.unused.files) {
-    lines.push(`- Unused file: \`${makeRelative(cwd, file)}\``);
-  }
-  for (const entry of data.unused.exports) {
-    lines.push(`- Unused export: \`${entry.name}\` in \`${makeRelative(cwd, entry.file)}\``);
-  }
-  lines.push("");
 }
 
 function renderServersSection(

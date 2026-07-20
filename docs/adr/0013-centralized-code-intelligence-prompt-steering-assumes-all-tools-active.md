@@ -56,8 +56,9 @@ live in the description) and drops low-value nudge bullets per
   steering may vanish for the narrowed set, and dual-sided bullets (per P1) may
   need to return.
 - Safety cues (`mode:"ast"`, `does not silently fall back`, `not by symbol
-  identity`, `symbol-identity-aware callers`, `code_health` coverage/unused)
-  remain pinned in `description` by `extension-registration.test.ts`; no safety
+  identity`, `symbol-identity-aware callers`, the `code_health` Live health
+  observation boundary) remain pinned in `description` by
+  `extension-registration.test.ts`; no safety
   cue relies on a `promptGuidelines` bullet.
 - Truncation limits are still mentioned in each `description` (required by
   `docs/pi/tool-guidance.md`); only the wording was tightened.

@@ -18,6 +18,10 @@ _Avoid_: context bundle, relation graph, treating orientation as target analysis
 The project, package, directory, file, or symbol that an orientation surface is centered on. An absent focus means workspace-level orientation; a precise focus means symbol-centered orientation rather than relation analysis.
 _Avoid_: scope, path, target when referring to orientation selection
 
+**Priority signal**:
+A bounded, focus-relevant fact included in Orientation to help choose what source to inspect next. It is prioritization context, not a full health report.
+_Avoid_: health section, diagnostic report, priority warning
+
 **Workspace code-intelligence session**:
 The workspace-scoped Code intelligence context that owns workflow policy, capability readiness, and ephemeral target and refactor handles for one PI session. It yields typed workflow outcomes without owning Tool result assembly or presentation.
 _Avoid_: provider bag, renderer, global code-intelligence state
@@ -70,9 +74,17 @@ _Avoid_: semantic evidence, treating unknown inventory as empty, treating disabl
 The authoritative final readiness classification—ready, pending, inactive, disabled, or unavailable—for semantic diagnostics at the requested scope, determined after routing and requested recovery. A concrete ready project or file server establishes readiness even if capability publication lags; server inventory remains a separate fact.
 _Avoid_: runtime availability, capability publication status, configured-route availability, vacuous readiness, optimistic diagnostics
 
+**Capability Warning**:
+An actionable notice that Code intelligence capability is reduced or configured through obsolete settings. It concerns the ability to produce code evidence, not software test coverage.
+_Avoid_: degraded coverage, coverage warning
+
+**Live health observation**:
+Tool evidence obtained by querying an available source during a `code_health` call. A continuously maintained source may expose its current snapshot with freshness limitations disclosed; a batch source must collect during the call, so a precomputed report is not a Live health observation.
+_Avoid_: live/runtime-backed signal, ambient report evidence, undisclosed cached evidence
+
 **Honest correctness**:
-The code-intelligence result standard that a tool must either report evidence-backed facts or explicitly say why it cannot. A deterministic convention may locate evidence, but it cannot create a classification, relationship, or claim; heuristic and convention-based inferences are guidance chrome, not Tool evidence. Silent guessing, truncation, scope widening, and fallback to a weaker substrate are incorrect even when they look helpful.
-_Avoid_: best-effort correctness, "probably right", inferred facts, treating a locator as evidence, hiding degraded evidence
+The code-intelligence result standard that a tool must either report evidence-backed facts or explicitly say why it cannot. Source limitations stay explicit; heuristic and convention-based inferences are guidance chrome, not Tool evidence. Silent guessing, truncation, scope widening, and fallback to a weaker substrate are incorrect even when they look helpful.
+_Avoid_: best-effort correctness, "probably right", inferred facts, treating a convention as evidence, hiding degraded evidence
 
 **Truncation disclosure**:
 The honest-correctness invariant that a partial result must say it is partial. When a tool omits matching evidence because of a result cap, the user and agent must be able to distinguish "there are no more results" from "more results exist but were not shown".
@@ -81,10 +93,6 @@ _Avoid_: silent truncation, hidden caps, treating capped output as complete evid
 **Tool evidence**:
 The facts in a public code-intelligence result that a user or agent may rely on to make a coding decision, such as matched targets, references, diagnostics, structurally recognized test declarations, imports, exports, callees, implementations, source-file listings, manifest dependency facts, planned refactor edits, or exposed code-action facts. Decorative summaries, next-step hints, and UI-only chrome are not Tool evidence.
 _Avoid_: treating every rendered list as evidence, convention-derived relationships, hiding evidence limits in presentation details
-
-**Evidence locator**:
-A deterministic convention used only to find an artifact whose contents may provide Tool evidence. The locator contributes no classification or relationship of its own; failure to find the artifact means unavailable at that location, not proof that the artifact or fact does not exist. Located facts retain their provenance.
-_Avoid_: convention-derived evidence, inferring absence from one path, treating a filename pattern as a relationship
 
 **Tool result assembly**:
 The code-intelligence flow that turns collected facts into public result evidence: typed result sections, evidence lists, omission metadata, confidence, read-next guidance, and details data. Tool result assembly stops before presentation; markdown and TUI rendering are adapters over the assembled evidence.

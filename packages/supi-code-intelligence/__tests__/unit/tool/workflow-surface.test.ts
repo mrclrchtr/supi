@@ -1,3 +1,4 @@
+import { Check } from "typebox/value";
 import { describe, expect, it } from "vitest";
 import { CODE_INTELLIGENCE_TOOL_SCHEMAS } from "../../../src/tool/schemas.ts";
 import { CODE_INTELLIGENCE_TOOL_SPECS } from "../../../src/tool/specs.ts";
@@ -146,5 +147,30 @@ describe("code intelligence tool specs", () => {
 
     expect(values).toEqual(expect.arrayContaining(["text", "regex", "ast", "semantic"]));
     expect(values).not.toContain("natural");
+  });
+
+  it("restricts code_health to its live section vocabulary", () => {
+    const healthSchema = CODE_INTELLIGENCE_TOOL_SCHEMAS.code_health as {
+      additionalProperties?: boolean;
+      properties?: Record<string, unknown>;
+    };
+    const properties = healthSchema.properties ?? {};
+    const values = collectStringValues(properties.include).sort((left, right) =>
+      left.localeCompare(right),
+    );
+
+    expect(healthSchema.additionalProperties).toBe(false);
+    expect(Object.keys(properties).sort()).toEqual(["include", "level", "refresh", "scope"]);
+    expect(values).toEqual(["diagnostics", "dirty", "servers"]);
+    expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_health, { include: ["coverage"] })).toBe(
+      false,
+    );
+    expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_health, { include: ["unused"] })).toBe(false);
+    expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_health, { coveragePath: "report.json" })).toBe(
+      false,
+    );
+    expect(Check(CODE_INTELLIGENCE_TOOL_SCHEMAS.code_health, { unusedPath: "report.json" })).toBe(
+      false,
+    );
   });
 });

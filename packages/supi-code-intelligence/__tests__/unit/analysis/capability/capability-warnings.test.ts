@@ -1,19 +1,14 @@
-/**
- * Tests for the degraded-coverage warning evaluation module.
- *
- * These tests were RED (failing without the module) and now validate
- * the evaluateCoverageWarnings API contract.
- */
+/** Tests for Capability Warning evaluation and per-session deduplication. */
 
 import { describe, expect, it } from "vitest";
 import {
-  CoverageWarningState,
-  evaluateCoverageWarnings,
-} from "../../../../src/analysis/coverage/coverage-warnings.ts";
+  CapabilityWarningState,
+  evaluateCapabilityWarnings,
+} from "../../../../src/analysis/capability/capability-warnings.ts";
 
-describe("evaluateCoverageWarnings", () => {
+describe("evaluateCapabilityWarnings", () => {
   it("returns deprecation warning when lsp.enabled is present in config", () => {
-    const result = evaluateCoverageWarnings({
+    const result = evaluateCapabilityWarnings({
       deprecatedKeys: {
         projectEnabled: true,
         globalEnabled: false,
@@ -32,7 +27,7 @@ describe("evaluateCoverageWarnings", () => {
   });
 
   it("returns deprecation warning when lsp.active is present in config", () => {
-    const result = evaluateCoverageWarnings({
+    const result = evaluateCapabilityWarnings({
       deprecatedKeys: {
         projectEnabled: false,
         globalEnabled: false,
@@ -51,7 +46,7 @@ describe("evaluateCoverageWarnings", () => {
   });
 
   it("returns language-disabled warning for explicitly disabled language servers", () => {
-    const result = evaluateCoverageWarnings({
+    const result = evaluateCapabilityWarnings({
       deprecatedKeys: {
         projectEnabled: false,
         globalEnabled: false,
@@ -65,12 +60,17 @@ describe("evaluateCoverageWarnings", () => {
 
     expect(result.hasWarnings).toBe(true);
     expect(
-      result.warnings.some((w) => w.type === "language-disabled" && w.language === "python"),
+      result.warnings.some(
+        (warning) =>
+          warning.type === "language-disabled" &&
+          warning.language === "python" &&
+          warning.message.includes("Semantic capability reduced"),
+      ),
     ).toBe(true);
   });
 
   it("returns missing-server warning when a server binary is not on PATH", () => {
-    const result = evaluateCoverageWarnings({
+    const result = evaluateCapabilityWarnings({
       deprecatedKeys: {
         projectEnabled: false,
         globalEnabled: false,
@@ -89,7 +89,7 @@ describe("evaluateCoverageWarnings", () => {
   });
 
   it("returns structural-unavailable warning when tree-sitter is unavailable", () => {
-    const result = evaluateCoverageWarnings({
+    const result = evaluateCapabilityWarnings({
       deprecatedKeys: {
         projectEnabled: false,
         globalEnabled: false,
@@ -102,11 +102,17 @@ describe("evaluateCoverageWarnings", () => {
     });
 
     expect(result.hasWarnings).toBe(true);
-    expect(result.warnings.some((w) => w.type === "structural-unavailable")).toBe(true);
+    expect(
+      result.warnings.some(
+        (warning) =>
+          warning.type === "structural-unavailable" &&
+          warning.message.includes("Structural capability unavailable"),
+      ),
+    ).toBe(true);
   });
 
   it("returns empty warnings when everything is healthy", () => {
-    const result = evaluateCoverageWarnings({
+    const result = evaluateCapabilityWarnings({
       deprecatedKeys: {
         projectEnabled: false,
         globalEnabled: false,
@@ -122,9 +128,9 @@ describe("evaluateCoverageWarnings", () => {
     expect(result.warnings).toEqual([]);
   });
 
-  describe("CoverageWarningState", () => {
+  describe("CapabilityWarningState", () => {
     it("respects grace period — no pending warnings before grace expires", () => {
-      const state = new CoverageWarningState();
+      const state = new CapabilityWarningState();
       const report = {
         hasWarnings: true,
         warnings: [{ type: "deprecated-key" as const, message: "test warning" }],
@@ -136,7 +142,7 @@ describe("evaluateCoverageWarnings", () => {
     });
 
     it("deduplicates — same warning report not emitted twice", () => {
-      const state = new CoverageWarningState();
+      const state = new CapabilityWarningState();
       const report = {
         hasWarnings: true,
         warnings: [{ type: "deprecated-key" as const, message: "test warning" }],
@@ -147,7 +153,7 @@ describe("evaluateCoverageWarnings", () => {
     });
 
     it("does not consume emission state for an empty report", () => {
-      const state = new CoverageWarningState();
+      const state = new CapabilityWarningState();
       expect(state.getPendingWarnings({ hasWarnings: false, warnings: [] }, 0)).toEqual([]);
       expect(state.hasEmitted).toBe(false);
 

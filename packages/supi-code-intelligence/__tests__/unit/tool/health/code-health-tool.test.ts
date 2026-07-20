@@ -6,7 +6,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createPiMock, getTool, makeCtx } from "@mrclrchtr/supi-test-utils";
@@ -88,32 +88,6 @@ function mockReadyLsp(
   });
 
   return runtime;
-}
-
-function writeCoverageSummary(
-  entries: Record<string, { lines: number; statements: number }>,
-): void {
-  mkdirSync(path.join(tmpDir, "coverage"), { recursive: true });
-  const coverageSummary = {
-    total: { lines: { pct: 90 }, statements: { pct: 90 } },
-    ...Object.fromEntries(
-      Object.entries(entries).map(([file, pct]) => [
-        file,
-        { lines: { pct: pct.lines }, statements: { pct: pct.statements } },
-      ]),
-    ),
-  };
-  writeFileSync(
-    path.join(tmpDir, "coverage", "coverage-summary.json"),
-    JSON.stringify(coverageSummary, null, 2),
-  );
-}
-
-function writeKnipSummary(content: {
-  files?: string[];
-  exports?: Array<{ file: string; name: string }>;
-}) {
-  writeFileSync(path.join(tmpDir, "knip.json"), JSON.stringify(content, null, 2));
 }
 
 function makeCodeActions(items: CodeActionSuggestion[]): HealthCodeActions {
@@ -501,129 +475,26 @@ describe("code_health tool", () => {
     expect(result.content[0].text).not.toContain("### Diagnostics");
   });
 
-  it("renders a real coverage section when coverage is requested", async () => {
-    registerMockProvider(tmpDir);
-    mockReadyLsp();
-    writeCoverageSummary({ "src/payment.ts": { lines: 10, statements: 15 } });
-
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_health");
-
-    const result = (await tool.execute(
-      "test-6c",
-      { include: ["coverage"] },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
-
-    expect(result.content[0].text).toContain("### Coverage");
-    expect(result.content[0].text).toContain("src/payment.ts");
-    expect(result.content[0].text).not.toContain("### Diagnostics");
-  });
-
-  it("renders a real unused section when unused is requested", async () => {
-    registerMockProvider(tmpDir);
-    mockReadyLsp();
-    writeKnipSummary({
-      files: ["src/unused.ts"],
-      exports: [{ file: "src/payment.ts", name: "paymentLoader" }],
-    });
-
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_health");
-
-    const result = (await tool.execute(
-      "test-6d",
-      { include: ["unused"] },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
-
-    expect(result.content[0].text).toContain("### Unused");
-    expect(result.content[0].text).toContain("src/unused.ts");
-    expect(result.content[0].text).toContain("paymentLoader");
-    expect(result.content[0].text).not.toContain("### Diagnostics");
-  });
-
-  it("uses custom coveragePath and unusedPath when provided", async () => {
-    registerMockProvider(tmpDir);
-    mockReadyLsp();
-    writeFileSync(
-      path.join(tmpDir, "custom-coverage.json"),
-      JSON.stringify(
-        {
-          total: { lines: { pct: 90 }, statements: { pct: 90 } },
-          "src/custom-covered.ts": { lines: { pct: 20 }, statements: { pct: 25 } },
-        },
-        null,
-        2,
-      ),
-    );
-    writeFileSync(
-      path.join(tmpDir, "custom-knip.json"),
-      JSON.stringify({ files: ["src/custom-unused.ts"] }, null, 2),
-    );
-
-    const pi = createPiMock();
-    codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_health");
-
-    const result = (await tool.execute(
-      "test-custom-health-paths",
-      {
-        include: ["coverage", "unused"],
-        coveragePath: "custom-coverage.json",
-        unusedPath: "custom-knip.json",
-      },
-      undefined,
-      undefined,
-      makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
-
-    expect(result.content[0].text).toContain("src/custom-covered.ts");
-    expect(result.content[0].text).toContain("src/custom-unused.ts");
-  });
-
-  it("reports missing coverage and unused artifacts explicitly when requested", async () => {
+  it.each([
+    ["coverage section", { include: ["coverage"] }],
+    ["unused section", { include: ["unused"] }],
+    ["coveragePath", { coveragePath: "coverage.json" }],
+    ["unusedPath", { unusedPath: "unused.json" }],
+  ])("rejects the removed %s input", async (_label, input) => {
     registerMockProvider(tmpDir);
     mockReadyLsp();
 
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_health");
-
-    const result = (await tool.execute(
-      "test-6e",
-      { include: ["coverage", "unused"] },
+    const result = (await getTool(pi, "code_health").execute(
+      "removed-health-input",
+      input,
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
-    )) as {
-      content: Array<{ type: string; text: string }>;
-    };
+    )) as { content: Array<{ type: string; text: string }> };
 
-    expect(result.content[0].text).toContain("### Coverage");
-    expect(result.content[0].text).toContain("Coverage report unavailable");
-    expect(result.content[0].text).toContain("coverage/coverage-summary.json");
-    expect(result.content[0].text).toContain(
-      "does not establish that no coverage report exists elsewhere",
-    );
-    expect(result.content[0].text).toContain("### Unused");
-    expect(result.content[0].text).toContain("Unused-code report unavailable");
-    expect(result.content[0].text).toContain(
-      "does not establish that no unused-code report exists elsewhere",
-    );
-    expect(result.content[0].text).not.toContain("### Diagnostics");
+    expect(result.content[0].text).toContain("**Error:**");
   });
 
   it("accepts level: summary", async () => {
@@ -708,50 +579,44 @@ describe("code_health tool", () => {
     expect(result.content[0].text).not.toContain("**Error");
   });
 
-  // ── RED: degraded-coverage warnings in health output ────────────
-
-  it("[RED] includes degraded coverage warnings section when LSP is degraded", async () => {
-    // RED: this test requires the health tool to report degraded coverage reasons
+  it("includes Capability Warnings in Markdown and structured details", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_health");
-
-    const result = (await tool.execute(
-      "test-red-cov-1",
+    const result = (await getTool(pi, "code_health").execute(
+      "capability-warnings",
       { include: ["diagnostics", "servers"] },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
     )) as {
       content: Array<{ type: string; text: string }>;
+      details?: {
+        type: "health";
+        data: { capabilityWarnings: { hasWarnings: boolean; warnings: unknown[] } | null };
+      };
     };
 
-    // The health output should contain a "Coverage" or "Degraded Coverage" heading
-    // that reflects the degraded semantic/structural state
-    const text = result.content[0].text;
-    expect(text).toContain("Degraded Coverage");
+    expect(result.content[0].text).toContain("### Capability Warnings");
+    expect(result.details?.data.capabilityWarnings?.hasWarnings).toBe(true);
+    expect(result.details?.data.capabilityWarnings?.warnings.length).toBeGreaterThan(0);
   });
 
-  it("[RED] matches degraded coverage reasons with /supi-ci-status", async () => {
-    // RED: the health tool and status command should share the same warning evaluation
+  it("omits Capability Warnings when neither diagnostics nor servers is requested", async () => {
     const pi = createPiMock();
     codeIntelligenceExtension(pi as never);
-    const tool = getTool(pi, "code_health");
-
-    const result = (await tool.execute(
-      "test-red-cov-2",
-      { include: ["diagnostics", "servers"] },
+    const result = (await getTool(pi, "code_health").execute(
+      "dirty-without-capability-warnings",
+      { include: ["dirty"] },
       undefined,
       undefined,
       makeCtx({ cwd: tmpDir }),
     )) as {
       content: Array<{ type: string; text: string }>;
+      details?: { type: "health"; data: { capabilityWarnings: unknown } };
     };
 
-    // Should report the reason coverage is degraded
-    const text = result.content[0].text;
-    // Either degraded coverage info or no servers warning
-    expect(text).not.toContain("**Error");
+    expect(result.content[0].text).not.toContain("Capability Warnings");
+    expect(result.details?.data.capabilityWarnings).toBeNull();
   });
 });
 
@@ -769,8 +634,6 @@ describe("renderHealthResult code actions", () => {
       scopeFilter: null,
       level: "detailed",
       codeActions: null,
-      coverage: null,
-      unused: null,
       ...overrides,
     };
   }

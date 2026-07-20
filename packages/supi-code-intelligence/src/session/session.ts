@@ -2,7 +2,7 @@
  * Workspace code-intelligence session.
  *
  * Per-workspace module that owns session-scoped state (targets, plans,
- * coverage warnings) and provides typed workflow methods for all
+ * Capability Warnings) and provides typed workflow methods for all
  * public code_* tools. Tool executors receive this session explicitly
  * through their execution context; the session centralizes provider
  * access, target resolution, plan management, and readiness policy.
@@ -19,11 +19,11 @@ import * as path from "node:path";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { LspRuntimeController } from "@mrclrchtr/supi-lsp/api";
 import {
-  type CoverageWarning,
-  CoverageWarningState,
-  evaluateCoverageWarnings,
-  gatherCoverageEvalInput,
-} from "../analysis/coverage/coverage-warnings.ts";
+  type CapabilityWarning,
+  CapabilityWarningState,
+  evaluateCapabilityWarnings,
+  gatherCapabilityWarningInput,
+} from "../analysis/capability/capability-warnings.ts";
 import { type CapabilityAdapter, WorkspaceCapabilityAdapter } from "./capability-adapter.ts";
 import type { FindWorkflowInput, FindWorkflowOutcome } from "./find-types.ts";
 import { runFindWorkflow } from "./find-workflow.ts";
@@ -62,7 +62,7 @@ import { reportProgress, throwIfAborted, type WorkflowControl } from "./workflow
 
 // ── Re-export types consumed by callers ───────────────────────────────
 
-export type { CoverageWarningState } from "../analysis/coverage/coverage-warnings.ts";
+export type { CapabilityWarningState } from "../analysis/capability/capability-warnings.ts";
 export type { CapabilityAdapter } from "./capability-adapter.ts";
 export type {
   FindMode,
@@ -80,10 +80,8 @@ export type {
 export type {
   CodeActionSuggestion,
   HealthCodeActions,
-  HealthCoverageData,
   HealthData,
   HealthSection,
-  HealthUnusedData,
   HealthWorkflowInput,
   HealthWorkflowOutcome,
 } from "./health-types.ts";
@@ -156,10 +154,8 @@ export class WorkspaceCodeIntelligenceSession {
   /** Session-scoped refactor plan storage (planId → plan). */
   readonly #refactorPlans = new Map<string, RefactorPlan>();
 
-  /**
-   * Coverage warning state for deduplication and grace-period timing.
-   */
-  readonly #coverageWarningState = new CoverageWarningState();
+  /** Capability Warning state for deduplication and grace-period timing. */
+  readonly #capabilityWarningState = new CapabilityWarningState();
 
   /** Absolute instruction files already loaded by PI's native context-file mechanism. */
   readonly #nativeInstructionPaths = new Set<string>();
@@ -169,7 +165,7 @@ export class WorkspaceCodeIntelligenceSession {
 
   /**
    * Optional LSP controller reference — attached by LSP lifecycle module
-   * for coverage evaluation and server management.
+   * for Capability Warning evaluation and server management.
    */
   #lspController: LspRuntimeController | null = null;
 
@@ -195,10 +191,12 @@ export class WorkspaceCodeIntelligenceSession {
     return true;
   }
 
-  /** Evaluate and deduplicate coverage warnings behind the session seam. */
-  pendingCoverageWarnings(): readonly CoverageWarning[] {
-    const report = evaluateCoverageWarnings(gatherCoverageEvalInput(this.cwd, this.#lspController));
-    return this.#coverageWarningState.getPendingWarnings(report);
+  /** Evaluate and deduplicate Capability Warnings behind the session seam. */
+  pendingCapabilityWarnings(): readonly CapabilityWarning[] {
+    const report = evaluateCapabilityWarnings(
+      gatherCapabilityWarningInput(this.cwd, this.#lspController),
+    );
+    return this.#capabilityWarningState.getPendingWarnings(report);
   }
 
   // ── Target workflow (deep seam) ───────────────────────────────────
@@ -396,7 +394,7 @@ export class WorkspaceCodeIntelligenceSession {
     this.#workflowTargets.clear();
     this.#surfacedInstructionDirs.clear();
     this.#nativeInstructionPaths.clear();
-    this.#coverageWarningState.reset();
+    this.#capabilityWarningState.reset();
     this.#lspController = null;
   }
 }

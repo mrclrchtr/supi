@@ -45,7 +45,9 @@ Schemas encode exact-one objects with one-key cardinality and closed properties.
 
 Structural callees are source-shape calls from the enclosing scope, not symbol-identity relationships. Imports, exports, tests, and impact are not graph relation families.
 
-A deterministic convention may locate an artifact. It cannot create a classification, relationship, or absence claim. A miss at one conventional path means only that no artifact was found there. Evidence keeps its provider or structural provenance; degraded or unavailable substrates are disclosed rather than silently replaced. Next-query guidance follows the same honest-correctness boundary: a proposed Tool call must be executable from capabilities and evidence established by the current result or explicitly name its unmet prerequisite. In particular, point inspection recommends target/graph work only from an evidence-backed definition location; structural-only inspection does not recommend a fresh graph anchor that LSP-first target establishment will reject.
+`code_health` reports Live health observations rather than probing precomputed reports by conventional path. A continuously maintained source may expose its current snapshot when freshness limitations are disclosed; a batch analyzer must collect during the call. Coverage and unused-code report sections and path inputs are therefore outside the health surface. Capability Warnings remain supplemental status derived from current capability/configuration checks, not a selectable health section. Orientation may retain bounded diagnostics as Priority Signals solely to guide source selection.
+
+Evidence keeps its provider or structural provenance; degraded or unavailable substrates are disclosed rather than silently replaced. Next-query guidance follows the same honest-correctness boundary: a proposed Tool call must be executable from capabilities and evidence established by the current result or explicitly name its unmet prerequisite. In particular, point inspection recommends target/graph work only from an evidence-backed definition location; structural-only inspection does not recommend a fresh graph anchor that LSP-first target establishment will reject.
 
 ## Consequences
 
@@ -53,7 +55,8 @@ A deterministic convention may locate an artifact. It cannot create a classifica
 - Callers express intent structurally instead of relying on precedence.
 - A public breaking change is intentional; SuPi is pre-release.
 - Graph output has a coherent evidence contract.
-- Search conventions remain useful locators without being promoted to Tool evidence.
+- Health checks do not infer optional integrations from ambient report files; future batch integrations must collect when called.
+- Bounded diagnostic Priority Signals remain Orientation context without turning Orientation into a health report.
 - Descriptions and guidelines must name only the eight-tool family and the current nested shapes.
 
 ## Rejected alternatives
@@ -61,5 +64,5 @@ A deterministic convention may locate an artifact. It cannot create a classifica
 - **Keep `code_impact`:** overlaps relationship and change reasoning without a coherent evidence substrate.
 - **Keep flat arguments plus precedence:** allows contradictory calls and hidden ignored input.
 - **Keep graph imports, exports, and tests:** mixes file structure, convention discovery, and symbol relationships.
-- **Treat naming or path conventions as evidence:** produces claims that the located artifact has not established.
+- **Probe conventional coverage or unused-code report paths:** couples health output to optional, potentially stale artifacts that the tool did not produce.
 - **Silently fall back between semantic, structural, and text search:** obscures confidence and breaks honest correctness.

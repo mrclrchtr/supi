@@ -12,12 +12,10 @@ import type { HealthDetails, HealthSectionDetails } from "./types.ts";
 export type {
   CodeActionSuggestion,
   HealthCodeActions,
-  HealthCoverageData,
   HealthData,
   HealthDiagnosticEntry,
   HealthSection,
   HealthServerInfo,
-  HealthUnusedData,
   SemanticHealthState,
 } from "../../session/health-types.ts";
 export type { HealthSectionDetails } from "./types.ts";
@@ -32,8 +30,6 @@ const SECTION_TITLES: Record<HealthSection, string> = {
   diagnostics: "Diagnostics",
   servers: "Servers",
   dirty: "Dirty",
-  coverage: "Coverage",
-  unused: "Unused",
 };
 
 /** Assemble public code_health evidence and details before presentation adapters render it. */
@@ -71,24 +67,10 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
       recovered: data.recovered,
       structuralAvailable: structuralCapabilityReady(data),
       structuralStatus: data.structuralStatus,
+      capabilityWarnings: data.capabilityWarnings ?? null,
       diagnosticFileCount: data.diagnostics.length,
       serverCount: data.servers.length,
       dirtyFileCount: data.gitContext?.dirtyFiles.length ?? null,
-      coverage: data.coverage
-        ? {
-            available: data.coverage.available,
-            entryCount: data.coverage.entries.length,
-            reportPath: data.coverage.reportPath,
-          }
-        : null,
-      unused: data.unused
-        ? {
-            available: data.unused.available,
-            fileCount: data.unused.files.length,
-            exportCount: data.unused.exports.length,
-            reportPath: data.unused.reportPath,
-          }
-        : null,
       codeActionCount: data.codeActions?.items.length ?? null,
       evidenceLists: [...assembled.evidenceLists],
     },
@@ -100,7 +82,6 @@ interface HealthSectionFacts {
   items: readonly unknown[];
   confidence: ConfidenceMode;
   provenance: ResultProvenance[];
-  locator?: string;
 }
 
 function projectSection(
@@ -127,7 +108,6 @@ function projectSection(
       provenance: [...facts.provenance],
       itemCount: facts.items.length,
       available: facts.available,
-      ...(facts.locator ? { locator: facts.locator } : {}),
     },
   };
 }
@@ -158,38 +138,6 @@ function collectSectionFacts(key: HealthSection, data: HealthData): HealthSectio
         items: data.gitContext?.dirtyFiles ?? [],
         confidence: "heuristic",
         provenance: data.gitContext ? [{ source: "git" }] : [],
-      };
-    case "coverage":
-      return {
-        available: data.coverage?.available === true,
-        items: data.coverage?.entries ?? [],
-        confidence: "heuristic",
-        provenance: data.coverage
-          ? [
-              {
-                source: "filesystem",
-                capability: "coverage-report",
-                detail: data.coverage.reportPath,
-              },
-            ]
-          : [],
-        locator: data.coverage?.reportPath,
-      };
-    case "unused":
-      return {
-        available: data.unused?.available === true,
-        items: data.unused ? [...data.unused.files, ...data.unused.exports] : [],
-        confidence: "heuristic",
-        provenance: data.unused
-          ? [
-              {
-                source: "filesystem",
-                capability: "unused-report",
-                detail: data.unused.reportPath,
-              },
-            ]
-          : [],
-        locator: data.unused?.reportPath,
       };
   }
 }

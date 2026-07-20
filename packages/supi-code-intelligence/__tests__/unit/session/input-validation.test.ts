@@ -48,6 +48,22 @@ describe("symbol-kind validation", () => {
 });
 
 describe("session runtime input validation", () => {
+  it.each(["coverage", "unused"])("rejects removed health section %s", (section) => {
+    expect(parseHealthWorkflowInput({ include: [section] })).toEqual({
+      kind: "invalid-input",
+      message: "include contains an unsupported or duplicate health section.",
+    });
+  });
+
+  it.each(["coveragePath", "unusedPath"])("rejects removed health path field %s", (field) => {
+    const outcome = parseHealthWorkflowInput({ [field]: "report.json" });
+
+    expect(outcome.kind).toBe("invalid-input");
+    if (outcome.kind === "invalid-input") {
+      expect(outcome.message).toContain(`unsupported field: \`${field}\``);
+    }
+  });
+
   it.each([
     [
       "rejects fractional inspection coordinates",

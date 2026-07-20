@@ -260,8 +260,8 @@ export const CodeHealthParameters = Type.Object(
     ),
     include: Type.Optional(
       Type.Array(
-        StringEnum(["diagnostics", "servers", "dirty", "coverage", "unused"], {
-          description: "Health signals to include.",
+        StringEnum(["diagnostics", "servers", "dirty"], {
+          description: "Live health signals to include.",
         }),
         { description: "Requested health-signal sections.", uniqueItems: true },
       ),
@@ -270,14 +270,6 @@ export const CodeHealthParameters = Type.Object(
       StringEnum(["summary", "detailed"], {
         description: "Detail level for the health report.",
       }),
-    ),
-    coveragePath: Type.Optional(
-      Type.String({
-        description: "Coverage summary path; defaults to coverage/coverage-summary.json.",
-      }),
-    ),
-    unusedPath: Type.Optional(
-      Type.String({ description: "Knip report path; defaults to knip.json." }),
     ),
   },
   { additionalProperties: false },

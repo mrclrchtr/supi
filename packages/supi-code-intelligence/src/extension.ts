@@ -114,19 +114,19 @@ export default function codeIntelligenceExtension(
     session.captureNativeInstructionPaths(event.systemPromptOptions.contextFiles ?? []);
   });
 
-  // ── Coverage warning emission ─────────────────────────────────────
+  // ── Capability Warning emission ──────────────────────────────────
   pi.on(
     "before_agent_start",
     async (_event, ctx): Promise<BeforeAgentStartEventResult | undefined> => {
       const session = app.getSession(ctx.cwd);
       if (!session) return;
 
-      const pending = session.pendingCoverageWarnings();
+      const pending = session.pendingCapabilityWarnings();
       if (pending.length === 0) return;
 
       const lines = [
         '<extension-context source="supi-code-intelligence">',
-        "Code intelligence coverage is degraded:",
+        "Code intelligence Capability Warnings:",
       ];
       for (const w of pending) {
         const lang = w.language ? `[${w.language}] ` : "";
@@ -138,13 +138,13 @@ export default function codeIntelligenceExtension(
 
       return {
         message: {
-          customType: "code-intelligence-coverage",
+          customType: "code-intelligence-capability-warnings",
           display: true,
           content: warningContext,
         },
         systemPrompt:
           (await ctx.getSystemPrompt()) +
-          `\n\nThe code intelligence stack has degraded coverage. This means some code-understanding tools (code_* tools) may return limited or structural-only information. The agent should still attempt using them, but be aware that semantic coverage for some languages may be unavailable.`,
+          "\n\nThe code intelligence stack reports Capability Warnings. Some code_* tools may return limited or structural-only information. Continue using them, but account for unavailable semantic or structural analysis named by the warnings.",
       };
     },
   );

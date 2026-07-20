@@ -114,6 +114,68 @@ describe("code_orientation tool", () => {
     expect(result.content[0].text).toContain("Project Brief");
   });
 
+  it("renders bounded live diagnostics as Priority Signals", async () => {
+    writeSource("src/index.ts", "export const paymentLoader = 1;\n");
+    markLspReady({
+      getOutstandingDiagnosticSummary: vi.fn(() => [
+        {
+          file: "src/index.ts",
+          total: 2,
+          errors: 1,
+          warnings: 1,
+          information: 0,
+          hints: 0,
+        },
+      ]),
+      fileDiagnostics: vi.fn(async () => []),
+    });
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const result = (await getTool(pi, "code_orientation").execute(
+      "orientation-with-priority-signals",
+      { focus: { path: "src/index.ts" } },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ text: string }> };
+
+    expect(result.content[0].text).toContain("## Priority Signals");
+    expect(result.content[0].text).toContain("Diagnostics: `src/index.ts` (2 total");
+  });
+
+  it("does not turn ambient coverage or unused-code reports into Priority Signals", async () => {
+    writeSource("src/index.ts", "export const paymentLoader = 1;\n");
+    writeSource(
+      "coverage/coverage-summary.json",
+      JSON.stringify({
+        "src/index.ts": { lines: { pct: 10 }, statements: { pct: 15 } },
+      }),
+    );
+    writeSource(
+      "knip.json",
+      JSON.stringify({
+        files: ["src/index.ts"],
+        exports: [{ file: "src/index.ts", name: "paymentLoader" }],
+      }),
+    );
+
+    const pi = createPiMock();
+    codeIntelligenceExtension(pi as never);
+    const result = (await getTool(pi, "code_orientation").execute(
+      "orientation-with-ambient-reports",
+      { focus: { path: "src/index.ts" } },
+      undefined,
+      undefined,
+      makeCtx({ cwd: tmpDir }),
+    )) as { content: Array<{ text: string }> };
+
+    expect(result.content[0].text).not.toContain("Priority Signals");
+    expect(result.content[0].text).not.toContain("Low coverage");
+    expect(result.content[0].text).not.toContain("Unused file");
+    expect(result.content[0].text).not.toContain("Unused export");
+  });
+
   it("orients around a discovered module name", async () => {
     writeFileSync(path.join(tmpDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'\n");
     const pkgDir = path.join(tmpDir, "packages", "app");

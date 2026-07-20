@@ -66,6 +66,11 @@ export function renderHealthResult(
 
   // Expanded view
   container.addChild(buildStatusBar(data, theme));
+  const capabilityWarnings = readCapabilityWarnings(data);
+  if (capabilityWarnings.length > 0) {
+    container.addChild(new Spacer(1));
+    container.addChild(buildCapabilityWarnings(capabilityWarnings, theme));
+  }
   container.addChild(new Spacer(1));
   container.addChild(buildDiagnosticSummary(data, theme));
   container.addChild(buildHealthSectionSummary(data, theme));
@@ -88,7 +93,6 @@ interface HealthSectionSummary {
   status: "complete" | "partial" | "unavailable";
   itemCount: number;
   available: boolean;
-  locator?: string;
 }
 
 function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme): Text {
@@ -115,6 +119,11 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
     const semanticStatus = readSemanticStatus(data);
     const statusColor = semanticStatus.startsWith("ready") ? "success" : "warning";
     segments.push(`${theme.fg("dim", "lsp")} ${theme.fg(statusColor, semanticStatus)}`);
+  }
+  const capabilityWarningCount = readCapabilityWarnings(data).length;
+  if (capabilityWarningCount > 0) {
+    const label = capabilityWarningCount === 1 ? "capability warning" : "capability warnings";
+    segments.push(theme.fg("warning", `${capabilityWarningCount} ${label}`));
   }
 
   const dot = theme.fg("dim", "·");
@@ -163,6 +172,44 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
   return new Text(lines.join("  "), 0, 0);
 }
 
+interface RenderedCapabilityWarning {
+  message: string;
+  language?: string;
+  detail?: string;
+}
+
+function buildCapabilityWarnings(
+  warnings: readonly RenderedCapabilityWarning[],
+  theme: Theme,
+): Text {
+  const lines = [theme.fg("warning", theme.bold("Capability Warnings"))];
+  for (const warning of warnings) {
+    const language = warning.language ? `[${warning.language}] ` : "";
+    const detail = warning.detail ? ` — ${warning.detail}` : "";
+    lines.push(`${theme.fg("warning", "⚠")} ${language}${warning.message}${detail}`);
+  }
+  return new Text(lines.join("\n"), 0, 0);
+}
+
+function readCapabilityWarnings(data: Record<string, unknown> | null): RenderedCapabilityWarning[] {
+  const report = data?.capabilityWarnings;
+  if (typeof report !== "object" || report === null) return [];
+  const warnings = (report as Record<string, unknown>).warnings;
+  if (!Array.isArray(warnings)) return [];
+  return warnings.flatMap((warning) => {
+    if (typeof warning !== "object" || warning === null) return [];
+    const record = warning as Record<string, unknown>;
+    if (typeof record.message !== "string") return [];
+    return [
+      {
+        message: record.message,
+        ...(typeof record.language === "string" ? { language: record.language } : {}),
+        ...(typeof record.detail === "string" ? { detail: record.detail } : {}),
+      },
+    ];
+  });
+}
+
 function buildHealthSectionSummary(data: Record<string, unknown> | null, theme: Theme): Text {
   const sections = readHealthSections(data).filter((section) => section.key !== "diagnostics");
   if (sections.length === 0) return new Text("", 0, 0);
@@ -170,8 +217,7 @@ function buildHealthSectionSummary(data: Record<string, unknown> | null, theme: 
   const lines = sections.map((section) => {
     const label = sectionLabel(section.key);
     if (section.status === "unavailable" || !section.available) {
-      const locator = section.locator ? ` at ${section.locator}` : "";
-      return `${label} unavailable${locator}`;
+      return `${label} unavailable`;
     }
     return `${label} ${section.itemCount}`;
   });
@@ -220,7 +266,6 @@ function readHealthSections(data: Record<string, unknown> | null): HealthSection
         status: isSectionStatus(record.status) ? record.status : "unavailable",
         itemCount: typeof record.itemCount === "number" ? record.itemCount : 0,
         available: record.available === true,
-        ...(typeof record.locator === "string" ? { locator: record.locator } : {}),
       },
     ];
   });
@@ -243,8 +288,6 @@ const SECTION_LABELS: Record<string, string> = {
   diagnostics: "diag",
   servers: "servers",
   dirty: "dirty",
-  coverage: "coverage",
-  unused: "unused",
 };
 
 function sectionLabel(key: string): string {

@@ -1,8 +1,8 @@
-import type { CoverageWarningReport } from "../analysis/coverage/coverage-warnings.ts";
+import type { CapabilityWarningReport } from "../analysis/capability/capability-warnings.ts";
 import type { EvidenceListMetadata } from "../analysis/evidence.ts";
 import type { GitContext } from "../analysis/signals/git.ts";
 
-export type HealthSection = "diagnostics" | "servers" | "dirty" | "coverage" | "unused";
+export type HealthSection = "diagnostics" | "servers" | "dirty";
 
 /** Final semantic-diagnostics readiness after routing and requested recovery. */
 export type SemanticHealthState =
@@ -17,8 +17,6 @@ export interface HealthWorkflowInput {
   readonly refresh?: boolean;
   readonly include?: readonly HealthSection[];
   readonly level?: "summary" | "detailed";
-  readonly coveragePath?: string;
-  readonly unusedPath?: string;
 }
 
 export interface HealthServerInfo {
@@ -33,21 +31,6 @@ export interface HealthDiagnosticEntry {
   readonly file: string;
   readonly errors: number;
   readonly warnings: number;
-}
-
-export interface HealthCoverageData {
-  /** Exact report locator that was checked. */
-  readonly reportPath: string;
-  readonly available: boolean;
-  readonly entries: ReadonlyArray<{ file: string; pct: number }>;
-}
-
-export interface HealthUnusedData {
-  /** Exact report locator that was checked. */
-  readonly reportPath: string;
-  readonly available: boolean;
-  readonly files: readonly string[];
-  readonly exports: ReadonlyArray<{ file: string; name: string }>;
 }
 
 export interface CodeActionSuggestion {
@@ -80,9 +63,7 @@ export interface HealthData {
   readonly scopeFilter: string | null;
   readonly level: "summary" | "detailed";
   readonly codeActions: HealthCodeActions | null;
-  readonly coverage: HealthCoverageData | null;
-  readonly unused: HealthUnusedData | null;
-  readonly degradedCoverage?: CoverageWarningReport;
+  readonly capabilityWarnings?: CapabilityWarningReport;
   readonly diagnosticAgeSeconds?: number;
 }
 

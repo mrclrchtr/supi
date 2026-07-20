@@ -16,47 +16,31 @@ afterEach(() => {
 });
 
 describe("prioritization signals", () => {
-  it("summarizes low coverage and knip signals for relevant files", () => {
+  it("ignores ambient coverage and unused-code reports", () => {
     mkdirSync(path.join(tmpDir, "src"), { recursive: true });
     mkdirSync(path.join(tmpDir, "coverage"), { recursive: true });
-    writeFileSync(path.join(tmpDir, "src", "payment.ts"), "export const paymentLoader = 1;\n");
-    writeFileSync(path.join(tmpDir, "src", "unused.ts"), "export const oldThing = 1;\n");
+    const paymentFile = path.join(tmpDir, "src", "payment.ts");
+    writeFileSync(paymentFile, "export const paymentLoader = 1;\n");
     writeFileSync(
       path.join(tmpDir, "coverage", "coverage-summary.json"),
-      JSON.stringify(
-        {
-          total: { lines: { pct: 90 }, statements: { pct: 90 } },
-          "src/payment.ts": { lines: { pct: 10 }, statements: { pct: 15 } },
-          "src/unused.ts": { lines: { pct: 100 }, statements: { pct: 100 } },
-        },
-        null,
-        2,
-      ),
+      JSON.stringify({
+        "src/payment.ts": { lines: { pct: 10 }, statements: { pct: 15 } },
+      }),
     );
     writeFileSync(
       path.join(tmpDir, "knip.json"),
-      JSON.stringify(
-        {
-          files: ["src/unused.ts"],
-          exports: [{ file: "src/payment.ts", name: "paymentLoader" }],
-        },
-        null,
-        2,
-      ),
+      JSON.stringify({
+        files: ["src/payment.ts"],
+        exports: [{ file: "src/payment.ts", name: "paymentLoader" }],
+      }),
     );
 
-    const summary = summarizePrioritySignalsForFiles(
-      tmpDir,
-      [path.join(tmpDir, "src", "payment.ts"), path.join(tmpDir, "src", "unused.ts")],
-      { kind: "unavailable", reason: "No LSP in test env" },
-    );
+    const summary = summarizePrioritySignalsForFiles(tmpDir, [paymentFile], {
+      kind: "unavailable",
+      reason: "No LSP in test env",
+    });
 
-    expect(summary).not.toBeNull();
-    expect(summary?.lowCoverageCount).toBe(1);
-    expect(summary?.unusedCount).toBe(2);
-    expect(summary?.warnings.join("\n")).toContain("Low coverage");
-    expect(summary?.warnings.join("\n")).toContain("Unused file");
-    expect(summary?.warnings.join("\n")).toContain("Unused export");
+    expect(summary).toBeNull();
   });
 
   it("maps diagnostic summaries from a ready LSP session", () => {

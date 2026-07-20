@@ -54,8 +54,8 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
   },
   code_health: {
     description:
-      "Report diagnostics, language-server status, final semantic health state, dirty files, coverage, and unused-code evidence. scope/include/level narrow the report; refresh:true attempts diagnostic recovery before semantic state is finalized. Server inventory is status evidence, not proof that semantic operations are ready; unavailable inventory is not reported as empty. Default coverage and unused paths are evidence locators only: a miss means unavailable at that location, not global absence.",
-    promptSnippet: "code_health — workspace diagnostics and maintenance evidence",
+      "Report live diagnostics, language-server status, final semantic health state, and dirty files. scope/include/level narrow the report; refresh:true attempts diagnostic recovery before semantic state is finalized. Server inventory is status evidence, not proof that semantic operations are ready; unavailable inventory is not reported as empty. Capability Warnings supplement diagnostic/server requests and are not an include section.",
+    promptSnippet: "code_health — live workspace health observations",
     promptGuidelines: [
       "Use code_health with refresh:true before relying on potentially stale diagnostics.",
     ],

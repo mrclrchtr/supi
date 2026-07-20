@@ -1,4 +1,5 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
+import type { CapabilityWarningReport } from "../../analysis/capability/capability-warnings.ts";
 import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
@@ -179,8 +180,6 @@ export interface HealthSectionDetails {
   provenance: ResultProvenance[];
   itemCount: number;
   available: boolean;
-  /** Exact report path checked when this section is an artifact locator. */
-  locator?: string;
 }
 
 /** Structured details metadata for code_health results. */
@@ -197,16 +196,11 @@ export interface HealthDetails {
   structuralAvailable: boolean;
   /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */
   structuralStatus?: string;
+  /** Supplemental status for diagnostic/server requests; not a selectable section. */
+  capabilityWarnings: CapabilityWarningReport | null;
   diagnosticFileCount: number;
   serverCount: number;
   dirtyFileCount: number | null;
-  coverage: { available: boolean; entryCount: number; reportPath: string } | null;
-  unused: {
-    available: boolean;
-    fileCount: number;
-    exportCount: number;
-    reportPath: string;
-  } | null;
   /** Null means advisory code actions were not requested or collected. */
   codeActionCount: number | null;
   evidenceLists?: EvidenceListMetadata[];

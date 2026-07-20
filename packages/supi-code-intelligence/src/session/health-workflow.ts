@@ -7,24 +7,17 @@ import type {
   WorkspaceLspRuntimeState,
 } from "@mrclrchtr/supi-lsp/api";
 import {
-  evaluateCoverageWarnings,
-  gatherCoverageEvalInput,
-} from "../analysis/coverage/coverage-warnings.ts";
+  evaluateCapabilityWarnings,
+  gatherCapabilityWarningInput,
+} from "../analysis/capability/capability-warnings.ts";
 import {
   collectCodeActions,
   collectDiagnostics,
   isScopedFile,
 } from "../analysis/health/diagnostics.ts";
 import { describeStructuralState, maybeRecover } from "../analysis/health/recovery.ts";
-import {
-  collectCoverageSection,
-  collectGitContext,
-  collectServers,
-  collectUnusedSection,
-  needsPrioritizationSignals,
-} from "../analysis/health/signals.ts";
+import { collectGitContext, collectServers } from "../analysis/health/signals.ts";
 import { resolveScope } from "../analysis/search/ripgrep.ts";
-import { loadPrioritizationSignals } from "../analysis/signals/project.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import type {
   HealthData,
@@ -104,13 +97,6 @@ export async function runHealthWorkflow(
   );
   const servers = collectServers(runtime, included);
   const gitContext = collectGitContext(included, deps.cwd);
-  const artifacts = collectHealthArtifacts({
-    included,
-    request,
-    cwd: deps.cwd,
-    scopeFilter,
-    lspState,
-  });
   const codeActions = await collectOptionalCodeActions({
     level,
     included,
@@ -118,7 +104,7 @@ export async function runHealthWorkflow(
     scopeFilter,
     cwd: deps.cwd,
   });
-  const degradedCoverage = collectDegradedCoverage(semanticRequested, deps);
+  const capabilityWarnings = collectCapabilityWarnings(semanticRequested, deps);
   const diagnosticAgeSeconds = getDiagnosticAgeSeconds(
     included,
     deps.lastRefresh,
@@ -138,9 +124,7 @@ export async function runHealthWorkflow(
     scopeFilter: request.scope ? scopeFilter : null,
     level,
     codeActions,
-    coverage: artifacts.coverage,
-    unused: artifacts.unused,
-    degradedCoverage: degradedCoverage?.hasWarnings ? degradedCoverage : undefined,
+    capabilityWarnings: capabilityWarnings?.hasWarnings ? capabilityWarnings : undefined,
     diagnosticAgeSeconds,
   };
 
@@ -233,39 +217,6 @@ async function prepareDiagnosticRefresh(options: {
   return true;
 }
 
-function collectHealthArtifacts(options: {
-  included: readonly HealthSection[];
-  request: HealthWorkflowInput;
-  cwd: string;
-  scopeFilter: string | null;
-  lspState: ReturnType<CapabilityAdapter["getLspRuntimeState"]>;
-}): Pick<HealthData, "coverage" | "unused"> {
-  const prioritizationSignals = needsPrioritizationSignals([...options.included])
-    ? loadPrioritizationSignals(options.cwd, options.lspState, {
-        coveragePath: options.request.coveragePath,
-        unusedPath: options.request.unusedPath,
-      })
-    : null;
-  return {
-    coverage: options.included.includes("coverage")
-      ? collectCoverageSection(
-          prioritizationSignals,
-          options.cwd,
-          options.scopeFilter,
-          options.request.coveragePath,
-        )
-      : null,
-    unused: options.included.includes("unused")
-      ? collectUnusedSection(
-          prioritizationSignals,
-          options.cwd,
-          options.scopeFilter,
-          options.request.unusedPath,
-        )
-      : null,
-  };
-}
-
 async function collectOptionalCodeActions(options: {
   level: "summary" | "detailed";
   included: readonly HealthSection[];
@@ -283,12 +234,14 @@ async function collectOptionalCodeActions(options: {
   return collectCodeActions(options.runtime, options.scopeFilter, options.cwd);
 }
 
-function collectDegradedCoverage(
+function collectCapabilityWarnings(
   semanticRequested: boolean,
   deps: HealthWorkflowDeps,
-): HealthData["degradedCoverage"] {
+): HealthData["capabilityWarnings"] {
   if (!semanticRequested) return undefined;
-  const report = evaluateCoverageWarnings(gatherCoverageEvalInput(deps.cwd, deps.lspController));
+  const report = evaluateCapabilityWarnings(
+    gatherCapabilityWarningInput(deps.cwd, deps.lspController),
+  );
   return report.hasWarnings ? report : undefined;
 }
 

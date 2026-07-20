@@ -14,8 +14,8 @@ import {
 } from "../../analysis/brief/inventory.ts";
 import { listSourceFiles, summarizeDirectoryRecursively } from "../../analysis/brief/summarize.ts";
 import type { CodeProvider } from "../../analysis/provider.ts";
-import { gatherGitContext } from "../../analysis/signals/git.ts";
 import type { OrientationBlock, OrientationResultData } from "../orientation-types.ts";
+import { collectGitContextBlocks, collectPrioritySignalBlocks } from "./context-signals.ts";
 
 interface ContextFactsInput {
   readonly model: ArchitectureModel | null;
@@ -47,7 +47,14 @@ function collectProjectFacts(input: ContextFactsInput): OrientationResultData {
       blank(),
     );
   }
-  appendGitFacts(blocks, input);
+  blocks.push(
+    ...collectPrioritySignalBlocks(
+      model.root,
+      summarizeDirectoryRecursively(model.root).allFiles,
+      input.lspRuntime,
+    ),
+    ...collectGitContextBlocks(model.root, input.showGitContext),
+  );
 
   if (model.modules.length === 0) {
     blocks.push(
@@ -149,7 +156,14 @@ async function collectDirectoryFacts(input: ContextFactsInput): Promise<Orientat
       `Use code_find with an explicit query and scope ["${relPath}"] for nested evidence`,
     );
   }
-  appendGitFacts(blocks, input);
+  blocks.push(
+    ...collectPrioritySignalBlocks(
+      model.root,
+      summarizeDirectoryRecursively(input.focus as string).allFiles,
+      input.lspRuntime,
+    ),
+    ...collectGitContextBlocks(model.root, input.showGitContext),
+  );
 
   return resultData({
     blocks,
@@ -285,7 +299,10 @@ async function collectFileFacts(input: ContextFactsInput): Promise<OrientationRe
     blocks.push(paragraph(`_Module: ${shortName(module)} (\`${module.relativePath}\`)_`), blank());
   blocks.push(listItem(`Lines: ${lines}`));
   appendFileEnrichment(blocks, enrichment);
-  appendGitFacts(blocks, input);
+  blocks.push(
+    ...collectPrioritySignalBlocks(model.root, [focus], input.lspRuntime),
+    ...collectGitContextBlocks(model.root, input.showGitContext),
+  );
   return resultData({
     blocks,
     confidence: "structural",
@@ -321,25 +338,6 @@ function appendFileEnrichment(
       );
     }
   }
-  blocks.push(blank());
-}
-
-function appendGitFacts(blocks: OrientationBlock[], input: ContextFactsInput): void {
-  if (!input.showGitContext) return;
-  const context = gatherGitContext((input.model as ArchitectureModel).root);
-  if (!context) return;
-  blocks.push(heading(2, "Git Context"), blank(), paragraph(`Branch: \`${context.branch}\``));
-  if (context.dirtyFiles.length === 0) blocks.push(paragraph("Working tree clean."));
-  else {
-    blocks.push(
-      paragraph(
-        `Uncommitted: ${context.dirtyFiles.length} file${context.dirtyFiles.length === 1 ? "" : "s"}`,
-      ),
-    );
-    for (const file of context.dirtyFiles.slice(0, 5)) blocks.push(listItem(`\`${file}\``));
-  }
-  if (context.lastCommitMessage)
-    blocks.push(paragraph(`Last commit: \`${context.lastCommitMessage}\``));
   blocks.push(blank());
 }
 

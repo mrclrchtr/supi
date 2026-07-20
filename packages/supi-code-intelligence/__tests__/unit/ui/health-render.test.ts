@@ -34,11 +34,10 @@ function makeDetails(overrides: Record<string, unknown> = {}): Record<string, un
     recovered: false,
     structuralAvailable: true,
     structuralStatus: "ready",
+    capabilityWarnings: null,
     diagnosticFileCount: 2,
     serverCount: 1,
     dirtyFileCount: null,
-    coverage: null,
-    unused: null,
     codeActionCount: null,
     ...overrides,
   };
@@ -89,48 +88,24 @@ describe("code_health TUI projection", () => {
     expect(text).not.toContain("lsp");
   });
 
-  it("shows an unavailable coverage locator in expanded health output", () => {
-    const text = render(
-      makeDetails({
-        includedSections: ["coverage"],
-        sections: [
+  it("renders Capability Warnings from structured health details", () => {
+    const details = makeDetails({
+      capabilityWarnings: {
+        hasWarnings: true,
+        warnings: [
           {
-            key: "coverage",
-            title: "Coverage",
-            status: "unavailable",
-            confidence: "unavailable",
-            provenance: [
-              {
-                source: "filesystem",
-                capability: "coverage-report",
-                detail: "/repo/missing-coverage.json",
-              },
-            ],
-            itemCount: 0,
-            available: false,
-            locator: "/repo/missing-coverage.json",
+            type: "missing-server",
+            language: "python",
+            message: "pyright-langserver not found on PATH",
           },
         ],
-        semanticState: { kind: "unavailable", reason: "no LSP" },
-        structuralAvailable: false,
-        structuralStatus: "unavailable — no tree-sitter",
-        diagnosticFileCount: 0,
-        serverCount: 0,
-        dirtyFileCount: null,
-        coverage: {
-          available: false,
-          entryCount: 0,
-          reportPath: "/repo/missing-coverage.json",
-        },
-      }),
-      true,
-      "## Code Health\n\n### Coverage\n\nCoverage report unavailable at `missing-coverage.json`.",
-    );
+      },
+    });
 
-    expect(text).toContain("coverage unavailable");
-    expect(text).toContain("Coverage report unavailable");
-    expect(text).not.toContain("diag");
-    expect(text).not.toContain("LSP:");
+    expect(render(details)).toContain("1 capability warning");
+    const expanded = render(details, true);
+    expect(expanded).toContain("Capability Warnings");
+    expect(expanded).toContain("pyright-langserver not found on PATH");
   });
 
   it.each([false, true])("projects bounded dirty-file evidence when expanded is %s", (expanded) => {

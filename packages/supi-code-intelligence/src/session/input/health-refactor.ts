@@ -20,25 +20,19 @@ import {
   valid,
 } from "./common.ts";
 
-const HEALTH_SECTIONS = new Set<HealthSection>([
-  "diagnostics",
-  "servers",
-  "dirty",
-  "coverage",
-  "unused",
-]);
+const HEALTH_SECTIONS = new Set<HealthSection>(["diagnostics", "servers", "dirty"]);
 
 export function parseHealthWorkflowInput(value: unknown): InputValidation<HealthWorkflowInput> {
   const record = requireRecord(value, "code_health input");
   if (record.kind === "invalid-input") return record;
   const keysError = requireOnlyKeys(
     record.value,
-    ["scope", "refresh", "include", "level", "coveragePath", "unusedPath"],
+    ["scope", "refresh", "include", "level"],
     "code_health input",
   );
   if (keysError) return invalid(keysError);
-  const paths = parseHealthPaths(record.value);
-  if (paths.kind === "invalid-input") return paths;
+  const scope = optionalString(record.value.scope, "scope");
+  if (scope.kind === "invalid-input") return scope;
   const refresh = parseRefresh(record.value.refresh);
   if (refresh.kind === "invalid-input") return refresh;
   const level = parseHealthLevel(record.value.level);
@@ -46,26 +40,10 @@ export function parseHealthWorkflowInput(value: unknown): InputValidation<Health
   const include = parseHealthSections(record.value.include);
   if (include.kind === "invalid-input") return include;
   return valid({
-    ...paths.value,
+    ...(scope.value === undefined ? {} : { scope: scope.value }),
     ...(refresh.value === undefined ? {} : { refresh: refresh.value }),
     ...(include.value === undefined ? {} : { include: include.value }),
     ...(level.value === undefined ? {} : { level: level.value }),
-  });
-}
-
-function parseHealthPaths(
-  value: Record<string, unknown>,
-): InputValidation<Pick<HealthWorkflowInput, "scope" | "coveragePath" | "unusedPath">> {
-  const scope = optionalString(value.scope, "scope");
-  if (scope.kind === "invalid-input") return scope;
-  const coveragePath = optionalString(value.coveragePath, "coveragePath");
-  if (coveragePath.kind === "invalid-input") return coveragePath;
-  const unusedPath = optionalString(value.unusedPath, "unusedPath");
-  if (unusedPath.kind === "invalid-input") return unusedPath;
-  return valid({
-    ...(scope.value === undefined ? {} : { scope: scope.value }),
-    ...(coveragePath.value === undefined ? {} : { coveragePath: coveragePath.value }),
-    ...(unusedPath.value === undefined ? {} : { unusedPath: unusedPath.value }),
   });
 }
 

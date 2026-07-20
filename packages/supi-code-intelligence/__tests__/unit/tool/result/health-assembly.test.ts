@@ -17,8 +17,6 @@ function makeHealthData(overrides: Partial<HealthData> = {}): HealthData {
     scopeFilter: null,
     level: "summary",
     codeActions: null,
-    coverage: null,
-    unused: null,
     ...overrides,
   };
 }
@@ -27,54 +25,25 @@ describe("code_health result assembly", () => {
   it("assembles only requested sections with evidence-backed provenance", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
-        includedSections: ["dirty", "coverage"],
+        includedSections: ["dirty"],
         semanticState: null,
         gitContext: {
           branch: "main",
           dirtyFiles: ["src/index.ts"],
           lastCommitMessage: "initial",
         },
-        coverage: {
-          reportPath: "/repo/coverage.json",
-          available: true,
-          entries: [{ file: "/repo/src/index.ts", pct: 20 }],
-        },
       }),
     );
 
-    expect(assembly.assembled.sections.map((section) => section.key)).toEqual([
-      "health.dirty",
-      "health.coverage",
+    expect(assembly.assembled.sections).toEqual([
+      expect.objectContaining({
+        key: "health.dirty",
+        status: "complete",
+        confidence: "heuristic",
+        provenance: [{ source: "git" }],
+      }),
     ]);
-    expect(assembly.assembled.sections).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          key: "health.dirty",
-          status: "complete",
-          confidence: "heuristic",
-          provenance: [{ source: "git" }],
-        }),
-        expect.objectContaining({
-          key: "health.coverage",
-          status: "complete",
-          confidence: "heuristic",
-          provenance: [
-            {
-              source: "filesystem",
-              capability: "coverage-report",
-              detail: "/repo/coverage.json",
-            },
-          ],
-        }),
-      ]),
-    );
     expect(assembly.assembled.provenance).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ source: "semantic" }),
-        expect.objectContaining({ source: "structural" }),
-      ]),
-    );
-    expect(assembly.details.provenance).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ source: "semantic" }),
         expect.objectContaining({ source: "structural" }),
@@ -82,12 +51,9 @@ describe("code_health result assembly", () => {
     );
     expect(assembly.details).toMatchObject({
       confidence: "heuristic",
-      candidateCount: 2,
+      candidateCount: 1,
       omittedCount: 0,
-      sections: expect.arrayContaining([
-        expect.objectContaining({ key: "dirty", itemCount: 1, status: "complete" }),
-        expect.objectContaining({ key: "coverage", itemCount: 1, status: "complete" }),
-      ]),
+      sections: [expect.objectContaining({ key: "dirty", itemCount: 1, status: "complete" })],
       evidenceLists: [
         {
           key: "health.dirtyFiles",
@@ -148,54 +114,24 @@ describe("code_health result assembly", () => {
     expect(markdown).not.toContain("No servers found.");
   });
 
-  it("keeps a missing report as an unavailable locator check", () => {
-    const data = makeHealthData({
-      includedSections: ["diagnostics", "coverage", "unused"],
-      semanticState: { kind: "unavailable", reason: "No LSP" },
-      coverage: {
-        reportPath: "/repo/missing-coverage.json",
-        available: false,
-        entries: [],
-      },
-      unused: {
-        reportPath: "/repo/missing-knip.json",
-        available: false,
-        files: [],
-        exports: [],
-      },
-    });
+  it("projects Capability Warnings into structured details and Markdown", () => {
+    const capabilityWarnings = {
+      hasWarnings: true,
+      warnings: [
+        {
+          type: "missing-server" as const,
+          language: "python",
+          message: 'Cannot start "python" server — "pyright-langserver" not found on PATH',
+        },
+      ],
+    };
+    const data = makeHealthData({ includedSections: ["servers"], capabilityWarnings });
     const assembly = assembleHealthResult(data);
     const markdown = renderHealthResult(assembly, "/repo");
 
-    expect(assembly.assembled.sections.map((section) => section.key)).toEqual([
-      "health.diagnostics",
-      "health.coverage",
-      "health.unused",
-    ]);
-    expect(assembly.details.sections).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          key: "coverage",
-          status: "unavailable",
-          available: false,
-          locator: "/repo/missing-coverage.json",
-        }),
-        expect.objectContaining({
-          key: "unused",
-          status: "unavailable",
-          available: false,
-          locator: "/repo/missing-knip.json",
-        }),
-      ]),
-    );
-    expect(markdown).toContain("Diagnostics unavailable");
-    expect(markdown).not.toContain("No diagnostics found.");
-    expect(markdown).toContain(
-      "Coverage report unavailable at `missing-coverage.json`; this locator does not establish that no coverage report exists elsewhere.",
-    );
-    expect(markdown).toContain(
-      "Unused-code report unavailable at `missing-knip.json`; this locator does not establish that no unused-code report exists elsewhere.",
-    );
+    expect(assembly.details).toHaveProperty("capabilityWarnings", capabilityWarnings);
+    expect(markdown).toContain("### Capability Warnings");
+    expect(markdown).toContain("pyright-langserver");
   });
 
   it("does not expose code-action evidence outside a requested detailed diagnostics collection", () => {
