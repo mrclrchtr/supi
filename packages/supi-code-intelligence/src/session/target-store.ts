@@ -267,16 +267,18 @@ export function registerWorkflowTarget(
 }
 
 /**
- * Merge compatible facts behind one stable target ID without losing a more
- * precise anchor. Name anchors are monotonic refinements; semantic confidence
- * may improve independently from the positional anchor.
+ * Merge compatible facts behind one stable target ID. Anchor precision,
+ * evidence strength, display kind, and provider provenance refine independently
+ * so no weaker or missing observation erases stronger established facts.
  */
 function mergeTargetRefinement(
   existing: TargetStoreEntry,
   incoming: TargetStoreEntry,
 ): TargetStoreEntry {
   const anchorSource = selectAnchorSource(existing, incoming);
-  const confidenceSource = selectConfidenceSource(existing, incoming);
+  const strongestEvidenceSource = selectStrongestEvidenceSource(existing, incoming);
+  // Missing classification is not evidence that can erase an established display kind.
+  const displayKind = strongestEvidenceSource.kind ?? existing.kind ?? incoming.kind;
 
   return {
     ...existing,
@@ -284,9 +286,10 @@ function mergeTargetRefinement(
     position: { ...anchorSource.position },
     displayLine: anchorSource.displayLine,
     displayCharacter: anchorSource.displayCharacter,
+    kind: displayKind,
     anchorKind: anchorSource.anchorKind,
     resolution: anchorSource.resolution,
-    confidence: confidenceSource.confidence,
+    confidence: strongestEvidenceSource.confidence,
     provenance: mergeProvenance(existing.provenance, incoming.provenance),
   };
 }
@@ -301,7 +304,7 @@ function selectAnchorSource(
   return existing;
 }
 
-function selectConfidenceSource(
+function selectStrongestEvidenceSource(
   existing: TargetStoreEntry,
   incoming: TargetStoreEntry,
 ): TargetStoreEntry {

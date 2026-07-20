@@ -49,8 +49,11 @@ describe("type-alias target provider provenance", () => {
     const repeated = register("semantic", ["semantic"]);
 
     expect(refined.targetId).toBe(first.targetId);
-    expect(refined.entry.confidence).toBe("semantic");
-    expect(refined.entry.provenance).toEqual(["semantic", "structural"]);
+    expect(refined.entry).toMatchObject({
+      kind: "Variable",
+      confidence: "semantic",
+      provenance: ["semantic", "structural"],
+    });
     expect(repeated.entry.provenance).toEqual(["semantic", "structural"]);
   });
 });

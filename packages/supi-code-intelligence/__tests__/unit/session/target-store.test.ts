@@ -410,6 +410,42 @@ describe("workflow target store", () => {
     expect(merged.entry.provenance).toEqual(["semantic", "structural"]);
   });
 
+  it("keeps a known display kind when stronger evidence has no kind", () => {
+    const filePath = path.join(tmpDir, "index.ts");
+    writeFileSync(filePath, "export const foo = 1;\n");
+    const store = createStore();
+    const base = {
+      file: filePath,
+      position: { line: 0, character: 13 },
+      declarationPosition: { line: 0, character: 0 },
+      displayLine: 1,
+      displayCharacter: 14,
+      name: "foo",
+      identityKind: "value",
+      anchorKind: "name" as const,
+      container: null,
+    };
+    const structural = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      kind: "variable",
+      confidence: "structural",
+      provenance: ["structural"],
+    });
+    const semantic = registerWorkflowTarget(store, tmpDir, {
+      ...base,
+      kind: null,
+      confidence: "semantic",
+      provenance: ["semantic"],
+    });
+
+    expect(semantic.targetId).toBe(structural.targetId);
+    expect(semantic.entry).toMatchObject({
+      kind: "variable",
+      confidence: "semantic",
+      provenance: ["semantic", "structural"],
+    });
+  });
+
   it("never downgrades a stable name anchor to a declaration anchor", () => {
     const filePath = path.join(tmpDir, "index.ts");
     writeFileSync(filePath, "export const foo = 1;\n");

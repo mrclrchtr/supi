@@ -34,6 +34,10 @@ _Avoid_: ad-hoc target expansion, mutating search params, treating scope as a ta
 The immutable output of a target workflow: the evidence-backed file, anchor, symbol identity, confidence, provenance, and notes a downstream code-intelligence tool may rely on. A resolved target is not a public parameter bag and should not be changed by downstream tools.
 _Avoid_: expanded params, anonymous point target, mutable target
 
+**Target refinement**:
+The evidence-preserving reconciliation of repeated observations that share one Canonical declaration identity. Identity remains stable while display kind, anchor quality, confidence, and Target provider provenance are refined independently.
+_Avoid_: whole-record replacement, latest observation wins, first observation wins
+
 **Target provider provenance**:
 The monotonic set of provider families—semantic and structural—that established a target declaration. It records corroborating evidence, not selector or workflow origin; anchored resolution path belongs to resolution metadata.
 _Avoid_: strongest source, symbol-query provenance, resolution reason
@@ -53,6 +57,10 @@ _Avoid_: strongest member confidence, provider availability, mixed provenance
 **Canonical declaration identity kind**:
 The provider-independent declaration family used only for cross-provider matching and Target-handle identity. It normally normalizes the Provider-reported symbol kind; when that kind cannot express the source construct, exact structural evidence at the declaration's Name anchor may refine it. For example, a TypeScript LSP `Variable` at a Tree-sitter `type_alias_declaration` retains `Variable` for display but uses `type` for identity. This is declaration-specific and does not merge separate type/value namespace declarations.
 _Avoid_: display kind, blanket type-to-value normalization, name-only equivalence, syntax guessing
+
+**Target display kind**:
+The declaration category shown for a Target. Repeated observations select the strongest available non-null value—semantic before structural—preserve the established value on equal-strength ties, and keep it independent of Canonical declaration identity kind.
+_Avoid_: identity kind, latest observation wins, missing classification erasing known evidence
 
 **Declaration occurrence identity**:
 The provider-independent identity of one declaration within a file: Canonical declaration identity kind, symbolic container, declaration line, and deterministic occurrence among otherwise identical declarations on that line. It distinguishes overloads and type/value namespace declarations while remaining stable when semantic evidence replaces structural evidence or a declaration anchor refines to a Name anchor.

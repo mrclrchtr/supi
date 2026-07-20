@@ -513,6 +513,7 @@ describe("target-workflow (deep session seam)", () => {
 
       expect(refined.targets[0]?.targetId).toBe(first.targets[0]?.targetId);
       expect(refined.targets[0]).toMatchObject({
+        kind: "Variable",
         anchorKind: "name",
         confidence: "semantic",
         provenance: ["semantic", "structural"] as const,
