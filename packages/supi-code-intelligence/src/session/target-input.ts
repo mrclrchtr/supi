@@ -7,17 +7,38 @@ export interface SourcePointInput {
   readonly character: number;
 }
 
-/** Optional symbol kinds used to narrow semantic target discovery. */
-export type TargetSymbolKind =
-  | "symbol"
-  | "function"
-  | "class"
-  | "interface"
-  | "type"
-  | "variable"
-  | "method"
-  | "const"
-  | "enum";
+/** Exact LSP SymbolKind vocabulary accepted by semantic target discovery. */
+export const TARGET_SYMBOL_KINDS = [
+  "file",
+  "module",
+  "namespace",
+  "package",
+  "class",
+  "method",
+  "property",
+  "field",
+  "constructor",
+  "enum",
+  "interface",
+  "function",
+  "variable",
+  "constant",
+  "string",
+  "number",
+  "boolean",
+  "array",
+  "object",
+  "key",
+  "null",
+  "enumMember",
+  "struct",
+  "event",
+  "operator",
+  "typeParameter",
+] as const;
+
+/** Provider-reported symbol kind used as a strict semantic filter. */
+export type TargetSymbolKind = (typeof TARGET_SYMBOL_KINDS)[number];
 
 /** A semantic symbol query and its optional workspace-relative scope. */
 export interface SymbolTargetInput {

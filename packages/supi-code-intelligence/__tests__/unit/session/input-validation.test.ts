@@ -10,6 +10,7 @@ import {
   parseInspectWorkflowInput,
   parseOrientationWorkflowInput,
 } from "../../../src/session/input/workflows.ts";
+import { TARGET_SYMBOL_KINDS } from "../../../src/session/target-input.ts";
 
 describe("code_find query validation", () => {
   it.each(["text", "regex"] as const)("preserves significant whitespace in %s mode", (mode) => {
@@ -24,6 +25,24 @@ describe("code_find query validation", () => {
     expect(parseFindWorkflowInput({ query })).toEqual({
       kind: "invalid-input",
       message: "query must not be empty.",
+    });
+  });
+});
+
+describe("symbol-kind validation", () => {
+  it.each(TARGET_SYMBOL_KINDS)("accepts LSP SymbolKind %s", (symbolKind) => {
+    expect(parseTargetInput({ symbol: { query: "Widget", symbolKind } }, ["symbol"])).toMatchObject(
+      { kind: "valid", value: { symbol: { symbolKind } } },
+    );
+  });
+
+  it("rejects source-language aliases that are not LSP SymbolKinds", () => {
+    expect(
+      parseTargetInput({ symbol: { query: "Widget", symbolKind: "type" } }, ["symbol"]),
+    ).toEqual({
+      kind: "invalid-input",
+      message:
+        "target.symbol.symbolKind must be a provider-reported LSP SymbolKind; omit it when the provider category is uncertain.",
     });
   });
 });

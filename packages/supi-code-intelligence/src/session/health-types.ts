@@ -4,6 +4,14 @@ import type { GitContext } from "../analysis/signals/git.ts";
 
 export type HealthSection = "diagnostics" | "servers" | "dirty" | "coverage" | "unused";
 
+/** Final semantic-diagnostics readiness after routing and requested recovery. */
+export type SemanticHealthState =
+  | { readonly kind: "ready" }
+  | { readonly kind: "pending"; readonly reason: string }
+  | { readonly kind: "inactive"; readonly reason: string }
+  | { readonly kind: "disabled"; readonly reason: string }
+  | { readonly kind: "unavailable"; readonly reason: string };
+
 export interface HealthWorkflowInput {
   readonly scope?: string;
   readonly refresh?: boolean;
@@ -58,11 +66,10 @@ export interface HealthCodeActions {
 /** Presentation-neutral health facts. */
 export interface HealthData {
   readonly includedSections: readonly HealthSection[];
-  /** Whether semantic diagnostics are currently evidence-backed for the requested scope. */
-  readonly semanticAvailable: boolean;
+  /** Final semantic state, or null when no semantic health section was requested. */
+  readonly semanticState: SemanticHealthState | null;
   /** Whether server inventory was observed from a live owner or explicit disabled state. */
   readonly serverInventoryAvailable: boolean;
-  readonly lspStatus: string;
   readonly recovered: boolean;
   /** True only when the structural capability is explicitly ready. */
   readonly structuralAvailable?: boolean;

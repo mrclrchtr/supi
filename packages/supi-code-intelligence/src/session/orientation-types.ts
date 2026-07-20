@@ -1,7 +1,7 @@
 import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
 import type { InstructionFilesMetadata } from "../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../analysis/read-next.ts";
-import type { OrientationTargetInput } from "./target-input.ts";
+import type { OrientationTargetInput, TargetSymbolKind } from "./target-input.ts";
 import type { AnchorKind, TargetStoreEntry } from "./target-store.ts";
 
 /** Exact-one non-workspace Orientation focus. */
@@ -57,6 +57,12 @@ export type OrientationWorkflowOutcome =
   | { readonly kind: "completed"; readonly data: OrientationResultData }
   | {
       readonly kind: "disambiguation";
+      readonly candidates: readonly OrientationCandidate[];
+      readonly omittedCount: number;
+    }
+  | {
+      readonly kind: "kind-mismatch";
+      readonly requestedKind: TargetSymbolKind;
       readonly candidates: readonly OrientationCandidate[];
       readonly omittedCount: number;
     }

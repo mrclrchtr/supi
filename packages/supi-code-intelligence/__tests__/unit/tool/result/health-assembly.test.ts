@@ -6,9 +6,8 @@ import { assembleHealthResult } from "../../../../src/tool/result/health.ts";
 function makeHealthData(overrides: Partial<HealthData> = {}): HealthData {
   return {
     includedSections: ["diagnostics", "servers"],
-    semanticAvailable: true,
+    semanticState: { kind: "ready" },
     serverInventoryAvailable: true,
-    lspStatus: "ready",
     recovered: false,
     structuralAvailable: false,
     structuralStatus: "unavailable — no tree-sitter",
@@ -29,7 +28,7 @@ describe("code_health result assembly", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
         includedSections: ["dirty", "coverage"],
-        semanticAvailable: false,
+        semanticState: null,
         gitContext: {
           branch: "main",
           dirtyFiles: ["src/index.ts"],
@@ -104,8 +103,7 @@ describe("code_health result assembly", () => {
   it("separates complete disabled server status from unavailable semantic diagnostics", () => {
     const data = makeHealthData({
       includedSections: ["diagnostics", "servers"],
-      semanticAvailable: false,
-      lspStatus: "disabled by configuration",
+      semanticState: { kind: "disabled", reason: "Disabled by configuration" },
       diagnostics: [],
       servers: [],
     });
@@ -125,7 +123,7 @@ describe("code_health result assembly", () => {
     expect(assembly.details.provenance).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ source: "semantic" })]),
     );
-    expect(markdown).toContain("**LSP**: disabled by configuration");
+    expect(markdown).toContain("**LSP**: disabled — Disabled by configuration");
     expect(markdown).toContain("Diagnostics unavailable");
     expect(markdown).toContain("No servers found.");
     expect(markdown).not.toContain("Server status unavailable");
@@ -134,9 +132,8 @@ describe("code_health result assembly", () => {
   it("does not turn an unavailable runtime into a complete empty server inventory", () => {
     const assembly = assembleHealthResult(
       makeHealthData({
-        semanticAvailable: false,
+        semanticState: { kind: "unavailable", reason: "no LSP session" },
         serverInventoryAvailable: false,
-        lspStatus: "unavailable — no LSP session",
         diagnostics: [],
         servers: [],
       }),
@@ -154,7 +151,7 @@ describe("code_health result assembly", () => {
   it("keeps a missing report as an unavailable locator check", () => {
     const data = makeHealthData({
       includedSections: ["diagnostics", "coverage", "unused"],
-      semanticAvailable: false,
+      semanticState: { kind: "unavailable", reason: "No LSP" },
       coverage: {
         reportPath: "/repo/missing-coverage.json",
         available: false,

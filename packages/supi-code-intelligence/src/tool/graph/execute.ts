@@ -27,11 +27,22 @@ export async function executeGraphTool(
   if (outcome.kind === "invalid-input") {
     return searchErrorResult(`**Error:** ${outcome.message}`);
   }
-  if (outcome.kind === "disambiguation") {
-    const lines = ["**Target is ambiguous. Choose one candidate handle:**", ""];
+  if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
+    const lines = [
+      outcome.kind === "kind-mismatch"
+        ? `**No target matched provider kind \`${outcome.requestedKind}\`. Near matches:**`
+        : "**Target is ambiguous. Choose one candidate handle:**",
+      "",
+    ];
     for (const candidate of outcome.candidates) {
       lines.push(
-        `- \`${candidate.targetId}\` — ${candidate.name} at ${candidate.file}:${candidate.line}:${candidate.character}`,
+        `- \`${candidate.targetId}\` — ${candidate.name} (\`${candidate.kind ?? "unknown"}\`) at ${candidate.file}:${candidate.line}:${candidate.character}`,
+      );
+    }
+    if (outcome.kind === "kind-mismatch") {
+      lines.push(
+        "",
+        "Retry without `symbolKind`, use an observed provider kind, or choose a handle.",
       );
     }
     return searchErrorResult(lines.join("\n"));

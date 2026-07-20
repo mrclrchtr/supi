@@ -1,6 +1,6 @@
 /**
  * Symbol target resolution — discovers symbols via the semantic substrate
- * and returns typed outcomes (resolved, disambiguation, or error).
+ * and returns typed outcomes (resolved, disambiguation, kind mismatch, or error).
  *
  * This resolver is semantic-only: it does not fall back to text search
  * or heuristic guessing. Ambiguous matches produce explicit disambiguation.
@@ -12,6 +12,7 @@ import type {
   SemanticProvider as SemanticSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
 import { isWithinOrEqual } from "@mrclrchtr/supi-core/project";
+import type { TargetSymbolKind } from "../../session/target-input.ts";
 import type { AnchorKind } from "../../session/target-store.ts";
 import { normalizePath } from "../search/ripgrep.ts";
 import type { DisambiguationCandidateData, TargetOutcome } from "./types.ts";
@@ -84,7 +85,7 @@ async function refineResolvedSymbolAnchor(
  * @param cwd - session working directory
  * @param semantic - the semantic substrate (LSP-backed)
  * @param options - optional filters: path scope, kind filter, exported-only
- * @returns Typed outcome: resolved, disambiguation, or error
+ * @returns Typed outcome: resolved, disambiguation, kind mismatch, or error
  */
 export async function resolveSymbolTarget(
   symbol: string,
@@ -92,7 +93,7 @@ export async function resolveSymbolTarget(
   semantic: SemanticSubstrate,
   options?: {
     path?: string;
-    kind?: string;
+    kind?: TargetSymbolKind;
     exportedOnly?: boolean;
     maxResults?: number;
   },
@@ -108,104 +109,160 @@ export async function resolveSymbolTarget(
     return { kind: "error", message: `Symbol not found: \`${symbol}\`` };
   }
 
-  // Filter by path scope. Tool paths may include pi's leading `@` prefix;
-  // normalize through the shared path helper so every caller gets the same
-  // scope semantics.
   const scopePath = options?.path ? normalizePath(options.path, cwd) : null;
-  let candidates = results.filter((s) => {
-    if (scopePath && !isWithinOrEqual(scopePath, s.file)) return false;
-    return true;
-  });
-
-  // Filter by kind
-  if (options?.kind) {
-    const kindLower = options.kind.toLowerCase();
-    candidates = candidates.filter((s) => s.kind.toLowerCase().includes(kindLower));
-  }
-
-  // Filter to exported symbols only
-  if (options?.exportedOnly) {
-    candidates = candidates.filter((s) => !NON_EXPORTED_KINDS.has(s.kind));
-  }
-
-  // Range-less candidates (line=0,char=0) come from URI-only workspace symbols.
-  // Keep them for disambiguation but don't promote to single-match resolution.
-  const ranged = candidates.filter(
-    (s) => s.declarationAnchor.line > 0 || s.declarationAnchor.character > 0,
+  const scoped = results.filter((candidate) =>
+    scopePath ? isWithinOrEqual(scopePath, candidate.file) : true,
   );
-
-  if (ranged.length === 1) {
-    const c = await refineResolvedSymbolAnchor(ranged[0], semantic);
-    const a = anchorOf(c);
-    return {
-      kind: "resolved",
-      target: {
-        file: c.file,
-        position: { line: a.line - 1, character: a.character - 1 },
-        displayLine: a.line,
-        displayCharacter: a.character,
-        declarationAnchor: { ...c.declarationAnchor },
-        declarationOccurrence: 0,
-        name: c.name,
-        kind: c.kind,
-        confidence: "semantic",
-        provenance: ["semantic"],
-        anchorKind: (c.nameAnchor ? "name" : "declaration") as AnchorKind,
-        container: c.container ?? null,
-      },
-    };
-  }
-
-  // All candidates lost or only rangeless
-  if (candidates.length === 0) {
+  const eligible = options?.exportedOnly
+    ? scoped.filter((candidate) => !NON_EXPORTED_KINDS.has(candidate.kind))
+    : scoped;
+  if (eligible.length === 0) {
     return {
       kind: "error",
       message: `Symbol not found: \`${symbol}\`${scopePath ? ` in path \`${options?.path}\`` : ""}`,
     };
   }
 
-  // Multiple candidates — refine each to a name (identifier) anchor before
-  // returning disambiguation, so position-strict downstream substrates
-  // (tree-sitter calleesAt, LSP rename) receive the identifier anchor rather
-  // than the declaration anchor (the `export` keyword) that workspace-symbol
-  // hits carry. Mirrors the single-match refine path above.
-  // Per ADR 0003, `anchorOf` prefers the refined doc symbol's `nameAnchor`.
-  // TODO: batch the per-file documentSymbols dedupe across candidates.
-  const cap = options?.maxResults ?? MAX_CANDIDATES;
-  const refined = await Promise.all(
-    candidates.slice(0, cap).map((c) => refineResolvedSymbolAnchor(c, semantic)),
+  const requestedKind = options?.kind;
+  if (requestedKind) {
+    const exactKind = eligible.filter((candidate) =>
+      providerKindMatches(candidate.kind, requestedKind),
+    );
+    if (exactKind.length === 0) {
+      return buildCandidateOutcome({
+        kind: "kind-mismatch",
+        candidates: eligible,
+        semantic,
+        cwd,
+        maxResults: options.maxResults,
+        requestedKind,
+      });
+    }
+    return resolveCandidates(exactKind, semantic, cwd, options.maxResults);
+  }
+
+  return resolveCandidates(eligible, semantic, cwd, options?.maxResults);
+}
+
+function providerKindMatches(reported: string, requested: TargetSymbolKind): boolean {
+  return normalizeProviderKind(reported) === normalizeProviderKind(requested);
+}
+
+function normalizeProviderKind(kind: string): string {
+  return kind.replace(/[\s_-]/g, "").toLowerCase();
+}
+
+async function resolveCandidates(
+  candidates: readonly CodeSymbol[],
+  semantic: SemanticSubstrate,
+  cwd: string,
+  maxResults?: number,
+): Promise<TargetOutcome> {
+  const ranged = candidates.filter(
+    (candidate) =>
+      candidate.declarationAnchor.line > 0 || candidate.declarationAnchor.character > 0,
   );
+  if (ranged.length === 1) {
+    return resolvedTarget(await refineResolvedSymbolAnchor(ranged[0], semantic));
+  }
+  return buildCandidateOutcome({
+    kind: "disambiguation",
+    candidates,
+    semantic,
+    cwd,
+    maxResults,
+  });
+}
+
+function resolvedTarget(candidate: CodeSymbol): TargetOutcome {
+  const anchor = anchorOf(candidate);
+  return {
+    kind: "resolved",
+    target: {
+      file: candidate.file,
+      position: { line: anchor.line - 1, character: anchor.character - 1 },
+      displayLine: anchor.line,
+      displayCharacter: anchor.character,
+      declarationAnchor: { ...candidate.declarationAnchor },
+      declarationOccurrence: 0,
+      name: candidate.name,
+      kind: candidate.kind,
+      confidence: "semantic",
+      provenance: ["semantic"],
+      anchorKind: (candidate.nameAnchor ? "name" : "declaration") as AnchorKind,
+      container: candidate.container ?? null,
+    },
+  };
+}
+
+interface CandidateOutcomeBase {
+  candidates: readonly CodeSymbol[];
+  semantic: SemanticSubstrate;
+  cwd: string;
+  maxResults?: number;
+}
+
+type CandidateOutcomeOptions = CandidateOutcomeBase &
+  (
+    | { kind: "disambiguation"; requestedKind?: never }
+    | { kind: "kind-mismatch"; requestedKind: TargetSymbolKind }
+  );
+
+/**
+ * Refine only bounded visible candidates to name anchors while retaining the
+ * exact provider result count for omission disclosure. No candidate is
+ * promoted when the requested provider kind did not match.
+ */
+async function buildCandidateOutcome(
+  options: CandidateOutcomeOptions,
+): Promise<Extract<TargetOutcome, { kind: "disambiguation" | "kind-mismatch" }>> {
+  const cap = options.maxResults ?? MAX_CANDIDATES;
+  const refined = await Promise.all(
+    options.candidates
+      .slice(0, cap)
+      .map((candidate) => refineResolvedSymbolAnchor(candidate, options.semantic)),
+  );
+  const common = {
+    candidates: toDisambiguationCandidates(refined, options.cwd),
+    omittedCount: Math.max(0, options.candidates.length - cap),
+  };
+  return options.kind === "kind-mismatch"
+    ? {
+        kind: options.kind,
+        requestedKind: options.requestedKind,
+        ...common,
+      }
+    : { kind: options.kind, ...common };
+}
+
+function toDisambiguationCandidates(
+  candidates: readonly CodeSymbol[],
+  cwd: string,
+): DisambiguationCandidateData[] {
   const occurrences = new Map<string, number>();
-  const candidatesOut = refined.map((c, idx) => {
-    const relFile = path.relative(cwd, c.file);
-    const a = anchorOf(c);
+  return candidates.map((candidate, index) => {
+    const relFile = path.relative(cwd, candidate.file);
+    const anchor = anchorOf(candidate);
     const occurrenceKey = [
       relFile,
-      c.declarationAnchor.line,
-      c.name,
-      c.kind,
-      c.container ?? "",
+      candidate.declarationAnchor.line,
+      candidate.name,
+      candidate.kind,
+      candidate.container ?? "",
     ].join("\0");
     const declarationOccurrence = occurrences.get(occurrenceKey) ?? 0;
     occurrences.set(occurrenceKey, declarationOccurrence + 1);
     return {
-      name: c.name,
-      kind: c.kind,
-      container: c.container ?? null,
+      name: candidate.name,
+      kind: candidate.kind,
+      container: candidate.container ?? null,
       file: relFile,
-      line: a.line,
-      character: a.character,
-      declarationAnchor: { ...c.declarationAnchor },
+      line: anchor.line,
+      character: anchor.character,
+      declarationAnchor: { ...candidate.declarationAnchor },
       declarationOccurrence,
-      reason: relFile,
-      rank: idx + 1,
-      anchorKind: (c.nameAnchor ? "name" : "declaration") as AnchorKind,
+      rank: index + 1,
+      anchorKind: (candidate.nameAnchor ? "name" : "declaration") as AnchorKind,
     };
-  }) satisfies DisambiguationCandidateData[];
-
-  return {
-    kind: "disambiguation",
-    candidates: candidatesOut,
-    omittedCount: Math.max(0, candidates.length - cap),
-  };
+  });
 }

@@ -10,10 +10,10 @@ import type {
   SemanticProvider as SemanticSubstrate,
   StructuralProvider as StructuralSubstrate,
 } from "@mrclrchtr/supi-code-runtime/api";
-import type { AnchorKind } from "../../session/target-store.ts";
+import type { TargetSymbolKind } from "../../session/target-input.ts";
+import type { AnchorKind, TargetProviderProvenance } from "../../session/target-store.ts";
 
-/** Provider families that contributed evidence to one resolved target. */
-export type TargetProviderProvenance = "semantic" | "structural";
+export type { TargetProviderProvenance } from "../../session/target-store.ts";
 
 // ── Normalized query ──────────────────────────────────────────────────
 
@@ -103,6 +103,9 @@ export interface ResolvedTargetGroupData {
   file: string;
   displayName: string;
   targets: ResolvedTargetData[];
+  /** Providers that successfully enumerated the selected file. */
+  discoveryProvenance: readonly TargetProviderProvenance[];
+  /** Conservative confidence across the complete group, before display capping. */
   confidence: "semantic" | "structural" | "heuristic" | "unavailable";
 }
 
@@ -120,7 +123,6 @@ export interface DisambiguationCandidateData {
   declarationAnchor: { line: number; character: number };
   /** Zero-based occurrence among otherwise-identical declarations on that line. */
   declarationOccurrence: number;
-  reason: string;
   rank: number;
   /** Which anchor this candidate carries (ADR 0003). */
   anchorKind: AnchorKind;
@@ -137,6 +139,12 @@ export type TargetOutcome =
   | { kind: "group"; group: ResolvedTargetGroupData }
   | {
       kind: "disambiguation";
+      candidates: DisambiguationCandidateData[];
+      omittedCount: number;
+    }
+  | {
+      kind: "kind-mismatch";
+      requestedKind: TargetSymbolKind;
       candidates: DisambiguationCandidateData[];
       omittedCount: number;
     }

@@ -203,7 +203,10 @@ describe("code_inspect tool", () => {
       makeCtx({ cwd: tmpDir }),
     )) as {
       content: Array<{ text: string }>;
-      details?: { type: "inspect"; data: { confidence: string; unavailableSections: string[] } };
+      details?: {
+        type: "inspect";
+        data: { confidence: string; unavailableSections: string[]; nextQueries: string[] };
+      };
     };
 
     expect(hover).not.toHaveBeenCalled();
@@ -213,6 +216,12 @@ describe("code_inspect tool", () => {
     expect(result.details?.data.confidence).toBe("structural");
     expect(result.details?.data.unavailableSections).toEqual(
       expect.arrayContaining(["hover", "definition", "diagnostics", "codeActions"]),
+    );
+    expect(result.details?.data.nextQueries).toEqual(
+      expect.arrayContaining([expect.stringContaining("code_health")]),
+    );
+    expect(result.details?.data.nextQueries).not.toEqual(
+      expect.arrayContaining([expect.stringContaining("code_graph")]),
     );
   });
 
@@ -259,6 +268,8 @@ describe("code_inspect tool", () => {
     if (result.details?.type === "inspect") {
       expect(result.details.data?.nextQueries).toEqual(
         expect.arrayContaining([
+          expect.stringContaining("Use code_resolve with target.anchor"),
+          expect.stringContaining("then code_graph with the returned handle"),
           expect.stringContaining('code_orientation with focus.path "src/index.ts"'),
         ]),
       );

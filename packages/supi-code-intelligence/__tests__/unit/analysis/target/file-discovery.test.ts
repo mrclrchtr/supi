@@ -93,12 +93,12 @@ describe("file Target group discovery", () => {
       confidence: "semantic",
       anchorKind: "name",
       displayCharacter: 14,
-      provenance: ["semantic", "structural"],
+      provenance: ["semantic", "structural"] as const,
     });
     expect(outcome.group.targets[2]).toMatchObject({
       confidence: "semantic",
       anchorKind: "name",
-      provenance: ["semantic", "structural"],
+      provenance: ["semantic", "structural"] as const,
     });
   });
 
@@ -165,6 +165,31 @@ describe("file Target group discovery", () => {
     expect(outcome.group.targets.every((target) => target.provenance.length === 2)).toBe(true);
   });
 
+  it("keeps group confidence at the weakest member while retaining discovery provenance", async () => {
+    const outcome = await resolveFileTargetGroup(file, cwd, {
+      semantic: semanticProvider([]),
+      structural: structuralProvider([
+        {
+          name: "Box",
+          kind: "class",
+          startLine: 1,
+          startCharacter: 1,
+          endLine: 1,
+          endCharacter: 33,
+        },
+      ]),
+    });
+
+    expect(outcome).toMatchObject({
+      kind: "resolved",
+      group: {
+        confidence: "structural",
+        discoveryProvenance: ["semantic", "structural"],
+        targets: [{ confidence: "structural", provenance: ["structural"] }],
+      },
+    });
+  });
+
   it("returns a successful empty group after complete enumeration", async () => {
     const outcome = await resolveFileTargetGroup(file, cwd, {
       semantic: semanticProvider([]),
@@ -173,7 +198,11 @@ describe("file Target group discovery", () => {
 
     expect(outcome).toMatchObject({
       kind: "resolved",
-      group: { targets: [], confidence: "semantic" },
+      group: {
+        targets: [],
+        confidence: "semantic",
+        discoveryProvenance: ["semantic", "structural"],
+      },
     });
   });
 

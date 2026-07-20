@@ -16,6 +16,8 @@ export function renderResolveResult(assembly: ResolveResultAssembly): string {
       return renderTargetGroup(assembly.details);
     case "disambiguation":
       return renderDisambiguation(assembly.details);
+    case "kind-mismatch":
+      return renderKindMismatch(assembly.details);
     case "invalid-input":
       return `**Error:** ${outcome.message}`;
     case "unavailable":
@@ -39,7 +41,7 @@ function renderResolved(
     `- Target ID: \`${target.targetId}\``,
     `- Span ID: \`${target.spanId}\``,
     `- Confidence: \`${target.confidence}\``,
-    `- Provenance: \`${target.provenance}\``,
+    `- Provenance: \`${target.provenance.join("+")}\``,
   ];
 
   const resolutionNote = renderAnchoredResolutionNote(target);
@@ -59,7 +61,14 @@ function isResolutionMetadataNote(note: string): boolean {
 }
 
 function renderTargetGroup(details: ResolveDetails): string {
-  const lines = [`# Targets in \`${details.groupFile ?? "file"}\``, ""];
+  const discovery = details.groupDiscoveryProvenance?.join("+") || "unavailable";
+  const lines = [
+    `# Targets in \`${details.groupFile ?? "file"}\``,
+    "",
+    `- Group confidence: \`${details.confidence}\``,
+    `- Discovery provenance: \`${discovery}\``,
+    "",
+  ];
   if (details.targets.length === 0) {
     lines.push("No declarations were reported for this file.");
   } else {
@@ -72,7 +81,7 @@ function renderTargetGroup(details: ResolveDetails): string {
       const container = target.container ? ` in \`${target.container}\`` : "";
       lines.push(
         `- **${target.name ?? "anonymous"}**${kind}${container} — \`${target.file}:${target.displayLine}:${target.displayCharacter}\``,
-        `  Target ID: \`${target.targetId}\` (${target.anchorKind} anchor, ${target.confidence}, provenance: ${target.provenance})`,
+        `  Target ID: \`${target.targetId}\` (${target.anchorKind} anchor, ${target.confidence}, provenance: ${target.provenance.join("+")})`,
       );
     }
   }
@@ -101,7 +110,29 @@ function renderDisambiguation(details: ResolveDetails): string {
     "Choose one handle, or narrow target.symbol with scope or symbolKind:",
     "",
   ];
+  appendCandidates(lines, details);
+  appendDisclosure(lines, details);
+  return lines.join("\n");
+}
 
+function renderKindMismatch(details: ResolveDetails): string {
+  const lines = [
+    "# No exact symbol-kind match",
+    "",
+    `No query candidate was reported as provider kind \`${details.requestedKind ?? "unknown"}\`.`,
+    "Near matches:",
+    "",
+  ];
+  appendCandidates(lines, details);
+  lines.push(
+    "",
+    "Retry without `symbolKind`, use an observed provider kind, or choose a handle explicitly.",
+  );
+  appendDisclosure(lines, details);
+  return lines.join("\n");
+}
+
+function appendCandidates(lines: string[], details: ResolveDetails): void {
   for (const candidate of details.candidates ?? []) {
     const kind = candidate.kind ? ` (\`${candidate.kind}\`)` : "";
     const container = candidate.container ? ` in \`${candidate.container}\`` : "";
@@ -110,9 +141,6 @@ function renderDisambiguation(details: ResolveDetails): string {
       `   Target ID: \`${candidate.targetId}\``,
     );
   }
-
-  appendDisclosure(lines, details);
-  return lines.join("\n");
 }
 
 function appendDisclosure(lines: string[], details: ResolveDetails): void {

@@ -18,9 +18,9 @@ import type {
 } from "../analysis/target/types.ts";
 import type { CapabilityAdapter } from "./capability-adapter.ts";
 import { parseTargetInput } from "./input/common.ts";
-import type { TargetInput } from "./target-input.ts";
+import { registerTargetCandidates, type TargetWorkflowCandidate } from "./target-candidates.ts";
+import type { TargetInput, TargetSymbolKind } from "./target-input.ts";
 import {
-  type AnchorKind,
   computeFileFingerprint,
   type TargetLookupResult,
   type TargetRegistrationInput,
@@ -47,23 +47,20 @@ export type TargetWorkflowOutcome =
       kind: "target-group";
       file: string;
       confidence: ResolvedTargetData["confidence"];
+      discoveryProvenance: ResolvedTargetGroupData["discoveryProvenance"];
       targets: ReadonlyArray<Readonly<TargetStoreEntry>>;
       totalCount: number;
       omittedCount: number;
     }
   | {
       kind: "disambiguation";
-      candidates: ReadonlyArray<{
-        targetId: string;
-        name: string;
-        kind: string | null;
-        container: string | null;
-        file: string;
-        line: number;
-        character: number;
-        rank: number;
-        anchorKind: AnchorKind;
-      }>;
+      candidates: ReadonlyArray<TargetWorkflowCandidate>;
+      omittedCount: number;
+    }
+  | {
+      kind: "kind-mismatch";
+      requestedKind: TargetSymbolKind;
+      candidates: ReadonlyArray<TargetWorkflowCandidate>;
       omittedCount: number;
     }
   | { kind: "invalid-input"; message: string }
@@ -163,7 +160,7 @@ async function resolveAnchoredWorkflow(
 }
 
 async function resolveSymbolWorkflow(
-  symbol: { query: string; scope?: string; symbolKind?: string },
+  symbol: { query: string; scope?: string; symbolKind?: TargetSymbolKind },
   policy: TargetWorkflowPolicy,
   deps: TargetWorkflowDeps,
 ): Promise<TargetWorkflowOutcome> {
@@ -267,42 +264,19 @@ function toWorkflowOutcome(
     return registerTargetGroup(outcome.group, deps, policy.maxResults ?? 10);
   }
 
-  const candidates = outcome.candidates.map((candidate, index) => {
-    const registered = deps.registerTarget({
-      file: candidate.file,
-      position: { line: candidate.line - 1, character: candidate.character - 1 },
-      declarationPosition: {
-        line: candidate.declarationAnchor.line - 1,
-        character: candidate.declarationAnchor.character - 1,
-      },
-      declarationOccurrence: candidate.declarationOccurrence,
-      displayLine: candidate.line,
-      displayCharacter: candidate.character,
-      name: candidate.name,
-      kind: candidate.kind,
-      identityKind: canonicalDeclarationKind(candidate.kind),
-      confidence: "semantic",
-      provenance: "symbol-query",
-      anchorKind: candidate.anchorKind ?? "declaration",
-      container: candidate.container,
-    });
-    return Object.freeze({
-      targetId: registered.targetId,
-      name: candidate.name,
-      kind: candidate.kind,
-      container: candidate.container,
-      file: candidate.file,
-      line: candidate.line,
-      character: candidate.character,
-      rank: index + 1,
-      anchorKind: candidate.anchorKind ?? ("declaration" as const),
-    });
-  });
-  return {
-    kind: "disambiguation",
-    candidates: Object.freeze(candidates),
-    omittedCount: outcome.omittedCount,
-  };
+  const candidates = registerTargetCandidates(outcome.candidates, deps.registerTarget);
+  return outcome.kind === "kind-mismatch"
+    ? {
+        kind: "kind-mismatch",
+        requestedKind: outcome.requestedKind,
+        candidates,
+        omittedCount: outcome.omittedCount,
+      }
+    : {
+        kind: "disambiguation",
+        candidates,
+        omittedCount: outcome.omittedCount,
+      };
 }
 
 function registerTargetGroup(
@@ -321,6 +295,7 @@ function registerTargetGroup(
     kind: "target-group",
     file: group.file,
     confidence: group.confidence,
+    discoveryProvenance: Object.freeze([...group.discoveryProvenance]),
     targets: Object.freeze(targets),
     totalCount,
     omittedCount: totalCount - targets.length,
@@ -359,7 +334,7 @@ function registerFromTargetData(
     kind: target.kind,
     identityKind: canonicalDeclarationKind(target.kind),
     confidence: target.confidence,
-    provenance: target.provenance.join("+"),
+    provenance: target.provenance,
     anchorKind: target.anchorKind,
     container: target.container,
     resolution: target.resolution,
@@ -371,6 +346,7 @@ function immutableEntry(entry: TargetStoreEntry): Readonly<TargetStoreEntry> {
   return Object.freeze({
     ...entry,
     position: Object.freeze({ ...entry.position }),
+    provenance: Object.freeze([...entry.provenance]),
     declarationPosition: entry.declarationPosition
       ? Object.freeze({ ...entry.declarationPosition })
       : entry.declarationPosition,

@@ -107,21 +107,26 @@ async function orientTarget(options: {
       message: "Precise Orientation requires one member handle from a Target group.",
     };
   }
-  if (target.kind === "disambiguation") {
-    return {
-      kind: "disambiguation",
-      omittedCount: target.omittedCount,
-      candidates: target.candidates.map((candidate) => ({
-        targetId: candidate.targetId,
-        name: candidate.name,
-        kind: candidate.kind,
-        container: candidate.container,
-        file: candidate.file,
-        line: candidate.line,
-        character: candidate.character,
-        rank: candidate.rank,
-      })),
-    };
+  if (target.kind === "disambiguation" || target.kind === "kind-mismatch") {
+    const candidates = target.candidates.map((candidate) => ({
+      targetId: candidate.targetId,
+      name: candidate.name,
+      kind: candidate.kind,
+      container: candidate.container,
+      file: candidate.file,
+      line: candidate.line,
+      character: candidate.character,
+      rank: candidate.rank,
+      anchorKind: candidate.anchorKind,
+    }));
+    return target.kind === "kind-mismatch"
+      ? {
+          kind: "kind-mismatch",
+          requestedKind: target.requestedKind,
+          omittedCount: target.omittedCount,
+          candidates,
+        }
+      : { kind: "disambiguation", omittedCount: target.omittedCount, candidates };
   }
   if (target.kind !== "resolved") return target;
   throwIfAborted(control);

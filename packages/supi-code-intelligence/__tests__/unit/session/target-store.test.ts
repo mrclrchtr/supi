@@ -40,7 +40,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "const",
       confidence: "semantic",
-      provenance: "anchored",
+      provenance: ["semantic"] as const,
       anchorKind: "name",
       container: null,
     });
@@ -61,7 +61,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "const",
       confidence: "semantic" as const,
-      provenance: "anchored",
+      provenance: ["semantic"] as const,
       anchorKind: "name" as const,
       container: null,
     };
@@ -88,7 +88,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "const",
       confidence: "semantic",
-      provenance: "anchored",
+      provenance: ["semantic"] as const,
       anchorKind: "name",
       container: null,
     });
@@ -104,7 +104,7 @@ describe("workflow target store", () => {
       expect(lookup.entry.kind).toBe("const");
       expect(lookup.entry.displayLine).toBe(1);
       expect(lookup.entry.displayCharacter).toBe(15);
-      expect(lookup.entry.provenance).toBe("anchored");
+      expect(lookup.entry.provenance).toEqual(["semantic"]);
     }
   });
 
@@ -132,7 +132,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "const",
       confidence: "semantic",
-      provenance: "anchored",
+      provenance: ["semantic"] as const,
       anchorKind: "name",
       container: null,
     });
@@ -150,7 +150,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "const",
       confidence: "semantic",
-      provenance: "anchored",
+      provenance: ["semantic"] as const,
       anchorKind: "name",
       container: null,
     });
@@ -182,7 +182,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "const",
       confidence: "semantic",
-      provenance: "anchored",
+      provenance: ["semantic"] as const,
       anchorKind: "name",
       container: null,
     });
@@ -213,7 +213,7 @@ describe("workflow target store", () => {
         name: "a",
         kind: null,
         confidence: "heuristic",
-        provenance: "file",
+        provenance: ["structural"] as const,
         anchorKind: "name",
         container: null,
       });
@@ -225,7 +225,7 @@ describe("workflow target store", () => {
         name: "b",
         kind: null,
         confidence: "heuristic",
-        provenance: "file",
+        provenance: ["structural"] as const,
         anchorKind: "name",
         container: null,
       });
@@ -260,7 +260,7 @@ describe("workflow target store", () => {
       name: "x",
       kind: "const",
       confidence: "semantic",
-      provenance: "anchored",
+      provenance: ["semantic"] as const,
       anchorKind: "name",
       container: null,
     });
@@ -290,7 +290,7 @@ describe("workflow target store", () => {
       name: "ghost",
       kind: null,
       confidence: "heuristic",
-      provenance: "file",
+      provenance: ["structural"] as const,
       anchorKind: "name",
       container: null,
     });
@@ -312,7 +312,7 @@ describe("workflow target store", () => {
       name: "same",
       kind: "Function",
       confidence: "semantic" as const,
-      provenance: "semantic",
+      provenance: ["semantic"] as const,
       anchorKind: "name" as const,
       container: null,
     };
@@ -348,7 +348,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "const",
       confidence: "semantic" as const,
-      provenance: "symbol",
+      provenance: ["semantic"] as const,
       container: null,
       declarationPosition: { line: 0, character: 0 },
     };
@@ -399,15 +399,15 @@ describe("workflow target store", () => {
     };
     const semantic = registerWorkflowTarget(store, tmpDir, {
       ...base,
-      provenance: "semantic",
+      provenance: ["semantic"] as const,
     });
     const merged = registerWorkflowTarget(store, tmpDir, {
       ...base,
-      provenance: "semantic+structural",
+      provenance: ["semantic", "structural"] as const,
     });
 
     expect(merged.targetId).toBe(semantic.targetId);
-    expect(merged.entry.provenance).toBe("semantic+structural");
+    expect(merged.entry.provenance).toEqual(["semantic", "structural"]);
   });
 
   it("never downgrades a stable name anchor to a declaration anchor", () => {
@@ -419,7 +419,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "const",
       confidence: "semantic" as const,
-      provenance: "symbol",
+      provenance: ["semantic"] as const,
       container: null,
       declarationPosition: { line: 0, character: 0 },
     };
@@ -457,7 +457,7 @@ describe("workflow target store", () => {
       name: "foo",
       kind: "Method",
       confidence: "semantic" as const,
-      provenance: "symbol",
+      provenance: ["semantic"] as const,
       anchorKind: "name" as const,
       position: { line: 0, character: 10 },
     };

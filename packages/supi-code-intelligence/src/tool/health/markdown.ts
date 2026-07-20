@@ -16,6 +16,7 @@ import type {
   HealthResultAssembly,
   HealthSection,
 } from "../result/health.ts";
+import { formatSemanticHealthState } from "./semantic-state.ts";
 
 export type {
   CodeActionSuggestion,
@@ -24,6 +25,7 @@ export type {
   HealthData,
   HealthSection,
   HealthUnusedData,
+  SemanticHealthState,
 } from "../result/health.ts";
 
 export function renderHealthResult(result: HealthResultAssembly, cwd: string): string {
@@ -107,7 +109,7 @@ function renderDegradedCoverageSection(lines: string[], data: HealthData): void 
 function renderStatusLine(lines: string[], data: HealthData, semanticRequested: boolean): void {
   if (!semanticRequested) return;
 
-  lines.push(`**LSP**: ${displayLspStatus(data)}`);
+  lines.push(`**LSP**: ${displaySemanticStatus(data)}`);
   if (data.structuralStatus) {
     lines.push(`**Structural**: ${data.structuralStatus}`);
   }
@@ -132,7 +134,7 @@ function renderDiagnosticsSection(
   lines.push("");
 
   if (options.status === "unavailable") {
-    lines.push(`Diagnostics unavailable — ${displayLspStatus(data)}.`);
+    lines.push(`Diagnostics unavailable — ${displaySemanticStatus(data)}.`);
   } else if (data.diagnostics.length === 0) {
     lines.push("No diagnostics found.");
   } else if (data.level === "summary") {
@@ -172,7 +174,7 @@ function renderCodeActionsSection(
   evidence: EvidenceListMetadata | undefined,
 ): void {
   const codeActions = data.codeActions;
-  if (!codeActions || data.level !== "detailed" || !data.semanticAvailable) return;
+  if (!codeActions || data.level !== "detailed" || data.semanticState?.kind !== "ready") return;
   const disclosure = evidence ? renderEvidenceListMetadataDisclosure(evidence) : null;
   if (codeActions.items.length === 0 && !disclosure) return;
 
@@ -262,7 +264,7 @@ function renderServersSection(
   lines.push("");
 
   if (status === "unavailable") {
-    lines.push(`Server status unavailable — ${displayLspStatus(data)}.`);
+    lines.push(`Server status unavailable — ${displaySemanticStatus(data)}.`);
     lines.push("");
     return;
   }
@@ -301,8 +303,8 @@ function renderDirtySection(
   lines.push(formatGitContext(data.gitContext, evidence));
 }
 
-function displayLspStatus(data: HealthData): string {
-  return data.lspStatus;
+function displaySemanticStatus(data: HealthData): string {
+  return formatSemanticHealthState(data.semanticState);
 }
 
 function sectionStatus(

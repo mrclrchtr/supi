@@ -30,19 +30,28 @@ export async function executeOrientationTool(
       details: unavailableContextDetails(["Choose an existing path, module, or precise target"]),
     };
   }
-  if (outcome.kind === "disambiguation") {
+  if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
     const candidates = outcome.candidates ?? [];
-    const lines = ["# Multiple Orientation targets", ""];
+    const lines = [
+      outcome.kind === "kind-mismatch"
+        ? `# No Orientation target matched provider kind \`${outcome.requestedKind}\``
+        : "# Multiple Orientation targets",
+      "",
+    ];
     for (const candidate of candidates) {
       lines.push(
-        `${candidate.rank}. **${candidate.name}** — \`${candidate.file}\`:${candidate.line}:${candidate.character} — \`${candidate.targetId}\``,
+        `${candidate.rank}. **${candidate.name}** (\`${candidate.kind ?? "unknown"}\`) — \`${candidate.file}\`:${candidate.line}:${candidate.character} — \`${candidate.targetId}\``,
       );
     }
+    const nextQueries =
+      outcome.kind === "kind-mismatch"
+        ? ["Retry without symbolKind, use an observed provider kind, or focus one handle"]
+        : ["Use one candidate handle as focus.target.handle"];
     const details = assembleOrientationDetails({
       confidence: "semantic",
       omittedCount: outcome.omittedCount,
       candidates,
-      nextQueries: ["Use one candidate handle as focus.target.handle"],
+      nextQueries,
     });
     return { content: lines.join("\n"), details: { type: "context", data: details } };
   }

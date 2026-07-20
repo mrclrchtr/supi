@@ -1,12 +1,13 @@
 /** Common runtime input-validation primitives for session workflows. */
 
-import type {
-  AnchorTargetInput,
-  ResolveTargetInput,
-  SourcePointInput,
-  SymbolTargetInput,
-  TargetInput,
-  TargetSymbolKind,
+import {
+  type AnchorTargetInput,
+  type ResolveTargetInput,
+  type SourcePointInput,
+  type SymbolTargetInput,
+  TARGET_SYMBOL_KINDS,
+  type TargetInput,
+  type TargetSymbolKind,
 } from "../target-input.ts";
 
 /** A parsed workflow input or an agent-correctable validation error. */
@@ -14,17 +15,7 @@ export type InputValidation<T> =
   | { readonly kind: "valid"; readonly value: T }
   | { readonly kind: "invalid-input"; readonly message: string };
 
-const SYMBOL_KINDS = new Set<TargetSymbolKind>([
-  "symbol",
-  "function",
-  "class",
-  "interface",
-  "type",
-  "variable",
-  "method",
-  "const",
-  "enum",
-]);
+const SYMBOL_KINDS = new Set<TargetSymbolKind>(TARGET_SYMBOL_KINDS);
 
 type TargetBranch = "handle" | "anchor" | "symbol" | "file";
 
@@ -154,7 +145,9 @@ function parseSymbolTarget(value: unknown): InputValidation<SymbolTargetInput> {
   const symbolKind = optionalString(record.value.symbolKind, "target.symbol.symbolKind");
   if (symbolKind.kind === "invalid-input") return symbolKind;
   if (symbolKind.value !== undefined && !SYMBOL_KINDS.has(symbolKind.value as TargetSymbolKind)) {
-    return invalid("target.symbol.symbolKind is not supported.");
+    return invalid(
+      "target.symbol.symbolKind must be a provider-reported LSP SymbolKind; omit it when the provider category is uncertain.",
+    );
   }
   return valid({
     query: query.value,

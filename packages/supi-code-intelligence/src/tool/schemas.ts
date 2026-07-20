@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type TSchema, Type } from "typebox";
+import { TARGET_SYMBOL_KINDS } from "../session/target-input.ts";
 import type { CodeIntelligenceToolName } from "../types/index.ts";
 
 const ScopeParam = Type.String({
@@ -38,10 +39,9 @@ const SymbolTargetParam = Type.Object(
     query: QueryParam,
     scope: Type.Optional(ScopeParam),
     symbolKind: Type.Optional(
-      StringEnum(
-        ["symbol", "function", "class", "interface", "type", "variable", "method", "const", "enum"],
-        { description: "Preferred symbol kind when disambiguating the query." },
-      ),
+      StringEnum(TARGET_SYMBOL_KINDS, {
+        description: "Exact provider-reported LSP SymbolKind filter; omit when uncertain.",
+      }),
     ),
   },
   {

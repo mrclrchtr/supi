@@ -356,14 +356,17 @@ describe("code_health tool", () => {
       details?: {
         type: "health";
         data: {
-          semanticAvailable: boolean;
+          semanticState: { kind: string; reason?: string } | null;
           sections: Array<{ key: string; status: string; provenance: unknown[] }>;
           provenance: Array<{ source: string }>;
         };
       };
     };
 
-    expect(result.details?.data.semanticAvailable).toBe(false);
+    expect(result.details?.data.semanticState).toEqual({
+      kind: "pending",
+      reason: "No active, ready project servers",
+    });
     expect(result.details?.data.sections).toEqual([
       expect.objectContaining({ key: "diagnostics", status: "unavailable", provenance: [] }),
       expect.objectContaining({ key: "servers", status: "complete" }),
@@ -371,7 +374,7 @@ describe("code_health tool", () => {
     expect(result.details?.data.provenance).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ source: "semantic" })]),
     );
-    expect(result.content[0].text).toContain("no active, ready project servers");
+    expect(result.content[0].text).toContain("No active, ready project servers");
     expect(result.content[0].text).toContain("Diagnostics unavailable");
   });
 
@@ -414,12 +417,12 @@ describe("code_health tool", () => {
       content: Array<{ text: string }>;
       details?: {
         type: "health";
-        data: { semanticAvailable: boolean; diagnosticFileCount: number };
+        data: { semanticState: { kind: string } | null; diagnosticFileCount: number };
       };
     };
 
     expect(recoverDiagnostics).toHaveBeenCalledOnce();
-    expect(result.details?.data.semanticAvailable).toBe(true);
+    expect(result.details?.data.semanticState).toEqual({ kind: "ready" });
     expect(result.details?.data.diagnosticFileCount).toBe(1);
     expect(result.content[0].text).toContain("1 file with issues");
   });
@@ -756,9 +759,8 @@ describe("renderHealthResult code actions", () => {
   function makeBaseData(overrides: Partial<HealthData>): HealthData {
     return {
       includedSections: ["diagnostics"],
-      semanticAvailable: false,
+      semanticState: { kind: "unavailable", reason: "unavailable" },
       serverInventoryAvailable: false,
-      lspStatus: "unavailable",
       recovered: false,
       structuralAvailable: false,
       diagnostics: [],
@@ -780,8 +782,7 @@ describe("renderHealthResult code actions", () => {
     ];
 
     const data = makeBaseData({
-      semanticAvailable: true,
-      lspStatus: "ready",
+      semanticState: { kind: "ready" },
       diagnostics: [{ file: "/tmp/src/file.ts", errors: 2, warnings: 0 }],
       codeActions: makeCodeActions(actions),
     });
@@ -797,8 +798,7 @@ describe("renderHealthResult code actions", () => {
 
   it("renders structural readiness in the status line when structuralStatus is set", () => {
     const data = makeBaseData({
-      semanticAvailable: true,
-      lspStatus: "ready",
+      semanticState: { kind: "ready" },
       structuralAvailable: true,
       structuralStatus: "ready",
     });
@@ -810,7 +810,7 @@ describe("renderHealthResult code actions", () => {
   });
 
   it("omits the structural status line when structuralStatus is unset", () => {
-    const data = makeBaseData({ semanticAvailable: true, lspStatus: "ready" });
+    const data = makeBaseData({ semanticState: { kind: "ready" } });
 
     const result = renderHealthResult(assembleHealthResult(data), "/tmp");
 
@@ -843,8 +843,7 @@ describe("renderHealthResult code actions", () => {
 
   it("discloses a partial code-action collection even when it has no suggestions", () => {
     const data = makeBaseData({
-      semanticAvailable: true,
-      lspStatus: "ready",
+      semanticState: { kind: "ready" },
       diagnostics: [{ file: "/tmp/src/file.ts", errors: 1, warnings: 0 }],
       codeActions: makePartialCodeActions([]),
     });

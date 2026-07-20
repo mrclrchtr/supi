@@ -15,7 +15,7 @@ function makeTarget(
     name: null,
     kind: null,
     confidence: "semantic",
-    provenance: ["semantic"],
+    provenance: ["semantic"] as const,
     declarationOccurrence: 0,
     anchorKind: "name" as const,
     container: null,

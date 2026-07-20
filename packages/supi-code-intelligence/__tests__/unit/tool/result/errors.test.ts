@@ -98,8 +98,7 @@ describe("error result factories", () => {
 
       expect(result.content).toBe("msg");
       expect(result.details?.type).toBe("health");
-      expect(data.semanticAvailable).toBe(false);
-      expect(data.lspStatus).toBe("no providers");
+      expect(data.semanticState).toEqual({ kind: "unavailable", reason: "no providers" });
       expect(data.recovered).toBe(false);
       expect(data.diagnosticFileCount).toBe(0);
       expect(data.serverCount).toBe(0);
@@ -109,7 +108,10 @@ describe("error result factories", () => {
       const result = healthErrorResult("upstream failure");
       const data = result.details!.data as HealthDetails;
 
-      expect(data.lspStatus).toBe("upstream failure");
+      expect(data.semanticState).toEqual({
+        kind: "unavailable",
+        reason: "upstream failure",
+      });
     });
   });
 
@@ -153,8 +155,7 @@ describe("error result factories", () => {
       const data = details.data as HealthDetails;
 
       expect(details.type).toBe("health");
-      expect(data.semanticAvailable).toBe(false);
-      expect(data.lspStatus).toBe("no LSP");
+      expect(data.semanticState).toEqual({ kind: "unavailable", reason: "no LSP" });
     });
   });
 });

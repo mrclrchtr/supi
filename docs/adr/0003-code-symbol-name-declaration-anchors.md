@@ -12,7 +12,7 @@
 - Position-strict consumers (`calleesAt`, rename) require a name anchor and fail observably when it cannot be established.
 - Position-tolerant consumers (references, implementations, definitions) may use either anchor.
 - Target-handle identity hashes stable fields (`cwd`, file, name, canonical provider-independent kind, container, declaration line/occurrence, fingerprint), not the preferred display/name-anchor position. The occurrence discriminator keeps overloads distinct while declaration-to-name refinement and equivalent semantic/structural observations reuse the handle.
-- Repeated observations refine anchor quality, confidence, and per-member provider provenance monotonically; a later weaker observation cannot erase a name anchor or a contributing provider.
+- Repeated observations refine anchor quality and confidence monotonically. Target provider provenance is a typed set containing only `semantic` and `structural`; registrations union that set independently of confidence, so a later observation cannot erase a name anchor or contributing provider. Selector and workflow origin are not provider provenance; anchored resolution path remains in its dedicated resolution metadata.
 
 The distinction is big-bang: no deprecated position alias or fallback shape is retained. Vocabulary is pinned in `packages/supi-code-intelligence/CONTEXT.md`.
 

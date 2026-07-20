@@ -30,13 +30,33 @@ _Avoid_: ad-hoc target expansion, mutating search params, treating scope as a ta
 The immutable output of a target workflow: the evidence-backed file, anchor, symbol identity, confidence, provenance, and notes a downstream code-intelligence tool may rely on. A resolved target is not a public parameter bag and should not be changed by downstream tools.
 _Avoid_: expanded params, anonymous point target, mutable target
 
+**Target provider provenance**:
+The monotonic set of provider families—semantic and structural—that established a target declaration. It records corroborating evidence, not selector or workflow origin; anchored resolution path belongs to resolution metadata.
+_Avoid_: strongest source, symbol-query provenance, resolution reason
+
 **Target group**:
 A bounded public collection derived from all evidence-backed declarations discovered within one file when no single symbol was selected, including nested declarations. Discovery retains exact total/omitted completeness, but only visible members are materialized as handles. The group is not itself a Resolved target; downstream precise intents select one member.
 _Avoid_: file handle, synthetic target, unbounded handle batch, treating a file coordinate as a symbol
 
+**Target group discovery provenance**:
+The provider families that successfully enumerated a selected file, including successful empty observations. It describes the group discovery attempt, not the evidence establishing each member.
+_Avoid_: member provenance, group confidence, provider availability
+
+**Target group confidence**:
+A conservative summary of member confidence: semantic only when every member is semantic, and structural when any member is structural-only. For an empty group, it reflects the strongest successful enumerator.
+_Avoid_: strongest member confidence, provider availability, mixed provenance
+
 **Declaration occurrence identity**:
 The provider-independent identity of one declaration within a file: canonical kind, symbolic container, declaration line, and deterministic occurrence among otherwise identical declarations on that line. It distinguishes overloads while remaining stable when semantic evidence replaces structural evidence or a declaration anchor refines to a name anchor.
 _Avoid_: display position identity, raw provider kind, treating all same-name declarations as one target
+
+**Provider-reported symbol kind**:
+The declaration category supplied by the active semantic provider during symbol discovery. It may not map one-to-one to source-language constructs such as type aliases and is not a canonical syntax classification.
+_Avoid_: source declaration kind, canonical kind, syntax kind
+
+**Symbol-kind mismatch**:
+A valid target-selection outcome where a semantic symbol query reports candidates but none has the requested Provider-reported symbol kind. Near-match candidates remain explicit evidence rather than being silently promoted to a Resolved target.
+_Avoid_: symbol not found, invalid input, disambiguation, silent fallback
 
 **LSP-first target resolution**:
 The rule that ready semantic capability is required when a Resolved target or Target group is established or refined. A fresh stored target may still support structural consumers, while semantic consumers require live semantic readiness.
@@ -46,9 +66,9 @@ _Avoid_: structural-only target creation, treating a structural identifier as se
 Runtime facts about LSP state and server inventory. A live runtime owner or explicit disabled state can establish complete inventory status; pending, inactive, or unavailable state cannot establish an empty inventory. Complete inventory may report disabled capability or zero servers and does not imply semantic code evidence.
 _Avoid_: semantic evidence, treating unknown inventory as empty, treating disabled as unknown, inferring capability from runtime presence
 
-**Semantic health availability**:
-Workspace diagnostics are available only when at least one project language server is active and ready; a file-scoped health check may establish a concrete routed client for that file. Runtime or configuration presence alone is insufficient. When diagnostic refresh is requested, recovery runs before this fact is finalized and availability is recomputed afterward.
-_Avoid_: runtime availability, configured-route availability, vacuous readiness, optimistic diagnostics
+**Semantic health state**:
+The authoritative final readiness classification—ready, pending, inactive, disabled, or unavailable—for semantic diagnostics at the requested scope, determined after routing and requested recovery. A concrete ready project or file server establishes readiness even if capability publication lags; server inventory remains a separate fact.
+_Avoid_: runtime availability, capability publication status, configured-route availability, vacuous readiness, optimistic diagnostics
 
 **Honest correctness**:
 The code-intelligence result standard that a tool must either report evidence-backed facts or explicitly say why it cannot. A deterministic convention may locate evidence, but it cannot create a classification, relationship, or claim; heuristic and convention-based inferences are guidance chrome, not Tool evidence. Silent guessing, truncation, scope widening, and fallback to a weaker substrate are incorrect even when they look helpful.
@@ -81,6 +101,10 @@ _Avoid_: silently capped command lists, treating generated actions as evidence f
 **Read-next guidance**:
 A guidance-chrome section in public code-intelligence markdown that points a user or agent to exact source ranges worth inspecting after a summarized result. It is not tool evidence and does not replace reading the source before editing.
 _Avoid_: treating read suggestions as evidence, treating read suggestions as verification commands, hiding source inspection behind summaries
+
+**Next-query guidance**:
+Guidance chrome that proposes a follow-up Tool call. It must be executable from evidence and capabilities established by the current result or explicitly name the unmet prerequisite; it does not establish Tool evidence itself.
+_Avoid_: unconditional follow-up, implicit capability claim, known-failing call
 
 **Evidence atom**:
 One fact that can independently support a coding decision. Evidence-list totals and omitted counts are expressed in evidence atoms, not rendered rows or grouping containers. For example, reference locations count as references even when displayed under grouped file headings, and individual diagnostic messages count as diagnostics even when grouped by file.

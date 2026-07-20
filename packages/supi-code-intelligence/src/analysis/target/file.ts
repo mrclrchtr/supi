@@ -96,15 +96,33 @@ export async function resolveFileTargetGroup(
   }
 
   const targets = mergeDiscoveries(structural.targets, semantic.targets);
+  const discoveryProvenance = [
+    ...(semantic.available ? (["semantic"] as const) : []),
+    ...(structural.available ? (["structural"] as const) : []),
+  ];
   return {
     kind: "resolved",
     group: {
       file: resolvedFile,
       displayName: path.relative(cwd, resolvedFile) || resolvedFile,
       targets,
-      confidence: semantic.available ? "semantic" : "structural",
+      discoveryProvenance,
+      confidence: targetGroupConfidence(targets, discoveryProvenance),
     },
   };
+}
+
+function targetGroupConfidence(
+  targets: readonly ResolvedTargetData[],
+  discoveryProvenance: ResolvedTargetGroupData["discoveryProvenance"],
+): ResolvedTargetGroupData["confidence"] {
+  if (targets.length === 0) {
+    return discoveryProvenance.includes("semantic") ? "semantic" : "structural";
+  }
+  if (targets.some((target) => target.confidence === "unavailable")) return "unavailable";
+  if (targets.some((target) => target.confidence === "heuristic")) return "heuristic";
+  if (targets.some((target) => target.confidence === "structural")) return "structural";
+  return "semantic";
 }
 
 function validateDiscoveryFile(resolvedFile: string, requestedFile: string): string | null {

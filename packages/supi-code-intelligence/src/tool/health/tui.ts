@@ -15,6 +15,7 @@ import {
   type ToolResult,
 } from "../../ui/tui/common.ts";
 import type { CodeHealthToolParams } from "./execute.ts";
+import { formatSemanticHealthState, readSemanticHealthState } from "./semantic-state.ts";
 
 /** ── renderCall ────────────────────────────────────────────────── */
 
@@ -111,9 +112,9 @@ function buildCompactSummary(data: Record<string, unknown> | null, theme: Theme)
     segments.push(theme.fg("success", theme.bold(formatEvidenceEntry(entry))));
   }
   if (semanticRequested) {
-    const lspStatus = readLspStatus(data);
-    const statusColor = lspStatus.startsWith("ready") ? "success" : "warning";
-    segments.push(`${theme.fg("dim", "lsp")} ${theme.fg(statusColor, lspStatus)}`);
+    const semanticStatus = readSemanticStatus(data);
+    const statusColor = semanticStatus.startsWith("ready") ? "success" : "warning";
+    segments.push(`${theme.fg("dim", "lsp")} ${theme.fg(statusColor, semanticStatus)}`);
   }
 
   const dot = theme.fg("dim", "·");
@@ -142,15 +143,17 @@ function buildStatusBar(data: Record<string, unknown> | null, theme: Theme): Tex
   );
   if (!data || !semanticRequested) return new Text("", 0, 0);
 
-  const lspStatus = readLspStatus(data);
+  const semanticStatus = readSemanticStatus(data);
   const structuralStatus = readString(data, "structuralStatus");
   const recovered = data.recovered === true;
 
-  const lspColor = lspStatus.startsWith("ready") ? "success" : "warning";
+  const lspColor = semanticStatus.startsWith("ready") ? "success" : "warning";
   const structuralColor = structuralStatus === "ready" ? "success" : "muted";
 
   const lspLabel =
-    lspStatus.includes("(recovered)") || !recovered ? lspStatus : `${lspStatus} (recovered)`;
+    semanticStatus.includes("(recovered)") || !recovered
+      ? semanticStatus
+      : `${semanticStatus} (recovered)`;
 
   const lines: string[] = [`LSP: ${theme.fg(lspColor, lspLabel)}`];
   if (structuralStatus) {
@@ -227,9 +230,8 @@ function isSectionStatus(value: unknown): value is HealthSectionSummary["status"
   return value === "complete" || value === "partial" || value === "unavailable";
 }
 
-function readLspStatus(data: Record<string, unknown> | null): string {
-  const status = readString(data, "lspStatus") ?? "unknown";
-  return status;
+function readSemanticStatus(data: Record<string, unknown> | null): string {
+  return formatSemanticHealthState(readSemanticHealthState(data?.semanticState));
 }
 
 function readString(data: Record<string, unknown> | null, key: string): string | null {

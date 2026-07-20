@@ -25,6 +25,9 @@ import type { ConfidenceMode } from "@mrclrchtr/supi-code-runtime/api";
  */
 export type AnchorKind = "name" | "declaration";
 
+/** Provider families that contributed evidence to one resolved target. */
+export type TargetProviderProvenance = "semantic" | "structural";
+
 /**
  * A stored resolved target entry with handles and metadata.
  *
@@ -48,7 +51,8 @@ export interface TargetStoreEntry {
   name: string | null;
   kind: string | null;
   confidence: ConfidenceMode;
-  provenance: string;
+  /** Monotonic provider families that established this target. */
+  provenance: readonly TargetProviderProvenance[];
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
   fileFingerprint: string;
@@ -81,7 +85,8 @@ export interface TargetRegistrationInput {
   /** Provider-independent declaration kind used only for stable identity. */
   identityKind?: string;
   confidence: ConfidenceMode;
-  provenance: string;
+  /** Provider families observed by this registration. */
+  provenance: readonly TargetProviderProvenance[];
   /** Which anchor this target carries — drives strict-consumer enforcement (ADR 0003). */
   anchorKind: AnchorKind;
   /** Symbolic container (class/namespace/module name), or null for top-level (ADR 0003 — disambiguates same-file collisions in the identity hash). */
@@ -247,7 +252,7 @@ export function registerWorkflowTarget(
     name: input.name,
     kind: input.kind,
     confidence: input.confidence,
-    provenance: input.provenance,
+    provenance: normalizeProvenance(input.provenance),
     anchorKind: input.anchorKind,
     fileFingerprint: fingerprint,
     container: input.container,
@@ -271,7 +276,7 @@ function mergeTargetRefinement(
   incoming: TargetStoreEntry,
 ): TargetStoreEntry {
   const anchorSource = selectAnchorSource(existing, incoming);
-  const evidenceSource = selectEvidenceSource(existing, incoming);
+  const confidenceSource = selectConfidenceSource(existing, incoming);
 
   return {
     ...existing,
@@ -281,8 +286,8 @@ function mergeTargetRefinement(
     displayCharacter: anchorSource.displayCharacter,
     anchorKind: anchorSource.anchorKind,
     resolution: anchorSource.resolution,
-    confidence: evidenceSource.confidence,
-    provenance: evidenceSource.provenance,
+    confidence: confidenceSource.confidence,
+    provenance: mergeProvenance(existing.provenance, incoming.provenance),
   };
 }
 
@@ -296,20 +301,29 @@ function selectAnchorSource(
   return existing;
 }
 
-function selectEvidenceSource(
+function selectConfidenceSource(
   existing: TargetStoreEntry,
   incoming: TargetStoreEntry,
 ): TargetStoreEntry {
-  const confidenceDelta = confidenceRank(incoming.confidence) - confidenceRank(existing.confidence);
-  if (confidenceDelta > 0) return incoming;
-  if (confidenceDelta < 0) return existing;
-  return provenanceBreadth(incoming.provenance) > provenanceBreadth(existing.provenance)
+  return confidenceRank(incoming.confidence) > confidenceRank(existing.confidence)
     ? incoming
     : existing;
 }
 
-function provenanceBreadth(provenance: string): number {
-  return new Set(provenance.split("+").filter(Boolean)).size;
+const PROVENANCE_ORDER: readonly TargetProviderProvenance[] = ["semantic", "structural"];
+
+function normalizeProvenance(
+  provenance: readonly TargetProviderProvenance[],
+): readonly TargetProviderProvenance[] {
+  const sources = new Set(provenance);
+  return Object.freeze(PROVENANCE_ORDER.filter((source) => sources.has(source)));
+}
+
+function mergeProvenance(
+  existing: readonly TargetProviderProvenance[],
+  incoming: readonly TargetProviderProvenance[],
+): readonly TargetProviderProvenance[] {
+  return normalizeProvenance([...existing, ...incoming]);
 }
 
 function confidenceRank(confidence: ConfidenceMode): number {

@@ -1,6 +1,11 @@
 /** Session-owned workspace health workflow. */
 
-import type { LspRuntimeController, WorkspaceLspRuntime } from "@mrclrchtr/supi-lsp/api";
+import type { CapabilityState } from "@mrclrchtr/supi-code-runtime/api";
+import type {
+  LspRuntimeController,
+  WorkspaceLspRuntime,
+  WorkspaceLspRuntimeState,
+} from "@mrclrchtr/supi-lsp/api";
 import {
   evaluateCoverageWarnings,
   gatherCoverageEvalInput,
@@ -26,6 +31,7 @@ import type {
   HealthSection,
   HealthWorkflowInput,
   HealthWorkflowOutcome,
+  SemanticHealthState,
 } from "./health-types.ts";
 import type { InputValidation } from "./input/common.ts";
 import { parseHealthWorkflowInput } from "./input/health-refactor.ts";
@@ -69,24 +75,29 @@ export async function runHealthWorkflow(
     included,
     scopeFilter,
   });
-  const recovery = await recoverHealthState({
-    semanticRequested: refreshAttempted,
-    runtime,
-    request,
-    lspState,
-    semanticStateKind: capabilityStates.semantic.kind,
-    control,
+  const recovery = await maybeRecover({
+    service: refreshAttempted ? runtime : null,
+    refresh: refreshAttempted,
+    progress: () =>
+      reportProgress(control, {
+        intent: "health",
+        phase: "recovery",
+        message: "Refreshing diagnostics and recovery state",
+      }),
   });
   if (refreshAttempted) deps.trackRefresh();
-  const semanticAvailable = await establishSemanticHealthAvailability(
-    semanticRequested,
+  const semanticState = await establishSemanticHealthState({
+    requested: semanticRequested,
     runtime,
     scopeFilter,
-  );
+    lspState,
+    capabilityState: capabilityStates.semantic,
+  });
+  const semanticReady = semanticState?.kind === "ready";
   throwIfAborted(control);
 
   const diagnostics = await collectDiagnostics(
-    semanticAvailable ? runtime : null,
+    semanticReady ? runtime : null,
     included,
     scopeFilter,
     deps.cwd,
@@ -103,7 +114,7 @@ export async function runHealthWorkflow(
   const codeActions = await collectOptionalCodeActions({
     level,
     included,
-    runtime: semanticAvailable ? runtime : null,
+    runtime: semanticReady ? runtime : null,
     scopeFilter,
     cwd: deps.cwd,
   });
@@ -116,9 +127,8 @@ export async function runHealthWorkflow(
 
   const data: HealthData = {
     includedSections: included,
-    semanticAvailable,
+    semanticState,
     serverInventoryAvailable,
-    lspStatus: displaySemanticStatus(recovery.lspStatus, semanticAvailable),
     recovered: recovery.recovered,
     structuralAvailable: capabilityStates.structural.kind === "ready",
     structuralStatus: describeStructuralState(capabilityStates.structural),
@@ -141,24 +151,68 @@ function healthNeedsSemantic(included: readonly HealthSection[]): boolean {
   return included.includes("diagnostics") || included.includes("servers");
 }
 
-async function establishSemanticHealthAvailability(
-  requested: boolean,
-  runtime: WorkspaceLspRuntime | null,
-  scopeFilter: string | null,
-): Promise<boolean> {
-  if (!requested || !runtime) return false;
-  if (isScopedFile(scopeFilter)) {
-    const readiness = await runtime.waitUntilReadyForFile(scopeFilter);
-    return readiness.kind === "ready";
-  }
-  return runtime
-    .getProjectServers()
-    .some((server) => server.status === "running" && server.ready === true);
+interface SemanticHealthStateOptions {
+  requested: boolean;
+  runtime: WorkspaceLspRuntime | null;
+  scopeFilter: string | null;
+  lspState: WorkspaceLspRuntimeState;
+  capabilityState: CapabilityState;
 }
 
-function displaySemanticStatus(status: string, semanticAvailable: boolean): string {
-  if (semanticAvailable || !status.startsWith("ready")) return status;
-  return "ready — no active, ready project servers";
+async function establishSemanticHealthState(
+  options: SemanticHealthStateOptions,
+): Promise<SemanticHealthState | null> {
+  if (!options.requested) return null;
+  if (options.runtime && isScopedFile(options.scopeFilter)) {
+    const readiness = await options.runtime.waitUntilReadyForFile(options.scopeFilter);
+    if (readiness.kind === "ready") return { kind: "ready" };
+    if (readiness.kind === "timeout") {
+      return { kind: "pending", reason: "File semantic readiness timed out" };
+    }
+    return { kind: "unavailable", reason: readiness.reason };
+  }
+  if (
+    options.runtime
+      ?.getProjectServers()
+      .some((server) => server.status === "running" && server.ready === true)
+  ) {
+    return { kind: "ready" };
+  }
+  return deriveNonReadySemanticState(options.lspState, options.capabilityState);
+}
+
+function deriveNonReadySemanticState(
+  lspState: WorkspaceLspRuntimeState,
+  capabilityState: CapabilityState,
+): Exclude<SemanticHealthState, { kind: "ready" }> {
+  switch (lspState.kind) {
+    case "pending":
+      return { kind: "pending", reason: "LSP is starting" };
+    case "inactive":
+      return { kind: "inactive", reason: "Inactive on the current session branch" };
+    case "disabled":
+      return { kind: "disabled", reason: "Disabled by configuration" };
+    case "unavailable":
+      return { kind: "unavailable", reason: lspState.reason };
+    case "ready":
+      return deriveReadyOwnerWithoutServerState(capabilityState);
+  }
+}
+
+function deriveReadyOwnerWithoutServerState(
+  capabilityState: CapabilityState,
+): Exclude<SemanticHealthState, { kind: "ready" }> {
+  switch (capabilityState.kind) {
+    case "inactive":
+      return { kind: "inactive", reason: "Inactive on the current session branch" };
+    case "disabled":
+      return { kind: "disabled", reason: "Disabled by configuration" };
+    case "unavailable":
+      return { kind: "unavailable", reason: capabilityState.reason };
+    case "pending":
+    case "ready":
+      return { kind: "pending", reason: "No active, ready project servers" };
+  }
 }
 
 async function prepareDiagnosticRefresh(options: {
@@ -177,28 +231,6 @@ async function prepareDiagnosticRefresh(options: {
     }
   }
   return true;
-}
-
-async function recoverHealthState(options: {
-  semanticRequested: boolean;
-  runtime: WorkspaceLspRuntime | null;
-  request: HealthWorkflowInput;
-  lspState: ReturnType<CapabilityAdapter["getLspRuntimeState"]>;
-  semanticStateKind: ReturnType<CapabilityAdapter["getCapabilityStates"]>["semantic"]["kind"];
-  control?: WorkflowControl;
-}): ReturnType<typeof maybeRecover> {
-  return maybeRecover({
-    service: options.semanticRequested ? options.runtime : null,
-    refresh: options.semanticRequested ? options.request.refresh : false,
-    lspState: options.lspState,
-    semanticStateKind: options.semanticStateKind,
-    progress: () =>
-      reportProgress(options.control, {
-        intent: "health",
-        phase: "recovery",
-        message: "Refreshing diagnostics and recovery state",
-      }),
-  });
 }
 
 function collectHealthArtifacts(options: {

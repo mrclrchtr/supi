@@ -152,7 +152,7 @@ describe("canonical Tool result assembly", () => {
           kind: "Function",
           container: null,
           confidence: "semantic",
-          provenance: "workspace-symbol",
+          provenance: ["semantic"] as const,
           anchorKind: "name",
           fileFingerprint: "fp",
         },
@@ -184,7 +184,7 @@ describe("canonical Tool result assembly", () => {
           kind: "Function",
           container: null,
           confidence: "semantic",
-          provenance: "semantic+structural",
+          provenance: ["semantic", "structural"] as const,
           anchorKind: "name",
           fileFingerprint: "fp",
           resolution: {
@@ -205,6 +205,41 @@ describe("canonical Tool result assembly", () => {
     expect(markdown).toContain("Independent workflow note");
   });
 
+  it("assembles a typed symbol-kind mismatch without inventing candidate reasons", () => {
+    const assembly = assembleResolveResult(
+      {
+        kind: "kind-mismatch",
+        requestedKind: "class",
+        candidates: [
+          {
+            targetId: "tg-near",
+            name: "Widget",
+            kind: "Variable",
+            container: null,
+            file: "src/widget.ts",
+            line: 3,
+            character: 7,
+            rank: 1,
+            anchorKind: "name",
+          },
+        ],
+        omittedCount: 0,
+      },
+      "/repo",
+    );
+    const markdown = renderResolveResult(assembly);
+
+    expect(assembly.details).toMatchObject({
+      resultKind: "kind-mismatch",
+      requestedKind: "class",
+      targetCount: 1,
+      candidates: [{ targetId: "tg-near", kind: "Variable" }],
+    });
+    expect(assembly.details.candidates?.[0]).not.toHaveProperty("reason");
+    expect(markdown).toContain("No exact symbol-kind match");
+    expect(markdown).toContain("Retry without `symbolKind`");
+  });
+
   it("assembles a bounded file Target group without synthetic handles", () => {
     const makeTarget = (name: string, line: number) => ({
       targetId: `tg-${name}`,
@@ -217,7 +252,7 @@ describe("canonical Tool result assembly", () => {
       kind: "Function",
       container: null,
       confidence: "semantic" as const,
-      provenance: "semantic+structural",
+      provenance: ["semantic", "structural"] as const,
       anchorKind: "name" as const,
       fileFingerprint: "fp",
     });
@@ -226,6 +261,7 @@ describe("canonical Tool result assembly", () => {
         kind: "target-group",
         file: "/repo/src/a.ts",
         confidence: "semantic",
+        discoveryProvenance: ["semantic", "structural"],
         targets: [makeTarget("one", 1)],
         totalCount: 2,
         omittedCount: 1,
@@ -237,6 +273,7 @@ describe("canonical Tool result assembly", () => {
     expect(assembly.details).toMatchObject({
       resultKind: "target-group",
       groupFile: "src/a.ts",
+      groupDiscoveryProvenance: ["semantic", "structural"],
       targetCount: 2,
       omittedCount: 1,
       targets: [{ targetId: "tg-one" }],

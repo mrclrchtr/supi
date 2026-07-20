@@ -81,7 +81,9 @@ No flat `targetId`, `file`, `line`, `character`, or `symbol` target fields are a
 
 Coordinates are 1-based; `character` is a UTF-16 column. Establishing or refining a target requires ready semantic capability. Tree-sitter may supplement LSP evidence after readiness, but cannot create targets in a structural-only workspace.
 
-A file selector enumerates all provider-reported declarations, including nested declarations, then returns a bounded Target group with exact total/omitted metadata. Only visible members are materialized as handles. Semantic and structural declarations are matched through canonical declaration identity; semantic facts win duplicates while each member reports semantic, structural, or combined provenance. Declaration line/occurrence keeps overload handles distinct without tying identity to the preferred display anchor. The group itself is not a handle; choose one member handle for precise graph or refactor work. A file with no declarations returns a successful empty group.
+`symbolKind` is an optional exact filter over the 26 provider-reported LSP `SymbolKind` values exposed by the tool schema. It is not a source-language classifier: for example, LSP has no `TypeAlias` kind and TypeScript may report a type alias as `Variable`. Omit the filter when the provider category is uncertain. If a symbol query reports candidates but none has the requested kind, the result returns a bounded Symbol-kind mismatch with observed candidate kinds and handles rather than claiming the symbol was not found or silently promoting a mismatch.
+
+A file selector enumerates all provider-reported declarations, including nested declarations, then returns a bounded Target group with exact total/omitted metadata. Only visible members are materialized as handles. Semantic and structural declarations are matched through canonical declaration identity; semantic facts win duplicates while each member retains a typed, monotonic set of contributing provider families. The group separately reports successful discovery providers. Its aggregate confidence is conservative across the complete group—semantic only when every member is semantic—while an empty group derives confidence from its strongest successful enumerator. Declaration line/occurrence keeps overload handles distinct without tying identity to the preferred display anchor. The group itself is not a handle; choose one member handle for precise graph or refactor work. A file with no declarations returns a successful empty group.
 
 ### Handle lifecycle
 
@@ -138,7 +140,7 @@ code_inspect({
 })
 ```
 
-Point inspection may include syntax, an enclosing symbol, hover/type facts, definitions, nearby diagnostics, and code-action titles. It does not invent heuristic substitutes when every required substrate is unavailable.
+Point inspection may include syntax, an enclosing symbol, hover/type facts, definitions, nearby diagnostics, and code-action titles. It does not invent heuristic substitutes when every required substrate is unavailable. Relationship guidance is emitted only from an evidence-backed definition location: resolve that definition first, then use its handle with `code_graph`. Structural-only inspection does not recommend a fresh graph anchor that LSP-first target establishment would reject.
 
 ### Search explicitly
 
@@ -231,7 +233,7 @@ Detected language servers start concurrently. In polyglot workspaces, disable un
 }
 ```
 
-The old global `lsp.enabled` and `lsp.active` keys are deprecated and ignored. Missing binaries, disabled languages, and structural startup failures appear in `/supi-ci-status` and `code_health`. If every language-server definition is disabled, the LSP runtime publishes an explicit disabled state and semantic capability remains unavailable. A ready runtime owner may have only lazy routes: server inventory remains status evidence, while diagnostics require an active ready project server or successful file-scoped readiness. `refresh: true` attempts recovery before that availability decision is finalized.
+The old global `lsp.enabled` and `lsp.active` keys are deprecated and ignored. Missing binaries, disabled languages, and structural startup failures appear in `/supi-ci-status` and `code_health`. If every language-server definition is disabled, the LSP runtime publishes an explicit disabled state and semantic capability remains unavailable. A ready runtime owner may have only lazy routes: server inventory remains status evidence, while diagnostics require an active ready project server or successful file-scoped readiness. `refresh: true` attempts recovery before the final Semantic health state is derived. Public health details expose one authoritative `semanticState` (`ready`, `pending`, `inactive`, `disabled`, or `unavailable`) rather than an independently computed boolean/status pair.
 
 ## Architecture
 

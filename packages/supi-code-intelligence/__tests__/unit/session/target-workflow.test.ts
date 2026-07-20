@@ -122,7 +122,7 @@ describe("target-workflow (deep session seam)", () => {
         name: "x",
         kind: "const",
         confidence: "semantic",
-        provenance: "test",
+        provenance: ["semantic"] as const,
         anchorKind: "name",
         container: null,
       });
@@ -151,7 +151,7 @@ describe("target-workflow (deep session seam)", () => {
         name: "x",
         kind: "const",
         confidence: "semantic",
-        provenance: "test",
+        provenance: ["semantic"] as const,
         anchorKind: "name",
         container: null,
       });
@@ -206,7 +206,7 @@ describe("target-workflow (deep session seam)", () => {
         name: "foo",
         kind: "Function",
         confidence: "semantic",
-        provenance: "test",
+        provenance: ["semantic"] as const,
         anchorKind: "declaration",
         container: null,
       });
@@ -236,7 +236,7 @@ describe("target-workflow (deep session seam)", () => {
         name: "foo",
         kind: "Function",
         confidence: "semantic",
-        provenance: "test",
+        provenance: ["semantic"] as const,
         anchorKind: "name",
         container: null,
       });
@@ -416,7 +416,7 @@ describe("target-workflow (deep session seam)", () => {
         expect(outcome.file).toContain("src/mod.ts");
         expect(outcome.targets).toHaveLength(1);
         expect(outcome.targets[0]?.name).toBe("x");
-        expect(outcome.targets[0]?.provenance).toBe("structural");
+        expect(outcome.targets[0]?.provenance).toEqual(["structural"]);
         expect(outcome.targets[0]?.position).not.toEqual({ line: 0, character: 0 });
       }
     });
@@ -453,7 +453,10 @@ describe("target-workflow (deep session seam)", () => {
       if (outcome.kind !== "target-group") return;
       expect(new Set(outcome.targets.map((target) => target.targetId))).toHaveLength(2);
       expect(outcome.targets.map((target) => target.displayLine)).toEqual([1, 1]);
-      expect(outcome.targets.map((target) => target.provenance)).toEqual(["semantic", "semantic"]);
+      expect(outcome.targets.map((target) => target.provenance)).toEqual([
+        ["semantic"],
+        ["semantic"],
+      ]);
 
       const anchored = await resolveTargetWorkflow(
         { anchor: { file: "src/mod.ts", line: 1, character: 47 } },
@@ -512,7 +515,7 @@ describe("target-workflow (deep session seam)", () => {
       expect(refined.targets[0]).toMatchObject({
         anchorKind: "name",
         confidence: "semantic",
-        provenance: "semantic+structural",
+        provenance: ["semantic", "structural"] as const,
       });
     });
 

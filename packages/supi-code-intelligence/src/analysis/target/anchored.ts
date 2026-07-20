@@ -195,7 +195,6 @@ function candidatesFromSymbols(
       character: a.character,
       declarationAnchor: { ...s.declarationAnchor },
       declarationOccurrence,
-      reason: `${a.line}:${a.character}`,
       rank: idx + 1,
       anchorKind: (s.nameAnchor ? "name" : "declaration") as AnchorKind,
     } satisfies DisambiguationCandidateData;

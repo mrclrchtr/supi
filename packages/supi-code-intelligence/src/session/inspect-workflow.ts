@@ -119,11 +119,33 @@ export async function runInspectWorkflow(
   return {
     kind: "completed",
     data,
-    nextQueries: Object.freeze([
-      `Use code_graph with target.anchor at ${relPath}:${point.line}:${point.character} for relationships`,
-      `Use code_orientation with focus.path "${relPath}" for broader orientation`,
-    ]),
+    nextQueries: Object.freeze(buildInspectNextQueries(relPath, definitions, semanticReady)),
   };
+}
+
+function buildInspectNextQueries(
+  relPath: string,
+  definitions: InspectResultData["definitions"],
+  semanticReady: boolean,
+): string[] {
+  const queries: string[] = [];
+  const definition = definitions[0];
+  if (semanticReady && definition) {
+    const anchor = JSON.stringify({
+      file: definition.file,
+      line: definition.line,
+      character: definition.character,
+    });
+    queries.push(
+      `Use code_resolve with target.anchor ${anchor}, then code_graph with the returned handle`,
+    );
+  } else if (!semanticReady) {
+    queries.push(
+      `Use code_health with scope "${relPath}", refresh true, and include ["diagnostics","servers"] before semantic target or graph work`,
+    );
+  }
+  queries.push(`Use code_orientation with focus.path "${relPath}" for broader orientation`);
+  return queries;
 }
 
 function mapDefinitions(

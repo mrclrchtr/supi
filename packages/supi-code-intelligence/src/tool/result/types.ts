@@ -3,8 +3,13 @@ import type { EvidenceListMetadata } from "../../analysis/evidence.ts";
 import type { InstructionFilesMetadata } from "../../analysis/instruction-files.ts";
 import type { ReadNextItem } from "../../analysis/read-next.ts";
 import type { PrioritySignalsSummary } from "../../analysis/signals/project.ts";
-import type { HealthSection } from "../../session/health-types.ts";
-import type { AnchorKind, TargetStoreEntry } from "../../session/target-store.ts";
+import type { HealthSection, SemanticHealthState } from "../../session/health-types.ts";
+import type { TargetSymbolKind } from "../../session/target-input.ts";
+import type {
+  AnchorKind,
+  TargetProviderProvenance,
+  TargetStoreEntry,
+} from "../../session/target-store.ts";
 import type { ResultProvenance } from "./assembly.ts";
 
 // ── Anchored coordinate resolution metadata ───────────────────────────
@@ -70,9 +75,19 @@ export type { DisambiguationCandidateData as DisambiguationCandidate } from "../
 
 /** Structured details metadata for code_resolve results. */
 export interface ResolveDetails {
-  resultKind: "resolved" | "target-group" | "disambiguation" | "invalid-input" | "unavailable";
+  resultKind:
+    | "resolved"
+    | "target-group"
+    | "disambiguation"
+    | "kind-mismatch"
+    | "invalid-input"
+    | "unavailable";
   /** Workspace-relative source file for a file-derived Target group. */
   groupFile?: string;
+  /** Providers that successfully enumerated a file-derived Target group. */
+  groupDiscoveryProvenance?: readonly TargetProviderProvenance[];
+  /** Strict provider kind that produced a near-match result. */
+  requestedKind?: TargetSymbolKind;
   confidence: ConfidenceMode;
   targetCount: number;
   omittedCount: number;
@@ -90,7 +105,7 @@ export interface ResolveDetails {
     container: string | null;
     anchorKind: AnchorKind;
     confidence: ConfidenceMode;
-    provenance: string;
+    provenance: readonly TargetProviderProvenance[];
     /** Resolution provenance — present when the target was resolved from anchored coordinates. */
     resolution?: AnchoredResolutionMetadata;
   }>;
@@ -103,7 +118,6 @@ export interface ResolveDetails {
     file: string;
     line: number;
     character: number;
-    reason: string;
     rank: number;
     anchorKind: AnchorKind;
   }>;
@@ -126,14 +140,14 @@ export interface ContextDetails {
   instructions?: InstructionFilesMetadata;
   /**
    * Resolved target store entry — populated for both coordinate and targetId
-   * precise-target inputs. Absent for orientation/scope-only calls and for
-   * ambiguous coordinate resolution (see `candidates`).
+   * precise-target inputs. Absent for orientation/scope-only calls and when
+   * target selection remains ambiguous or has a Symbol-kind mismatch.
    * File paths are absolute; compute relative paths at render time.
    */
   target?: TargetStoreEntry;
   /**
-   * Disambiguation candidates with targetIds — populated only when coordinate
-   * resolution was ambiguous. No task sections are rendered in that case.
+   * Bounded candidates with targetIds when target selection is ambiguous or
+   * has a Symbol-kind mismatch. No task sections are rendered in that case.
    */
   candidates?: Array<{
     targetId: string;
@@ -177,9 +191,8 @@ export interface HealthDetails {
   provenance: ResultProvenance[];
   candidateCount: number;
   omittedCount: number;
-  semanticAvailable: boolean;
+  semanticState: SemanticHealthState | null;
   serverInventoryAvailable: boolean;
-  lspStatus: string;
   recovered: boolean;
   structuralAvailable: boolean;
   /** Structural (tree-sitter) substrate readiness. Undefined when not evaluated. */

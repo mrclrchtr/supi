@@ -200,6 +200,73 @@ describe("resolveSymbolTarget", () => {
     }
   });
 
+  it("uses symbolKind as an exact provider-kind filter", async () => {
+    const result = await resolveSymbolTarget(
+      "Widget",
+      "/project",
+      {
+        workspaceSymbols: vi.fn().mockResolvedValue([
+          {
+            name: "Widget",
+            kind: "Class",
+            file: "/project/src/class.ts",
+            declarationAnchor: { line: 1, character: 1 },
+            container: null,
+          },
+          {
+            name: "Widget",
+            kind: "Variable",
+            file: "/project/src/value.ts",
+            declarationAnchor: { line: 2, character: 3 },
+            container: null,
+          },
+        ]),
+      } as unknown as SemanticSubstrate,
+      { kind: "variable" },
+    );
+
+    expect(result).toMatchObject({
+      kind: "resolved",
+      target: { file: "/project/src/value.ts", kind: "Variable" },
+    });
+  });
+
+  it("returns bounded query-candidate evidence when no provider kind matches", async () => {
+    const result = await resolveSymbolTarget(
+      "Widget",
+      "/project",
+      {
+        workspaceSymbols: vi.fn().mockResolvedValue([
+          {
+            name: "Widget",
+            kind: "Variable",
+            file: "/project/src/a.ts",
+            declarationAnchor: { line: 1, character: 1 },
+            container: null,
+          },
+          {
+            name: "Widget",
+            kind: "Interface",
+            file: "/project/src/b.ts",
+            declarationAnchor: { line: 2, character: 1 },
+            container: null,
+          },
+        ]),
+      } as unknown as SemanticSubstrate,
+      { kind: "class", maxResults: 1 },
+    );
+
+    expect(result).toMatchObject({
+      kind: "kind-mismatch",
+      requestedKind: "class",
+      candidates: [{ name: "Widget", kind: "Variable", rank: 1 }],
+      omittedCount: 1,
+    });
+    if (result.kind === "kind-mismatch") {
+      expect(result.candidates[0]).not.toHaveProperty("reason");
+    }
+  });
+
   // Tracer bullet for ADR 0003 — see docs/adr/0003-code-symbol-name-declaration-anchors.md
   it("refines ambiguous-symbol disambiguation candidates to the identifier (name) anchor, not the declaration (export) anchor", async () => {
     // Workspace symbols mimic toCodeSymbol (LSP SymbolInformation): only a

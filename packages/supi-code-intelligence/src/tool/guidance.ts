@@ -16,7 +16,7 @@ export type CodeIntelligenceToolPromptSurfaceMap = Record<
 export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptSurfaceMap = {
   code_resolve: {
     description:
-      "Resolve exactly one evidence-backed target source. target accepts one key: anchor ({file,line,character}), symbol ({query,scope?,symbolKind?}), or file. Anchor/symbol selectors return handles; a file selector enumerates all declarations but materializes handles only for a bounded Target group with exact omission metadata and per-member provenance. Overloads remain distinct. Anchors snap only to real provider-backed symbols; symbol lookup never falls back to text search. Target establishment requires a concrete ready LSP client.",
+      "Resolve exactly one evidence-backed target source. target accepts one key: anchor ({file,line,character}), symbol ({query,scope?,symbolKind?}), or file. symbolKind is an exact provider-reported LSP kind filter; mismatches return bounded near-match handles with exact omission metadata. Anchor/symbol selectors return handles; a file selector enumerates all declarations but materializes handles only for a bounded Target group with exact omission metadata, discovery provenance, and per-member provider provenance. Overloads remain distinct. Anchors snap only to real provider-backed symbols; symbol lookup never falls back to text search. Target establishment requires a concrete ready LSP client.",
     promptSnippet: "code_resolve — resolve a precise target or enumerate a file’s target group",
     promptGuidelines: [
       "Use code_resolve when a symbol query may be ambiguous, when later calls should share a stable target handle, or when a known file’s declarations should be enumerated.",
@@ -54,7 +54,7 @@ export const CODE_INTELLIGENCE_TOOL_PROMPT_SURFACES: CodeIntelligenceToolPromptS
   },
   code_health: {
     description:
-      "Report diagnostics, language-server status, semantic availability, dirty files, coverage, and unused-code evidence. scope/include/level narrow the report; refresh:true attempts diagnostic recovery before availability is finalized. Server inventory is status evidence, not proof that semantic operations are available; unavailable inventory is not reported as empty. Default coverage and unused paths are evidence locators only: a miss means unavailable at that location, not global absence.",
+      "Report diagnostics, language-server status, final semantic health state, dirty files, coverage, and unused-code evidence. scope/include/level narrow the report; refresh:true attempts diagnostic recovery before semantic state is finalized. Server inventory is status evidence, not proof that semantic operations are ready; unavailable inventory is not reported as empty. Default coverage and unused paths are evidence locators only: a miss means unavailable at that location, not global absence.",
     promptSnippet: "code_health — workspace diagnostics and maintenance evidence",
     promptGuidelines: [
       "Use code_health with refresh:true before relying on potentially stale diagnostics.",

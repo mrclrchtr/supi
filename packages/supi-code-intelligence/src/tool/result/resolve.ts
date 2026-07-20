@@ -76,7 +76,8 @@ function projectResolveOutcome(outcome: TargetWorkflowOutcome, cwd: string): Res
     case "target-group":
       return projectTargetGroup(outcome, cwd);
     case "disambiguation":
-      return projectDisambiguation(outcome);
+    case "kind-mismatch":
+      return projectCandidateOutcome(outcome);
     case "invalid-input":
     case "unavailable":
       return projectFailure(outcome.kind);
@@ -129,6 +130,7 @@ function projectTargetGroup(
     details: {
       resultKind: "target-group",
       groupFile: relative(cwd, outcome.file) || outcome.file,
+      groupDiscoveryProvenance: [...outcome.discoveryProvenance],
       confidence: outcome.confidence,
       targetCount: outcome.totalCount,
       omittedCount: evidence.metadata.omittedCount,
@@ -142,8 +144,8 @@ function projectTargetGroup(
   };
 }
 
-function projectDisambiguation(
-  outcome: Extract<TargetWorkflowOutcome, { kind: "disambiguation" }>,
+function projectCandidateOutcome(
+  outcome: Extract<TargetWorkflowOutcome, { kind: "disambiguation" | "kind-mismatch" }>,
 ): ResolveProjection {
   const totalCount = outcome.candidates.length + outcome.omittedCount;
   const evidence: EvidenceListMetadata = {
@@ -153,15 +155,17 @@ function projectDisambiguation(
     omittedCount: outcome.omittedCount,
     partialReason: null,
   };
+  const mismatch = outcome.kind === "kind-mismatch";
   return {
     key: "resolve.candidates",
-    title: "Candidates",
+    title: mismatch ? "Near matches" : "Candidates",
     status: "complete",
     items: outcome.candidates,
     confidence: "semantic",
     evidence,
     details: {
-      resultKind: "disambiguation",
+      resultKind: outcome.kind,
+      ...(mismatch ? { requestedKind: outcome.requestedKind } : {}),
       confidence: "semantic",
       targetCount: totalCount,
       omittedCount: outcome.omittedCount,
@@ -175,13 +179,12 @@ function projectDisambiguation(
         file: candidate.file,
         line: candidate.line,
         character: candidate.character,
-        reason: candidate.file,
         rank: candidate.rank,
         anchorKind: candidate.anchorKind,
       })),
-      nextQueries: [
-        "Choose one candidate handle, or narrow the symbol selector with scope or symbolKind",
-      ],
+      nextQueries: mismatch
+        ? ["Retry without symbolKind, use an observed provider kind, or choose a near-match handle"]
+        : ["Choose one candidate handle, or narrow the symbol selector with scope or symbolKind"],
     },
   };
 }
@@ -220,20 +223,20 @@ function toTargetDetails(target: Readonly<TargetStoreEntry>, cwd: string) {
     container: target.container,
     anchorKind: target.anchorKind,
     confidence: target.confidence,
-    provenance: target.provenance,
+    provenance: [...target.provenance],
     resolution: target.resolution,
   };
 }
 
 function resolveProvenance(outcome: TargetWorkflowOutcome): ResultProvenance[] {
-  const entries =
-    outcome.kind === "resolved"
-      ? [outcome.entry]
-      : outcome.kind === "target-group"
-        ? outcome.targets
-        : [];
-  const sources = new Set(entries.map((entry) => entry.confidence));
-  if (outcome.kind === "target-group" && entries.length === 0) sources.add(outcome.confidence);
+  const sources = new Set<"semantic" | "structural">();
+  if (outcome.kind === "resolved") {
+    for (const source of outcome.entry.provenance) sources.add(source);
+  } else if (outcome.kind === "target-group") {
+    for (const source of outcome.discoveryProvenance) sources.add(source);
+  } else if (outcome.kind === "disambiguation" || outcome.kind === "kind-mismatch") {
+    sources.add("semantic");
+  }
   return [
     ...(sources.has("semantic")
       ? [{ source: "semantic" as const, detail: "target-workflow" }]

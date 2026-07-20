@@ -18,6 +18,7 @@ export type {
   HealthSection,
   HealthServerInfo,
   HealthUnusedData,
+  SemanticHealthState,
 } from "../../session/health-types.ts";
 export type { HealthSectionDetails } from "./types.ts";
 
@@ -65,9 +66,8 @@ export function assembleHealthResult(data: HealthData): HealthResultAssembly {
       provenance: [...assembled.provenance],
       candidateCount: assembled.totals.candidateCount,
       omittedCount: assembled.totals.omittedCount,
-      semanticAvailable: data.semanticAvailable,
+      semanticState: data.semanticState,
       serverInventoryAvailable: data.serverInventoryAvailable,
-      lspStatus: data.lspStatus,
       recovered: data.recovered,
       structuralAvailable: structuralCapabilityReady(data),
       structuralStatus: data.structuralStatus,
@@ -134,13 +134,15 @@ function projectSection(
 
 function collectSectionFacts(key: HealthSection, data: HealthData): HealthSectionFacts {
   switch (key) {
-    case "diagnostics":
+    case "diagnostics": {
+      const available = semanticHealthReady(data);
       return {
-        available: data.semanticAvailable,
+        available,
         items: data.diagnostics,
         confidence: "semantic",
-        provenance: data.semanticAvailable ? [{ source: "semantic", capability: "LSP" }] : [],
+        provenance: available ? [{ source: "semantic", capability: "LSP" }] : [],
       };
+    }
     case "servers":
       return {
         available: data.serverInventoryAvailable,
@@ -190,6 +192,11 @@ function collectSectionFacts(key: HealthSection, data: HealthData): HealthSectio
         locator: data.unused?.reportPath,
       };
   }
+}
+
+/** Accept only the explicit ready state; arbitrary status text is not provenance. */
+function semanticHealthReady(data: HealthData): boolean {
+  return data.semanticState?.kind === "ready";
 }
 
 /** Accept only the explicit ready state; arbitrary status text is not provenance. */

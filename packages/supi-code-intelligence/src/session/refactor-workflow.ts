@@ -73,7 +73,7 @@ export async function runRefactorPlanWorkflow(
       message: "Refactor planning requires one member handle from a Target group.",
     };
   }
-  if (target.kind === "disambiguation") {
+  if (target.kind === "disambiguation" || target.kind === "kind-mismatch") {
     return {
       kind: "invalid-input",
       message: "Refactor planning requires one precise target handle or anchor.",
